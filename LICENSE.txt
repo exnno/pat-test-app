@@ -1,0 +1,6 @@
+Copyright (c) 2026 Peter [Surname]. All rights reserved.
+
+This software and associated files are the proprietary work of the author.
+No permission is granted to use, copy, modify, distribute, or create derivative
+works of this software, in whole or in part, without the express written
+permission of the author.
