@@ -1,4 +1,9 @@
-* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+/*!
+ * PAT Test PWA
+ * Copyright (c) 2026 Peter [Your Surname]. All rights reserved.
+ * Unauthorised use, reproduction, or distribution prohibited.
+ * See LICENSE.txt for full terms.
+ */* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
   margin: 0;
   padding: 0;
