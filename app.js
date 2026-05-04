@@ -369,7 +369,7 @@ function renderSettings() {
       <p class="muted">One per line. Up to 8. These appear as quick-tap buttons on the entry screen.</p>
       <textarea class="textarea" id="settings-types" style="min-height:200px">${escapeHTML(state.itemTypes.join('\n'))}</textarea>
       <button class="btn-primary" id="settings-save" style="margin-top:16px">Save</button>
-      <p class="muted" style="margin-top:24px;font-size:12px">PAT Test · Offline PWA · Data stored on this device only</p>
+      <p class="muted" style="margin-top:24px;font-size:12px">PAT Test · © 2026 Peter Birchley· Data stored on this device only</p>
     </div>
   `;
 }
