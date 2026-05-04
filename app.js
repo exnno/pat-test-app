@@ -1,4 +1,9 @@
-// ============== PAT Test PWA ==============
+/*!
+ * PAT Test PWA
+ * Copyright (c) 2026 Peter Birchley. All rights reserved.
+ * Unauthorised use, reproduction, or distribution prohibited.
+ * See LICENSE.txt for full terms.
+ */// ============== PAT Test PWA ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
 const STORAGE_KEY = 'pat:sessions';
