@@ -1,9 +1,11 @@
 /*!
  * PAT Test PWA
- * Copyright (c) 2026 Peter [Your Surname]. All rights reserved.
+ * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
- */* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+ */
+
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body {
   margin: 0;
   padding: 0;
@@ -41,17 +43,63 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .input-big { width: 100%; padding: 14px 16px; font-size: 18px; font-weight: 600; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; }
 .textarea { width: 100%; padding: 12px 14px; font-size: 15px; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; resize: vertical; min-height: 60px; }
 
+/* (#6) 3x3 grid for up to 9 quick-pick items */
 .quick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .quick-btn { padding: 14px 4px; font-size: 14px; font-weight: 600; border: 1px solid #d1d5db; border-radius: 8px; background: #fff; color: #374151; }
 .quick-btn.active { background: #2563eb; color: #fff; border-color: #2563eb; }
 
+/* (#7) Custom type input + autocomplete suggestions */
+.custom-type-wrap { position: relative; }
+.suggestions {
+  position: absolute;
+  top: 100%; left: 0; right: 0;
+  background: #fff;
+  border: 1px solid #d1d5db;
+  border-top: none;
+  border-radius: 0 0 8px 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  z-index: 20;
+  max-height: 220px;
+  overflow-y: auto;
+}
+.suggestion-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 12px 14px;
+  background: #fff;
+  border: none;
+  border-bottom: 1px solid #f3f4f6;
+  font-size: 15px;
+  color: #111827;
+}
+.suggestion-item:last-child { border-bottom: none; }
+.suggestion-item:active { background: #eff6ff; }
+
 .notes-toggle { background: transparent; border: none; color: #2563eb; font-size: 13px; font-weight: 600; padding: 8px 0; margin-top: 4px; text-align: left; display: block; }
 
-.pass-fail-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 22px; }
+/* (#10) Pass/Fail 75/25 split, same height */
+.pass-fail-row { display: grid; grid-template-columns: 3fr 1fr; gap: 10px; margin-top: 22px; }
 .pass-btn { padding: 26px 0; font-size: 22px; font-weight: 800; letter-spacing: 0.05em; background: #16a34a; color: #fff; border: none; border-radius: 12px; box-shadow: 0 2px 0 #15803d; }
-.fail-btn { padding: 26px 0; font-size: 22px; font-weight: 800; letter-spacing: 0.05em; background: #dc2626; color: #fff; border: none; border-radius: 12px; box-shadow: 0 2px 0 #b91c1c; }
+.fail-btn { padding: 26px 0; font-size: 18px; font-weight: 800; letter-spacing: 0.05em; background: #dc2626; color: #fff; border: none; border-radius: 12px; box-shadow: 0 2px 0 #b91c1c; }
 .pass-btn:active, .fail-btn:active { transform: translateY(1px); }
-.pass-btn .icon, .fail-btn .icon { display: block; font-size: 28px; margin-bottom: 4px; }
+.pass-btn .icon { display: block; font-size: 28px; margin-bottom: 4px; }
+.fail-btn .icon { display: block; font-size: 22px; margin-bottom: 4px; }
+
+/* (#8) Copy-last button: full-width, secondary styling */
+.copy-last-btn {
+  width: 100%;
+  margin-top: 10px;
+  padding: 14px 12px;
+  font-size: 15px;
+  font-weight: 600;
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+}
+.copy-last-btn:active { background: #dbeafe; }
+.copy-last-btn:disabled { background: #f3f4f6; color: #9ca3af; border-color: #e5e7eb; }
 
 .nav-row { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; gap: 8px; }
 .nav-btn { display: inline-flex; align-items: center; gap: 4px; padding: 10px 14px; background: #fff; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; font-weight: 600; color: #374151; }
@@ -79,7 +127,3 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .td { padding: 10px 8px; border-bottom: 1px solid #f3f4f6; }
 .td-result { font-weight: 700; }
 .td-action { width: 36px; text-align: center; color: #9ca3af; }
-
-.install-banner { background: #2563eb; color: #fff; padding: 10px 14px; display: flex; align-items: center; gap: 10px; font-size: 14px; }
-.install-banner button { margin-left: auto; padding: 6px 12px; background: #fff; color: #2563eb; border: none; border-radius: 6px; font-weight: 700; font-size: 13px; }
-.install-banner .dismiss { background: transparent; color: #fff; padding: 6px; }
