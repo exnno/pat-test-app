@@ -1,6 +1,6 @@
 // Service worker — caches app shell for full offline use.
 // Bump CACHE_VERSION when you change app files to force update.
-const CACHE_VERSION = 'pat-v3';
+const CACHE_VERSION = 'pat-v4';
 const ASSETS = [
   './',
   './index.html',
