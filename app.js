@@ -9,7 +9,7 @@
 // ============== PAT Test PWA — v4 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V4';
+const APP_VERSION = 'V5';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -214,33 +214,39 @@ function sortedSessions() {
 }
 
 // ---------- Haptics ----------
-// Triggers haptic feedback. iOS 17.4–26.4: uses the <input type="checkbox" switch> toggle trick.
-// iOS 26.5+: Apple patched it — silently no-op there. Android: navigator.vibrate.
+// Triggers haptic feedback. iOS 17.4–26.4: uses the <input type="checkbox" switch>
+// trick — wrapped in a hidden <label>, clicking the LABEL fires the Taptic Engine.
+// iOS 26.5+: Apple patched it. Android: navigator.vibrate.
 // Counts: 1 = pass, 2 = copy, 3 = fail.
+function _hapticOnce() {
+  try {
+    const labelEl = document.createElement('label');
+    labelEl.setAttribute('aria-hidden', 'true');
+    labelEl.style.display = 'none';
+    const inputEl = document.createElement('input');
+    inputEl.type = 'checkbox';
+    inputEl.setAttribute('switch', '');
+    labelEl.appendChild(inputEl);
+    document.head.appendChild(labelEl);
+    labelEl.click();
+    document.head.removeChild(labelEl);
+  } catch {}
+}
+
 function haptic(count) {
-  // Android (and any browser that supports vibrate)
+  // Android first — if vibrate is implemented, use it and stop.
+  // iOS Safari does not implement navigator.vibrate, so this is skipped on iOS.
   if (navigator.vibrate) {
-    if (count === 1) navigator.vibrate(25);
-    else if (count === 2) navigator.vibrate([25, 70, 25]);
-    else if (count === 3) navigator.vibrate([25, 70, 25, 70, 25]);
+    if (count === 1) navigator.vibrate(50);
+    else if (count === 2) navigator.vibrate([50, 70, 50]);
+    else if (count === 3) navigator.vibrate([50, 70, 50, 70, 50]);
+    return;
   }
-  // iOS via switch input toggle
-  let remaining = count;
-  function fire() {
-    if (remaining <= 0) return;
-    const sw = document.createElement('input');
-    sw.type = 'checkbox';
-    sw.setAttribute('switch', '');
-    sw.style.cssText = 'position:fixed;left:-9999px;top:0;opacity:0;pointer-events:none;';
-    document.body.appendChild(sw);
-    requestAnimationFrame(() => {
-      try { sw.click(); } catch {}
-      setTimeout(() => sw.remove(), 30);
-    });
-    remaining--;
-    if (remaining > 0) setTimeout(fire, 90);
-  }
-  fire();
+  // iOS — fire haptics synchronously inside the user-gesture context.
+  // Subsequent haptics fire 120ms apart via setTimeout.
+  _hapticOnce();
+  if (count >= 2) setTimeout(_hapticOnce, 120);
+  if (count >= 3) setTimeout(_hapticOnce, 240);
 }
 
 // ---------- CSV ----------
