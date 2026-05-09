@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA
- * v4 (May 2026)
+ * v6 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -256,19 +256,108 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   line-height: 1.2;
 }
 .fail-reason-btn:active { background: #fee2e2; }
-.fail-skip-btn {
+
+/* Settings sections spacing */
+.settings-section + .settings-section { margin-top: 28px; }
+.settings-section h2 { margin-top: 0; }
+
+/* ===== v6 additions ===== */
+
+/* Progress row with inline delete bin (entry screen) */
+.progress-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 8px 0 14px;
+  gap: 8px;
+}
+.progress-row .progress {
+  margin: 0;
+  flex: 1;
+  min-width: 0;
+}
+.del-icon-top {
+  background: transparent;
+  border: none;
+  color: #dc2626;
+  font-size: 18px;
+  padding: 6px 10px;
+  border-radius: 6px;
+  line-height: 1;
+}
+.del-icon-top:active { background: #fef2f2; }
+
+/* 3-button nav row (Prev / Skip-to-new / Next) — equal widths so it stays balanced */
+.nav-row .nav-btn {
+  flex: 1;
+  justify-content: center;
+}
+
+/* Overview filter row: search box stacked above fails-only toggle */
+.overview-filters {
+  margin: 12px 0 8px;
+}
+.search-input {
+  width: 100%;
+  padding: 10px 14px;
+  font-size: 15px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  margin-bottom: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.search-input::-webkit-search-cancel-button {
+  -webkit-appearance: searchfield-cancel-button;
+  appearance: searchfield-cancel-button;
+}
+
+/* Fail modal stage 1: full-width "Other..." button replacing old Skip */
+.fail-other-btn {
   width: 100%;
   padding: 14px;
   font-size: 14px;
   font-weight: 600;
   background: #f3f4f6;
-  color: #6b7280;
+  color: #374151;
   border: 1px solid #e5e7eb;
   border-radius: 10px;
   margin-top: 4px;
 }
-.fail-skip-btn:active { background: #e5e7eb; }
+.fail-other-btn:active { background: #e5e7eb; }
 
-/* Settings sections spacing */
-.settings-section + .settings-section { margin-top: 28px; }
-.settings-section h2 { margin-top: 0; }
+/* Fail modal stage 2: "back" link, free-text reason input, save button */
+.fail-other-back {
+  background: transparent;
+  border: none;
+  color: #2563eb;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 4px 0 12px;
+  text-align: left;
+  display: block;
+}
+.fail-other-input {
+  width: 100%;
+  padding: 12px 14px;
+  font-size: 15px;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+  background: #fff;
+  resize: vertical;
+  min-height: 80px;
+  font-family: inherit;
+  margin-bottom: 12px;
+}
+.fail-other-save {
+  width: 100%;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  background: #dc2626;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+}
+.fail-other-save:active { background: #b91c1c; }

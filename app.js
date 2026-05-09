@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v4 (May 2026)
+ * v6 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v4 ==============
+// ============== PAT Test PWA — v6 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V5';
+const APP_VERSION = 'V6';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -46,7 +46,10 @@ let state = {
   suggestions: [],
   showSuggestions: false,
   failModalOpen: false,
-  showFailsOnly: false
+  failModalStage: 'reasons', // 'reasons' or 'other'
+  failOtherText: '',
+  showFailsOnly: false,
+  searchQuery: ''
 };
 
 // ---------- Persistence ----------
@@ -73,7 +76,7 @@ function load() {
     if (s.prefix === undefined) s.prefix = '';
   });
 
-  // Descriptions list — initialise from existing item history on first v4 launch
+  // Descriptions list — initialise from existing item history on first v4+ launch
   let storedDesc = null;
   try {
     storedDesc = JSON.parse(localStorage.getItem(DESCRIPTIONS_KEY) || 'null');
@@ -172,6 +175,26 @@ function nextAssetNo(session) {
   return split.prefix + (split.number + 1);
 }
 
+// v6: location carried forward to a new entry comes from the item directly before
+// the cursor — NOT from whichever item was last edited. Editing item 5 must not
+// change what item 11 inherits.
+function getCarryForwardLocation(sess, cursor) {
+  if (!sess || cursor <= 0) return '';
+  const prev = sess.items[cursor - 1];
+  return prev ? (prev.location || '') : '';
+}
+
+// v6: returns index of an existing item (other than excludeCursor) that has the
+// same asset number, or -1 if none. Used to hard-block duplicate saves.
+function findDuplicateAssetIndex(sess, assetNo, excludeCursor) {
+  if (!assetNo) return -1;
+  for (let i = 0; i < sess.items.length; i++) {
+    if (i === excludeCursor) continue;
+    if (sess.items[i].assetNo === assetNo) return i;
+  }
+  return -1;
+}
+
 // Autocomplete — pulls from the user-managed descriptions list, excludes quick-picks.
 function computeSuggestions(query) {
   if (!query || query.length < 1) return [];
@@ -255,15 +278,16 @@ function csvEscape(v) {
   const s = String(v);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
+// v6 column order: Asset ID, Engineer name, Description, Site, Location, Date, Result, Notes
 function buildCSV(session) {
-  const header = ['Site', 'Date', 'Engineer', 'Asset No', 'Location', 'Item Type', 'Result', 'Notes'];
+  const header = ['Asset ID', 'Engineer name', 'Description', 'Site', 'Location', 'Date', 'Result', 'Notes'];
   const rows = session.items.map(it => [
-    session.site,
-    formatDate(session.date),
-    session.engineer || '',
     it.assetNo,
-    it.location,
+    session.engineer || '',
     it.itemType,
+    session.site,
+    it.location,
+    formatDate(session.date),
     capitalise(it.result || ''),
     it.notes
   ].map(csvEscape).join(','));
@@ -295,7 +319,7 @@ function loadFormForCursor() {
   } else {
     state.form = {
       assetNo: nextAssetNo(sess),
-      location: sess.lastLocation || '',
+      location: getCarryForwardLocation(sess, state.cursor),
       itemType: '',
       notes: '',
       showNotes: false
@@ -304,6 +328,25 @@ function loadFormForCursor() {
   state.suggestions = [];
   state.showSuggestions = false;
   state.failModalOpen = false;
+  state.failModalStage = 'reasons';
+  state.failOtherText = '';
+}
+
+// ---------- Validation ----------
+// v6: shared check used by Pass, Fail (before opening the modal), and Copy-last.
+// Returns null if OK, or an error message string otherwise.
+function validateBeforeSave(opts = {}) {
+  const sess = activeSession();
+  if (!sess) return 'No active session.';
+  if (!opts.skipItemType && !state.form.itemType.trim()) {
+    return 'Please choose or enter an item type.';
+  }
+  const assetNo = state.form.assetNo.trim() || nextAssetNo(sess);
+  const dupIdx = findDuplicateAssetIndex(sess, assetNo, state.cursor);
+  if (dupIdx !== -1) {
+    return `Asset number ${assetNo} already used on item ${dupIdx + 1}.`;
+  }
+  return null;
 }
 
 // ---------- Actions ----------
@@ -318,7 +361,6 @@ function createSession() {
     prefix: prefix.trim(),
     date: todayISO(),
     startNumber: parseInt(startNo, 10) || 1,
-    lastLocation: '',
     items: []
   };
   state.sessions.unshift(s);
@@ -337,6 +379,7 @@ function openSession(id) {
   state.cursor = s.items.length;
   state.view = 'entry';
   state.showFailsOnly = false;
+  state.searchQuery = '';
   loadFormForCursor();
   save(); render();
 }
@@ -353,10 +396,9 @@ function deleteSession(id) {
 function saveItem(result) {
   const sess = activeSession();
   if (!sess) return;
-  if (!state.form.itemType.trim()) {
-    alert('Please choose or enter an item type.');
-    return;
-  }
+  // Defence-in-depth — these are also checked at the click handlers.
+  const err = validateBeforeSave();
+  if (err) { alert(err); return; }
   const cleanLocation = normaliseLocation(state.form.location);
   const cleanType = normaliseItemType(state.form.itemType);
   const item = {
@@ -371,7 +413,6 @@ function saveItem(result) {
   } else {
     sess.items.push({ id: uid(), ...item });
   }
-  if (item.location) sess.lastLocation = item.location;
   // Track new descriptions for autocomplete
   addDescriptionIfNew(cleanType);
   state.cursor++;
@@ -380,17 +421,18 @@ function saveItem(result) {
 }
 
 function passClicked() {
+  const err = validateBeforeSave();
+  if (err) { alert(err); return; }
   haptic(1);
   saveItem('pass');
 }
 
 function failClicked() {
-  // Validate item type before opening modal so we don't get stuck
-  if (!state.form.itemType.trim()) {
-    alert('Please choose or enter an item type.');
-    return;
-  }
+  const err = validateBeforeSave();
+  if (err) { alert(err); return; }
   haptic(3);
+  state.failModalStage = 'reasons';
+  state.failOtherText = '';
   state.failModalOpen = true;
   render();
 }
@@ -402,11 +444,15 @@ function pickFailReason(reasonOrNull) {
       : reasonOrNull;
   }
   state.failModalOpen = false;
+  state.failModalStage = 'reasons';
+  state.failOtherText = '';
   saveItem('fail');
 }
 
 function cancelFailModal() {
   state.failModalOpen = false;
+  state.failModalStage = 'reasons';
+  state.failOtherText = '';
   render();
 }
 
@@ -414,6 +460,9 @@ function cancelFailModal() {
 function copyLastResult() {
   const sess = activeSession();
   if (!sess || sess.items.length === 0) return;
+  // Asset duplicate is the only thing worth checking — item type is taken from the last item.
+  const err = validateBeforeSave({ skipItemType: true });
+  if (err) { alert(err); return; }
   haptic(2);
   const last = sess.items[sess.items.length - 1];
   const item = {
@@ -428,7 +477,6 @@ function copyLastResult() {
   } else {
     sess.items.push({ id: uid(), ...item });
   }
-  if (item.location) sess.lastLocation = item.location;
   state.cursor++;
   loadFormForCursor();
   save(); render();
@@ -453,6 +501,15 @@ function moveCursor(delta) {
   render();
 }
 
+// v6: jump straight to the new-entry slot, no matter where the cursor is.
+function skipToNew() {
+  const sess = activeSession();
+  if (!sess) return;
+  state.cursor = sess.items.length;
+  loadFormForCursor();
+  render();
+}
+
 function jumpTo(idx) {
   state.cursor = idx;
   state.view = 'entry';
@@ -462,6 +519,10 @@ function jumpTo(idx) {
 
 function setView(v) {
   state.failModalOpen = false;
+  state.failModalStage = 'reasons';
+  state.failOtherText = '';
+  // Search is overview-local; clear it whenever we leave overview.
+  if (v !== 'overview') state.searchQuery = '';
   state.view = v;
   render();
 }
@@ -639,6 +700,25 @@ function renderEntry() {
     ? ` (${escapeHTML(sess.items[sess.items.length - 1].itemType)} · ${capitalise(sess.items[sess.items.length - 1].result)})`
     : '';
 
+  // v6: fail modal now has two stages — chip picker, or "other" free-text input.
+  let failSheetInner = '';
+  if (state.failModalStage === 'reasons') {
+    failSheetInner = `
+      <div class="fail-reasons-grid">
+        ${state.failReasons.map(r => `
+          <button class="fail-reason-btn" data-reason="${escapeHTML(r)}">${escapeHTML(r)}</button>
+        `).join('')}
+      </div>
+      <button class="fail-other-btn" id="fail-other-btn">Other…</button>
+    `;
+  } else {
+    failSheetInner = `
+      <button class="fail-other-back" id="fail-other-back">‹ Back to reasons</button>
+      <textarea class="fail-other-input" id="fail-other-input" placeholder="Type reason…" rows="3">${escapeHTML(state.failOtherText)}</textarea>
+      <button class="fail-other-save" id="fail-other-save">Save fail</button>
+    `;
+  }
+
   const failModal = state.failModalOpen ? `
     <div class="modal-backdrop" id="fail-backdrop"></div>
     <div class="fail-sheet" role="dialog" aria-label="Why did it fail?">
@@ -648,14 +728,22 @@ function renderEntry() {
         <h3 class="fail-sheet-title">Why did it fail?</h3>
         <button class="fail-close-btn" id="fail-close" aria-label="Cancel">×</button>
       </div>
-      <div class="fail-reasons-grid">
-        ${state.failReasons.map(r => `
-          <button class="fail-reason-btn" data-reason="${escapeHTML(r)}">${escapeHTML(r)}</button>
-        `).join('')}
-      </div>
-      <button class="fail-skip-btn" id="fail-skip">Skip — save fail with no reason</button>
+      ${failSheetInner}
     </div>
   ` : '';
+
+  // v6: location-carried hint now reflects whether form.location actually has a carry value.
+  const carriedHint = (!isExisting && state.form.location)
+    ? '<span class="hint">(carried from last)</span>'
+    : '';
+
+  // v6: progress row gets a small bin icon on the right when an existing item is shown.
+  const progressRow = `
+    <div class="progress-row">
+      <div class="progress">Item ${state.cursor + 1} ${isExisting ? `of ${sess.items.length}` : '(new)'}${resultBadge}</div>
+      ${isExisting ? `<button class="del-icon-top" id="del-item-btn" aria-label="Delete item" title="Delete item">🗑</button>` : ''}
+    </div>
+  `;
 
   return `
     <div class="screen">
@@ -665,12 +753,12 @@ function renderEntry() {
         <button class="icon-btn" id="overview-btn" aria-label="Overview">▦</button>
       </header>
 
-      <div class="progress">Item ${state.cursor + 1} ${isExisting ? `of ${sess.items.length}` : '(new)'}${resultBadge}</div>
+      ${progressRow}
 
       <label class="label">Asset number</label>
       <input class="input-big" id="f-asset" value="${escapeHTML(state.form.assetNo)}">
 
-      <label class="label">Location ${!isExisting && sess.lastLocation ? '<span class="hint">(carried from last)</span>' : ''}</label>
+      <label class="label">Location ${carriedHint}</label>
       <input class="input-big" id="f-location" value="${escapeHTML(state.form.location)}" placeholder="e.g. Office 1">
 
       <label class="label">Item type</label>
@@ -693,7 +781,7 @@ function renderEntry() {
 
       <div class="nav-row">
         <button class="nav-btn" id="prev-btn" ${state.cursor === 0 ? 'disabled' : ''}>‹ Prev</button>
-        ${isExisting ? `<button class="delete-btn" id="del-item-btn">🗑 Delete</button>` : '<span></span>'}
+        <button class="nav-btn" id="skip-new-btn" ${!isExisting ? 'disabled' : ''}>⏭ New</button>
         <button class="nav-btn" id="next-btn" ${state.cursor >= sess.items.length ? 'disabled' : ''}>Next ›</button>
       </div>
 
@@ -702,46 +790,67 @@ function renderEntry() {
   `;
 }
 
+// v6: extracted body so the search input can refresh the table without re-rendering
+// the whole screen (which would lose focus on every keystroke).
+function computeVisibleOverviewItems(sess) {
+  const q = state.searchQuery.trim().toLowerCase();
+  return sess.items
+    .map((it, i) => ({ it, i }))
+    .filter(x => state.showFailsOnly ? x.it.result === 'fail' : true)
+    .filter(x => {
+      if (!q) return true;
+      const it = x.it;
+      return (it.assetNo || '').toLowerCase().includes(q)
+          || (it.location || '').toLowerCase().includes(q)
+          || (it.itemType || '').toLowerCase().includes(q)
+          || (it.notes || '').toLowerCase().includes(q);
+    });
+}
+
+function renderOverviewBodyHTML(sess) {
+  const visible = computeVisibleOverviewItems(sess);
+  if (visible.length === 0) {
+    let msg;
+    if (state.searchQuery.trim()) msg = 'No items match your search.';
+    else if (state.showFailsOnly) msg = 'No fails in this session.';
+    else msg = 'No items recorded yet.';
+    return `<p class="muted">${msg}</p>`;
+  }
+  return `<div class="table-wrap">
+    <table class="table">
+      <thead><tr>
+        <th class="th">#</th><th class="th">Location</th><th class="th">Item</th><th class="th">Result</th><th class="th"></th>
+      </tr></thead>
+      <tbody>
+        ${visible.map(({ it, i }) => `
+          <tr class="tr" data-jump="${i}">
+            <td class="td">${escapeHTML(it.assetNo)}</td>
+            <td class="td">${escapeHTML(it.location)}</td>
+            <td class="td">${escapeHTML(it.itemType)}</td>
+            <td class="td td-result" style="color:${it.result === 'pass' ? '#16a34a' : '#dc2626'}">${capitalise(it.result || '')}</td>
+            <td class="td td-action" data-del-item="${i}">🗑</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  </div>`;
+}
+
 function renderOverview() {
   const sess = activeSession();
   if (!sess) { state.view = 'sessions'; return renderSessions(); }
   const passes = sess.items.filter(i => i.result === 'pass').length;
   const fails = sess.items.filter(i => i.result === 'fail').length;
 
-  // Build view list preserving original indices for jump/delete
-  const visibleItems = sess.items
-    .map((it, i) => ({ it, i }))
-    .filter(x => state.showFailsOnly ? x.it.result === 'fail' : true);
-
-  const filterToggle = sess.items.length > 0 ? `
-    <div class="filter-row">
+  const filterRow = sess.items.length > 0 ? `
+    <div class="overview-filters">
+      <input type="search" class="search-input" id="overview-search" placeholder="Search asset, location, item, notes…" value="${escapeHTML(state.searchQuery)}" autocomplete="off">
       <label class="filter-toggle">
         <input type="checkbox" id="fails-only-toggle" ${state.showFailsOnly ? 'checked' : ''}>
         <span>Show fails only</span>
       </label>
     </div>
   ` : '';
-
-  const body = visibleItems.length === 0
-    ? `<p class="muted">${state.showFailsOnly ? 'No fails in this session.' : 'No items recorded yet.'}</p>`
-    : `<div class="table-wrap">
-        <table class="table">
-          <thead><tr>
-            <th class="th">#</th><th class="th">Location</th><th class="th">Item</th><th class="th">Result</th><th class="th"></th>
-          </tr></thead>
-          <tbody>
-            ${visibleItems.map(({ it, i }) => `
-              <tr class="tr" data-jump="${i}">
-                <td class="td">${escapeHTML(it.assetNo)}</td>
-                <td class="td">${escapeHTML(it.location)}</td>
-                <td class="td">${escapeHTML(it.itemType)}</td>
-                <td class="td td-result" style="color:${it.result === 'pass' ? '#16a34a' : '#dc2626'}">${capitalise(it.result || '')}</td>
-                <td class="td td-action" data-del-item="${i}">🗑</td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>`;
 
   return `
     <div class="screen">
@@ -754,10 +863,26 @@ function renderOverview() {
         </div>
       </header>
       <div class="progress">${sess.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span>${sess.engineer ? ' · ' + escapeHTML(sess.engineer) : ''}</div>
-      ${filterToggle}
-      ${body}
+      ${filterRow}
+      <div class="overview-body">${renderOverviewBodyHTML(sess)}</div>
     </div>
   `;
+}
+
+// v6: refresh just the overview table body in response to search-input typing.
+// Keeps the search box focused (full re-render would steal focus on every keystroke).
+function refreshOverviewBody() {
+  const sess = activeSession();
+  if (!sess) return;
+  const wrap = document.querySelector('.overview-body');
+  if (!wrap) return;
+  wrap.innerHTML = renderOverviewBodyHTML(sess);
+  document.querySelectorAll('[data-jump]').forEach(el => {
+    el.onclick = () => jumpTo(parseInt(el.dataset.jump, 10));
+  });
+  document.querySelectorAll('[data-del-item]').forEach(el => {
+    el.onclick = (e) => { e.stopPropagation(); if (confirm('Delete this item?')) deleteItem(parseInt(el.dataset.delItem, 10)); };
+  });
 }
 
 function renderEditSession() {
@@ -950,13 +1075,28 @@ function bindEvents() {
   if ($('copy-last-btn')) $('copy-last-btn').onclick = () => copyLastResult();
   if ($('prev-btn')) $('prev-btn').onclick = () => moveCursor(-1);
   if ($('next-btn')) $('next-btn').onclick = () => moveCursor(1);
+  if ($('skip-new-btn')) $('skip-new-btn').onclick = () => skipToNew();
   if ($('del-item-btn')) $('del-item-btn').onclick = () => { if (confirm('Delete this item?')) deleteItem(state.cursor); };
 
-  // Fail modal
+  // Fail modal — stage 1 (reasons) and stage 2 (other text input)
   document.querySelectorAll('[data-reason]').forEach(el => {
     el.onclick = () => pickFailReason(el.dataset.reason);
   });
-  if ($('fail-skip')) $('fail-skip').onclick = () => pickFailReason(null);
+  if ($('fail-other-btn')) $('fail-other-btn').onclick = () => {
+    state.failModalStage = 'other';
+    render();
+    document.getElementById('fail-other-input')?.focus();
+  };
+  if ($('fail-other-back')) $('fail-other-back').onclick = () => {
+    state.failModalStage = 'reasons';
+    state.failOtherText = '';
+    render();
+  };
+  if ($('fail-other-input')) $('fail-other-input').oninput = e => state.failOtherText = e.target.value;
+  if ($('fail-other-save')) $('fail-other-save').onclick = () => {
+    const reason = state.failOtherText.trim();
+    pickFailReason(reason || null);
+  };
   if ($('fail-close')) $('fail-close').onclick = () => cancelFailModal();
   if ($('fail-backdrop')) $('fail-backdrop').onclick = () => cancelFailModal();
 
@@ -964,9 +1104,13 @@ function bindEvents() {
   if ($('back-btn')) $('back-btn').onclick = () => setView(state.activeId ? 'entry' : 'sessions');
   if ($('export-btn')) $('export-btn').onclick = () => { const s = activeSession(); if (s) downloadCSV(s); };
   if ($('edit-session-btn')) $('edit-session-btn').onclick = () => startEditSession();
+  if ($('overview-search')) $('overview-search').oninput = e => {
+    state.searchQuery = e.target.value;
+    refreshOverviewBody();
+  };
   if ($('fails-only-toggle')) $('fails-only-toggle').onchange = e => {
     state.showFailsOnly = e.target.checked;
-    render();
+    refreshOverviewBody();
   };
   document.querySelectorAll('[data-jump]').forEach(el => {
     el.onclick = () => jumpTo(parseInt(el.dataset.jump, 10));
