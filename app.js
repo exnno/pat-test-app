@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v6 (May 2026)
+ * v7 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v6 ==============
+// ============== PAT Test PWA — v7 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V6';
+const APP_VERSION = 'V7';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -18,6 +18,8 @@ const FAIL_REASONS_KEY = 'pat:failreasons';
 const ENGINEER_KEY = 'pat:engineer';
 const DESCRIPTIONS_KEY = 'pat:descriptions';
 const SORT_KEY = 'pat:sort';
+const THEME_KEY = 'pat:theme';            // v7: 'system' | 'light' | 'dark'
+const HAPTICS_KEY = 'pat:haptics';        // v7: '1' | '0'
 
 const DEFAULT_ITEM_TYPES = ['Lead', 'AC adapter', 'Monitor', 'PC', 'Hub', 'Dock'];
 const DEFAULT_FAIL_REASONS = [
@@ -46,10 +48,19 @@ let state = {
   suggestions: [],
   showSuggestions: false,
   failModalOpen: false,
-  failModalStage: 'reasons', // 'reasons' or 'other'
+  failModalStage: 'reasons',
   failOtherText: '',
   showFailsOnly: false,
-  searchQuery: ''
+  searchQuery: '',
+  // v7
+  theme: 'system',                  // 'system' | 'light' | 'dark'
+  hapticsEnabled: true,
+  selectionMode: false,
+  selectedIndices: [],              // absolute indices into sess.items
+  bulkLocationDialogOpen: false,
+  bulkLocationValue: '',
+  updateAvailable: false,
+  pendingWorker: null               // SW that's installed and waiting
 };
 
 // ---------- Persistence ----------
@@ -69,6 +80,12 @@ function load() {
 
   state.engineer = localStorage.getItem(ENGINEER_KEY) || '';
   state.sort = localStorage.getItem(SORT_KEY) || 'date_desc';
+
+  // v7: theme + haptics
+  const storedTheme = localStorage.getItem(THEME_KEY);
+  state.theme = (storedTheme === 'light' || storedTheme === 'dark') ? storedTheme : 'system';
+  const storedHaptics = localStorage.getItem(HAPTICS_KEY);
+  state.hapticsEnabled = storedHaptics !== '0';   // default true; only '0' disables
 
   // Migration: ensure all sessions have new fields
   state.sessions.forEach(s => {
@@ -120,6 +137,8 @@ function save() {
   localStorage.setItem(ENGINEER_KEY, state.engineer);
   localStorage.setItem(DESCRIPTIONS_KEY, JSON.stringify(state.descriptions));
   localStorage.setItem(SORT_KEY, state.sort);
+  localStorage.setItem(THEME_KEY, state.theme);
+  localStorage.setItem(HAPTICS_KEY, state.hapticsEnabled ? '1' : '0');
 }
 
 // ---------- Helpers ----------
@@ -129,13 +148,10 @@ const escapeHTML = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp
 function activeSession() { return state.sessions.find(s => s.id === state.activeId); }
 const capitalise = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 
-// Title case for location and free-typed item types — capitalises the first letter of each word.
-// "main office" -> "Main Office"; preserves existing capitals like "USB" or "iPhone".
 function titleCase(s) {
   return String(s || '').replace(/\b\w/g, c => c.toUpperCase());
 }
 
-// For item type: preserves quick-pick casing exactly; otherwise title-cases.
 function normaliseItemType(s) {
   const trimmed = String(s || '').trim();
   if (!trimmed) return '';
@@ -148,7 +164,6 @@ function normaliseLocation(s) {
   return titleCase(String(s || '').trim());
 }
 
-// Date formatting: ISO -> DD/MM/YYYY
 function formatDate(iso) {
   if (!iso) return '';
   const parts = iso.split('-');
@@ -156,7 +171,6 @@ function formatDate(iso) {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
-// Asset number split & next
 function splitAssetNo(s) {
   if (!s) return { prefix: '', number: null };
   const m = String(s).match(/^(.*?)(\d+)$/);
@@ -175,17 +189,12 @@ function nextAssetNo(session) {
   return split.prefix + (split.number + 1);
 }
 
-// v6: location carried forward to a new entry comes from the item directly before
-// the cursor — NOT from whichever item was last edited. Editing item 5 must not
-// change what item 11 inherits.
 function getCarryForwardLocation(sess, cursor) {
   if (!sess || cursor <= 0) return '';
   const prev = sess.items[cursor - 1];
   return prev ? (prev.location || '') : '';
 }
 
-// v6: returns index of an existing item (other than excludeCursor) that has the
-// same asset number, or -1 if none. Used to hard-block duplicate saves.
 function findDuplicateAssetIndex(sess, assetNo, excludeCursor) {
   if (!assetNo) return -1;
   for (let i = 0; i < sess.items.length; i++) {
@@ -195,7 +204,6 @@ function findDuplicateAssetIndex(sess, assetNo, excludeCursor) {
   return -1;
 }
 
-// Autocomplete — pulls from the user-managed descriptions list, excludes quick-picks.
 function computeSuggestions(query) {
   if (!query || query.length < 1) return [];
   const q = query.toLowerCase();
@@ -206,7 +214,6 @@ function computeSuggestions(query) {
   return [...starts, ...contains].slice(0, 5);
 }
 
-// Add a description to the saved list if not already there (case-insensitive).
 function addDescriptionIfNew(desc) {
   const trimmed = String(desc || '').trim();
   if (!trimmed) return;
@@ -215,7 +222,6 @@ function addDescriptionIfNew(desc) {
   if (!exists) state.descriptions.push(trimmed);
 }
 
-// Sorted view of sessions for display.
 function sortedSessions() {
   const arr = state.sessions.slice();
   switch (state.sort) {
@@ -236,11 +242,18 @@ function sortedSessions() {
   return arr;
 }
 
+// ---------- Theme ----------
+// v7: applies user's theme choice. 'system' removes the override and lets the CSS
+// media query take effect; 'light'/'dark' force the choice via data-theme attribute.
+function applyTheme(theme) {
+  if (theme === 'system') {
+    document.documentElement.removeAttribute('data-theme');
+  } else {
+    document.documentElement.setAttribute('data-theme', theme);
+  }
+}
+
 // ---------- Haptics ----------
-// Triggers haptic feedback. iOS 17.4–26.4: uses the <input type="checkbox" switch>
-// trick — wrapped in a hidden <label>, clicking the LABEL fires the Taptic Engine.
-// iOS 26.5+: Apple patched it. Android: navigator.vibrate.
-// Counts: 1 = pass, 2 = copy, 3 = fail.
 function _hapticOnce() {
   try {
     const labelEl = document.createElement('label');
@@ -257,16 +270,13 @@ function _hapticOnce() {
 }
 
 function haptic(count) {
-  // Android first — if vibrate is implemented, use it and stop.
-  // iOS Safari does not implement navigator.vibrate, so this is skipped on iOS.
+  if (!state.hapticsEnabled) return;        // v7: respect user setting
   if (navigator.vibrate) {
     if (count === 1) navigator.vibrate(50);
     else if (count === 2) navigator.vibrate([50, 70, 50]);
     else if (count === 3) navigator.vibrate([50, 70, 50, 70, 50]);
     return;
   }
-  // iOS — fire haptics synchronously inside the user-gesture context.
-  // Subsequent haptics fire 120ms apart via setTimeout.
   _hapticOnce();
   if (count >= 2) setTimeout(_hapticOnce, 120);
   if (count >= 3) setTimeout(_hapticOnce, 240);
@@ -278,7 +288,6 @@ function csvEscape(v) {
   const s = String(v);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
-// v6 column order: Asset ID, Engineer name, Description, Site, Location, Date, Result, Notes
 function buildCSV(session) {
   const header = ['Asset ID', 'Engineer name', 'Description', 'Site', 'Location', 'Date', 'Result', 'Notes'];
   const rows = session.items.map(it => [
@@ -294,7 +303,6 @@ function buildCSV(session) {
   return [header.join(','), ...rows].join('\n');
 }
 function downloadCSV(session) {
-  // UTF-8 BOM so Excel on Windows opens £, accents, etc. correctly
   const BOM = '\uFEFF';
   const blob = new Blob([BOM + buildCSV(session)], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
@@ -303,6 +311,112 @@ function downloadCSV(session) {
   a.href = url; a.download = `PAT_${safe}_${session.date}.csv`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// ---------- Backup / Restore (v7) ----------
+// Full app state -> downloadable .json file. Restore replaces all current data.
+function buildBackup() {
+  return {
+    appVersion: APP_VERSION,
+    backupVersion: 1,
+    exportedAt: new Date().toISOString(),
+    sessions: state.sessions,
+    itemTypes: state.itemTypes,
+    failReasons: state.failReasons,
+    descriptions: state.descriptions,
+    engineer: state.engineer,
+    sort: state.sort,
+    theme: state.theme,
+    hapticsEnabled: state.hapticsEnabled
+  };
+}
+
+function downloadBackup() {
+  const payload = buildBackup();
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `PAT_backup_${todayISO()}.json`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function restoreBackupFromFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    let data;
+    try {
+      data = JSON.parse(e.target.result);
+    } catch (err) {
+      alert('That file isn\'t a valid backup — JSON could not be read.');
+      return;
+    }
+    if (!data || !Array.isArray(data.sessions)) {
+      alert('That file isn\'t a recognised PAT Test backup. Make sure you picked a file exported from this app.');
+      return;
+    }
+    const itemCount = data.sessions.reduce((n, s) => n + (Array.isArray(s.items) ? s.items.length : 0), 0);
+    const ok = confirm(
+      `Restore from backup?\n\n` +
+      `This file contains:\n` +
+      `• ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'}\n` +
+      `• ${itemCount} item${itemCount === 1 ? '' : 's'} in total\n` +
+      `• Exported ${data.exportedAt ? new Date(data.exportedAt).toLocaleString() : 'unknown date'}\n\n` +
+      `This will REPLACE all current data on this device. This cannot be undone.\n\n` +
+      `Continue?`
+    );
+    if (!ok) return;
+    // Apply
+    state.sessions = data.sessions;
+    state.itemTypes = Array.isArray(data.itemTypes) && data.itemTypes.length ? data.itemTypes : DEFAULT_ITEM_TYPES.slice();
+    state.failReasons = Array.isArray(data.failReasons) && data.failReasons.length ? data.failReasons : DEFAULT_FAIL_REASONS.slice();
+    state.descriptions = Array.isArray(data.descriptions) ? data.descriptions : [];
+    state.engineer = typeof data.engineer === 'string' ? data.engineer : '';
+    state.sort = typeof data.sort === 'string' ? data.sort : 'date_desc';
+    if (data.theme === 'light' || data.theme === 'dark' || data.theme === 'system') {
+      state.theme = data.theme;
+      applyTheme(state.theme);
+    }
+    if (typeof data.hapticsEnabled === 'boolean') {
+      state.hapticsEnabled = data.hapticsEnabled;
+    }
+    state.activeId = null;
+    state.view = 'sessions';
+    state.cursor = 0;
+    state.newForm.show = false;
+    save();
+    alert(`Restored ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'} (${itemCount} item${itemCount === 1 ? '' : 's'}).`);
+    render();
+  };
+  reader.onerror = () => alert('Could not read that file.');
+  reader.readAsText(file);
+}
+
+// ---------- Storage usage (v7) ----------
+function getStorageStats() {
+  let bytes = 0;
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      const value = localStorage.getItem(key) || '';
+      // localStorage strings are UTF-16 internally → ~2 bytes per char
+      bytes += (key.length + value.length) * 2;
+    }
+  } catch {}
+  const items = state.sessions.reduce((n, s) => n + (s.items ? s.items.length : 0), 0);
+  const sessions = state.sessions.length;
+  // Most browsers cap localStorage at ~5MB
+  const approxCap = 5 * 1024 * 1024;
+  const pct = Math.min(100, Math.round((bytes / approxCap) * 100));
+  return { bytes, items, sessions, pct };
+}
+
+function formatBytes(b) {
+  if (b < 1024) return `${b} B`;
+  if (b < 1024 * 1024) return `${(b / 1024).toFixed(1)} KB`;
+  return `${(b / (1024 * 1024)).toFixed(2)} MB`;
 }
 
 // ---------- Form helpers ----------
@@ -333,8 +447,6 @@ function loadFormForCursor() {
 }
 
 // ---------- Validation ----------
-// v6: shared check used by Pass, Fail (before opening the modal), and Copy-last.
-// Returns null if OK, or an error message string otherwise.
 function validateBeforeSave(opts = {}) {
   const sess = activeSession();
   if (!sess) return 'No active session.';
@@ -367,7 +479,6 @@ function createSession() {
   state.activeId = s.id;
   state.cursor = 0;
   state.view = 'entry';
-  // Reset new form but keep engineer default for next time
   state.newForm = { name: '', site: '', engineer: state.engineer, prefix: '', startNo: '1', show: false };
   loadFormForCursor();
   save(); render();
@@ -380,6 +491,7 @@ function openSession(id) {
   state.view = 'entry';
   state.showFailsOnly = false;
   state.searchQuery = '';
+  exitSelectionMode();
   loadFormForCursor();
   save(); render();
 }
@@ -396,7 +508,6 @@ function deleteSession(id) {
 function saveItem(result) {
   const sess = activeSession();
   if (!sess) return;
-  // Defence-in-depth — these are also checked at the click handlers.
   const err = validateBeforeSave();
   if (err) { alert(err); return; }
   const cleanLocation = normaliseLocation(state.form.location);
@@ -413,7 +524,6 @@ function saveItem(result) {
   } else {
     sess.items.push({ id: uid(), ...item });
   }
-  // Track new descriptions for autocomplete
   addDescriptionIfNew(cleanType);
   state.cursor++;
   loadFormForCursor();
@@ -456,11 +566,9 @@ function cancelFailModal() {
   render();
 }
 
-// Copy last result — type + result from the most recently saved item.
 function copyLastResult() {
   const sess = activeSession();
   if (!sess || sess.items.length === 0) return;
-  // Asset duplicate is the only thing worth checking — item type is taken from the last item.
   const err = validateBeforeSave({ skipItemType: true });
   if (err) { alert(err); return; }
   haptic(2);
@@ -487,6 +595,12 @@ function deleteItem(idx) {
   if (!sess) return;
   sess.items.splice(idx, 1);
   state.cursor = Math.min(state.cursor, sess.items.length);
+  // If we were in selection mode, indices may have shifted — clean up.
+  if (state.selectionMode) {
+    state.selectedIndices = state.selectedIndices
+      .filter(i => i !== idx)
+      .map(i => i > idx ? i - 1 : i);
+  }
   loadFormForCursor();
   save(); render();
 }
@@ -501,7 +615,6 @@ function moveCursor(delta) {
   render();
 }
 
-// v6: jump straight to the new-entry slot, no matter where the cursor is.
 function skipToNew() {
   const sess = activeSession();
   if (!sess) return;
@@ -513,6 +626,7 @@ function skipToNew() {
 function jumpTo(idx) {
   state.cursor = idx;
   state.view = 'entry';
+  exitSelectionMode();
   loadFormForCursor();
   render();
 }
@@ -521,10 +635,80 @@ function setView(v) {
   state.failModalOpen = false;
   state.failModalStage = 'reasons';
   state.failOtherText = '';
-  // Search is overview-local; clear it whenever we leave overview.
-  if (v !== 'overview') state.searchQuery = '';
+  // Search and selection are overview-local; clear when leaving overview.
+  if (v !== 'overview') {
+    state.searchQuery = '';
+    exitSelectionMode();
+  }
   state.view = v;
   render();
+}
+
+// ---------- Bulk-edit (v7) ----------
+function enterSelectionMode() {
+  state.selectionMode = true;
+  state.selectedIndices = [];
+  render();
+}
+
+function exitSelectionMode() {
+  state.selectionMode = false;
+  state.selectedIndices = [];
+  state.bulkLocationDialogOpen = false;
+  state.bulkLocationValue = '';
+}
+
+function toggleSelected(idx) {
+  if (state.selectedIndices.includes(idx)) {
+    state.selectedIndices = state.selectedIndices.filter(i => i !== idx);
+  } else {
+    state.selectedIndices = [...state.selectedIndices, idx].sort((a, b) => a - b);
+  }
+}
+
+function selectAllVisible() {
+  const sess = activeSession();
+  if (!sess) return;
+  const visible = computeVisibleOverviewItems(sess).map(x => x.i);
+  // Add visible to existing selection
+  const set = new Set(state.selectedIndices);
+  visible.forEach(i => set.add(i));
+  state.selectedIndices = Array.from(set).sort((a, b) => a - b);
+  render();
+}
+
+function clearSelection() {
+  state.selectedIndices = [];
+  render();
+}
+
+function openBulkLocationDialog() {
+  if (state.selectedIndices.length === 0) return;
+  state.bulkLocationDialogOpen = true;
+  state.bulkLocationValue = '';
+  render();
+}
+
+function applyBulkLocation() {
+  const sess = activeSession();
+  if (!sess) return;
+  const newLoc = normaliseLocation(state.bulkLocationValue);
+  if (!newLoc) {
+    alert('Please enter a location.');
+    return;
+  }
+  let count = 0;
+  state.selectedIndices.forEach(i => {
+    if (sess.items[i]) {
+      sess.items[i].location = newLoc;
+      count++;
+    }
+  });
+  exitSelectionMode();
+  save();
+  render();
+  // Brief confirmation — not blocking.
+  setTimeout(() => alert(`Updated location on ${count} item${count === 1 ? '' : 's'}.`), 50);
 }
 
 // Edit-session flow
@@ -559,19 +743,31 @@ function saveSessionEdits() {
   save(); render();
 }
 
-// ---------- Settings save ----------
-function saveSettings() {
+// ---------- Settings: per-page saves (v7) ----------
+function saveUserSettings() {
+  state.engineer = document.getElementById('settings-engineer').value.trim();
+  state.newForm.engineer = state.engineer;
+  save();
+  setView('settings');
+}
+
+function saveItemTypesSettings() {
   const types = document.getElementById('settings-types').value
     .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 9);
   state.itemTypes = types.length ? types : DEFAULT_ITEM_TYPES.slice();
+  save();
+  setView('settings');
+}
 
+function saveFailReasonsSettings() {
   const reasons = document.getElementById('settings-reasons').value
     .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 6);
   state.failReasons = reasons.length ? reasons : DEFAULT_FAIL_REASONS.slice();
+  save();
+  setView('settings');
+}
 
-  state.engineer = document.getElementById('settings-engineer').value.trim();
-
-  // Descriptions: dedupe case-insensitively, preserve first-occurrence casing
+function saveDescriptionsSettings() {
   const rawDescs = document.getElementById('settings-descriptions').value
     .split('\n').map(s => s.trim()).filter(Boolean);
   const seen = new Set();
@@ -581,12 +777,75 @@ function saveSettings() {
     seen.add(l);
     return true;
   });
-
-  // Refresh new-session-form engineer default to match the new setting
-  state.newForm.engineer = state.engineer;
-
   save();
-  setView(state.activeId ? 'entry' : 'sessions');
+  setView('settings');
+}
+
+function setTheme(theme) {
+  state.theme = theme;
+  applyTheme(theme);
+  save();
+  render();   // re-render to update radio button highlights
+}
+
+function setHaptics(enabled) {
+  state.hapticsEnabled = !!enabled;
+  save();
+  // No re-render needed — toggle visual handled by checkbox state
+}
+
+// ---------- Service worker + update detection (v7) ----------
+function registerServiceWorker() {
+  if (!('serviceWorker' in navigator)) return;
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js').then(reg => {
+      // Check if a worker is already waiting from a previous tab/load.
+      if (reg.waiting && navigator.serviceWorker.controller) {
+        showUpdateBanner(reg.waiting);
+      }
+      // Watch for new workers becoming installed.
+      reg.addEventListener('updatefound', () => {
+        const installingWorker = reg.installing;
+        if (!installingWorker) return;
+        installingWorker.addEventListener('statechange', () => {
+          if (installingWorker.state === 'installed' && navigator.serviceWorker.controller) {
+            // A new SW is installed AND there was already a controller — i.e. an update.
+            showUpdateBanner(installingWorker);
+          }
+        });
+      });
+    }).catch(err => console.log('SW reg failed:', err));
+
+    // When the active SW changes (after we tell it to skipWaiting), reload to use it.
+    let reloading = false;
+    navigator.serviceWorker.addEventListener('controllerchange', () => {
+      if (reloading) return;
+      reloading = true;
+      window.location.reload();
+    });
+  });
+}
+
+function showUpdateBanner(worker) {
+  state.updateAvailable = true;
+  state.pendingWorker = worker;
+  document.body.classList.add('has-update-banner');
+  render();
+}
+
+function applyUpdate() {
+  if (state.pendingWorker) {
+    state.pendingWorker.postMessage({ type: 'SKIP_WAITING' });
+    // Page will reload via controllerchange listener.
+  } else {
+    window.location.reload();
+  }
+}
+
+function dismissUpdateBanner() {
+  state.updateAvailable = false;
+  document.body.classList.remove('has-update-banner');
+  render();
 }
 
 // ---------- Rendering ----------
@@ -599,8 +858,35 @@ function render() {
   else if (v === 'entry') html = renderEntry();
   else if (v === 'overview') html = renderOverview();
   else if (v === 'editSession') html = renderEditSession();
-  else if (v === 'settings') html = renderSettings();
-  app.innerHTML = html;
+  else if (v === 'settings') html = renderSettingsHub();
+  else if (v === 'settingsUser') html = renderSettingsUser();
+  else if (v === 'settingsItems') html = renderSettingsItems();
+  else if (v === 'settingsFails') html = renderSettingsFails();
+  else if (v === 'settingsDescriptions') html = renderSettingsDescriptions();
+  else if (v === 'settingsDisplay') html = renderSettingsDisplay();
+  else if (v === 'settingsBackup') html = renderSettingsBackup();
+  else if (v === 'settingsCalculator') html = renderSettingsCalculator();
+  else if (v === 'settingsAbout') html = renderSettingsAbout();
+  else if (v === 'settingsContact') html = renderSettingsContact();
+
+  // Update banner sits above the screen
+  const banner = state.updateAvailable ? `
+    <div class="update-banner" role="status">
+      <span class="update-banner-text">⟳ Update available</span>
+      <div class="update-banner-actions">
+        <button class="update-refresh-btn" id="update-refresh">Refresh</button>
+        <button class="update-dismiss-btn" id="update-dismiss" aria-label="Dismiss">×</button>
+      </div>
+    </div>
+  ` : '';
+
+  app.innerHTML = banner + html;
+  // Toggle body class for selection bar spacing
+  if (state.view === 'overview' && state.selectionMode) {
+    document.body.classList.add('has-selection-bar');
+  } else {
+    document.body.classList.remove('has-selection-bar');
+  }
   bindEvents();
 }
 
@@ -687,7 +973,7 @@ function renderEntry() {
     : `<button class="notes-toggle" id="show-notes-btn">✎ Add note</button>`;
 
   const resultBadge = isExisting && existing.result
-    ? `<span style="margin-left:8px;color:${existing.result === 'pass' ? '#16a34a' : '#dc2626'};font-weight:700">· ${capitalise(existing.result).toUpperCase()}</span>`
+    ? `<span class="result-badge ${existing.result}">· ${capitalise(existing.result).toUpperCase()}</span>`
     : '';
 
   const suggestionsBlock = (state.showSuggestions && state.suggestions.length > 0)
@@ -700,7 +986,6 @@ function renderEntry() {
     ? ` (${escapeHTML(sess.items[sess.items.length - 1].itemType)} · ${capitalise(sess.items[sess.items.length - 1].result)})`
     : '';
 
-  // v6: fail modal now has two stages — chip picker, or "other" free-text input.
   let failSheetInner = '';
   if (state.failModalStage === 'reasons') {
     failSheetInner = `
@@ -732,12 +1017,10 @@ function renderEntry() {
     </div>
   ` : '';
 
-  // v6: location-carried hint now reflects whether form.location actually has a carry value.
   const carriedHint = (!isExisting && state.form.location)
     ? '<span class="hint">(carried from last)</span>'
     : '';
 
-  // v6: progress row gets a small bin icon on the right when an existing item is shown.
   const progressRow = `
     <div class="progress-row">
       <div class="progress">Item ${state.cursor + 1} ${isExisting ? `of ${sess.items.length}` : '(new)'}${resultBadge}</div>
@@ -790,8 +1073,6 @@ function renderEntry() {
   `;
 }
 
-// v6: extracted body so the search input can refresh the table without re-rendering
-// the whole screen (which would lose focus on every keystroke).
 function computeVisibleOverviewItems(sess) {
   const q = state.searchQuery.trim().toLowerCase();
   return sess.items
@@ -816,21 +1097,36 @@ function renderOverviewBodyHTML(sess) {
     else msg = 'No items recorded yet.';
     return `<p class="muted">${msg}</p>`;
   }
+  const sel = state.selectionMode;
+  const checkColHead = sel ? `<th class="th"></th>` : '';
   return `<div class="table-wrap">
     <table class="table">
       <thead><tr>
+        ${checkColHead}
         <th class="th">#</th><th class="th">Location</th><th class="th">Item</th><th class="th">Result</th><th class="th"></th>
       </tr></thead>
       <tbody>
-        ${visible.map(({ it, i }) => `
-          <tr class="tr" data-jump="${i}">
-            <td class="td">${escapeHTML(it.assetNo)}</td>
-            <td class="td">${escapeHTML(it.location)}</td>
-            <td class="td">${escapeHTML(it.itemType)}</td>
-            <td class="td td-result" style="color:${it.result === 'pass' ? '#16a34a' : '#dc2626'}">${capitalise(it.result || '')}</td>
-            <td class="td td-action" data-del-item="${i}">🗑</td>
-          </tr>
-        `).join('')}
+        ${visible.map(({ it, i }) => {
+          const checked = sel && state.selectedIndices.includes(i);
+          const checkCol = sel
+            ? `<td class="td td-check"><input type="checkbox" data-select="${i}" ${checked ? 'checked' : ''}></td>`
+            : '';
+          const actionCol = sel
+            ? `<td class="td td-action"></td>`
+            : `<td class="td td-action" data-del-item="${i}">🗑</td>`;
+          const rowAttr = sel ? `data-row-toggle="${i}"` : `data-jump="${i}"`;
+          const rowClass = sel && checked ? 'tr selected' : 'tr';
+          return `
+            <tr class="${rowClass}" ${rowAttr}>
+              ${checkCol}
+              <td class="td">${escapeHTML(it.assetNo)}</td>
+              <td class="td">${escapeHTML(it.location)}</td>
+              <td class="td">${escapeHTML(it.itemType)}</td>
+              <td class="td td-result ${it.result || ''}">${capitalise(it.result || '')}</td>
+              ${actionCol}
+            </tr>
+          `;
+        }).join('')}
       </tbody>
     </table>
   </div>`;
@@ -852,36 +1148,104 @@ function renderOverview() {
     </div>
   ` : '';
 
-  return `
-    <div class="screen">
+  // Header changes in selection mode
+  let header;
+  if (state.selectionMode) {
+    const n = state.selectedIndices.length;
+    header = `
+      <header class="header-row">
+        <button class="icon-btn" id="cancel-selection-btn" aria-label="Cancel selection">✕</button>
+        <div class="site-name">${n} selected</div>
+        <span style="width:40px"></span>
+      </header>
+    `;
+  } else {
+    const showSelectBtn = sess.items.length > 0;
+    header = `
       <header class="header-row">
         <button class="icon-btn" id="back-btn" aria-label="Back">‹</button>
         <div class="site-name">Overview</div>
         <div class="header-actions">
+          ${showSelectBtn ? `<button class="icon-btn" id="select-mode-btn" aria-label="Select items" title="Select items">☑</button>` : ''}
           <button class="icon-btn" id="edit-session-btn" aria-label="Edit session">✎</button>
           <button class="icon-btn" id="export-btn" aria-label="Export CSV">⬇</button>
         </div>
       </header>
-      <div class="progress">${sess.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span>${sess.engineer ? ' · ' + escapeHTML(sess.engineer) : ''}</div>
-      ${filterRow}
+    `;
+  }
+
+  const selectAllRow = state.selectionMode ? `
+    <div class="select-all-row">
+      <button id="select-all-visible-btn">Select all visible</button>
+      <button id="clear-selection-btn">Clear</button>
+    </div>
+  ` : '';
+
+  const selectionBar = state.selectionMode ? `
+    <div class="selection-bar">
+      <span class="selection-bar-count">${state.selectedIndices.length} selected</span>
+      <button class="selection-bar-action" id="bulk-edit-loc-btn" ${state.selectedIndices.length === 0 ? 'disabled' : ''}>Change location</button>
+    </div>
+  ` : '';
+
+  const bulkDialog = state.bulkLocationDialogOpen ? `
+    <div class="modal-backdrop" id="bulk-backdrop"></div>
+    <div class="bulk-sheet" role="dialog" aria-label="Change location">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">Change location for ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</h3>
+        <button class="fail-close-btn" id="bulk-cancel-btn" aria-label="Cancel">×</button>
+      </div>
+      <input class="input-big" id="bulk-location-input" value="${escapeHTML(state.bulkLocationValue)}" placeholder="New location" autofocus style="margin-bottom:14px">
+      <button class="btn-primary" id="bulk-apply-btn">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
+    </div>
+  ` : '';
+
+  const stats = `<div class="progress">${sess.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span>${sess.engineer ? ' · ' + escapeHTML(sess.engineer) : ''}</div>`;
+
+  return `
+    <div class="screen">
+      ${header}
+      ${stats}
+      ${state.selectionMode ? '' : filterRow}
+      ${selectAllRow}
       <div class="overview-body">${renderOverviewBodyHTML(sess)}</div>
+      ${selectionBar}
+      ${bulkDialog}
     </div>
   `;
 }
 
-// v6: refresh just the overview table body in response to search-input typing.
-// Keeps the search box focused (full re-render would steal focus on every keystroke).
 function refreshOverviewBody() {
   const sess = activeSession();
   if (!sess) return;
   const wrap = document.querySelector('.overview-body');
   if (!wrap) return;
   wrap.innerHTML = renderOverviewBodyHTML(sess);
+  bindOverviewBodyEvents();
+}
+
+function bindOverviewBodyEvents() {
   document.querySelectorAll('[data-jump]').forEach(el => {
     el.onclick = () => jumpTo(parseInt(el.dataset.jump, 10));
   });
   document.querySelectorAll('[data-del-item]').forEach(el => {
     el.onclick = (e) => { e.stopPropagation(); if (confirm('Delete this item?')) deleteItem(parseInt(el.dataset.delItem, 10)); };
+  });
+  document.querySelectorAll('[data-row-toggle]').forEach(el => {
+    el.onclick = (e) => {
+      // Avoid double-toggling when the checkbox itself is clicked
+      if (e.target && e.target.tagName === 'INPUT') return;
+      toggleSelected(parseInt(el.dataset.rowToggle, 10));
+      render();
+    };
+  });
+  document.querySelectorAll('[data-select]').forEach(el => {
+    el.onchange = () => {
+      toggleSelected(parseInt(el.dataset.select, 10));
+      render();
+    };
   });
 }
 
@@ -913,7 +1277,29 @@ function renderEditSession() {
   `;
 }
 
-function renderSettings() {
+// ===== Settings hub & sub-pages (v7) =====
+
+function renderSettingsHub() {
+  // Each row leads to a focused sub-page. The subtitle gives a one-glance count or status.
+  const itemSummary = state.itemTypes.length === 1 ? '1 quick-pick' : `${state.itemTypes.length} quick-picks`;
+  const failSummary = state.failReasons.length === 1 ? '1 quick-pick' : `${state.failReasons.length} quick-picks`;
+  const descSummary = state.descriptions.length === 1 ? '1 description' : `${state.descriptions.length} descriptions`;
+  const themeSummary = state.theme === 'system' ? 'System' : (state.theme === 'dark' ? 'Dark' : 'Light');
+  const hapticsSummary = state.hapticsEnabled ? 'Haptics on' : 'Haptics off';
+  const displaySummary = `${themeSummary} · ${hapticsSummary}`;
+
+  const rows = [
+    { id: 'settingsUser', icon: '👤', title: 'User Settings', sub: state.engineer ? state.engineer : 'Engineer name' },
+    { id: 'settingsItems', icon: '⚡', title: 'Quick Pick Items', sub: itemSummary },
+    { id: 'settingsFails', icon: '⚠️', title: 'Quick Pick Fail', sub: failSummary },
+    { id: 'settingsDescriptions', icon: '📝', title: 'Item Description List', sub: descSummary },
+    { id: 'settingsDisplay', icon: '🎨', title: 'Display Settings', sub: displaySummary },
+    { id: 'settingsBackup', icon: '💾', title: 'Backup & Restore', sub: 'Export or import all data' },
+    { id: 'settingsCalculator', icon: '🧮', title: 'Resistance Calculator', sub: 'Coming soon' },
+    { id: 'settingsAbout', icon: 'ℹ️', title: 'About', sub: 'About this app' },
+    { id: 'settingsContact', icon: '✉️', title: 'Contact', sub: 'Get in touch' }
+  ];
+
   return `
     <div class="screen">
       <header class="header-row">
@@ -921,33 +1307,219 @@ function renderSettings() {
         <div class="site-name">Settings</div>
         <span style="width:40px"></span>
       </header>
+      <div class="settings-list">
+        ${rows.map(r => `
+          <button class="settings-row" data-page="${r.id}">
+            <span class="settings-row-icon">${r.icon}</span>
+            <div class="settings-row-text">
+              <div class="settings-row-title">${escapeHTML(r.title)}</div>
+              <div class="settings-row-sub">${escapeHTML(r.sub)}</div>
+            </div>
+            <span class="settings-row-chevron">›</span>
+          </button>
+        `).join('')}
+      </div>
+      <p class="settings-footer">PAT Test ${APP_VERSION} · © 2026 Peter Birchley<br>Data stored on this device only</p>
+    </div>
+  `;
+}
 
+function renderSettingsSubHeader(title) {
+  return `
+    <header class="header-row">
+      <button class="icon-btn" id="back-to-settings-btn" aria-label="Back">‹</button>
+      <div class="site-name">${escapeHTML(title)}</div>
+      <span style="width:40px"></span>
+    </header>
+  `;
+}
+
+function renderSettingsUser() {
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('User Settings')}
       <div class="settings-section">
         <h2 class="h2">Engineer name</h2>
-        <p class="muted">Used as the default for new sessions.</p>
+        <p class="muted">Used as the default for new sessions and shown on exported CSVs.</p>
         <input class="input" id="settings-engineer" value="${escapeHTML(state.engineer)}" placeholder="Your name">
       </div>
+      <button class="btn-primary" id="settings-user-save" style="margin-top:24px">Save</button>
+    </div>
+  `;
+}
 
+function renderSettingsItems() {
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Quick Pick Items')}
       <div class="settings-section">
-        <h2 class="h2">Quick-pick item types</h2>
+        <h2 class="h2">Item types</h2>
         <p class="muted">One per line. Up to 9. Appear as quick-tap buttons on the entry screen.</p>
-        <textarea class="textarea" id="settings-types" style="min-height:180px">${escapeHTML(state.itemTypes.join('\n'))}</textarea>
+        <textarea class="textarea" id="settings-types" style="min-height:240px">${escapeHTML(state.itemTypes.join('\n'))}</textarea>
       </div>
+      <button class="btn-primary" id="settings-items-save" style="margin-top:24px">Save</button>
+    </div>
+  `;
+}
 
+function renderSettingsFails() {
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Quick Pick Fail')}
       <div class="settings-section">
-        <h2 class="h2">Quick-pick fail reasons</h2>
+        <h2 class="h2">Fail reasons</h2>
         <p class="muted">One per line. Up to 6. Shown when you tap FAIL.</p>
-        <textarea class="textarea" id="settings-reasons" style="min-height:140px">${escapeHTML(state.failReasons.join('\n'))}</textarea>
+        <textarea class="textarea" id="settings-reasons" style="min-height:200px">${escapeHTML(state.failReasons.join('\n'))}</textarea>
       </div>
+      <button class="btn-primary" id="settings-fails-save" style="margin-top:24px">Save</button>
+    </div>
+  `;
+}
 
+function renderSettingsDescriptions() {
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Item Description List')}
       <div class="settings-section">
         <h2 class="h2">Saved descriptions</h2>
         <p class="muted">Item types you've typed into the custom field. Edit to fix typos for future autocomplete (won't change items already saved). Add new lines to seed autocomplete with common items.</p>
-        <textarea class="textarea" id="settings-descriptions" style="min-height:200px">${escapeHTML(state.descriptions.join('\n'))}</textarea>
+        <textarea class="textarea" id="settings-descriptions" style="min-height:280px">${escapeHTML(state.descriptions.join('\n'))}</textarea>
+      </div>
+      <button class="btn-primary" id="settings-descriptions-save" style="margin-top:24px">Save</button>
+    </div>
+  `;
+}
+
+function renderSettingsDisplay() {
+  const themes = [
+    { key: 'system', label: 'System', sub: 'Match device appearance' },
+    { key: 'light', label: 'Light', sub: '' },
+    { key: 'dark', label: 'Dark', sub: '' }
+  ];
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Display Settings')}
+      <div class="settings-section">
+        <h2 class="h2">Theme</h2>
+        <p class="muted">Choose how the app looks.</p>
+        <div class="theme-options">
+          ${themes.map(t => `
+            <button class="theme-option" data-theme="${t.key}">
+              <span class="theme-option-radio ${state.theme === t.key ? 'checked' : ''}"></span>
+              <span class="theme-option-label">${escapeHTML(t.label)}</span>
+              ${t.sub ? `<span class="theme-option-sub">${escapeHTML(t.sub)}</span>` : ''}
+            </button>
+          `).join('')}
+        </div>
       </div>
 
-      <button class="btn-primary" id="settings-save" style="margin-top:20px">Save</button>
-      <p class="muted" style="margin-top:24px;font-size:12px">PAT Test ${APP_VERSION} · © 2026 Peter Birchley · Data stored on this device only</p>
+      <div class="settings-section">
+        <h2 class="h2">Haptics</h2>
+        <p class="muted">Vibration on pass, fail, and copy actions. Turn off if you find it distracting or if it's too aggressive on your device.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Haptic feedback</div>
+            <div class="toggle-row-sub">${state.hapticsEnabled ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="haptics-toggle" ${state.hapticsEnabled ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderSettingsBackup() {
+  const stats = getStorageStats();
+  const barClass = stats.pct >= 90 ? 'danger' : (stats.pct >= 70 ? 'warn' : '');
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Backup & Restore')}
+      <div class="settings-section">
+        <h2 class="h2">Backup</h2>
+        <p class="muted">Save a complete copy of all sessions and settings as a single JSON file. Keep it somewhere safe — it's the only safety net if the browser ever clears its data.</p>
+        <button class="backup-action-btn primary" id="backup-export-btn">⬇ Export backup (.json)</button>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Restore</h2>
+        <p class="muted">Import a previously exported backup file. <strong>This will replace all current data on this device.</strong> You'll be asked to confirm before anything is overwritten.</p>
+        <input type="file" id="backup-import-file" accept="application/json,.json" style="display:none">
+        <button class="backup-action-btn danger" id="backup-import-btn">⬆ Import backup (.json)</button>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Storage usage</h2>
+        <div class="storage-card">
+          <div class="storage-stat"><span class="storage-stat-label">Sessions</span><span class="storage-stat-value">${stats.sessions}</span></div>
+          <div class="storage-stat"><span class="storage-stat-label">Items recorded</span><span class="storage-stat-value">${stats.items.toLocaleString()}</span></div>
+          <div class="storage-stat"><span class="storage-stat-label">Storage used</span><span class="storage-stat-value">${formatBytes(stats.bytes)}</span></div>
+          <div class="storage-stat"><span class="storage-stat-label">Approx. limit</span><span class="storage-stat-value">~5 MB</span></div>
+          <div class="storage-bar-wrap"><div class="storage-bar ${barClass}" style="width:${stats.pct}%"></div></div>
+          <p class="muted" style="margin-top:10px;font-size:12px">Browsers cap local data at around 5 MB. Export a backup and clear old sessions before you get close to the limit.</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function renderSettingsCalculator() {
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Resistance Calculator')}
+      <div class="info-card">
+        <h2>Coming in a future release</h2>
+        <p>A built-in calculator for long-lead resistance compensation tests, so you don't have to switch apps mid-session.</p>
+        <p class="muted">When this lands you'll be able to enter the lead's measured resistance, the published cross-section / length, and get the compensated reading inline — keeping your workflow in one app.</p>
+      </div>
+    </div>
+  `;
+}
+
+function renderSettingsAbout() {
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('About')}
+      <div class="info-card">
+        <h2>PAT Test ${APP_VERSION}</h2>
+        <p>A fast, offline-first portable appliance testing app for working PAT engineers. Built around speed of data entry — pass/fail decisions in two taps, no fighting the interface.</p>
+        <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed.</p>
+        <h3>Status</h3>
+        <p>The app is currently in active testing. Features and refinements ship regularly. If something breaks, behaves oddly, or you've got an idea for what's next, get in touch via the Contact page.</p>
+        <h3>Privacy</h3>
+        <p>All test records, settings, and saved descriptions live in your phone or browser's local storage. The app makes no network calls after the initial install. Backups are stored only where you choose to save them.</p>
+      </div>
+      <div class="info-card">
+        <p class="muted">© 2026 Peter Birchley. All rights reserved.</p>
+      </div>
+    </div>
+  `;
+}
+
+function renderSettingsContact() {
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Contact')}
+      <div class="info-card">
+        <h2>Get in touch</h2>
+        <p>Feedback, bug reports, and feature requests are all welcome. Tell us what you're testing, where the app slowed you down, and what would have made it faster.</p>
+
+        <h3>Email</h3>
+        <p class="muted">[contact email — to be added]</p>
+
+        <h3>Web</h3>
+        <p class="muted">[website — to be added]</p>
+
+        <h3>Support hours</h3>
+        <p class="muted">[support hours — to be added]</p>
+      </div>
+      <div class="info-card">
+        <h3>What to include in a bug report</h3>
+        <p>If something's gone wrong, the more of this you can include the better:</p>
+        <p class="muted">• What you were trying to do<br>• What happened instead<br>• Your phone model and OS version<br>• The app version (currently ${APP_VERSION})<br>• Any error messages on screen</p>
+      </div>
     </div>
   `;
 }
@@ -955,6 +1527,10 @@ function renderSettings() {
 // ---------- Event binding ----------
 function bindEvents() {
   const $ = id => document.getElementById(id);
+
+  // Update banner — present on every view if updateAvailable
+  if ($('update-refresh')) $('update-refresh').onclick = () => applyUpdate();
+  if ($('update-dismiss')) $('update-dismiss').onclick = () => dismissUpdateBanner();
 
   // Sessions screen
   if ($('settings-btn')) $('settings-btn').onclick = () => setView('settings');
@@ -978,7 +1554,6 @@ function bindEvents() {
   if ($('nf-prefix')) $('nf-prefix').oninput = e => state.newForm.prefix = e.target.value;
   if ($('nf-start')) $('nf-start').oninput = e => state.newForm.startNo = e.target.value;
 
-  // Sort selector
   if ($('sort-select')) $('sort-select').onchange = e => {
     state.sort = e.target.value;
     save();
@@ -1004,7 +1579,6 @@ function bindEvents() {
   if ($('overview-btn')) $('overview-btn').onclick = () => setView('overview');
   if ($('f-asset')) $('f-asset').oninput = e => state.form.assetNo = e.target.value;
 
-  // Location: tap-to-clear, restore on empty blur, title-case on commit
   if ($('f-location')) {
     $('f-location').oninput = e => state.form.location = e.target.value;
     $('f-location').onfocus = e => {
@@ -1025,7 +1599,6 @@ function bindEvents() {
     };
   }
 
-  // Item type: autocomplete + title-case on blur (preserving quick-pick casing)
   if ($('f-type')) {
     $('f-type').oninput = e => {
       const val = e.target.value;
@@ -1051,7 +1624,6 @@ function bindEvents() {
         e.target.value = cased;
         state.form.itemType = cased;
       }
-      // Delay hide so suggestion clicks can register
       setTimeout(() => { state.showSuggestions = false; renderSuggestionsOnly(); }, 150);
     };
   }
@@ -1078,7 +1650,6 @@ function bindEvents() {
   if ($('skip-new-btn')) $('skip-new-btn').onclick = () => skipToNew();
   if ($('del-item-btn')) $('del-item-btn').onclick = () => { if (confirm('Delete this item?')) deleteItem(state.cursor); };
 
-  // Fail modal — stage 1 (reasons) and stage 2 (other text input)
   document.querySelectorAll('[data-reason]').forEach(el => {
     el.onclick = () => pickFailReason(el.dataset.reason);
   });
@@ -1101,9 +1672,24 @@ function bindEvents() {
   if ($('fail-backdrop')) $('fail-backdrop').onclick = () => cancelFailModal();
 
   // Overview screen
-  if ($('back-btn')) $('back-btn').onclick = () => setView(state.activeId ? 'entry' : 'sessions');
+  // Overview & Settings hub both use #back-btn — disambiguate by current view.
+  // Settings hub is only reachable from sessions; Overview is only reachable from entry.
+  if ($('back-btn')) $('back-btn').onclick = () => {
+    if (state.view === 'overview') setView('entry');
+    else if (state.view === 'settings') setView('sessions');
+  };
   if ($('export-btn')) $('export-btn').onclick = () => { const s = activeSession(); if (s) downloadCSV(s); };
   if ($('edit-session-btn')) $('edit-session-btn').onclick = () => startEditSession();
+  if ($('select-mode-btn')) $('select-mode-btn').onclick = () => enterSelectionMode();
+  if ($('cancel-selection-btn')) $('cancel-selection-btn').onclick = () => { exitSelectionMode(); render(); };
+  if ($('select-all-visible-btn')) $('select-all-visible-btn').onclick = () => selectAllVisible();
+  if ($('clear-selection-btn')) $('clear-selection-btn').onclick = () => clearSelection();
+  if ($('bulk-edit-loc-btn')) $('bulk-edit-loc-btn').onclick = () => openBulkLocationDialog();
+  if ($('bulk-cancel-btn')) $('bulk-cancel-btn').onclick = () => { state.bulkLocationDialogOpen = false; render(); };
+  if ($('bulk-backdrop')) $('bulk-backdrop').onclick = () => { state.bulkLocationDialogOpen = false; render(); };
+  if ($('bulk-location-input')) $('bulk-location-input').oninput = e => state.bulkLocationValue = e.target.value;
+  if ($('bulk-apply-btn')) $('bulk-apply-btn').onclick = () => applyBulkLocation();
+
   if ($('overview-search')) $('overview-search').oninput = e => {
     state.searchQuery = e.target.value;
     refreshOverviewBody();
@@ -1112,12 +1698,7 @@ function bindEvents() {
     state.showFailsOnly = e.target.checked;
     refreshOverviewBody();
   };
-  document.querySelectorAll('[data-jump]').forEach(el => {
-    el.onclick = () => jumpTo(parseInt(el.dataset.jump, 10));
-  });
-  document.querySelectorAll('[data-del-item]').forEach(el => {
-    el.onclick = (e) => { e.stopPropagation(); if (confirm('Delete this item?')) deleteItem(parseInt(el.dataset.delItem, 10)); };
-  });
+  bindOverviewBodyEvents();
 
   // Edit-session screen
   if ($('cancel-edit-btn')) $('cancel-edit-btn').onclick = () => setView('overview');
@@ -1136,8 +1717,38 @@ function bindEvents() {
   if ($('ef-date')) $('ef-date').oninput = e => state.editForm.date = e.target.value;
   if ($('ef-prefix')) $('ef-prefix').oninput = e => state.editForm.prefix = e.target.value;
 
-  // Settings screen
-  if ($('settings-save')) $('settings-save').onclick = () => saveSettings();
+  // Settings hub — row taps
+  document.querySelectorAll('[data-page]').forEach(el => {
+    el.onclick = () => setView(el.dataset.page);
+  });
+  // Settings sub-pages — back button
+  if ($('back-to-settings-btn')) $('back-to-settings-btn').onclick = () => setView('settings');
+
+  // Settings sub-page save buttons
+  if ($('settings-user-save')) $('settings-user-save').onclick = () => saveUserSettings();
+  if ($('settings-items-save')) $('settings-items-save').onclick = () => saveItemTypesSettings();
+  if ($('settings-fails-save')) $('settings-fails-save').onclick = () => saveFailReasonsSettings();
+  if ($('settings-descriptions-save')) $('settings-descriptions-save').onclick = () => saveDescriptionsSettings();
+
+  // Display settings — instant apply
+  document.querySelectorAll('[data-theme]').forEach(el => {
+    el.onclick = () => setTheme(el.dataset.theme);
+  });
+  if ($('haptics-toggle')) $('haptics-toggle').onchange = e => {
+    setHaptics(e.target.checked);
+    // Re-render so the "On"/"Off" sub-text updates
+    render();
+  };
+
+  // Backup & Restore
+  if ($('backup-export-btn')) $('backup-export-btn').onclick = () => downloadBackup();
+  if ($('backup-import-btn')) $('backup-import-btn').onclick = () => $('backup-import-file').click();
+  if ($('backup-import-file')) $('backup-import-file').onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    restoreBackupFromFile(file);
+    // Reset so picking the same file twice still triggers
+    e.target.value = '';
+  };
 }
 
 // Light re-render of just the suggestions dropdown so we don't lose input focus
@@ -1166,5 +1777,7 @@ function renderSuggestionsOnly() {
 
 // ---------- Boot ----------
 load();
+applyTheme(state.theme);
 loadFormForCursor();
 render();
+registerServiceWorker();

@@ -1,6 +1,10 @@
 // Service worker — caches app shell for full offline use.
 // Bump CACHE_VERSION when you change app files to force update.
-const CACHE_VERSION = 'pat-v6';
+//
+// v7: removed self.skipWaiting() from install. New SW now sits in 'waiting' state
+// until the app explicitly tells it to activate. The app shows an "Update available"
+// banner; tapping Refresh sends a SKIP_WAITING message and the page reloads.
+const CACHE_VERSION = 'pat-v7';
 const ASSETS = [
   './',
   './index.html',
@@ -13,7 +17,7 @@ const ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting())
+    caches.open(CACHE_VERSION).then(cache => cache.addAll(ASSETS))
   );
 });
 
@@ -23,6 +27,14 @@ self.addEventListener('activate', (event) => {
       Promise.all(keys.filter(k => k !== CACHE_VERSION).map(k => caches.delete(k)))
     ).then(() => self.clients.claim())
   );
+});
+
+// App posts {type: 'SKIP_WAITING'} when the user taps the update banner.
+// We then activate, which fires controllerchange in the page → page reloads.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
 });
 
 self.addEventListener('fetch', (event) => {

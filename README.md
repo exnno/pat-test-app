@@ -1,24 +1,32 @@
 # PAT Test PWA
 
-A fast, offline Progressive Web App for PAT testing.
+A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, search, fails-only filter, bulk edit, JSON backup/restore, dark mode, and CSV export.
+
+**Live:** https://exnno.github.io/pat-test-app/
+
+## Stack
+
+Vanilla HTML / CSS / JS — no frameworks, no build step. Service-worker cached for full offline use. State lives in `localStorage`.
 
 ## Files
-- `index.html` — main page
-- `styles.css` — styling
-- `app.js` — application logic
-- `sw.js` — service worker (offline caching)
-- `manifest.webmanifest` — install metadata
+
+- `index.html` — shell
+- `app.js` — all app logic
+- `styles.css` — themed via CSS variables; supports light, dark, and system theme
+- `sw.js` — service worker (bump `CACHE_VERSION` on every release)
+- `manifest.webmanifest` — PWA manifest
 - `icon-192.png`, `icon-512.png` — app icons
+- `LICENSE.txt` — proprietary license; all rights reserved
 
-## How it works
-- All data is stored on the device (`localStorage`). Nothing is sent anywhere.
-- The service worker caches every file on first visit, so the app then runs with no internet.
-- "Add to Home Screen" on a phone makes it open like a native app.
+## Deployment
 
-## Hosting
-Upload the whole folder to any static host (GitHub Pages, Netlify, Cloudflare Pages, etc.).
-The site **must** be served over HTTPS for the service worker (and offline mode) to work.
-Once installed, the phone has its own copy and works with no signal.
+GitHub Pages, auto-deploys on commit to `main`. Edit via the GitHub web UI for quick iterations.
 
-## Updates
-When you change any file, increment `CACHE_VERSION` in `sw.js` so phones pick up the new version on next launch.
+## Releasing
+
+1. **Always bump `CACHE_VERSION` in `sw.js`** when any file changes.
+2. **Always bump `APP_VERSION` in `app.js`** for the user-visible version label.
+3. Replace files via the GitHub web UI and commit.
+4. The app shows an "Update available" banner inside the PWA when it detects the new version — tap Refresh to activate.
+
+© 2026 Peter Birchley. All rights reserved.
