@@ -4,7 +4,11 @@
 // v7: removed self.skipWaiting() from install. New SW now sits in 'waiting' state
 // until the app explicitly tells it to activate. The app shows an "Update available"
 // banner; tapping Refresh sends a SKIP_WAITING message and the page reloads.
-const CACHE_VERSION = 'pat-v7';
+//
+// v8: cache bump for fixes (date field height, defensive DOM hygiene against
+// orphaned modal backdrops causing the "taps do nothing" bug) plus new features
+// (lock-session toggle, working resistance calculator, About changelog).
+const CACHE_VERSION = 'pat-v8';
 const ASSETS = [
   './',
   './index.html',

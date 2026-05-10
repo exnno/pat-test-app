@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v7 (May 2026)
+ * v8 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v7 ==============
+// ============== PAT Test PWA — v8 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V7';
+const APP_VERSION = 'V8';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -31,6 +31,22 @@ const DEFAULT_FAIL_REASONS = [
   'Visual fail'
 ];
 
+// v8: Resistance calculator — IET Code of Practice Table V1.1 nominal values.
+// Earth continuity limit = (0.1 + R)Ω, where R = length × per-metre resistance.
+// CSAs and lengths chosen to match pat-testing-training.net/articles/earth-limits.php
+const CSA_RESISTANCE = {
+  '0.5':  0.039,
+  '0.75': 0.026,
+  '1.0':  0.0195,
+  '1.25': 0.0156,
+  '1.5':  0.0133,
+  '2.5':  0.008
+};
+const CALC_LENGTHS = [0.25, 0.5, 0.75, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
+  11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30,
+  31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
+  51, 52];
+
 // ---------- State ----------
 let state = {
   sessions: [],
@@ -44,7 +60,7 @@ let state = {
   cursor: 0,
   form: { assetNo: '', location: '', itemType: '', notes: '', showNotes: false },
   newForm: { name: '', site: '', engineer: '', prefix: '', startNo: '1', show: false },
-  editForm: { name: '', site: '', engineer: '', prefix: '', date: '' },
+  editForm: { name: '', site: '', engineer: '', prefix: '', date: '', locked: false },
   suggestions: [],
   showSuggestions: false,
   failModalOpen: false,
@@ -60,7 +76,10 @@ let state = {
   bulkLocationDialogOpen: false,
   bulkLocationValue: '',
   updateAvailable: false,
-  pendingWorker: null               // SW that's installed and waiting
+  pendingWorker: null,              // SW that's installed and waiting
+  // v8
+  calcCsa: '0.75',                  // matches pat-testing-training.net default
+  calcLength: 0.75
 };
 
 // ---------- Persistence ----------
@@ -91,6 +110,7 @@ function load() {
   state.sessions.forEach(s => {
     if (s.engineer === undefined) s.engineer = '';
     if (s.prefix === undefined) s.prefix = '';
+    if (s.locked === undefined) s.locked = false;   // v8
   });
 
   // Descriptions list — initialise from existing item history on first v4+ launch
@@ -473,7 +493,8 @@ function createSession() {
     prefix: prefix.trim(),
     date: todayISO(),
     startNumber: parseInt(startNo, 10) || 1,
-    items: []
+    items: [],
+    locked: false   // v8
   };
   state.sessions.unshift(s);
   state.activeId = s.id;
@@ -531,6 +552,9 @@ function saveItem(result) {
 }
 
 function passClicked() {
+  // v8: belt-and-braces — UI disables the buttons when locked, but block here too.
+  const sess = activeSession();
+  if (sess && sess.locked) return;
   const err = validateBeforeSave();
   if (err) { alert(err); return; }
   haptic(1);
@@ -538,6 +562,8 @@ function passClicked() {
 }
 
 function failClicked() {
+  const sess = activeSession();
+  if (sess && sess.locked) return;
   const err = validateBeforeSave();
   if (err) { alert(err); return; }
   haptic(3);
@@ -569,6 +595,7 @@ function cancelFailModal() {
 function copyLastResult() {
   const sess = activeSession();
   if (!sess || sess.items.length === 0) return;
+  if (sess.locked) return;   // v8
   const err = validateBeforeSave({ skipItemType: true });
   if (err) { alert(err); return; }
   haptic(2);
@@ -632,9 +659,14 @@ function jumpTo(idx) {
 }
 
 function setView(v) {
+  // v8: clear every modal/dialog flag on every view transition. Previously
+  // bulkLocationDialogOpen was only cleared via exitSelectionMode (overview-only),
+  // which left a window where the wrong navigation path could leave it true.
   state.failModalOpen = false;
   state.failModalStage = 'reasons';
   state.failOtherText = '';
+  state.bulkLocationDialogOpen = false;
+  state.bulkLocationValue = '';
   // Search and selection are overview-local; clear when leaving overview.
   if (v !== 'overview') {
     state.searchQuery = '';
@@ -720,7 +752,8 @@ function startEditSession() {
     site: sess.site || '',
     engineer: sess.engineer || '',
     prefix: sess.prefix || '',
-    date: sess.date || ''
+    date: sess.date || '',
+    locked: !!sess.locked   // v8
   };
   state.view = 'editSession';
   render();
@@ -729,7 +762,7 @@ function startEditSession() {
 function saveSessionEdits() {
   const sess = activeSession();
   if (!sess) return;
-  const { name, site, engineer, prefix, date } = state.editForm;
+  const { name, site, engineer, prefix, date, locked } = state.editForm;
   if (!String(site).trim()) {
     alert('Site is required.');
     return;
@@ -739,7 +772,17 @@ function saveSessionEdits() {
   sess.engineer = String(engineer).trim();
   sess.prefix = String(prefix).trim();
   sess.date = date || sess.date;
+  sess.locked = !!locked;   // v8
   state.view = 'overview';
+  save(); render();
+}
+
+// v8: unlock the active session from the entry-screen banner.
+// Toggling lock back on must go through the Edit Session screen — deliberate friction.
+function unlockActiveSession() {
+  const sess = activeSession();
+  if (!sess) return;
+  sess.locked = false;
   save(); render();
 }
 
@@ -852,6 +895,19 @@ function dismissUpdateBanner() {
 const app = document.getElementById('app');
 
 function render() {
+  // v8: DOM hygiene — defensive cleanup against the "taps do nothing" bug.
+  // Symptom: across the whole app, tapping any input gives no cursor and no keyboard.
+  // A fresh PWA install fixes it. The most likely cause is an orphaned modal
+  // backdrop or sheet sitting in the DOM at z-index 90+, silently swallowing every
+  // tap. We can't always reproduce it, so we sweep aggressively here every render:
+  //   1. Strip any modal/sheet elements that ended up outside #app (where they
+  //      would survive an innerHTML rewrite).
+  //   2. Drop any body classes that are only meant to be transient.
+  // The cost is one querySelectorAll per render — negligible.
+  document.querySelectorAll(
+    'body > .modal-backdrop, body > .fail-sheet, body > .bulk-sheet'
+  ).forEach(el => el.remove());
+
   const v = state.view;
   let html = '';
   if (v === 'sessions') html = renderSessions();
@@ -931,10 +987,12 @@ function renderSessions() {
     : sortedList.map(s => {
         const passes = s.items.filter(i => i.result === 'pass').length;
         const fails = s.items.filter(i => i.result === 'fail').length;
+        // v8: subtle 🔒 prefix on locked sessions so they're easy to spot in the list.
+        const lockMark = s.locked ? '<span class="session-lock" title="Locked">🔒</span>' : '';
         return `
-          <div class="session-card">
+          <div class="session-card${s.locked ? ' locked' : ''}">
             <div class="session-info" data-open="${s.id}">
-              <div class="session-title">${escapeHTML(s.site || s.name)}</div>
+              <div class="session-title">${lockMark}${escapeHTML(s.site || s.name)}</div>
               <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span></div>
             </div>
             <button class="icon-btn-sm" data-export="${s.id}" aria-label="Export CSV">⬇</button>
@@ -1028,6 +1086,20 @@ function renderEntry() {
     </div>
   `;
 
+  // v8: lock banner sits between the header and the form. When locked, save actions
+  // (Pass / Fail / Copy last) are disabled. Editing existing items via the overview
+  // is still possible — the lock is a soft guard against accidental new entries.
+  const isLocked = !!sess.locked;
+  const lockBanner = isLocked ? `
+    <div class="lock-banner" role="status">
+      <span class="lock-banner-text">🔒 Session locked — no new entries</span>
+      <button class="lock-banner-action" id="lock-unlock-btn">Unlock</button>
+    </div>
+  ` : '';
+
+  const passFailDisabled = isLocked ? 'disabled' : '';
+  const copyDisabled = (!hasLast || isLocked) ? 'disabled' : '';
+
   return `
     <div class="screen">
       <header class="header-row">
@@ -1036,6 +1108,7 @@ function renderEntry() {
         <button class="icon-btn" id="overview-btn" aria-label="Overview">▦</button>
       </header>
 
+      ${lockBanner}
       ${progressRow}
 
       <label class="label">Asset number</label>
@@ -1054,11 +1127,11 @@ function renderEntry() {
       ${notesBlock}
 
       <div class="pass-fail-row">
-        <button class="pass-btn" id="pass-btn"><span class="icon">✓</span>PASS</button>
-        <button class="fail-btn" id="fail-btn"><span class="icon">✗</span>FAIL</button>
+        <button class="pass-btn" id="pass-btn" ${passFailDisabled}><span class="icon">✓</span>PASS</button>
+        <button class="fail-btn" id="fail-btn" ${passFailDisabled}><span class="icon">✗</span>FAIL</button>
       </div>
 
-      <button class="copy-last-btn" id="copy-last-btn" ${hasLast ? '' : 'disabled'}>
+      <button class="copy-last-btn" id="copy-last-btn" ${copyDisabled}>
         ⎘ Copy last result${lastInfo}
       </button>
 
@@ -1250,6 +1323,7 @@ function bindOverviewBodyEvents() {
 }
 
 function renderEditSession() {
+  const lockChecked = state.editForm.locked ? 'checked' : '';
   return `
     <div class="screen">
       <header class="header-row">
@@ -1265,9 +1339,24 @@ function renderEditSession() {
         <label class="label">Session name</label>
         <input class="input" id="ef-name" value="${escapeHTML(state.editForm.name)}">
         <label class="label">Date</label>
-        <input class="input" id="ef-date" type="date" value="${escapeHTML(state.editForm.date)}">
+        <input class="input input-date" id="ef-date" type="date" value="${escapeHTML(state.editForm.date)}">
         <label class="label">Asset number prefix</label>
         <input class="input" id="ef-prefix" value="${escapeHTML(state.editForm.prefix)}">
+
+        <!-- v8: lock toggle. When on, Pass/Fail/Copy on the entry screen are disabled.
+             Bulk edit and item delete from the overview still work, so mistakes can be
+             corrected without unlocking the whole session. -->
+        <div class="lock-toggle-row">
+          <div class="lock-toggle-text">
+            <div class="lock-toggle-title">🔒 Lock session</div>
+            <div class="lock-toggle-sub">Prevents new entries from the test screen. Edits via the overview still work.</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="ef-locked" ${lockChecked}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+
         <div class="btn-row">
           <button class="btn-secondary" id="ef-cancel">Cancel</button>
           <button class="btn-primary" id="ef-save">Save</button>
@@ -1295,7 +1384,7 @@ function renderSettingsHub() {
     { id: 'settingsDescriptions', icon: '📝', title: 'Item Description List', sub: descSummary },
     { id: 'settingsDisplay', icon: '🎨', title: 'Display Settings', sub: displaySummary },
     { id: 'settingsBackup', icon: '💾', title: 'Backup & Restore', sub: 'Export or import all data' },
-    { id: 'settingsCalculator', icon: '🧮', title: 'Resistance Calculator', sub: 'Coming soon' },
+    { id: 'settingsCalculator', icon: '🧮', title: 'Resistance Calculator', sub: 'Earth continuity limit' },
     { id: 'settingsAbout', icon: 'ℹ️', title: 'About', sub: 'About this app' },
     { id: 'settingsContact', icon: '✉️', title: 'Contact', sub: 'Get in touch' }
   ];
@@ -1465,14 +1554,56 @@ function renderSettingsBackup() {
   `;
 }
 
+function computeEarthLimit(csaKey, lengthM) {
+  const r = CSA_RESISTANCE[csaKey];
+  if (r === undefined) return null;
+  const limit = 0.1 + (lengthM * r);
+  return limit;
+}
+
+function formatLengthOption(m) {
+  // Show whole-metre values without decimals, sub-metre with the fractional value.
+  return Number.isInteger(m) ? `${m} m` : `${m} m`;
+}
+
 function renderSettingsCalculator() {
+  const csaOptions = Object.keys(CSA_RESISTANCE).map(k =>
+    `<option value="${k}"${state.calcCsa === k ? ' selected' : ''}>${k} mm²</option>`
+  ).join('');
+
+  const lengthOptions = CALC_LENGTHS.map(L =>
+    `<option value="${L}"${Number(state.calcLength) === L ? ' selected' : ''}>${formatLengthOption(L)}</option>`
+  ).join('');
+
+  const limit = computeEarthLimit(state.calcCsa, Number(state.calcLength));
+  const limitText = limit === null ? '—' : `${limit.toFixed(2)} Ω`;
+  const r = CSA_RESISTANCE[state.calcCsa];
+  const workings = r === undefined ? '' :
+    `(0.1 + (${state.calcLength} × ${r})) Ω`;
+
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Resistance Calculator')}
-      <div class="info-card">
-        <h2>Coming in a future release</h2>
-        <p>A built-in calculator for long-lead resistance compensation tests, so you don't have to switch apps mid-session.</p>
-        <p class="muted">When this lands you'll be able to enter the lead's measured resistance, the published cross-section / length, and get the compensated reading inline — keeping your workflow in one app.</p>
+
+      <div class="settings-section">
+        <h2 class="h2">Earth Continuity Limit</h2>
+        <p class="muted">For a Class I appliance, the earth continuity limit is (0.1 + R) Ω, where R is the resistance of the protective conductor in the supply cable. Values from IET Code of Practice Table V1.1.</p>
+
+        <label class="label">CSA (cable cross-section)</label>
+        <select class="input" id="calc-csa">${csaOptions}</select>
+
+        <label class="label">Length</label>
+        <select class="input" id="calc-length">${lengthOptions}</select>
+
+        <div class="calc-result-card">
+          <div class="calc-result-label">Earth limit</div>
+          <div class="calc-result-value">${limitText}</div>
+          <div class="calc-result-formula">${workings}</div>
+        </div>
+      </div>
+
+      <div class="info-card" style="margin-top:20px">
+        <p class="muted">High readings are often down to test procedure rather than the appliance — contact resistance on the plug, test-lead resistance not nulled, or fortuitous contact with unearthed metalwork. Clean the earth pin, null the leads, and use the high-current (hard) test where possible.</p>
       </div>
     </div>
   `;
@@ -1491,6 +1622,29 @@ function renderSettingsAbout() {
         <h3>Privacy</h3>
         <p>All test records, settings, and saved descriptions live in your phone or browser's local storage. The app makes no network calls after the initial install. Backups are stored only where you choose to save them.</p>
       </div>
+
+      <!-- v8: emergency reload — for the rare case where the app stops responding to
+           taps. A reload clears any in-memory weirdness without losing data. -->
+      <div class="info-card">
+        <h3>If the app stops responding</h3>
+        <p class="muted">If taps stop registering anywhere in the app, tap Reload below. Your sessions and settings are not affected — only the app itself reloads.</p>
+        <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
+      </div>
+
+      <!-- v8: rolling 3-version changelog -->
+      <div class="info-card">
+        <h3>What's new</h3>
+
+        <p><strong>V8</strong> · May 2026</p>
+        <p class="muted">Lock-session toggle to prevent accidental new entries (with overview-edit override). Working earth continuity calculator under Settings. Date field on Edit Session sized to match other fields. Defensive cleanup against the "taps do nothing" bug. Reload-app shortcut on this page.</p>
+
+        <p><strong>V7</strong> · May 2026</p>
+        <p class="muted">Settings reorganised into a hub with focused sub-pages. Auto-update banner replaces the close-open-close-open dance. JSON backup / restore. Bulk-edit location from the overview. Storage usage indicator. Light / dark / system theme. Haptics toggle.</p>
+
+        <p><strong>V6</strong> · April 2026</p>
+        <p class="muted">Skip-to-new button so you can jump back to entering new items from anywhere in the session. Carry-forward location on new items. Copy-last-result button. Refinements to the autocomplete and item description list.</p>
+      </div>
+
       <div class="info-card">
         <p class="muted">© 2026 Peter Birchley. All rights reserved.</p>
       </div>
@@ -1709,6 +1863,7 @@ function bindEvents() {
     state.editForm.name = $('ef-name').value;
     state.editForm.date = $('ef-date').value;
     state.editForm.prefix = $('ef-prefix').value;
+    state.editForm.locked = $('ef-locked') ? $('ef-locked').checked : false;   // v8
     saveSessionEdits();
   };
   if ($('ef-site')) $('ef-site').oninput = e => state.editForm.site = e.target.value;
@@ -1716,6 +1871,10 @@ function bindEvents() {
   if ($('ef-name')) $('ef-name').oninput = e => state.editForm.name = e.target.value;
   if ($('ef-date')) $('ef-date').oninput = e => state.editForm.date = e.target.value;
   if ($('ef-prefix')) $('ef-prefix').oninput = e => state.editForm.prefix = e.target.value;
+  if ($('ef-locked')) $('ef-locked').onchange = e => state.editForm.locked = e.target.checked;   // v8
+
+  // v8: Lock banner unlock shortcut on entry screen
+  if ($('lock-unlock-btn')) $('lock-unlock-btn').onclick = () => unlockActiveSession();
 
   // Settings hub — row taps
   document.querySelectorAll('[data-page]').forEach(el => {
@@ -1748,6 +1907,26 @@ function bindEvents() {
     restoreBackupFromFile(file);
     // Reset so picking the same file twice still triggers
     e.target.value = '';
+  };
+
+  // v8: Resistance calculator — re-render the page on change so the result and
+  // formula text update. The dropdowns themselves don't lose focus on iOS because
+  // the user has already committed their selection by the time onchange fires.
+  if ($('calc-csa')) $('calc-csa').onchange = e => {
+    state.calcCsa = e.target.value;
+    render();
+  };
+  if ($('calc-length')) $('calc-length').onchange = e => {
+    state.calcLength = Number(e.target.value);
+    render();
+  };
+
+  // v8: emergency reload button on About — recovery for the rare "taps do nothing"
+  // bug without needing to reinstall the PWA. localStorage data is untouched.
+  if ($('about-reload-btn')) $('about-reload-btn').onclick = () => {
+    if (confirm('Reload the app? Your data is safe — only the app itself reloads.')) {
+      window.location.reload();
+    }
   };
 }
 
