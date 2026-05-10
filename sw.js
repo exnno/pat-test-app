@@ -18,8 +18,12 @@
 // iOS PWA. Hypothesis: WebKit in PWA mode disrupts form-input focus when a
 // data-* attribute is present on <html>. Replaced data-theme on <html> with
 // classes (.theme-force-light / .theme-force-dark). Same effect on CSS, no
-// data-* attribute on the root element.
-const CACHE_VERSION = 'pat-v8-2';
+// data-* attribute on the root element. Confirmed fix by Peter on iOS PWA.
+//
+// v9: new defaults (items, fails, descriptions), Quick Pick presets, reset
+// buttons on each settings sub-page, haptic on fail-modal commits, backup
+// includes presets.
+const CACHE_VERSION = 'pat-v9';
 const ASSETS = [
   './',
   './index.html',

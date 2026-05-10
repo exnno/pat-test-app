@@ -1,34 +1,75 @@
 /*!
  * PAT Test PWA
- * v8 (May 2026)
+ * v9 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v8 ==============
+// ============== PAT Test PWA — v9 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V8';
+const APP_VERSION = 'V9';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
-const ITEMS_KEY = 'pat:itemtypes';
+const ITEMS_KEY = 'pat:itemtypes';        // legacy (pre-v9). Read for migration.
 const FAIL_REASONS_KEY = 'pat:failreasons';
 const ENGINEER_KEY = 'pat:engineer';
 const DESCRIPTIONS_KEY = 'pat:descriptions';
 const SORT_KEY = 'pat:sort';
 const THEME_KEY = 'pat:theme';            // v7: 'system' | 'light' | 'dark'
 const HAPTICS_KEY = 'pat:haptics';        // v7: '1' | '0'
+const ITEM_PRESETS_KEY = 'pat:itempresets';     // v9: JSON [{id,name,items:[...]}]
+const ACTIVE_PRESET_KEY = 'pat:activepreset';   // v9: preset id
 
-const DEFAULT_ITEM_TYPES = ['Lead', 'AC adapter', 'Monitor', 'PC', 'Hub', 'Dock'];
+// v9: built-in defaults updated to Peter's working lists. These ship with fresh
+// installs and back stop the "Reset to defaults" button on each settings sub-page.
+// Existing users keep whatever they have until they tap Reset.
+const DEFAULT_ITEM_TYPES = [
+  'Lead', 'AC Adapter', 'Battery Charger',
+  'Monitor', 'PC', 'Hub',
+  'Extension', 'Fan', 'Heater'
+];
 const DEFAULT_FAIL_REASONS = [
-  'Damaged plug',
-  'Frayed cable',
-  'Cord grip loose',
-  'Earth fail',
-  'Insulation fail',
-  'Visual fail'
+  'Damaged Plug',
+  'Damaged Lead',
+  'Damaged Casing',
+  'Earth Continuity',
+  'Insulation Resistance',
+  'Does Not Conform To BS 1363'
+];
+// v9: alphabetical Item Description list — autocomplete seed for fresh installs
+// and the target of the new Reset button on the Item Description List page.
+// Capitalisation tightened: AC, PC, USB, TV, CCTV, CD, PAT, NAS, UPS, VoIP,
+// iMac, MacBook, Wi-Fi all rendered properly.
+const DEFAULT_DESCRIPTIONS = [
+  'AC Adapter', 'Air Conditioner', 'Air Fryer', 'Air Purifier', 'Amplifier',
+  'Angle Grinder', 'Appliance', 'Barcode Scanner', 'Battery Charger',
+  'Bench Grinder', 'Bench Power Supply', 'Blender', 'Cable', 'Camera',
+  'Card Reader', 'Cash Drawer', 'CCTV Monitor', 'CD Player', 'Charging Station',
+  'Chromebook', 'Circular Saw', 'Clock', 'Coffee Grinder', 'Coffee Machine',
+  'Compressor', 'Computer Stand', 'Control Unit', 'Cooker', 'Curling Tongs',
+  'Dehumidifier', 'Desk', 'Dishwasher', 'Display', 'Docking Station', 'Drill',
+  'Electric Blanket', 'Ethernet Switch', 'Extension Lead', 'Extension Reel',
+  'Extractor Fan', 'Fan', 'Fog Machine', 'Food Processor', 'Freezer', 'Fridge',
+  'Glue Gun', 'Hair Dryer', 'Hair Straighteners', 'Hand Dryer', 'Hand Mixer',
+  'Heat Gun', 'Heater', 'Hot Plate', 'Humidifier', 'iMac',
+  'Interactive Whiteboard', 'Iron', 'Jigsaw', 'Juicer', 'Kettle', 'Kettle Base',
+  'Keyboard', 'Label Printer', 'Laminator', 'Laptop', 'Lead', 'Light',
+  'MacBook', 'Microscope', 'Microwave', 'Mitre Saw', 'Mixer', 'Mixer Amplifier',
+  'Modem', 'Monitor', 'Mouse', 'NAS Drive', 'Network Switch', 'Oscilloscope',
+  'Oven', 'Paper Cutter', 'Paper Punch', 'Patch Panel', 'PAT Tester', 'PC',
+  'Phone Charger', 'Photocopier', 'Portable AC', 'Portable Heater',
+  'Portable Projector', 'Portable Speaker', 'Power Supply', 'Pressure Washer',
+  'Printer', 'Projector', 'Pump Controller', 'Radio', 'Receipt Printer',
+  'Rice Cooker', 'Router', 'Scanner', 'Screen', 'Server', 'Sewing Machine',
+  'Shredder', 'Signal Generator', 'Slow Cooker', 'Smart Board', 'Soldering Iron',
+  'Soundbar', 'Speaker', 'Speaker System', 'Stage Light', 'Stapler',
+  'Steam Cleaner', 'Subwoofer', 'Switch', 'Tablet', 'Test Meter', 'Thin Client',
+  'Till', 'Toaster', 'Tripod', 'Tumble Dryer', 'TV', 'UPS', 'USB Charger',
+  'Vacuum', 'Vending Machine', 'Visualiser', 'VoIP Phone', 'Washing Machine',
+  'Water Boiler', 'Water Cooler', 'Water Pump', 'Whisk', 'Wi-Fi Access Point'
 ];
 
 // v8: Resistance calculator — IET Code of Practice Table V1.1 nominal values.
@@ -51,6 +92,9 @@ const CALC_LENGTHS = [0.25, 0.5, 0.75, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
 let state = {
   sessions: [],
   activeId: null,
+  // v9: itemTypes is now derived — see activeItems(). Held in state for read-only
+  // convenience by render code; never written to directly. Always sync via
+  // syncItemTypesFromActivePreset() after preset edits or switches.
   itemTypes: DEFAULT_ITEM_TYPES.slice(),
   failReasons: DEFAULT_FAIL_REASONS.slice(),
   engineer: '',
@@ -79,7 +123,19 @@ let state = {
   pendingWorker: null,              // SW that's installed and waiting
   // v8
   calcCsa: '0.75',                  // matches pat-testing-training.net default
-  calcLength: 0.75
+  calcLength: 0.75,
+  // v9: quick-pick presets — items only.
+  // itemPresets: array of { id, name, items: [up to 9 strings] }
+  // activePresetId: id of the currently selected preset
+  // Selection sticks globally — changing it affects all sessions immediately.
+  itemPresets: [],
+  activePresetId: null,
+  // v9: first-launch prompt. When migrating from v8 with a non-empty existing
+  // itemTypes list, we ask the user to name the preset their existing list will
+  // become. Set in load() and shown via a modal that blocks the UI.
+  migrationPrompt: { show: false, name: '', items: [] },
+  // v9: presets management dialog state (rename / new)
+  presetDialog: { mode: null, name: '', editingId: null }   // mode: 'new' | 'rename'
 };
 
 // ---------- Persistence ----------
@@ -89,9 +145,62 @@ function load() {
   } catch { state.sessions = []; }
   state.activeId = localStorage.getItem(ACTIVE_KEY) || null;
 
+  // v9: presets first — migration logic for users coming from v8 or earlier.
+  // Three cases on first v9 load:
+  //  (1) Already migrated: ITEM_PRESETS_KEY exists → just load it.
+  //  (2) v8 user with custom items: ITEMS_KEY exists, no presets → trigger
+  //      first-run prompt to name their list as a preset.
+  //  (3) Fresh install: neither key exists → create a "Default" preset with
+  //      the new built-in defaults.
+  let storedPresets = null;
   try {
-    state.itemTypes = JSON.parse(localStorage.getItem(ITEMS_KEY) || 'null') || DEFAULT_ITEM_TYPES.slice();
-  } catch { state.itemTypes = DEFAULT_ITEM_TYPES.slice(); }
+    storedPresets = JSON.parse(localStorage.getItem(ITEM_PRESETS_KEY) || 'null');
+  } catch {}
+
+  if (Array.isArray(storedPresets) && storedPresets.length) {
+    // Case 1: already migrated.
+    state.itemPresets = storedPresets;
+    state.activePresetId = localStorage.getItem(ACTIVE_PRESET_KEY) || storedPresets[0].id;
+    if (!state.itemPresets.find(p => p.id === state.activePresetId)) {
+      // Active id no longer valid (shouldn't happen but be safe) — pick first.
+      state.activePresetId = storedPresets[0].id;
+    }
+  } else {
+    // Cases 2 and 3 — need to inspect legacy itemTypes.
+    let legacyItems = null;
+    try {
+      legacyItems = JSON.parse(localStorage.getItem(ITEMS_KEY) || 'null');
+    } catch {}
+    const hasLegacyCustom = Array.isArray(legacyItems) && legacyItems.length > 0;
+
+    if (hasLegacyCustom) {
+      // Case 2: prompt user. We pre-create a preset NOW so the app remains
+      // usable while the prompt sits — fall back name 'My items' if they cancel.
+      // The prompt overwrites the name on confirm.
+      const interim = {
+        id: 'preset_' + uid(),
+        name: 'My items',
+        items: legacyItems.slice(0, 9)
+      };
+      state.itemPresets = [interim];
+      state.activePresetId = interim.id;
+      state.migrationPrompt = {
+        show: true,
+        name: '',
+        items: legacyItems.slice(0, 9)
+      };
+    } else {
+      // Case 3: fresh install.
+      const defaultPreset = {
+        id: 'preset_' + uid(),
+        name: 'Default',
+        items: DEFAULT_ITEM_TYPES.slice()
+      };
+      state.itemPresets = [defaultPreset];
+      state.activePresetId = defaultPreset.id;
+    }
+  }
+  syncItemTypesFromActivePreset();
 
   try {
     state.failReasons = JSON.parse(localStorage.getItem(FAIL_REASONS_KEY) || 'null') || DEFAULT_FAIL_REASONS.slice();
@@ -113,7 +222,9 @@ function load() {
     if (s.locked === undefined) s.locked = false;   // v8
   });
 
-  // Descriptions list — initialise from existing item history on first v4+ launch
+  // Descriptions list — initialise from existing item history on first v4+ launch.
+  // v9: fresh installs (no stored DESCRIPTIONS_KEY and no item history) now seed
+  // with DEFAULT_DESCRIPTIONS so the autocomplete is useful out of the box.
   let storedDesc = null;
   try {
     storedDesc = JSON.parse(localStorage.getItem(DESCRIPTIONS_KEY) || 'null');
@@ -121,7 +232,8 @@ function load() {
   if (Array.isArray(storedDesc)) {
     state.descriptions = storedDesc;
   } else {
-    state.descriptions = computeHistoryFromItems();
+    const fromHistory = computeHistoryFromItems();
+    state.descriptions = fromHistory.length ? fromHistory : DEFAULT_DESCRIPTIONS.slice();
     localStorage.setItem(DESCRIPTIONS_KEY, JSON.stringify(state.descriptions));
   }
 
@@ -152,13 +264,90 @@ function computeHistoryFromItems() {
 function save() {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sessions));
   localStorage.setItem(ACTIVE_KEY, state.activeId || '');
-  localStorage.setItem(ITEMS_KEY, JSON.stringify(state.itemTypes));
+  // v9: legacy ITEMS_KEY no longer written; ITEM_PRESETS_KEY + ACTIVE_PRESET_KEY are
+  // the source of truth. Backup/restore still uses the same logic.
+  localStorage.setItem(ITEM_PRESETS_KEY, JSON.stringify(state.itemPresets));
+  localStorage.setItem(ACTIVE_PRESET_KEY, state.activePresetId || '');
   localStorage.setItem(FAIL_REASONS_KEY, JSON.stringify(state.failReasons));
   localStorage.setItem(ENGINEER_KEY, state.engineer);
   localStorage.setItem(DESCRIPTIONS_KEY, JSON.stringify(state.descriptions));
   localStorage.setItem(SORT_KEY, state.sort);
   localStorage.setItem(THEME_KEY, state.theme);
   localStorage.setItem(HAPTICS_KEY, state.hapticsEnabled ? '1' : '0');
+}
+
+// ---------- v9: Preset helpers ----------
+function activePreset() {
+  return state.itemPresets.find(p => p.id === state.activePresetId) || state.itemPresets[0];
+}
+
+// Mirrors the active preset's items into state.itemTypes for read-only use by
+// the rest of the app (entry screen quick-pick grid, autocomplete dedupe, etc).
+// Call after every preset switch or edit.
+function syncItemTypesFromActivePreset() {
+  const p = activePreset();
+  state.itemTypes = p ? p.items.slice() : DEFAULT_ITEM_TYPES.slice();
+}
+
+function switchPreset(id) {
+  if (!state.itemPresets.find(p => p.id === id)) return;
+  state.activePresetId = id;
+  syncItemTypesFromActivePreset();
+  save(); render();
+}
+
+function createPreset(name) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return null;
+  const preset = {
+    id: 'preset_' + uid(),
+    name: trimmed,
+    items: DEFAULT_ITEM_TYPES.slice()
+  };
+  state.itemPresets.push(preset);
+  state.activePresetId = preset.id;
+  syncItemTypesFromActivePreset();
+  save();
+  return preset;
+}
+
+function renamePreset(id, name) {
+  const trimmed = (name || '').trim();
+  if (!trimmed) return false;
+  const p = state.itemPresets.find(x => x.id === id);
+  if (!p) return false;
+  p.name = trimmed;
+  save();
+  return true;
+}
+
+// Refuses to delete the last remaining preset — there must always be at least one.
+function deletePreset(id) {
+  if (state.itemPresets.length <= 1) return false;
+  const idx = state.itemPresets.findIndex(p => p.id === id);
+  if (idx === -1) return false;
+  const wasActive = state.activePresetId === id;
+  state.itemPresets.splice(idx, 1);
+  if (wasActive) {
+    // Pick the previous one (or first if we deleted the first).
+    state.activePresetId = state.itemPresets[Math.max(0, idx - 1)].id;
+    syncItemTypesFromActivePreset();
+  }
+  save();
+  return true;
+}
+
+// v9: confirm the migration prompt — sets the chosen name on the interim preset
+// created during load(). If name is blank we keep the placeholder 'My items'.
+function confirmMigrationPrompt() {
+  const name = (state.migrationPrompt.name || '').trim();
+  if (name) {
+    const p = activePreset();
+    if (p) p.name = name;
+  }
+  state.migrationPrompt = { show: false, name: '', items: [] };
+  save();
+  render();
 }
 
 // ---------- Helpers ----------
@@ -347,13 +536,18 @@ function downloadCSV(session) {
 
 // ---------- Backup / Restore (v7) ----------
 // Full app state -> downloadable .json file. Restore replaces all current data.
+// v9: now includes itemPresets + activePresetId. Backups missing these fields
+// fall back to converting the legacy itemTypes array into a single 'Default'
+// preset, so old backups still restore cleanly.
 function buildBackup() {
   return {
     appVersion: APP_VERSION,
-    backupVersion: 1,
+    backupVersion: 2,                         // v9 bumped from 1 → 2
     exportedAt: new Date().toISOString(),
     sessions: state.sessions,
-    itemTypes: state.itemTypes,
+    itemPresets: state.itemPresets,           // v9
+    activePresetId: state.activePresetId,     // v9
+    itemTypes: state.itemTypes,               // legacy mirror for backward compat
     failReasons: state.failReasons,
     descriptions: state.descriptions,
     engineer: state.engineer,
@@ -402,7 +596,26 @@ function restoreBackupFromFile(file) {
     if (!ok) return;
     // Apply
     state.sessions = data.sessions;
-    state.itemTypes = Array.isArray(data.itemTypes) && data.itemTypes.length ? data.itemTypes : DEFAULT_ITEM_TYPES.slice();
+    // v9: preset restoration. Three cases:
+    //   New backup with presets → use directly.
+    //   Old backup with itemTypes only → convert to a single 'Default' preset.
+    //   Neither → fall back to defaults.
+    if (Array.isArray(data.itemPresets) && data.itemPresets.length) {
+      state.itemPresets = data.itemPresets;
+      state.activePresetId = (typeof data.activePresetId === 'string'
+        && data.itemPresets.find(p => p.id === data.activePresetId))
+        ? data.activePresetId
+        : data.itemPresets[0].id;
+    } else if (Array.isArray(data.itemTypes) && data.itemTypes.length) {
+      const p = { id: 'preset_' + uid(), name: 'Default', items: data.itemTypes };
+      state.itemPresets = [p];
+      state.activePresetId = p.id;
+    } else {
+      const p = { id: 'preset_' + uid(), name: 'Default', items: DEFAULT_ITEM_TYPES.slice() };
+      state.itemPresets = [p];
+      state.activePresetId = p.id;
+    }
+    syncItemTypesFromActivePreset();
     state.failReasons = Array.isArray(data.failReasons) && data.failReasons.length ? data.failReasons : DEFAULT_FAIL_REASONS.slice();
     state.descriptions = Array.isArray(data.descriptions) ? data.descriptions : [];
     state.engineer = typeof data.engineer === 'string' ? data.engineer : '';
@@ -586,6 +799,11 @@ function failClicked() {
 }
 
 function pickFailReason(reasonOrNull) {
+  // v9: same 3-buzz on commit as the FAIL button — fires when a quick-pick reason
+  // is tapped, or when Save is tapped after typing in the Other field. Confirms
+  // the fail has actually been recorded, since the visible state changes (modal
+  // closes, cursor advances) can be subtle on a tired screen at the end of a job.
+  haptic(3);
   if (reasonOrNull) {
     state.form.notes = state.form.notes
       ? state.form.notes + ' — ' + reasonOrNull
@@ -809,7 +1027,12 @@ function saveUserSettings() {
 function saveItemTypesSettings() {
   const types = document.getElementById('settings-types').value
     .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 9);
-  state.itemTypes = types.length ? types : DEFAULT_ITEM_TYPES.slice();
+  // v9: writes to the currently active preset, not a global itemTypes array.
+  const p = activePreset();
+  if (p) {
+    p.items = types.length ? types : DEFAULT_ITEM_TYPES.slice();
+    syncItemTypesFromActivePreset();
+  }
   save();
   setView('settings');
 }
@@ -834,6 +1057,33 @@ function saveDescriptionsSettings() {
   });
   save();
   setView('settings');
+}
+
+// v9: Reset-to-defaults helpers — overwrite the current list with the built-in
+// defaults. Each prompts to confirm because they're destructive.
+// Items: resets the *current preset* only, not all presets.
+function resetItemsToDefaults() {
+  const p = activePreset();
+  if (!p) return;
+  if (!confirm(`Reset preset "${p.name}" to default items?\n\nThis replaces the current list with the 9 built-in defaults. Other presets are not affected.`)) return;
+  p.items = DEFAULT_ITEM_TYPES.slice();
+  syncItemTypesFromActivePreset();
+  save();
+  render();
+}
+
+function resetFailReasonsToDefaults() {
+  if (!confirm('Reset Quick Pick Fail to default reasons?\n\nThis replaces the current list with the built-in defaults.')) return;
+  state.failReasons = DEFAULT_FAIL_REASONS.slice();
+  save();
+  render();
+}
+
+function resetDescriptionsToDefaults() {
+  if (!confirm('Reset Item Description List to defaults?\n\nThis replaces the current list with the built-in defaults. Items already saved in past sessions are unaffected.')) return;
+  state.descriptions = DEFAULT_DESCRIPTIONS.slice();
+  save();
+  render();
 }
 
 function setTheme(theme) {
@@ -948,7 +1198,33 @@ function render() {
     </div>
   ` : '';
 
-  app.innerHTML = banner + html;
+  // v9: first-launch migration prompt — shown above everything when the user is
+  // upgrading from v8 (or earlier) with a non-empty itemTypes list. Asks them to
+  // name the preset their existing list will become. Uses the bulk-sheet pattern
+  // (bottom sheet) like other dialogs. No close button — user must commit.
+  const migrationModal = state.migrationPrompt.show ? `
+    <div class="modal-backdrop" style="z-index:300"></div>
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Welcome to V9">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">Welcome to V9</h3>
+        <span class="fail-close-spacer"></span>
+      </div>
+      <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--text)">
+        You can now save multiple Quick Pick lists as <strong>presets</strong> and switch between them.
+      </p>
+      <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--text)">
+        Your current Quick Pick items have become your first preset. What would you like to call it?
+      </p>
+      <label class="label">Preset name</label>
+      <input class="input" id="migration-prompt-input" value="${escapeHTML(state.migrationPrompt.name)}" placeholder="e.g. Default, My items, Office" autofocus>
+      <p class="muted" style="margin:8px 0 14px;font-size:12px">You can rename or add more presets later in Settings → Quick Pick Items.</p>
+      <button class="btn-primary" id="migration-prompt-confirm">Continue</button>
+    </div>
+  ` : '';
+
+  app.innerHTML = banner + html + migrationModal;
   // Toggle body class for selection bar spacing
   if (state.view === 'overview' && state.selectionMode) {
     document.body.classList.add('has-selection-bar');
@@ -1382,7 +1658,13 @@ function renderEditSession() {
 
 function renderSettingsHub() {
   // Each row leads to a focused sub-page. The subtitle gives a one-glance count or status.
-  const itemSummary = state.itemTypes.length === 1 ? '1 quick-pick' : `${state.itemTypes.length} quick-picks`;
+  // v9: subtitle on Items row now shows the active preset name + count.
+  const activeP = activePreset();
+  const itemCount = activeP ? activeP.items.length : 0;
+  const presetCount = state.itemPresets.length;
+  const itemSummary = activeP
+    ? `${escapeHTML(activeP.name)} · ${itemCount} quick-pick${itemCount === 1 ? '' : 's'}${presetCount > 1 ? ` · ${presetCount} presets` : ''}`
+    : 'No preset selected';
   const failSummary = state.failReasons.length === 1 ? '1 quick-pick' : `${state.failReasons.length} quick-picks`;
   const descSummary = state.descriptions.length === 1 ? '1 description' : `${state.descriptions.length} descriptions`;
   const themeSummary = state.theme === 'system' ? 'System' : (state.theme === 'dark' ? 'Dark' : 'Light');
@@ -1450,15 +1732,64 @@ function renderSettingsUser() {
 }
 
 function renderSettingsItems() {
+  const presets = state.itemPresets;
+  const active = activePreset();
+  const presetOptions = presets.map(p =>
+    `<option value="${escapeHTML(p.id)}"${p.id === state.activePresetId ? ' selected' : ''}>${escapeHTML(p.name)}</option>`
+  ).join('');
+  const canDelete = presets.length > 1;
+  const presetCount = presets.length;
+  const presetSummary = presetCount === 1 ? '1 preset' : `${presetCount} presets`;
+
+  // v9: presets dialog (rename / new) — uses the existing bulk-sheet bottom-sheet
+  // pattern so it visually matches the bulk-edit-location dialog and the fail
+  // picker. One input, two buttons.
+  const dialog = state.presetDialog;
+  const dialogModal = (dialog.mode === 'new' || dialog.mode === 'rename') ? `
+    <div class="modal-backdrop" id="preset-backdrop"></div>
+    <div class="bulk-sheet" role="dialog" aria-label="${dialog.mode === 'new' ? 'New preset' : 'Rename preset'}">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">${dialog.mode === 'new' ? 'New preset' : 'Rename preset'}</h3>
+        <button class="fail-close-btn" id="preset-dialog-cancel" aria-label="Cancel">×</button>
+      </div>
+      <label class="label">Name</label>
+      <input class="input" id="preset-dialog-input" value="${escapeHTML(dialog.name)}" placeholder="e.g. Workshop, Office, Site visit" autofocus>
+      <button class="btn-primary" id="preset-dialog-confirm" style="margin-top:14px">${dialog.mode === 'new' ? 'Create' : 'Save'}</button>
+    </div>
+  ` : '';
+
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Quick Pick Items')}
+
+      <!-- v9: Presets picker. Switching here changes which list is edited below
+           and which 9 items appear on the entry screen. Selection sticks
+           globally until changed again. -->
       <div class="settings-section">
-        <h2 class="h2">Item types</h2>
-        <p class="muted">One per line. Up to 9. Appear as quick-tap buttons on the entry screen.</p>
-        <textarea class="textarea" id="settings-types" style="min-height:240px">${escapeHTML(state.itemTypes.join('\n'))}</textarea>
+        <h2 class="h2">Preset</h2>
+        <p class="muted">${escapeHTML(presetSummary)}. The selected preset is what shows on the entry screen.</p>
+        <select class="input" id="settings-preset-select">${presetOptions}</select>
+        <div class="preset-actions-row">
+          <button class="preset-action-btn" id="preset-new-btn">＋ New</button>
+          <button class="preset-action-btn" id="preset-rename-btn">✎ Rename</button>
+          <button class="preset-action-btn preset-action-danger" id="preset-delete-btn"${canDelete ? '' : ' disabled'}>🗑 Delete</button>
+        </div>
       </div>
-      <button class="btn-primary" id="settings-items-save" style="margin-top:24px">Save</button>
+
+      <div class="settings-section">
+        <h2 class="h2">Items in "${escapeHTML(active ? active.name : '')}"</h2>
+        <p class="muted">One per line. Up to 9. Appear as quick-tap buttons on the entry screen.</p>
+        <textarea class="textarea" id="settings-types" style="min-height:240px">${escapeHTML((active ? active.items : []).join('\n'))}</textarea>
+      </div>
+
+      <div class="btn-row" style="margin-top:24px">
+        <button class="btn-secondary" id="settings-items-reset">↺ Reset to defaults</button>
+        <button class="btn-primary" id="settings-items-save">Save</button>
+      </div>
+
+      ${dialogModal}
     </div>
   `;
 }
@@ -1472,7 +1803,10 @@ function renderSettingsFails() {
         <p class="muted">One per line. Up to 6. Shown when you tap FAIL.</p>
         <textarea class="textarea" id="settings-reasons" style="min-height:200px">${escapeHTML(state.failReasons.join('\n'))}</textarea>
       </div>
-      <button class="btn-primary" id="settings-fails-save" style="margin-top:24px">Save</button>
+      <div class="btn-row" style="margin-top:24px">
+        <button class="btn-secondary" id="settings-fails-reset">↺ Reset to defaults</button>
+        <button class="btn-primary" id="settings-fails-save">Save</button>
+      </div>
     </div>
   `;
 }
@@ -1486,7 +1820,10 @@ function renderSettingsDescriptions() {
         <p class="muted">Item types you've typed into the custom field. Edit to fix typos for future autocomplete (won't change items already saved). Add new lines to seed autocomplete with common items.</p>
         <textarea class="textarea" id="settings-descriptions" style="min-height:280px">${escapeHTML(state.descriptions.join('\n'))}</textarea>
       </div>
-      <button class="btn-primary" id="settings-descriptions-save" style="margin-top:24px">Save</button>
+      <div class="btn-row" style="margin-top:24px">
+        <button class="btn-secondary" id="settings-descriptions-reset">↺ Reset to defaults</button>
+        <button class="btn-primary" id="settings-descriptions-save">Save</button>
+      </div>
     </div>
   `;
 }
@@ -1643,18 +1980,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog -->
+      <!-- v8: rolling 3-version changelog. v9: rolled forward — V9 on top, V6 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V9</strong> · May 2026</p>
+        <p class="muted">Quick Pick presets — save multiple named lists and switch between them on the Quick Pick Items page. Reset-to-defaults buttons on Items, Fails, and Item Description List pages. Updated built-in defaults to reflect real PAT work. Haptic feedback on fail-reason taps and the Other Save button. Backup/restore extended to include presets.</p>
+
         <p><strong>V8</strong> · May 2026</p>
-        <p class="muted">Lock-session toggle to prevent accidental new entries (with overview-edit override). Working earth continuity calculator under Settings. Date field on Edit Session sized to match other fields. Defensive cleanup against the "taps do nothing" bug. Reload-app shortcut on this page.</p>
+        <p class="muted">Lock-session toggle to prevent accidental new entries (with overview-edit override). Working earth continuity calculator under Settings. Date field on Edit Session sized to match other fields. Fix for the "taps do nothing" bug after switching theme to Light or Dark.</p>
 
         <p><strong>V7</strong> · May 2026</p>
         <p class="muted">Settings reorganised into a hub with focused sub-pages. Auto-update banner replaces the close-open-close-open dance. JSON backup / restore. Bulk-edit location from the overview. Storage usage indicator. Light / dark / system theme. Haptics toggle.</p>
-
-        <p><strong>V6</strong> · April 2026</p>
-        <p class="muted">Skip-to-new button so you can jump back to entering new items from anywhere in the session. Carry-forward location on new items. Copy-last-result button. Refinements to the autocomplete and item description list.</p>
       </div>
 
       <div class="info-card">
@@ -1900,6 +2237,65 @@ function bindEvents() {
   if ($('settings-items-save')) $('settings-items-save').onclick = () => saveItemTypesSettings();
   if ($('settings-fails-save')) $('settings-fails-save').onclick = () => saveFailReasonsSettings();
   if ($('settings-descriptions-save')) $('settings-descriptions-save').onclick = () => saveDescriptionsSettings();
+
+  // v9: Reset-to-defaults buttons
+  if ($('settings-items-reset')) $('settings-items-reset').onclick = () => resetItemsToDefaults();
+  if ($('settings-fails-reset')) $('settings-fails-reset').onclick = () => resetFailReasonsToDefaults();
+  if ($('settings-descriptions-reset')) $('settings-descriptions-reset').onclick = () => resetDescriptionsToDefaults();
+
+  // v9: preset switching, creation, rename, delete on the Quick Pick Items page.
+  // Switching is via the dropdown — onchange because we want commit-on-blur,
+  // not change-as-you-arrow (which would fire a render on every option).
+  // Note: switching DOES NOT save unsaved textarea edits. The user must hit
+  // Save first; otherwise the typed-but-unsaved items are lost. This is a
+  // deliberate match of the existing behaviour for textareas — the textarea
+  // is a draft buffer; the underlying preset is the source of truth.
+  if ($('settings-preset-select')) $('settings-preset-select').onchange = e => switchPreset(e.target.value);
+  if ($('preset-new-btn')) $('preset-new-btn').onclick = () => {
+    state.presetDialog = { mode: 'new', name: '', editingId: null };
+    render();
+  };
+  if ($('preset-rename-btn')) $('preset-rename-btn').onclick = () => {
+    const p = activePreset();
+    if (!p) return;
+    state.presetDialog = { mode: 'rename', name: p.name, editingId: p.id };
+    render();
+  };
+  if ($('preset-delete-btn')) $('preset-delete-btn').onclick = () => {
+    const p = activePreset();
+    if (!p) return;
+    if (state.itemPresets.length <= 1) {
+      alert('You must have at least one preset.');
+      return;
+    }
+    if (!confirm(`Delete preset "${p.name}"?\n\nThe items in this preset will be lost. Other presets are not affected.`)) return;
+    deletePreset(p.id);
+    render();
+  };
+  if ($('preset-dialog-input')) $('preset-dialog-input').oninput = e => state.presetDialog.name = e.target.value;
+  if ($('preset-dialog-cancel')) $('preset-dialog-cancel').onclick = () => {
+    state.presetDialog = { mode: null, name: '', editingId: null };
+    render();
+  };
+  if ($('preset-backdrop')) $('preset-backdrop').onclick = () => {
+    state.presetDialog = { mode: null, name: '', editingId: null };
+    render();
+  };
+  if ($('preset-dialog-confirm')) $('preset-dialog-confirm').onclick = () => {
+    const name = (state.presetDialog.name || '').trim();
+    if (!name) { alert('Name cannot be empty.'); return; }
+    if (state.presetDialog.mode === 'new') {
+      createPreset(name);
+    } else if (state.presetDialog.mode === 'rename' && state.presetDialog.editingId) {
+      renamePreset(state.presetDialog.editingId, name);
+    }
+    state.presetDialog = { mode: null, name: '', editingId: null };
+    render();
+  };
+
+  // v9: first-launch migration prompt — names the user's existing item list.
+  if ($('migration-prompt-input')) $('migration-prompt-input').oninput = e => state.migrationPrompt.name = e.target.value;
+  if ($('migration-prompt-confirm')) $('migration-prompt-confirm').onclick = () => confirmMigrationPrompt();
 
   // Display settings — instant apply.
   // v8 hotfix: this used to be [data-theme] but applyTheme() ALSO sets data-theme

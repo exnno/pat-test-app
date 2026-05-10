@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA
- * v8 (May 2026)
+ * v9 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -409,6 +409,30 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Settings sections spacing (used inside individual settings sub-pages) */
 .settings-section + .settings-section { margin-top: 28px; }
 .settings-section h2 { margin-top: 0; }
+
+/* v9: preset action row on Quick Pick Items page — three small buttons under
+   the preset dropdown for new / rename / delete. Visual style mirrors
+   .icon-btn-sm but with a label, and danger variant for delete. */
+.preset-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+}
+.preset-action-btn {
+  flex: 1;
+  padding: 10px 8px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--card-bg);
+  color: var(--neutral-text);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  white-space: nowrap;
+}
+.preset-action-btn:active { background: var(--row-active); }
+.preset-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+.preset-action-danger { color: var(--fail); border-color: var(--fail-soft-border); }
+.preset-action-danger:active { background: var(--fail-soft-bg); }
 
 /* Progress row with inline delete bin (entry screen) */
 .progress-row {
