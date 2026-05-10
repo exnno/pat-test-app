@@ -7,13 +7,15 @@
  */
 
 /* ===== Theme tokens =====
-   :root carries the LIGHT theme. The dark theme is applied either via
-   prefers-color-scheme (when state.theme === 'system') or via [data-theme="dark"]
-   on <html> (when state.theme === 'dark'). [data-theme="light"] forces light.
-   Light explicitly forced wins over the media query because the [data-theme]
-   selectors come after the media query. */
+   :root carries the LIGHT theme by default. The dark theme is applied either via
+   the prefers-color-scheme media query (state.theme === 'system') or via the
+   .theme-force-dark class on <html> (state.theme === 'dark'). .theme-force-light
+   forces light regardless of device preference.
+   v8-2: switched from [data-theme] attribute to class. iOS Safari in PWA mode
+   appears to break form-input focus when a data-* attribute is set on <html>;
+   classes don't trigger the same quirk. */
 
-:root, [data-theme="light"] {
+:root, .theme-force-light {
   --bg: #f3f4f6;
   --text: #111827;
   --text-muted: #6b7280;
@@ -48,7 +50,7 @@
 }
 
 @media (prefers-color-scheme: dark) {
-  :root:not([data-theme="light"]) {
+  :root:not(.theme-force-light) {
     --bg: #0f172a;
     --text: #f1f5f9;
     --text-muted: #94a3b8;
@@ -83,7 +85,7 @@
   }
 }
 
-[data-theme="dark"] {
+.theme-force-dark {
   --bg: #0f172a;
   --text: #f1f5f9;
   --text-muted: #94a3b8;

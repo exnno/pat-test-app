@@ -264,16 +264,25 @@ function sortedSessions() {
 
 // ---------- Theme ----------
 // v7: applies user's theme choice. 'system' removes the override and lets the CSS
-// media query take effect; 'light'/'dark' force the choice via data-theme attribute.
-// v8 hotfix: only accept the three known values. Anything else (undefined, '', etc.)
-// falls back to system, so a stray call can't set data-theme="undefined" and leave
-// the UI in a half-themed state.
+// media query take effect; 'light'/'dark' force the choice.
+// v8 hotfix: only accept the three known values.
+// v8-2: switched from data-theme attribute on <html> to a class. iOS Safari in
+// PWA mode appears to have a quirk where a data-* attribute on the root element
+// disrupts form-input focus delegation — selecting Light or Dark made every
+// field across the app un-tappable until the PWA was reinstalled. Using a class
+// instead has the same effect on the CSS variables but doesn't trigger the bug.
+// We also clean up the legacy data-theme attribute if it's lingering from a
+// previous version, so users updating from v8 / v8-1 recover automatically.
 function applyTheme(theme) {
-  if (theme === 'light' || theme === 'dark') {
-    document.documentElement.setAttribute('data-theme', theme);
-  } else {
-    document.documentElement.removeAttribute('data-theme');
+  const html = document.documentElement;
+  html.classList.remove('theme-force-light', 'theme-force-dark');
+  html.removeAttribute('data-theme');
+  if (theme === 'light') {
+    html.classList.add('theme-force-light');
+  } else if (theme === 'dark') {
+    html.classList.add('theme-force-dark');
   }
+  // 'system' or anything else: no class, prefers-color-scheme media query wins.
 }
 
 // ---------- Haptics ----------

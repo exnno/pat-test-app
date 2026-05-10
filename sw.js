@@ -13,7 +13,13 @@
 // orphaned overlays — it was [data-theme] selector colliding with the data-theme
 // attribute applied to <html> by applyTheme(). Renamed button attribute to
 // data-set-theme. See app.js bindEvents() comment for detail.
-const CACHE_VERSION = 'pat-v8-1';
+//
+// v8-2: v8-1 unstuck the System button but Light/Dark still broke fields on
+// iOS PWA. Hypothesis: WebKit in PWA mode disrupts form-input focus when a
+// data-* attribute is present on <html>. Replaced data-theme on <html> with
+// classes (.theme-force-light / .theme-force-dark). Same effect on CSS, no
+// data-* attribute on the root element.
+const CACHE_VERSION = 'pat-v8-2';
 const ASSETS = [
   './',
   './index.html',
