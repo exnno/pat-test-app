@@ -265,11 +265,14 @@ function sortedSessions() {
 // ---------- Theme ----------
 // v7: applies user's theme choice. 'system' removes the override and lets the CSS
 // media query take effect; 'light'/'dark' force the choice via data-theme attribute.
+// v8 hotfix: only accept the three known values. Anything else (undefined, '', etc.)
+// falls back to system, so a stray call can't set data-theme="undefined" and leave
+// the UI in a half-themed state.
 function applyTheme(theme) {
-  if (theme === 'system') {
-    document.documentElement.removeAttribute('data-theme');
-  } else {
+  if (theme === 'light' || theme === 'dark') {
     document.documentElement.setAttribute('data-theme', theme);
+  } else {
+    document.documentElement.removeAttribute('data-theme');
   }
 }
 
@@ -1493,7 +1496,7 @@ function renderSettingsDisplay() {
         <p class="muted">Choose how the app looks.</p>
         <div class="theme-options">
           ${themes.map(t => `
-            <button class="theme-option" data-theme="${t.key}">
+            <button class="theme-option" data-set-theme="${t.key}">
               <span class="theme-option-radio ${state.theme === t.key ? 'checked' : ''}"></span>
               <span class="theme-option-label">${escapeHTML(t.label)}</span>
               ${t.sub ? `<span class="theme-option-sub">${escapeHTML(t.sub)}</span>` : ''}
@@ -1889,9 +1892,15 @@ function bindEvents() {
   if ($('settings-fails-save')) $('settings-fails-save').onclick = () => saveFailReasonsSettings();
   if ($('settings-descriptions-save')) $('settings-descriptions-save').onclick = () => saveDescriptionsSettings();
 
-  // Display settings — instant apply
-  document.querySelectorAll('[data-theme]').forEach(el => {
-    el.onclick = () => setTheme(el.dataset.theme);
+  // Display settings — instant apply.
+  // v8 hotfix: this used to be [data-theme] but applyTheme() ALSO sets data-theme
+  // on <html>, so the selector matched <html> too. Every tap anywhere bubbled to
+  // <html>, fired its onclick → setTheme → render → destroyed the tapped input
+  // before iOS could focus it. Result: app-wide "taps do nothing" the moment a
+  // user picked Light or Dark. Renamed the button attribute to data-set-theme to
+  // remove the collision.
+  document.querySelectorAll('[data-set-theme]').forEach(el => {
+    el.onclick = () => setTheme(el.dataset.setTheme);
   });
   if ($('haptics-toggle')) $('haptics-toggle').onchange = e => {
     setHaptics(e.target.checked);

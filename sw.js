@@ -8,7 +8,12 @@
 // v8: cache bump for fixes (date field height, defensive DOM hygiene against
 // orphaned modal backdrops causing the "taps do nothing" bug) plus new features
 // (lock-session toggle, working resistance calculator, About changelog).
-const CACHE_VERSION = 'pat-v8';
+//
+// v8-1: hotfix for the actual root cause of "taps do nothing". The bug wasn't
+// orphaned overlays — it was [data-theme] selector colliding with the data-theme
+// attribute applied to <html> by applyTheme(). Renamed button attribute to
+// data-set-theme. See app.js bindEvents() comment for detail.
+const CACHE_VERSION = 'pat-v8-1';
 const ASSETS = [
   './',
   './index.html',
