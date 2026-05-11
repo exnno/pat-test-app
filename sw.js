@@ -23,7 +23,13 @@
 // v9: new defaults (items, fails, descriptions), Quick Pick presets, reset
 // buttons on each settings sub-page, haptic on fail-modal commits, backup
 // includes presets.
-const CACHE_VERSION = 'pat-v9';
+//
+// v10: CSV import (strict, single-session), Web Share API for CSV export
+// with iOS share-glyph icon, sessions list search bar (matches site/engineer/
+// date/name and asset/location/item/notes within items, jumps to first item
+// match), session-scoped location autofill mirroring item-type autocomplete,
+// unsaved-textarea-edit guard on preset switch.
+const CACHE_VERSION = 'pat-v10';
 const ASSETS = [
   './',
   './index.html',

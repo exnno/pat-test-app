@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA
- * v9 (May 2026)
+ * v10 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -984,3 +984,108 @@ body.has-update-banner .screen { padding-top: 64px; }
 }
 /* When selection bar is showing, give the table some bottom space so last rows aren't hidden */
 body.has-selection-bar .screen { padding-bottom: 88px; }
+
+/* ===== v10 additions ===== */
+
+/* Inline SVG share-glyph (replaces the ⬇ unicode arrow on Export buttons).
+   Uses currentColor so it inherits whatever colour the surrounding button has
+   (--text-muted inside .icon-btn-sm on the sessions list, --neutral-text on
+   .icon-btn in the overview header). 18×18 hits the same optical weight as
+   the previous emoji glyph. */
+.share-icon {
+  width: 18px;
+  height: 18px;
+  display: inline-block;
+  vertical-align: middle;
+}
+.icon-btn .share-icon { width: 20px; height: 20px; }
+
+/* v10: Sessions list — sticky search bar above the sort row. Reuses .search-input
+   from the overview but sits in its own container so we can show the result
+   count next to it. */
+.sessions-search-row {
+  margin-bottom: 10px;
+}
+.sessions-search-count {
+  display: block;
+  font-size: 12px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  padding-left: 2px;
+}
+
+/* v10: small badge on a session card showing "3 matches in items" when the
+   query hit an item-level field. Tapping the session jumps straight to the
+   first matched item rather than the most recent. */
+.session-match-badge {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border-radius: 10px;
+  border: 1px solid var(--accent-border);
+}
+
+/* v10: Sessions list row of action buttons — currently New + Import. Stack as
+   a two-column row when both are visible; New full-width when alone. */
+.sessions-actions-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.sessions-actions-row .btn-primary,
+.sessions-actions-row .btn-secondary {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+/* v10: Location input autofill suggestions — mirrors .custom-type-wrap +
+   .suggestions but lives under the Location field on the entry screen. The
+   .suggestions block itself is already styled (used by item-type autocomplete);
+   we just need the relative wrapper. */
+.location-input-wrap {
+  position: relative;
+}
+
+/* v10: Import-summary modal body — narrow list of skipped rows with reason. */
+.import-summary-list {
+  max-height: 160px;
+  overflow-y: auto;
+  margin: 8px 0 14px;
+  padding: 10px 12px;
+  background: var(--neutral-bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text);
+  line-height: 1.5;
+}
+.import-summary-list ul { margin: 0; padding-left: 18px; }
+
+/* v10: Three-option conflict modal — vertical stack of action buttons.
+   First button is primary (duplicate as it's the safest default), second
+   is secondary (merge), third is cancel. */
+.import-conflict-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 10px;
+}
+.import-conflict-actions .btn-primary,
+.import-conflict-actions .btn-secondary {
+  width: 100%;
+  margin: 0;
+}
+.import-conflict-actions .btn-tertiary {
+  width: 100%;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--text-muted);
+  border: none;
+  border-radius: 10px;
+}

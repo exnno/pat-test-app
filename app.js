@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v9 (May 2026)
+ * v10 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v9 ==============
+// ============== PAT Test PWA — v10 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V9';
+const APP_VERSION = 'V10';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -135,7 +135,29 @@ let state = {
   // become. Set in load() and shown via a modal that blocks the UI.
   migrationPrompt: { show: false, name: '', items: [] },
   // v9: presets management dialog state (rename / new)
-  presetDialog: { mode: null, name: '', editingId: null }   // mode: 'new' | 'rename'
+  presetDialog: { mode: null, name: '', editingId: null },   // mode: 'new' | 'rename'
+  // v10: sessions list search — separate from overview's per-session searchQuery.
+  // Matches against session-level fields (site, name, engineer, date) AND
+  // item-level fields (assetNo, location, itemType, notes) within each session.
+  // A session passes the filter if any field matches. Tapping a session that
+  // only matched at the item level jumps straight to the first matched item.
+  sessionsSearchQuery: '',
+  // v10: per-session location autocomplete on the entry screen. Mirrors the
+  // item-type suggestions pattern (state.suggestions / state.showSuggestions)
+  // but the source is the active session's existing item locations only —
+  // nothing is persisted globally or shared between sessions.
+  locationSuggestions: [],
+  showLocationSuggestions: false,
+  // v10: CSV import — file-pick → parse → optional conflict prompt → optional
+  // summary. The two dialogs share this state object. Only one is open at a
+  // time; the conflict dialog (if shown) precedes the summary dialog.
+  importDialog: {
+    conflictOpen: false,
+    summaryOpen: false,
+    pendingSession: null,         // parsed session awaiting conflict resolution
+    conflictExistingId: null,     // id of the existing session that clashed
+    summary: null                 // { mode, sessionName, itemCount, skipped: [{row, reason}] }
+  }
 };
 
 // ---------- Persistence ----------
@@ -423,6 +445,33 @@ function computeSuggestions(query) {
   return [...starts, ...contains].slice(0, 5);
 }
 
+// v10: Location autofill suggestions — sourced ONLY from the current session's
+// existing item locations. Nothing is persisted globally and nothing carries
+// over between sessions. Mirrors the item-type autocomplete behaviour: only
+// triggers once the user has typed at least one character.
+//
+// Case handling: we keep distinct casings as separate entries (so "Kitchen"
+// and "kitchen" both show if they both exist in the session), but dedupe
+// identical strings. Sort order is alphabetical, case-insensitive.
+// Cap at 5 to match the item-type list.
+function computeLocationSuggestions(query) {
+  if (!query || query.length < 1) return [];
+  const sess = activeSession();
+  if (!sess) return [];
+  const q = query.toLowerCase();
+  const seen = new Set();
+  const distinct = [];
+  sess.items.forEach(it => {
+    const loc = (it.location || '').trim();
+    if (!loc || seen.has(loc)) return;
+    seen.add(loc);
+    distinct.push(loc);
+  });
+  const matches = distinct.filter(l => l.toLowerCase().includes(q));
+  matches.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  return matches.slice(0, 5);
+}
+
 function addDescriptionIfNew(desc) {
   const trimmed = String(desc || '').trim();
   if (!trimmed) return;
@@ -449,6 +498,55 @@ function sortedSessions() {
       break;
   }
   return arr;
+}
+
+// v10: Sessions-list search. Two-pass match:
+//   1. Session-level fields (site, name, engineer, formatted date, raw ISO date).
+//   2. Item-level fields (assetNo, location, itemType, notes) within each item.
+// A session is included if either pass matches. For sessions that *only* matched
+// at the item level we record the first matched item's index so the UI can:
+//   • Show a "N match in items" badge under the session card
+//   • Jump straight to that item when the session is opened.
+// Empty query → returns all sessions with matchedItemIndex = -1 (the normal case).
+function filteredSessions(sortedList, query) {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return sortedList.map(s => ({ session: s, matchedItemIndex: -1, itemMatchCount: 0 }));
+  const out = [];
+  for (const s of sortedList) {
+    const sessionLevelHit =
+      (s.site || '').toLowerCase().includes(q) ||
+      (s.name || '').toLowerCase().includes(q) ||
+      (s.engineer || '').toLowerCase().includes(q) ||
+      (s.date || '').toLowerCase().includes(q) ||
+      formatDate(s.date).toLowerCase().includes(q);
+    let firstItemHit = -1;
+    let itemMatchCount = 0;
+    if (Array.isArray(s.items)) {
+      for (let i = 0; i < s.items.length; i++) {
+        const it = s.items[i];
+        if (!it) continue;
+        const hit =
+          (it.assetNo || '').toLowerCase().includes(q) ||
+          (it.location || '').toLowerCase().includes(q) ||
+          (it.itemType || '').toLowerCase().includes(q) ||
+          (it.notes || '').toLowerCase().includes(q);
+        if (hit) {
+          if (firstItemHit === -1) firstItemHit = i;
+          itemMatchCount++;
+        }
+      }
+    }
+    if (sessionLevelHit || firstItemHit !== -1) {
+      out.push({
+        session: s,
+        // Only set the matched index if there was NO session-level hit — otherwise
+        // we want the normal open behaviour (jump to end of items as usual).
+        matchedItemIndex: (sessionLevelHit ? -1 : firstItemHit),
+        itemMatchCount
+      });
+    }
+  }
+  return out;
 }
 
 // ---------- Theme ----------
@@ -532,6 +630,376 @@ function downloadCSV(session) {
   a.href = url; a.download = `PAT_${safe}_${session.date}.csv`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+// v10: Inline iOS share-style glyph (square with arrow protruding from the top).
+// Replaces the ⬇ unicode arrow on Export buttons. Uses currentColor so it
+// inherits the surrounding button colour. Used both in the sessions list
+// (.icon-btn-sm, muted) and in the overview header (.icon-btn, neutral).
+const SHARE_ICON_SVG =
+  '<svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
+  'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
+  '<path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>' +
+  '<line x1="12" y1="3" x2="12" y2="15"/>' +
+  '<polyline points="7 8 12 3 17 8"/>' +
+  '</svg>';
+
+// v10: Share or download a session's CSV. Prefers the native share sheet via
+// Web Share API (iOS Safari, modern Android Chrome) so the engineer can send
+// the CSV to a colleague via Messages, Mail, AirDrop, WhatsApp, etc. — which
+// pairs naturally with the new Import feature on the receiving end.
+//
+// Falls back to a direct download when:
+//   • navigator.share is not present (desktop browsers, older mobile)
+//   • navigator.canShare reports the file isn't shareable (some Android
+//     versions support share but not files)
+//   • The share API throws a non-Abort error
+//
+// If the user CANCELS the share sheet (AbortError), we do NOT fall back to a
+// download — they explicitly dismissed the share, a sudden download would
+// surprise them.
+async function shareOrDownloadCSV(session) {
+  const BOM = '\uFEFF';
+  const csvText = BOM + buildCSV(session);
+  const safe = (session.site || session.name || 'session').replace(/[^a-z0-9]+/gi, '_');
+  const filename = `PAT_${safe}_${session.date}.csv`;
+
+  // Feature detection — File constructor is also required for navigator.share({files})
+  if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && typeof File === 'function') {
+    try {
+      const file = new File([csvText], filename, { type: 'text/csv' });
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          files: [file],
+          title: filename,
+          text: `PAT test results: ${session.site || session.name || 'session'}`
+        });
+        return;
+      }
+    } catch (err) {
+      // User dismissed the share sheet — respect that, no download.
+      if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return;
+      // Anything else (e.g. partial support, permission glitch) → fall through to download.
+    }
+  }
+  downloadCSV(session);
+}
+
+// ---------- v10: CSV Import ----------
+// Strict format only — must match this app's export exactly:
+//   Header line: Asset ID,Engineer name,Description,Site,Location,Date,Result,Notes
+//   All rows must share the same Site AND Date (single session per file).
+// Anything that doesn't match is rejected with a clear message.
+//
+// Multi-session CSVs (someone manually concatenated two exports) are refused
+// for v10 — see PAThandoff_v10.md "v10 flags" for future work.
+
+const EXPECTED_CSV_HEADER = ['Asset ID', 'Engineer name', 'Description', 'Site', 'Location', 'Date', 'Result', 'Notes'];
+
+// Parse a CSV string into an array of row arrays. Handles double-quoted fields,
+// escaped quotes (""), and embedded commas/newlines inside quoted fields.
+// Returns null if the input is empty or fundamentally malformed.
+function parseCSV(text) {
+  if (typeof text !== 'string') return null;
+  // Strip BOM if present (our own exports prepend \uFEFF)
+  if (text.charCodeAt(0) === 0xFEFF) text = text.slice(1);
+  const rows = [];
+  let row = [];
+  let field = '';
+  let inQuotes = false;
+  let i = 0;
+  while (i < text.length) {
+    const c = text[i];
+    if (inQuotes) {
+      if (c === '"') {
+        if (text[i + 1] === '"') {
+          // Escaped quote
+          field += '"';
+          i += 2;
+          continue;
+        }
+        inQuotes = false;
+        i++;
+        continue;
+      }
+      field += c;
+      i++;
+      continue;
+    }
+    // Not in quotes
+    if (c === '"') {
+      inQuotes = true;
+      i++;
+      continue;
+    }
+    if (c === ',') {
+      row.push(field);
+      field = '';
+      i++;
+      continue;
+    }
+    if (c === '\n' || c === '\r') {
+      row.push(field);
+      field = '';
+      // Skip \r\n combos
+      if (c === '\r' && text[i + 1] === '\n') i++;
+      rows.push(row);
+      row = [];
+      i++;
+      continue;
+    }
+    field += c;
+    i++;
+  }
+  // Trailing field / row
+  if (field.length > 0 || row.length > 0) {
+    row.push(field);
+    rows.push(row);
+  }
+  // Trim trailing empty rows (last newline in a file produces an empty row)
+  while (rows.length && rows[rows.length - 1].length === 1 && rows[rows.length - 1][0] === '') {
+    rows.pop();
+  }
+  return rows.length ? rows : null;
+}
+
+// Convert "DD/MM/YYYY" back to "YYYY-MM-DD". Returns null if not a valid date.
+function parseUkDateToIso(s) {
+  const m = String(s || '').trim().match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+  if (!m) return null;
+  const dd = parseInt(m[1], 10);
+  const mm = parseInt(m[2], 10);
+  const yyyy = parseInt(m[3], 10);
+  if (mm < 1 || mm > 12 || dd < 1 || dd > 31) return null;
+  const iso = `${yyyy}-${String(mm).padStart(2, '0')}-${String(dd).padStart(2, '0')}`;
+  // Round-trip sanity — catches Feb 30 etc.
+  const d = new Date(iso + 'T00:00:00Z');
+  if (isNaN(d.getTime())) return null;
+  if (d.getUTCDate() !== dd || (d.getUTCMonth() + 1) !== mm || d.getUTCFullYear() !== yyyy) return null;
+  return iso;
+}
+
+// Parse and validate the CSV text into a candidate session. Returns either:
+//   { ok: true, session, skipped: [{row, reason}] }
+//   { ok: false, error: 'message to show user' }
+function parseImportCSV(text) {
+  const rows = parseCSV(text);
+  if (!rows || rows.length === 0) {
+    return { ok: false, error: 'The CSV file is empty.' };
+  }
+  // Header check — must match exactly, in order
+  const header = rows[0].map(h => String(h || '').trim());
+  if (header.length !== EXPECTED_CSV_HEADER.length
+      || header.some((h, i) => h !== EXPECTED_CSV_HEADER[i])) {
+    return {
+      ok: false,
+      error:
+        'This file doesn\'t match the expected format.\n\n' +
+        'Imports must be CSVs exported from this app, with columns in the order:\n' +
+        EXPECTED_CSV_HEADER.join(', ')
+    };
+  }
+  const dataRows = rows.slice(1);
+  if (dataRows.length === 0) {
+    return { ok: false, error: 'The CSV file has a header but no rows.' };
+  }
+  // First-pass scan: find canonical Site + Date. We grab them from the first
+  // VALID row (with a parseable date) so a single typo on row 1 doesn't reject
+  // the whole file. If no row has both, we bail.
+  let canonicalSite = null;
+  let canonicalIsoDate = null;
+  let canonicalDateRaw = null;
+  let canonicalEngineer = '';
+  for (const r of dataRows) {
+    const site = String(r[3] || '').trim();
+    const dateRaw = String(r[5] || '').trim();
+    const iso = parseUkDateToIso(dateRaw);
+    if (site && iso) {
+      canonicalSite = site;
+      canonicalIsoDate = iso;
+      canonicalDateRaw = dateRaw;
+      canonicalEngineer = String(r[1] || '').trim();
+      break;
+    }
+  }
+  if (!canonicalSite || !canonicalIsoDate) {
+    return {
+      ok: false,
+      error: 'No rows in this file have both a Site and a valid Date (DD/MM/YYYY). Cannot import.'
+    };
+  }
+  // Check uniqueness — refuse multi-session CSVs.
+  const siteLower = canonicalSite.toLowerCase();
+  let multiSession = false;
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const site = String(r[3] || '').trim();
+    const dateRaw = String(r[5] || '').trim();
+    // Skip rows with no site or no date — they'll be flagged as skipped below.
+    if (!site || !dateRaw) continue;
+    if (site.toLowerCase() !== siteLower || dateRaw !== canonicalDateRaw) {
+      multiSession = true;
+      break;
+    }
+  }
+  if (multiSession) {
+    return {
+      ok: false,
+      error:
+        'This file contains rows from more than one session (different Site or Date values).\n\n' +
+        'Importing combined CSVs isn\'t supported yet — please export each session separately and import them one at a time.'
+    };
+  }
+  // Build items + collect skipped row reports
+  const items = [];
+  const skipped = [];
+  for (let i = 0; i < dataRows.length; i++) {
+    const r = dataRows[i];
+    const rowNum = i + 2; // +1 for header, +1 because humans count from 1
+    const assetNo = String(r[0] || '').trim();
+    const desc = String(r[2] || '').trim();
+    const location = String(r[4] || '').trim();
+    const dateRaw = String(r[5] || '').trim();
+    const resultRaw = String(r[6] || '').trim().toLowerCase();
+    const notes = String(r[7] || '').trim();
+    // Skip a row if any of these are wrong; collect reason for the summary.
+    if (!assetNo) { skipped.push({ row: rowNum, reason: 'missing Asset ID' }); continue; }
+    if (!desc)    { skipped.push({ row: rowNum, reason: 'missing Description' }); continue; }
+    if (!dateRaw) { skipped.push({ row: rowNum, reason: 'missing Date' }); continue; }
+    if (parseUkDateToIso(dateRaw) === null) {
+      skipped.push({ row: rowNum, reason: 'invalid Date format (expected DD/MM/YYYY)' });
+      continue;
+    }
+    if (resultRaw !== 'pass' && resultRaw !== 'fail') {
+      skipped.push({ row: rowNum, reason: `invalid Result "${String(r[6] || '').trim()}" (expected Pass or Fail)` });
+      continue;
+    }
+    items.push({
+      id: uid(),
+      assetNo,
+      location,
+      itemType: desc,
+      notes,
+      result: resultRaw
+    });
+  }
+  if (items.length === 0) {
+    return {
+      ok: false,
+      error:
+        `No importable rows found in this file.\n\n` +
+        `${skipped.length} row${skipped.length === 1 ? '' : 's'} could not be parsed.`
+    };
+  }
+  const session = {
+    id: uid(),
+    name: `Imported: ${canonicalSite}`,
+    site: canonicalSite,
+    engineer: canonicalEngineer,
+    prefix: '',
+    date: canonicalIsoDate,
+    startNumber: 1,
+    items,
+    locked: false
+  };
+  return { ok: true, session, skipped };
+}
+
+// Trigger point: user picked a file on the Sessions screen. We parse, then
+// either prompt for conflict, show a summary, or alert on error.
+function handleImportFile(file) {
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    const result = parseImportCSV(String(e.target.result || ''));
+    if (!result.ok) {
+      alert(result.error);
+      return;
+    }
+    // Check for an existing session with the same Site (case-insensitive) AND
+    // the same Date. If found, ask the user how to proceed.
+    const incoming = result.session;
+    const existing = state.sessions.find(s =>
+      s && s.date === incoming.date &&
+      (s.site || '').toLowerCase().trim() === (incoming.site || '').toLowerCase().trim()
+    );
+    if (existing) {
+      state.importDialog.conflictOpen = true;
+      state.importDialog.pendingSession = incoming;
+      state.importDialog.conflictExistingId = existing.id;
+      state.importDialog.summary = { skipped: result.skipped };  // stashed for after resolution
+      render();
+      return;
+    }
+    // No conflict — commit straight away.
+    commitImportedSession(incoming, 'new', result.skipped);
+  };
+  reader.onerror = () => alert('Could not read that file.');
+  reader.readAsText(file);
+}
+
+// Commit a parsed import into state. Mode is one of:
+//   'new'       → push the parsed session as-is (no conflict)
+//   'duplicate' → push as a separate session even though one already exists
+//   'merge'     → append the imported items into the existing session
+function commitImportedSession(incoming, mode, skipped) {
+  let sessionName = incoming.site;
+  let mergedInto = null;
+  if (mode === 'merge' && state.importDialog.conflictExistingId) {
+    const target = state.sessions.find(s => s.id === state.importDialog.conflictExistingId);
+    if (target) {
+      // Re-id incoming items to avoid any collision and append.
+      const newItems = incoming.items.map(it => ({ ...it, id: uid() }));
+      target.items = (target.items || []).concat(newItems);
+      mergedInto = target;
+      sessionName = target.site || target.name;
+    } else {
+      // Existing vanished between prompt and confirm — fall through to duplicate.
+      state.sessions.unshift(incoming);
+    }
+  } else {
+    // new or duplicate — same behaviour, push to the top of the list.
+    state.sessions.unshift(incoming);
+  }
+  state.importDialog = {
+    conflictOpen: false,
+    summaryOpen: true,
+    pendingSession: null,
+    conflictExistingId: null,
+    summary: {
+      mode,
+      sessionName,
+      itemCount: incoming.items.length,
+      skipped: skipped || []
+    }
+  };
+  // Add any new item-type descriptions to the global descriptions list so
+  // autocomplete benefits from imported data immediately.
+  incoming.items.forEach(it => addDescriptionIfNew(it.itemType));
+  save();
+  render();
+}
+
+function cancelImportConflict() {
+  state.importDialog = {
+    conflictOpen: false,
+    summaryOpen: false,
+    pendingSession: null,
+    conflictExistingId: null,
+    summary: null
+  };
+  render();
+}
+
+function closeImportSummary() {
+  state.importDialog = {
+    conflictOpen: false,
+    summaryOpen: false,
+    pendingSession: null,
+    conflictExistingId: null,
+    summary: null
+  };
+  render();
 }
 
 // ---------- Backup / Restore (v7) ----------
@@ -686,6 +1154,9 @@ function loadFormForCursor() {
   }
   state.suggestions = [];
   state.showSuggestions = false;
+  // v10: location suggestions follow the same lifecycle
+  state.locationSuggestions = [];
+  state.showLocationSuggestions = false;
   state.failModalOpen = false;
   state.failModalStage = 'reasons';
   state.failOtherText = '';
@@ -730,13 +1201,20 @@ function createSession() {
   save(); render();
 }
 
-function openSession(id) {
+function openSession(id, opts) {
   state.activeId = id;
   const s = activeSession();
-  state.cursor = s.items.length;
+  if (!s) return;
+  // v10: when called from the sessions-list search with an item-level match, we
+  // jump straight to that item. Otherwise default to "the next blank entry"
+  // (one past the last item) as before.
+  const targetCursor = (opts && typeof opts.cursor === 'number') ? opts.cursor : s.items.length;
+  state.cursor = Math.max(0, Math.min(targetCursor, s.items.length));
   state.view = 'entry';
   state.showFailsOnly = false;
   state.searchQuery = '';
+  // Don't clear sessionsSearchQuery — keeps the search alive for when the user
+  // navigates back to the sessions list.
   exitSelectionMode();
   loadFormForCursor();
   save(); render();
@@ -1254,10 +1732,70 @@ function renderSessions() {
       </div>
     </div>
   ` : `
-    <button class="btn-primary" id="new-session-btn" style="margin-bottom:16px">+ New session</button>
+    <div class="sessions-actions-row">
+      <button class="btn-primary" id="new-session-btn">+ New session</button>
+      <button class="btn-secondary" id="import-session-btn">⬆ Import (.csv)</button>
+    </div>
+    <input type="file" id="import-session-file" accept=".csv,text/csv" style="display:none">
   `;
 
-  const sortControl = state.sessions.length > 1 ? `
+  // v10: search bar above the sort row. Hidden when there are no sessions OR
+  // when the new-session form is open (which dominates the screen anyway).
+  // The result-count subtitle gives the user feedback when their query thins
+  // out the list — important because the empty-state message otherwise looks
+  // like a bug if you don't realise the search is filtering. The dynamic
+  // portion (count + sort + list) is wrapped in #sessions-list-area so we can
+  // refresh it on every keystroke without re-rendering the input itself,
+  // which would lose focus on iOS mid-typing.
+  const hasSessions = state.sessions.length > 0;
+  const showSearch = hasSessions && !state.newForm.show;
+  const searchRow = showSearch ? `
+    <div class="sessions-search-row">
+      <input type="search" class="search-input" id="sessions-search" placeholder="Search sessions and items…" value="${escapeHTML(state.sessionsSearchQuery)}" autocomplete="off">
+    </div>
+  ` : '';
+  const sessionsListArea = `<div id="sessions-list-area">${renderSessionsListAreaHTML()}</div>`;
+
+  // v10: Import conflict dialog — shown when the user picks a CSV whose
+  // Site+Date matches an existing session. Three options stacked vertically
+  // because the consequences of each differ enough that horizontal grouping
+  // would invite mis-tap.
+  const importConflict = state.importDialog.conflictOpen ? renderImportConflictModal() : '';
+  // v10: Import summary dialog — shown after commit, lists skipped rows (if any)
+  // and confirms what happened.
+  const importSummary = state.importDialog.summaryOpen ? renderImportSummaryModal() : '';
+
+  return `
+    <div class="screen">
+      <header class="header">
+        <h1 class="h1">PAT Sessions</h1>
+        <button class="icon-btn" id="settings-btn" aria-label="Settings">⚙</button>
+      </header>
+      ${newForm}
+      ${searchRow}
+      ${sessionsListArea}
+      ${importConflict}
+      ${importSummary}
+    </div>
+  `;
+}
+
+// v10: The dynamic portion of the Sessions screen — count + sort + list. Built
+// as a separate function so we can refresh just this region on every keystroke
+// in the search input without re-rendering the input itself (which would lose
+// focus + keyboard on iOS).
+function renderSessionsListAreaHTML() {
+  const sortedAll = sortedSessions();
+  const filtered = filteredSessions(sortedAll, state.sessionsSearchQuery);
+  const queryTrimmed = state.sessionsSearchQuery.trim();
+
+  const countHTML = queryTrimmed
+    ? `<span class="sessions-search-count">${filtered.length} of ${sortedAll.length} session${sortedAll.length === 1 ? '' : 's'} match</span>`
+    : '';
+
+  // Sort control: only show when there's >1 session AND no active search filter
+  // (the search-result subtitle becomes the more useful contextual cue).
+  const sortControl = sortedAll.length > 1 && !queryTrimmed ? `
     <div class="sort-row">
       <span class="sort-label">Sort by</span>
       <select id="sort-select" class="sort-select">
@@ -1269,35 +1807,114 @@ function renderSessions() {
     </div>
   ` : '';
 
-  const sortedList = sortedSessions();
-  const list = sortedList.length === 0 && !state.newForm.show
-    ? `<p class="muted">No sessions yet. Create one to start testing.</p>`
-    : sortedList.map(s => {
-        const passes = s.items.filter(i => i.result === 'pass').length;
-        const fails = s.items.filter(i => i.result === 'fail').length;
-        // v8: subtle 🔒 prefix on locked sessions so they're easy to spot in the list.
-        const lockMark = s.locked ? '<span class="session-lock" title="Locked">🔒</span>' : '';
-        return `
-          <div class="session-card${s.locked ? ' locked' : ''}">
-            <div class="session-info" data-open="${s.id}">
-              <div class="session-title">${lockMark}${escapeHTML(s.site || s.name)}</div>
-              <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span></div>
-            </div>
-            <button class="icon-btn-sm" data-export="${s.id}" aria-label="Export CSV">⬇</button>
-            <button class="icon-btn-sm" data-delete-session="${s.id}" aria-label="Delete">🗑</button>
+  let list;
+  if (sortedAll.length === 0 && !state.newForm.show) {
+    list = `<p class="muted">No sessions yet. Create one to start testing.</p>`;
+  } else if (queryTrimmed && filtered.length === 0) {
+    list = `<p class="muted">No sessions or items match "${escapeHTML(queryTrimmed)}".</p>`;
+  } else {
+    list = filtered.map(({ session: s, matchedItemIndex, itemMatchCount }) => {
+      const passes = s.items.filter(i => i.result === 'pass').length;
+      const fails = s.items.filter(i => i.result === 'fail').length;
+      // v8: subtle 🔒 prefix on locked sessions so they're easy to spot in the list.
+      const lockMark = s.locked ? '<span class="session-lock" title="Locked">🔒</span>' : '';
+      // v10: when the query only hit item-level fields, show how many items matched
+      // and (via data-open-at) jump straight to the first match.
+      const itemBadge = matchedItemIndex !== -1
+        ? `<div><span class="session-match-badge">${itemMatchCount} match${itemMatchCount === 1 ? '' : 'es'} in items</span></div>`
+        : '';
+      const openAttr = matchedItemIndex !== -1
+        ? `data-open="${s.id}" data-open-at="${matchedItemIndex}"`
+        : `data-open="${s.id}"`;
+      return `
+        <div class="session-card${s.locked ? ' locked' : ''}">
+          <div class="session-info" ${openAttr}>
+            <div class="session-title">${lockMark}${escapeHTML(s.site || s.name)}</div>
+            <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span></div>
+            ${itemBadge}
           </div>
-        `;
-      }).join('');
+          <button class="icon-btn-sm" data-export="${s.id}" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
+          <button class="icon-btn-sm" data-delete-session="${s.id}" aria-label="Delete">🗑</button>
+        </div>
+      `;
+    }).join('');
+  }
 
+  return `${countHTML}${sortControl}<div>${list}</div>`;
+}
+
+// v10: Partial refresh used by the sessions-search oninput. Replaces only
+// #sessions-list-area, leaves the search input intact, and rebinds row events.
+function refreshSessionsListAreaOnly() {
+  const wrap = document.getElementById('sessions-list-area');
+  if (!wrap) return;
+  wrap.innerHTML = renderSessionsListAreaHTML();
+  bindSessionsListAreaEvents();
+}
+
+// v10: Conflict dialog body. Sits above the sessions list in a bulk-sheet.
+function renderImportConflictModal() {
+  const incoming = state.importDialog.pendingSession;
+  if (!incoming) return '';
+  const existing = state.sessions.find(s => s.id === state.importDialog.conflictExistingId);
+  const existingItemCount = existing && Array.isArray(existing.items) ? existing.items.length : 0;
   return `
-    <div class="screen">
-      <header class="header">
-        <h1 class="h1">PAT Sessions</h1>
-        <button class="icon-btn" id="settings-btn" aria-label="Settings">⚙</button>
-      </header>
-      ${newForm}
-      ${sortControl}
-      <div>${list}</div>
+    <div class="modal-backdrop" id="import-conflict-backdrop" style="z-index:300"></div>
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Session already exists">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">Session already exists</h3>
+        <button class="fail-close-btn" id="import-conflict-cancel" aria-label="Cancel">×</button>
+      </div>
+      <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--text)">
+        A session for <strong>${escapeHTML(incoming.site)}</strong> on <strong>${escapeHTML(formatDate(incoming.date))}</strong> already exists with ${existingItemCount} item${existingItemCount === 1 ? '' : 's'}.
+      </p>
+      <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--text)">
+        The imported file has ${incoming.items.length} item${incoming.items.length === 1 ? '' : 's'}. How would you like to import them?
+      </p>
+      <div class="import-conflict-actions">
+        <button class="btn-primary" id="import-conflict-duplicate">Import as duplicate (new session)</button>
+        <button class="btn-secondary" id="import-conflict-merge">Merge into existing session</button>
+        <button class="btn-tertiary" id="import-conflict-cancel2">Cancel import</button>
+      </div>
+    </div>
+  `;
+}
+
+// v10: Summary dialog body. Confirms what was imported and lists any rows that
+// were skipped due to validation errors. Doubles as the success confirmation
+// when nothing was skipped (skipped.length === 0).
+function renderImportSummaryModal() {
+  const sum = state.importDialog.summary;
+  if (!sum) return '';
+  const modeText = sum.mode === 'merge'
+    ? `Merged ${sum.itemCount} item${sum.itemCount === 1 ? '' : 's'} into <strong>${escapeHTML(sum.sessionName)}</strong>.`
+    : (sum.mode === 'duplicate'
+        ? `Imported ${sum.itemCount} item${sum.itemCount === 1 ? '' : 's'} as a new duplicate of <strong>${escapeHTML(sum.sessionName)}</strong>.`
+        : `Imported ${sum.itemCount} item${sum.itemCount === 1 ? '' : 's'} into new session <strong>${escapeHTML(sum.sessionName)}</strong>.`);
+  const skippedBlock = (sum.skipped && sum.skipped.length > 0) ? `
+    <p style="margin:12px 0 4px;font-size:14px;font-weight:600;color:var(--text)">
+      ${sum.skipped.length} row${sum.skipped.length === 1 ? '' : 's'} skipped:
+    </p>
+    <div class="import-summary-list">
+      <ul>
+        ${sum.skipped.map(s => `<li>Row ${s.row}: ${escapeHTML(s.reason)}</li>`).join('')}
+      </ul>
+    </div>
+  ` : '';
+  return `
+    <div class="modal-backdrop" id="import-summary-backdrop" style="z-index:300"></div>
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Import summary">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">Import complete</h3>
+        <button class="fail-close-btn" id="import-summary-close" aria-label="Close">×</button>
+      </div>
+      <p style="margin:0;font-size:14px;line-height:1.5;color:var(--text)">${modeText}</p>
+      ${skippedBlock}
+      <button class="btn-primary" id="import-summary-done" style="margin-top:14px">Done</button>
     </div>
   `;
 }
@@ -1325,6 +1942,16 @@ function renderEntry() {
   const suggestionsBlock = (state.showSuggestions && state.suggestions.length > 0)
     ? `<div class="suggestions">
         ${state.suggestions.map(s => `<button class="suggestion-item" data-suggest="${escapeHTML(s)}">${escapeHTML(s)}</button>`).join('')}
+      </div>`
+    : '';
+
+  // v10: location autocomplete — same .suggestions block as item-type, but the
+  // entries come from the current session's existing item locations only and
+  // use a distinct data-* attribute so the click handler doesn't collide with
+  // the item-type one.
+  const locationSuggestionsBlock = (state.showLocationSuggestions && state.locationSuggestions.length > 0)
+    ? `<div class="suggestions" id="location-suggestions">
+        ${state.locationSuggestions.map(s => `<button class="suggestion-item" data-loc-suggest="${escapeHTML(s)}">${escapeHTML(s)}</button>`).join('')}
       </div>`
     : '';
 
@@ -1403,7 +2030,10 @@ function renderEntry() {
       <input class="input-big" id="f-asset" value="${escapeHTML(state.form.assetNo)}">
 
       <label class="label">Location ${carriedHint}</label>
-      <input class="input-big" id="f-location" value="${escapeHTML(state.form.location)}" placeholder="e.g. Office 1">
+      <div class="location-input-wrap">
+        <input class="input-big" id="f-location" value="${escapeHTML(state.form.location)}" placeholder="e.g. Office 1">
+        ${locationSuggestionsBlock}
+      </div>
 
       <label class="label">Item type</label>
       <div class="quick-grid">${quickButtons}</div>
@@ -1529,7 +2159,7 @@ function renderOverview() {
         <div class="header-actions">
           ${showSelectBtn ? `<button class="icon-btn" id="select-mode-btn" aria-label="Select items" title="Select items">☑</button>` : ''}
           <button class="icon-btn" id="edit-session-btn" aria-label="Edit session">✎</button>
-          <button class="icon-btn" id="export-btn" aria-label="Export CSV">⬇</button>
+          <button class="icon-btn" id="export-btn" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
         </div>
       </header>
     `;
@@ -1606,6 +2236,47 @@ function bindOverviewBodyEvents() {
     el.onchange = () => {
       toggleSelected(parseInt(el.dataset.select, 10));
       render();
+    };
+  });
+}
+
+// v10: Bind events for everything inside #sessions-list-area. Called both from
+// bindEvents() on initial render and from refreshSessionsListAreaOnly() after
+// each keystroke in the sessions search input.
+function bindSessionsListAreaEvents() {
+  const $ = id => document.getElementById(id);
+  if ($('sort-select')) $('sort-select').onchange = e => {
+    state.sort = e.target.value;
+    save();
+    refreshSessionsListAreaOnly();
+  };
+  document.querySelectorAll('[data-open]').forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.open;
+      // v10: if the card was rendered with data-open-at (search-mode item-level
+      // match), jump straight to that item rather than the default "new entry"
+      // position at end-of-list.
+      if (el.dataset.openAt !== undefined && el.dataset.openAt !== '') {
+        const idx = parseInt(el.dataset.openAt, 10);
+        openSession(id, { cursor: idx });
+      } else {
+        openSession(id);
+      }
+    };
+  });
+  document.querySelectorAll('[data-export]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const s = state.sessions.find(x => x.id === el.dataset.export);
+      // v10: native share sheet first (iOS/Android), falls back to download.
+      if (s) shareOrDownloadCSV(s);
+    };
+  });
+  document.querySelectorAll('[data-delete-session]').forEach(el => {
+    el.onclick = (e) => {
+      e.stopPropagation();
+      const s = state.sessions.find(x => x.id === el.dataset.deleteSession);
+      if (s && confirm(`Delete "${s.site || s.name}"? This cannot be undone.`)) deleteSession(el.dataset.deleteSession);
     };
   });
 }
@@ -1980,18 +2651,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v9: rolled forward — V9 on top, V6 dropped. -->
+      <!-- v8: rolling 3-version changelog. v10: rolled forward — V10 on top, V7 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V10</strong> · May 2026</p>
+        <p class="muted">Import sessions from a CSV file sent by another engineer. Share button on session export now opens the native share sheet (Messages, Mail, AirDrop, WhatsApp) instead of saving straight to Files. Search bar on the Sessions list matches site, engineer, date and items within each session — tap a result to jump straight to the matching item. Location field now autofills from other locations used in the same session. Confirm prompt before discarding unsaved changes when switching Quick Pick presets.</p>
 
         <p><strong>V9</strong> · May 2026</p>
         <p class="muted">Quick Pick presets — save multiple named lists and switch between them on the Quick Pick Items page. Reset-to-defaults buttons on Items, Fails, and Item Description List pages. Updated built-in defaults to reflect real PAT work. Haptic feedback on fail-reason taps and the Other Save button. Backup/restore extended to include presets.</p>
 
         <p><strong>V8</strong> · May 2026</p>
         <p class="muted">Lock-session toggle to prevent accidental new entries (with overview-edit override). Working earth continuity calculator under Settings. Date field on Edit Session sized to match other fields. Fix for the "taps do nothing" bug after switching theme to Light or Dark.</p>
-
-        <p><strong>V7</strong> · May 2026</p>
-        <p class="muted">Settings reorganised into a hub with focused sub-pages. Auto-update banner replaces the close-open-close-open dance. JSON backup / restore. Bulk-edit location from the overview. Storage usage indicator. Light / dark / system theme. Haptics toggle.</p>
       </div>
 
       <div class="info-card">
@@ -2063,19 +2734,53 @@ function bindEvents() {
     render();
   };
 
-  document.querySelectorAll('[data-open]').forEach(el => {
-    el.onclick = () => openSession(el.dataset.open);
-  });
-  document.querySelectorAll('[data-export]').forEach(el => {
-    el.onclick = (e) => { e.stopPropagation(); const s = state.sessions.find(x => x.id === el.dataset.export); if (s) downloadCSV(s); };
-  });
-  document.querySelectorAll('[data-delete-session]').forEach(el => {
-    el.onclick = (e) => {
-      e.stopPropagation();
-      const s = state.sessions.find(x => x.id === el.dataset.deleteSession);
-      if (s && confirm(`Delete "${s.site || s.name}"? This cannot be undone.`)) deleteSession(el.dataset.deleteSession);
+  // v10: Sessions list search — partial refresh on input so focus is preserved.
+  // The sort-select inside #sessions-list-area gets rebuilt every keystroke
+  // (the area is replaced wholesale), so its onchange handler is rebound in
+  // bindSessionsListAreaEvents() below.
+  if ($('sessions-search')) {
+    $('sessions-search').oninput = e => {
+      state.sessionsSearchQuery = e.target.value;
+      refreshSessionsListAreaOnly();
     };
-  });
+  }
+
+  // v10: Import button — opens the (hidden) file picker, then handleImportFile
+  // takes over once a file is chosen.
+  if ($('import-session-btn')) $('import-session-btn').onclick = () => {
+    const inp = $('import-session-file');
+    if (inp) inp.click();
+  };
+  if ($('import-session-file')) $('import-session-file').onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    handleImportFile(file);
+    // Reset so picking the same file twice still triggers a change
+    e.target.value = '';
+  };
+
+  // v10: Import conflict dialog — three actions stacked vertically.
+  if ($('import-conflict-cancel')) $('import-conflict-cancel').onclick = () => cancelImportConflict();
+  if ($('import-conflict-cancel2')) $('import-conflict-cancel2').onclick = () => cancelImportConflict();
+  if ($('import-conflict-backdrop')) $('import-conflict-backdrop').onclick = () => cancelImportConflict();
+  if ($('import-conflict-duplicate')) $('import-conflict-duplicate').onclick = () => {
+    const pending = state.importDialog.pendingSession;
+    const skipped = (state.importDialog.summary && state.importDialog.summary.skipped) || [];
+    if (pending) commitImportedSession(pending, 'duplicate', skipped);
+  };
+  if ($('import-conflict-merge')) $('import-conflict-merge').onclick = () => {
+    const pending = state.importDialog.pendingSession;
+    const skipped = (state.importDialog.summary && state.importDialog.summary.skipped) || [];
+    if (pending) commitImportedSession(pending, 'merge', skipped);
+  };
+
+  // v10: Import summary dialog — single Done button (and the × in the header).
+  if ($('import-summary-done')) $('import-summary-done').onclick = () => closeImportSummary();
+  if ($('import-summary-close')) $('import-summary-close').onclick = () => closeImportSummary();
+  if ($('import-summary-backdrop')) $('import-summary-backdrop').onclick = () => closeImportSummary();
+
+  // Sessions-list row events — extracted so refreshSessionsListAreaOnly() can
+  // rebind without touching anything else.
+  bindSessionsListAreaEvents();
 
   // Entry screen
   if ($('sessions-btn')) $('sessions-btn').onclick = () => setView('sessions');
@@ -2083,10 +2788,23 @@ function bindEvents() {
   if ($('f-asset')) $('f-asset').oninput = e => state.form.assetNo = e.target.value;
 
   if ($('f-location')) {
-    $('f-location').oninput = e => state.form.location = e.target.value;
+    // v10: location autocomplete. We keep the v6 focus-clears-the-field behaviour
+    // (so the carry-forward location doesn't get in the way when you want to type
+    // something different), and additionally feed state.locationSuggestions from
+    // the current session's existing item locations on every keystroke.
+    $('f-location').oninput = e => {
+      state.form.location = e.target.value;
+      state.locationSuggestions = computeLocationSuggestions(e.target.value);
+      state.showLocationSuggestions = state.locationSuggestions.length > 0;
+      renderLocationSuggestionsOnly();
+    };
     $('f-location').onfocus = e => {
       e.target.dataset.original = e.target.value;
       e.target.value = '';
+      // Field is now empty → no suggestions until the user types.
+      state.locationSuggestions = [];
+      state.showLocationSuggestions = false;
+      renderLocationSuggestionsOnly();
     };
     $('f-location').onblur = e => {
       const v = e.target.value.trim();
@@ -2099,6 +2817,11 @@ function bindEvents() {
         e.target.value = cased;
         state.form.location = cased;
       }
+      // Delay hiding so a click on a suggestion can register first.
+      setTimeout(() => {
+        state.showLocationSuggestions = false;
+        renderLocationSuggestionsOnly();
+      }, 150);
     };
   }
 
@@ -2181,7 +2904,7 @@ function bindEvents() {
     if (state.view === 'overview') setView('entry');
     else if (state.view === 'settings') setView('sessions');
   };
-  if ($('export-btn')) $('export-btn').onclick = () => { const s = activeSession(); if (s) downloadCSV(s); };
+  if ($('export-btn')) $('export-btn').onclick = () => { const s = activeSession(); if (s) shareOrDownloadCSV(s); };
   if ($('edit-session-btn')) $('edit-session-btn').onclick = () => startEditSession();
   if ($('select-mode-btn')) $('select-mode-btn').onclick = () => enterSelectionMode();
   if ($('cancel-selection-btn')) $('cancel-selection-btn').onclick = () => { exitSelectionMode(); render(); };
@@ -2246,11 +2969,39 @@ function bindEvents() {
   // v9: preset switching, creation, rename, delete on the Quick Pick Items page.
   // Switching is via the dropdown — onchange because we want commit-on-blur,
   // not change-as-you-arrow (which would fire a render on every option).
-  // Note: switching DOES NOT save unsaved textarea edits. The user must hit
-  // Save first; otherwise the typed-but-unsaved items are lost. This is a
-  // deliberate match of the existing behaviour for textareas — the textarea
-  // is a draft buffer; the underlying preset is the source of truth.
-  if ($('settings-preset-select')) $('settings-preset-select').onchange = e => switchPreset(e.target.value);
+  //
+  // v10: confirm-on-switch guard. Previously the textarea was a pure draft
+  // buffer — typing then switching presets silently discarded the edits. Now
+  // we compare the textarea content against the active preset's stored items;
+  // if it differs, we confirm. On cancel, the dropdown is reverted to the
+  // current active preset. On confirm, the edits ARE still discarded — same as
+  // before — but at least the user gave informed consent. Auto-save-on-switch
+  // would be the alternative; we picked confirm because it matches the broader
+  // "Save = commit" model used across every other settings sub-page.
+  if ($('settings-preset-select')) $('settings-preset-select').onchange = e => {
+    const newId = e.target.value;
+    const currentP = activePreset();
+    const ta = document.getElementById('settings-types');
+    if (ta && currentP) {
+      const storedItems = (currentP.items || []).join('\n');
+      // Tolerate trailing whitespace differences (e.g. trailing newline from
+      // the textarea) but otherwise demand exact match.
+      const taValueNorm = ta.value.replace(/\s+$/, '');
+      const storedNorm = storedItems.replace(/\s+$/, '');
+      if (taValueNorm !== storedNorm) {
+        const ok = confirm(
+          `You have unsaved changes to "${currentP.name}".\n\n` +
+          `Switch presets and discard the changes?`
+        );
+        if (!ok) {
+          // Revert dropdown to the still-active preset.
+          e.target.value = state.activePresetId;
+          return;
+        }
+      }
+    }
+    switchPreset(newId);
+  };
   if ($('preset-new-btn')) $('preset-new-btn').onclick = () => {
     state.presetDialog = { mode: 'new', name: '', editingId: null };
     render();
@@ -2363,6 +3114,43 @@ function renderSuggestionsOnly() {
         if (inp) inp.value = el.dataset.suggest;
         state.showSuggestions = false;
         renderSuggestionsOnly();
+      };
+    });
+  }
+}
+
+// v10: Same partial-refresh trick for the location autofill. Lives inside
+// .location-input-wrap rather than .custom-type-wrap. Tapping a suggestion
+// fills the field, normalises casing the same way blur would, and immediately
+// clears the suggestions.
+function renderLocationSuggestionsOnly() {
+  const wrap = document.querySelector('.location-input-wrap');
+  if (!wrap) return;
+  const existing = wrap.querySelector('.suggestions');
+  if (existing) existing.remove();
+  if (state.showLocationSuggestions && state.locationSuggestions.length > 0) {
+    const div = document.createElement('div');
+    div.className = 'suggestions';
+    div.id = 'location-suggestions';
+    div.innerHTML = state.locationSuggestions.map(s => `<button class="suggestion-item" data-loc-suggest="${escapeHTML(s)}">${escapeHTML(s)}</button>`).join('');
+    wrap.appendChild(div);
+    div.querySelectorAll('[data-loc-suggest]').forEach(el => {
+      // preventDefault on mousedown so the blur on the input doesn't fire
+      // before the click handler — without this, blur restores the original
+      // value and the click never lands.
+      el.onmousedown = (e) => { e.preventDefault(); };
+      el.onclick = () => {
+        const picked = el.dataset.locSuggest;
+        state.form.location = picked;
+        const inp = document.getElementById('f-location');
+        if (inp) {
+          inp.value = picked;
+          // Clear the focus-restore stash so blur doesn't undo our pick.
+          inp.dataset.original = picked;
+        }
+        state.showLocationSuggestions = false;
+        state.locationSuggestions = [];
+        renderLocationSuggestionsOnly();
       };
     });
   }
