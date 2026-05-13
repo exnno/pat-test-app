@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v12 (May 2026)
+ * v12.1 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v12 ==============
+// ============== PAT Test PWA — v12.1 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V12';
+const APP_VERSION = 'V12.1';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -2397,7 +2397,6 @@ function render() {
         <li><strong>Tester &amp; calibration in CSV.</strong> Your tester make/model and calibration details can now be included on exports. Turn them on under Settings → CSV Columns (they start hidden so existing exports don't change).</li>
         <li><strong>Calibration-due warning.</strong> User Settings now shows a small chip when your next calibration is overdue or coming up within 30 days.</li>
         <li><strong>Search-jump highlight.</strong> When you tap a search result on the Sessions list, the matched item briefly flashes on arrival so you know exactly where you've landed.</li>
-        <li><strong>No-scroll test screen.</strong> The entry screen no longer scrolls — everything fits in one view.</li>
         <li><strong>Smarter autocomplete.</strong> Item-type suggestions now float anything you've already entered in the current session to the top of the list.</li>
       </ul>
       <button class="btn-primary" id="v12-welcome-dismiss">Continue</button>
@@ -2411,15 +2410,13 @@ function render() {
   } else {
     document.body.classList.remove('has-selection-bar');
   }
-  // v12: toggle body class for entry-view no-scroll layout. The .screen
-  // gets height:100dvh + overflow:hidden under this class so the page
-  // doesn't get the phantom scrollbar that 100vh + safe-area-insets caused
-  // on iOS PWA. Other views keep their normal scroll behaviour.
-  if (state.view === 'entry') {
-    document.body.classList.add('view-entry');
-  } else {
-    document.body.classList.remove('view-entry');
-  }
+  // v12: previously toggled body.view-entry here for no-scroll layout.
+  // v12.1: rolled back — the 100dvh + overflow:hidden approach caused issues
+  // on some devices (notes textarea + keyboard pushing the PASS/FAIL row
+  // off-screen, plus inconsistent dvh support). Defensive cleanup: strip the
+  // class if it lingered from a previous v12 render, in case a hot-swap
+  // mid-session leaves a stale body class.
+  document.body.classList.remove('view-entry');
   bindEvents();
 }
 
@@ -3609,7 +3606,7 @@ function renderSettingsAbout() {
         <h3>What's new</h3>
 
         <p><strong>V12</strong> · May 2026</p>
-        <p class="muted">Tester type and calibration info (date, certificate, due date) now flow through to CSV exports — four new columns, off by default, switch them on under Settings → CSV Columns. A small chip on User Settings flags when your tester's next calibration is overdue or due within 30 days, with the same status echoed on the Settings hub. When you tap a Sessions-list search result, the matched item now flashes briefly on arrival so you know exactly where you've landed. The entry/test screen no longer scrolls. Item-type autocomplete now floats any description you've already used in the current session to the top of the suggestions.</p>
+        <p class="muted">Tester type and calibration info (date, certificate, due date) now flow through to CSV exports — four new columns, off by default, switch them on under Settings → CSV Columns. A small chip on User Settings flags when your tester's next calibration is overdue or due within 30 days, with the same status echoed on the Settings hub. When you tap a Sessions-list search result, the matched item now flashes briefly on arrival so you know exactly where you've landed. Item-type autocomplete now floats any description you've already used in the current session to the top of the suggestions.</p>
 
         <p><strong>V11</strong> · May 2026</p>
         <p class="muted">Backup-reminder banner on the Sessions list when it's been more than 7 days since your last JSON backup — "Export now" or "Remind me later". New CSV Columns settings page lets you reorder, hide, or rename any column on the exported CSV (the in-app screens are unchanged). Bulk-edit menu in selection mode now offers Location, Type, Notes (replace or append), or Delete on the items you've ticked. User Settings has new fields for tester type and calibration info (last cal date, certificate number, next due). CSV results now read "Passed" or "Failed" rather than "Pass" / "Fail".</p>

@@ -44,7 +44,14 @@
 // on the entry/test screen — content sized to fit the viewport. Item-type
 // autocomplete sorts descriptions already used in the current session to the
 // top of the suggestion list. New "what's new in V12" welcome modal.
-const CACHE_VERSION = 'pat-v12';
+//
+// v12.1: rolled back the no-scroll change from v12. The 100dvh + overflow:
+// hidden combo caused the PASS / FAIL row to get pushed off-screen when the
+// notes textarea + on-screen keyboard were up, with no recovery via scroll.
+// Reverted to v11 scroll behaviour on the entry screen. All other v12
+// features (tester+cal in CSV, cal-due chip, search-jump highlight,
+// session-first autocomplete, welcome modal) are unchanged.
+const CACHE_VERSION = 'pat-v12-1';
 const ASSETS = [
   './',
   './index.html',

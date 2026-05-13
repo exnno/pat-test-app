@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA
- * v12 (May 2026)
+ * v12.1 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -1384,26 +1384,10 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   100% { background-color: transparent; }
 }
 
-/* No-scroll on the entry (test) screen. body.view-entry is toggled in
-   render() whenever state.view === 'entry'. We override the base .screen
-   rule's min-height: 100vh / padding-bottom: 32px so that:
-     - the screen is exactly one dynamic viewport tall (accounts for the
-       iOS Safari address-bar collapse — 100dvh handles that where 100vh
-       does not, which was the root cause of the phantom-scrollbar we saw
-       even with content that visually fit);
-     - overflow:hidden prevents the page from scrolling at all.
-   Trade-off (flagged in the v12 handover): on very small phones or with
-   iOS Dynamic Type cranked, the notes textarea + on-screen keyboard could
-   in principle push the PASS / FAIL buttons off-screen. Acceptable for now;
-   if it bites in practice we can switch to a hide-bar-but-keep-scroll
-   approach. Other screens are untouched. */
-body.view-entry {
-  overflow: hidden;
-  height: 100dvh;
-}
-body.view-entry .screen {
-  min-height: 0;
-  height: 100dvh;
-  overflow: hidden;
-  padding-bottom: 16px;
-}
+/* No-scroll on the entry (test) screen was added in v12 (body.view-entry
+   class toggled in render(), .screen overrides with height:100dvh +
+   overflow:hidden) but rolled back in v12.1 — the dvh + overflow:hidden
+   combo caused content (PASS/FAIL row) to get pushed off-screen when the
+   notes textarea + on-screen keyboard were up, with no way to scroll to
+   recover. Reverted to v11 scroll behaviour. The body class strip in
+   render() is defensive cleanup only. */
