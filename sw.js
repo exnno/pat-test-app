@@ -35,7 +35,16 @@
 // extended bulk-edit menu (location/type/notes/delete), tester + calibration
 // fields on User Settings, CSV results now Passed/Failed (UI unchanged),
 // one-time "what's new in V11" welcome modal.
-const CACHE_VERSION = 'pat-v11';
+//
+// v12: tester + calibration info now flow through to CSV exports (four new
+// columns, default-hidden, picked up automatically by the CSV Columns page).
+// Calibration-due chip on User Settings + subtitle on the settings hub when
+// cal date is overdue or within 30 days. Search-jump from the Sessions list
+// now flashes the matched item briefly on arrival. Page-level scroll killed
+// on the entry/test screen — content sized to fit the viewport. Item-type
+// autocomplete sorts descriptions already used in the current session to the
+// top of the suggestion list. New "what's new in V12" welcome modal.
+const CACHE_VERSION = 'pat-v12';
 const ASSETS = [
   './',
   './index.html',

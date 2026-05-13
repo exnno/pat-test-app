@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA
- * v11 (May 2026)
+ * v12 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -47,6 +47,13 @@
   --shadow: rgba(0,0,0,0.08);
   --backdrop: rgba(0,0,0,0.4);
   --modal-shadow: rgba(0,0,0,0.15);
+  /* v12: warm-amber tokens for the calibration-due chip + search-jump flash.
+     Light theme uses Tailwind amber-100/800/300 + amber-200 for the flash so
+     the chip reads as a clearly warning-coloured pill against white cards. */
+  --warn-soft-bg: #fef3c7;
+  --warn-soft-text: #92400e;
+  --warn-soft-border: #fcd34d;
+  --highlight-flash: #fde68a;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -82,6 +89,12 @@
     --shadow: rgba(0,0,0,0.4);
     --backdrop: rgba(0,0,0,0.6);
     --modal-shadow: rgba(0,0,0,0.5);
+    /* v12 dark equivalents — deep amber-900 for chip surface, amber-300
+       for text, amber-700 for the border. Flash uses amber-900. */
+    --warn-soft-bg: #422006;
+    --warn-soft-text: #fcd34d;
+    --warn-soft-border: #92400e;
+    --highlight-flash: #78350f;
   }
 }
 
@@ -117,6 +130,11 @@
   --shadow: rgba(0,0,0,0.4);
   --backdrop: rgba(0,0,0,0.6);
   --modal-shadow: rgba(0,0,0,0.5);
+  /* v12 — see media-query block above for token meanings. */
+  --warn-soft-bg: #422006;
+  --warn-soft-text: #fcd34d;
+  --warn-soft-border: #92400e;
+  --highlight-flash: #78350f;
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -1313,4 +1331,79 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   margin-top: 4px;
   font-size: 12px;
   color: var(--text-muted);
+}
+
+/* ============================================================
+   v12 additions
+   ============================================================ */
+
+/* Calibration-due chip — appears next to the "Next calibration due" field
+   on User Settings, and in the User Settings subtitle on the settings hub.
+   Two variants:
+     .overdue — red, matches the fail-soft palette already used for delete
+                confirms and similar destructive surfaces.
+     .soon    — warm amber, matches the new --warn-soft-* tokens. Used when
+                cal date is within 30 days but not yet past. */
+.cal-chip {
+  display: inline-block;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.01em;
+  margin-left: 8px;
+  vertical-align: middle;
+  white-space: nowrap;
+}
+.cal-chip.overdue {
+  background: var(--fail-soft-bg);
+  color: var(--fail-soft-text);
+  border: 1px solid var(--fail-soft-border);
+}
+.cal-chip.soon {
+  background: var(--warn-soft-bg);
+  color: var(--warn-soft-text);
+  border: 1px solid var(--warn-soft-border);
+}
+
+/* Sessions-list search-jump highlight. When openSession() is called with an
+   explicit cursor (i.e. the user tapped an item-level search result), the
+   progress row on the entry screen gets data-search-jump="1" for the
+   single render that follows. The keyframes hold the warm-amber background
+   for the first 20% of the animation so the eye has time to register the
+   landing, then fade to transparent over the remainder. ~1.6s feels right
+   — long enough to notice, short enough not to nag. */
+.progress-row[data-search-jump] {
+  animation: searchJumpFlash 1.6s ease-out;
+  border-radius: 8px;
+}
+@keyframes searchJumpFlash {
+  0%   { background-color: var(--highlight-flash); }
+  20%  { background-color: var(--highlight-flash); }
+  100% { background-color: transparent; }
+}
+
+/* No-scroll on the entry (test) screen. body.view-entry is toggled in
+   render() whenever state.view === 'entry'. We override the base .screen
+   rule's min-height: 100vh / padding-bottom: 32px so that:
+     - the screen is exactly one dynamic viewport tall (accounts for the
+       iOS Safari address-bar collapse — 100dvh handles that where 100vh
+       does not, which was the root cause of the phantom-scrollbar we saw
+       even with content that visually fit);
+     - overflow:hidden prevents the page from scrolling at all.
+   Trade-off (flagged in the v12 handover): on very small phones or with
+   iOS Dynamic Type cranked, the notes textarea + on-screen keyboard could
+   in principle push the PASS / FAIL buttons off-screen. Acceptable for now;
+   if it bites in practice we can switch to a hide-bar-but-keep-scroll
+   approach. Other screens are untouched. */
+body.view-entry {
+  overflow: hidden;
+  height: 100dvh;
+}
+body.view-entry .screen {
+  min-height: 0;
+  height: 100dvh;
+  overflow: hidden;
+  padding-bottom: 16px;
 }

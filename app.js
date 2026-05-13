@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v11 (May 2026)
+ * v12 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v11 ==============
+// ============== PAT Test PWA — v12 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V11';
+const APP_VERSION = 'V12';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -32,9 +32,13 @@ const ACTIVE_PRESET_KEY = 'pat:activepreset';   // v9: preset id
 //   CSV_COLUMNS_KEY     — JSON array of {id, header, visible} configuring the
 //                         CSV export. See DEFAULT_CSV_COLUMNS below.
 //   TESTER_KEY, CAL_*   — Optional tester type + calibration info shown on the
-//                         User Settings page. v11 stores them but does NOT
-//                         include them in CSV exports (flagged for v12).
-//   V11_WELCOME_KEY     — '1' once the user has dismissed the welcome modal.
+//                         User Settings page. v12 update: these now also flow
+//                         through to CSV exports via four new default-hidden
+//                         columns. Toggle in Settings → CSV Columns.
+// v12: WELCOME_KEY renamed from pat:v11welcome → pat:v12welcome. The new modal
+//                  fires for everyone again. The old key (if present in storage
+//                  from v11 users) is orphaned and harmless — we don't bother
+//                  cleaning it up since it's a single string-valued flag.
 const LAST_BACKUP_KEY = 'pat:lastbackup';
 const BACKUP_SNOOZE_KEY = 'pat:backupsnooze';
 const CSV_COLUMNS_KEY = 'pat:csvcolumns';
@@ -42,7 +46,13 @@ const TESTER_KEY = 'pat:tester';
 const CAL_DATE_KEY = 'pat:caldate';
 const CAL_CERT_KEY = 'pat:calcert';
 const CAL_DUE_KEY = 'pat:caldue';
-const V11_WELCOME_KEY = 'pat:v11welcome';
+const V12_WELCOME_KEY = 'pat:v12welcome';
+
+// v12: calibration status thresholds for the User Settings chip + hub subtitle.
+// CAL_DUE_SOON_DAYS — when the next-due date is within this many days from
+//                     today, show an amber "Due in N days" chip.
+// Anything past the due date is shown as red "Overdue · N days" regardless.
+const CAL_DUE_SOON_DAYS = 30;
 
 const BACKUP_REMINDER_DAYS = 7;
 const BACKUP_SNOOZE_HOURS = 24;
@@ -115,14 +125,22 @@ const DEFAULT_DESCRIPTIONS = [
 // parseImportCSV(). Old user configs missing the new column will pick it up
 // automatically via ensureAllCsvColumns() on next load.
 const DEFAULT_CSV_COLUMNS = [
-  { id: 'assetNo',     header: 'Asset ID',      visible: true },
-  { id: 'engineer',    header: 'Engineer name', visible: true },
-  { id: 'description', header: 'Description',   visible: true },
-  { id: 'site',        header: 'Site',          visible: true },
-  { id: 'location',    header: 'Location',      visible: true },
-  { id: 'date',        header: 'Date',          visible: true },
-  { id: 'result',      header: 'Result',        visible: true },
-  { id: 'notes',       header: 'Notes',         visible: true }
+  { id: 'assetNo',     header: 'Asset ID',      visible: true  },
+  { id: 'engineer',    header: 'Engineer name', visible: true  },
+  { id: 'description', header: 'Description',   visible: true  },
+  { id: 'site',        header: 'Site',          visible: true  },
+  { id: 'location',    header: 'Location',      visible: true  },
+  { id: 'date',        header: 'Date',          visible: true  },
+  { id: 'result',      header: 'Result',        visible: true  },
+  { id: 'notes',       header: 'Notes',         visible: true  },
+  // v12: tester + calibration info, sourced from state.tester / state.calDate
+  // / state.calCertNo / state.calDue (NOT session-stamped — these are current
+  // engineer-global values at export time). Default hidden so existing users'
+  // exports don't suddenly grow new columns; turn on via Settings → CSV Columns.
+  { id: 'tester',      header: 'Tester',        visible: false },
+  { id: 'calDate',     header: 'Cal. Date',     visible: false },
+  { id: 'calCertNo',   header: 'Cal. Cert No.', visible: false },
+  { id: 'calDue',      header: 'Cal. Due',      visible: false }
 ];
 
 // v8: Resistance calculator — IET Code of Practice Table V1.1 nominal values.
@@ -228,15 +246,23 @@ let state = {
 
   // User Settings: tester type + calibration info. All optional, all free text
   // (dates use <input type="date"> so they're stored as ISO YYYY-MM-DD strings).
-  // Persisted to localStorage and included in backups. NOT yet exported in CSV
-  // — see v11 backlog in handover doc.
+  // Persisted to localStorage and included in backups. v12: now also flow into
+  // CSV exports via the four new default-hidden columns in DEFAULT_CSV_COLUMNS.
   tester: '',
   calDate: '',
   calCertNo: '',
   calDue: '',
 
-  // First-launch welcome modal — shown once after the v11 update.
-  v11WelcomeSeen: false,
+  // v12: First-launch welcome modal flag. Renamed from v11WelcomeSeen so the
+  // modal fires once for everyone on update to V12.
+  v12WelcomeSeen: false,
+
+  // v12: Sessions-list search-jump highlight. Set to the cursor index by
+  // openSession() when called with an explicit opts.cursor (i.e. the user
+  // tapped an item-level search result). Captured + cleared during the next
+  // renderEntry() so the CSS keyframe animation runs exactly once. null when
+  // no flash is pending — the default state.
+  searchJumpCursor: null,
 
   // Bulk-edit menu state. Replaces v10's single-purpose bulkLocationDialogOpen.
   //   menuOpen — true when the "Edit selected ▾" menu sheet is showing.
@@ -409,8 +435,9 @@ function loadV11Settings() {
   state.calCertNo = localStorage.getItem(CAL_CERT_KEY) || '';
   state.calDue = localStorage.getItem(CAL_DUE_KEY) || '';
 
-  // Welcome modal flag — only suppress if explicitly seen.
-  state.v11WelcomeSeen = localStorage.getItem(V11_WELCOME_KEY) === '1';
+  // v12: welcome modal flag — only suppress if explicitly seen. v11 users will
+  // see the v12 modal once on update because the key changed.
+  state.v12WelcomeSeen = localStorage.getItem(V12_WELCOME_KEY) === '1';
 }
 
 // v11: Ensure state.csvColumns contains every column defined in
@@ -563,6 +590,34 @@ function formatDate(iso) {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
+// v12: Compute the calibration-due status from state.calDue. Returns null when
+// no due date is set (so callers can skip rendering the chip/subtitle entirely)
+// or a {status, days} object otherwise. days is always non-negative:
+//   - 'overdue' → days past the due date (e.g. {status:'overdue', days:12})
+//   - 'soon'    → days remaining until due (e.g. {status:'soon', days:7})
+//   - 'ok'      → days remaining (no chip rendered for this state)
+// Day count uses date-only comparison (both sides normalised to midnight) so
+// the chip flips from 'soon' to 'overdue' at midnight local time, not after a
+// rolling 24h window from when the user saved the date.
+function calibrationStatus() {
+  if (!state.calDue) return null;
+  const parts = state.calDue.split('-');
+  if (parts.length !== 3) return null;
+  const yyyy = parseInt(parts[0], 10);
+  const mm   = parseInt(parts[1], 10);
+  const dd   = parseInt(parts[2], 10);
+  if (!yyyy || !mm || !dd) return null;
+  const due = new Date(yyyy, mm - 1, dd);
+  if (isNaN(due.getTime())) return null;
+  due.setHours(0, 0, 0, 0);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  const days = Math.round((due.getTime() - now.getTime()) / 86400000);
+  if (days < 0) return { status: 'overdue', days: -days };
+  if (days <= CAL_DUE_SOON_DAYS) return { status: 'soon', days };
+  return { status: 'ok', days };
+}
+
 function splitAssetNo(s) {
   if (!s) return { prefix: '', number: null };
   const m = String(s).match(/^(.*?)(\d+)$/);
@@ -603,7 +658,32 @@ function computeSuggestions(query) {
   const all = state.descriptions.filter(t => !quickLower.includes(t.toLowerCase()));
   const starts = all.filter(t => t.toLowerCase().startsWith(q) && t.toLowerCase() !== q);
   const contains = all.filter(t => !t.toLowerCase().startsWith(q) && t.toLowerCase().includes(q));
-  return [...starts, ...contains].slice(0, 5);
+  const merged = [...starts, ...contains];
+
+  // v12: descriptions already used in the current session sort to the top of
+  // the suggestion list. Silent reorder — no visual separator or labels. The
+  // typed-prefix filter above still applies; this just re-bands the filtered
+  // results so session-relevant choices appear first.
+  //
+  // Rationale: when an engineer is testing a batch of similar items at one
+  // site (e.g. 12 kettles in a kitchen), they want their previous choice for
+  // this session at fingertip-reach. Global descriptions still appear, just
+  // below anything they've actually used here.
+  const sess = activeSession();
+  const sessionUsed = new Set();
+  if (sess) {
+    sess.items.forEach(it => {
+      const t = (it.itemType || '').toLowerCase();
+      if (t) sessionUsed.add(t);
+    });
+  }
+  const sessionFirst = [];
+  const others = [];
+  merged.forEach(t => {
+    if (sessionUsed.has(t.toLowerCase())) sessionFirst.push(t);
+    else others.push(t);
+  });
+  return [...sessionFirst, ...others].slice(0, 5);
 }
 
 // v10: Location autofill suggestions — sourced ONLY from the current session's
@@ -787,6 +867,13 @@ function csvResultLabel(internal) {
 // v11: resolve the value for a single CSV cell, given the column id, the
 // session, and the item. Kept as a flat switch so adding new columns later
 // (e.g. tester type, calibration cert) is a single-place edit.
+// v12: tester / calDate / calCertNo / calDue cases added. These read from
+// state.* (current engineer-global values at export time) rather than from
+// the session, so the values that appear in the CSV always reflect what's
+// configured in User Settings right now — same engineer, same calibration
+// cert, whichever session they're exporting. If the user wants per-session
+// snapshots we'd need to start stamping these onto each session at creation
+// time; deferring that until there's a real need.
 function csvCellValue(colId, session, item) {
   switch (colId) {
     case 'assetNo':     return item.assetNo;
@@ -797,6 +884,11 @@ function csvCellValue(colId, session, item) {
     case 'date':        return formatDate(session.date);
     case 'result':      return csvResultLabel(item.result);
     case 'notes':       return item.notes;
+    // v12: tester + calibration columns (default-hidden).
+    case 'tester':      return state.tester || '';
+    case 'calDate':     return state.calDate ? formatDate(state.calDate) : '';
+    case 'calCertNo':   return state.calCertNo || '';
+    case 'calDue':      return state.calDue ? formatDate(state.calDue) : '';
     default:            return '';
   }
 }
@@ -1557,6 +1649,14 @@ function openSession(id, opts) {
   // (one past the last item) as before.
   const targetCursor = (opts && typeof opts.cursor === 'number') ? opts.cursor : s.items.length;
   state.cursor = Math.max(0, Math.min(targetCursor, s.items.length));
+  // v12: only set the search-jump flash when we were actually navigated here
+  // via a search hit (opts.cursor present). Plain "open this session" taps
+  // leave searchJumpCursor null so nothing flashes.
+  if (opts && typeof opts.cursor === 'number') {
+    state.searchJumpCursor = state.cursor;
+  } else {
+    state.searchJumpCursor = null;
+  }
   state.view = 'entry';
   state.showFailsOnly = false;
   state.searchQuery = '';
@@ -2067,11 +2167,13 @@ function moveCsvColumn(id, delta) {
   render();
 }
 
-// v11: dismiss the welcome modal — sets the flag in localStorage so it
-// doesn't reappear, then re-renders to clear it from view.
-function dismissV11Welcome() {
-  state.v11WelcomeSeen = true;
-  localStorage.setItem(V11_WELCOME_KEY, '1');
+// v12: dismiss the welcome modal — sets the flag in localStorage so it
+// doesn't reappear, then re-renders to clear it from view. Renamed from
+// dismissV11Welcome and now writes pat:v12welcome so v11 users see the modal
+// once on update.
+function dismissV12Welcome() {
+  state.v12WelcomeSeen = true;
+  localStorage.setItem(V12_WELCOME_KEY, '1');
   render();
 }
 
@@ -2276,29 +2378,29 @@ function render() {
     </div>
   ` : '';
 
-  // v11: one-time "what's new" modal on first launch after the v11 update.
+  // v12: one-time "what's new" modal on first launch after the v12 update.
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal. Brand-new installs also see it on first
   // launch — slightly odd phrasing ("what's new") but the content is just
   // a feature intro so it works fine as a first-run overview.
-  const welcomeModal = (state.v11WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  const welcomeModal = (state.v12WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V11">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V12">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V11</h3>
+        <h3 class="bulk-sheet-title">What's new in V12</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Backup reminders.</strong> A banner on the Sessions list nudges you to export a backup if it's been more than 7 days.</li>
-        <li><strong>CSV columns are now customisable.</strong> Settings → CSV Columns lets you reorder, hide, or rename any column on the exported file.</li>
-        <li><strong>More bulk editing.</strong> In selection mode you can now change Location, Type, Notes, or delete multiple items in one go.</li>
-        <li><strong>Tester &amp; calibration info.</strong> User Settings has new fields for tester type, calibration date, certificate number, and due date.</li>
-        <li><strong>CSV wording.</strong> Results now read "Passed" or "Failed" in exports. The app screens are unchanged.</li>
+        <li><strong>Tester &amp; calibration in CSV.</strong> Your tester make/model and calibration details can now be included on exports. Turn them on under Settings → CSV Columns (they start hidden so existing exports don't change).</li>
+        <li><strong>Calibration-due warning.</strong> User Settings now shows a small chip when your next calibration is overdue or coming up within 30 days.</li>
+        <li><strong>Search-jump highlight.</strong> When you tap a search result on the Sessions list, the matched item briefly flashes on arrival so you know exactly where you've landed.</li>
+        <li><strong>No-scroll test screen.</strong> The entry screen no longer scrolls — everything fits in one view.</li>
+        <li><strong>Smarter autocomplete.</strong> Item-type suggestions now float anything you've already entered in the current session to the top of the list.</li>
       </ul>
-      <button class="btn-primary" id="v11-welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v12-welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -2308,6 +2410,15 @@ function render() {
     document.body.classList.add('has-selection-bar');
   } else {
     document.body.classList.remove('has-selection-bar');
+  }
+  // v12: toggle body class for entry-view no-scroll layout. The .screen
+  // gets height:100dvh + overflow:hidden under this class so the page
+  // doesn't get the phantom scrollbar that 100vh + safe-area-insets caused
+  // on iOS PWA. Other views keep their normal scroll behaviour.
+  if (state.view === 'entry') {
+    document.body.classList.add('view-entry');
+  } else {
+    document.body.classList.remove('view-entry');
   }
   bindEvents();
 }
@@ -2563,6 +2674,16 @@ function renderEntry() {
   const existing = isExisting ? sess.items[state.cursor] : null;
   const hasLast = sess.items.length > 0;
 
+  // v12: capture and immediately clear the search-jump cursor. The CSS
+  // keyframe animation runs once on mount, so we only want to emit the
+  // data-search-jump attribute on this single render — subsequent renders
+  // (typing, prev/next, etc.) must not re-trigger the flash. Clearing in
+  // render rather than bindEvents keeps the timing tight: the attribute
+  // is present in the very HTML the browser paints, the animation fires,
+  // and state is already cleared by the time the user can interact.
+  const flashSearchJump = (state.searchJumpCursor !== null && state.searchJumpCursor === state.cursor);
+  state.searchJumpCursor = null;
+
   const quickButtons = state.itemTypes.map(t => `
     <button class="quick-btn ${state.form.itemType === t ? 'active' : ''}" data-type="${escapeHTML(t)}">${escapeHTML(t)}</button>
   `).join('');
@@ -2632,7 +2753,7 @@ function renderEntry() {
     : '';
 
   const progressRow = `
-    <div class="progress-row">
+    <div class="progress-row"${flashSearchJump ? ' data-search-jump="1"' : ''}>
       <div class="progress">Item ${state.cursor + 1} ${isExisting ? `of ${sess.items.length}` : '(new)'}${resultBadge}</div>
       ${isExisting ? `<button class="del-icon-top" id="del-item-btn" aria-label="Delete item" title="Delete item">🗑</button>` : ''}
     </div>
@@ -3067,8 +3188,21 @@ function renderSettingsHub() {
   });
   const csvSummary = `${visibleCsv} of ${totalCsv} column${totalCsv === 1 ? '' : 's'} visible${csvCustomised ? ' · customised' : ''}`;
 
+  // v12: User Settings subtitle picks up calibration-due status. The base
+  // text is the engineer name (or "Engineer name" placeholder); we append
+  // " · Cal overdue (N days)" or " · Cal due in N days" when there's
+  // something to flag. 'ok' (more than 30 days off) and missing dates
+  // produce no suffix — the row stays clean by default.
+  const calSt = calibrationStatus();
+  let userSubtitle = state.engineer ? state.engineer : 'Engineer name';
+  if (calSt && calSt.status === 'overdue') {
+    userSubtitle += ` · Cal overdue (${calSt.days} day${calSt.days === 1 ? '' : 's'})`;
+  } else if (calSt && calSt.status === 'soon') {
+    userSubtitle += ` · Cal due in ${calSt.days} day${calSt.days === 1 ? '' : 's'}`;
+  }
+
   const rows = [
-    { id: 'settingsUser', icon: '👤', title: 'User Settings', sub: state.engineer ? state.engineer : 'Engineer name' },
+    { id: 'settingsUser', icon: '👤', title: 'User Settings', sub: userSubtitle },
     { id: 'settingsItems', icon: '⚡', title: 'Quick Pick Items', sub: itemSummary },
     { id: 'settingsFails', icon: '⚠️', title: 'Quick Pick Fail', sub: failSummary },
     { id: 'settingsDescriptions', icon: '📝', title: 'Item Description List', sub: descSummary },
@@ -3115,6 +3249,19 @@ function renderSettingsSubHeader(title) {
 }
 
 function renderSettingsUser() {
+  // v12: build the calibration-due chip if a due date is set and is either
+  // overdue or within CAL_DUE_SOON_DAYS. Placed in the label for the "Next
+  // calibration due" field so it sits visually next to the date input that
+  // drives it. Empty string when there's nothing to flag (no date set, or
+  // 'ok' status).
+  const calSt = calibrationStatus();
+  let calChip = '';
+  if (calSt && calSt.status === 'overdue') {
+    calChip = ` <span class="cal-chip overdue">Overdue · ${calSt.days} day${calSt.days === 1 ? '' : 's'}</span>`;
+  } else if (calSt && calSt.status === 'soon') {
+    calChip = ` <span class="cal-chip soon">Due in ${calSt.days} day${calSt.days === 1 ? '' : 's'}</span>`;
+  }
+
   return `
     <div class="screen">
       ${renderSettingsSubHeader('User Settings')}
@@ -3125,17 +3272,17 @@ function renderSettingsUser() {
       </div>
 
       <!-- v11: tester type + calibration info. All optional. Stored locally
-           and included in JSON backups. NOT currently included in CSV exports
-           — flagged for a later release. -->
+           and included in JSON backups. v12 update: now exported to CSV via
+           the four new default-hidden columns under Settings → CSV Columns. -->
       <div class="settings-section">
         <h2 class="h2">Tester type</h2>
-        <p class="muted">The make and model of your PAT tester, if you'd like to record it. Used for your own reference for now — will appear on certificate exports in a later release.</p>
+        <p class="muted">The make and model of your PAT tester, if you'd like to record it. v12: now exports to CSV when the "Tester" column is enabled in Settings → CSV Columns.</p>
         <input class="input" id="settings-tester" value="${escapeHTML(state.tester)}" placeholder="e.g. Megger PAT250, Seaward Apollo 600">
       </div>
 
       <div class="settings-section">
         <h2 class="h2">Calibration</h2>
-        <p class="muted">Calibration details for your tester. All optional. Recorded locally for future certificate exports.</p>
+        <p class="muted">Calibration details for your tester. All optional. v12: exports to CSV when the matching columns are enabled in Settings → CSV Columns.</p>
 
         <label class="label">Last calibration date</label>
         <input class="input" id="settings-cal-date" type="date" value="${escapeHTML(state.calDate)}">
@@ -3143,7 +3290,7 @@ function renderSettingsUser() {
         <label class="label">Certificate number</label>
         <input class="input" id="settings-cal-cert" value="${escapeHTML(state.calCertNo)}" placeholder="e.g. CAL-2026-0142">
 
-        <label class="label">Next calibration due</label>
+        <label class="label">Next calibration due${calChip}</label>
         <input class="input" id="settings-cal-due" type="date" value="${escapeHTML(state.calDue)}">
       </div>
 
@@ -3457,18 +3604,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v11: rolled forward — V11 on top, V8 dropped. -->
+      <!-- v8: rolling 3-version changelog. v12: rolled forward — V12 on top, V9 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V12</strong> · May 2026</p>
+        <p class="muted">Tester type and calibration info (date, certificate, due date) now flow through to CSV exports — four new columns, off by default, switch them on under Settings → CSV Columns. A small chip on User Settings flags when your tester's next calibration is overdue or due within 30 days, with the same status echoed on the Settings hub. When you tap a Sessions-list search result, the matched item now flashes briefly on arrival so you know exactly where you've landed. The entry/test screen no longer scrolls. Item-type autocomplete now floats any description you've already used in the current session to the top of the suggestions.</p>
 
         <p><strong>V11</strong> · May 2026</p>
         <p class="muted">Backup-reminder banner on the Sessions list when it's been more than 7 days since your last JSON backup — "Export now" or "Remind me later". New CSV Columns settings page lets you reorder, hide, or rename any column on the exported CSV (the in-app screens are unchanged). Bulk-edit menu in selection mode now offers Location, Type, Notes (replace or append), or Delete on the items you've ticked. User Settings has new fields for tester type and calibration info (last cal date, certificate number, next due). CSV results now read "Passed" or "Failed" rather than "Pass" / "Fail".</p>
 
         <p><strong>V10</strong> · May 2026</p>
         <p class="muted">Import sessions from a CSV file sent by another engineer. Share button on session export now opens the native share sheet (Messages, Mail, AirDrop, WhatsApp) instead of saving straight to Files. Search bar on the Sessions list matches site, engineer, date and items within each session — tap a result to jump straight to the matching item. Location field now autofills from other locations used in the same session. Confirm prompt before discarding unsaved changes when switching Quick Pick presets.</p>
-
-        <p><strong>V9</strong> · May 2026</p>
-        <p class="muted">Quick Pick presets — save multiple named lists and switch between them on the Quick Pick Items page. Reset-to-defaults buttons on Items, Fails, and Item Description List pages. Updated built-in defaults to reflect real PAT work. Haptic feedback on fail-reason taps and the Other Save button. Backup/restore extended to include presets.</p>
       </div>
 
       <div class="info-card">
@@ -3969,7 +4116,7 @@ function bindEvents() {
   };
 
   // v11 welcome modal — Continue button dismisses and stamps the flag.
-  if ($('v11-welcome-dismiss')) $('v11-welcome-dismiss').onclick = () => dismissV11Welcome();
+  if ($('v12-welcome-dismiss')) $('v12-welcome-dismiss').onclick = () => dismissV12Welcome();
 
   // CSV Columns settings page
   if ($('settings-csv-save')) $('settings-csv-save').onclick = () => saveCsvColumnsSettings();
