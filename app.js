@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v10 (May 2026)
+ * v11 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v10 ==============
+// ============== PAT Test PWA — v11 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V10';
+const APP_VERSION = 'V11';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -22,6 +22,30 @@ const THEME_KEY = 'pat:theme';            // v7: 'system' | 'light' | 'dark'
 const HAPTICS_KEY = 'pat:haptics';        // v7: '1' | '0'
 const ITEM_PRESETS_KEY = 'pat:itempresets';     // v9: JSON [{id,name,items:[...]}]
 const ACTIVE_PRESET_KEY = 'pat:activepreset';   // v9: preset id
+
+// v11: new persistence keys.
+//   LAST_BACKUP_KEY     — ISO timestamp of last successful JSON backup export.
+//                         Drives the 7-day reminder banner on the Sessions list.
+//   BACKUP_SNOOZE_KEY   — ISO timestamp until which the reminder is suppressed.
+//                         Set to now + 24h when the user taps "Remind me later"
+//                         or dismisses the banner.
+//   CSV_COLUMNS_KEY     — JSON array of {id, header, visible} configuring the
+//                         CSV export. See DEFAULT_CSV_COLUMNS below.
+//   TESTER_KEY, CAL_*   — Optional tester type + calibration info shown on the
+//                         User Settings page. v11 stores them but does NOT
+//                         include them in CSV exports (flagged for v12).
+//   V11_WELCOME_KEY     — '1' once the user has dismissed the welcome modal.
+const LAST_BACKUP_KEY = 'pat:lastbackup';
+const BACKUP_SNOOZE_KEY = 'pat:backupsnooze';
+const CSV_COLUMNS_KEY = 'pat:csvcolumns';
+const TESTER_KEY = 'pat:tester';
+const CAL_DATE_KEY = 'pat:caldate';
+const CAL_CERT_KEY = 'pat:calcert';
+const CAL_DUE_KEY = 'pat:caldue';
+const V11_WELCOME_KEY = 'pat:v11welcome';
+
+const BACKUP_REMINDER_DAYS = 7;
+const BACKUP_SNOOZE_HOURS = 24;
 
 // v9: built-in defaults updated to Peter's working lists. These ship with fresh
 // installs and back stop the "Reset to defaults" button on each settings sub-page.
@@ -70,6 +94,35 @@ const DEFAULT_DESCRIPTIONS = [
   'Till', 'Toaster', 'Tripod', 'Tumble Dryer', 'TV', 'UPS', 'USB Charger',
   'Vacuum', 'Vending Machine', 'Visualiser', 'VoIP Phone', 'Washing Machine',
   'Water Boiler', 'Water Cooler', 'Water Pump', 'Whisk', 'Wi-Fi Access Point'
+];
+
+// v11: CSV column configuration.
+//   id      — internal field key, NEVER renamed by the user. Used to look up
+//             the value for each row in buildCSV() and to match incoming
+//             columns in parseImportCSV().
+//   header  — the column heading written to the CSV. User-customisable on
+//             the new CSV Columns settings page; falls back to the default
+//             value if blank on save.
+//   visible — when false, the column is excluded from exports entirely.
+//             Imports still recognise the column by header name when present.
+//
+// Column order in this list IS the export order. The user can reorder, hide,
+// or rename columns via Settings → CSV Columns; the canonical defaults below
+// are also what the Reset button restores.
+//
+// Adding a new column? Append to this list with a unique id, then add a
+// matching case to the value-resolver in buildCSV() and the field-binder in
+// parseImportCSV(). Old user configs missing the new column will pick it up
+// automatically via ensureAllCsvColumns() on next load.
+const DEFAULT_CSV_COLUMNS = [
+  { id: 'assetNo',     header: 'Asset ID',      visible: true },
+  { id: 'engineer',    header: 'Engineer name', visible: true },
+  { id: 'description', header: 'Description',   visible: true },
+  { id: 'site',        header: 'Site',          visible: true },
+  { id: 'location',    header: 'Location',      visible: true },
+  { id: 'date',        header: 'Date',          visible: true },
+  { id: 'result',      header: 'Result',        visible: true },
+  { id: 'notes',       header: 'Notes',         visible: true }
 ];
 
 // v8: Resistance calculator — IET Code of Practice Table V1.1 nominal values.
@@ -157,6 +210,49 @@ let state = {
     pendingSession: null,         // parsed session awaiting conflict resolution
     conflictExistingId: null,     // id of the existing session that clashed
     summary: null                 // { mode, sessionName, itemCount, skipped: [{row, reason}] }
+  },
+
+  // ===== v11 additions =====
+
+  // CSV column configuration. Loaded from localStorage on boot; defaults to a
+  // deep copy of DEFAULT_CSV_COLUMNS when no saved config exists. The order of
+  // this array IS the export order. Mutated via Settings → CSV Columns.
+  csvColumns: DEFAULT_CSV_COLUMNS.map(c => ({ ...c })),
+
+  // Backup-reminder timing. lastBackupAt is set by downloadBackup() after a
+  // successful export, and on restoreBackupFromFile() (so users who've just
+  // restored aren't immediately nagged). backupSnoozedUntil is set when the
+  // user taps "Remind me later" or dismisses the banner.
+  lastBackupAt: null,
+  backupSnoozedUntil: null,
+
+  // User Settings: tester type + calibration info. All optional, all free text
+  // (dates use <input type="date"> so they're stored as ISO YYYY-MM-DD strings).
+  // Persisted to localStorage and included in backups. NOT yet exported in CSV
+  // — see v11 backlog in handover doc.
+  tester: '',
+  calDate: '',
+  calCertNo: '',
+  calDue: '',
+
+  // First-launch welcome modal — shown once after the v11 update.
+  v11WelcomeSeen: false,
+
+  // Bulk-edit menu state. Replaces v10's single-purpose bulkLocationDialogOpen.
+  //   menuOpen — true when the "Edit selected ▾" menu sheet is showing.
+  //   mode     — null | 'location' | 'type' | 'notes' | 'delete'. The active
+  //              sub-dialog. Only one is open at a time. 'location' preserves
+  //              v10's bulkLocationValue path so we don't break that flow.
+  //   typeValue, notesValue — text inputs for the type and notes sub-dialogs.
+  //   notesMode — 'replace' | 'append'. Replace overwrites existing notes;
+  //              append concatenates with '; ' separator (only when both old
+  //              and new are non-empty; otherwise no separator).
+  bulkEdit: {
+    menuOpen: false,
+    mode: null,
+    typeValue: '',
+    notesValue: '',
+    notesMode: 'replace'
   }
 };
 
@@ -273,6 +369,62 @@ function load() {
   if (!state.newForm.engineer && state.engineer) {
     state.newForm.engineer = state.engineer;
   }
+
+  // v11: load new keys.
+  loadV11Settings();
+}
+
+// v11: dedicated loader for the v11 storage keys. Kept out of load() proper so
+// the existing migration logic stays compact. Called once from load() and once
+// from restoreBackupFromFile() after the backup has been applied.
+function loadV11Settings() {
+  // CSV column config — JSON array. ensureAllCsvColumns() backfills any new
+  // default columns that didn't exist when the user's config was saved,
+  // appending them to the end. This makes future column additions safe.
+  try {
+    const stored = JSON.parse(localStorage.getItem(CSV_COLUMNS_KEY) || 'null');
+    if (Array.isArray(stored) && stored.length) {
+      state.csvColumns = stored
+        .map(c => ({
+          id: String(c && c.id || ''),
+          header: String(c && c.header || ''),
+          visible: !!(c && c.visible)
+        }))
+        .filter(c => c.id && DEFAULT_CSV_COLUMNS.some(d => d.id === c.id));
+    } else {
+      state.csvColumns = DEFAULT_CSV_COLUMNS.map(c => ({ ...c }));
+    }
+  } catch {
+    state.csvColumns = DEFAULT_CSV_COLUMNS.map(c => ({ ...c }));
+  }
+  ensureAllCsvColumns();
+
+  // Backup timing
+  state.lastBackupAt = localStorage.getItem(LAST_BACKUP_KEY) || null;
+  state.backupSnoozedUntil = localStorage.getItem(BACKUP_SNOOZE_KEY) || null;
+
+  // Tester + calibration
+  state.tester = localStorage.getItem(TESTER_KEY) || '';
+  state.calDate = localStorage.getItem(CAL_DATE_KEY) || '';
+  state.calCertNo = localStorage.getItem(CAL_CERT_KEY) || '';
+  state.calDue = localStorage.getItem(CAL_DUE_KEY) || '';
+
+  // Welcome modal flag — only suppress if explicitly seen.
+  state.v11WelcomeSeen = localStorage.getItem(V11_WELCOME_KEY) === '1';
+}
+
+// v11: Ensure state.csvColumns contains every column defined in
+// DEFAULT_CSV_COLUMNS, in case the user's saved config was written when fewer
+// columns existed. Missing columns are appended at the end with their defaults
+// (including default visibility) so they're discoverable rather than silently
+// hidden.
+function ensureAllCsvColumns() {
+  const have = new Set(state.csvColumns.map(c => c.id));
+  DEFAULT_CSV_COLUMNS.forEach(d => {
+    if (!have.has(d.id)) {
+      state.csvColumns.push({ ...d });
+    }
+  });
 }
 
 function computeHistoryFromItems() {
@@ -296,6 +448,15 @@ function save() {
   localStorage.setItem(SORT_KEY, state.sort);
   localStorage.setItem(THEME_KEY, state.theme);
   localStorage.setItem(HAPTICS_KEY, state.hapticsEnabled ? '1' : '0');
+  // v11
+  localStorage.setItem(CSV_COLUMNS_KEY, JSON.stringify(state.csvColumns));
+  localStorage.setItem(TESTER_KEY, state.tester);
+  localStorage.setItem(CAL_DATE_KEY, state.calDate);
+  localStorage.setItem(CAL_CERT_KEY, state.calCertNo);
+  localStorage.setItem(CAL_DUE_KEY, state.calDue);
+  // lastBackupAt + backupSnoozedUntil are written via their own helpers
+  // (markBackupExported, snoozeBackupReminder) rather than here, because they
+  // shouldn't update on every state change.
 }
 
 // ---------- v9: Preset helpers ----------
@@ -607,19 +768,62 @@ function csvEscape(v) {
   const s = String(v);
   return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
 }
+
+// v11: result-cell wording for CSV exports only. Maps internal 'pass'/'fail'
+// strings (which the app state uses everywhere — entry screen, overview,
+// fail-reason notes) to the longer 'Passed'/'Failed' labels Peter prefers in
+// CSVs sent to clients. The in-app UI is unchanged; this transformation is
+// applied ONLY in buildCSV's value resolver below.
+//
+// Import recognises both spellings (pass/passed and fail/failed,
+// case-insensitive), so old CSVs exported by v10 or earlier still round-trip.
+function csvResultLabel(internal) {
+  const v = String(internal || '').toLowerCase();
+  if (v === 'pass') return 'Passed';
+  if (v === 'fail') return 'Failed';
+  return '';
+}
+
+// v11: resolve the value for a single CSV cell, given the column id, the
+// session, and the item. Kept as a flat switch so adding new columns later
+// (e.g. tester type, calibration cert) is a single-place edit.
+function csvCellValue(colId, session, item) {
+  switch (colId) {
+    case 'assetNo':     return item.assetNo;
+    case 'engineer':    return session.engineer || '';
+    case 'description': return item.itemType;
+    case 'site':        return session.site;
+    case 'location':    return item.location;
+    case 'date':        return formatDate(session.date);
+    case 'result':      return csvResultLabel(item.result);
+    case 'notes':       return item.notes;
+    default:            return '';
+  }
+}
+
+// v11: buildCSV is now driven by state.csvColumns. Order in that array IS the
+// export order; columns with visible=false are skipped entirely. Header cells
+// use the user-customised .header value (which falls back to the default on
+// save if blank — see saveCsvColumnsSettings()).
+//
+// If for some reason every column is hidden (shouldn't happen — save validates
+// at least one is visible), we fall back to the default header+order so an
+// accidental empty config doesn't yield a totally blank file.
 function buildCSV(session) {
-  const header = ['Asset ID', 'Engineer name', 'Description', 'Site', 'Location', 'Date', 'Result', 'Notes'];
-  const rows = session.items.map(it => [
-    it.assetNo,
-    session.engineer || '',
-    it.itemType,
-    session.site,
-    it.location,
-    formatDate(session.date),
-    capitalise(it.result || ''),
-    it.notes
-  ].map(csvEscape).join(','));
-  return [header.join(','), ...rows].join('\n');
+  let cols = state.csvColumns.filter(c => c.visible);
+  if (cols.length === 0) cols = DEFAULT_CSV_COLUMNS.map(c => ({ ...c }));
+  const header = cols.map(c => csvEscape(c.header || defaultHeaderFor(c.id))).join(',');
+  const rows = session.items.map(it =>
+    cols.map(c => csvEscape(csvCellValue(c.id, session, it))).join(',')
+  );
+  return [header, ...rows].join('\n');
+}
+
+// Lookup the default header text for a column id — used as a last-resort
+// fallback if the user-customised header is empty.
+function defaultHeaderFor(id) {
+  const d = DEFAULT_CSV_COLUMNS.find(x => x.id === id);
+  return d ? d.header : '';
 }
 function downloadCSV(session) {
   const BOM = '\uFEFF';
@@ -686,15 +890,41 @@ async function shareOrDownloadCSV(session) {
 }
 
 // ---------- v10: CSV Import ----------
-// Strict format only — must match this app's export exactly:
-//   Header line: Asset ID,Engineer name,Description,Site,Location,Date,Result,Notes
-//   All rows must share the same Site AND Date (single session per file).
-// Anything that doesn't match is rejected with a clear message.
+// v11 update: header-name-based matching. Columns may appear in any order;
+// the user may have renamed headers (via Settings → CSV Columns); columns
+// they've hidden simply won't be present in their own exports. We accept all
+// of these cases as long as we can still resolve the required fields.
 //
-// Multi-session CSVs (someone manually concatenated two exports) are refused
-// for v10 — see PAThandoff_v10.md "v10 flags" for future work.
+// Default header names are ALWAYS recognised, so a CSV exported by an
+// untouched install (or by another engineer using defaults) still imports
+// regardless of the local CSV column config. The user's custom header names
+// are recognised in addition to the defaults — never instead of them.
+//
+// Multi-session CSVs (someone manually concatenated two exports) are still
+// refused — see PAThandoff_v10.md flag 1 and PAThandoff_v11.md backlog.
 
+// v11: kept for backward compat (older release notes / handover doc reference
+// this), but no longer used as a strict template. Header lookup uses
+// buildCsvHeaderLookup() below.
 const EXPECTED_CSV_HEADER = ['Asset ID', 'Engineer name', 'Description', 'Site', 'Location', 'Date', 'Result', 'Notes'];
+
+// v11: build a map from (lowercased, trimmed) header text → canonical column
+// id, combining the defaults with whatever the user has configured locally.
+// Used by parseImportCSV() to identify columns by name in any order.
+function buildCsvHeaderLookup() {
+  const map = {};
+  // Defaults first so they always win on collision (the user could in theory
+  // rename "Notes" to "Asset ID"; we keep the default mapping authoritative).
+  DEFAULT_CSV_COLUMNS.forEach(d => {
+    map[d.header.toLowerCase().trim()] = d.id;
+  });
+  // Then user customisations — only added if they don't collide with a default.
+  state.csvColumns.forEach(c => {
+    const key = String(c.header || '').toLowerCase().trim();
+    if (key && !(key in map)) map[key] = c.id;
+  });
+  return map;
+}
 
 // Parse a CSV string into an array of row arrays. Handles double-quoted fields,
 // escaped quotes (""), and embedded commas/newlines inside quoted fields.
@@ -782,43 +1012,75 @@ function parseUkDateToIso(s) {
 // Parse and validate the CSV text into a candidate session. Returns either:
 //   { ok: true, session, skipped: [{row, reason}] }
 //   { ok: false, error: 'message to show user' }
+//
+// v11: header-name-based. The first line is parsed for header text, mapped to
+// column ids via buildCsvHeaderLookup(), and the resulting positional map is
+// used for all subsequent rows. Required columns: Asset ID, Description,
+// Site, Date, Result. Engineer, Location, and Notes are optional. If a
+// required column is absent from the header, we reject the file with a clear
+// message before trying to parse rows.
 function parseImportCSV(text) {
   const rows = parseCSV(text);
   if (!rows || rows.length === 0) {
     return { ok: false, error: 'The CSV file is empty.' };
   }
-  // Header check — must match exactly, in order
-  const header = rows[0].map(h => String(h || '').trim());
-  if (header.length !== EXPECTED_CSV_HEADER.length
-      || header.some((h, i) => h !== EXPECTED_CSV_HEADER[i])) {
+
+  // Map each header cell to a column id, dropping unknowns.
+  const lookup = buildCsvHeaderLookup();
+  const headerCells = rows[0].map(h => String(h || '').toLowerCase().trim());
+  const colIdAt = headerCells.map(h => lookup[h] || null);
+
+  // Build positional accessors for the required + optional fields.
+  const idxOf = id => {
+    const i = colIdAt.indexOf(id);
+    return i === -1 ? null : i;
+  };
+  const iAsset  = idxOf('assetNo');
+  const iEng    = idxOf('engineer');
+  const iDesc   = idxOf('description');
+  const iSite   = idxOf('site');
+  const iLoc    = idxOf('location');
+  const iDate   = idxOf('date');
+  const iResult = idxOf('result');
+  const iNotes  = idxOf('notes');
+
+  const missing = [];
+  if (iAsset  === null) missing.push('Asset ID');
+  if (iDesc   === null) missing.push('Description');
+  if (iSite   === null) missing.push('Site');
+  if (iDate   === null) missing.push('Date');
+  if (iResult === null) missing.push('Result');
+  if (missing.length) {
     return {
       ok: false,
       error:
-        'This file doesn\'t match the expected format.\n\n' +
-        'Imports must be CSVs exported from this app, with columns in the order:\n' +
-        EXPECTED_CSV_HEADER.join(', ')
+        'This file is missing required column' + (missing.length === 1 ? '' : 's') + ': ' +
+        missing.join(', ') + '.\n\n' +
+        'Imports must be CSVs exported from this app. If you have hidden any of these ' +
+        'columns under Settings → CSV Columns, re-enable them before exporting.'
     };
   }
+
   const dataRows = rows.slice(1);
   if (dataRows.length === 0) {
     return { ok: false, error: 'The CSV file has a header but no rows.' };
   }
-  // First-pass scan: find canonical Site + Date. We grab them from the first
-  // VALID row (with a parseable date) so a single typo on row 1 doesn't reject
-  // the whole file. If no row has both, we bail.
+
+  // First-pass scan: find canonical Site + Date from the first VALID row so a
+  // single typo on row 1 doesn't reject the whole file.
   let canonicalSite = null;
   let canonicalIsoDate = null;
   let canonicalDateRaw = null;
   let canonicalEngineer = '';
   for (const r of dataRows) {
-    const site = String(r[3] || '').trim();
-    const dateRaw = String(r[5] || '').trim();
+    const site = String(r[iSite] || '').trim();
+    const dateRaw = String(r[iDate] || '').trim();
     const iso = parseUkDateToIso(dateRaw);
     if (site && iso) {
       canonicalSite = site;
       canonicalIsoDate = iso;
       canonicalDateRaw = dateRaw;
-      canonicalEngineer = String(r[1] || '').trim();
+      canonicalEngineer = iEng !== null ? String(r[iEng] || '').trim() : '';
       break;
     }
   }
@@ -828,14 +1090,14 @@ function parseImportCSV(text) {
       error: 'No rows in this file have both a Site and a valid Date (DD/MM/YYYY). Cannot import.'
     };
   }
+
   // Check uniqueness — refuse multi-session CSVs.
   const siteLower = canonicalSite.toLowerCase();
   let multiSession = false;
   for (let i = 0; i < dataRows.length; i++) {
     const r = dataRows[i];
-    const site = String(r[3] || '').trim();
-    const dateRaw = String(r[5] || '').trim();
-    // Skip rows with no site or no date — they'll be flagged as skipped below.
+    const site = String(r[iSite] || '').trim();
+    const dateRaw = String(r[iDate] || '').trim();
     if (!site || !dateRaw) continue;
     if (site.toLowerCase() !== siteLower || dateRaw !== canonicalDateRaw) {
       multiSession = true;
@@ -850,19 +1112,21 @@ function parseImportCSV(text) {
         'Importing combined CSVs isn\'t supported yet — please export each session separately and import them one at a time.'
     };
   }
-  // Build items + collect skipped row reports
+
+  // Build items + collect skipped row reports.
   const items = [];
   const skipped = [];
   for (let i = 0; i < dataRows.length; i++) {
     const r = dataRows[i];
     const rowNum = i + 2; // +1 for header, +1 because humans count from 1
-    const assetNo = String(r[0] || '').trim();
-    const desc = String(r[2] || '').trim();
-    const location = String(r[4] || '').trim();
-    const dateRaw = String(r[5] || '').trim();
-    const resultRaw = String(r[6] || '').trim().toLowerCase();
-    const notes = String(r[7] || '').trim();
-    // Skip a row if any of these are wrong; collect reason for the summary.
+    const assetNo  = String(r[iAsset] || '').trim();
+    const desc     = String(r[iDesc] || '').trim();
+    const location = iLoc !== null ? String(r[iLoc] || '').trim() : '';
+    const dateRaw  = String(r[iDate] || '').trim();
+    const resultRawDisplay = String(r[iResult] || '').trim();
+    const resultRaw = resultRawDisplay.toLowerCase();
+    const notes    = iNotes !== null ? String(r[iNotes] || '').trim() : '';
+
     if (!assetNo) { skipped.push({ row: rowNum, reason: 'missing Asset ID' }); continue; }
     if (!desc)    { skipped.push({ row: rowNum, reason: 'missing Description' }); continue; }
     if (!dateRaw) { skipped.push({ row: rowNum, reason: 'missing Date' }); continue; }
@@ -870,8 +1134,13 @@ function parseImportCSV(text) {
       skipped.push({ row: rowNum, reason: 'invalid Date format (expected DD/MM/YYYY)' });
       continue;
     }
-    if (resultRaw !== 'pass' && resultRaw !== 'fail') {
-      skipped.push({ row: rowNum, reason: `invalid Result "${String(r[6] || '').trim()}" (expected Pass or Fail)` });
+    // v11: accept both old 'Pass'/'Fail' and new 'Passed'/'Failed' wording,
+    // case-insensitive. Normalise to internal 'pass'/'fail' for storage.
+    let normResult = null;
+    if (resultRaw === 'pass' || resultRaw === 'passed') normResult = 'pass';
+    else if (resultRaw === 'fail' || resultRaw === 'failed') normResult = 'fail';
+    if (!normResult) {
+      skipped.push({ row: rowNum, reason: `invalid Result "${resultRawDisplay}" (expected Passed or Failed)` });
       continue;
     }
     items.push({
@@ -880,7 +1149,7 @@ function parseImportCSV(text) {
       location,
       itemType: desc,
       notes,
-      result: resultRaw
+      result: normResult
     });
   }
   if (items.length === 0) {
@@ -1007,10 +1276,13 @@ function closeImportSummary() {
 // v9: now includes itemPresets + activePresetId. Backups missing these fields
 // fall back to converting the legacy itemTypes array into a single 'Default'
 // preset, so old backups still restore cleanly.
+// v11: bumped to backupVersion: 3. Added csvColumns, tester, calDate,
+// calCertNo, calDue, and lastBackupAt. Old backups still restore — missing
+// fields use defaults.
 function buildBackup() {
   return {
     appVersion: APP_VERSION,
-    backupVersion: 2,                         // v9 bumped from 1 → 2
+    backupVersion: 3,                         // v11 bumped from 2 → 3
     exportedAt: new Date().toISOString(),
     sessions: state.sessions,
     itemPresets: state.itemPresets,           // v9
@@ -1021,7 +1293,14 @@ function buildBackup() {
     engineer: state.engineer,
     sort: state.sort,
     theme: state.theme,
-    hapticsEnabled: state.hapticsEnabled
+    hapticsEnabled: state.hapticsEnabled,
+    // v11
+    csvColumns: state.csvColumns,
+    tester: state.tester,
+    calDate: state.calDate,
+    calCertNo: state.calCertNo,
+    calDue: state.calDue,
+    lastBackupAt: state.lastBackupAt
   };
 }
 
@@ -1034,6 +1313,50 @@ function downloadBackup() {
   a.download = `PAT_backup_${todayISO()}.json`;
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
+  // v11: stamp the successful export so the 7-day reminder timer resets.
+  markBackupExported();
+}
+
+// v11: stamp the current time as the "last successful export" and clear any
+// active snooze. Called from downloadBackup() and from restoreBackupFromFile()
+// (since restoring a backup is itself a sign the user is on top of their
+// backups — no need to nag them immediately afterwards).
+function markBackupExported() {
+  state.lastBackupAt = new Date().toISOString();
+  state.backupSnoozedUntil = null;
+  localStorage.setItem(LAST_BACKUP_KEY, state.lastBackupAt);
+  localStorage.removeItem(BACKUP_SNOOZE_KEY);
+}
+
+// v11: snooze the reminder for 24 hours. Called from the "Remind me later"
+// button and the × dismiss control on the banner.
+function snoozeBackupReminder() {
+  const until = new Date(Date.now() + BACKUP_SNOOZE_HOURS * 3600 * 1000).toISOString();
+  state.backupSnoozedUntil = until;
+  localStorage.setItem(BACKUP_SNOOZE_KEY, until);
+}
+
+// v11: should the banner show on the Sessions list right now?
+// Conditions:
+//   • current view is 'sessions' AND no new-session form is open (would crowd
+//     the screen);
+//   • lastBackupAt is missing OR was more than BACKUP_REMINDER_DAYS ago;
+//   • backupSnoozedUntil is missing or already passed.
+function shouldShowBackupReminder() {
+  if (state.view !== 'sessions') return false;
+  if (state.newForm.show) return false;
+  // Don't show on a totally empty install — nothing to back up yet.
+  if (state.sessions.length === 0) return false;
+  const now = Date.now();
+  if (state.backupSnoozedUntil) {
+    const snoozeMs = Date.parse(state.backupSnoozedUntil);
+    if (!isNaN(snoozeMs) && snoozeMs > now) return false;
+  }
+  if (!state.lastBackupAt) return true; // never backed up
+  const lastMs = Date.parse(state.lastBackupAt);
+  if (isNaN(lastMs)) return true;
+  const ageDays = (now - lastMs) / (1000 * 3600 * 24);
+  return ageDays >= BACKUP_REMINDER_DAYS;
 }
 
 function restoreBackupFromFile(file) {
@@ -1095,11 +1418,35 @@ function restoreBackupFromFile(file) {
     if (typeof data.hapticsEnabled === 'boolean') {
       state.hapticsEnabled = data.hapticsEnabled;
     }
+
+    // v11: restore the new fields if present, otherwise leave defaults intact.
+    if (Array.isArray(data.csvColumns) && data.csvColumns.length) {
+      // Re-validate the same way loadV11Settings does — drop unknown ids,
+      // coerce types, then backfill missing defaults.
+      state.csvColumns = data.csvColumns
+        .map(c => ({
+          id: String(c && c.id || ''),
+          header: String(c && c.header || ''),
+          visible: !!(c && c.visible)
+        }))
+        .filter(c => c.id && DEFAULT_CSV_COLUMNS.some(d => d.id === c.id));
+      ensureAllCsvColumns();
+    } else {
+      state.csvColumns = DEFAULT_CSV_COLUMNS.map(c => ({ ...c }));
+    }
+    state.tester = typeof data.tester === 'string' ? data.tester : '';
+    state.calDate = typeof data.calDate === 'string' ? data.calDate : '';
+    state.calCertNo = typeof data.calCertNo === 'string' ? data.calCertNo : '';
+    state.calDue = typeof data.calDue === 'string' ? data.calDue : '';
+
     state.activeId = null;
     state.view = 'sessions';
     state.cursor = 0;
     state.newForm.show = false;
     save();
+    // v11: stamp the restore as a fresh backup checkpoint so we don't nag the
+    // user the moment they restore from a known-good file.
+    markBackupExported();
     alert(`Restored ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'} (${itemCount} item${itemCount === 1 ? '' : 's'}).`);
     render();
   };
@@ -1375,6 +1722,12 @@ function setView(v) {
   state.failOtherText = '';
   state.bulkLocationDialogOpen = false;
   state.bulkLocationValue = '';
+  // v11: also clear the new bulk-edit menu + sub-dialog state.
+  state.bulkEdit.menuOpen = false;
+  state.bulkEdit.mode = null;
+  state.bulkEdit.typeValue = '';
+  state.bulkEdit.notesValue = '';
+  state.bulkEdit.notesMode = 'replace';
   // Search and selection are overview-local; clear when leaving overview.
   if (v !== 'overview') {
     state.searchQuery = '';
@@ -1384,7 +1737,7 @@ function setView(v) {
   render();
 }
 
-// ---------- Bulk-edit (v7) ----------
+// ---------- Bulk-edit (v7, extended in v11) ----------
 function enterSelectionMode() {
   state.selectionMode = true;
   state.selectedIndices = [];
@@ -1396,6 +1749,12 @@ function exitSelectionMode() {
   state.selectedIndices = [];
   state.bulkLocationDialogOpen = false;
   state.bulkLocationValue = '';
+  // v11: clear the new bulk-edit state too.
+  state.bulkEdit.menuOpen = false;
+  state.bulkEdit.mode = null;
+  state.bulkEdit.typeValue = '';
+  state.bulkEdit.notesValue = '';
+  state.bulkEdit.notesMode = 'replace';
 }
 
 function toggleSelected(idx) {
@@ -1451,6 +1810,128 @@ function applyBulkLocation() {
   setTimeout(() => alert(`Updated location on ${count} item${count === 1 ? '' : 's'}.`), 50);
 }
 
+// ---------- v11: extended bulk-edit ----------
+// The selection bar's single "Change location" button is replaced by an
+// "Edit selected ▾" button that opens a menu sheet with four options:
+// Location, Type, Notes, Delete. Each option opens a dedicated sub-dialog.
+// State for all of this lives in state.bulkEdit (see top of file).
+
+function openBulkEditMenu() {
+  if (state.selectedIndices.length === 0) return;
+  state.bulkEdit.menuOpen = true;
+  state.bulkEdit.mode = null;
+  render();
+}
+
+function closeBulkEditMenu() {
+  state.bulkEdit.menuOpen = false;
+  render();
+}
+
+// Open a specific sub-dialog. Closes the menu sheet first so we don't stack
+// two bottom sheets on top of each other.
+function openBulkEditDialog(mode) {
+  if (state.selectedIndices.length === 0) return;
+  state.bulkEdit.menuOpen = false;
+  state.bulkEdit.mode = mode;
+  // Reset working values so a previous run's text doesn't bleed through.
+  if (mode === 'location') {
+    // Re-use the v10 dialog path — set the legacy state so the existing
+    // dialog renders correctly. Cleanest minimal-diff approach.
+    state.bulkLocationDialogOpen = true;
+    state.bulkLocationValue = '';
+  } else if (mode === 'type') {
+    state.bulkEdit.typeValue = '';
+  } else if (mode === 'notes') {
+    state.bulkEdit.notesValue = '';
+    state.bulkEdit.notesMode = 'replace';
+  }
+  render();
+}
+
+function cancelBulkEditDialog() {
+  state.bulkEdit.mode = null;
+  state.bulkLocationDialogOpen = false;
+  state.bulkLocationValue = '';
+  state.bulkEdit.typeValue = '';
+  state.bulkEdit.notesValue = '';
+  state.bulkEdit.notesMode = 'replace';
+  render();
+}
+
+function applyBulkType() {
+  const sess = activeSession();
+  if (!sess) return;
+  const newType = normaliseItemType(String(state.bulkEdit.typeValue || '').trim());
+  if (!newType) {
+    alert('Please enter or pick an item type.');
+    return;
+  }
+  let count = 0;
+  state.selectedIndices.forEach(i => {
+    if (sess.items[i]) {
+      sess.items[i].itemType = newType;
+      count++;
+    }
+  });
+  // Feed the autocomplete so future entries get it.
+  addDescriptionIfNew(newType);
+  exitSelectionMode();
+  save();
+  render();
+  setTimeout(() => alert(`Updated type on ${count} item${count === 1 ? '' : 's'}.`), 50);
+}
+
+function applyBulkNotes() {
+  const sess = activeSession();
+  if (!sess) return;
+  const text = String(state.bulkEdit.notesValue || '').trim();
+  const mode = state.bulkEdit.notesMode === 'append' ? 'append' : 'replace';
+  // Allow an empty value ONLY in replace mode (i.e. "clear notes on these
+  // items"). In append mode an empty string is a no-op and we should bounce.
+  if (!text && mode === 'append') {
+    alert('Please enter some text to append.');
+    return;
+  }
+  let count = 0;
+  state.selectedIndices.forEach(i => {
+    const it = sess.items[i];
+    if (!it) return;
+    if (mode === 'replace') {
+      it.notes = text;
+    } else {
+      const existing = String(it.notes || '').trim();
+      it.notes = existing ? `${existing}; ${text}` : text;
+    }
+    count++;
+  });
+  exitSelectionMode();
+  save();
+  render();
+  const verb = mode === 'replace' ? 'Replaced' : 'Appended to';
+  setTimeout(() => alert(`${verb} notes on ${count} item${count === 1 ? '' : 's'}.`), 50);
+}
+
+function applyBulkDelete() {
+  const sess = activeSession();
+  if (!sess) return;
+  const n = state.selectedIndices.length;
+  if (n === 0) return;
+  if (!confirm(`Delete ${n} item${n === 1 ? '' : 's'}? This can't be undone.`)) return;
+  // Sort descending so splicing doesn't shift the remaining indices.
+  const indices = state.selectedIndices.slice().sort((a, b) => b - a);
+  indices.forEach(i => {
+    if (sess.items[i]) sess.items.splice(i, 1);
+  });
+  // If the cursor was past the new end, pull it back.
+  if (state.cursor > sess.items.length) state.cursor = sess.items.length;
+  exitSelectionMode();
+  save();
+  loadFormForCursor();
+  render();
+  setTimeout(() => alert(`Deleted ${n} item${n === 1 ? '' : 's'}.`), 50);
+}
+
 // Edit-session flow
 function startEditSession() {
   const sess = activeSession();
@@ -1498,8 +1979,100 @@ function unlockActiveSession() {
 function saveUserSettings() {
   state.engineer = document.getElementById('settings-engineer').value.trim();
   state.newForm.engineer = state.engineer;
+  // v11: tester type + calibration info. All optional. Empty strings stored
+  // as empty so the UI doesn't show stale values from previous edits.
+  const $t = document.getElementById('settings-tester');
+  const $cd = document.getElementById('settings-cal-date');
+  const $cc = document.getElementById('settings-cal-cert');
+  const $cdu = document.getElementById('settings-cal-due');
+  if ($t) state.tester = $t.value.trim();
+  if ($cd) state.calDate = $cd.value.trim();
+  if ($cc) state.calCertNo = $cc.value.trim();
+  if ($cdu) state.calDue = $cdu.value.trim();
   save();
   setView('settings');
+}
+
+// v11: save the CSV column configuration. Reads the live DOM rows so the
+// user's ordering, visibility checks, and renamed headers are all picked up
+// in one pass.
+//
+// Validation:
+//   • At least one column must be visible. Otherwise we'd produce CSVs with
+//     just a blank line, which is useless.
+//   • Empty / whitespace-only header text falls back to the default header
+//     for that column id rather than erroring out — a one-character typo
+//     shouldn't block the save.
+function saveCsvColumnsSettings() {
+  const rows = document.querySelectorAll('.csv-col-row');
+  if (!rows.length) { setView('settings'); return; }
+  const next = [];
+  rows.forEach(row => {
+    const id = row.dataset.colId;
+    if (!id) return;
+    const visEl = row.querySelector('.csv-col-visible');
+    const hdrEl = row.querySelector('.csv-col-header');
+    const visible = visEl ? !!visEl.checked : true;
+    let header = hdrEl ? String(hdrEl.value || '').trim() : '';
+    if (!header) header = defaultHeaderFor(id);
+    next.push({ id, header, visible });
+  });
+  if (!next.some(c => c.visible)) {
+    alert('At least one column must be visible. Tick at least one before saving.');
+    return;
+  }
+  state.csvColumns = next;
+  ensureAllCsvColumns();
+  save();
+  setView('settings');
+}
+
+function resetCsvColumnsSettings() {
+  if (!confirm('Reset CSV columns to defaults?\n\nThis restores the original 8-column order, default header names, and shows all columns. Cannot be undone.')) return;
+  state.csvColumns = DEFAULT_CSV_COLUMNS.map(c => ({ ...c }));
+  save();
+  render();
+}
+
+// v11: move a CSV column up or down in the list and re-render the settings
+// page. We re-read the live DOM values first so any unsaved edits to header
+// text or visibility don't get clobbered by the re-render.
+function moveCsvColumn(id, delta) {
+  // Snapshot pending edits from the DOM before mutating state, otherwise the
+  // re-render below would revert anything the user has typed but not saved.
+  const rows = document.querySelectorAll('.csv-col-row');
+  if (rows.length) {
+    const pending = [];
+    rows.forEach(row => {
+      const rid = row.dataset.colId;
+      if (!rid) return;
+      const visEl = row.querySelector('.csv-col-visible');
+      const hdrEl = row.querySelector('.csv-col-header');
+      pending.push({
+        id: rid,
+        header: hdrEl ? String(hdrEl.value || '') : '',
+        visible: visEl ? !!visEl.checked : true
+      });
+    });
+    if (pending.length === state.csvColumns.length) {
+      state.csvColumns = pending;
+    }
+  }
+  const idx = state.csvColumns.findIndex(c => c.id === id);
+  if (idx === -1) return;
+  const newIdx = idx + delta;
+  if (newIdx < 0 || newIdx >= state.csvColumns.length) return;
+  const arr = state.csvColumns;
+  [arr[idx], arr[newIdx]] = [arr[newIdx], arr[idx]];
+  render();
+}
+
+// v11: dismiss the welcome modal — sets the flag in localStorage so it
+// doesn't reappear, then re-renders to clear it from view.
+function dismissV11Welcome() {
+  state.v11WelcomeSeen = true;
+  localStorage.setItem(V11_WELCOME_KEY, '1');
+  render();
 }
 
 function saveItemTypesSettings() {
@@ -1661,6 +2234,7 @@ function render() {
   else if (v === 'settingsDescriptions') html = renderSettingsDescriptions();
   else if (v === 'settingsDisplay') html = renderSettingsDisplay();
   else if (v === 'settingsBackup') html = renderSettingsBackup();
+  else if (v === 'settingsCsv') html = renderSettingsCsv();   // v11
   else if (v === 'settingsCalculator') html = renderSettingsCalculator();
   else if (v === 'settingsAbout') html = renderSettingsAbout();
   else if (v === 'settingsContact') html = renderSettingsContact();
@@ -1702,7 +2276,33 @@ function render() {
     </div>
   ` : '';
 
-  app.innerHTML = banner + html + migrationModal;
+  // v11: one-time "what's new" modal on first launch after the v11 update.
+  // Suppressed if the v9 migration prompt is currently showing (that one
+  // takes priority because it requires a name commit) or if the user has
+  // already dismissed this modal. Brand-new installs also see it on first
+  // launch — slightly odd phrasing ("what's new") but the content is just
+  // a feature intro so it works fine as a first-run overview.
+  const welcomeModal = (state.v11WelcomeSeen || state.migrationPrompt.show) ? '' : `
+    <div class="modal-backdrop" style="z-index:300"></div>
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V11">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">What's new in V11</h3>
+        <span class="fail-close-spacer"></span>
+      </div>
+      <ul class="welcome-list">
+        <li><strong>Backup reminders.</strong> A banner on the Sessions list nudges you to export a backup if it's been more than 7 days.</li>
+        <li><strong>CSV columns are now customisable.</strong> Settings → CSV Columns lets you reorder, hide, or rename any column on the exported file.</li>
+        <li><strong>More bulk editing.</strong> In selection mode you can now change Location, Type, Notes, or delete multiple items in one go.</li>
+        <li><strong>Tester &amp; calibration info.</strong> User Settings has new fields for tester type, calibration date, certificate number, and due date.</li>
+        <li><strong>CSV wording.</strong> Results now read "Passed" or "Failed" in exports. The app screens are unchanged.</li>
+      </ul>
+      <button class="btn-primary" id="v11-welcome-dismiss">Continue</button>
+    </div>
+  `;
+
+  app.innerHTML = banner + html + migrationModal + welcomeModal;
   // Toggle body class for selection bar spacing
   if (state.view === 'overview' && state.selectionMode) {
     document.body.classList.add('has-selection-bar');
@@ -1765,17 +2365,54 @@ function renderSessions() {
   // and confirms what happened.
   const importSummary = state.importDialog.summaryOpen ? renderImportSummaryModal() : '';
 
+  // v11: backup reminder banner — sits inline at the top of the Sessions screen
+  // when no JSON backup has been exported in the last BACKUP_REMINDER_DAYS
+  // days. Two actions: "Export now" runs downloadBackup() (which also stamps
+  // lastBackupAt so the banner clears), and "Remind me later" snoozes for 24h.
+  // The × control is equivalent to the snooze. Hidden when the new-session
+  // form is open or the sessions list is empty.
+  const backupBanner = shouldShowBackupReminder() ? renderBackupReminderBanner() : '';
+
   return `
     <div class="screen">
       <header class="header">
         <h1 class="h1">PAT Sessions</h1>
         <button class="icon-btn" id="settings-btn" aria-label="Settings">⚙</button>
       </header>
+      ${backupBanner}
       ${newForm}
       ${searchRow}
       ${sessionsListArea}
       ${importConflict}
       ${importSummary}
+    </div>
+  `;
+}
+
+// v11: the backup-reminder banner body. Shown by renderSessions() above when
+// shouldShowBackupReminder() returns true. The message adapts based on
+// whether the user has ever backed up:
+//   • Never → "You haven't backed up yet. Export a copy to keep your data safe."
+//   • Stale → "It's been N days since your last backup."
+function renderBackupReminderBanner() {
+  let msg;
+  if (!state.lastBackupAt) {
+    msg = "You haven't exported a backup yet.";
+  } else {
+    const lastMs = Date.parse(state.lastBackupAt);
+    const days = Math.floor((Date.now() - lastMs) / (1000 * 3600 * 24));
+    msg = `It's been ${days} day${days === 1 ? '' : 's'} since your last backup.`;
+  }
+  return `
+    <div class="backup-banner" role="status">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text">${escapeHTML(msg)}</div>
+        <div class="backup-banner-actions">
+          <button class="backup-banner-action primary" id="backup-banner-export">Export now</button>
+          <button class="backup-banner-action" id="backup-banner-later">Remind me later</button>
+        </div>
+      </div>
+      <button class="backup-banner-dismiss" id="backup-banner-dismiss" aria-label="Dismiss">×</button>
     </div>
   `;
 }
@@ -2172,13 +2809,41 @@ function renderOverview() {
     </div>
   ` : '';
 
+  // v11: selection bar now shows "Edit selected ▾" instead of "Change location"
+  // directly. Tapping it opens the bulk-edit menu sheet with four options:
+  // Location, Type, Notes, Delete. The location flow still uses the existing
+  // v10 bulkLocationDialogOpen path so we don't regress that codepath; the
+  // other three are new and live entirely in state.bulkEdit.
   const selectionBar = state.selectionMode ? `
     <div class="selection-bar">
       <span class="selection-bar-count">${state.selectedIndices.length} selected</span>
-      <button class="selection-bar-action" id="bulk-edit-loc-btn" ${state.selectedIndices.length === 0 ? 'disabled' : ''}>Change location</button>
+      <button class="selection-bar-action" id="bulk-edit-menu-btn" ${state.selectedIndices.length === 0 ? 'disabled' : ''}>Edit selected ▾</button>
     </div>
   ` : '';
 
+  // v11: bulk-edit menu sheet. Four options stacked vertically. Delete is
+  // styled as a destructive action (red) and sits at the bottom to put more
+  // distance between it and the safer edits above it.
+  const bulkMenu = state.bulkEdit.menuOpen ? `
+    <div class="modal-backdrop" id="bulk-menu-backdrop"></div>
+    <div class="bulk-sheet" role="dialog" aria-label="Edit selected items">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">Edit ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</h3>
+        <button class="fail-close-btn" id="bulk-menu-close" aria-label="Cancel">×</button>
+      </div>
+      <div class="bulk-menu-actions">
+        <button class="bulk-menu-btn" data-bulk-edit="location">Change location</button>
+        <button class="bulk-menu-btn" data-bulk-edit="type">Change type</button>
+        <button class="bulk-menu-btn" data-bulk-edit="notes">Change notes</button>
+        <button class="bulk-menu-btn danger" data-bulk-edit="delete">Delete selected</button>
+      </div>
+    </div>
+  ` : '';
+
+  // v10/v11: location dialog — reuses the v10 path. Opened via the bulk-edit
+  // menu (mode === 'location' OR legacy bulkLocationDialogOpen).
   const bulkDialog = state.bulkLocationDialogOpen ? `
     <div class="modal-backdrop" id="bulk-backdrop"></div>
     <div class="bulk-sheet" role="dialog" aria-label="Change location">
@@ -2193,6 +2858,54 @@ function renderOverview() {
     </div>
   ` : '';
 
+  // v11: bulk-edit Type dialog. Shows the active preset's quick-picks above a
+  // free-text input — same pattern as the entry screen but laid out for a
+  // bottom sheet. Tapping a quick-pick fills the input.
+  const typeQuickButtons = (state.itemTypes || []).map(t =>
+    `<button class="quick-btn" data-bulk-type-quick="${escapeHTML(t)}">${escapeHTML(t)}</button>`
+  ).join('');
+  const bulkTypeDialog = state.bulkEdit.mode === 'type' ? `
+    <div class="modal-backdrop" id="bulk-type-backdrop"></div>
+    <div class="bulk-sheet" role="dialog" aria-label="Change item type">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">Change type for ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</h3>
+        <button class="fail-close-btn" id="bulk-type-cancel" aria-label="Cancel">×</button>
+      </div>
+      <div class="quick-grid" style="margin-bottom:10px">${typeQuickButtons}</div>
+      <input class="input-big" id="bulk-type-input" value="${escapeHTML(state.bulkEdit.typeValue)}" placeholder="…or type custom" autocomplete="off" style="margin-bottom:14px">
+      <button class="btn-primary" id="bulk-type-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
+    </div>
+  ` : '';
+
+  // v11: bulk-edit Notes dialog. Two-mode (radio): Replace overwrites all
+  // selected items' notes; Append concatenates the new text after a "; "
+  // separator. Empty text is allowed only in Replace mode (clears notes).
+  const bulkNotesDialog = state.bulkEdit.mode === 'notes' ? `
+    <div class="modal-backdrop" id="bulk-notes-backdrop"></div>
+    <div class="bulk-sheet" role="dialog" aria-label="Change notes">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">Change notes for ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</h3>
+        <button class="fail-close-btn" id="bulk-notes-cancel" aria-label="Cancel">×</button>
+      </div>
+      <div class="bulk-notes-mode">
+        <label class="bulk-notes-mode-opt">
+          <input type="radio" name="bulk-notes-mode" value="replace" ${state.bulkEdit.notesMode !== 'append' ? 'checked' : ''}>
+          <span><strong>Replace</strong> — overwrite existing notes</span>
+        </label>
+        <label class="bulk-notes-mode-opt">
+          <input type="radio" name="bulk-notes-mode" value="append" ${state.bulkEdit.notesMode === 'append' ? 'checked' : ''}>
+          <span><strong>Append</strong> — add to existing notes (separated by " ; ")</span>
+        </label>
+      </div>
+      <textarea class="input" id="bulk-notes-input" rows="3" placeholder="${state.bulkEdit.notesMode === 'append' ? 'Text to append' : 'New notes (leave empty to clear)'}" style="margin-bottom:14px">${escapeHTML(state.bulkEdit.notesValue)}</textarea>
+      <button class="btn-primary" id="bulk-notes-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
+    </div>
+  ` : '';
+
   const stats = `<div class="progress">${sess.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span>${sess.engineer ? ' · ' + escapeHTML(sess.engineer) : ''}</div>`;
 
   return `
@@ -2203,7 +2916,10 @@ function renderOverview() {
       ${selectAllRow}
       <div class="overview-body">${renderOverviewBodyHTML(sess)}</div>
       ${selectionBar}
+      ${bulkMenu}
       ${bulkDialog}
+      ${bulkTypeDialog}
+      ${bulkNotesDialog}
     </div>
   `;
 }
@@ -2341,6 +3057,15 @@ function renderSettingsHub() {
   const themeSummary = state.theme === 'system' ? 'System' : (state.theme === 'dark' ? 'Dark' : 'Light');
   const hapticsSummary = state.hapticsEnabled ? 'Haptics on' : 'Haptics off';
   const displaySummary = `${themeSummary} · ${hapticsSummary}`;
+  // v11: CSV summary — how many columns are visible vs total, plus whether
+  // they've been customised away from defaults.
+  const visibleCsv = state.csvColumns.filter(c => c.visible).length;
+  const totalCsv = state.csvColumns.length;
+  const csvCustomised = state.csvColumns.some((c, i) => {
+    const d = DEFAULT_CSV_COLUMNS[i];
+    return !d || d.id !== c.id || d.header !== c.header || d.visible !== c.visible;
+  });
+  const csvSummary = `${visibleCsv} of ${totalCsv} column${totalCsv === 1 ? '' : 's'} visible${csvCustomised ? ' · customised' : ''}`;
 
   const rows = [
     { id: 'settingsUser', icon: '👤', title: 'User Settings', sub: state.engineer ? state.engineer : 'Engineer name' },
@@ -2348,6 +3073,7 @@ function renderSettingsHub() {
     { id: 'settingsFails', icon: '⚠️', title: 'Quick Pick Fail', sub: failSummary },
     { id: 'settingsDescriptions', icon: '📝', title: 'Item Description List', sub: descSummary },
     { id: 'settingsDisplay', icon: '🎨', title: 'Display Settings', sub: displaySummary },
+    { id: 'settingsCsv', icon: '📊', title: 'CSV Columns', sub: csvSummary },   // v11
     { id: 'settingsBackup', icon: '💾', title: 'Backup & Restore', sub: 'Export or import all data' },
     { id: 'settingsCalculator', icon: '🧮', title: 'Resistance Calculator', sub: 'Earth continuity limit' },
     { id: 'settingsAbout', icon: 'ℹ️', title: 'About', sub: 'About this app' },
@@ -2397,6 +3123,30 @@ function renderSettingsUser() {
         <p class="muted">Used as the default for new sessions and shown on exported CSVs.</p>
         <input class="input" id="settings-engineer" value="${escapeHTML(state.engineer)}" placeholder="Your name">
       </div>
+
+      <!-- v11: tester type + calibration info. All optional. Stored locally
+           and included in JSON backups. NOT currently included in CSV exports
+           — flagged for a later release. -->
+      <div class="settings-section">
+        <h2 class="h2">Tester type</h2>
+        <p class="muted">The make and model of your PAT tester, if you'd like to record it. Used for your own reference for now — will appear on certificate exports in a later release.</p>
+        <input class="input" id="settings-tester" value="${escapeHTML(state.tester)}" placeholder="e.g. Megger PAT250, Seaward Apollo 600">
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Calibration</h2>
+        <p class="muted">Calibration details for your tester. All optional. Recorded locally for future certificate exports.</p>
+
+        <label class="label">Last calibration date</label>
+        <input class="input" id="settings-cal-date" type="date" value="${escapeHTML(state.calDate)}">
+
+        <label class="label">Certificate number</label>
+        <input class="input" id="settings-cal-cert" value="${escapeHTML(state.calCertNo)}" placeholder="e.g. CAL-2026-0142">
+
+        <label class="label">Next calibration due</label>
+        <input class="input" id="settings-cal-due" type="date" value="${escapeHTML(state.calDue)}">
+      </div>
+
       <button class="btn-primary" id="settings-user-save" style="margin-top:24px">Save</button>
     </div>
   `;
@@ -2574,6 +3324,62 @@ function renderSettingsBackup() {
   `;
 }
 
+// ---------- v11: CSV Columns settings page ----------
+// Controls the column order, visibility, and header text used by buildCSV().
+// Layout for each row: ↑ button, ↓ button, visibility checkbox, header text
+// input, plus a "(default: X)" hint when the header has been customised. The
+// up/down arrows are the primary reorder mechanism — they work reliably on
+// iOS PWA where drag-and-drop is unreliable. The list re-renders on every
+// arrow tap (via moveCsvColumn), which preserves user-edited but not yet
+// saved header text by reading the DOM first.
+//
+// Save validates that at least one column is visible. Reset restores the
+// defaults via resetCsvColumnsSettings().
+//
+// Changes here only affect exports; the in-app screens (entry, overview,
+// edit) are unaffected by column hiding / renaming.
+function renderSettingsCsv() {
+  const cols = state.csvColumns;
+  const rowsHtml = cols.map((c, i) => {
+    const isFirst = i === 0;
+    const isLast = i === cols.length - 1;
+    const def = defaultHeaderFor(c.id);
+    const hint = (c.header && c.header !== def)
+      ? `<span class="csv-col-default-hint">Default: ${escapeHTML(def)}</span>`
+      : '';
+    return `
+      <div class="csv-col-row" data-col-id="${escapeHTML(c.id)}">
+        <div class="csv-col-row-top">
+          <div class="csv-col-arrows">
+            <button class="csv-col-arrow" data-csv-up="${escapeHTML(c.id)}" ${isFirst ? 'disabled' : ''} aria-label="Move up">▲</button>
+            <button class="csv-col-arrow" data-csv-down="${escapeHTML(c.id)}" ${isLast ? 'disabled' : ''} aria-label="Move down">▼</button>
+          </div>
+          <label class="csv-col-vis-label">
+            <input type="checkbox" class="csv-col-visible" ${c.visible ? 'checked' : ''}>
+            <span>Show</span>
+          </label>
+        </div>
+        <label class="label csv-col-header-label">Header text</label>
+        <input class="input csv-col-header" value="${escapeHTML(c.header || def)}" placeholder="${escapeHTML(def)}">
+        ${hint}
+      </div>
+    `;
+  }).join('');
+
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('CSV Columns')}
+      <div class="settings-section">
+        <p class="muted" style="margin-top:0">Customise the columns on exported CSV files. Reorder with the arrows, untick "Show" to hide a column entirely, or edit the header text. These changes only affect the exported file — the app screens are unchanged.</p>
+        <div class="csv-cols-list">${rowsHtml}</div>
+      </div>
+
+      <button class="btn-primary" id="settings-csv-save" style="margin-top:8px">Save</button>
+      <button class="btn-secondary" id="settings-csv-reset" style="margin-top:8px;width:100%">Reset to defaults</button>
+    </div>
+  `;
+}
+
 function computeEarthLimit(csaKey, lengthM) {
   const r = CSA_RESISTANCE[csaKey];
   if (r === undefined) return null;
@@ -2651,18 +3457,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v10: rolled forward — V10 on top, V7 dropped. -->
+      <!-- v8: rolling 3-version changelog. v11: rolled forward — V11 on top, V8 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V11</strong> · May 2026</p>
+        <p class="muted">Backup-reminder banner on the Sessions list when it's been more than 7 days since your last JSON backup — "Export now" or "Remind me later". New CSV Columns settings page lets you reorder, hide, or rename any column on the exported CSV (the in-app screens are unchanged). Bulk-edit menu in selection mode now offers Location, Type, Notes (replace or append), or Delete on the items you've ticked. User Settings has new fields for tester type and calibration info (last cal date, certificate number, next due). CSV results now read "Passed" or "Failed" rather than "Pass" / "Fail".</p>
 
         <p><strong>V10</strong> · May 2026</p>
         <p class="muted">Import sessions from a CSV file sent by another engineer. Share button on session export now opens the native share sheet (Messages, Mail, AirDrop, WhatsApp) instead of saving straight to Files. Search bar on the Sessions list matches site, engineer, date and items within each session — tap a result to jump straight to the matching item. Location field now autofills from other locations used in the same session. Confirm prompt before discarding unsaved changes when switching Quick Pick presets.</p>
 
         <p><strong>V9</strong> · May 2026</p>
         <p class="muted">Quick Pick presets — save multiple named lists and switch between them on the Quick Pick Items page. Reset-to-defaults buttons on Items, Fails, and Item Description List pages. Updated built-in defaults to reflect real PAT work. Haptic feedback on fail-reason taps and the Other Save button. Backup/restore extended to include presets.</p>
-
-        <p><strong>V8</strong> · May 2026</p>
-        <p class="muted">Lock-session toggle to prevent accidental new entries (with overview-edit override). Working earth continuity calculator under Settings. Date field on Edit Session sized to match other fields. Fix for the "taps do nothing" bug after switching theme to Light or Dark.</p>
       </div>
 
       <div class="info-card">
@@ -2910,11 +3716,60 @@ function bindEvents() {
   if ($('cancel-selection-btn')) $('cancel-selection-btn').onclick = () => { exitSelectionMode(); render(); };
   if ($('select-all-visible-btn')) $('select-all-visible-btn').onclick = () => selectAllVisible();
   if ($('clear-selection-btn')) $('clear-selection-btn').onclick = () => clearSelection();
-  if ($('bulk-edit-loc-btn')) $('bulk-edit-loc-btn').onclick = () => openBulkLocationDialog();
-  if ($('bulk-cancel-btn')) $('bulk-cancel-btn').onclick = () => { state.bulkLocationDialogOpen = false; render(); };
-  if ($('bulk-backdrop')) $('bulk-backdrop').onclick = () => { state.bulkLocationDialogOpen = false; render(); };
+
+  // v11: Bulk-edit menu — selection bar button opens the menu sheet; the menu
+  // options route to the four sub-flows (location reuses the v10 path).
+  if ($('bulk-edit-menu-btn')) $('bulk-edit-menu-btn').onclick = () => openBulkEditMenu();
+  if ($('bulk-menu-close')) $('bulk-menu-close').onclick = () => closeBulkEditMenu();
+  if ($('bulk-menu-backdrop')) $('bulk-menu-backdrop').onclick = () => closeBulkEditMenu();
+  document.querySelectorAll('[data-bulk-edit]').forEach(el => {
+    el.onclick = () => {
+      const mode = el.dataset.bulkEdit;
+      if (mode === 'delete') {
+        // Delete confirms inside applyBulkDelete() — no separate dialog.
+        state.bulkEdit.menuOpen = false;
+        applyBulkDelete();
+      } else {
+        openBulkEditDialog(mode);
+      }
+    };
+  });
+
+  // v10/v11: bulk Location dialog (reuses v10 IDs).
+  if ($('bulk-cancel-btn')) $('bulk-cancel-btn').onclick = () => cancelBulkEditDialog();
+  if ($('bulk-backdrop')) $('bulk-backdrop').onclick = () => cancelBulkEditDialog();
   if ($('bulk-location-input')) $('bulk-location-input').oninput = e => state.bulkLocationValue = e.target.value;
   if ($('bulk-apply-btn')) $('bulk-apply-btn').onclick = () => applyBulkLocation();
+
+  // v11: bulk Type dialog. Quick-pick buttons fill the input; Apply commits.
+  if ($('bulk-type-cancel')) $('bulk-type-cancel').onclick = () => cancelBulkEditDialog();
+  if ($('bulk-type-backdrop')) $('bulk-type-backdrop').onclick = () => cancelBulkEditDialog();
+  if ($('bulk-type-input')) $('bulk-type-input').oninput = e => state.bulkEdit.typeValue = e.target.value;
+  if ($('bulk-type-apply')) $('bulk-type-apply').onclick = () => applyBulkType();
+  document.querySelectorAll('[data-bulk-type-quick]').forEach(el => {
+    el.onclick = () => {
+      state.bulkEdit.typeValue = el.dataset.bulkTypeQuick;
+      // Update the input value live without a full re-render to keep keyboard.
+      const inp = document.getElementById('bulk-type-input');
+      if (inp) inp.value = state.bulkEdit.typeValue;
+    };
+  });
+
+  // v11: bulk Notes dialog. Mode radios + textarea; Apply commits.
+  if ($('bulk-notes-cancel')) $('bulk-notes-cancel').onclick = () => cancelBulkEditDialog();
+  if ($('bulk-notes-backdrop')) $('bulk-notes-backdrop').onclick = () => cancelBulkEditDialog();
+  if ($('bulk-notes-input')) $('bulk-notes-input').oninput = e => state.bulkEdit.notesValue = e.target.value;
+  if ($('bulk-notes-apply')) $('bulk-notes-apply').onclick = () => applyBulkNotes();
+  document.querySelectorAll('input[name="bulk-notes-mode"]').forEach(el => {
+    el.onchange = e => {
+      state.bulkEdit.notesMode = e.target.value === 'append' ? 'append' : 'replace';
+      // Update the placeholder live without a full re-render.
+      const ta = document.getElementById('bulk-notes-input');
+      if (ta) ta.placeholder = state.bulkEdit.notesMode === 'append'
+        ? 'Text to append'
+        : 'New notes (leave empty to clear)';
+    };
+  });
 
   if ($('overview-search')) $('overview-search').oninput = e => {
     state.searchQuery = e.target.value;
@@ -3093,6 +3948,38 @@ function bindEvents() {
       window.location.reload();
     }
   };
+
+  // ===== v11 bindings =====
+
+  // Backup reminder banner — Sessions list only. "Export now" runs the same
+  // downloadBackup() the Backup & Restore page does (which also stamps
+  // lastBackupAt and clears the snooze). "Remind me later" and × both snooze
+  // for 24h.
+  if ($('backup-banner-export')) $('backup-banner-export').onclick = () => {
+    downloadBackup();
+    render();
+  };
+  if ($('backup-banner-later')) $('backup-banner-later').onclick = () => {
+    snoozeBackupReminder();
+    render();
+  };
+  if ($('backup-banner-dismiss')) $('backup-banner-dismiss').onclick = () => {
+    snoozeBackupReminder();
+    render();
+  };
+
+  // v11 welcome modal — Continue button dismisses and stamps the flag.
+  if ($('v11-welcome-dismiss')) $('v11-welcome-dismiss').onclick = () => dismissV11Welcome();
+
+  // CSV Columns settings page
+  if ($('settings-csv-save')) $('settings-csv-save').onclick = () => saveCsvColumnsSettings();
+  if ($('settings-csv-reset')) $('settings-csv-reset').onclick = () => resetCsvColumnsSettings();
+  document.querySelectorAll('[data-csv-up]').forEach(el => {
+    el.onclick = () => moveCsvColumn(el.dataset.csvUp, -1);
+  });
+  document.querySelectorAll('[data-csv-down]').forEach(el => {
+    el.onclick = () => moveCsvColumn(el.dataset.csvDown, +1);
+  });
 }
 
 // Light re-render of just the suggestions dropdown so we don't lose input focus

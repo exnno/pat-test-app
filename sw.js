@@ -29,7 +29,13 @@
 // date/name and asset/location/item/notes within items, jumps to first item
 // match), session-scoped location autofill mirroring item-type autocomplete,
 // unsaved-textarea-edit guard on preset switch.
-const CACHE_VERSION = 'pat-v10';
+//
+// v11: backup-reminder banner on Sessions list (7-day trigger, 24h snooze),
+// CSV Columns settings page (reorder/hide/rename, header-name-based import),
+// extended bulk-edit menu (location/type/notes/delete), tester + calibration
+// fields on User Settings, CSV results now Passed/Failed (UI unchanged),
+// one-time "what's new in V11" welcome modal.
+const CACHE_VERSION = 'pat-v11';
 const ASSETS = [
   './',
   './index.html',
