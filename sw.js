@@ -51,7 +51,15 @@
 // Reverted to v11 scroll behaviour on the entry screen. All other v12
 // features (tester+cal in CSV, cal-due chip, search-jump highlight,
 // session-first autocomplete, welcome modal) are unchanged.
-const CACHE_VERSION = 'pat-v12-1';
+//
+// v13: location is now a required field on every item. Test instrument
+// split into Manufacturer + Model on User Settings; CSV combines them as
+// a single "Test Instrument" column. Locked sessions stable-sort below
+// unlocked ones on the Sessions list regardless of which sort is picked.
+// App no longer auto-resumes a locked session on relaunch — drops to
+// Sessions list instead. Stronger "Are you sure?" confirm on item delete.
+// New "what's new in V13" welcome modal.
+const CACHE_VERSION = 'pat-v13';
 const ASSETS = [
   './',
   './index.html',

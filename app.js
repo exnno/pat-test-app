@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v12.1 (May 2026)
+ * v13 (May 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v12.1 ==============
+// ============== PAT Test PWA — v13 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V12.1';
+const APP_VERSION = 'V13';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -39,14 +39,24 @@ const ACTIVE_PRESET_KEY = 'pat:activepreset';   // v9: preset id
 //                  fires for everyone again. The old key (if present in storage
 //                  from v11 users) is orphaned and harmless — we don't bother
 //                  cleaning it up since it's a single string-valued flag.
+// v13: tester split into manufacturer + model — two new keys replace
+//                  TESTER_KEY. The old key is read once during migration
+//                  (loadV11Settings) and its value is dumped into
+//                  testerModel (since the existing field was free-form and
+//                  the model name is the more specific bit users tend to
+//                  recall). Old key is then cleared. WELCOME_KEY rolled
+//                  forward to pat:v13welcome for the new modal.
 const LAST_BACKUP_KEY = 'pat:lastbackup';
 const BACKUP_SNOOZE_KEY = 'pat:backupsnooze';
 const CSV_COLUMNS_KEY = 'pat:csvcolumns';
-const TESTER_KEY = 'pat:tester';
+const TESTER_KEY = 'pat:tester';            // v13: legacy. Read for migration only.
+const TESTER_MAKE_KEY = 'pat:testermake';   // v13
+const TESTER_MODEL_KEY = 'pat:testermodel'; // v13
 const CAL_DATE_KEY = 'pat:caldate';
 const CAL_CERT_KEY = 'pat:calcert';
 const CAL_DUE_KEY = 'pat:caldue';
-const V12_WELCOME_KEY = 'pat:v12welcome';
+const V12_WELCOME_KEY = 'pat:v12welcome';   // v13: legacy. Not referenced; left documented.
+const V13_WELCOME_KEY = 'pat:v13welcome';
 
 // v12: calibration status thresholds for the User Settings chip + hub subtitle.
 // CAL_DUE_SOON_DAYS — when the next-due date is within this many days from
@@ -133,11 +143,17 @@ const DEFAULT_CSV_COLUMNS = [
   { id: 'date',        header: 'Date',          visible: true  },
   { id: 'result',      header: 'Result',        visible: true  },
   { id: 'notes',       header: 'Notes',         visible: true  },
-  // v12: tester + calibration info, sourced from state.tester / state.calDate
-  // / state.calCertNo / state.calDue (NOT session-stamped — these are current
-  // engineer-global values at export time). Default hidden so existing users'
-  // exports don't suddenly grow new columns; turn on via Settings → CSV Columns.
-  { id: 'tester',      header: 'Tester',        visible: false },
+  // v12: tester + calibration info, sourced from state.testerMake/Model +
+  // state.calDate / state.calCertNo / state.calDue (NOT session-stamped —
+  // these are current engineer-global values at export time). Default hidden
+  // so existing users' exports don't suddenly grow new columns; turn on via
+  // Settings → CSV Columns.
+  // v13: 'tester' column now combines testerMake + testerModel (space-
+  // separated, trimmed). Default header relabelled to "Test Instrument" to
+  // match the User Settings copy; the column id stays 'tester' so existing
+  // saved column configs migrate cleanly via ensureAllCsvColumns(). Existing
+  // users who customised the header keep their customisation.
+  { id: 'tester',      header: 'Test Instrument', visible: false },
   { id: 'calDate',     header: 'Cal. Date',     visible: false },
   { id: 'calCertNo',   header: 'Cal. Cert No.', visible: false },
   { id: 'calDue',      header: 'Cal. Due',      visible: false }
@@ -248,14 +264,18 @@ let state = {
   // (dates use <input type="date"> so they're stored as ISO YYYY-MM-DD strings).
   // Persisted to localStorage and included in backups. v12: now also flow into
   // CSV exports via the four new default-hidden columns in DEFAULT_CSV_COLUMNS.
-  tester: '',
+  // v13: tester field split into manufacturer + model — two inputs on User
+  // Settings, combined back into a single space-separated value at CSV
+  // export time (column id 'tester', header now "Test Instrument").
+  testerMake: '',
+  testerModel: '',
   calDate: '',
   calCertNo: '',
   calDue: '',
 
-  // v12: First-launch welcome modal flag. Renamed from v11WelcomeSeen so the
-  // modal fires once for everyone on update to V12.
-  v12WelcomeSeen: false,
+  // v13: First-launch welcome modal flag. Renamed from v12WelcomeSeen so the
+  // modal fires once for everyone on update to V13.
+  v13WelcomeSeen: false,
 
   // v12: Sessions-list search-jump highlight. Set to the cursor index by
   // openSession() when called with an explicit opts.cursor (i.e. the user
@@ -382,9 +402,22 @@ function load() {
   }
 
   if (state.activeId && state.sessions.find(s => s.id === state.activeId)) {
-    state.view = 'entry';
     const sess = activeSession();
-    state.cursor = sess.items.length;
+    // v13: if the active session is locked, don't auto-resume — drop the user
+    // back at the Sessions list. The session itself is still there in the list
+    // for them to tap into if they want; we just don't open it for them. The
+    // "resume where I left off" behaviour applies only to unlocked sessions
+    // (i.e. work-in-progress), which is what the user actually wants on
+    // re-open. Clearing activeId here means the next save() persists the
+    // cleared state — no stale "active" pointer to a locked session.
+    if (sess && sess.locked) {
+      state.activeId = null;
+      state.view = 'sessions';
+      state.newForm.show = state.sessions.length === 0;
+    } else {
+      state.view = 'entry';
+      state.cursor = sess.items.length;
+    }
   } else {
     state.activeId = null;
     state.view = 'sessions';
@@ -429,15 +462,31 @@ function loadV11Settings() {
   state.lastBackupAt = localStorage.getItem(LAST_BACKUP_KEY) || null;
   state.backupSnoozedUntil = localStorage.getItem(BACKUP_SNOOZE_KEY) || null;
 
-  // Tester + calibration
-  state.tester = localStorage.getItem(TESTER_KEY) || '';
+  // Tester + calibration.
+  // v13: tester field split into make + model. Load the two new keys; if
+  // neither has a stored value but the legacy pat:tester key does, migrate
+  // the legacy value into testerModel (since users tended to put the
+  // specific model name there — "PAT420", "Apollo 600" — sometimes with
+  // make prefixed) and clear the old key so we don't migrate twice.
+  // Cautious migration: don't try to auto-split on whitespace, that
+  // mangles values like "Seaward Apollo 600". The V13 welcome modal flags
+  // the change so the user knows to split it themselves on next edit.
+  state.testerMake = localStorage.getItem(TESTER_MAKE_KEY) || '';
+  state.testerModel = localStorage.getItem(TESTER_MODEL_KEY) || '';
+  if (!state.testerMake && !state.testerModel) {
+    const legacyTester = localStorage.getItem(TESTER_KEY);
+    if (legacyTester) {
+      state.testerModel = legacyTester;
+      localStorage.removeItem(TESTER_KEY);
+    }
+  }
   state.calDate = localStorage.getItem(CAL_DATE_KEY) || '';
   state.calCertNo = localStorage.getItem(CAL_CERT_KEY) || '';
   state.calDue = localStorage.getItem(CAL_DUE_KEY) || '';
 
-  // v12: welcome modal flag — only suppress if explicitly seen. v11 users will
-  // see the v12 modal once on update because the key changed.
-  state.v12WelcomeSeen = localStorage.getItem(V12_WELCOME_KEY) === '1';
+  // v13: welcome modal flag — only suppress if explicitly seen. v12 / v12.1
+  // users will see the v13 modal once on update because the key changed.
+  state.v13WelcomeSeen = localStorage.getItem(V13_WELCOME_KEY) === '1';
 }
 
 // v11: Ensure state.csvColumns contains every column defined in
@@ -477,7 +526,9 @@ function save() {
   localStorage.setItem(HAPTICS_KEY, state.hapticsEnabled ? '1' : '0');
   // v11
   localStorage.setItem(CSV_COLUMNS_KEY, JSON.stringify(state.csvColumns));
-  localStorage.setItem(TESTER_KEY, state.tester);
+  // v13: split tester keys; legacy TESTER_KEY is not written.
+  localStorage.setItem(TESTER_MAKE_KEY, state.testerMake);
+  localStorage.setItem(TESTER_MODEL_KEY, state.testerModel);
   localStorage.setItem(CAL_DATE_KEY, state.calDate);
   localStorage.setItem(CAL_CERT_KEY, state.calCertNo);
   localStorage.setItem(CAL_DUE_KEY, state.calDue);
@@ -738,7 +789,15 @@ function sortedSessions() {
       arr.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
       break;
   }
-  return arr;
+  // v13: stable two-tier — unlocked sessions first, locked sessions
+  // afterwards, with the selected sort applied within each tier.
+  // Locked sessions are read-only archives so this keeps the active
+  // work-in-progress sessions at the top of the list regardless of which
+  // sort the user has picked. Stable because we partition by filter(),
+  // not by re-sorting on a composite key.
+  const unlocked = arr.filter(s => !s.locked);
+  const locked = arr.filter(s => s.locked);
+  return [...unlocked, ...locked];
 }
 
 // v10: Sessions-list search. Two-pass match:
@@ -885,7 +944,10 @@ function csvCellValue(colId, session, item) {
     case 'result':      return csvResultLabel(item.result);
     case 'notes':       return item.notes;
     // v12: tester + calibration columns (default-hidden).
-    case 'tester':      return state.tester || '';
+    // v13: 'tester' now combines testerMake + testerModel into a single
+    // space-separated string. Either field on its own is fine — empty
+    // strings drop out via the trim, no leading/trailing whitespace.
+    case 'tester':      return [state.testerMake, state.testerModel].filter(Boolean).join(' ').trim();
     case 'calDate':     return state.calDate ? formatDate(state.calDate) : '';
     case 'calCertNo':   return state.calCertNo || '';
     case 'calDue':      return state.calDue ? formatDate(state.calDue) : '';
@@ -1388,7 +1450,10 @@ function buildBackup() {
     hapticsEnabled: state.hapticsEnabled,
     // v11
     csvColumns: state.csvColumns,
-    tester: state.tester,
+    // v13: tester now split. Old backups (with .tester) load via the
+    // legacy fallback in restoreBackupFromFile().
+    testerMake: state.testerMake,
+    testerModel: state.testerModel,
     calDate: state.calDate,
     calCertNo: state.calCertNo,
     calDue: state.calDue,
@@ -1526,7 +1591,19 @@ function restoreBackupFromFile(file) {
     } else {
       state.csvColumns = DEFAULT_CSV_COLUMNS.map(c => ({ ...c }));
     }
-    state.tester = typeof data.tester === 'string' ? data.tester : '';
+    // v13: split tester restore. New backups carry testerMake / testerModel;
+    // older v11 / v12 backups carry the single .tester field — we dump that
+    // into testerModel for the same reason as the localStorage migration.
+    if (typeof data.testerMake === 'string' || typeof data.testerModel === 'string') {
+      state.testerMake = typeof data.testerMake === 'string' ? data.testerMake : '';
+      state.testerModel = typeof data.testerModel === 'string' ? data.testerModel : '';
+    } else if (typeof data.tester === 'string') {
+      state.testerMake = '';
+      state.testerModel = data.tester;
+    } else {
+      state.testerMake = '';
+      state.testerModel = '';
+    }
     state.calDate = typeof data.calDate === 'string' ? data.calDate : '';
     state.calCertNo = typeof data.calCertNo === 'string' ? data.calCertNo : '';
     state.calDue = typeof data.calDue === 'string' ? data.calDue : '';
@@ -1605,6 +1682,12 @@ function loadFormForCursor() {
 function validateBeforeSave(opts = {}) {
   const sess = activeSession();
   if (!sess) return 'No active session.';
+  // v13: location is now mandatory. Same skip pattern as item type for the
+  // copy-last-result path (opts.skipLocation), since that flow copies the
+  // location from the previous item before this check runs.
+  if (!opts.skipLocation && !state.form.location.trim()) {
+    return 'Please enter a location for this item.';
+  }
   if (!opts.skipItemType && !state.form.itemType.trim()) {
     return 'Please choose or enter an item type.';
   }
@@ -2081,11 +2164,16 @@ function saveUserSettings() {
   state.newForm.engineer = state.engineer;
   // v11: tester type + calibration info. All optional. Empty strings stored
   // as empty so the UI doesn't show stale values from previous edits.
-  const $t = document.getElementById('settings-tester');
+  // v13: tester now read from two separate inputs (Manufacturer + Model).
+  // The legacy single 'tester' field is no longer in state — split into
+  // testerMake + testerModel.
+  const $tm = document.getElementById('settings-tester-make');
+  const $tmod = document.getElementById('settings-tester-model');
   const $cd = document.getElementById('settings-cal-date');
   const $cc = document.getElementById('settings-cal-cert');
   const $cdu = document.getElementById('settings-cal-due');
-  if ($t) state.tester = $t.value.trim();
+  if ($tm) state.testerMake = $tm.value.trim();
+  if ($tmod) state.testerModel = $tmod.value.trim();
   if ($cd) state.calDate = $cd.value.trim();
   if ($cc) state.calCertNo = $cc.value.trim();
   if ($cdu) state.calDue = $cdu.value.trim();
@@ -2171,9 +2259,9 @@ function moveCsvColumn(id, delta) {
 // doesn't reappear, then re-renders to clear it from view. Renamed from
 // dismissV11Welcome and now writes pat:v12welcome so v11 users see the modal
 // once on update.
-function dismissV12Welcome() {
-  state.v12WelcomeSeen = true;
-  localStorage.setItem(V12_WELCOME_KEY, '1');
+function dismissV13Welcome() {
+  state.v13WelcomeSeen = true;
+  localStorage.setItem(V13_WELCOME_KEY, '1');
   render();
 }
 
@@ -2384,22 +2472,25 @@ function render() {
   // already dismissed this modal. Brand-new installs also see it on first
   // launch — slightly odd phrasing ("what's new") but the content is just
   // a feature intro so it works fine as a first-run overview.
-  const welcomeModal = (state.v12WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // v13: rolled forward — content covers the v13 changes, key bumped to
+  // pat:v13welcome so v12 / v12.1 users see it once on update.
+  const welcomeModal = (state.v13WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V12">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V13">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V12</h3>
+        <h3 class="bulk-sheet-title">What's new in V13</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Tester &amp; calibration in CSV.</strong> Your tester make/model and calibration details can now be included on exports. Turn them on under Settings → CSV Columns (they start hidden so existing exports don't change).</li>
-        <li><strong>Calibration-due warning.</strong> User Settings now shows a small chip when your next calibration is overdue or coming up within 30 days.</li>
-        <li><strong>Search-jump highlight.</strong> When you tap a search result on the Sessions list, the matched item briefly flashes on arrival so you know exactly where you've landed.</li>
-        <li><strong>Smarter autocomplete.</strong> Item-type suggestions now float anything you've already entered in the current session to the top of the list.</li>
+        <li><strong>Location is now required.</strong> Every item needs a location before it can be saved. Locations carry forward from the previous item, so you'll usually only type it once per area.</li>
+        <li><strong>Test instrument split.</strong> User Settings now has separate Manufacturer and Model fields. If you had a value here before, it's been moved into the Model field — open User Settings and split it across the two if you like. The CSV column combines them and is now called "Test Instrument".</li>
+        <li><strong>Locked sessions move to the bottom.</strong> The Sessions list now keeps your locked (finished) sessions below the unlocked ones, whichever sort you've picked. Active work stays at the top.</li>
+        <li><strong>Locked sessions don't auto-resume.</strong> When you reopen the app, you'll only land back in a session if it's still unlocked. Locked sessions drop you on the Sessions list — tap one if you need to view it.</li>
+        <li><strong>Stronger delete confirm.</strong> Deleting an item now asks "Are you sure?" rather than the old quick prompt, so a stray tap can't lose an entry.</li>
       </ul>
-      <button class="btn-primary" id="v12-welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v13-welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -3056,7 +3147,7 @@ function bindOverviewBodyEvents() {
     el.onclick = () => jumpTo(parseInt(el.dataset.jump, 10));
   });
   document.querySelectorAll('[data-del-item]').forEach(el => {
-    el.onclick = (e) => { e.stopPropagation(); if (confirm('Delete this item?')) deleteItem(parseInt(el.dataset.delItem, 10)); };
+    el.onclick = (e) => { e.stopPropagation(); if (confirm('Are you sure you want to delete this item?\n\nThis cannot be undone.')) deleteItem(parseInt(el.dataset.delItem, 10)); };
   });
   document.querySelectorAll('[data-row-toggle]').forEach(el => {
     el.onclick = (e) => {
@@ -3269,12 +3360,19 @@ function renderSettingsUser() {
       </div>
 
       <!-- v11: tester type + calibration info. All optional. Stored locally
-           and included in JSON backups. v12 update: now exported to CSV via
-           the four new default-hidden columns under Settings → CSV Columns. -->
+           and included in JSON backups. v12 update: exports to CSV via four
+           default-hidden columns under Settings → CSV Columns. v13: tester
+           split into Manufacturer + Model — combined back into a single
+           space-separated value at CSV export time. -->
       <div class="settings-section">
-        <h2 class="h2">Tester type</h2>
-        <p class="muted">The make and model of your PAT tester, if you'd like to record it. v12: now exports to CSV when the "Tester" column is enabled in Settings → CSV Columns.</p>
-        <input class="input" id="settings-tester" value="${escapeHTML(state.tester)}" placeholder="e.g. Megger PAT250, Seaward Apollo 600">
+        <h2 class="h2">Test instrument</h2>
+        <p class="muted">The make and model of your PAT tester, if you'd like to record it. Combined as a single value on the CSV export when the "Test Instrument" column is enabled in Settings → CSV Columns.</p>
+
+        <label class="label">Manufacturer</label>
+        <input class="input" id="settings-tester-make" value="${escapeHTML(state.testerMake)}" placeholder="e.g. Megger, Seaward, Kewtech">
+
+        <label class="label">Model</label>
+        <input class="input" id="settings-tester-model" value="${escapeHTML(state.testerModel)}" placeholder="e.g. PAT250, Apollo 600, KT77">
       </div>
 
       <div class="settings-section">
@@ -3601,18 +3699,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v12: rolled forward — V12 on top, V9 dropped. -->
+      <!-- v8: rolling 3-version changelog. v13: rolled forward — V13 on top, V10 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V13</strong> · May 2026</p>
+        <p class="muted">Location is now required on every item — saves you ever forgetting one. Test instrument split into separate Manufacturer and Model fields under User Settings; the CSV exports them as a single "Test Instrument" column. Locked sessions automatically sort below unlocked ones on the Sessions list, whichever sort you've chosen. Reopening the app no longer auto-resumes a locked session — you'll land on the Sessions list instead, keeping the resume behaviour only for unlocked (in-progress) work. Stronger "Are you sure?" confirmation when deleting an item.</p>
 
         <p><strong>V12</strong> · May 2026</p>
         <p class="muted">Tester type and calibration info (date, certificate, due date) now flow through to CSV exports — four new columns, off by default, switch them on under Settings → CSV Columns. A small chip on User Settings flags when your tester's next calibration is overdue or due within 30 days, with the same status echoed on the Settings hub. When you tap a Sessions-list search result, the matched item now flashes briefly on arrival so you know exactly where you've landed. Item-type autocomplete now floats any description you've already used in the current session to the top of the suggestions.</p>
 
         <p><strong>V11</strong> · May 2026</p>
         <p class="muted">Backup-reminder banner on the Sessions list when it's been more than 7 days since your last JSON backup — "Export now" or "Remind me later". New CSV Columns settings page lets you reorder, hide, or rename any column on the exported CSV (the in-app screens are unchanged). Bulk-edit menu in selection mode now offers Location, Type, Notes (replace or append), or Delete on the items you've ticked. User Settings has new fields for tester type and calibration info (last cal date, certificate number, next due). CSV results now read "Passed" or "Failed" rather than "Pass" / "Fail".</p>
-
-        <p><strong>V10</strong> · May 2026</p>
-        <p class="muted">Import sessions from a CSV file sent by another engineer. Share button on session export now opens the native share sheet (Messages, Mail, AirDrop, WhatsApp) instead of saving straight to Files. Search bar on the Sessions list matches site, engineer, date and items within each session — tap a result to jump straight to the matching item. Location field now autofills from other locations used in the same session. Confirm prompt before discarding unsaved changes when switching Quick Pick presets.</p>
       </div>
 
       <div class="info-card">
@@ -3824,7 +3922,7 @@ function bindEvents() {
   if ($('prev-btn')) $('prev-btn').onclick = () => moveCursor(-1);
   if ($('next-btn')) $('next-btn').onclick = () => moveCursor(1);
   if ($('skip-new-btn')) $('skip-new-btn').onclick = () => skipToNew();
-  if ($('del-item-btn')) $('del-item-btn').onclick = () => { if (confirm('Delete this item?')) deleteItem(state.cursor); };
+  if ($('del-item-btn')) $('del-item-btn').onclick = () => { if (confirm('Are you sure you want to delete this item?\n\nThis cannot be undone.')) deleteItem(state.cursor); };
 
   document.querySelectorAll('[data-reason]').forEach(el => {
     el.onclick = () => pickFailReason(el.dataset.reason);
@@ -4113,7 +4211,7 @@ function bindEvents() {
   };
 
   // v11 welcome modal — Continue button dismisses and stamps the flag.
-  if ($('v12-welcome-dismiss')) $('v12-welcome-dismiss').onclick = () => dismissV12Welcome();
+  if ($('v13-welcome-dismiss')) $('v13-welcome-dismiss').onclick = () => dismissV13Welcome();
 
   // CSV Columns settings page
   if ($('settings-csv-save')) $('settings-csv-save').onclick = () => saveCsvColumnsSettings();
