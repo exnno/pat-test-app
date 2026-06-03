@@ -72,7 +72,24 @@
 // Sessions list gains Status + Lock filters beside Sort (persisted). Cal-due
 // chip + subtitle read "Due today" on the due date. Page scrollbar hidden
 // visually (scroll still works). New "what's new in V15" welcome modal.
-const CACHE_VERSION = 'pat-v15';
+//
+// v16: Multi Pick — a global, optional feature that logs a preset ordered list
+// of item types as PASS in one tap. Up to 6 named multi-picks, configured on a
+// new Settings → Multi Pick page with a show/hide toggle (off by default). New
+// full-width entry-screen button + bottom sheet, transient "Added N items"
+// toast, multiPick added to backup/restore. New "what's new in V16" welcome
+// modal. About changelog rolled (V16/V15/V14).
+//
+// v16.1: HOTFIX. The v16 entry screen crashed (blank screen, couldn't open a
+// session) whenever the Multi Pick button was enabled — the button markup read
+// `isLocked` before its `const` was initialised (temporal dead zone), and that
+// branch only ran when the toggle was on. Moved the Multi Pick block below the
+// `isLocked` declaration. Added a boot-level safety net so a render error can
+// never brick the app to a blank screen again. Cache bumped to pat-v16-1 so the
+// fix actually reaches installed PWAs (a same-key cache would have kept serving
+// the broken app.js). Welcome key left at pat:v16welcome (hotfix follows the
+// release immediately — no second modal).
+const CACHE_VERSION = 'pat-v16-1';
 const ASSETS = [
   './',
   './index.html',
