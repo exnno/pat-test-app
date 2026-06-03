@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v15 (June 2026)
+ * v16 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v15 ==============
+// ============== PAT Test PWA — v16 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V15';
+const APP_VERSION = 'V16';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -58,7 +58,20 @@ const CAL_DUE_KEY = 'pat:caldue';
 const V12_WELCOME_KEY = 'pat:v12welcome';   // v13: legacy. Not referenced; left documented.
 const V13_WELCOME_KEY = 'pat:v13welcome';   // v14: legacy. Orphaned, harmless.
 const V14_WELCOME_KEY = 'pat:v14welcome';   // v15: legacy. Orphaned, harmless.
-const V15_WELCOME_KEY = 'pat:v15welcome';   // v15
+const V15_WELCOME_KEY = 'pat:v15welcome';   // v16: legacy. Orphaned, harmless.
+const V16_WELCOME_KEY = 'pat:v16welcome';   // v16
+
+// v16: Multi Pick. A single GLOBAL set of up to 6 named, ordered item-type
+// sequences, plus a show/hide toggle for the entry-screen button. Stored as one
+// JSON object under MULTIPICK_KEY:
+//   { enabled: bool, slots: [ { name: string, items: [string, ...] }, ... ] }
+// "enabled" gates the full-width Multi Pick button on the entry screen (default
+// off — the feature is niche, only worth it on certain jobs). Each slot, when
+// tapped, logs its items as PASS in order, auto-numbered, using the current
+// Location field. Not tied to the item presets — one set shared everywhere.
+// Slots with no items are dropped on save and never shown in the sheet.
+const MULTIPICK_KEY = 'pat:multipick';
+const MULTIPICK_MAX_SLOTS = 6;
 
 // v15: Sessions-list filter persistence. Two independent filters that combine
 // (AND) and sit beside the Sort control. Both default to 'all'.
@@ -440,9 +453,23 @@ let state = {
   // completeness only — no longer gates anything.
   v14WelcomeSeen: false,
 
-  // v15: welcome modal flag (key pat:v15welcome). Gates the V15 "what's new"
-  // modal so v14 users see it once on update.
+  // v15: welcome modal flag (key pat:v15welcome). v16: retained for load-time
+  // completeness only — no longer gates anything.
   v15WelcomeSeen: false,
+
+  // v16: welcome modal flag (key pat:v16welcome). Gates the V16 "what's new"
+  // modal so v15 users see it once on update.
+  v16WelcomeSeen: false,
+
+  // v16: Multi Pick config — GLOBAL (not per-preset). enabled gates the
+  // entry-screen button; slots is an array of up to 6 { name, items:[strings] }.
+  // Loaded/validated via loadMultiPickConfig() + normaliseMultiPickConfig().
+  // Only slots with at least one item are kept (and shown).
+  multiPick: { enabled: false, slots: [] },
+
+  // v16: Multi Pick bottom-sheet open flag on the entry screen. Cleared on every
+  // view transition (setView) and in loadFormForCursor(), same as failModalOpen.
+  multiPickSheetOpen: false,
 
   // v14: prune-age threshold in months. Sessions that are both exported and
   // older than this are offered for pruning in the storage indicator. Loaded
@@ -674,9 +701,15 @@ function loadV11Settings() {
   // v15: welcome modal flag — key bumped to pat:v15welcome so v14 users see the
   // v15 modal once on update. v13/v14 flags kept loaded for completeness but no
   // longer gate the modal.
+  // v16: key bumped again to pat:v16welcome; v15WelcomeSeen now load-only.
   state.v13WelcomeSeen = localStorage.getItem(V13_WELCOME_KEY) === '1';
   state.v14WelcomeSeen = localStorage.getItem(V14_WELCOME_KEY) === '1';
   state.v15WelcomeSeen = localStorage.getItem(V15_WELCOME_KEY) === '1';
+  state.v16WelcomeSeen = localStorage.getItem(V16_WELCOME_KEY) === '1';
+
+  // v16: Multi Pick config. Validated defensively so a corrupt/garbage key can
+  // never wedge the entry screen — falls back to { enabled:false, slots:[] }.
+  state.multiPick = loadMultiPickConfig();
 
   // v14: prune-age setting (months). Clamp to a sane 1–120 range; fall back
   // to the default on anything non-numeric.
@@ -735,6 +768,8 @@ function save() {
   localStorage.setItem(CAL_DUE_KEY, state.calDue);
   // v14: prune-age setting.
   localStorage.setItem(PRUNE_AGE_KEY, String(state.pruneAgeMonths));
+  // v16: Multi Pick config (single JSON object).
+  localStorage.setItem(MULTIPICK_KEY, JSON.stringify(state.multiPick));
   // lastBackupAt + backupSnoozedUntil are written via their own helpers
   // (markBackupExported, snoozeBackupReminder) rather than here, because they
   // shouldn't update on every state change.
@@ -799,6 +834,137 @@ function deletePreset(id) {
   }
   save();
   return true;
+}
+
+// ---------- v16: Multi Pick helpers ----------
+// Validate an arbitrary value (from localStorage or a restored backup) into a
+// safe config object. Anything unexpected collapses to { enabled:false,
+// slots:[] }. Slot names are trimmed and capped; item entries are trimmed and
+// blanks dropped; slots with no items are discarded. Slot count is capped at
+// MULTIPICK_MAX_SLOTS.
+function normaliseMultiPickConfig(raw) {
+  const out = { enabled: false, slots: [] };
+  if (!raw || typeof raw !== 'object') return out;
+  out.enabled = !!raw.enabled;
+  if (Array.isArray(raw.slots)) {
+    raw.slots.forEach(s => {
+      if (out.slots.length >= MULTIPICK_MAX_SLOTS) return;
+      const name = (s && typeof s.name === 'string') ? s.name.trim().slice(0, 40) : '';
+      const items = (s && Array.isArray(s.items))
+        ? s.items.map(x => String(x || '').trim()).filter(Boolean)
+        : [];
+      if (items.length) out.slots.push({ name, items });
+    });
+  }
+  return out;
+}
+
+function loadMultiPickConfig() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(MULTIPICK_KEY) || 'null'); } catch {}
+  return normaliseMultiPickConfig(raw);
+}
+
+// Slots that are actually usable (have at least one item). Belt-and-braces: the
+// stored config is already filtered, but a hand-edited backup could carry
+// empties, so we filter again at the point of use.
+function activeMultiPickSlots() {
+  return (state.multiPick.slots || []).filter(s => s.items && s.items.length);
+}
+
+// Fire a multi-pick: append every item in the chosen slot as a PASS, in order,
+// to the END of the active session (never overwriting the item on screen),
+// auto-numbering each off the previous one and using the current Location field
+// for all of them. Notes are left blank. Lands the cursor on a fresh new item
+// afterwards, buzzes the copy-last haptic, and shows an "Added N items" toast.
+function multiPickFire(idx) {
+  const sess = activeSession();
+  if (!sess) return;
+  if (sess.locked) return;                       // belt-and-braces; button is disabled too
+  const slot = activeMultiPickSlots()[idx];
+  if (!slot || !slot.items.length) return;
+
+  // Location is mandatory per item (v13). Multi Pick supplies the item types
+  // itself, so we only need a location — applied to every inserted item. If it's
+  // missing, close the sheet first so the alert clears to the entry screen with
+  // the Location field in view, rather than leaving the sheet covering it.
+  const cleanLocation = normaliseLocation(state.form.location);
+  if (!cleanLocation) {
+    state.multiPickSheetOpen = false;
+    render();
+    alert('Please enter a location before using Multi Pick — it\'s applied to every item it adds.');
+    return;
+  }
+
+  slot.items.forEach(typeRaw => {
+    const cleanType = normaliseItemType(typeRaw);
+    sess.items.push({
+      id: uid(),
+      assetNo: nextAssetNo(sess),   // recomputed each push off the growing list
+      location: cleanLocation,
+      itemType: cleanType,
+      notes: '',
+      result: 'pass'
+    });
+    addDescriptionIfNew(cleanType);
+  });
+
+  const n = slot.items.length;
+  markSessionDirty(sess);            // v14: new entries invalidate a prior export
+  state.multiPickSheetOpen = false;
+  state.cursor = sess.items.length;  // drop onto a fresh new item after the batch
+  loadFormForCursor();
+  haptic(2);                         // copy-last double-buzz
+  save();
+  render();
+  showToast(`Added ${n} item${n === 1 ? '' : 's'}`);
+}
+
+// v16: save the Multi Pick settings page. Reads the show/hide toggle and all 6
+// slot rows from the live DOM in one pass. Each row's sequence input is split on
+// commas; blanks dropped. Slots with no items are not stored. Matches the
+// "Save = commit" model of the other settings sub-pages (the toggle persists on
+// Save too, not instantly).
+function saveMultiPickSettings() {
+  const enabledEl = document.getElementById('multipick-enabled');
+  const enabled = enabledEl ? !!enabledEl.checked : !!state.multiPick.enabled;
+  const slots = [];
+  document.querySelectorAll('.mp-slot').forEach(row => {
+    const nameEl = row.querySelector('.mp-slot-name');
+    const seqEl  = row.querySelector('.mp-slot-seq');
+    const name = nameEl ? String(nameEl.value || '').trim().slice(0, 40) : '';
+    const items = seqEl
+      ? String(seqEl.value || '').split(',').map(s => s.trim()).filter(Boolean)
+      : [];
+    if (items.length) slots.push({ name, items });
+  });
+  state.multiPick = { enabled, slots: slots.slice(0, MULTIPICK_MAX_SLOTS) };
+  save();
+  setView('settings');
+}
+
+// v16: transient toast — a small auto-dismissing pill at the bottom of the
+// screen. Appended directly to <body> (outside #app) so it survives the next
+// render() (which rewrites #app and sweeps stray sheets/backdrops, but leaves
+// .toast alone). Self-contained: replaces any existing toast, fades in, then
+// removes itself after a short delay. No state needed.
+let _toastTimer = null;
+function showToast(message) {
+  document.querySelectorAll('body > .toast').forEach(el => el.remove());
+  if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+  const el = document.createElement('div');
+  el.className = 'toast';
+  el.setAttribute('role', 'status');
+  el.textContent = message;
+  document.body.appendChild(el);
+  // Force a reflow so the transition runs, then reveal.
+  void el.offsetWidth;
+  el.classList.add('toast-show');
+  _toastTimer = setTimeout(() => {
+    el.classList.remove('toast-show');
+    setTimeout(() => el.remove(), 250);   // wait out the fade-out transition
+    _toastTimer = null;
+  }, 1900);
 }
 
 // v9: confirm the migration prompt — sets the chosen name on the interim preset
@@ -1747,6 +1913,8 @@ function buildBackup() {
     calDate: state.calDate,
     calCertNo: state.calCertNo,
     calDue: state.calDue,
+    // v16: Multi Pick config.
+    multiPick: state.multiPick,
     lastBackupAt: state.lastBackupAt
   };
 }
@@ -1897,6 +2065,10 @@ function restoreBackupFromFile(file) {
     state.calDate = typeof data.calDate === 'string' ? data.calDate : '';
     state.calCertNo = typeof data.calCertNo === 'string' ? data.calCertNo : '';
     state.calDue = typeof data.calDue === 'string' ? data.calDue : '';
+
+    // v16: Multi Pick config — validate through the same normaliser used on
+    // load. Missing/old backups collapse to { enabled:false, slots:[] }.
+    state.multiPick = normaliseMultiPickConfig(data.multiPick);
 
     state.activeId = null;
     state.view = 'sessions';
@@ -2075,6 +2247,7 @@ function loadFormForCursor() {
   state.failModalOpen = false;
   state.failModalStage = 'reasons';
   state.failOtherText = '';
+  state.multiPickSheetOpen = false;   // v16
 }
 
 // ---------- Validation ----------
@@ -2345,6 +2518,7 @@ function setView(v) {
   state.failModalOpen = false;
   state.failModalStage = 'reasons';
   state.failOtherText = '';
+  state.multiPickSheetOpen = false;   // v16
   state.bulkLocationDialogOpen = false;
   state.bulkLocationValue = '';
   // v11: also clear the new bulk-edit menu + sub-dialog state.
@@ -2702,11 +2876,11 @@ function moveCsvColumn(id, delta) {
 }
 
 // v12: dismiss the welcome modal — sets the flag in localStorage so it
-// doesn't reappear, then re-renders to clear it from view. v15: writes
-// pat:v15welcome so v14 users see the modal once on update.
-function dismissV15Welcome() {
-  state.v15WelcomeSeen = true;
-  localStorage.setItem(V15_WELCOME_KEY, '1');
+// doesn't reappear, then re-renders to clear it from view. v16: writes
+// pat:v16welcome so v15 users see the modal once on update.
+function dismissV16Welcome() {
+  state.v16WelcomeSeen = true;
+  localStorage.setItem(V16_WELCOME_KEY, '1');
   render();
 }
 
@@ -2866,6 +3040,7 @@ function render() {
   else if (v === 'settingsUser') html = renderSettingsUser();
   else if (v === 'settingsItems') html = renderSettingsItems();
   else if (v === 'settingsFails') html = renderSettingsFails();
+  else if (v === 'settingsMultiPick') html = renderSettingsMultiPick();   // v16
   else if (v === 'settingsDescriptions') html = renderSettingsDescriptions();
   else if (v === 'settingsDisplay') html = renderSettingsDisplay();
   else if (v === 'settingsBackup') html = renderSettingsBackup();
@@ -2915,24 +3090,22 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v15: rolled forward — content covers the v15 changes, key bumped to
-  // pat:v15welcome so v14 users see it once on update. Gate uses v15WelcomeSeen.
-  const welcomeModal = (state.v15WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // v16: rolled forward — content covers the V16 Multi Pick feature, key bumped
+  // to pat:v16welcome so v15 users see it once on update. Gate uses v16WelcomeSeen.
+  const welcomeModal = (state.v16WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V15">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V16">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V15</h3>
+        <h3 class="bulk-sheet-title">What's new in V16</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Export them all at once.</strong> The "not yet exported" line on the Sessions list is now a button — tap it to share every session that still needs exporting in one go.</li>
-        <li><strong>Filter your sessions.</strong> Alongside Sort, you can now filter the Sessions list by export status (not exported / exported / modified since) and by locked or unlocked.</li>
-        <li><strong>"Due today".</strong> When a calibration date falls on today, the reminder now reads "Due today" instead of "Due in 0 days".</li>
-        <li><strong>Tidier scrolling.</strong> The scrollbar no longer shows on screen, while scrolling works exactly as before.</li>
+        <li><strong>Multi Pick.</strong> Log a whole set of items as PASS in one tap — perfect for a repeated setup like a desk PC (lead, adapter, monitor and so on). Build up to six of your own, name them however you like, and they're logged in the order you set.</li>
+        <li><strong>Off until you want it.</strong> The Multi Pick button is hidden by default. Set up your lists and switch the button on under <strong>Settings → Multi Pick</strong>.</li>
       </ul>
-      <button class="btn-primary" id="v15-welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v16-welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -3367,6 +3540,53 @@ function renderEntry() {
     </div>
   ` : '';
 
+  // v16: Multi Pick. Full-width button at the very bottom of the entry screen,
+  // shown only when the feature is enabled in Settings. Disabled (like Pass/Fail)
+  // when the session is locked. Tapping opens a bottom sheet listing the
+  // configured multi-picks; each logs its sequence as PASS in one go.
+  const mpEnabled = !!(state.multiPick && state.multiPick.enabled);
+  const multiPickButton = mpEnabled ? `
+    <button class="multipick-btn" id="multipick-btn" ${isLocked ? 'disabled' : ''}>
+      ＋ Multi Pick
+    </button>
+  ` : '';
+
+  let multiPickSheet = '';
+  if (state.multiPickSheetOpen) {
+    const slots = activeMultiPickSlots();
+    const body = slots.length ? `
+      <div class="multipick-list">
+        ${slots.map((s, i) => {
+          const seqText = s.items.join(' · ');
+          const hasName = !!s.name;
+          const main = hasName ? s.name : seqText;
+          const sub = hasName ? seqText : `${s.items.length} item${s.items.length === 1 ? '' : 's'}`;
+          return `
+            <button class="multipick-option" data-mp-index="${i}">
+              <span class="multipick-option-name">${escapeHTML(main)}</span>
+              <span class="multipick-option-seq">${escapeHTML(sub)}</span>
+            </button>
+          `;
+        }).join('')}
+      </div>
+    ` : `
+      <p class="multipick-empty">No multi-picks set up yet. Add them in Settings → Multi Pick.</p>
+    `;
+    multiPickSheet = `
+      <div class="modal-backdrop" id="multipick-backdrop"></div>
+      <div class="fail-sheet multipick-sheet" role="dialog" aria-label="Multi Pick">
+        <div class="fail-sheet-handle"></div>
+        <div class="fail-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="fail-sheet-title">Multi Pick</h3>
+          <button class="fail-close-btn" id="multipick-close" aria-label="Cancel">×</button>
+        </div>
+        <p class="multipick-sheet-hint">Each adds its items as a PASS, in order, using the current location.</p>
+        ${body}
+      </div>
+    `;
+  }
+
   const carriedHint = (!isExisting && state.form.location)
     ? '<span class="hint">(carried from last)</span>'
     : '';
@@ -3436,7 +3656,10 @@ function renderEntry() {
         <button class="nav-btn" id="next-btn" ${state.cursor >= sess.items.length ? 'disabled' : ''}>Next ›</button>
       </div>
 
+      ${multiPickButton}
+
       ${failModal}
+      ${multiPickSheet}
     </div>
   `;
 }
@@ -3813,6 +4036,11 @@ function renderSettingsHub() {
     ? `${escapeHTML(activeP.name)} · ${itemCount} quick-pick${itemCount === 1 ? '' : 's'}${presetCount > 1 ? ` · ${presetCount} presets` : ''}`
     : 'No preset selected';
   const failSummary = state.failReasons.length === 1 ? '1 quick-pick' : `${state.failReasons.length} quick-picks`;
+  // v16: Multi Pick summary — count of configured slots + on/off state.
+  const mpSlots = activeMultiPickSlots().length;
+  const mpSummary = mpSlots === 0
+    ? (state.multiPick.enabled ? 'On · none set up yet' : 'Off')
+    : `${state.multiPick.enabled ? 'On' : 'Off'} · ${mpSlots} multi-pick${mpSlots === 1 ? '' : 's'}`;
   const descSummary = state.descriptions.length === 1 ? '1 description' : `${state.descriptions.length} descriptions`;
   const themeSummary = state.theme === 'system' ? 'System' : (state.theme === 'dark' ? 'Dark' : 'Light');
   const hapticsSummary = state.hapticsEnabled ? 'Haptics on' : 'Haptics off';
@@ -3848,6 +4076,7 @@ function renderSettingsHub() {
     { id: 'settingsUser', icon: '👤', title: 'User Settings', sub: userSubtitle },
     { id: 'settingsItems', icon: '⚡', title: 'Quick Pick Items', sub: itemSummary },
     { id: 'settingsFails', icon: '⚠️', title: 'Quick Pick Fail', sub: failSummary },
+    { id: 'settingsMultiPick', icon: '🧰', title: 'Multi Pick', sub: mpSummary },   // v16
     { id: 'settingsDescriptions', icon: '📝', title: 'Item Description List', sub: descSummary },
     { id: 'settingsDisplay', icon: '🎨', title: 'Display Settings', sub: displaySummary },
     { id: 'settingsCsv', icon: '📊', title: 'CSV Columns', sub: csvSummary },   // v11
@@ -4028,6 +4257,57 @@ function renderSettingsFails() {
         <button class="btn-secondary" id="settings-fails-reset">↺ Reset to defaults</button>
         <button class="btn-primary" id="settings-fails-save">Save</button>
       </div>
+    </div>
+  `;
+}
+
+function renderSettingsMultiPick() {
+  const enabled = !!(state.multiPick && state.multiPick.enabled);
+  const slots = state.multiPick.slots || [];
+
+  // Always render MULTIPICK_MAX_SLOTS fixed rows, pre-filled from the stored
+  // slots in order. Empty rows save as empty and are dropped on save. This keeps
+  // the editor predictable (no add/remove buttons to fiddle with on mobile).
+  const slotRows = [];
+  for (let i = 0; i < MULTIPICK_MAX_SLOTS; i++) {
+    const s = slots[i] || { name: '', items: [] };
+    const seqValue = (s.items || []).join(', ');
+    slotRows.push(`
+      <div class="mp-slot">
+        <div class="mp-slot-head">Multi-pick ${i + 1}</div>
+        <input class="input mp-slot-name" value="${escapeHTML(s.name || '')}" placeholder="Name (optional) — e.g. Desk PC setup">
+        <input class="input mp-slot-seq" value="${escapeHTML(seqValue)}" placeholder="Lead, AC Adapter, Lead, PC, Lead, Monitor">
+      </div>
+    `);
+  }
+
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Multi Pick')}
+
+      <div class="settings-section">
+        <h2 class="h2">Multi Pick button</h2>
+        <p class="muted">Multi Pick logs a fixed list of items as PASS, in order, with a single tap — handy on jobs with lots of identical setups, and easy to leave off when you don't need it.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Show on entry screen</div>
+            <div class="toggle-row-sub" id="multipick-enabled-sub">${enabled ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="multipick-enabled" ${enabled ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Your multi-picks</h2>
+        <p class="muted">For each one, type the item types you want logged, <strong>separated by commas</strong>, in the order they should be added. Add a name to label the button, or leave it blank to show the list itself. Leave a multi-pick's items blank to hide it. Up to ${MULTIPICK_MAX_SLOTS}.</p>
+        <div class="mp-example">Example — items <strong>Lead, AC Adapter, Lead, PC, Lead, Monitor</strong> log six passes in that order, each on whatever location is in the entry screen's Location field.</div>
+        ${slotRows.join('')}
+      </div>
+
+      <button class="btn-primary" id="settings-multipick-save" style="margin-top:24px">Save</button>
     </div>
   `;
 }
@@ -4277,18 +4557,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v15: rolled forward — V15 on top, V12 dropped. -->
+      <!-- v8: rolling 3-version changelog. v16: rolled forward — V16 on top, V13 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V16</strong> · June 2026</p>
+        <p class="muted">New Multi Pick feature. Define your own lists of items — say a lead, adapter and monitor for a desk PC — and log the whole list as passes with a single tap, in the order you set, all on the current location. Build up to six of these under Settings → Multi Pick, name them however you like, and show or hide the entry-screen button with a toggle. It's off by default, since it's only worth it on certain jobs.</p>
 
         <p><strong>V15</strong> · June 2026</p>
         <p class="muted">The "not yet exported" line on the Sessions list is now a button — tap it to share every session that still needs exporting in one action. New filters sit beside Sort: narrow the list by export status (not exported, exported, or modified since export) and by locked or unlocked, with your choices remembered between visits. A calibration date that falls on today now reads "Due today" rather than "Due in 0 days". The on-screen scrollbar is now hidden while scrolling works exactly as before.</p>
 
         <p><strong>V14</strong> · June 2026</p>
         <p class="muted">Your sessions are now stored more compactly behind the scenes, so more data fits on the device before reaching the storage limit — existing data is upgraded automatically with no change to how you work. The Sessions list now marks sessions you've exported to CSV with a ✓, switching to "✓✎ Modified since export" if you edit one afterwards, and shows a count of sessions not yet exported. Opening an already-exported session reminds you that further changes will need re-exporting (locked, view-only sessions don't prompt). Backup &amp; Restore can now clear sessions that are exported and older than a set age (default 12 months, adjustable) to reclaim space, always with confirmation first.</p>
-
-        <p><strong>V13</strong> · May 2026</p>
-        <p class="muted">Location is now required on every item — saves you ever forgetting one. Test instrument split into separate Manufacturer and Model fields under User Settings; the CSV exports them as a single "Test Instrument" column. Locked sessions automatically sort below unlocked ones on the Sessions list, whichever sort you've chosen. Reopening the app no longer auto-resumes a locked session — you'll land on the Sessions list instead, keeping the resume behaviour only for unlocked (in-progress) work. Stronger "Are you sure?" confirmation when deleting an item.</p>
       </div>
 
       <div class="info-card">
@@ -4523,6 +4803,25 @@ function bindEvents() {
   if ($('fail-close')) $('fail-close').onclick = () => cancelFailModal();
   if ($('fail-backdrop')) $('fail-backdrop').onclick = () => cancelFailModal();
 
+  // v16: Multi Pick — open the sheet, pick a slot, or dismiss.
+  if ($('multipick-btn')) $('multipick-btn').onclick = () => {
+    const sess = activeSession();
+    if (sess && sess.locked) return;
+    state.multiPickSheetOpen = true;
+    render();
+  };
+  document.querySelectorAll('[data-mp-index]').forEach(el => {
+    el.onclick = () => multiPickFire(parseInt(el.dataset.mpIndex, 10));
+  });
+  if ($('multipick-close')) $('multipick-close').onclick = () => {
+    state.multiPickSheetOpen = false;
+    render();
+  };
+  if ($('multipick-backdrop')) $('multipick-backdrop').onclick = () => {
+    state.multiPickSheetOpen = false;
+    render();
+  };
+
   // Overview screen
   // Overview & Settings hub both use #back-btn — disambiguate by current view.
   // Settings hub is only reachable from sessions; Overview is only reachable from entry.
@@ -4635,6 +4934,15 @@ function bindEvents() {
   if ($('settings-items-save')) $('settings-items-save').onclick = () => saveItemTypesSettings();
   if ($('settings-fails-save')) $('settings-fails-save').onclick = () => saveFailReasonsSettings();
   if ($('settings-descriptions-save')) $('settings-descriptions-save').onclick = () => saveDescriptionsSettings();
+  // v16: Multi Pick settings save.
+  if ($('settings-multipick-save')) $('settings-multipick-save').onclick = () => saveMultiPickSettings();
+  // v16: toggle's On/Off subtext updates live WITHOUT a re-render (a render here
+  // would clobber any unsaved slot edits, like the CSV page). The actual value
+  // is committed on Save, matching the other settings sub-pages.
+  if ($('multipick-enabled')) $('multipick-enabled').onchange = e => {
+    const sub = document.getElementById('multipick-enabled-sub');
+    if (sub) sub.textContent = e.target.checked ? 'On' : 'Off';
+  };
 
   // v9: Reset-to-defaults buttons
   if ($('settings-items-reset')) $('settings-items-reset').onclick = () => resetItemsToDefaults();
@@ -4792,7 +5100,7 @@ function bindEvents() {
   };
 
   // v11 welcome modal — Continue button dismisses and stamps the flag.
-  if ($('v15-welcome-dismiss')) $('v15-welcome-dismiss').onclick = () => dismissV15Welcome();
+  if ($('v16-welcome-dismiss')) $('v16-welcome-dismiss').onclick = () => dismissV16Welcome();
 
   // v14: reopen-warning modal buttons.
   if ($('reopen-warn-continue')) $('reopen-warn-continue').onclick = () => confirmReopenWarning();

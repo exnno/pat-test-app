@@ -72,7 +72,14 @@
 // Sessions list gains Status + Lock filters beside Sort (persisted). Cal-due
 // chip + subtitle read "Due today" on the due date. Page scrollbar hidden
 // visually (scroll still works). New "what's new in V15" welcome modal.
-const CACHE_VERSION = 'pat-v15';
+//
+// v16: Multi Pick — a global, optional feature that logs a preset ordered list
+// of item types as PASS in one tap. Up to 6 named multi-picks, configured on a
+// new Settings → Multi Pick page with a show/hide toggle (off by default). New
+// full-width entry-screen button + bottom sheet, transient "Added N items"
+// toast, multiPick added to backup/restore. New "what's new in V16" welcome
+// modal. About changelog rolled (V16/V15/V14).
+const CACHE_VERSION = 'pat-v16';
 const ASSETS = [
   './',
   './index.html',
