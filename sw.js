@@ -66,7 +66,13 @@
 // list, an unexported-count nudge, and a reopen warning on already-exported
 // sessions. Backup & Restore can clear exported sessions older than a
 // configurable age (default 12 months). New "what's new in V14" welcome modal.
-const CACHE_VERSION = 'pat-v14';
+//
+// v15: the unexported-count nudge is now a tappable button that bulk-exports
+// every not-yet-cleanly-exported session in one share/download action.
+// Sessions list gains Status + Lock filters beside Sort (persisted). Cal-due
+// chip + subtitle read "Due today" on the due date. Page scrollbar hidden
+// visually (scroll still works). New "what's new in V15" welcome modal.
+const CACHE_VERSION = 'pat-v15';
 const ASSETS = [
   './',
   './index.html',

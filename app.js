@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v14 (June 2026)
+ * v15 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v14 ==============
+// ============== PAT Test PWA — v15 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V14';
+const APP_VERSION = 'V15';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -57,7 +57,18 @@ const CAL_CERT_KEY = 'pat:calcert';
 const CAL_DUE_KEY = 'pat:caldue';
 const V12_WELCOME_KEY = 'pat:v12welcome';   // v13: legacy. Not referenced; left documented.
 const V13_WELCOME_KEY = 'pat:v13welcome';   // v14: legacy. Orphaned, harmless.
-const V14_WELCOME_KEY = 'pat:v14welcome';   // v14
+const V14_WELCOME_KEY = 'pat:v14welcome';   // v15: legacy. Orphaned, harmless.
+const V15_WELCOME_KEY = 'pat:v15welcome';   // v15
+
+// v15: Sessions-list filter persistence. Two independent filters that combine
+// (AND) and sit beside the Sort control. Both default to 'all'.
+//   SESSION_FILTER_KEY — export-state filter:
+//       'all' | 'unexported' | 'exported' | 'modified'
+//       ('unexported' here means status === 'none' — never exported; 'modified'
+//        is its own option, distinct from 'unexported'.)
+//   LOCK_FILTER_KEY    — lock-state filter: 'all' | 'unlocked' | 'locked'
+const SESSION_FILTER_KEY = 'pat:sessionfilter';
+const LOCK_FILTER_KEY = 'pat:lockfilter';
 
 // v14: prune-age setting (months). Sessions that are BOTH exported AND older
 // than this many months are surfaced as a prune suggestion inside the storage
@@ -332,6 +343,9 @@ let state = {
   engineer: '',
   descriptions: [],
   sort: 'date_desc',
+  // v15: Sessions-list filters (persisted). Both combine with Sort + each other.
+  sessionFilter: 'all',   // 'all' | 'unexported' | 'exported' | 'modified'
+  lockFilter: 'all',      // 'all' | 'unlocked' | 'locked'
   view: 'sessions',
   cursor: 0,
   form: { assetNo: '', location: '', itemType: '', notes: '', showNotes: false },
@@ -422,9 +436,13 @@ let state = {
   // modal fires once for everyone on update to V13.
   v13WelcomeSeen: false,
 
-  // v14: welcome modal flag (key pat:v14welcome). Gates the V14 "what's new"
-  // modal. v13WelcomeSeen above is retained for load-time completeness only.
+  // v14: welcome modal flag (key pat:v14welcome). v15: retained for load-time
+  // completeness only — no longer gates anything.
   v14WelcomeSeen: false,
+
+  // v15: welcome modal flag (key pat:v15welcome). Gates the V15 "what's new"
+  // modal so v14 users see it once on update.
+  v15WelcomeSeen: false,
 
   // v14: prune-age threshold in months. Sessions that are both exported and
   // older than this are offered for pruning in the storage indicator. Loaded
@@ -534,6 +552,13 @@ function load() {
 
   state.engineer = localStorage.getItem(ENGINEER_KEY) || '';
   state.sort = localStorage.getItem(SORT_KEY) || 'date_desc';
+
+  // v15: load the two Sessions-list filters, validating against known values so
+  // a stale/garbage key can never wedge the list into an impossible state.
+  const sf = localStorage.getItem(SESSION_FILTER_KEY);
+  state.sessionFilter = ['all', 'unexported', 'exported', 'modified'].includes(sf) ? sf : 'all';
+  const lf = localStorage.getItem(LOCK_FILTER_KEY);
+  state.lockFilter = ['all', 'unlocked', 'locked'].includes(lf) ? lf : 'all';
 
   // v7: theme + haptics
   const storedTheme = localStorage.getItem(THEME_KEY);
@@ -646,11 +671,12 @@ function loadV11Settings() {
   state.calCertNo = localStorage.getItem(CAL_CERT_KEY) || '';
   state.calDue = localStorage.getItem(CAL_DUE_KEY) || '';
 
-  // v14: welcome modal flag — key bumped to pat:v14welcome so v13 users see
-  // the v14 modal once on update. v13WelcomeSeen kept loaded for completeness
-  // but no longer gates the modal.
+  // v15: welcome modal flag — key bumped to pat:v15welcome so v14 users see the
+  // v15 modal once on update. v13/v14 flags kept loaded for completeness but no
+  // longer gate the modal.
   state.v13WelcomeSeen = localStorage.getItem(V13_WELCOME_KEY) === '1';
   state.v14WelcomeSeen = localStorage.getItem(V14_WELCOME_KEY) === '1';
+  state.v15WelcomeSeen = localStorage.getItem(V15_WELCOME_KEY) === '1';
 
   // v14: prune-age setting (months). Clamp to a sane 1–120 range; fall back
   // to the default on anything non-numeric.
@@ -694,6 +720,9 @@ function save() {
   localStorage.setItem(ENGINEER_KEY, state.engineer);
   localStorage.setItem(DESCRIPTIONS_KEY, JSON.stringify(state.descriptions));
   localStorage.setItem(SORT_KEY, state.sort);
+  // v15: Sessions-list filters.
+  localStorage.setItem(SESSION_FILTER_KEY, state.sessionFilter);
+  localStorage.setItem(LOCK_FILTER_KEY, state.lockFilter);
   localStorage.setItem(THEME_KEY, state.theme);
   localStorage.setItem(HAPTICS_KEY, state.hapticsEnabled ? '1' : '0');
   // v11
@@ -974,6 +1003,25 @@ function sortedSessions() {
   return [...unlocked, ...locked];
 }
 
+// v15: predicate for the Sessions-list control filters (Status + Lock). The two
+// filters combine with AND. 'all' on either axis matches everything on that
+// axis. Status maps to exportStatus():
+//   'unexported' → status 'none'  (never exported — distinct from 'modified')
+//   'exported'   → status 'exported'
+//   'modified'   → status 'modified'
+// Applied only when not searching (see renderSessionsListAreaHTML).
+function sessionMatchesControlFilters(s) {
+  if (state.sessionFilter !== 'all') {
+    const st = exportStatus(s);
+    if (state.sessionFilter === 'unexported' && st !== 'none') return false;
+    if (state.sessionFilter === 'exported' && st !== 'exported') return false;
+    if (state.sessionFilter === 'modified' && st !== 'modified') return false;
+  }
+  if (state.lockFilter === 'unlocked' && s.locked) return false;
+  if (state.lockFilter === 'locked' && !s.locked) return false;
+  return true;
+}
+
 // v10: Sessions-list search. Two-pass match:
 //   1. Session-level fields (site, name, engineer, formatted date, raw ISO date).
 //   2. Item-level fields (assetNo, location, itemType, notes) within each item.
@@ -1221,6 +1269,65 @@ async function shareOrDownloadCSV(session) {
   downloadCSV(session);
   // v14: a direct download always counts as an export.
   markSessionExported(session);
+  save();
+  render();
+}
+
+// v15: Bulk-export every not-yet-cleanly-exported session (status 'none' or
+// 'modified') in one action, fired from the tappable "N not yet exported"
+// nudge on the Sessions list.
+//
+// Strategy mirrors shareOrDownloadCSV but for many files:
+//   • Preferred path: a single navigator.share with ALL CSVs attached as files.
+//     iOS Safari and modern Android Chrome accept multi-file shares; the user
+//     picks one destination (Mail, Files, AirDrop…) for the whole batch.
+//   • If the platform can't share files (desktop, older mobile) or the file set
+//     is rejected by canShare, fall back to sequential downloads with a small
+//     stagger (some browsers collapse rapid programmatic downloads).
+//
+// Export-mark rule matches single export: on a COMPLETED share or the download
+// fallback, every batched session is marked exported (clears the nudge). On a
+// cancelled share sheet (AbortError / NotAllowedError) NOTHING is marked — the
+// user backed out, so the nudge stays exactly as it was.
+//
+// Per-session CSVs (one file each) are used deliberately rather than one
+// concatenated file: the importer refuses multi-session CSVs, so one-file-per
+// keeps every export round-trippable back through Import.
+async function bulkExportUnexported() {
+  const targets = unexportedSessions();
+  if (targets.length === 0) return;
+  const BOM = '\uFEFF';
+
+  if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && typeof File === 'function') {
+    try {
+      const files = targets.map(s => {
+        const safe = (s.site || s.name || 'session').replace(/[^a-z0-9]+/gi, '_');
+        return new File([BOM + buildCSV(s)], `PAT_${safe}_${s.date}.csv`, { type: 'text/csv' });
+      });
+      if (navigator.canShare({ files })) {
+        await navigator.share({
+          files,
+          title: `PAT export — ${targets.length} session${targets.length === 1 ? '' : 's'}`
+        });
+        // Share completed → mark all batched sessions exported.
+        targets.forEach(markSessionExported);
+        save();
+        render();
+        return;
+      }
+    } catch (err) {
+      // Cancelled share sheet — respect it, mark nothing.
+      if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return;
+      // Anything else → fall through to sequential downloads.
+    }
+  }
+
+  // Fallback: download each CSV in turn, lightly staggered.
+  for (const s of targets) {
+    downloadCSV(s);
+    await new Promise(r => setTimeout(r, 300));
+  }
+  targets.forEach(markSessionExported);
   save();
   render();
 }
@@ -1875,6 +1982,13 @@ function markSessionDirty(sess) {
 // Drives the "N sessions not yet exported" nudge on the Sessions list.
 function unexportedSessionCount() {
   return state.sessions.filter(s => exportStatus(s) !== 'exported').length;
+}
+
+// v15: the actual session objects behind that count (status 'none' or
+// 'modified'), in the current display order so a batch export produces files
+// in a sensible sequence. Drives the tappable bulk-export nudge.
+function unexportedSessions() {
+  return sortedSessions().filter(s => exportStatus(s) !== 'exported');
 }
 
 // v14: sessions eligible for pruning — exported AND older than the configured
@@ -2588,12 +2702,11 @@ function moveCsvColumn(id, delta) {
 }
 
 // v12: dismiss the welcome modal — sets the flag in localStorage so it
-// doesn't reappear, then re-renders to clear it from view. Renamed from
-// dismissV11Welcome and now writes pat:v12welcome so v11 users see the modal
-// once on update.
-function dismissV14Welcome() {
-  state.v14WelcomeSeen = true;
-  localStorage.setItem(V14_WELCOME_KEY, '1');
+// doesn't reappear, then re-renders to clear it from view. v15: writes
+// pat:v15welcome so v14 users see the modal once on update.
+function dismissV15Welcome() {
+  state.v15WelcomeSeen = true;
+  localStorage.setItem(V15_WELCOME_KEY, '1');
   render();
 }
 
@@ -2802,26 +2915,24 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v14: rolled forward — content covers the v14 changes, key bumped to
-  // pat:v14welcome so v13 users see it once on update. Gate now uses
-  // v14WelcomeSeen.
-  const welcomeModal = (state.v14WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // v15: rolled forward — content covers the v15 changes, key bumped to
+  // pat:v15welcome so v14 users see it once on update. Gate uses v15WelcomeSeen.
+  const welcomeModal = (state.v15WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V14">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V15">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V14</h3>
+        <h3 class="bulk-sheet-title">What's new in V15</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Smaller storage footprint.</strong> Your data is now stored more compactly behind the scenes, so you can keep more sessions on the device before hitting the limit. Nothing changes in how you use the app — existing data is upgraded automatically.</li>
-        <li><strong>Export tracking.</strong> The Sessions list now shows a ✓ on sessions you've exported to CSV. If you edit a session after exporting, it changes to "✓✎ Modified since export" so you know to export again.</li>
-        <li><strong>Reopen reminder.</strong> Opening a session you've already exported now reminds you that further changes mean you'll need to export again. (Locked, view-only sessions don't prompt.)</li>
-        <li><strong>Not-yet-exported count.</strong> A small line at the top of the Sessions list tells you how many sessions still need exporting.</li>
-        <li><strong>Old-session clean-up.</strong> Backup &amp; Restore now offers to remove sessions that are exported and older than a set age (default 12 months, adjustable) to reclaim space. You confirm before anything is deleted.</li>
+        <li><strong>Export them all at once.</strong> The "not yet exported" line on the Sessions list is now a button — tap it to share every session that still needs exporting in one go.</li>
+        <li><strong>Filter your sessions.</strong> Alongside Sort, you can now filter the Sessions list by export status (not exported / exported / modified since) and by locked or unlocked.</li>
+        <li><strong>"Due today".</strong> When a calibration date falls on today, the reminder now reads "Due today" instead of "Due in 0 days".</li>
+        <li><strong>Tidier scrolling.</strong> The scrollbar no longer shows on screen, while scrolling works exactly as before.</li>
       </ul>
-      <button class="btn-primary" id="v14-welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v15-welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -2983,33 +3094,70 @@ function renderBackupReminderBanner() {
 // focus + keyboard on iOS).
 function renderSessionsListAreaHTML() {
   const sortedAll = sortedSessions();
-  const filtered = filteredSessions(sortedAll, state.sessionsSearchQuery);
   const queryTrimmed = state.sessionsSearchQuery.trim();
+
+  // v15: control filters (Status + Lock) apply ONLY when not searching — an
+  // active search dominates the list, and the sort/filter controls are hidden
+  // in that mode anyway. When searching, the search runs over the full set.
+  const filtersActive = !queryTrimmed && (state.sessionFilter !== 'all' || state.lockFilter !== 'all');
+  const controlFiltered = queryTrimmed
+    ? sortedAll
+    : sortedAll.filter(sessionMatchesControlFilters);
+  const filtered = filteredSessions(controlFiltered, state.sessionsSearchQuery);
 
   const countHTML = queryTrimmed
     ? `<span class="sessions-search-count">${filtered.length} of ${sortedAll.length} session${sortedAll.length === 1 ? '' : 's'} match</span>`
     : '';
 
-  // v14: "N sessions not yet exported" nudge. Counts sessions whose export
-  // status is 'none' (never exported) or 'modified' (edited since export).
-  // Hidden when there are none, when the list is empty, or while searching
-  // (the search count takes the slot). Purely informational — no action.
-  const unexported = unexportedSessionCount();
-  const nudgeHTML = (!queryTrimmed && sortedAll.length > 0 && unexported > 0)
-    ? `<div class="export-nudge">${unexported} session${unexported === 1 ? '' : 's'} not yet exported</div>`
+  // v15: when a control filter is narrowing the list (and we're not searching),
+  // show an "X of Y shown" line so a filtered list never looks like data loss.
+  const filterCountHTML = (filtersActive && sortedAll.length > 0)
+    ? `<span class="sessions-search-count">${controlFiltered.length} of ${sortedAll.length} session${sortedAll.length === 1 ? '' : 's'} shown</span>`
     : '';
 
-  // Sort control: only show when there's >1 session AND no active search filter
-  // (the search-result subtitle becomes the more useful contextual cue).
-  const sortControl = sortedAll.length > 1 && !queryTrimmed ? `
-    <div class="sort-row">
-      <span class="sort-label">Sort by</span>
-      <select id="sort-select" class="sort-select">
-        <option value="date_desc"${state.sort === 'date_desc' ? ' selected' : ''}>Date (newest)</option>
-        <option value="date_asc"${state.sort === 'date_asc' ? ' selected' : ''}>Date (oldest)</option>
-        <option value="name_asc"${state.sort === 'name_asc' ? ' selected' : ''}>Name (A–Z)</option>
-        <option value="name_desc"${state.sort === 'name_desc' ? ' selected' : ''}>Name (Z–A)</option>
-      </select>
+  // v14/v15: "N sessions not yet exported" nudge — now a tappable control that
+  // bulk-exports every not-yet-cleanly-exported session (status 'none' or
+  // 'modified') in one action. Count is global (independent of the active
+  // filter view). Hidden when there are none, the list is empty, or while
+  // searching (the search count takes the slot).
+  const unexported = unexportedSessionCount();
+  const nudgeHTML = (!queryTrimmed && sortedAll.length > 0 && unexported > 0)
+    ? `<button type="button" class="export-nudge" id="bulk-export-btn" aria-label="Export ${unexported} not-yet-exported session${unexported === 1 ? '' : 's'}">
+        <span class="export-nudge-text">${unexported} session${unexported === 1 ? '' : 's'} not yet exported</span>
+        <span class="export-nudge-cta">${SHARE_ICON_SVG} Export all</span>
+      </button>`
+    : '';
+
+  // Sort + filters: only show when there's >1 session AND no active search
+  // (the search-result subtitle becomes the more useful contextual cue there).
+  const controls = sortedAll.length > 1 && !queryTrimmed ? `
+    <div class="list-controls">
+      <label class="control-field">
+        <span class="control-label">Sort</span>
+        <select id="sort-select" class="sort-select">
+          <option value="date_desc"${state.sort === 'date_desc' ? ' selected' : ''}>Date (newest)</option>
+          <option value="date_asc"${state.sort === 'date_asc' ? ' selected' : ''}>Date (oldest)</option>
+          <option value="name_asc"${state.sort === 'name_asc' ? ' selected' : ''}>Name (A–Z)</option>
+          <option value="name_desc"${state.sort === 'name_desc' ? ' selected' : ''}>Name (Z–A)</option>
+        </select>
+      </label>
+      <label class="control-field">
+        <span class="control-label">Status</span>
+        <select id="status-filter" class="sort-select">
+          <option value="all"${state.sessionFilter === 'all' ? ' selected' : ''}>All</option>
+          <option value="unexported"${state.sessionFilter === 'unexported' ? ' selected' : ''}>Not exported</option>
+          <option value="exported"${state.sessionFilter === 'exported' ? ' selected' : ''}>Exported</option>
+          <option value="modified"${state.sessionFilter === 'modified' ? ' selected' : ''}>Modified since</option>
+        </select>
+      </label>
+      <label class="control-field">
+        <span class="control-label">Lock</span>
+        <select id="lock-filter" class="sort-select">
+          <option value="all"${state.lockFilter === 'all' ? ' selected' : ''}>All</option>
+          <option value="unlocked"${state.lockFilter === 'unlocked' ? ' selected' : ''}>Unlocked</option>
+          <option value="locked"${state.lockFilter === 'locked' ? ' selected' : ''}>Locked</option>
+        </select>
+      </label>
     </div>
   ` : '';
 
@@ -3018,6 +3166,10 @@ function renderSessionsListAreaHTML() {
     list = `<p class="muted">No sessions yet. Create one to start testing.</p>`;
   } else if (queryTrimmed && filtered.length === 0) {
     list = `<p class="muted">No sessions or items match "${escapeHTML(queryTrimmed)}".</p>`;
+  } else if (!queryTrimmed && sortedAll.length > 0 && filtered.length === 0) {
+    // v15: there ARE sessions, but the active filters hid them all.
+    list = `<p class="muted">No sessions match the current filters.</p>
+      <button type="button" class="btn-tertiary" id="clear-filters-btn">Show all sessions</button>`;
   } else {
     list = filtered.map(({ session: s, matchedItemIndex, itemMatchCount }) => {
       const passes = s.items.filter(i => i.result === 'pass').length;
@@ -3055,7 +3207,7 @@ function renderSessionsListAreaHTML() {
     }).join('');
   }
 
-  return `${nudgeHTML}${countHTML}${sortControl}<div>${list}</div>`;
+  return `${nudgeHTML}${countHTML}${filterCountHTML}${controls}<div>${list}</div>`;
 }
 
 // v10: Partial refresh used by the sessions-search oninput. Replaces only
@@ -3554,6 +3706,26 @@ function bindSessionsListAreaEvents() {
     save();
     refreshSessionsListAreaOnly();
   };
+  // v15: Status + Lock filters. Both persist and re-render just the list area.
+  if ($('status-filter')) $('status-filter').onchange = e => {
+    state.sessionFilter = e.target.value;
+    save();
+    refreshSessionsListAreaOnly();
+  };
+  if ($('lock-filter')) $('lock-filter').onchange = e => {
+    state.lockFilter = e.target.value;
+    save();
+    refreshSessionsListAreaOnly();
+  };
+  // v15: reset both filters from the filtered-empty state.
+  if ($('clear-filters-btn')) $('clear-filters-btn').onclick = () => {
+    state.sessionFilter = 'all';
+    state.lockFilter = 'all';
+    save();
+    refreshSessionsListAreaOnly();
+  };
+  // v15: tappable nudge → bulk-export all not-yet-cleanly-exported sessions.
+  if ($('bulk-export-btn')) $('bulk-export-btn').onclick = () => bulkExportUnexported();
   document.querySelectorAll('[data-open]').forEach(el => {
     el.onclick = () => {
       const id = el.dataset.open;
@@ -3665,7 +3837,11 @@ function renderSettingsHub() {
   if (calSt && calSt.status === 'overdue') {
     userSubtitle += ` · Cal overdue (${calSt.days} day${calSt.days === 1 ? '' : 's'})`;
   } else if (calSt && calSt.status === 'soon') {
-    userSubtitle += ` · Cal due in ${calSt.days} day${calSt.days === 1 ? '' : 's'}`;
+    // v15: when the due date is today (days === 0), "due in 0 days" reads
+    // awkwardly — say "due today" instead.
+    userSubtitle += calSt.days === 0
+      ? ' · Cal due today'
+      : ` · Cal due in ${calSt.days} day${calSt.days === 1 ? '' : 's'}`;
   }
 
   const rows = [
@@ -3726,7 +3902,10 @@ function renderSettingsUser() {
   if (calSt && calSt.status === 'overdue') {
     calChip = ` <span class="cal-chip overdue">Overdue · ${calSt.days} day${calSt.days === 1 ? '' : 's'}</span>`;
   } else if (calSt && calSt.status === 'soon') {
-    calChip = ` <span class="cal-chip soon">Due in ${calSt.days} day${calSt.days === 1 ? '' : 's'}</span>`;
+    // v15: "Due today" when the due date is today (days === 0).
+    calChip = calSt.days === 0
+      ? ` <span class="cal-chip soon">Due today</span>`
+      : ` <span class="cal-chip soon">Due in ${calSt.days} day${calSt.days === 1 ? '' : 's'}</span>`;
   }
 
   return `
@@ -4098,18 +4277,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v14: rolled forward — V14 on top, V11 dropped. -->
+      <!-- v8: rolling 3-version changelog. v15: rolled forward — V15 on top, V12 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V15</strong> · June 2026</p>
+        <p class="muted">The "not yet exported" line on the Sessions list is now a button — tap it to share every session that still needs exporting in one action. New filters sit beside Sort: narrow the list by export status (not exported, exported, or modified since export) and by locked or unlocked, with your choices remembered between visits. A calibration date that falls on today now reads "Due today" rather than "Due in 0 days". The on-screen scrollbar is now hidden while scrolling works exactly as before.</p>
 
         <p><strong>V14</strong> · June 2026</p>
         <p class="muted">Your sessions are now stored more compactly behind the scenes, so more data fits on the device before reaching the storage limit — existing data is upgraded automatically with no change to how you work. The Sessions list now marks sessions you've exported to CSV with a ✓, switching to "✓✎ Modified since export" if you edit one afterwards, and shows a count of sessions not yet exported. Opening an already-exported session reminds you that further changes will need re-exporting (locked, view-only sessions don't prompt). Backup &amp; Restore can now clear sessions that are exported and older than a set age (default 12 months, adjustable) to reclaim space, always with confirmation first.</p>
 
         <p><strong>V13</strong> · May 2026</p>
         <p class="muted">Location is now required on every item — saves you ever forgetting one. Test instrument split into separate Manufacturer and Model fields under User Settings; the CSV exports them as a single "Test Instrument" column. Locked sessions automatically sort below unlocked ones on the Sessions list, whichever sort you've chosen. Reopening the app no longer auto-resumes a locked session — you'll land on the Sessions list instead, keeping the resume behaviour only for unlocked (in-progress) work. Stronger "Are you sure?" confirmation when deleting an item.</p>
-
-        <p><strong>V12</strong> · May 2026</p>
-        <p class="muted">Tester type and calibration info (date, certificate, due date) now flow through to CSV exports — four new columns, off by default, switch them on under Settings → CSV Columns. A small chip on User Settings flags when your tester's next calibration is overdue or due within 30 days, with the same status echoed on the Settings hub. When you tap a Sessions-list search result, the matched item now flashes briefly on arrival so you know exactly where you've landed. Item-type autocomplete now floats any description you've already used in the current session to the top of the suggestions.</p>
       </div>
 
       <div class="info-card">
@@ -4613,7 +4792,7 @@ function bindEvents() {
   };
 
   // v11 welcome modal — Continue button dismisses and stamps the flag.
-  if ($('v14-welcome-dismiss')) $('v14-welcome-dismiss').onclick = () => dismissV14Welcome();
+  if ($('v15-welcome-dismiss')) $('v15-welcome-dismiss').onclick = () => dismissV15Welcome();
 
   // v14: reopen-warning modal buttons.
   if ($('reopen-warn-continue')) $('reopen-warn-continue').onclick = () => confirmReopenWarning();

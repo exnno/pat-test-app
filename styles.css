@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA
- * v14 (June 2026)
+ * v15 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -145,6 +145,19 @@ html, body {
   background: var(--bg);
   color: var(--text);
   overscroll-behavior: none;
+  /* v15: hide the page scrollbar visually but keep scrolling fully enabled.
+     This is a cosmetic hide only — no overflow:hidden / 100dvh (that combo was
+     tried in v12 and rolled back because it pushed the PASS/FAIL row off-screen
+     under the keyboard). Firefox uses scrollbar-width; WebKit uses the
+     ::-webkit-scrollbar pseudo-element; old Edge uses -ms-overflow-style. */
+  scrollbar-width: none;        /* Firefox */
+  -ms-overflow-style: none;     /* legacy Edge / IE */
+}
+html::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 0;
+  height: 0;
+  display: none;                /* WebKit (iOS Safari, Chrome) */
 }
 body {
   padding-top: env(safe-area-inset-top);
@@ -322,6 +335,35 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   background: var(--card-bg);
   color: var(--text);
   flex: 1;
+}
+
+/* v15: Sessions-list controls row — Sort + Status + Lock, side by side. Each
+   field is a label stacking a small caption over its select. Wraps on narrow
+   screens so all three stay usable on a phone. */
+.list-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  margin-bottom: 12px;
+  padding: 0 2px;
+}
+.control-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1 1 30%;
+  min-width: 96px;
+}
+.control-label {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.05em;
+}
+.control-field .sort-select {
+  width: 100%;
+  flex: none;
 }
 
 /* Header actions cluster (overview right side) */
@@ -1070,16 +1112,54 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 
 /* v14: "N sessions not yet exported" nudge above the sessions list. */
+/* v14/v15: the "N not yet exported" nudge is now a tappable button that
+   bulk-exports every not-yet-cleanly-exported session. Keeps the amber
+   informational look but reads as a control: full width, text on the left,
+   a share-style CTA on the right. */
 .export-nudge {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
   font-size: 12px;
   font-weight: 600;
   color: var(--warn-soft-text);
   background: var(--warn-soft-bg);
   border: 1px solid var(--warn-soft-border);
   border-radius: 8px;
-  padding: 6px 10px;
+  padding: 8px 10px;
   margin-bottom: 10px;
+  -webkit-appearance: none;
+  appearance: none;
 }
+.export-nudge:active { background: var(--warn-soft-border); }
+.export-nudge-text { flex: 1; }
+.export-nudge-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+  font-weight: 700;
+}
+.export-nudge-cta .share-icon { width: 15px; height: 15px; }
+
+/* v15: standalone tertiary button (used by the "Show all sessions" reset in the
+   filtered-empty state). A more specific rule inside .import-conflict-actions
+   still overrides this where that dialog uses the same class. */
+.btn-tertiary {
+  display: inline-block;
+  padding: 8px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  background: transparent;
+  color: var(--accent);
+  border: none;
+  border-radius: 8px;
+  margin-top: 4px;
+}
+.btn-tertiary:active { background: var(--accent-soft); }
 
 /* v14: prune suggestion inside the storage-usage card on Backup & Restore. */
 .prune-suggestion {
