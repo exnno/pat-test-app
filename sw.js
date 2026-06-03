@@ -59,7 +59,14 @@
 // App no longer auto-resumes a locked session on relaunch — drops to
 // Sessions list instead. Stronger "Are you sure?" confirm on item delete.
 // New "what's new in V13" welcome modal.
-const CACHE_VERSION = 'pat-v13';
+//
+// v14: sessions now stored compressed (key-shortening codec) for a smaller
+// localStorage footprint — legacy v13 data migrates transparently on first
+// save. Per-session CSV export tracking with ✓ / ✓✎ badges on the Sessions
+// list, an unexported-count nudge, and a reopen warning on already-exported
+// sessions. Backup & Restore can clear exported sessions older than a
+// configurable age (default 12 months). New "what's new in V14" welcome modal.
+const CACHE_VERSION = 'pat-v14';
 const ASSETS = [
   './',
   './index.html',

@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v13 (May 2026)
+ * v14 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v13 ==============
+// ============== PAT Test PWA — v14 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V13';
+const APP_VERSION = 'V14';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -56,7 +56,14 @@ const CAL_DATE_KEY = 'pat:caldate';
 const CAL_CERT_KEY = 'pat:calcert';
 const CAL_DUE_KEY = 'pat:caldue';
 const V12_WELCOME_KEY = 'pat:v12welcome';   // v13: legacy. Not referenced; left documented.
-const V13_WELCOME_KEY = 'pat:v13welcome';
+const V13_WELCOME_KEY = 'pat:v13welcome';   // v14: legacy. Orphaned, harmless.
+const V14_WELCOME_KEY = 'pat:v14welcome';   // v14
+
+// v14: prune-age setting (months). Sessions that are BOTH exported AND older
+// than this many months are surfaced as a prune suggestion inside the storage
+// indicator on the Backup & Restore page. User-editable there. Default 12.
+const PRUNE_AGE_KEY = 'pat:pruneagemonths';
+const PRUNE_AGE_DEFAULT = 12;
 
 // v12: calibration status thresholds for the User Settings chip + hub subtitle.
 // CAL_DUE_SOON_DAYS — when the next-due date is within this many days from
@@ -175,6 +182,144 @@ const CALC_LENGTHS = [0.25, 0.5, 0.75, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10,
   31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46, 47, 48, 49, 50,
   51, 52];
 
+// ---------- v14: Storage codec (key-shortening compression) ----------
+// Reduces the on-disk size of state.sessions — by far the largest stored
+// value — by replacing the long, repeated property names on every session
+// and item object with one- or two-character codes before JSON.stringify,
+// and expanding them back on read. With thousands of items, the repeated
+// field names ("location", "assetNo", "itemType"...) are a big chunk of the
+// 5 MB localStorage budget; shortening them typically saves 30–50%.
+//
+// IMPORTANT design choice: this is a TRANSPARENT codec applied ONLY at the
+// save()/load() boundary. The in-memory state.sessions objects keep their
+// full, readable property names everywhere else in the app — render code,
+// CSV export, import, search etc. are all unchanged and never see short
+// keys. That keeps the blast radius tiny and the data debuggable in memory.
+//
+// Backups (buildBackup / restoreBackupFromFile) deliberately stay in the
+// FULL, human-readable long-key format — a backup should be readable and
+// portable, not an opaque compressed blob. Only the localStorage copy is
+// compressed.
+//
+// Format detection: the compressed payload is wrapped as
+//   { _c: 1, s: [ ...short-key sessions... ] }
+// The _c marker (compression version) lets load() tell a compressed blob
+// from a legacy plain array. Anything that isn't this shape is treated as
+// legacy uncompressed data and read as-is, then re-saved compressed on the
+// next save() — a seamless one-way migration with no separate migration
+// step and full backward compatibility with v13 and earlier stored data.
+
+const STORAGE_CODEC_VERSION = 1;
+
+// Session-level field map. Long name → short code.
+// 'items' is handled specially (its array elements are item objects, encoded
+// with ITEM_KEY_MAP). Any session field NOT listed here is passed through
+// unchanged under its original name, so future additions are safe even before
+// they're added to the map (they just won't be compressed until added).
+const SESSION_KEY_MAP = {
+  id:          'i',
+  name:        'n',
+  site:        's',
+  engineer:    'e',
+  prefix:      'p',
+  date:        'd',
+  startNumber: 'sn',
+  locked:      'l',
+  // v14 export-state fields (see below)
+  exportedAt:  'xa',
+  exportDirty: 'xd'
+};
+
+// Item-level field map. Long name → short code.
+const ITEM_KEY_MAP = {
+  id:       'i',
+  assetNo:  'a',
+  location: 'o',
+  itemType: 't',
+  notes:    'm',
+  result:   'r'
+};
+
+// Build the reverse maps once.
+const SESSION_KEY_MAP_REV = Object.fromEntries(
+  Object.entries(SESSION_KEY_MAP).map(([k, v]) => [v, k])
+);
+const ITEM_KEY_MAP_REV = Object.fromEntries(
+  Object.entries(ITEM_KEY_MAP).map(([k, v]) => [v, k])
+);
+
+// Encode one object using a forward map, leaving unmapped keys under their
+// original name. undefined values are dropped (so absent optional fields cost
+// nothing). The 'items' key on sessions is encoded recursively as items.
+function encodeWithMap(obj, map, isSession) {
+  const out = {};
+  for (const key in obj) {
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+    const val = obj[key];
+    if (val === undefined) continue;
+    if (isSession && key === 'items') {
+      out['it'] = Array.isArray(val) ? val.map(encodeItem) : [];
+      continue;
+    }
+    const shortKey = map[key] || key;
+    out[shortKey] = val;
+  }
+  return out;
+}
+
+function decodeWithMap(obj, revMap, isSession) {
+  const out = {};
+  for (const key in obj) {
+    if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+    const val = obj[key];
+    if (isSession && key === 'it') {
+      out['items'] = Array.isArray(val) ? val.map(decodeItem) : [];
+      continue;
+    }
+    const longKey = revMap[key] || key;
+    out[longKey] = val;
+  }
+  return out;
+}
+
+function encodeItem(item)    { return encodeWithMap(item, ITEM_KEY_MAP, false); }
+function decodeItem(item)    { return decodeWithMap(item, ITEM_KEY_MAP_REV, false); }
+function encodeSession(sess) { return encodeWithMap(sess, SESSION_KEY_MAP, true); }
+function decodeSession(sess) { return decodeWithMap(sess, SESSION_KEY_MAP_REV, true); }
+
+// Serialise the sessions array for localStorage in compressed form.
+function serialiseSessions(sessions) {
+  const payload = {
+    _c: STORAGE_CODEC_VERSION,
+    s: sessions.map(encodeSession)
+  };
+  return JSON.stringify(payload);
+}
+
+// Parse a localStorage sessions string. Handles BOTH the new compressed
+// wrapper ({_c:1, s:[...]}) and the legacy plain array (v13 and earlier).
+// Always returns an array of full-key session objects. On any failure,
+// returns an empty array — the same fail-safe behaviour load() had before.
+function parseStoredSessions(raw) {
+  if (!raw) return [];
+  let parsed;
+  try {
+    parsed = JSON.parse(raw);
+  } catch {
+    return [];
+  }
+  // Legacy: a plain array of full-key sessions.
+  if (Array.isArray(parsed)) {
+    return parsed;
+  }
+  // Compressed wrapper.
+  if (parsed && typeof parsed === 'object' && parsed._c && Array.isArray(parsed.s)) {
+    return parsed.s.map(decodeSession);
+  }
+  // Anything else is unrecognised — treat as empty rather than risk a crash.
+  return [];
+}
+
 // ---------- State ----------
 let state = {
   sessions: [],
@@ -277,6 +422,22 @@ let state = {
   // modal fires once for everyone on update to V13.
   v13WelcomeSeen: false,
 
+  // v14: welcome modal flag (key pat:v14welcome). Gates the V14 "what's new"
+  // modal. v13WelcomeSeen above is retained for load-time completeness only.
+  v14WelcomeSeen: false,
+
+  // v14: prune-age threshold in months. Sessions that are both exported and
+  // older than this are offered for pruning in the storage indicator. Loaded
+  // from PRUNE_AGE_KEY; editable on the Backup & Restore page.
+  pruneAgeMonths: PRUNE_AGE_DEFAULT,
+
+  // v14: reopen warning. When the user opens a session that has already been
+  // exported (clean or modified-since), and it's not locked/view-only, we
+  // show a one-shot confirm-style modal warning that further edits mean
+  // re-exporting. Holds the pending session id while the modal is up; null
+  // when no warning is showing.
+  exportWarnSessionId: null,
+
   // v12: Sessions-list search-jump highlight. Set to the cursor index by
   // openSession() when called with an explicit opts.cursor (i.e. the user
   // tapped an item-level search result). Captured + cleared during the next
@@ -304,9 +465,10 @@ let state = {
 
 // ---------- Persistence ----------
 function load() {
-  try {
-    state.sessions = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
-  } catch { state.sessions = []; }
+  // v14: sessions are now stored compressed (key-shortened). parseStoredSessions
+  // transparently handles both the new compressed wrapper and the legacy v13
+  // plain-array format, so old installs migrate seamlessly on the next save().
+  state.sessions = parseStoredSessions(localStorage.getItem(STORAGE_KEY));
   state.activeId = localStorage.getItem(ACTIVE_KEY) || null;
 
   // v9: presets first — migration logic for users coming from v8 or earlier.
@@ -484,9 +646,18 @@ function loadV11Settings() {
   state.calCertNo = localStorage.getItem(CAL_CERT_KEY) || '';
   state.calDue = localStorage.getItem(CAL_DUE_KEY) || '';
 
-  // v13: welcome modal flag — only suppress if explicitly seen. v12 / v12.1
-  // users will see the v13 modal once on update because the key changed.
+  // v14: welcome modal flag — key bumped to pat:v14welcome so v13 users see
+  // the v14 modal once on update. v13WelcomeSeen kept loaded for completeness
+  // but no longer gates the modal.
   state.v13WelcomeSeen = localStorage.getItem(V13_WELCOME_KEY) === '1';
+  state.v14WelcomeSeen = localStorage.getItem(V14_WELCOME_KEY) === '1';
+
+  // v14: prune-age setting (months). Clamp to a sane 1–120 range; fall back
+  // to the default on anything non-numeric.
+  const storedPruneAge = parseInt(localStorage.getItem(PRUNE_AGE_KEY) || '', 10);
+  state.pruneAgeMonths = (Number.isFinite(storedPruneAge) && storedPruneAge >= 1 && storedPruneAge <= 120)
+    ? storedPruneAge
+    : PRUNE_AGE_DEFAULT;
 }
 
 // v11: Ensure state.csvColumns contains every column defined in
@@ -512,7 +683,8 @@ function computeHistoryFromItems() {
 }
 
 function save() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(state.sessions));
+  // v14: sessions stored compressed via the key-shortening codec.
+  localStorage.setItem(STORAGE_KEY, serialiseSessions(state.sessions));
   localStorage.setItem(ACTIVE_KEY, state.activeId || '');
   // v9: legacy ITEMS_KEY no longer written; ITEM_PRESETS_KEY + ACTIVE_PRESET_KEY are
   // the source of truth. Backup/restore still uses the same logic.
@@ -532,6 +704,8 @@ function save() {
   localStorage.setItem(CAL_DATE_KEY, state.calDate);
   localStorage.setItem(CAL_CERT_KEY, state.calCertNo);
   localStorage.setItem(CAL_DUE_KEY, state.calDue);
+  // v14: prune-age setting.
+  localStorage.setItem(PRUNE_AGE_KEY, String(state.pruneAgeMonths));
   // lastBackupAt + backupSnoozedUntil are written via their own helpers
   // (markBackupExported, snoozeBackupReminder) rather than here, because they
   // shouldn't update on every state change.
@@ -1032,15 +1206,23 @@ async function shareOrDownloadCSV(session) {
           title: filename,
           text: `PAT test results: ${session.site || session.name || 'session'}`
         });
+        // v14: share completed → mark this session exported (clears dirty).
+        markSessionExported(session);
+        save();
+        render();
         return;
       }
     } catch (err) {
-      // User dismissed the share sheet — respect that, no download.
+      // User dismissed the share sheet — respect that, no download, no export mark.
       if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return;
       // Anything else (e.g. partial support, permission glitch) → fall through to download.
     }
   }
   downloadCSV(session);
+  // v14: a direct download always counts as an export.
+  markSessionExported(session);
+  save();
+  render();
 }
 
 // ---------- v10: CSV Import ----------
@@ -1374,6 +1556,7 @@ function commitImportedSession(incoming, mode, skipped) {
       // Re-id incoming items to avoid any collision and append.
       const newItems = incoming.items.map(it => ({ ...it, id: uid() }));
       target.items = (target.items || []).concat(newItems);
+      markSessionDirty(target);   // v14: merge invalidates a prior export
       mergedInto = target;
       sessionName = target.site || target.name;
     } else {
@@ -1648,6 +1831,108 @@ function formatBytes(b) {
   return `${(b / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+// ---------- v14: Session export-state ----------
+// Each session can carry two optional fields:
+//   exportedAt   — ISO timestamp of the last successful CSV export of THIS
+//                  session. Absent/empty → never exported.
+//   exportDirty  — true when the session has been edited since that export.
+//                  Only meaningful when exportedAt is set.
+//
+// Derived status (exportStatus) is one of:
+//   'none'     — never exported (no badge)
+//   'exported' — exported and unchanged since (✓ badge)
+//   'modified' — exported, then edited (✓✎ badge)
+//
+// Only the per-session CSV export sets exportedAt (backup JSON does NOT).
+// Any change to a session's items (pass/fail, copy-last, edit, delete, bulk
+// edit, import-merge) flips exportDirty true via markSessionDirty().
+
+function exportStatus(sess) {
+  if (!sess || !sess.exportedAt) return 'none';
+  return sess.exportDirty ? 'modified' : 'exported';
+}
+
+// Mark a session exported "now" and clear the dirty flag. Called after a
+// successful CSV export only. Does NOT call save()/render() itself — the
+// caller decides, since the export path is async.
+function markSessionExported(sess) {
+  if (!sess) return;
+  sess.exportedAt = new Date().toISOString();
+  sess.exportDirty = false;
+}
+
+// Flag a session as edited-since-export. No-op if it was never exported
+// (nothing to invalidate) or already marked dirty. Returns true if it
+// actually changed something, so callers can decide whether to re-save.
+function markSessionDirty(sess) {
+  if (!sess || !sess.exportedAt) return false;
+  if (sess.exportDirty) return false;
+  sess.exportDirty = true;
+  return true;
+}
+
+// Count sessions not in a clean 'exported' state (i.e. 'none' or 'modified').
+// Drives the "N sessions not yet exported" nudge on the Sessions list.
+function unexportedSessionCount() {
+  return state.sessions.filter(s => exportStatus(s) !== 'exported').length;
+}
+
+// v14: sessions eligible for pruning — exported AND older than the configured
+// age threshold. Age is measured from the session date (YYYY-MM-DD). Returns
+// the matching session objects (newest first by date) for the prune dialog.
+function prunableSessions() {
+  const cutoff = new Date();
+  cutoff.setMonth(cutoff.getMonth() - (state.pruneAgeMonths || PRUNE_AGE_DEFAULT));
+  const cutoffISO = cutoff.toISOString().slice(0, 10);
+  return state.sessions
+    .filter(s => exportStatus(s) === 'exported' && (s.date || '') !== '' && s.date < cutoffISO)
+    .sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+}
+
+// v14: save a new prune-age threshold from the Backup & Restore page input.
+function savePruneAge() {
+  const el = document.getElementById('prune-age-input');
+  if (!el) return;
+  const n = parseInt(el.value, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 120) {
+    alert('Enter a whole number of months between 1 and 120.');
+    return;
+  }
+  state.pruneAgeMonths = n;
+  save();
+  render();
+}
+
+// v14: confirm and clear the prunable sessions (exported + older than the
+// threshold). Lists count + total items in the confirm so the user knows
+// exactly what's going. Active session is never among them (it can't be both
+// exported-clean and the one being edited without the export having happened
+// after the last edit — but we still guard by skipping state.activeId to be
+// safe). Deletion is permanent; we strongly word the confirm.
+function pruneOldSessions() {
+  const targets = prunableSessions().filter(s => s.id !== state.activeId);
+  if (targets.length === 0) {
+    alert('Nothing to clear.');
+    return;
+  }
+  const itemTotal = targets.reduce((n, s) => n + (s.items ? s.items.length : 0), 0);
+  const names = targets.slice(0, 8).map(s => `• ${s.site || s.name} (${formatDate(s.date)})`).join('\n');
+  const more = targets.length > 8 ? `\n…and ${targets.length - 8} more` : '';
+  const ok = confirm(
+    `Clear ${targets.length} exported session${targets.length === 1 ? '' : 's'} ` +
+    `(${itemTotal} item${itemTotal === 1 ? '' : 's'} in total)?\n\n` +
+    `${names}${more}\n\n` +
+    `These have all been exported to CSV and are older than ${state.pruneAgeMonths} month${state.pruneAgeMonths === 1 ? '' : 's'}. ` +
+    `This permanently removes them from this device and cannot be undone.\n\nContinue?`
+  );
+  if (!ok) return;
+  const ids = new Set(targets.map(s => s.id));
+  state.sessions = state.sessions.filter(s => !ids.has(s.id));
+  save();
+  render();
+  setTimeout(() => alert(`Cleared ${targets.length} session${targets.length === 1 ? '' : 's'}.`), 50);
+}
+
 // ---------- Form helpers ----------
 function loadFormForCursor() {
   const sess = activeSession();
@@ -1750,6 +2035,46 @@ function openSession(id, opts) {
   save(); render();
 }
 
+// v14: Reopen-warning gatekeeper. Sessions-list taps route through here rather
+// than calling openSession() directly. If the session has been exported
+// (clean or modified-since) AND is NOT locked, we show a one-shot warning
+// that editing means re-exporting, and defer the actual open until the user
+// taps Continue. Locked / view-only sessions, and never-exported sessions,
+// open immediately with no warning.
+//
+// pendingOpts is stashed on state so the modal's Continue handler can pass the
+// original opts (e.g. a search-jump cursor) through to openSession unchanged.
+let pendingOpenOpts = null;
+function requestOpenSession(id, opts) {
+  const s = state.sessions.find(x => x.id === id);
+  if (!s) return;
+  const warrantsWarning = !s.locked && exportStatus(s) !== 'none';
+  if (warrantsWarning) {
+    state.exportWarnSessionId = id;
+    pendingOpenOpts = opts || null;
+    render();
+    return;
+  }
+  openSession(id, opts);
+}
+
+// Confirm the reopen warning → proceed to open the session.
+function confirmReopenWarning() {
+  const id = state.exportWarnSessionId;
+  const opts = pendingOpenOpts;
+  state.exportWarnSessionId = null;
+  pendingOpenOpts = null;
+  if (id) openSession(id, opts);
+  else render();
+}
+
+// Cancel the reopen warning → stay on the Sessions list.
+function cancelReopenWarning() {
+  state.exportWarnSessionId = null;
+  pendingOpenOpts = null;
+  render();
+}
+
 function deleteSession(id) {
   state.sessions = state.sessions.filter(s => s.id !== id);
   if (id === state.activeId) {
@@ -1778,6 +2103,7 @@ function saveItem(result) {
   } else {
     sess.items.push({ id: uid(), ...item });
   }
+  markSessionDirty(sess);   // v14: edits invalidate a prior export
   addDescriptionIfNew(cleanType);
   state.cursor++;
   loadFormForCursor();
@@ -1850,6 +2176,7 @@ function copyLastResult() {
   } else {
     sess.items.push({ id: uid(), ...item });
   }
+  markSessionDirty(sess);   // v14
   state.cursor++;
   loadFormForCursor();
   save(); render();
@@ -1859,6 +2186,7 @@ function deleteItem(idx) {
   const sess = activeSession();
   if (!sess) return;
   sess.items.splice(idx, 1);
+  markSessionDirty(sess);   // v14
   state.cursor = Math.min(state.cursor, sess.items.length);
   // If we were in selection mode, indices may have shifted — clean up.
   if (state.selectionMode) {
@@ -1986,6 +2314,7 @@ function applyBulkLocation() {
       count++;
     }
   });
+  markSessionDirty(sess);   // v14
   exitSelectionMode();
   save();
   render();
@@ -2057,6 +2386,7 @@ function applyBulkType() {
       count++;
     }
   });
+  markSessionDirty(sess);   // v14
   // Feed the autocomplete so future entries get it.
   addDescriptionIfNew(newType);
   exitSelectionMode();
@@ -2088,6 +2418,7 @@ function applyBulkNotes() {
     }
     count++;
   });
+  markSessionDirty(sess);   // v14
   exitSelectionMode();
   save();
   render();
@@ -2106,6 +2437,7 @@ function applyBulkDelete() {
   indices.forEach(i => {
     if (sess.items[i]) sess.items.splice(i, 1);
   });
+  markSessionDirty(sess);   // v14
   // If the cursor was past the new end, pull it back.
   if (state.cursor > sess.items.length) state.cursor = sess.items.length;
   exitSelectionMode();
@@ -2259,9 +2591,9 @@ function moveCsvColumn(id, delta) {
 // doesn't reappear, then re-renders to clear it from view. Renamed from
 // dismissV11Welcome and now writes pat:v12welcome so v11 users see the modal
 // once on update.
-function dismissV13Welcome() {
-  state.v13WelcomeSeen = true;
-  localStorage.setItem(V13_WELCOME_KEY, '1');
+function dismissV14Welcome() {
+  state.v14WelcomeSeen = true;
+  localStorage.setItem(V14_WELCOME_KEY, '1');
   render();
 }
 
@@ -2466,35 +2798,64 @@ function render() {
     </div>
   ` : '';
 
-  // v12: one-time "what's new" modal on first launch after the v12 update.
+  // v12: one-time "what's new" modal on first launch after an update.
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
-  // already dismissed this modal. Brand-new installs also see it on first
-  // launch — slightly odd phrasing ("what's new") but the content is just
-  // a feature intro so it works fine as a first-run overview.
-  // v13: rolled forward — content covers the v13 changes, key bumped to
-  // pat:v13welcome so v12 / v12.1 users see it once on update.
-  const welcomeModal = (state.v13WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // already dismissed this modal.
+  // v14: rolled forward — content covers the v14 changes, key bumped to
+  // pat:v14welcome so v13 users see it once on update. Gate now uses
+  // v14WelcomeSeen.
+  const welcomeModal = (state.v14WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V13">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V14">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V13</h3>
+        <h3 class="bulk-sheet-title">What's new in V14</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Location is now required.</strong> Every item needs a location before it can be saved. Locations carry forward from the previous item, so you'll usually only type it once per area.</li>
-        <li><strong>Test instrument split.</strong> User Settings now has separate Manufacturer and Model fields. If you had a value here before, it's been moved into the Model field — open User Settings and split it across the two if you like. The CSV column combines them and is now called "Test Instrument".</li>
-        <li><strong>Locked sessions move to the bottom.</strong> The Sessions list now keeps your locked (finished) sessions below the unlocked ones, whichever sort you've picked. Active work stays at the top.</li>
-        <li><strong>Locked sessions don't auto-resume.</strong> When you reopen the app, you'll only land back in a session if it's still unlocked. Locked sessions drop you on the Sessions list — tap one if you need to view it.</li>
-        <li><strong>Stronger delete confirm.</strong> Deleting an item now asks "Are you sure?" rather than the old quick prompt, so a stray tap can't lose an entry.</li>
+        <li><strong>Smaller storage footprint.</strong> Your data is now stored more compactly behind the scenes, so you can keep more sessions on the device before hitting the limit. Nothing changes in how you use the app — existing data is upgraded automatically.</li>
+        <li><strong>Export tracking.</strong> The Sessions list now shows a ✓ on sessions you've exported to CSV. If you edit a session after exporting, it changes to "✓✎ Modified since export" so you know to export again.</li>
+        <li><strong>Reopen reminder.</strong> Opening a session you've already exported now reminds you that further changes mean you'll need to export again. (Locked, view-only sessions don't prompt.)</li>
+        <li><strong>Not-yet-exported count.</strong> A small line at the top of the Sessions list tells you how many sessions still need exporting.</li>
+        <li><strong>Old-session clean-up.</strong> Backup &amp; Restore now offers to remove sessions that are exported and older than a set age (default 12 months, adjustable) to reclaim space. You confirm before anything is deleted.</li>
       </ul>
-      <button class="btn-primary" id="v13-welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v14-welcome-dismiss">Continue</button>
     </div>
   `;
 
-  app.innerHTML = banner + html + migrationModal + welcomeModal;
+  // v14: reopen warning modal — shown when the user taps an exported (clean or
+  // modified) unlocked session on the Sessions list. Warns that editing means
+  // re-exporting. Continue proceeds to open; Cancel stays on the list.
+  let reopenWarnModal = '';
+  if (state.exportWarnSessionId) {
+    const ws = state.sessions.find(x => x.id === state.exportWarnSessionId);
+    if (ws) {
+      const wasModified = exportStatus(ws) === 'modified';
+      const line = wasModified
+        ? "You've already exported this session, and it's been edited since. If you make further changes you'll need to export it again."
+        : "You've already exported this session. If you make changes you'll need to export it again.";
+      reopenWarnModal = `
+        <div class="modal-backdrop" style="z-index:300"></div>
+        <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Already exported">
+          <div class="bulk-sheet-handle"></div>
+          <div class="bulk-sheet-header">
+            <span class="fail-close-spacer"></span>
+            <h3 class="bulk-sheet-title">Already exported</h3>
+            <button class="fail-close-btn" id="reopen-warn-cancel" aria-label="Cancel">×</button>
+          </div>
+          <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text)">${escapeHTML(line)}</p>
+          <div class="btn-row">
+            <button class="btn-secondary" id="reopen-warn-cancel2">Cancel</button>
+            <button class="btn-primary" id="reopen-warn-continue">Open anyway</button>
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  app.innerHTML = banner + html + migrationModal + welcomeModal + reopenWarnModal;
   // Toggle body class for selection bar spacing
   if (state.view === 'overview' && state.selectionMode) {
     document.body.classList.add('has-selection-bar');
@@ -2629,6 +2990,15 @@ function renderSessionsListAreaHTML() {
     ? `<span class="sessions-search-count">${filtered.length} of ${sortedAll.length} session${sortedAll.length === 1 ? '' : 's'} match</span>`
     : '';
 
+  // v14: "N sessions not yet exported" nudge. Counts sessions whose export
+  // status is 'none' (never exported) or 'modified' (edited since export).
+  // Hidden when there are none, when the list is empty, or while searching
+  // (the search count takes the slot). Purely informational — no action.
+  const unexported = unexportedSessionCount();
+  const nudgeHTML = (!queryTrimmed && sortedAll.length > 0 && unexported > 0)
+    ? `<div class="export-nudge">${unexported} session${unexported === 1 ? '' : 's'} not yet exported</div>`
+    : '';
+
   // Sort control: only show when there's >1 session AND no active search filter
   // (the search-result subtitle becomes the more useful contextual cue).
   const sortControl = sortedAll.length > 1 && !queryTrimmed ? `
@@ -2654,6 +3024,14 @@ function renderSessionsListAreaHTML() {
       const fails = s.items.filter(i => i.result === 'fail').length;
       // v8: subtle 🔒 prefix on locked sessions so they're easy to spot in the list.
       const lockMark = s.locked ? '<span class="session-lock" title="Locked">🔒</span>' : '';
+      // v14: export-status badge in the meta row. 'exported' → ✓ Exported;
+      // 'modified' → ✓✎ Modified since export; 'none' → no badge.
+      const xStatus = exportStatus(s);
+      const exportBadge = xStatus === 'exported'
+        ? '<span class="export-badge exported" title="Exported">✓ Exported</span>'
+        : (xStatus === 'modified'
+            ? '<span class="export-badge modified" title="Edited since last export">✓✎ Modified since export</span>'
+            : '');
       // v10: when the query only hit item-level fields, show how many items matched
       // and (via data-open-at) jump straight to the first match.
       const itemBadge = matchedItemIndex !== -1
@@ -2667,6 +3045,7 @@ function renderSessionsListAreaHTML() {
           <div class="session-info" ${openAttr}>
             <div class="session-title">${lockMark}${escapeHTML(s.site || s.name)}</div>
             <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span></div>
+            ${exportBadge ? `<div class="session-export-row">${exportBadge}</div>` : ''}
             ${itemBadge}
           </div>
           <button class="icon-btn-sm" data-export="${s.id}" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
@@ -2676,7 +3055,7 @@ function renderSessionsListAreaHTML() {
     }).join('');
   }
 
-  return `${countHTML}${sortControl}<div>${list}</div>`;
+  return `${nudgeHTML}${countHTML}${sortControl}<div>${list}</div>`;
 }
 
 // v10: Partial refresh used by the sessions-search oninput. Replaces only
@@ -3183,9 +3562,9 @@ function bindSessionsListAreaEvents() {
       // position at end-of-list.
       if (el.dataset.openAt !== undefined && el.dataset.openAt !== '') {
         const idx = parseInt(el.dataset.openAt, 10);
-        openSession(id, { cursor: idx });
+        requestOpenSession(id, { cursor: idx });   // v14: warning gatekeeper
       } else {
-        openSession(id);
+        requestOpenSession(id);                     // v14: warning gatekeeper
       }
     };
   });
@@ -3535,6 +3914,15 @@ function renderSettingsDisplay() {
 function renderSettingsBackup() {
   const stats = getStorageStats();
   const barClass = stats.pct >= 90 ? 'danger' : (stats.pct >= 70 ? 'warn' : '');
+  // v14: prune suggestion — sessions exported AND older than the threshold.
+  const prunable = prunableSessions();
+  const ageMonths = state.pruneAgeMonths || PRUNE_AGE_DEFAULT;
+  const pruneBlock = prunable.length > 0 ? `
+          <div class="prune-suggestion">
+            <p class="prune-suggestion-text">${prunable.length} exported session${prunable.length === 1 ? '' : 's'} older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} can be cleared to free space.</p>
+            <button class="backup-action-btn" id="prune-review-btn">Review &amp; clear…</button>
+          </div>
+  ` : `<p class="muted" style="margin-top:10px;font-size:12px">No exported sessions older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} to clear right now.</p>`;
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Backup & Restore')}
@@ -3560,6 +3948,17 @@ function renderSettingsBackup() {
           <div class="storage-stat"><span class="storage-stat-label">Approx. limit</span><span class="storage-stat-value">~5 MB</span></div>
           <div class="storage-bar-wrap"><div class="storage-bar ${barClass}" style="width:${stats.pct}%"></div></div>
           <p class="muted" style="margin-top:10px;font-size:12px">Browsers cap local data at around 5 MB. Export a backup and clear old sessions before you get close to the limit.</p>
+          ${pruneBlock}
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Clear-old-sessions age</h2>
+        <p class="muted">When a session has been exported and is older than this, it'll be offered for clearing above. Nothing is ever deleted without your confirmation.</p>
+        <label class="label">Age in months</label>
+        <input class="input" id="prune-age-input" type="number" inputmode="numeric" min="1" max="120" value="${ageMonths}">
+        <div class="btn-row">
+          <button class="btn-primary" id="prune-age-save">Save</button>
         </div>
       </div>
     </div>
@@ -3699,18 +4098,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v13: rolled forward — V13 on top, V10 dropped. -->
+      <!-- v8: rolling 3-version changelog. v14: rolled forward — V14 on top, V11 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V14</strong> · June 2026</p>
+        <p class="muted">Your sessions are now stored more compactly behind the scenes, so more data fits on the device before reaching the storage limit — existing data is upgraded automatically with no change to how you work. The Sessions list now marks sessions you've exported to CSV with a ✓, switching to "✓✎ Modified since export" if you edit one afterwards, and shows a count of sessions not yet exported. Opening an already-exported session reminds you that further changes will need re-exporting (locked, view-only sessions don't prompt). Backup &amp; Restore can now clear sessions that are exported and older than a set age (default 12 months, adjustable) to reclaim space, always with confirmation first.</p>
 
         <p><strong>V13</strong> · May 2026</p>
         <p class="muted">Location is now required on every item — saves you ever forgetting one. Test instrument split into separate Manufacturer and Model fields under User Settings; the CSV exports them as a single "Test Instrument" column. Locked sessions automatically sort below unlocked ones on the Sessions list, whichever sort you've chosen. Reopening the app no longer auto-resumes a locked session — you'll land on the Sessions list instead, keeping the resume behaviour only for unlocked (in-progress) work. Stronger "Are you sure?" confirmation when deleting an item.</p>
 
         <p><strong>V12</strong> · May 2026</p>
         <p class="muted">Tester type and calibration info (date, certificate, due date) now flow through to CSV exports — four new columns, off by default, switch them on under Settings → CSV Columns. A small chip on User Settings flags when your tester's next calibration is overdue or due within 30 days, with the same status echoed on the Settings hub. When you tap a Sessions-list search result, the matched item now flashes briefly on arrival so you know exactly where you've landed. Item-type autocomplete now floats any description you've already used in the current session to the top of the suggestions.</p>
-
-        <p><strong>V11</strong> · May 2026</p>
-        <p class="muted">Backup-reminder banner on the Sessions list when it's been more than 7 days since your last JSON backup — "Export now" or "Remind me later". New CSV Columns settings page lets you reorder, hide, or rename any column on the exported CSV (the in-app screens are unchanged). Bulk-edit menu in selection mode now offers Location, Type, Notes (replace or append), or Delete on the items you've ticked. User Settings has new fields for tester type and calibration info (last cal date, certificate number, next due). CSV results now read "Passed" or "Failed" rather than "Pass" / "Fail".</p>
       </div>
 
       <div class="info-card">
@@ -4163,6 +4562,9 @@ function bindEvents() {
 
   // Backup & Restore
   if ($('backup-export-btn')) $('backup-export-btn').onclick = () => downloadBackup();
+  // v14: prune controls on the Backup & Restore page.
+  if ($('prune-review-btn')) $('prune-review-btn').onclick = () => pruneOldSessions();
+  if ($('prune-age-save')) $('prune-age-save').onclick = () => savePruneAge();
   if ($('backup-import-btn')) $('backup-import-btn').onclick = () => $('backup-import-file').click();
   if ($('backup-import-file')) $('backup-import-file').onchange = e => {
     const file = e.target.files && e.target.files[0];
@@ -4211,7 +4613,12 @@ function bindEvents() {
   };
 
   // v11 welcome modal — Continue button dismisses and stamps the flag.
-  if ($('v13-welcome-dismiss')) $('v13-welcome-dismiss').onclick = () => dismissV13Welcome();
+  if ($('v14-welcome-dismiss')) $('v14-welcome-dismiss').onclick = () => dismissV14Welcome();
+
+  // v14: reopen-warning modal buttons.
+  if ($('reopen-warn-continue')) $('reopen-warn-continue').onclick = () => confirmReopenWarning();
+  if ($('reopen-warn-cancel')) $('reopen-warn-cancel').onclick = () => cancelReopenWarning();
+  if ($('reopen-warn-cancel2')) $('reopen-warn-cancel2').onclick = () => cancelReopenWarning();
 
   // CSV Columns settings page
   if ($('settings-csv-save')) $('settings-csv-save').onclick = () => saveCsvColumnsSettings();

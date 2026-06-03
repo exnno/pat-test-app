@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA
- * v13 (May 2026)
+ * v14 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -1046,6 +1046,54 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   border-radius: 10px;
   border: 1px solid var(--accent-border);
 }
+
+/* v14: per-session export-status badge in the Sessions list. Green ✓ for a
+   clean export, amber ✓✎ when edited since the last export. */
+.session-export-row { margin-top: 4px; }
+.export-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.export-badge.exported {
+  background: var(--pass);
+  color: #fff;
+  border-color: var(--pass-shadow);
+}
+.export-badge.modified {
+  background: var(--warn-soft-bg);
+  color: var(--warn-soft-text);
+  border-color: var(--warn-soft-border);
+}
+
+/* v14: "N sessions not yet exported" nudge above the sessions list. */
+.export-nudge {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--warn-soft-text);
+  background: var(--warn-soft-bg);
+  border: 1px solid var(--warn-soft-border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin-bottom: 10px;
+}
+
+/* v14: prune suggestion inside the storage-usage card on Backup & Restore. */
+.prune-suggestion {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, #e5e7eb);
+}
+.prune-suggestion-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+  margin: 0 0 8px;
+}
+.prune-suggestion .backup-action-btn { margin-bottom: 0; }
 
 /* v10: Sessions list row of action buttons — currently New + Import. Stack as
    a two-column row when both are visible; New full-width when alone. */
