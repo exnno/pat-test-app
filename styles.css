@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA
- * v17.1 (June 2026)
+ * v17.2 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -1638,49 +1638,22 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
    render() is defensive cleanup only. */
 
 /* ===== v17: action feedback flash (overlay) =====
-   Channel 2 of the v17 feedback engine (see app.js). When a Pass / Fail / Copy
-   / Multi Pick button is tapped, JS reads the button's screen rectangle and
-   spawns a .flash-overlay element on <body>, positioned over the button, which
-   pulses a coloured ring and self-removes. This is the always-on visual
-   confirmation that replaces the iOS haptic Apple disabled in 26.5 — no API, no
-   permission, no sound.
+   Channel 2 of the v17 feedback engine (see app.js). On a Pass / Fail / Copy /
+   Multi Pick tap, JS reads the button's rectangle and spawns a .flash-overlay
+   <div> on <body>, fully positioned + tinted + transitioned via INLINE styles,
+   then flips opacity/transform on the next frame so it fades out over the
+   button. It lives outside #app (like the toast) so the immediate re-render
+   (saveItem/render) can't destroy it before it plays.
 
-   v17.1 fix: the original version added a class to the button itself, but the
-   click handlers re-render #app immediately (saveItem/render), destroying the
-   button before the animation could play — so nothing was ever visible. The
-   overlay lives OUTSIDE #app (like the toast), so the re-render can't touch it.
-
-   The overlay is purely decorative and must never intercept taps. position:fixed
-   uses the same viewport coordinates getBoundingClientRect returns. JS sets
-   left/top/width/height/border-radius inline to match the button.
-
-   --flash-pass-ring / --flash-neutral-ring are theme-tokenised above. */
+   Everything visual is set inline in JS (v17.1b) — colour, geometry, and the
+   transition itself — because:
+     - the earlier box-shadow + CSS-variable @keyframes silently failed to start
+       on iOS Safari for a freshly inserted fixed node (no flash ever showed);
+     - an inline initial state (opacity:1) would beat any class-based end state,
+       so the end state must also be inline to actually transition.
+   This rule is just a documented fallback / non-inline safety net. */
 .flash-overlay {
-  position: fixed;
-  z-index: 400;               /* above the fail modal backdrop (300) */
-  pointer-events: none;       /* never swallow a tap */
-  box-sizing: border-box;
-  background: transparent;
-  animation: actionFlash 0.34s ease-out forwards;
-}
-.flash-overlay.flash-pass    { --flash-ring: var(--flash-pass-ring); }
-.flash-overlay.flash-neutral { --flash-ring: var(--flash-neutral-ring); }
-@keyframes actionFlash {
-  0% {
-    box-shadow: 0 0 0 0 var(--flash-ring);
-    background: var(--flash-ring);
-    opacity: 1;
-  }
-  55% {
-    box-shadow: 0 0 0 7px transparent;
-    background: transparent;
-    opacity: 1;
-  }
-  100% {
-    box-shadow: 0 0 0 9px transparent;
-    background: transparent;
-    opacity: 0;
-  }
+  pointer-events: none;
 }
 
 /* ===== v17: item timestamp in the overview =====

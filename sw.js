@@ -104,9 +104,16 @@
 // button, but the click handlers re-render #app immediately (saveItem/render),
 // destroying the button before the CSS animation could play — so no flash was
 // ever visible. Reworked the flash into a body-level overlay (like the toast)
-// that's positioned over the button and survives the re-render. Cache bumped to
-// pat-v17-1 so the fix reaches any device that already pulled v17.
-const CACHE_VERSION = 'pat-v17-1';
+// that's positioned over the button and survives the re-render.
+//
+// v17.2: the v17.1 overlay still didn't show on iOS Safari — a box-shadow +
+// CSS-variable @keyframes animation on a freshly inserted fixed node silently
+// failed to start on WebKit. Reworked again: the overlay's colour, geometry and
+// transition are now all set INLINE in JS, with a forced reflow + next-frame
+// opacity/transform flip (a plain fade+scale, which WebKit renders reliably).
+// Confirmed the haptic/sound/timestamp features were unaffected throughout.
+// Cache bumped to pat-v17-2 so the fix reaches devices already on v17 / v17.1.
+const CACHE_VERSION = 'pat-v17-2';
 const ASSETS = [
   './',
   './index.html',

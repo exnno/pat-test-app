@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v17.1 (June 2026)
+ * v17.2 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v17.1 ==============
+// ============== PAT Test PWA — v17.2 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V17.1';
+const APP_VERSION = 'V17.2';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -1398,43 +1398,82 @@ function haptic(count) {
   if (count >= 3) setTimeout(_hapticOnce, 240);
 }
 
-// Channel 2: visual flash. v17.1 fix — the original implementation added a CSS
-// class to the tapped button, but the click handlers re-render #app
-// (saveItem/render) immediately afterwards, which destroys that button before
-// the animation can play a single frame, so no flash was ever visible.
-//
-// The robust fix mirrors the toast pattern: we read the button's screen
-// rectangle BEFORE the re-render, then spawn a position:fixed overlay on
-// <body> (outside #app) sized to cover the button. The overlay animates and
-// removes itself. Because it lives outside #app and isn't one of the swept
-// selectors in render(), the re-render can't touch it — the pulse plays in
-// full regardless of what the action does to the screen. This also handles the
-// cases where the button genuinely disappears (fail opens a modal; multipick
-// closes the sheet), since the overlay is independent of the button's lifetime.
+// Channel 2: visual flash. v17.1 spawned a body-level overlay (so the #app
+// re-render can't destroy it — see below), but on iOS Safari the animation
+// often didn't start: (a) an animation declared on a freshly-inserted node
+// doesn't reliably fire without a forced reflow, and (b) relying on a CSS
+// custom property resolving inside the keyframe is fragile. v17.1b fixes both:
+//   - the tint colour is baked in as an inline background (no var() timing risk)
+//   - the element is inserted, layout is flushed (reflow), THEN the animating
+//     class is added on the next frame, which guarantees the keyframe runs
+//   - the animation is a simple opacity + scale fade of a solid tinted box,
+//     which WebKit renders reliably on a freshly inserted fixed element (far
+//     more dependable than animating box-shadow spread).
+// Still mirrors the toast pattern: appended to <body>, outside #app, so the
+// immediate re-render (saveItem/render) leaves it alone.
 const FLASH_MS = 340;
+// Solid tint colours, baked inline so there's no CSS-variable resolution timing
+// to depend on. Pass = green, everything else = neutral grey.
+const FLASH_TINT = {
+  pass:    'rgba(22, 163, 74, 0.55)',
+  neutral: 'rgba(107, 114, 128, 0.45)'
+};
 function flashEl(elId, kind) {
   if (!elId) return;
   const el = document.getElementById(elId);
   if (!el) return;
   let rect;
   try { rect = el.getBoundingClientRect(); } catch { return; }
-  // Guard against a zero-size / off-screen target.
   if (!rect || rect.width < 1 || rect.height < 1) return;
-  const overlay = document.createElement('div');
-  overlay.className = 'flash-overlay ' + (kind === 'pass' ? 'flash-pass' : 'flash-neutral');
-  // Match the button's rounded corners so the ring traces its shape.
+
+  // Corner radius to trace the button shape.
   let radius = '12px';
   try {
     const cs = window.getComputedStyle(el);
     if (cs && cs.borderTopLeftRadius) radius = cs.borderTopLeftRadius;
   } catch {}
-  overlay.style.left = rect.left + 'px';
-  overlay.style.top = rect.top + 'px';
-  overlay.style.width = rect.width + 'px';
-  overlay.style.height = rect.height + 'px';
-  overlay.style.borderRadius = radius;
+
+  const overlay = document.createElement('div');
+  overlay.className = 'flash-overlay';
+  const tint = (kind === 'pass') ? FLASH_TINT.pass : FLASH_TINT.neutral;
+  // All positioning + colour inline so nothing depends on the stylesheet having
+  // loaded a variable or a keyframe colour. The .flash-overlay class only needs
+  // to provide position:fixed, pointer-events:none, and the animation hook.
+  overlay.style.cssText =
+    'position:fixed;' +
+    'left:' + rect.left + 'px;' +
+    'top:' + rect.top + 'px;' +
+    'width:' + rect.width + 'px;' +
+    'height:' + rect.height + 'px;' +
+    'border-radius:' + radius + ';' +
+    'background:' + tint + ';' +
+    'z-index:400;' +
+    'pointer-events:none;' +
+    'opacity:1;' +
+    'transform:scale(1);' +
+    'transition:opacity 0.34s ease-out, transform 0.34s ease-out;' +
+    'will-change:opacity,transform;';
   document.body.appendChild(overlay);
-  setTimeout(() => { overlay.remove(); }, FLASH_MS + 60);
+
+  // Force a reflow so iOS Safari registers the element's initial (opacity:1)
+  // state, THEN flip to the end state on the next frame so the transition runs.
+  // We drive opacity/transform via INLINE styles (not a class) because the
+  // initial state above is also inline — an inline value beats a class rule, so
+  // a class-based end state would be ignored and nothing would animate.
+  void overlay.offsetWidth;
+  const runFade = () => {
+    overlay.style.opacity = '0';
+    overlay.style.transform = 'scale(1.06)';
+  };
+  // rAF gives the cleanest next-frame flip; fall back to a short timeout in any
+  // environment where it's unavailable.
+  if (typeof requestAnimationFrame === 'function') {
+    requestAnimationFrame(runFade);
+  } else {
+    setTimeout(runFade, 16);
+  }
+
+  setTimeout(() => { overlay.remove(); }, FLASH_MS + 120);
 }
 
 // Channel 3: sound. A short Web Audio tone, opt-in (state.soundEnabled). One
