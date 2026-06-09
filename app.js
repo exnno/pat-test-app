@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v17 (June 2026)
+ * v17.1 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v17 ==============
+// ============== PAT Test PWA — v17.1 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V17';
+const APP_VERSION = 'V17.1';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -1398,21 +1398,43 @@ function haptic(count) {
   if (count >= 3) setTimeout(_hapticOnce, 240);
 }
 
-// Channel 2: visual flash. Adds a short-lived class to the named element; the
-// CSS animation (styles.css .flash-pass / .flash-neutral) pulses it. Safe to
-// call with a missing/disabled element — it just does nothing. The class is
-// removed after the animation so it can re-fire on the next tap.
-const FLASH_MS = 320;
+// Channel 2: visual flash. v17.1 fix — the original implementation added a CSS
+// class to the tapped button, but the click handlers re-render #app
+// (saveItem/render) immediately afterwards, which destroys that button before
+// the animation can play a single frame, so no flash was ever visible.
+//
+// The robust fix mirrors the toast pattern: we read the button's screen
+// rectangle BEFORE the re-render, then spawn a position:fixed overlay on
+// <body> (outside #app) sized to cover the button. The overlay animates and
+// removes itself. Because it lives outside #app and isn't one of the swept
+// selectors in render(), the re-render can't touch it — the pulse plays in
+// full regardless of what the action does to the screen. This also handles the
+// cases where the button genuinely disappears (fail opens a modal; multipick
+// closes the sheet), since the overlay is independent of the button's lifetime.
+const FLASH_MS = 340;
 function flashEl(elId, kind) {
   if (!elId) return;
   const el = document.getElementById(elId);
   if (!el) return;
-  const cls = kind === 'pass' ? 'flash-pass' : 'flash-neutral';
-  el.classList.remove('flash-pass', 'flash-neutral');
-  // Force reflow so re-adding the class restarts the animation on rapid taps.
-  void el.offsetWidth;
-  el.classList.add(cls);
-  setTimeout(() => { el.classList.remove(cls); }, FLASH_MS);
+  let rect;
+  try { rect = el.getBoundingClientRect(); } catch { return; }
+  // Guard against a zero-size / off-screen target.
+  if (!rect || rect.width < 1 || rect.height < 1) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'flash-overlay ' + (kind === 'pass' ? 'flash-pass' : 'flash-neutral');
+  // Match the button's rounded corners so the ring traces its shape.
+  let radius = '12px';
+  try {
+    const cs = window.getComputedStyle(el);
+    if (cs && cs.borderTopLeftRadius) radius = cs.borderTopLeftRadius;
+  } catch {}
+  overlay.style.left = rect.left + 'px';
+  overlay.style.top = rect.top + 'px';
+  overlay.style.width = rect.width + 'px';
+  overlay.style.height = rect.height + 'px';
+  overlay.style.borderRadius = radius;
+  document.body.appendChild(overlay);
+  setTimeout(() => { overlay.remove(); }, FLASH_MS + 60);
 }
 
 // Channel 3: sound. A short Web Audio tone, opt-in (state.soundEnabled). One

@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA
- * v17 (June 2026)
+ * v17.1 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -1637,47 +1637,51 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
    recover. Reverted to v11 scroll behaviour. The body class strip in
    render() is defensive cleanup only. */
 
-/* ===== v17: action feedback flash =====
+/* ===== v17: action feedback flash (overlay) =====
    Channel 2 of the v17 feedback engine (see app.js). When a Pass / Fail / Copy
-   / Multi Pick button is tapped, JS adds .flash-pass or .flash-neutral to it for
-   ~320ms (FLASH_MS). This is the always-on visual confirmation that replaces the
-   iOS haptic Apple disabled in 26.5 — it needs no API, no permission, no sound.
+   / Multi Pick button is tapped, JS reads the button's screen rectangle and
+   spawns a .flash-overlay element on <body>, positioned over the button, which
+   pulses a coloured ring and self-removes. This is the always-on visual
+   confirmation that replaces the iOS haptic Apple disabled in 26.5 — no API, no
+   permission, no sound.
 
-   Implemented as an outline pulse (box-shadow ring + brief brightness lift) so
-   it overlays the button without shifting layout and reads clearly in both
-   themes. The class is removed after the animation so it can re-fire on the next
-   tap; JS forces a reflow between removal and re-add for rapid repeat taps.
+   v17.1 fix: the original version added a class to the button itself, but the
+   click handlers re-render #app immediately (saveItem/render), destroying the
+   button before the animation could play — so nothing was ever visible. The
+   overlay lives OUTSIDE #app (like the toast), so the re-render can't touch it.
 
-   --flash-pass-ring / --flash-neutral-ring are theme-tokenised below. */
-.flash-pass,
-.flash-neutral {
-  animation: actionFlash 0.32s ease-out;
+   The overlay is purely decorative and must never intercept taps. position:fixed
+   uses the same viewport coordinates getBoundingClientRect returns. JS sets
+   left/top/width/height/border-radius inline to match the button.
+
+   --flash-pass-ring / --flash-neutral-ring are theme-tokenised above. */
+.flash-overlay {
+  position: fixed;
+  z-index: 400;               /* above the fail modal backdrop (300) */
+  pointer-events: none;       /* never swallow a tap */
+  box-sizing: border-box;
+  background: transparent;
+  animation: actionFlash 0.34s ease-out forwards;
 }
-.flash-pass {
-  --flash-ring: var(--flash-pass-ring);
-}
-.flash-neutral {
-  --flash-ring: var(--flash-neutral-ring);
-}
+.flash-overlay.flash-pass    { --flash-ring: var(--flash-pass-ring); }
+.flash-overlay.flash-neutral { --flash-ring: var(--flash-neutral-ring); }
 @keyframes actionFlash {
   0% {
-    box-shadow: 0 0 0 0 var(--flash-ring), 0 2px 0 var(--pass-shadow);
-    filter: brightness(1.18);
+    box-shadow: 0 0 0 0 var(--flash-ring);
+    background: var(--flash-ring);
+    opacity: 1;
   }
-  60% {
-    box-shadow: 0 0 0 6px transparent, 0 2px 0 var(--pass-shadow);
-    filter: brightness(1.06);
+  55% {
+    box-shadow: 0 0 0 7px transparent;
+    background: transparent;
+    opacity: 1;
   }
   100% {
-    box-shadow: 0 0 0 0 transparent;
-    filter: brightness(1);
+    box-shadow: 0 0 0 9px transparent;
+    background: transparent;
+    opacity: 0;
   }
 }
-/* The PASS/FAIL buttons carry a 0 2px 0 drop-shadow normally; the keyframe
-   above preserves it during the pulse for the pass-btn. The copy-last and
-   multipick buttons have no such shadow, so the trailing ", 0 2px 0 ..." is
-   harmless on them (an invisible 0-spread shadow in their own colour context).
-   Keeping a single keyframe avoids duplicating it per button type. */
 
 /* ===== v17: item timestamp in the overview =====
    When Item Timestamps is on, each overview row shows HH:MM beneath the item

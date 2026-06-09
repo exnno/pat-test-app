@@ -99,7 +99,14 @@
 // as a new default-hidden CSV column — off by default, no backfill of old
 // items. New "what's new in V17" welcome modal (key pat:v17welcome). About
 // changelog rolled (V17/V16/V15). New storage keys: pat:soundfx, pat:timestamps.
-const CACHE_VERSION = 'pat-v17';
+//
+// v17.1: HOTFIX for the visual flash. v17 added the flash class to the tapped
+// button, but the click handlers re-render #app immediately (saveItem/render),
+// destroying the button before the CSS animation could play — so no flash was
+// ever visible. Reworked the flash into a body-level overlay (like the toast)
+// that's positioned over the button and survives the re-render. Cache bumped to
+// pat-v17-1 so the fix reaches any device that already pulled v17.
+const CACHE_VERSION = 'pat-v17-1';
 const ASSETS = [
   './',
   './index.html',
