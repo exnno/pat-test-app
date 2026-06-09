@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v16.1 (June 2026)
+ * v17 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v16.1 ==============
+// ============== PAT Test PWA — v17 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V16.1';
+const APP_VERSION = 'V17';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -60,6 +60,23 @@ const V13_WELCOME_KEY = 'pat:v13welcome';   // v14: legacy. Orphaned, harmless.
 const V14_WELCOME_KEY = 'pat:v14welcome';   // v15: legacy. Orphaned, harmless.
 const V15_WELCOME_KEY = 'pat:v15welcome';   // v16: legacy. Orphaned, harmless.
 const V16_WELCOME_KEY = 'pat:v16welcome';   // v16
+const V17_WELCOME_KEY = 'pat:v17welcome';   // v17
+
+// v17: Sound feedback (opt-in audio confirmation). Stored as '1'|'0', default
+// OFF ('0'). Distinct from haptics — this plays a short Web Audio tone on
+// pass/fail/copy. Added because iOS 26.5 patched the <input switch> haptic
+// trick the app relied on, leaving newer iPhones with no in-app vibration.
+// Sound (plus the always-on visual flash) is the replacement confirmation
+// channel for those devices, but it's off until the user turns it on.
+const SOUNDFX_KEY = 'pat:soundfx';          // v17: '1' | '0', default '0'
+
+// v17: Item timestamps. Stored as '1'|'0', default OFF ('0'). When ON, each
+// item gets a `ts` (ISO string) stamped the moment it's first saved, shown in
+// the Overview (HH:MM beneath the item type) and available as a CSV column.
+// When OFF, no new stamps are written and existing ones are hidden everywhere.
+// Timestamps were deliberately dropped back in v15; this is an opt-in revival,
+// so existing users see no change unless they enable it.
+const TIMESTAMPS_KEY = 'pat:timestamps';    // v17: '1' | '0', default '0'
 
 // v16: Multi Pick. A single GLOBAL set of up to 6 named, ordered item-type
 // sequences, plus a show/hide toggle for the entry-screen button. Stored as one
@@ -187,7 +204,13 @@ const DEFAULT_CSV_COLUMNS = [
   { id: 'tester',      header: 'Test Instrument', visible: false },
   { id: 'calDate',     header: 'Cal. Date',     visible: false },
   { id: 'calCertNo',   header: 'Cal. Cert No.', visible: false },
-  { id: 'calDue',      header: 'Cal. Due',      visible: false }
+  { id: 'calDue',      header: 'Cal. Due',      visible: false },
+  // v17: per-item timestamp (date + time the item was first logged). Sourced
+  // from item.ts (ISO). Default hidden so existing users' exports don't grow a
+  // column. Produces blanks when the Item Timestamps setting is OFF, or for
+  // items logged before timestamps were enabled. Turn the column on via
+  // Settings → CSV Columns; turn capture on via Settings → Display.
+  { id: 'time',        header: 'Time',          visible: false }
 ];
 
 // v8: Resistance calculator — IET Code of Practice Table V1.1 nominal values.
@@ -261,7 +284,12 @@ const ITEM_KEY_MAP = {
   location: 'o',
   itemType: 't',
   notes:    'm',
-  result:   'r'
+  result:   'r',
+  // v17: per-item timestamp (ISO string), present only on items logged while
+  // Item Timestamps was enabled. Short code 'c' (captured). Absent on items
+  // logged before the feature, which cost nothing — encodeWithMap drops
+  // undefined values.
+  ts:       'c'
 };
 
 // Build the reverse maps once.
@@ -457,9 +485,21 @@ let state = {
   // completeness only — no longer gates anything.
   v15WelcomeSeen: false,
 
-  // v16: welcome modal flag (key pat:v16welcome). Gates the V16 "what's new"
-  // modal so v15 users see it once on update.
+  // v16: welcome modal flag (key pat:v16welcome). v17: retained for load-time
+  // completeness only — no longer gates anything.
   v16WelcomeSeen: false,
+
+  // v17: welcome modal flag (key pat:v17welcome). Gates the V17 "what's new"
+  // modal so v16 users see it once on update.
+  v17WelcomeSeen: false,
+
+  // v17: Sound feedback (opt-in audio confirmation). Default OFF. When ON, a
+  // short Web Audio tone plays on pass/fail/copy alongside the haptic call.
+  soundEnabled: false,
+
+  // v17: Item timestamps. Default OFF. Gates both capture (stamping item.ts on
+  // first save) and display (Overview HH:MM + CSV column output).
+  timestampsEnabled: false,
 
   // v16: Multi Pick config — GLOBAL (not per-preset). enabled gates the
   // entry-screen button; slots is an array of up to 6 { name, items:[strings] }.
@@ -706,6 +746,12 @@ function loadV11Settings() {
   state.v14WelcomeSeen = localStorage.getItem(V14_WELCOME_KEY) === '1';
   state.v15WelcomeSeen = localStorage.getItem(V15_WELCOME_KEY) === '1';
   state.v16WelcomeSeen = localStorage.getItem(V16_WELCOME_KEY) === '1';
+  state.v17WelcomeSeen = localStorage.getItem(V17_WELCOME_KEY) === '1';
+
+  // v17: Sound feedback + Item timestamps. Both default OFF; only an explicit
+  // '1' enables them. Anything else (absent key, '0', garbage) reads as off.
+  state.soundEnabled = localStorage.getItem(SOUNDFX_KEY) === '1';
+  state.timestampsEnabled = localStorage.getItem(TIMESTAMPS_KEY) === '1';
 
   // v16: Multi Pick config. Validated defensively so a corrupt/garbage key can
   // never wedge the entry screen — falls back to { enabled:false, slots:[] }.
@@ -770,6 +816,9 @@ function save() {
   localStorage.setItem(PRUNE_AGE_KEY, String(state.pruneAgeMonths));
   // v16: Multi Pick config (single JSON object).
   localStorage.setItem(MULTIPICK_KEY, JSON.stringify(state.multiPick));
+  // v17: Sound feedback + Item timestamps settings.
+  localStorage.setItem(SOUNDFX_KEY, state.soundEnabled ? '1' : '0');
+  localStorage.setItem(TIMESTAMPS_KEY, state.timestampsEnabled ? '1' : '0');
   // lastBackupAt + backupSnoozedUntil are written via their own helpers
   // (markBackupExported, snoozeBackupReminder) rather than here, because they
   // shouldn't update on every state change.
@@ -898,14 +947,17 @@ function multiPickFire(idx) {
 
   slot.items.forEach(typeRaw => {
     const cleanType = normaliseItemType(typeRaw);
-    sess.items.push({
+    const item = {
       id: uid(),
       assetNo: nextAssetNo(sess),   // recomputed each push off the growing list
       location: cleanLocation,
       itemType: cleanType,
       notes: '',
       result: 'pass'
-    });
+    };
+    // v17: stamp each item on creation, only when timestamps are enabled.
+    if (state.timestampsEnabled) item.ts = new Date().toISOString();
+    sess.items.push(item);
     addDescriptionIfNew(cleanType);
   });
 
@@ -914,7 +966,10 @@ function multiPickFire(idx) {
   state.multiPickSheetOpen = false;
   state.cursor = sess.items.length;  // drop onto a fresh new item after the batch
   loadFormForCursor();
-  haptic(2);                         // copy-last double-buzz
+  // v17: copy-style feedback (double-buzz / copy tone), matching its existing
+  // haptic. The sheet has just closed, so flash the entry-screen Multi Pick
+  // button as the visual cue.
+  feedback('copy', 'multipick-btn');
   save();
   render();
   showToast(`Added ${n} item${n === 1 ? '' : 's'}`);
@@ -1008,6 +1063,33 @@ function formatDate(iso) {
   const parts = iso.split('-');
   if (parts.length !== 3) return iso;
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+// v17: format an item timestamp (full ISO) as HH:MM in the device's local
+// time, for the Overview row. Returns '' for missing/invalid input so callers
+// can omit the line entirely.
+function formatTimeShort(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+}
+
+// v17: format an item timestamp for CSV — full local date + time, e.g.
+// "09/06/2026 14:32". The Date column is date-only, so the Time column carries
+// the more precise stamp. Local time matches what the engineer saw on screen.
+function formatTimestampCSV(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '';
+  const dd = String(d.getDate()).padStart(2, '0');
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const yy = d.getFullYear();
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${dd}/${mo}/${yy} ${hh}:${mm}`;
 }
 
 // v12: Compute the calibration-due status from state.calDue. Returns null when
@@ -1260,7 +1342,31 @@ function applyTheme(theme) {
   // 'system' or anything else: no class, prefers-color-scheme media query wins.
 }
 
-// ---------- Haptics ----------
+// ---------- Feedback: haptics + visual flash + sound (v17) ----------
+//
+// Background: the app's only way to fire a haptic in an iOS PWA was the
+// <input type="checkbox" switch> trick below (programmatically clicking a
+// hidden switch's label, which WebKit rewarded with a selection haptic). iOS
+// 26.5 patched that exact behaviour — a programmatic label click no longer
+// produces a haptic; only a real user tap on the switch does. WebKit has never
+// exposed navigator.vibrate, so on iOS 26.5+ there is NO programmatic haptic
+// path left, and there's no version-sniff that would bring one back.
+//
+// v17's answer is to confirm actions through THREE channels instead of one:
+//   1. Haptic — unchanged. navigator.vibrate on Android; the switch trick on
+//      iOS (still works ≤26.4, a harmless no-op on 26.5+). Gated by the
+//      existing Haptics setting.
+//   2. Visual flash — ALWAYS on, every device. A brief colour pulse on the
+//      button that was tapped (green for pass, neutral for copy/multi-pick;
+//      fail keeps its own modal flow). This is the real replacement for the
+//      lost iOS buzz — it needs no API, no permission, no sound.
+//   3. Sound — OPT-IN, default off. A short Web Audio tone, a different one per
+//      action (pass / fail / copy) so they're distinguishable on a noisy site.
+//
+// Call sites use feedback(kind, elId): kind is 'pass' | 'fail' | 'copy', elId
+// is the id of the button to flash (optional). The old haptic(count) is kept as
+// a thin shim so nothing else has to change, mapping 1→pass, 2→copy, 3→fail.
+
 function _hapticOnce() {
   try {
     const labelEl = document.createElement('label');
@@ -1276,6 +1382,8 @@ function _hapticOnce() {
   } catch {}
 }
 
+// Channel 1: haptic. Unchanged behaviour, still gated by the Haptics setting.
+// count: 1 = single, 2 = double, 3 = triple.
 function haptic(count) {
   if (!state.hapticsEnabled) return;        // v7: respect user setting
   if (navigator.vibrate) {
@@ -1284,9 +1392,98 @@ function haptic(count) {
     else if (count === 3) navigator.vibrate([50, 70, 50, 70, 50]);
     return;
   }
+  // iOS path: works ≤26.4; a harmless no-op on 26.5+ (Apple patched it).
   _hapticOnce();
   if (count >= 2) setTimeout(_hapticOnce, 120);
   if (count >= 3) setTimeout(_hapticOnce, 240);
+}
+
+// Channel 2: visual flash. Adds a short-lived class to the named element; the
+// CSS animation (styles.css .flash-pass / .flash-neutral) pulses it. Safe to
+// call with a missing/disabled element — it just does nothing. The class is
+// removed after the animation so it can re-fire on the next tap.
+const FLASH_MS = 320;
+function flashEl(elId, kind) {
+  if (!elId) return;
+  const el = document.getElementById(elId);
+  if (!el) return;
+  const cls = kind === 'pass' ? 'flash-pass' : 'flash-neutral';
+  el.classList.remove('flash-pass', 'flash-neutral');
+  // Force reflow so re-adding the class restarts the animation on rapid taps.
+  void el.offsetWidth;
+  el.classList.add(cls);
+  setTimeout(() => { el.classList.remove(cls); }, FLASH_MS);
+}
+
+// Channel 3: sound. A short Web Audio tone, opt-in (state.soundEnabled). One
+// shared AudioContext, created lazily on first use (and resumed if the browser
+// suspended it — common on iOS until the first user gesture, which a Pass/Fail
+// tap satisfies). Distinct tone per action:
+//   pass — a single bright, short, pleasant tick (high, quick decay)
+//   copy — a mid double-tick (echoes the double-buzz of copy/multi-pick)
+//   fail — a lower, longer, buzzier tone (clearly "not a pass")
+// Tones are deliberately tiny (≤120ms total) so they never get in the way of
+// fast entry. All wrapped in try/catch — audio must never break logging.
+let _audioCtx = null;
+function _getAudioCtx() {
+  try {
+    if (!_audioCtx) {
+      const AC = window.AudioContext || window.webkitAudioContext;
+      if (!AC) return null;
+      _audioCtx = new AC();
+    }
+    if (_audioCtx.state === 'suspended' && _audioCtx.resume) {
+      _audioCtx.resume();
+    }
+    return _audioCtx;
+  } catch {
+    return null;
+  }
+}
+
+// Play one beep: frequency (Hz), duration (s), type, and peak gain.
+function _beep(ctx, startAt, freq, dur, type, peak) {
+  const osc = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, startAt);
+  // Quick attack, exponential decay — gives a clean "tick" rather than a click.
+  gain.gain.setValueAtTime(0.0001, startAt);
+  gain.gain.exponentialRampToValueAtTime(peak, startAt + 0.008);
+  gain.gain.exponentialRampToValueAtTime(0.0001, startAt + dur);
+  osc.connect(gain);
+  gain.connect(ctx.destination);
+  osc.start(startAt);
+  osc.stop(startAt + dur + 0.02);
+}
+
+function playSound(kind) {
+  if (!state.soundEnabled) return;
+  try {
+    const ctx = _getAudioCtx();
+    if (!ctx) return;
+    const t = ctx.currentTime;
+    if (kind === 'pass') {
+      // Single bright tick.
+      _beep(ctx, t, 880, 0.09, 'sine', 0.18);
+    } else if (kind === 'copy') {
+      // Mid double-tick.
+      _beep(ctx, t,         660, 0.06, 'sine', 0.16);
+      _beep(ctx, t + 0.085, 660, 0.06, 'sine', 0.16);
+    } else if (kind === 'fail') {
+      // Lower, longer, buzzier tone.
+      _beep(ctx, t, 220, 0.18, 'sawtooth', 0.14);
+    }
+  } catch {}
+}
+
+// Unified entry point: fire all three channels for an action. kind is
+// 'pass' | 'fail' | 'copy'; elId (optional) is the button to flash.
+const FEEDBACK_HAPTIC_COUNT = { pass: 1, copy: 2, fail: 3 };
+function feedback(kind, elId) {
+  haptic(FEEDBACK_HAPTIC_COUNT[kind] || 1);   // channel 1 (respects Haptics setting)
+  flashEl(elId, kind);                         // channel 2 (always on)
+  playSound(kind);                             // channel 3 (opt-in)
 }
 
 // ---------- CSV ----------
@@ -1339,6 +1536,10 @@ function csvCellValue(colId, session, item) {
     case 'calDate':     return state.calDate ? formatDate(state.calDate) : '';
     case 'calCertNo':   return state.calCertNo || '';
     case 'calDue':      return state.calDue ? formatDate(state.calDue) : '';
+    // v17: per-item timestamp. Blank when the Item Timestamps setting is OFF
+    // (even if the column is visible), and blank for items logged before the
+    // feature was enabled.
+    case 'time':        return state.timestampsEnabled ? formatTimestampCSV(item.ts) : '';
     default:            return '';
   }
 }
@@ -1915,6 +2116,9 @@ function buildBackup() {
     calDue: state.calDue,
     // v16: Multi Pick config.
     multiPick: state.multiPick,
+    // v17: feedback + timestamp settings.
+    soundEnabled: state.soundEnabled,
+    timestampsEnabled: state.timestampsEnabled,
     lastBackupAt: state.lastBackupAt
   };
 }
@@ -2069,6 +2273,15 @@ function restoreBackupFromFile(file) {
     // v16: Multi Pick config — validate through the same normaliser used on
     // load. Missing/old backups collapse to { enabled:false, slots:[] }.
     state.multiPick = normaliseMultiPickConfig(data.multiPick);
+
+    // v17: feedback + timestamp settings. Booleans only; older backups without
+    // these keys leave the defaults (both off) intact.
+    if (typeof data.soundEnabled === 'boolean') {
+      state.soundEnabled = data.soundEnabled;
+    }
+    if (typeof data.timestampsEnabled === 'boolean') {
+      state.timestampsEnabled = data.timestampsEnabled;
+    }
 
     state.activeId = null;
     state.view = 'sessions';
@@ -2386,8 +2599,14 @@ function saveItem(result) {
     result
   };
   if (state.cursor < sess.items.length) {
+    // v17: editing an existing item must NOT change its original timestamp —
+    // ts records when the item was FIRST logged, not last touched. We spread
+    // the new fields over the old item, which leaves any existing .ts intact
+    // (item, above, has no ts key, so it can't overwrite it).
     sess.items[state.cursor] = { ...sess.items[state.cursor], ...item };
   } else {
+    // v17: stamp the timestamp on first save, only when the setting is on.
+    if (state.timestampsEnabled) item.ts = new Date().toISOString();
     sess.items.push({ id: uid(), ...item });
   }
   markSessionDirty(sess);   // v14: edits invalidate a prior export
@@ -2403,7 +2622,7 @@ function passClicked() {
   if (sess && sess.locked) return;
   const err = validateBeforeSave();
   if (err) { alert(err); return; }
-  haptic(1);
+  feedback('pass', 'pass-btn');   // v17: haptic + green flash + (opt-in) pass tone
   saveItem('pass');
 }
 
@@ -2412,7 +2631,7 @@ function failClicked() {
   if (sess && sess.locked) return;
   const err = validateBeforeSave();
   if (err) { alert(err); return; }
-  haptic(3);
+  feedback('fail', 'fail-btn');   // v17: haptic + neutral flash + (opt-in) fail tone
   state.failModalStage = 'reasons';
   state.failOtherText = '';
   state.failModalOpen = true;
@@ -2424,7 +2643,9 @@ function pickFailReason(reasonOrNull) {
   // is tapped, or when Save is tapped after typing in the Other field. Confirms
   // the fail has actually been recorded, since the visible state changes (modal
   // closes, cursor advances) can be subtle on a tired screen at the end of a job.
-  haptic(3);
+  // v17: also plays the fail tone (if sound on). No button flash here — the
+  // Fail button sits behind the modal, so the modal closing is the visual cue.
+  feedback('fail');
   if (reasonOrNull) {
     state.form.notes = state.form.notes
       ? state.form.notes + ' — ' + reasonOrNull
@@ -2449,7 +2670,7 @@ function copyLastResult() {
   if (sess.locked) return;   // v8
   const err = validateBeforeSave({ skipItemType: true });
   if (err) { alert(err); return; }
-  haptic(2);
+  feedback('copy', 'copy-last-btn');   // v17: haptic + neutral flash + (opt-in) copy tone
   const last = sess.items[sess.items.length - 1];
   const item = {
     assetNo: state.form.assetNo.trim() || nextAssetNo(sess),
@@ -2459,8 +2680,11 @@ function copyLastResult() {
     result: last.result
   };
   if (state.cursor < sess.items.length) {
+    // v17: overwrite keeps the existing item's original ts (item has no ts key).
     sess.items[state.cursor] = { ...sess.items[state.cursor], ...item };
   } else {
+    // v17: stamp on first save (append), only when timestamps are enabled.
+    if (state.timestampsEnabled) item.ts = new Date().toISOString();
     sess.items.push({ id: uid(), ...item });
   }
   markSessionDirty(sess);   // v14
@@ -2878,9 +3102,9 @@ function moveCsvColumn(id, delta) {
 // v12: dismiss the welcome modal — sets the flag in localStorage so it
 // doesn't reappear, then re-renders to clear it from view. v16: writes
 // pat:v16welcome so v15 users see the modal once on update.
-function dismissV16Welcome() {
-  state.v16WelcomeSeen = true;
-  localStorage.setItem(V16_WELCOME_KEY, '1');
+function dismissV17Welcome() {
+  state.v17WelcomeSeen = true;
+  localStorage.setItem(V17_WELCOME_KEY, '1');
   render();
 }
 
@@ -2957,6 +3181,23 @@ function setHaptics(enabled) {
   state.hapticsEnabled = !!enabled;
   save();
   // No re-render needed — toggle visual handled by checkbox state
+}
+
+// v17: opt-in sound feedback. Flipping it on plays a sample pass tone so the
+// user immediately hears what they've enabled (and it doubles as the first
+// user-gesture that unlocks the AudioContext on iOS). Flipping off is silent.
+function setSound(enabled) {
+  state.soundEnabled = !!enabled;
+  save();
+  if (state.soundEnabled) playSound('pass');
+}
+
+// v17: item timestamps on/off. Gates both capture (future items) and display.
+// Existing items are untouched either way — turning it on doesn't backfill old
+// items, turning it off doesn't strip stamps already recorded.
+function setTimestamps(enabled) {
+  state.timestampsEnabled = !!enabled;
+  save();
 }
 
 // ---------- Service worker + update detection (v7) ----------
@@ -3090,22 +3331,24 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v16: rolled forward — content covers the V16 Multi Pick feature, key bumped
-  // to pat:v16welcome so v15 users see it once on update. Gate uses v16WelcomeSeen.
-  const welcomeModal = (state.v16WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // v17: rolled forward — content covers the V17 feedback + timestamps changes,
+  // key bumped to pat:v17welcome so v16 users see it once on update. Gate uses
+  // v17WelcomeSeen.
+  const welcomeModal = (state.v17WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V16">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V17">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V16</h3>
+        <h3 class="bulk-sheet-title">What's new in V17</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Multi Pick.</strong> Log a whole set of items as PASS in one tap — perfect for a repeated setup like a desk PC (lead, adapter, monitor and so on). Build up to six of your own, name them however you like, and they're logged in the order you set.</li>
-        <li><strong>Off until you want it.</strong> The Multi Pick button is hidden by default. Set up your lists and switch the button on under <strong>Settings → Multi Pick</strong>.</li>
+        <li><strong>Clearer confirmation.</strong> Every Pass, Fail and Copy now flashes the button you tapped, so you get a visual confirmation even on iPhones where newer iOS has stopped in-app vibration from working.</li>
+        <li><strong>Optional sound.</strong> Turn on Sound feedback for a short tone on each action — a different one for pass, fail and copy. Find it under <strong>Settings → Display</strong>. Off by default.</li>
+        <li><strong>Item timestamps.</strong> Optionally record the time each item was logged — shown in the overview and available as a CSV column. Switch it on under <strong>Settings → Display</strong>. Off by default.</li>
       </ul>
-      <button class="btn-primary" id="v16-welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v17-welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -3709,12 +3952,18 @@ function renderOverviewBodyHTML(sess) {
             : `<td class="td td-action" data-del-item="${i}">🗑</td>`;
           const rowAttr = sel ? `data-row-toggle="${i}"` : `data-jump="${i}"`;
           const rowClass = sel && checked ? 'tr selected' : 'tr';
+          // v17: when timestamps are on, show HH:MM subtly beneath the item
+          // type. Items logged before the feature have no ts → no line, so the
+          // column doesn't get a stray blank gap.
+          const timeLine = (state.timestampsEnabled && it.ts)
+            ? `<div class="item-time">${escapeHTML(formatTimeShort(it.ts))}</div>`
+            : '';
           return `
             <tr class="${rowClass}" ${rowAttr}>
               ${checkCol}
               <td class="td">${escapeHTML(it.assetNo)}</td>
               <td class="td">${escapeHTML(it.location)}</td>
-              <td class="td">${escapeHTML(it.itemType)}</td>
+              <td class="td">${escapeHTML(it.itemType)}${timeLine}</td>
               <td class="td td-result ${it.result || ''}">${capitalise(it.result || '')}</td>
               ${actionCol}
             </tr>
@@ -4046,7 +4295,12 @@ function renderSettingsHub() {
   const descSummary = state.descriptions.length === 1 ? '1 description' : `${state.descriptions.length} descriptions`;
   const themeSummary = state.theme === 'system' ? 'System' : (state.theme === 'dark' ? 'Dark' : 'Light');
   const hapticsSummary = state.hapticsEnabled ? 'Haptics on' : 'Haptics off';
-  const displaySummary = `${themeSummary} · ${hapticsSummary}`;
+  // v17: surface the two opt-in extras only when on, to keep the subtitle short
+  // by default. e.g. "System · Haptics on · Sound on · Times on".
+  const displayExtras = [];
+  if (state.soundEnabled) displayExtras.push('Sound on');
+  if (state.timestampsEnabled) displayExtras.push('Times on');
+  const displaySummary = [themeSummary, hapticsSummary, ...displayExtras].join(' · ');
   // v11: CSV summary — how many columns are visible vs total, plus whether
   // they've been customised away from defaults.
   const visibleCsv = state.csvColumns.filter(c => c.visible).length;
@@ -4357,6 +4611,7 @@ function renderSettingsDisplay() {
       <div class="settings-section">
         <h2 class="h2">Haptics</h2>
         <p class="muted">Vibration on pass, fail, and copy actions. Turn off if you find it distracting or if it's too aggressive on your device.</p>
+        <p class="muted" style="margin-top:8px">Note: iPhones on iOS 26.5 or later no longer allow apps like this one to trigger vibration from the web. On those phones the on-screen flash still confirms every action, and you can switch on Sound feedback below for an audible cue.</p>
         <div class="toggle-row">
           <div class="toggle-row-text">
             <div class="toggle-row-title">Haptic feedback</div>
@@ -4364,6 +4619,36 @@ function renderSettingsDisplay() {
           </div>
           <label class="toggle-switch">
             <input type="checkbox" id="haptics-toggle" ${state.hapticsEnabled ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Sound feedback</h2>
+        <p class="muted">Play a short tone on pass, fail, and copy actions — a different tone for each. Useful where vibration isn't available (newer iPhones) or when you want an audible confirmation. Off by default.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Sound on pass / fail / copy</div>
+            <div class="toggle-row-sub">${state.soundEnabled ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="sound-toggle" ${state.soundEnabled ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Item timestamps</h2>
+        <p class="muted">Record the time each item was first logged. When on, the time shows beneath the item in a session's overview, and a Time column becomes available for CSV export (switch it on under Settings → CSV Columns). Items logged while this is off have no time recorded. Off by default.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Record item times</div>
+            <div class="toggle-row-sub">${state.timestampsEnabled ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="timestamps-toggle" ${state.timestampsEnabled ? 'checked' : ''}>
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -4559,18 +4844,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v16: rolled forward — V16 on top, V13 dropped. -->
+      <!-- v8: rolling 3-version changelog. v17: rolled forward — V17 on top, V14 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V17</strong> · June 2026</p>
+        <p class="muted">Every Pass, Fail and Copy now flashes the button you tapped, giving a clear visual confirmation — useful on newer iPhones where iOS has stopped apps like this one from using vibration. You can also turn on Sound feedback for a short tone on each action, with a different tone for pass, fail and copy (under Settings → Display, off by default). And there's a new option to record the time each item was logged: switch on Item timestamps under Settings → Display to show times in a session's overview and to add a Time column to CSV export. Both new options are off by default, so nothing changes unless you turn them on.</p>
 
         <p><strong>V16</strong> · June 2026</p>
         <p class="muted">New Multi Pick feature. Define your own lists of items — say a lead, adapter and monitor for a desk PC — and log the whole list as passes with a single tap, in the order you set, all on the current location. Build up to six of these under Settings → Multi Pick, name them however you like, and show or hide the entry-screen button with a toggle. It's off by default, since it's only worth it on certain jobs.</p>
 
         <p><strong>V15</strong> · June 2026</p>
         <p class="muted">The "not yet exported" line on the Sessions list is now a button — tap it to share every session that still needs exporting in one action. New filters sit beside Sort: narrow the list by export status (not exported, exported, or modified since export) and by locked or unlocked, with your choices remembered between visits. A calibration date that falls on today now reads "Due today" rather than "Due in 0 days". The on-screen scrollbar is now hidden while scrolling works exactly as before.</p>
-
-        <p><strong>V14</strong> · June 2026</p>
-        <p class="muted">Your sessions are now stored more compactly behind the scenes, so more data fits on the device before reaching the storage limit — existing data is upgraded automatically with no change to how you work. The Sessions list now marks sessions you've exported to CSV with a ✓, switching to "✓✎ Modified since export" if you edit one afterwards, and shows a count of sessions not yet exported. Opening an already-exported session reminds you that further changes will need re-exporting (locked, view-only sessions don't prompt). Backup &amp; Restore can now clear sessions that are exported and older than a set age (default 12 months, adjustable) to reclaim space, always with confirmation first.</p>
       </div>
 
       <div class="info-card">
@@ -5048,6 +5333,16 @@ function bindEvents() {
     // Re-render so the "On"/"Off" sub-text updates
     render();
   };
+  // v17: sound + timestamps toggles. Both re-render to refresh their On/Off
+  // sub-text, matching the haptics row.
+  if ($('sound-toggle')) $('sound-toggle').onchange = e => {
+    setSound(e.target.checked);
+    render();
+  };
+  if ($('timestamps-toggle')) $('timestamps-toggle').onchange = e => {
+    setTimestamps(e.target.checked);
+    render();
+  };
 
   // Backup & Restore
   if ($('backup-export-btn')) $('backup-export-btn').onclick = () => downloadBackup();
@@ -5101,8 +5396,8 @@ function bindEvents() {
     render();
   };
 
-  // v11 welcome modal — Continue button dismisses and stamps the flag.
-  if ($('v16-welcome-dismiss')) $('v16-welcome-dismiss').onclick = () => dismissV16Welcome();
+  // v17 welcome modal — Continue button dismisses and stamps the flag.
+  if ($('v17-welcome-dismiss')) $('v17-welcome-dismiss').onclick = () => dismissV17Welcome();
 
   // v14: reopen-warning modal buttons.
   if ($('reopen-warn-continue')) $('reopen-warn-continue').onclick = () => confirmReopenWarning();

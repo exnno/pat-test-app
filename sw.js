@@ -89,7 +89,17 @@
 // fix actually reaches installed PWAs (a same-key cache would have kept serving
 // the broken app.js). Welcome key left at pat:v16welcome (hotfix follows the
 // release immediately — no second modal).
-const CACHE_VERSION = 'pat-v16-1';
+//
+// v17: Action feedback rework + item timestamps. iOS 26.5 patched the <input
+// switch> haptic trick the app used, so newer iPhones had no in-app vibration.
+// v17 confirms actions through three channels: haptic (unchanged, where it
+// still works), an always-on visual button flash, and an opt-in Web Audio tone
+// (distinct per pass/fail/copy, off by default). Plus optional item timestamps:
+// stamp the time each item is first logged, shown in the overview and available
+// as a new default-hidden CSV column — off by default, no backfill of old
+// items. New "what's new in V17" welcome modal (key pat:v17welcome). About
+// changelog rolled (V17/V16/V15). New storage keys: pat:soundfx, pat:timestamps.
+const CACHE_VERSION = 'pat-v17';
 const ASSETS = [
   './',
   './index.html',

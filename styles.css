@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA
- * v16.1 (June 2026)
+ * v17 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -54,6 +54,9 @@
   --warn-soft-text: #92400e;
   --warn-soft-border: #fcd34d;
   --highlight-flash: #fde68a;
+  /* v17: action-flash ring colours. Pass = translucent green, neutral = grey. */
+  --flash-pass-ring: rgba(22, 163, 74, 0.45);
+  --flash-neutral-ring: rgba(107, 114, 128, 0.40);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -95,6 +98,9 @@
     --warn-soft-text: #fcd34d;
     --warn-soft-border: #92400e;
     --highlight-flash: #78350f;
+    /* v17: brighter rings for contrast on the dark background. */
+    --flash-pass-ring: rgba(34, 197, 94, 0.55);
+    --flash-neutral-ring: rgba(148, 163, 184, 0.45);
   }
 }
 
@@ -135,6 +141,9 @@
   --warn-soft-text: #fcd34d;
   --warn-soft-border: #92400e;
   --highlight-flash: #78350f;
+  /* v17: brighter rings for contrast on the dark background. */
+  --flash-pass-ring: rgba(34, 197, 94, 0.55);
+  --flash-neutral-ring: rgba(148, 163, 184, 0.45);
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
@@ -1627,3 +1636,58 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
    notes textarea + on-screen keyboard were up, with no way to scroll to
    recover. Reverted to v11 scroll behaviour. The body class strip in
    render() is defensive cleanup only. */
+
+/* ===== v17: action feedback flash =====
+   Channel 2 of the v17 feedback engine (see app.js). When a Pass / Fail / Copy
+   / Multi Pick button is tapped, JS adds .flash-pass or .flash-neutral to it for
+   ~320ms (FLASH_MS). This is the always-on visual confirmation that replaces the
+   iOS haptic Apple disabled in 26.5 — it needs no API, no permission, no sound.
+
+   Implemented as an outline pulse (box-shadow ring + brief brightness lift) so
+   it overlays the button without shifting layout and reads clearly in both
+   themes. The class is removed after the animation so it can re-fire on the next
+   tap; JS forces a reflow between removal and re-add for rapid repeat taps.
+
+   --flash-pass-ring / --flash-neutral-ring are theme-tokenised below. */
+.flash-pass,
+.flash-neutral {
+  animation: actionFlash 0.32s ease-out;
+}
+.flash-pass {
+  --flash-ring: var(--flash-pass-ring);
+}
+.flash-neutral {
+  --flash-ring: var(--flash-neutral-ring);
+}
+@keyframes actionFlash {
+  0% {
+    box-shadow: 0 0 0 0 var(--flash-ring), 0 2px 0 var(--pass-shadow);
+    filter: brightness(1.18);
+  }
+  60% {
+    box-shadow: 0 0 0 6px transparent, 0 2px 0 var(--pass-shadow);
+    filter: brightness(1.06);
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+    filter: brightness(1);
+  }
+}
+/* The PASS/FAIL buttons carry a 0 2px 0 drop-shadow normally; the keyframe
+   above preserves it during the pulse for the pass-btn. The copy-last and
+   multipick buttons have no such shadow, so the trailing ", 0 2px 0 ..." is
+   harmless on them (an invisible 0-spread shadow in their own colour context).
+   Keeping a single keyframe avoids duplicating it per button type. */
+
+/* ===== v17: item timestamp in the overview =====
+   When Item Timestamps is on, each overview row shows HH:MM beneath the item
+   type. Small, muted, tight line-height so it tucks under the type without
+   adding a visible row gap. Items logged before the feature have no ts, so the
+   line is simply omitted (no empty space). */
+.item-time {
+  font-size: 11px;
+  color: var(--text-hint);
+  line-height: 1.2;
+  margin-top: 2px;
+  font-variant-numeric: tabular-nums;
+}
