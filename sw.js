@@ -116,7 +116,11 @@
 //
 // v18: Smart Quick Pick (opt-in entry-screen quick-pick reordering by location).
 // No new asset files; app.js + styles.css changed, so cache bumped to pat-v18.
-const CACHE_VERSION = 'pat-v18';
+//
+// v18.1: Smart Quick Pick now SWAPS location-specific item types into the row
+// (filling up to all 9 slots, learned-first then preset-fill) instead of only
+// reordering the fixed preset. app.js-only change; cache bumped to pat-v18-1.
+const CACHE_VERSION = 'pat-v18-1';
 const ASSETS = [
   './',
   './index.html',

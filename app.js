@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v18 (June 2026)
+ * v18.1 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v18 ==============
+// ============== PAT Test PWA — v18.1 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V18';
+const APP_VERSION = 'V18.1';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -1136,21 +1136,52 @@ function sqpScoresForLocation(location) {
   return scores;
 }
 
-// Reorder a copy of the quick-pick item-type list for the current location.
-// STABLE: types with a learned score sort to the front by descending score;
-// everything else keeps its original preset order behind them; ties among scored
-// types also keep preset order. Never adds or drops a button — the returned array
-// is always a permutation of the input. When the feature is off, the location is
-// blank, or nothing matches, the input order is returned unchanged.
+// v18.1: compose the quick-pick row for the current location. When Smart Quick
+// Pick is on and the location matches learned history, the row is filled with
+// the highest-scoring item types for that location FIRST — even types that
+// aren't in the standard preset (they're swapped IN) — then topped up from the
+// preset's own list (in preset order, skipping any already shown) so the row is
+// always full. Capped at the preset's button count (`types.length`, up to 9).
+//
+// This is a change from the original v18 behaviour, which only reordered the
+// fixed preset and never brought in location-specific types. Decisions:
+//   - swap freely up to all 9 slots (no pinned standard buttons)
+//   - learned types first by descending score, then preset-fill to keep 9
+//   - the preset is the FALLBACK row: shown verbatim when off / blank / no match
+//
+// Always returns the preset `types` unchanged when the feature is off, the
+// location is blank, or nothing matches — so the default experience is intact.
+// Ties among learned types keep their first-seen order; preset-fill keeps preset
+// order. The result length never exceeds `types.length`.
 function smartOrderedItemTypes(types, location) {
   if (!state.sqpEnabled) return types;
   const scores = sqpScoresForLocation(location);
-  if (!Object.keys(scores).length) return types;
-  // Decorate-sort-undecorate with the original index as the stable tiebreaker.
-  return types
-    .map((t, i) => ({ t, i, score: scores[t] || 0 }))
+  const learned = Object.keys(scores);
+  if (!learned.length) return types;
+
+  const cap = types.length;   // keep the row the same size as the preset (≤9)
+
+  // Learned types, highest score first. Object key order preserves first-seen
+  // order for equal scores, which a stable sort then respects as the tiebreaker.
+  const learnedSorted = learned
+    .map((t, i) => ({ t, i, score: scores[t] }))
     .sort((a, b) => (b.score - a.score) || (a.i - b.i))
     .map(x => x.t);
+
+  const row = [];
+  const seen = new Set();
+  // 1) Fill from learned types first (these may be SWAPPED IN — not in preset).
+  for (const t of learnedSorted) {
+    if (row.length >= cap) break;
+    if (!seen.has(t)) { row.push(t); seen.add(t); }
+  }
+  // 2) Top up from the preset (in preset order), skipping anything already shown,
+  //    so the row stays full at `cap` buttons.
+  for (const t of types) {
+    if (row.length >= cap) break;
+    if (!seen.has(t)) { row.push(t); seen.add(t); }
+  }
+  return row;
 }
 
 // v18: clear the learned history to empty (a true reset). Re-enabling the
@@ -3609,9 +3640,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Smart Quick Pick.</strong> Turn this on and the quick-pick buttons reorder themselves so the item types you most often test at the current location come first — less hunting, faster entry.</li>
+        <li><strong>Smart Quick Pick.</strong> Turn this on and the quick-pick buttons adapt to the current location — swapping in the item types you most often test there so they're one tap away, instead of a fixed nine.</li>
         <li><strong>It learns from your data.</strong> Switching it on builds straight away from your existing sessions, so it's useful from the off, and it keeps learning as you log more.</li>
-        <li><strong>Yours to control.</strong> Find it under <strong>Settings → Quick Pick Items</strong>, with buttons to rebuild or clear the history. It never changes which buttons you have or what they log — only their order. Off by default.</li>
+        <li><strong>Yours to control.</strong> Find it under <strong>Settings → Quick Pick Items</strong>, with buttons to rebuild or clear the history. Your preset is still the default row when there's no match for a location. Off by default.</li>
       </ul>
       <button class="btn-primary" id="v18-welcome-dismiss">Continue</button>
     </div>
@@ -4775,10 +4806,10 @@ function renderSettingsItems() {
            which only commits the items textarea / preset). -->
       <div class="settings-section">
         <h2 class="h2">Smart Quick Pick</h2>
-        <p class="muted">Reorder the quick-pick buttons so the item types you've most often tested at the current Location appear first. It never adds, removes, or hides buttons and never changes what a tap logs — only the order changes. Off by default.</p>
+        <p class="muted">Adapt the quick-pick buttons to the current Location — swapping in the item types you've most often tested there (even ones not in your preset) so they're one tap away. Your preset list is the default row whenever a location has no match. It never changes what a tap logs. Off by default.</p>
         <div class="toggle-row">
           <div class="toggle-row-text">
-            <div class="toggle-row-title">Reorder by location</div>
+            <div class="toggle-row-title">Adapt buttons to location</div>
             <div class="toggle-row-sub">${state.sqpEnabled ? 'On' : 'Off'}</div>
           </div>
           <label class="toggle-switch">
@@ -5151,8 +5182,8 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h3>What's new</h3>
 
-        <p><strong>V18</strong> · June 2026</p>
-        <p class="muted">New Smart Quick Pick option. Turn it on and the quick-pick buttons on the entry screen reorder themselves so the item types you most often test at the current location appear first — handy when different sites or rooms tend to have different kit. It builds from your existing sessions the moment you switch it on, then keeps learning as you log more, and you can rebuild or clear that history at any time. It only changes the order of the buttons — never which buttons you have or what they record. Find it under Settings → Quick Pick Items; it's off by default.</p>
+        <p><strong>V18.1</strong> · June 2026</p>
+        <p class="muted">New Smart Quick Pick option. Turn it on and the quick-pick buttons on the entry screen adapt to the current location — swapping in the item types you most often test there, even ones that aren't in your usual nine, so they're a single tap away. It builds from your existing sessions the moment you switch it on, then keeps learning as you log more, and you can rebuild or clear that history at any time. Your preset list is still the default row whenever there's no match for a location. Find it under Settings → Quick Pick Items; it's off by default.</p>
 
         <p><strong>V17</strong> · June 2026</p>
         <p class="muted">Every Pass, Fail and Copy now flashes the button you tapped, giving a clear visual confirmation — useful on newer iPhones where iOS has stopped apps like this one from using vibration. You can also turn on Sound feedback for a short tone on each action, with a different tone for pass, fail and copy (under Settings → Display, off by default). And there's a new option to record the time each item was logged: switch on Item timestamps under Settings → Display to show times in a session's overview and to add a Time column to CSV export. Both new options are off by default, so nothing changes unless you turn them on.</p>
