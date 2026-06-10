@@ -120,7 +120,12 @@
 // v18.1: Smart Quick Pick now SWAPS location-specific item types into the row
 // (filling up to all 9 slots, learned-first then preset-fill) instead of only
 // reordering the fixed preset. app.js-only change; cache bumped to pat-v18-1.
-const CACHE_VERSION = 'pat-v18-1';
+//
+// v19: Clients & Sites — a proper client→site data model with a management page
+// (Settings → Clients) and a two-field New Session form. Plus an entry-screen
+// efficiency change: pass/copy logging now does a partial DOM refresh instead of
+// a full re-render. app.js + styles.css changed; cache bumped to pat-v19.
+const CACHE_VERSION = 'pat-v19';
 const ASSETS = [
   './',
   './index.html',

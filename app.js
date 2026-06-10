@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v18.1 (June 2026)
+ * v19 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v18.1 ==============
+// ============== PAT Test PWA — v19 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V18.1';
+const APP_VERSION = 'V19';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -62,6 +62,22 @@ const V15_WELCOME_KEY = 'pat:v15welcome';   // v16: legacy. Orphaned, harmless.
 const V16_WELCOME_KEY = 'pat:v16welcome';   // v16
 const V17_WELCOME_KEY = 'pat:v17welcome';   // v17: legacy. Orphaned, harmless.
 const V18_WELCOME_KEY = 'pat:v18welcome';   // v18
+const V19_WELCOME_KEY = 'pat:v19welcome';   // v19
+
+// v19: Clients & Sites. A two-level model so one client can have several sites.
+//   CLIENTS_KEY — JSON array [{ id, name }].
+//   SITES_KEY   — JSON array [{ id, clientId, name }]; each site belongs to
+//                 exactly one client (clientId references CLIENTS_KEY).
+// Both stored readable/long-key (small next to item data, and human-readable in
+// backups, matching the backup principle). On first V19 load the lists are
+// SEEDED from existing sessions' plain `site` strings — each distinct site
+// string becomes a client with one same-named site — so returning users aren't
+// faced with empty pickers. These lists drive the New Session form's Client and
+// Site pickers and the Settings → Clients management page. They are convenience
+// data only: a session always stores its own `site` TEXT snapshot, so editing or
+// deleting a client/site never alters any saved session, CSV, or import.
+const CLIENTS_KEY = 'pat:clients';          // v19: JSON [{id,name}]
+const SITES_KEY = 'pat:sites';              // v19: JSON [{id,clientId,name}]
 
 // v18: Smart Quick Pick. An OPT-IN feature (default OFF) that reorders the
 // entry-screen quick-pick buttons so the item types you've most often logged at
@@ -410,7 +426,7 @@ let state = {
   view: 'sessions',
   cursor: 0,
   form: { assetNo: '', location: '', itemType: '', notes: '', showNotes: false },
-  newForm: { name: '', site: '', engineer: '', prefix: '', startNo: '1', show: false },
+  newForm: { name: '', site: '', engineer: '', prefix: '', startNo: '1', show: false, clientId: '', siteId: '' },
   editForm: { name: '', site: '', engineer: '', prefix: '', date: '', locked: false },
   suggestions: [],
   showSuggestions: false,
@@ -516,6 +532,31 @@ let state = {
   // v18: welcome modal flag (key pat:v18welcome). Gates the V18 "what's new"
   // modal so v17 users see it once on update.
   v18WelcomeSeen: false,
+
+  // v19: welcome modal flag (key pat:v19welcome). Gates the V19 "what's new"
+  // modal so v18 users see it once on update.
+  v19WelcomeSeen: false,
+
+  // v19: Clients & Sites. Two flat arrays kept in a parent/child relationship:
+  //   clients — [{ id, name }]
+  //   sites   — [{ id, clientId, name }]
+  // Loaded via loadV11Settings(); seeded from existing sessions on first V19
+  // load. Edited on the Settings → Clients page and auto-extended when the user
+  // types a new client/site on the New Session form. Convenience data only —
+  // sessions store their own `site` text snapshot, so these never retro-edit
+  // saved work.
+  clients: [],
+  sites: [],
+
+  // v19: Settings → Clients page UI state. expandedClientId tracks which client
+  // row is open to show its sites; the *Dialog objects drive the add/rename
+  // bottom-sheet flows (mode 'add'|'rename', the in-progress text, and which
+  // record is being edited). All cleared on leaving the page (setView).
+  clientsPage: {
+    expandedClientId: null,
+    clientDialog: { mode: null, name: '', editingId: null },   // 'add' | 'rename'
+    siteDialog: { mode: null, name: '', editingId: null, clientId: null }
+  },
 
   // v17: Sound feedback (opt-in audio confirmation). Default OFF. When ON, a
   // short Web Audio tone plays on pass/fail/copy alongside the haptic call.
@@ -781,6 +822,7 @@ function loadV11Settings() {
   state.v16WelcomeSeen = localStorage.getItem(V16_WELCOME_KEY) === '1';
   state.v17WelcomeSeen = localStorage.getItem(V17_WELCOME_KEY) === '1';
   state.v18WelcomeSeen = localStorage.getItem(V18_WELCOME_KEY) === '1';
+  state.v19WelcomeSeen = localStorage.getItem(V19_WELCOME_KEY) === '1';
 
   // v17: Sound feedback + Item timestamps. Both default OFF; only an explicit
   // '1' enables them. Anything else (absent key, '0', garbage) reads as off.
@@ -791,6 +833,17 @@ function loadV11Settings() {
   // so a corrupt key can never wedge the entry screen (falls back to {}).
   state.sqpEnabled = localStorage.getItem(SQP_ENABLED_KEY) === '1';
   state.sqpHistory = loadSqpHistory();
+
+  // v19: Clients & Sites. Validate defensively (any garbage collapses to []),
+  // then seed from existing sessions if BOTH lists are empty — i.e. the first
+  // V19 load on an install that has sessions but no client/site data yet. The
+  // seed is idempotent: once anything exists in either list it never re-runs,
+  // so a user who deletes all their clients on purpose isn't re-seeded.
+  state.clients = loadClients();
+  state.sites = loadSites();
+  if (state.clients.length === 0 && state.sites.length === 0) {
+    seedClientsSitesFromSessions();   // writes via save() only if it adds anything
+  }
 
   // v16: Multi Pick config. Validated defensively so a corrupt/garbage key can
   // never wedge the entry screen — falls back to { enabled:false, slots:[] }.
@@ -861,6 +914,9 @@ function save() {
   // v18: Smart Quick Pick flag + learned history.
   localStorage.setItem(SQP_ENABLED_KEY, state.sqpEnabled ? '1' : '0');
   localStorage.setItem(SQP_HISTORY_KEY, JSON.stringify(state.sqpHistory || {}));
+  // v19: Clients & Sites (readable long-key arrays).
+  localStorage.setItem(CLIENTS_KEY, JSON.stringify(state.clients || []));
+  localStorage.setItem(SITES_KEY, JSON.stringify(state.sites || []));
   // lastBackupAt + backupSnoozedUntil are written via their own helpers
   // (markBackupExported, snoozeBackupReminder) rather than here, because they
   // shouldn't update on every state change.
@@ -1213,6 +1269,210 @@ function setSqp(enabled) {
   if (state.sqpEnabled && Object.keys(state.sqpHistory).length === 0) {
     state.sqpHistory = buildSqpHistory();
   }
+  save();
+  render();
+}
+
+// ---------- v19: Clients & Sites ----------
+//
+// Two flat arrays in a parent/child relationship. A client has a name; a site
+// belongs to one client (by clientId) and has a name. These drive the New
+// Session pickers and the Settings → Clients page. They are NEVER the source of
+// truth for what a session records — each session keeps its own `site` text
+// snapshot — so editing/deleting here can't corrupt saved work.
+
+// Defensive loaders: any non-array or malformed entry collapses to a clean list,
+// mirroring the SQP/Multi Pick approach so a corrupt key can't wedge the app.
+function loadClients() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(CLIENTS_KEY) || 'null'); } catch {}
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(c => ({ id: String(c && c.id || ''), name: String(c && c.name || '').trim() }))
+    .filter(c => c.id && c.name);
+}
+
+function loadSites() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(SITES_KEY) || 'null'); } catch {}
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .map(s => ({
+      id: String(s && s.id || ''),
+      clientId: String(s && s.clientId || ''),
+      name: String(s && s.name || '').trim()
+    }))
+    .filter(s => s.id && s.clientId && s.name);
+}
+
+// First-V19 seed. Each distinct existing session `site` string becomes a client
+// with a single same-named site. Case-insensitive dedupe on the client name.
+// Only writes if it actually creates something. No-op when there are no
+// sessions or no usable site strings.
+function seedClientsSitesFromSessions() {
+  const seen = new Map();   // lowercased name -> client id
+  let added = false;
+  state.sessions.forEach(sess => {
+    const raw = String(sess && sess.site || '').trim();
+    if (!raw) return;
+    const key = raw.toLowerCase();
+    if (seen.has(key)) return;
+    const clientId = 'client_' + uid();
+    state.clients.push({ id: clientId, name: raw });
+    state.sites.push({ id: 'site_' + uid(), clientId, name: raw });
+    seen.set(key, clientId);
+    added = true;
+  });
+  if (added) save();
+}
+
+// Lookups + derived lists.
+function clientById(id) { return state.clients.find(c => c.id === id) || null; }
+function siteById(id) { return state.sites.find(s => s.id === id) || null; }
+function sitesForClient(clientId) {
+  return state.sites
+    .filter(s => s.clientId === clientId)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+function sortedClients() {
+  return state.clients
+    .slice()
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+// Find an existing client by name (case-insensitive), or null.
+function findClientByName(name) {
+  const n = String(name || '').trim().toLowerCase();
+  if (!n) return null;
+  return state.clients.find(c => c.name.toLowerCase() === n) || null;
+}
+// Find an existing site by name within a client (case-insensitive), or null.
+function findSiteByName(clientId, name) {
+  const n = String(name || '').trim().toLowerCase();
+  if (!n || !clientId) return null;
+  return state.sites.find(s => s.clientId === clientId && s.name.toLowerCase() === n) || null;
+}
+
+// Add helpers — return the existing record if the name already exists (so the
+// New Session form's "save what I typed" path never creates duplicates). These
+// mutate state but DO NOT save() or render() — the caller decides when.
+function ensureClient(name) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) return null;
+  const existing = findClientByName(trimmed);
+  if (existing) return existing;
+  const client = { id: 'client_' + uid(), name: trimmed };
+  state.clients.push(client);
+  return client;
+}
+function ensureSite(clientId, name) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed || !clientId) return null;
+  const existing = findSiteByName(clientId, trimmed);
+  if (existing) return existing;
+  const site = { id: 'site_' + uid(), clientId, name: trimmed };
+  state.sites.push(site);
+  return site;
+}
+
+// Build the combined "Client — Site" snapshot stored on the session as `site`.
+// Falls back gracefully: both → "Client — Site"; one → that one; neither → ''.
+// The em dash matches the placeholder style used elsewhere in the app.
+function composeSiteSnapshot(clientName, siteName) {
+  const c = String(clientName || '').trim();
+  const s = String(siteName || '').trim();
+  if (c && s) return `${c} — ${s}`;
+  return c || s || '';
+}
+
+// ----- Settings → Clients page actions -----
+// All confirm-on-destructive, save() + render() at the end. Deleting a client
+// also deletes its sites (after a count-aware confirm). None of this touches any
+// session's stored `site` snapshot.
+
+function addClientFromDialog() {
+  const name = state.clientsPage.clientDialog.name.trim();
+  if (!name) return;
+  if (findClientByName(name)) {
+    alert('A client with that name already exists.');
+    return;
+  }
+  const client = ensureClient(name);
+  state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
+  if (client) state.clientsPage.expandedClientId = client.id;
+  save();
+  render();
+}
+
+function renameClientFromDialog() {
+  const { editingId, name } = state.clientsPage.clientDialog;
+  const trimmed = name.trim();
+  const client = clientById(editingId);
+  if (!client || !trimmed) return;
+  const clash = findClientByName(trimmed);
+  if (clash && clash.id !== client.id) {
+    alert('A client with that name already exists.');
+    return;
+  }
+  client.name = trimmed;
+  state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
+  save();
+  render();
+}
+
+function deleteClient(clientId) {
+  const client = clientById(clientId);
+  if (!client) return;
+  const childSites = sitesForClient(clientId);
+  const msg = childSites.length
+    ? `Delete "${client.name}" and its ${childSites.length} site${childSites.length === 1 ? '' : 's'}?\n\nThis only removes them from your client list — sessions you've already created keep their site name.`
+    : `Delete "${client.name}"?\n\nThis only removes it from your client list — sessions you've already created keep their site name.`;
+  if (!confirm(msg)) return;
+  state.clients = state.clients.filter(c => c.id !== clientId);
+  state.sites = state.sites.filter(s => s.clientId !== clientId);
+  if (state.clientsPage.expandedClientId === clientId) {
+    state.clientsPage.expandedClientId = null;
+  }
+  save();
+  render();
+}
+
+function addSiteFromDialog() {
+  const { clientId, name } = state.clientsPage.siteDialog;
+  const trimmed = name.trim();
+  if (!clientId || !trimmed) return;
+  if (findSiteByName(clientId, trimmed)) {
+    alert('That client already has a site with that name.');
+    return;
+  }
+  ensureSite(clientId, trimmed);
+  state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
+  state.clientsPage.expandedClientId = clientId;
+  save();
+  render();
+}
+
+function renameSiteFromDialog() {
+  const { editingId, name } = state.clientsPage.siteDialog;
+  const trimmed = name.trim();
+  const site = siteById(editingId);
+  if (!site || !trimmed) return;
+  const clash = findSiteByName(site.clientId, trimmed);
+  if (clash && clash.id !== site.id) {
+    alert('That client already has a site with that name.');
+    return;
+  }
+  site.name = trimmed;
+  state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
+  save();
+  render();
+}
+
+function deleteSite(siteId) {
+  const site = siteById(siteId);
+  if (!site) return;
+  if (!confirm(`Delete site "${site.name}"?\n\nThis only removes it from your client list — sessions already created keep their site name.`)) return;
+  state.sites = state.sites.filter(s => s.id !== siteId);
   save();
   render();
 }
@@ -2373,7 +2633,7 @@ function closeImportSummary() {
 function buildBackup() {
   return {
     appVersion: APP_VERSION,
-    backupVersion: 3,                         // v11 bumped from 2 → 3
+    backupVersion: 4,                         // v19 bumped from 3 → 4 (clients/sites)
     exportedAt: new Date().toISOString(),
     sessions: state.sessions,
     itemPresets: state.itemPresets,           // v9
@@ -2402,6 +2662,9 @@ function buildBackup() {
     // v18: Smart Quick Pick flag + learned history (readable long-key form).
     sqpEnabled: state.sqpEnabled,
     sqpHistory: state.sqpHistory,
+    // v19: Clients & Sites (readable long-key arrays).
+    clients: state.clients,
+    sites: state.sites,
     lastBackupAt: state.lastBackupAt
   };
 }
@@ -2573,6 +2836,30 @@ function restoreBackupFromFile(file) {
       state.sqpEnabled = data.sqpEnabled;
     }
     state.sqpHistory = normaliseSqpHistory(data.sqpHistory);
+
+    // v19: Clients & Sites. Validate to the same shape the loaders enforce; any
+    // missing/garbage value collapses to an empty list. Pre-v19 backups simply
+    // restore with no clients/sites — the lists then re-seed from the restored
+    // sessions on the next load() (which calls loadV11Settings → seed). To keep
+    // restore self-consistent right now, we seed immediately if both are empty
+    // and there are sessions, so the pickers aren't blank until a reload.
+    state.clients = Array.isArray(data.clients)
+      ? data.clients
+          .map(c => ({ id: String(c && c.id || ''), name: String(c && c.name || '').trim() }))
+          .filter(c => c.id && c.name)
+      : [];
+    state.sites = Array.isArray(data.sites)
+      ? data.sites
+          .map(s => ({
+            id: String(s && s.id || ''),
+            clientId: String(s && s.clientId || ''),
+            name: String(s && s.name || '').trim()
+          }))
+          .filter(s => s.id && s.clientId && s.name)
+      : [];
+    if (state.clients.length === 0 && state.sites.length === 0) {
+      seedClientsSitesFromSessions();
+    }
 
     state.activeId = null;
     state.view = 'sessions';
@@ -2777,12 +3064,36 @@ function validateBeforeSave(opts = {}) {
 
 // ---------- Actions ----------
 function createSession() {
-  const { name, site, engineer, prefix, startNo } = state.newForm;
-  if (!site.trim()) return;
+  const { name, engineer, prefix, startNo } = state.newForm;
+
+  // v19: resolve the Client and Site fields. The form carries the typed text in
+  // state.newForm.site (now repurposed as the SITE text) plus the chosen client
+  // name in a dedicated field. We ensure both exist in the lists (creating them
+  // if the user typed something new — the auto-learn half of the feature), then
+  // store BOTH structured references (clientId/siteId) AND a combined text
+  // snapshot on the session so CSV, search, and old-session compatibility are
+  // untouched.
+  const clientName = String(state.newForm.clientId || '').trim();   // holds the typed client NAME
+  const siteName = String(state.newForm.site || '').trim();         // holds the typed site NAME
+
+  // A site name is still required (the old rule was "site can't be blank").
+  if (!siteName) return;
+
+  let clientRec = null;
+  let siteRec = null;
+  if (clientName) {
+    clientRec = ensureClient(clientName);
+    if (clientRec) siteRec = ensureSite(clientRec.id, siteName);
+  }
+
+  const snapshot = composeSiteSnapshot(clientName, siteName);
+
   const s = {
     id: uid(),
     name: name.trim() || `Session ${state.sessions.length + 1}`,
-    site: site.trim(),
+    site: snapshot,                              // combined text snapshot (back-compat)
+    clientId: clientRec ? clientRec.id : '',     // v19: structured refs (convenience)
+    siteId: siteRec ? siteRec.id : '',
     engineer: engineer.trim(),
     prefix: prefix.trim(),
     date: todayISO(),
@@ -2794,7 +3105,7 @@ function createSession() {
   state.activeId = s.id;
   state.cursor = 0;
   state.view = 'entry';
-  state.newForm = { name: '', site: '', engineer: state.engineer, prefix: '', startNo: '1', show: false };
+  state.newForm = { name: '', site: '', engineer: state.engineer, prefix: '', startNo: '1', show: false, clientId: '', siteId: '' };
   loadFormForCursor();
   save(); render();
 }
@@ -2907,7 +3218,11 @@ function saveItem(result) {
   addDescriptionIfNew(cleanType);
   state.cursor++;
   loadFormForCursor();
-  save(); render();
+  // v19 (efficiency item 4): on the entry screen with no modal open (the state
+  // after any save — pass, fail-commit, or edit-overwrite), use the lightweight
+  // entry-only refresh. refreshEntryAfterLog() falls back to full render() if we
+  // are somehow not on the entry screen, so this is always safe.
+  save(); refreshEntryAfterLog();
 }
 
 function passClicked() {
@@ -2986,7 +3301,8 @@ function copyLastResult() {
   markSessionDirty(sess);   // v14
   state.cursor++;
   loadFormForCursor();
-  save(); render();
+  // v19 (efficiency item 4): lightweight entry-only refresh (see saveItem).
+  save(); refreshEntryAfterLog();
 }
 
 function deleteItem(idx) {
@@ -3047,6 +3363,11 @@ function setView(v) {
   state.bulkEdit.typeValue = '';
   state.bulkEdit.notesValue = '';
   state.bulkEdit.notesMode = 'replace';
+  // v19: clear the Clients page add/rename sheets on any view change so an open
+  // dialog can't leak across pages. The expanded-client accordion can persist
+  // harmlessly.
+  state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
+  state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
   // Search and selection are overview-local; clear when leaving overview.
   if (v !== 'overview') {
     state.searchQuery = '';
@@ -3281,6 +3602,9 @@ function saveSessionEdits() {
   }
   sess.name = String(name).trim() || sess.name;
   sess.site = String(site).trim();
+  // v19: clientId/siteId refs are convenience-only and never drive display, CSV,
+  // or search (the `site` text snapshot does). We intentionally leave them as set
+  // at creation — editing the site text here won't and needn't update them.
   sess.engineer = String(engineer).trim();
   sess.prefix = String(prefix).trim();
   sess.date = date || sess.date;
@@ -3396,11 +3720,11 @@ function moveCsvColumn(id, delta) {
 }
 
 // v12: dismiss the welcome modal — sets the flag in localStorage so it
-// doesn't reappear, then re-renders to clear it from view. v18: writes
-// pat:v18welcome so v17 users see the modal once on update.
-function dismissV18Welcome() {
-  state.v18WelcomeSeen = true;
-  localStorage.setItem(V18_WELCOME_KEY, '1');
+// doesn't reappear, then re-renders to clear it from view. v19: writes
+// pat:v19welcome so v18 users see the modal once on update.
+function dismissV19Welcome() {
+  state.v19WelcomeSeen = true;
+  localStorage.setItem(V19_WELCOME_KEY, '1');
   render();
 }
 
@@ -3582,6 +3906,7 @@ function render() {
   else if (v === 'settingsDisplay') html = renderSettingsDisplay();
   else if (v === 'settingsBackup') html = renderSettingsBackup();
   else if (v === 'settingsCsv') html = renderSettingsCsv();   // v11
+  else if (v === 'settingsClients') html = renderSettingsClients();   // v19
   else if (v === 'settingsCalculator') html = renderSettingsCalculator();
   else if (v === 'settingsAbout') html = renderSettingsAbout();
   else if (v === 'settingsContact') html = renderSettingsContact();
@@ -3627,24 +3952,24 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v18: rolled forward — content covers the V18 Smart Quick Pick change, key
-  // bumped to pat:v18welcome so v17 users see it once on update. Gate uses
-  // v18WelcomeSeen.
-  const welcomeModal = (state.v18WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // v19: rolled forward — content covers the V19 Clients & Sites change, key
+  // bumped to pat:v19welcome so v18 users see it once on update. Gate uses
+  // v19WelcomeSeen.
+  const welcomeModal = (state.v19WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V18">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V19">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V18</h3>
+        <h3 class="bulk-sheet-title">What's new in V19</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Smart Quick Pick.</strong> Turn this on and the quick-pick buttons adapt to the current location — swapping in the item types you most often test there so they're one tap away, instead of a fixed nine.</li>
-        <li><strong>It learns from your data.</strong> Switching it on builds straight away from your existing sessions, so it's useful from the off, and it keeps learning as you log more.</li>
-        <li><strong>Yours to control.</strong> Find it under <strong>Settings → Quick Pick Items</strong>, with buttons to rebuild or clear the history. Your preset is still the default row when there's no match for a location. Off by default.</li>
+        <li><strong>Clients &amp; Sites.</strong> The New Session screen now has a separate <strong>Client</strong> and <strong>Site</strong> field, so one client can have several sites. Pick from your saved ones or type new — they're remembered for next time.</li>
+        <li><strong>A place to manage them.</strong> Find <strong>Settings → Clients</strong> to add, rename, or remove clients and their sites. Your existing sessions' site names are brought in automatically to get you started.</li>
+        <li><strong>Faster logging.</strong> Behind the scenes, logging a pass or copying a result now updates the screen more efficiently — same screen, less work.</li>
       </ul>
-      <button class="btn-primary" id="v18-welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v19-welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -3695,12 +4020,71 @@ function render() {
   bindEvents();
 }
 
+// v19 (efficiency item 4): fast path for logging on the entry screen.
+//
+// After a PASS or a Copy-last, the cursor advances to a fresh "new" item and the
+// form is reset — but we're still on the entry screen, the header is unchanged,
+// and crucially NO modal is open (neither saveItem nor copyLastResult opens one;
+// only the FAIL flow does, and that still calls full render()). So instead of
+// the full render() — which rebuilds five modal strings that are always empty
+// here, runs a whole-document querySelectorAll body-sweep, and re-evaluates the
+// update banner — we rebuild ONLY the entry screen's HTML into #app and rebind.
+//
+// This is behaviour-identical to render() for this specific transition:
+//   • The flash overlay lives on <body> (position:fixed), untouched by replacing
+//     #app's contents, so visual feedback is unaffected.
+//   • renderEntry() already recomputes the progress row, asset/location/type
+//     fields, quick-pick grid (incl. Smart Quick Pick ordering), notes block,
+//     copy-last label + disabled state, and nav-row disabled states — i.e. every
+//     part of the screen that changes after a log.
+//   • bindEvents() is the same binding pass render() uses.
+// If we are NOT on the entry screen for any reason, fall back to a full render()
+// so there is never a path where this does something unexpected.
+function refreshEntryAfterLog() {
+  if (state.view !== 'entry') { render(); return; }
+  const sess = activeSession();
+  if (!sess) { render(); return; }
+  // Defensive: keep the same body-class hygiene render() guarantees, minus the
+  // overview selection bar (never relevant on the entry screen).
+  document.body.classList.remove('has-selection-bar');
+  document.body.classList.remove('view-entry');
+  app.innerHTML = renderEntry();
+  bindEvents();
+}
+// matches a saved client, show only that client's sites; otherwise show every
+// site (so the picker is still useful before a client is chosen). De-duped by
+// visible name to avoid identical options across clients.
+function nfSiteOptionsHTML() {
+  const typedClient = String(state.newForm.clientId || '').trim();
+  const match = findClientByName(typedClient);
+  const list = match ? sitesForClient(match.id) : state.sites.slice();
+  const seen = new Set();
+  const names = [];
+  list.forEach(s => {
+    const key = s.name.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    names.push(s.name);
+  });
+  names.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  return names.map(n => `<option value="${escapeHTML(n)}"></option>`).join('');
+}
+
 function renderSessions() {
   const newForm = state.newForm.show ? `
     <div class="card">
       <h2 class="h2">New session</h2>
-      <label class="label">Site / client</label>
-      <input class="input" id="nf-site" value="${escapeHTML(state.newForm.site)}" placeholder="e.g. Acme Ltd – Unit 4" autofocus>
+      <label class="label">Client</label>
+      <input class="input" id="nf-client" list="nf-client-list" value="${escapeHTML(state.newForm.clientId)}" placeholder="e.g. Acme Ltd" autocomplete="off" autofocus>
+      <datalist id="nf-client-list">
+        ${sortedClients().map(c => `<option value="${escapeHTML(c.name)}"></option>`).join('')}
+      </datalist>
+      <label class="label">Site</label>
+      <input class="input" id="nf-site" list="nf-site-list" value="${escapeHTML(state.newForm.site)}" placeholder="e.g. Unit 4, Head Office" autocomplete="off">
+      <datalist id="nf-site-list">
+        ${nfSiteOptionsHTML()}
+      </datalist>
+      <p class="muted" style="margin:-4px 0 12px;font-size:12px">Pick from your saved clients and sites, or type new ones — they'll be saved for next time. Manage them under Settings → Clients.</p>
       <label class="label">Engineer</label>
       <input class="input" id="nf-engineer" value="${escapeHTML(state.newForm.engineer || state.engineer)}" placeholder="Your name">
       <label class="label">Session name <span class="hint">(optional)</span></label>
@@ -4543,8 +4927,9 @@ function renderEditSession() {
         <span style="width:40px"></span>
       </header>
       <div class="card">
-        <label class="label">Site / client</label>
+        <label class="label">Site</label>
         <input class="input" id="ef-site" value="${escapeHTML(state.editForm.site)}">
+        <p class="muted" style="margin:6px 0 0;font-size:12px">This is the site name saved on the session. Editing it here changes only this session, not your Clients list.</p>
         <label class="label">Engineer</label>
         <input class="input" id="ef-engineer" value="${escapeHTML(state.editForm.engineer)}">
         <label class="label">Session name</label>
@@ -4613,6 +4998,13 @@ function renderSettingsHub() {
   });
   const csvSummary = `${visibleCsv} of ${totalCsv} column${totalCsv === 1 ? '' : 's'} visible${csvCustomised ? ' · customised' : ''}`;
 
+  // v19: Clients summary — client count + total site count.
+  const clientCount = state.clients.length;
+  const siteCount = state.sites.length;
+  const clientsSummary = clientCount === 0
+    ? 'No clients yet'
+    : `${clientCount} client${clientCount === 1 ? '' : 's'} · ${siteCount} site${siteCount === 1 ? '' : 's'}`;
+
   // v12: User Settings subtitle picks up calibration-due status. The base
   // text is the engineer name (or "Engineer name" placeholder); we append
   // " · Cal overdue (N days)" or " · Cal due in N days" when there's
@@ -4638,6 +5030,7 @@ function renderSettingsHub() {
     { id: 'settingsDescriptions', icon: '📝', title: 'Item Description List', sub: descSummary },
     { id: 'settingsDisplay', icon: '🎨', title: 'Display Settings', sub: displaySummary },
     { id: 'settingsCsv', icon: '📊', title: 'CSV Columns', sub: csvSummary },   // v11
+    { id: 'settingsClients', icon: '🏢', title: 'Clients', sub: clientsSummary },   // v19
     { id: 'settingsBackup', icon: '💾', title: 'Backup & Restore', sub: 'Export or import all data' },
     { id: 'settingsCalculator', icon: '🧮', title: 'Resistance Calculator', sub: 'Earth continuity limit' },
     { id: 'settingsAbout', icon: 'ℹ️', title: 'About', sub: 'About this app' },
@@ -5101,6 +5494,115 @@ function renderSettingsCsv() {
   `;
 }
 
+// ---------- v19: Clients & Sites settings page ----------
+// Lists clients; tapping a client expands it to show its sites with add /
+// rename / delete. Add / rename use a bottom-sheet (the same .bulk-sheet
+// pattern used elsewhere) so the flow matches the rest of the app and works
+// reliably on iOS PWA. Deleting confirms first (and a client delete warns about
+// its sites). Nothing here changes any saved session's stored site text.
+function renderSettingsClients() {
+  const clients = sortedClients();
+
+  const emptyState = clients.length === 0 ? `
+    <div class="settings-section">
+      <p class="muted" style="margin-top:0">No clients yet. Add a client, then add the sites you test at — they'll appear as quick picks when you start a new session.</p>
+    </div>
+  ` : '';
+
+  const listHtml = clients.map(c => {
+    const expanded = state.clientsPage.expandedClientId === c.id;
+    const sites = sitesForClient(c.id);
+    const siteCount = sites.length;
+    const sub = siteCount === 0 ? 'No sites' : `${siteCount} site${siteCount === 1 ? '' : 's'}`;
+
+    const sitesBlock = expanded ? `
+      <div class="client-sites">
+        ${sites.length ? sites.map(s => `
+          <div class="client-site-row">
+            <span class="client-site-name">${escapeHTML(s.name)}</span>
+            <div class="client-site-actions">
+              <button class="link-btn" data-site-rename="${escapeHTML(s.id)}">Rename</button>
+              <button class="link-btn danger" data-site-delete="${escapeHTML(s.id)}">Delete</button>
+            </div>
+          </div>
+        `).join('') : `<p class="muted" style="margin:4px 0 8px">No sites for this client yet.</p>`}
+        <button class="btn-secondary client-add-site-btn" data-site-add="${escapeHTML(c.id)}">+ Add site</button>
+      </div>
+    ` : '';
+
+    return `
+      <div class="client-card${expanded ? ' expanded' : ''}">
+        <button class="client-head" data-client-toggle="${escapeHTML(c.id)}">
+          <span class="client-head-text">
+            <span class="client-head-name">${escapeHTML(c.name)}</span>
+            <span class="client-head-sub">${escapeHTML(sub)}</span>
+          </span>
+          <span class="client-head-chevron">${expanded ? '⌄' : '›'}</span>
+        </button>
+        <div class="client-head-actions">
+          <button class="link-btn" data-client-rename="${escapeHTML(c.id)}">Rename</button>
+          <button class="link-btn danger" data-client-delete="${escapeHTML(c.id)}">Delete</button>
+        </div>
+        ${sitesBlock}
+      </div>
+    `;
+  }).join('');
+
+  // Bottom-sheet dialogs (one at a time). Client add/rename, then site add/rename.
+  let dialog = '';
+  const cd = state.clientsPage.clientDialog;
+  const sd = state.clientsPage.siteDialog;
+  if (cd.mode) {
+    const title = cd.mode === 'add' ? 'Add client' : 'Rename client';
+    dialog = `
+      <div class="modal-backdrop" id="client-dialog-backdrop" style="z-index:300"></div>
+      <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="${title}">
+        <div class="bulk-sheet-handle"></div>
+        <div class="bulk-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="bulk-sheet-title">${title}</h3>
+          <button class="fail-close-btn" id="client-dialog-cancel" aria-label="Cancel">×</button>
+        </div>
+        <label class="label">Client name</label>
+        <input class="input" id="client-dialog-input" value="${escapeHTML(cd.name)}" placeholder="e.g. Acme Ltd" autofocus>
+        <button class="btn-primary" id="client-dialog-confirm" style="margin-top:14px">${cd.mode === 'add' ? 'Add' : 'Save'}</button>
+      </div>
+    `;
+  } else if (sd.mode) {
+    const title = sd.mode === 'add' ? 'Add site' : 'Rename site';
+    const parent = sd.mode === 'add' ? clientById(sd.clientId) : (siteById(sd.editingId) ? clientById(siteById(sd.editingId).clientId) : null);
+    const parentLine = parent ? `<p class="muted" style="margin:0 0 12px">Client: ${escapeHTML(parent.name)}</p>` : '';
+    dialog = `
+      <div class="modal-backdrop" id="site-dialog-backdrop" style="z-index:300"></div>
+      <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="${title}">
+        <div class="bulk-sheet-handle"></div>
+        <div class="bulk-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="bulk-sheet-title">${title}</h3>
+          <button class="fail-close-btn" id="site-dialog-cancel" aria-label="Cancel">×</button>
+        </div>
+        ${parentLine}
+        <label class="label">Site name</label>
+        <input class="input" id="site-dialog-input" value="${escapeHTML(sd.name)}" placeholder="e.g. Unit 4, Head Office" autofocus>
+        <button class="btn-primary" id="site-dialog-confirm" style="margin-top:14px">${sd.mode === 'add' ? 'Add' : 'Save'}</button>
+      </div>
+    `;
+  }
+
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Clients')}
+      <div class="settings-section">
+        <p class="muted" style="margin-top:0">Your clients and the sites you test at. These appear as quick picks on the New Session screen. Editing or deleting here never changes sessions you've already saved.</p>
+        <button class="btn-primary" id="client-add-btn" style="margin-top:4px">+ Add client</button>
+      </div>
+      ${emptyState}
+      <div class="clients-list">${listHtml}</div>
+      ${dialog}
+    </div>
+  `;
+}
+
 function computeEarthLimit(csaKey, lengthM) {
   const r = CSA_RESISTANCE[csaKey];
   if (r === undefined) return null;
@@ -5178,18 +5680,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v18: rolled forward — V18 on top, V15 dropped. -->
+      <!-- v8: rolling 3-version changelog. v19: rolled forward — V19 on top, V16 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V19</strong> · June 2026</p>
+        <p class="muted">Clients and sites are now separate. When you start a new session you pick (or type) a Client, then a Site — so one client can have as many sites as you like, and both are remembered for next time. A new Clients page under Settings lets you add, rename, and tidy up your clients and their sites, and your existing sessions' site names are brought in automatically so the lists aren't empty to begin with. Editing or removing a client or site never changes any session you've already saved. Logging a pass or copying a result is also a little quicker behind the scenes.</p>
 
         <p><strong>V18.1</strong> · June 2026</p>
         <p class="muted">New Smart Quick Pick option. Turn it on and the quick-pick buttons on the entry screen adapt to the current location — swapping in the item types you most often test there, even ones that aren't in your usual nine, so they're a single tap away. It builds from your existing sessions the moment you switch it on, then keeps learning as you log more, and you can rebuild or clear that history at any time. Your preset list is still the default row whenever there's no match for a location. Find it under Settings → Quick Pick Items; it's off by default.</p>
 
         <p><strong>V17</strong> · June 2026</p>
         <p class="muted">Every Pass, Fail and Copy now flashes the button you tapped, giving a clear visual confirmation — useful on newer iPhones where iOS has stopped apps like this one from using vibration. You can also turn on Sound feedback for a short tone on each action, with a different tone for pass, fail and copy (under Settings → Display, off by default). And there's a new option to record the time each item was logged: switch on Item timestamps under Settings → Display to show times in a session's overview and to add a Time column to CSV export. Both new options are off by default, so nothing changes unless you turn them on.</p>
-
-        <p><strong>V16</strong> · June 2026</p>
-        <p class="muted">New Multi Pick feature. Define your own lists of items — say a lead, adapter and monitor for a desk PC — and log the whole list as passes with a single tap, in the order you set, all on the current location. Build up to six of these under Settings → Multi Pick, name them however you like, and show or hide the entry-screen button with a toggle. It's off by default, since it's only worth it on certain jobs.</p>
       </div>
 
       <div class="info-card">
@@ -5240,15 +5742,33 @@ function bindEvents() {
     if (!state.newForm.engineer && state.engineer) state.newForm.engineer = state.engineer;
     render();
   };
-  if ($('nf-cancel')) $('nf-cancel').onclick = () => { state.newForm.show = false; render(); };
+  if ($('nf-cancel')) $('nf-cancel').onclick = () => {
+    // v19: clear the form on cancel so a half-filled client/site (or any other
+    // field) doesn't carry into the next New Session. Engineer is re-seeded from
+    // the saved default when the form is next opened.
+    state.newForm = { name: '', site: '', engineer: state.engineer, prefix: '', startNo: '1', show: false, clientId: '', siteId: '' };
+    render();
+  };
   if ($('nf-submit')) $('nf-submit').onclick = () => {
-    state.newForm.site = $('nf-site').value;
+    // v19: nf-client carries the typed CLIENT name; nf-site the SITE name.
+    state.newForm.clientId = $('nf-client') ? $('nf-client').value : '';
+    state.newForm.site = $('nf-site') ? $('nf-site').value : '';
     state.newForm.engineer = $('nf-engineer').value;
     state.newForm.name = $('nf-name').value;
     state.newForm.prefix = $('nf-prefix').value;
     state.newForm.startNo = $('nf-start').value;
     createSession();
   };
+  // v19: client field — on change, refresh the Site datalist to that client's
+  // sites. We rebuild only the <datalist> options (not the whole form) so the
+  // user's focus and any half-typed site value are preserved.
+  if ($('nf-client')) {
+    $('nf-client').oninput = e => {
+      state.newForm.clientId = e.target.value;
+      const dl = document.getElementById('nf-site-list');
+      if (dl) dl.innerHTML = nfSiteOptionsHTML();
+    };
+  }
   if ($('nf-site')) $('nf-site').oninput = e => state.newForm.site = e.target.value;
   if ($('nf-engineer')) $('nf-engineer').oninput = e => state.newForm.engineer = e.target.value;
   if ($('nf-name')) $('nf-name').oninput = e => state.newForm.name = e.target.value;
@@ -5748,7 +6268,7 @@ function bindEvents() {
   };
 
   // v17 welcome modal — Continue button dismisses and stamps the flag.
-  if ($('v18-welcome-dismiss')) $('v18-welcome-dismiss').onclick = () => dismissV18Welcome();
+  if ($('v19-welcome-dismiss')) $('v19-welcome-dismiss').onclick = () => dismissV19Welcome();
 
   // v14: reopen-warning modal buttons.
   if ($('reopen-warn-continue')) $('reopen-warn-continue').onclick = () => confirmReopenWarning();
@@ -5764,6 +6284,81 @@ function bindEvents() {
   document.querySelectorAll('[data-csv-down]').forEach(el => {
     el.onclick = () => moveCsvColumn(el.dataset.csvDown, +1);
   });
+
+  // v19: Clients & Sites settings page.
+  if ($('client-add-btn')) $('client-add-btn').onclick = () => {
+    state.clientsPage.clientDialog = { mode: 'add', name: '', editingId: null };
+    state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
+    render();
+  };
+  // Expand / collapse a client to reveal its sites.
+  document.querySelectorAll('[data-client-toggle]').forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.clientToggle;
+      state.clientsPage.expandedClientId =
+        state.clientsPage.expandedClientId === id ? null : id;
+      render();
+    };
+  });
+  document.querySelectorAll('[data-client-rename]').forEach(el => {
+    el.onclick = () => {
+      const c = clientById(el.dataset.clientRename);
+      if (!c) return;
+      state.clientsPage.clientDialog = { mode: 'rename', name: c.name, editingId: c.id };
+      state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
+      render();
+    };
+  });
+  document.querySelectorAll('[data-client-delete]').forEach(el => {
+    el.onclick = () => deleteClient(el.dataset.clientDelete);
+  });
+  document.querySelectorAll('[data-site-add]').forEach(el => {
+    el.onclick = () => {
+      state.clientsPage.siteDialog = { mode: 'add', name: '', editingId: null, clientId: el.dataset.siteAdd };
+      state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
+      render();
+    };
+  });
+  document.querySelectorAll('[data-site-rename]').forEach(el => {
+    el.onclick = () => {
+      const s = siteById(el.dataset.siteRename);
+      if (!s) return;
+      state.clientsPage.siteDialog = { mode: 'rename', name: s.name, editingId: s.id, clientId: s.clientId };
+      state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
+      render();
+    };
+  });
+  document.querySelectorAll('[data-site-delete]').forEach(el => {
+    el.onclick = () => deleteSite(el.dataset.siteDelete);
+  });
+  // Client dialog (add / rename)
+  if ($('client-dialog-input')) $('client-dialog-input').oninput = e => state.clientsPage.clientDialog.name = e.target.value;
+  if ($('client-dialog-confirm')) $('client-dialog-confirm').onclick = () => {
+    if (state.clientsPage.clientDialog.mode === 'add') addClientFromDialog();
+    else renameClientFromDialog();
+  };
+  if ($('client-dialog-cancel')) $('client-dialog-cancel').onclick = () => {
+    state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
+    render();
+  };
+  if ($('client-dialog-backdrop')) $('client-dialog-backdrop').onclick = () => {
+    state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
+    render();
+  };
+  // Site dialog (add / rename)
+  if ($('site-dialog-input')) $('site-dialog-input').oninput = e => state.clientsPage.siteDialog.name = e.target.value;
+  if ($('site-dialog-confirm')) $('site-dialog-confirm').onclick = () => {
+    if (state.clientsPage.siteDialog.mode === 'add') addSiteFromDialog();
+    else renameSiteFromDialog();
+  };
+  if ($('site-dialog-cancel')) $('site-dialog-cancel').onclick = () => {
+    state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
+    render();
+  };
+  if ($('site-dialog-backdrop')) $('site-dialog-backdrop').onclick = () => {
+    state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
+    render();
+  };
 }
 
 // Light re-render of just the suggestions dropdown so we don't lose input focus
