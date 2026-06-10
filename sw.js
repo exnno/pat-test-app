@@ -131,11 +131,22 @@
 // positionally stable (preset buttons keep their place) and frozen per location
 // (no more reshuffling mid-logging); a "Rebuild from my sessions" button on the
 // Clients page. app.js + styles.css changed; cache bumped to pat-v20.
-const CACHE_VERSION = 'pat-v20';
+//
+// v21: structural refactor — app.js split into modules (config.js, state.js,
+// utils.js, storage.js + the remaining app.js). No behaviour, visual, storage
+// or feature change. The four new files are added to the cache list below and
+// loaded in order from index.html (config → state → utils → storage → app).
+// Cache bumped to pat-v21 so installed PWAs pull the new file set; a stale
+// cache would serve the old single app.js with no matching index.html scripts.
+const CACHE_VERSION = 'pat-v21';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
+  './config.js',
+  './state.js',
+  './utils.js',
+  './storage.js',
   './app.js',
   './manifest.webmanifest',
   './icon-192.png',

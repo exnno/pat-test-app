@@ -17,6 +17,13 @@
 </head>
 <body>
   <div id="app"></div>
+  <!-- v21: app.js split into modules. ORDER MATTERS — load top to bottom.
+       config (data) → state → utils → storage → app (everything else + boot).
+       app.js runs the boot block and must stay LAST. -->
+  <script src="config.js"></script>
+  <script src="state.js"></script>
+  <script src="utils.js"></script>
+  <script src="storage.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
