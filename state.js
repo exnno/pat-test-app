@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA — state.js (global application state)
- * v21 (June 2026)
+ * v22 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.

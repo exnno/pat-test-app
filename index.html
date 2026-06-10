@@ -17,13 +17,24 @@
 </head>
 <body>
   <div id="app"></div>
-  <!-- v21: app.js split into modules. ORDER MATTERS — load top to bottom.
-       config (data) → state → utils → storage → app (everything else + boot).
-       app.js runs the boot block and must stay LAST. -->
+  <!-- v22: app.js fully split into single-concern modules. ORDER MATTERS —
+       load top to bottom; later files may call functions defined earlier.
+       data/state/utils/storage → feature files → render → events → boot.
+       boot.js runs the startup block and MUST stay LAST. -->
   <script src="config.js"></script>
   <script src="state.js"></script>
   <script src="utils.js"></script>
   <script src="storage.js"></script>
-  <script src="app.js"></script>
+  <script src="clients.js"></script>
+  <script src="sqp.js"></script>
+  <script src="multipick.js"></script>
+  <script src="feedback.js"></script>
+  <script src="csv.js"></script>
+  <script src="backup.js"></script>
+  <script src="session.js"></script>
+  <script src="render-core.js"></script>
+  <script src="render-settings.js"></script>
+  <script src="events.js"></script>
+  <script src="boot.js"></script>
 </body>
 </html>

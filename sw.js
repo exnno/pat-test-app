@@ -138,7 +138,15 @@
 // loaded in order from index.html (config → state → utils → storage → app).
 // Cache bumped to pat-v21 so installed PWAs pull the new file set; a stale
 // cache would serve the old single app.js with no matching index.html scripts.
-const CACHE_VERSION = 'pat-v21';
+//
+// v22: refactor part 2 — the remaining app.js is split into eleven more files
+// (clients, sqp, multipick, feedback, csv, backup, session, render-core,
+// render-settings, events, boot) and app.js is DELETED. Still no behaviour,
+// visual, storage, codec or backup change. The ASSETS list below now lists all
+// fifteen scripts in load order and NO LONGER includes app.js. Cache bumped to
+// pat-v22 — a stale cache would 404 the new files (or serve the now-removed
+// app.js) and blank the app. The boot.js crash fallback guards the failure mode.
+const CACHE_VERSION = 'pat-v22';
 const ASSETS = [
   './',
   './index.html',
@@ -147,7 +155,17 @@ const ASSETS = [
   './state.js',
   './utils.js',
   './storage.js',
-  './app.js',
+  './clients.js',
+  './sqp.js',
+  './multipick.js',
+  './feedback.js',
+  './csv.js',
+  './backup.js',
+  './session.js',
+  './render-core.js',
+  './render-settings.js',
+  './events.js',
+  './boot.js',
   './manifest.webmanifest',
   './icon-192.png',
   './icon-512.png'
