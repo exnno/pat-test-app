@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v17.2 (June 2026)
+ * v18 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v17.2 ==============
+// ============== PAT Test PWA — v18 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V17.2';
+const APP_VERSION = 'V18';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -60,7 +60,27 @@ const V13_WELCOME_KEY = 'pat:v13welcome';   // v14: legacy. Orphaned, harmless.
 const V14_WELCOME_KEY = 'pat:v14welcome';   // v15: legacy. Orphaned, harmless.
 const V15_WELCOME_KEY = 'pat:v15welcome';   // v16: legacy. Orphaned, harmless.
 const V16_WELCOME_KEY = 'pat:v16welcome';   // v16
-const V17_WELCOME_KEY = 'pat:v17welcome';   // v17
+const V17_WELCOME_KEY = 'pat:v17welcome';   // v17: legacy. Orphaned, harmless.
+const V18_WELCOME_KEY = 'pat:v18welcome';   // v18
+
+// v18: Smart Quick Pick. An OPT-IN feature (default OFF) that reorders the
+// entry-screen quick-pick buttons so the item types you've most often logged at
+// the current Location float to the front. It NEVER adds, removes, or hides
+// buttons and never changes what a tap logs — it only changes their order. When
+// off (the default), the grid renders in its plain preset order exactly as
+// before, so existing users see no change until they turn it on.
+//
+//   SQP_ENABLED_KEY — '1' | '0', default '0'. Gates the whole feature.
+//   SQP_HISTORY_KEY — JSON object mapping a normalised location string to a
+//                     { itemType: count } tally:
+//                       { "server room": { "PC": 4, "Monitor": 3 }, ... }
+//                     Built once from all existing sessions when first enabled
+//                     (or via the Rebuild button), then incremented on every new
+//                     item logged. Stored readable/long-key (not codec-shortened)
+//                     — it's small next to item data and benefits from being
+//                     human-readable in backups, matching the backup principle.
+const SQP_ENABLED_KEY = 'pat:sqpenabled';   // v18: '1' | '0', default '0'
+const SQP_HISTORY_KEY = 'pat:sqphistory';   // v18: JSON { loc: { type: count } }
 
 // v17: Sound feedback (opt-in audio confirmation). Stored as '1'|'0', default
 // OFF ('0'). Distinct from haptics — this plays a short Web Audio tone on
@@ -489,9 +509,13 @@ let state = {
   // completeness only — no longer gates anything.
   v16WelcomeSeen: false,
 
-  // v17: welcome modal flag (key pat:v17welcome). Gates the V17 "what's new"
-  // modal so v16 users see it once on update.
+  // v17: welcome modal flag (key pat:v17welcome). v18: retained for load-time
+  // completeness only — no longer gates anything.
   v17WelcomeSeen: false,
+
+  // v18: welcome modal flag (key pat:v18welcome). Gates the V18 "what's new"
+  // modal so v17 users see it once on update.
+  v18WelcomeSeen: false,
 
   // v17: Sound feedback (opt-in audio confirmation). Default OFF. When ON, a
   // short Web Audio tone plays on pass/fail/copy alongside the haptic call.
@@ -500,6 +524,15 @@ let state = {
   // v17: Item timestamps. Default OFF. Gates both capture (stamping item.ts on
   // first save) and display (Overview HH:MM + CSV column output).
   timestampsEnabled: false,
+
+  // v18: Smart Quick Pick. Default OFF. When ON, the entry-screen quick-pick
+  // buttons are reordered (not added/removed) so the types most used at the
+  // current Location come first. sqpHistory is the learned tally:
+  //   { normalisedLocation: { itemType: count } }.
+  // Loaded via loadSqpHistory(); seeded from existing sessions the first time
+  // the feature is enabled (or rebuilt via the settings button).
+  sqpEnabled: false,
+  sqpHistory: {},
 
   // v16: Multi Pick config — GLOBAL (not per-preset). enabled gates the
   // entry-screen button; slots is an array of up to 6 { name, items:[strings] }.
@@ -747,11 +780,17 @@ function loadV11Settings() {
   state.v15WelcomeSeen = localStorage.getItem(V15_WELCOME_KEY) === '1';
   state.v16WelcomeSeen = localStorage.getItem(V16_WELCOME_KEY) === '1';
   state.v17WelcomeSeen = localStorage.getItem(V17_WELCOME_KEY) === '1';
+  state.v18WelcomeSeen = localStorage.getItem(V18_WELCOME_KEY) === '1';
 
   // v17: Sound feedback + Item timestamps. Both default OFF; only an explicit
   // '1' enables them. Anything else (absent key, '0', garbage) reads as off.
   state.soundEnabled = localStorage.getItem(SOUNDFX_KEY) === '1';
   state.timestampsEnabled = localStorage.getItem(TIMESTAMPS_KEY) === '1';
+
+  // v18: Smart Quick Pick. Flag defaults OFF; history is validated defensively
+  // so a corrupt key can never wedge the entry screen (falls back to {}).
+  state.sqpEnabled = localStorage.getItem(SQP_ENABLED_KEY) === '1';
+  state.sqpHistory = loadSqpHistory();
 
   // v16: Multi Pick config. Validated defensively so a corrupt/garbage key can
   // never wedge the entry screen — falls back to { enabled:false, slots:[] }.
@@ -819,6 +858,9 @@ function save() {
   // v17: Sound feedback + Item timestamps settings.
   localStorage.setItem(SOUNDFX_KEY, state.soundEnabled ? '1' : '0');
   localStorage.setItem(TIMESTAMPS_KEY, state.timestampsEnabled ? '1' : '0');
+  // v18: Smart Quick Pick flag + learned history.
+  localStorage.setItem(SQP_ENABLED_KEY, state.sqpEnabled ? '1' : '0');
+  localStorage.setItem(SQP_HISTORY_KEY, JSON.stringify(state.sqpHistory || {}));
   // lastBackupAt + backupSnoozedUntil are written via their own helpers
   // (markBackupExported, snoozeBackupReminder) rather than here, because they
   // shouldn't update on every state change.
@@ -959,6 +1001,8 @@ function multiPickFire(idx) {
     if (state.timestampsEnabled) item.ts = new Date().toISOString();
     sess.items.push(item);
     addDescriptionIfNew(cleanType);
+    // v18: learn each (location, type) pairing in the batch.
+    recordSqpUsage(cleanLocation, cleanType);
   });
 
   const n = slot.items.length;
@@ -996,6 +1040,150 @@ function saveMultiPickSettings() {
   state.multiPick = { enabled, slots: slots.slice(0, MULTIPICK_MAX_SLOTS) };
   save();
   setView('settings');
+}
+
+// ---------- v18: Smart Quick Pick helpers ----------
+// The learned model is a plain object: { normalisedLocation: { itemType: count } }.
+// "normalised" here means lowercased + whitespace-collapsed (NOT title-cased) so
+// "Server Room", "server  room" and "SERVER ROOM" all map to one bucket. Matching
+// a typed location against the buckets is substring-based (Q3 = option b): the
+// row reorders when the current location contains, or is contained by, a learned
+// bucket key. The frequency tally drives the order; ties keep the preset order.
+
+// Lowercase + collapse internal/edge whitespace. Empty/garbage → ''.
+function normaliseSqpLocation(s) {
+  return String(s || '').trim().toLowerCase().replace(/\s+/g, ' ');
+}
+
+// Validate an arbitrary value (from localStorage or a restored backup) into a
+// safe history object. Anything unexpected collapses to {}. Keys must be
+// non-empty normalised strings; each value must be a { type: positive-int } map.
+function normaliseSqpHistory(raw) {
+  const out = {};
+  if (!raw || typeof raw !== 'object') return out;
+  Object.keys(raw).forEach(locKey => {
+    const loc = normaliseSqpLocation(locKey);
+    if (!loc) return;
+    const tally = raw[locKey];
+    if (!tally || typeof tally !== 'object') return;
+    const bucket = out[loc] || (out[loc] = {});
+    Object.keys(tally).forEach(typeRaw => {
+      const type = String(typeRaw || '').trim();
+      const n = parseInt(tally[typeRaw], 10);
+      if (type && Number.isFinite(n) && n > 0) {
+        bucket[type] = (bucket[type] || 0) + n;   // sum on key-collision after normalise
+      }
+    });
+    if (!Object.keys(bucket).length) delete out[loc];
+  });
+  return out;
+}
+
+function loadSqpHistory() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(SQP_HISTORY_KEY) || 'null'); } catch {}
+  return normaliseSqpHistory(raw);
+}
+
+// Record one (location, itemType) pairing into the learned history. Called at
+// the point an item is FIRST logged (saveItem append, copyLastResult append, and
+// each item in multiPickFire). No-op when the feature is off, or when either
+// field is blank. Does NOT call save() itself — the caller's existing save()
+// persists state.sqpHistory alongside everything else.
+function recordSqpUsage(location, itemType) {
+  if (!state.sqpEnabled) return;
+  const loc = normaliseSqpLocation(location);
+  const type = String(itemType || '').trim();
+  if (!loc || !type) return;
+  const bucket = state.sqpHistory[loc] || (state.sqpHistory[loc] = {});
+  bucket[type] = (bucket[type] || 0) + 1;
+}
+
+// Build (or rebuild) the entire history map from every item already in storage.
+// Used to seed the model the first time the feature is enabled — so it's useful
+// immediately on an existing database rather than starting empty — and by the
+// "Rebuild from my data" button. Returns a fresh map; does not mutate state.
+function buildSqpHistory() {
+  const out = {};
+  state.sessions.forEach(s => (s.items || []).forEach(it => {
+    const loc = normaliseSqpLocation(it.location);
+    const type = String(it.itemType || '').trim();
+    if (!loc || !type) return;
+    const bucket = out[loc] || (out[loc] = {});
+    bucket[type] = (bucket[type] || 0) + 1;
+  }));
+  return out;
+}
+
+// Aggregate the learned tallies for a given typed location into a single
+// { itemType: score } map. A learned bucket contributes when its key and the
+// typed location have a substring relationship in EITHER direction (so typing
+// "Server Room 2" matches a learned "server room", and typing "server" matches
+// "server room a"). Scores from all matching buckets are summed. Returns {} when
+// the location is blank or nothing matches (→ caller leaves the order untouched).
+function sqpScoresForLocation(location) {
+  const loc = normaliseSqpLocation(location);
+  if (!loc) return {};
+  const scores = {};
+  Object.keys(state.sqpHistory).forEach(key => {
+    if (loc.includes(key) || key.includes(loc)) {
+      const tally = state.sqpHistory[key];
+      Object.keys(tally).forEach(type => {
+        scores[type] = (scores[type] || 0) + tally[type];
+      });
+    }
+  });
+  return scores;
+}
+
+// Reorder a copy of the quick-pick item-type list for the current location.
+// STABLE: types with a learned score sort to the front by descending score;
+// everything else keeps its original preset order behind them; ties among scored
+// types also keep preset order. Never adds or drops a button — the returned array
+// is always a permutation of the input. When the feature is off, the location is
+// blank, or nothing matches, the input order is returned unchanged.
+function smartOrderedItemTypes(types, location) {
+  if (!state.sqpEnabled) return types;
+  const scores = sqpScoresForLocation(location);
+  if (!Object.keys(scores).length) return types;
+  // Decorate-sort-undecorate with the original index as the stable tiebreaker.
+  return types
+    .map((t, i) => ({ t, i, score: scores[t] || 0 }))
+    .sort((a, b) => (b.score - a.score) || (a.i - b.i))
+    .map(x => x.t);
+}
+
+// v18: clear the learned history to empty (a true reset). Re-enabling the
+// feature, or logging new items, will repopulate it. Confirmed by the caller.
+function clearSqpHistory() {
+  state.sqpHistory = {};
+  save();
+  render();
+  setTimeout(() => alert('Smart Quick Pick history cleared.'), 50);
+}
+
+// v18: rebuild the learned history from all current session data, replacing
+// whatever was there. Confirmed by the caller.
+function rebuildSqpHistory() {
+  state.sqpHistory = buildSqpHistory();
+  save();
+  render();
+  const locs = Object.keys(state.sqpHistory).length;
+  setTimeout(() => alert(`Smart Quick Pick history rebuilt from your data (${locs} location${locs === 1 ? '' : 's'}).`), 50);
+}
+
+// v18: toggle handler. Turning it ON for the first time on a fresh/empty history
+// seeds it from existing data so it's immediately useful; turning it ON when a
+// history already exists leaves that history intact. Turning it OFF keeps the
+// history (so toggling back on doesn't lose the learning) but stops all
+// reordering and recording.
+function setSqp(enabled) {
+  state.sqpEnabled = !!enabled;
+  if (state.sqpEnabled && Object.keys(state.sqpHistory).length === 0) {
+    state.sqpHistory = buildSqpHistory();
+  }
+  save();
+  render();
 }
 
 // v16: transient toast — a small auto-dismissing pill at the bottom of the
@@ -2180,6 +2368,9 @@ function buildBackup() {
     // v17: feedback + timestamp settings.
     soundEnabled: state.soundEnabled,
     timestampsEnabled: state.timestampsEnabled,
+    // v18: Smart Quick Pick flag + learned history (readable long-key form).
+    sqpEnabled: state.sqpEnabled,
+    sqpHistory: state.sqpHistory,
     lastBackupAt: state.lastBackupAt
   };
 }
@@ -2343,6 +2534,14 @@ function restoreBackupFromFile(file) {
     if (typeof data.timestampsEnabled === 'boolean') {
       state.timestampsEnabled = data.timestampsEnabled;
     }
+
+    // v18: Smart Quick Pick. Flag is a boolean (older backups without it leave
+    // the default off); history is validated through the same normaliser used on
+    // load, so a missing/garbage value collapses to {}.
+    if (typeof data.sqpEnabled === 'boolean') {
+      state.sqpEnabled = data.sqpEnabled;
+    }
+    state.sqpHistory = normaliseSqpHistory(data.sqpHistory);
 
     state.activeId = null;
     state.view = 'sessions';
@@ -2669,6 +2868,9 @@ function saveItem(result) {
     // v17: stamp the timestamp on first save, only when the setting is on.
     if (state.timestampsEnabled) item.ts = new Date().toISOString();
     sess.items.push({ id: uid(), ...item });
+    // v18: learn this (location, type) pairing on first log (pass OR fail — a
+    // failed item still belongs to that location). No-op when SQP is off.
+    recordSqpUsage(cleanLocation, cleanType);
   }
   markSessionDirty(sess);   // v14: edits invalidate a prior export
   addDescriptionIfNew(cleanType);
@@ -2747,6 +2949,8 @@ function copyLastResult() {
     // v17: stamp on first save (append), only when timestamps are enabled.
     if (state.timestampsEnabled) item.ts = new Date().toISOString();
     sess.items.push({ id: uid(), ...item });
+    // v18: learn the copied (location, type) pairing as a fresh log.
+    recordSqpUsage(item.location, item.itemType);
   }
   markSessionDirty(sess);   // v14
   state.cursor++;
@@ -3161,11 +3365,11 @@ function moveCsvColumn(id, delta) {
 }
 
 // v12: dismiss the welcome modal — sets the flag in localStorage so it
-// doesn't reappear, then re-renders to clear it from view. v16: writes
-// pat:v16welcome so v15 users see the modal once on update.
-function dismissV17Welcome() {
-  state.v17WelcomeSeen = true;
-  localStorage.setItem(V17_WELCOME_KEY, '1');
+// doesn't reappear, then re-renders to clear it from view. v18: writes
+// pat:v18welcome so v17 users see the modal once on update.
+function dismissV18Welcome() {
+  state.v18WelcomeSeen = true;
+  localStorage.setItem(V18_WELCOME_KEY, '1');
   render();
 }
 
@@ -3392,24 +3596,24 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v17: rolled forward — content covers the V17 feedback + timestamps changes,
-  // key bumped to pat:v17welcome so v16 users see it once on update. Gate uses
-  // v17WelcomeSeen.
-  const welcomeModal = (state.v17WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // v18: rolled forward — content covers the V18 Smart Quick Pick change, key
+  // bumped to pat:v18welcome so v17 users see it once on update. Gate uses
+  // v18WelcomeSeen.
+  const welcomeModal = (state.v18WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V17">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V18">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V17</h3>
+        <h3 class="bulk-sheet-title">What's new in V18</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Clearer confirmation.</strong> Every Pass, Fail and Copy now flashes the button you tapped, so you get a visual confirmation even on iPhones where newer iOS has stopped in-app vibration from working.</li>
-        <li><strong>Optional sound.</strong> Turn on Sound feedback for a short tone on each action — a different one for pass, fail and copy. Find it under <strong>Settings → Display</strong>. Off by default.</li>
-        <li><strong>Item timestamps.</strong> Optionally record the time each item was logged — shown in the overview and available as a CSV column. Switch it on under <strong>Settings → Display</strong>. Off by default.</li>
+        <li><strong>Smart Quick Pick.</strong> Turn this on and the quick-pick buttons reorder themselves so the item types you most often test at the current location come first — less hunting, faster entry.</li>
+        <li><strong>It learns from your data.</strong> Switching it on builds straight away from your existing sessions, so it's useful from the off, and it keeps learning as you log more.</li>
+        <li><strong>Yours to control.</strong> Find it under <strong>Settings → Quick Pick Items</strong>, with buttons to rebuild or clear the history. It never changes which buttons you have or what they log — only their order. Off by default.</li>
       </ul>
-      <button class="btn-primary" id="v17-welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v18-welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -3780,7 +3984,13 @@ function renderEntry() {
   const flashSearchJump = (state.searchJumpCursor !== null && state.searchJumpCursor === state.cursor);
   state.searchJumpCursor = null;
 
-  const quickButtons = state.itemTypes.map(t => `
+  // v18: Smart Quick Pick reorders the buttons so the types most often logged at
+  // the current Location come first. When the feature is off (default), the
+  // location is blank, or nothing matches, this returns state.itemTypes
+  // unchanged — same buttons, same order, same count as before. It only ever
+  // permutes; it never adds, removes, or hides a button.
+  const orderedTypes = smartOrderedItemTypes(state.itemTypes, state.form.location);
+  const quickButtons = orderedTypes.map(t => `
     <button class="quick-btn ${state.form.itemType === t ? 'active' : ''}" data-type="${escapeHTML(t)}">${escapeHTML(t)}</button>
   `).join('');
 
@@ -4508,6 +4718,13 @@ function renderSettingsItems() {
   const presetCount = presets.length;
   const presetSummary = presetCount === 1 ? '1 preset' : `${presetCount} presets`;
 
+  // v18: a short status line describing the learned history, so the Rebuild /
+  // Clear buttons have context. Counts the learned locations.
+  const sqpLocCount = Object.keys(state.sqpHistory || {}).length;
+  const sqpHistoryNote = sqpLocCount === 0
+    ? 'No history learned yet. Turning this on builds it from your existing sessions; it then keeps learning as you log items.'
+    : `Learned from ${sqpLocCount} location${sqpLocCount === 1 ? '' : 's'}. Rebuild re-scans all your sessions; Clear empties it (re-enabling rebuilds it).`;
+
   // v9: presets dialog (rename / new) — uses the existing bulk-sheet bottom-sheet
   // pattern so it visually matches the bulk-edit-location dialog and the fail
   // picker. One input, two buttons.
@@ -4549,6 +4766,31 @@ function renderSettingsItems() {
         <h2 class="h2">Items in "${escapeHTML(active ? active.name : '')}"</h2>
         <p class="muted">One per line. Up to 9. Appear as quick-tap buttons on the entry screen.</p>
         <textarea class="textarea" id="settings-types" style="min-height:240px">${escapeHTML((active ? active.items : []).join('\n'))}</textarea>
+      </div>
+
+      <!-- v18: Smart Quick Pick. Reorders the quick-pick buttons on the entry
+           screen so the types you most often log at the current location come
+           first. Off by default — when off, buttons keep their plain order. The
+           toggle persists instantly (own handler, not the Save button below,
+           which only commits the items textarea / preset). -->
+      <div class="settings-section">
+        <h2 class="h2">Smart Quick Pick</h2>
+        <p class="muted">Reorder the quick-pick buttons so the item types you've most often tested at the current Location appear first. It never adds, removes, or hides buttons and never changes what a tap logs — only the order changes. Off by default.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Reorder by location</div>
+            <div class="toggle-row-sub">${state.sqpEnabled ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="sqp-toggle" ${state.sqpEnabled ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <p class="muted" style="margin-top:12px;font-size:12px">${sqpHistoryNote}</p>
+        <div class="preset-actions-row" style="margin-top:8px">
+          <button class="preset-action-btn" id="sqp-rebuild-btn">↻ Rebuild from my data</button>
+          <button class="preset-action-btn preset-action-danger" id="sqp-clear-btn">🗑 Clear history</button>
+        </div>
       </div>
 
       <div class="btn-row" style="margin-top:24px">
@@ -4905,18 +5147,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v17: rolled forward — V17 on top, V14 dropped. -->
+      <!-- v8: rolling 3-version changelog. v18: rolled forward — V18 on top, V15 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V18</strong> · June 2026</p>
+        <p class="muted">New Smart Quick Pick option. Turn it on and the quick-pick buttons on the entry screen reorder themselves so the item types you most often test at the current location appear first — handy when different sites or rooms tend to have different kit. It builds from your existing sessions the moment you switch it on, then keeps learning as you log more, and you can rebuild or clear that history at any time. It only changes the order of the buttons — never which buttons you have or what they record. Find it under Settings → Quick Pick Items; it's off by default.</p>
 
         <p><strong>V17</strong> · June 2026</p>
         <p class="muted">Every Pass, Fail and Copy now flashes the button you tapped, giving a clear visual confirmation — useful on newer iPhones where iOS has stopped apps like this one from using vibration. You can also turn on Sound feedback for a short tone on each action, with a different tone for pass, fail and copy (under Settings → Display, off by default). And there's a new option to record the time each item was logged: switch on Item timestamps under Settings → Display to show times in a session's overview and to add a Time column to CSV export. Both new options are off by default, so nothing changes unless you turn them on.</p>
 
         <p><strong>V16</strong> · June 2026</p>
         <p class="muted">New Multi Pick feature. Define your own lists of items — say a lead, adapter and monitor for a desk PC — and log the whole list as passes with a single tap, in the order you set, all on the current location. Build up to six of these under Settings → Multi Pick, name them however you like, and show or hide the entry-screen button with a toggle. It's off by default, since it's only worth it on certain jobs.</p>
-
-        <p><strong>V15</strong> · June 2026</p>
-        <p class="muted">The "not yet exported" line on the Sessions list is now a button — tap it to share every session that still needs exporting in one action. New filters sit beside Sort: narrow the list by export status (not exported, exported, or modified since export) and by locked or unlocked, with your choices remembered between visits. A calibration date that falls on today now reads "Due today" rather than "Due in 0 days". The on-screen scrollbar is now hidden while scrolling works exactly as before.</p>
       </div>
 
       <div class="info-card">
@@ -5074,7 +5316,11 @@ function bindEvents() {
       // Delay hiding so a click on a suggestion can register first.
       setTimeout(() => {
         state.showLocationSuggestions = false;
-        renderLocationSuggestionsOnly();
+        // v18: when Smart Quick Pick is on, the quick-pick row order depends on
+        // the confirmed location, so a full render is needed to reorder it.
+        // Otherwise the lightweight suggestions-only refresh is enough.
+        if (state.sqpEnabled) render();
+        else renderLocationSuggestionsOnly();
       }, 150);
     };
   }
@@ -5297,6 +5543,19 @@ function bindEvents() {
   if ($('settings-fails-reset')) $('settings-fails-reset').onclick = () => resetFailReasonsToDefaults();
   if ($('settings-descriptions-reset')) $('settings-descriptions-reset').onclick = () => resetDescriptionsToDefaults();
 
+  // v18: Smart Quick Pick controls on the Quick Pick Items page. The toggle
+  // commits instantly (and seeds history on first enable); the two buttons
+  // confirm before acting since they replace/clear the learned data.
+  if ($('sqp-toggle')) $('sqp-toggle').onchange = e => setSqp(e.target.checked);
+  if ($('sqp-rebuild-btn')) $('sqp-rebuild-btn').onclick = () => {
+    if (!confirm('Rebuild Smart Quick Pick history from all your current sessions?\n\nThis replaces the learned history with a fresh scan of your data.')) return;
+    rebuildSqpHistory();
+  };
+  if ($('sqp-clear-btn')) $('sqp-clear-btn').onclick = () => {
+    if (!confirm('Clear all Smart Quick Pick history?\n\nThe buttons will go back to their normal order until it learns again. Re-enabling the feature rebuilds the history from your data.')) return;
+    clearSqpHistory();
+  };
+
   // v9: preset switching, creation, rename, delete on the Quick Pick Items page.
   // Switching is via the dropdown — onchange because we want commit-on-blur,
   // not change-as-you-arrow (which would fire a render on every option).
@@ -5458,7 +5717,7 @@ function bindEvents() {
   };
 
   // v17 welcome modal — Continue button dismisses and stamps the flag.
-  if ($('v17-welcome-dismiss')) $('v17-welcome-dismiss').onclick = () => dismissV17Welcome();
+  if ($('v18-welcome-dismiss')) $('v18-welcome-dismiss').onclick = () => dismissV18Welcome();
 
   // v14: reopen-warning modal buttons.
   if ($('reopen-warn-continue')) $('reopen-warn-continue').onclick = () => confirmReopenWarning();
@@ -5531,7 +5790,11 @@ function renderLocationSuggestionsOnly() {
         }
         state.showLocationSuggestions = false;
         state.locationSuggestions = [];
-        renderLocationSuggestionsOnly();
+        // v18: tapping a suggestion confirms the location, so reorder the
+        // quick-pick row when Smart Quick Pick is on. Otherwise just clear the
+        // suggestions in place.
+        if (state.sqpEnabled) render();
+        else renderLocationSuggestionsOnly();
       };
     });
   }

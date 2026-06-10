@@ -113,7 +113,10 @@
 // opacity/transform flip (a plain fade+scale, which WebKit renders reliably).
 // Confirmed the haptic/sound/timestamp features were unaffected throughout.
 // Cache bumped to pat-v17-2 so the fix reaches devices already on v17 / v17.1.
-const CACHE_VERSION = 'pat-v17-2';
+//
+// v18: Smart Quick Pick (opt-in entry-screen quick-pick reordering by location).
+// No new asset files; app.js + styles.css changed, so cache bumped to pat-v18.
+const CACHE_VERSION = 'pat-v18';
 const ASSETS = [
   './',
   './index.html',
