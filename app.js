@@ -1,15 +1,15 @@
 /*!
  * PAT Test PWA
- * v19 (June 2026)
+ * v20 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v19 ==============
+// ============== PAT Test PWA — v20 ==============
 // Storage uses localStorage — works fully offline, persists across launches.
 
-const APP_VERSION = 'V19';
+const APP_VERSION = 'V20';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -63,6 +63,7 @@ const V16_WELCOME_KEY = 'pat:v16welcome';   // v16
 const V17_WELCOME_KEY = 'pat:v17welcome';   // v17: legacy. Orphaned, harmless.
 const V18_WELCOME_KEY = 'pat:v18welcome';   // v18
 const V19_WELCOME_KEY = 'pat:v19welcome';   // v19
+const V20_WELCOME_KEY = 'pat:v20welcome';   // v20
 
 // v19: Clients & Sites. A two-level model so one client can have several sites.
 //   CLIENTS_KEY — JSON array [{ id, name }].
@@ -471,6 +472,14 @@ let state = {
   // nothing is persisted globally or shared between sessions.
   locationSuggestions: [],
   showLocationSuggestions: false,
+  // v20: New Session form Client / Site autocomplete. Replaces the v19 native
+  // <datalist> pickers (unreliable on iOS PWA — often showed nothing). Mirrors
+  // the entry-screen location pattern: a tappable .suggestions list under the
+  // active field, filtered live as the user types. `nfActiveField` tracks which
+  // of the two fields the list currently belongs to so the two never collide.
+  nfSuggestions: [],
+  showNfSuggestions: false,
+  nfActiveField: null,              // 'client' | 'site' | null
   // v10: CSV import — file-pick → parse → optional conflict prompt → optional
   // summary. The two dialogs share this state object. Only one is open at a
   // time; the conflict dialog (if shown) precedes the summary dialog.
@@ -536,6 +545,9 @@ let state = {
   // v19: welcome modal flag (key pat:v19welcome). Gates the V19 "what's new"
   // modal so v18 users see it once on update.
   v19WelcomeSeen: false,
+  // v20: welcome modal flag (key pat:v20welcome). Gates the V20 "what's new"
+  // modal so v19 users see it once on update.
+  v20WelcomeSeen: false,
 
   // v19: Clients & Sites. Two flat arrays kept in a parent/child relationship:
   //   clients — [{ id, name }]
@@ -574,6 +586,15 @@ let state = {
   // the feature is enabled (or rebuilt via the settings button).
   sqpEnabled: false,
   sqpHistory: {},
+  // v20: SQP row stability. The composed quick-pick row is FROZEN per location:
+  // it is recomputed only when the confirmed location changes (or a session
+  // opens), never mid-logging — so logging a PASS no longer reshuffles the
+  // buttons under the user's thumb. The cache holds the row computed for
+  // `sqpRowKey` (the normalised location it was built for); render reuses it
+  // whenever the current location still matches that key. Learning still happens
+  // on every tap; the new tallies surface next time the location changes.
+  sqpRowCache: null,        // array of item-type strings, or null = not yet built
+  sqpRowKey: null,          // the normalised location sqpRowCache was built for
 
   // v16: Multi Pick config — GLOBAL (not per-preset). enabled gates the
   // entry-screen button; slots is an array of up to 6 { name, items:[strings] }.
@@ -823,6 +844,7 @@ function loadV11Settings() {
   state.v17WelcomeSeen = localStorage.getItem(V17_WELCOME_KEY) === '1';
   state.v18WelcomeSeen = localStorage.getItem(V18_WELCOME_KEY) === '1';
   state.v19WelcomeSeen = localStorage.getItem(V19_WELCOME_KEY) === '1';
+  state.v20WelcomeSeen = localStorage.getItem(V20_WELCOME_KEY) === '1';
 
   // v17: Sound feedback + Item timestamps. Both default OFF; only an explicit
   // '1' enables them. Anything else (absent key, '0', garbage) reads as off.
@@ -933,6 +955,9 @@ function activePreset() {
 function syncItemTypesFromActivePreset() {
   const p = activePreset();
   state.itemTypes = p ? p.items.slice() : DEFAULT_ITEM_TYPES.slice();
+  // v20: the frozen SQP row is built from state.itemTypes, so a preset switch or
+  // edit must rebuild it. Cheap no-op when the feature is off.
+  invalidateSqpRow();
 }
 
 function switchPreset(id) {
@@ -1192,58 +1217,98 @@ function sqpScoresForLocation(location) {
   return scores;
 }
 
-// v18.1: compose the quick-pick row for the current location. When Smart Quick
-// Pick is on and the location matches learned history, the row is filled with
-// the highest-scoring item types for that location FIRST — even types that
-// aren't in the standard preset (they're swapped IN) — then topped up from the
-// preset's own list (in preset order, skipping any already shown) so the row is
-// always full. Capped at the preset's button count (`types.length`, up to 9).
+// v20: compose the quick-pick row with POSITIONAL stability. This replaces the
+// v18.1 "learned-first" ordering, which moved matched preset buttons to the
+// front and reshuffled the whole row. The new rule (Peter's request):
 //
-// This is a change from the original v18 behaviour, which only reordered the
-// fixed preset and never brought in location-specific types. Decisions:
-//   - swap freely up to all 9 slots (no pinned standard buttons)
-//   - learned types first by descending score, then preset-fill to keep 9
-//   - the preset is the FALLBACK row: shown verbatim when off / blank / no match
+//   • Preset buttons NEVER move from their preset position. The row starts as a
+//     verbatim copy of the preset.
+//   • A learned type that is ALSO in the preset simply stays where it is — its
+//     learned-ness costs nothing positionally; it's just one of the buttons you
+//     already have, in its usual spot.
+//   • A learned type NOT in the preset is "swapped in": it takes the slot of the
+//     preset button with the LOWEST learned score at this location (Q3b). Preset
+//     buttons you've never tested here (score 0) are displaced first; among
+//     equal scores, the RIGHTMOST slot goes first so the front of the row is the
+//     stickiest. Highest-scoring swap-ins claim slots first.
+//   • Row size is unchanged (the preset's button count). The number of swap-ins
+//     can't exceed the number of preset buttons.
 //
-// Always returns the preset `types` unchanged when the feature is off, the
-// location is blank, or nothing matches — so the default experience is intact.
-// Ties among learned types keep their first-seen order; preset-fill keeps preset
-// order. The result length never exceeds `types.length`.
+// Result: the buttons that are always there stay put; only genuinely
+// location-specific extras appear, and only by displacing the least-relevant
+// preset button for this location. Returns the preset unchanged when the
+// feature is off, the location is blank, or nothing was learned here.
 function smartOrderedItemTypes(types, location) {
   if (!state.sqpEnabled) return types;
   const scores = sqpScoresForLocation(location);
-  const learned = Object.keys(scores);
-  if (!learned.length) return types;
+  const learnedKeys = Object.keys(scores);
+  if (!learnedKeys.length) return types;
 
-  const cap = types.length;   // keep the row the same size as the preset (≤9)
+  // Work on a copy of the preset, positions intact.
+  const row = types.slice();
+  const presetLower = new Set(row.map(t => t.toLowerCase()));
 
-  // Learned types, highest score first. Object key order preserves first-seen
-  // order for equal scores, which a stable sort then respects as the tiebreaker.
-  const learnedSorted = learned
+  // Swap-in candidates: learned types that are NOT in the preset, highest score
+  // first. Object key order preserves first-seen order as a stable tiebreaker.
+  const swapIns = learnedKeys
+    .filter(t => !presetLower.has(t.toLowerCase()))
     .map((t, i) => ({ t, i, score: scores[t] }))
     .sort((a, b) => (b.score - a.score) || (a.i - b.i))
     .map(x => x.t);
 
-  const row = [];
-  const seen = new Set();
-  // 1) Fill from learned types first (these may be SWAPPED IN — not in preset).
-  for (const t of learnedSorted) {
-    if (row.length >= cap) break;
-    if (!seen.has(t)) { row.push(t); seen.add(t); }
-  }
-  // 2) Top up from the preset (in preset order), skipping anything already shown,
-  //    so the row stays full at `cap` buttons.
-  for (const t of types) {
-    if (row.length >= cap) break;
-    if (!seen.has(t)) { row.push(t); seen.add(t); }
+  if (!swapIns.length) return row;   // nothing new to bring in → preset as-is
+
+  // Rank preset slots by how displaceable they are. A slot's "defence" is the
+  // learned score of its occupant at this location (0 if never tested here).
+  // Lowest defence is displaced first; on a tie, the higher index (further
+  // right) goes first so the front of the row stays put.
+  const slots = row.map((t, idx) => ({
+    idx,
+    defence: scores[t] || 0
+  })).sort((a, b) => (a.defence - b.defence) || (b.idx - a.idx));
+
+  // Place each swap-in into the next most-displaceable slot.
+  const n = Math.min(swapIns.length, slots.length);
+  for (let k = 0; k < n; k++) {
+    row[slots[k].idx] = swapIns[k];
   }
   return row;
+}
+
+// v20: temporal freeze. The composed row is cached against the normalised
+// location it was built for. While the location is unchanged, the SAME row is
+// returned every render — even though logging items has updated the underlying
+// tallies — so the buttons never reshuffle mid-logging. The row is recomputed
+// only when the location key changes (a new location typed/picked, or a session
+// opened). `invalidateSqpRow()` forces a rebuild on the next call.
+//
+// When the feature is off this is a passthrough to the live preset (no caching
+// needed — nothing reorders).
+function sqpRowForLocation(types, location) {
+  if (!state.sqpEnabled) return types;
+  const key = normaliseSqpLocation(location);
+  if (state.sqpRowKey === key && Array.isArray(state.sqpRowCache)) {
+    return state.sqpRowCache;
+  }
+  const row = smartOrderedItemTypes(types, location);
+  state.sqpRowCache = row;
+  state.sqpRowKey = key;
+  return row;
+}
+
+// Force the frozen row to rebuild on the next render. Called when the confirmed
+// location changes and whenever the feature is toggled / history is rebuilt or
+// cleared (so a stale frozen row can't outlive the data it was built from).
+function invalidateSqpRow() {
+  state.sqpRowCache = null;
+  state.sqpRowKey = null;
 }
 
 // v18: clear the learned history to empty (a true reset). Re-enabling the
 // feature, or logging new items, will repopulate it. Confirmed by the caller.
 function clearSqpHistory() {
   state.sqpHistory = {};
+  invalidateSqpRow();   // v20: drop the frozen row built from the old history
   save();
   render();
   setTimeout(() => alert('Smart Quick Pick history cleared.'), 50);
@@ -1253,6 +1318,7 @@ function clearSqpHistory() {
 // whatever was there. Confirmed by the caller.
 function rebuildSqpHistory() {
   state.sqpHistory = buildSqpHistory();
+  invalidateSqpRow();   // v20: rebuild the frozen row from the new history
   save();
   render();
   const locs = Object.keys(state.sqpHistory).length;
@@ -1269,6 +1335,7 @@ function setSqp(enabled) {
   if (state.sqpEnabled && Object.keys(state.sqpHistory).length === 0) {
     state.sqpHistory = buildSqpHistory();
   }
+  invalidateSqpRow();   // v20: build/clear the frozen row to match the new mode
   save();
   render();
 }
@@ -1375,7 +1442,47 @@ function ensureSite(clientId, name) {
   return site;
 }
 
-// Build the combined "Client — Site" snapshot stored on the session as `site`.
+// v20: Non-destructive rebuild of the Clients/Sites lists from every session's
+// stored `site` snapshot. Unlike seedClientsSitesFromSessions() (which only
+// runs once, on a totally empty install), this is a user-triggered action that
+// ADDS any client/site found in the sessions that isn't already in the lists —
+// without touching, renaming, or deleting anything already there. It catches
+// sites that arrived via CSV import after the one-shot seed.
+//
+// Parsing: V19+ snapshots are "Client — Site" (em dash). We split on that to
+// recover the two parts. Older/plain snapshots (no dash) are treated as a
+// site-only entry, mirroring how such sessions display — added under a client
+// of the same name so the pair is self-consistent (same shape the seed makes).
+// Idempotent: ensureClient/ensureSite return existing records, so running it
+// repeatedly never duplicates. Returns the count of new records added.
+function rebuildClientsFromSessions() {
+  let added = 0;
+  state.sessions.forEach(sess => {
+    const snap = String(sess && sess.site || '').trim();
+    if (!snap) return;
+    let clientName, siteName;
+    const dash = snap.indexOf(' — ');
+    if (dash !== -1) {
+      clientName = snap.slice(0, dash).trim();
+      siteName = snap.slice(dash + 3).trim();
+    } else {
+      // Plain snapshot: client and site take the same name (seed convention).
+      clientName = snap;
+      siteName = snap;
+    }
+    if (!clientName) clientName = siteName;
+    if (!siteName) siteName = clientName;
+    const hadClient = !!findClientByName(clientName);
+    const client = ensureClient(clientName);
+    if (!client) return;
+    if (!hadClient) added++;
+    const hadSite = !!findSiteByName(client.id, siteName);
+    ensureSite(client.id, siteName);
+    if (!hadSite) added++;
+  });
+  if (added) save();
+  return added;
+}
 // Falls back gracefully: both → "Client — Site"; one → that one; neither → ''.
 // The em dash matches the placeholder style used elsewhere in the app.
 function composeSiteSnapshot(clientName, siteName) {
@@ -3039,6 +3146,9 @@ function loadFormForCursor() {
   state.failModalStage = 'reasons';
   state.failOtherText = '';
   state.multiPickSheetOpen = false;   // v16
+  // v20: the loaded item may carry a different location, so the frozen SQP row
+  // must rebuild for it. Cheap no-op when the feature is off.
+  invalidateSqpRow();
 }
 
 // ---------- Validation ----------
@@ -3106,6 +3216,7 @@ function createSession() {
   state.cursor = 0;
   state.view = 'entry';
   state.newForm = { name: '', site: '', engineer: state.engineer, prefix: '', startNo: '1', show: false, clientId: '', siteId: '' };
+  state.nfSuggestions = []; state.showNfSuggestions = false; state.nfActiveField = null;
   loadFormForCursor();
   save(); render();
 }
@@ -3728,6 +3839,14 @@ function dismissV19Welcome() {
   render();
 }
 
+// v20: dismiss the V20 "what's new" modal. Writes pat:v20welcome so v19 users
+// see it once on update.
+function dismissV20Welcome() {
+  state.v20WelcomeSeen = true;
+  localStorage.setItem(V20_WELCOME_KEY, '1');
+  render();
+}
+
 function saveItemTypesSettings() {
   const types = document.getElementById('settings-types').value
     .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 9);
@@ -3952,24 +4071,24 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v19: rolled forward — content covers the V19 Clients & Sites change, key
-  // bumped to pat:v19welcome so v18 users see it once on update. Gate uses
-  // v19WelcomeSeen.
-  const welcomeModal = (state.v19WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // v20: rolled forward — content covers the V20 fixes + Smart Quick Pick
+  // stability, key bumped to pat:v20welcome so v19 users see it once on update.
+  // Gate uses v20WelcomeSeen.
+  const welcomeModal = (state.v20WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V19">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V20">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V19</h3>
+        <h3 class="bulk-sheet-title">What's new in V20</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Clients &amp; Sites.</strong> The New Session screen now has a separate <strong>Client</strong> and <strong>Site</strong> field, so one client can have several sites. Pick from your saved ones or type new — they're remembered for next time.</li>
-        <li><strong>A place to manage them.</strong> Find <strong>Settings → Clients</strong> to add, rename, or remove clients and their sites. Your existing sessions' site names are brought in automatically to get you started.</li>
-        <li><strong>Faster logging.</strong> Behind the scenes, logging a pass or copying a result now updates the screen more efficiently — same screen, less work.</li>
+        <li><strong>Client &amp; Site pickers fixed.</strong> On the New Session screen, tap the Client or Site box and your saved ones now appear in a list to tap — start typing to filter. (The old picker didn't always open on phones.)</li>
+        <li><strong>Steadier Smart Quick Pick.</strong> Your quick-pick buttons no longer shuffle around while you log. The ones from your preset stay put in their usual spots; only the extra location-specific types swap in, and the row stays fixed until you change location.</li>
+        <li><strong>Rebuild from your sessions.</strong> Under <strong>Settings → Clients</strong>, a new button adds any clients and sites from your saved sessions that aren't listed yet — handy after importing.</li>
       </ul>
-      <button class="btn-primary" id="v19-welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v20-welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -4051,10 +4170,26 @@ function refreshEntryAfterLog() {
   app.innerHTML = renderEntry();
   bindEvents();
 }
-// matches a saved client, show only that client's sites; otherwise show every
-// site (so the picker is still useful before a client is chosen). De-duped by
-// visible name to avoid identical options across clients.
-function nfSiteOptionsHTML() {
+// v20: New Session Client / Site autocomplete. These replace the v19 native
+// <datalist> pickers, which were unreliable in iOS PWA mode (frequently showed
+// no options at all). They mirror the entry-screen location autocomplete: a
+// tappable .suggestions list, filtered live by the typed text.
+//
+// Client suggestions: all saved client names, optionally filtered by the typed
+// substring. An empty field shows the full list (so a tap reveals everything).
+// Case-insensitive sort and filter. Capped at 6 to keep the list compact.
+function computeNfClientSuggestions(query) {
+  const q = String(query || '').trim().toLowerCase();
+  const names = sortedClients().map(c => c.name);
+  const matches = q ? names.filter(n => n.toLowerCase().includes(q)) : names;
+  return matches.slice(0, 6);
+}
+
+// Site suggestions: if the typed Client matches a saved client, only that
+// client's sites; otherwise every site (so the picker stays useful before a
+// client is chosen — the v19 quirk, kept deliberately). De-duped by visible
+// name, then filtered by the typed Site substring. Case-insensitive throughout.
+function computeNfSiteSuggestions(query) {
   const typedClient = String(state.newForm.clientId || '').trim();
   const match = findClientByName(typedClient);
   const list = match ? sitesForClient(match.id) : state.sites.slice();
@@ -4067,7 +4202,21 @@ function nfSiteOptionsHTML() {
     names.push(s.name);
   });
   names.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  return names.map(n => `<option value="${escapeHTML(n)}"></option>`).join('');
+  const q = String(query || '').trim().toLowerCase();
+  const matches = q ? names.filter(n => n.toLowerCase().includes(q)) : names;
+  return matches.slice(0, 6);
+}
+
+// v20: the suggestions list HTML for the New Session form. `field` is 'client'
+// or 'site'; only renders when that field is the active one and has matches.
+// Uses field-specific data-* attributes so the two click handlers never collide.
+function nfSuggestionsHTML(field) {
+  if (state.nfActiveField !== field || !state.showNfSuggestions) return '';
+  if (!state.nfSuggestions.length) return '';
+  const attr = field === 'client' ? 'data-nf-client-suggest' : 'data-nf-site-suggest';
+  return `<div class="suggestions" id="nf-${field}-suggestions">
+    ${state.nfSuggestions.map(s => `<button class="suggestion-item" ${attr}="${escapeHTML(s)}">${escapeHTML(s)}</button>`).join('')}
+  </div>`;
 }
 
 function renderSessions() {
@@ -4075,16 +4224,16 @@ function renderSessions() {
     <div class="card">
       <h2 class="h2">New session</h2>
       <label class="label">Client</label>
-      <input class="input" id="nf-client" list="nf-client-list" value="${escapeHTML(state.newForm.clientId)}" placeholder="e.g. Acme Ltd" autocomplete="off" autofocus>
-      <datalist id="nf-client-list">
-        ${sortedClients().map(c => `<option value="${escapeHTML(c.name)}"></option>`).join('')}
-      </datalist>
+      <div class="nf-input-wrap" id="nf-client-wrap">
+        <input class="input" id="nf-client" value="${escapeHTML(state.newForm.clientId)}" placeholder="e.g. Acme Ltd" autocomplete="off" autofocus>
+        ${nfSuggestionsHTML('client')}
+      </div>
       <label class="label">Site</label>
-      <input class="input" id="nf-site" list="nf-site-list" value="${escapeHTML(state.newForm.site)}" placeholder="e.g. Unit 4, Head Office" autocomplete="off">
-      <datalist id="nf-site-list">
-        ${nfSiteOptionsHTML()}
-      </datalist>
-      <p class="muted" style="margin:-4px 0 12px;font-size:12px">Pick from your saved clients and sites, or type new ones — they'll be saved for next time. Manage them under Settings → Clients.</p>
+      <div class="nf-input-wrap" id="nf-site-wrap">
+        <input class="input" id="nf-site" value="${escapeHTML(state.newForm.site)}" placeholder="e.g. Unit 4, Head Office" autocomplete="off">
+        ${nfSuggestionsHTML('site')}
+      </div>
+      <p class="muted nf-hint">Pick from your saved clients and sites, or type new ones — they'll be saved for next time. Manage them under Settings → Clients.</p>
       <label class="label">Engineer</label>
       <input class="input" id="nf-engineer" value="${escapeHTML(state.newForm.engineer || state.engineer)}" placeholder="Your name">
       <label class="label">Session name <span class="hint">(optional)</span></label>
@@ -4404,7 +4553,9 @@ function renderEntry() {
   // location is blank, or nothing matches, this returns state.itemTypes
   // unchanged — same buttons, same order, same count as before. It only ever
   // permutes; it never adds, removes, or hides a button.
-  const orderedTypes = smartOrderedItemTypes(state.itemTypes, state.form.location);
+  // v20: read the FROZEN row (cached per location). It only recomputes when the
+  // confirmed location changes — logging a PASS no longer reshuffles buttons.
+  const orderedTypes = sqpRowForLocation(state.itemTypes, state.form.location);
   const quickButtons = orderedTypes.map(t => `
     <button class="quick-btn ${state.form.itemType === t ? 'active' : ''}" data-type="${escapeHTML(t)}">${escapeHTML(t)}</button>
   `).join('');
@@ -5589,6 +5740,16 @@ function renderSettingsClients() {
     `;
   }
 
+  // v20: rebuild-from-sessions action. Only worth showing when there are
+  // sessions to scan. Non-destructive (adds missing clients/sites; never edits
+  // or removes existing ones), so safe to offer alongside the manual list.
+  const rebuildBlock = state.sessions.length ? `
+    <div class="settings-section">
+      <button class="preset-action-btn" id="clients-rebuild-btn">↻ Rebuild from my sessions</button>
+      <p class="muted" style="margin:8px 0 0;font-size:12px">Scans every saved session and adds any client or site that isn't already listed. Useful after importing sessions. It only adds — it never changes or removes what's here.</p>
+    </div>
+  ` : '';
+
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Clients')}
@@ -5598,6 +5759,7 @@ function renderSettingsClients() {
       </div>
       ${emptyState}
       <div class="clients-list">${listHtml}</div>
+      ${rebuildBlock}
       ${dialog}
     </div>
   `;
@@ -5680,18 +5842,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v19: rolled forward — V19 on top, V16 dropped. -->
+      <!-- v8: rolling 3-version changelog. v20: rolled forward — V20 on top, V17 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V20</strong> · June 2026</p>
+        <p class="muted">A few fixes and refinements. On the New Session screen, the Client and Site boxes now show your saved entries in a tap-to-pick list (start typing to filter) — the old picker didn't always open on phones. Smart Quick Pick is steadier too: the buttons no longer rearrange while you're logging. The ones from your preset keep their usual positions, only the extra location-specific types swap in, and the row stays put until you change location. There's also a new "Rebuild from my sessions" button on the Clients page that adds any clients or sites from your saved sessions that aren't already listed — handy after importing.</p>
 
         <p><strong>V19</strong> · June 2026</p>
         <p class="muted">Clients and sites are now separate. When you start a new session you pick (or type) a Client, then a Site — so one client can have as many sites as you like, and both are remembered for next time. A new Clients page under Settings lets you add, rename, and tidy up your clients and their sites, and your existing sessions' site names are brought in automatically so the lists aren't empty to begin with. Editing or removing a client or site never changes any session you've already saved. Logging a pass or copying a result is also a little quicker behind the scenes.</p>
 
         <p><strong>V18.1</strong> · June 2026</p>
         <p class="muted">New Smart Quick Pick option. Turn it on and the quick-pick buttons on the entry screen adapt to the current location — swapping in the item types you most often test there, even ones that aren't in your usual nine, so they're a single tap away. It builds from your existing sessions the moment you switch it on, then keeps learning as you log more, and you can rebuild or clear that history at any time. Your preset list is still the default row whenever there's no match for a location. Find it under Settings → Quick Pick Items; it's off by default.</p>
-
-        <p><strong>V17</strong> · June 2026</p>
-        <p class="muted">Every Pass, Fail and Copy now flashes the button you tapped, giving a clear visual confirmation — useful on newer iPhones where iOS has stopped apps like this one from using vibration. You can also turn on Sound feedback for a short tone on each action, with a different tone for pass, fail and copy (under Settings → Display, off by default). And there's a new option to record the time each item was logged: switch on Item timestamps under Settings → Display to show times in a session's overview and to add a Time column to CSV export. Both new options are off by default, so nothing changes unless you turn them on.</p>
       </div>
 
       <div class="info-card">
@@ -5740,6 +5902,7 @@ function bindEvents() {
   if ($('new-session-btn')) $('new-session-btn').onclick = () => {
     state.newForm.show = true;
     if (!state.newForm.engineer && state.engineer) state.newForm.engineer = state.engineer;
+    state.nfSuggestions = []; state.showNfSuggestions = false; state.nfActiveField = null;
     render();
   };
   if ($('nf-cancel')) $('nf-cancel').onclick = () => {
@@ -5747,6 +5910,7 @@ function bindEvents() {
     // field) doesn't carry into the next New Session. Engineer is re-seeded from
     // the saved default when the form is next opened.
     state.newForm = { name: '', site: '', engineer: state.engineer, prefix: '', startNo: '1', show: false, clientId: '', siteId: '' };
+    state.nfSuggestions = []; state.showNfSuggestions = false; state.nfActiveField = null;
     render();
   };
   if ($('nf-submit')) $('nf-submit').onclick = () => {
@@ -5759,18 +5923,58 @@ function bindEvents() {
     state.newForm.startNo = $('nf-start').value;
     createSession();
   };
-  // v19: client field — on change, refresh the Site datalist to that client's
-  // sites. We rebuild only the <datalist> options (not the whole form) so the
-  // user's focus and any half-typed site value are preserved.
+  // v20: Client field — tappable suggestions (replaces the v19 <datalist>).
+  // Focus shows the full saved-client list; typing filters it live; tapping a
+  // suggestion fills the field. On every change we also refresh the Site list
+  // so it tracks the chosen client. We rebuild only the suggestion <div> (not
+  // the whole form) so focus and any half-typed value are preserved.
   if ($('nf-client')) {
     $('nf-client').oninput = e => {
       state.newForm.clientId = e.target.value;
-      const dl = document.getElementById('nf-site-list');
-      if (dl) dl.innerHTML = nfSiteOptionsHTML();
+      state.nfActiveField = 'client';
+      state.nfSuggestions = computeNfClientSuggestions(e.target.value);
+      state.showNfSuggestions = state.nfSuggestions.length > 0;
+      renderNfSuggestionsOnly('client');
+    };
+    $('nf-client').onfocus = e => {
+      state.nfActiveField = 'client';
+      state.nfSuggestions = computeNfClientSuggestions(e.target.value);
+      state.showNfSuggestions = state.nfSuggestions.length > 0;
+      renderNfSuggestionsOnly('client');
+    };
+    $('nf-client').onblur = () => {
+      // Delay hiding so a tap on a suggestion registers first.
+      setTimeout(() => {
+        if (state.nfActiveField === 'client') {
+          state.showNfSuggestions = false;
+          renderNfSuggestionsOnly('client');
+        }
+      }, 150);
     };
   }
-  if ($('nf-site')) $('nf-site').oninput = e => state.newForm.site = e.target.value;
-  if ($('nf-engineer')) $('nf-engineer').oninput = e => state.newForm.engineer = e.target.value;
+  if ($('nf-site')) {
+    $('nf-site').oninput = e => {
+      state.newForm.site = e.target.value;
+      state.nfActiveField = 'site';
+      state.nfSuggestions = computeNfSiteSuggestions(e.target.value);
+      state.showNfSuggestions = state.nfSuggestions.length > 0;
+      renderNfSuggestionsOnly('site');
+    };
+    $('nf-site').onfocus = e => {
+      state.nfActiveField = 'site';
+      state.nfSuggestions = computeNfSiteSuggestions(e.target.value);
+      state.showNfSuggestions = state.nfSuggestions.length > 0;
+      renderNfSuggestionsOnly('site');
+    };
+    $('nf-site').onblur = () => {
+      setTimeout(() => {
+        if (state.nfActiveField === 'site') {
+          state.showNfSuggestions = false;
+          renderNfSuggestionsOnly('site');
+        }
+      }, 150);
+    };
+  }
   if ($('nf-name')) $('nf-name').oninput = e => state.newForm.name = e.target.value;
   if ($('nf-prefix')) $('nf-prefix').oninput = e => state.newForm.prefix = e.target.value;
   if ($('nf-start')) $('nf-start').oninput = e => state.newForm.startNo = e.target.value;
@@ -5867,10 +6071,10 @@ function bindEvents() {
       // Delay hiding so a click on a suggestion can register first.
       setTimeout(() => {
         state.showLocationSuggestions = false;
-        // v18: when Smart Quick Pick is on, the quick-pick row order depends on
-        // the confirmed location, so a full render is needed to reorder it.
+        // v18/v20: when Smart Quick Pick is on, the confirmed location may have
+        // changed, so rebuild the FROZEN row (v20) and full-render to show it.
         // Otherwise the lightweight suggestions-only refresh is enough.
-        if (state.sqpEnabled) render();
+        if (state.sqpEnabled) { invalidateSqpRow(); render(); }
         else renderLocationSuggestionsOnly();
       }, 150);
     };
@@ -6268,7 +6472,7 @@ function bindEvents() {
   };
 
   // v17 welcome modal — Continue button dismisses and stamps the flag.
-  if ($('v19-welcome-dismiss')) $('v19-welcome-dismiss').onclick = () => dismissV19Welcome();
+  if ($('v20-welcome-dismiss')) $('v20-welcome-dismiss').onclick = () => dismissV20Welcome();
 
   // v14: reopen-warning modal buttons.
   if ($('reopen-warn-continue')) $('reopen-warn-continue').onclick = () => confirmReopenWarning();
@@ -6290,6 +6494,17 @@ function bindEvents() {
     state.clientsPage.clientDialog = { mode: 'add', name: '', editingId: null };
     state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
     render();
+  };
+  // v20: rebuild clients/sites from all sessions (non-destructive; adds only).
+  if ($('clients-rebuild-btn')) $('clients-rebuild-btn').onclick = () => {
+    if (!confirm('Scan all your sessions and add any clients and sites that aren\'t already listed? Nothing already here will be changed or removed.')) return;
+    const added = rebuildClientsFromSessions();
+    render();
+    setTimeout(() => alert(
+      added === 0
+        ? 'Nothing new to add — every client and site from your sessions is already listed.'
+        : `Added ${added} new ${added === 1 ? 'entry' : 'entries'} from your sessions.`
+    ), 50);
   };
   // Expand / collapse a client to reveal its sites.
   document.querySelectorAll('[data-client-toggle]').forEach(el => {
@@ -6385,8 +6600,51 @@ function renderSuggestionsOnly() {
   }
 }
 
-// v10: Same partial-refresh trick for the location autofill. Lives inside
-// .location-input-wrap rather than .custom-type-wrap. Tapping a suggestion
+// v20: partial refresh for the New Session Client / Site suggestion lists.
+// Same trick as renderLocationSuggestionsOnly — rebuild only the .suggestions
+// div inside the field's wrap so the input keeps focus and the half-typed value
+// survives. `field` is 'client' or 'site'.
+//
+// On picking a client we ALSO refresh the site suggestions, because the site
+// list depends on which client is chosen — but only if the site field happens
+// to be showing its list (it usually won't be, since focus is on client).
+function renderNfSuggestionsOnly(field) {
+  const wrap = document.getElementById(`nf-${field}-wrap`);
+  if (!wrap) return;
+  const existing = wrap.querySelector('.suggestions');
+  if (existing) existing.remove();
+  if (state.nfActiveField !== field || !state.showNfSuggestions || !state.nfSuggestions.length) return;
+
+  const attr = field === 'client' ? 'data-nf-client-suggest' : 'data-nf-site-suggest';
+  const datasetKey = field === 'client' ? 'nfClientSuggest' : 'nfSiteSuggest';
+  const div = document.createElement('div');
+  div.className = 'suggestions';
+  div.id = `nf-${field}-suggestions`;
+  div.innerHTML = state.nfSuggestions.map(s => `<button class="suggestion-item" ${attr}="${escapeHTML(s)}">${escapeHTML(s)}</button>`).join('');
+  wrap.appendChild(div);
+  div.querySelectorAll(`[${attr}]`).forEach(el => {
+    // preventDefault on mousedown so the input's blur doesn't fire and hide the
+    // list before the click lands.
+    el.onmousedown = (e) => { e.preventDefault(); };
+    el.onclick = () => {
+      const picked = el.dataset[datasetKey];
+      if (field === 'client') {
+        state.newForm.clientId = picked;
+        const inp = document.getElementById('nf-client');
+        if (inp) inp.value = picked;
+      } else {
+        state.newForm.site = picked;
+        const inp = document.getElementById('nf-site');
+        if (inp) inp.value = picked;
+      }
+      state.showNfSuggestions = false;
+      state.nfSuggestions = [];
+      renderNfSuggestionsOnly(field);
+    };
+  });
+}
+
+
 // fills the field, normalises casing the same way blur would, and immediately
 // clears the suggestions.
 function renderLocationSuggestionsOnly() {
@@ -6416,10 +6674,9 @@ function renderLocationSuggestionsOnly() {
         }
         state.showLocationSuggestions = false;
         state.locationSuggestions = [];
-        // v18: tapping a suggestion confirms the location, so reorder the
-        // quick-pick row when Smart Quick Pick is on. Otherwise just clear the
-        // suggestions in place.
-        if (state.sqpEnabled) render();
+        // v18/v20: tapping a suggestion confirms the location, so rebuild the
+        // frozen row (v20) and full-render when Smart Quick Pick is on.
+        if (state.sqpEnabled) { invalidateSqpRow(); render(); }
         else renderLocationSuggestionsOnly();
       };
     });

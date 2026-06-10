@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA
- * v19 (June 2026)
+ * v20 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -1311,6 +1311,21 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
    we just need the relative wrapper. */
 .location-input-wrap {
   position: relative;
+}
+
+/* v20: New Session form Client / Site fields. Each input sits in a relative
+   wrapper so its tappable .suggestions list (which is position:absolute) anchors
+   to the field — same approach as .location-input-wrap on the entry screen. */
+.nf-input-wrap {
+  position: relative;
+}
+
+/* v20: the explanatory line under the Client/Site fields. Replaces a v19 inline
+   style that used a negative top margin and pulled the text up against the Site
+   box. Sits comfortably below the field with normal spacing. */
+.nf-hint {
+  margin: 8px 0 14px;
+  font-size: 12px;
 }
 
 /* v10: Import-summary modal body — narrow list of skipped rows with reason. */

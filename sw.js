@@ -125,7 +125,13 @@
 // (Settings → Clients) and a two-field New Session form. Plus an entry-screen
 // efficiency change: pass/copy logging now does a partial DOM refresh instead of
 // a full re-render. app.js + styles.css changed; cache bumped to pat-v19.
-const CACHE_VERSION = 'pat-v19';
+//
+// v20: fixes + polish — New Session Client/Site pickers rebuilt as tappable
+// lists (the iOS <datalist> never worked); Smart Quick Pick row is now both
+// positionally stable (preset buttons keep their place) and frozen per location
+// (no more reshuffling mid-logging); a "Rebuild from my sessions" button on the
+// Clients page. app.js + styles.css changed; cache bumped to pat-v20.
+const CACHE_VERSION = 'pat-v20';
 const ASSETS = [
   './',
   './index.html',
