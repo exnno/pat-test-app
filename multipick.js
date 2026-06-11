@@ -1,12 +1,12 @@
 /*!
  * PAT Test PWA
- * v22 (June 2026)
+ * v23 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v22 — Multi Pick ==============
+// ============== PAT Test PWA — v23 — Multi Pick ==============
 // Multi Pick: config validation, load, active-slots, fire, settings save.
 
 // ---------- v16: Multi Pick helpers ----------
@@ -96,7 +96,9 @@ function multiPickFire(idx) {
   // haptic. The sheet has just closed, so flash the entry-screen Multi Pick
   // button as the visual cue.
   feedback('copy', 'multipick-btn');
-  save();
+  // v23 (E2): hot path — a batch append touches the sessions blob plus the two
+  // cold keys it can change (descriptions, learned SQP history). Skips the rest.
+  saveSessions(); saveSqpHistory(); saveDescriptions();
   render();
   showToast(`Added ${n} item${n === 1 ? '' : 's'}`);
 }

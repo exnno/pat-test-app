@@ -1,12 +1,12 @@
 /*!
  * PAT Test PWA
- * v22 (June 2026)
+ * v23 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v22 — Smart Quick Pick ==============
+// ============== PAT Test PWA — v23 — Smart Quick Pick ==============
 // Smart Quick Pick (v18): history, scoring, ordering, freeze cache, on/off.
 
 // ---------- v18: Smart Quick Pick helpers ----------
@@ -49,6 +49,7 @@ function normaliseSqpHistory(raw) {
 function loadSqpHistory() {
   let raw = null;
   try { raw = JSON.parse(localStorage.getItem(SQP_HISTORY_KEY) || 'null'); } catch {}
+  bumpSqpHistoryVersion();   // v23 (E6): a fresh load/restore replaces the history
   return normaliseSqpHistory(raw);
 }
 
@@ -64,6 +65,7 @@ function recordSqpUsage(location, itemType) {
   if (!loc || !type) return;
   const bucket = state.sqpHistory[loc] || (state.sqpHistory[loc] = {});
   bucket[type] = (bucket[type] || 0) + 1;
+  bumpSqpHistoryVersion();   // v23 (E6): invalidate the scores memo
 }
 
 // Build (or rebuild) the entire history map from every item already in storage.
@@ -88,9 +90,24 @@ function buildSqpHistory() {
 // "Server Room 2" matches a learned "server room", and typing "server" matches
 // "server room a"). Scores from all matching buckets are summed. Returns {} when
 // the location is blank or nothing matches (→ caller leaves the order untouched).
+// v23 (E6): sqpScoresForLocation walks the ENTIRE learned history on every call.
+// Post-v20 the freeze means it runs only when the location changes (not per
+// render), so it's already cheap — but it's still an O(locations × types) sweep,
+// and prev/next stepping through items at different locations can call it
+// repeatedly. We add a tiny one-entry memo keyed on the normalised location plus
+// a history "version" counter. The counter (_sqpHistoryVersion) is bumped by
+// every function that mutates state.sqpHistory (record / build / clear / rebuild
+// / restore), so the memo can never return scores computed from stale history.
+let _sqpScoresMemo = { loc: null, version: -1, scores: null };
+let _sqpHistoryVersion = 0;
+function bumpSqpHistoryVersion() { _sqpHistoryVersion++; }
+
 function sqpScoresForLocation(location) {
   const loc = normaliseSqpLocation(location);
   if (!loc) return {};
+  if (_sqpScoresMemo.loc === loc && _sqpScoresMemo.version === _sqpHistoryVersion) {
+    return _sqpScoresMemo.scores;
+  }
   const scores = {};
   Object.keys(state.sqpHistory).forEach(key => {
     if (loc.includes(key) || key.includes(loc)) {
@@ -100,6 +117,7 @@ function sqpScoresForLocation(location) {
       });
     }
   });
+  _sqpScoresMemo = { loc, version: _sqpHistoryVersion, scores };
   return scores;
 }
 
@@ -194,6 +212,7 @@ function invalidateSqpRow() {
 // feature, or logging new items, will repopulate it. Confirmed by the caller.
 function clearSqpHistory() {
   state.sqpHistory = {};
+  bumpSqpHistoryVersion();   // v23 (E6)
   invalidateSqpRow();   // v20: drop the frozen row built from the old history
   save();
   render();
@@ -204,6 +223,7 @@ function clearSqpHistory() {
 // whatever was there. Confirmed by the caller.
 function rebuildSqpHistory() {
   state.sqpHistory = buildSqpHistory();
+  bumpSqpHistoryVersion();   // v23 (E6)
   invalidateSqpRow();   // v20: rebuild the frozen row from the new history
   save();
   render();
@@ -221,6 +241,7 @@ function setSqp(enabled) {
   if (state.sqpEnabled && Object.keys(state.sqpHistory).length === 0) {
     state.sqpHistory = buildSqpHistory();
   }
+  bumpSqpHistoryVersion();   // v23 (E6): history may have just been (re)built
   invalidateSqpRow();   // v20: build/clear the frozen row to match the new mode
   save();
   render();

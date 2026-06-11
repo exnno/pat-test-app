@@ -1,12 +1,12 @@
 /*!
  * PAT Test PWA
- * v22 (June 2026)
+ * v23 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v22 — Render: settings ==============
+// ============== PAT Test PWA — v23 — Render: settings ==============
 // All renderSettings* screens + the earth-resistance calculator page.
 
 // ===== Settings hub & sub-pages (v7) =====
@@ -738,18 +738,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v22: rolled forward — V22 on top, V19 dropped. -->
+      <!-- v8: rolling 3-version changelog. v23: rolled forward — V23 on top, V20 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V23</strong> · June 2026</p>
+        <p class="muted">A speed update, with no changes to how the app looks or works. Saving each test result now does less work behind the scenes — instead of re-processing your whole history on every tap, it only handles the session you're working in. The benefit grows with the size of your data: on a long job, or a busy device, logging stays quick from the first item to the last. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
 
         <p><strong>V22</strong> · June 2026</p>
         <p class="muted">Another under-the-hood update, with no changes to how the app looks or works. This completes the code reorganisation started in V21 — the last big code file has now been split into smaller, single-purpose files, so future updates are faster and safer to build. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
 
         <p><strong>V21</strong> · June 2026</p>
         <p class="muted">An under-the-hood update with no changes to how the app looks or works. The app's code has been reorganised into smaller, separate files to make future updates faster and safer to build. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
-
-        <p><strong>V20</strong> · June 2026</p>
-        <p class="muted">A few fixes and refinements. On the New Session screen, the Client and Site boxes now show your saved entries in a tap-to-pick list (start typing to filter) — the old picker didn't always open on phones. Smart Quick Pick is steadier too: the buttons no longer rearrange while you're logging. The ones from your preset keep their usual positions, only the extra location-specific types swap in, and the row stays put until you change location. There's also a new "Rebuild from my sessions" button on the Clients page that adds any clients or sites from your saved sessions that aren't already listed — handy after importing.</p>
       </div>
 
       <div class="info-card">

@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA — storage.js (persistence layer)
- * v22 (June 2026)
+ * v23 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -121,12 +121,71 @@ function decodeItem(item)    { return decodeWithMap(item, ITEM_KEY_MAP_REV, fals
 function encodeSession(sess) { return encodeWithMap(sess, SESSION_KEY_MAP, true); }
 function decodeSession(sess) { return decodeWithMap(sess, SESSION_KEY_MAP_REV, true); }
 
+// ---------- v23 (E1): per-session encoded cache ----------
+// PROBLEM this solves: pre-v23, every save() re-encoded (key-shortened) EVERY
+// session and EVERY item in storage, even though a single logged item changes
+// only the one session you're working in. On a large database that's thousands
+// of object allocations on every PASS tap — work that grows with your total
+// history and makes late-in-the-day taps feel sticky.
+//
+// FIX: cache each session's encoded form, keyed on the session OBJECT itself via
+// a WeakMap (so it's automatically dropped when a session is pruned/garbage-
+// collected — no manual cleanup, no leak). On the next serialise we reuse a
+// session's cached encoding UNLESS we can prove it might have changed.
+//
+// CORRECTNESS (why this can't silently save stale data — the one real risk):
+//   1. The ACTIVE session is ALWAYS re-encoded, cache bypassed. In-place item
+//      edits (items[i] = {...}) and appends happen only on the active session
+//      during logging, and they keep the same `items` array reference, so this
+//      blanket re-encode is what guarantees those edits are never missed.
+//   2. For every OTHER session we reuse the cache only when BOTH hold:
+//        • the `items` array is the SAME reference as when we cached it, AND
+//        • a cheap signature over the session-level fields + item count matches.
+//      The only place a non-active session is mutated is CSV import-merge, which
+//      REPLACES `target.items` with a new array — changing the reference, which
+//      fails check (a) and forces a re-encode. Session-level field edits change
+//      the signature and fail check (b). So any change that could alter the
+//      serialised output invalidates the cache. There is no dirty flag to forget
+//      to set.
+//
+// Net effect: a save re-encodes the active session (small) instead of the whole
+// database. The on-disk string is byte-for-byte identical to the pre-v23 output.
+const _encodedSessionCache = new WeakMap();
+
+// Cheap signature over everything serialiseSessions could put on disk for a
+// session EXCEPT its items array contents (those are guarded by the array-
+// reference identity check + the active-session always-re-encode rule). Pure
+// string concatenation of primitives — no object allocation, no JSON.stringify.
+function _sessionSig(s) {
+  return [
+    s.id, s.name, s.site, s.engineer, s.prefix, s.date,
+    s.startNumber, s.locked ? 1 : 0,
+    s.exportedAt || '', s.exportDirty ? 1 : 0,
+    (s.items ? s.items.length : 0)
+  ].join('\u0001');
+}
+
 // Serialise the sessions array for localStorage in compressed form.
+// v23: reuses each session's cached encoding when provably unchanged (see above).
 function serialiseSessions(sessions) {
-  const payload = {
-    _c: STORAGE_CODEC_VERSION,
-    s: sessions.map(encodeSession)
-  };
+  const activeId = state && state.activeId;
+  const encoded = sessions.map(s => {
+    // Reuse the cached encoding only for a NON-active session that is provably
+    // unchanged. The active session always falls through to a fresh encode.
+    if (s.id !== activeId) {
+      const cached = _encodedSessionCache.get(s);
+      if (cached && cached.itemsRef === s.items && cached.sig === _sessionSig(s)) {
+        return cached.encoded;
+      }
+    }
+    // Fresh encode + (re)cache. Refreshing the cache here — including for the
+    // active session — means that once you switch away from it, its first save
+    // as a non-active session already has an up-to-date entry to reuse.
+    const enc = encodeSession(s);
+    _encodedSessionCache.set(s, { itemsRef: s.items, sig: _sessionSig(s), encoded: enc });
+    return enc;
+  });
+  const payload = { _c: STORAGE_CODEC_VERSION, s: encoded };
   return JSON.stringify(payload);
 }
 
@@ -415,10 +474,36 @@ function computeHistoryFromItems() {
   return Array.from(set);
 }
 
-function save() {
+// v23 (E2): save() is split into a HOT path and a COLD path.
+//
+// Pre-v23, every save() wrote ~25 separate localStorage keys — the sessions blob
+// PLUS every settings key (presets, fail reasons, theme, CSV columns, calibration,
+// Multi Pick, SQP, clients…) — even when you'd only logged one item and none of
+// those settings had changed. Writing 23 unchanged keys on every PASS tap is pure
+// waste.
+//
+//   • saveSessions()  — the HOT path: the two things that actually change when you
+//                       log/edit an item (the sessions blob + the active pointer).
+//   • saveSettings()  — the COLD path: everything else, written only when a setting
+//                       actually changes.
+//   • save()          — unchanged behaviour: calls BOTH. Every existing caller keeps
+//                       working exactly as before; only the genuinely hot loggers
+//                       were repointed at saveSessions() (passClicked, failClicked,
+//                       copyLastResult, saveItem, deleteItem, multiPickFire).
+//
+// Nothing on disk changes: save() still writes the full set. The win is that the
+// hot loggers now skip the 23 cold writes.
+
+// HOT: session data only. Called on every logged/edited/deleted item.
+function saveSessions() {
   // v14: sessions stored compressed via the key-shortening codec.
+  // v23: serialiseSessions reuses cached encodings for unchanged sessions.
   localStorage.setItem(STORAGE_KEY, serialiseSessions(state.sessions));
   localStorage.setItem(ACTIVE_KEY, state.activeId || '');
+}
+
+// COLD: all settings/config keys. Called when a setting changes (and by save()).
+function saveSettings() {
   // v9: legacy ITEMS_KEY no longer written; ITEM_PRESETS_KEY + ACTIVE_PRESET_KEY are
   // the source of truth. Backup/restore still uses the same logic.
   localStorage.setItem(ITEM_PRESETS_KEY, JSON.stringify(state.itemPresets));
@@ -456,6 +541,25 @@ function save() {
   // lastBackupAt + backupSnoozedUntil are written via their own helpers
   // (markBackupExported, snoozeBackupReminder) rather than here, because they
   // shouldn't update on every state change.
+}
+
+// Full save — sessions + settings. Unchanged behaviour for every existing caller.
+function save() {
+  saveSessions();
+  saveSettings();
+}
+
+// v23 (E2): targeted single-key writers. The hot loggers (saveItem,
+// copyLastResult) occasionally mutate ONE cold key on append — the learned SQP
+// history and/or the descriptions list. Rather than fall back to a full save()
+// (and rewrite all 23 cold keys) just to persist one of them, they call the
+// matching targeted writer. This keeps the hot path to: sessions (always) + at
+// most the one or two cold keys that genuinely changed.
+function saveSqpHistory() {
+  localStorage.setItem(SQP_HISTORY_KEY, JSON.stringify(state.sqpHistory || {}));
+}
+function saveDescriptions() {
+  localStorage.setItem(DESCRIPTIONS_KEY, JSON.stringify(state.descriptions));
 }
 
 

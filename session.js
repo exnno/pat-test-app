@@ -1,12 +1,12 @@
 /*!
  * PAT Test PWA
- * v22 (June 2026)
+ * v23 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v22 — Sessions & logic ==============
+// ============== PAT Test PWA — v23 — Sessions & logic ==============
 // Presets, core helpers, theme, export-state, form, validation, session/item
 // actions, bulk-edit, selection, per-page settings saves. Reads global state.
 
@@ -76,7 +76,29 @@ function deletePreset(id) {
 // ---------- Helpers ----------
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const todayISO = () => new Date().toISOString().slice(0, 10);
-function activeSession() { return state.sessions.find(s => s.id === state.activeId); }
+// v23 (E5): activeSession() is called many times per render and per logged item.
+// Pre-v23 each call did a fresh linear .find() over the whole sessions array.
+// Now we memoise the result, validating the cache against BOTH the current
+// activeId AND the sessions array reference. Any operation that changes which
+// session is active (openSession, createSession unshift, deleteSession, prune,
+// import) either reassigns state.activeId or replaces/reorders state.sessions —
+// either of which busts the cache, so a stale object can never be returned. On a
+// miss we re-find and re-cache. Returns undefined when there's no active session,
+// exactly as before.
+let _activeSessionCache = { id: null, sessionsRef: null, session: undefined };
+function activeSession() {
+  if (_activeSessionCache.id === state.activeId &&
+      _activeSessionCache.sessionsRef === state.sessions) {
+    return _activeSessionCache.session;
+  }
+  const found = state.sessions.find(s => s.id === state.activeId);
+  _activeSessionCache = {
+    id: state.activeId,
+    sessionsRef: state.sessions,
+    session: found
+  };
+  return found;
+}
 
 
 function normaliseItemType(s) {
@@ -662,7 +684,11 @@ function saveItem(result) {
   // after any save — pass, fail-commit, or edit-overwrite), use the lightweight
   // entry-only refresh. refreshEntryAfterLog() falls back to full render() if we
   // are somehow not on the entry screen, so this is always safe.
-  save(); refreshEntryAfterLog();
+  // v23 (E2): hot path — write the sessions blob plus only the two cold keys this
+  // function can touch on append (learned SQP history, descriptions). Skips the
+  // ~21 other unchanged settings keys a full save() would rewrite every tap.
+  saveSessions(); saveSqpHistory(); saveDescriptions();
+  refreshEntryAfterLog();
 }
 
 function passClicked() {
@@ -742,7 +768,11 @@ function copyLastResult() {
   state.cursor++;
   loadFormForCursor();
   // v19 (efficiency item 4): lightweight entry-only refresh (see saveItem).
-  save(); refreshEntryAfterLog();
+  // v23 (E2): hot path — sessions blob plus the one cold key this can touch on
+  // append (learned SQP history). copyLastResult never adds a new description
+  // (it reuses the previous item's type), so descriptions can't change here.
+  saveSessions(); saveSqpHistory();
+  refreshEntryAfterLog();
 }
 
 function deleteItem(idx) {
@@ -758,7 +788,9 @@ function deleteItem(idx) {
       .map(i => i > idx ? i - 1 : i);
   }
   loadFormForCursor();
-  save(); render();
+  // v23 (E2): hot path — deleting an item changes only the sessions blob; no
+  // settings key is touched, so saveSessions() alone is correct here.
+  saveSessions(); render();
 }
 
 function moveCursor(delta) {
