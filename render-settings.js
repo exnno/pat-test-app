@@ -738,18 +738,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v23: rolled forward — V23 on top, V20 dropped. -->
+      <!-- v8: rolling 3-version changelog. v24: rolled forward — V24 on top, V21 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V24</strong> · June 2026</p>
+        <p class="muted">Another speed update with no changes to how the app looks or works. Redrawing the screen now does less unnecessary work — selecting items in a session's overview, in particular, updates more efficiently. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
 
         <p><strong>V23</strong> · June 2026</p>
         <p class="muted">A speed update, with no changes to how the app looks or works. Saving each test result now does less work behind the scenes — instead of re-processing your whole history on every tap, it only handles the session you're working in. The benefit grows with the size of your data: on a long job, or a busy device, logging stays quick from the first item to the last. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
 
         <p><strong>V22</strong> · June 2026</p>
         <p class="muted">Another under-the-hood update, with no changes to how the app looks or works. This completes the code reorganisation started in V21 — the last big code file has now been split into smaller, single-purpose files, so future updates are faster and safer to build. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
-
-        <p><strong>V21</strong> · June 2026</p>
-        <p class="muted">An under-the-hood update with no changes to how the app looks or works. The app's code has been reorganised into smaller, separate files to make future updates faster and safer to build. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
       </div>
 
       <div class="info-card">

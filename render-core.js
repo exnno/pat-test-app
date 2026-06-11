@@ -13,19 +13,25 @@
 // ---------- Rendering ----------
 const app = document.getElementById('app');
 
+// v24 (E4): the orphaned-backdrop sweep below used to run on EVERY render. It's a
+// defensive guard against the old "taps do nothing" bug, where a modal backdrop
+// left sitting as a direct child of <body> (z-index 90+) silently swallows every
+// tap. In the current architecture modals are only ever emitted as HTML strings
+// inside #app (never appended to <body> directly), and an innerHTML rewrite of
+// #app removes all of its old children — so an orphan can only ever arise from a
+// render that ACTUALLY emitted a modal/sheet. We therefore track whether the
+// previous render contained any modal/sheet markup and run the (whole-document)
+// querySelectorAll sweep only then. On the overwhelmingly common modal-free
+// renders (entry logging, sessions list, settings pages) the sweep is skipped
+// entirely. The safety net is unchanged for every render that could need it.
+let _lastRenderHadModal = false;
+
 function render() {
-  // v8: DOM hygiene — defensive cleanup against the "taps do nothing" bug.
-  // Symptom: across the whole app, tapping any input gives no cursor and no keyboard.
-  // A fresh PWA install fixes it. The most likely cause is an orphaned modal
-  // backdrop or sheet sitting in the DOM at z-index 90+, silently swallowing every
-  // tap. We can't always reproduce it, so we sweep aggressively here every render:
-  //   1. Strip any modal/sheet elements that ended up outside #app (where they
-  //      would survive an innerHTML rewrite).
-  //   2. Drop any body classes that are only meant to be transient.
-  // The cost is one querySelectorAll per render — negligible.
-  document.querySelectorAll(
-    'body > .modal-backdrop, body > .fail-sheet, body > .bulk-sheet'
-  ).forEach(el => el.remove());
+  if (_lastRenderHadModal) {
+    document.querySelectorAll(
+      'body > .modal-backdrop, body > .fail-sheet, body > .bulk-sheet'
+    ).forEach(el => el.remove());
+  }
 
   const v = state.view;
   let html = '';
@@ -139,7 +145,17 @@ function render() {
     }
   }
 
-  app.innerHTML = banner + html + migrationModal + welcomeModal + reopenWarnModal;
+  const finalHTML = banner + html + migrationModal + welcomeModal + reopenWarnModal;
+  app.innerHTML = finalHTML;
+  // v24 (E4): record whether THIS render put any modal/sheet into the DOM, so the
+  // next render knows whether the orphan-sweep above could find anything. Cheap
+  // substring checks against the same classes the sweep targets — far cheaper
+  // than a whole-document querySelectorAll, and only the screen HTML (`html`) plus
+  // the three top-level modal strings can contain these.
+  _lastRenderHadModal =
+    finalHTML.indexOf('modal-backdrop') !== -1 ||
+    finalHTML.indexOf('fail-sheet') !== -1 ||
+    finalHTML.indexOf('bulk-sheet') !== -1;
   // Toggle body class for selection bar spacing
   if (state.view === 'overview' && state.selectionMode) {
     document.body.classList.add('has-selection-bar');
@@ -185,6 +201,9 @@ function refreshEntryAfterLog() {
   document.body.classList.remove('has-selection-bar');
   document.body.classList.remove('view-entry');
   app.innerHTML = renderEntry();
+  // v24 (E4): the entry screen never contains a modal/sheet, so a subsequent
+  // render() has nothing to sweep. Keep the flag accurate.
+  _lastRenderHadModal = false;
   bindEvents();
 }
 // v20: New Session Client / Site autocomplete. These replace the v19 native
@@ -1001,6 +1020,34 @@ function refreshOverviewBody() {
   bindOverviewBodyEvents();
 }
 
+// v24 (E7): selecting/deselecting a row in selection mode used to call full
+// render(). The only things that change are all confined to the overview screen:
+//   • the item rows (selected styling)           — inside .overview-body
+//   • the header "N selected" count              — outside .overview-body
+//   • the selection-bar count + its button's     — outside .overview-body
+//     disabled state
+// selectionMode itself does NOT change here (the body.has-selection-bar class is
+// therefore stable), and no modal opens or closes — so a full render is overkill.
+// This helper rebuilds the body (reusing refreshOverviewBody) and patches the two
+// out-of-body counts in place via textContent / a disabled toggle. If any of the
+// expected nodes is missing (e.g. we're somehow not in selection mode), it falls
+// back to a full render() so there is never a path that leaves the screen stale.
+function refreshOverviewSelection() {
+  if (state.view !== 'overview' || !state.selectionMode) { render(); return; }
+  const body = document.querySelector('.overview-body');
+  if (!body) { render(); return; }
+  refreshOverviewBody();
+  const n = state.selectedIndices.length;
+  // Header "N selected"
+  const headerCount = document.querySelector('.header-row .site-name');
+  if (headerCount) headerCount.textContent = `${n} selected`;
+  // Selection-bar count + Edit-selected button disabled state
+  const barCount = document.querySelector('.selection-bar-count');
+  if (barCount) barCount.textContent = `${n} selected`;
+  const editBtn = document.getElementById('bulk-edit-menu-btn');
+  if (editBtn) editBtn.disabled = (n === 0);
+}
+
 function bindOverviewBodyEvents() {
   document.querySelectorAll('[data-jump]').forEach(el => {
     el.onclick = () => jumpTo(parseInt(el.dataset.jump, 10));
@@ -1013,13 +1060,13 @@ function bindOverviewBodyEvents() {
       // Avoid double-toggling when the checkbox itself is clicked
       if (e.target && e.target.tagName === 'INPUT') return;
       toggleSelected(parseInt(el.dataset.rowToggle, 10));
-      render();
+      refreshOverviewSelection();   // v24 (E7): was render()
     };
   });
   document.querySelectorAll('[data-select]').forEach(el => {
     el.onchange = () => {
       toggleSelected(parseInt(el.dataset.select, 10));
-      render();
+      refreshOverviewSelection();   // v24 (E7): was render()
     };
   });
 }
