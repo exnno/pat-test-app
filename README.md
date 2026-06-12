@@ -2,7 +2,7 @@
 
 A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, flexible clients & sites, search, filters, bulk edit, JSON backup/restore, dark mode, and CSV export/import.
 
-**Live:** <https://exnno.github.io/pat-test-app/>
+**Live:** https://exnno.github.io/pat-test-app/
 **Current version:** V26 · cache `pat-v26`
 
 ## Key features
@@ -10,7 +10,7 @@ A fast, offline-first portable appliance testing app. Records pass/fail decision
 - **Single-item entry** — one appliance at a time, sticky location field, 9 Quick Pick type buttons, optional asset-number prefix, cross-session autocomplete, copy-last-result.
 - **Smart Quick Pick** — learns which item types you test at each location and reorders the Quick Pick buttons accordingly (opt-in).
 - **Multi Pick** — pre-set sequences of item types for repetitive runs.
-- **Clients & Sites** — a session can be tied to a client, a site, or both (at least one). Sites can exist without a client (“Unassigned”) and be assigned to a client later, or moved between clients. Managed under Settings → Clients.
+- **Clients & Sites** — a session can be tied to a client, a site, or both (at least one). Sites can exist without a client ("Unassigned") and be assigned to a client later, or moved between clients. Managed under Settings → Clients.
 - **Sessions** — search, filter, lock, bulk edit/export, duplicate-protection on import.
 - **CSV export/import** — customisable columns (incl. a separate, optional Client column), single-session import with round-trip support.
 - **Backup/restore** — full JSON backup (human-readable), versioned (`backupVersion` 5).
@@ -60,14 +60,14 @@ GitHub Pages, auto-deploys on commit to `main`. Edit via the GitHub web UI for q
 ## Releasing
 
 1. **Always bump `CACHE_VERSION` in `sw.js`** when any file changes (`pat-vN`; hotfix `pat-vN-1`). This is the step that must never be skipped — a stale cache serves old/broken files.
-1. **Always bump `APP_VERSION` in `config.js`** for the user-visible version label.
-1. If scripts are added/removed, update both the `<script>` tags in `index.html` and the `ASSETS` list in `sw.js` (keep load order; `boot.js` stays last).
-1. Roll the About changelog in `render-settings.js` (most recent 3 versions). For feature releases, roll the welcome modal (new `pat:vNNwelcome` key); skip it for pure structural/refactor releases.
-1. If the storage schema changes, bump `backupVersion` in `backup.js` and confirm older backups still restore.
-1. Replace the changed files via the GitHub web UI and commit each.
-1. Wait ~1 min for Pages to redeploy, then verify in incognito before testing the installed PWA.
-1. On a phone, fully close the PWA from the app switcher and reopen once or twice to force the service-worker refresh. The app also shows an “Update available” banner when it detects a new version — tap Refresh to activate.
-1. **Run the release’s post-commit test checklist** (every release ships with one in its handoff) to confirm the new features/fixes actually work on the live app — not just that the deploy landed.
+2. **Always bump `APP_VERSION` in `config.js`** for the user-visible version label.
+3. If scripts are added/removed, update both the `<script>` tags in `index.html` and the `ASSETS` list in `sw.js` (keep load order; `boot.js` stays last).
+4. Roll the About changelog in `render-settings.js` (most recent 3 versions). For feature releases, roll the welcome modal (new `pat:vNNwelcome` key); skip it for pure structural/refactor releases.
+5. If the storage schema changes, bump `backupVersion` in `backup.js` and confirm older backups still restore.
+6. Replace the changed files via the GitHub web UI and commit each.
+7. Wait ~1 min for Pages to redeploy, then verify in incognito before testing the installed PWA.
+8. On a phone, fully close the PWA from the app switcher and reopen once or twice to force the service-worker refresh. The app also shows an "Update available" banner when it detects a new version — tap Refresh to activate.
+9. **Run the release's post-commit test checklist** (every release ships with one in its handoff) to confirm the new features/fixes actually work on the live app — not just that the deploy landed.
 
 ### Hotfixes
 

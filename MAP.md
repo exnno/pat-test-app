@@ -1,18 +1,20 @@
-# PAT App — Code Map (V22)
+# PAT App — Code Map (V26)
 
 Where each thing lives, so a feature change reads one or two small files instead
-of a 5,700-line `app.js`. Load order = the order below. `app.js` no longer
+of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
 exists — the modular split is complete.
 (c) 2026 Peter Birchley. All rights reserved.
 
-> **V22 status:** refactor complete. The remaining `app.js` has been split into
-> eleven single-concern files (`clients` → `boot`) and deleted. No behaviour,
-> visual, storage, codec or backup change in V21 or V22 — pure code relocation.
+> **This file is the index the read-discipline workflow depends on.** Read it
+> first, then open only the file(s) it points to. It MUST be kept fully accurate
+> every release — a stale map breaks the whole approach. If you ever open a file
+> the map didn't point you to, the map is out of date: fix it.
 
-## Load order (index.html) — 15 files
+## Load order (index.html) — 16 files
 `config.js` → `state.js` → `utils.js` → `storage.js` → `clients.js` → `sqp.js`
 → `multipick.js` → `feedback.js` → `csv.js` → `backup.js` → `session.js`
-→ `render-core.js` → `render-settings.js` → `events.js` → `boot.js`
+→ `render-core.js` → `render-settings.js` → `events.js` → `dispatch.js`
+→ `boot.js`
 
 `boot.js` runs the startup block and must stay **last**. Later files may call
 functions defined in earlier ones; nothing executes until `boot.js` because
@@ -38,15 +40,18 @@ UI transients, welcome-modal flags, SQP/Multi Pick in-memory caches.
 `formatTimestampCSV`, `splitAssetNo`, `csvEscape`, `csvResultLabel`, `formatBytes`.
 *Touch to:* add a stateless formatting/escaping helper.
 
-## storage.js (~480 ln) — persistence boundary
+## storage.js (~585 ln) — persistence boundary
 Codec: `STORAGE_CODEC_VERSION`, `SESSION_KEY_MAP`, `ITEM_KEY_MAP` (+ `_REV`),
-`encodeWithMap`/`decodeWithMap`, `encode/decodeItem`, `encode/decodeSession`,
-`serialiseSessions`, `parseStoredSessions`. Lifecycle: `load`, `loadV11Settings`,
-`ensureAllCsvColumns`, `computeHistoryFromItems`, `save`, `getStorageStats`.
+`encodeWithMap`/`decodeWithMap`, `encodeItem`/`decodeItem`,
+`encodeSession`/`decodeSession`, `_sessionSig`, `serialiseSessions`,
+`parseStoredSessions`. Lifecycle: `load`, `loadV11Settings`,
+`ensureAllCsvColumns`, `computeHistoryFromItems`. Saves: `save` (full),
+`saveSessions`, `saveSettings`, `saveSqpHistory`, `saveDescriptions`. Stats:
+`getStorageStats`.
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
-## clients.js (~340 ln) — Clients & Sites (v19, extended v26)
+## clients.js (~405 ln) — Clients & Sites (v19, extended v26)
 Data model: `loadClients`, `loadSites` (v26: orphan sites allowed — clientId may
 be empty), `seedClientsSitesFromSessions`, `clientById`, `siteById`,
 `sitesForClient`, `sortedClients`, `findClientByName`, `findSiteByName`,
@@ -63,10 +68,11 @@ sites). Settings→Clients page actions: `addClientFromDialog`,
 
 ## sqp.js (~225 ln) — Smart Quick Pick (v18)
 `normaliseSqpLocation`, `normaliseSqpHistory`, `loadSqpHistory`,
-`recordSqpUsage`, `buildSqpHistory`, `sqpScoresForLocation`,
-`smartOrderedItemTypes`, `sqpRowForLocation`, `invalidateSqpRow`,
-`clearSqpHistory`, `rebuildSqpHistory`, `setSqp`.
+`recordSqpUsage`, `buildSqpHistory`, `bumpSqpHistoryVersion`,
+`sqpScoresForLocation`, `smartOrderedItemTypes`, `sqpRowForLocation`,
+`invalidateSqpRow`, `clearSqpHistory`, `rebuildSqpHistory`, `setSqp`.
 *Touch to:* change how the quick-pick row adapts to location.
+**V27 candidate** — matching too greedy + swap-in scoring favours rare oddities.
 
 ## multipick.js (~125 ln) — Multi Pick (v16)
 `normaliseMultiPickConfig`, `loadMultiPickConfig`, `activeMultiPickSlots`,
@@ -95,49 +101,70 @@ title/text). Import: `buildCsvHeaderLookup`, `parseCSV`, `parseUkDateToIso`,
 *Touch to:* change the JSON backup shape or restore path. **Bump `backupVersion`
 if the shape changes; keep old-backup compatibility.**
 
-## session.js (~1270 ln) — sessions, items & most logic
-Presets (`activePreset`, `switchPreset`, `createPreset`, …); core helpers
-(`uid`, `todayISO`, `activeSession`, `normaliseItemType`, `normaliseLocation`,
-`calibrationStatus`, `nextAssetNo`, `getCarryForwardLocation`,
-`findDuplicateAssetIndex`, `computeSuggestions`, `computeLocationSuggestions`,
-`addDescriptionIfNew`, `sortedSessions`, `sessionMatchesControlFilters`,
-`filteredSessions`); theme (`applyTheme`); export-state (`exportStatus`,
-`markSessionExported`, `markSessionDirty`, `unexportedSessions*`,
+## session.js (~1320 ln) — sessions, items & most logic
+Presets (`activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
+`createPreset`, `renamePreset`, `deletePreset`); core helpers (`uid`, `todayISO`,
+`activeSession`, `normaliseItemType`, `normaliseLocation`, `calibrationStatus`,
+`nextAssetNo`, `getCarryForwardLocation`, `findDuplicateAssetIndex`,
+`computeSuggestions`, `computeLocationSuggestions`, `addDescriptionIfNew`,
+`sortedSessions`, `sessionMatchesControlFilters`, `filteredSessions`); theme
+(`applyTheme`); export-state (`exportStatus`, `markSessionExported`,
+`markSessionDirty`, `unexportedSessionCount`, `unexportedSessions`,
 `prunableSessions`, `savePruneAge`, `pruneOldSessions`); form
-(`loadFormForCursor`); validation (`validateBeforeSave`); actions
-(`createSession`, `openSession`, `requestOpenSession`, `deleteSession`,
-`saveItem`, `passClicked`, `failClicked`, `pickFailReason`, `copyLastResult`,
-`deleteItem`, `moveCursor`, `skipToNew`, `jumpTo`, `setView`, …); bulk-edit &
-selection (`enterSelectionMode`, `toggleSelected`, `applyBulk*`, …);
-per-page settings saves (`saveUserSettings`, `saveCsvColumnsSettings`,
-`moveCsvColumn`, `saveItemTypesSettings`, `resetItemsToDefaults`, `setTheme`,
-`setHaptics`, `setSound`, `setTimestamps`, `dismissV19Welcome`,
-`dismissV20Welcome`, …).
+(`loadFormForCursor`); validation (`validateBeforeSave`); session/item actions
+(`createSession`, `openSession`, `requestOpenSession`, `confirmReopenWarning`,
+`cancelReopenWarning`, `deleteSession`, `saveItem`, `passClicked`, `failClicked`,
+`pickFailReason`, `cancelFailModal`, `copyLastResult`, `deleteItem`, `moveCursor`,
+`skipToNew`, `jumpTo`, `setView`); selection + bulk edit (`enterSelectionMode`,
+`exitSelectionMode`, `toggleSelected`, `selectAllVisible`, `clearSelection`,
+`openBulkLocationDialog`, `applyBulkLocation`, `openBulkEditMenu`,
+`closeBulkEditMenu`, `openBulkEditDialog`, `cancelBulkEditDialog`, `applyBulkType`,
+`applyBulkNotes`, `applyBulkDelete`); edit-session (`startEditSession`,
+`saveSessionEdits`, `unlockActiveSession`); settings saves/resets
+(`saveUserSettings`, `saveCsvColumnsSettings`, `resetCsvColumnsSettings`,
+`moveCsvColumn`, `saveItemTypesSettings`, `saveFailReasonsSettings`,
+`saveDescriptionsSettings`, `resetItemsToDefaults`, `resetFailReasonsToDefaults`,
+`resetDescriptionsToDefaults`, `setTheme`, `setHaptics`, `setSound`,
+`setTimestamps`); welcome dismiss (`dismissV19Welcome`, `dismissV26Welcome`).
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
-filtering, theme, bulk edit, settings saves. The stranded accessors live here
-now (moved from app.js in V22, as planned).
+filtering, theme, bulk edit, settings saves.
 
-## render-core.js (~1130 ln) — main screens
-Owns `const app = document.getElementById('app')`. `render()` dispatcher;
-`renderSessions`, `renderEntry`, `renderOverview`, `renderEditSession` and their
-partial refreshes (`refreshEntryAfterLog`, `refreshSessionsListAreaOnly`,
-`refreshOverviewBody`, `bindOverviewBodyEvents`, `bindSessionsListAreaEvents`,
-`renderSessionsListAreaHTML`, `renderBackupReminderBanner`, import modals, the
-new-session client/site suggestion helpers).
+## render-core.js (~1140 ln) — main screens
+Owns `const app = document.getElementById('app')`. `render()` dispatcher.
+Sessions: `renderSessions`, `renderSessionsListAreaHTML`,
+`refreshSessionsListAreaOnly`, `bindSessionsListAreaEvents`,
+`renderBackupReminderBanner`. New-session form suggestions:
+`computeNfClientSuggestions`, `computeNfSiteSuggestions`, `nfSuggestionsHTML`.
+Import modals: `renderImportConflictModal`, `renderImportSummaryModal`. Entry:
+`renderEntry`, `refreshEntryAfterLog`. Overview: `computeVisibleOverviewItems`,
+`renderOverviewBodyHTML`, `renderOverview`, `refreshOverviewBody`,
+`refreshOverviewSelection`, `bindOverviewBodyEvents`. Edit: `renderEditSession`.
 *Touch to:* change the Sessions list, Entry screen, Overview, or Edit-session UI.
 
-## render-settings.js (~785 ln) — settings screens
+## render-settings.js (~855 ln) — settings screens
 `renderSettingsHub`, `renderSettingsSubHeader`, and every `renderSettings*`
 sub-page (User, Items, Fails, MultiPick, Descriptions, Display, Backup, Csv,
 Clients, Calculator, About, Contact) + calculator helpers (`computeEarthLimit`,
 `formatLengthOption`). **About changelog lives here** (`renderSettingsAbout`).
 *Touch to:* change any Settings page or roll the About changelog.
 
-## events.js (~805 ln) — event binding
+## events.js (~485 ln) — event binding (per-render)
 `bindEvents()` (the big per-render rebind) + suggestion re-render helpers
 (`renderSuggestionsOnly`, `renderNfSuggestionsOnly`, `renderLocationSuggestionsOnly`).
-*Touch to:* wire up a new tappable control (paired with its render file).
-**Carry-forward E3 lives here** — delegated listeners would shrink this.
+*Touch to:* wire up a control whose handler still lives here (paired with its
+render file).
+**Carry-forward E3-tail lives here** — the ~46 remaining stateful
+`oninput`/`onchange` handlers still bound per-render; migrating them to delegation
+in `dispatch.js` would empty this. Its own release; riskiest handlers.
+
+## dispatch.js (~435 ln) — delegated event handling (V25)
+The single delegated click system + action registry: `registerActions` (each
+section of the app registers its `data-action` handlers), `handleDelegatedClick`
+(one listener on `#app` routes clicks by `data-action`/`data-arg`),
+`initDelegation` (wires it up at boot). Click actions moved here in V25 so they
+survive re-renders without rebinding.
+*Touch to:* add/route a new `data-action` click handler. Text-field
+input/change handlers still live in `events.js` (see E3-tail above).
 
 ## boot.js (~145 ln) — startup, RUNS ON LOAD, must load LAST
 Service worker: `registerServiceWorker`, `showUpdateBanner`, `applyUpdate`,
