@@ -46,13 +46,19 @@ Codec: `STORAGE_CODEC_VERSION`, `SESSION_KEY_MAP`, `ITEM_KEY_MAP` (+ `_REV`),
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
-## clients.js (~260 ln) — Clients & Sites (v19)
-Data model: `loadClients`, `loadSites`, `seedClientsSitesFromSessions`,
-`clientById`, `siteById`, `sitesForClient`, `sortedClients`, `findClientByName`,
-`findSiteByName`, `ensureClient`, `ensureSite`, `rebuildClientsFromSessions`,
-`composeSiteSnapshot`. Settings→Clients page actions: `addClientFromDialog`,
+## clients.js (~340 ln) — Clients & Sites (v19, extended v26)
+Data model: `loadClients`, `loadSites` (v26: orphan sites allowed — clientId may
+be empty), `seedClientsSitesFromSessions`, `clientById`, `siteById`,
+`sitesForClient`, `sortedClients`, `findClientByName`, `findSiteByName`,
+`ensureClient`, `ensureSite`, `rebuildClientsFromSessions`, `composeSiteSnapshot`,
+`splitSiteSnapshot` (v26: snapshot → {client, site} for CSV split),
+`unassignedSites` + `ensureOrphanSite` + `findOrphanSiteByName` (v26: clientless
+sites). Settings→Clients page actions: `addClientFromDialog`,
 `renameClientFromDialog`, `deleteClient`, `addSiteFromDialog`,
-`renameSiteFromDialog`, `deleteSite`.
+`renameSiteFromDialog`, `deleteSite`. v26 assign/move (Q3=B/Q14=B):
+`openSiteAssignDialog`, `cancelSiteAssignDialog`, `commitSiteAssign`,
+`resolveAssignMerge`, `resolveAssignKeepBoth`, `finishSiteAssign`,
+`nextFreeSiteName`.
 *Touch to:* change how clients/sites are stored or managed.
 
 ## sqp.js (~225 ln) — Smart Quick Pick (v18)
@@ -73,10 +79,13 @@ Data model: `loadClients`, `loadSites`, `seedClientsSitesFromSessions`,
 `feedback` (+ `FEEDBACK_HAPTIC_COUNT`).
 *Touch to:* change pass/fail/copy feedback channels or toasts.
 
-## csv.js (~575 ln) — CSV build + import (v10/v11)
-Build/share: `csvCellValue`, `buildCSV`, `defaultHeaderFor`, `downloadCSV`
-(+ `SHARE_ICON_SVG`). Import: `buildCsvHeaderLookup`, `parseCSV`,
-`parseUkDateToIso`, `parseImportCSV`, `handleImportFile`, `commitImportedSession`,
+## csv.js (~600 ln) — CSV build + import (v10/v11, split v26)
+Build/share: `csvCellValue` (v26: `client` column + adaptive `site` column — full
+snapshot when Client hidden, site-only when shown), `buildCSV`, `defaultHeaderFor`,
+`downloadCSV` (+ `SHARE_ICON_SVG`; v26: share payload no longer carries
+title/text). Import: `buildCsvHeaderLookup`, `parseCSV`, `parseUkDateToIso`,
+`parseImportCSV` (v26: recognises a `Client` column, composes snapshot),
+`handleImportFile`, `commitImportedSession` (v26: learns client/site into lists),
 `cancelImportConflict`, `closeImportSummary` (+ `EXPECTED_CSV_HEADER`).
 *Touch to:* change CSV columns, export, or import parsing.
 
@@ -130,10 +139,14 @@ Clients, Calculator, About, Contact) + calculator helpers (`computeEarthLimit`,
 *Touch to:* wire up a new tappable control (paired with its render file).
 **Carry-forward E3 lives here** — delegated listeners would shrink this.
 
-## boot.js (~100 ln) — startup, RUNS ON LOAD, must load LAST
+## boot.js (~145 ln) — startup, RUNS ON LOAD, must load LAST
 Service worker: `registerServiceWorker`, `showUpdateBanner`, `applyUpdate`,
-`dismissUpdateBanner`. Boot tail: `load()`, `applyTheme(state.theme)`, the
-crash-fallback `try { loadFormForCursor(); render(); } catch …`, then
-`registerServiceWorker()`.
-*Touch to:* change startup sequence or the SW update banner. The crash fallback
-that prevents a permanent blank screen lives here.
+`dismissUpdateBanner`. v26 boot integrity guard: `bootIntegrityOK()` verifies the
+critical cross-file functions all loaded before any storage write; if not, it
+shows an "Update needed" reload prompt and SKIPS load()/render()/save() (guards
+the v26-era duplicate-const data-loss class). Boot tail: the guard's else-branch
+runs `load()`, `applyTheme(state.theme)`, the crash-fallback
+`try { loadFormForCursor(); render(); } catch …`; `registerServiceWorker()` runs
+regardless.
+*Touch to:* change startup sequence, the SW update banner, or the integrity
+guard. The crash fallback that prevents a permanent blank screen lives here.

@@ -86,6 +86,7 @@ registerActions({
   'open-settings': () => setView('settings'),
   'new-session': () => {
     state.newForm.show = true;
+    state.newFormError = '';
     if (!state.newForm.engineer && state.engineer) state.newForm.engineer = state.engineer;
     state.nfSuggestions = []; state.showNfSuggestions = false; state.nfActiveField = null;
     render();
@@ -136,6 +137,7 @@ registerActions({
   // exactly as the old #nf-submit handler did.
   'nf-cancel': () => {
     state.newForm = { name: '', site: '', engineer: state.engineer, prefix: '', startNo: '1', show: false, clientId: '', siteId: '' };
+    state.newFormError = '';
     state.nfSuggestions = []; state.showNfSuggestions = false; state.nfActiveField = null;
     render();
   },
@@ -346,7 +348,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV20Welcome(),
+  'welcome-dismiss': () => dismissV26Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -409,6 +411,16 @@ registerActions({
     render();
   },
   'site-delete': (arg) => deleteSite(arg),
+  // v26 (Q3=B): assign/move a site to a client.
+  'site-assign': (arg) => openSiteAssignDialog(arg),
+  'site-assign-confirm': () => {
+    const inp = document.getElementById('assign-dialog-input');
+    state.clientsPage.assignDialog.name = inp ? inp.value : '';
+    commitSiteAssign();
+  },
+  'site-assign-merge': () => resolveAssignMerge(),
+  'site-assign-keepboth': () => resolveAssignKeepBoth(),
+  'site-assign-cancel': () => cancelSiteAssignDialog(),
   'client-dialog-confirm': () => {
     if (state.clientsPage.clientDialog.mode === 'add') addClientFromDialog();
     else renameClientFromDialog();

@@ -537,14 +537,30 @@ function createSession() {
   const clientName = String(state.newForm.clientId || '').trim();   // holds the typed client NAME
   const siteName = String(state.newForm.site || '').trim();         // holds the typed site NAME
 
-  // A site name is still required (the old rule was "site can't be blank").
-  if (!siteName) return;
+  // v26 (Q1=A): a session now needs at LEAST ONE of Client or Site (previously
+  // Site was mandatory). Neither → block with a gentle inline message rather
+  // than a silent return, so the user knows why nothing happened.
+  if (!clientName && !siteName) {
+    state.newFormError = 'Enter a client or a site to start the session.';
+    render();
+    return;
+  }
+  state.newFormError = '';
 
+  // Resolve structured refs, creating list entries for anything newly typed:
+  //   • client + site → client created, site created under it (as before)
+  //   • client only   → client created, no site (Q3: a site can be added later)
+  //   • site only     → orphan site created with no client (Q2=A); it lands in
+  //                     the Unassigned group and can be assigned to a client later
   let clientRec = null;
   let siteRec = null;
-  if (clientName) {
+  if (clientName && siteName) {
     clientRec = ensureClient(clientName);
     if (clientRec) siteRec = ensureSite(clientRec.id, siteName);
+  } else if (clientName) {
+    clientRec = ensureClient(clientName);
+  } else {
+    siteRec = ensureOrphanSite(siteName);
   }
 
   const snapshot = composeSiteSnapshot(clientName, siteName);
@@ -567,6 +583,7 @@ function createSession() {
   state.cursor = 0;
   state.view = 'entry';
   state.newForm = { name: '', site: '', engineer: state.engineer, prefix: '', startNo: '1', show: false, clientId: '', siteId: '' };
+  state.newFormError = '';
   state.nfSuggestions = []; state.showNfSuggestions = false; state.nfActiveField = null;
   loadFormForCursor();
   save(); render();
@@ -1200,11 +1217,11 @@ function dismissV19Welcome() {
   render();
 }
 
-// v20: dismiss the V20 "what's new" modal. Writes pat:v20welcome so v19 users
-// see it once on update.
-function dismissV20Welcome() {
-  state.v20WelcomeSeen = true;
-  localStorage.setItem(V20_WELCOME_KEY, '1');
+// v26: dismiss the V26 "what's new" modal. Writes pat:v26welcome so users see
+// it once on update.
+function dismissV26Welcome() {
+  state.v26WelcomeSeen = true;
+  localStorage.setItem(V26_WELCOME_KEY, '1');
   render();
 }
 

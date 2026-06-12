@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V25';
+const APP_VERSION = 'V26';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -66,6 +66,7 @@ const V17_WELCOME_KEY = 'pat:v17welcome';   // v17: legacy. Orphaned, harmless.
 const V18_WELCOME_KEY = 'pat:v18welcome';   // v18
 const V19_WELCOME_KEY = 'pat:v19welcome';   // v19
 const V20_WELCOME_KEY = 'pat:v20welcome';   // v20
+const V26_WELCOME_KEY = 'pat:v26welcome';   // v26: Clients & Sites flexibility + split CSV
 
 // v19: Clients & Sites. A two-level model so one client can have several sites.
 //   CLIENTS_KEY — JSON array [{ id, name }].
@@ -225,6 +226,14 @@ const DEFAULT_CSV_COLUMNS = [
   { id: 'assetNo',     header: 'Asset ID',      visible: true  },
   { id: 'engineer',    header: 'Engineer name', visible: true  },
   { id: 'description', header: 'Description',   visible: true  },
+  // v26: Client column split out from the combined Site snapshot. The session's
+  // `site` field stores a combined "Client — Site" text snapshot (back-compat);
+  // for CSV we now resolve the two parts separately (see csvCellValue). Default
+  // HIDDEN (Q4=B) so existing users' export width is unchanged until they opt in;
+  // turn on via Settings → CSV Columns. Inserted before 'site' so, when shown,
+  // Client reads left-of Site naturally. The 'site' column id/header are kept
+  // exactly as before so saved column configs and renamed headers survive.
+  { id: 'client',      header: 'Client',        visible: false },
   { id: 'site',        header: 'Site',          visible: true  },
   { id: 'location',    header: 'Location',      visible: true  },
   { id: 'date',        header: 'Date',          visible: true  },

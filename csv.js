@@ -14,7 +14,21 @@ function csvCellValue(colId, session, item) {
     case 'assetNo':     return item.assetNo;
     case 'engineer':    return session.engineer || '';
     case 'description': return item.itemType;
-    case 'site':        return session.site;
+    // v26 (Q4=B): Client/Site column split. The session stores ONE combined
+    // `site` snapshot ("Client — Site", or just one part). We resolve the two
+    // parts on the fly. To avoid changing exports for users who DON'T turn the
+    // new Client column on, the 'site' column's output adapts:
+    //   • Client column hidden  → 'site' emits the FULL snapshot (unchanged
+    //                              from pre-v26 — "Client — Site" as before).
+    //   • Client column visible  → 'site' emits only the SITE part, and the
+    //                              'client' column carries the client part, so
+    //                              the two columns together reconstruct it.
+    case 'client':      return splitSiteSnapshot(session.site).client;
+    case 'site': {
+      const clientCol = state.csvColumns.find(c => c.id === 'client');
+      const clientVisible = clientCol ? clientCol.visible : false;
+      return clientVisible ? splitSiteSnapshot(session.site).site : session.site;
+    }
     case 'location':    return item.location;
     case 'date':        return formatDate(session.date);
     case 'result':      return csvResultLabel(item.result);
@@ -107,11 +121,11 @@ async function shareOrDownloadCSV(session) {
     try {
       const file = new File([csvText], filename, { type: 'text/csv' });
       if (navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          files: [file],
-          title: filename,
-          text: `PAT test results: ${session.site || session.name || 'session'}`
-        });
+        // v26: share ONLY the CSV file. Previously we also passed `title` and
+        // `text`, which some targets (Mail/Messages) attach as a separate .txt
+        // note or message body — unwanted clutter. Dropping them sends just the
+        // CSV.
+        await navigator.share({ files: [file] });
         // v14: share completed → mark this session exported (clears dirty).
         markSessionExported(session);
         save();
@@ -163,10 +177,9 @@ async function bulkExportUnexported() {
         return new File([BOM + buildCSV(s)], `PAT_${safe}_${s.date}.csv`, { type: 'text/csv' });
       });
       if (navigator.canShare({ files })) {
-        await navigator.share({
-          files,
-          title: `PAT export — ${targets.length} session${targets.length === 1 ? '' : 's'}`
-        });
+        // v26: share ONLY the CSV files (no `title`/`text` — see single-export
+        // note above).
+        await navigator.share({ files });
         // Share completed → mark all batched sessions exported.
         targets.forEach(markSessionExported);
         save();
@@ -339,6 +352,7 @@ function parseImportCSV(text) {
   const iAsset  = idxOf('assetNo');
   const iEng    = idxOf('engineer');
   const iDesc   = idxOf('description');
+  const iClient = idxOf('client');   // v26 (Q6=A): optional Client column
   const iSite   = idxOf('site');
   const iLoc    = idxOf('location');
   const iDate   = idxOf('date');
@@ -369,16 +383,27 @@ function parseImportCSV(text) {
 
   // First-pass scan: find canonical Site + Date from the first VALID row so a
   // single typo on row 1 doesn't reject the whole file.
-  let canonicalSite = null;
+  // v26 (Q6=A): if a Client column is present, the row's "site identity" is the
+  // COMPOSED snapshot ("Client — Site"), matching how the app stores it — so a
+  // two-column export round-trips to the same snapshot a one-column export of
+  // the same session would. With no Client column, the composed value is just
+  // the site text, i.e. exactly the pre-v26 behaviour.
+  let canonicalSite = null;        // the composed snapshot used as session.site
+  let canonicalClient = '';        // client part (for structured refs)
+  let canonicalSiteOnly = '';      // site part (for structured refs)
   let canonicalIsoDate = null;
   let canonicalDateRaw = null;
   let canonicalEngineer = '';
   for (const r of dataRows) {
-    const site = String(r[iSite] || '').trim();
+    const siteOnly = String(r[iSite] || '').trim();
+    const clientPart = iClient !== null ? String(r[iClient] || '').trim() : '';
+    const composed = composeSiteSnapshot(clientPart, siteOnly);
     const dateRaw = String(r[iDate] || '').trim();
     const iso = parseUkDateToIso(dateRaw);
-    if (site && iso) {
-      canonicalSite = site;
+    if (composed && iso) {
+      canonicalSite = composed;
+      canonicalClient = clientPart;
+      canonicalSiteOnly = siteOnly;
       canonicalIsoDate = iso;
       canonicalDateRaw = dateRaw;
       canonicalEngineer = iEng !== null ? String(r[iEng] || '').trim() : '';
@@ -388,19 +413,22 @@ function parseImportCSV(text) {
   if (!canonicalSite || !canonicalIsoDate) {
     return {
       ok: false,
-      error: 'No rows in this file have both a Site and a valid Date (DD/MM/YYYY). Cannot import.'
+      error: 'No rows in this file have both a Site (or Client) and a valid Date (DD/MM/YYYY). Cannot import.'
     };
   }
 
   // Check uniqueness — refuse multi-session CSVs.
+  // v26: compare on the COMPOSED snapshot so a Client+Site pair is one identity.
   const siteLower = canonicalSite.toLowerCase();
   let multiSession = false;
   for (let i = 0; i < dataRows.length; i++) {
     const r = dataRows[i];
-    const site = String(r[iSite] || '').trim();
+    const siteOnly = String(r[iSite] || '').trim();
+    const clientPart = iClient !== null ? String(r[iClient] || '').trim() : '';
+    const composed = composeSiteSnapshot(clientPart, siteOnly);
     const dateRaw = String(r[iDate] || '').trim();
-    if (!site || !dateRaw) continue;
-    if (site.toLowerCase() !== siteLower || dateRaw !== canonicalDateRaw) {
+    if (!composed || !dateRaw) continue;
+    if (composed.toLowerCase() !== siteLower || dateRaw !== canonicalDateRaw) {
       multiSession = true;
       break;
     }
@@ -409,7 +437,7 @@ function parseImportCSV(text) {
     return {
       ok: false,
       error:
-        'This file contains rows from more than one session (different Site or Date values).\n\n' +
+        'This file contains rows from more than one session (different Client/Site or Date values).\n\n' +
         'Importing combined CSVs isn\'t supported yet — please export each session separately and import them one at a time.'
     };
   }
@@ -547,6 +575,20 @@ function commitImportedSession(incoming, mode, skipped) {
   // Add any new item-type descriptions to the global descriptions list so
   // autocomplete benefits from imported data immediately.
   incoming.items.forEach(it => addDescriptionIfNew(it.itemType));
+  // v26: learn the imported session's Client/Site into the lists so they appear
+  // as quick picks. Split the snapshot the same way the CSV split does: a
+  // "Client — Site" snapshot creates the client and the site under it; a plain
+  // (site-only) snapshot creates an orphan site (Q2/Q5). Idempotent — the
+  // ensure* helpers return existing records, never duplicate.
+  if (incoming.site) {
+    const parts = splitSiteSnapshot(incoming.site);
+    if (parts.client) {
+      const c = ensureClient(parts.client);
+      if (c && parts.site) ensureSite(c.id, parts.site);
+    } else if (parts.site) {
+      ensureOrphanSite(parts.site);
+    }
+  }
   save();
   render();
 }

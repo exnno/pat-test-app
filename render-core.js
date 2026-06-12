@@ -94,24 +94,25 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v20: rolled forward — content covers the V20 fixes + Smart Quick Pick
-  // stability, key bumped to pat:v20welcome so v19 users see it once on update.
-  // Gate uses v20WelcomeSeen.
-  const welcomeModal = (state.v20WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // v26: rolled forward — content covers the Clients/Sites flexibility and the
+  // split CSV columns. Key bumped to pat:v26welcome (gate uses v26WelcomeSeen)
+  // so users see it once on update to V26.
+  const welcomeModal = (state.v26WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V20">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V26">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V20</h3>
+        <h3 class="bulk-sheet-title">What's new in V26</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Client &amp; Site pickers fixed.</strong> On the New Session screen, tap the Client or Site box and your saved ones now appear in a list to tap — start typing to filter. (The old picker didn't always open on phones.)</li>
-        <li><strong>Steadier Smart Quick Pick.</strong> Your quick-pick buttons no longer shuffle around while you log. The ones from your preset stay put in their usual spots; only the extra location-specific types swap in, and the row stays fixed until you change location.</li>
-        <li><strong>Rebuild from your sessions.</strong> Under <strong>Settings → Clients</strong>, a new button adds any clients and sites from your saved sessions that aren't listed yet — handy after importing.</li>
+        <li><strong>Client or site — your choice.</strong> When you start a session you now only need <em>one</em> of them. Enter just a client, just a site, or both. A site with no client is kept under "Unassigned".</li>
+        <li><strong>Assign sites to clients later.</strong> Under <strong>Settings → Clients</strong>, you can now move a site to a client (or between clients) whenever you like — handy for tidying up "Unassigned" sites.</li>
+        <li><strong>Client &amp; Site as separate CSV columns.</strong> Your export can now split Client and Site into two columns. The Client column starts switched off, so your exports look exactly as before until you turn it on under <strong>Settings → CSV Columns</strong>.</li>
+        <li><strong>Cleaner sharing.</strong> Exporting a CSV no longer attaches an extra text note — just the file.</li>
       </ul>
-      <button class="btn-primary" id="v20-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v26-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -256,20 +257,24 @@ function nfSuggestionsHTML(field) {
 }
 
 function renderSessions() {
+  const nfError = state.newFormError ? `
+      <p class="nf-error" role="alert">${escapeHTML(state.newFormError)}</p>
+  ` : '';
   const newForm = state.newForm.show ? `
     <div class="card">
       <h2 class="h2">New session</h2>
-      <label class="label">Client</label>
+      <label class="label">Client <span class="hint">(optional)</span></label>
       <div class="nf-input-wrap" id="nf-client-wrap">
         <input class="input" id="nf-client" value="${escapeHTML(state.newForm.clientId)}" placeholder="e.g. Acme Ltd" autocomplete="off" autofocus>
         ${nfSuggestionsHTML('client')}
       </div>
-      <label class="label">Site</label>
+      <label class="label">Site <span class="hint">(optional)</span></label>
       <div class="nf-input-wrap" id="nf-site-wrap">
         <input class="input" id="nf-site" value="${escapeHTML(state.newForm.site)}" placeholder="e.g. Unit 4, Head Office" autocomplete="off">
         ${nfSuggestionsHTML('site')}
       </div>
-      <p class="muted nf-hint">Pick from your saved clients and sites, or type new ones — they'll be saved for next time. Manage them under Settings → Clients.</p>
+      <p class="muted nf-hint">Enter a client, a site, or both — at least one. Type new ones to save them for next time, or pick from your saved list. Manage them under Settings → Clients.</p>
+      ${nfError}
       <label class="label">Engineer</label>
       <input class="input" id="nf-engineer" value="${escapeHTML(state.newForm.engineer || state.engineer)}" placeholder="Your name">
       <label class="label">Session name <span class="hint">(optional)</span></label>

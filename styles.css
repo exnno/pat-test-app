@@ -1747,6 +1747,24 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .link-btn:active { opacity: 0.6; }
 .link-btn.danger { color: var(--fail); }
 
+/* v26: inline validation message on the New Session form (Q1 — neither client
+   nor site entered). */
+.nf-error {
+  margin: 0 0 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--fail);
+}
+
+/* v26: "Unassigned" group on the Clients page — sites with no client. A static
+   (non-tappable) header, visually distinguished with a dashed border. */
+.unassigned-card { border-style: dashed; }
+.client-head-static {
+  cursor: default;
+  background: transparent;
+}
+.client-head-static:active { background: transparent; }
+
 .client-sites {
   border-top: 1px solid var(--border);
   padding: 12px 16px 14px;

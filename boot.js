@@ -64,6 +64,46 @@ function dismissUpdateBanner() {
   render();
 }
 // ---------- Boot ----------
+// v26 (Q8): boot integrity self-check. The v26-era data-loss bug was caused by
+// two script files both being live for a short window during the refactor, each
+// declaring the same global `const`s — a duplicate-const SyntaxError kills a
+// whole file, leaving the app half-initialised, after which a save() could
+// persist empty defaults over good data. This guard verifies the critical
+// pieces all loaded before we touch storage. If anything essential is missing,
+// we DO NOT run load()/save() (which is what overwrote data); we show a safe
+// reload prompt instead. Cheap insurance against that whole class of bug.
+function bootIntegrityOK() {
+  const requiredFns = [
+    'load', 'save', 'render', 'applyTheme', 'initDelegation', 'loadFormForCursor',
+    'loadMultiPickConfig', 'loadClients', 'loadSites', 'composeSiteSnapshot'
+  ];
+  for (const name of requiredFns) {
+    if (typeof window[name] !== 'function') {
+      // Top-level `function` declarations attach to window; a missing one means
+      // that script file failed to execute (the exact failure we guard against).
+      console.error('Boot integrity check failed: missing', name);
+      return false;
+    }
+  }
+  if (typeof state === 'undefined' || !state) {
+    console.error('Boot integrity check failed: state missing');
+    return false;
+  }
+  return true;
+}
+
+if (!bootIntegrityOK()) {
+  const appEl = document.getElementById('app');
+  if (appEl) {
+    appEl.innerHTML =
+      '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;line-height:1.5">' +
+      '<h2 style="margin:0 0 8px">Update needed</h2>' +
+      '<p style="margin:0 0 16px">The app didn\'t load completely. Your saved data is safe and untouched. Tap Reload to finish updating.</p>' +
+      '<button onclick="location.reload()" style="padding:12px 18px;font-size:16px;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
+      '</div>';
+  }
+  // Deliberately stop here — do NOT call load()/render()/save() with a partial build.
+} else {
 load();
 applyTheme(state.theme);
 // v25 (E3): attach the single delegated click listener to #app once, before the
@@ -100,5 +140,6 @@ try {
         '</div>';
     }
   }
+}
 }
 registerServiceWorker();

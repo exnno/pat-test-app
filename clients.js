@@ -32,13 +32,17 @@ function loadSites() {
   let raw = null;
   try { raw = JSON.parse(localStorage.getItem(SITES_KEY) || 'null'); } catch {}
   if (!Array.isArray(raw)) return [];
+  // v26 (Q2=A): a site may now have an EMPTY clientId — an "Unassigned" site
+  // not yet attached to a client. Previously such sites were dropped here; now
+  // we keep them (clientId coerced to '') and surface them in an Unassigned
+  // group on the Clients page, where they can be assigned to a client later.
   return raw
     .map(s => ({
       id: String(s && s.id || ''),
       clientId: String(s && s.clientId || ''),
       name: String(s && s.name || '').trim()
     }))
-    .filter(s => s.id && s.clientId && s.name);
+    .filter(s => s.id && s.name);   // clientId no longer required
 }
 
 // First-V19 seed. Each distinct existing session `site` string becomes a client
@@ -74,6 +78,35 @@ function sortedClients() {
   return state.clients
     .slice()
     .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+// v26 (Q2=A): sites with no client. Surfaced in an "Unassigned" group at the
+// bottom of the Clients page, where each can be assigned to a client later.
+function unassignedSites() {
+  return state.sites
+    .filter(s => !s.clientId)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }));
+}
+
+// v26: find an orphan (clientless) site by name, case-insensitive.
+function findOrphanSiteByName(name) {
+  const n = String(name || '').trim().toLowerCase();
+  if (!n) return null;
+  return state.sites.find(s => !s.clientId && s.name.toLowerCase() === n) || null;
+}
+
+// v26: ensure an orphan site exists (no client attached). Returns the existing
+// orphan if one with that name already exists. Mutates state but does NOT
+// save()/render() — caller decides. Used by the New Session "site, no client"
+// path (Q1=A) and by CSV import of a site-only row (Q6=A).
+function ensureOrphanSite(name) {
+  const trimmed = String(name || '').trim();
+  if (!trimmed) return null;
+  const existing = findOrphanSiteByName(trimmed);
+  if (existing) return existing;
+  const site = { id: 'site_' + uid(), clientId: '', name: trimmed };
+  state.sites.push(site);
+  return site;
 }
 
 // Find an existing client by name (case-insensitive), or null.
@@ -159,6 +192,24 @@ function composeSiteSnapshot(clientName, siteName) {
   const s = String(siteName || '').trim();
   if (c && s) return `${c} — ${s}`;
   return c || s || '';
+}
+
+// v26 (Q5=A): split a stored `site` snapshot back into { client, site } for the
+// CSV column split. A "Client — Site" snapshot (em dash) splits into its two
+// parts. A plain snapshot (no dash) is treated as SITE-ONLY — site gets the
+// text, client is left blank — matching how a site-only session (Q1=A) is now
+// represented. This is display/export-only; it never mutates the session.
+function splitSiteSnapshot(snapshot) {
+  const snap = String(snapshot || '').trim();
+  if (!snap) return { client: '', site: '' };
+  const dash = snap.indexOf(' — ');
+  if (dash !== -1) {
+    return {
+      client: snap.slice(0, dash).trim(),
+      site: snap.slice(dash + 3).trim()
+    };
+  }
+  return { client: '', site: snap };
 }
 
 // ----- Settings → Clients page actions -----
@@ -251,6 +302,98 @@ function deleteSite(siteId) {
   state.sites = state.sites.filter(s => s.id !== siteId);
   save();
   render();
+}
+
+// v26 (Q3=B): open the "assign / move site to a client" sheet. Works for an
+// orphan site (assign it for the first time) and for an already-assigned site
+// (move it to a different client). The sheet lets the user pick an existing
+// client or type a new one.
+function openSiteAssignDialog(siteId) {
+  const site = siteById(siteId);
+  if (!site) return;
+  state.clientsPage.assignDialog = { siteId, name: '', clash: null };
+  // Close any other open dialog so only one sheet shows at a time.
+  state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
+  state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
+  render();
+}
+
+function cancelSiteAssignDialog() {
+  state.clientsPage.assignDialog = { siteId: null, name: '', clash: null };
+  render();
+}
+
+// v26 (Q3=B): first stage — resolve the typed target client and either complete
+// the move immediately, or, if the target already has a same-named site, switch
+// the sheet into the clash-choice stage (Q14=B). Reads the live input value via
+// the caller (dispatch) which writes assignDialog.name before calling.
+function commitSiteAssign() {
+  const ad = state.clientsPage.assignDialog;
+  const site = siteById(ad.siteId);
+  const targetName = String(ad.name || '').trim();
+  if (!site || !targetName) return;
+
+  const targetClient = ensureClient(targetName);
+  if (!targetClient) return;
+
+  // No-op: already under this client.
+  if (site.clientId === targetClient.id) {
+    finishSiteAssign(targetClient.id);
+    return;
+  }
+
+  const clash = findSiteByName(targetClient.id, site.name);
+  if (clash && clash.id !== site.id) {
+    // Switch the sheet to the three-way choice; nothing committed yet.
+    state.clientsPage.assignDialog.clash = { targetClientId: targetClient.id };
+    render();
+    return;
+  }
+
+  // No clash → straightforward move.
+  site.clientId = targetClient.id;
+  finishSiteAssign(targetClient.id);
+}
+
+// v26 (Q14=B): clash resolvers, called from the clash-choice sheet buttons.
+function resolveAssignMerge() {
+  const ad = state.clientsPage.assignDialog;
+  const site = siteById(ad.siteId);
+  const targetId = ad.clash && ad.clash.targetClientId;
+  if (!site || !targetId) return;
+  // Drop the moving site; the target's existing same-named site stands.
+  state.sites = state.sites.filter(s => s.id !== site.id);
+  finishSiteAssign(targetId);
+}
+
+function resolveAssignKeepBoth() {
+  const ad = state.clientsPage.assignDialog;
+  const site = siteById(ad.siteId);
+  const targetId = ad.clash && ad.clash.targetClientId;
+  if (!site || !targetId) return;
+  site.name = nextFreeSiteName(targetId, site.name);
+  site.clientId = targetId;
+  finishSiteAssign(targetId);
+}
+
+function finishSiteAssign(expandClientId) {
+  state.clientsPage.assignDialog = { siteId: null, name: '', clash: null };
+  if (expandClientId) state.clientsPage.expandedClientId = expandClientId;
+  save();
+  render();
+}
+
+// v26: given a desired site name that clashes within a client, return the next
+// free "<name> (n)" variant not already used by that client (case-insensitive).
+function nextFreeSiteName(clientId, baseName) {
+  const base = String(baseName || '').trim();
+  let n = 2;
+  let candidate = `${base} (${n})`;
+  while (findSiteByName(clientId, candidate)) {
+    n++;
+    candidate = `${base} (${n})`;
+  }
+  return candidate;
 }
 
 // v16: transient toast — a small auto-dismissing pill at the bottom of the

@@ -29,6 +29,9 @@ let state = {
   cursor: 0,
   form: { assetNo: '', location: '', itemType: '', notes: '', showNotes: false },
   newForm: { name: '', site: '', engineer: '', prefix: '', startNo: '1', show: false, clientId: '', siteId: '' },
+  // v26 (Q1=A): inline validation message for the New Session form (e.g. when
+  // neither client nor site is entered). '' = no error shown.
+  newFormError: '',
   editForm: { name: '', site: '', engineer: '', prefix: '', date: '', locked: false },
   suggestions: [],
   showSuggestions: false,
@@ -146,9 +149,9 @@ let state = {
   // v19: welcome modal flag (key pat:v19welcome). Gates the V19 "what's new"
   // modal so v18 users see it once on update.
   v19WelcomeSeen: false,
-  // v20: welcome modal flag (key pat:v20welcome). Gates the V20 "what's new"
-  // modal so v19 users see it once on update.
-  v20WelcomeSeen: false,
+  // v26: welcome modal flag (key pat:v26welcome). Gates the V26 "what's new"
+  // modal so users see it once on update.
+  v26WelcomeSeen: false,
 
   // v19: Clients & Sites. Two flat arrays kept in a parent/child relationship:
   //   clients — [{ id, name }]
@@ -168,7 +171,12 @@ let state = {
   clientsPage: {
     expandedClientId: null,
     clientDialog: { mode: null, name: '', editingId: null },   // 'add' | 'rename'
-    siteDialog: { mode: null, name: '', editingId: null, clientId: null }
+    siteDialog: { mode: null, name: '', editingId: null, clientId: null },
+    // v26 (Q3=B): assign/move a site to a client. siteId is the site being
+    // moved; name holds the typed/selected target client name. When a same-name
+    // clash is detected on confirm, `clash` holds { targetClientId } and the
+    // sheet switches to a Merge / Keep both / Cancel choice (Q14=B).
+    assignDialog: { siteId: null, name: '', clash: null }
   },
 
   // v17: Sound feedback (opt-in audio confirmation). Default OFF. When ON, a

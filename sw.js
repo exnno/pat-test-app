@@ -146,7 +146,14 @@
 // fifteen scripts in load order and NO LONGER includes app.js. Cache bumped to
 // pat-v22 — a stale cache would 404 the new files (or serve the now-removed
 // app.js) and blank the app. The boot.js crash fallback guards the failure mode.
-const CACHE_VERSION = 'pat-v25-2';
+// v26: Clients & Sites flexibility — a session needs only ONE of client/site;
+// orphan sites allowed (Unassigned group) and assignable to clients later; CSV
+// Client/Site column split (Client hidden by default = identical exports until
+// enabled); CSV share no longer attaches a text note; boot integrity self-check
+// added. No new asset files (only existing scripts + styles changed), so the
+// ASSETS list is unchanged. Cache bumped to pat-v26 so installed PWAs pull the
+// updated files; a stale cache would serve the old build.
+const CACHE_VERSION = 'pat-v26';
 const ASSETS = [
   './',
   './index.html',

@@ -20,7 +20,7 @@
 function buildBackup() {
   return {
     appVersion: APP_VERSION,
-    backupVersion: 4,                         // v19 bumped from 3 → 4 (clients/sites)
+    backupVersion: 5,                         // v26 bumped 4 → 5 (orphan sites: clientId may be empty)
     exportedAt: new Date().toISOString(),
     sessions: state.sessions,
     itemPresets: state.itemPresets,           // v9
@@ -242,7 +242,7 @@ function restoreBackupFromFile(file) {
             clientId: String(s && s.clientId || ''),
             name: String(s && s.name || '').trim()
           }))
-          .filter(s => s.id && s.clientId && s.name)
+          .filter(s => s.id && s.name)   // v26: clientId no longer required (orphan sites)
       : [];
     if (state.clients.length === 0 && state.sites.length === 0) {
       seedClientsSitesFromSessions();

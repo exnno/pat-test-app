@@ -568,6 +568,7 @@ function renderSettingsClients() {
           <div class="client-site-row">
             <span class="client-site-name">${escapeHTML(s.name)}</span>
             <div class="client-site-actions">
+              <button class="link-btn" data-action="site-assign" data-arg="${escapeHTML(s.id)}">Move</button>
               <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Rename</button>
               <button class="link-btn danger" data-action="site-delete" data-arg="${escapeHTML(s.id)}" data-site-delete="${escapeHTML(s.id)}">Delete</button>
             </div>
@@ -595,10 +596,37 @@ function renderSettingsClients() {
     `;
   }).join('');
 
+  // v26 (Q2=A / Q11=A): sites with no client, grouped under "Unassigned" at the
+  // bottom. Each offers "Assign to client…" (Q3=B). Rename/Delete still apply.
+  const orphans = unassignedSites();
+  const unassignedHtml = orphans.length ? `
+    <div class="client-card unassigned-card">
+      <div class="client-head client-head-static">
+        <span class="client-head-text">
+          <span class="client-head-name">Unassigned</span>
+          <span class="client-head-sub">${orphans.length} site${orphans.length === 1 ? '' : 's'} with no client</span>
+        </span>
+      </div>
+      <div class="client-sites">
+        ${orphans.map(s => `
+          <div class="client-site-row">
+            <span class="client-site-name">${escapeHTML(s.name)}</span>
+            <div class="client-site-actions">
+              <button class="link-btn" data-action="site-assign" data-arg="${escapeHTML(s.id)}">Assign to client…</button>
+              <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Rename</button>
+              <button class="link-btn danger" data-action="site-delete" data-arg="${escapeHTML(s.id)}" data-site-delete="${escapeHTML(s.id)}">Delete</button>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    </div>
+  ` : '';
+
   // Bottom-sheet dialogs (one at a time). Client add/rename, then site add/rename.
   let dialog = '';
   const cd = state.clientsPage.clientDialog;
   const sd = state.clientsPage.siteDialog;
+  const ad = state.clientsPage.assignDialog;
   if (cd.mode) {
     const title = cd.mode === 'add' ? 'Add client' : 'Rename client';
     dialog = `
@@ -634,6 +662,49 @@ function renderSettingsClients() {
         <button class="btn-primary" id="site-dialog-confirm" data-action="site-dialog-confirm" style="margin-top:14px">${sd.mode === 'add' ? 'Add' : 'Save'}</button>
       </div>
     `;
+  } else if (ad.siteId) {
+    // v26 (Q3=B): assign / move a site to a client. Two stages in one sheet:
+    // (1) pick/type the target client; (2) if a same-named site already exists
+    // under that client, a Merge / Keep both / Cancel choice (Q14=B).
+    const movingSite = siteById(ad.siteId);
+    const movingName = movingSite ? movingSite.name : '';
+    if (ad.clash) {
+      const target = clientById(ad.clash.targetClientId);
+      const keepName = movingSite ? nextFreeSiteName(ad.clash.targetClientId, movingSite.name) : '';
+      dialog = `
+        <div class="modal-backdrop" id="assign-dialog-backdrop" data-action="site-assign-cancel" style="z-index:300"></div>
+        <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Site name clash">
+          <div class="bulk-sheet-handle"></div>
+          <div class="bulk-sheet-header">
+            <span class="fail-close-spacer"></span>
+            <h3 class="bulk-sheet-title">Name already used</h3>
+            <button class="fail-close-btn" data-action="site-assign-cancel" aria-label="Cancel">×</button>
+          </div>
+          <p class="muted" style="margin:0 0 14px">${escapeHTML(target ? target.name : 'That client')} already has a site called "${escapeHTML(movingName)}". What would you like to do?</p>
+          <button class="btn-primary" data-action="site-assign-merge" style="margin-bottom:10px">Merge into the existing site</button>
+          <button class="btn-secondary" data-action="site-assign-keepboth" style="margin-bottom:10px">Keep both — rename to "${escapeHTML(keepName)}"</button>
+          <button class="link-btn" data-action="site-assign-cancel">Cancel</button>
+        </div>
+      `;
+    } else {
+      dialog = `
+        <div class="modal-backdrop" id="assign-dialog-backdrop" data-action="site-assign-cancel" style="z-index:300"></div>
+        <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Assign site to client">
+          <div class="bulk-sheet-handle"></div>
+          <div class="bulk-sheet-header">
+            <span class="fail-close-spacer"></span>
+            <h3 class="bulk-sheet-title">Assign "${escapeHTML(movingName)}"</h3>
+            <button class="fail-close-btn" data-action="site-assign-cancel" aria-label="Cancel">×</button>
+          </div>
+          <label class="label">Client</label>
+          <input class="input" id="assign-dialog-input" value="${escapeHTML(ad.name)}" placeholder="Type or pick a client" list="assign-client-list" autofocus>
+          <datalist id="assign-client-list">
+            ${sortedClients().map(c => `<option value="${escapeHTML(c.name)}"></option>`).join('')}
+          </datalist>
+          <button class="btn-primary" data-action="site-assign-confirm" style="margin-top:14px">Assign</button>
+        </div>
+      `;
+    }
   }
 
   // v20: rebuild-from-sessions action. Only worth showing when there are
@@ -654,7 +725,7 @@ function renderSettingsClients() {
         <button class="btn-primary" id="client-add-btn" data-action="client-add" style="margin-top:4px">+ Add client</button>
       </div>
       ${emptyState}
-      <div class="clients-list">${listHtml}</div>
+      <div class="clients-list">${listHtml}${unassignedHtml}</div>
       ${rebuildBlock}
       ${dialog}
     </div>
@@ -738,18 +809,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" data-action="about-reload" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v24: rolled forward — V24 on top, V21 dropped. -->
+      <!-- v8: rolling 3-version changelog. v26: rolled forward — V26 on top, V23 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V26</strong> · June 2026</p>
+        <p class="muted">More flexible clients and sites. When you start a session you now only need a client <em>or</em> a site — enter either one, or both. Sites without a client are grouped under "Unassigned", and you can assign a site to a client (or move it between clients) at any time under Settings → Clients. Your CSV export can now split Client and Site into two separate columns; the new Client column starts switched off, so your exports are unchanged until you turn it on. Exporting a CSV no longer attaches a separate text note — just the file. All your existing sessions and data are untouched.</p>
 
         <p><strong>V25</strong> · June 2026</p>
         <p class="muted">Another under-the-hood update with no changes to how the app looks or works. The way the app responds to taps has been rebuilt on a single, more efficient system — buttons can no longer lose their responsiveness when the screen redraws, and future updates are quicker and safer to build. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
 
         <p><strong>V24</strong> · June 2026</p>
         <p class="muted">Another speed update with no changes to how the app looks or works. Redrawing the screen now does less unnecessary work — selecting items in a session's overview, in particular, updates more efficiently. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
-
-        <p><strong>V23</strong> · June 2026</p>
-        <p class="muted">A speed update, with no changes to how the app looks or works. Saving each test result now does less work behind the scenes — instead of re-processing your whole history on every tap, it only handles the session you're working in. The benefit grows with the size of your data: on a long job, or a busy device, logging stays quick from the first item to the last. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
       </div>
 
       <div class="info-card">
