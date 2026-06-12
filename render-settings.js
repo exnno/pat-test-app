@@ -87,7 +87,7 @@ function renderSettingsHub() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="back-btn" aria-label="Back">‹</button>
+        <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">‹</button>
         <div class="site-name">Settings</div>
         <span style="width:40px"></span>
       </header>

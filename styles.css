@@ -298,6 +298,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .session-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
 .btn-primary { width: 100%; padding: 14px 16px; font-size: 16px; font-weight: 700; background: var(--accent); color: #fff; border: none; border-radius: 10px; }
+/* v25.1: .btn-primary had no press state, so primary buttons (e.g. the prune
+   Save on Backup & Restore) didn't give tap feedback like the .backup-action-btn
+   buttons beside them. Add a subtle press, consistent with .pass-btn/.fail-btn. */
+.btn-primary:active { background: var(--accent-hover); transform: translateY(1px); }
 .btn-secondary { flex: 1; padding: 14px 16px; font-size: 16px; font-weight: 600; background: var(--card-bg); color: var(--neutral-text); border: 1px solid var(--border-strong); border-radius: 10px; }
 .btn-row { display: flex; gap: 8px; margin-top: 16px; }
 
