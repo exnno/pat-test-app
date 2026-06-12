@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA
- * v25 (June 2026)
+ * v25.1 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -49,12 +49,16 @@ function registerActions(map) {
 // The single delegated click handler. Attached once to #app by initDelegation().
 function handleDelegatedClick(e) {
   // Find the nearest ancestor (including the target) that carries data-action.
+  // v25 hotfix: start from e.target, but it can be a TEXT NODE (a tap landing on
+  // the button's label text). Text nodes have no .dataset and, in some engines,
+  // no .parentElement — only .parentNode. Walk via parentNode and skip any node
+  // that isn't an element (nodeType 1) so the search reaches the real button.
   let el = e.target;
   while (el && el !== document.body) {
-    if (el.dataset && el.dataset.action) break;
-    el = el.parentElement;
+    if (el.nodeType === 1 && el.dataset && el.dataset.action) break;
+    el = el.parentNode;
   }
-  if (!el || !el.dataset || !el.dataset.action) return;
+  if (!el || el.nodeType !== 1 || !el.dataset || !el.dataset.action) return;
   const name = el.dataset.action;
   const fn = ACTIONS[name];
   if (!fn) return;            // unknown action → ignore (old direct binding, if any, still ran)
