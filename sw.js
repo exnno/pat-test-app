@@ -153,7 +153,7 @@
 // added. No new asset files (only existing scripts + styles changed), so the
 // ASSETS list is unchanged. Cache bumped to pat-v26 so installed PWAs pull the
 // updated files; a stale cache would serve the old build.
-const CACHE_VERSION = 'pat-v27';
+const CACHE_VERSION = 'pat-v28';
 const ASSETS = [
   './',
   './index.html',

@@ -1,6 +1,6 @@
 /*!
  * PAT Test PWA
- * v25.1 (June 2026)
+ * v28 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -66,12 +66,67 @@ function handleDelegatedClick(e) {
   fn(arg, el, e);
 }
 
+// ---------------------------------------------------------------------------
+// v28 (E3-tail): the INPUT and CHANGE half of delegation.
+//
+// v25 delegated CLICK. v28 finishes the job by delegating the stateful field
+// handlers too — the oninput / onchange writes that used to be re-attached on
+// every render by bindEvents(). Same idea, two more listeners on #app:
+//   • `input`  events → INPUT_ACTIONS, routed by data-input-action
+//   • `change` events → CHANGE_ACTIONS, routed by data-change-action
+// Both bubble, so one listener each on #app catches every field, and (like the
+// click system) controls can't lose their wiring on render.
+//
+// Handlers receive (value, el, e): `value` is el.value for text/select, or
+// el.checked for checkboxes — resolved here so handlers don't each repeat it.
+//
+// NOT migrated (deliberately, Q2=A): the four focus-sensitive fields
+// (f-location, f-type, nf-client, nf-site). Their oninput/onfocus/onblur use
+// focus-clears-field, casing-on-blur, SQP-row rebuild, and the
+// onmousedown→preventDefault suggestion-tap trick — timing that focus/blur
+// delegation would put at risk. Those stay as direct binds in bindFocusFields()
+// (events.js). Pure value-writes and side-effecting toggles/selects live here.
+
+const INPUT_ACTIONS = {};
+const CHANGE_ACTIONS = {};
+
+function registerInputActions(map) {
+  Object.keys(map).forEach(k => { INPUT_ACTIONS[k] = map[k]; });
+}
+function registerChangeActions(map) {
+  Object.keys(map).forEach(k => { CHANGE_ACTIONS[k] = map[k]; });
+}
+
+// Resolve the value a handler cares about: checkbox/radio → checked, else value.
+function _fieldValue(el) {
+  if (el.type === 'checkbox' || el.type === 'radio') return el.checked;
+  return el.value;
+}
+
+function handleDelegatedInput(e) {
+  const el = e.target;
+  if (!el || el.nodeType !== 1 || !el.dataset || !el.dataset.inputAction) return;
+  const fn = INPUT_ACTIONS[el.dataset.inputAction];
+  if (!fn) return;
+  fn(_fieldValue(el), el, e);
+}
+
+function handleDelegatedChange(e) {
+  const el = e.target;
+  if (!el || el.nodeType !== 1 || !el.dataset || !el.dataset.changeAction) return;
+  const fn = CHANGE_ACTIONS[el.dataset.changeAction];
+  if (!fn) return;
+  fn(_fieldValue(el), el, e);
+}
+
 let _delegationInited = false;
 function initDelegation() {
   if (_delegationInited) return;       // idempotent — attach exactly once
   const app = document.getElementById('app');
   if (!app) return;
   app.addEventListener('click', handleDelegatedClick);
+  app.addEventListener('input', handleDelegatedInput);    // v28 (E3-tail)
+  app.addEventListener('change', handleDelegatedChange);  // v28 (E3-tail)
   _delegationInited = true;
 }
 
@@ -431,4 +486,144 @@ registerActions({
     else renameSiteFromDialog();
   },
   'site-dialog-cancel': () => { state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null }; render(); }
+});
+
+// ===========================================================================
+// v28 (E3-tail) — INPUT actions (oninput → data-input-action)
+// All migrated verbatim from bindEvents(). These are simple value-writes plus a
+// handful that refresh a partial area. The four focus-sensitive fields are NOT
+// here (see bindFocusFields() in events.js).
+// ===========================================================================
+registerInputActions({
+  // New Session form — plain field writes
+  'nf-name': (v) => { state.newForm.name = v; },
+  'nf-prefix': (v) => { state.newForm.prefix = v; },
+  'nf-start': (v) => { state.newForm.startNo = v; },
+
+  // Migration prompt (first launch)
+  'migration-name': (v) => { state.migrationPrompt.name = v; },
+
+  // Sessions list search — partial refresh so focus is preserved
+  'sessions-search': (v) => {
+    state.sessionsSearchQuery = v;
+    refreshSessionsListAreaOnly();
+  },
+
+  // Entry screen
+  'f-asset': (v) => { state.form.assetNo = v; },
+  'f-notes': (v) => { state.form.notes = v; },
+
+  // Fail sheet — "other" reason free text
+  'fail-other': (v) => { state.failOtherText = v; },
+
+  // Overview search — partial refresh
+  'overview-search': (v) => {
+    state.searchQuery = v;
+    refreshOverviewBody();
+  },
+
+  // Bulk-edit dialogs
+  'bulk-location': (v) => { state.bulkLocationValue = v; },
+  'bulk-type': (v) => { state.bulkEdit.typeValue = v; },
+  'bulk-notes': (v) => { state.bulkEdit.notesValue = v; },
+
+  // Edit-session form
+  'ef-site': (v) => { state.editForm.site = v; },
+  'ef-engineer': (v) => { state.editForm.engineer = v; },
+  'ef-name': (v) => { state.editForm.name = v; },
+  'ef-date': (v) => { state.editForm.date = v; },
+  'ef-prefix': (v) => { state.editForm.prefix = v; },
+
+  // Settings dialogs
+  'preset-name': (v) => { state.presetDialog.name = v; },
+  'client-name': (v) => { state.clientsPage.clientDialog.name = v; },
+  'site-name': (v) => { state.clientsPage.siteDialog.name = v; }
+});
+
+// ===========================================================================
+// v28 (E3-tail) — CHANGE actions (onchange → data-change-action)
+// Toggles, selects and radios. Several re-render to refresh sub-text or the
+// affected area, exactly as the old direct handlers did. Includes the three
+// sessions-list <select>s and the overview checkbox that previously lived in
+// render-core.js (bindSessionsListAreaEvents / bindOverviewBodyEvents).
+// ===========================================================================
+registerChangeActions({
+  // Sessions list area — sort / status / lock filters (were in render-core.js).
+  // Each persists and refreshes just the list area.
+  'sessions-sort': (v) => { state.sort = v; save(); refreshSessionsListAreaOnly(); },
+  'status-filter': (v) => { state.sessionFilter = v; save(); refreshSessionsListAreaOnly(); },
+  'lock-filter': (v) => { state.lockFilter = v; save(); refreshSessionsListAreaOnly(); },
+
+  // Import / backup file pickers (the change fires when a file is chosen)
+  'import-file': (v, el) => {
+    const file = el.files && el.files[0];
+    handleImportFile(file);
+    el.value = '';   // reset so re-picking the same file fires again
+  },
+  'backup-import-file': (v, el) => {
+    const file = el.files && el.files[0];
+    restoreBackupFromFile(file);
+    el.value = '';
+  },
+
+  // Overview — fails-only toggle + the per-row selection checkbox
+  // (checkbox was in render-core.js bindOverviewBodyEvents).
+  'fails-only': (checked) => { state.showFailsOnly = checked; refreshOverviewBody(); },
+  'row-select': (checked, el) => {
+    toggleSelected(parseInt(el.dataset.arg, 10));
+    refreshOverviewSelection();
+  },
+
+  // Bulk-notes mode radios — update the textarea placeholder live
+  'bulk-notes-mode': (v, el) => {
+    state.bulkEdit.notesMode = el.value === 'append' ? 'append' : 'replace';
+    const ta = document.getElementById('bulk-notes-input');
+    if (ta) ta.placeholder = state.bulkEdit.notesMode === 'append'
+      ? 'Text to append'
+      : 'New notes (leave empty to clear)';
+  },
+
+  // Edit-session locked checkbox
+  'ef-locked': (checked) => { state.editForm.locked = checked; },
+
+  // Display settings toggles — each re-renders to refresh its On/Off sub-text
+  'haptics': (checked) => { setHaptics(checked); render(); },
+  'sound': (checked) => { setSound(checked); render(); },
+  'timestamps': (checked) => { setTimestamps(checked); render(); },
+
+  // Multi Pick enabled — live sub-text update (no full render, matches old)
+  'multipick-enabled': (checked) => {
+    const sub = document.getElementById('multipick-enabled-sub');
+    if (sub) sub.textContent = checked ? 'On' : 'Off';
+  },
+
+  // Smart Quick Pick on/off
+  'sqp-toggle': (checked) => setSqp(checked),
+
+  // Resistance calculator selects — re-render to update the result/formula
+  'calc-csa': (v) => { state.calcCsa = v; render(); },
+  'calc-length': (v) => { state.calcLength = Number(v); render(); },
+
+  // Quick Pick preset switcher — confirm-on-switch guard (was the big handler).
+  'preset-switch': (v, el) => {
+    const newId = v;
+    const currentP = activePreset();
+    const ta = document.getElementById('settings-types');
+    if (ta && currentP) {
+      const storedItems = (currentP.items || []).join('\n');
+      const taValueNorm = ta.value.replace(/\s+$/, '');
+      const storedNorm = storedItems.replace(/\s+$/, '');
+      if (taValueNorm !== storedNorm) {
+        const ok = confirm(
+          `You have unsaved changes to "${currentP.name}".\n\n` +
+          `Switch presets and discard the changes?`
+        );
+        if (!ok) {
+          el.value = state.activePresetId;   // revert dropdown to still-active preset
+          return;
+        }
+      }
+    }
+    switchPreset(newId);
+  }
 });

@@ -210,7 +210,7 @@ function renderSettingsItems() {
         <button class="fail-close-btn" id="preset-dialog-cancel" data-action="preset-dialog-cancel" aria-label="Cancel">×</button>
       </div>
       <label class="label">Name</label>
-      <input class="input" id="preset-dialog-input" value="${escapeHTML(dialog.name)}" placeholder="e.g. Workshop, Office, Site visit" autofocus>
+      <input class="input" id="preset-dialog-input" data-input-action="preset-name" value="${escapeHTML(dialog.name)}" placeholder="e.g. Workshop, Office, Site visit" autofocus>
       <button class="btn-primary" id="preset-dialog-confirm" data-action="preset-dialog-confirm" style="margin-top:14px">${dialog.mode === 'new' ? 'Create' : 'Save'}</button>
     </div>
   ` : '';
@@ -225,7 +225,7 @@ function renderSettingsItems() {
       <div class="settings-section">
         <h2 class="h2">Preset</h2>
         <p class="muted">${escapeHTML(presetSummary)}. The selected preset is what shows on the entry screen.</p>
-        <select class="input" id="settings-preset-select">${presetOptions}</select>
+        <select class="input" id="settings-preset-select" data-change-action="preset-switch">${presetOptions}</select>
         <div class="preset-actions-row">
           <button class="preset-action-btn" id="preset-new-btn" data-action="preset-new">＋ New</button>
           <button class="preset-action-btn" id="preset-rename-btn" data-action="preset-rename">✎ Rename</button>
@@ -253,7 +253,7 @@ function renderSettingsItems() {
             <div class="toggle-row-sub">${state.sqpEnabled ? 'On' : 'Off'}</div>
           </div>
           <label class="toggle-switch">
-            <input type="checkbox" id="sqp-toggle" ${state.sqpEnabled ? 'checked' : ''}>
+            <input type="checkbox" id="sqp-toggle" data-change-action="sqp-toggle" ${state.sqpEnabled ? 'checked' : ''}>
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -324,7 +324,7 @@ function renderSettingsMultiPick() {
             <div class="toggle-row-sub" id="multipick-enabled-sub">${enabled ? 'On' : 'Off'}</div>
           </div>
           <label class="toggle-switch">
-            <input type="checkbox" id="multipick-enabled" ${enabled ? 'checked' : ''}>
+            <input type="checkbox" id="multipick-enabled" data-change-action="multipick-enabled" ${enabled ? 'checked' : ''}>
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -392,7 +392,7 @@ function renderSettingsDisplay() {
             <div class="toggle-row-sub">${state.hapticsEnabled ? 'On' : 'Off'}</div>
           </div>
           <label class="toggle-switch">
-            <input type="checkbox" id="haptics-toggle" ${state.hapticsEnabled ? 'checked' : ''}>
+            <input type="checkbox" id="haptics-toggle" data-change-action="haptics" ${state.hapticsEnabled ? 'checked' : ''}>
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -407,7 +407,7 @@ function renderSettingsDisplay() {
             <div class="toggle-row-sub">${state.soundEnabled ? 'On' : 'Off'}</div>
           </div>
           <label class="toggle-switch">
-            <input type="checkbox" id="sound-toggle" ${state.soundEnabled ? 'checked' : ''}>
+            <input type="checkbox" id="sound-toggle" data-change-action="sound" ${state.soundEnabled ? 'checked' : ''}>
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -422,7 +422,7 @@ function renderSettingsDisplay() {
             <div class="toggle-row-sub">${state.timestampsEnabled ? 'On' : 'Off'}</div>
           </div>
           <label class="toggle-switch">
-            <input type="checkbox" id="timestamps-toggle" ${state.timestampsEnabled ? 'checked' : ''}>
+            <input type="checkbox" id="timestamps-toggle" data-change-action="timestamps" ${state.timestampsEnabled ? 'checked' : ''}>
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -455,7 +455,7 @@ function renderSettingsBackup() {
       <div class="settings-section">
         <h2 class="h2">Restore</h2>
         <p class="muted">Import a previously exported backup file. <strong>This will replace all current data on this device.</strong> You'll be asked to confirm before anything is overwritten.</p>
-        <input type="file" id="backup-import-file" accept="application/json,.json" style="display:none">
+        <input type="file" id="backup-import-file" data-change-action="backup-import-file" accept="application/json,.json" style="display:none">
         <button class="backup-action-btn danger" id="backup-import-btn" data-action="backup-import">⬆ Import backup (.json)</button>
       </div>
 
@@ -639,7 +639,7 @@ function renderSettingsClients() {
           <button class="fail-close-btn" id="client-dialog-cancel" data-action="client-dialog-cancel" aria-label="Cancel">×</button>
         </div>
         <label class="label">Client name</label>
-        <input class="input" id="client-dialog-input" value="${escapeHTML(cd.name)}" placeholder="e.g. Acme Ltd" autofocus>
+        <input class="input" id="client-dialog-input" data-input-action="client-name" value="${escapeHTML(cd.name)}" placeholder="e.g. Acme Ltd" autofocus>
         <button class="btn-primary" id="client-dialog-confirm" data-action="client-dialog-confirm" style="margin-top:14px">${cd.mode === 'add' ? 'Add' : 'Save'}</button>
       </div>
     `;
@@ -658,7 +658,7 @@ function renderSettingsClients() {
         </div>
         ${parentLine}
         <label class="label">Site name</label>
-        <input class="input" id="site-dialog-input" value="${escapeHTML(sd.name)}" placeholder="e.g. Unit 4, Head Office" autofocus>
+        <input class="input" id="site-dialog-input" data-input-action="site-name" value="${escapeHTML(sd.name)}" placeholder="e.g. Unit 4, Head Office" autofocus>
         <button class="btn-primary" id="site-dialog-confirm" data-action="site-dialog-confirm" style="margin-top:14px">${sd.mode === 'add' ? 'Add' : 'Save'}</button>
       </div>
     `;
@@ -768,10 +768,10 @@ function renderSettingsCalculator() {
         <p class="muted">For a Class I appliance, the earth continuity limit is (0.1 + R) Ω, where R is the resistance of the protective conductor in the supply cable. Values from IET Code of Practice Table V1.1.</p>
 
         <label class="label">CSA (cable cross-section)</label>
-        <select class="input" id="calc-csa">${csaOptions}</select>
+        <select class="input" id="calc-csa" data-change-action="calc-csa">${csaOptions}</select>
 
         <label class="label">Length</label>
-        <select class="input" id="calc-length">${lengthOptions}</select>
+        <select class="input" id="calc-length" data-change-action="calc-length">${lengthOptions}</select>
 
         <div class="calc-result-card">
           <div class="calc-result-label">Earth limit</div>
@@ -809,18 +809,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" data-action="about-reload" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v27: rolled forward — V27 on top, V24 dropped. -->
+      <!-- v8: rolling 3-version changelog. v28: rolled forward — V28 on top, V25 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V28</strong> · June 2026</p>
+        <p class="muted">Another under-the-hood update with no changes to how the app looks or works. The last part of the tap-and-typing system has been moved onto the same single, efficient setup the buttons already use — so text fields, switches and dropdowns can no longer lose their responsiveness when the screen redraws, and future updates stay quicker and safer to build. Everything you do — logging, search, settings, exports — behaves exactly as before, and all your data is untouched.</p>
 
         <p><strong>V27</strong> · June 2026</p>
         <p class="muted">Smarter Smart Quick Pick ordering. If you use Smart Quick Pick, the quick-pick buttons now match your location more precisely — a location only borrows learned items from another when they genuinely share a word, so a short name like "Office" no longer pulls in unrelated places. The item types you test most often at a location are now protected too, so a one-off item logged there once won't push your everyday buttons out of the row. This applies to your existing history automatically — nothing to set up. Everything else behaves exactly as before, and all your data is untouched.</p>
 
         <p><strong>V26</strong> · June 2026</p>
         <p class="muted">More flexible clients and sites. When you start a session you now only need a client <em>or</em> a site — enter either one, or both. Sites without a client are grouped under "Unassigned", and you can assign a site to a client (or move it between clients) at any time under Settings → Clients. Your CSV export can now split Client and Site into two separate columns; the new Client column starts switched off, so your exports are unchanged until you turn it on. Exporting a CSV no longer attaches a separate text note — just the file. All your existing sessions and data are untouched.</p>
-
-        <p><strong>V25</strong> · June 2026</p>
-        <p class="muted">Another under-the-hood update with no changes to how the app looks or works. The way the app responds to taps has been rebuilt on a single, more efficient system — buttons can no longer lose their responsiveness when the screen redraws, and future updates are quicker and safer to build. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
       </div>
 
       <div class="info-card">

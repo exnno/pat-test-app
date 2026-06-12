@@ -3,7 +3,7 @@
 A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, flexible clients & sites, search, filters, bulk edit, JSON backup/restore, dark mode, and CSV export/import.
 
 **Live:** https://exnno.github.io/pat-test-app/
-**Current version:** V27 · cache `pat-v27`
+**Current version:** V28 · cache `pat-v28`
 
 ## Key features
 
@@ -22,7 +22,7 @@ Vanilla HTML / CSS / JS — no frameworks, no build step, no external dependenci
 
 ## Files
 
-The app logic was split out of the old single `app.js` into single-concern script files during the V21/V22 refactor (V25 added `dispatch.js` for delegated event handling). They share one global scope and load in a fixed order (see `MAP.md` for what lives where).
+The app logic was split out of the old single `app.js` into single-concern script files during the V21/V22 refactor. V25 added `dispatch.js` for delegated CLICK handling; V28 (E3-tail) finished the job by moving every stateful input/change handler into `dispatch.js` too, leaving only four focus-sensitive fields directly bound. They share one global scope and load in a fixed order (see `MAP.md` for what lives where).
 
 **Load order (defined in `index.html`):**
 
@@ -42,8 +42,8 @@ The app logic was split out of the old single `app.js` into single-concern scrip
 - `session.js` — sessions, items, and most app logic
 - `render-core.js` — main screens (Sessions, Entry, Overview, Edit) + the New Session form and welcome modal
 - `render-settings.js` — Settings sub-pages, calculator, About changelog
-- `events.js` — per-render event binding (`bindEvents`) + suggestion re-renders
-- `dispatch.js` — delegated event handling and the action registry (V25)
+- `events.js` — direct binding for the four focus-sensitive fields only (`bindFocusFields`) + suggestion re-renders
+- `dispatch.js` — delegated click + input + change handling and the three action registries (clicks V25, input/change V28)
 - `boot.js` — startup; runs a boot integrity self-check, then `load()`/`render()`. **Runs on load and must load last**
 - `styles.css` — themed via CSS variables; light, dark, and system theme
 - `sw.js` — service worker; caches the app shell. Its `ASSETS` list must include all scripts in load order. Bump `CACHE_VERSION` on every release.

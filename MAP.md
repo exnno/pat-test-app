@@ -1,4 +1,4 @@
-# PAT App — Code Map (V27)
+# PAT App — Code Map (V28)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -146,6 +146,11 @@ Import modals: `renderImportConflictModal`, `renderImportSummaryModal`. Entry:
 `renderOverviewBodyHTML`, `renderOverview`, `refreshOverviewBody`,
 `refreshOverviewSelection`, `bindOverviewBodyEvents`. Edit: `renderEditSession`.
 *Touch to:* change the Sessions list, Entry screen, Overview, or Edit-session UI.
+**v28 (E3-tail):** `bindSessionsListAreaEvents` and `bindOverviewBodyEvents` are
+now empty no-op shells — the sort/status/lock selects and the row-select
+checkbox they used to bind are delegated in `dispatch.js`. Call sites kept so
+refresh paths don't need editing; the binders that render() called are gone —
+render() now calls `bindFocusFields()` (events.js) instead of `bindEvents()`.
 
 ## render-settings.js (~855 ln) — settings screens
 `renderSettingsHub`, `renderSettingsSubHeader`, and every `renderSettings*`
@@ -154,23 +159,38 @@ Clients, Calculator, About, Contact) + calculator helpers (`computeEarthLimit`,
 `formatLengthOption`). **About changelog lives here** (`renderSettingsAbout`).
 *Touch to:* change any Settings page or roll the About changelog.
 
-## events.js (~485 ln) — event binding (per-render)
-`bindEvents()` (the big per-render rebind) + suggestion re-render helpers
-(`renderSuggestionsOnly`, `renderNfSuggestionsOnly`, `renderLocationSuggestionsOnly`).
-*Touch to:* wire up a control whose handler still lives here (paired with its
-render file).
-**Carry-forward E3-tail lives here** — the ~46 remaining stateful
-`oninput`/`onchange` handlers still bound per-render; migrating them to delegation
-in `dispatch.js` would empty this. Its own release; riskiest handlers.
+## events.js (~290 ln) — focus-sensitive field binding (per-render)
+`bindFocusFields()` — direct `oninput`/`onfocus`/`onblur` binds for the **four**
+focus-sensitive fields only: `nf-client`, `nf-site` (New Session autocomplete),
+`f-location` (focus-clears-field + casing-on-blur + SQP row rebuild), `f-type`
+(casing-on-blur). Plus the suggestion re-render helpers (`renderSuggestionsOnly`,
+`renderNfSuggestionsOnly`, `renderLocationSuggestionsOnly`) that own the
+`.suggestions` dropdowns these fields drive (they use the
+`onmousedown→preventDefault` tap trick).
+*Touch to:* change one of the four autocomplete/casing fields or their dropdowns.
+**v28 (E3-tail):** every other stateful input/change handler moved to delegation
+in `dispatch.js`; `bindEvents()` is gone — its non-focus handlers are now
+`data-input-action`/`data-change-action`. These four stay direct because
+focus/blur timing can't be safely delegated (the fragile iOS area). Called from
+render() and refreshEntryAfterLog() in render-core.js.
 
-## dispatch.js (~435 ln) — delegated event handling (V25)
-The single delegated click system + action registry: `registerActions` (each
-section of the app registers its `data-action` handlers), `handleDelegatedClick`
-(one listener on `#app` routes clicks by `data-action`/`data-arg`),
-`initDelegation` (wires it up at boot). Click actions moved here in V25 so they
-survive re-renders without rebinding.
-*Touch to:* add/route a new `data-action` click handler. Text-field
-input/change handlers still live in `events.js` (see E3-tail above).
+## dispatch.js (~600 ln) — delegated event handling (V25 clicks, V28 input/change)
+The full delegated event system + three action registries, all attached once to
+`#app` at boot via `initDelegation`:
+- **Clicks (V25):** `ACTIONS` + `registerActions` + `handleDelegatedClick`
+  (ancestor-walk by `data-action`/`data-arg`).
+- **Input (V28 E3-tail):** `INPUT_ACTIONS` + `registerInputActions` +
+  `handleDelegatedInput` (routed by `data-input-action`). The ~20 plain
+  value-write fields + the two search fields (partial refresh).
+- **Change (V28 E3-tail):** `CHANGE_ACTIONS` + `registerChangeActions` +
+  `handleDelegatedChange` (routed by `data-change-action`). All toggles/selects/
+  radios + the two file pickers, the overview row checkbox (`row-select`), the
+  sessions-list sort/status/lock selects (moved out of render-core.js), and the
+  preset-switch confirm-on-switch dropdown.
+- `_fieldValue(el)` resolves checkbox/radio→checked else value, passed as the
+  handler's first arg.
+*Touch to:* add/route any delegated click/input/change handler. Only the four
+focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 
 ## boot.js (~145 ln) — startup, RUNS ON LOAD, must load LAST
 Service worker: `registerServiceWorker`, `showUpdateBanner`, `applyUpdate`,

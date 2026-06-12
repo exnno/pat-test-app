@@ -84,7 +84,7 @@ function render() {
         Your current Quick Pick items have become your first preset. What would you like to call it?
       </p>
       <label class="label">Preset name</label>
-      <input class="input" id="migration-prompt-input" value="${escapeHTML(state.migrationPrompt.name)}" placeholder="e.g. Default, My items, Office" autofocus>
+      <input class="input" id="migration-prompt-input" data-input-action="migration-name" value="${escapeHTML(state.migrationPrompt.name)}" placeholder="e.g. Default, My items, Office" autofocus>
       <p class="muted" style="margin:8px 0 14px;font-size:12px">You can rename or add more presets later in Settings → Quick Pick Items.</p>
       <button class="btn-primary" id="migration-prompt-confirm" data-action="migration-confirm">Continue</button>
     </div>
@@ -169,7 +169,7 @@ function render() {
   // class if it lingered from a previous v12 render, in case a hot-swap
   // mid-session leaves a stale body class.
   document.body.classList.remove('view-entry');
-  bindEvents();
+  bindFocusFields();
 }
 
 // v19 (efficiency item 4): fast path for logging on the entry screen.
@@ -189,7 +189,7 @@ function render() {
 //     fields, quick-pick grid (incl. Smart Quick Pick ordering), notes block,
 //     copy-last label + disabled state, and nav-row disabled states — i.e. every
 //     part of the screen that changes after a log.
-//   • bindEvents() is the same binding pass render() uses.
+//   • bindFocusFields() is the same binding pass render() uses.
 // If we are NOT on the entry screen for any reason, fall back to a full render()
 // so there is never a path where this does something unexpected.
 function refreshEntryAfterLog() {
@@ -204,7 +204,7 @@ function refreshEntryAfterLog() {
   // v24 (E4): the entry screen never contains a modal/sheet, so a subsequent
   // render() has nothing to sweep. Keep the flag accurate.
   _lastRenderHadModal = false;
-  bindEvents();
+  bindFocusFields();
 }
 // v20: New Session Client / Site autocomplete. These replace the v19 native
 // <datalist> pickers, which were unreliable in iOS PWA mode (frequently showed
@@ -277,11 +277,11 @@ function renderSessions() {
       <label class="label">Engineer</label>
       <input class="input" id="nf-engineer" value="${escapeHTML(state.newForm.engineer || state.engineer)}" placeholder="Your name">
       <label class="label">Session name <span class="hint">(optional)</span></label>
-      <input class="input" id="nf-name" value="${escapeHTML(state.newForm.name)}" placeholder="e.g. Annual test 2026">
+      <input class="input" id="nf-name" data-input-action="nf-name" value="${escapeHTML(state.newForm.name)}" placeholder="e.g. Annual test 2026">
       <label class="label">Asset number prefix <span class="hint">(optional, e.g. BT)</span></label>
-      <input class="input" id="nf-prefix" value="${escapeHTML(state.newForm.prefix)}" placeholder="Leave blank for none">
+      <input class="input" id="nf-prefix" data-input-action="nf-prefix" value="${escapeHTML(state.newForm.prefix)}" placeholder="Leave blank for none">
       <label class="label">Starting asset number</label>
-      <input class="input" id="nf-start" type="number" inputmode="numeric" value="${escapeHTML(state.newForm.startNo)}">
+      <input class="input" id="nf-start" data-input-action="nf-start" type="number" inputmode="numeric" value="${escapeHTML(state.newForm.startNo)}">
       <div class="btn-row">
         <button class="btn-secondary" id="nf-cancel" data-action="nf-cancel">Cancel</button>
         <button class="btn-primary" id="nf-submit" data-action="nf-submit">Start</button>
@@ -292,7 +292,7 @@ function renderSessions() {
       <button class="btn-primary" id="new-session-btn" data-action="new-session">+ New session</button>
       <button class="btn-secondary" id="import-session-btn" data-action="import-session">⬆ Import (.csv)</button>
     </div>
-    <input type="file" id="import-session-file" accept=".csv,text/csv" style="display:none">
+    <input type="file" id="import-session-file" data-change-action="import-file" accept=".csv,text/csv" style="display:none">
   `;
 
   // v10: search bar above the sort row. Hidden when there are no sessions OR
@@ -307,7 +307,7 @@ function renderSessions() {
   const showSearch = hasSessions && !state.newForm.show;
   const searchRow = showSearch ? `
     <div class="sessions-search-row">
-      <input type="search" class="search-input" id="sessions-search" placeholder="Search sessions and items…" value="${escapeHTML(state.sessionsSearchQuery)}" autocomplete="off">
+      <input type="search" class="search-input" id="sessions-search" data-input-action="sessions-search" placeholder="Search sessions and items…" value="${escapeHTML(state.sessionsSearchQuery)}" autocomplete="off">
     </div>
   ` : '';
   const sessionsListArea = `<div id="sessions-list-area">${renderSessionsListAreaHTML()}</div>`;
@@ -419,7 +419,7 @@ function renderSessionsListAreaHTML() {
     <div class="list-controls">
       <label class="control-field">
         <span class="control-label">Sort</span>
-        <select id="sort-select" class="sort-select">
+        <select id="sort-select" class="sort-select" data-change-action="sessions-sort">
           <option value="date_desc"${state.sort === 'date_desc' ? ' selected' : ''}>Date (newest)</option>
           <option value="date_asc"${state.sort === 'date_asc' ? ' selected' : ''}>Date (oldest)</option>
           <option value="name_asc"${state.sort === 'name_asc' ? ' selected' : ''}>Name (A–Z)</option>
@@ -428,7 +428,7 @@ function renderSessionsListAreaHTML() {
       </label>
       <label class="control-field">
         <span class="control-label">Status</span>
-        <select id="status-filter" class="sort-select">
+        <select id="status-filter" class="sort-select" data-change-action="status-filter">
           <option value="all"${state.sessionFilter === 'all' ? ' selected' : ''}>All</option>
           <option value="unexported"${state.sessionFilter === 'unexported' ? ' selected' : ''}>Not exported</option>
           <option value="exported"${state.sessionFilter === 'exported' ? ' selected' : ''}>Exported</option>
@@ -437,7 +437,7 @@ function renderSessionsListAreaHTML() {
       </label>
       <label class="control-field">
         <span class="control-label">Lock</span>
-        <select id="lock-filter" class="sort-select">
+        <select id="lock-filter" class="sort-select" data-change-action="lock-filter">
           <option value="all"${state.lockFilter === 'all' ? ' selected' : ''}>All</option>
           <option value="unlocked"${state.lockFilter === 'unlocked' ? ' selected' : ''}>Unlocked</option>
           <option value="locked"${state.lockFilter === 'locked' ? ' selected' : ''}>Locked</option>
@@ -602,7 +602,7 @@ function renderEntry() {
 
   const notesBlock = state.form.showNotes
     ? `<label class="label">Notes</label>
-       <textarea class="textarea" id="f-notes" rows="2" placeholder="Optional">${escapeHTML(state.form.notes)}</textarea>`
+       <textarea class="textarea" id="f-notes" data-input-action="f-notes" rows="2" placeholder="Optional">${escapeHTML(state.form.notes)}</textarea>`
     : `<button class="notes-toggle" id="show-notes-btn" data-action="show-notes">✎ Add note</button>`;
 
   const resultBadge = isExisting && existing.result
@@ -642,7 +642,7 @@ function renderEntry() {
   } else {
     failSheetInner = `
       <button class="fail-other-back" id="fail-other-back" data-action="fail-other-back">‹ Back to reasons</button>
-      <textarea class="fail-other-input" id="fail-other-input" placeholder="Type reason…" rows="3">${escapeHTML(state.failOtherText)}</textarea>
+      <textarea class="fail-other-input" id="fail-other-input" data-input-action="fail-other" placeholder="Type reason…" rows="3">${escapeHTML(state.failOtherText)}</textarea>
       <button class="fail-other-save" id="fail-other-save" data-action="fail-other-save">Save fail</button>
     `;
   }
@@ -746,7 +746,7 @@ function renderEntry() {
       ${progressRow}
 
       <label class="label">Asset number</label>
-      <input class="input-big" id="f-asset" value="${escapeHTML(state.form.assetNo)}">
+      <input class="input-big" id="f-asset" data-input-action="f-asset" value="${escapeHTML(state.form.assetNo)}">
 
       <label class="label">Location ${carriedHint}</label>
       <div class="location-input-wrap">
@@ -822,7 +822,7 @@ function renderOverviewBodyHTML(sess) {
         ${visible.map(({ it, i }) => {
           const checked = sel && state.selectedIndices.includes(i);
           const checkCol = sel
-            ? `<td class="td td-check"><input type="checkbox" data-select="${i}" ${checked ? 'checked' : ''}></td>`
+            ? `<td class="td td-check"><input type="checkbox" data-change-action="row-select" data-arg="${i}" ${checked ? 'checked' : ''}></td>`
             : '';
           const actionCol = sel
             ? `<td class="td td-action"></td>`
@@ -859,9 +859,9 @@ function renderOverview() {
 
   const filterRow = sess.items.length > 0 ? `
     <div class="overview-filters">
-      <input type="search" class="search-input" id="overview-search" placeholder="Search asset, location, item, notes…" value="${escapeHTML(state.searchQuery)}" autocomplete="off">
+      <input type="search" class="search-input" id="overview-search" data-input-action="overview-search" placeholder="Search asset, location, item, notes…" value="${escapeHTML(state.searchQuery)}" autocomplete="off">
       <label class="filter-toggle">
-        <input type="checkbox" id="fails-only-toggle" ${state.showFailsOnly ? 'checked' : ''}>
+        <input type="checkbox" id="fails-only-toggle" data-change-action="fails-only" ${state.showFailsOnly ? 'checked' : ''}>
         <span>Show fails only</span>
       </label>
     </div>
@@ -944,7 +944,7 @@ function renderOverview() {
         <h3 class="bulk-sheet-title">Change location for ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</h3>
         <button class="fail-close-btn" id="bulk-cancel-btn" data-action="bulk-cancel" aria-label="Cancel">×</button>
       </div>
-      <input class="input-big" id="bulk-location-input" value="${escapeHTML(state.bulkLocationValue)}" placeholder="New location" autofocus style="margin-bottom:14px">
+      <input class="input-big" id="bulk-location-input" data-input-action="bulk-location" value="${escapeHTML(state.bulkLocationValue)}" placeholder="New location" autofocus style="margin-bottom:14px">
       <button class="btn-primary" id="bulk-apply-btn" data-action="bulk-location-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
     </div>
   ` : '';
@@ -965,7 +965,7 @@ function renderOverview() {
         <button class="fail-close-btn" id="bulk-type-cancel" data-action="bulk-cancel" aria-label="Cancel">×</button>
       </div>
       <div class="quick-grid" style="margin-bottom:10px">${typeQuickButtons}</div>
-      <input class="input-big" id="bulk-type-input" value="${escapeHTML(state.bulkEdit.typeValue)}" placeholder="…or type custom" autocomplete="off" style="margin-bottom:14px">
+      <input class="input-big" id="bulk-type-input" data-input-action="bulk-type" value="${escapeHTML(state.bulkEdit.typeValue)}" placeholder="…or type custom" autocomplete="off" style="margin-bottom:14px">
       <button class="btn-primary" id="bulk-type-apply" data-action="bulk-type-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
     </div>
   ` : '';
@@ -984,15 +984,15 @@ function renderOverview() {
       </div>
       <div class="bulk-notes-mode">
         <label class="bulk-notes-mode-opt">
-          <input type="radio" name="bulk-notes-mode" value="replace" ${state.bulkEdit.notesMode !== 'append' ? 'checked' : ''}>
+          <input type="radio" name="bulk-notes-mode" value="replace" data-change-action="bulk-notes-mode" ${state.bulkEdit.notesMode !== 'append' ? 'checked' : ''}>
           <span><strong>Replace</strong> — overwrite existing notes</span>
         </label>
         <label class="bulk-notes-mode-opt">
-          <input type="radio" name="bulk-notes-mode" value="append" ${state.bulkEdit.notesMode === 'append' ? 'checked' : ''}>
+          <input type="radio" name="bulk-notes-mode" value="append" data-change-action="bulk-notes-mode" ${state.bulkEdit.notesMode === 'append' ? 'checked' : ''}>
           <span><strong>Append</strong> — add to existing notes (separated by " ; ")</span>
         </label>
       </div>
-      <textarea class="input" id="bulk-notes-input" rows="3" placeholder="${state.bulkEdit.notesMode === 'append' ? 'Text to append' : 'New notes (leave empty to clear)'}" style="margin-bottom:14px">${escapeHTML(state.bulkEdit.notesValue)}</textarea>
+      <textarea class="input" id="bulk-notes-input" data-input-action="bulk-notes" rows="3" placeholder="${state.bulkEdit.notesMode === 'append' ? 'Text to append' : 'New notes (leave empty to clear)'}" style="margin-bottom:14px">${escapeHTML(state.bulkEdit.notesValue)}</textarea>
       <button class="btn-primary" id="bulk-notes-apply" data-action="bulk-notes-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
     </div>
   ` : '';
@@ -1054,44 +1054,25 @@ function refreshOverviewSelection() {
 
 function bindOverviewBodyEvents() {
   // v25 (E3): row open (jump-to-item), per-row delete (delete-item) and
-  // row-toggle are delegated via data-action in dispatch.js — no rebinding
-  // needed when the body is rebuilt. The checkbox's onCHANGE (the actual
-  // selection toggle) is a change event, out of v25 scope, so it stays here and
-  // is rebound on every body refresh.
-  document.querySelectorAll('[data-select]').forEach(el => {
-    el.onchange = () => {
-      toggleSelected(parseInt(el.dataset.select, 10));
-      refreshOverviewSelection();   // v24 (E7)
-    };
-  });
+  // row-toggle are delegated via data-action in dispatch.js.
+  // v28 (E3-tail): the per-row checkbox's onCHANGE is now delegated too
+  // (data-change-action="row-select"), so there is nothing left to rebind when
+  // the body is rebuilt. Retained as a no-op call site so refreshOverviewBody()
+  // and bindEvents-era callers don't need editing; safe to delete in future.
 }
 
 // v10: Bind events for everything inside #sessions-list-area. Called both from
 // bindEvents() on initial render and from refreshSessionsListAreaOnly() after
 // each keystroke in the sessions search input.
 function bindSessionsListAreaEvents() {
-  const $ = id => document.getElementById(id);
-  if ($('sort-select')) $('sort-select').onchange = e => {
-    state.sort = e.target.value;
-    save();
-    refreshSessionsListAreaOnly();
-  };
-  // v15: Status + Lock filters. Both persist and re-render just the list area.
-  if ($('status-filter')) $('status-filter').onchange = e => {
-    state.sessionFilter = e.target.value;
-    save();
-    refreshSessionsListAreaOnly();
-  };
-  if ($('lock-filter')) $('lock-filter').onchange = e => {
-    state.lockFilter = e.target.value;
-    save();
-    refreshSessionsListAreaOnly();
-  };
   // v25 (E3): the click controls in this area — #clear-filters-btn
   // (clear-session-filters), #bulk-export-btn (bulk-export-unexported), and the
-  // per-card [data-open]/[data-export]/[data-delete-session] rows — are now
-  // delegated via data-action in dispatch.js. Only the sort/status/lock <select>
-  // onchange handlers (change events, out of v25 scope) remain here.
+  // per-card [data-open]/[data-export]/[data-delete-session] rows — are
+  // delegated via data-action in dispatch.js.
+  // v28 (E3-tail): the sort / status / lock <select> onCHANGE handlers are now
+  // delegated too (data-change-action="sessions-sort" / "status-filter" /
+  // "lock-filter"), so nothing here needs rebinding when the list area is
+  // replaced on each search keystroke. Retained as a no-op call site.
 }
 
 function renderEditSession() {
@@ -1105,16 +1086,16 @@ function renderEditSession() {
       </header>
       <div class="card">
         <label class="label">Site</label>
-        <input class="input" id="ef-site" value="${escapeHTML(state.editForm.site)}">
+        <input class="input" id="ef-site" data-input-action="ef-site" value="${escapeHTML(state.editForm.site)}">
         <p class="muted" style="margin:6px 0 0;font-size:12px">This is the site name saved on the session. Editing it here changes only this session, not your Clients list.</p>
         <label class="label">Engineer</label>
-        <input class="input" id="ef-engineer" value="${escapeHTML(state.editForm.engineer)}">
+        <input class="input" id="ef-engineer" data-input-action="ef-engineer" value="${escapeHTML(state.editForm.engineer)}">
         <label class="label">Session name</label>
-        <input class="input" id="ef-name" value="${escapeHTML(state.editForm.name)}">
+        <input class="input" id="ef-name" data-input-action="ef-name" value="${escapeHTML(state.editForm.name)}">
         <label class="label">Date</label>
-        <input class="input input-date" id="ef-date" type="date" value="${escapeHTML(state.editForm.date)}">
+        <input class="input input-date" id="ef-date" data-input-action="ef-date" type="date" value="${escapeHTML(state.editForm.date)}">
         <label class="label">Asset number prefix</label>
-        <input class="input" id="ef-prefix" value="${escapeHTML(state.editForm.prefix)}">
+        <input class="input" id="ef-prefix" data-input-action="ef-prefix" value="${escapeHTML(state.editForm.prefix)}">
 
         <!-- v8: lock toggle. When on, Pass/Fail/Copy on the entry screen are disabled.
              Bulk edit and item delete from the overview still work, so mistakes can be
@@ -1125,7 +1106,7 @@ function renderEditSession() {
             <div class="lock-toggle-sub">Prevents new entries from the test screen. Edits via the overview still work.</div>
           </div>
           <label class="toggle-switch">
-            <input type="checkbox" id="ef-locked" ${lockChecked}>
+            <input type="checkbox" id="ef-locked" data-change-action="ef-locked" ${lockChecked}>
             <span class="toggle-slider"></span>
           </label>
         </div>
