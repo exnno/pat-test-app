@@ -58,8 +58,8 @@ function render() {
     <div class="update-banner" role="status">
       <span class="update-banner-text">⟳ Update available</span>
       <div class="update-banner-actions">
-        <button class="update-refresh-btn" id="update-refresh">Refresh</button>
-        <button class="update-dismiss-btn" id="update-dismiss" aria-label="Dismiss">×</button>
+        <button class="update-refresh-btn" id="update-refresh" data-action="update-refresh">Refresh</button>
+        <button class="update-dismiss-btn" id="update-dismiss" data-action="update-dismiss" aria-label="Dismiss">×</button>
       </div>
     </div>
   ` : '';
@@ -86,7 +86,7 @@ function render() {
       <label class="label">Preset name</label>
       <input class="input" id="migration-prompt-input" value="${escapeHTML(state.migrationPrompt.name)}" placeholder="e.g. Default, My items, Office" autofocus>
       <p class="muted" style="margin:8px 0 14px;font-size:12px">You can rename or add more presets later in Settings → Quick Pick Items.</p>
-      <button class="btn-primary" id="migration-prompt-confirm">Continue</button>
+      <button class="btn-primary" id="migration-prompt-confirm" data-action="migration-confirm">Continue</button>
     </div>
   ` : '';
 
@@ -111,7 +111,7 @@ function render() {
         <li><strong>Steadier Smart Quick Pick.</strong> Your quick-pick buttons no longer shuffle around while you log. The ones from your preset stay put in their usual spots; only the extra location-specific types swap in, and the row stays fixed until you change location.</li>
         <li><strong>Rebuild from your sessions.</strong> Under <strong>Settings → Clients</strong>, a new button adds any clients and sites from your saved sessions that aren't listed yet — handy after importing.</li>
       </ul>
-      <button class="btn-primary" id="v20-welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v20-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -133,12 +133,12 @@ function render() {
           <div class="bulk-sheet-header">
             <span class="fail-close-spacer"></span>
             <h3 class="bulk-sheet-title">Already exported</h3>
-            <button class="fail-close-btn" id="reopen-warn-cancel" aria-label="Cancel">×</button>
+            <button class="fail-close-btn" id="reopen-warn-cancel" data-action="reopen-cancel" aria-label="Cancel">×</button>
           </div>
           <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text)">${escapeHTML(line)}</p>
           <div class="btn-row">
-            <button class="btn-secondary" id="reopen-warn-cancel2">Cancel</button>
-            <button class="btn-primary" id="reopen-warn-continue">Open anyway</button>
+            <button class="btn-secondary" id="reopen-warn-cancel2" data-action="reopen-cancel">Cancel</button>
+            <button class="btn-primary" id="reopen-warn-continue" data-action="reopen-continue">Open anyway</button>
           </div>
         </div>
       `;
@@ -279,14 +279,14 @@ function renderSessions() {
       <label class="label">Starting asset number</label>
       <input class="input" id="nf-start" type="number" inputmode="numeric" value="${escapeHTML(state.newForm.startNo)}">
       <div class="btn-row">
-        <button class="btn-secondary" id="nf-cancel">Cancel</button>
-        <button class="btn-primary" id="nf-submit">Start</button>
+        <button class="btn-secondary" id="nf-cancel" data-action="nf-cancel">Cancel</button>
+        <button class="btn-primary" id="nf-submit" data-action="nf-submit">Start</button>
       </div>
     </div>
   ` : `
     <div class="sessions-actions-row">
-      <button class="btn-primary" id="new-session-btn">+ New session</button>
-      <button class="btn-secondary" id="import-session-btn">⬆ Import (.csv)</button>
+      <button class="btn-primary" id="new-session-btn" data-action="new-session">+ New session</button>
+      <button class="btn-secondary" id="import-session-btn" data-action="import-session">⬆ Import (.csv)</button>
     </div>
     <input type="file" id="import-session-file" accept=".csv,text/csv" style="display:none">
   `;
@@ -329,7 +329,7 @@ function renderSessions() {
     <div class="screen">
       <header class="header">
         <h1 class="h1">PAT Sessions</h1>
-        <button class="icon-btn" id="settings-btn" aria-label="Settings">⚙</button>
+        <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">⚙</button>
       </header>
       ${backupBanner}
       ${newForm}
@@ -360,11 +360,11 @@ function renderBackupReminderBanner() {
       <div class="backup-banner-body">
         <div class="backup-banner-text">${escapeHTML(msg)}</div>
         <div class="backup-banner-actions">
-          <button class="backup-banner-action primary" id="backup-banner-export">Export now</button>
-          <button class="backup-banner-action" id="backup-banner-later">Remind me later</button>
+          <button class="backup-banner-action primary" id="backup-banner-export" data-action="backup-banner-export">Export now</button>
+          <button class="backup-banner-action" id="backup-banner-later" data-action="backup-banner-later">Remind me later</button>
         </div>
       </div>
-      <button class="backup-banner-dismiss" id="backup-banner-dismiss" aria-label="Dismiss">×</button>
+      <button class="backup-banner-dismiss" id="backup-banner-dismiss" data-action="backup-banner-dismiss" aria-label="Dismiss">×</button>
     </div>
   `;
 }
@@ -403,7 +403,7 @@ function renderSessionsListAreaHTML() {
   // searching (the search count takes the slot).
   const unexported = unexportedSessionCount();
   const nudgeHTML = (!queryTrimmed && sortedAll.length > 0 && unexported > 0)
-    ? `<button type="button" class="export-nudge" id="bulk-export-btn" aria-label="Export ${unexported} not-yet-exported session${unexported === 1 ? '' : 's'}">
+    ? `<button type="button" class="export-nudge" id="bulk-export-btn" data-action="bulk-export-unexported" aria-label="Export ${unexported} not-yet-exported session${unexported === 1 ? '' : 's'}">
         <span class="export-nudge-text">${unexported} session${unexported === 1 ? '' : 's'} not yet exported</span>
         <span class="export-nudge-cta">${SHARE_ICON_SVG} Export all</span>
       </button>`
@@ -450,7 +450,7 @@ function renderSessionsListAreaHTML() {
   } else if (!queryTrimmed && sortedAll.length > 0 && filtered.length === 0) {
     // v15: there ARE sessions, but the active filters hid them all.
     list = `<p class="muted">No sessions match the current filters.</p>
-      <button type="button" class="btn-tertiary" id="clear-filters-btn">Show all sessions</button>`;
+      <button type="button" class="btn-tertiary" id="clear-filters-btn" data-action="clear-session-filters">Show all sessions</button>`;
   } else {
     list = filtered.map(({ session: s, matchedItemIndex, itemMatchCount }) => {
       const passes = s.items.filter(i => i.result === 'pass').length;
@@ -471,8 +471,8 @@ function renderSessionsListAreaHTML() {
         ? `<div><span class="session-match-badge">${itemMatchCount} match${itemMatchCount === 1 ? '' : 'es'} in items</span></div>`
         : '';
       const openAttr = matchedItemIndex !== -1
-        ? `data-open="${s.id}" data-open-at="${matchedItemIndex}"`
-        : `data-open="${s.id}"`;
+        ? `data-action="open-session" data-arg="${s.id}" data-open="${s.id}" data-open-at="${matchedItemIndex}"`
+        : `data-action="open-session" data-arg="${s.id}" data-open="${s.id}"`;
       return `
         <div class="session-card${s.locked ? ' locked' : ''}">
           <div class="session-info" ${openAttr}>
@@ -481,8 +481,8 @@ function renderSessionsListAreaHTML() {
             ${exportBadge ? `<div class="session-export-row">${exportBadge}</div>` : ''}
             ${itemBadge}
           </div>
-          <button class="icon-btn-sm" data-export="${s.id}" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
-          <button class="icon-btn-sm" data-delete-session="${s.id}" aria-label="Delete">🗑</button>
+          <button class="icon-btn-sm" data-action="export-session" data-arg="${s.id}" data-export="${s.id}" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
+          <button class="icon-btn-sm" data-action="delete-session" data-arg="${s.id}" data-delete-session="${s.id}" aria-label="Delete">🗑</button>
         </div>
       `;
     }).join('');
@@ -507,13 +507,13 @@ function renderImportConflictModal() {
   const existing = state.sessions.find(s => s.id === state.importDialog.conflictExistingId);
   const existingItemCount = existing && Array.isArray(existing.items) ? existing.items.length : 0;
   return `
-    <div class="modal-backdrop" id="import-conflict-backdrop" style="z-index:300"></div>
+    <div class="modal-backdrop" id="import-conflict-backdrop" data-action="import-conflict-cancel" style="z-index:300"></div>
     <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Session already exists">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
         <h3 class="bulk-sheet-title">Session already exists</h3>
-        <button class="fail-close-btn" id="import-conflict-cancel" aria-label="Cancel">×</button>
+        <button class="fail-close-btn" id="import-conflict-cancel" data-action="import-conflict-cancel" aria-label="Cancel">×</button>
       </div>
       <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--text)">
         A session for <strong>${escapeHTML(incoming.site)}</strong> on <strong>${escapeHTML(formatDate(incoming.date))}</strong> already exists with ${existingItemCount} item${existingItemCount === 1 ? '' : 's'}.
@@ -522,9 +522,9 @@ function renderImportConflictModal() {
         The imported file has ${incoming.items.length} item${incoming.items.length === 1 ? '' : 's'}. How would you like to import them?
       </p>
       <div class="import-conflict-actions">
-        <button class="btn-primary" id="import-conflict-duplicate">Import as duplicate (new session)</button>
-        <button class="btn-secondary" id="import-conflict-merge">Merge into existing session</button>
-        <button class="btn-tertiary" id="import-conflict-cancel2">Cancel import</button>
+        <button class="btn-primary" id="import-conflict-duplicate" data-action="import-conflict-duplicate">Import as duplicate (new session)</button>
+        <button class="btn-secondary" id="import-conflict-merge" data-action="import-conflict-merge">Merge into existing session</button>
+        <button class="btn-tertiary" id="import-conflict-cancel2" data-action="import-conflict-cancel">Cancel import</button>
       </div>
     </div>
   `;
@@ -552,17 +552,17 @@ function renderImportSummaryModal() {
     </div>
   ` : '';
   return `
-    <div class="modal-backdrop" id="import-summary-backdrop" style="z-index:300"></div>
+    <div class="modal-backdrop" id="import-summary-backdrop" data-action="import-summary-done" style="z-index:300"></div>
     <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Import summary">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
         <h3 class="bulk-sheet-title">Import complete</h3>
-        <button class="fail-close-btn" id="import-summary-close" aria-label="Close">×</button>
+        <button class="fail-close-btn" id="import-summary-close" data-action="import-summary-done" aria-label="Close">×</button>
       </div>
       <p style="margin:0;font-size:14px;line-height:1.5;color:var(--text)">${modeText}</p>
       ${skippedBlock}
-      <button class="btn-primary" id="import-summary-done" style="margin-top:14px">Done</button>
+      <button class="btn-primary" id="import-summary-done" data-action="import-summary-done" style="margin-top:14px">Done</button>
     </div>
   `;
 }
@@ -593,13 +593,13 @@ function renderEntry() {
   // confirmed location changes — logging a PASS no longer reshuffles buttons.
   const orderedTypes = sqpRowForLocation(state.itemTypes, state.form.location);
   const quickButtons = orderedTypes.map(t => `
-    <button class="quick-btn ${state.form.itemType === t ? 'active' : ''}" data-type="${escapeHTML(t)}">${escapeHTML(t)}</button>
+    <button class="quick-btn ${state.form.itemType === t ? 'active' : ''}" data-action="quick-pick" data-arg="${escapeHTML(t)}" data-type="${escapeHTML(t)}">${escapeHTML(t)}</button>
   `).join('');
 
   const notesBlock = state.form.showNotes
     ? `<label class="label">Notes</label>
        <textarea class="textarea" id="f-notes" rows="2" placeholder="Optional">${escapeHTML(state.form.notes)}</textarea>`
-    : `<button class="notes-toggle" id="show-notes-btn">✎ Add note</button>`;
+    : `<button class="notes-toggle" id="show-notes-btn" data-action="show-notes">✎ Add note</button>`;
 
   const resultBadge = isExisting && existing.result
     ? `<span class="result-badge ${existing.result}">· ${capitalise(existing.result).toUpperCase()}</span>`
@@ -630,27 +630,27 @@ function renderEntry() {
     failSheetInner = `
       <div class="fail-reasons-grid">
         ${state.failReasons.map(r => `
-          <button class="fail-reason-btn" data-reason="${escapeHTML(r)}">${escapeHTML(r)}</button>
+          <button class="fail-reason-btn" data-action="fail-reason" data-arg="${escapeHTML(r)}" data-reason="${escapeHTML(r)}">${escapeHTML(r)}</button>
         `).join('')}
       </div>
-      <button class="fail-other-btn" id="fail-other-btn">Other…</button>
+      <button class="fail-other-btn" id="fail-other-btn" data-action="fail-other">Other…</button>
     `;
   } else {
     failSheetInner = `
-      <button class="fail-other-back" id="fail-other-back">‹ Back to reasons</button>
+      <button class="fail-other-back" id="fail-other-back" data-action="fail-other-back">‹ Back to reasons</button>
       <textarea class="fail-other-input" id="fail-other-input" placeholder="Type reason…" rows="3">${escapeHTML(state.failOtherText)}</textarea>
-      <button class="fail-other-save" id="fail-other-save">Save fail</button>
+      <button class="fail-other-save" id="fail-other-save" data-action="fail-other-save">Save fail</button>
     `;
   }
 
   const failModal = state.failModalOpen ? `
-    <div class="modal-backdrop" id="fail-backdrop"></div>
+    <div class="modal-backdrop" id="fail-backdrop" data-action="fail-cancel"></div>
     <div class="fail-sheet" role="dialog" aria-label="Why did it fail?">
       <div class="fail-sheet-handle"></div>
       <div class="fail-sheet-header">
         <span class="fail-close-spacer"></span>
         <h3 class="fail-sheet-title">Why did it fail?</h3>
-        <button class="fail-close-btn" id="fail-close" aria-label="Cancel">×</button>
+        <button class="fail-close-btn" id="fail-close" data-action="fail-cancel" aria-label="Cancel">×</button>
       </div>
       ${failSheetInner}
     </div>
@@ -663,7 +663,7 @@ function renderEntry() {
   const progressRow = `
     <div class="progress-row"${flashSearchJump ? ' data-search-jump="1"' : ''}>
       <div class="progress">Item ${state.cursor + 1} ${isExisting ? `of ${sess.items.length}` : '(new)'}${resultBadge}</div>
-      ${isExisting ? `<button class="del-icon-top" id="del-item-btn" aria-label="Delete item" title="Delete item">🗑</button>` : ''}
+      ${isExisting ? `<button class="del-icon-top" id="del-item-btn" data-action="delete-current-item" aria-label="Delete item" title="Delete item">🗑</button>` : ''}
     </div>
   `;
 
@@ -674,7 +674,7 @@ function renderEntry() {
   const lockBanner = isLocked ? `
     <div class="lock-banner" role="status">
       <span class="lock-banner-text">🔒 Session locked — no new entries</span>
-      <button class="lock-banner-action" id="lock-unlock-btn">Unlock</button>
+      <button class="lock-banner-action" id="lock-unlock-btn" data-action="unlock-session">Unlock</button>
     </div>
   ` : '';
 
@@ -689,7 +689,7 @@ function renderEntry() {
   // references it, and a `const` read before its declaration is a TDZ error.
   const mpEnabled = !!(state.multiPick && state.multiPick.enabled);
   const multiPickButton = mpEnabled ? `
-    <button class="multipick-btn" id="multipick-btn" ${isLocked ? 'disabled' : ''}>
+    <button class="multipick-btn" id="multipick-btn" data-action="multipick-open" ${isLocked ? 'disabled' : ''}>
       ＋ Multi Pick
     </button>
   ` : '';
@@ -705,7 +705,7 @@ function renderEntry() {
           const main = hasName ? s.name : seqText;
           const sub = hasName ? seqText : `${s.items.length} item${s.items.length === 1 ? '' : 's'}`;
           return `
-            <button class="multipick-option" data-mp-index="${i}">
+            <button class="multipick-option" data-action="multipick-fire" data-arg="${i}" data-mp-index="${i}">
               <span class="multipick-option-name">${escapeHTML(main)}</span>
               <span class="multipick-option-seq">${escapeHTML(sub)}</span>
             </button>
@@ -716,13 +716,13 @@ function renderEntry() {
       <p class="multipick-empty">No multi-picks set up yet. Add them in Settings → Multi Pick.</p>
     `;
     multiPickSheet = `
-      <div class="modal-backdrop" id="multipick-backdrop"></div>
+      <div class="modal-backdrop" id="multipick-backdrop" data-action="multipick-close"></div>
       <div class="fail-sheet multipick-sheet" role="dialog" aria-label="Multi Pick">
         <div class="fail-sheet-handle"></div>
         <div class="fail-sheet-header">
           <span class="fail-close-spacer"></span>
           <h3 class="fail-sheet-title">Multi Pick</h3>
-          <button class="fail-close-btn" id="multipick-close" aria-label="Cancel">×</button>
+          <button class="fail-close-btn" id="multipick-close" data-action="multipick-close" aria-label="Cancel">×</button>
         </div>
         <p class="multipick-sheet-hint">Each adds its items as a PASS, in order, using the current location.</p>
         ${body}
@@ -733,9 +733,9 @@ function renderEntry() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="sessions-btn" aria-label="Sessions">📁</button>
+        <button class="icon-btn" id="sessions-btn" data-action="go-sessions" aria-label="Sessions">📁</button>
         <div class="site-name">${escapeHTML(sess.site || sess.name)}</div>
-        <button class="icon-btn" id="overview-btn" aria-label="Overview">▦</button>
+        <button class="icon-btn" id="overview-btn" data-action="go-overview" aria-label="Overview">▦</button>
       </header>
 
       ${lockBanner}
@@ -760,18 +760,18 @@ function renderEntry() {
       ${notesBlock}
 
       <div class="pass-fail-row">
-        <button class="pass-btn" id="pass-btn" ${passFailDisabled}><span class="icon">✓</span>PASS</button>
-        <button class="fail-btn" id="fail-btn" ${passFailDisabled}><span class="icon">✗</span>FAIL</button>
+        <button class="pass-btn" id="pass-btn" data-action="log-pass" ${passFailDisabled}><span class="icon">✓</span>PASS</button>
+        <button class="fail-btn" id="fail-btn" data-action="log-fail" ${passFailDisabled}><span class="icon">✗</span>FAIL</button>
       </div>
 
-      <button class="copy-last-btn" id="copy-last-btn" ${copyDisabled}>
+      <button class="copy-last-btn" id="copy-last-btn" data-action="copy-last" ${copyDisabled}>
         ⎘ Copy last result${lastInfo}
       </button>
 
       <div class="nav-row">
-        <button class="nav-btn" id="prev-btn" ${state.cursor === 0 ? 'disabled' : ''}>‹ Prev</button>
-        <button class="nav-btn" id="skip-new-btn" ${!isExisting ? 'disabled' : ''}>⏭ New</button>
-        <button class="nav-btn" id="next-btn" ${state.cursor >= sess.items.length ? 'disabled' : ''}>Next ›</button>
+        <button class="nav-btn" id="prev-btn" data-action="cursor-prev" ${state.cursor === 0 ? 'disabled' : ''}>‹ Prev</button>
+        <button class="nav-btn" id="skip-new-btn" data-action="skip-new" ${!isExisting ? 'disabled' : ''}>⏭ New</button>
+        <button class="nav-btn" id="next-btn" data-action="cursor-next" ${state.cursor >= sess.items.length ? 'disabled' : ''}>Next ›</button>
       </div>
 
       ${multiPickButton}
@@ -822,8 +822,8 @@ function renderOverviewBodyHTML(sess) {
             : '';
           const actionCol = sel
             ? `<td class="td td-action"></td>`
-            : `<td class="td td-action" data-del-item="${i}">🗑</td>`;
-          const rowAttr = sel ? `data-row-toggle="${i}"` : `data-jump="${i}"`;
+            : `<td class="td td-action" data-action="delete-item" data-arg="${i}" data-del-item="${i}">🗑</td>`;
+          const rowAttr = sel ? `data-action="row-toggle" data-arg="${i}" data-row-toggle="${i}"` : `data-action="jump-to-item" data-arg="${i}" data-jump="${i}"`;
           const rowClass = sel && checked ? 'tr selected' : 'tr';
           // v17: when timestamps are on, show HH:MM subtly beneath the item
           // type. Items logged before the feature have no ts → no line, so the
@@ -869,7 +869,7 @@ function renderOverview() {
     const n = state.selectedIndices.length;
     header = `
       <header class="header-row">
-        <button class="icon-btn" id="cancel-selection-btn" aria-label="Cancel selection">✕</button>
+        <button class="icon-btn" id="cancel-selection-btn" data-action="cancel-selection" aria-label="Cancel selection">✕</button>
         <div class="site-name">${n} selected</div>
         <span style="width:40px"></span>
       </header>
@@ -878,12 +878,12 @@ function renderOverview() {
     const showSelectBtn = sess.items.length > 0;
     header = `
       <header class="header-row">
-        <button class="icon-btn" id="back-btn" aria-label="Back">‹</button>
+        <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">‹</button>
         <div class="site-name">Overview</div>
         <div class="header-actions">
-          ${showSelectBtn ? `<button class="icon-btn" id="select-mode-btn" aria-label="Select items" title="Select items">☑</button>` : ''}
-          <button class="icon-btn" id="edit-session-btn" aria-label="Edit session">✎</button>
-          <button class="icon-btn" id="export-btn" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
+          ${showSelectBtn ? `<button class="icon-btn" id="select-mode-btn" data-action="enter-selection" aria-label="Select items" title="Select items">☑</button>` : ''}
+          <button class="icon-btn" id="edit-session-btn" data-action="edit-session" aria-label="Edit session">✎</button>
+          <button class="icon-btn" id="export-btn" data-action="export-current" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
         </div>
       </header>
     `;
@@ -891,8 +891,8 @@ function renderOverview() {
 
   const selectAllRow = state.selectionMode ? `
     <div class="select-all-row">
-      <button id="select-all-visible-btn">Select all visible</button>
-      <button id="clear-selection-btn">Clear</button>
+      <button id="select-all-visible-btn" data-action="select-all-visible">Select all visible</button>
+      <button id="clear-selection-btn" data-action="clear-selection">Clear</button>
     </div>
   ` : '';
 
@@ -904,7 +904,7 @@ function renderOverview() {
   const selectionBar = state.selectionMode ? `
     <div class="selection-bar">
       <span class="selection-bar-count">${state.selectedIndices.length} selected</span>
-      <button class="selection-bar-action" id="bulk-edit-menu-btn" ${state.selectedIndices.length === 0 ? 'disabled' : ''}>Edit selected ▾</button>
+      <button class="selection-bar-action" id="bulk-edit-menu-btn" data-action="bulk-menu-open" ${state.selectedIndices.length === 0 ? 'disabled' : ''}>Edit selected ▾</button>
     </div>
   ` : '';
 
@@ -912,19 +912,19 @@ function renderOverview() {
   // styled as a destructive action (red) and sits at the bottom to put more
   // distance between it and the safer edits above it.
   const bulkMenu = state.bulkEdit.menuOpen ? `
-    <div class="modal-backdrop" id="bulk-menu-backdrop"></div>
+    <div class="modal-backdrop" id="bulk-menu-backdrop" data-action="bulk-menu-close"></div>
     <div class="bulk-sheet" role="dialog" aria-label="Edit selected items">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
         <h3 class="bulk-sheet-title">Edit ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</h3>
-        <button class="fail-close-btn" id="bulk-menu-close" aria-label="Cancel">×</button>
+        <button class="fail-close-btn" id="bulk-menu-close" data-action="bulk-menu-close" aria-label="Cancel">×</button>
       </div>
       <div class="bulk-menu-actions">
-        <button class="bulk-menu-btn" data-bulk-edit="location">Change location</button>
-        <button class="bulk-menu-btn" data-bulk-edit="type">Change type</button>
-        <button class="bulk-menu-btn" data-bulk-edit="notes">Change notes</button>
-        <button class="bulk-menu-btn danger" data-bulk-edit="delete">Delete selected</button>
+        <button class="bulk-menu-btn" data-action="bulk-edit-mode" data-arg="location" data-bulk-edit="location">Change location</button>
+        <button class="bulk-menu-btn" data-action="bulk-edit-mode" data-arg="type" data-bulk-edit="type">Change type</button>
+        <button class="bulk-menu-btn" data-action="bulk-edit-mode" data-arg="notes" data-bulk-edit="notes">Change notes</button>
+        <button class="bulk-menu-btn danger" data-action="bulk-edit-mode" data-arg="delete" data-bulk-edit="delete">Delete selected</button>
       </div>
     </div>
   ` : '';
@@ -932,16 +932,16 @@ function renderOverview() {
   // v10/v11: location dialog — reuses the v10 path. Opened via the bulk-edit
   // menu (mode === 'location' OR legacy bulkLocationDialogOpen).
   const bulkDialog = state.bulkLocationDialogOpen ? `
-    <div class="modal-backdrop" id="bulk-backdrop"></div>
+    <div class="modal-backdrop" id="bulk-backdrop" data-action="bulk-cancel"></div>
     <div class="bulk-sheet" role="dialog" aria-label="Change location">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
         <h3 class="bulk-sheet-title">Change location for ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</h3>
-        <button class="fail-close-btn" id="bulk-cancel-btn" aria-label="Cancel">×</button>
+        <button class="fail-close-btn" id="bulk-cancel-btn" data-action="bulk-cancel" aria-label="Cancel">×</button>
       </div>
       <input class="input-big" id="bulk-location-input" value="${escapeHTML(state.bulkLocationValue)}" placeholder="New location" autofocus style="margin-bottom:14px">
-      <button class="btn-primary" id="bulk-apply-btn">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
+      <button class="btn-primary" id="bulk-apply-btn" data-action="bulk-location-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
     </div>
   ` : '';
 
@@ -949,20 +949,20 @@ function renderOverview() {
   // free-text input — same pattern as the entry screen but laid out for a
   // bottom sheet. Tapping a quick-pick fills the input.
   const typeQuickButtons = (state.itemTypes || []).map(t =>
-    `<button class="quick-btn" data-bulk-type-quick="${escapeHTML(t)}">${escapeHTML(t)}</button>`
+    `<button class="quick-btn" data-action="bulk-type-quick" data-arg="${escapeHTML(t)}" data-bulk-type-quick="${escapeHTML(t)}">${escapeHTML(t)}</button>`
   ).join('');
   const bulkTypeDialog = state.bulkEdit.mode === 'type' ? `
-    <div class="modal-backdrop" id="bulk-type-backdrop"></div>
+    <div class="modal-backdrop" id="bulk-type-backdrop" data-action="bulk-cancel"></div>
     <div class="bulk-sheet" role="dialog" aria-label="Change item type">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
         <h3 class="bulk-sheet-title">Change type for ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</h3>
-        <button class="fail-close-btn" id="bulk-type-cancel" aria-label="Cancel">×</button>
+        <button class="fail-close-btn" id="bulk-type-cancel" data-action="bulk-cancel" aria-label="Cancel">×</button>
       </div>
       <div class="quick-grid" style="margin-bottom:10px">${typeQuickButtons}</div>
       <input class="input-big" id="bulk-type-input" value="${escapeHTML(state.bulkEdit.typeValue)}" placeholder="…or type custom" autocomplete="off" style="margin-bottom:14px">
-      <button class="btn-primary" id="bulk-type-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
+      <button class="btn-primary" id="bulk-type-apply" data-action="bulk-type-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
     </div>
   ` : '';
 
@@ -970,13 +970,13 @@ function renderOverview() {
   // selected items' notes; Append concatenates the new text after a "; "
   // separator. Empty text is allowed only in Replace mode (clears notes).
   const bulkNotesDialog = state.bulkEdit.mode === 'notes' ? `
-    <div class="modal-backdrop" id="bulk-notes-backdrop"></div>
+    <div class="modal-backdrop" id="bulk-notes-backdrop" data-action="bulk-cancel"></div>
     <div class="bulk-sheet" role="dialog" aria-label="Change notes">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
         <h3 class="bulk-sheet-title">Change notes for ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</h3>
-        <button class="fail-close-btn" id="bulk-notes-cancel" aria-label="Cancel">×</button>
+        <button class="fail-close-btn" id="bulk-notes-cancel" data-action="bulk-cancel" aria-label="Cancel">×</button>
       </div>
       <div class="bulk-notes-mode">
         <label class="bulk-notes-mode-opt">
@@ -989,7 +989,7 @@ function renderOverview() {
         </label>
       </div>
       <textarea class="input" id="bulk-notes-input" rows="3" placeholder="${state.bulkEdit.notesMode === 'append' ? 'Text to append' : 'New notes (leave empty to clear)'}" style="margin-bottom:14px">${escapeHTML(state.bulkEdit.notesValue)}</textarea>
-      <button class="btn-primary" id="bulk-notes-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
+      <button class="btn-primary" id="bulk-notes-apply" data-action="bulk-notes-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
     </div>
   ` : '';
 
@@ -1049,24 +1049,15 @@ function refreshOverviewSelection() {
 }
 
 function bindOverviewBodyEvents() {
-  document.querySelectorAll('[data-jump]').forEach(el => {
-    el.onclick = () => jumpTo(parseInt(el.dataset.jump, 10));
-  });
-  document.querySelectorAll('[data-del-item]').forEach(el => {
-    el.onclick = (e) => { e.stopPropagation(); if (confirm('Are you sure you want to delete this item?\n\nThis cannot be undone.')) deleteItem(parseInt(el.dataset.delItem, 10)); };
-  });
-  document.querySelectorAll('[data-row-toggle]').forEach(el => {
-    el.onclick = (e) => {
-      // Avoid double-toggling when the checkbox itself is clicked
-      if (e.target && e.target.tagName === 'INPUT') return;
-      toggleSelected(parseInt(el.dataset.rowToggle, 10));
-      refreshOverviewSelection();   // v24 (E7): was render()
-    };
-  });
+  // v25 (E3): row open (jump-to-item), per-row delete (delete-item) and
+  // row-toggle are delegated via data-action in dispatch.js — no rebinding
+  // needed when the body is rebuilt. The checkbox's onCHANGE (the actual
+  // selection toggle) is a change event, out of v25 scope, so it stays here and
+  // is rebound on every body refresh.
   document.querySelectorAll('[data-select]').forEach(el => {
     el.onchange = () => {
       toggleSelected(parseInt(el.dataset.select, 10));
-      refreshOverviewSelection();   // v24 (E7): was render()
+      refreshOverviewSelection();   // v24 (E7)
     };
   });
 }
@@ -1092,44 +1083,11 @@ function bindSessionsListAreaEvents() {
     save();
     refreshSessionsListAreaOnly();
   };
-  // v15: reset both filters from the filtered-empty state.
-  if ($('clear-filters-btn')) $('clear-filters-btn').onclick = () => {
-    state.sessionFilter = 'all';
-    state.lockFilter = 'all';
-    save();
-    refreshSessionsListAreaOnly();
-  };
-  // v15: tappable nudge → bulk-export all not-yet-cleanly-exported sessions.
-  if ($('bulk-export-btn')) $('bulk-export-btn').onclick = () => bulkExportUnexported();
-  document.querySelectorAll('[data-open]').forEach(el => {
-    el.onclick = () => {
-      const id = el.dataset.open;
-      // v10: if the card was rendered with data-open-at (search-mode item-level
-      // match), jump straight to that item rather than the default "new entry"
-      // position at end-of-list.
-      if (el.dataset.openAt !== undefined && el.dataset.openAt !== '') {
-        const idx = parseInt(el.dataset.openAt, 10);
-        requestOpenSession(id, { cursor: idx });   // v14: warning gatekeeper
-      } else {
-        requestOpenSession(id);                     // v14: warning gatekeeper
-      }
-    };
-  });
-  document.querySelectorAll('[data-export]').forEach(el => {
-    el.onclick = (e) => {
-      e.stopPropagation();
-      const s = state.sessions.find(x => x.id === el.dataset.export);
-      // v10: native share sheet first (iOS/Android), falls back to download.
-      if (s) shareOrDownloadCSV(s);
-    };
-  });
-  document.querySelectorAll('[data-delete-session]').forEach(el => {
-    el.onclick = (e) => {
-      e.stopPropagation();
-      const s = state.sessions.find(x => x.id === el.dataset.deleteSession);
-      if (s && confirm(`Delete "${s.site || s.name}"? This cannot be undone.`)) deleteSession(el.dataset.deleteSession);
-    };
-  });
+  // v25 (E3): the click controls in this area — #clear-filters-btn
+  // (clear-session-filters), #bulk-export-btn (bulk-export-unexported), and the
+  // per-card [data-open]/[data-export]/[data-delete-session] rows — are now
+  // delegated via data-action in dispatch.js. Only the sort/status/lock <select>
+  // onchange handlers (change events, out of v25 scope) remain here.
 }
 
 function renderEditSession() {
@@ -1137,7 +1095,7 @@ function renderEditSession() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="cancel-edit-btn" aria-label="Cancel">‹</button>
+        <button class="icon-btn" id="cancel-edit-btn" data-action="edit-cancel" aria-label="Cancel">‹</button>
         <div class="site-name">Edit session</div>
         <span style="width:40px"></span>
       </header>
@@ -1169,8 +1127,8 @@ function renderEditSession() {
         </div>
 
         <div class="btn-row">
-          <button class="btn-secondary" id="ef-cancel">Cancel</button>
-          <button class="btn-primary" id="ef-save">Save</button>
+          <button class="btn-secondary" id="ef-cancel" data-action="edit-cancel">Cancel</button>
+          <button class="btn-primary" id="ef-save" data-action="edit-save">Save</button>
         </div>
       </div>
     </div>

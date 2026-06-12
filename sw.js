@@ -146,7 +146,7 @@
 // fifteen scripts in load order and NO LONGER includes app.js. Cache bumped to
 // pat-v22 — a stale cache would 404 the new files (or serve the now-removed
 // app.js) and blank the app. The boot.js crash fallback guards the failure mode.
-const CACHE_VERSION = 'pat-v24';
+const CACHE_VERSION = 'pat-v25';
 const ASSETS = [
   './',
   './index.html',
@@ -165,6 +165,7 @@ const ASSETS = [
   './render-core.js',
   './render-settings.js',
   './events.js',
+  './dispatch.js',
   './boot.js',
   './manifest.webmanifest',
   './icon-192.png',

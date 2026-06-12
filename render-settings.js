@@ -93,7 +93,7 @@ function renderSettingsHub() {
       </header>
       <div class="settings-list">
         ${rows.map(r => `
-          <button class="settings-row" data-page="${r.id}">
+          <button class="settings-row" data-action="settings-page" data-arg="${r.id}" data-page="${r.id}">
             <span class="settings-row-icon">${r.icon}</span>
             <div class="settings-row-text">
               <div class="settings-row-title">${escapeHTML(r.title)}</div>
@@ -111,7 +111,7 @@ function renderSettingsHub() {
 function renderSettingsSubHeader(title) {
   return `
     <header class="header-row">
-      <button class="icon-btn" id="back-to-settings-btn" aria-label="Back">‹</button>
+      <button class="icon-btn" id="back-to-settings-btn" data-action="back-to-settings" aria-label="Back">‹</button>
       <div class="site-name">${escapeHTML(title)}</div>
       <span style="width:40px"></span>
     </header>
@@ -174,7 +174,7 @@ function renderSettingsUser() {
         <input class="input" id="settings-cal-due" type="date" value="${escapeHTML(state.calDue)}">
       </div>
 
-      <button class="btn-primary" id="settings-user-save" style="margin-top:24px">Save</button>
+      <button class="btn-primary" id="settings-user-save" data-action="settings-user-save" style="margin-top:24px">Save</button>
     </div>
   `;
 }
@@ -201,17 +201,17 @@ function renderSettingsItems() {
   // picker. One input, two buttons.
   const dialog = state.presetDialog;
   const dialogModal = (dialog.mode === 'new' || dialog.mode === 'rename') ? `
-    <div class="modal-backdrop" id="preset-backdrop"></div>
+    <div class="modal-backdrop" id="preset-backdrop" data-action="preset-dialog-cancel"></div>
     <div class="bulk-sheet" role="dialog" aria-label="${dialog.mode === 'new' ? 'New preset' : 'Rename preset'}">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
         <h3 class="bulk-sheet-title">${dialog.mode === 'new' ? 'New preset' : 'Rename preset'}</h3>
-        <button class="fail-close-btn" id="preset-dialog-cancel" aria-label="Cancel">×</button>
+        <button class="fail-close-btn" id="preset-dialog-cancel" data-action="preset-dialog-cancel" aria-label="Cancel">×</button>
       </div>
       <label class="label">Name</label>
       <input class="input" id="preset-dialog-input" value="${escapeHTML(dialog.name)}" placeholder="e.g. Workshop, Office, Site visit" autofocus>
-      <button class="btn-primary" id="preset-dialog-confirm" style="margin-top:14px">${dialog.mode === 'new' ? 'Create' : 'Save'}</button>
+      <button class="btn-primary" id="preset-dialog-confirm" data-action="preset-dialog-confirm" style="margin-top:14px">${dialog.mode === 'new' ? 'Create' : 'Save'}</button>
     </div>
   ` : '';
 
@@ -227,9 +227,9 @@ function renderSettingsItems() {
         <p class="muted">${escapeHTML(presetSummary)}. The selected preset is what shows on the entry screen.</p>
         <select class="input" id="settings-preset-select">${presetOptions}</select>
         <div class="preset-actions-row">
-          <button class="preset-action-btn" id="preset-new-btn">＋ New</button>
-          <button class="preset-action-btn" id="preset-rename-btn">✎ Rename</button>
-          <button class="preset-action-btn preset-action-danger" id="preset-delete-btn"${canDelete ? '' : ' disabled'}>🗑 Delete</button>
+          <button class="preset-action-btn" id="preset-new-btn" data-action="preset-new">＋ New</button>
+          <button class="preset-action-btn" id="preset-rename-btn" data-action="preset-rename">✎ Rename</button>
+          <button class="preset-action-btn preset-action-danger" id="preset-delete-btn" data-action="preset-delete"${canDelete ? '' : ' disabled'}>🗑 Delete</button>
         </div>
       </div>
 
@@ -259,14 +259,14 @@ function renderSettingsItems() {
         </div>
         <p class="muted" style="margin-top:12px;font-size:12px">${sqpHistoryNote}</p>
         <div class="preset-actions-row" style="margin-top:8px">
-          <button class="preset-action-btn" id="sqp-rebuild-btn">↻ Rebuild from my data</button>
-          <button class="preset-action-btn preset-action-danger" id="sqp-clear-btn">🗑 Clear history</button>
+          <button class="preset-action-btn" id="sqp-rebuild-btn" data-action="sqp-rebuild">↻ Rebuild from my data</button>
+          <button class="preset-action-btn preset-action-danger" id="sqp-clear-btn" data-action="sqp-clear">🗑 Clear history</button>
         </div>
       </div>
 
       <div class="btn-row" style="margin-top:24px">
-        <button class="btn-secondary" id="settings-items-reset">↺ Reset to defaults</button>
-        <button class="btn-primary" id="settings-items-save">Save</button>
+        <button class="btn-secondary" id="settings-items-reset" data-action="settings-items-reset">↺ Reset to defaults</button>
+        <button class="btn-primary" id="settings-items-save" data-action="settings-items-save">Save</button>
       </div>
 
       ${dialogModal}
@@ -284,8 +284,8 @@ function renderSettingsFails() {
         <textarea class="textarea" id="settings-reasons" style="min-height:200px">${escapeHTML(state.failReasons.join('\n'))}</textarea>
       </div>
       <div class="btn-row" style="margin-top:24px">
-        <button class="btn-secondary" id="settings-fails-reset">↺ Reset to defaults</button>
-        <button class="btn-primary" id="settings-fails-save">Save</button>
+        <button class="btn-secondary" id="settings-fails-reset" data-action="settings-fails-reset">↺ Reset to defaults</button>
+        <button class="btn-primary" id="settings-fails-save" data-action="settings-fails-save">Save</button>
       </div>
     </div>
   `;
@@ -337,7 +337,7 @@ function renderSettingsMultiPick() {
         ${slotRows.join('')}
       </div>
 
-      <button class="btn-primary" id="settings-multipick-save" style="margin-top:24px">Save</button>
+      <button class="btn-primary" id="settings-multipick-save" data-action="settings-multipick-save" style="margin-top:24px">Save</button>
     </div>
   `;
 }
@@ -352,8 +352,8 @@ function renderSettingsDescriptions() {
         <textarea class="textarea" id="settings-descriptions" style="min-height:280px">${escapeHTML(state.descriptions.join('\n'))}</textarea>
       </div>
       <div class="btn-row" style="margin-top:24px">
-        <button class="btn-secondary" id="settings-descriptions-reset">↺ Reset to defaults</button>
-        <button class="btn-primary" id="settings-descriptions-save">Save</button>
+        <button class="btn-secondary" id="settings-descriptions-reset" data-action="settings-descriptions-reset">↺ Reset to defaults</button>
+        <button class="btn-primary" id="settings-descriptions-save" data-action="settings-descriptions-save">Save</button>
       </div>
     </div>
   `;
@@ -373,7 +373,7 @@ function renderSettingsDisplay() {
         <p class="muted">Choose how the app looks.</p>
         <div class="theme-options">
           ${themes.map(t => `
-            <button class="theme-option" data-set-theme="${t.key}">
+            <button class="theme-option" data-action="set-theme" data-arg="${t.key}" data-set-theme="${t.key}">
               <span class="theme-option-radio ${state.theme === t.key ? 'checked' : ''}"></span>
               <span class="theme-option-label">${escapeHTML(t.label)}</span>
               ${t.sub ? `<span class="theme-option-sub">${escapeHTML(t.sub)}</span>` : ''}
@@ -440,7 +440,7 @@ function renderSettingsBackup() {
   const pruneBlock = prunable.length > 0 ? `
           <div class="prune-suggestion">
             <p class="prune-suggestion-text">${prunable.length} exported session${prunable.length === 1 ? '' : 's'} older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} can be cleared to free space.</p>
-            <button class="backup-action-btn" id="prune-review-btn">Review &amp; clear…</button>
+            <button class="backup-action-btn" id="prune-review-btn" data-action="prune-review">Review &amp; clear…</button>
           </div>
   ` : `<p class="muted" style="margin-top:10px;font-size:12px">No exported sessions older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} to clear right now.</p>`;
   return `
@@ -449,14 +449,14 @@ function renderSettingsBackup() {
       <div class="settings-section">
         <h2 class="h2">Backup</h2>
         <p class="muted">Save a complete copy of all sessions and settings as a single JSON file. Keep it somewhere safe — it's the only safety net if the browser ever clears its data.</p>
-        <button class="backup-action-btn primary" id="backup-export-btn">⬇ Export backup (.json)</button>
+        <button class="backup-action-btn primary" id="backup-export-btn" data-action="backup-export">⬇ Export backup (.json)</button>
       </div>
 
       <div class="settings-section">
         <h2 class="h2">Restore</h2>
         <p class="muted">Import a previously exported backup file. <strong>This will replace all current data on this device.</strong> You'll be asked to confirm before anything is overwritten.</p>
         <input type="file" id="backup-import-file" accept="application/json,.json" style="display:none">
-        <button class="backup-action-btn danger" id="backup-import-btn">⬆ Import backup (.json)</button>
+        <button class="backup-action-btn danger" id="backup-import-btn" data-action="backup-import">⬆ Import backup (.json)</button>
       </div>
 
       <div class="settings-section">
@@ -478,7 +478,7 @@ function renderSettingsBackup() {
         <label class="label">Age in months</label>
         <input class="input" id="prune-age-input" type="number" inputmode="numeric" min="1" max="120" value="${ageMonths}">
         <div class="btn-row">
-          <button class="btn-primary" id="prune-age-save">Save</button>
+          <button class="btn-primary" id="prune-age-save" data-action="prune-age-save">Save</button>
         </div>
       </div>
     </div>
@@ -512,8 +512,8 @@ function renderSettingsCsv() {
       <div class="csv-col-row" data-col-id="${escapeHTML(c.id)}">
         <div class="csv-col-row-top">
           <div class="csv-col-arrows">
-            <button class="csv-col-arrow" data-csv-up="${escapeHTML(c.id)}" ${isFirst ? 'disabled' : ''} aria-label="Move up">▲</button>
-            <button class="csv-col-arrow" data-csv-down="${escapeHTML(c.id)}" ${isLast ? 'disabled' : ''} aria-label="Move down">▼</button>
+            <button class="csv-col-arrow" data-action="csv-up" data-arg="${escapeHTML(c.id)}" data-csv-up="${escapeHTML(c.id)}" ${isFirst ? 'disabled' : ''} aria-label="Move up">▲</button>
+            <button class="csv-col-arrow" data-action="csv-down" data-arg="${escapeHTML(c.id)}" data-csv-down="${escapeHTML(c.id)}" ${isLast ? 'disabled' : ''} aria-label="Move down">▼</button>
           </div>
           <label class="csv-col-vis-label">
             <input type="checkbox" class="csv-col-visible" ${c.visible ? 'checked' : ''}>
@@ -535,8 +535,8 @@ function renderSettingsCsv() {
         <div class="csv-cols-list">${rowsHtml}</div>
       </div>
 
-      <button class="btn-primary" id="settings-csv-save" style="margin-top:8px">Save</button>
-      <button class="btn-secondary" id="settings-csv-reset" style="margin-top:8px;width:100%">Reset to defaults</button>
+      <button class="btn-primary" id="settings-csv-save" data-action="settings-csv-save" style="margin-top:8px">Save</button>
+      <button class="btn-secondary" id="settings-csv-reset" data-action="settings-csv-reset" style="margin-top:8px;width:100%">Reset to defaults</button>
     </div>
   `;
 }
@@ -568,18 +568,18 @@ function renderSettingsClients() {
           <div class="client-site-row">
             <span class="client-site-name">${escapeHTML(s.name)}</span>
             <div class="client-site-actions">
-              <button class="link-btn" data-site-rename="${escapeHTML(s.id)}">Rename</button>
-              <button class="link-btn danger" data-site-delete="${escapeHTML(s.id)}">Delete</button>
+              <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Rename</button>
+              <button class="link-btn danger" data-action="site-delete" data-arg="${escapeHTML(s.id)}" data-site-delete="${escapeHTML(s.id)}">Delete</button>
             </div>
           </div>
         `).join('') : `<p class="muted" style="margin:4px 0 8px">No sites for this client yet.</p>`}
-        <button class="btn-secondary client-add-site-btn" data-site-add="${escapeHTML(c.id)}">+ Add site</button>
+        <button class="btn-secondary client-add-site-btn" data-action="site-add" data-arg="${escapeHTML(c.id)}" data-site-add="${escapeHTML(c.id)}">+ Add site</button>
       </div>
     ` : '';
 
     return `
       <div class="client-card${expanded ? ' expanded' : ''}">
-        <button class="client-head" data-client-toggle="${escapeHTML(c.id)}">
+        <button class="client-head" data-action="client-toggle" data-arg="${escapeHTML(c.id)}" data-client-toggle="${escapeHTML(c.id)}">
           <span class="client-head-text">
             <span class="client-head-name">${escapeHTML(c.name)}</span>
             <span class="client-head-sub">${escapeHTML(sub)}</span>
@@ -587,8 +587,8 @@ function renderSettingsClients() {
           <span class="client-head-chevron">${expanded ? '⌄' : '›'}</span>
         </button>
         <div class="client-head-actions">
-          <button class="link-btn" data-client-rename="${escapeHTML(c.id)}">Rename</button>
-          <button class="link-btn danger" data-client-delete="${escapeHTML(c.id)}">Delete</button>
+          <button class="link-btn" data-action="client-rename" data-arg="${escapeHTML(c.id)}" data-client-rename="${escapeHTML(c.id)}">Rename</button>
+          <button class="link-btn danger" data-action="client-delete" data-arg="${escapeHTML(c.id)}" data-client-delete="${escapeHTML(c.id)}">Delete</button>
         </div>
         ${sitesBlock}
       </div>
@@ -602,17 +602,17 @@ function renderSettingsClients() {
   if (cd.mode) {
     const title = cd.mode === 'add' ? 'Add client' : 'Rename client';
     dialog = `
-      <div class="modal-backdrop" id="client-dialog-backdrop" style="z-index:300"></div>
+      <div class="modal-backdrop" id="client-dialog-backdrop" data-action="client-dialog-cancel" style="z-index:300"></div>
       <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="${title}">
         <div class="bulk-sheet-handle"></div>
         <div class="bulk-sheet-header">
           <span class="fail-close-spacer"></span>
           <h3 class="bulk-sheet-title">${title}</h3>
-          <button class="fail-close-btn" id="client-dialog-cancel" aria-label="Cancel">×</button>
+          <button class="fail-close-btn" id="client-dialog-cancel" data-action="client-dialog-cancel" aria-label="Cancel">×</button>
         </div>
         <label class="label">Client name</label>
         <input class="input" id="client-dialog-input" value="${escapeHTML(cd.name)}" placeholder="e.g. Acme Ltd" autofocus>
-        <button class="btn-primary" id="client-dialog-confirm" style="margin-top:14px">${cd.mode === 'add' ? 'Add' : 'Save'}</button>
+        <button class="btn-primary" id="client-dialog-confirm" data-action="client-dialog-confirm" style="margin-top:14px">${cd.mode === 'add' ? 'Add' : 'Save'}</button>
       </div>
     `;
   } else if (sd.mode) {
@@ -620,18 +620,18 @@ function renderSettingsClients() {
     const parent = sd.mode === 'add' ? clientById(sd.clientId) : (siteById(sd.editingId) ? clientById(siteById(sd.editingId).clientId) : null);
     const parentLine = parent ? `<p class="muted" style="margin:0 0 12px">Client: ${escapeHTML(parent.name)}</p>` : '';
     dialog = `
-      <div class="modal-backdrop" id="site-dialog-backdrop" style="z-index:300"></div>
+      <div class="modal-backdrop" id="site-dialog-backdrop" data-action="site-dialog-cancel" style="z-index:300"></div>
       <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="${title}">
         <div class="bulk-sheet-handle"></div>
         <div class="bulk-sheet-header">
           <span class="fail-close-spacer"></span>
           <h3 class="bulk-sheet-title">${title}</h3>
-          <button class="fail-close-btn" id="site-dialog-cancel" aria-label="Cancel">×</button>
+          <button class="fail-close-btn" id="site-dialog-cancel" data-action="site-dialog-cancel" aria-label="Cancel">×</button>
         </div>
         ${parentLine}
         <label class="label">Site name</label>
         <input class="input" id="site-dialog-input" value="${escapeHTML(sd.name)}" placeholder="e.g. Unit 4, Head Office" autofocus>
-        <button class="btn-primary" id="site-dialog-confirm" style="margin-top:14px">${sd.mode === 'add' ? 'Add' : 'Save'}</button>
+        <button class="btn-primary" id="site-dialog-confirm" data-action="site-dialog-confirm" style="margin-top:14px">${sd.mode === 'add' ? 'Add' : 'Save'}</button>
       </div>
     `;
   }
@@ -641,7 +641,7 @@ function renderSettingsClients() {
   // or removes existing ones), so safe to offer alongside the manual list.
   const rebuildBlock = state.sessions.length ? `
     <div class="settings-section">
-      <button class="preset-action-btn" id="clients-rebuild-btn">↻ Rebuild from my sessions</button>
+      <button class="preset-action-btn" id="clients-rebuild-btn" data-action="clients-rebuild">↻ Rebuild from my sessions</button>
       <p class="muted" style="margin:8px 0 0;font-size:12px">Scans every saved session and adds any client or site that isn't already listed. Useful after importing sessions. It only adds — it never changes or removes what's here.</p>
     </div>
   ` : '';
@@ -651,7 +651,7 @@ function renderSettingsClients() {
       ${renderSettingsSubHeader('Clients')}
       <div class="settings-section">
         <p class="muted" style="margin-top:0">Your clients and the sites you test at. These appear as quick picks on the New Session screen. Editing or deleting here never changes sessions you've already saved.</p>
-        <button class="btn-primary" id="client-add-btn" style="margin-top:4px">+ Add client</button>
+        <button class="btn-primary" id="client-add-btn" data-action="client-add" style="margin-top:4px">+ Add client</button>
       </div>
       ${emptyState}
       <div class="clients-list">${listHtml}</div>
@@ -735,21 +735,21 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h3>If the app stops responding</h3>
         <p class="muted">If taps stop registering anywhere in the app, tap Reload below. Your sessions and settings are not affected — only the app itself reloads.</p>
-        <button class="backup-action-btn" id="about-reload-btn" style="margin-top:8px">⟳ Reload app</button>
+        <button class="backup-action-btn" id="about-reload-btn" data-action="about-reload" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
       <!-- v8: rolling 3-version changelog. v24: rolled forward — V24 on top, V21 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V25</strong> · June 2026</p>
+        <p class="muted">Another under-the-hood update with no changes to how the app looks or works. The way the app responds to taps has been rebuilt on a single, more efficient system — buttons can no longer lose their responsiveness when the screen redraws, and future updates are quicker and safer to build. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
+
         <p><strong>V24</strong> · June 2026</p>
         <p class="muted">Another speed update with no changes to how the app looks or works. Redrawing the screen now does less unnecessary work — selecting items in a session's overview, in particular, updates more efficiently. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
 
         <p><strong>V23</strong> · June 2026</p>
         <p class="muted">A speed update, with no changes to how the app looks or works. Saving each test result now does less work behind the scenes — instead of re-processing your whole history on every tap, it only handles the session you're working in. The benefit grows with the size of your data: on a long job, or a busy device, logging stays quick from the first item to the last. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
-
-        <p><strong>V22</strong> · June 2026</p>
-        <p class="muted">Another under-the-hood update, with no changes to how the app looks or works. This completes the code reorganisation started in V21 — the last big code file has now been split into smaller, single-purpose files, so future updates are faster and safer to build. Everything you do — sessions, logging, exports, settings — behaves exactly as before, and all your data is untouched.</p>
       </div>
 
       <div class="info-card">

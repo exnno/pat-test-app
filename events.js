@@ -13,36 +13,15 @@
 function bindEvents() {
   const $ = id => document.getElementById(id);
 
-  // Update banner — present on every view if updateAvailable
-  if ($('update-refresh')) $('update-refresh').onclick = () => applyUpdate();
-  if ($('update-dismiss')) $('update-dismiss').onclick = () => dismissUpdateBanner();
+  // Update banner — present on every view if updateAvailable.
+  // v25 (E3): #update-refresh (update-refresh) and #update-dismiss
+  // (update-dismiss) are delegated via data-action in dispatch.js.
 
   // Sessions screen
-  if ($('settings-btn')) $('settings-btn').onclick = () => setView('settings');
-  if ($('new-session-btn')) $('new-session-btn').onclick = () => {
-    state.newForm.show = true;
-    if (!state.newForm.engineer && state.engineer) state.newForm.engineer = state.engineer;
-    state.nfSuggestions = []; state.showNfSuggestions = false; state.nfActiveField = null;
-    render();
-  };
-  if ($('nf-cancel')) $('nf-cancel').onclick = () => {
-    // v19: clear the form on cancel so a half-filled client/site (or any other
-    // field) doesn't carry into the next New Session. Engineer is re-seeded from
-    // the saved default when the form is next opened.
-    state.newForm = { name: '', site: '', engineer: state.engineer, prefix: '', startNo: '1', show: false, clientId: '', siteId: '' };
-    state.nfSuggestions = []; state.showNfSuggestions = false; state.nfActiveField = null;
-    render();
-  };
-  if ($('nf-submit')) $('nf-submit').onclick = () => {
-    // v19: nf-client carries the typed CLIENT name; nf-site the SITE name.
-    state.newForm.clientId = $('nf-client') ? $('nf-client').value : '';
-    state.newForm.site = $('nf-site') ? $('nf-site').value : '';
-    state.newForm.engineer = $('nf-engineer').value;
-    state.newForm.name = $('nf-name').value;
-    state.newForm.prefix = $('nf-prefix').value;
-    state.newForm.startNo = $('nf-start').value;
-    createSession();
-  };
+  // v25 (E3): #settings-btn (open-settings), #new-session-btn (new-session) and
+  // #import-session-btn (import-session) are now delegated via data-action in
+  // dispatch.js. #nf-cancel (nf-cancel) and #nf-submit (nf-submit) are delegated
+  // too. The new-session FORM's stateful field handlers stay below.
   // v20: Client field — tappable suggestions (replaces the v19 <datalist>).
   // Focus shows the full saved-client list; typing filters it live; tapping a
   // suggestion fills the field. On every change we also refresh the Site list
@@ -118,10 +97,8 @@ function bindEvents() {
 
   // v10: Import button — opens the (hidden) file picker, then handleImportFile
   // takes over once a file is chosen.
-  if ($('import-session-btn')) $('import-session-btn').onclick = () => {
-    const inp = $('import-session-file');
-    if (inp) inp.click();
-  };
+  // v25 (E3): #import-session-btn click is delegated (import-session). The file
+  // input's onchange is a change event — stays here.
   if ($('import-session-file')) $('import-session-file').onchange = e => {
     const file = e.target.files && e.target.files[0];
     handleImportFile(file);
@@ -129,33 +106,17 @@ function bindEvents() {
     e.target.value = '';
   };
 
-  // v10: Import conflict dialog — three actions stacked vertically.
-  if ($('import-conflict-cancel')) $('import-conflict-cancel').onclick = () => cancelImportConflict();
-  if ($('import-conflict-cancel2')) $('import-conflict-cancel2').onclick = () => cancelImportConflict();
-  if ($('import-conflict-backdrop')) $('import-conflict-backdrop').onclick = () => cancelImportConflict();
-  if ($('import-conflict-duplicate')) $('import-conflict-duplicate').onclick = () => {
-    const pending = state.importDialog.pendingSession;
-    const skipped = (state.importDialog.summary && state.importDialog.summary.skipped) || [];
-    if (pending) commitImportedSession(pending, 'duplicate', skipped);
-  };
-  if ($('import-conflict-merge')) $('import-conflict-merge').onclick = () => {
-    const pending = state.importDialog.pendingSession;
-    const skipped = (state.importDialog.summary && state.importDialog.summary.skipped) || [];
-    if (pending) commitImportedSession(pending, 'merge', skipped);
-  };
-
-  // v10: Import summary dialog — single Done button (and the × in the header).
-  if ($('import-summary-done')) $('import-summary-done').onclick = () => closeImportSummary();
-  if ($('import-summary-close')) $('import-summary-close').onclick = () => closeImportSummary();
-  if ($('import-summary-backdrop')) $('import-summary-backdrop').onclick = () => closeImportSummary();
+  // v10: Import conflict + summary dialogs are delegated (import-conflict-cancel,
+  // import-conflict-duplicate, import-conflict-merge, import-summary-done) in
+  // dispatch.js.
 
   // Sessions-list row events — extracted so refreshSessionsListAreaOnly() can
   // rebind without touching anything else.
   bindSessionsListAreaEvents();
 
   // Entry screen
-  if ($('sessions-btn')) $('sessions-btn').onclick = () => setView('sessions');
-  if ($('overview-btn')) $('overview-btn').onclick = () => setView('overview');
+  // v25 (E3): #sessions-btn (go-sessions) and #overview-btn (go-overview) are
+  // delegated. #f-asset below is a text field — stays here.
   if ($('f-asset')) $('f-asset').oninput = e => state.form.assetNo = e.target.value;
 
   if ($('f-location')) {
@@ -229,125 +190,39 @@ function bindEvents() {
     };
   }
 
-  document.querySelectorAll('.quick-btn').forEach(b => {
-    b.onclick = () => {
-      state.form.itemType = b.dataset.type;
-      const inp = document.getElementById('f-type');
-      if (inp) inp.value = b.dataset.type;
-      document.querySelectorAll('.quick-btn').forEach(x => x.classList.toggle('active', x === b));
-      state.showSuggestions = false;
-      renderSuggestionsOnly();
-    };
-  });
+  // v25 (E3): quick-pick buttons are delegated (quick-pick) in dispatch.js.
 
   if ($('f-notes')) $('f-notes').oninput = e => state.form.notes = e.target.value;
-  if ($('show-notes-btn')) $('show-notes-btn').onclick = () => { state.form.showNotes = true; render(); document.getElementById('f-notes')?.focus(); };
-
-  if ($('pass-btn')) $('pass-btn').onclick = () => passClicked();
-  if ($('fail-btn')) $('fail-btn').onclick = () => failClicked();
-  if ($('copy-last-btn')) $('copy-last-btn').onclick = () => copyLastResult();
-  if ($('prev-btn')) $('prev-btn').onclick = () => moveCursor(-1);
-  if ($('next-btn')) $('next-btn').onclick = () => moveCursor(1);
-  if ($('skip-new-btn')) $('skip-new-btn').onclick = () => skipToNew();
-  if ($('del-item-btn')) $('del-item-btn').onclick = () => { if (confirm('Are you sure you want to delete this item?\n\nThis cannot be undone.')) deleteItem(state.cursor); };
-
-  document.querySelectorAll('[data-reason]').forEach(el => {
-    el.onclick = () => pickFailReason(el.dataset.reason);
-  });
-  if ($('fail-other-btn')) $('fail-other-btn').onclick = () => {
-    state.failModalStage = 'other';
-    render();
-    document.getElementById('fail-other-input')?.focus();
-  };
-  if ($('fail-other-back')) $('fail-other-back').onclick = () => {
-    state.failModalStage = 'reasons';
-    state.failOtherText = '';
-    render();
-  };
+  // v25 (E3): #show-notes-btn (show-notes), the log/nav buttons (log-pass,
+  // log-fail, copy-last, cursor-prev, cursor-next, skip-new,
+  // delete-current-item), the fail sheet (fail-reason, fail-other,
+  // fail-other-back, fail-other-save, fail-cancel) and the Multi Pick sheet
+  // (multipick-open, multipick-fire, multipick-close) are all delegated.
+  // #fail-other-input below is a text field — stays here.
   if ($('fail-other-input')) $('fail-other-input').oninput = e => state.failOtherText = e.target.value;
-  if ($('fail-other-save')) $('fail-other-save').onclick = () => {
-    const reason = state.failOtherText.trim();
-    pickFailReason(reason || null);
-  };
-  if ($('fail-close')) $('fail-close').onclick = () => cancelFailModal();
-  if ($('fail-backdrop')) $('fail-backdrop').onclick = () => cancelFailModal();
-
-  // v16: Multi Pick — open the sheet, pick a slot, or dismiss.
-  if ($('multipick-btn')) $('multipick-btn').onclick = () => {
-    const sess = activeSession();
-    if (sess && sess.locked) return;
-    state.multiPickSheetOpen = true;
-    render();
-  };
-  document.querySelectorAll('[data-mp-index]').forEach(el => {
-    el.onclick = () => multiPickFire(parseInt(el.dataset.mpIndex, 10));
-  });
-  if ($('multipick-close')) $('multipick-close').onclick = () => {
-    state.multiPickSheetOpen = false;
-    render();
-  };
-  if ($('multipick-backdrop')) $('multipick-backdrop').onclick = () => {
-    state.multiPickSheetOpen = false;
-    render();
-  };
 
   // Overview screen
-  // Overview & Settings hub both use #back-btn — disambiguate by current view.
-  // Settings hub is only reachable from sessions; Overview is only reachable from entry.
-  if ($('back-btn')) $('back-btn').onclick = () => {
-    if (state.view === 'overview') setView('entry');
-    else if (state.view === 'settings') setView('sessions');
-  };
-  if ($('export-btn')) $('export-btn').onclick = () => { const s = activeSession(); if (s) shareOrDownloadCSV(s); };
-  if ($('edit-session-btn')) $('edit-session-btn').onclick = () => startEditSession();
-  if ($('select-mode-btn')) $('select-mode-btn').onclick = () => enterSelectionMode();
-  if ($('cancel-selection-btn')) $('cancel-selection-btn').onclick = () => { exitSelectionMode(); render(); };
-  if ($('select-all-visible-btn')) $('select-all-visible-btn').onclick = () => selectAllVisible();
-  if ($('clear-selection-btn')) $('clear-selection-btn').onclick = () => clearSelection();
+  // v25 (E3): #back-btn (overview-back), #export-btn (export-current),
+  // #edit-session-btn (edit-session), #select-mode-btn (enter-selection),
+  // #cancel-selection-btn (cancel-selection), #select-all-visible-btn
+  // (select-all-visible) and #clear-selection-btn (clear-selection) are delegated.
 
-  // v11: Bulk-edit menu — selection bar button opens the menu sheet; the menu
-  // options route to the four sub-flows (location reuses the v10 path).
-  if ($('bulk-edit-menu-btn')) $('bulk-edit-menu-btn').onclick = () => openBulkEditMenu();
-  if ($('bulk-menu-close')) $('bulk-menu-close').onclick = () => closeBulkEditMenu();
-  if ($('bulk-menu-backdrop')) $('bulk-menu-backdrop').onclick = () => closeBulkEditMenu();
-  document.querySelectorAll('[data-bulk-edit]').forEach(el => {
-    el.onclick = () => {
-      const mode = el.dataset.bulkEdit;
-      if (mode === 'delete') {
-        // Delete confirms inside applyBulkDelete() — no separate dialog.
-        state.bulkEdit.menuOpen = false;
-        applyBulkDelete();
-      } else {
-        openBulkEditDialog(mode);
-      }
-    };
-  });
+  // v11: Bulk-edit menu — selection-bar button, menu close/backdrop, and the
+  // four mode buttons are delegated (bulk-menu-open, bulk-menu-close,
+  // bulk-edit-mode) in dispatch.js.
 
-  // v10/v11: bulk Location dialog (reuses v10 IDs).
-  if ($('bulk-cancel-btn')) $('bulk-cancel-btn').onclick = () => cancelBulkEditDialog();
-  if ($('bulk-backdrop')) $('bulk-backdrop').onclick = () => cancelBulkEditDialog();
+  // v10/v11: bulk Location dialog — cancel/backdrop/apply delegated (bulk-cancel,
+  // bulk-location-apply). The text input's oninput stays here.
   if ($('bulk-location-input')) $('bulk-location-input').oninput = e => state.bulkLocationValue = e.target.value;
-  if ($('bulk-apply-btn')) $('bulk-apply-btn').onclick = () => applyBulkLocation();
 
-  // v11: bulk Type dialog. Quick-pick buttons fill the input; Apply commits.
-  if ($('bulk-type-cancel')) $('bulk-type-cancel').onclick = () => cancelBulkEditDialog();
-  if ($('bulk-type-backdrop')) $('bulk-type-backdrop').onclick = () => cancelBulkEditDialog();
+  // v11: bulk Type dialog — cancel/backdrop/apply and the quick-pick buttons are
+  // delegated (bulk-cancel, bulk-type-apply, bulk-type-quick). The text input
+  // oninput stays here.
   if ($('bulk-type-input')) $('bulk-type-input').oninput = e => state.bulkEdit.typeValue = e.target.value;
-  if ($('bulk-type-apply')) $('bulk-type-apply').onclick = () => applyBulkType();
-  document.querySelectorAll('[data-bulk-type-quick]').forEach(el => {
-    el.onclick = () => {
-      state.bulkEdit.typeValue = el.dataset.bulkTypeQuick;
-      // Update the input value live without a full re-render to keep keyboard.
-      const inp = document.getElementById('bulk-type-input');
-      if (inp) inp.value = state.bulkEdit.typeValue;
-    };
-  });
 
-  // v11: bulk Notes dialog. Mode radios + textarea; Apply commits.
-  if ($('bulk-notes-cancel')) $('bulk-notes-cancel').onclick = () => cancelBulkEditDialog();
-  if ($('bulk-notes-backdrop')) $('bulk-notes-backdrop').onclick = () => cancelBulkEditDialog();
+  // v11: bulk Notes dialog — cancel/backdrop/apply delegated (bulk-cancel,
+  // bulk-notes-apply). The textarea oninput + the mode radios (change) stay here.
   if ($('bulk-notes-input')) $('bulk-notes-input').oninput = e => state.bulkEdit.notesValue = e.target.value;
-  if ($('bulk-notes-apply')) $('bulk-notes-apply').onclick = () => applyBulkNotes();
   document.querySelectorAll('input[name="bulk-notes-mode"]').forEach(el => {
     el.onchange = e => {
       state.bulkEdit.notesMode = e.target.value === 'append' ? 'append' : 'replace';
@@ -370,17 +245,8 @@ function bindEvents() {
   bindOverviewBodyEvents();
 
   // Edit-session screen
-  if ($('cancel-edit-btn')) $('cancel-edit-btn').onclick = () => setView('overview');
-  if ($('ef-cancel')) $('ef-cancel').onclick = () => setView('overview');
-  if ($('ef-save')) $('ef-save').onclick = () => {
-    state.editForm.site = $('ef-site').value;
-    state.editForm.engineer = $('ef-engineer').value;
-    state.editForm.name = $('ef-name').value;
-    state.editForm.date = $('ef-date').value;
-    state.editForm.prefix = $('ef-prefix').value;
-    state.editForm.locked = $('ef-locked') ? $('ef-locked').checked : false;   // v8
-    saveSessionEdits();
-  };
+  // v25 (E3): #cancel-edit-btn + #ef-cancel (edit-cancel) and #ef-save
+  // (edit-save) are delegated. The ef-* field handlers below stay.
   if ($('ef-site')) $('ef-site').oninput = e => state.editForm.site = e.target.value;
   if ($('ef-engineer')) $('ef-engineer').oninput = e => state.editForm.engineer = e.target.value;
   if ($('ef-name')) $('ef-name').oninput = e => state.editForm.name = e.target.value;
@@ -389,47 +255,18 @@ function bindEvents() {
   if ($('ef-locked')) $('ef-locked').onchange = e => state.editForm.locked = e.target.checked;   // v8
 
   // v8: Lock banner unlock shortcut on entry screen
-  if ($('lock-unlock-btn')) $('lock-unlock-btn').onclick = () => unlockActiveSession();
+  // v25 (E3): #lock-unlock-btn is delegated (unlock-session) in dispatch.js.
 
-  // Settings hub — row taps
-  document.querySelectorAll('[data-page]').forEach(el => {
-    el.onclick = () => setView(el.dataset.page);
-  });
-  // Settings sub-pages — back button
-  if ($('back-to-settings-btn')) $('back-to-settings-btn').onclick = () => setView('settings');
-
-  // Settings sub-page save buttons
-  if ($('settings-user-save')) $('settings-user-save').onclick = () => saveUserSettings();
-  if ($('settings-items-save')) $('settings-items-save').onclick = () => saveItemTypesSettings();
-  if ($('settings-fails-save')) $('settings-fails-save').onclick = () => saveFailReasonsSettings();
-  if ($('settings-descriptions-save')) $('settings-descriptions-save').onclick = () => saveDescriptionsSettings();
-  // v16: Multi Pick settings save.
-  if ($('settings-multipick-save')) $('settings-multipick-save').onclick = () => saveMultiPickSettings();
-  // v16: toggle's On/Off subtext updates live WITHOUT a re-render (a render here
-  // would clobber any unsaved slot edits, like the CSV page). The actual value
-  // is committed on Save, matching the other settings sub-pages.
+  // Settings hub + sub-pages
+  // v25 (E3): row taps ([data-page] → settings-page), the back button
+  // (back-to-settings), every Save/Reset button across the sub-pages, and the
+  // Smart Quick Pick rebuild/clear buttons are delegated in dispatch.js. The
+  // stateful toggles/selects below stay here (change events, out of v25 scope).
   if ($('multipick-enabled')) $('multipick-enabled').onchange = e => {
     const sub = document.getElementById('multipick-enabled-sub');
     if (sub) sub.textContent = e.target.checked ? 'On' : 'Off';
   };
-
-  // v9: Reset-to-defaults buttons
-  if ($('settings-items-reset')) $('settings-items-reset').onclick = () => resetItemsToDefaults();
-  if ($('settings-fails-reset')) $('settings-fails-reset').onclick = () => resetFailReasonsToDefaults();
-  if ($('settings-descriptions-reset')) $('settings-descriptions-reset').onclick = () => resetDescriptionsToDefaults();
-
-  // v18: Smart Quick Pick controls on the Quick Pick Items page. The toggle
-  // commits instantly (and seeds history on first enable); the two buttons
-  // confirm before acting since they replace/clear the learned data.
   if ($('sqp-toggle')) $('sqp-toggle').onchange = e => setSqp(e.target.checked);
-  if ($('sqp-rebuild-btn')) $('sqp-rebuild-btn').onclick = () => {
-    if (!confirm('Rebuild Smart Quick Pick history from all your current sessions?\n\nThis replaces the learned history with a fresh scan of your data.')) return;
-    rebuildSqpHistory();
-  };
-  if ($('sqp-clear-btn')) $('sqp-clear-btn').onclick = () => {
-    if (!confirm('Clear all Smart Quick Pick history?\n\nThe buttons will go back to their normal order until it learns again. Re-enabling the feature rebuilds the history from your data.')) return;
-    clearSqpHistory();
-  };
 
   // v9: preset switching, creation, rename, delete on the Quick Pick Items page.
   // Switching is via the dropdown — onchange because we want commit-on-blur,
@@ -467,62 +304,20 @@ function bindEvents() {
     }
     switchPreset(newId);
   };
-  if ($('preset-new-btn')) $('preset-new-btn').onclick = () => {
-    state.presetDialog = { mode: 'new', name: '', editingId: null };
-    render();
-  };
-  if ($('preset-rename-btn')) $('preset-rename-btn').onclick = () => {
-    const p = activePreset();
-    if (!p) return;
-    state.presetDialog = { mode: 'rename', name: p.name, editingId: p.id };
-    render();
-  };
-  if ($('preset-delete-btn')) $('preset-delete-btn').onclick = () => {
-    const p = activePreset();
-    if (!p) return;
-    if (state.itemPresets.length <= 1) {
-      alert('You must have at least one preset.');
-      return;
-    }
-    if (!confirm(`Delete preset "${p.name}"?\n\nThe items in this preset will be lost. Other presets are not affected.`)) return;
-    deletePreset(p.id);
-    render();
-  };
   if ($('preset-dialog-input')) $('preset-dialog-input').oninput = e => state.presetDialog.name = e.target.value;
-  if ($('preset-dialog-cancel')) $('preset-dialog-cancel').onclick = () => {
-    state.presetDialog = { mode: null, name: '', editingId: null };
-    render();
-  };
-  if ($('preset-backdrop')) $('preset-backdrop').onclick = () => {
-    state.presetDialog = { mode: null, name: '', editingId: null };
-    render();
-  };
-  if ($('preset-dialog-confirm')) $('preset-dialog-confirm').onclick = () => {
-    const name = (state.presetDialog.name || '').trim();
-    if (!name) { alert('Name cannot be empty.'); return; }
-    if (state.presetDialog.mode === 'new') {
-      createPreset(name);
-    } else if (state.presetDialog.mode === 'rename' && state.presetDialog.editingId) {
-      renamePreset(state.presetDialog.editingId, name);
-    }
-    state.presetDialog = { mode: null, name: '', editingId: null };
-    render();
-  };
+  // v25 (E3): #preset-new-btn, #preset-rename-btn, #preset-delete-btn,
+  // #preset-dialog-cancel, #preset-backdrop and #preset-dialog-confirm are
+  // delegated (preset-new / preset-rename / preset-delete / preset-dialog-cancel
+  // / preset-dialog-confirm) in dispatch.js.
 
   // v9: first-launch migration prompt — names the user's existing item list.
   if ($('migration-prompt-input')) $('migration-prompt-input').oninput = e => state.migrationPrompt.name = e.target.value;
-  if ($('migration-prompt-confirm')) $('migration-prompt-confirm').onclick = () => confirmMigrationPrompt();
+  // v25 (E3): #migration-prompt-confirm is delegated (migration-confirm).
 
-  // Display settings — instant apply.
-  // v8 hotfix: this used to be [data-theme] but applyTheme() ALSO sets data-theme
-  // on <html>, so the selector matched <html> too. Every tap anywhere bubbled to
-  // <html>, fired its onclick → setTheme → render → destroyed the tapped input
-  // before iOS could focus it. Result: app-wide "taps do nothing" the moment a
-  // user picked Light or Dark. Renamed the button attribute to data-set-theme to
-  // remove the collision.
-  document.querySelectorAll('[data-set-theme]').forEach(el => {
-    el.onclick = () => setTheme(el.dataset.setTheme);
-  });
+  // Display settings — theme buttons ([data-set-theme] → set-theme) are delegated
+  // in dispatch.js. (v8 note retained: the attribute is data-set-theme, NOT
+  // data-theme, to avoid the <html data-theme> selector collision that caused an
+  // app-wide "taps do nothing" bug.) The toggles below stay (change events).
   if ($('haptics-toggle')) $('haptics-toggle').onchange = e => {
     setHaptics(e.target.checked);
     // Re-render so the "On"/"Off" sub-text updates
@@ -540,11 +335,10 @@ function bindEvents() {
   };
 
   // Backup & Restore
-  if ($('backup-export-btn')) $('backup-export-btn').onclick = () => downloadBackup();
-  // v14: prune controls on the Backup & Restore page.
-  if ($('prune-review-btn')) $('prune-review-btn').onclick = () => pruneOldSessions();
-  if ($('prune-age-save')) $('prune-age-save').onclick = () => savePruneAge();
-  if ($('backup-import-btn')) $('backup-import-btn').onclick = () => $('backup-import-file').click();
+  // v25 (E3): #backup-export-btn (backup-export), #prune-review-btn
+  // (prune-review), #prune-age-save (prune-age-save), #backup-import-btn
+  // (backup-import) and #about-reload-btn (about-reload) are delegated. The file
+  // input's onchange stays here.
   if ($('backup-import-file')) $('backup-import-file').onchange = e => {
     const file = e.target.files && e.target.files[0];
     restoreBackupFromFile(file);
@@ -564,136 +358,25 @@ function bindEvents() {
     render();
   };
 
-  // v8: emergency reload button on About — recovery for the rare "taps do nothing"
-  // bug without needing to reinstall the PWA. localStorage data is untouched.
-  if ($('about-reload-btn')) $('about-reload-btn').onclick = () => {
-    if (confirm('Reload the app? Your data is safe — only the app itself reloads.')) {
-      window.location.reload();
-    }
-  };
-
   // ===== v11 bindings =====
-
-  // Backup reminder banner — Sessions list only. "Export now" runs the same
-  // downloadBackup() the Backup & Restore page does (which also stamps
-  // lastBackupAt and clears the snooze). "Remind me later" and × both snooze
-  // for 24h.
-  if ($('backup-banner-export')) $('backup-banner-export').onclick = () => {
-    downloadBackup();
-    render();
-  };
-  if ($('backup-banner-later')) $('backup-banner-later').onclick = () => {
-    snoozeBackupReminder();
-    render();
-  };
-  if ($('backup-banner-dismiss')) $('backup-banner-dismiss').onclick = () => {
-    snoozeBackupReminder();
-    render();
-  };
-
-  // v17 welcome modal — Continue button dismisses and stamps the flag.
-  if ($('v20-welcome-dismiss')) $('v20-welcome-dismiss').onclick = () => dismissV20Welcome();
-
-  // v14: reopen-warning modal buttons.
-  if ($('reopen-warn-continue')) $('reopen-warn-continue').onclick = () => confirmReopenWarning();
-  if ($('reopen-warn-cancel')) $('reopen-warn-cancel').onclick = () => cancelReopenWarning();
-  if ($('reopen-warn-cancel2')) $('reopen-warn-cancel2').onclick = () => cancelReopenWarning();
+  // v25 (E3): the backup reminder banner (backup-banner-export / -later /
+  // -dismiss), the welcome modal (welcome-dismiss) and the reopen-warning modal
+  // (reopen-continue / reopen-cancel) are all delegated in dispatch.js.
 
   // CSV Columns settings page
-  if ($('settings-csv-save')) $('settings-csv-save').onclick = () => saveCsvColumnsSettings();
-  if ($('settings-csv-reset')) $('settings-csv-reset').onclick = () => resetCsvColumnsSettings();
-  document.querySelectorAll('[data-csv-up]').forEach(el => {
-    el.onclick = () => moveCsvColumn(el.dataset.csvUp, -1);
-  });
-  document.querySelectorAll('[data-csv-down]').forEach(el => {
-    el.onclick = () => moveCsvColumn(el.dataset.csvDown, +1);
-  });
+  // v25 (E3): #settings-csv-save (settings-csv-save), #settings-csv-reset
+  // (settings-csv-reset), and the [data-csv-up]/[data-csv-down] reorder arrows
+  // (csv-up / csv-down) are delegated in dispatch.js.
 
   // v19: Clients & Sites settings page.
-  if ($('client-add-btn')) $('client-add-btn').onclick = () => {
-    state.clientsPage.clientDialog = { mode: 'add', name: '', editingId: null };
-    state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
-    render();
-  };
-  // v20: rebuild clients/sites from all sessions (non-destructive; adds only).
-  if ($('clients-rebuild-btn')) $('clients-rebuild-btn').onclick = () => {
-    if (!confirm('Scan all your sessions and add any clients and sites that aren\'t already listed? Nothing already here will be changed or removed.')) return;
-    const added = rebuildClientsFromSessions();
-    render();
-    setTimeout(() => alert(
-      added === 0
-        ? 'Nothing new to add — every client and site from your sessions is already listed.'
-        : `Added ${added} new ${added === 1 ? 'entry' : 'entries'} from your sessions.`
-    ), 50);
-  };
-  // Expand / collapse a client to reveal its sites.
-  document.querySelectorAll('[data-client-toggle]').forEach(el => {
-    el.onclick = () => {
-      const id = el.dataset.clientToggle;
-      state.clientsPage.expandedClientId =
-        state.clientsPage.expandedClientId === id ? null : id;
-      render();
-    };
-  });
-  document.querySelectorAll('[data-client-rename]').forEach(el => {
-    el.onclick = () => {
-      const c = clientById(el.dataset.clientRename);
-      if (!c) return;
-      state.clientsPage.clientDialog = { mode: 'rename', name: c.name, editingId: c.id };
-      state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
-      render();
-    };
-  });
-  document.querySelectorAll('[data-client-delete]').forEach(el => {
-    el.onclick = () => deleteClient(el.dataset.clientDelete);
-  });
-  document.querySelectorAll('[data-site-add]').forEach(el => {
-    el.onclick = () => {
-      state.clientsPage.siteDialog = { mode: 'add', name: '', editingId: null, clientId: el.dataset.siteAdd };
-      state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
-      render();
-    };
-  });
-  document.querySelectorAll('[data-site-rename]').forEach(el => {
-    el.onclick = () => {
-      const s = siteById(el.dataset.siteRename);
-      if (!s) return;
-      state.clientsPage.siteDialog = { mode: 'rename', name: s.name, editingId: s.id, clientId: s.clientId };
-      state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
-      render();
-    };
-  });
-  document.querySelectorAll('[data-site-delete]').forEach(el => {
-    el.onclick = () => deleteSite(el.dataset.siteDelete);
-  });
-  // Client dialog (add / rename)
+  // v25 (E3): #client-add-btn (client-add), #clients-rebuild-btn
+  // (clients-rebuild), the [data-client-*]/[data-site-*] row controls
+  // (client-toggle / client-rename / client-delete / site-add / site-rename /
+  // site-delete), and the dialog confirm/cancel/backdrop buttons
+  // (client-dialog-confirm / client-dialog-cancel / site-dialog-confirm /
+  // site-dialog-cancel) are all delegated. The two dialog text inputs stay here.
   if ($('client-dialog-input')) $('client-dialog-input').oninput = e => state.clientsPage.clientDialog.name = e.target.value;
-  if ($('client-dialog-confirm')) $('client-dialog-confirm').onclick = () => {
-    if (state.clientsPage.clientDialog.mode === 'add') addClientFromDialog();
-    else renameClientFromDialog();
-  };
-  if ($('client-dialog-cancel')) $('client-dialog-cancel').onclick = () => {
-    state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
-    render();
-  };
-  if ($('client-dialog-backdrop')) $('client-dialog-backdrop').onclick = () => {
-    state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
-    render();
-  };
-  // Site dialog (add / rename)
   if ($('site-dialog-input')) $('site-dialog-input').oninput = e => state.clientsPage.siteDialog.name = e.target.value;
-  if ($('site-dialog-confirm')) $('site-dialog-confirm').onclick = () => {
-    if (state.clientsPage.siteDialog.mode === 'add') addSiteFromDialog();
-    else renameSiteFromDialog();
-  };
-  if ($('site-dialog-cancel')) $('site-dialog-cancel').onclick = () => {
-    state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
-    render();
-  };
-  if ($('site-dialog-backdrop')) $('site-dialog-backdrop').onclick = () => {
-    state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
-    render();
-  };
 }
 
 // Light re-render of just the suggestions dropdown so we don't lose input focus
