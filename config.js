@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V26';
+const APP_VERSION = 'V27';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -67,6 +67,7 @@ const V18_WELCOME_KEY = 'pat:v18welcome';   // v18
 const V19_WELCOME_KEY = 'pat:v19welcome';   // v19
 const V20_WELCOME_KEY = 'pat:v20welcome';   // v20
 const V26_WELCOME_KEY = 'pat:v26welcome';   // v26: Clients & Sites flexibility + split CSV
+const V27_WELCOME_KEY = 'pat:v27welcome';   // v27: Smart Quick Pick ordering quality
 
 // v19: Clients & Sites. A two-level model so one client can have several sites.
 //   CLIENTS_KEY — JSON array [{ id, name }].
@@ -101,6 +102,22 @@ const SITES_KEY = 'pat:sites';              // v19: JSON [{id,clientId,name}]
 //                     human-readable in backups, matching the backup principle.
 const SQP_ENABLED_KEY = 'pat:sqpenabled';   // v18: '1' | '0', default '0'
 const SQP_HISTORY_KEY = 'pat:sqphistory';   // v18: JSON { loc: { type: count } }
+
+// v27: Smart Quick Pick ordering-quality tuning. These shape how the learned
+// history is matched and scored against a typed location — no storage change,
+// they only affect how the existing history is read.
+//   SQP_PARTIAL_WEIGHT — a learned bucket whose key only shares a WORD with the
+//     typed location (not an exact match) contributes at this fraction of its
+//     tally, so the location you actually typed dominates over neighbours that
+//     merely share a word. Exact bucket matches always count full (weight 1).
+//   SQP_SWAP_IN_MIN — a learned type must have at least this combined score at
+//     the location to be eligible to "swap in" (displace a preset button). Stops
+//     a one-off oddity from shoving a preset staple out of the row.
+//   SQP_STAPLE_DEFENCE — a preset button with at least this learned score at the
+//     location is a proven staple and is NEVER displaced by a swap-in.
+const SQP_PARTIAL_WEIGHT = 0.5;   // v27: half weight for word-overlap (non-exact) matches
+const SQP_SWAP_IN_MIN = 2;        // v27: min score here for a non-preset type to swap in
+const SQP_STAPLE_DEFENCE = 2;     // v27: preset button at/above this score is protected
 
 // v17: Sound feedback (opt-in audio confirmation). Stored as '1'|'0', default
 // OFF ('0'). Distinct from haptics — this plays a short Web Audio tone on

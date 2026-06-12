@@ -1,13 +1,15 @@
 /*!
  * PAT Test PWA
- * v23 (June 2026)
+ * v27 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v23 — Smart Quick Pick ==============
+// ============== PAT Test PWA — v27 — Smart Quick Pick ==============
 // Smart Quick Pick (v18): history, scoring, ordering, freeze cache, on/off.
+// v27: ordering-quality pass — word-token matching (not greedy substring),
+// exact-match weighting, a swap-in floor, and staple protection.
 
 // ---------- v18: Smart Quick Pick helpers ----------
 // The learned model is a plain object: { normalisedLocation: { itemType: count } }.
@@ -84,20 +86,38 @@ function buildSqpHistory() {
   return out;
 }
 
+// v27: split a normalised location into its words for token matching. Splits on
+// any run of non-alphanumeric characters so "server room 2" → ["server","room",
+// "2"]. Empty/garbage → []. Used to decide whether a learned bucket relates to
+// the typed location by SHARING A WHOLE WORD, rather than the old greedy
+// substring test (which let a short typed "office" pool in every unrelated
+// "…office…" bucket, and let one-letter inputs match almost everything).
+function sqpTokens(s) {
+  return normaliseSqpLocation(s).split(/[^a-z0-9]+/).filter(Boolean);
+}
+
 // Aggregate the learned tallies for a given typed location into a single
-// { itemType: score } map. A learned bucket contributes when its key and the
-// typed location have a substring relationship in EITHER direction (so typing
-// "Server Room 2" matches a learned "server room", and typing "server" matches
-// "server room a"). Scores from all matching buckets are summed. Returns {} when
-// the location is blank or nothing matches (→ caller leaves the order untouched).
-// v23 (E6): sqpScoresForLocation walks the ENTIRE learned history on every call.
-// Post-v20 the freeze means it runs only when the location changes (not per
-// render), so it's already cheap — but it's still an O(locations × types) sweep,
-// and prev/next stepping through items at different locations can call it
-// repeatedly. We add a tiny one-entry memo keyed on the normalised location plus
-// a history "version" counter. The counter (_sqpHistoryVersion) is bumped by
-// every function that mutates state.sqpHistory (record / build / clear / rebuild
-// / restore), so the memo can never return scores computed from stale history.
+// { itemType: score } map.
+//
+// v27 matching (Q1=A, Q2=A) — replaces the v18 greedy substring test:
+//   • A learned bucket contributes only if its key is an EXACT match for the
+//     typed location, OR the two share at least one whole WORD. So "Server Room
+//     2" still matches learned "server room" (shared "server"/"room"), but a
+//     short typed "office" no longer matches "back office party" via raw
+//     substring soup, and "office" never matches "officer".
+//   • An EXACT bucket match counts at full weight; a word-overlap (non-exact)
+//     match counts at SQP_PARTIAL_WEIGHT, so what you log AT the typed location
+//     dominates over neighbours that merely share a word. Weighted scores are
+//     rounded so downstream integer comparisons (thresholds) stay clean.
+//
+// Returns {} when the location is blank or nothing matches (→ caller leaves the
+// order untouched).
+//
+// (E6) memo, unchanged: the sweep is O(locations × types); a one-entry memo
+// keyed on the normalised location plus a history "version" counter avoids
+// recomputing while the location is unchanged. _sqpHistoryVersion is bumped by
+// every mutator of state.sqpHistory (record / build / clear / rebuild / restore)
+// so the memo can never return scores computed from stale history.
 let _sqpScoresMemo = { loc: null, version: -1, scores: null };
 let _sqpHistoryVersion = 0;
 function bumpSqpHistoryVersion() { _sqpHistoryVersion++; }
@@ -108,15 +128,23 @@ function sqpScoresForLocation(location) {
   if (_sqpScoresMemo.loc === loc && _sqpScoresMemo.version === _sqpHistoryVersion) {
     return _sqpScoresMemo.scores;
   }
+  const locTokens = new Set(sqpTokens(loc));
   const scores = {};
   Object.keys(state.sqpHistory).forEach(key => {
-    if (loc.includes(key) || key.includes(loc)) {
-      const tally = state.sqpHistory[key];
-      Object.keys(tally).forEach(type => {
-        scores[type] = (scores[type] || 0) + tally[type];
-      });
+    let weight = 0;
+    if (key === loc) {
+      weight = 1;                       // exact bucket match → full weight
+    } else if (sqpTokens(key).some(w => locTokens.has(w))) {
+      weight = SQP_PARTIAL_WEIGHT;      // shares a whole word → partial weight
     }
+    if (!weight) return;
+    const tally = state.sqpHistory[key];
+    Object.keys(tally).forEach(type => {
+      scores[type] = (scores[type] || 0) + tally[type] * weight;
+    });
   });
+  // Round so threshold comparisons downstream work on clean numbers.
+  Object.keys(scores).forEach(t => { scores[t] = Math.round(scores[t]); });
   _sqpScoresMemo = { loc, version: _sqpHistoryVersion, scores };
   return scores;
 }
@@ -130,18 +158,27 @@ function sqpScoresForLocation(location) {
 //   • A learned type that is ALSO in the preset simply stays where it is — its
 //     learned-ness costs nothing positionally; it's just one of the buttons you
 //     already have, in its usual spot.
-//   • A learned type NOT in the preset is "swapped in": it takes the slot of the
-//     preset button with the LOWEST learned score at this location (Q3b). Preset
-//     buttons you've never tested here (score 0) are displaced first; among
-//     equal scores, the RIGHTMOST slot goes first so the front of the row is the
-//     stickiest. Highest-scoring swap-ins claim slots first.
-//   • Row size is unchanged (the preset's button count). The number of swap-ins
-//     can't exceed the number of preset buttons.
+//   • A learned type NOT in the preset can be "swapped in": it takes the slot of
+//     a displaceable preset button. Preset buttons you've never tested here
+//     (score 0) are displaced first; among equal scores, the RIGHTMOST slot goes
+//     first so the front of the row is the stickiest. Highest-scoring swap-ins
+//     claim slots first.
+//   • Row size is unchanged (the preset's button count).
+//
+// v27 quality rules (Q3=A, Q4=A) layered on top:
+//   • Swap-in FLOOR — a learned non-preset type only qualifies as a swap-in if
+//     its score at this location is ≥ SQP_SWAP_IN_MIN. A one-off oddity (logged
+//     here once) never shoves a preset button out of the row.
+//   • Staple PROTECTION — a preset button whose own learned score here is
+//     ≥ SQP_STAPLE_DEFENCE is a proven staple and is NEVER a displaceable slot.
+//     Only never-tested-here or rarely-tested preset slots can be swapped out,
+//     so your everyday buttons for a location always survive.
 //
 // Result: the buttons that are always there stay put; only genuinely
-// location-specific extras appear, and only by displacing the least-relevant
-// preset button for this location. Returns the preset unchanged when the
-// feature is off, the location is blank, or nothing was learned here.
+// location-specific extras (that you've actually used here more than once)
+// appear, and only by displacing a preset button that isn't a staple here.
+// Returns the preset unchanged when the feature is off, the location is blank,
+// or nothing qualifies.
 function smartOrderedItemTypes(types, location) {
   if (!state.sqpEnabled) return types;
   const scores = sqpScoresForLocation(location);
@@ -152,26 +189,27 @@ function smartOrderedItemTypes(types, location) {
   const row = types.slice();
   const presetLower = new Set(row.map(t => t.toLowerCase()));
 
-  // Swap-in candidates: learned types that are NOT in the preset, highest score
-  // first. Object key order preserves first-seen order as a stable tiebreaker.
+  // Swap-in candidates: learned types NOT in the preset, scoring at least the
+  // floor (Q3=A — one-offs excluded), highest score first. Object key order
+  // preserves first-seen order as a stable tiebreaker.
   const swapIns = learnedKeys
-    .filter(t => !presetLower.has(t.toLowerCase()))
+    .filter(t => !presetLower.has(t.toLowerCase()) && scores[t] >= SQP_SWAP_IN_MIN)
     .map((t, i) => ({ t, i, score: scores[t] }))
     .sort((a, b) => (b.score - a.score) || (a.i - b.i))
     .map(x => x.t);
 
-  if (!swapIns.length) return row;   // nothing new to bring in → preset as-is
+  if (!swapIns.length) return row;   // nothing new qualifies → preset as-is
 
-  // Rank preset slots by how displaceable they are. A slot's "defence" is the
-  // learned score of its occupant at this location (0 if never tested here).
-  // Lowest defence is displaced first; on a tie, the higher index (further
-  // right) goes first so the front of the row stays put.
-  const slots = row.map((t, idx) => ({
-    idx,
-    defence: scores[t] || 0
-  })).sort((a, b) => (a.defence - b.defence) || (b.idx - a.idx));
+  // Displaceable preset slots, least-defended first. A slot's "defence" is the
+  // learned score of its occupant here (0 if never tested here). Staples
+  // (defence ≥ SQP_STAPLE_DEFENCE) are excluded entirely (Q4=A) so they can't be
+  // swapped out. On a tie, the higher index (further right) goes first so the
+  // front of the row stays put.
+  const slots = row.map((t, idx) => ({ idx, defence: scores[t] || 0 }))
+    .filter(s => s.defence < SQP_STAPLE_DEFENCE)
+    .sort((a, b) => (a.defence - b.defence) || (b.idx - a.idx));
 
-  // Place each swap-in into the next most-displaceable slot.
+  // Place each swap-in into the next most-displaceable non-staple slot.
   const n = Math.min(swapIns.length, slots.length);
   for (let k = 0; k < n; k++) {
     row[slots[k].idx] = swapIns[k];

@@ -348,7 +348,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV26Welcome(),
+  'welcome-dismiss': () => dismissV27Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 

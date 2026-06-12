@@ -1225,6 +1225,14 @@ function dismissV26Welcome() {
   render();
 }
 
+// v27: dismiss the V27 "what's new" modal. Writes pat:v27welcome so users see
+// it once on update.
+function dismissV27Welcome() {
+  state.v27WelcomeSeen = true;
+  localStorage.setItem(V27_WELCOME_KEY, '1');
+  render();
+}
+
 function saveItemTypesSettings() {
   const types = document.getElementById('settings-types').value
     .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 9);

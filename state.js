@@ -153,6 +153,10 @@ let state = {
   // modal so users see it once on update.
   v26WelcomeSeen: false,
 
+  // v27: welcome modal flag (key pat:v27welcome). Gates the V27 "what's new"
+  // modal (Smart Quick Pick ordering quality) so users see it once on update.
+  v27WelcomeSeen: false,
+
   // v19: Clients & Sites. Two flat arrays kept in a parent/child relationship:
   //   clients — [{ id, name }]
   //   sites   — [{ id, clientId, name }]

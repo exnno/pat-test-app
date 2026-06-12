@@ -94,25 +94,24 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v26: rolled forward — content covers the Clients/Sites flexibility and the
-  // split CSV columns. Key bumped to pat:v26welcome (gate uses v26WelcomeSeen)
-  // so users see it once on update to V26.
-  const welcomeModal = (state.v26WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // v27: rolled forward — content covers the Smart Quick Pick ordering
+  // improvements. Key bumped to pat:v27welcome (gate uses v27WelcomeSeen) so
+  // users see it once on update to V27.
+  const welcomeModal = (state.v27WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V26">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V27">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V26</h3>
+        <h3 class="bulk-sheet-title">What's new in V27</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Client or site — your choice.</strong> When you start a session you now only need <em>one</em> of them. Enter just a client, just a site, or both. A site with no client is kept under "Unassigned".</li>
-        <li><strong>Assign sites to clients later.</strong> Under <strong>Settings → Clients</strong>, you can now move a site to a client (or between clients) whenever you like — handy for tidying up "Unassigned" sites.</li>
-        <li><strong>Client &amp; Site as separate CSV columns.</strong> Your export can now split Client and Site into two columns. The Client column starts switched off, so your exports look exactly as before until you turn it on under <strong>Settings → CSV Columns</strong>.</li>
-        <li><strong>Cleaner sharing.</strong> Exporting a CSV no longer attaches an extra text note — just the file.</li>
+        <li><strong>Smarter Quick Pick ordering.</strong> If you use Smart Quick Pick, the buttons now match your location more precisely — a location only borrows from another if they actually share a word, so a short name like "Office" no longer picks up unrelated places.</li>
+        <li><strong>Your regulars stay put.</strong> The item types you test most at a location are protected — a one-off item you logged there once will no longer push your everyday buttons out of the row.</li>
+        <li><strong>Nothing to set up.</strong> This applies to your existing history automatically. If you'd ever like to refresh it, the "Rebuild from my data" button under Settings → Smart Quick Pick is still there.</li>
       </ul>
-      <button class="btn-primary" id="v26-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v27-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 

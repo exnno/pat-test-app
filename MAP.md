@@ -1,4 +1,4 @@
-# PAT App — Code Map (V26)
+# PAT App — Code Map (V27)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -22,13 +22,15 @@ every other file is function declarations sharing one global scope.
 
 ---
 
-## config.js (~270 ln) — constants & defaults, pure data
-`APP_VERSION`; all `*_KEY` localStorage key names; `MULTIPICK_MAX_SLOTS`,
-`PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`, `BACKUP_REMINDER_DAYS`,
-`BACKUP_SNOOZE_HOURS`; `DEFAULT_ITEM_TYPES`, `DEFAULT_FAIL_REASONS`,
-`DEFAULT_DESCRIPTIONS`, `DEFAULT_CSV_COLUMNS`; `CSA_RESISTANCE`, `CALC_LENGTHS`.
+## config.js (~290 ln) — constants & defaults, pure data
+`APP_VERSION`; all `*_KEY` localStorage key names (incl. welcome keys, latest
+`V27_WELCOME_KEY`); `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
+`BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`; v27 SQP tuning
+(`SQP_PARTIAL_WEIGHT`, `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`);
+`DEFAULT_ITEM_TYPES`, `DEFAULT_FAIL_REASONS`, `DEFAULT_DESCRIPTIONS`,
+`DEFAULT_CSV_COLUMNS`; `CSA_RESISTANCE`, `CALC_LENGTHS`.
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
-bump the version label.
+bump the version label, tune Smart Quick Pick matching/scoring.
 
 ## state.js (~245 ln) — the global `state` object
 The single `let state = { ... }` runtime shape: sessions, form, view, all the
@@ -66,13 +68,17 @@ sites). Settings→Clients page actions: `addClientFromDialog`,
 `nextFreeSiteName`.
 *Touch to:* change how clients/sites are stored or managed.
 
-## sqp.js (~225 ln) — Smart Quick Pick (v18)
-`normaliseSqpLocation`, `normaliseSqpHistory`, `loadSqpHistory`,
-`recordSqpUsage`, `buildSqpHistory`, `bumpSqpHistoryVersion`,
-`sqpScoresForLocation`, `smartOrderedItemTypes`, `sqpRowForLocation`,
-`invalidateSqpRow`, `clearSqpHistory`, `rebuildSqpHistory`, `setSqp`.
-*Touch to:* change how the quick-pick row adapts to location.
-**V27 candidate** — matching too greedy + swap-in scoring favours rare oddities.
+## sqp.js (~245 ln) — Smart Quick Pick (v18, ordering-quality pass v27)
+`normaliseSqpLocation`, `sqpTokens` (v27: word-split for token matching),
+`normaliseSqpHistory`, `loadSqpHistory`, `recordSqpUsage`, `buildSqpHistory`,
+`bumpSqpHistoryVersion`, `sqpScoresForLocation` (v27: word-overlap match instead
+of greedy substring + exact-match full / partial half weighting),
+`smartOrderedItemTypes` (v27: swap-in floor `SQP_SWAP_IN_MIN` + staple protection
+`SQP_STAPLE_DEFENCE`), `sqpRowForLocation`, `invalidateSqpRow`, `clearSqpHistory`,
+`rebuildSqpHistory`, `setSqp`.
+*Touch to:* change how the quick-pick row adapts to location. v27 tuning
+constants (`SQP_PARTIAL_WEIGHT`, `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`) live in
+config.js.
 
 ## multipick.js (~125 ln) — Multi Pick (v16)
 `normaliseMultiPickConfig`, `loadMultiPickConfig`, `activeMultiPickSlots`,
@@ -125,7 +131,7 @@ Presets (`activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
 `moveCsvColumn`, `saveItemTypesSettings`, `saveFailReasonsSettings`,
 `saveDescriptionsSettings`, `resetItemsToDefaults`, `resetFailReasonsToDefaults`,
 `resetDescriptionsToDefaults`, `setTheme`, `setHaptics`, `setSound`,
-`setTimestamps`); welcome dismiss (`dismissV19Welcome`, `dismissV26Welcome`).
+`setTimestamps`); welcome dismiss (`dismissV19Welcome`, `dismissV26Welcome`, `dismissV27Welcome`).
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves.
 

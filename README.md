@@ -3,12 +3,12 @@
 A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, flexible clients & sites, search, filters, bulk edit, JSON backup/restore, dark mode, and CSV export/import.
 
 **Live:** https://exnno.github.io/pat-test-app/
-**Current version:** V26 · cache `pat-v26`
+**Current version:** V27 · cache `pat-v27`
 
 ## Key features
 
 - **Single-item entry** — one appliance at a time, sticky location field, 9 Quick Pick type buttons, optional asset-number prefix, cross-session autocomplete, copy-last-result.
-- **Smart Quick Pick** — learns which item types you test at each location and reorders the Quick Pick buttons accordingly (opt-in).
+- **Smart Quick Pick** — learns which item types you test at each location and reorders the Quick Pick buttons accordingly (opt-in). Matching is by shared whole words (an exact location match counts more than a word-overlap one), with a swap-in floor and staple protection so your everyday buttons aren't displaced by a one-off (V27).
 - **Multi Pick** — pre-set sequences of item types for repetitive runs.
 - **Clients & Sites** — a session can be tied to a client, a site, or both (at least one). Sites can exist without a client ("Unassigned") and be assigned to a client later, or moved between clients. Managed under Settings → Clients.
 - **Sessions** — search, filter, lock, bulk edit/export, duplicate-protection on import.
