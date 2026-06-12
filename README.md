@@ -1,9 +1,20 @@
 # PAT Test PWA
 
-A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, clients & sites, search, filters, bulk edit, JSON backup/restore, dark mode, and CSV export/import.
+A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, flexible clients & sites, search, filters, bulk edit, JSON backup/restore, dark mode, and CSV export/import.
 
-**Live:** https://exnno.github.io/pat-test-app/
-**Current version:** V23 · cache `pat-v23`
+**Live:** <https://exnno.github.io/pat-test-app/>
+**Current version:** V26 · cache `pat-v26`
+
+## Key features
+
+- **Single-item entry** — one appliance at a time, sticky location field, 9 Quick Pick type buttons, optional asset-number prefix, cross-session autocomplete, copy-last-result.
+- **Smart Quick Pick** — learns which item types you test at each location and reorders the Quick Pick buttons accordingly (opt-in).
+- **Multi Pick** — pre-set sequences of item types for repetitive runs.
+- **Clients & Sites** — a session can be tied to a client, a site, or both (at least one). Sites can exist without a client (“Unassigned”) and be assigned to a client later, or moved between clients. Managed under Settings → Clients.
+- **Sessions** — search, filter, lock, bulk edit/export, duplicate-protection on import.
+- **CSV export/import** — customisable columns (incl. a separate, optional Client column), single-session import with round-trip support.
+- **Backup/restore** — full JSON backup (human-readable), versioned (`backupVersion` 5).
+- **Offline-first** — service-worker cached; all data in `localStorage` on the device only.
 
 ## Stack
 
@@ -11,35 +22,36 @@ Vanilla HTML / CSS / JS — no frameworks, no build step, no external dependenci
 
 ## Files
 
-The app logic was split out of the old single `app.js` into 15 single-concern script files during the V21/V22 refactor. They share one global scope and load in a fixed order (see `MAP.md` for what lives where).
+The app logic was split out of the old single `app.js` into single-concern script files during the V21/V22 refactor (V25 added `dispatch.js` for delegated event handling). They share one global scope and load in a fixed order (see `MAP.md` for what lives where).
 
 **Load order (defined in `index.html`):**
 
-`config.js` -> `state.js` -> `utils.js` -> `storage.js` -> `clients.js` -> `sqp.js` -> `multipick.js` -> `feedback.js` -> `csv.js` -> `backup.js` -> `session.js` -> `render-core.js` -> `render-settings.js` -> `events.js` -> `boot.js`
+`config.js` -> `state.js` -> `utils.js` -> `storage.js` -> `clients.js` -> `sqp.js` -> `multipick.js` -> `feedback.js` -> `csv.js` -> `backup.js` -> `session.js` -> `render-core.js` -> `render-settings.js` -> `events.js` -> `dispatch.js` -> `boot.js`
 
-- `index.html` — shell; lists the 15 scripts in load order
-- `config.js` — constants & defaults, incl. `APP_VERSION` and all storage-key names
+- `index.html` — shell; lists the scripts in load order
+- `config.js` — constants & defaults, incl. `APP_VERSION`, all storage-key names, and `DEFAULT_CSV_COLUMNS`
 - `state.js` — the global `state` object
 - `utils.js` — pure stateless helpers
 - `storage.js` — persistence boundary: codec, `load()`, `save()`/`saveSessions()`/`saveSettings()`, storage stats
-- `clients.js` — Clients & Sites data model and Settings->Clients actions
+- `clients.js` — Clients & Sites data model (incl. orphan/unassigned sites and assign/move) and Settings->Clients actions
 - `sqp.js` — Smart Quick Pick (learned location->type ordering)
 - `multipick.js` — Multi Pick sequences
 - `feedback.js` — toasts + haptic/flash/sound feedback
-- `csv.js` — CSV build/export and import
+- `csv.js` — CSV build/export (incl. the Client/Site column split) and import
 - `backup.js` — JSON backup/restore
 - `session.js` — sessions, items, and most app logic
-- `render-core.js` — main screens (Sessions, Entry, Overview, Edit)
+- `render-core.js` — main screens (Sessions, Entry, Overview, Edit) + the New Session form and welcome modal
 - `render-settings.js` — Settings sub-pages, calculator, About changelog
-- `events.js` — event binding
-- `boot.js` — startup; **runs on load and must load last**
+- `events.js` — per-render event binding (`bindEvents`) + suggestion re-renders
+- `dispatch.js` — delegated event handling and the action registry (V25)
+- `boot.js` — startup; runs a boot integrity self-check, then `load()`/`render()`. **Runs on load and must load last**
 - `styles.css` — themed via CSS variables; light, dark, and system theme
-- `sw.js` — service worker; caches the app shell. Its `ASSETS` list must include all 15 scripts in load order. Bump `CACHE_VERSION` on every release.
+- `sw.js` — service worker; caches the app shell. Its `ASSETS` list must include all scripts in load order. Bump `CACHE_VERSION` on every release.
 - `manifest.webmanifest` — PWA manifest
-- `icon192.png`, `icon512.png` — app icons
+- `icon-192.png`, `icon-512.png` — app icons
 - `LICENSE.txt` — proprietary license; all rights reserved
 - `MAP.md` — code map: where each function lives
-- `PAThandoff_vN.md` — per-release handoff notes
+- `PAThandoff_vN.md` — per-release handoff notes (amended in place for hotfixes)
 
 ## Deployment
 
@@ -48,11 +60,17 @@ GitHub Pages, auto-deploys on commit to `main`. Edit via the GitHub web UI for q
 ## Releasing
 
 1. **Always bump `CACHE_VERSION` in `sw.js`** when any file changes (`pat-vN`; hotfix `pat-vN-1`). This is the step that must never be skipped — a stale cache serves old/broken files.
-2. **Always bump `APP_VERSION` in `config.js`** for the user-visible version label.
-3. If scripts are added/removed, update both the `<script>` tags in `index.html` and the `ASSETS` list in `sw.js` (keep load order; `boot.js` stays last).
-4. Roll the About changelog in `render-settings.js` (most recent 3 versions).
-5. Replace the changed files via the GitHub web UI and commit each.
-6. Wait ~1 min for Pages to redeploy, then verify in incognito before testing the installed PWA.
-7. On a phone, fully close the PWA from the app switcher and reopen once or twice to force the service-worker refresh. The app also shows an "Update available" banner when it detects a new version — tap Refresh to activate.
+1. **Always bump `APP_VERSION` in `config.js`** for the user-visible version label.
+1. If scripts are added/removed, update both the `<script>` tags in `index.html` and the `ASSETS` list in `sw.js` (keep load order; `boot.js` stays last).
+1. Roll the About changelog in `render-settings.js` (most recent 3 versions). For feature releases, roll the welcome modal (new `pat:vNNwelcome` key); skip it for pure structural/refactor releases.
+1. If the storage schema changes, bump `backupVersion` in `backup.js` and confirm older backups still restore.
+1. Replace the changed files via the GitHub web UI and commit each.
+1. Wait ~1 min for Pages to redeploy, then verify in incognito before testing the installed PWA.
+1. On a phone, fully close the PWA from the app switcher and reopen once or twice to force the service-worker refresh. The app also shows an “Update available” banner when it detects a new version — tap Refresh to activate.
+1. **Run the release’s post-commit test checklist** (every release ships with one in its handoff) to confirm the new features/fixes actually work on the live app — not just that the deploy landed.
+
+### Hotfixes
+
+A hotfix (e.g. `v25.1`, `v25.2`) bumps the cache to `pat-vNN-1` and **amends the existing handoff doc** for that version to record what changed, why, and which files were touched — so the handoff stays the accurate current-state record.
 
 (c) 2026 Peter Birchley. All rights reserved.
