@@ -1,4 +1,4 @@
-# PAT App — Code Map (V28)
+# PAT App — Code Map (V29)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -135,22 +135,22 @@ Presets (`activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves.
 
-## render-core.js (~1140 ln) — main screens
+## render-core.js (~1100 ln) — main screens
 Owns `const app = document.getElementById('app')`. `render()` dispatcher.
 Sessions: `renderSessions`, `renderSessionsListAreaHTML`,
-`refreshSessionsListAreaOnly`, `bindSessionsListAreaEvents`,
-`renderBackupReminderBanner`. New-session form suggestions:
-`computeNfClientSuggestions`, `computeNfSiteSuggestions`, `nfSuggestionsHTML`.
-Import modals: `renderImportConflictModal`, `renderImportSummaryModal`. Entry:
-`renderEntry`, `refreshEntryAfterLog`. Overview: `computeVisibleOverviewItems`,
-`renderOverviewBodyHTML`, `renderOverview`, `refreshOverviewBody`,
-`refreshOverviewSelection`, `bindOverviewBodyEvents`. Edit: `renderEditSession`.
+`refreshSessionsListAreaOnly`, `renderBackupReminderBanner`. New-session form
+suggestions: `computeNfClientSuggestions`, `computeNfSiteSuggestions`,
+`nfSuggestionsHTML`. Import modals: `renderImportConflictModal`,
+`renderImportSummaryModal`. Entry: `renderEntry`, `refreshEntryAfterLog`.
+Overview: `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
+`renderOverview`, `refreshOverviewBody`, `refreshOverviewSelection`. Edit:
+`renderEditSession`.
 *Touch to:* change the Sessions list, Entry screen, Overview, or Edit-session UI.
-**v28 (E3-tail):** `bindSessionsListAreaEvents` and `bindOverviewBodyEvents` are
-now empty no-op shells — the sort/status/lock selects and the row-select
-checkbox they used to bind are delegated in `dispatch.js`. Call sites kept so
-refresh paths don't need editing; the binders that render() called are gone —
-render() now calls `bindFocusFields()` (events.js) instead of `bindEvents()`.
+**v29:** the two no-op binder shells left from V28
+(`bindSessionsListAreaEvents`, `bindOverviewBodyEvents`) and their last call
+sites in `refreshSessionsListAreaOnly` / `refreshOverviewBody` were deleted —
+all those events have been delegated in `dispatch.js` since V25/V28. render()
+calls `bindFocusFields()` (events.js) for the four focus-sensitive fields.
 
 ## render-settings.js (~855 ln) — settings screens
 `renderSettingsHub`, `renderSettingsSubHeader`, and every `renderSettings*`

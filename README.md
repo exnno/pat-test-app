@@ -3,7 +3,7 @@
 A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, flexible clients & sites, search, filters, bulk edit, JSON backup/restore, dark mode, and CSV export/import.
 
 **Live:** https://exnno.github.io/pat-test-app/
-**Current version:** V28 · cache `pat-v28`
+**Current version:** V29 · cache `pat-v29`
 
 ## Key features
 
@@ -22,7 +22,7 @@ Vanilla HTML / CSS / JS — no frameworks, no build step, no external dependenci
 
 ## Files
 
-The app logic was split out of the old single `app.js` into single-concern script files during the V21/V22 refactor. V25 added `dispatch.js` for delegated CLICK handling; V28 (E3-tail) finished the job by moving every stateful input/change handler into `dispatch.js` too, leaving only four focus-sensitive fields directly bound. They share one global scope and load in a fixed order (see `MAP.md` for what lives where).
+The app logic was split out of the old single `app.js` into single-concern script files during the V21/V22 refactor. V25 added `dispatch.js` for delegated CLICK handling; V28 (E3-tail) finished the job by moving every stateful input/change handler into `dispatch.js` too, leaving only four focus-sensitive fields directly bound. V29 removed the last two no-op binder shells left over from that migration. They share one global scope and load in a fixed order (see `MAP.md` for what lives where).
 
 **Load order (defined in `index.html`):**
 

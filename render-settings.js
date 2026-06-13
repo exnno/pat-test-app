@@ -809,18 +809,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" data-action="about-reload" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v28: rolled forward — V28 on top, V25 dropped. -->
+      <!-- v8: rolling 3-version changelog. v29: rolled forward — V29 on top, V26 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V29</strong> · June 2026</p>
+        <p class="muted">A small housekeeping update. Some leftover scaffolding from the previous behind-the-scenes work has been cleared out, keeping the app lean and quick to build on. Nothing you see or do has changed — logging, search, settings and exports all behave exactly as before, and all your data is untouched.</p>
 
         <p><strong>V28</strong> · June 2026</p>
         <p class="muted">Another under-the-hood update with no changes to how the app looks or works. The last part of the tap-and-typing system has been moved onto the same single, efficient setup the buttons already use — so text fields, switches and dropdowns can no longer lose their responsiveness when the screen redraws, and future updates stay quicker and safer to build. Everything you do — logging, search, settings, exports — behaves exactly as before, and all your data is untouched.</p>
 
         <p><strong>V27</strong> · June 2026</p>
         <p class="muted">Smarter Smart Quick Pick ordering. If you use Smart Quick Pick, the quick-pick buttons now match your location more precisely — a location only borrows learned items from another when they genuinely share a word, so a short name like "Office" no longer pulls in unrelated places. The item types you test most often at a location are now protected too, so a one-off item logged there once won't push your everyday buttons out of the row. This applies to your existing history automatically — nothing to set up. Everything else behaves exactly as before, and all your data is untouched.</p>
-
-        <p><strong>V26</strong> · June 2026</p>
-        <p class="muted">More flexible clients and sites. When you start a session you now only need a client <em>or</em> a site — enter either one, or both. Sites without a client are grouped under "Unassigned", and you can assign a site to a client (or move it between clients) at any time under Settings → Clients. Your CSV export can now split Client and Site into two separate columns; the new Client column starts switched off, so your exports are unchanged until you turn it on. Exporting a CSV no longer attaches a separate text note — just the file. All your existing sessions and data are untouched.</p>
       </div>
 
       <div class="info-card">

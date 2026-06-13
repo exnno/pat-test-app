@@ -496,12 +496,12 @@ function renderSessionsListAreaHTML() {
 }
 
 // v10: Partial refresh used by the sessions-search oninput. Replaces only
-// #sessions-list-area, leaves the search input intact, and rebinds row events.
+// #sessions-list-area, leaves the search input intact. v29: row/select events are
+// fully delegated (dispatch.js) so there is nothing to rebind after the swap.
 function refreshSessionsListAreaOnly() {
   const wrap = document.getElementById('sessions-list-area');
   if (!wrap) return;
   wrap.innerHTML = renderSessionsListAreaHTML();
-  bindSessionsListAreaEvents();
 }
 
 // v10: Conflict dialog body. Sits above the sessions list in a bulk-sheet.
@@ -1021,7 +1021,6 @@ function refreshOverviewBody() {
   const wrap = document.querySelector('.overview-body');
   if (!wrap) return;
   wrap.innerHTML = renderOverviewBodyHTML(sess);
-  bindOverviewBodyEvents();
 }
 
 // v24 (E7): selecting/deselecting a row in selection mode used to call full
@@ -1050,29 +1049,6 @@ function refreshOverviewSelection() {
   if (barCount) barCount.textContent = `${n} selected`;
   const editBtn = document.getElementById('bulk-edit-menu-btn');
   if (editBtn) editBtn.disabled = (n === 0);
-}
-
-function bindOverviewBodyEvents() {
-  // v25 (E3): row open (jump-to-item), per-row delete (delete-item) and
-  // row-toggle are delegated via data-action in dispatch.js.
-  // v28 (E3-tail): the per-row checkbox's onCHANGE is now delegated too
-  // (data-change-action="row-select"), so there is nothing left to rebind when
-  // the body is rebuilt. Retained as a no-op call site so refreshOverviewBody()
-  // and bindEvents-era callers don't need editing; safe to delete in future.
-}
-
-// v10: Bind events for everything inside #sessions-list-area. Called both from
-// bindEvents() on initial render and from refreshSessionsListAreaOnly() after
-// each keystroke in the sessions search input.
-function bindSessionsListAreaEvents() {
-  // v25 (E3): the click controls in this area — #clear-filters-btn
-  // (clear-session-filters), #bulk-export-btn (bulk-export-unexported), and the
-  // per-card [data-open]/[data-export]/[data-delete-session] rows — are
-  // delegated via data-action in dispatch.js.
-  // v28 (E3-tail): the sort / status / lock <select> onCHANGE handlers are now
-  // delegated too (data-change-action="sessions-sort" / "status-filter" /
-  // "lock-filter"), so nothing here needs rebinding when the list area is
-  // replaced on each search keystroke. Retained as a no-op call site.
 }
 
 function renderEditSession() {
