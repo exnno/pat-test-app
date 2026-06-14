@@ -1,9 +1,9 @@
 # PAT Test PWA
 
-A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, flexible clients & sites, search, filters, bulk edit, JSON backup/restore, dark mode, and CSV export/import.
+A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, flexible clients & sites, search, filters, bulk edit, JSON backup/restore, dark mode, CSV export/import, and branded PDF report generation.
 
 **Live:** https://exnno.github.io/pat-test-app/
-**Current version:** V29 · cache `pat-v29`
+**Current version:** V30 · cache `pat-v30`
 
 ## Key features
 
@@ -13,12 +13,15 @@ A fast, offline-first portable appliance testing app. Records pass/fail decision
 - **Clients & Sites** — a session can be tied to a client, a site, or both (at least one). Sites can exist without a client ("Unassigned") and be assigned to a client later, or moved between clients. Managed under Settings → Clients.
 - **Sessions** — search, filter, lock, bulk edit/export, duplicate-protection on import.
 - **CSV export/import** — customisable columns (incl. a separate, optional Client column), single-session import with round-trip support.
-- **Backup/restore** — full JSON backup (human-readable), versioned (`backupVersion` 5).
+- **PDF reports (V30)** — turn any session into a branded *Portable Appliance Test Report*: company name/address/logo header, appliance register (Asset ID / Description / Location / Result, plus an automatic Notes column when present), tested/passed/failed totals, optional test-instrument, calibration and recommended-retest details, and an editable declaration + signature line. Configured under Settings → Report Settings behind a master switch that is **off by default** (so a freshly set-up device can't generate an unconfigured report); when on, a Reports button appears on the Sessions screen and the session Overview. Generated on-device, fully offline, and shared via the OS share sheet.
+- **Backup/restore** — full JSON backup (human-readable), versioned (`backupVersion` 5; report settings are included additively).
 - **Offline-first** — service-worker cached; all data in `localStorage` on the device only.
 
 ## Stack
 
-Vanilla HTML / CSS / JS — no frameworks, no build step, no external dependencies. Service-worker cached for full offline use. State lives in `localStorage` (session data is key-shortened/compressed at the storage boundary since v14; backups stay human-readable).
+Vanilla HTML / CSS / JS — no frameworks, no build step. Service-worker cached for full offline use. State lives in `localStorage` (session data is key-shortened/compressed at the storage boundary since v14; backups stay human-readable).
+
+**Third-party code:** from V30, the app bundles two MIT-licensed libraries — **jsPDF** and **jsPDF-AutoTable** — for client-side PDF generation. They are vendored as minified UMD files (`jspdf.umd.min.js`, `jspdf.plugin.autotable.min.js`), served from the app's own origin and service-worker cached so reports work fully offline. This is the only third-party code in the app; see `THIRD-PARTY-LICENSES.txt`. MIT permits commercial/subscription use with no royalty. (Prior to V30 the app had no external dependencies at all.)
 
 ## Files
 
@@ -26,28 +29,31 @@ The app logic was split out of the old single `app.js` into single-concern scrip
 
 **Load order (defined in `index.html`):**
 
-`config.js` -> `state.js` -> `utils.js` -> `storage.js` -> `clients.js` -> `sqp.js` -> `multipick.js` -> `feedback.js` -> `csv.js` -> `backup.js` -> `session.js` -> `render-core.js` -> `render-settings.js` -> `events.js` -> `dispatch.js` -> `boot.js`
+`config.js` -> `state.js` -> `utils.js` -> `storage.js` -> `clients.js` -> `sqp.js` -> `multipick.js` -> `feedback.js` -> `csv.js` -> `backup.js` -> `session.js` -> `jspdf.umd.min.js` -> `jspdf.plugin.autotable.min.js` -> `report.js` -> `render-core.js` -> `render-settings.js` -> `events.js` -> `dispatch.js` -> `boot.js`
 
 - `index.html` — shell; lists the scripts in load order
-- `config.js` — constants & defaults, incl. `APP_VERSION`, all storage-key names, and `DEFAULT_CSV_COLUMNS`
-- `state.js` — the global `state` object
+- `config.js` — constants & defaults, incl. `APP_VERSION`, all storage-key names, `DEFAULT_CSV_COLUMNS`, and the report-settings defaults factory
+- `state.js` — the global `state` object (incl. `reportSettings`)
 - `utils.js` — pure stateless helpers
-- `storage.js` — persistence boundary: codec, `load()`, `save()`/`saveSessions()`/`saveSettings()`, storage stats
+- `storage.js` — persistence boundary: codec, `load()`, `save()`/`saveSessions()`/`saveSettings()`, report-settings load/save/validate, storage stats
 - `clients.js` — Clients & Sites data model (incl. orphan/unassigned sites and assign/move) and Settings->Clients actions
 - `sqp.js` — Smart Quick Pick (learned location->type ordering)
 - `multipick.js` — Multi Pick sequences
 - `feedback.js` — toasts + haptic/flash/sound feedback
 - `csv.js` — CSV build/export (incl. the Client/Site column split) and import
-- `backup.js` — JSON backup/restore
-- `session.js` — sessions, items, and most app logic
-- `render-core.js` — main screens (Sessions, Entry, Overview, Edit) + the New Session form and welcome modal
-- `render-settings.js` — Settings sub-pages, calculator, About changelog
+- `backup.js` — JSON backup/restore (incl. report settings)
+- `session.js` — sessions, items, most app logic, and report-settings save/logo handling
+- `jspdf.umd.min.js`, `jspdf.plugin.autotable.min.js` — vendored MIT PDF libraries (V30)
+- `report.js` — PDF report builder, preview modal, and share (V30)
+- `render-core.js` — main screens (Sessions, Entry, Overview, Edit), the New Session form, the Reports hub, and the welcome modal
+- `render-settings.js` — Settings sub-pages (incl. Report Settings), calculator, About changelog
 - `events.js` — direct binding for the four focus-sensitive fields only (`bindFocusFields`) + suggestion re-renders
-- `dispatch.js` — delegated click + input + change handling and the three action registries (clicks V25, input/change V28)
+- `dispatch.js` — delegated click + input + change handling and the three action registries (clicks V25, input/change V28, report actions V30)
 - `boot.js` — startup; runs a boot integrity self-check, then `load()`/`render()`. **Runs on load and must load last**
 - `styles.css` — themed via CSS variables; light, dark, and system theme
-- `sw.js` — service worker; caches the app shell. Its `ASSETS` list must include all scripts in load order. Bump `CACHE_VERSION` on every release.
+- `sw.js` — service worker; caches the app shell. Its `ASSETS` list must include all scripts (incl. the two PDF libs + `report.js`) in load order. Bump `CACHE_VERSION` on every release.
 - `manifest.webmanifest` — PWA manifest
+- `THIRD-PARTY-LICENSES.txt` — MIT notices for the bundled PDF libraries (V30)
 - `icon-192.png`, `icon-512.png` — app icons
 - `LICENSE.txt` — proprietary license; all rights reserved
 - `MAP.md` — code map: where each function lives

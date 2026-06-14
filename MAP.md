@@ -1,4 +1,4 @@
-# PAT App — Code Map (V29)
+# PAT App — Code Map (V30)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -10,9 +10,10 @@ exists — the modular split is complete.
 > every release — a stale map breaks the whole approach. If you ever open a file
 > the map didn't point you to, the map is out of date: fix it.
 
-## Load order (index.html) — 16 files
+## Load order (index.html) — 19 files (incl. 2 vendored libs)
 `config.js` → `state.js` → `utils.js` → `storage.js` → `clients.js` → `sqp.js`
 → `multipick.js` → `feedback.js` → `csv.js` → `backup.js` → `session.js`
+→ **`jspdf.umd.min.js`** → **`jspdf.plugin.autotable.min.js`** → **`report.js`**
 → `render-core.js` → `render-settings.js` → `events.js` → `dispatch.js`
 → `boot.js`
 
@@ -20,21 +21,33 @@ exists — the modular split is complete.
 functions defined in earlier ones; nothing executes until `boot.js` because
 every other file is function declarations sharing one global scope.
 
+**v30:** the two vendored PDF libraries (jsPDF + autotable, MIT) load after
+`session.js` and before `report.js`, which uses them. They are the first
+third-party code in the app — see `THIRD-PARTY-LICENSES.txt`. They attach to
+`window.jspdf` in the browser UMD build; `report.js` reads them from there.
+
 ---
 
-## config.js (~290 ln) — constants & defaults, pure data
-`APP_VERSION`; all `*_KEY` localStorage key names (incl. welcome keys, latest
-`V27_WELCOME_KEY`); `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
+## config.js (~340 ln) — constants & defaults, pure data
+`APP_VERSION` (V30); all `*_KEY` localStorage key names (incl. welcome keys,
+latest `V30_WELCOME_KEY`); `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`; v27 SQP tuning
 (`SQP_PARTIAL_WEIGHT`, `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`);
 `DEFAULT_ITEM_TYPES`, `DEFAULT_FAIL_REASONS`, `DEFAULT_DESCRIPTIONS`,
-`DEFAULT_CSV_COLUMNS`; `CSA_RESISTANCE`, `CALC_LENGTHS`.
+`DEFAULT_CSV_COLUMNS`; `CSA_RESISTANCE`, `CALC_LENGTHS`. **v30:**
+`REPORT_SETTINGS_KEY`, `V30_WELCOME_KEY`, `REPORT_DECLARATION_DEFAULT`,
+`REPORT_LOGO_MAX_PX`, and `makeDefaultReportSettings()` (the report-settings
+defaults factory — master switch OFF, no retest default).
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
-bump the version label, tune Smart Quick Pick matching/scoring.
+bump the version label, tune Smart Quick Pick matching/scoring, change report
+defaults.
 
-## state.js (~245 ln) — the global `state` object
+## state.js (~265 ln) — the global `state` object
 The single `let state = { ... }` runtime shape: sessions, form, view, all the
-UI transients, welcome-modal flags, SQP/Multi Pick in-memory caches.
+UI transients, welcome-modal flags, SQP/Multi Pick in-memory caches. **v30:**
+`reportSettings` (the report config object, seeded from
+`makeDefaultReportSettings()`) + `reportSettingsError` (transient inline error
+for the logo control) + `v30WelcomeSeen`.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -42,14 +55,18 @@ UI transients, welcome-modal flags, SQP/Multi Pick in-memory caches.
 `formatTimestampCSV`, `splitAssetNo`, `csvEscape`, `csvResultLabel`, `formatBytes`.
 *Touch to:* add a stateless formatting/escaping helper.
 
-## storage.js (~585 ln) — persistence boundary
+## storage.js (~640 ln) — persistence boundary
 Codec: `STORAGE_CODEC_VERSION`, `SESSION_KEY_MAP`, `ITEM_KEY_MAP` (+ `_REV`),
 `encodeWithMap`/`decodeWithMap`, `encodeItem`/`decodeItem`,
 `encodeSession`/`decodeSession`, `_sessionSig`, `serialiseSessions`,
 `parseStoredSessions`. Lifecycle: `load`, `loadV11Settings`,
 `ensureAllCsvColumns`, `computeHistoryFromItems`. Saves: `save` (full),
 `saveSessions`, `saveSettings`, `saveSqpHistory`, `saveDescriptions`. Stats:
-`getStorageStats`.
+`getStorageStats`. **v30:** `loadReportSettings` + `normaliseReportSettings`
+(shared validator used by load AND backup restore — coerces any
+candidate/garbage object to a complete type-safe report-settings object merged
+over defaults) + `saveReportSettings`; `saveSettings` now also persists report
+settings.
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -101,9 +118,12 @@ title/text). Import: `buildCsvHeaderLookup`, `parseCSV`, `parseUkDateToIso`,
 `cancelImportConflict`, `closeImportSummary` (+ `EXPECTED_CSV_HEADER`).
 *Touch to:* change CSV columns, export, or import parsing.
 
-## backup.js (~265 ln) — Backup / Restore (v7)
-`buildBackup`, `downloadBackup`, `markBackupExported`, `snoozeBackupReminder`,
-`shouldShowBackupReminder`, `restoreBackupFromFile`.
+## backup.js (~270 ln) — Backup / Restore (v7)
+`buildBackup` (v30: now includes `reportSettings`), `downloadBackup`,
+`markBackupExported`, `snoozeBackupReminder`, `shouldShowBackupReminder`,
+`restoreBackupFromFile` (v30: restores `reportSettings` via
+`normaliseReportSettings` — old backups with no key restore to defaults, i.e.
+reporting OFF). `backupVersion` stays **5** (reportSettings is purely additive).
 *Touch to:* change the JSON backup shape or restore path. **Bump `backupVersion`
 if the shape changes; keep old-backup compatibility.**
 
@@ -131,9 +151,28 @@ Presets (`activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
 `moveCsvColumn`, `saveItemTypesSettings`, `saveFailReasonsSettings`,
 `saveDescriptionsSettings`, `resetItemsToDefaults`, `resetFailReasonsToDefaults`,
 `resetDescriptionsToDefaults`, `setTheme`, `setHaptics`, `setSound`,
-`setTimestamps`); welcome dismiss (`dismissV19Welcome`, `dismissV26Welcome`, `dismissV27Welcome`).
+`setTimestamps`); **v30 report settings** (`captureReportTextInputs`,
+`saveReportSettingsForm`, `handleReportLogoFile` — logo read + canvas-downscale
+to `REPORT_LOGO_MAX_PX` + base64 store); welcome dismiss (`dismissV19Welcome`,
+`dismissV26Welcome`, `dismissV30Welcome`).
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves.
+
+## report.js (~310 ln) — PDF reports (v30) — NEW
+The PDF report builder + preview + share. `getJsPDF` (reads `window.jspdf`),
+`runAutoTable` (method-form with functional-form fallback), `addMonthsFormatted`
+(retest date), `buildReportDoc` (the document: logo/company header, title, job
+details, tested/passed/failed totals, the appliance-register **autotable built
+from a COLUMN LIST so V31 reading/class columns drop in without layout change**,
+failed-row tint, page footers, declaration + signature), `reportFilename`,
+`produceReport` (dispatch entry — gated by `reportSettings.enabled`; friendly
+alert if the engine hasn't loaded), `openReportPreview` (near-fullscreen iframe
+modal built directly in the DOM), `triggerDownload`, `shareOrDownloadReport`
+(OS share sheet → download fallback, mirrors `shareOrDownloadCSV`). Reuses
+`splitSiteSnapshot` (clients.js), `formatDate`/`csvResultLabel` (utils.js),
+`todayISO`/`state` (session.js/state.js).
+*Touch to:* change the report layout/content, add reading columns (V31), or
+change how the PDF is previewed/shared. **Uses the vendored MIT libs.**
 
 ## render-core.js (~1100 ln) — main screens
 Owns `const app = document.getElementById('app')`. `render()` dispatcher.
@@ -143,21 +182,31 @@ suggestions: `computeNfClientSuggestions`, `computeNfSiteSuggestions`,
 `nfSuggestionsHTML`. Import modals: `renderImportConflictModal`,
 `renderImportSummaryModal`. Entry: `renderEntry`, `refreshEntryAfterLog`.
 Overview: `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
-`renderOverview`, `refreshOverviewBody`, `refreshOverviewSelection`. Edit:
-`renderEditSession`.
-*Touch to:* change the Sessions list, Entry screen, Overview, or Edit-session UI.
+`renderOverview` (v30: "Produce Report" 📄 button in header when
+`reportSettings.enabled`), `refreshOverviewBody`, `refreshOverviewSelection`. Edit:
+`renderEditSession`. **v30:** `renderReports` (the top-level Reports hub — session
+list → produce report; reached from the Sessions header 📄 button, shown only
+when reporting is on); the welcome modal block is now the **V30** "What's new"
+(PDF Reports), gated by `v30WelcomeSeen`.
+*Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, or
+Edit-session UI.
 **v29:** the two no-op binder shells left from V28
 (`bindSessionsListAreaEvents`, `bindOverviewBodyEvents`) and their last call
 sites in `refreshSessionsListAreaOnly` / `refreshOverviewBody` were deleted —
 all those events have been delegated in `dispatch.js` since V25/V28. render()
 calls `bindFocusFields()` (events.js) for the four focus-sensitive fields.
 
-## render-settings.js (~855 ln) — settings screens
-`renderSettingsHub`, `renderSettingsSubHeader`, and every `renderSettings*`
-sub-page (User, Items, Fails, MultiPick, Descriptions, Display, Backup, Csv,
-Clients, Calculator, About, Contact) + calculator helpers (`computeEarthLimit`,
-`formatLengthOption`). **About changelog lives here** (`renderSettingsAbout`).
-*Touch to:* change any Settings page or roll the About changelog.
+## render-settings.js (~960 ln) — settings screens
+`renderSettingsHub` (v30: + Report Settings row), `renderSettingsSubHeader`, and
+every `renderSettings*` sub-page (User, Items, Fails, MultiPick, Descriptions,
+Display, Backup, Csv, Clients, **Report (v30)**, Calculator, About, Contact) +
+calculator helpers (`computeEarthLimit`, `formatLengthOption`).
+`renderSettingsReport` (v30) builds the Report Settings page: master enable
+toggle, company name/address/logo, report title, include-toggles
+(engineer/instrument/calibration/fails/declaration), retest on/off + months,
+declaration text, Save. **About changelog lives here** (`renderSettingsAbout`).
+*Touch to:* change any Settings page, the Report Settings page, or roll the About
+changelog.
 
 ## events.js (~290 ln) — focus-sensitive field binding (per-render)
 `bindFocusFields()` — direct `oninput`/`onfocus`/`onblur` binds for the **four**
@@ -189,6 +238,12 @@ The full delegated event system + three action registries, all attached once to
   preset-switch confirm-on-switch dropdown.
 - `_fieldValue(el)` resolves checkbox/radio→checked else value, passed as the
   handler's first arg.
+**v30:** report actions added — clicks `open-reports`, `produce-report`,
+`settings-report-save`, `report-logo-pick`, `report-logo-remove`; changes
+`report-enabled` (master, persists instantly + re-render), the five include
+toggles + `report-retest-enabled` (in-memory + re-render; each calls
+`captureReportTextInputs` first so unsaved text survives the re-render), and the
+`report-logo-file` picker. `welcome-dismiss` now calls `dismissV30Welcome`.
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 
