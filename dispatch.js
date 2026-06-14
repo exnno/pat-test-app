@@ -354,6 +354,14 @@ registerActions({
   },
   'produce-report': (arg) => produceReport(arg),
 
+  // v31: PDF filename token chip — inserts {site}/{client}/{date}/{engineer}.
+  'report-filename-token': (arg) => insertReportFilenameToken(arg),
+
+  // v31: Export/Import Setup (on the Backup page).
+  'setup-share': () => startShareSetup(),
+  'setup-include-toggle-open': () => toggleSetupIncludeOpen(),
+  'setup-import': () => { const f = document.getElementById('setup-import-file'); if (f) f.click(); },
+
   // Sub-page Save / Reset buttons
   'settings-user-save': () => saveUserSettings(),
   'settings-items-save': () => saveItemTypesSettings(),
@@ -416,7 +424,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV30Welcome(),
+  'welcome-dismiss': () => dismissV31Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -576,6 +584,16 @@ registerChangeActions({
   'backup-import-file': (v, el) => {
     const file = el.files && el.files[0];
     restoreBackupFromFile(file);
+    el.value = '';
+  },
+
+  // v31: Export/Import Setup. The include toggles update in-memory (no full
+  // re-render needed — the checkbox shows its own state). The import file picker
+  // reads a setup bundle and applies config-only sections.
+  'setup-include-toggle': (checked, el) => { setSetupInclude(el.dataset.arg, checked); },
+  'setup-import-file': (v, el) => {
+    const file = el.files && el.files[0];
+    importSetupFromFile(file);
     el.value = '';
   },
 

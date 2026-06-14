@@ -468,6 +468,8 @@ function renderSettingsBackup() {
         <button class="backup-action-btn danger" id="backup-import-btn" data-action="backup-import">⬆ Import backup (.json)</button>
       </div>
 
+      ${renderSetupSection()}
+
       <div class="settings-section">
         <h2 class="h2">Storage usage</h2>
         <div class="storage-card">
@@ -494,7 +496,48 @@ function renderSettingsBackup() {
   `;
 }
 
-// ---------- v11: CSV Columns settings page ----------
+// ---------- v31: Export / Import Setup (lives on the Backup page) ----------
+// Share your CONFIGURATION (presets, report settings, CSV columns, tester/cal,
+// app preferences) as a small file so another device can match this one — no
+// sessions are included or touched. Export uses progressive disclosure: a single
+// "Share setup" button, with a collapsed "Choose what to include" list beneath
+// (all on by default, so the common path is one tap). Import reads the bundle,
+// confirms, and replaces only the sections it carries.
+function renderSetupSection() {
+  const inc = state.setupInclude || {};
+  const open = !!state.setupIncludeOpen;
+  const rows = SETUP_SECTIONS.map(sec => `
+        <label class="setup-include-row">
+          <input type="checkbox" data-change-action="setup-include-toggle" data-arg="${escapeHTML(sec.id)}" ${inc[sec.id] ? 'checked' : ''}>
+          <span class="setup-include-text">
+            <span class="setup-include-name">${escapeHTML(sec.label)}</span>
+            <span class="setup-include-hint">${escapeHTML(sec.hint)}</span>
+          </span>
+        </label>`).join('');
+  const errBlock = state.setupError
+    ? `<p class="muted" style="color:#c0392b;margin-top:8px;font-size:13px">${escapeHTML(state.setupError)}</p>` : '';
+  return `
+      <div class="settings-section">
+        <h2 class="h2">Share setup</h2>
+        <p class="muted">Send your configuration to another phone or a new engineer so it's set up just like this one. This shares <strong>settings only</strong> — your sessions, clients and sites are never included.</p>
+        <button class="backup-action-btn primary" id="setup-share-btn" data-action="setup-share">⬆ Share setup…</button>
+        <button class="setup-disclose" data-action="setup-include-toggle-open" aria-expanded="${open ? 'true' : 'false'}">
+          ${open ? '▾' : '▸'} Choose what to include
+        </button>
+        ${open ? `<div class="setup-include-list">${rows}</div>` : ''}
+        ${errBlock}
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Import setup</h2>
+        <p class="muted">Load a setup file from another device. This replaces the matching settings on this phone (you'll see exactly what before it's applied). <strong>Your sessions are not touched.</strong></p>
+        <input type="file" id="setup-import-file" data-change-action="setup-import-file" accept="application/json,.json" style="display:none">
+        <button class="backup-action-btn" id="setup-import-btn" data-action="setup-import">⬇ Import setup (.json)</button>
+      </div>
+  `;
+}
+
+
 // Controls the column order, visibility, and header text used by buildCSV().
 // Layout for each row: ↑ button, ↓ button, visibility checkbox, header text
 // input, plus a "(default: X)" hint when the header has been customised. The
@@ -798,6 +841,18 @@ function renderSettingsReport() {
       </div>
 
       <div class="settings-section">
+        <h2 class="h2">PDF file name</h2>
+        <p class="muted">Sets the name each report file is saved with. Tap a chip to insert a detail that fills in automatically for each session. You can still rename any single report just before sharing it.</p>
+        <input class="input" id="report-filename-pattern" value="${escapeHTML(rs.reportFilenamePattern || REPORT_FILENAME_DEFAULT)}" placeholder="${escapeHTML(REPORT_FILENAME_DEFAULT)}" autocapitalize="off" autocomplete="off" spellcheck="false">
+        <div class="filename-token-chips">
+          ${REPORT_FILENAME_TOKENS.map(t =>
+            `<button type="button" class="filename-token-chip" data-action="report-filename-token" data-arg="${escapeHTML(t)}">${escapeHTML(t.replace(/[{}]/g, ''))}</button>`
+          ).join('')}
+        </div>
+        <p class="muted" style="font-size:12px;margin-top:6px">Anything that isn't a letter or number becomes an underscore in the saved file. Leave it as <code>${escapeHTML(REPORT_FILENAME_DEFAULT)}</code> to keep the original naming.</p>
+      </div>
+
+      <div class="settings-section">
         <h2 class="h2">What to include</h2>
         ${toggle('report-show-engineer', 'Engineer name', rs.showEngineer)}
         ${toggle('report-show-instrument', 'Test instrument', rs.showInstrument)}
@@ -902,18 +957,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" data-action="about-reload" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v30: rolled forward — V30 on top, V27 dropped. -->
+      <!-- v8: rolling 3-version changelog. v31: rolled forward — V31 on top, V28 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V31</strong> · June 2026</p>
+        <p class="muted">Share your setup, and name your report files. You can now send your whole configuration — Quick Pick presets, report settings, CSV columns, tester details and preferences — to another phone or a colleague from Settings → Backup → Share setup, so a new device matches this one in seconds. You choose what to include, and importing only ever changes settings — your sessions, clients and sites are never touched. Report PDFs can now be named the way you like, using details such as site and date that fill in automatically, and you can still rename any single report before sharing it.</p>
 
         <p><strong>V30</strong> · June 2026</p>
         <p class="muted">PDF reports. You can now turn any session into a professional Portable Appliance Test Report — branded with your company name and logo, listing every appliance with its pass/fail result, and showing tested/passed/failed totals. Set it up under Settings → Report Settings (add your details, choose what's shown, switch it on); a Reports button then appears on the Sessions screen and the session Overview. Reporting starts switched off, so nothing changes until you've set it up. Reports generate on-device and work offline. All your data is untouched.</p>
 
         <p><strong>V29</strong> · June 2026</p>
         <p class="muted">A small housekeeping update. Some leftover scaffolding from the previous behind-the-scenes work has been cleared out, keeping the app lean and quick to build on. Nothing you see or do has changed — logging, search, settings and exports all behave exactly as before, and all your data is untouched.</p>
-
-        <p><strong>V28</strong> · June 2026</p>
-        <p class="muted">Another under-the-hood update with no changes to how the app looks or works. The last part of the tap-and-typing system has been moved onto the same single, efficient setup the buttons already use — so text fields, switches and dropdowns can no longer lose their responsiveness when the screen redraws, and future updates stay quicker and safer to build. Everything you do — logging, search, settings, exports — behaves exactly as before, and all your data is untouched.</p>
       </div>
 
       <div class="info-card">

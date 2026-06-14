@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V30';
+const APP_VERSION = 'V31';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -69,6 +69,7 @@ const V20_WELCOME_KEY = 'pat:v20welcome';   // v20
 const V26_WELCOME_KEY = 'pat:v26welcome';   // v26: Clients & Sites flexibility + split CSV
 const V27_WELCOME_KEY = 'pat:v27welcome';   // v27: Smart Quick Pick ordering quality
 const V30_WELCOME_KEY = 'pat:v30welcome';   // v30: PDF Reports
+const V31_WELCOME_KEY = 'pat:v31welcome';   // v31: Export/Import Setup + named PDF files
 
 // v30: PDF Reports. A single object under REPORT_SETTINGS_KEY holds every
 // report-configuration field plus the optional company logo (base64). Stored as
@@ -97,6 +98,15 @@ const REPORT_DECLARATION_DEFAULT =
   'Tested in accordance with the IET Code of Practice for In-Service Inspection ' +
   'and Testing of Electrical Equipment.';
 
+// v31: PDF report filename pattern. The default reproduces the exact pre-v31
+// filename (PAT_Report_<site>_<date>) so upgrading users see no change unless
+// they opt in by editing it. Tokens are substituted then the whole string is
+// sanitised to a safe filename by reportFilename() in report.js.
+const REPORT_FILENAME_DEFAULT = 'PAT_Report_{site}_{date}';
+
+// The insertable tokens offered as tappable chips on the Report Settings page.
+const REPORT_FILENAME_TOKENS = ['{site}', '{client}', '{date}', '{engineer}'];
+
 // Factory (not a shared object) so callers always get an independent copy —
 // mirrors the DEFAULT_CSV_COLUMNS.map(...) deep-copy pattern used elsewhere.
 function makeDefaultReportSettings() {
@@ -113,13 +123,42 @@ function makeDefaultReportSettings() {
     retestMonths:     null,    // no default (Q10=B); required when retestEnabled
     showFails:        true,    // false = passes-only register
     declaration:      true,    // print the declaration/signature line
-    declarationText:  REPORT_DECLARATION_DEFAULT
+    declarationText:  REPORT_DECLARATION_DEFAULT,
+    // v31: PDF filename pattern. Tokens {site} {client} {date} {engineer} plus
+    // free text; substituted + sanitised by reportFilename(). Seeded to the exact
+    // pre-v31 behaviour so nothing changes unless the user edits it.
+    reportFilenamePattern: REPORT_FILENAME_DEFAULT
   };
 }
 
 // v30: logo upload constraint — longest edge downscaled to this many px before
 // base64 storage, to keep localStorage and JSON backups sane.
 const REPORT_LOGO_MAX_PX = 600;
+
+// v31: Export/Import Setup. A "setup" is a shareable bundle of CONFIGURATION
+// only — no sessions, no clients/sites, no learned SQP history, no backup
+// timers. The use case is "make a second device (or a new employee phone) match
+// this one's setup". It deliberately overlaps the backup serialisation (same
+// per-field shapes, validated through the same normalisers on import) but is a
+// SEPARATE file kind so a backup can never be imported as a setup, or vice
+// versa (which would silently wipe sessions). The file carries:
+//   kind:        "pat-setup"   — identity marker, checked on import
+//   setupVersion: 1            — bundle schema version
+//   label:        "<name>"     — user-given name, shown in the import confirm
+//   sections:     { ... }      — only the ticked groups (progressive-disclosure)
+// SETUP_SECTIONS is the single source of truth mapping the five user-facing
+// groups to the state fields each carries. The export include-list, the bundle
+// builder, and the importer all read this — add a field in one place only.
+const SETUP_KIND = 'pat-setup';
+const SETUP_BUNDLE_VERSION = 1;
+const SETUP_SECTIONS = [
+  { id: 'presets',     label: 'Quick Pick presets & lists',  hint: 'Item presets, fail reasons, descriptions' },
+  { id: 'report',      label: 'Report settings',             hint: 'Branding, logo, filename, declaration' },
+  { id: 'csv',         label: 'CSV columns',                 hint: 'Column order, visibility, headers' },
+  { id: 'tester',      label: 'Tester & calibration details', hint: 'Instrument make/model, calibration info' },
+  { id: 'prefs',       label: 'App preferences',             hint: 'Theme, haptics, sound, timestamps, Multi Pick, Smart Quick Pick on/off' }
+];
+
 
 // v19: Clients & Sites. A two-level model so one client can have several sites.
 //   CLIENTS_KEY — JSON array [{ id, name }].

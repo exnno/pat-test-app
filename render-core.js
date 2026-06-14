@@ -96,24 +96,24 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v30: rolled forward — content covers PDF Reports. Key bumped to
-  // pat:v30welcome (gate uses v30WelcomeSeen) so users see it once on update.
-  const welcomeModal = (state.v30WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // v31: rolled forward — content covers Export/Import Setup + named report
+  // files. Key bumped to pat:v31welcome (gate uses v31WelcomeSeen).
+  const welcomeModal = (state.v31WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V30">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V31">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V30</h3>
+        <h3 class="bulk-sheet-title">What's new in V31</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>PDF reports.</strong> You can now turn any session into a professional Portable Appliance Test Report — branded with your company name and logo, with a full appliance register and pass/fail totals.</li>
-        <li><strong>Set it up once.</strong> Go to Settings → Report Settings to add your details, choose what's shown, and switch reporting on. A new Reports button then appears on the Sessions screen and the session Overview.</li>
-        <li><strong>Off until you're ready.</strong> Reporting starts switched off, so nothing changes until you've set it up — handy when setting up a device for someone else.</li>
-        <li><strong>Works offline.</strong> Once the app has updated, reports generate on-device with no signal needed, and share straight from your phone.</li>
+        <li><strong>Share your setup.</strong> Set up a new phone — or a colleague's — to match this one in seconds. Settings → Backup → Share setup sends your presets, report settings, CSV columns and preferences as a single file. Your sessions are never included.</li>
+        <li><strong>Choose what to share.</strong> Send your whole setup in one tap, or open "Choose what to include" to leave out, say, your calibration details when sharing presets with someone else.</li>
+        <li><strong>Importing is safe.</strong> Importing a setup only changes your settings — it never touches your saved sessions, clients or sites, and shows you exactly what it'll change first.</li>
+        <li><strong>Name your report files.</strong> Report Settings now lets you set how report PDFs are named, using details like site and date that fill in automatically — and you can still rename any single report before sharing it.</li>
       </ul>
-      <button class="btn-primary" id="v30-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v31-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 

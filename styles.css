@@ -1835,3 +1835,71 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   border: 1px solid var(--border);
   background: #fff;
 }
+
+/* ============== v31: Export/Import Setup + filename tokens ============== */
+
+/* "Choose what to include" disclosure button on the Backup page. */
+.setup-disclose {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 500;
+  padding: 10px 2px;
+  margin-top: 4px;
+  cursor: pointer;
+}
+
+/* The grouped include list (revealed when the disclosure is open). */
+.setup-include-list {
+  margin-top: 4px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+}
+.setup-include-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+}
+.setup-include-row:last-child { border-bottom: none; }
+.setup-include-row input[type="checkbox"] {
+  margin-top: 2px;
+  width: 18px;
+  height: 18px;
+  flex: 0 0 auto;
+}
+.setup-include-text { display: flex; flex-direction: column; gap: 2px; }
+.setup-include-name { font-size: 14px; font-weight: 500; color: var(--text); }
+.setup-include-hint { font-size: 12px; color: var(--text-muted); line-height: 1.4; }
+
+/* Report filename token chips on the Report Settings page. */
+.filename-token-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.filename-token-chip {
+  border: 1px solid var(--accent-border);
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.filename-token-chip:active { background: var(--accent-hover); }
+
+/* Editable filename field in the report preview. */
+.report-filename-label { margin-top: 4px; }
+.report-filename-row { display: flex; align-items: center; gap: 6px; }
+.report-filename-row .report-filename-input { flex: 1 1 auto; }
+.report-filename-ext { font-size: 14px; color: var(--text-muted); flex: 0 0 auto; }

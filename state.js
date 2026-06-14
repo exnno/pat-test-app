@@ -161,6 +161,19 @@ let state = {
   // modal (PDF Reports) so users see it once on update.
   v30WelcomeSeen: false,
 
+  // v31: welcome modal flag (key pat:v31welcome). Gates the V31 "what's new"
+  // modal (Export/Import Setup + named report files).
+  v31WelcomeSeen: false,
+
+  // v31: Export/Import Setup transient UI state (not persisted). The Backup page
+  // shows a collapsed "Choose what to include" list; this holds whether it's
+  // expanded and which section ids are ticked. Seeded to all-on so the common
+  // "share my whole setup" path is one tap without opening the list.
+  setupIncludeOpen: false,
+  setupInclude: { presets: true, report: true, csv: true, tester: true, prefs: true },
+  setupError: '',
+
+
   // v30: PDF Reports configuration + company logo. Single object, loaded from
   // localStorage on boot (REPORT_SETTINGS_KEY) and seeded from
   // makeDefaultReportSettings() when absent. `enabled` is the master switch

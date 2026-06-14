@@ -224,10 +224,39 @@ function buildReportDoc(session) {
   return doc;
 }
 
-// Safe filename mirroring the CSV convention.
-function reportFilename(session) {
-  const safe = (session.site || session.name || 'session').replace(/[^a-z0-9]+/gi, '_');
-  return `PAT_Report_${safe}_${session.date}.pdf`;
+// v31: build the report filename from the user's pattern (reportFilenamePattern
+// in report settings), substituting {site} {client} {date} {engineer} from the
+// session, then sanitising the whole thing to a safe filename. The default
+// pattern is PAT_Report_{site}_{date}, which reproduces the exact pre-v31 name.
+// An empty result (e.g. a pattern of only blank tokens) falls back to "PAT_Report".
+function reportFilename(session, patternOverride) {
+  const rs = state.reportSettings || {};
+  const pattern = (typeof patternOverride === 'string' && patternOverride.trim())
+    ? patternOverride
+    : (typeof rs.reportFilenamePattern === 'string' && rs.reportFilenamePattern.trim())
+      ? rs.reportFilenamePattern
+      : 'PAT_Report_{site}_{date}';
+
+  // Resolve tokens. Client comes from the session's site snapshot if present.
+  let client = '';
+  try {
+    if (typeof splitSiteSnapshot === 'function') {
+      const split = splitSiteSnapshot(session.site || '');
+      client = (split && split.client) || '';
+    }
+  } catch (e) { client = ''; }
+
+  const values = {
+    '{site}': session.site || session.name || '',
+    '{client}': client,
+    '{date}': session.date || todayISO(),
+    '{engineer}': (session.engineer != null ? session.engineer : (state.engineer || ''))
+  };
+  let name = pattern.replace(/\{site\}|\{client\}|\{date\}|\{engineer\}/g, m => values[m] || '');
+  // Sanitise: collapse anything non-filename-safe to underscores, trim edges.
+  name = name.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '');
+  if (!name) name = 'PAT_Report';
+  return `${name}.pdf`;
 }
 
 // Entry point from dispatch. Builds the doc and opens the preview modal.
@@ -266,6 +295,10 @@ function openReportPreview(doc, session) {
   sheet.className = 'report-preview-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-label', 'Report preview');
+  // v31: filename is editable here (Q6=C) — seeded from the configured pattern,
+  // shown without the .pdf suffix so the user edits a clean name. The .pdf is
+  // re-appended at share/download time.
+  const baseName = filename.replace(/\.pdf$/i, '');
   sheet.innerHTML = `
     <div class="report-preview-bar">
       <button class="btn-secondary" id="report-preview-close">Close</button>
@@ -274,9 +307,23 @@ function openReportPreview(doc, session) {
     </div>
     <iframe class="report-preview-frame" src="${url}" title="Report preview"></iframe>
     <div class="report-preview-fallback">
+      <label class="label report-filename-label" for="report-filename-input">File name</label>
+      <div class="report-filename-row">
+        <input class="input report-filename-input" id="report-filename-input" value="${baseName.replace(/"/g, '&quot;')}" autocapitalize="off" autocomplete="off" spellcheck="false">
+        <span class="report-filename-ext">.pdf</span>
+      </div>
       <button class="btn-secondary" id="report-preview-download">Download PDF</button>
     </div>
   `;
+
+  // Resolve the current filename from the editable field at action time.
+  function currentFilename() {
+    const inp = document.getElementById('report-filename-input');
+    let n = inp ? inp.value : baseName;
+    n = String(n).replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '');
+    if (!n) n = 'PAT_Report';
+    return `${n}.pdf`;
+  }
 
   function cleanup() {
     URL.revokeObjectURL(url);
@@ -289,10 +336,10 @@ function openReportPreview(doc, session) {
 
   document.getElementById('report-preview-close').addEventListener('click', cleanup);
   document.getElementById('report-preview-download').addEventListener('click', () => {
-    triggerDownload(blob, filename);
+    triggerDownload(blob, currentFilename());
   });
   document.getElementById('report-preview-share').addEventListener('click', async () => {
-    await shareOrDownloadReport(blob, filename);
+    await shareOrDownloadReport(blob, currentFilename());
   });
 }
 

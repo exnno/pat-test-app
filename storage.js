@@ -420,6 +420,7 @@ function loadV11Settings() {
   state.v26WelcomeSeen = localStorage.getItem(V26_WELCOME_KEY) === '1';
   state.v27WelcomeSeen = localStorage.getItem(V27_WELCOME_KEY) === '1';
   state.v30WelcomeSeen = localStorage.getItem(V30_WELCOME_KEY) === '1';
+  state.v31WelcomeSeen = localStorage.getItem(V31_WELCOME_KEY) === '1';
 
   // v17: Sound feedback + Item timestamps. Both default OFF; only an explicit
   // '1' enables them. Anything else (absent key, '0', garbage) reads as off.
@@ -497,6 +498,12 @@ function normaliseReportSettings(stored) {
     ? stored.reportTitle : defaults.reportTitle;
   out.declarationText = typeof stored.declarationText === 'string'
     ? stored.declarationText : defaults.declarationText;
+  // v31: filename pattern. A non-empty string is kept as-is (tokens are resolved
+  // and the result sanitised at build time, so any text is safe here); empty,
+  // missing, or non-string falls back to the default pattern.
+  out.reportFilenamePattern = (typeof stored.reportFilenamePattern === 'string'
+    && stored.reportFilenamePattern.trim())
+    ? stored.reportFilenamePattern : defaults.reportFilenamePattern;
   if (out.retestEnabled && out.retestMonths === null) out.retestEnabled = false;
   return out;
 }

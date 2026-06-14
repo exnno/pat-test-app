@@ -3,7 +3,7 @@
 A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, flexible clients & sites, search, filters, bulk edit, JSON backup/restore, dark mode, CSV export/import, and branded PDF report generation.
 
 **Live:** https://exnno.github.io/pat-test-app/
-**Current version:** V30 · cache `pat-v30`
+**Current version:** V31 · cache `pat-v31`
 
 ## Key features
 
@@ -15,6 +15,8 @@ A fast, offline-first portable appliance testing app. Records pass/fail decision
 - **CSV export/import** — customisable columns (incl. a separate, optional Client column), single-session import with round-trip support.
 - **PDF reports (V30)** — turn any session into a branded *Portable Appliance Test Report*: company name/address/logo header, appliance register (Asset ID / Description / Location / Result, plus an automatic Notes column when present), tested/passed/failed totals, optional test-instrument, calibration and recommended-retest details, and an editable declaration + signature line. Configured under Settings → Report Settings behind a master switch that is **off by default** (so a freshly set-up device can't generate an unconfigured report); when on, a Reports button appears on the Sessions screen and the session Overview. Generated on-device, fully offline, and shared via the OS share sheet.
 - **Backup/restore** — full JSON backup (human-readable), versioned (`backupVersion` 5; report settings are included additively).
+- **Export/Import Setup (V31)** — share your *configuration* (Quick Pick presets, fail reasons, descriptions, report settings incl. logo, CSV columns, tester/calibration details, and app preferences) as a small self-describing `pat-setup` file, so a second device or a new engineer can be set up to match in seconds. Found on Settings → Backup. Export uses progressive disclosure (one-tap "Share setup", or open "Choose what to include" to leave sections out) and the bundle carries a user-given name. Import **replaces only the settings it carries and never touches sessions, clients or sites** — and a separate file kind means a full backup can't be imported as a setup (or vice versa). Built to be reused later as "team admin pushes a setup to all engineers" in the planned cloud product.
+- **Custom report file names (V31)** — set how report PDFs are named under Settings → Report Settings, using tappable tokens (`{site}`, `{client}`, `{date}`, `{engineer}`) that fill in per session; the default reproduces the original `PAT_Report_<site>_<date>` naming, and any single report can be renamed in the preview before sharing.
 - **Offline-first** — service-worker cached; all data in `localStorage` on the device only.
 
 ## Stack
@@ -44,11 +46,12 @@ The app logic was split out of the old single `app.js` into single-concern scrip
 - `backup.js` — JSON backup/restore (incl. report settings)
 - `session.js` — sessions, items, most app logic, and report-settings save/logo handling
 - `jspdf.umd.min.js`, `jspdf.plugin.autotable.min.js` — vendored MIT PDF libraries (V30)
-- `report.js` — PDF report builder, preview modal, and share (V30)
+- `report.js` — PDF report builder, preview modal, and share (V30; V31 adds configurable filenames)
+- `setup.js` — Export/Import Setup: config-only shareable bundle build/share/import (V31)
 - `render-core.js` — main screens (Sessions, Entry, Overview, Edit), the New Session form, the Reports hub, and the welcome modal
 - `render-settings.js` — Settings sub-pages (incl. Report Settings), calculator, About changelog
 - `events.js` — direct binding for the four focus-sensitive fields only (`bindFocusFields`) + suggestion re-renders
-- `dispatch.js` — delegated click + input + change handling and the three action registries (clicks V25, input/change V28, report actions V30)
+- `dispatch.js` — delegated click + input + change handling and the three action registries (clicks V25, input/change V28, report actions V30, setup + filename actions V31)
 - `boot.js` — startup; runs a boot integrity self-check, then `load()`/`render()`. **Runs on load and must load last**
 - `styles.css` — themed via CSS variables; light, dark, and system theme
 - `sw.js` — service worker; caches the app shell. Its `ASSETS` list must include all scripts (incl. the two PDF libs + `report.js`) in load order. Bump `CACHE_VERSION` on every release.

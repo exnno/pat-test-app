@@ -1147,10 +1147,12 @@ function captureReportTextInputs() {
   const title = document.getElementById('report-title');
   const decl = document.getElementById('report-declaration-text');
   const months = document.getElementById('report-retest-months');
+  const fnpat = document.getElementById('report-filename-pattern');
   if (name) rs.companyName = name.value.trim();
   if (addr) rs.companyAddress = addr.value.replace(/\s+$/, '');
   if (title) rs.reportTitle = title.value.trim() || 'Portable Appliance Test Report';
   if (decl) rs.declarationText = decl.value.trim();
+  if (fnpat) rs.reportFilenamePattern = fnpat.value.trim() || REPORT_FILENAME_DEFAULT;
   if (months) {
     const m = parseInt(months.value, 10);
     rs.retestMonths = (Number.isFinite(m) && m >= 1 && m <= 120) ? m : null;
@@ -1312,6 +1314,102 @@ function dismissV30Welcome() {
   state.v30WelcomeSeen = true;
   localStorage.setItem(V30_WELCOME_KEY, '1');
   render();
+}
+
+function dismissV31Welcome() {
+  state.v31WelcomeSeen = true;
+  localStorage.setItem(V31_WELCOME_KEY, '1');
+  render();
+}
+
+// ---------- v31: Export/Import Setup UI handlers ----------
+
+// Toggle the "Choose what to include" disclosure on the Backup page.
+function toggleSetupIncludeOpen() {
+  state.setupIncludeOpen = !state.setupIncludeOpen;
+  state.setupError = '';
+  render();
+}
+
+// Tick/untick one include section. `on` comes from the checkbox.
+function setSetupInclude(sectionId, on) {
+  if (!state.setupInclude) state.setupInclude = {};
+  state.setupInclude[sectionId] = !!on;
+  state.setupError = '';
+  // No full re-render needed (the checkbox reflects itself), but keep state and
+  // the disclosure open. A light re-render keeps the markup authoritative.
+}
+
+// Insert a filename token into the report filename pattern field at the caret
+// (falls back to appending). Updates state so a subsequent render keeps it.
+function insertReportFilenameToken(token) {
+  const inp = document.getElementById('report-filename-pattern');
+  if (!inp) return;
+  const start = (typeof inp.selectionStart === 'number') ? inp.selectionStart : inp.value.length;
+  const end = (typeof inp.selectionEnd === 'number') ? inp.selectionEnd : inp.value.length;
+  const v = inp.value;
+  inp.value = v.slice(0, start) + token + v.slice(end);
+  // Keep the field's settings in step so Save (which reads the DOM) is correct.
+  state.reportSettings.reportFilenamePattern = inp.value.trim() || REPORT_FILENAME_DEFAULT;
+  // Restore caret just after the inserted token.
+  const pos = start + token.length;
+  try { inp.focus(); inp.setSelectionRange(pos, pos); } catch (e) {}
+}
+
+// Share setup. Builds a default name from the company name (if set) and opens a
+// small bottom sheet to confirm/edit it, then shares. At least one section must
+// be ticked. Built directly in the DOM (like the report preview) so it overlays
+// without a view change and works reliably in the iOS PWA.
+function startShareSetup() {
+  const inc = state.setupInclude || {};
+  const anyOn = SETUP_SECTIONS.some(s => inc[s.id]);
+  if (!anyOn) {
+    state.setupError = 'Pick at least one thing to include before sharing.';
+    state.setupIncludeOpen = true;
+    render();
+    return;
+  }
+  state.setupError = '';
+  const company = (state.reportSettings && state.reportSettings.companyName || '').trim();
+  const defaultName = company ? `${company} setup` : 'PAT setup';
+
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.style.zIndex = '300';
+  const sheet = document.createElement('div');
+  sheet.className = 'bulk-sheet';
+  sheet.style.zIndex = '301';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-label', 'Name this setup');
+  const included = SETUP_SECTIONS.filter(s => inc[s.id]).map(s => s.label);
+  sheet.innerHTML = `
+    <div class="bulk-sheet-handle"></div>
+    <div class="bulk-sheet-header">
+      <span class="fail-close-spacer"></span>
+      <h3 class="bulk-sheet-title">Name this setup</h3>
+      <button class="fail-close-btn" id="setup-name-cancel" aria-label="Cancel">×</button>
+    </div>
+    <p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text-muted)">Give this setup a name so it's easy to recognise when importing it later.</p>
+    <input class="input" id="setup-name-input" value="${escapeHTML(defaultName)}" autocapitalize="on" autocomplete="off" maxlength="60">
+    <p style="margin:12px 0 4px;font-size:12px;color:var(--text-muted)">Includes: ${escapeHTML(included.join(', '))}</p>
+    <button class="btn-primary" id="setup-name-share" style="margin-top:12px">Share</button>
+  `;
+
+  function cleanup() { backdrop.remove(); sheet.remove(); }
+  backdrop.addEventListener('click', cleanup);
+  document.getElementById && document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+  const cancelBtn = document.getElementById('setup-name-cancel');
+  if (cancelBtn) cancelBtn.addEventListener('click', cleanup);
+  const shareBtn = document.getElementById('setup-name-share');
+  if (shareBtn) shareBtn.addEventListener('click', async () => {
+    const inp = document.getElementById('setup-name-input');
+    const label = inp ? inp.value.trim() : defaultName;
+    cleanup();
+    await shareSetup(label || defaultName, state.setupInclude);
+  });
+  const nameInput = document.getElementById('setup-name-input');
+  if (nameInput) { try { nameInput.focus(); nameInput.select(); } catch (e) {} }
 }
 
 function saveItemTypesSettings() {

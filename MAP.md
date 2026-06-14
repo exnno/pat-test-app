@@ -1,4 +1,4 @@
-# PAT App — Code Map (V30)
+# PAT App — Code Map (V31)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -10,12 +10,12 @@ exists — the modular split is complete.
 > every release — a stale map breaks the whole approach. If you ever open a file
 > the map didn't point you to, the map is out of date: fix it.
 
-## Load order (index.html) — 19 files (incl. 2 vendored libs)
+## Load order (index.html) — 20 files (incl. 2 vendored libs)
 `config.js` → `state.js` → `utils.js` → `storage.js` → `clients.js` → `sqp.js`
 → `multipick.js` → `feedback.js` → `csv.js` → `backup.js` → `session.js`
-→ **`jspdf.umd.min.js`** → **`jspdf.plugin.autotable.min.js`** → **`report.js`**
-→ `render-core.js` → `render-settings.js` → `events.js` → `dispatch.js`
-→ `boot.js`
+→ **`setup.js`** → **`jspdf.umd.min.js`** → **`jspdf.plugin.autotable.min.js`**
+→ **`report.js`** → `render-core.js` → `render-settings.js` → `events.js`
+→ `dispatch.js` → `boot.js`
 
 `boot.js` runs the startup block and must stay **last**. Later files may call
 functions defined in earlier ones; nothing executes until `boot.js` because
@@ -28,26 +28,30 @@ third-party code in the app — see `THIRD-PARTY-LICENSES.txt`. They attach to
 
 ---
 
-## config.js (~340 ln) — constants & defaults, pure data
-`APP_VERSION` (V30); all `*_KEY` localStorage key names (incl. welcome keys,
-latest `V30_WELCOME_KEY`); `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
+## config.js (~390 ln) — constants & defaults, pure data
+`APP_VERSION` (V31); all `*_KEY` localStorage key names (incl. welcome keys,
+latest `V31_WELCOME_KEY`); `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`; v27 SQP tuning
 (`SQP_PARTIAL_WEIGHT`, `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`);
 `DEFAULT_ITEM_TYPES`, `DEFAULT_FAIL_REASONS`, `DEFAULT_DESCRIPTIONS`,
 `DEFAULT_CSV_COLUMNS`; `CSA_RESISTANCE`, `CALC_LENGTHS`. **v30:**
-`REPORT_SETTINGS_KEY`, `V30_WELCOME_KEY`, `REPORT_DECLARATION_DEFAULT`,
-`REPORT_LOGO_MAX_PX`, and `makeDefaultReportSettings()` (the report-settings
-defaults factory — master switch OFF, no retest default).
+`REPORT_SETTINGS_KEY`, `REPORT_DECLARATION_DEFAULT`, `REPORT_LOGO_MAX_PX`,
+`makeDefaultReportSettings()`. **v31:** `V31_WELCOME_KEY`;
+`REPORT_FILENAME_DEFAULT` + `REPORT_FILENAME_TOKENS` (PDF filename pattern +
+chips); `makeDefaultReportSettings()` now seeds `reportFilenamePattern`;
+`SETUP_KIND`, `SETUP_BUNDLE_VERSION`, `SETUP_SECTIONS` (the five Export/Import
+Setup groups → which fields each carries — single source of truth).
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
-bump the version label, tune Smart Quick Pick matching/scoring, change report
-defaults.
+bump the version label, tune Smart Quick Pick, change report defaults, change
+what an exported setup includes (`SETUP_SECTIONS`).
 
-## state.js (~265 ln) — the global `state` object
+## state.js (~280 ln) — the global `state` object
 The single `let state = { ... }` runtime shape: sessions, form, view, all the
 UI transients, welcome-modal flags, SQP/Multi Pick in-memory caches. **v30:**
-`reportSettings` (the report config object, seeded from
-`makeDefaultReportSettings()`) + `reportSettingsError` (transient inline error
-for the logo control) + `v30WelcomeSeen`.
+`reportSettings` + `reportSettingsError` + `v30WelcomeSeen`. **v31:**
+`v31WelcomeSeen`; `setupIncludeOpen` (disclosure state) + `setupInclude`
+({sectionId:bool}, all true by default) + `setupError` — all transient Export/
+Import Setup UI state, not persisted.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -66,7 +70,9 @@ Codec: `STORAGE_CODEC_VERSION`, `SESSION_KEY_MAP`, `ITEM_KEY_MAP` (+ `_REV`),
 (shared validator used by load AND backup restore — coerces any
 candidate/garbage object to a complete type-safe report-settings object merged
 over defaults) + `saveReportSettings`; `saveSettings` now also persists report
-settings.
+settings. **v31:** `normaliseReportSettings` also validates
+`reportFilenamePattern` (non-empty kept, else default — old data/backups backfill
+the new field); `load` reads `V31_WELCOME_KEY`.
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -127,6 +133,24 @@ reporting OFF). `backupVersion` stays **5** (reportSettings is purely additive).
 *Touch to:* change the JSON backup shape or restore path. **Bump `backupVersion`
 if the shape changes; keep old-backup compatibility.**
 
+## setup.js (~250 ln) — Export/Import Setup (v31) — NEW
+Config-only shareable bundle (NOT sessions/clients/sites). `buildSetupBundle`
+(reads `SETUP_SECTIONS` from config; includes only ticked sections),
+`setupFilename`, `describeSetupSections`, `shareSetup` (OS share sheet → download
+fallback, mirrors shareOrDownloadReport), `importSetupFromFile` (FileReader +
+**file-kind guard**: rejects a full backup imported as a setup, and vice versa —
+a setup never touches sessions, so the guard is the only thing preventing a
+mis-import from looking destructive), `applySetupBundle` (applies present
+sections via the SAME validators as backup-restore: preset-restore logic,
+`normaliseReportSettings`, CSV column re-validation + `ensureAllCsvColumns`,
+`normaliseMultiPickConfig`, `applyTheme`). Five user-facing groups: presets &
+lists / report settings / CSV columns / tester & calibration / app preferences.
+Deliberately excludes `sqpHistory` (device-specific). Bundle marker `kind:
+"pat-setup"`, `setupVersion:1`, plus a user-given `label`. Reuses `uid`,
+`syncItemTypesFromActivePreset`, `todayISO` (session.js).
+*Touch to:* change what a shared setup carries, the import/merge behaviour, or
+the bundle format. **Config-only — must never read or write sessions.**
+
 ## session.js (~1320 ln) — sessions, items & most logic
 Presets (`activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
 `createPreset`, `renamePreset`, `deletePreset`); core helpers (`uid`, `todayISO`,
@@ -154,25 +178,30 @@ Presets (`activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
 `setTimestamps`); **v30 report settings** (`captureReportTextInputs`,
 `saveReportSettingsForm`, `handleReportLogoFile` — logo read + canvas-downscale
 to `REPORT_LOGO_MAX_PX` + base64 store); welcome dismiss (`dismissV19Welcome`,
-`dismissV26Welcome`, `dismissV30Welcome`).
+`dismissV26Welcome`, `dismissV30Welcome`, **`dismissV31Welcome`**). **v31:**
+report filename pattern captured in `captureReportTextInputs`; Export/Import
+Setup UI handlers (`toggleSetupIncludeOpen`, `setSetupInclude`, `startShareSetup`
+— builds the name bottom-sheet then calls `shareSetup`) and
+`insertReportFilenameToken` (token-chip → filename field insert at caret).
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves.
 
 ## report.js (~310 ln) — PDF reports (v30) — NEW
 The PDF report builder + preview + share. `getJsPDF` (reads `window.jspdf`),
-`runAutoTable` (method-form with functional-form fallback), `addMonthsFormatted`
-(retest date), `buildReportDoc` (the document: logo/company header, title, job
-details, tested/passed/failed totals, the appliance-register **autotable built
-from a COLUMN LIST so V31 reading/class columns drop in without layout change**,
-failed-row tint, page footers, declaration + signature), `reportFilename`,
-`produceReport` (dispatch entry — gated by `reportSettings.enabled`; friendly
-alert if the engine hasn't loaded), `openReportPreview` (near-fullscreen iframe
-modal built directly in the DOM), `triggerDownload`, `shareOrDownloadReport`
-(OS share sheet → download fallback, mirrors `shareOrDownloadCSV`). Reuses
+`runAutoTable`, `addMonthsFormatted` (retest date), `buildReportDoc` (logo/company
+header, title, job details, tested/passed/failed totals, the appliance-register
+autotable built from a COLUMN LIST, failed-row tint, footers, declaration),
+`reportFilename` (**v31:** builds from `reportSettings.reportFilenamePattern`
+with {site}/{client}/{date}/{engineer} token substitution + sanitisation; default
+pattern reproduces the exact pre-v31 name), `produceReport` (dispatch entry —
+gated by `reportSettings.enabled`; friendly alert if the engine hasn't loaded),
+`openReportPreview` (near-fullscreen iframe modal; **v31:** an editable filename
+field, seeded from the pattern, used for share/download), `triggerDownload`,
+`shareOrDownloadReport` (OS share sheet → download fallback). Reuses
 `splitSiteSnapshot` (clients.js), `formatDate`/`csvResultLabel` (utils.js),
 `todayISO`/`state` (session.js/state.js).
-*Touch to:* change the report layout/content, add reading columns (V31), or
-change how the PDF is previewed/shared. **Uses the vendored MIT libs.**
+*Touch to:* change the report layout/content, add reading columns (future), or
+change how the PDF is previewed/shared/named. **Uses the vendored MIT libs.**
 
 ## render-core.js (~1100 ln) — main screens
 Owns `const app = document.getElementById('app')`. `render()` dispatcher.
@@ -204,9 +233,14 @@ calculator helpers (`computeEarthLimit`, `formatLengthOption`).
 `renderSettingsReport` (v30) builds the Report Settings page: master enable
 toggle, company name/address/logo, report title, include-toggles
 (engineer/instrument/calibration/fails/declaration), retest on/off + months,
-declaration text, Save. **About changelog lives here** (`renderSettingsAbout`).
-*Touch to:* change any Settings page, the Report Settings page, or roll the About
-changelog.
+declaration text, Save. **v31:** a "PDF file name" section (pattern input +
+{site}/{client}/{date}/{engineer} token chips) on Report Settings; and
+`renderSetupSection()` (lives on the Backup page) — the Export/Import Setup UI:
+"Share setup" + a progressive-disclosure "Choose what to include" list (driven
+by `SETUP_SECTIONS` + `state.setupInclude`) + "Import setup". **About changelog
+lives here** (`renderSettingsAbout`) — v31: V31 on top, V28 dropped.
+*Touch to:* change any Settings page, the Report Settings page, the Export/Import
+Setup section, or roll the About changelog.
 
 ## events.js (~290 ln) — focus-sensitive field binding (per-render)
 `bindFocusFields()` — direct `oninput`/`onfocus`/`onblur` binds for the **four**
@@ -244,6 +278,10 @@ The full delegated event system + three action registries, all attached once to
 toggles + `report-retest-enabled` (in-memory + re-render; each calls
 `captureReportTextInputs` first so unsaved text survives the re-render), and the
 `report-logo-file` picker. `welcome-dismiss` now calls `dismissV30Welcome`.
+**v31:** clicks `report-filename-token` (chip insert), `setup-share`,
+`setup-include-toggle-open`, `setup-import`; changes `setup-include-toggle` (per
+section), `setup-import-file` (→ `importSetupFromFile`); `welcome-dismiss` now
+calls `dismissV31Welcome`.
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

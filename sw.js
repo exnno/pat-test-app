@@ -166,7 +166,13 @@
 // the label's measured width instead of a fixed offset, and the label was
 // shortened. report.js only; cache bumped to pat-v30-1 so the fix reaches
 // devices already on v30 (cache-first would otherwise keep serving old report.js).
-const CACHE_VERSION = 'pat-v30-1';
+// v31: Export/Import Setup + named report files. New app file setup.js (config-
+// only setup bundle export/import) added to the ASSETS list below. config/state/
+// storage/session/report/render-settings/render-core/dispatch/index/styles
+// changed; backupVersion unchanged (5). Cache bumped to pat-v31 so installed
+// PWAs pull the new file set; a stale cache would 404 setup.js and blank the app
+// (the boot.js crash fallback still guards that failure mode).
+const CACHE_VERSION = 'pat-v31';
 const ASSETS = [
   './',
   './index.html',
@@ -182,6 +188,7 @@ const ASSETS = [
   './csv.js',
   './backup.js',
   './session.js',
+  './setup.js',
   './jspdf.umd.min.js',
   './jspdf.plugin.autotable.min.js',
   './report.js',
