@@ -1,0 +1,59 @@
+PAT Test PWA — Third-Party Licenses
+===================================
+
+The PAT Test PWA application code is © 2026 Peter Birchley, all rights reserved
+(see LICENSE.txt). It bundles the following third-party libraries, used under
+the permissive MIT License. Each library's own copyright/permission notice is
+preserved verbatim inside its minified file (do not strip those headers — that
+preservation is the MIT License's one condition).
+
+Introduced in: V30 (June 2026), for PDF report generation.
+
+---------------------------------------------------------------------------
+1. jsPDF
+---------------------------------------------------------------------------
+File:        jspdf.umd.min.js
+Version:     3.0.3 (built 2025-09-18)
+Copyright:   (c) 2010-2025 James Hall <james@parall.ax>, and contributors
+Project:     https://github.com/parallax/jsPDF
+License:     MIT
+
+---------------------------------------------------------------------------
+2. jsPDF-AutoTable
+---------------------------------------------------------------------------
+File:        jspdf.plugin.autotable.min.js
+Version:     5.0.2
+Copyright:   (c) 2025 Simon Bengtsson
+Project:     https://github.com/simonbengtsson/jsPDF-AutoTable
+License:     MIT
+
+---------------------------------------------------------------------------
+The MIT License (applies to both libraries above)
+---------------------------------------------------------------------------
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+---------------------------------------------------------------------------
+Notes
+---------------------------------------------------------------------------
+- MIT permits commercial use, modification, and distribution, including in a
+  paid/subscription product, with no royalty.
+- These files are served from the app's own origin and cached by the service
+  worker, so report generation works fully offline after first load.
+- When the project later adopts a build step (e.g. the planned SaaS version),
+  these can be pulled from npm and this manifest regenerated automatically.
