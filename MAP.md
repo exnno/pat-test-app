@@ -1,4 +1,4 @@
-# PAT App — Code Map (V31)
+# PAT App — Code Map (V32)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -28,22 +28,23 @@ third-party code in the app — see `THIRD-PARTY-LICENSES.txt`. They attach to
 
 ---
 
-## config.js (~390 ln) — constants & defaults, pure data
-`APP_VERSION` (V31); all `*_KEY` localStorage key names (incl. welcome keys,
-latest `V31_WELCOME_KEY`); `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
-`BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`; v27 SQP tuning
-(`SQP_PARTIAL_WEIGHT`, `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`);
+## config.js (~440 ln) — constants & defaults, pure data
+`APP_VERSION` (V32); all `*_KEY` localStorage key names (incl. welcome keys,
+latest `V32_WELCOME_KEY`); `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
+`BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`; v27 SQP tuning;
 `DEFAULT_ITEM_TYPES`, `DEFAULT_FAIL_REASONS`, `DEFAULT_DESCRIPTIONS`,
 `DEFAULT_CSV_COLUMNS`; `CSA_RESISTANCE`, `CALC_LENGTHS`. **v30:**
 `REPORT_SETTINGS_KEY`, `REPORT_DECLARATION_DEFAULT`, `REPORT_LOGO_MAX_PX`,
 `makeDefaultReportSettings()`. **v31:** `V31_WELCOME_KEY`;
-`REPORT_FILENAME_DEFAULT` + `REPORT_FILENAME_TOKENS` (PDF filename pattern +
-chips); `makeDefaultReportSettings()` now seeds `reportFilenamePattern`;
-`SETUP_KIND`, `SETUP_BUNDLE_VERSION`, `SETUP_SECTIONS` (the five Export/Import
-Setup groups → which fields each carries — single source of truth).
+`REPORT_FILENAME_DEFAULT` + `REPORT_FILENAME_TOKENS`; `SETUP_KIND`,
+`SETUP_BUNDLE_VERSION`, `SETUP_SECTIONS`. **v32:** `V32_WELCOME_KEY`;
+`SETTINGS_CATEGORIES` (the six Settings groups → which page ids each contains,
+plus icon/title/blurb) and `SETTINGS_PAGE_META` (per-page icon/title + search
+`aliases`) — the single source of truth for the two-level Settings hub, the
+category sub-lists, search matching, and back-navigation.
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
-bump the version label, tune Smart Quick Pick, change report defaults, change
-what an exported setup includes (`SETUP_SECTIONS`).
+bump the version, change report/setup defaults, **or restructure Settings / add a
+new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
 
 ## state.js (~280 ln) — the global `state` object
 The single `let state = { ... }` runtime shape: sessions, form, view, all the
@@ -51,7 +52,9 @@ UI transients, welcome-modal flags, SQP/Multi Pick in-memory caches. **v30:**
 `reportSettings` + `reportSettingsError` + `v30WelcomeSeen`. **v31:**
 `v31WelcomeSeen`; `setupIncludeOpen` (disclosure state) + `setupInclude`
 ({sectionId:bool}, all true by default) + `setupError` — all transient Export/
-Import Setup UI state, not persisted.
+Import Setup UI state, not persisted. **v32:** `v32WelcomeSeen`;
+`settingsCategory` (the open category id, or null at the hub) + `settingsSearchQuery`
+(live settings-hub search text) — transient two-level-Settings nav state.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -72,7 +75,7 @@ candidate/garbage object to a complete type-safe report-settings object merged
 over defaults) + `saveReportSettings`; `saveSettings` now also persists report
 settings. **v31:** `normaliseReportSettings` also validates
 `reportFilenamePattern` (non-empty kept, else default — old data/backups backfill
-the new field); `load` reads `V31_WELCOME_KEY`.
+the new field); `load` reads `V31_WELCOME_KEY` (and **v32:** `V32_WELCOME_KEY`).
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -212,35 +215,42 @@ suggestions: `computeNfClientSuggestions`, `computeNfSiteSuggestions`,
 `renderImportSummaryModal`. Entry: `renderEntry`, `refreshEntryAfterLog`.
 Overview: `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
 `renderOverview` (v30: "Produce Report" 📄 button in header when
-`reportSettings.enabled`), `refreshOverviewBody`, `refreshOverviewSelection`. Edit:
-`renderEditSession`. **v30:** `renderReports` (the top-level Reports hub — session
-list → produce report; reached from the Sessions header 📄 button, shown only
-when reporting is on); the welcome modal block is now the **V30** "What's new"
-(PDF Reports), gated by `v30WelcomeSeen`.
-*Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, or
-Edit-session UI.
+`reportSettings.enabled`), `refreshOverviewBody`, `refreshOverviewSelection`. Edit: `renderEditSession`. **v30:** `renderReports` (the top-level Reports hub).
+**v32:** `emptyStateHTML(icon,title,body,actionLabel,actionName)` — the shared
+empty-state block used on Sessions (no sessions → "Start your first session"
+button), Overview (genuinely-empty session, no button), Clients (in
+render-settings), and Reports hub (no sessions); `refreshSettingsHubBodyOnly`
+(partial re-render of the settings hub body for live search, alongside
+`refreshSessionsListAreaOnly`); `settingsCategory` view routed in `render()`; the
+welcome modal block is now the **V32** "What's new" (settings restructure +
+search), gated by `v32WelcomeSeen`.
+*Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
+Edit-session UI, the empty states, or the welcome modal.
 **v29:** the two no-op binder shells left from V28
 (`bindSessionsListAreaEvents`, `bindOverviewBodyEvents`) and their last call
 sites in `refreshSessionsListAreaOnly` / `refreshOverviewBody` were deleted —
 all those events have been delegated in `dispatch.js` since V25/V28. render()
 calls `bindFocusFields()` (events.js) for the four focus-sensitive fields.
 
-## render-settings.js (~960 ln) — settings screens
-`renderSettingsHub` (v30: + Report Settings row), `renderSettingsSubHeader`, and
-every `renderSettings*` sub-page (User, Items, Fails, MultiPick, Descriptions,
-Display, Backup, Csv, Clients, **Report (v30)**, Calculator, About, Contact) +
-calculator helpers (`computeEarthLimit`, `formatLengthOption`).
-`renderSettingsReport` (v30) builds the Report Settings page: master enable
-toggle, company name/address/logo, report title, include-toggles
-(engineer/instrument/calibration/fails/declaration), retest on/off + months,
-declaration text, Save. **v31:** a "PDF file name" section (pattern input +
-{site}/{client}/{date}/{engineer} token chips) on Report Settings; and
-`renderSetupSection()` (lives on the Backup page) — the Export/Import Setup UI:
-"Share setup" + a progressive-disclosure "Choose what to include" list (driven
-by `SETUP_SECTIONS` + `state.setupInclude`) + "Import setup". **About changelog
-lives here** (`renderSettingsAbout`) — v31: V31 on top, V28 dropped.
-*Touch to:* change any Settings page, the Report Settings page, the Export/Import
-Setup section, or roll the About changelog.
+## render-settings.js (~1050 ln) — settings screens
+**v32: two-level Settings.** `renderSettingsHub` is now a list of CATEGORIES
+(from `SETTINGS_CATEGORIES` in config.js) plus a search box; `renderSettingsHubBodyHTML`
+builds the body (search results across all pages, OR the category list) and is
+re-rendered alone by `refreshSettingsHubBodyOnly` (render-core) so the search box
+keeps focus while typing. `renderSettingsCategory` shows one category's pages +
+a muted blurb (helper text); back → hub. `settingsPageSubtitle(pageId)` computes
+the live count/status line for a page row (was inline in the old flat hub);
+`settingsPageRowHTML(pageId, context)` renders a page row (context = category
+name, shown in search results). `renderSettingsSubHeader` + every `renderSettings*`
+sub-page (User, Items, Fails, MultiPick, Descriptions, Display, Backup, Csv,
+Clients, Report, Calculator, About, Contact) + calculator helpers. v31 bits
+(Report "PDF file name" section, `renderSetupSection()` on Backup) unchanged.
+**About changelog lives here** (`renderSettingsAbout`) — v32: V32 on top, V29
+dropped, cards reordered (intro → what's new → privacy → reload utility → ©).
+The Clients empty state uses the shared `emptyStateHTML` (render-core).
+*Touch to:* change any Settings page; the category structure (edit
+`SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META` in **config.js**, not here); search
+matching (aliases live in config); or roll the About changelog.
 
 ## events.js (~290 ln) — focus-sensitive field binding (per-render)
 `bindFocusFields()` — direct `oninput`/`onfocus`/`onblur` binds for the **four**
@@ -282,6 +292,11 @@ toggles + `report-retest-enabled` (in-memory + re-render; each calls
 `setup-include-toggle-open`, `setup-import`; changes `setup-include-toggle` (per
 section), `setup-import-file` (→ `importSetupFromFile`); `welcome-dismiss` now
 calls `dismissV31Welcome`.
+**v32:** clicks `settings-category` (open a category sub-list); `back-to-settings`
+is now level-aware (page → its category, category → hub); `open-settings` resets
+`settingsCategory`/`settingsSearchQuery` so the hub opens clean; input
+`settings-search` (live filter → `refreshSettingsHubBodyOnly`); `welcome-dismiss`
+now calls `dismissV32Welcome`.
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

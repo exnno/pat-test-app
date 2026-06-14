@@ -138,7 +138,7 @@ function initDelegation() {
 // ---------------------------------------------------------------------------
 registerActions({
   // Sessions screen header / new-session form (click parts only).
-  'open-settings': () => setView('settings'),
+  'open-settings': () => { state.settingsCategory = null; state.settingsSearchQuery = ''; setView('settings'); },
   'new-session': () => {
     state.newForm.show = true;
     state.newFormError = '';
@@ -339,7 +339,22 @@ registerActions({
 
   // Settings hub + sub-page nav. data-page carries the target view.
   'settings-page': (arg) => setView(arg),
-  'back-to-settings': () => setView('settings'),
+  // v32: open a category sub-list from the hub.
+  'settings-category': (arg) => { state.settingsCategory = arg; setView('settingsCategory'); },
+  // v32: back from a setting page returns to its category (if opened from one),
+  // back from a category returns to the hub. setView is also used directly when
+  // jumping to a page from a flat search result (settingsCategory stays null →
+  // back goes to the hub, which is correct: there's no category context).
+  'back-to-settings': () => {
+    if (state.view === 'settingsCategory') {
+      state.settingsCategory = null;
+      setView('settings');
+    } else if (state.settingsCategory) {
+      setView('settingsCategory');
+    } else {
+      setView('settings');
+    }
+  },
 
   // v30: Reports hub nav + actions. open-reports is defence-checked against the
   // master switch (the button is already hidden when off, this is a backstop).
@@ -424,7 +439,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV31Welcome(),
+  'welcome-dismiss': () => dismissV32Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -528,6 +543,12 @@ registerInputActions({
   'sessions-search': (v) => {
     state.sessionsSearchQuery = v;
     refreshSessionsListAreaOnly();
+  },
+
+  // v32: Settings hub search — partial refresh so the search box keeps focus
+  'settings-search': (v) => {
+    state.settingsSearchQuery = v;
+    refreshSettingsHubBodyOnly();
   },
 
   // Entry screen

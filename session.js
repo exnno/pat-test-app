@@ -1322,6 +1322,12 @@ function dismissV31Welcome() {
   render();
 }
 
+function dismissV32Welcome() {
+  state.v32WelcomeSeen = true;
+  localStorage.setItem(V32_WELCOME_KEY, '1');
+  render();
+}
+
 // ---------- v31: Export/Import Setup UI handlers ----------
 
 // Toggle the "Choose what to include" disclosure on the Backup page.

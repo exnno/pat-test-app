@@ -3,7 +3,7 @@
 A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, flexible clients & sites, search, filters, bulk edit, JSON backup/restore, dark mode, CSV export/import, and branded PDF report generation.
 
 **Live:** https://exnno.github.io/pat-test-app/
-**Current version:** V31 · cache `pat-v31`
+**Current version:** V32 · cache `pat-v32`
 
 ## Key features
 
@@ -17,6 +17,7 @@ A fast, offline-first portable appliance testing app. Records pass/fail decision
 - **Backup/restore** — full JSON backup (human-readable), versioned (`backupVersion` 5; report settings are included additively).
 - **Export/Import Setup (V31)** — share your *configuration* (Quick Pick presets, fail reasons, descriptions, report settings incl. logo, CSV columns, tester/calibration details, and app preferences) as a small self-describing `pat-setup` file, so a second device or a new engineer can be set up to match in seconds. Found on Settings → Backup. Export uses progressive disclosure (one-tap "Share setup", or open "Choose what to include" to leave sections out) and the bundle carries a user-given name. Import **replaces only the settings it carries and never touches sessions, clients or sites** — and a separate file kind means a full backup can't be imported as a setup (or vice versa). Built to be reused later as "team admin pushes a setup to all engineers" in the planned cloud product.
 - **Custom report file names (V31)** — set how report PDFs are named under Settings → Report Settings, using tappable tokens (`{site}`, `{client}`, `{date}`, `{engineer}`) that fill in per session; the default reproduces the original `PAT_Report_<site>_<date>` naming, and any single report can be renamed in the preview before sharing.
+- **Settings home + search (V32)** — Settings is a two-level structure: a hub of six categories (User & Calibration, Testing Setup, Reports & Output, App & Display, Data, Help) each opening a sub-list of pages, with a search box at the top that flattens to any matching page (matches titles plus plain-language aliases, e.g. "logo", "earth", "dark"). Back navigation is level-aware (page → its category → hub). Purely presentational — every setting is functionally where it was. Empty screens (Sessions, Overview, Clients, Reports) now show a guiding empty state pointing to the next step.
 - **Offline-first** — service-worker cached; all data in `localStorage` on the device only.
 
 ## Stack
@@ -31,7 +32,7 @@ The app logic was split out of the old single `app.js` into single-concern scrip
 
 **Load order (defined in `index.html`):**
 
-`config.js` -> `state.js` -> `utils.js` -> `storage.js` -> `clients.js` -> `sqp.js` -> `multipick.js` -> `feedback.js` -> `csv.js` -> `backup.js` -> `session.js` -> `jspdf.umd.min.js` -> `jspdf.plugin.autotable.min.js` -> `report.js` -> `render-core.js` -> `render-settings.js` -> `events.js` -> `dispatch.js` -> `boot.js`
+`config.js` -> `state.js` -> `utils.js` -> `storage.js` -> `clients.js` -> `sqp.js` -> `multipick.js` -> `feedback.js` -> `csv.js` -> `backup.js` -> `session.js` -> `setup.js` -> `jspdf.umd.min.js` -> `jspdf.plugin.autotable.min.js` -> `report.js` -> `render-core.js` -> `render-settings.js` -> `events.js` -> `dispatch.js` -> `boot.js`
 
 - `index.html` — shell; lists the scripts in load order
 - `config.js` — constants & defaults, incl. `APP_VERSION`, all storage-key names, `DEFAULT_CSV_COLUMNS`, and the report-settings defaults factory

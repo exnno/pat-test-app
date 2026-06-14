@@ -165,6 +165,17 @@ let state = {
   // modal (Export/Import Setup + named report files).
   v31WelcomeSeen: false,
 
+  // v32: welcome modal flag (key pat:v32welcome). Gates the V32 "what's new"
+  // modal (settings restructure + search).
+  v32WelcomeSeen: false,
+
+  // v32: two-level Settings navigation + search (transient, not persisted).
+  // settingsCategory: the category id currently open (view 'settingsCategory'),
+  // or null at the hub. settingsSearchQuery: the live filter text on the hub;
+  // when non-empty the hub shows flat search results instead of categories.
+  settingsCategory: null,
+  settingsSearchQuery: '',
+
   // v31: Export/Import Setup transient UI state (not persisted). The Backup page
   // shows a collapsed "Choose what to include" list; this holds whether it's
   // expanded and which section ids are ticked. Seeded to all-on so the common

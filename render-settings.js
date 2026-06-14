@@ -11,87 +11,130 @@
 
 // ===== Settings hub & sub-pages (v7) =====
 
-function renderSettingsHub() {
-  // Each row leads to a focused sub-page. The subtitle gives a one-glance count or status.
-  // v9: subtitle on Items row now shows the active preset name + count.
-  const activeP = activePreset();
-  const itemCount = activeP ? activeP.items.length : 0;
-  const presetCount = state.itemPresets.length;
-  const itemSummary = activeP
-    ? `${escapeHTML(activeP.name)} · ${itemCount} quick-pick${itemCount === 1 ? '' : 's'}${presetCount > 1 ? ` · ${presetCount} presets` : ''}`
-    : 'No preset selected';
-  const failSummary = state.failReasons.length === 1 ? '1 quick-pick' : `${state.failReasons.length} quick-picks`;
-  // v16: Multi Pick summary — count of configured slots + on/off state.
-  const mpSlots = activeMultiPickSlots().length;
-  const mpSummary = mpSlots === 0
-    ? (state.multiPick.enabled ? 'On · none set up yet' : 'Off')
-    : `${state.multiPick.enabled ? 'On' : 'Off'} · ${mpSlots} multi-pick${mpSlots === 1 ? '' : 's'}`;
-  const descSummary = state.descriptions.length === 1 ? '1 description' : `${state.descriptions.length} descriptions`;
-  const themeSummary = state.theme === 'system' ? 'System' : (state.theme === 'dark' ? 'Dark' : 'Light');
-  const hapticsSummary = state.hapticsEnabled ? 'Haptics on' : 'Haptics off';
-  // v17: surface the two opt-in extras only when on, to keep the subtitle short
-  // by default. e.g. "System · Haptics on · Sound on · Times on".
-  const displayExtras = [];
-  if (state.soundEnabled) displayExtras.push('Sound on');
-  if (state.timestampsEnabled) displayExtras.push('Times on');
-  const displaySummary = [themeSummary, hapticsSummary, ...displayExtras].join(' · ');
-  // v11: CSV summary — how many columns are visible vs total, plus whether
-  // they've been customised away from defaults.
-  const visibleCsv = state.csvColumns.filter(c => c.visible).length;
-  const totalCsv = state.csvColumns.length;
-  const csvCustomised = state.csvColumns.some((c, i) => {
-    const d = DEFAULT_CSV_COLUMNS[i];
-    return !d || d.id !== c.id || d.header !== c.header || d.visible !== c.visible;
-  });
-  const csvSummary = `${visibleCsv} of ${totalCsv} column${totalCsv === 1 ? '' : 's'} visible${csvCustomised ? ' · customised' : ''}`;
-
-  // v19: Clients summary — client count + total site count.
-  const clientCount = state.clients.length;
-  const siteCount = state.sites.length;
-  const clientsSummary = clientCount === 0
-    ? 'No clients yet'
-    : `${clientCount} client${clientCount === 1 ? '' : 's'} · ${siteCount} site${siteCount === 1 ? '' : 's'}`;
-
-  // v30: Report Settings summary — master on/off, plus a "needs setup" hint when
-  // reporting is on but no company name has been entered (so a half-set-up
-  // device is obvious at a glance).
-  const rs = state.reportSettings;
-  const reportSummary = !rs.enabled
-    ? 'Off'
-    : (rs.companyName ? `On · ${escapeHTML(rs.companyName)}` : 'On · no company name set');
-
-  // v12: User Settings subtitle picks up calibration-due status. The base
-  // text is the engineer name (or "Engineer name" placeholder); we append
-  // " · Cal overdue (N days)" or " · Cal due in N days" when there's
-  // something to flag. 'ok' (more than 30 days off) and missing dates
-  // produce no suffix — the row stays clean by default.
-  const calSt = calibrationStatus();
-  let userSubtitle = state.engineer ? state.engineer : 'Engineer name';
-  if (calSt && calSt.status === 'overdue') {
-    userSubtitle += ` · Cal overdue (${calSt.days} day${calSt.days === 1 ? '' : 's'})`;
-  } else if (calSt && calSt.status === 'soon') {
-    // v15: when the due date is today (days === 0), "due in 0 days" reads
-    // awkwardly — say "due today" instead.
-    userSubtitle += calSt.days === 0
-      ? ' · Cal due today'
-      : ` · Cal due in ${calSt.days} day${calSt.days === 1 ? '' : 's'}`;
+// v32: live subtitle for a settings page row (the per-page count/status line).
+// Extracted so both the category sub-list and search results can show it. Returns
+// '' for pages with no dynamic status (their static blurb is used instead).
+function settingsPageSubtitle(pageId) {
+  switch (pageId) {
+    case 'settingsUser': {
+      const calSt = calibrationStatus();
+      let s = state.engineer ? state.engineer : 'Engineer name';
+      if (calSt && calSt.status === 'overdue') {
+        s += ` · Cal overdue (${calSt.days} day${calSt.days === 1 ? '' : 's'})`;
+      } else if (calSt && calSt.status === 'soon') {
+        s += calSt.days === 0 ? ' · Cal due today' : ` · Cal due in ${calSt.days} day${calSt.days === 1 ? '' : 's'}`;
+      }
+      return s;
+    }
+    case 'settingsItems': {
+      const activeP = activePreset();
+      const itemCount = activeP ? activeP.items.length : 0;
+      const presetCount = state.itemPresets.length;
+      return activeP
+        ? `${activeP.name} · ${itemCount} quick-pick${itemCount === 1 ? '' : 's'}${presetCount > 1 ? ` · ${presetCount} presets` : ''}`
+        : 'No preset selected';
+    }
+    case 'settingsFails':
+      return state.failReasons.length === 1 ? '1 quick-pick' : `${state.failReasons.length} quick-picks`;
+    case 'settingsMultiPick': {
+      const mpSlots = activeMultiPickSlots().length;
+      return mpSlots === 0
+        ? (state.multiPick.enabled ? 'On · none set up yet' : 'Off')
+        : `${state.multiPick.enabled ? 'On' : 'Off'} · ${mpSlots} multi-pick${mpSlots === 1 ? '' : 's'}`;
+    }
+    case 'settingsDescriptions':
+      return state.descriptions.length === 1 ? '1 description' : `${state.descriptions.length} descriptions`;
+    case 'settingsDisplay': {
+      const themeSummary = state.theme === 'system' ? 'System' : (state.theme === 'dark' ? 'Dark' : 'Light');
+      const extras = [];
+      if (state.soundEnabled) extras.push('Sound on');
+      if (state.timestampsEnabled) extras.push('Times on');
+      return [themeSummary, state.hapticsEnabled ? 'Haptics on' : 'Haptics off', ...extras].join(' · ');
+    }
+    case 'settingsCsv': {
+      const visibleCsv = state.csvColumns.filter(c => c.visible).length;
+      const totalCsv = state.csvColumns.length;
+      const csvCustomised = state.csvColumns.some((c, i) => {
+        const d = DEFAULT_CSV_COLUMNS[i];
+        return !d || d.id !== c.id || d.header !== c.header || d.visible !== c.visible;
+      });
+      return `${visibleCsv} of ${totalCsv} column${totalCsv === 1 ? '' : 's'} visible${csvCustomised ? ' · customised' : ''}`;
+    }
+    case 'settingsClients': {
+      const clientCount = state.clients.length;
+      const siteCount = state.sites.length;
+      return clientCount === 0 ? 'No clients yet'
+        : `${clientCount} client${clientCount === 1 ? '' : 's'} · ${siteCount} site${siteCount === 1 ? '' : 's'}`;
+    }
+    case 'settingsReport': {
+      const rs = state.reportSettings;
+      return !rs.enabled ? 'Off' : (rs.companyName ? `On · ${rs.companyName}` : 'On · no company name set');
+    }
+    case 'settingsBackup':  return 'Back up, restore, share setup';
+    case 'settingsCalculator': return 'Earth continuity limit';
+    case 'settingsAbout':   return `PAT Test ${APP_VERSION}`;
+    case 'settingsContact': return 'Get in touch';
+    default: return '';
   }
+}
 
-  const rows = [
-    { id: 'settingsUser', icon: '👤', title: 'User Settings', sub: userSubtitle },
-    { id: 'settingsItems', icon: '⚡', title: 'Quick Pick Items', sub: itemSummary },
-    { id: 'settingsFails', icon: '⚠️', title: 'Quick Pick Fail', sub: failSummary },
-    { id: 'settingsMultiPick', icon: '🧰', title: 'Multi Pick', sub: mpSummary },   // v16
-    { id: 'settingsDescriptions', icon: '📝', title: 'Item Description List', sub: descSummary },
-    { id: 'settingsDisplay', icon: '🎨', title: 'Display Settings', sub: displaySummary },
-    { id: 'settingsCsv', icon: '📊', title: 'CSV Columns', sub: csvSummary },   // v11
-    { id: 'settingsClients', icon: '🏢', title: 'Clients', sub: clientsSummary },   // v19
-    { id: 'settingsReport', icon: '📄', title: 'Report Settings', sub: reportSummary },   // v30
-    { id: 'settingsBackup', icon: '💾', title: 'Backup & Restore', sub: 'Export or import all data' },
-    { id: 'settingsCalculator', icon: '🧮', title: 'Resistance Calculator', sub: 'Earth continuity limit' },
-    { id: 'settingsAbout', icon: 'ℹ️', title: 'About', sub: 'About this app' },
-    { id: 'settingsContact', icon: '✉️', title: 'Contact', sub: 'Get in touch' }
-  ];
+// A single settings row button (used by category sub-lists and search results).
+// `context` is an optional muted suffix (e.g. the category name in search results).
+function settingsPageRowHTML(pageId, context) {
+  const meta = SETTINGS_PAGE_META[pageId] || { icon: '•', title: pageId };
+  const sub = settingsPageSubtitle(pageId);
+  const ctx = context ? `<span class="settings-row-context">${escapeHTML(context)}</span>` : '';
+  return `
+    <button class="settings-row" data-action="settings-page" data-arg="${pageId}" data-page="${pageId}">
+      <span class="settings-row-icon">${meta.icon}</span>
+      <div class="settings-row-text">
+        <div class="settings-row-title">${escapeHTML(meta.title)}${ctx}</div>
+        ${sub ? `<div class="settings-row-sub">${escapeHTML(sub)}</div>` : ''}
+      </div>
+      <span class="settings-row-chevron">›</span>
+    </button>`;
+}
+
+// v32: the hub body (search results OR category list). Separated so the live
+// search filter can re-render just this region, preserving focus on the search
+// input (a full render() would blur it on every keystroke — the same reason
+// the sessions list uses refreshSessionsListAreaOnly).
+function renderSettingsHubBodyHTML() {
+  const query = state.settingsSearchQuery.trim().toLowerCase();
+  if (query) {
+    const results = [];
+    SETTINGS_CATEGORIES.forEach(cat => {
+      cat.pages.forEach(pageId => {
+        const meta = SETTINGS_PAGE_META[pageId];
+        if (!meta) return;
+        const hay = `${meta.title} ${meta.aliases || ''}`.toLowerCase();
+        if (hay.includes(query)) results.push({ pageId, cat });
+      });
+    });
+    return results.length
+      ? `<div class="settings-list">${results.map(r => settingsPageRowHTML(r.pageId, r.cat.title)).join('')}</div>`
+      : `<p class="muted settings-empty-search">No settings match "${escapeHTML(state.settingsSearchQuery.trim())}".</p>`;
+  }
+  return `<div class="settings-list">${SETTINGS_CATEGORIES.map(cat => `
+      <button class="settings-row" data-action="settings-category" data-arg="${cat.id}">
+        <span class="settings-row-icon">${cat.icon}</span>
+        <div class="settings-row-text">
+          <div class="settings-row-title">${escapeHTML(cat.title)}</div>
+          <div class="settings-row-sub">${escapeHTML(cat.blurb)}</div>
+        </div>
+        <span class="settings-row-chevron">›</span>
+      </button>`).join('')}</div>`;
+}
+
+// v32: the Settings hub — a list of CATEGORIES, with a search box that flattens
+// to matching pages across all categories.
+function renderSettingsHub() {
+  const searchBox = `
+    <div class="settings-search">
+      <input type="search" id="settings-search-input" class="input settings-search-input"
+        placeholder="Search settings" value="${escapeHTML(state.settingsSearchQuery)}"
+        data-input-action="settings-search" autocapitalize="off" autocomplete="off" spellcheck="false">
+    </div>`;
 
   return `
     <div class="screen">
@@ -100,19 +143,32 @@ function renderSettingsHub() {
         <div class="site-name">Settings</div>
         <span style="width:40px"></span>
       </header>
-      <div class="settings-list">
-        ${rows.map(r => `
-          <button class="settings-row" data-action="settings-page" data-arg="${r.id}" data-page="${r.id}">
-            <span class="settings-row-icon">${r.icon}</span>
-            <div class="settings-row-text">
-              <div class="settings-row-title">${escapeHTML(r.title)}</div>
-              <div class="settings-row-sub">${escapeHTML(r.sub)}</div>
-            </div>
-            <span class="settings-row-chevron">›</span>
-          </button>
-        `).join('')}
-      </div>
+      ${searchBox}
+      <div id="settings-hub-body">${renderSettingsHubBodyHTML()}</div>
       <p class="settings-footer">PAT Test ${APP_VERSION} · © 2026 Peter Birchley<br>Data stored on this device only</p>
+    </div>
+  `;
+}
+
+// v32: a category sub-list — the pages within one category. Back returns to the
+// hub. A muted blurb under the header explains the group (helper text).
+function renderSettingsCategory() {
+  const cat = SETTINGS_CATEGORIES.find(c => c.id === state.settingsCategory);
+  if (!cat) { // defensive: unknown category → bounce to hub
+    state.view = 'settings';
+    return renderSettingsHub();
+  }
+  return `
+    <div class="screen">
+      <header class="header-row">
+        <button class="icon-btn" id="back-to-settings-btn" data-action="back-to-settings" aria-label="Back">‹</button>
+        <div class="site-name">${escapeHTML(cat.title)}</div>
+        <span style="width:40px"></span>
+      </header>
+      <p class="settings-category-blurb">${escapeHTML(cat.blurb)}</p>
+      <div class="settings-list">
+        ${cat.pages.map(pageId => settingsPageRowHTML(pageId)).join('')}
+      </div>
     </div>
   `;
 }
@@ -602,11 +658,10 @@ function renderSettingsCsv() {
 function renderSettingsClients() {
   const clients = sortedClients();
 
-  const emptyState = clients.length === 0 ? `
-    <div class="settings-section">
-      <p class="muted" style="margin-top:0">No clients yet. Add a client, then add the sites you test at — they'll appear as quick picks when you start a new session.</p>
-    </div>
-  ` : '';
+  const emptyState = clients.length === 0
+    ? emptyStateHTML('🏢', 'No clients yet',
+        'Add a client below, then add the sites you test at — they\'ll appear as quick picks when you start a new session.')
+    : '';
 
   const listHtml = clients.map(c => {
     const expanded = state.clientsPage.expandedClientId === c.id;
@@ -942,33 +997,35 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h2>PAT Test ${APP_VERSION}</h2>
         <p>A fast, offline-first portable appliance testing app for working PAT engineers. Built around speed of data entry — pass/fail decisions in two taps, no fighting the interface.</p>
-        <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed.</p>
-        <h3>Status</h3>
-        <p>The app is currently in active testing. Features and refinements ship regularly. If something breaks, behaves oddly, or you've got an idea for what's next, get in touch via the Contact page.</p>
-        <h3>Privacy</h3>
-        <p>All test records, settings, and saved descriptions live in your phone or browser's local storage. The app makes no network calls after the initial install. Backups are stored only where you choose to save them.</p>
+        <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: emergency reload — for the rare case where the app stops responding to
-           taps. A reload clears any in-memory weirdness without losing data. -->
-      <div class="info-card">
-        <h3>If the app stops responding</h3>
-        <p class="muted">If taps stop registering anywhere in the app, tap Reload below. Your sessions and settings are not affected — only the app itself reloads.</p>
-        <button class="backup-action-btn" id="about-reload-btn" data-action="about-reload" style="margin-top:8px">⟳ Reload app</button>
-      </div>
-
-      <!-- v8: rolling 3-version changelog. v31: rolled forward — V31 on top, V28 dropped. -->
+      <!-- v8: rolling 3-version changelog. v32: rolled forward — V32 on top, V29 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V32</strong> · June 2026</p>
+        <p class="muted">Settings has a new home. Everything is now grouped into clear sections — User &amp; Calibration, Testing Setup, Reports &amp; Output, App &amp; Display, Data and Help — with a search box at the top that jumps straight to any page. Empty screens now point you to the next step, headings and back buttons behave consistently throughout, and this About page has been tidied. Every setting works exactly as before — just easier to find — and all your data is untouched.</p>
 
         <p><strong>V31</strong> · June 2026</p>
         <p class="muted">Share your setup, and name your report files. You can now send your whole configuration — Quick Pick presets, report settings, CSV columns, tester details and preferences — to another phone or a colleague from Settings → Backup → Share setup, so a new device matches this one in seconds. You choose what to include, and importing only ever changes settings — your sessions, clients and sites are never touched. Report PDFs can now be named the way you like, using details such as site and date that fill in automatically, and you can still rename any single report before sharing it.</p>
 
         <p><strong>V30</strong> · June 2026</p>
         <p class="muted">PDF reports. You can now turn any session into a professional Portable Appliance Test Report — branded with your company name and logo, listing every appliance with its pass/fail result, and showing tested/passed/failed totals. Set it up under Settings → Report Settings (add your details, choose what's shown, switch it on); a Reports button then appears on the Sessions screen and the session Overview. Reporting starts switched off, so nothing changes until you've set it up. Reports generate on-device and work offline. All your data is untouched.</p>
+      </div>
 
-        <p><strong>V29</strong> · June 2026</p>
-        <p class="muted">A small housekeeping update. Some leftover scaffolding from the previous behind-the-scenes work has been cleared out, keeping the app lean and quick to build on. Nothing you see or do has changed — logging, search, settings and exports all behave exactly as before, and all your data is untouched.</p>
+      <div class="info-card">
+        <h3>Privacy</h3>
+        <p class="muted">All test records, settings, and saved descriptions live in your phone or browser's local storage. The app makes no network calls after the initial install. Backups are stored only where you choose to save them.</p>
+      </div>
+
+      <!-- v8: emergency reload — for the rare case where the app stops responding to
+           taps. A reload clears any in-memory weirdness without losing data. Kept
+           near the bottom (a maintenance utility, not a primary action). -->
+      <div class="info-card">
+        <h3>If the app stops responding</h3>
+        <p class="muted">If taps stop registering anywhere in the app, tap Reload below. Your sessions and settings are not affected — only the app itself reloads.</p>
+        <button class="backup-action-btn" id="about-reload-btn" data-action="about-reload" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
       <div class="info-card">

@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V31';
+const APP_VERSION = 'V32';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -70,6 +70,7 @@ const V26_WELCOME_KEY = 'pat:v26welcome';   // v26: Clients & Sites flexibility 
 const V27_WELCOME_KEY = 'pat:v27welcome';   // v27: Smart Quick Pick ordering quality
 const V30_WELCOME_KEY = 'pat:v30welcome';   // v30: PDF Reports
 const V31_WELCOME_KEY = 'pat:v31welcome';   // v31: Export/Import Setup + named PDF files
+const V32_WELCOME_KEY = 'pat:v32welcome';   // v32: settings restructure + search
 
 // v30: PDF Reports. A single object under REPORT_SETTINGS_KEY holds every
 // report-configuration field plus the optional company logo (base64). Stored as
@@ -106,6 +107,48 @@ const REPORT_FILENAME_DEFAULT = 'PAT_Report_{site}_{date}';
 
 // The insertable tokens offered as tappable chips on the Report Settings page.
 const REPORT_FILENAME_TOKENS = ['{site}', '{client}', '{date}', '{engineer}'];
+
+// v32: two-level Settings. The hub shows these CATEGORIES; each opens a sub-list
+// of the existing setting pages (by their view id). Single source of truth for
+// the structure — the hub, the category sub-list, search (which flattens this),
+// and back-navigation all read it. `pages` are view ids handled in render().
+// `aliases` are extra search keywords so plain-language terms find a page.
+// Grouping rationale: split by "whose data is this" — User (the engineer) vs the
+// job (clients/reports/CSV) vs the app vs data-movement vs help. Clients sits in
+// Reports & Output because it feeds the report header and CSV, not identity.
+const SETTINGS_CATEGORIES = [
+  { id: 'catUser',    icon: '👤', title: 'User & Calibration', blurb: 'Your engineer details and calibration',
+    pages: ['settingsUser'] },
+  { id: 'catTesting', icon: '⚡', title: 'Testing Setup', blurb: 'How Quick Pick, Multi Pick and descriptions behave',
+    pages: ['settingsItems', 'settingsFails', 'settingsMultiPick', 'settingsDescriptions'] },
+  { id: 'catReports', icon: '📄', title: 'Reports & Output', blurb: 'PDF reports, CSV export and your clients',
+    pages: ['settingsReport', 'settingsCsv', 'settingsClients'] },
+  { id: 'catApp',     icon: '🎨', title: 'App & Display', blurb: 'Appearance and the resistance calculator',
+    pages: ['settingsDisplay', 'settingsCalculator'] },
+  { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Back up, restore and share your setup',
+    pages: ['settingsBackup'] },
+  { id: 'catHelp',    icon: 'ℹ️', title: 'Help', blurb: 'About this app and how to get in touch',
+    pages: ['settingsAbout', 'settingsContact'] }
+];
+
+// Per-page metadata for the category sub-lists and for search. icon/title shown
+// on the row; `aliases` widen search matching. Subtitles are computed live in
+// renderSettingsCategory (counts/status), so they're not stored here.
+const SETTINGS_PAGE_META = {
+  settingsUser:        { icon: '👤', title: 'User Settings',         aliases: 'engineer name calibration cal due instrument' },
+  settingsItems:       { icon: '⚡', title: 'Quick Pick Items',      aliases: 'item types presets quick pick buttons' },
+  settingsFails:       { icon: '⚠️', title: 'Quick Pick Fail',       aliases: 'fail reasons failure quick pick' },
+  settingsMultiPick:   { icon: '🧰', title: 'Multi Pick',            aliases: 'multi pick bulk multiple slots' },
+  settingsDescriptions:{ icon: '📝', title: 'Item Description List', aliases: 'descriptions notes labels' },
+  settingsReport:      { icon: '📄', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration' },
+  settingsCsv:         { icon: '📊', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
+  settingsClients:     { icon: '🏢', title: 'Clients',               aliases: 'clients sites customers addresses' },
+  settingsDisplay:     { icon: '🎨', title: 'Display Settings',      aliases: 'theme dark light haptics sound timestamps appearance' },
+  settingsCalculator:  { icon: '🧮', title: 'Resistance Calculator', aliases: 'earth continuity resistance limit ohms calculator csa' },
+  settingsBackup:      { icon: '💾', title: 'Backup & Restore',      aliases: 'backup restore export import data setup share' },
+  settingsAbout:       { icon: 'ℹ️', title: 'About',                 aliases: 'about version changelog whats new' },
+  settingsContact:     { icon: '✉️', title: 'Contact',              aliases: 'contact support email help feedback' }
+};
 
 // Factory (not a shared object) so callers always get an independent copy —
 // mirrors the DEFAULT_CSV_COLUMNS.map(...) deep-copy pattern used elsewhere.

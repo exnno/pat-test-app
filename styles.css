@@ -1903,3 +1903,60 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .report-filename-row { display: flex; align-items: center; gap: 6px; }
 .report-filename-row .report-filename-input { flex: 1 1 auto; }
 .report-filename-ext { font-size: 14px; color: var(--text-muted); flex: 0 0 auto; }
+
+/* ===================== v32: settings restructure + search ===================== */
+
+/* Settings hub search box */
+.settings-search { padding: 8px 0 4px; }
+.settings-search-input {
+  width: 100%;
+  -webkit-appearance: none;
+  appearance: none;
+}
+.settings-empty-search { padding: 24px 4px; text-align: center; }
+
+/* Category sub-list helper blurb under the header */
+.settings-category-blurb {
+  margin: 4px 4px 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+/* Category name shown as muted context on a search-result row */
+.settings-row-context {
+  display: block;
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--text-muted);
+  margin-top: 1px;
+}
+
+/* ===================== v32: empty states ===================== */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 40px 24px;
+  gap: 6px;
+}
+.empty-state-icon {
+  font-size: 44px;
+  line-height: 1;
+  opacity: 0.85;
+  margin-bottom: 4px;
+}
+.empty-state-title {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+}
+.empty-state-body {
+  margin: 0;
+  max-width: 320px;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+.empty-state-action { margin-top: 14px; }

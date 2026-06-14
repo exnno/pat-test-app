@@ -421,6 +421,7 @@ function loadV11Settings() {
   state.v27WelcomeSeen = localStorage.getItem(V27_WELCOME_KEY) === '1';
   state.v30WelcomeSeen = localStorage.getItem(V30_WELCOME_KEY) === '1';
   state.v31WelcomeSeen = localStorage.getItem(V31_WELCOME_KEY) === '1';
+  state.v32WelcomeSeen = localStorage.getItem(V32_WELCOME_KEY) === '1';
 
   // v17: Sound feedback + Item timestamps. Both default OFF; only an explicit
   // '1' enables them. Anything else (absent key, '0', garbage) reads as off.

@@ -40,6 +40,7 @@ function render() {
   else if (v === 'overview') html = renderOverview();
   else if (v === 'editSession') html = renderEditSession();
   else if (v === 'settings') html = renderSettingsHub();
+  else if (v === 'settingsCategory') html = renderSettingsCategory();   // v32
   else if (v === 'settingsUser') html = renderSettingsUser();
   else if (v === 'settingsItems') html = renderSettingsItems();
   else if (v === 'settingsFails') html = renderSettingsFails();
@@ -96,24 +97,24 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v31: rolled forward — content covers Export/Import Setup + named report
-  // files. Key bumped to pat:v31welcome (gate uses v31WelcomeSeen).
-  const welcomeModal = (state.v31WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // v32: rolled forward — content covers the settings restructure + search. Key
+  // bumped to pat:v32welcome (gate uses v32WelcomeSeen).
+  const welcomeModal = (state.v32WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V31">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V32">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V31</h3>
+        <h3 class="bulk-sheet-title">What's new in V32</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Share your setup.</strong> Set up a new phone — or a colleague's — to match this one in seconds. Settings → Backup → Share setup sends your presets, report settings, CSV columns and preferences as a single file. Your sessions are never included.</li>
-        <li><strong>Choose what to share.</strong> Send your whole setup in one tap, or open "Choose what to include" to leave out, say, your calibration details when sharing presets with someone else.</li>
-        <li><strong>Importing is safe.</strong> Importing a setup only changes your settings — it never touches your saved sessions, clients or sites, and shows you exactly what it'll change first.</li>
-        <li><strong>Name your report files.</strong> Report Settings now lets you set how report PDFs are named, using details like site and date that fill in automatically — and you can still rename any single report before sharing it.</li>
+        <li><strong>Settings, reorganised.</strong> Settings are now grouped into clear sections — User &amp; Calibration, Testing Setup, Reports &amp; Output, App &amp; Display, Data and Help — so everything's easier to find.</li>
+        <li><strong>Search your settings.</strong> A search box at the top of Settings jumps straight to any page — try "logo", "earth" or "dark".</li>
+        <li><strong>A more finished feel.</strong> Empty screens now guide you to the next step, headings and back buttons are consistent throughout, and the About page has been tidied up.</li>
+        <li><strong>Nothing moved that matters.</strong> Every setting is exactly where it was functionally — just easier to reach. All your data is untouched.</li>
       </ul>
-      <button class="btn-primary" id="v31-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v32-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -255,6 +256,23 @@ function nfSuggestionsHTML(field) {
   return `<div class="suggestions" id="nf-${field}-suggestions">
     ${state.nfSuggestions.map(s => `<button class="suggestion-item" ${attr}="${escapeHTML(s)}">${escapeHTML(s)}</button>`).join('')}
   </div>`;
+}
+
+// v32: shared empty-state block — a centred icon, a bold line, a muted line, and
+// an optional primary action button. Used on the Sessions list, Overview,
+// Clients and Reports screens so "nothing here yet" always looks intentional and
+// points to the next step rather than showing a bare line of text.
+function emptyStateHTML(icon, title, body, actionLabel, actionName) {
+  const btn = (actionLabel && actionName)
+    ? `<button class="btn-primary empty-state-action" data-action="${actionName}">+ ${escapeHTML(actionLabel)}</button>`
+    : '';
+  return `
+    <div class="empty-state">
+      <div class="empty-state-icon" aria-hidden="true">${icon}</div>
+      <div class="empty-state-title">${escapeHTML(title)}</div>
+      <p class="empty-state-body">${escapeHTML(body)}</p>
+      ${btn}
+    </div>`;
 }
 
 function renderSessions() {
@@ -451,7 +469,9 @@ function renderSessionsListAreaHTML() {
 
   let list;
   if (sortedAll.length === 0 && !state.newForm.show) {
-    list = `<p class="muted">No sessions yet. Create one to start testing.</p>`;
+    list = emptyStateHTML('📋', 'No sessions yet',
+      'Start logging appliance tests and they\'ll appear here.',
+      'Start your first session', 'new-session');
   } else if (queryTrimmed && filtered.length === 0) {
     list = `<p class="muted">No sessions or items match "${escapeHTML(queryTrimmed)}".</p>`;
   } else if (!queryTrimmed && sortedAll.length > 0 && filtered.length === 0) {
@@ -505,6 +525,14 @@ function refreshSessionsListAreaOnly() {
   const wrap = document.getElementById('sessions-list-area');
   if (!wrap) return;
   wrap.innerHTML = renderSessionsListAreaHTML();
+}
+
+// v32: re-render only the settings hub body (search results / category list) so
+// the search box keeps focus while typing.
+function refreshSettingsHubBodyOnly() {
+  const wrap = document.getElementById('settings-hub-body');
+  if (!wrap) return;
+  wrap.innerHTML = renderSettingsHubBodyHTML();
 }
 
 // v10: Conflict dialog body. Sits above the sessions list in a bulk-sheet.
@@ -807,11 +835,12 @@ function computeVisibleOverviewItems(sess) {
 function renderOverviewBodyHTML(sess) {
   const visible = computeVisibleOverviewItems(sess);
   if (visible.length === 0) {
-    let msg;
-    if (state.searchQuery.trim()) msg = 'No items match your search.';
-    else if (state.showFailsOnly) msg = 'No fails in this session.';
-    else msg = 'No items recorded yet.';
-    return `<p class="muted">${msg}</p>`;
+    if (state.searchQuery.trim()) return `<p class="muted">No items match your search.</p>`;
+    if (state.showFailsOnly) return `<p class="muted">No fails in this session.</p>`;
+    // Genuinely empty session → rich empty state. No action button: the entry
+    // controls to log the first item are right there on the screen.
+    return emptyStateHTML('⚡', 'No items logged yet',
+      'Use the item buttons to log your first test for this session.');
   }
   const sel = state.selectionMode;
   const checkColHead = sel ? `<th class="th"></th>` : '';
@@ -1120,7 +1149,8 @@ function renderReports() {
 
   let list;
   if (sorted.length === 0) {
-    list = `<p class="muted">No sessions yet. Create and log a session first, then come back here to produce its report.</p>`;
+    list = emptyStateHTML('📄', 'Nothing to report yet',
+      'Once you\'ve logged a session, you can turn it into a PDF report here.');
   } else {
     list = sorted.map(s => {
       const passes = s.items.filter(i => i.result === 'pass').length;
