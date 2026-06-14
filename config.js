@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V29';
+const APP_VERSION = 'V30';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -68,6 +68,58 @@ const V19_WELCOME_KEY = 'pat:v19welcome';   // v19
 const V20_WELCOME_KEY = 'pat:v20welcome';   // v20
 const V26_WELCOME_KEY = 'pat:v26welcome';   // v26: Clients & Sites flexibility + split CSV
 const V27_WELCOME_KEY = 'pat:v27welcome';   // v27: Smart Quick Pick ordering quality
+const V30_WELCOME_KEY = 'pat:v30welcome';   // v30: PDF Reports
+
+// v30: PDF Reports. A single object under REPORT_SETTINGS_KEY holds every
+// report-configuration field plus the optional company logo (base64). Stored as
+// one readable JSON blob (one read, one write — matches the storage principle;
+// the logo is the only sizeable part and it's capped on upload). Included in
+// JSON backups. Old backups without it restore with REPORT_SETTINGS_DEFAULTS.
+//
+// MASTER SWITCH: `enabled` gates BOTH report entry points (the top-level Reports
+// hub control on the Sessions screen, and the "Produce Report" button on the
+// session Overview). Default OFF for EVERYONE — including upgrading users — so a
+// freshly set-up employee phone can't generate an unbranded/half-configured
+// report before the lead has been into Report Settings, configured branding, and
+// deliberately switched reporting on. Nothing about reports is visible until then.
+//
+// RETEST: there is NO default retest period (the IET 5th Edition deliberately
+// removed fixed intervals in favour of risk assessment). When retestEnabled is
+// on, retestMonths must be set by the user; the report prints
+// "Recommended retest by <test date + retestMonths>" with a note that it is a
+// guidance figure, not a legal requirement.
+//
+// DECLARATION: free text the tester is comfortable certifying. Seeded with a
+// sensible default the user can overwrite with their own wording.
+const REPORT_SETTINGS_KEY = 'pat:reportsettings';
+
+const REPORT_DECLARATION_DEFAULT =
+  'Tested in accordance with the IET Code of Practice for In-Service Inspection ' +
+  'and Testing of Electrical Equipment.';
+
+// Factory (not a shared object) so callers always get an independent copy —
+// mirrors the DEFAULT_CSV_COLUMNS.map(...) deep-copy pattern used elsewhere.
+function makeDefaultReportSettings() {
+  return {
+    enabled:          false,   // master switch — OFF for everyone (see note above)
+    companyName:      '',
+    companyAddress:   '',
+    logo:             '',      // base64 data URL, downscaled <=600px on upload
+    reportTitle:      'Portable Appliance Test Report',
+    showEngineer:     true,
+    showInstrument:   true,    // sources state.testerMake / testerModel
+    showCalibration:  true,    // sources state.calDate / calCertNo / calDue
+    retestEnabled:    false,
+    retestMonths:     null,    // no default (Q10=B); required when retestEnabled
+    showFails:        true,    // false = passes-only register
+    declaration:      true,    // print the declaration/signature line
+    declarationText:  REPORT_DECLARATION_DEFAULT
+  };
+}
+
+// v30: logo upload constraint — longest edge downscaled to this many px before
+// base64 storage, to keep localStorage and JSON backups sane.
+const REPORT_LOGO_MAX_PX = 600;
 
 // v19: Clients & Sites. A two-level model so one client can have several sites.
 //   CLIENTS_KEY — JSON array [{ id, name }].

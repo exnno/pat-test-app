@@ -1788,3 +1788,50 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .client-site-actions { display: flex; gap: 14px; flex-shrink: 0; }
 .client-add-site-btn { margin-top: 4px; width: 100%; }
+
+/* ============== v30: PDF report preview + Report Settings ============== */
+/* The report preview is a near-fullscreen sheet (a PDF iframe needs real
+   height, unlike the short bottom-sheets). Built directly in the DOM by
+   report.js, overlaid above everything via z-index 400. */
+.report-preview-sheet {
+  position: fixed;
+  inset: 0;
+  background: var(--bg);
+  z-index: 401;
+  display: flex;
+  flex-direction: column;
+  animation: slide-up 0.22s ease-out;
+}
+.report-preview-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(10px + env(safe-area-inset-top)) 14px 10px;
+  background: var(--card-bg);
+  border-bottom: 1px solid var(--border);
+}
+.report-preview-title {
+  font-weight: 600;
+  color: var(--text);
+  font-size: 15px;
+}
+.report-preview-frame {
+  flex: 1 1 auto;
+  width: 100%;
+  border: 0;
+  background: #525659; /* neutral PDF-viewer grey behind the page */
+}
+.report-preview-fallback {
+  padding: 10px 14px calc(10px + env(safe-area-inset-bottom));
+  background: var(--card-bg);
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+.report-preview-fallback .btn-secondary { width: 100%; }
+
+/* Report Settings — logo preview frame */
+.report-logo-preview img {
+  border: 1px solid var(--border);
+  background: #fff;
+}

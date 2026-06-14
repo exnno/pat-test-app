@@ -52,6 +52,14 @@ function renderSettingsHub() {
     ? 'No clients yet'
     : `${clientCount} client${clientCount === 1 ? '' : 's'} · ${siteCount} site${siteCount === 1 ? '' : 's'}`;
 
+  // v30: Report Settings summary — master on/off, plus a "needs setup" hint when
+  // reporting is on but no company name has been entered (so a half-set-up
+  // device is obvious at a glance).
+  const rs = state.reportSettings;
+  const reportSummary = !rs.enabled
+    ? 'Off'
+    : (rs.companyName ? `On · ${escapeHTML(rs.companyName)}` : 'On · no company name set');
+
   // v12: User Settings subtitle picks up calibration-due status. The base
   // text is the engineer name (or "Engineer name" placeholder); we append
   // " · Cal overdue (N days)" or " · Cal due in N days" when there's
@@ -78,6 +86,7 @@ function renderSettingsHub() {
     { id: 'settingsDisplay', icon: '🎨', title: 'Display Settings', sub: displaySummary },
     { id: 'settingsCsv', icon: '📊', title: 'CSV Columns', sub: csvSummary },   // v11
     { id: 'settingsClients', icon: '🏢', title: 'Clients', sub: clientsSummary },   // v19
+    { id: 'settingsReport', icon: '📄', title: 'Report Settings', sub: reportSummary },   // v30
     { id: 'settingsBackup', icon: '💾', title: 'Backup & Restore', sub: 'Export or import all data' },
     { id: 'settingsCalculator', icon: '🧮', title: 'Resistance Calculator', sub: 'Earth continuity limit' },
     { id: 'settingsAbout', icon: 'ℹ️', title: 'About', sub: 'About this app' },
@@ -732,6 +741,90 @@ function renderSettingsClients() {
   `;
 }
 
+function renderSettingsReport() {
+  const rs = state.reportSettings;
+  // Reusable toggle-row builder matching the SQP / Multi Pick markup. `id` is the
+  // checkbox id (and its data-change-action). `on` is current state.
+  const toggle = (id, title, on, sub) => `
+    <div class="toggle-row">
+      <div class="toggle-row-text">
+        <div class="toggle-row-title">${escapeHTML(title)}</div>
+        <div class="toggle-row-sub">${escapeHTML(sub || (on ? 'On' : 'Off'))}</div>
+      </div>
+      <label class="toggle-switch">
+        <input type="checkbox" id="${id}" data-change-action="${id}" ${on ? 'checked' : ''}>
+        <span class="toggle-slider"></span>
+      </label>
+    </div>`;
+
+  // Logo preview (if set) with a Remove button; otherwise a file picker.
+  const logoBlock = rs.logo
+    ? `<div class="report-logo-preview"><img src="${rs.logo}" alt="Company logo" style="max-width:160px;max-height:80px;display:block;margin:8px 0;border-radius:6px"></div>
+       <button class="preset-action-btn preset-action-danger" id="report-logo-remove" data-action="report-logo-remove">🗑 Remove logo</button>`
+    : `<button class="preset-action-btn" id="report-logo-pick-btn" data-action="report-logo-pick">⬆ Upload logo</button>`;
+  const logoError = state.reportSettingsError
+    ? `<p class="muted" style="color:#c0392b;margin-top:8px;font-size:12px">${escapeHTML(state.reportSettingsError)}</p>`
+    : '';
+
+  const retestMonthsVal = rs.retestMonths == null ? '' : String(rs.retestMonths);
+
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Report Settings')}
+
+      <div class="settings-section">
+        <h2 class="h2">Reports</h2>
+        <p class="muted">Turn on to produce PDF reports from your sessions. While off, the Reports button is hidden everywhere — so a freshly set-up device won't generate a report until you've configured it here and switched this on.</p>
+        ${toggle('report-enabled', 'Enable reports', rs.enabled)}
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Company details</h2>
+        <p class="muted">Printed in the report header. All optional.</p>
+        <label class="label">Company name</label>
+        <input class="input" id="report-company-name" value="${escapeHTML(rs.companyName)}" placeholder="e.g. Birchley PAT Services">
+        <label class="label">Address</label>
+        <textarea class="textarea" id="report-company-address" style="min-height:80px" placeholder="Optional — printed under the company name">${escapeHTML(rs.companyAddress)}</textarea>
+        <label class="label">Logo</label>
+        <p class="muted" style="font-size:12px;margin-top:0">A PNG or JPEG. Large images are scaled down automatically.</p>
+        ${logoBlock}
+        ${logoError}
+        <input type="file" id="report-logo-file" data-change-action="report-logo-file" accept="image/png,image/jpeg" style="display:none">
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Report title</h2>
+        <input class="input" id="report-title" value="${escapeHTML(rs.reportTitle)}" placeholder="Portable Appliance Test Report">
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">What to include</h2>
+        ${toggle('report-show-engineer', 'Engineer name', rs.showEngineer)}
+        ${toggle('report-show-instrument', 'Test instrument', rs.showInstrument)}
+        ${toggle('report-show-calibration', 'Calibration details', rs.showCalibration)}
+        ${toggle('report-show-fails', 'List failed items', rs.showFails, rs.showFails ? 'All items listed' : 'Passes only')}
+        ${toggle('report-declaration', 'Declaration line', rs.declaration)}
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Recommended retest</h2>
+        <p class="muted">Optional. When on, the report shows a recommended retest date (test date plus the months below). This is a guidance figure for your client — the IET Code of Practice sets no fixed interval and recommends a risk-based assessment.</p>
+        ${toggle('report-retest-enabled', 'Show recommended retest', rs.retestEnabled)}
+        <label class="label" style="margin-top:12px">Retest period (months)</label>
+        <input class="input" id="report-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(retestMonthsVal)}" placeholder="e.g. 12"${rs.retestEnabled ? '' : ' disabled style="opacity:.5"'}>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Declaration text</h2>
+        <p class="muted">Printed above the signature line when the declaration is on. Edit to your own wording.</p>
+        <textarea class="textarea" id="report-declaration-text" style="min-height:90px">${escapeHTML(rs.declarationText)}</textarea>
+      </div>
+
+      <button class="btn-primary" id="settings-report-save" data-action="settings-report-save" style="margin-top:8px">Save</button>
+    </div>
+  `;
+}
+
 function computeEarthLimit(csaKey, lengthM) {
   const r = CSA_RESISTANCE[csaKey];
   if (r === undefined) return null;
@@ -809,18 +902,18 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-reload-btn" data-action="about-reload" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v29: rolled forward — V29 on top, V26 dropped. -->
+      <!-- v8: rolling 3-version changelog. v30: rolled forward — V30 on top, V27 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V30</strong> · June 2026</p>
+        <p class="muted">PDF reports. You can now turn any session into a professional Portable Appliance Test Report — branded with your company name and logo, listing every appliance with its pass/fail result, and showing tested/passed/failed totals. Set it up under Settings → Report Settings (add your details, choose what's shown, switch it on); a Reports button then appears on the Sessions screen and the session Overview. Reporting starts switched off, so nothing changes until you've set it up. Reports generate on-device and work offline. All your data is untouched.</p>
 
         <p><strong>V29</strong> · June 2026</p>
         <p class="muted">A small housekeeping update. Some leftover scaffolding from the previous behind-the-scenes work has been cleared out, keeping the app lean and quick to build on. Nothing you see or do has changed — logging, search, settings and exports all behave exactly as before, and all your data is untouched.</p>
 
         <p><strong>V28</strong> · June 2026</p>
         <p class="muted">Another under-the-hood update with no changes to how the app looks or works. The last part of the tap-and-typing system has been moved onto the same single, efficient setup the buttons already use — so text fields, switches and dropdowns can no longer lose their responsiveness when the screen redraws, and future updates stay quicker and safer to build. Everything you do — logging, search, settings, exports — behaves exactly as before, and all your data is untouched.</p>
-
-        <p><strong>V27</strong> · June 2026</p>
-        <p class="muted">Smarter Smart Quick Pick ordering. If you use Smart Quick Pick, the quick-pick buttons now match your location more precisely — a location only borrows learned items from another when they genuinely share a word, so a short name like "Office" no longer pulls in unrelated places. The item types you test most often at a location are now protected too, so a one-off item logged there once won't push your everyday buttons out of the row. This applies to your existing history automatically — nothing to set up. Everything else behaves exactly as before, and all your data is untouched.</p>
       </div>
 
       <div class="info-card">

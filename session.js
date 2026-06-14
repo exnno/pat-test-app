@@ -1134,7 +1134,88 @@ function saveUserSettings() {
   setView('settings');
 }
 
-// v11: save the CSV column configuration. Reads the live DOM rows so the
+// ---------- v30: Report Settings ----------
+
+// Read the report-settings text inputs currently in the DOM into state. Used
+// before any toggle-driven re-render so unsaved text isn't lost, and as the
+// first half of the Save handler. Guards each lookup so it's safe to call when
+// some fields aren't present.
+function captureReportTextInputs() {
+  const rs = state.reportSettings;
+  const name = document.getElementById('report-company-name');
+  const addr = document.getElementById('report-company-address');
+  const title = document.getElementById('report-title');
+  const decl = document.getElementById('report-declaration-text');
+  const months = document.getElementById('report-retest-months');
+  if (name) rs.companyName = name.value.trim();
+  if (addr) rs.companyAddress = addr.value.replace(/\s+$/, '');
+  if (title) rs.reportTitle = title.value.trim() || 'Portable Appliance Test Report';
+  if (decl) rs.declarationText = decl.value.trim();
+  if (months) {
+    const m = parseInt(months.value, 10);
+    rs.retestMonths = (Number.isFinite(m) && m >= 1 && m <= 120) ? m : null;
+  }
+}
+
+// Save handler for the Report Settings page. Captures the text inputs (toggles
+// are already live in state) and persists. If retest is on but no valid month
+// value was entered, we turn retest off rather than print a meaningless date.
+function saveReportSettingsForm() {
+  captureReportTextInputs();
+  const rs = state.reportSettings;
+  if (rs.retestEnabled && rs.retestMonths == null) {
+    rs.retestEnabled = false;
+    alert('Recommended retest needs a period in months (1–120). It has been left off — set a value and save again to enable it.');
+  }
+  saveReportSettings();
+  setView('settings');
+}
+
+// Logo upload: read the chosen image, downscale its longest edge to
+// REPORT_LOGO_MAX_PX via a canvas, and store the result as a base64 data URL on
+// reportSettings.logo. Runs entirely in the browser (no network). Errors surface
+// inline via state.reportSettingsError. Capture text inputs first so an in-
+// progress edit survives the post-load re-render.
+function handleReportLogoFile(file) {
+  state.reportSettingsError = '';
+  if (!file) return;
+  if (!/^image\/(png|jpeg)$/.test(file.type)) {
+    state.reportSettingsError = 'Please choose a PNG or JPEG image.';
+    render();
+    return;
+  }
+  captureReportTextInputs();
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const maxPx = (typeof REPORT_LOGO_MAX_PX === 'number') ? REPORT_LOGO_MAX_PX : 600;
+        let { width, height } = img;
+        if (width > maxPx || height > maxPx) {
+          const scale = maxPx / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        const cx = canvas.getContext('2d');
+        cx.drawImage(img, 0, 0, width, height);
+        // PNG preserves logo transparency; JPEG sources still export fine as PNG.
+        state.reportSettings.logo = canvas.toDataURL('image/png');
+        state.reportSettingsError = '';
+        saveReportSettings();
+      } catch (err) {
+        state.reportSettingsError = 'Could not process that image. Try a different file.';
+      }
+      render();
+    };
+    img.onerror = () => { state.reportSettingsError = 'Could not read that image.'; render(); };
+    img.src = e.target.result;
+  };
+  reader.onerror = () => { state.reportSettingsError = 'Could not read that file.'; render(); };
+  reader.readAsDataURL(file);
+}
 // user's ordering, visibility checks, and renamed headers are all picked up
 // in one pass.
 //
@@ -1225,11 +1306,11 @@ function dismissV26Welcome() {
   render();
 }
 
-// v27: dismiss the V27 "what's new" modal. Writes pat:v27welcome so users see
+// v30: dismiss the V30 "what's new" modal. Writes pat:v30welcome so users see
 // it once on update.
-function dismissV27Welcome() {
-  state.v27WelcomeSeen = true;
-  localStorage.setItem(V27_WELCOME_KEY, '1');
+function dismissV30Welcome() {
+  state.v30WelcomeSeen = true;
+  localStorage.setItem(V30_WELCOME_KEY, '1');
   render();
 }
 

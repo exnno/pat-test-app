@@ -419,6 +419,7 @@ function loadV11Settings() {
   state.v19WelcomeSeen = localStorage.getItem(V19_WELCOME_KEY) === '1';
   state.v26WelcomeSeen = localStorage.getItem(V26_WELCOME_KEY) === '1';
   state.v27WelcomeSeen = localStorage.getItem(V27_WELCOME_KEY) === '1';
+  state.v30WelcomeSeen = localStorage.getItem(V30_WELCOME_KEY) === '1';
 
   // v17: Sound feedback + Item timestamps. Both default OFF; only an explicit
   // '1' enables them. Anything else (absent key, '0', garbage) reads as off.
@@ -451,6 +452,58 @@ function loadV11Settings() {
   state.pruneAgeMonths = (Number.isFinite(storedPruneAge) && storedPruneAge >= 1 && storedPruneAge <= 120)
     ? storedPruneAge
     : PRUNE_AGE_DEFAULT;
+
+  // v30: PDF Reports settings. Loaded defensively — any corrupt/garbage key
+  // collapses to defaults so a bad value can never wedge boot. We merge stored
+  // values over a fresh defaults object so a backup/store written by an older or
+  // partial writer still gains any field added later (same forward-compat idea
+  // as ensureAllCsvColumns). enabled stays whatever was stored (default false).
+  state.reportSettings = loadReportSettings();
+}
+
+// v30: validate + merge stored report settings over defaults. Returns an
+// independent object. Never throws.
+function loadReportSettings() {
+  let stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem(REPORT_SETTINGS_KEY) || 'null');
+  } catch (e) {
+    stored = null;
+  }
+  return normaliseReportSettings(stored);
+}
+
+// v30: coerce any candidate object (from localStorage OR a restored backup) into
+// a complete, type-safe report-settings object merged over the defaults. A
+// null/garbage input returns clean defaults. Shared by load + restore so both
+// paths enforce identical shape and forward-compat (new fields backfill).
+function normaliseReportSettings(stored) {
+  const defaults = makeDefaultReportSettings();
+  if (!stored || typeof stored !== 'object') return defaults;
+  const out = { ...defaults, ...stored };
+  out.enabled         = stored.enabled === true;
+  out.showEngineer    = stored.showEngineer !== false;
+  out.showInstrument  = stored.showInstrument !== false;
+  out.showCalibration = stored.showCalibration !== false;
+  out.showFails       = stored.showFails !== false;
+  out.declaration     = stored.declaration !== false;
+  out.retestEnabled   = stored.retestEnabled === true;
+  const rm = parseInt(stored.retestMonths, 10);
+  out.retestMonths    = (Number.isFinite(rm) && rm >= 1 && rm <= 120) ? rm : null;
+  out.companyName     = typeof stored.companyName === 'string' ? stored.companyName : '';
+  out.companyAddress  = typeof stored.companyAddress === 'string' ? stored.companyAddress : '';
+  out.logo            = typeof stored.logo === 'string' ? stored.logo : '';
+  out.reportTitle     = (typeof stored.reportTitle === 'string' && stored.reportTitle.trim())
+    ? stored.reportTitle : defaults.reportTitle;
+  out.declarationText = typeof stored.declarationText === 'string'
+    ? stored.declarationText : defaults.declarationText;
+  if (out.retestEnabled && out.retestMonths === null) out.retestEnabled = false;
+  return out;
+}
+
+// v30: persist report settings as one JSON blob.
+function saveReportSettings() {
+  localStorage.setItem(REPORT_SETTINGS_KEY, JSON.stringify(state.reportSettings || makeDefaultReportSettings()));
 }
 
 // v11: Ensure state.csvColumns contains every column defined in
@@ -539,6 +592,8 @@ function saveSettings() {
   // v19: Clients & Sites (readable long-key arrays).
   localStorage.setItem(CLIENTS_KEY, JSON.stringify(state.clients || []));
   localStorage.setItem(SITES_KEY, JSON.stringify(state.sites || []));
+  // v30: PDF report settings (single blob incl. logo).
+  saveReportSettings();
   // lastBackupAt + backupSnoozedUntil are written via their own helpers
   // (markBackupExported, snoozeBackupReminder) rather than here, because they
   // shouldn't update on every state change.

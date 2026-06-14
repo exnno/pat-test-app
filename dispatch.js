@@ -341,6 +341,19 @@ registerActions({
   'settings-page': (arg) => setView(arg),
   'back-to-settings': () => setView('settings'),
 
+  // v30: Reports hub nav + actions. open-reports is defence-checked against the
+  // master switch (the button is already hidden when off, this is a backstop).
+  'open-reports': () => { if (state.reportSettings.enabled) setView('reports'); else setView('settings'); },
+  'settings-report-save': () => saveReportSettingsForm(),
+  'report-logo-pick': () => { const inp = document.getElementById('report-logo-file'); if (inp) inp.click(); },
+  'report-logo-remove': () => {
+    state.reportSettings.logo = '';
+    state.reportSettingsError = '';
+    saveReportSettings();
+    render();
+  },
+  'produce-report': (arg) => produceReport(arg),
+
   // Sub-page Save / Reset buttons
   'settings-user-save': () => saveUserSettings(),
   'settings-items-save': () => saveItemTypesSettings(),
@@ -403,7 +416,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV27Welcome(),
+  'welcome-dismiss': () => dismissV30Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -599,6 +612,31 @@ registerChangeActions({
 
   // Smart Quick Pick on/off
   'sqp-toggle': (checked) => setSqp(checked),
+
+  // v30: Report Settings toggles. The master switch and logo persist instantly
+  // (the master gates other screens; logo is a discrete pick). The rest update
+  // in-memory and re-render so dependent UI (retest-months enable, "Passes only"
+  // sub-text) reflects immediately; they commit to storage on Save. Re-rendering
+  // preserves unsaved text inputs because saveReportSettingsForm reads the DOM —
+  // but a toggle re-render would DISCARD unsaved text fields, so for the
+  // non-instant toggles we capture the current text inputs into state first.
+  'report-enabled': (checked) => {
+    captureReportTextInputs();
+    state.reportSettings.enabled = checked;
+    saveReportSettings();   // instant — gates Reports button on other screens
+    render();
+  },
+  'report-show-engineer':    (checked) => { captureReportTextInputs(); state.reportSettings.showEngineer = checked; render(); },
+  'report-show-instrument':  (checked) => { captureReportTextInputs(); state.reportSettings.showInstrument = checked; render(); },
+  'report-show-calibration': (checked) => { captureReportTextInputs(); state.reportSettings.showCalibration = checked; render(); },
+  'report-show-fails':       (checked) => { captureReportTextInputs(); state.reportSettings.showFails = checked; render(); },
+  'report-declaration':      (checked) => { captureReportTextInputs(); state.reportSettings.declaration = checked; render(); },
+  'report-retest-enabled':   (checked) => { captureReportTextInputs(); state.reportSettings.retestEnabled = checked; render(); },
+  'report-logo-file': (v, el) => {
+    const file = el.files && el.files[0];
+    el.value = '';
+    handleReportLogoFile(file);
+  },
 
   // Resistance calculator selects — re-render to update the result/formula
   'calc-csa': (v) => { state.calcCsa = v; render(); },

@@ -52,6 +52,10 @@ function buildBackup() {
     // v19: Clients & Sites (readable long-key arrays).
     clients: state.clients,
     sites: state.sites,
+    // v30: PDF report settings (single object incl. logo). Additive — old
+    // backups without it restore via makeDefaultReportSettings(). No
+    // backupVersion bump needed (purely additive, missing-field-tolerant).
+    reportSettings: state.reportSettings,
     lastBackupAt: state.lastBackupAt
   };
 }
@@ -247,6 +251,13 @@ function restoreBackupFromFile(file) {
     if (state.clients.length === 0 && state.sites.length === 0) {
       seedClientsSitesFromSessions();
     }
+
+    // v30: PDF report settings. Validate through the same normaliser the loader
+    // uses, so a missing key (any pre-v30 backup) restores clean defaults — which
+    // means `enabled:false`, i.e. reporting stays OFF after restoring an older
+    // backup until the user turns it on. A present-but-partial object backfills
+    // missing fields. Logo (if present) rides along inside the object.
+    state.reportSettings = normaliseReportSettings(data.reportSettings);
 
     state.activeId = null;
     state.view = 'sessions';

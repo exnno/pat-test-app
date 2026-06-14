@@ -49,6 +49,8 @@ function render() {
   else if (v === 'settingsBackup') html = renderSettingsBackup();
   else if (v === 'settingsCsv') html = renderSettingsCsv();   // v11
   else if (v === 'settingsClients') html = renderSettingsClients();   // v19
+  else if (v === 'settingsReport') html = renderSettingsReport();   // v30
+  else if (v === 'reports') html = renderReports();   // v30
   else if (v === 'settingsCalculator') html = renderSettingsCalculator();
   else if (v === 'settingsAbout') html = renderSettingsAbout();
   else if (v === 'settingsContact') html = renderSettingsContact();
@@ -94,24 +96,24 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v27: rolled forward — content covers the Smart Quick Pick ordering
-  // improvements. Key bumped to pat:v27welcome (gate uses v27WelcomeSeen) so
-  // users see it once on update to V27.
-  const welcomeModal = (state.v27WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // v30: rolled forward — content covers PDF Reports. Key bumped to
+  // pat:v30welcome (gate uses v30WelcomeSeen) so users see it once on update.
+  const welcomeModal = (state.v30WelcomeSeen || state.migrationPrompt.show) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V27">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V30">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V27</h3>
+        <h3 class="bulk-sheet-title">What's new in V30</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Smarter Quick Pick ordering.</strong> If you use Smart Quick Pick, the buttons now match your location more precisely — a location only borrows from another if they actually share a word, so a short name like "Office" no longer picks up unrelated places.</li>
-        <li><strong>Your regulars stay put.</strong> The item types you test most at a location are protected — a one-off item you logged there once will no longer push your everyday buttons out of the row.</li>
-        <li><strong>Nothing to set up.</strong> This applies to your existing history automatically. If you'd ever like to refresh it, the "Rebuild from my data" button under Settings → Smart Quick Pick is still there.</li>
+        <li><strong>PDF reports.</strong> You can now turn any session into a professional Portable Appliance Test Report — branded with your company name and logo, with a full appliance register and pass/fail totals.</li>
+        <li><strong>Set it up once.</strong> Go to Settings → Report Settings to add your details, choose what's shown, and switch reporting on. A new Reports button then appears on the Sessions screen and the session Overview.</li>
+        <li><strong>Off until you're ready.</strong> Reporting starts switched off, so nothing changes until you've set it up — handy when setting up a device for someone else.</li>
+        <li><strong>Works offline.</strong> Once the app has updated, reports generate on-device with no signal needed, and share straight from your phone.</li>
       </ul>
-      <button class="btn-primary" id="v27-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v30-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -333,6 +335,7 @@ function renderSessions() {
     <div class="screen">
       <header class="header">
         <h1 class="h1">PAT Sessions</h1>
+        ${state.reportSettings.enabled ? '<button class="icon-btn" id="reports-btn" data-action="open-reports" aria-label="Reports">📄</button>' : ''}
         <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">⚙</button>
       </header>
       ${backupBanner}
@@ -887,6 +890,7 @@ function renderOverview() {
         <div class="header-actions">
           ${showSelectBtn ? `<button class="icon-btn" id="select-mode-btn" data-action="enter-selection" aria-label="Select items" title="Select items">☑</button>` : ''}
           <button class="icon-btn" id="edit-session-btn" data-action="edit-session" aria-label="Edit session">✎</button>
+          ${state.reportSettings.enabled ? `<button class="icon-btn" id="produce-report-btn" data-action="produce-report" data-arg="${sess.id}" aria-label="Produce report" title="Produce report">📄</button>` : ''}
           <button class="icon-btn" id="export-btn" data-action="export-current" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
         </div>
       </header>
@@ -1092,6 +1096,60 @@ function renderEditSession() {
           <button class="btn-primary" id="ef-save" data-action="edit-save">Save</button>
         </div>
       </div>
+    </div>
+  `;
+}
+
+// ============== PAT Test PWA — v30 — Reports hub ==============
+// Top-level Reports area: pick a session to turn into a PDF report. Reached from
+// the Sessions screen header (only when reportSettings.enabled) and linked to
+// Report Settings. Reuses the session-card visual style from the sessions list.
+// Gated entirely by the master switch: setView('reports') falls back to sessions
+// if reporting is off (defence-in-depth — the entry buttons are already hidden).
+function renderReports() {
+  const rs = state.reportSettings;
+  // Newest-first, same ordering basis as the sessions list default.
+  const sorted = state.sessions.slice().sort((a, b) => {
+    const da = Date.parse(a.date) || 0, db = Date.parse(b.date) || 0;
+    return db - da;
+  });
+
+  const needsCompany = !rs.companyName
+    ? `<div class="info-card" style="margin:0 0 12px"><p class="muted" style="margin:0">Tip: add your company name and logo in Report Settings so your reports are branded.</p></div>`
+    : '';
+
+  let list;
+  if (sorted.length === 0) {
+    list = `<p class="muted">No sessions yet. Create and log a session first, then come back here to produce its report.</p>`;
+  } else {
+    list = sorted.map(s => {
+      const passes = s.items.filter(i => i.result === 'pass').length;
+      const fails = s.items.filter(i => i.result === 'fail').length;
+      const lockMark = s.locked ? '<span class="session-lock" title="Locked">🔒</span>' : '';
+      return `
+        <div class="session-card">
+          <div class="session-info" data-action="produce-report" data-arg="${s.id}">
+            <div class="session-title">${lockMark}${escapeHTML(s.site || s.name)}</div>
+            <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span></div>
+          </div>
+          <button class="icon-btn-sm" data-action="produce-report" data-arg="${s.id}" aria-label="Produce report">📄</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  return `
+    <div class="screen">
+      <header class="header-row">
+        <button class="icon-btn" id="reports-back-btn" data-action="go-sessions" aria-label="Back">‹</button>
+        <div class="site-name">Reports</div>
+        <button class="icon-btn" id="reports-settings-btn" data-action="settings-page" data-arg="settingsReport" data-page="settingsReport" aria-label="Report Settings">⚙</button>
+      </header>
+      <div class="settings-section" style="margin-top:4px">
+        <p class="muted" style="margin-top:0">Choose a session to produce a PDF Portable Appliance Test Report. You can preview it before sharing or saving.</p>
+      </div>
+      ${needsCompany}
+      <div class="sessions-list">${list}</div>
     </div>
   `;
 }

@@ -157,6 +157,22 @@ let state = {
   // modal (Smart Quick Pick ordering quality) so users see it once on update.
   v27WelcomeSeen: false,
 
+  // v30: welcome modal flag (key pat:v30welcome). Gates the V30 "what's new"
+  // modal (PDF Reports) so users see it once on update.
+  v30WelcomeSeen: false,
+
+  // v30: PDF Reports configuration + company logo. Single object, loaded from
+  // localStorage on boot (REPORT_SETTINGS_KEY) and seeded from
+  // makeDefaultReportSettings() when absent. `enabled` is the master switch
+  // gating both report entry points — default OFF for everyone. Included in
+  // backups; old backups restore with defaults. See config.js for field notes.
+  reportSettings: makeDefaultReportSettings(),
+
+  // v30: Report Settings page transient UI state (cleared on leaving the page).
+  // Currently just tracks a logo-too-large / load-error message to surface
+  // inline under the logo control. '' = nothing to show.
+  reportSettingsError: '',
+
   // v19: Clients & Sites. Two flat arrays kept in a parent/child relationship:
   //   clients — [{ id, name }]
   //   sites   — [{ id, clientId, name }]
