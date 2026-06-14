@@ -48,6 +48,7 @@ function render() {
   else if (v === 'settingsDescriptions') html = renderSettingsDescriptions();
   else if (v === 'settingsDisplay') html = renderSettingsDisplay();
   else if (v === 'settingsBackup') html = renderSettingsBackup();
+  else if (v === 'settingsSetup') html = renderSettingsSetup();   // v33
   else if (v === 'settingsCsv') html = renderSettingsCsv();   // v11
   else if (v === 'settingsClients') html = renderSettingsClients();   // v19
   else if (v === 'settingsReport') html = renderSettingsReport();   // v30
@@ -97,26 +98,80 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v32: rolled forward — content covers the settings restructure + search. Key
-  // bumped to pat:v32welcome (gate uses v32WelcomeSeen).
-  const welcomeModal = (state.v32WelcomeSeen || state.migrationPrompt.show) ? '' : `
+  // v33: rolled forward — content covers the first-run wizard (for new users) and
+  // the Export/Import Setup row. Key bumped to pat:v33welcome (gate uses
+  // v33WelcomeSeen). ALSO suppressed when the first-run wizard is showing — a
+  // genuinely-new install gets the wizard, never the modal (they're mutually
+  // exclusive: a new install has onboardedV33Seen=false, an upgrader has it true).
+  const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
+  const welcomeModal = (state.v33WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V32">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V33">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V32</h3>
+        <h3 class="bulk-sheet-title">What's new in V33</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Settings, reorganised.</strong> Settings are now grouped into clear sections — User &amp; Calibration, Testing Setup, Reports &amp; Output, App &amp; Display, Data and Help — so everything's easier to find.</li>
-        <li><strong>Search your settings.</strong> A search box at the top of Settings jumps straight to any page — try "logo", "earth" or "dark".</li>
-        <li><strong>A more finished feel.</strong> Empty screens now guide you to the next step, headings and back buttons are consistent throughout, and the About page has been tidied up.</li>
-        <li><strong>Nothing moved that matters.</strong> Every setting is exactly where it was functionally — just easier to reach. All your data is untouched.</li>
+        <li><strong>A guided setup for new devices.</strong> When the app is opened on a fresh phone, a short setup walks the new user through importing your settings or starting clean — handy for kitting out a new engineer.</li>
+        <li><strong>Export / Import Setup has its own home.</strong> It's now its own row under <strong>Settings → Data</strong>, instead of being tucked at the bottom of the Backup page.</li>
+        <li><strong>Run it any time.</strong> "Run first-time setup again" lives under <strong>Settings → Help</strong> if you ever want to walk through it on this device.</li>
+        <li><strong>Nothing changed in your data.</strong> All your sessions and settings are exactly as you left them.</li>
       </ul>
-      <button class="btn-primary" id="v32-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v33-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
+
+  // v33: first-run wizard — replaces the welcome modal for a genuinely-new
+  // install. Three steps, skippable throughout. Built on the bottom-sheet pattern
+  // (the reliable iOS PWA modal). All step state is transient (state.wizardStep /
+  // state.wizardPath).
+  let wizardModal = '';
+  if (wizardShowing) {
+    const step = state.wizardStep || 1;
+    const skipBtn = `<button class="wizard-skip" data-action="wizard-skip">Skip for now</button>`;
+    let bodyHTML = '';
+    if (step === 1) {
+      bodyHTML = `
+        <h3 class="bulk-sheet-title">Welcome to PAT Test</h3>
+        <p class="wizard-lead">A fast, fully-offline way to log portable appliance tests in the field. Everything stays on this device.</p>
+        <p class="wizard-lead">Let's get this phone set up — it'll only take a moment.</p>
+        <button class="btn-primary" data-action="wizard-next" data-arg="1">Get started</button>
+        ${skipBtn}
+      `;
+    } else if (step === 2) {
+      bodyHTML = `
+        <h3 class="bulk-sheet-title">Set up this device</h3>
+        <p class="wizard-lead">If another phone is already set up the way you like, bring its settings across. Otherwise, start fresh.</p>
+        <input type="file" id="wizard-import-file" data-change-action="wizard-import-file" accept="application/json,.json" style="display:none">
+        <button class="btn-primary" data-action="wizard-import">⬇ Import a setup file</button>
+        <button class="btn-secondary" data-action="wizard-fresh">Start fresh</button>
+        <button class="wizard-back" data-action="wizard-back">‹ Back</button>
+        ${skipBtn}
+      `;
+    } else {
+      bodyHTML = `
+        <h3 class="bulk-sheet-title">Your details</h3>
+        <p class="wizard-lead">Optional — you can change or add these any time in Settings.</p>
+        <label class="label">Your name (the engineer)</label>
+        <input class="input" id="wizard-engineer" type="text" value="${escapeHTML(state.engineer || '')}" placeholder="e.g. Sam Taylor" autocomplete="name">
+        <label class="label" style="margin-top:12px">Calibration date of your tester</label>
+        <input class="input" id="wizard-caldate" type="date" value="${escapeHTML(state.calDate || '')}">
+        <button class="btn-primary" style="margin-top:16px" data-action="wizard-finish">Finish setup</button>
+        <button class="wizard-back" data-action="wizard-back">‹ Back</button>
+        ${skipBtn}
+      `;
+    }
+    wizardModal = `
+      <div class="modal-backdrop" style="z-index:300"></div>
+      <div class="bulk-sheet wizard-sheet" style="z-index:301" role="dialog" aria-label="First-time setup">
+        <div class="bulk-sheet-handle"></div>
+        <div class="wizard-steps">Step ${step} of 3</div>
+        ${bodyHTML}
+      </div>
+    `;
+  }
 
   // v14: reopen warning modal — shown when the user taps an exported (clean or
   // modified) unlocked session on the Sessions list. Warns that editing means
@@ -148,7 +203,7 @@ function render() {
     }
   }
 
-  const finalHTML = banner + html + migrationModal + welcomeModal + reopenWarnModal;
+  const finalHTML = banner + html + migrationModal + welcomeModal + wizardModal + reopenWarnModal;
   app.innerHTML = finalHTML;
   // v24 (E4): record whether THIS render put any modal/sheet into the DOM, so the
   // next render knows whether the orphan-sweep above could find anything. Cheap

@@ -1328,6 +1328,92 @@ function dismissV32Welcome() {
   render();
 }
 
+function dismissV33Welcome() {
+  state.v33WelcomeSeen = true;
+  localStorage.setItem(V33_WELCOME_KEY, '1');
+  render();
+}
+
+// ---------- v33: First-run wizard ----------
+// Shown only on a genuinely blank install (gated in storage.load via
+// state.onboardedV33Seen). Three steps: 1 intro → 2 choose path (import a setup
+// file OR start fresh) → 3 (fresh only) engineer name + optional calibration
+// date. Skippable at any step. Completing or skipping sets ONBOARD_KEY so it
+// never returns.
+
+// Mark onboarding finished (completed or skipped) and drop into the app.
+function finishOnboarding() {
+  state.onboardedV33Seen = true;
+  localStorage.setItem(ONBOARD_KEY, '1');
+  state.wizardStep = 1;
+  state.wizardPath = '';
+  state.view = 'sessions';
+  render();
+}
+
+// Skip from any step — same as finishing, no data captured.
+function skipOnboarding() {
+  finishOnboarding();
+}
+
+// Step navigation. Step 2 records the chosen path; "import" immediately opens the
+// file picker (handled in dispatch via the hidden input), "fresh" advances to
+// step 3.
+function wizardChoosePath(path) {
+  state.wizardPath = path;
+  if (path === 'fresh') {
+    state.wizardStep = 3;
+    render();
+  }
+  // 'import' is handled by the file input in dispatch; nothing to render here.
+}
+
+function wizardBack() {
+  if (state.wizardStep > 1) state.wizardStep -= 1;
+  state.wizardPath = '';
+  render();
+}
+
+// Step 3 (fresh) finish: persist the optional engineer name + calibration date,
+// then complete onboarding. Both fields are optional — empty just means "set it
+// later in Settings".
+function wizardFinishFresh() {
+  const nameEl = document.getElementById('wizard-engineer');
+  const calEl = document.getElementById('wizard-caldate');
+  if (nameEl) {
+    state.engineer = (nameEl.value || '').trim();
+    state.newForm.engineer = state.engineer;
+  }
+  if (calEl && calEl.value) {
+    state.calDate = calEl.value;
+  }
+  save();                 // persists engineer + calibration via saveSettings inside save()
+  finishOnboarding();
+}
+
+// Setup import launched from the wizard. Reuses the standard importSetupFromFile
+// (which validates, confirms, applies and saves), but marks onboarding complete
+// first so the user lands in the app rather than the wizard after import. If the
+// user cancels the OS picker, onboarding is NOT marked complete (this is only
+// called once a file is actually chosen).
+function onboardSetupImport(file) {
+  if (!file) return;
+  state.onboardedV33Seen = true;
+  localStorage.setItem(ONBOARD_KEY, '1');
+  state.wizardStep = 1;
+  state.wizardPath = '';
+  importSetupFromFile(file);   // handles confirm/apply/save/render itself
+}
+
+// "Run first-time setup again" (Help). Clears the flag and reopens the wizard.
+function restartOnboarding() {
+  state.onboardedV33Seen = false;
+  localStorage.removeItem(ONBOARD_KEY);
+  state.wizardStep = 1;
+  state.wizardPath = '';
+  render();
+}
+
 // ---------- v31: Export/Import Setup UI handlers ----------
 
 // Toggle the "Choose what to include" disclosure on the Backup page.

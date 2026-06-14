@@ -433,13 +433,22 @@ registerActions({
   'backup-import': () => { const f = document.getElementById('backup-import-file'); if (f) f.click(); },
   'about-reload': () => { if (confirm('Reload the app? Your data is safe — only the app itself reloads.')) window.location.reload(); },
 
+  // v33: first-run wizard
+  'wizard-next': () => { state.wizardStep = 2; render(); },
+  'wizard-back': () => wizardBack(),
+  'wizard-skip': () => skipOnboarding(),
+  'wizard-fresh': () => wizardChoosePath('fresh'),
+  'wizard-import': () => { const f = document.getElementById('wizard-import-file'); if (f) f.click(); },
+  'wizard-finish': () => wizardFinishFresh(),
+  'restart-onboarding': () => restartOnboarding(),
+
   // Backup reminder banner
   'backup-banner-export': () => { downloadBackup(); render(); },
   'backup-banner-later': () => { snoozeBackupReminder(); render(); },
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV32Welcome(),
+  'welcome-dismiss': () => dismissV33Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -615,6 +624,13 @@ registerChangeActions({
   'setup-import-file': (v, el) => {
     const file = el.files && el.files[0];
     importSetupFromFile(file);
+    el.value = '';
+  },
+  // v33: setup import launched from the first-run wizard. Marks onboarding
+  // complete then reuses importSetupFromFile (via onboardSetupImport).
+  'wizard-import-file': (v, el) => {
+    const file = el.files && el.files[0];
+    onboardSetupImport(file);
     el.value = '';
   },
 

@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V32';
+const APP_VERSION = 'V33';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -71,6 +71,14 @@ const V27_WELCOME_KEY = 'pat:v27welcome';   // v27: Smart Quick Pick ordering qu
 const V30_WELCOME_KEY = 'pat:v30welcome';   // v30: PDF Reports
 const V31_WELCOME_KEY = 'pat:v31welcome';   // v31: Export/Import Setup + named PDF files
 const V32_WELCOME_KEY = 'pat:v32welcome';   // v32: settings restructure + search
+const V33_WELCOME_KEY = 'pat:v33welcome';   // v33: first-run wizard (shown to UPGRADERS only)
+// v33: First-run wizard "seen" flag. Set once the wizard is completed OR skipped,
+// so it never reappears. Distinct from the welcome modal key: a genuinely-new
+// install gets the WIZARD (gated by this key + an empty-install test); an
+// upgrading user fails the empty-install test and gets the V33 welcome modal
+// instead. The two are mutually exclusive — never both. "Run first-time setup
+// again" (Help) simply clears this key and re-renders.
+const ONBOARD_KEY = 'pat:onboardedV33';
 
 // v30: PDF Reports. A single object under REPORT_SETTINGS_KEY holds every
 // report-configuration field plus the optional company logo (base64). Stored as
@@ -126,7 +134,7 @@ const SETTINGS_CATEGORIES = [
   { id: 'catApp',     icon: '🎨', title: 'App & Display', blurb: 'Appearance and the resistance calculator',
     pages: ['settingsDisplay', 'settingsCalculator'] },
   { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Back up, restore and share your setup',
-    pages: ['settingsBackup'] },
+    pages: ['settingsBackup', 'settingsSetup'] },
   { id: 'catHelp',    icon: 'ℹ️', title: 'Help', blurb: 'About this app and how to get in touch',
     pages: ['settingsAbout', 'settingsContact'] }
 ];
@@ -145,7 +153,8 @@ const SETTINGS_PAGE_META = {
   settingsClients:     { icon: '🏢', title: 'Clients',               aliases: 'clients sites customers addresses' },
   settingsDisplay:     { icon: '🎨', title: 'Display Settings',      aliases: 'theme dark light haptics sound timestamps appearance' },
   settingsCalculator:  { icon: '🧮', title: 'Resistance Calculator', aliases: 'earth continuity resistance limit ohms calculator csa' },
-  settingsBackup:      { icon: '💾', title: 'Backup & Restore',      aliases: 'backup restore export import data setup share' },
+  settingsBackup:      { icon: '💾', title: 'Backup & Restore',      aliases: 'backup restore export import data save json' },
+  settingsSetup:       { icon: '🔁', title: 'Export / Import Setup', aliases: 'setup share configuration new device employee copy presets transfer' },
   settingsAbout:       { icon: 'ℹ️', title: 'About',                 aliases: 'about version changelog whats new' },
   settingsContact:     { icon: '✉️', title: 'Contact',              aliases: 'contact support email help feedback' }
 };

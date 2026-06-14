@@ -1,4 +1,4 @@
-# PAT App — Code Map (V32)
+# PAT App — Code Map (V33)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -28,9 +28,10 @@ third-party code in the app — see `THIRD-PARTY-LICENSES.txt`. They attach to
 
 ---
 
-## config.js (~440 ln) — constants & defaults, pure data
-`APP_VERSION` (V32); all `*_KEY` localStorage key names (incl. welcome keys,
-latest `V32_WELCOME_KEY`); `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
+## config.js (~445 ln) — constants & defaults, pure data
+`APP_VERSION` (V33); all `*_KEY` localStorage key names (incl. welcome keys,
+latest `V33_WELCOME_KEY`, and the v33 first-run `ONBOARD_KEY`);
+`MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`; v27 SQP tuning;
 `DEFAULT_ITEM_TYPES`, `DEFAULT_FAIL_REASONS`, `DEFAULT_DESCRIPTIONS`,
 `DEFAULT_CSV_COLUMNS`; `CSA_RESISTANCE`, `CALC_LENGTHS`. **v30:**
@@ -41,12 +42,16 @@ latest `V32_WELCOME_KEY`); `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_
 `SETTINGS_CATEGORIES` (the six Settings groups → which page ids each contains,
 plus icon/title/blurb) and `SETTINGS_PAGE_META` (per-page icon/title + search
 `aliases`) — the single source of truth for the two-level Settings hub, the
-category sub-lists, search matching, and back-navigation.
+category sub-lists, search matching, and back-navigation. **v33:**
+`V33_WELCOME_KEY` + `ONBOARD_KEY` (first-run wizard "seen" flag); the `catData`
+category now lists TWO pages (`settingsBackup`, `settingsSetup`) and
+`settingsSetup` has its own `SETTINGS_PAGE_META` entry (Export/Import Setup is
+now its own row, no longer embedded in the Backup page).
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
 
-## state.js (~280 ln) — the global `state` object
+## state.js (~290 ln) — the global `state` object
 The single `let state = { ... }` runtime shape: sessions, form, view, all the
 UI transients, welcome-modal flags, SQP/Multi Pick in-memory caches. **v30:**
 `reportSettings` + `reportSettingsError` + `v30WelcomeSeen`. **v31:**
@@ -54,7 +59,10 @@ UI transients, welcome-modal flags, SQP/Multi Pick in-memory caches. **v30:**
 ({sectionId:bool}, all true by default) + `setupError` — all transient Export/
 Import Setup UI state, not persisted. **v32:** `v32WelcomeSeen`;
 `settingsCategory` (the open category id, or null at the hub) + `settingsSearchQuery`
-(live settings-hub search text) — transient two-level-Settings nav state.
+(live settings-hub search text) — transient two-level-Settings nav state. **v33:**
+`v33WelcomeSeen` + `onboardedV33Seen` (persisted-flag mirrors; the latter gates the
+first-run wizard) + transient `wizardStep` (1–3) and `wizardPath` ('' | 'import' |
+'fresh').
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -76,6 +84,11 @@ over defaults) + `saveReportSettings`; `saveSettings` now also persists report
 settings. **v31:** `normaliseReportSettings` also validates
 `reportFilenamePattern` (non-empty kept, else default — old data/backups backfill
 the new field); `load` reads `V31_WELCOME_KEY` (and **v32:** `V32_WELCOME_KEY`).
+**v33:** `load` reads `V33_WELCOME_KEY` + `ONBOARD_KEY` and computes
+`state.onboardedV33Seen` — true if the key is set OR the install "looks like a
+returning user" (has sessions, an engineer name, or any prior welcome flag). That
+gate is what makes the first-run wizard show ONLY on a genuinely blank install;
+everyone else gets the V33 welcome modal instead.
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -186,8 +199,15 @@ report filename pattern captured in `captureReportTextInputs`; Export/Import
 Setup UI handlers (`toggleSetupIncludeOpen`, `setSetupInclude`, `startShareSetup`
 — builds the name bottom-sheet then calls `shareSetup`) and
 `insertReportFilenameToken` (token-chip → filename field insert at caret).
+**v32:** welcome dismiss `dismissV32Welcome`. **v33: first-run wizard** —
+`dismissV33Welcome`; `finishOnboarding` (sets `ONBOARD_KEY` + lands on Sessions),
+`skipOnboarding`, `wizardChoosePath(path)` ('fresh'→step 3; 'import' handled by the
+file input), `wizardBack`, `wizardFinishFresh` (reads the optional engineer/cal
+inputs, `save()`s, then finishes), `onboardSetupImport(file)` (marks onboarded then
+reuses `importSetupFromFile`), `restartOnboarding` (clears `ONBOARD_KEY`, reopens
+the wizard — driven from About → "Run first-time setup again").
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
-filtering, theme, bulk edit, settings saves.
+filtering, theme, bulk edit, settings saves, the first-run wizard.
 
 ## report.js (~310 ln) — PDF reports (v30) — NEW
 The PDF report builder + preview + share. `getJsPDF` (reads `window.jspdf`),
@@ -222,10 +242,15 @@ button), Overview (genuinely-empty session, no button), Clients (in
 render-settings), and Reports hub (no sessions); `refreshSettingsHubBodyOnly`
 (partial re-render of the settings hub body for live search, alongside
 `refreshSessionsListAreaOnly`); `settingsCategory` view routed in `render()`; the
-welcome modal block is now the **V32** "What's new" (settings restructure +
-search), gated by `v32WelcomeSeen`.
+welcome modal block. **v33:** the welcome modal is now the **V33** "What's new"
+(first-run wizard + Export/Import Setup row), gated by `v33WelcomeSeen`; a separate
+**first-run wizard** modal block (`wizardModal`) renders when
+`!onboardedV33Seen && !migrationPrompt.show` — three bottom-sheet steps driven by
+`state.wizardStep`/`wizardPath`. The two are mutually exclusive: the welcome modal
+is suppressed whenever the wizard is showing, so a blank install sees the wizard
+and an upgrader sees the modal. `settingsSetup` view routed in `render()`.
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
-Edit-session UI, the empty states, or the welcome modal.
+Edit-session UI, the empty states, the welcome modal, or the first-run wizard.
 **v29:** the two no-op binder shells left from V28
 (`bindSessionsListAreaEvents`, `bindOverviewBodyEvents`) and their last call
 sites in `refreshSessionsListAreaOnly` / `refreshOverviewBody` were deleted —
@@ -244,9 +269,12 @@ the live count/status line for a page row (was inline in the old flat hub);
 name, shown in search results). `renderSettingsSubHeader` + every `renderSettings*`
 sub-page (User, Items, Fails, MultiPick, Descriptions, Display, Backup, Csv,
 Clients, Report, Calculator, About, Contact) + calculator helpers. v31 bits
-(Report "PDF file name" section, `renderSetupSection()` on Backup) unchanged.
-**About changelog lives here** (`renderSettingsAbout`) — v32: V32 on top, V29
-dropped, cards reordered (intro → what's new → privacy → reload utility → ©).
+(Report "PDF file name" section, `renderSetupSection()`) unchanged. **v33:**
+`renderSetupSection()` is no longer embedded in the Backup page — it's wrapped by
+the new `renderSettingsSetup()` (its own `settingsSetup` page in the Data
+category); `renderSettingsBackup` lost the embedded call. **About changelog lives
+here** (`renderSettingsAbout`) — v33: V33 on top, V30 dropped; the About page also
+gained a "Set up another device" card with the `restart-onboarding` button.
 The Clients empty state uses the shared `emptyStateHTML` (render-core).
 *Touch to:* change any Settings page; the category structure (edit
 `SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META` in **config.js**, not here); search
@@ -296,7 +324,11 @@ calls `dismissV31Welcome`.
 is now level-aware (page → its category, category → hub); `open-settings` resets
 `settingsCategory`/`settingsSearchQuery` so the hub opens clean; input
 `settings-search` (live filter → `refreshSettingsHubBodyOnly`); `welcome-dismiss`
-now calls `dismissV32Welcome`.
+calls `dismissV32Welcome`.
+**v33:** clicks `wizard-next`, `wizard-back`, `wizard-skip`, `wizard-fresh`,
+`wizard-import` (clicks the hidden `wizard-import-file` input), `wizard-finish`,
+`restart-onboarding`; change `wizard-import-file` (→ `onboardSetupImport`);
+`welcome-dismiss` now calls `dismissV33Welcome`.
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

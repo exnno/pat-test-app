@@ -169,6 +169,19 @@ let state = {
   // modal (settings restructure + search).
   v32WelcomeSeen: false,
 
+  // v33: first-run wizard + its welcome modal (upgraders).
+  //   v33WelcomeSeen  — the "what's new in V33" modal (shown to UPGRADERS).
+  //   onboardedV33Seen — the first-run wizard has been completed OR skipped.
+  // A new install shows the WIZARD (and never the modal); an upgrader shows the
+  // MODAL (and never the wizard). Both flags load from localStorage.
+  v33WelcomeSeen: false,
+  onboardedV33Seen: false,
+  // Transient wizard nav (not persisted): which step is showing (1=intro,
+  // 2=choose path, 3=details) and which path the user chose ('' | 'import' |
+  // 'fresh'). Reset whenever the wizard opens.
+  wizardStep: 1,
+  wizardPath: '',
+
   // v32: two-level Settings navigation + search (transient, not persisted).
   // settingsCategory: the category id currently open (view 'settingsCategory'),
   // or null at the hub. settingsSearchQuery: the live filter text on the hub;

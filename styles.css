@@ -1467,6 +1467,46 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   margin-bottom: 0;
 }
 
+/* v33: first-run wizard — reuses the bottom-sheet shell; buttons stack full-width
+   with comfortable spacing, plus a step indicator and muted back/skip links. */
+.wizard-sheet .btn-primary,
+.wizard-sheet .btn-secondary {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+}
+.wizard-steps {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--neutral-text);
+  text-align: center;
+  margin: 2px 0 12px;
+}
+.wizard-lead {
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--text);
+  margin: 0 0 12px;
+}
+.wizard-back,
+.wizard-skip {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 600;
+  background: none;
+  border: none;
+  color: var(--neutral-text);
+  text-align: center;
+}
+.wizard-skip {
+  margin-top: 6px;
+}
+
 /* v11: Bulk-edit menu sheet — vertical stack of options inside a bottom sheet,
    plus a Delete option styled as destructive. Matches the import-conflict-actions
    pattern from v10. */

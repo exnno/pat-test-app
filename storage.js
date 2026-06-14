@@ -422,6 +422,24 @@ function loadV11Settings() {
   state.v30WelcomeSeen = localStorage.getItem(V30_WELCOME_KEY) === '1';
   state.v31WelcomeSeen = localStorage.getItem(V31_WELCOME_KEY) === '1';
   state.v32WelcomeSeen = localStorage.getItem(V32_WELCOME_KEY) === '1';
+  state.v33WelcomeSeen = localStorage.getItem(V33_WELCOME_KEY) === '1';
+
+  // v33: first-run wizard gate. onboardedV33Seen is set true once the wizard is
+  // completed OR skipped. We treat the install as "already onboarded" (so the
+  // wizard never shows) if EITHER the flag is set, OR this is clearly a returning
+  // user — they already have sessions, an engineer name, or have dismissed any
+  // earlier welcome modal. That last clause means existing users upgrading to V33
+  // are never shown the wizard; they get the V33 welcome modal instead. The
+  // wizard is reserved for a genuinely blank install. (render-core reads
+  // state.onboardedV33Seen to decide.)
+  const explicitlyOnboarded = localStorage.getItem(ONBOARD_KEY) === '1';
+  const looksLikeReturningUser =
+    state.sessions.length > 0 ||
+    !!state.engineer ||
+    state.v32WelcomeSeen || state.v31WelcomeSeen || state.v30WelcomeSeen ||
+    state.v27WelcomeSeen || state.v26WelcomeSeen || state.v19WelcomeSeen ||
+    state.v18WelcomeSeen;
+  state.onboardedV33Seen = explicitlyOnboarded || looksLikeReturningUser;
 
   // v17: Sound feedback + Item timestamps. Both default OFF; only an explicit
   // '1' enables them. Anything else (absent key, '0', garbage) reads as off.

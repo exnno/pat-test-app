@@ -172,11 +172,12 @@
 // changed; backupVersion unchanged (5). Cache bumped to pat-v31 so installed
 // PWAs pull the new file set; a stale cache would 404 setup.js and blank the app
 // (the boot.js crash fallback still guards that failure mode).
-// v32: settings restructure (two-level nav) + search + empty states + header
-// audit + About tidy. Pure UI/presentation — no new app files, no data/codec
-// change, backupVersion unchanged (5). Cache bumped to pat-v32 so installed PWAs
-// pull the changed render/dispatch/config/state/storage/styles set.
-const CACHE_VERSION = 'pat-v32';
+// v33: first-run wizard (new blank installs only) + Export/Import Setup promoted
+// to its own Settings → Data row + welcome modal/changelog rolled. No new app
+// files, no data/codec change, backupVersion unchanged (5). Cache bumped to
+// pat-v33 so installed PWAs pull the changed config/state/storage/session/render/
+// dispatch/styles set.
+const CACHE_VERSION = 'pat-v33';
 const ASSETS = [
   './',
   './index.html',

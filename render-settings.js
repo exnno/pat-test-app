@@ -70,7 +70,8 @@ function settingsPageSubtitle(pageId) {
       const rs = state.reportSettings;
       return !rs.enabled ? 'Off' : (rs.companyName ? `On · ${rs.companyName}` : 'On · no company name set');
     }
-    case 'settingsBackup':  return 'Back up, restore, share setup';
+    case 'settingsBackup':  return 'Back up and restore your data';
+    case 'settingsSetup':   return 'Share your setup to another device';
     case 'settingsCalculator': return 'Earth continuity limit';
     case 'settingsAbout':   return `PAT Test ${APP_VERSION}`;
     case 'settingsContact': return 'Get in touch';
@@ -524,8 +525,6 @@ function renderSettingsBackup() {
         <button class="backup-action-btn danger" id="backup-import-btn" data-action="backup-import">⬆ Import backup (.json)</button>
       </div>
 
-      ${renderSetupSection()}
-
       <div class="settings-section">
         <h2 class="h2">Storage usage</h2>
         <div class="storage-card">
@@ -590,6 +589,19 @@ function renderSetupSection() {
         <input type="file" id="setup-import-file" data-change-action="setup-import-file" accept="application/json,.json" style="display:none">
         <button class="backup-action-btn" id="setup-import-btn" data-action="setup-import">⬇ Import setup (.json)</button>
       </div>
+  `;
+}
+
+// v33: Export / Import Setup now has its own page in the Data category (it used
+// to be appended to the Backup page). The page body is the same self-contained
+// `renderSetupSection()` block, just wrapped in a screen + standard sub-header.
+function renderSettingsSetup() {
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Export / Import Setup')}
+      <p class="muted" style="margin:0 16px 4px">Copy this device's configuration to another phone or a new engineer. <strong>Settings only</strong> — sessions, clients and sites are never shared.</p>
+      ${renderSetupSection()}
+    </div>
   `;
 }
 
@@ -1000,18 +1012,24 @@ function renderSettingsAbout() {
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v32: rolled forward — V32 on top, V29 dropped. -->
+      <!-- v8: rolling 3-version changelog. v33: rolled forward — V33 on top, V30 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V33</strong> · June 2026</p>
+        <p class="muted">A guided first-time setup. Open the app on a brand-new phone and a short walkthrough helps get it ready — either by importing the settings from another device or starting clean — which makes kitting out a new engineer quick. Export / Import Setup now has its own row under Settings → Data instead of sitting at the foot of the Backup page, and you can re-run the walkthrough any time from Settings → Help. None of your existing data is affected.</p>
 
         <p><strong>V32</strong> · June 2026</p>
         <p class="muted">Settings has a new home. Everything is now grouped into clear sections — User &amp; Calibration, Testing Setup, Reports &amp; Output, App &amp; Display, Data and Help — with a search box at the top that jumps straight to any page. Empty screens now point you to the next step, headings and back buttons behave consistently throughout, and this About page has been tidied. Every setting works exactly as before — just easier to find — and all your data is untouched.</p>
 
         <p><strong>V31</strong> · June 2026</p>
-        <p class="muted">Share your setup, and name your report files. You can now send your whole configuration — Quick Pick presets, report settings, CSV columns, tester details and preferences — to another phone or a colleague from Settings → Backup → Share setup, so a new device matches this one in seconds. You choose what to include, and importing only ever changes settings — your sessions, clients and sites are never touched. Report PDFs can now be named the way you like, using details such as site and date that fill in automatically, and you can still rename any single report before sharing it.</p>
+        <p class="muted">Share your setup, and name your report files. You can now send your whole configuration — Quick Pick presets, report settings, CSV columns, tester details and preferences — to another phone or a colleague from Settings → Data → Export / Import Setup, so a new device matches this one in seconds. You choose what to include, and importing only ever changes settings — your sessions, clients and sites are never touched. Report PDFs can now be named the way you like, using details such as site and date that fill in automatically, and you can still rename any single report before sharing it.</p>
+      </div>
 
-        <p><strong>V30</strong> · June 2026</p>
-        <p class="muted">PDF reports. You can now turn any session into a professional Portable Appliance Test Report — branded with your company name and logo, listing every appliance with its pass/fail result, and showing tested/passed/failed totals. Set it up under Settings → Report Settings (add your details, choose what's shown, switch it on); a Reports button then appears on the Sessions screen and the session Overview. Reporting starts switched off, so nothing changes until you've set it up. Reports generate on-device and work offline. All your data is untouched.</p>
+      <div class="info-card">
+        <h3>Set up another device</h3>
+        <p class="muted">Walk through the first-time setup again on this phone — useful for re-importing a setup file or refreshing your details.</p>
+        <button class="backup-action-btn" id="about-restart-onboarding" data-action="restart-onboarding" style="margin-top:8px">↻ Run first-time setup again</button>
       </div>
 
       <div class="info-card">
