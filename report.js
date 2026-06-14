@@ -124,19 +124,24 @@ function buildReportDoc(session) {
   }
   if (rs.retestEnabled && rs.retestMonths) {
     const rd = addMonthsFormatted(session.date, rs.retestMonths);
-    if (rd) detailPairs.push(['Recommended retest by', rd]);
+    if (rd) detailPairs.push(['Recommended retest', rd]);
   }
 
-  // Two-column label/value layout.
+  // Two-column label/value layout. The value is placed just after the label's
+  // measured width (min 96pt) so a long label like "Recommended retest" never
+  // overlaps its value, while short labels keep the values aligned.
   const colGap = (pageW - margin * 2) / 2;
   detailPairs.forEach((pair, i) => {
     const col = i % 2;
     const x = margin + col * colGap;
     if (col === 0 && i > 0) y += 15;
-    if (i === 0) {} // first row uses current y
-    const rowY = y + (col === 0 ? 0 : 0);
-    doc.setFont(undefined, 'bold'); doc.text(pair[0] + ':', x, rowY);
-    doc.setFont(undefined, 'normal'); doc.text(String(pair[1] || ''), x + 96, rowY);
+    const label = pair[0] + ':';
+    doc.setFont(undefined, 'bold');
+    doc.text(label, x, y);
+    const labelW = doc.getTextWidth(label);
+    const valX = x + Math.max(96, labelW + 8);
+    doc.setFont(undefined, 'normal');
+    doc.text(String(pair[1] || ''), valX, y);
   });
   if (detailPairs.length % 2 === 1) y += 15;
   y += 22;

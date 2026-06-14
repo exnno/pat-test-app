@@ -161,7 +161,12 @@
 // dispatch/session/styles/index changed. Cache bumped to pat-v30 so installed
 // PWAs pull the new file set; a stale cache would 404 the new scripts and blank
 // the app (the boot.js crash fallback still guards that failure mode).
-const CACHE_VERSION = 'pat-v30';
+// v30.1 (hotfix): fixed a spacing bug on the report where a long detail label
+// ("Recommended retest") overlapped its value — the value is now placed after
+// the label's measured width instead of a fixed offset, and the label was
+// shortened. report.js only; cache bumped to pat-v30-1 so the fix reaches
+// devices already on v30 (cache-first would otherwise keep serving old report.js).
+const CACHE_VERSION = 'pat-v30-1';
 const ASSETS = [
   './',
   './index.html',
