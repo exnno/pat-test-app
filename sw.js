@@ -153,7 +153,15 @@
 // added. No new asset files (only existing scripts + styles changed), so the
 // ASSETS list is unchanged. Cache bumped to pat-v26 so installed PWAs pull the
 // updated files; a stale cache would serve the old build.
-const CACHE_VERSION = 'pat-v29';
+// v30: PDF Reports feature. New Report Settings page + top-level Reports hub +
+// "Produce Report" on the Overview, all gated by a master switch (default OFF).
+// First third-party code in the app: vendored jsPDF + jspdf-autotable (MIT) for
+// PDF generation — added to the ASSETS list below so reports work fully offline
+// once cached. New app file report.js; config/state/storage/backup/render-*/
+// dispatch/session/styles/index changed. Cache bumped to pat-v30 so installed
+// PWAs pull the new file set; a stale cache would 404 the new scripts and blank
+// the app (the boot.js crash fallback still guards that failure mode).
+const CACHE_VERSION = 'pat-v30';
 const ASSETS = [
   './',
   './index.html',
@@ -169,6 +177,9 @@ const ASSETS = [
   './csv.js',
   './backup.js',
   './session.js',
+  './jspdf.umd.min.js',
+  './jspdf.plugin.autotable.min.js',
+  './report.js',
   './render-core.js',
   './render-settings.js',
   './events.js',
