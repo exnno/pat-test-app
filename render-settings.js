@@ -1120,18 +1120,18 @@ function renderSettingsAbout() {
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v36: rolled forward — V36 on top, V33 dropped. -->
+      <!-- v8: rolling 3-version changelog. v37: rolled forward — V37 on top, V34 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V37</strong> · June 2026</p>
+        <p class="muted">Small tidy-ups based on your feedback. The back button on the entry screen now uses the same arrow as everywhere else, and the session overview has been simplified — Share and Report stay at the top, while "Select items" and "Session settings" are now clearly labelled buttons just below, instead of a row of similar-looking icons. None of your existing data is affected.</p>
 
         <p><strong>V36</strong> · June 2026</p>
         <p class="muted">More on your certificates. You can now switch on certificate numbers (Settings → Report Settings → Certificate numbers) — each session gets its own unique number, built from your prefix and a counter, and kept with that session so it never changes. Add job notes to a session from its overview and they print on the report. And you can save your report settings as named templates — for example a full certificate and a lighter client summary — then switch between them in a tap. None of your existing data is affected.</p>
 
         <p><strong>V35</strong> · June 2026</p>
         <p class="muted">Reports got more flexible. You can now colour your reports — pick a theme or your own colours for the table header and accent lines, under Settings → Report Settings → Colours, with the header text staying readable automatically. The report preview gained quick toggles (list all items, calibration, declaration, signature side) and an Edit settings shortcut, so you can adjust a report without leaving the preview. The date line now fills in the test date automatically alongside your signature, and multi-page reports show a clear note pointing you to Share / Save for the full document. None of your existing data is affected.</p>
-
-        <p><strong>V34</strong> · June 2026</p>
-        <p class="muted">Sign your reports. You can now add your signature to PDF reports — draw it on screen with a finger or stylus, or upload an image of it — under Settings → Report Settings → Signature. Once set, it prints on the declaration line of every report, and you can choose whether it sits to the left or right, or replace and remove it any time. The plain signing line still shows if you'd rather sign by hand. None of your existing data is affected.</p>
       </div>
 
       <div class="info-card">

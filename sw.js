@@ -182,7 +182,15 @@
 // the new fields. No new app files. Cache bumped to pat-v36 so installed PWAs
 // pull the changed config/state/storage/session/report/backup/setup/render-core/
 // render-settings/dispatch/styles set.
-const CACHE_VERSION = 'pat-v36';
+// v37: small UI fixes from user feedback — entry-screen back control now uses the
+// standard ‹ chevron (was a folder icon), and the session-overview header is
+// decluttered: Share + Report stay as header icons, while Select items + Session
+// settings become two clearly-labelled text buttons in a row beneath (the ☑/✎
+// icons were too similar). Pure UI — no data/codec/settings change, backupVersion
+// unchanged (5), no welcome modal (fix-grade, not a feature). No new app files.
+// Cache bumped to pat-v37 so installed PWAs pull the changed render-core/
+// render-settings/config/styles set.
+const CACHE_VERSION = 'pat-v37';
 const ASSETS = [
   './',
   './index.html',

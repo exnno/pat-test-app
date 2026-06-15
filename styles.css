@@ -2043,6 +2043,25 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   padding: 0 16px 8px;
 }
 
+/* v37: Select items + Session settings as two text buttons side by side,
+   replacing the cramped ☑/✎ header icons. */
+.overview-action-row {
+  display: flex;
+  gap: 10px;
+  padding: 4px 16px 10px;
+}
+.overview-action-btn {
+  flex: 1;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+}
+.overview-action-btn:active { background: var(--row-active); }
+
 /* Report Settings — logo preview frame */
 .report-logo-preview img {
   border: 1px solid var(--border);

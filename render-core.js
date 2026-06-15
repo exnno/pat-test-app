@@ -929,7 +929,7 @@ function renderEntry() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="sessions-btn" data-action="go-sessions" aria-label="Sessions">📁</button>
+        <button class="icon-btn" id="sessions-btn" data-action="go-sessions" aria-label="Back to sessions">‹</button>
         <div class="site-name">${escapeHTML(sess.site || sess.name)}</div>
         <button class="icon-btn" id="overview-btn" data-action="go-overview" aria-label="Overview">▦</button>
       </header>
@@ -1072,20 +1072,28 @@ function renderOverview() {
       </header>
     `;
   } else {
-    const showSelectBtn = sess.items.length > 0;
     header = `
       <header class="header-row">
         <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">‹</button>
         <div class="site-name">Overview</div>
         <div class="header-actions">
-          ${showSelectBtn ? `<button class="icon-btn" id="select-mode-btn" data-action="enter-selection" aria-label="Select items" title="Select items">☑</button>` : ''}
-          <button class="icon-btn" id="edit-session-btn" data-action="edit-session" aria-label="Edit session">✎</button>
           ${state.reportSettings.enabled ? `<button class="icon-btn" id="produce-report-btn" data-action="produce-report" data-arg="${sess.id}" aria-label="Produce report" title="Produce report">📄</button>` : ''}
           <button class="icon-btn" id="export-btn" data-action="export-current" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
         </div>
       </header>
     `;
   }
+
+  // v37: Select items + Session settings moved out of the cramped header icon
+  // cluster into two clear text buttons side by side beneath it (the ☑ and ✎
+  // icons were too similar and confused people). Hidden in selection mode and on
+  // a session with no items (nothing to select / the screen is empty).
+  const actionRow = (!state.selectionMode) ? `
+    <div class="overview-action-row">
+      ${sess.items.length > 0 ? `<button class="overview-action-btn" id="select-mode-btn" data-action="enter-selection">Select items</button>` : ''}
+      <button class="overview-action-btn" id="edit-session-btn" data-action="edit-session">Session settings</button>
+    </div>
+  ` : '';
 
   const selectAllRow = state.selectionMode ? `
     <div class="select-all-row">
@@ -1212,6 +1220,7 @@ function renderOverview() {
     <div class="screen">
       ${header}
       ${stats}
+      ${actionRow}
       ${jobDetails}
       ${state.selectionMode ? '' : filterRow}
       ${selectAllRow}

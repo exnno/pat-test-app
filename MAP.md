@@ -1,4 +1,4 @@
-# PAT App — Code Map (V36)
+# PAT App — Code Map (V37)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -364,6 +364,12 @@ templates), gated by `v36WelcomeSeen`; `renderOverview` gains a job-details bloc
 under the stats — a Job notes textarea (`session-notes`) and, when
 `reportSettings.certEnabled`, a certificate-number input (`session-cert-no`); both
 change-actions (fire on blur), hidden in selection mode and on locked sessions.
+**v37:** entry-screen header back control (`sessions-btn`, `go-sessions`) now uses
+the standard `‹` chevron instead of the 📁 folder glyph; the Overview non-selection
+header keeps only Report (📄) + Share, and Select items + Session settings moved to
+an `overview-action-row` of two text buttons (`select-mode-btn` “Select items”,
+`edit-session-btn` “Session settings”) rendered under the stats (hidden in
+selection mode; Select hidden when the session has no items).
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
 Edit-session UI, the empty states, the welcome modal, the first-run wizard, or the
 signature draw pad.
