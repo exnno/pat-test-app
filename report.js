@@ -206,16 +206,37 @@ function buildReportDoc(session) {
   if (rs.declaration) {
     doc.setPage(pageCount);
     const pageH = doc.internal.pageSize.getHeight();
+    // v34: does a signature image exist? If so we need extra headroom above the
+    // signing rule for it.
+    const sigImg = (typeof rs.signature === 'string' && rs.signature) ? rs.signature : '';
+    const sigHeadroom = sigImg ? 50 : 0;   // pt reserved above the rule for the image
     let dy = (doc.lastAutoTable ? doc.lastAutoTable.finalY : y) + 30;
-    // If too close to the footer, push to a fresh page.
-    if (dy > pageH - 110) { doc.addPage(); dy = margin + 10; }
+    // If too close to the footer, push to a fresh page (include the declaration
+    // text, the signature headroom, and the signing rule in the clearance).
+    if (dy > pageH - 110 - sigHeadroom) { doc.addPage(); dy = margin + 10; }
     doc.setFontSize(9); doc.setFont(undefined, 'italic'); doc.setTextColor(80);
     const declText = String(rs.declarationText || '');
     const wrapped = doc.splitTextToSize(declText, pageW - margin * 2);
     doc.text(wrapped, margin, dy);
-    dy += wrapped.length * 12 + 24;
+    dy += wrapped.length * 12 + 24 + sigHeadroom;
     doc.setTextColor(0); doc.setFont(undefined, 'normal'); doc.setFontSize(10);
     const engineerLine = (rs.showEngineer && session.engineer) ? session.engineer : '';
+    // v34: signature image, drawn just above the signing rule on the side given
+    // by rs.signaturePosition ('left' default | 'right'). The "Signed:" label +
+    // ruled line always print. A bad image never blocks the report (logo guard).
+    if (sigImg) {
+      try {
+        const maxW = 150, maxH = 44;   // pt box for the printed signature
+        const props = doc.getImageProperties ? doc.getImageProperties(sigImg) : null;
+        let w = maxW, h = maxH;
+        if (props && props.width && props.height) {
+          const r = Math.min(maxW / props.width, maxH / props.height);
+          w = props.width * r; h = props.height * r;
+        }
+        const sigX = (rs.signaturePosition === 'right') ? (pageW - margin - w) : margin;
+        doc.addImage(sigImg, 'PNG', sigX, dy - h - 2, w, h);
+      } catch (e) { /* a bad signature never blocks the report */ }
+    }
     doc.text('Signed: ____________________________', margin, dy);
     if (engineerLine) doc.text(engineerLine, margin, dy + 16);
     doc.text('Date: ______________', pageW - margin - 150, dy);

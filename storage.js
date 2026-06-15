@@ -423,6 +423,7 @@ function loadV11Settings() {
   state.v31WelcomeSeen = localStorage.getItem(V31_WELCOME_KEY) === '1';
   state.v32WelcomeSeen = localStorage.getItem(V32_WELCOME_KEY) === '1';
   state.v33WelcomeSeen = localStorage.getItem(V33_WELCOME_KEY) === '1';
+  state.v34WelcomeSeen = localStorage.getItem(V34_WELCOME_KEY) === '1';
 
   // v33: first-run wizard gate. onboardedV33Seen is set true once the wizard is
   // completed OR skipped. We treat the install as "already onboarded" (so the
@@ -513,6 +514,10 @@ function normaliseReportSettings(stored) {
   out.companyName     = typeof stored.companyName === 'string' ? stored.companyName : '';
   out.companyAddress  = typeof stored.companyAddress === 'string' ? stored.companyAddress : '';
   out.logo            = typeof stored.logo === 'string' ? stored.logo : '';
+  // v34: signature is a base64 data URL string like logo (empty if none). The
+  // position is constrained to 'left'|'right', anything else falls back to left.
+  out.signature       = typeof stored.signature === 'string' ? stored.signature : '';
+  out.signaturePosition = (stored.signaturePosition === 'right') ? 'right' : 'left';
   out.reportTitle     = (typeof stored.reportTitle === 'string' && stored.reportTitle.trim())
     ? stored.reportTitle : defaults.reportTitle;
   out.declarationText = typeof stored.declarationText === 'string'

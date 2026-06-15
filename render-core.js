@@ -98,28 +98,27 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v33: rolled forward — content covers the first-run wizard (for new users) and
-  // the Export/Import Setup row. Key bumped to pat:v33welcome (gate uses
-  // v33WelcomeSeen). ALSO suppressed when the first-run wizard is showing — a
-  // genuinely-new install gets the wizard, never the modal (they're mutually
-  // exclusive: a new install has onboardedV33Seen=false, an upgrader has it true).
+  // v34: rolled forward — content covers the report signature (draw or upload).
+  // Key bumped to pat:v34welcome (gate uses v34WelcomeSeen). Still suppressed
+  // while the first-run wizard is showing (a brand-new install gets the wizard,
+  // not this modal) and while the v9 migration prompt is up.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v33WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v34WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V33">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V34">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V33</h3>
+        <h3 class="bulk-sheet-title">What's new in V34</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>A guided setup for new devices.</strong> When the app is opened on a fresh phone, a short setup walks the new user through importing your settings or starting clean — handy for kitting out a new engineer.</li>
-        <li><strong>Export / Import Setup has its own home.</strong> It's now its own row under <strong>Settings → Data</strong>, instead of being tucked at the bottom of the Backup page.</li>
-        <li><strong>Run it any time.</strong> "Run first-time setup again" lives under <strong>Settings → Help</strong> if you ever want to walk through it on this device.</li>
+        <li><strong>Add your signature to reports.</strong> You can now sign your PDF reports — draw your signature on screen with a finger, or upload an image of it.</li>
+        <li><strong>Set it once.</strong> Add it under <strong>Settings → Report Settings → Signature</strong>; it then appears on the declaration line of every report you produce.</li>
+        <li><strong>Choose a side.</strong> Place the signature on the left or right of the declaration, and replace or remove it any time.</li>
         <li><strong>Nothing changed in your data.</strong> All your sessions and settings are exactly as you left them.</li>
       </ul>
-      <button class="btn-primary" id="v33-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v34-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -203,7 +202,36 @@ function render() {
     }
   }
 
-  const finalHTML = banner + html + migrationModal + welcomeModal + wizardModal + reopenWarnModal;
+  // v34: signature draw-pad bottom-sheet. Shown when state.signaturePadOpen.
+  // The canvas pointer wiring is attached after innerHTML is set (see below) —
+  // the markup just lays out the pad, a Clear and a Save (Save disabled until a
+  // stroke is made), and a Cancel.
+  let signaturePadModal = '';
+  if (state.signaturePadOpen) {
+    const saveDisabled = state.signaturePadHasInk ? '' : 'disabled';
+    signaturePadModal = `
+      <div class="modal-backdrop" style="z-index:300"></div>
+      <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Draw signature">
+        <div class="bulk-sheet-handle"></div>
+        <div class="bulk-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="bulk-sheet-title">Draw your signature</h3>
+          <button class="fail-close-btn" data-action="signature-pad-cancel" aria-label="Cancel">×</button>
+        </div>
+        <p style="margin:0 0 10px;font-size:13px;color:var(--neutral-text)">Sign in the box below with your finger or a stylus.</p>
+        <div class="sig-pad-wrap">
+          <canvas id="sig-pad-canvas" class="sig-pad-canvas"></canvas>
+          <span class="sig-pad-baseline"></span>
+        </div>
+        <div class="btn-row" style="margin-top:14px">
+          <button class="btn-secondary" data-action="signature-pad-clear">Clear</button>
+          <button class="btn-primary" data-action="signature-pad-save" ${saveDisabled}>Save signature</button>
+        </div>
+      </div>
+    `;
+  }
+
+  const finalHTML = banner + html + migrationModal + welcomeModal + wizardModal + signaturePadModal + reopenWarnModal;
   app.innerHTML = finalHTML;
   // v24 (E4): record whether THIS render put any modal/sheet into the DOM, so the
   // next render knows whether the orphan-sweep above could find anything. Cheap
@@ -228,6 +256,84 @@ function render() {
   // mid-session leaves a stale body class.
   document.body.classList.remove('view-entry');
   bindFocusFields();
+  if (state.signaturePadOpen) initSignaturePad();   // v34
+}
+
+// v34: attach pointer drawing to the live signature-pad canvas. Created fresh on
+// every render the pad is open, so this rebinds each time. Uses Pointer Events
+// (one path for finger/stylus/mouse) and touch-action:none (set in CSS) so
+// signing never scrolls the page — the key iOS PWA gotchas. Backing store is
+// sized to the element's CSS box × devicePixelRatio (capped) for a crisp line;
+// the exported PNG is downscaled again by storeSignatureFromSource.
+function initSignaturePad() {
+  const canvas = document.getElementById('sig-pad-canvas');
+  if (!canvas || typeof canvas.getContext !== 'function') return;
+  const rect = canvas.getBoundingClientRect();
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);   // cap at 2 to keep PNG small
+  const cssW = Math.max(1, Math.round(rect.width));
+  const cssH = Math.max(1, Math.round(rect.height || 160));
+  canvas.width = Math.round(cssW * dpr);
+  canvas.height = Math.round(cssH * dpr);
+  const cx = canvas.getContext('2d');
+  cx.scale(dpr, dpr);
+  cx.lineWidth = 2.2;
+  cx.lineCap = 'round';
+  cx.lineJoin = 'round';
+  cx.strokeStyle = '#111';
+
+  let drawing = false;
+  let lastX = 0, lastY = 0;
+  const pos = (e) => {
+    const r = canvas.getBoundingClientRect();
+    return { x: e.clientX - r.left, y: e.clientY - r.top };
+  };
+  const start = (e) => {
+    e.preventDefault();
+    drawing = true;
+    const p = pos(e);
+    lastX = p.x; lastY = p.y;
+    // dot for a tap
+    cx.beginPath();
+    cx.arc(lastX, lastY, 1.1, 0, Math.PI * 2);
+    cx.fillStyle = '#111';
+    cx.fill();
+    if (!state.signaturePadHasInk) {
+      state.signaturePadHasInk = true;
+      // enable the Save button without a full re-render (which would wipe the canvas)
+      const saveBtn = document.querySelector('[data-action="signature-pad-save"]');
+      if (saveBtn) saveBtn.removeAttribute('disabled');
+    }
+  };
+  const move = (e) => {
+    if (!drawing) return;
+    e.preventDefault();
+    const p = pos(e);
+    cx.beginPath();
+    cx.moveTo(lastX, lastY);
+    cx.lineTo(p.x, p.y);
+    cx.stroke();
+    lastX = p.x; lastY = p.y;
+  };
+  const end = (e) => { if (drawing) { e.preventDefault(); drawing = false; } };
+
+  canvas.addEventListener('pointerdown', start);
+  canvas.addEventListener('pointermove', move);
+  canvas.addEventListener('pointerup', end);
+  canvas.addEventListener('pointercancel', end);
+  canvas.addEventListener('pointerleave', end);
+}
+
+// v34: clear the pad canvas in place (no re-render, so the bound handlers + sized
+// backing store survive). Resets the ink flag and re-disables Save.
+function clearSignaturePad() {
+  const canvas = document.getElementById('sig-pad-canvas');
+  if (canvas && typeof canvas.getContext === 'function') {
+    const cx = canvas.getContext('2d');
+    cx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+  state.signaturePadHasInk = false;
+  const saveBtn = document.querySelector('[data-action="signature-pad-save"]');
+  if (saveBtn) saveBtn.setAttribute('disabled', '');
 }
 
 // v19 (efficiency item 4): fast path for logging on the entry screen.

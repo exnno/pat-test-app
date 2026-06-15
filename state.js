@@ -175,6 +175,13 @@ let state = {
   // A new install shows the WIZARD (and never the modal); an upgrader shows the
   // MODAL (and never the wizard). Both flags load from localStorage.
   v33WelcomeSeen: false,
+  v34WelcomeSeen: false,
+  // v34: transient signature draw-pad state (not persisted). signaturePadOpen
+  // gates the draw-pad bottom-sheet; signaturePadHasInk tracks whether at least
+  // one stroke has been made (gates the pad's Save button so a blank pad can't
+  // be saved). The actual signature lives on reportSettings.signature.
+  signaturePadOpen: false,
+  signaturePadHasInk: false,
   onboardedV33Seen: false,
   // Transient wizard nav (not persisted): which step is showing (1=intro,
   // 2=choose path, 3=details) and which path the user chose ('' | 'import' |

@@ -369,6 +369,15 @@ registerActions({
   },
   'produce-report': (arg) => produceReport(arg),
 
+  // v34: report signature (draw or upload) + position + remove + pad controls.
+  'signature-upload': () => { const inp = document.getElementById('report-signature-file'); if (inp) inp.click(); },
+  'signature-remove': () => removeReportSignature(),
+  'signature-position': (arg) => setSignaturePosition(arg),
+  'signature-draw': () => openSignaturePad(),
+  'signature-pad-cancel': () => closeSignaturePad(),
+  'signature-pad-clear': () => clearSignaturePad(),
+  'signature-pad-save': () => saveDrawnSignature(),
+
   // v31: PDF filename token chip — inserts {site}/{client}/{date}/{engineer}.
   'report-filename-token': (arg) => insertReportFilenameToken(arg),
 
@@ -448,7 +457,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV33Welcome(),
+  'welcome-dismiss': () => dismissV34Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -691,6 +700,11 @@ registerChangeActions({
     const file = el.files && el.files[0];
     el.value = '';
     handleReportLogoFile(file);
+  },
+  'report-signature-file': (v, el) => {   // v34
+    const file = el.files && el.files[0];
+    el.value = '';
+    handleReportSignatureFile(file);
   },
 
   // Resistance calculator selects — re-render to update the result/formula

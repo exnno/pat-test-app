@@ -1218,6 +1218,103 @@ function handleReportLogoFile(file) {
   reader.onerror = () => { state.reportSettingsError = 'Could not read that file.'; render(); };
   reader.readAsDataURL(file);
 }
+
+// ---------- v34: report signature (draw OR upload) ----------
+// Shared store path. Takes a source <img> or <canvas>, downscales the longest
+// edge to REPORT_SIGNATURE_MAX_PX, and stores a PNG data URL on
+// reportSettings.signature. Both the upload handler and the draw-pad save call
+// this so a drawn and an uploaded signature obey the same size cap and end up
+// as the identical string shape (which is what makes backup/setup round-trip
+// "for free"). Returns true on success.
+function storeSignatureFromSource(src, srcW, srcH) {
+  try {
+    const maxPx = (typeof REPORT_SIGNATURE_MAX_PX === 'number') ? REPORT_SIGNATURE_MAX_PX : 400;
+    let width = srcW, height = srcH;
+    if (width > maxPx || height > maxPx) {
+      const scale = maxPx / Math.max(width, height);
+      width = Math.round(width * scale);
+      height = Math.round(height * scale);
+    }
+    const canvas = document.createElement('canvas');
+    canvas.width = width; canvas.height = height;
+    const cx = canvas.getContext('2d');
+    cx.drawImage(src, 0, 0, width, height);
+    state.reportSettings.signature = canvas.toDataURL('image/png');
+    state.reportSettingsError = '';
+    saveReportSettings();
+    return true;
+  } catch (err) {
+    state.reportSettingsError = 'Could not process that signature. Try again.';
+    return false;
+  }
+}
+
+// Upload path — mirrors handleReportLogoFile exactly.
+function handleReportSignatureFile(file) {
+  state.reportSettingsError = '';
+  if (!file) return;
+  if (!/^image\/(png|jpeg)$/.test(file.type)) {
+    state.reportSettingsError = 'Please choose a PNG or JPEG image.';
+    render();
+    return;
+  }
+  captureReportTextInputs();
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => { storeSignatureFromSource(img, img.width, img.height); render(); };
+    img.onerror = () => { state.reportSettingsError = 'Could not read that image.'; render(); };
+    img.src = e.target.result;
+  };
+  reader.onerror = () => { state.reportSettingsError = 'Could not read that file.'; render(); };
+  reader.readAsDataURL(file);
+}
+
+// Remove the stored signature.
+function removeReportSignature() {
+  captureReportTextInputs();
+  state.reportSettings.signature = '';
+  saveReportSettings();
+  render();
+}
+
+// Position toggle ('left' | 'right').
+function setSignaturePosition(pos) {
+  captureReportTextInputs();
+  state.reportSettings.signaturePosition = (pos === 'right') ? 'right' : 'left';
+  saveReportSettings();
+  render();
+}
+
+// ----- Draw pad -----
+// Open/close the bottom-sheet pad. Opening captures any in-progress text edits
+// first (the pad triggers a re-render) and resets the ink flag.
+function openSignaturePad() {
+  captureReportTextInputs();
+  state.signaturePadOpen = true;
+  state.signaturePadHasInk = false;
+  render();
+}
+function closeSignaturePad() {
+  state.signaturePadOpen = false;
+  state.signaturePadHasInk = false;
+  render();
+}
+
+// Save whatever has been drawn. Reads the live pad canvas, trims nothing (keeps
+// it simple + reliable), stores via the shared path, then closes the sheet.
+// Guarded by signaturePadHasInk in the UI so this is only reachable with strokes.
+function saveDrawnSignature() {
+  const canvas = document.getElementById('sig-pad-canvas');
+  if (!canvas) { closeSignaturePad(); return; }
+  // The canvas backing store may be DPR-scaled; storeSignatureFromSource copies
+  // it through its own downscale so the saved PNG respects REPORT_SIGNATURE_MAX_PX.
+  const ok = storeSignatureFromSource(canvas, canvas.width, canvas.height);
+  state.signaturePadOpen = false;
+  state.signaturePadHasInk = false;
+  if (!ok) { render(); return; }
+  render();
+}
 // user's ordering, visibility checks, and renamed headers are all picked up
 // in one pass.
 //
@@ -1331,6 +1428,12 @@ function dismissV32Welcome() {
 function dismissV33Welcome() {
   state.v33WelcomeSeen = true;
   localStorage.setItem(V33_WELCOME_KEY, '1');
+  render();
+}
+
+function dismissV34Welcome() {
+  state.v34WelcomeSeen = true;
+  localStorage.setItem(V34_WELCOME_KEY, '1');
   render();
 }
 

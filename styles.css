@@ -615,6 +615,52 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .preset-action-danger { color: var(--fail); border-color: var(--fail-soft-border); }
 .preset-action-danger:active { background: var(--fail-soft-bg); }
 
+/* v34: report signature — preview, draw pad, position segmented control. */
+.report-sig-preview img { border: 1px solid var(--border-strong); }
+.sig-position-row {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+.sig-position-btn {
+  flex: 1;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  background: var(--card-bg);
+  color: var(--neutral-text);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+}
+.sig-position-btn.active {
+  background: var(--accent, #2563eb);
+  color: #fff;
+  border-color: var(--accent, #2563eb);
+}
+.sig-pad-wrap {
+  position: relative;
+  margin-top: 4px;
+}
+.sig-pad-canvas {
+  display: block;
+  width: 100%;
+  height: 160px;
+  background: #fff;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  /* critical iOS PWA fix: stop signing from scrolling the page */
+  touch-action: none;
+  cursor: crosshair;
+}
+.sig-pad-baseline {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 42px;
+  border-bottom: 1px dashed #bbb;
+  pointer-events: none;
+}
+
 /* Progress row with inline delete bin (entry screen) */
 .progress-row {
   display: flex;

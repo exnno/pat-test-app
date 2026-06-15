@@ -1,4 +1,4 @@
-# PAT App — Code Map (V33)
+# PAT App — Code Map (V34)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -29,8 +29,8 @@ third-party code in the app — see `THIRD-PARTY-LICENSES.txt`. They attach to
 ---
 
 ## config.js (~445 ln) — constants & defaults, pure data
-`APP_VERSION` (V33); all `*_KEY` localStorage key names (incl. welcome keys,
-latest `V33_WELCOME_KEY`, and the v33 first-run `ONBOARD_KEY`);
+`APP_VERSION` (V34); all `*_KEY` localStorage key names (incl. welcome keys,
+latest `V34_WELCOME_KEY`, and the v33 first-run `ONBOARD_KEY`);
 `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`; v27 SQP tuning;
 `DEFAULT_ITEM_TYPES`, `DEFAULT_FAIL_REASONS`, `DEFAULT_DESCRIPTIONS`,
@@ -46,7 +46,10 @@ category sub-lists, search matching, and back-navigation. **v33:**
 `V33_WELCOME_KEY` + `ONBOARD_KEY` (first-run wizard "seen" flag); the `catData`
 category now lists TWO pages (`settingsBackup`, `settingsSetup`) and
 `settingsSetup` has its own `SETTINGS_PAGE_META` entry (Export/Import Setup is
-now its own row, no longer embedded in the Backup page).
+now its own row, no longer embedded in the Backup page). **v34:**
+`V34_WELCOME_KEY`; `REPORT_SIGNATURE_MAX_PX` (signature downscale cap, 400);
+`makeDefaultReportSettings()` gains `signature` ('' base64 PNG) + `signaturePosition`
+('left'); Report page search aliases include "signature".
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
@@ -62,7 +65,10 @@ Import Setup UI state, not persisted. **v32:** `v32WelcomeSeen`;
 (live settings-hub search text) — transient two-level-Settings nav state. **v33:**
 `v33WelcomeSeen` + `onboardedV33Seen` (persisted-flag mirrors; the latter gates the
 first-run wizard) + transient `wizardStep` (1–3) and `wizardPath` ('' | 'import' |
-'fresh').
+'fresh').  **v34:** `v34WelcomeSeen`; transient `signaturePadOpen` +
+`signaturePadHasInk` (draw-pad sheet visibility + whether any stroke has been
+made, which gates the pad's Save button) — not persisted; the signature itself
+lives on `reportSettings.signature`.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -89,6 +95,10 @@ the new field); `load` reads `V31_WELCOME_KEY` (and **v32:** `V32_WELCOME_KEY`).
 returning user" (has sessions, an engineer name, or any prior welcome flag). That
 gate is what makes the first-run wizard show ONLY on a genuinely blank install;
 everyone else gets the V33 welcome modal instead.
+**v34:** `normaliseReportSettings` also validates `signature` (string kept else
+'') + `signaturePosition` ('right' kept else 'left') — so the signature
+round-trips through backup restore AND the setup bundle for free, and old
+data/backups/setups backfill both fields cleanly; `load` reads `V34_WELCOME_KEY`.
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -206,14 +216,28 @@ file input), `wizardBack`, `wizardFinishFresh` (reads the optional engineer/cal
 inputs, `save()`s, then finishes), `onboardSetupImport(file)` (marks onboarded then
 reuses `importSetupFromFile`), `restartOnboarding` (clears `ONBOARD_KEY`, reopens
 the wizard — driven from About → "Run first-time setup again").
+**v34: report signature** — `storeSignatureFromSource(src,w,h)` (shared canvas
+downscale to `REPORT_SIGNATURE_MAX_PX` → PNG data URL on `reportSettings.signature`,
+used by both upload and draw so they produce the identical string shape);
+`handleReportSignatureFile` (upload path, mirrors `handleReportLogoFile`);
+`removeReportSignature`; `setSignaturePosition('left'|'right')`; draw-pad
+`openSignaturePad`/`closeSignaturePad`/`saveDrawnSignature` (reads the live
+`#sig-pad-canvas`, stores via the shared path); `dismissV34Welcome`. (The pad's
+pointer-drawing wiring is `initSignaturePad`/`clearSignaturePad` in render-core,
+since it touches the live canvas after render.)
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
-filtering, theme, bulk edit, settings saves, the first-run wizard.
+filtering, theme, bulk edit, settings saves, the first-run wizard, the signature.
 
 ## report.js (~310 ln) — PDF reports (v30) — NEW
 The PDF report builder + preview + share. `getJsPDF` (reads `window.jspdf`),
 `runAutoTable`, `addMonthsFormatted` (retest date), `buildReportDoc` (logo/company
 header, title, job details, tested/passed/failed totals, the appliance-register
-autotable built from a COLUMN LIST, failed-row tint, footers, declaration),
+autotable built from a COLUMN LIST, failed-row tint, footers, declaration; **v34:**
+when `reportSettings.signature` is set, draws the signature image just above the
+"Signed:" rule on the side given by `signaturePosition` ('left'|'right'), reserving
+extra headroom and widening the footer-clearance page-break check; the blank ruled
+line still prints when no signature — a bad image never blocks the report, same
+try/catch guard as the logo),
 `reportFilename` (**v31:** builds from `reportSettings.reportFilenamePattern`
 with {site}/{client}/{date}/{engineer} token substitution + sanitisation; default
 pattern reproduces the exact pre-v31 name), `produceReport` (dispatch entry —
@@ -249,8 +273,15 @@ welcome modal block. **v33:** the welcome modal is now the **V33** "What's new"
 `state.wizardStep`/`wizardPath`. The two are mutually exclusive: the welcome modal
 is suppressed whenever the wizard is showing, so a blank install sees the wizard
 and an upgrader sees the modal. `settingsSetup` view routed in `render()`.
+**v34:** welcome modal rolled to **V34** "What's new" (report signature), gated by
+`v34WelcomeSeen` (still suppressed while the wizard shows); a `signaturePadModal`
+bottom-sheet (canvas + Clear/Save/Cancel) renders when `state.signaturePadOpen`,
+with its pointer-drawing wired by `initSignaturePad()` after `app.innerHTML` is set
+(Pointer Events + `touch-action:none`; DPR-scaled backing store capped at 2×) and
+`clearSignaturePad()` clearing it in place without a re-render.
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
-Edit-session UI, the empty states, the welcome modal, or the first-run wizard.
+Edit-session UI, the empty states, the welcome modal, the first-run wizard, or the
+signature draw pad.
 **v29:** the two no-op binder shells left from V28
 (`bindSessionsListAreaEvents`, `bindOverviewBodyEvents`) and their last call
 sites in `refreshSessionsListAreaOnly` / `refreshOverviewBody` were deleted —
@@ -275,6 +306,10 @@ the new `renderSettingsSetup()` (its own `settingsSetup` page in the Data
 category); `renderSettingsBackup` lost the embedded call. **About changelog lives
 here** (`renderSettingsAbout`) — v33: V33 on top, V30 dropped; the About page also
 gained a "Set up another device" card with the `restart-onboarding` button.
+**v34:** `renderSettingsReport` gains a **Signature** section — preview + Draw/Upload
+(or Replace/Remove when set) buttons + a left/right position segmented control,
+plus the hidden `report-signature-file` input; About changelog rolled (V34 top,
+V31 dropped).
 The Clients empty state uses the shared `emptyStateHTML` (render-core).
 *Touch to:* change any Settings page; the category structure (edit
 `SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META` in **config.js**, not here); search
@@ -329,6 +364,11 @@ calls `dismissV32Welcome`.
 `wizard-import` (clicks the hidden `wizard-import-file` input), `wizard-finish`,
 `restart-onboarding`; change `wizard-import-file` (→ `onboardSetupImport`);
 `welcome-dismiss` now calls `dismissV33Welcome`.
+**v34:** clicks `signature-upload` (clicks the hidden `report-signature-file`
+input), `signature-remove`, `signature-position` (data-arg left|right),
+`signature-draw` (opens the pad), `signature-pad-cancel`/`signature-pad-clear`/
+`signature-pad-save`; change `report-signature-file` (→ `handleReportSignatureFile`);
+`welcome-dismiss` now calls `dismissV34Welcome`.
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

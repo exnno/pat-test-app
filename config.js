@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V33';
+const APP_VERSION = 'V34';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -72,6 +72,7 @@ const V30_WELCOME_KEY = 'pat:v30welcome';   // v30: PDF Reports
 const V31_WELCOME_KEY = 'pat:v31welcome';   // v31: Export/Import Setup + named PDF files
 const V32_WELCOME_KEY = 'pat:v32welcome';   // v32: settings restructure + search
 const V33_WELCOME_KEY = 'pat:v33welcome';   // v33: first-run wizard (shown to UPGRADERS only)
+const V34_WELCOME_KEY = 'pat:v34welcome';   // v34: report signature (draw or upload)
 // v33: First-run wizard "seen" flag. Set once the wizard is completed OR skipped,
 // so it never reappears. Distinct from the welcome modal key: a genuinely-new
 // install gets the WIZARD (gated by this key + an empty-install test); an
@@ -148,7 +149,7 @@ const SETTINGS_PAGE_META = {
   settingsFails:       { icon: '⚠️', title: 'Quick Pick Fail',       aliases: 'fail reasons failure quick pick' },
   settingsMultiPick:   { icon: '🧰', title: 'Multi Pick',            aliases: 'multi pick bulk multiple slots' },
   settingsDescriptions:{ icon: '📝', title: 'Item Description List', aliases: 'descriptions notes labels' },
-  settingsReport:      { icon: '📄', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration' },
+  settingsReport:      { icon: '📄', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration signature sign' },
   settingsCsv:         { icon: '📊', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
   settingsClients:     { icon: '🏢', title: 'Clients',               aliases: 'clients sites customers addresses' },
   settingsDisplay:     { icon: '🎨', title: 'Display Settings',      aliases: 'theme dark light haptics sound timestamps appearance' },
@@ -176,6 +177,15 @@ function makeDefaultReportSettings() {
     showFails:        true,    // false = passes-only register
     declaration:      true,    // print the declaration/signature line
     declarationText:  REPORT_DECLARATION_DEFAULT,
+    // v34: optional signature image (base64 PNG data URL, downscaled <=400px on
+    // capture — drawn on-screen OR uploaded; both end up as the same data URL).
+    // Prints on the declaration line when `declaration` is on AND a signature
+    // exists; otherwise the blank ruled "Signed:" line shows exactly as before.
+    // signaturePosition: which side of the declaration block the signature sits
+    // ('left' | 'right'; default 'left', above the existing rule). Round-trips
+    // through backup + setup for free as part of the reportSettings blob.
+    signature:        '',
+    signaturePosition:'left',
     // v31: PDF filename pattern. Tokens {site} {client} {date} {engineer} plus
     // free text; substituted + sanitised by reportFilename(). Seeded to the exact
     // pre-v31 behaviour so nothing changes unless the user edits it.
@@ -186,6 +196,11 @@ function makeDefaultReportSettings() {
 // v30: logo upload constraint — longest edge downscaled to this many px before
 // base64 storage, to keep localStorage and JSON backups sane.
 const REPORT_LOGO_MAX_PX = 600;
+
+// v34: signature downscale constraint — longest edge capped to this many px
+// before base64 storage (drawn or uploaded). Signatures are smaller than logos,
+// so a tighter cap keeps localStorage + JSON backups lean.
+const REPORT_SIGNATURE_MAX_PX = 400;
 
 // v31: Export/Import Setup. A "setup" is a shareable bundle of CONFIGURATION
 // only — no sessions, no clients/sites, no learned SQP history, no backup
