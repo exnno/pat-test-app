@@ -98,27 +98,27 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v34: rolled forward — content covers the report signature (draw or upload).
-  // Key bumped to pat:v34welcome (gate uses v34WelcomeSeen). Still suppressed
-  // while the first-run wizard is showing (a brand-new install gets the wizard,
-  // not this modal) and while the v9 migration prompt is up.
+  // v35: rolled forward — content covers report colours, the preview quick-adjust,
+  // and the filled date line. Key bumped to pat:v35welcome (gate uses
+  // v35WelcomeSeen). Still suppressed while the first-run wizard is showing and
+  // while the v9 migration prompt is up.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v34WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v35WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V34">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V35">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V34</h3>
+        <h3 class="bulk-sheet-title">What's new in V35</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Add your signature to reports.</strong> You can now sign your PDF reports — draw your signature on screen with a finger, or upload an image of it.</li>
-        <li><strong>Set it once.</strong> Add it under <strong>Settings → Report Settings → Signature</strong>; it then appears on the declaration line of every report you produce.</li>
-        <li><strong>Choose a side.</strong> Place the signature on the left or right of the declaration, and replace or remove it any time.</li>
+        <li><strong>Colour your reports.</strong> Pick a theme — or your own colours — for the report's table header and accent lines, under <strong>Settings → Report Settings → Colours</strong>.</li>
+        <li><strong>Tweak while you preview.</strong> The report preview now has quick toggles (list all items, calibration, declaration, signature side) and an Edit settings shortcut, so you don't have to keep leaving the preview.</li>
+        <li><strong>The date fills itself in.</strong> The report's date line now shows the test date automatically, alongside your signature.</li>
         <li><strong>Nothing changed in your data.</strong> All your sessions and settings are exactly as you left them.</li>
       </ul>
-      <button class="btn-primary" id="v34-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v35-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 

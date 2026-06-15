@@ -99,7 +99,10 @@ function buildReportDoc(session) {
   doc.setFontSize(17); doc.setFont(undefined, 'bold');
   doc.text(String(rs.reportTitle || 'Portable Appliance Test Report'), margin, y);
   y += 22;
-  doc.setDrawColor(200); doc.line(margin, y, pageW - margin, y);
+  // v35: title underline uses the accent colour (was hardcoded grey 200).
+  const accentRgb = hexToRgb(rs.accentColor, [200, 200, 200]);
+  doc.setDrawColor(accentRgb[0], accentRgb[1], accentRgb[2]);
+  doc.line(margin, y, pageW - margin, y);
   y += 18;
 
   // ----- Job details (client / site / date / engineer) -----
@@ -150,8 +153,13 @@ function buildReportDoc(session) {
   const tested = session.items.length;
   const failed = session.items.filter(i => i.result === 'fail').length;
   const passed = tested - failed;
+  // v35: totals label uses the header colour for a tie-in with the table band
+  // (kept dark/legible since it's text on white, not a fill).
+  const headerRgb = hexToRgb(rs.headerColor, [40, 40, 40]);
   doc.setFont(undefined, 'bold'); doc.setFontSize(11);
+  doc.setTextColor(headerRgb[0], headerRgb[1], headerRgb[2]);
   doc.text(`Items tested: ${tested}    Passed: ${passed}    Failed: ${failed}`, margin, y);
+  doc.setTextColor(0);
   y += 8;
 
   // ----- Appliance register table -----
@@ -177,7 +185,9 @@ function buildReportDoc(session) {
     body: body.length ? body : [columns.map(() => '')],
     margin: { left: margin, right: margin },
     styles: { fontSize: 9, cellPadding: 4 },
-    headStyles: { fillColor: [40, 40, 40], textColor: 255 },
+    // v35: header band uses the chosen header colour, with auto-contrast text
+    // (white on dark, black on light) so a light theme stays legible.
+    headStyles: { fillColor: headerRgb, textColor: contrastColor(headerRgb) },
     // Tint failed rows so they stand out in the register (Q11).
     didParseCell: (data) => {
       if (data.section === 'body' && rs.showFails) {
@@ -239,7 +249,12 @@ function buildReportDoc(session) {
     }
     doc.text('Signed: ____________________________', margin, dy);
     if (engineerLine) doc.text(engineerLine, margin, dy + 16);
-    doc.text('Date: ______________', pageW - margin - 150, dy);
+    // v35: the Date line now prints the test date (was a blank write-in rule) so
+    // it matches the auto-filled signature side. Falls back to a blank rule only
+    // if the session somehow has no date.
+    const dateStr = session.date ? formatDate(session.date) : '';
+    const dateLabel = dateStr ? `Date: ${dateStr}` : 'Date: ______________';
+    doc.text(dateLabel, pageW - margin - 150, dy);
   }
 
   return doc;
@@ -280,6 +295,18 @@ function reportFilename(session, patternOverride) {
   return `${name}.pdf`;
 }
 
+// v35: reopen the preview for a session id (used by the settings deep-link
+// return). Rebuilds the doc from current settings so any edits show immediately.
+// Silently no-ops if the session/engine is unavailable.
+function reopenReportPreview(sessionId) {
+  if (!sessionId) return;
+  const session = state.sessions.find(s => s.id === sessionId);
+  if (!session || !getJsPDF()) return;
+  let doc;
+  try { doc = buildReportDoc(session); } catch (e) { return; }
+  openReportPreview(doc, session);
+}
+
 // Entry point from dispatch. Builds the doc and opens the preview modal.
 function produceReport(sessionId) {
   if (!state.reportSettings.enabled) { setView('settings'); return; }
@@ -302,10 +329,28 @@ function produceReport(sessionId) {
 // Preview modal (Q5=C): show the PDF in an iframe with Share + Download +
 // Close. Uses a blob URL; revoked on close. Built directly in the DOM rather
 // than through render() so it overlays the current screen without a view change.
+// v35: adds a multi-page note (the iOS inline PDF viewer only shows page 1), a
+// "Quick adjust" row that rebuilds the PDF in place when common settings are
+// toggled, and an "Edit report settings" deep-link that returns here afterwards.
 function openReportPreview(doc, session) {
-  const blob = doc.output('blob');
-  const url = URL.createObjectURL(blob);
+  // Keep the live session id so the settings deep-link can rebuild this preview.
+  const sessionId = session.id;
+
+  function pageCountOf(d) {
+    try { return d.internal.getNumberOfPages(); } catch (e) { return 1; }
+  }
+
+  // Build (or rebuild) all the per-doc bits: blob, url, page count.
+  let blob, url, pages;
+  function refreshDocState(d) {
+    blob = d.output('blob');
+    url = URL.createObjectURL(blob);
+    pages = pageCountOf(d);
+  }
+  refreshDocState(doc);
+
   const filename = reportFilename(session);
+  const baseName = filename.replace(/\.pdf$/i, '');
 
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -316,28 +361,56 @@ function openReportPreview(doc, session) {
   sheet.className = 'report-preview-sheet';
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-label', 'Report preview');
-  // v31: filename is editable here (Q6=C) — seeded from the configured pattern,
-  // shown without the .pdf suffix so the user edits a clean name. The .pdf is
-  // re-appended at share/download time.
-  const baseName = filename.replace(/\.pdf$/i, '');
-  sheet.innerHTML = `
-    <div class="report-preview-bar">
-      <button class="btn-secondary" id="report-preview-close">Close</button>
-      <span class="report-preview-title">Report preview</span>
-      <button class="btn-primary" id="report-preview-share">Share / Save</button>
-    </div>
-    <iframe class="report-preview-frame" src="${url}" title="Report preview"></iframe>
-    <div class="report-preview-fallback">
-      <label class="label report-filename-label" for="report-filename-input">File name</label>
-      <div class="report-filename-row">
-        <input class="input report-filename-input" id="report-filename-input" value="${baseName.replace(/"/g, '&quot;')}" autocapitalize="off" autocomplete="off" spellcheck="false">
-        <span class="report-filename-ext">.pdf</span>
-      </div>
-      <button class="btn-secondary" id="report-preview-download">Download PDF</button>
-    </div>
-  `;
 
-  // Resolve the current filename from the editable field at action time.
+  const rs = state.reportSettings;
+
+  // v35: quick-adjust toggle row. Each flips a reportSettings field, saves, and
+  // rebuilds the PDF in place. Signature side only shown when a signature exists.
+  function quickAdjustHTML() {
+    const hasSig = !!(rs.signature && rs.signature);
+    const chip = (action, on, label) =>
+      `<button class="qa-chip ${on ? 'on' : ''}" data-qa="${action}">${on ? '✓ ' : ''}${label}</button>`;
+    return `
+      <div class="report-qa-row">
+        ${chip('fails', rs.showFails, 'List all items')}
+        ${chip('calibration', rs.showCalibration, 'Calibration')}
+        ${chip('signature', rs.declaration, 'Declaration')}
+        ${hasSig ? chip('sigside', rs.signaturePosition === 'right', 'Signature right') : ''}
+      </div>
+    `;
+  }
+
+  function pageNoteHTML() {
+    return pages > 1
+      ? `<div class="report-page-note">Showing page 1 of ${pages} here. Tap <strong>Share / Save</strong> to view or send the full ${pages}-page report.</div>`
+      : '';
+  }
+
+  function buildSheetHTML() {
+    return `
+      <div class="report-preview-bar">
+        <button class="btn-secondary" id="report-preview-close">Close</button>
+        <span class="report-preview-title">Report preview</span>
+        <button class="btn-primary" id="report-preview-share">Share / Save</button>
+      </div>
+      ${pageNoteHTML()}
+      <iframe class="report-preview-frame" src="${url}" title="Report preview"></iframe>
+      <div class="report-preview-fallback">
+        <div class="report-qa-label">Quick adjust</div>
+        ${quickAdjustHTML()}
+        <button class="btn-secondary report-edit-settings-btn" id="report-edit-settings">⚙ Edit report settings</button>
+        <label class="label report-filename-label" for="report-filename-input">File name</label>
+        <div class="report-filename-row">
+          <input class="input report-filename-input" id="report-filename-input" value="${baseName.replace(/"/g, '&quot;')}" autocapitalize="off" autocomplete="off" spellcheck="false">
+          <span class="report-filename-ext">.pdf</span>
+        </div>
+        <button class="btn-secondary" id="report-preview-download">Download PDF</button>
+      </div>
+    `;
+  }
+
+  sheet.innerHTML = buildSheetHTML();
+
   function currentFilename() {
     const inp = document.getElementById('report-filename-input');
     let n = inp ? inp.value : baseName;
@@ -346,22 +419,68 @@ function openReportPreview(doc, session) {
     return `${n}.pdf`;
   }
 
+  // Preserve the typed filename across an in-place rebuild.
+  function currentBaseName() {
+    const inp = document.getElementById('report-filename-input');
+    return inp ? inp.value : baseName;
+  }
+
   function cleanup() {
     URL.revokeObjectURL(url);
     backdrop.remove();
     sheet.remove();
   }
+
+  // v35: rebuild the PDF after a quick-adjust change, keeping the modal open and
+  // the typed filename. Revokes the old blob URL first to avoid leaks.
+  function rebuild() {
+    const keepName = currentBaseName();
+    URL.revokeObjectURL(url);
+    let d;
+    try { d = buildReportDoc(session); }
+    catch (e) { alert('Could not rebuild the report.'); return; }
+    refreshDocState(d);
+    sheet.innerHTML = buildSheetHTML();
+    const inp = document.getElementById('report-filename-input');
+    if (inp) inp.value = keepName;
+    wireSheet();
+  }
+
+  // v35: quick-adjust handler — flip the field, persist, rebuild.
+  function onQuickAdjust(action) {
+    if (action === 'fails')        state.reportSettings.showFails = !state.reportSettings.showFails;
+    else if (action === 'calibration') state.reportSettings.showCalibration = !state.reportSettings.showCalibration;
+    else if (action === 'signature')   state.reportSettings.declaration = !state.reportSettings.declaration;
+    else if (action === 'sigside')      state.reportSettings.signaturePosition = (state.reportSettings.signaturePosition === 'right') ? 'left' : 'right';
+    saveReportSettings();
+    rebuild();
+  }
+
+  // Wire all the sheet's controls (called on open and after each rebuild).
+  function wireSheet() {
+    document.getElementById('report-preview-close').addEventListener('click', cleanup);
+    document.getElementById('report-preview-download').addEventListener('click', () => {
+      triggerDownload(blob, currentFilename());
+    });
+    document.getElementById('report-preview-share').addEventListener('click', async () => {
+      await shareOrDownloadReport(blob, currentFilename());
+    });
+    sheet.querySelectorAll('[data-qa]').forEach(btn => {
+      btn.addEventListener('click', () => onQuickAdjust(btn.getAttribute('data-qa')));
+    });
+    // Deep-link to Report Settings, returning to a fresh preview afterwards.
+    const editBtn = document.getElementById('report-edit-settings');
+    if (editBtn) editBtn.addEventListener('click', () => {
+      cleanup();
+      state.reportPreviewReturnSessionId = sessionId;
+      setView('settingsReport');
+    });
+  }
+
   backdrop.addEventListener('click', cleanup);
   document.body.appendChild(backdrop);
   document.body.appendChild(sheet);
-
-  document.getElementById('report-preview-close').addEventListener('click', cleanup);
-  document.getElementById('report-preview-download').addEventListener('click', () => {
-    triggerDownload(blob, currentFilename());
-  });
-  document.getElementById('report-preview-share').addEventListener('click', async () => {
-    await shareOrDownloadReport(blob, currentFilename());
-  });
+  wireSheet();
 }
 
 function triggerDownload(blob, filename) {

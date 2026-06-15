@@ -176,6 +176,12 @@ let state = {
   // MODAL (and never the wizard). Both flags load from localStorage.
   v33WelcomeSeen: false,
   v34WelcomeSeen: false,
+  v35WelcomeSeen: false,
+  // v35: when the user taps "Edit report settings" from the report preview, we
+  // remember the session id so the Report Settings back button can return them
+  // straight to a freshly-rebuilt preview instead of the settings hub. Cleared
+  // once consumed. null = normal settings navigation.
+  reportPreviewReturnSessionId: null,
   // v34: transient signature draw-pad state (not persisted). signaturePadOpen
   // gates the draw-pad bottom-sheet; signaturePadHasInk tracks whether at least
   // one stroke has been made (gates the pad's Save button so a blank pad can't

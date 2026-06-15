@@ -424,6 +424,7 @@ function loadV11Settings() {
   state.v32WelcomeSeen = localStorage.getItem(V32_WELCOME_KEY) === '1';
   state.v33WelcomeSeen = localStorage.getItem(V33_WELCOME_KEY) === '1';
   state.v34WelcomeSeen = localStorage.getItem(V34_WELCOME_KEY) === '1';
+  state.v35WelcomeSeen = localStorage.getItem(V35_WELCOME_KEY) === '1';
 
   // v33: first-run wizard gate. onboardedV33Seen is set true once the wizard is
   // completed OR skipped. We treat the install as "already onboarded" (so the
@@ -518,6 +519,10 @@ function normaliseReportSettings(stored) {
   // position is constrained to 'left'|'right', anything else falls back to left.
   out.signature       = typeof stored.signature === 'string' ? stored.signature : '';
   out.signaturePosition = (stored.signaturePosition === 'right') ? 'right' : 'left';
+  // v35: report colours — normalise to a safe '#rrggbb' or fall back to the
+  // default look. Old data/backups/setups without these fields backfill cleanly.
+  out.headerColor     = safeHexColor(stored.headerColor, REPORT_DEFAULT_HEADER_COLOR);
+  out.accentColor     = safeHexColor(stored.accentColor, REPORT_DEFAULT_ACCENT_COLOR);
   out.reportTitle     = (typeof stored.reportTitle === 'string' && stored.reportTitle.trim())
     ? stored.reportTitle : defaults.reportTitle;
   out.declarationText = typeof stored.declarationText === 'string'

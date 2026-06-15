@@ -172,14 +172,15 @@
 // changed; backupVersion unchanged (5). Cache bumped to pat-v31 so installed
 // PWAs pull the new file set; a stale cache would 404 setup.js and blank the app
 // (the boot.js crash fallback still guards that failure mode).
-// v34: report signature (draw on-screen OR upload an image) printed on the
-// declaration line, with a left/right position choice + remove. Additive
-// reportSettings field-pair (signature, signaturePosition) validated in
-// normaliseReportSettings — round-trips through backup + setup for free. No
-// codec change, backupVersion unchanged (5). No new app files. Cache bumped to
-// pat-v34 so installed PWAs pull the changed config/state/storage/session/
-// report/render-core/render-settings/dispatch/styles set.
-const CACHE_VERSION = 'pat-v34';
+// v35: report improvements — customisable header/accent colours (preset themes +
+// hex, auto-contrast header text), preview quick-adjust toggles + "edit settings"
+// deep-link, the declaration date line now auto-fills the test date, and a
+// multi-page preview note. Additive reportSettings fields (headerColor,
+// accentColor) validated in normaliseReportSettings — round-trip through backup +
+// setup for free. No new app files, no codec change, backupVersion unchanged (5).
+// Cache bumped to pat-v35 so installed PWAs pull the changed config/state/storage/
+// utils/session/report/render-core/render-settings/dispatch/styles set.
+const CACHE_VERSION = 'pat-v35';
 const ASSETS = [
   './',
   './index.html',

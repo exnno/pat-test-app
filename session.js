@@ -1170,6 +1170,15 @@ function saveReportSettingsForm() {
     alert('Recommended retest needs a period in months (1–120). It has been left off — set a value and save again to enable it.');
   }
   saveReportSettings();
+  // v35: if we came from the report preview's "Edit settings" deep-link, Save
+  // returns straight to a freshly-rebuilt preview instead of the settings hub.
+  if (state.reportPreviewReturnSessionId) {
+    const sid = state.reportPreviewReturnSessionId;
+    state.reportPreviewReturnSessionId = null;
+    setView('reports');
+    reopenReportPreview(sid);
+    return;
+  }
   setView('settings');
 }
 
@@ -1434,6 +1443,12 @@ function dismissV33Welcome() {
 function dismissV34Welcome() {
   state.v34WelcomeSeen = true;
   localStorage.setItem(V34_WELCOME_KEY, '1');
+  render();
+}
+
+function dismissV35Welcome() {
+  state.v35WelcomeSeen = true;
+  localStorage.setItem(V35_WELCOME_KEY, '1');
   render();
 }
 

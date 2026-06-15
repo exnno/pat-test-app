@@ -1,4 +1,4 @@
-# PAT App — Code Map (V34)
+# PAT App — Code Map (V35)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -49,7 +49,12 @@ category now lists TWO pages (`settingsBackup`, `settingsSetup`) and
 now its own row, no longer embedded in the Backup page). **v34:**
 `V34_WELCOME_KEY`; `REPORT_SIGNATURE_MAX_PX` (signature downscale cap, 400);
 `makeDefaultReportSettings()` gains `signature` ('' base64 PNG) + `signaturePosition`
-('left'); Report page search aliases include "signature".
+('left'); Report page search aliases include "signature". **v35:**
+`V35_WELCOME_KEY`; `REPORT_DEFAULT_HEADER_COLOR` + `REPORT_DEFAULT_ACCENT_COLOR`
+(reproduce the historic look) and `REPORT_COLOR_THEMES` (5 preset themes:
+classic/navy/forest/burgundy/teal, each setting header+accent);
+`makeDefaultReportSettings()` gains `headerColor` + `accentColor`; Report search
+aliases include "colour theme header accent".
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
@@ -68,12 +73,19 @@ first-run wizard) + transient `wizardStep` (1–3) and `wizardPath` ('' | 'impor
 'fresh').  **v34:** `v34WelcomeSeen`; transient `signaturePadOpen` +
 `signaturePadHasInk` (draw-pad sheet visibility + whether any stroke has been
 made, which gates the pad's Save button) — not persisted; the signature itself
-lives on `reportSettings.signature`.
+lives on `reportSettings.signature`.  **v35:** `v35WelcomeSeen`; transient
+`reportPreviewReturnSessionId` (set when "Edit report settings" is tapped in the
+report preview, so the settings back/save returns to a rebuilt preview; null =
+normal nav).
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
 `escapeHTML`, `capitalise`, `titleCase`, `formatDate`, `formatTimeShort`,
 `formatTimestampCSV`, `splitAssetNo`, `csvEscape`, `csvResultLabel`, `formatBytes`.
+**v35:** `hexToRgb(hex, fallback)` (→ [r,g,b] for jsPDF; safe on garbage),
+`contrastColor(rgb)` (black/white text by luminance), `safeHexColor(hex, fallback)`
+(validate/normalise to '#rrggbb'; 3-char shorthand only honoured when '#'-prefixed,
+so a bare hex-ish word can't slip through on the import path).
 *Touch to:* add a stateless formatting/escaping helper.
 
 ## storage.js (~640 ln) — persistence boundary
@@ -99,6 +111,9 @@ everyone else gets the V33 welcome modal instead.
 '') + `signaturePosition` ('right' kept else 'left') — so the signature
 round-trips through backup restore AND the setup bundle for free, and old
 data/backups/setups backfill both fields cleanly; `load` reads `V34_WELCOME_KEY`.
+**v35:** `normaliseReportSettings` also validates `headerColor` + `accentColor`
+via `safeHexColor` (→ safe '#rrggbb' or default) — round-trip through backup +
+setup for free, legacy data backfills the defaults; `load` reads `V35_WELCOME_KEY`.
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -225,6 +240,10 @@ used by both upload and draw so they produce the identical string shape);
 `#sig-pad-canvas`, stores via the shared path); `dismissV34Welcome`. (The pad's
 pointer-drawing wiring is `initSignaturePad`/`clearSignaturePad` in render-core,
 since it touches the live canvas after render.)
+**v35:** `dismissV35Welcome`; `saveReportSettingsForm` now returns to the report
+preview (via `reopenReportPreview`) when `reportPreviewReturnSessionId` is set
+instead of the settings hub. (Report colour theme/picker handlers live in
+dispatch.js; the preview quick-adjust + deep-link live in report.js.)
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves, the first-run wizard, the signature.
 
@@ -237,18 +256,26 @@ when `reportSettings.signature` is set, draws the signature image just above the
 "Signed:" rule on the side given by `signaturePosition` ('left'|'right'), reserving
 extra headroom and widening the footer-clearance page-break check; the blank ruled
 line still prints when no signature — a bad image never blocks the report, same
-try/catch guard as the logo),
+try/catch guard as the logo; **v35:** the table header band fill uses
+`reportSettings.headerColor` with auto-contrast text (`contrastColor`), the title
+rule + totals tie-in use `accentColor`/`headerColor` via `hexToRgb`, and the
+declaration Date line now prints the session test date instead of a blank rule),
 `reportFilename` (**v31:** builds from `reportSettings.reportFilenamePattern`
 with {site}/{client}/{date}/{engineer} token substitution + sanitisation; default
 pattern reproduces the exact pre-v31 name), `produceReport` (dispatch entry —
 gated by `reportSettings.enabled`; friendly alert if the engine hasn't loaded),
-`openReportPreview` (near-fullscreen iframe modal; **v31:** an editable filename
-field, seeded from the pattern, used for share/download), `triggerDownload`,
+`openReportPreview` (near-fullscreen iframe modal; **v31:** editable filename;
+**v35:** a multi-page note when the doc has >1 page, a "Quick adjust" chip row
+that flips `showFails`/`showCalibration`/`declaration`/`signaturePosition` and
+rebuilds the PDF in place via an internal `rebuild()`, and an "Edit report
+settings" deep-link that sets `reportPreviewReturnSessionId` and goes to settings),
+`reopenReportPreview(sessionId)` (**v35:** rebuilds + reopens the preview, used by
+the settings return hook), `triggerDownload`,
 `shareOrDownloadReport` (OS share sheet → download fallback). Reuses
-`splitSiteSnapshot` (clients.js), `formatDate`/`csvResultLabel` (utils.js),
-`todayISO`/`state` (session.js/state.js).
+`splitSiteSnapshot` (clients.js), `formatDate`/`csvResultLabel`/`hexToRgb`/
+`contrastColor` (utils.js), `todayISO`/`state` (session.js/state.js).
 *Touch to:* change the report layout/content, add reading columns (future), or
-change how the PDF is previewed/shared/named. **Uses the vendored MIT libs.**
+change how the PDF is previewed/shared/named/coloured. **Uses the vendored MIT libs.**
 
 ## render-core.js (~1100 ln) — main screens
 Owns `const app = document.getElementById('app')`. `render()` dispatcher.
@@ -279,6 +306,10 @@ bottom-sheet (canvas + Clear/Save/Cancel) renders when `state.signaturePadOpen`,
 with its pointer-drawing wired by `initSignaturePad()` after `app.innerHTML` is set
 (Pointer Events + `touch-action:none`; DPR-scaled backing store capped at 2×) and
 `clearSignaturePad()` clearing it in place without a re-render.
+**v35:** welcome modal rolled to **V35** "What's new" (report colours, preview
+quick-adjust, filled date), gated by `v35WelcomeSeen`. (The report preview's
+multi-page note + quick-adjust chips + settings deep-link all live in report.js's
+`openReportPreview`, built directly into the DOM, not through render().)
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
 Edit-session UI, the empty states, the welcome modal, the first-run wizard, or the
 signature draw pad.
@@ -310,6 +341,9 @@ gained a "Set up another device" card with the `restart-onboarding` button.
 (or Replace/Remove when set) buttons + a left/right position segmented control,
 plus the hidden `report-signature-file` input; About changelog rolled (V34 top,
 V31 dropped).
+**v35:** `renderSettingsReport` gains a **Colours** section — preset theme chips
+(`report-theme`) + two native `<input type="color">` pickers (`report-header-color`,
+`report-accent-color`); About changelog rolled (V35 top, V32 dropped).
 The Clients empty state uses the shared `emptyStateHTML` (render-core).
 *Touch to:* change any Settings page; the category structure (edit
 `SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META` in **config.js**, not here); search
@@ -369,6 +403,11 @@ input), `signature-remove`, `signature-position` (data-arg left|right),
 `signature-draw` (opens the pad), `signature-pad-cancel`/`signature-pad-clear`/
 `signature-pad-save`; change `report-signature-file` (→ `handleReportSignatureFile`);
 `welcome-dismiss` now calls `dismissV34Welcome`.
+**v35:** click `report-theme` (data-arg theme id → sets header+accent, saves,
+re-render); changes `report-header-color` + `report-accent-color` (native colour
+pickers → `safeHexColor` → save + re-render); `back-to-settings` now returns to a
+rebuilt report preview when `reportPreviewReturnSessionId` is set (the preview's
+"Edit settings" deep-link); `welcome-dismiss` now calls `dismissV35Welcome`.
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

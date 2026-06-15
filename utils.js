@@ -87,3 +87,39 @@ function formatBytes(b) {
   return `${(b / (1024 * 1024)).toFixed(2)} MB`;
 }
 
+// v35: parse a #rgb or #rrggbb hex string to an [r,g,b] array (0–255) for jsPDF
+// colour calls. Returns the provided fallback (default mid-grey) on anything
+// unparseable, so a garbage colour can never throw inside the report builder.
+function hexToRgb(hex, fallback) {
+  const fb = fallback || [40, 40, 40];
+  if (typeof hex !== 'string') return fb;
+  const had = hex.trim().charAt(0) === '#';
+  let h = hex.trim().replace(/^#/, '');
+  if (h.length === 3 && had) h = h.split('').map(c => c + c).join('');
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return fb;
+  return [parseInt(h.slice(0, 2), 16), parseInt(h.slice(2, 4), 16), parseInt(h.slice(4, 6), 16)];
+}
+
+// v35: pick black or white for text drawn on top of the given [r,g,b] fill, by
+// perceived luminance (so a light header band gets dark text and vice versa).
+function contrastColor(rgb) {
+  const [r, g, b] = Array.isArray(rgb) ? rgb : [40, 40, 40];
+  const lum = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  return lum > 0.6 ? [0, 0, 0] : [255, 255, 255];
+}
+
+// v35: validate a hex colour string for storage. Returns a normalised
+// '#rrggbb' (lowercased) or the fallback if invalid. Used by
+// normaliseReportSettings so stored/backed-up/imported colours are always safe.
+// 3-char shorthand is only honoured when explicitly '#'-prefixed, so a bare word
+// that happens to be hex-ish (e.g. 'bad' → b,a,d) can't masquerade as a colour
+// on the import path.
+function safeHexColor(hex, fallback) {
+  if (typeof hex !== 'string') return fallback;
+  const had = hex.trim().charAt(0) === '#';
+  let h = hex.trim().replace(/^#/, '');
+  if (h.length === 3 && had) h = h.split('').map(c => c + c).join('');
+  if (!/^[0-9a-fA-F]{6}$/.test(h)) return fallback;
+  return '#' + h.toLowerCase();
+}
+

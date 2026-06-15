@@ -346,6 +346,15 @@ registerActions({
   // jumping to a page from a flat search result (settingsCategory stays null →
   // back goes to the hub, which is correct: there's no category context).
   'back-to-settings': () => {
+    // v35: if we arrived at Report Settings via the preview's "Edit settings"
+    // deep-link, going back returns straight to a freshly-rebuilt preview.
+    if (state.reportPreviewReturnSessionId && state.view === 'settingsReport') {
+      const sid = state.reportPreviewReturnSessionId;
+      state.reportPreviewReturnSessionId = null;
+      setView('reports');   // a sensible underlay behind the preview overlay
+      reopenReportPreview(sid);
+      return;
+    }
     if (state.view === 'settingsCategory') {
       state.settingsCategory = null;
       setView('settings');
@@ -368,6 +377,19 @@ registerActions({
     render();
   },
   'produce-report': (arg) => produceReport(arg),
+
+  // v35: report colour theme (preset). Sets both header + accent, persists, and
+  // re-renders so the swatches + colour inputs reflect the choice. Captures text
+  // inputs first so an unsaved company name/title survives the re-render.
+  'report-theme': (arg) => {
+    const theme = REPORT_COLOR_THEMES.find(t => t.id === arg);
+    if (!theme) return;
+    captureReportTextInputs();
+    state.reportSettings.headerColor = theme.header;
+    state.reportSettings.accentColor = theme.accent;
+    saveReportSettings();
+    render();
+  },
 
   // v34: report signature (draw or upload) + position + remove + pad controls.
   'signature-upload': () => { const inp = document.getElementById('report-signature-file'); if (inp) inp.click(); },
@@ -457,7 +479,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV34Welcome(),
+  'welcome-dismiss': () => dismissV35Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -700,6 +722,21 @@ registerChangeActions({
     const file = el.files && el.files[0];
     el.value = '';
     handleReportLogoFile(file);
+  },
+  // v35: custom colour pickers. The value is the chosen hex; persist instantly
+  // and re-render so the theme-chip "active" highlight updates. Capture text
+  // inputs first so unsaved company name/title survive.
+  'report-header-color': (v) => {
+    captureReportTextInputs();
+    state.reportSettings.headerColor = safeHexColor(v, REPORT_DEFAULT_HEADER_COLOR);
+    saveReportSettings();
+    render();
+  },
+  'report-accent-color': (v) => {
+    captureReportTextInputs();
+    state.reportSettings.accentColor = safeHexColor(v, REPORT_DEFAULT_ACCENT_COLOR);
+    saveReportSettings();
+    render();
   },
   'report-signature-file': (v, el) => {   // v34
     const file = el.files && el.files[0];

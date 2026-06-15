@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V34';
+const APP_VERSION = 'V35';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -73,6 +73,7 @@ const V31_WELCOME_KEY = 'pat:v31welcome';   // v31: Export/Import Setup + named 
 const V32_WELCOME_KEY = 'pat:v32welcome';   // v32: settings restructure + search
 const V33_WELCOME_KEY = 'pat:v33welcome';   // v33: first-run wizard (shown to UPGRADERS only)
 const V34_WELCOME_KEY = 'pat:v34welcome';   // v34: report signature (draw or upload)
+const V35_WELCOME_KEY = 'pat:v35welcome';   // v35: report colours + preview quick-adjust + date fix
 // v33: First-run wizard "seen" flag. Set once the wizard is completed OR skipped,
 // so it never reappears. Distinct from the welcome modal key: a genuinely-new
 // install gets the WIZARD (gated by this key + an empty-install test); an
@@ -149,7 +150,7 @@ const SETTINGS_PAGE_META = {
   settingsFails:       { icon: '⚠️', title: 'Quick Pick Fail',       aliases: 'fail reasons failure quick pick' },
   settingsMultiPick:   { icon: '🧰', title: 'Multi Pick',            aliases: 'multi pick bulk multiple slots' },
   settingsDescriptions:{ icon: '📝', title: 'Item Description List', aliases: 'descriptions notes labels' },
-  settingsReport:      { icon: '📄', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration signature sign' },
+  settingsReport:      { icon: '📄', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration signature sign colour color theme header accent' },
   settingsCsv:         { icon: '📊', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
   settingsClients:     { icon: '🏢', title: 'Clients',               aliases: 'clients sites customers addresses' },
   settingsDisplay:     { icon: '🎨', title: 'Display Settings',      aliases: 'theme dark light haptics sound timestamps appearance' },
@@ -159,6 +160,22 @@ const SETTINGS_PAGE_META = {
   settingsAbout:       { icon: 'ℹ️', title: 'About',                 aliases: 'about version changelog whats new' },
   settingsContact:     { icon: '✉️', title: 'Contact',              aliases: 'contact support email help feedback' }
 };
+
+// v35: report colour defaults reproduce the exact pre-v35 look — dark grey
+// header band, mid-grey dividers. Stored as hex strings on reportSettings.
+const REPORT_DEFAULT_HEADER_COLOR = '#282828';   // was the hardcoded [40,40,40]
+const REPORT_DEFAULT_ACCENT_COLOR = '#c8c8c8';   // was the hardcoded line draw 200
+
+// Preset colour themes offered on the Report Settings page (plus a free hex
+// picker for each colour). 'Classic' = the historic default look. Each theme
+// sets both the header band and the accent. id is stable; label is shown.
+const REPORT_COLOR_THEMES = [
+  { id: 'classic',  label: 'Classic grey', header: '#282828', accent: '#c8c8c8' },
+  { id: 'navy',     label: 'Navy',         header: '#1f3a5f', accent: '#3d6ea5' },
+  { id: 'forest',   label: 'Forest green', header: '#1f4d2e', accent: '#4a8c63' },
+  { id: 'burgundy', label: 'Burgundy',     header: '#5e1f2e', accent: '#a5546a' },
+  { id: 'teal',     label: 'Teal',         header: '#14504f', accent: '#3f9c9a' }
+];
 
 // Factory (not a shared object) so callers always get an independent copy —
 // mirrors the DEFAULT_CSV_COLUMNS.map(...) deep-copy pattern used elsewhere.
@@ -186,6 +203,14 @@ function makeDefaultReportSettings() {
     // through backup + setup for free as part of the reportSettings blob.
     signature:        '',
     signaturePosition:'left',
+    // v35: report colours. headerColor = the register table's header band fill
+    // (hex). accentColor = title underline rule, section dividers, and the totals
+    // line (hex). Header TEXT colour is auto-chosen (white/black) for contrast at
+    // render time — not stored. Defaults reproduce the exact pre-v35 look (dark
+    // grey header, grey dividers). Additive strings on the blob → round-trip
+    // through backup + setup for free; validated in normaliseReportSettings.
+    headerColor:      REPORT_DEFAULT_HEADER_COLOR,
+    accentColor:      REPORT_DEFAULT_ACCENT_COLOR,
     // v31: PDF filename pattern. Tokens {site} {client} {date} {engineer} plus
     // free text; substituted + sanitised by reportFilename(). Seeded to the exact
     // pre-v31 behaviour so nothing changes unless the user edits it.

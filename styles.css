@@ -1916,6 +1916,98 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .report-preview-fallback .btn-secondary { width: 100%; }
 
+/* v35: multi-page note banner in the preview */
+.report-page-note {
+  padding: 10px 14px;
+  background: var(--accent-soft, #eef2ff);
+  color: var(--text);
+  font-size: 13px;
+  line-height: 1.4;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+}
+
+/* v35: preview quick-adjust chips */
+.report-qa-label,
+.report-color-field span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--neutral-text);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.report-qa-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 10px;
+}
+.qa-chip {
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  background: var(--card-bg);
+  color: var(--neutral-text);
+  border: 1px solid var(--border-strong);
+  border-radius: 16px;
+}
+.qa-chip.on {
+  background: var(--accent, #2563eb);
+  color: #fff;
+  border-color: var(--accent, #2563eb);
+}
+.report-edit-settings-btn { width: 100%; margin-bottom: 4px; }
+
+/* v35: report colour theme chips + custom pickers (Report Settings page) */
+.report-theme-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 14px;
+}
+.report-theme-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px 6px 8px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 18px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.report-theme-chip.active {
+  border-color: var(--accent, #2563eb);
+  box-shadow: 0 0 0 1px var(--accent, #2563eb) inset;
+}
+.report-theme-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: inline-block;
+  border: 1px solid rgba(0,0,0,0.15);
+}
+.report-theme-label { margin-left: 2px; }
+.report-color-pickers {
+  display: flex;
+  gap: 16px;
+}
+.report-color-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  align-items: flex-start;
+}
+.report-color-field input[type="color"] {
+  width: 56px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: none;
+}
+
 /* Report Settings — logo preview frame */
 .report-logo-preview img {
   border: 1px solid var(--border);

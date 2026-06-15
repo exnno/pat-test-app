@@ -930,6 +930,31 @@ function renderSettingsReport() {
       </div>
 
       <div class="settings-section">
+        <h2 class="h2">Colours</h2>
+        <p class="muted">Choose a theme for the report's table header and accent lines, or set your own colours. The header text switches between black and white automatically so it stays readable.</p>
+        <div class="report-theme-row">
+          ${REPORT_COLOR_THEMES.map(t => {
+            const active = (rs.headerColor === t.header && rs.accentColor === t.accent);
+            return `<button type="button" class="report-theme-chip ${active ? 'active' : ''}" data-action="report-theme" data-arg="${t.id}">
+              <span class="report-theme-swatch" style="background:${t.header}"></span>
+              <span class="report-theme-swatch" style="background:${t.accent}"></span>
+              <span class="report-theme-label">${escapeHTML(t.label)}</span>
+            </button>`;
+          }).join('')}
+        </div>
+        <div class="report-color-pickers">
+          <label class="report-color-field">
+            <span>Header band</span>
+            <input type="color" id="report-header-color" data-change-action="report-header-color" value="${escapeHTML(rs.headerColor || REPORT_DEFAULT_HEADER_COLOR)}">
+          </label>
+          <label class="report-color-field">
+            <span>Accent</span>
+            <input type="color" id="report-accent-color" data-change-action="report-accent-color" value="${escapeHTML(rs.accentColor || REPORT_DEFAULT_ACCENT_COLOR)}">
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
         <h2 class="h2">PDF file name</h2>
         <p class="muted">Sets the name each report file is saved with. Tap a chip to insert a detail that fills in automatically for each session. You can still rename any single report just before sharing it.</p>
         <input class="input" id="report-filename-pattern" value="${escapeHTML(rs.reportFilenamePattern || REPORT_FILENAME_DEFAULT)}" placeholder="${escapeHTML(REPORT_FILENAME_DEFAULT)}" autocapitalize="off" autocomplete="off" spellcheck="false">
@@ -1042,18 +1067,18 @@ function renderSettingsAbout() {
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v34: rolled forward — V34 on top, V31 dropped. -->
+      <!-- v8: rolling 3-version changelog. v35: rolled forward — V35 on top, V32 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V35</strong> · June 2026</p>
+        <p class="muted">Reports got more flexible. You can now colour your reports — pick a theme or your own colours for the table header and accent lines, under Settings → Report Settings → Colours, with the header text staying readable automatically. The report preview gained quick toggles (list all items, calibration, declaration, signature side) and an Edit settings shortcut, so you can adjust a report without leaving the preview. The date line now fills in the test date automatically alongside your signature, and multi-page reports show a clear note pointing you to Share / Save for the full document. None of your existing data is affected.</p>
 
         <p><strong>V34</strong> · June 2026</p>
         <p class="muted">Sign your reports. You can now add your signature to PDF reports — draw it on screen with a finger or stylus, or upload an image of it — under Settings → Report Settings → Signature. Once set, it prints on the declaration line of every report, and you can choose whether it sits to the left or right, or replace and remove it any time. The plain signing line still shows if you'd rather sign by hand. None of your existing data is affected.</p>
 
         <p><strong>V33</strong> · June 2026</p>
         <p class="muted">A guided first-time setup. Open the app on a brand-new phone and a short walkthrough helps get it ready — either by importing the settings from another device or starting clean — which makes kitting out a new engineer quick. Export / Import Setup now has its own row under Settings → Data instead of sitting at the foot of the Backup page, and you can re-run the walkthrough any time from Settings → Help. None of your existing data is affected.</p>
-
-        <p><strong>V32</strong> · June 2026</p>
-        <p class="muted">Settings has a new home. Everything is now grouped into clear sections — User &amp; Calibration, Testing Setup, Reports &amp; Output, App &amp; Display, Data and Help — with a search box at the top that jumps straight to any page. Empty screens now point you to the next step, headings and back buttons behave consistently throughout, and this About page has been tidied. Every setting works exactly as before — just easier to find — and all your data is untouched.</p>
       </div>
 
       <div class="info-card">

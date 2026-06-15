@@ -3,7 +3,7 @@
 A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, flexible clients & sites, search, filters, bulk edit, JSON backup/restore, dark mode, CSV export/import, and branded PDF report generation.
 
 **Live:** https://exnno.github.io/pat-test-app/
-**Current version:** V34 · cache `pat-v34`
+**Current version:** V35 · cache `pat-v35`
 
 ## Key features
 
@@ -19,6 +19,7 @@ A fast, offline-first portable appliance testing app. Records pass/fail decision
 - **Custom report file names (V31)** — set how report PDFs are named under Settings → Report Settings, using tappable tokens (`{site}`, `{client}`, `{date}`, `{engineer}`) that fill in per session; the default reproduces the original `PAT_Report_<site>_<date>` naming, and any single report can be renamed in the preview before sharing.
 - **Settings home + search (V32)** — Settings is a two-level structure: a hub of six categories (User & Calibration, Testing Setup, Reports & Output, App & Display, Data, Help) each opening a sub-list of pages, with a search box at the top that flattens to any matching page (matches titles plus plain-language aliases, e.g. "logo", "earth", "dark"). Back navigation is level-aware (page → its category → hub). Purely presentational — every setting is functionally where it was. Empty screens (Sessions, Overview, Clients, Reports) now show a guiding empty state pointing to the next step.
 - **Report signature (V34)** — add your signature to PDF reports by drawing it on screen (finger or stylus) or uploading a PNG/JPEG image, under Settings → Report Settings → Signature. Once set it prints on the declaration line of every report; you can place it left or right of the declaration, and replace or remove it any time. Stored on-device as part of the report settings (so it round-trips through both backups and the Export/Import Setup bundle), and the plain signing line still prints if no signature is set.
+- **Report customisation (V35)** — colour your reports (preset themes or your own header/accent colours, with header text auto-switching black/white for legibility) under Settings → Report Settings → Colours. The report preview has quick-adjust toggles (list all items, calibration, declaration, signature side) that rebuild the PDF in place plus an "Edit report settings" shortcut, so you can fine-tune a report without leaving the preview. The declaration date line fills in the test date automatically, and multi-page reports show a note pointing to Share / Save for the full document. Colours round-trip through backups and the setup bundle.
 - **First-run setup wizard (V33)** — on a genuinely new install, a short three-step walkthrough (intro → import a setup file *or* start fresh → optional engineer name & calibration date) helps get the device ready, which makes kitting out a new engineer's phone quick. It's skippable at every step, shows only on a blank install (existing users see a normal "what's new" note instead, never the wizard), and can be re-run any time from Settings → Help → "Run first-time setup again".
 - **Offline-first** — service-worker cached; all data in `localStorage` on the device only.
 
