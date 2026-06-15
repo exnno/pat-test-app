@@ -163,6 +163,11 @@ registerActions({
     const s = state.sessions.find(x => x.id === arg);
     if (s) shareOrDownloadCSV(s);
   },
+  'copy-session': (arg, el, e) => {   // v37.1
+    e.stopPropagation();
+    const s = state.sessions.find(x => x.id === arg);
+    if (s) copyCSV(s);
+  },
   'delete-session': (arg, el, e) => {
     e.stopPropagation();
     const s = state.sessions.find(x => x.id === arg);
@@ -267,6 +272,7 @@ registerActions({
     else if (state.view === 'settings') setView('sessions');
   },
   'export-current': () => { const s = activeSession(); if (s) shareOrDownloadCSV(s); },
+  'copy-current': () => { const s = activeSession(); if (s) copyCSV(s); },   // v37.1
   'edit-session': () => startEditSession(),
   'enter-selection': () => enterSelectionMode(),
   'cancel-selection': () => { exitSelectionMode(); render(); },

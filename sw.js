@@ -190,7 +190,7 @@
 // unchanged (5), no welcome modal (fix-grade, not a feature). No new app files.
 // Cache bumped to pat-v37 so installed PWAs pull the changed render-core/
 // render-settings/config/styles set.
-const CACHE_VERSION = 'pat-v37';
+const CACHE_VERSION = 'pat-v37-1';
 const ASSETS = [
   './',
   './index.html',

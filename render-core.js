@@ -669,6 +669,7 @@ function renderSessionsListAreaHTML() {
             ${exportBadge ? `<div class="session-export-row">${exportBadge}</div>` : ''}
             ${itemBadge}
           </div>
+          <button class="icon-btn-sm" data-action="copy-session" data-arg="${s.id}" aria-label="Copy CSV" title="Copy CSV">📋</button>
           <button class="icon-btn-sm" data-action="export-session" data-arg="${s.id}" data-export="${s.id}" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
           <button class="icon-btn-sm" data-action="delete-session" data-arg="${s.id}" data-delete-session="${s.id}" aria-label="Delete">🗑</button>
         </div>
@@ -1078,6 +1079,7 @@ function renderOverview() {
         <div class="site-name">Overview</div>
         <div class="header-actions">
           ${state.reportSettings.enabled ? `<button class="icon-btn" id="produce-report-btn" data-action="produce-report" data-arg="${sess.id}" aria-label="Produce report" title="Produce report">📄</button>` : ''}
+          <button class="icon-btn" id="copy-btn" data-action="copy-current" aria-label="Copy CSV" title="Copy CSV">📋</button>
           <button class="icon-btn" id="export-btn" data-action="export-current" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
         </div>
       </header>

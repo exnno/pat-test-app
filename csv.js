@@ -145,9 +145,52 @@ async function shareOrDownloadCSV(session) {
   render();
 }
 
-// v15: Bulk-export every not-yet-cleanly-exported session (status 'none' or
-// 'modified') in one action, fired from the tappable "N not yet exported"
-// nudge on the Sessions list.
+// v37.1 (hotfix): copy the CSV text straight to the clipboard. Added because the
+// v26 "share file only" change (which dropped the share payload's `text` field to
+// stop Mail/Messages attaching a clutter note) also removed iOS's "Copy" option
+// from the share sheet — Copy on iOS only appears when `text` is present. Rather
+// than reintroduce the clutter, this gives a reliable dedicated Copy action that
+// doesn't depend on the share sheet at all. Uses the async Clipboard API with a
+// hidden-textarea + execCommand fallback for contexts where it's blocked. Copying
+// counts as an export (clears the dirty flag), consistent with share/download.
+async function copyCSV(session) {
+  if (!session) return;
+  const BOM = '\uFEFF';
+  const csvText = BOM + buildCSV(session);
+  let copied = false;
+  try {
+    if (typeof navigator !== 'undefined' && navigator.clipboard && navigator.clipboard.writeText) {
+      await navigator.clipboard.writeText(csvText);
+      copied = true;
+    }
+  } catch (err) {
+    copied = false;   // fall through to the legacy path
+  }
+  if (!copied) {
+    try {
+      const ta = document.createElement('textarea');
+      ta.value = csvText;
+      ta.setAttribute('readonly', '');
+      ta.style.position = 'fixed';
+      ta.style.top = '-1000px';
+      document.body.appendChild(ta);
+      ta.select();
+      ta.setSelectionRange(0, csvText.length);   // iOS needs an explicit range
+      copied = document.execCommand('copy');
+      document.body.removeChild(ta);
+    } catch (err2) {
+      copied = false;
+    }
+  }
+  if (copied) {
+    showToast('CSV copied to clipboard');
+    markSessionExported(session);
+    save();
+    render();
+  } else {
+    showToast('Could not copy — try Share instead');
+  }
+}
 //
 // Strategy mirrors shareOrDownloadCSV but for many files:
 //   • Preferred path: a single navigator.share with ALL CSVs attached as files.
