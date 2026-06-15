@@ -425,6 +425,7 @@ function loadV11Settings() {
   state.v33WelcomeSeen = localStorage.getItem(V33_WELCOME_KEY) === '1';
   state.v34WelcomeSeen = localStorage.getItem(V34_WELCOME_KEY) === '1';
   state.v35WelcomeSeen = localStorage.getItem(V35_WELCOME_KEY) === '1';
+  state.v36WelcomeSeen = localStorage.getItem(V36_WELCOME_KEY) === '1';
 
   // v33: first-run wizard gate. onboardedV33Seen is set true once the wizard is
   // completed OR skipped. We treat the install as "already onboarded" (so the
@@ -481,6 +482,7 @@ function loadV11Settings() {
   // partial writer still gains any field added later (same forward-compat idea
   // as ensureAllCsvColumns). enabled stays whatever was stored (default false).
   state.reportSettings = loadReportSettings();
+  state.reportTemplates = loadReportTemplates();   // v36
 }
 
 // v30: validate + merge stored report settings over defaults. Returns an
@@ -523,6 +525,14 @@ function normaliseReportSettings(stored) {
   // default look. Old data/backups/setups without these fields backfill cleanly.
   out.headerColor     = safeHexColor(stored.headerColor, REPORT_DEFAULT_HEADER_COLOR);
   out.accentColor     = safeHexColor(stored.accentColor, REPORT_DEFAULT_ACCENT_COLOR);
+  // v36: certificate numbers. certEnabled defaults OFF; prefix is free text; the
+  // counter + padding are sane positive integers (garbage → defaults).
+  out.certEnabled     = stored.certEnabled === true;
+  out.certPrefix      = typeof stored.certPrefix === 'string' ? stored.certPrefix : '';
+  const cnn = parseInt(stored.certNextNumber, 10);
+  out.certNextNumber  = (Number.isFinite(cnn) && cnn >= 1) ? cnn : 1;
+  const cpd = parseInt(stored.certPadding, 10);
+  out.certPadding     = (Number.isFinite(cpd) && cpd >= 0 && cpd <= 10) ? cpd : 4;
   out.reportTitle     = (typeof stored.reportTitle === 'string' && stored.reportTitle.trim())
     ? stored.reportTitle : defaults.reportTitle;
   out.declarationText = typeof stored.declarationText === 'string'
@@ -540,6 +550,30 @@ function normaliseReportSettings(stored) {
 // v30: persist report settings as one JSON blob.
 function saveReportSettings() {
   localStorage.setItem(REPORT_SETTINGS_KEY, JSON.stringify(state.reportSettings || makeDefaultReportSettings()));
+}
+
+// v36: report templates. Each template is { id, name, settings } where settings
+// is a full reportSettings snapshot (C1=B), normalised through the same shared
+// validator so a hand-edited/corrupt entry can't poison the live settings when
+// applied. Returns a clean array; never throws. Seeds the starters when nothing
+// is stored yet (first run after upgrade).
+function loadReportTemplates() {
+  let stored = null;
+  try { stored = JSON.parse(localStorage.getItem(REPORT_TEMPLATES_KEY) || 'null'); }
+  catch (e) { stored = null; }
+  if (!Array.isArray(stored)) return makeStarterReportTemplates();
+  const clean = stored
+    .filter(t => t && typeof t === 'object')
+    .map(t => ({
+      id: (typeof t.id === 'string' && t.id) ? t.id : ('tpl_' + Math.random().toString(36).slice(2, 9)),
+      name: (typeof t.name === 'string' && t.name.trim()) ? t.name.trim() : 'Untitled template',
+      settings: normaliseReportSettings(t.settings)
+    }));
+  return clean;
+}
+
+function saveReportTemplates() {
+  localStorage.setItem(REPORT_TEMPLATES_KEY, JSON.stringify(state.reportTemplates || []));
 }
 
 // v11: Ensure state.csvColumns contains every column defined in

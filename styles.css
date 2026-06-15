@@ -2008,6 +2008,41 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   background: none;
 }
 
+/* v36: certificate-number two-field row */
+.cert-number-row {
+  display: flex;
+  gap: 12px;
+  margin-top: 10px;
+}
+.cert-number-row > div { flex: 1; }
+
+/* v36: report templates list */
+.template-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.template-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  flex-wrap: wrap;
+}
+.template-name { font-weight: 600; font-size: 14px; }
+.template-actions { display: flex; gap: 6px; flex-wrap: wrap; }
+.template-actions .preset-action-btn { padding: 6px 10px; font-size: 13px; }
+
+/* v36: job notes + cert field block on the Overview */
+.overview-jobdetails {
+  padding: 0 16px 8px;
+}
+
 /* Report Settings — logo preview frame */
 .report-logo-preview img {
   border: 1px solid var(--border);

@@ -42,7 +42,8 @@ function buildSetupBundle(label, include) {
     };
   }
   if (inc.report) {
-    sections.report = { reportSettings: state.reportSettings };
+    // v36: also share saved templates alongside the live report settings.
+    sections.report = { reportSettings: state.reportSettings, reportTemplates: state.reportTemplates };
   }
   if (inc.csv) {
     sections.csv = { csvColumns: state.csvColumns };
@@ -206,6 +207,17 @@ function applySetupBundle(data) {
   // --- report settings (validated through the shared normaliser) ---
   if (s.report && s.report.reportSettings) {
     state.reportSettings = normaliseReportSettings(s.report.reportSettings);
+  }
+  // v36: report templates from a shared setup (validated like backup restore).
+  if (s.report && Array.isArray(s.report.reportTemplates)) {
+    state.reportTemplates = s.report.reportTemplates
+      .filter(t => t && typeof t === 'object')
+      .map(t => ({
+        id: (typeof t.id === 'string' && t.id) ? t.id : ('tpl_' + Math.random().toString(36).slice(2, 9)),
+        name: (typeof t.name === 'string' && t.name.trim()) ? t.name.trim() : 'Untitled template',
+        settings: normaliseReportSettings(t.settings)
+      }));
+    saveReportTemplates();
   }
 
   // --- CSV columns (re-validated exactly like backup restore) ---

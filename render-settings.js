@@ -876,6 +876,30 @@ function renderSettingsReport() {
     ? `<p class="muted" style="color:#c0392b;margin-top:8px;font-size:12px">${escapeHTML(state.reportSettingsError)}</p>`
     : '';
 
+  // v36: live preview of the next certificate number from the current prefix +
+  // counter + padding (matches the stamping logic in report.js).
+  const certPreview = (() => {
+    const year = String(new Date().getFullYear());
+    const prefix = String(rs.certPrefix || '').replace(/\{year\}/gi, year);
+    const pad = Number.isFinite(rs.certPadding) ? rs.certPadding : 4;
+    const n = Number.isFinite(rs.certNextNumber) ? rs.certNextNumber : 1;
+    return prefix + String(n).padStart(pad, '0');
+  })();
+
+  // v36: saved templates list — each row applies / renames / deletes. Empty
+  // state nudges the user to save their first one.
+  const templatesBlock = (state.reportTemplates && state.reportTemplates.length)
+    ? `<div class="template-list">${state.reportTemplates.map(t => `
+        <div class="template-row">
+          <span class="template-name">${escapeHTML(t.name)}</span>
+          <span class="template-actions">
+            <button class="preset-action-btn" data-action="report-template-apply" data-arg="${escapeHTML(t.id)}">Apply</button>
+            <button class="preset-action-btn" data-action="report-template-rename" data-arg="${escapeHTML(t.id)}">Rename</button>
+            <button class="preset-action-btn preset-action-danger" data-action="report-template-delete" data-arg="${escapeHTML(t.id)}">Delete</button>
+          </span>
+        </div>`).join('')}</div>`
+    : `<p class="muted" style="font-style:italic">No templates yet.</p>`;
+
   const retestMonthsVal = rs.retestMonths == null ? '' : String(rs.retestMonths);
 
   // v34: signature block. Preview + Replace/Remove when set; Draw + Upload
@@ -964,6 +988,35 @@ function renderSettingsReport() {
           ).join('')}
         </div>
         <p class="muted" style="font-size:12px;margin-top:6px">Anything that isn't a letter or number becomes an underscore in the saved file. Leave it as <code>${escapeHTML(REPORT_FILENAME_DEFAULT)}</code> to keep the original naming.</p>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Certificate numbers</h2>
+        <p class="muted">Optional. When on, each session gets a unique certificate number the first time you produce its report — built from your prefix and a counter. The number is kept with that session, so re-generating the report always shows the same number.</p>
+        ${toggle('report-cert-enabled', 'Use certificate numbers', rs.certEnabled)}
+        <div${rs.certEnabled ? '' : ' style="opacity:.5"'}>
+          <label class="label" style="margin-top:12px">Prefix</label>
+          <input class="input" id="report-cert-prefix" value="${escapeHTML(rs.certPrefix || '')}" placeholder="e.g. BPS- or BPS-{year}-" autocapitalize="characters" autocomplete="off" spellcheck="false"${rs.certEnabled ? '' : ' disabled'}>
+          <p class="muted" style="font-size:12px;margin-top:4px">Use <code>{year}</code> to insert the test year, e.g. <code>BPS-{year}-</code> → <code>BPS-2026-0001</code>.</p>
+          <div class="cert-number-row">
+            <div>
+              <label class="label">Digits</label>
+              <input class="input" id="report-cert-padding" type="number" inputmode="numeric" min="0" max="10" value="${escapeHTML(String(rs.certPadding))}"${rs.certEnabled ? '' : ' disabled'}>
+            </div>
+            <div>
+              <label class="label">Next number</label>
+              <input class="input" id="report-cert-next" type="number" inputmode="numeric" min="1" value="${escapeHTML(String(rs.certNextNumber))}"${rs.certEnabled ? '' : ' disabled'}>
+            </div>
+          </div>
+          <p class="muted" style="font-size:12px;margin-top:8px">Next certificate will look like: <strong>${escapeHTML(certPreview)}</strong></p>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Templates</h2>
+        <p class="muted">Save your current report settings as a named template, then switch between them. Applying a template replaces all your report settings — including logo, signature and colours.</p>
+        ${templatesBlock}
+        <button class="preset-action-btn" data-action="report-template-save-new" style="margin-top:10px">💾 Save current settings as template…</button>
       </div>
 
       <div class="settings-section">
@@ -1067,18 +1120,18 @@ function renderSettingsAbout() {
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v35: rolled forward — V35 on top, V32 dropped. -->
+      <!-- v8: rolling 3-version changelog. v36: rolled forward — V36 on top, V33 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V36</strong> · June 2026</p>
+        <p class="muted">More on your certificates. You can now switch on certificate numbers (Settings → Report Settings → Certificate numbers) — each session gets its own unique number, built from your prefix and a counter, and kept with that session so it never changes. Add job notes to a session from its overview and they print on the report. And you can save your report settings as named templates — for example a full certificate and a lighter client summary — then switch between them in a tap. None of your existing data is affected.</p>
 
         <p><strong>V35</strong> · June 2026</p>
         <p class="muted">Reports got more flexible. You can now colour your reports — pick a theme or your own colours for the table header and accent lines, under Settings → Report Settings → Colours, with the header text staying readable automatically. The report preview gained quick toggles (list all items, calibration, declaration, signature side) and an Edit settings shortcut, so you can adjust a report without leaving the preview. The date line now fills in the test date automatically alongside your signature, and multi-page reports show a clear note pointing you to Share / Save for the full document. None of your existing data is affected.</p>
 
         <p><strong>V34</strong> · June 2026</p>
         <p class="muted">Sign your reports. You can now add your signature to PDF reports — draw it on screen with a finger or stylus, or upload an image of it — under Settings → Report Settings → Signature. Once set, it prints on the declaration line of every report, and you can choose whether it sits to the left or right, or replace and remove it any time. The plain signing line still shows if you'd rather sign by hand. None of your existing data is affected.</p>
-
-        <p><strong>V33</strong> · June 2026</p>
-        <p class="muted">A guided first-time setup. Open the app on a brand-new phone and a short walkthrough helps get it ready — either by importing the settings from another device or starting clean — which makes kitting out a new engineer quick. Export / Import Setup now has its own row under Settings → Data instead of sitting at the foot of the Backup page, and you can re-run the walkthrough any time from Settings → Help. None of your existing data is affected.</p>
       </div>
 
       <div class="info-card">

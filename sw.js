@@ -172,15 +172,17 @@
 // changed; backupVersion unchanged (5). Cache bumped to pat-v31 so installed
 // PWAs pull the new file set; a stale cache would 404 setup.js and blank the app
 // (the boot.js crash fallback still guards that failure mode).
-// v35: report improvements — customisable header/accent colours (preset themes +
-// hex, auto-contrast header text), preview quick-adjust toggles + "edit settings"
-// deep-link, the declaration date line now auto-fills the test date, and a
-// multi-page preview note. Additive reportSettings fields (headerColor,
-// accentColor) validated in normaliseReportSettings — round-trip through backup +
-// setup for free. No new app files, no codec change, backupVersion unchanged (5).
-// Cache bumped to pat-v35 so installed PWAs pull the changed config/state/storage/
-// utils/session/report/render-core/render-settings/dispatch/styles set.
-const CACHE_VERSION = 'pat-v35';
+// v36: certificate numbers (opt-in, assigned once per session, reused) + job
+// notes (per-session, printed on the report) + report templates (named full
+// reportSettings snapshots, apply/save/rename/delete). New session fields
+// (notes, certNo) ride inside `sessions`; new settings (cert fields,
+// reportTemplates collection) are additive — all validated on load/restore.
+// NO codec change and NO backupVersion bump (all additive, missing-field
+// tolerant, per the V30 precedent); old backups restore clean, new backups carry
+// the new fields. No new app files. Cache bumped to pat-v36 so installed PWAs
+// pull the changed config/state/storage/session/report/backup/setup/render-core/
+// render-settings/dispatch/styles set.
+const CACHE_VERSION = 'pat-v36';
 const ASSETS = [
   './',
   './index.html',

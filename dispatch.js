@@ -378,6 +378,23 @@ registerActions({
   },
   'produce-report': (arg) => produceReport(arg),
 
+  // v36: report templates (apply/rename/delete/save-new) + bulk handled in
+  // session.js. Rename/save-new use a simple prompt for the name (Report
+  // Settings is a deep settings screen; a prompt is acceptable here and keeps
+  // the change minimal — these are low-frequency admin actions).
+  'report-template-apply': (arg) => applyReportTemplate(arg),
+  'report-template-rename': (arg) => {
+    const tpl = (state.reportTemplates || []).find(t => t.id === arg);
+    if (!tpl) return;
+    const name = prompt('Rename template:', tpl.name);
+    if (name !== null) renameReportTemplate(arg, name);
+  },
+  'report-template-delete': (arg) => deleteReportTemplate(arg),
+  'report-template-save-new': () => {
+    const name = prompt('Name this template (saves your current report settings):', '');
+    if (name !== null) saveCurrentAsTemplate(name);
+  },
+
   // v35: report colour theme (preset). Sets both header + accent, persists, and
   // re-renders so the swatches + colour inputs reflect the choice. Captures text
   // inputs first so an unsaved company name/title survives the re-render.
@@ -479,7 +496,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV35Welcome(),
+  'welcome-dismiss': () => dismissV36Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -718,6 +735,18 @@ registerChangeActions({
   'report-show-fails':       (checked) => { captureReportTextInputs(); state.reportSettings.showFails = checked; render(); },
   'report-declaration':      (checked) => { captureReportTextInputs(); state.reportSettings.declaration = checked; render(); },
   'report-retest-enabled':   (checked) => { captureReportTextInputs(); state.reportSettings.retestEnabled = checked; render(); },
+  // v36: certificate-numbers master toggle. Capture cert text inputs first so an
+  // unsaved prefix/counter survives the re-render that enables/disables the
+  // fields. Persists instantly so the Overview cert field appears/hides too.
+  'report-cert-enabled': (checked) => {
+    captureReportTextInputs();
+    state.reportSettings.certEnabled = checked;
+    saveReportSettings();
+    render();
+  },
+  // v36: session-level fields edited on the Overview (fire on blur via change).
+  'session-notes': (v, el) => { saveSessionNotes(el.dataset.arg, v); },
+  'session-cert-no': (v, el) => { setSessionCertNo(el.dataset.arg, v); },
   'report-logo-file': (v, el) => {
     const file = el.files && el.files[0];
     el.value = '';

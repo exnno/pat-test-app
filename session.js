@@ -576,7 +576,13 @@ function createSession() {
     date: todayISO(),
     startNumber: parseInt(startNo, 10) || 1,
     items: [],
-    locked: false   // v8
+    locked: false,  // v8
+    // v36: optional job-level notes (printed on the report when non-empty) and
+    // the assigned certificate number (stamped once on first report when cert
+    // numbers are enabled; reused thereafter). Both additive — old sessions
+    // simply lack them and backfill as empty.
+    notes: '',
+    certNo: ''
   };
   state.sessions.unshift(s);
   state.activeId = s.id;
@@ -1148,11 +1154,24 @@ function captureReportTextInputs() {
   const decl = document.getElementById('report-declaration-text');
   const months = document.getElementById('report-retest-months');
   const fnpat = document.getElementById('report-filename-pattern');
+  const certPrefix = document.getElementById('report-cert-prefix');
+  const certPad = document.getElementById('report-cert-padding');
+  const certNext = document.getElementById('report-cert-next');
   if (name) rs.companyName = name.value.trim();
   if (addr) rs.companyAddress = addr.value.replace(/\s+$/, '');
   if (title) rs.reportTitle = title.value.trim() || 'Portable Appliance Test Report';
   if (decl) rs.declarationText = decl.value.trim();
   if (fnpat) rs.reportFilenamePattern = fnpat.value.trim() || REPORT_FILENAME_DEFAULT;
+  // v36: certificate-number fields.
+  if (certPrefix) rs.certPrefix = certPrefix.value;
+  if (certPad) {
+    const p = parseInt(certPad.value, 10);
+    rs.certPadding = (Number.isFinite(p) && p >= 0 && p <= 10) ? p : rs.certPadding;
+  }
+  if (certNext) {
+    const nx = parseInt(certNext.value, 10);
+    rs.certNextNumber = (Number.isFinite(nx) && nx >= 1) ? nx : rs.certNextNumber;
+  }
   if (months) {
     const m = parseInt(months.value, 10);
     rs.retestMonths = (Number.isFinite(m) && m >= 1 && m <= 120) ? m : null;
@@ -1449,6 +1468,93 @@ function dismissV34Welcome() {
 function dismissV35Welcome() {
   state.v35WelcomeSeen = true;
   localStorage.setItem(V35_WELCOME_KEY, '1');
+  render();
+}
+
+function dismissV36Welcome() {
+  state.v36WelcomeSeen = true;
+  localStorage.setItem(V36_WELCOME_KEY, '1');
+  render();
+}
+
+// ---------- v36: job notes, certificate override, report templates ----------
+
+// Save the per-session job note (from the Overview text area). Persists and
+// re-renders. Empty is fine (clears the note).
+function saveSessionNotes(sessionId, text) {
+  const s = state.sessions.find(x => x.id === sessionId);
+  if (!s) return;
+  s.notes = String(text || '').trim();
+  save();
+}
+
+// Manual certificate-number override (A3). Sets the session's certNo to a
+// user-supplied value; warns (but allows) if it duplicates another session's.
+// Empty clears it (so the next report re-stamps from the counter).
+function setSessionCertNo(sessionId, value) {
+  const s = state.sessions.find(x => x.id === sessionId);
+  if (!s) return;
+  const v = String(value || '').trim();
+  if (v) {
+    const dupe = state.sessions.some(x => x.id !== sessionId && x.certNo === v);
+    if (dupe && !confirm(`Certificate number "${v}" is already used by another session. Use it anyway?`)) {
+      render();
+      return;
+    }
+  }
+  s.certNo = v;
+  save();
+  render();
+}
+
+// Apply a saved template (C1=B: a full reportSettings snapshot). Overwrites the
+// live reportSettings — including branding — so we confirm first, naming the
+// template. The applied snapshot is re-normalised defensively.
+function applyReportTemplate(templateId) {
+  const tpl = (state.reportTemplates || []).find(t => t.id === templateId);
+  if (!tpl) return;
+  if (!confirm(`Apply the "${tpl.name}" template? This replaces your current report settings (including logo, signature and colours).`)) return;
+  state.reportSettings = normaliseReportSettings(tpl.settings);
+  saveReportSettings();
+  render();
+}
+
+// Save the CURRENT live reportSettings as a new named template, or overwrite an
+// existing one of the same name. Prompts for a name via a bottom-sheet-free
+// simple prompt fallback is avoided — name is passed in from the UI handler.
+function saveCurrentAsTemplate(name) {
+  const nm = String(name || '').trim();
+  if (!nm) return;
+  const snapshot = normaliseReportSettings(state.reportSettings);
+  const existing = (state.reportTemplates || []).find(t => t.name.toLowerCase() === nm.toLowerCase());
+  if (existing) {
+    existing.settings = snapshot;
+  } else {
+    state.reportTemplates.push({
+      id: 'tpl_' + Math.random().toString(36).slice(2, 9),
+      name: nm,
+      settings: snapshot
+    });
+  }
+  saveReportTemplates();
+  render();
+}
+
+function renameReportTemplate(templateId, name) {
+  const tpl = (state.reportTemplates || []).find(t => t.id === templateId);
+  const nm = String(name || '').trim();
+  if (!tpl || !nm) return;
+  tpl.name = nm;
+  saveReportTemplates();
+  render();
+}
+
+function deleteReportTemplate(templateId) {
+  const tpl = (state.reportTemplates || []).find(t => t.id === templateId);
+  if (!tpl) return;
+  if (!confirm(`Delete the "${tpl.name}" template? This can't be undone.`)) return;
+  state.reportTemplates = state.reportTemplates.filter(t => t.id !== templateId);
+  saveReportTemplates();
   render();
 }
 

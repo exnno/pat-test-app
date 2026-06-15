@@ -112,6 +112,9 @@ function buildReportDoc(session) {
   doc.setFontSize(10); doc.setFont(undefined, 'normal');
 
   const detailPairs = [];
+  // v36: certificate number (when enabled + stamped on the session). Shown first
+  // for prominence/traceability.
+  if (rs.certEnabled && session.certNo) detailPairs.push(['Certificate no', session.certNo]);
   if (client) detailPairs.push(['Client', client]);
   detailPairs.push(['Site', site]);
   detailPairs.push(['Test date', formatDate(session.date)]);
@@ -161,6 +164,20 @@ function buildReportDoc(session) {
   doc.text(`Items tested: ${tested}    Passed: ${passed}    Failed: ${failed}`, margin, y);
   doc.setTextColor(0);
   y += 8;
+
+  // ----- v36: Job notes (printed only when non-empty) -----
+  if (session.notes && String(session.notes).trim()) {
+    y += 14;
+    doc.setFont(undefined, 'bold'); doc.setFontSize(10);
+    doc.text('Notes', margin, y);
+    y += 14;
+    doc.setFont(undefined, 'normal'); doc.setFontSize(9); doc.setTextColor(60);
+    const wrapped = doc.splitTextToSize(String(session.notes).trim(), pageW - margin * 2);
+    doc.text(wrapped, margin, y);
+    y += wrapped.length * 12;
+    doc.setTextColor(0);
+    y += 6;
+  }
 
   // ----- Appliance register table -----
   // Column model (architected for V31): each col = { header, value(item) }.
@@ -308,6 +325,25 @@ function reopenReportPreview(sessionId) {
 }
 
 // Entry point from dispatch. Builds the doc and opens the preview modal.
+// v36: stamp a certificate number onto the session the FIRST time a report is
+// produced for it (A2), then reuse it forever. No-op when cert numbers are off
+// or the session already has one. Builds the number from certPrefix (with an
+// optional {year} token) + a zero-padded counter, then increments the counter
+// and persists both the session and the settings. Returns nothing.
+function stampCertNumber(session) {
+  const rs = state.reportSettings;
+  if (!rs.certEnabled) return;
+  if (session.certNo) return;            // already stamped — reuse (A2)
+  const n = Number.isFinite(parseInt(rs.certNextNumber, 10)) ? parseInt(rs.certNextNumber, 10) : 1;
+  const pad = Number.isFinite(parseInt(rs.certPadding, 10)) ? parseInt(rs.certPadding, 10) : 4;
+  const year = (session.date && String(session.date).slice(0, 4)) || String(new Date().getFullYear());
+  const prefix = String(rs.certPrefix || '').replace(/\{year\}/gi, year);
+  session.certNo = prefix + String(n).padStart(pad, '0');
+  rs.certNextNumber = n + 1;
+  save();                  // persists the session (with certNo)
+  saveReportSettings();    // persists the advanced counter
+}
+
 function produceReport(sessionId) {
   if (!state.reportSettings.enabled) { setView('settings'); return; }
   const session = state.sessions.find(s => s.id === sessionId);
@@ -316,6 +352,7 @@ function produceReport(sessionId) {
     alert('The PDF engine has not finished loading yet. If you are offline on first use, reconnect once so it can cache, then try again.');
     return;
   }
+  stampCertNumber(session);   // v36: assign-once cert number before building
   let doc;
   try {
     doc = buildReportDoc(session);

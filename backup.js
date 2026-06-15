@@ -56,6 +56,11 @@ function buildBackup() {
     // backups without it restore via makeDefaultReportSettings(). No
     // backupVersion bump needed (purely additive, missing-field-tolerant).
     reportSettings: state.reportSettings,
+    // v36: saved report templates (array of full reportSettings snapshots).
+    // Additive — old backups without it restore with the seeded starters. No
+    // backupVersion bump (the new session fields notes/certNo are also additive
+    // and ride along inside `sessions`).
+    reportTemplates: state.reportTemplates,
     lastBackupAt: state.lastBackupAt
   };
 }
@@ -258,6 +263,20 @@ function restoreBackupFromFile(file) {
     // backup until the user turns it on. A present-but-partial object backfills
     // missing fields. Logo (if present) rides along inside the object.
     state.reportSettings = normaliseReportSettings(data.reportSettings);
+
+    // v36: report templates. If present, validate each through
+    // normaliseReportSettings (inside loadReportTemplates' shape). If absent (any
+    // pre-v36 backup), keep whatever is already loaded (seeded starters) rather
+    // than wiping them. Additive — no backupVersion change.
+    if (Array.isArray(data.reportTemplates)) {
+      state.reportTemplates = data.reportTemplates
+        .filter(t => t && typeof t === 'object')
+        .map(t => ({
+          id: (typeof t.id === 'string' && t.id) ? t.id : ('tpl_' + Math.random().toString(36).slice(2, 9)),
+          name: (typeof t.name === 'string' && t.name.trim()) ? t.name.trim() : 'Untitled template',
+          settings: normaliseReportSettings(t.settings)
+        }));
+    }
 
     state.activeId = null;
     state.view = 'sessions';

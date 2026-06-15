@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V35';
+const APP_VERSION = 'V36';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -74,6 +74,7 @@ const V32_WELCOME_KEY = 'pat:v32welcome';   // v32: settings restructure + searc
 const V33_WELCOME_KEY = 'pat:v33welcome';   // v33: first-run wizard (shown to UPGRADERS only)
 const V34_WELCOME_KEY = 'pat:v34welcome';   // v34: report signature (draw or upload)
 const V35_WELCOME_KEY = 'pat:v35welcome';   // v35: report colours + preview quick-adjust + date fix
+const V36_WELCOME_KEY = 'pat:v36welcome';   // v36: certificate numbers + job notes + report templates
 // v33: First-run wizard "seen" flag. Set once the wizard is completed OR skipped,
 // so it never reappears. Distinct from the welcome modal key: a genuinely-new
 // install gets the WIZARD (gated by this key + an empty-install test); an
@@ -104,6 +105,12 @@ const ONBOARD_KEY = 'pat:onboardedV33';
 // DECLARATION: free text the tester is comfortable certifying. Seeded with a
 // sensible default the user can overwrite with their own wording.
 const REPORT_SETTINGS_KEY = 'pat:reportsettings';
+// v36: saved report templates — named full snapshots of reportSettings the user
+// can apply/switch between. Stored as its own key (array). Additive; round-trips
+// through backup + setup. Applying a template overwrites the live reportSettings
+// (including logo/signature/colours/cert prefix — C1=B: a template is a complete
+// report identity), so the UI confirms before applying.
+const REPORT_TEMPLATES_KEY = 'pat:reporttemplates';
 
 const REPORT_DECLARATION_DEFAULT =
   'Tested in accordance with the IET Code of Practice for In-Service Inspection ' +
@@ -150,7 +157,7 @@ const SETTINGS_PAGE_META = {
   settingsFails:       { icon: '⚠️', title: 'Quick Pick Fail',       aliases: 'fail reasons failure quick pick' },
   settingsMultiPick:   { icon: '🧰', title: 'Multi Pick',            aliases: 'multi pick bulk multiple slots' },
   settingsDescriptions:{ icon: '📝', title: 'Item Description List', aliases: 'descriptions notes labels' },
-  settingsReport:      { icon: '📄', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration signature sign colour color theme header accent' },
+  settingsReport:      { icon: '📄', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration signature sign colour color theme header accent cert number template preset notes' },
   settingsCsv:         { icon: '📊', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
   settingsClients:     { icon: '🏢', title: 'Clients',               aliases: 'clients sites customers addresses' },
   settingsDisplay:     { icon: '🎨', title: 'Display Settings',      aliases: 'theme dark light haptics sound timestamps appearance' },
@@ -211,11 +218,41 @@ function makeDefaultReportSettings() {
     // through backup + setup for free; validated in normaliseReportSettings.
     headerColor:      REPORT_DEFAULT_HEADER_COLOR,
     accentColor:      REPORT_DEFAULT_ACCENT_COLOR,
+    // v36: certificate numbers. OFF by default (opt-in) — when off, nothing
+    // about the report changes and no numbers are assigned to sessions. When on,
+    // the first time a report is produced for a session it's stamped with a
+    // number built from certPrefix + a zero-padded counter (certNextNumber,
+    // certPadding), optionally including {year}. The stamped value lives on the
+    // SESSION (session.certNo) so re-previewing reuses it — see report.js.
+    certEnabled:      false,
+    certPrefix:       '',      // e.g. 'BPS-' or 'BPS-{year}-'
+    certNextNumber:   1,       // the next counter value to assign
+    certPadding:      4,       // zero-pad width, e.g. 4 → 0001
     // v31: PDF filename pattern. Tokens {site} {client} {date} {engineer} plus
     // free text; substituted + sanitised by reportFilename(). Seeded to the exact
     // pre-v31 behaviour so nothing changes unless the user edits it.
     reportFilenamePattern: REPORT_FILENAME_DEFAULT
   };
+}
+
+// v36: starter report templates (C4=yes). Each is a full reportSettings snapshot
+// (C1=B) under a friendly name. Seeded on first run when the user has no
+// templates yet. "Standard" reproduces the defaults; "Client summary" is a
+// passes-only, lighter variant. Branding fields (logo/signature) start empty —
+// the user's saved templates will carry their own once they save from live
+// settings. Returns fresh independent copies (deep via the defaults factory).
+function makeStarterReportTemplates() {
+  const standard = makeDefaultReportSettings();
+  standard.enabled = true;
+  const summary = makeDefaultReportSettings();
+  summary.enabled = true;
+  summary.reportTitle = 'PAT Test Summary';
+  summary.showFails = false;        // passes-only register
+  summary.showInstrument = false;   // lighter client-facing copy
+  return [
+    { id: 'tpl_standard', name: 'Standard', settings: standard },
+    { id: 'tpl_summary',  name: 'Client summary', settings: summary }
+  ];
 }
 
 // v30: logo upload constraint — longest edge downscaled to this many px before

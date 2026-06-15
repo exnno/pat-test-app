@@ -177,6 +177,11 @@ let state = {
   v33WelcomeSeen: false,
   v34WelcomeSeen: false,
   v35WelcomeSeen: false,
+  v36WelcomeSeen: false,
+  // v36: saved report templates (array of {id, name, settings}). Loaded from
+  // REPORT_TEMPLATES_KEY; seeded with starters on first run. Applying one copies
+  // its settings snapshot over the live reportSettings.
+  reportTemplates: [],
   // v35: when the user taps "Edit report settings" from the report preview, we
   // remember the session id so the Report Settings back button can return them
   // straight to a freshly-rebuilt preview instead of the settings hub. Cleared

@@ -98,27 +98,27 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v35: rolled forward — content covers report colours, the preview quick-adjust,
-  // and the filled date line. Key bumped to pat:v35welcome (gate uses
-  // v35WelcomeSeen). Still suppressed while the first-run wizard is showing and
-  // while the v9 migration prompt is up.
+  // v36: rolled forward — content covers certificate numbers, job notes, and
+  // report templates. Key bumped to pat:v36welcome (gate uses v36WelcomeSeen).
+  // Still suppressed while the first-run wizard is showing and while the v9
+  // migration prompt is up.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v35WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v36WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V35">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V36">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V35</h3>
+        <h3 class="bulk-sheet-title">What's new in V36</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Colour your reports.</strong> Pick a theme — or your own colours — for the report's table header and accent lines, under <strong>Settings → Report Settings → Colours</strong>.</li>
-        <li><strong>Tweak while you preview.</strong> The report preview now has quick toggles (list all items, calibration, declaration, signature side) and an Edit settings shortcut, so you don't have to keep leaving the preview.</li>
-        <li><strong>The date fills itself in.</strong> The report's date line now shows the test date automatically, alongside your signature.</li>
+        <li><strong>Certificate numbers.</strong> Switch them on under <strong>Settings → Report Settings → Certificate numbers</strong> — each session gets its own unique number, kept with that session.</li>
+        <li><strong>Job notes.</strong> Add notes to a session from its overview screen, and they print on the report.</li>
+        <li><strong>Report templates.</strong> Save your report settings as named templates and switch between them in a tap.</li>
         <li><strong>Nothing changed in your data.</strong> All your sessions and settings are exactly as you left them.</li>
       </ul>
-      <button class="btn-primary" id="v35-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v36-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -1193,10 +1193,26 @@ function renderOverview() {
 
   const stats = `<div class="progress">${sess.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span>${sess.engineer ? ' · ' + escapeHTML(sess.engineer) : ''}</div>`;
 
+  // v36: job notes + (when enabled) the certificate number, editable from the
+  // overview. Hidden in selection mode to keep that flow uncluttered. Notes save
+  // on blur (data-blur-action); the cert field saves on blur too and warns on a
+  // duplicate. Only shown when the session isn't locked.
+  const jobDetails = (state.selectionMode || sess.locked) ? '' : `
+    <div class="overview-jobdetails">
+      ${state.reportSettings.certEnabled ? `
+        <label class="label" for="session-cert-no">Certificate number</label>
+        <input class="input" id="session-cert-no" data-change-action="session-cert-no" data-arg="${sess.id}" value="${escapeHTML(sess.certNo || '')}" placeholder="Assigned when you produce the report" autocapitalize="characters" autocomplete="off" spellcheck="false">
+      ` : ''}
+      <label class="label" for="session-notes" style="margin-top:10px">Job notes</label>
+      <textarea class="textarea" id="session-notes" data-change-action="session-notes" data-arg="${sess.id}" placeholder="Optional notes that print on the report (e.g. access issues, items removed from service)" style="min-height:64px">${escapeHTML(sess.notes || '')}</textarea>
+    </div>
+  `;
+
   return `
     <div class="screen">
       ${header}
       ${stats}
+      ${jobDetails}
       ${state.selectionMode ? '' : filterRow}
       ${selectAllRow}
       <div class="overview-body">${renderOverviewBodyHTML(sess)}</div>
