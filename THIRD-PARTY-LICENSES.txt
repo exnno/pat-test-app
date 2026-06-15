@@ -3,11 +3,12 @@ PAT Test PWA — Third-Party Licenses
 
 The PAT Test PWA application code is © 2026 Peter Birchley, all rights reserved
 (see LICENSE.txt). It bundles the following third-party libraries, used under
-the permissive MIT License. Each library's own copyright/permission notice is
-preserved verbatim inside its minified file (do not strip those headers — that
-preservation is the MIT License's one condition).
+permissive open-source licenses (MIT and Apache-2.0). Each library's own
+copyright/permission notice is preserved verbatim inside its minified file (do
+not strip those headers — that preservation is a license condition).
 
 Introduced in: V30 (June 2026), for PDF report generation.
+Added in:      V38 (June 2026), PDF.js for the multi-page report preview.
 
 ---------------------------------------------------------------------------
 1. jsPDF
@@ -49,11 +50,32 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
 ---------------------------------------------------------------------------
+3. PDF.js  (added V38, for the multi-page report preview)
+---------------------------------------------------------------------------
+Files:       pdfjs.min.js, pdfjs.worker.min.js
+Version:     pdfjs-dist 3.11.174 (legacy UMD build; API version 3.32.2)
+Copyright:   (c) 2011-2023 Mozilla Foundation and contributors
+Project:     https://github.com/mozilla/pdf.js
+License:     Apache License 2.0
+
+The legacy UMD build is used because it loads via a classic <script> tag with
+no build step (matching this app) and targets older Safari/iOS WebKit. These
+two files are NOT precached at install; they are fetched lazily from the app's
+own origin on the first report preview and then cached by the service worker.
+
+Apache-2.0 requires that this attribution and the library's own NOTICE/license
+header (preserved verbatim in the minified files) be retained. The full Apache
+License 2.0 text is at: http://www.apache.org/licenses/LICENSE-2.0
+Apache-2.0 permits commercial use, modification, and distribution royalty-free.
+
+---------------------------------------------------------------------------
 Notes
 ---------------------------------------------------------------------------
-- MIT permits commercial use, modification, and distribution, including in a
-  paid/subscription product, with no royalty.
-- These files are served from the app's own origin and cached by the service
-  worker, so report generation works fully offline after first load.
+- MIT and Apache-2.0 both permit commercial use, modification, and distribution,
+  including in a paid/subscription product, with no royalty.
+- jsPDF + AutoTable are served from the app's own origin and precached by the
+  service worker, so report generation works fully offline after first load.
+- PDF.js is served from the app's own origin and cached on first preview, so the
+  multi-page preview works offline after that first (online) use.
 - When the project later adopts a build step (e.g. the planned SaaS version),
   these can be pulled from npm and this manifest regenerated automatically.

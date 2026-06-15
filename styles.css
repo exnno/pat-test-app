@@ -1916,6 +1916,41 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .report-preview-fallback .btn-secondary { width: 100%; }
 
+/* v38: multi-page canvas preview view area. Replaces the single iframe; holds
+   either the stacked page canvases (success) or the iframe fallback. */
+.report-preview-view {
+  flex: 1 1 auto;
+  min-height: 0;
+  width: 100%;
+  background: #525659; /* same neutral PDF-viewer grey */
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+}
+.report-preview-view .report-preview-frame { flex: 1 1 auto; }
+.report-preview-loading {
+  margin: auto;
+  padding: 24px;
+  color: #fff;
+  font-size: 14px;
+  opacity: 0.85;
+}
+.report-preview-pages {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+}
+.pdf-page-canvas {
+  display: block;
+  max-width: 100%;
+  background: #fff;
+  box-shadow: 0 1px 6px rgba(0,0,0,0.45);
+  border-radius: 2px;
+}
+
 /* v35: multi-page note banner in the preview */
 .report-page-note {
   padding: 10px 14px;

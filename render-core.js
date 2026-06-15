@@ -98,27 +98,26 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v36: rolled forward — content covers certificate numbers, job notes, and
-  // report templates. Key bumped to pat:v36welcome (gate uses v36WelcomeSeen).
-  // Still suppressed while the first-run wizard is showing and while the v9
-  // migration prompt is up.
+  // v38: rolled forward — content covers the new multi-page PDF preview.
+  // Key bumped to pat:v38welcome (gate uses v38WelcomeSeen). Still suppressed
+  // while the first-run wizard is showing and while the v9 migration prompt is up.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v36WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v38WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V36">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V38">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V36</h3>
+        <h3 class="bulk-sheet-title">What's new in V38</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Certificate numbers.</strong> Switch them on under <strong>Settings → Report Settings → Certificate numbers</strong> — each session gets its own unique number, kept with that session.</li>
-        <li><strong>Job notes.</strong> Add notes to a session from its overview screen, and they print on the report.</li>
-        <li><strong>Report templates.</strong> Save your report settings as named templates and switch between them in a tap.</li>
-        <li><strong>Nothing changed in your data.</strong> All your sessions and settings are exactly as you left them.</li>
+        <li><strong>See the whole report.</strong> The report preview now shows <strong>every page</strong>, not just the first — scroll through the full report before you share or save it.</li>
+        <li><strong>One-time setup.</strong> The first time you open a preview, the app downloads a small viewer (about 1.5&nbsp;MB) once, while you're online. After that, previews work offline as usual.</li>
+        <li><strong>No effect on your storage.</strong> That viewer is kept with the app's own files, well away from your sessions data — nothing in your saved data has changed.</li>
+        <li><strong>No connection the first time?</strong> No problem — the preview just shows page one (as before) until you're next online, then upgrades automatically.</li>
       </ul>
-      <button class="btn-primary" id="v36-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v38-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 

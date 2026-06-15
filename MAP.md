@@ -1,4 +1,4 @@
-# PAT App — Code Map (V37)
+# PAT App — Code Map (V38)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -10,12 +10,12 @@ exists — the modular split is complete.
 > every release — a stale map breaks the whole approach. If you ever open a file
 > the map didn't point you to, the map is out of date: fix it.
 
-## Load order (index.html) — 20 files (incl. 2 vendored libs)
+## Load order (index.html) — 21 files (incl. 2 vendored libs)
 `config.js` → `state.js` → `utils.js` → `storage.js` → `clients.js` → `sqp.js`
 → `multipick.js` → `feedback.js` → `csv.js` → `backup.js` → `session.js`
 → **`setup.js`** → **`jspdf.umd.min.js`** → **`jspdf.plugin.autotable.min.js`**
-→ **`report.js`** → `render-core.js` → `render-settings.js` → `events.js`
-→ `dispatch.js` → `boot.js`
+→ **`report.js`** → **`pdfpreview.js`** → `render-core.js` → `render-settings.js`
+→ `events.js` → `dispatch.js` → `boot.js`
 
 `boot.js` runs the startup block and must stay **last**. Later files may call
 functions defined in earlier ones; nothing executes until `boot.js` because
@@ -25,6 +25,14 @@ every other file is function declarations sharing one global scope.
 `session.js` and before `report.js`, which uses them. They are the first
 third-party code in the app — see `THIRD-PARTY-LICENSES.txt`. They attach to
 `window.jspdf` in the browser UMD build; `report.js` reads them from there.
+
+**v38:** TWO more vendored files exist in the repo — `pdfjs.min.js` +
+`pdfjs.worker.min.js` (PDF.js legacy UMD, Apache-2.0, ~1.5 MB total) — but they
+are **NOT in this load order and NOT in sw.js ASSETS**. They are fetched lazily
+from the app's own origin on the FIRST report preview by `pdfpreview.js`, which
+IS in the chain (a small first-party loader). The lazy fetch is auto-cached by
+the existing same-origin SW fetch handler into Cache Storage (separate from the
+~5 MB localStorage data budget). After a cache bump they re-download once.
 
 ---
 
@@ -60,6 +68,8 @@ aliases include "colour theme header accent". **v36:** `V36_WELCOME_KEY`;
 `makeStarterReportTemplates()` (2 seed templates: Standard + Client summary, each
 a full reportSettings snapshot); Report search aliases include "cert number
 template preset notes".
+**v38:** `V38_WELCOME_KEY` (`pat:v38welcome`) — multi-page PDF preview welcome.
+No other config change (PDF.js paths are hard-coded in `pdfpreview.js`).
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
@@ -84,6 +94,9 @@ report preview, so the settings back/save returns to a rebuilt preview; null =
 normal nav).  **v36:** `v36WelcomeSeen`; `reportTemplates` (array of {id, name,
 settings} — saved full reportSettings snapshots). Per-session `notes` + `certNo`
 live ON the session objects (set in createSession), not in top-level state.
+**v38:** `v38WelcomeSeen` (multi-page-preview welcome gate). No other state
+change — the preview's per-open transients (render token, blob/url) are locals
+inside `openReportPreview`, not on global `state`.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -128,6 +141,8 @@ through `normaliseReportSettings`; seeds `makeStarterReportTemplates()` when non
 stored); `load` reads `V36_WELCOME_KEY` + `state.reportTemplates`. Per-session
 `notes`/`certNo` need no codec/validator work — they ride inside `sessions` and
 the codec passes unknown fields through unchanged.
+**v38:** `load` reads `V38_WELCOME_KEY` → `state.v38WelcomeSeen`. No codec or
+backup change (PDF.js is cache-stored, never in localStorage or backups).
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -277,6 +292,8 @@ dispatch.js; the preview quick-adjust + deep-link live in report.js.)
 `saveCurrentAsTemplate(name)` (new or overwrite-by-name),
 `renameReportTemplate`, `deleteReportTemplate`; `captureReportTextInputs` also
 reads the cert prefix/padding/next-number fields.
+**v38:** `dismissV38Welcome` (sets `v38WelcomeSeen` + persists `V38_WELCOME_KEY`,
+re-renders).
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves, the first-run wizard, the signature,
 cert numbers / job notes / report templates.
@@ -309,7 +326,14 @@ gated by `reportSettings.enabled`; friendly alert if the engine hasn't loaded),
 **v35:** a multi-page note when the doc has >1 page, a "Quick adjust" chip row
 that flips `showFails`/`showCalibration`/`declaration`/`signaturePosition` and
 rebuilds the PDF in place via an internal `rebuild()`, and an "Edit report
-settings" deep-link that sets `reportPreviewReturnSessionId` and goes to settings),
+settings" deep-link that sets `reportPreviewReturnSessionId` and goes to settings;
+**v38:** the single page-1-only iframe is replaced by a multi-page CANVAS view —
+`renderPreviewView()` (token-guarded) calls `loadPdfJsEngine()` then
+`renderPdfPagesToContainer()` (both in `pdfpreview.js`) to stack every page as a
+`<canvas>` in a scrollable column; on any failure (e.g. first-ever preview while
+offline) it swaps in the OLD single-page iframe + a "connect once" note, so it's
+never worse than before. Called on open and after each `rebuild()`; `cleanup()`
+bumps the render token so an in-flight async render is discarded),
 `reopenReportPreview(sessionId)` (**v35:** rebuilds + reopens the preview, used by
 the settings return hook), `triggerDownload`,
 `shareOrDownloadReport` (OS share sheet → download fallback). Reuses
@@ -317,6 +341,24 @@ the settings return hook), `triggerDownload`,
 `contrastColor` (utils.js), `todayISO`/`state` (session.js/state.js).
 *Touch to:* change the report layout/content, add reading columns (future), or
 change how the PDF is previewed/shared/named/coloured. **Uses the vendored MIT libs.**
+
+## pdfpreview.js (~140 ln) — multi-page PDF preview engine (v38) — NEW
+The lazy PDF.js loader + canvas renderer that powers the v38 multi-page preview.
+`PDFJS_LIB_SRC`/`PDFJS_WORKER_SRC` (same-origin `./pdfjs.min.js` +
+`./pdfjs.worker.min.js`); `pdfPreviewEngineReady()` (is `pdfjsLib` live with a
+configured workerSrc); `loadPdfJsEngine()` (injects the PDF.js `<script>` ONCE —
+one-shot shared promise — and points `GlobalWorkerOptions.workerSrc` at our
+same-origin worker; rejects on load error so the caller can fall back, and clears
+the promise so a later retry can succeed once back online);
+`renderPdfPagesToContainer(blob, container)` (renders every page to a stacked
+`<canvas>`, sized to container width, DPR-capped at 2×, sequential to keep iOS
+peak memory low; calls `page.cleanup()`/`pdf.destroy()` as it goes; throws if the
+engine isn't ready or the doc can't parse, caller catches → iframe fallback).
+The two heavy PDF.js files are vendored in the repo but **not precached** (see
+load-order note above + sw.js); this loader fetches them lazily from our origin
+on first preview, and the SW fetch handler auto-caches them.
+*Touch to:* change how the preview rasterises pages, the lazy-load behaviour, or
+the PDF.js version. **Uses the vendored Apache-2.0 PDF.js files.**
 
 ## render-core.js (~1100 ln) — main screens
 Owns `const app = document.getElementById('app')`. `render()` dispatcher.
@@ -362,6 +404,10 @@ header keeps only Report (📄) + Share, and Select items + Session settings mov
 an `overview-action-row` of two text buttons (`select-mode-btn` "Select items",
 `edit-session-btn` "Session settings") rendered under the stats (hidden in
 selection mode; Select hidden when the session has no items).
+**v38:** welcome modal rolled to **V38** "What's new" (multi-page PDF preview),
+gated by `v38WelcomeSeen` (still suppressed while the wizard/migration prompt
+shows). No other render-core change — the canvas preview lives in report.js/
+pdfpreview.js, built directly into the DOM, not through render().
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
 Edit-session UI, the empty states, the welcome modal, the first-run wizard, or the
 signature draw pad.
@@ -472,6 +518,9 @@ changes `report-cert-enabled` (toggle), `session-notes` + `session-cert-no`
 calls `dismissV36Welcome`. (Note: template rename/save-new use `prompt()` — a
 pragmatic choice for low-frequency admin naming; a bottom-sheet input is the
 "proper" iOS pattern if ever upgraded.)
+**v38:** `welcome-dismiss` now calls `dismissV38Welcome`. No new actions — the
+preview's canvas controls are wired directly in `openReportPreview` (report.js),
+not delegated.
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

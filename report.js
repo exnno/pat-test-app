@@ -363,12 +363,17 @@ function produceReport(sessionId) {
   openReportPreview(doc, session);
 }
 
-// Preview modal (Q5=C): show the PDF in an iframe with Share + Download +
-// Close. Uses a blob URL; revoked on close. Built directly in the DOM rather
-// than through render() so it overlays the current screen without a view change.
-// v35: adds a multi-page note (the iOS inline PDF viewer only shows page 1), a
-// "Quick adjust" row that rebuilds the PDF in place when common settings are
-// toggled, and an "Edit report settings" deep-link that returns here afterwards.
+// Preview modal (Q5=C): show the PDF with Share + Download + Close. Built
+// directly in the DOM rather than through render() so it overlays the current
+// screen without a view change.
+// v35: adds a "Quick adjust" row that rebuilds the PDF in place when common
+// settings are toggled, and an "Edit report settings" deep-link that returns here.
+// v38: MULTI-PAGE PREVIEW. Previously an <iframe src="blob:"> that iOS only
+// rendered page 1 of (hence the old "page 1 of N" note). Now, when the PDF.js
+// engine can be loaded (pdfpreview.js — lazy, same-origin, SW-cached), every
+// page is rendered to a stacked, scrollable column of <canvas> nodes. If the
+// engine can't load (first-ever preview while offline), it falls back to the
+// old single-page iframe + note, so it's never worse than before.
 function openReportPreview(doc, session) {
   // Keep the live session id so the settings deep-link can rebuild this preview.
   const sessionId = session.id;
@@ -417,10 +422,21 @@ function openReportPreview(doc, session) {
     `;
   }
 
-  function pageNoteHTML() {
+  // v38: the page-1-only note is only relevant in the iframe FALLBACK path now.
+  // When canvases render, all pages are visible and no note is shown.
+  function fallbackNoteHTML() {
     return pages > 1
-      ? `<div class="report-page-note">Showing page 1 of ${pages} here. Tap <strong>Share / Save</strong> to view or send the full ${pages}-page report.</div>`
+      ? `<div class="report-page-note">Showing page 1 of ${pages} here. Connect to the internet once to enable the full multi-page preview; meanwhile tap <strong>Share / Save</strong> to view or send the full ${pages}-page report.</div>`
       : '';
+  }
+
+  // The view area starts as a "preparing…" placeholder. After the sheet mounts
+  // we try the canvas renderer; on success it fills with pages, on failure we
+  // swap in the iframe fallback (renderPreviewView below).
+  function viewAreaHTML() {
+    return `<div class="report-preview-view" id="report-preview-view">
+        <div class="report-preview-loading" id="report-preview-loading">Preparing preview…</div>
+      </div>`;
   }
 
   function buildSheetHTML() {
@@ -430,8 +446,7 @@ function openReportPreview(doc, session) {
         <span class="report-preview-title">Report preview</span>
         <button class="btn-primary" id="report-preview-share">Share / Save</button>
       </div>
-      ${pageNoteHTML()}
-      <iframe class="report-preview-frame" src="${url}" title="Report preview"></iframe>
+      ${viewAreaHTML()}
       <div class="report-preview-fallback">
         <div class="report-qa-label">Quick adjust</div>
         ${quickAdjustHTML()}
@@ -444,6 +459,45 @@ function openReportPreview(doc, session) {
         <button class="btn-secondary" id="report-preview-download">Download PDF</button>
       </div>
     `;
+  }
+
+  // v38: render the current blob into the view area. Tries the multi-page canvas
+  // path first (loading PDF.js lazily if needed); on any failure shows the
+  // single-page iframe fallback. Token-guarded so a slow render that finishes
+  // after a rebuild or close is discarded.
+  let _renderToken = 0;
+  function renderPreviewView() {
+    const myToken = ++_renderToken;
+    const view = document.getElementById('report-preview-view');
+    if (!view) return;
+
+    function showIframeFallback() {
+      if (myToken !== _renderToken) return;
+      view.innerHTML =
+        `${fallbackNoteHTML()}` +
+        `<iframe class="report-preview-frame" src="${url}" title="Report preview"></iframe>`;
+    }
+
+    if (typeof loadPdfJsEngine !== 'function' || typeof renderPdfPagesToContainer !== 'function') {
+      showIframeFallback();
+      return;
+    }
+
+    loadPdfJsEngine()
+      .then(() => {
+        if (myToken !== _renderToken) return;
+        const pagesWrap = document.createElement('div');
+        pagesWrap.className = 'report-preview-pages';
+        pagesWrap.id = 'report-preview-pages';
+        view.innerHTML = '';
+        view.appendChild(pagesWrap);
+        return renderPdfPagesToContainer(blob, pagesWrap);
+      })
+      .then((count) => {
+        if (myToken !== _renderToken) return;
+        if (typeof count === 'number') pages = count;
+      })
+      .catch(() => { showIframeFallback(); });
   }
 
   sheet.innerHTML = buildSheetHTML();
@@ -463,6 +517,7 @@ function openReportPreview(doc, session) {
   }
 
   function cleanup() {
+    _renderToken++;
     URL.revokeObjectURL(url);
     backdrop.remove();
     sheet.remove();
@@ -481,6 +536,7 @@ function openReportPreview(doc, session) {
     const inp = document.getElementById('report-filename-input');
     if (inp) inp.value = keepName;
     wireSheet();
+    renderPreviewView();
   }
 
   // v35: quick-adjust handler — flip the field, persist, rebuild.
@@ -518,6 +574,7 @@ function openReportPreview(doc, session) {
   document.body.appendChild(backdrop);
   document.body.appendChild(sheet);
   wireSheet();
+  renderPreviewView();
 }
 
 function triggerDownload(blob, filename) {

@@ -190,7 +190,21 @@
 // unchanged (5), no welcome modal (fix-grade, not a feature). No new app files.
 // Cache bumped to pat-v37 so installed PWAs pull the changed render-core/
 // render-settings/config/styles set.
-const CACHE_VERSION = 'pat-v37-1';
+// v37.1: hotfix — dedicated Copy CSV action (csv.js/dispatch.js/render-core.js);
+// cache bumped to pat-v37-1.
+// v38: multi-page PDF preview. The report preview used to show only page 1 in an
+// iframe on iOS; it now renders every page to stacked canvases via PDF.js
+// (Mozilla, Apache-2.0). NEW app file pdfpreview.js (the loader/renderer) is
+// precached here. The two heavy PDF.js library files (pdfjs.min.js +
+// pdfjs.worker.min.js, ~1.5 MB) are DELIBERATELY NOT in this ASSETS list — they
+// are vendored in the repo but fetched lazily from our own origin on the FIRST
+// preview, at which point THIS fetch handler auto-caches them (same-origin,
+// status 200) into Cache Storage. That keeps startup light and keeps the ~1.5 MB
+// in Cache Storage (hundreds of MB on iOS), entirely separate from the ~5 MB
+// localStorage data budget. After a cache bump they re-download once (the user is
+// already online pulling the new app version). No codec/backup change;
+// backupVersion unchanged (5). Cache bumped to pat-v38.
+const CACHE_VERSION = 'pat-v38';
 const ASSETS = [
   './',
   './index.html',
@@ -210,6 +224,7 @@ const ASSETS = [
   './jspdf.umd.min.js',
   './jspdf.plugin.autotable.min.js',
   './report.js',
+  './pdfpreview.js',
   './render-core.js',
   './render-settings.js',
   './events.js',

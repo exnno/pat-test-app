@@ -1477,6 +1477,12 @@ function dismissV36Welcome() {
   render();
 }
 
+function dismissV38Welcome() {
+  state.v38WelcomeSeen = true;
+  localStorage.setItem(V38_WELCOME_KEY, '1');
+  render();
+}
+
 // ---------- v36: job notes, certificate override, report templates ----------
 
 // Save the per-session job note (from the Overview text area). Persists and

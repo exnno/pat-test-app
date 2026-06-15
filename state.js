@@ -178,6 +178,7 @@ let state = {
   v34WelcomeSeen: false,
   v35WelcomeSeen: false,
   v36WelcomeSeen: false,
+  v38WelcomeSeen: false,
   // v36: saved report templates (array of {id, name, settings}). Loaded from
   // REPORT_TEMPLATES_KEY; seeded with starters on first run. Applying one copies
   // its settings snapshot over the live reportSettings.

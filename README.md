@@ -3,7 +3,7 @@
 A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, flexible clients & sites, search, filters, bulk edit, JSON backup/restore, dark mode, CSV export/import, and branded PDF report generation.
 
 **Live:** <https://exnno.github.io/pat-test-app/>
-**Current version:** V37 · cache `pat-v37`
+**Current version:** V38 · cache `pat-v38`
 
 ## Key features
 
@@ -20,6 +20,7 @@ A fast, offline-first portable appliance testing app. Records pass/fail decision
 - **Settings home + search (V32)** — Settings is a two-level structure: a hub of six categories (User & Calibration, Testing Setup, Reports & Output, App & Display, Data, Help) each opening a sub-list of pages, with a search box at the top that flattens to any matching page (matches titles plus plain-language aliases, e.g. “logo”, “earth”, “dark”). Back navigation is level-aware (page → its category → hub). Purely presentational — every setting is functionally where it was. Empty screens (Sessions, Overview, Clients, Reports) now show a guiding empty state pointing to the next step.
 - **Report signature (V34)** — add your signature to PDF reports by drawing it on screen (finger or stylus) or uploading a PNG/JPEG image, under Settings → Report Settings → Signature. Once set it prints on the declaration line of every report; you can place it left or right of the declaration, and replace or remove it any time. Stored on-device as part of the report settings (so it round-trips through both backups and the Export/Import Setup bundle), and the plain signing line still prints if no signature is set.
 - **UI tidy-ups (V37)** — the entry-screen back control uses the standard back arrow (was a folder icon), and the session overview header is decluttered: Share and Report stay at the top, while “Select items” and “Session settings” are now clearly-labelled text buttons beneath (previously a row of similar-looking icons that confused people).
+- **Multi-page report preview (V38)** — the report preview now renders **every page** of the report as a scrollable column (previously the iframe-based preview only showed page 1 on iOS). On the first preview the app fetches a small viewer (PDF.js, ~1.5&nbsp;MB) once from its own origin while online, after which the service worker caches it and previews work fully offline. The viewer lives in Cache Storage alongside the app shell — entirely separate from the ~5&nbsp;MB localStorage data budget, so it has no effect on saved sessions. If the very first preview happens offline, it gracefully falls back to the old single-page iframe + a “connect once” note, then upgrades automatically next time online.
 - **Certificates, notes & templates (V36)** — optional **certificate numbers**: switch on under Settings → Report Settings → Certificate numbers and each session is assigned a unique number (prefix + counter, with an optional `{year}` token) the first time you produce its report, kept with that session so it never changes; editable per session with a duplicate warning. **Job notes**: a free-text note per session, edited on its overview screen, printed on the report. **Report templates**: save your report settings as named templates (e.g. a full certificate vs a lighter client summary) and switch between them in a tap — each is a complete snapshot including branding and colours. All three round-trip through backups and the setup bundle; no change to existing data (backup version stays 5).
 - **Report customisation (V35)** — colour your reports (preset themes or your own header/accent colours, with header text auto-switching black/white for legibility) under Settings → Report Settings → Colours. The report preview has quick-adjust toggles (list all items, calibration, declaration, signature side) that rebuild the PDF in place plus an “Edit report settings” shortcut, so you can fine-tune a report without leaving the preview. The declaration date line fills in the test date automatically, and multi-page reports show a note pointing to Share / Save for the full document. Colours round-trip through backups and the setup bundle.
 - **First-run setup wizard (V33)** — on a genuinely new install, a short three-step walkthrough (intro → import a setup file *or* start fresh → optional engineer name & calibration date) helps get the device ready, which makes kitting out a new engineer’s phone quick. It’s skippable at every step, shows only on a blank install (existing users see a normal “what’s new” note instead, never the wizard), and can be re-run any time from Settings → Help → “Run first-time setup again”.
@@ -29,7 +30,7 @@ A fast, offline-first portable appliance testing app. Records pass/fail decision
 
 Vanilla HTML / CSS / JS — no frameworks, no build step. Service-worker cached for full offline use. State lives in `localStorage` (session data is key-shortened/compressed at the storage boundary since v14; backups stay human-readable).
 
-**Third-party code:** from V30, the app bundles two MIT-licensed libraries — **jsPDF** and **jsPDF-AutoTable** — for client-side PDF generation. They are vendored as minified UMD files (`jspdf.umd.min.js`, `jspdf.plugin.autotable.min.js`), served from the app’s own origin and service-worker cached so reports work fully offline. This is the only third-party code in the app; see `THIRD-PARTY-LICENSES.txt`. MIT permits commercial/subscription use with no royalty. (Prior to V30 the app had no external dependencies at all.)
+**Third-party code:** from V30, the app bundles two MIT-licensed libraries — **jsPDF** and **jsPDF-AutoTable** — for client-side PDF generation. They are vendored as minified UMD files (`jspdf.umd.min.js`, `jspdf.plugin.autotable.min.js`), served from the app’s own origin and service-worker cached so reports work fully offline. From V38 the app also bundles **PDF.js** (Mozilla, Apache-2.0) for the multi-page report preview, vendored as `pdfjs.min.js` + `pdfjs.worker.min.js`; unlike the jsPDF libraries these are **not** precached — they’re fetched lazily from the app’s own origin on the first preview and then service-worker cached. See `THIRD-PARTY-LICENSES.txt`. Both MIT and Apache-2.0 permit commercial/subscription use with no royalty. (Prior to V30 the app had no external dependencies at all.)
 
 ## Files
 
@@ -37,7 +38,9 @@ The app logic was split out of the old single `app.js` into single-concern scrip
 
 **Load order (defined in `index.html`):**
 
-`config.js` -> `state.js` -> `utils.js` -> `storage.js` -> `clients.js` -> `sqp.js` -> `multipick.js` -> `feedback.js` -> `csv.js` -> `backup.js` -> `session.js` -> `setup.js` -> `jspdf.umd.min.js` -> `jspdf.plugin.autotable.min.js` -> `report.js` -> `render-core.js` -> `render-settings.js` -> `events.js` -> `dispatch.js` -> `boot.js`
+`config.js` -> `state.js` -> `utils.js` -> `storage.js` -> `clients.js` -> `sqp.js` -> `multipick.js` -> `feedback.js` -> `csv.js` -> `backup.js` -> `session.js` -> `setup.js` -> `jspdf.umd.min.js` -> `jspdf.plugin.autotable.min.js` -> `report.js` -> `pdfpreview.js` -> `render-core.js` -> `render-settings.js` -> `events.js` -> `dispatch.js` -> `boot.js`
+
+(`pdfjs.min.js` and `pdfjs.worker.min.js` are vendored in the repo but are **not** in this load order or the service-worker precache — they load lazily on first preview.)
 
 - `index.html` — shell; lists the scripts in load order
 - `config.js` — constants & defaults, incl. `APP_VERSION`, all storage-key names, `DEFAULT_CSV_COLUMNS`, and the report-settings defaults factory
@@ -52,7 +55,9 @@ The app logic was split out of the old single `app.js` into single-concern scrip
 - `backup.js` — JSON backup/restore (incl. report settings)
 - `session.js` — sessions, items, most app logic, and report-settings save/logo handling
 - `jspdf.umd.min.js`, `jspdf.plugin.autotable.min.js` — vendored MIT PDF libraries (V30)
-- `report.js` — PDF report builder, preview modal, and share (V30; V31 adds configurable filenames)
+- `report.js` — PDF report builder, preview modal, and share (V30; V31 adds configurable filenames; V38 swaps the page-1 iframe for a multi-page canvas preview)
+- `pdfpreview.js` — multi-page preview engine: lazy PDF.js loader + page-to-canvas renderer (V38)
+- `pdfjs.min.js`, `pdfjs.worker.min.js` — vendored Apache-2.0 PDF.js (V38); lazy-loaded, not precached
 - `setup.js` — Export/Import Setup: config-only shareable bundle build/share/import (V31)
 - `render-core.js` — main screens (Sessions, Entry, Overview, Edit), the New Session form, the Reports hub, and the welcome modal
 - `render-settings.js` — Settings sub-pages (incl. Report Settings), calculator, About changelog
@@ -60,9 +65,9 @@ The app logic was split out of the old single `app.js` into single-concern scrip
 - `dispatch.js` — delegated click + input + change handling and the three action registries (clicks V25, input/change V28, report actions V30, setup + filename actions V31)
 - `boot.js` — startup; runs a boot integrity self-check, then `load()`/`render()`. **Runs on load and must load last**
 - `styles.css` — themed via CSS variables; light, dark, and system theme
-- `sw.js` — service worker; caches the app shell. Its `ASSETS` list must include all scripts (incl. the two PDF libs + `report.js`) in load order. Bump `CACHE_VERSION` on every release.
+- `sw.js` — service worker; caches the app shell. Its `ASSETS` list must include all scripts in load order (incl. the two jsPDF libs, `report.js`, and `pdfpreview.js`) — but **not** the two PDF.js files, which are lazy-loaded and auto-cached on first preview. Bump `CACHE_VERSION` on every release.
 - `manifest.webmanifest` — PWA manifest
-- `THIRD-PARTY-LICENSES.txt` — MIT notices for the bundled PDF libraries (V30)
+- `THIRD-PARTY-LICENSES.txt` — notices for the bundled libraries: MIT (jsPDF + AutoTable, V30) and Apache-2.0 (PDF.js, V38)
 - `icon-192.png`, `icon-512.png` — app icons
 - `LICENSE.txt` — proprietary license; all rights reserved
 - `MAP.md` — code map: where each function lives
