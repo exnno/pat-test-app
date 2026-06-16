@@ -1120,18 +1120,18 @@ function renderSettingsAbout() {
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v38: rolled forward — V38 on top, V35 dropped. -->
+      <!-- v8: rolling 3-version changelog. v39: rolled forward — V39 on top, V36 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V39</strong> · June 2026</p>
+        <p class="muted">Two small tidy-ups to the New Session screen. The New Session form now closes when you move to another screen, so you get a clean Sessions list when you come back instead of the form still being open. And the saved-clients list no longer pops open the moment you start a new session — it appears only when you tap the Client field. None of your existing data is affected.</p>
 
         <p><strong>V38</strong> · June 2026</p>
         <p class="muted">The report preview now shows the whole report, not just the first page — scroll through every page before you share or save it. The first time you open a preview, the app downloads a small viewer (about 1.5 MB) once while you're online; after that, previews work offline as before. The viewer is kept with the app's own files, well away from your sessions data, so nothing in your saved data has changed. If you happen to be offline the very first time, the preview simply shows page one until you're next online, then upgrades automatically.</p>
 
         <p><strong>V37</strong> · June 2026</p>
         <p class="muted">Small tidy-ups based on your feedback. The back button on the entry screen now uses the same arrow as everywhere else, and the session overview has been simplified — Share and Report stay at the top, while "Select items" and "Session settings" are now clearly labelled buttons just below, instead of a row of similar-looking icons. None of your existing data is affected.</p>
-
-        <p><strong>V36</strong> · June 2026</p>
-        <p class="muted">More on your certificates. You can now switch on certificate numbers (Settings → Report Settings → Certificate numbers) — each session gets its own unique number, built from your prefix and a counter, and kept with that session so it never changes. Add job notes to a session from its overview and they print on the report. And you can save your report settings as named templates — for example a full certificate and a lighter client summary — then switch between them in a tap. None of your existing data is affected.</p>
       </div>
 
       <div class="info-card">

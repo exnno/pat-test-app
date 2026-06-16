@@ -203,8 +203,8 @@
 // in Cache Storage (hundreds of MB on iOS), entirely separate from the ~5 MB
 // localStorage data budget. After a cache bump they re-download once (the user is
 // already online pulling the new app version). No codec/backup change;
-// backupVersion unchanged (5). Cache bumped to pat-v38.
-const CACHE_VERSION = 'pat-v38';
+// backupVersion unchanged (5). Cache bumped to pat-v39.
+const CACHE_VERSION = 'pat-v39';
 const ASSETS = [
   './',
   './index.html',

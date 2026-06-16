@@ -1,4 +1,4 @@
-# PAT App — Code Map (V38)
+# PAT App — Code Map (V39)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -37,7 +37,7 @@ the existing same-origin SW fetch handler into Cache Storage (separate from the
 ---
 
 ## config.js (~445 ln) — constants & defaults, pure data
-`APP_VERSION` (V34); all `*_KEY` localStorage key names (incl. welcome keys,
+`APP_VERSION` (V39); all `*_KEY` localStorage key names (incl. welcome keys,
 latest `V34_WELCOME_KEY`, and the v33 first-run `ONBOARD_KEY`);
 `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`; v27 SQP tuning;
@@ -70,6 +70,8 @@ a full reportSettings snapshot); Report search aliases include "cert number
 template preset notes".
 **v38:** `V38_WELCOME_KEY` (`pat:v38welcome`) — multi-page PDF preview welcome.
 No other config change (PDF.js paths are hard-coded in `pdfpreview.js`).
+**v39:** `V39_WELCOME_KEY` (`pat:v39welcome`) — New Session polish welcome. No
+other config change.
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
@@ -97,6 +99,8 @@ live ON the session objects (set in createSession), not in top-level state.
 **v38:** `v38WelcomeSeen` (multi-page-preview welcome gate). No other state
 change — the preview's per-open transients (render token, blob/url) are locals
 inside `openReportPreview`, not on global `state`.
+**v39:** `v39WelcomeSeen` (New Session polish welcome gate). No other state
+change.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -294,6 +298,12 @@ dispatch.js; the preview quick-adjust + deep-link live in report.js.)
 reads the cert prefix/padding/next-number fields.
 **v38:** `dismissV38Welcome` (sets `v38WelcomeSeen` + persists `V38_WELCOME_KEY`,
 re-renders).
+**v39:** `dismissV39Welcome` (sets `v39WelcomeSeen` + persists `V39_WELCOME_KEY`).
+`setView` now also closes the New Session form on every view transition (clears
+`newForm.show`/`newFormError`/the nf-suggestion flags) — same dialog-clearing
+discipline it already applies to the fail sheet, multi-pick sheet, bulk-edit
+menus and client dialogs; fixes the form lingering open after navigating away
+and back to Sessions.
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves, the first-run wizard, the signature,
 cert numbers / job notes / report templates.
@@ -408,6 +418,10 @@ selection mode; Select hidden when the session has no items).
 gated by `v38WelcomeSeen` (still suppressed while the wizard/migration prompt
 shows). No other render-core change — the canvas preview lives in report.js/
 pdfpreview.js, built directly into the DOM, not through render().
+**v39:** welcome modal rolled to **V39** "What's new" (New Session polish), gated
+by `v39WelcomeSeen`. Also: the New Session Client `<input>` (`nf-client`) lost its
+`autofocus` attribute — it no longer steals focus on render, so the saved-clients
+suggestion dropdown only opens when the user actually taps the field.
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
 Edit-session UI, the empty states, the welcome modal, the first-run wizard, or the
 signature draw pad.
@@ -448,6 +462,7 @@ will look like" preview) and a **Templates** section (per-template Apply/Rename/
 Delete rows + "Save current as template"); About changelog rolled (V36 top, V33
 dropped).
 The Clients empty state uses the shared `emptyStateHTML` (render-core).
+**v39:** About changelog rolled (V39 top, V36 dropped) — no other settings change.
 *Touch to:* change any Settings page; the category structure (edit
 `SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META` in **config.js**, not here); search
 matching (aliases live in config); or roll the About changelog.
@@ -521,6 +536,7 @@ pragmatic choice for low-frequency admin naming; a bottom-sheet input is the
 **v38:** `welcome-dismiss` now calls `dismissV38Welcome`. No new actions — the
 preview's canvas controls are wired directly in `openReportPreview` (report.js),
 not delegated.
+**v39:** `welcome-dismiss` now calls `dismissV39Welcome`. No new actions.
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

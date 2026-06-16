@@ -427,6 +427,7 @@ function loadV11Settings() {
   state.v35WelcomeSeen = localStorage.getItem(V35_WELCOME_KEY) === '1';
   state.v36WelcomeSeen = localStorage.getItem(V36_WELCOME_KEY) === '1';
   state.v38WelcomeSeen = localStorage.getItem(V38_WELCOME_KEY) === '1';
+  state.v39WelcomeSeen = localStorage.getItem(V39_WELCOME_KEY) === '1';
 
   // v33: first-run wizard gate. onboardedV33Seen is set true once the wizard is
   // completed OR skipped. We treat the install as "already onboarded" (so the

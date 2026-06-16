@@ -98,26 +98,24 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v38: rolled forward — content covers the new multi-page PDF preview.
-  // Key bumped to pat:v38welcome (gate uses v38WelcomeSeen). Still suppressed
+  // v39: rolled forward — content covers the New Session polish.
+  // Key bumped to pat:v39welcome (gate uses v39WelcomeSeen). Still suppressed
   // while the first-run wizard is showing and while the v9 migration prompt is up.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v38WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v39WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V38">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V39">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V38</h3>
+        <h3 class="bulk-sheet-title">What's new in V39</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>See the whole report.</strong> The report preview now shows <strong>every page</strong>, not just the first — scroll through the full report before you share or save it.</li>
-        <li><strong>One-time setup.</strong> The first time you open a preview, the app downloads a small viewer (about 1.5&nbsp;MB) once, while you're online. After that, previews work offline as usual.</li>
-        <li><strong>No effect on your storage.</strong> That viewer is kept with the app's own files, well away from your sessions data — nothing in your saved data has changed.</li>
-        <li><strong>No connection the first time?</strong> No problem — the preview just shows page one (as before) until you're next online, then upgrades automatically.</li>
+        <li><strong>New session closes when you leave.</strong> Open the New Session form, switch to another screen, and it no longer stays open when you come back — you get a clean Sessions list as expected.</li>
+        <li><strong>Calmer client field.</strong> Opening New Session no longer pops the saved-clients list open straight away. It now appears only when you tap the Client field, so the form looks tidier to start with.</li>
       </ul>
-      <button class="btn-primary" id="v38-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v39-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -444,7 +442,7 @@ function renderSessions() {
       <h2 class="h2">New session</h2>
       <label class="label">Client <span class="hint">(optional)</span></label>
       <div class="nf-input-wrap" id="nf-client-wrap">
-        <input class="input" id="nf-client" value="${escapeHTML(state.newForm.clientId)}" placeholder="e.g. Acme Ltd" autocomplete="off" autofocus>
+        <input class="input" id="nf-client" value="${escapeHTML(state.newForm.clientId)}" placeholder="e.g. Acme Ltd" autocomplete="off">
         ${nfSuggestionsHTML('client')}
       </div>
       <label class="label">Site <span class="hint">(optional)</span></label>

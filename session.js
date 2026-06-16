@@ -863,6 +863,13 @@ function setView(v) {
   // harmlessly.
   state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
   state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
+  // v39: close the New Session form on any view change too. Previously its open
+  // flag (newForm.show) persisted, so navigating away and back to Sessions left
+  // the form still showing. This mirrors the nf-cancel reset, keeping it in step
+  // with the rest of the dialog-clearing this function already does.
+  state.newForm.show = false;
+  state.newFormError = '';
+  state.nfSuggestions = []; state.showNfSuggestions = false; state.nfActiveField = null;
   // Search and selection are overview-local; clear when leaving overview.
   if (v !== 'overview') {
     state.searchQuery = '';
@@ -1480,6 +1487,12 @@ function dismissV36Welcome() {
 function dismissV38Welcome() {
   state.v38WelcomeSeen = true;
   localStorage.setItem(V38_WELCOME_KEY, '1');
+  render();
+}
+
+function dismissV39Welcome() {
+  state.v39WelcomeSeen = true;
+  localStorage.setItem(V39_WELCOME_KEY, '1');
   render();
 }
 

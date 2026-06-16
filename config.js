@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V38';
+const APP_VERSION = 'V39';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -76,6 +76,7 @@ const V34_WELCOME_KEY = 'pat:v34welcome';   // v34: report signature (draw or up
 const V35_WELCOME_KEY = 'pat:v35welcome';   // v35: report colours + preview quick-adjust + date fix
 const V36_WELCOME_KEY = 'pat:v36welcome';   // v36: certificate numbers + job notes + report templates
 const V38_WELCOME_KEY = 'pat:v38welcome';   // v38: multi-page PDF preview
+const V39_WELCOME_KEY = 'pat:v39welcome';   // v39: New Session polish
 // v33: First-run wizard "seen" flag. Set once the wizard is completed OR skipped,
 // so it never reappears. Distinct from the welcome modal key: a genuinely-new
 // install gets the WIZARD (gated by this key + an empty-install test); an
