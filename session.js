@@ -566,6 +566,7 @@ function createSession() {
 
   const snapshot = composeSiteSnapshot(clientName, siteName);
 
+  const now = new Date().toISOString();
   const s = {
     id: uid(),
     name: name.trim() || `Session ${state.sessions.length + 1}`,
@@ -583,7 +584,13 @@ function createSession() {
     // numbers are enabled; reused thereafter). Both additive — old sessions
     // simply lack them and backfill as empty.
     notes: '',
-    certNo: ''
+    certNo: '',
+    // v43: cloud prep. Sync metadata (userId for ownership, lastModified timestamp,
+    // syncedAt for cloud sync checkpoints). All passthrough for now — old sessions
+    // backfill with null/defaults. userId is set on actual cloud login.
+    userId: null,
+    lastModified: now,
+    syncedAt: null
   };
   state.sessions.unshift(s);
   state.activeId = s.id;
@@ -1776,6 +1783,7 @@ function restartOnboarding() {
 function seedDemoSession() {
   const eng = (state.engineer || '').trim();
   const stamp = state.timestampsEnabled ? new Date().toISOString() : undefined;
+  const now = new Date().toISOString();
   const mk = (assetNo, location, itemType, result, notes) => {
     const it = { id: uid(), assetNo, location, itemType, notes: notes || '', result };
     if (stamp) it.ts = stamp;
@@ -1801,7 +1809,11 @@ function seedDemoSession() {
     locked: false,
     notes: 'This is an example session to show how the app works. Delete it any time.',
     certNo: '',
-    [DEMO_SESSION_FLAG]: true
+    [DEMO_SESSION_FLAG]: true,
+    // v43: sync metadata for demo session
+    userId: null,
+    lastModified: now,
+    syncedAt: null
   };
   state.sessions.unshift(s);
   // No activeId/cursor change and no nav — the user lands on the Sessions list

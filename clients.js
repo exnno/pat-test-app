@@ -24,7 +24,14 @@ function loadClients() {
   try { raw = JSON.parse(localStorage.getItem(CLIENTS_KEY) || 'null'); } catch {}
   if (!Array.isArray(raw)) return [];
   return raw
-    .map(c => ({ id: String(c && c.id || ''), name: String(c && c.name || '').trim() }))
+    .map(c => ({
+      id: String(c && c.id || ''),
+      name: String(c && c.name || '').trim(),
+      // v43: cloud prep. Passthrough fields for future sync (userId for ownership,
+      // lastModified timestamp). Defensive — old clients without these fields are fine.
+      userId: (c && typeof c.userId === 'string') ? c.userId : null,
+      lastModified: (c && typeof c.lastModified === 'string') ? c.lastModified : null
+    }))
     .filter(c => c.id && c.name);
 }
 
@@ -40,7 +47,10 @@ function loadSites() {
     .map(s => ({
       id: String(s && s.id || ''),
       clientId: String(s && s.clientId || ''),
-      name: String(s && s.name || '').trim()
+      name: String(s && s.name || '').trim(),
+      // v43: cloud prep. Passthrough fields for future sync.
+      userId: (s && typeof s.userId === 'string') ? s.userId : null,
+      lastModified: (s && typeof s.lastModified === 'string') ? s.lastModified : null
     }))
     .filter(s => s.id && s.name);   // clientId no longer required
 }
@@ -51,6 +61,7 @@ function loadSites() {
 // sessions or no usable site strings.
 function seedClientsSitesFromSessions() {
   const seen = new Map();   // lowercased name -> client id
+  const now = new Date().toISOString();
   let added = false;
   state.sessions.forEach(sess => {
     const raw = String(sess && sess.site || '').trim();
@@ -58,8 +69,9 @@ function seedClientsSitesFromSessions() {
     const key = raw.toLowerCase();
     if (seen.has(key)) return;
     const clientId = 'client_' + uid();
-    state.clients.push({ id: clientId, name: raw });
-    state.sites.push({ id: 'site_' + uid(), clientId, name: raw });
+    // v43: add userId (null for now, set when synced) and lastModified timestamp
+    state.clients.push({ id: clientId, name: raw, userId: null, lastModified: now });
+    state.sites.push({ id: 'site_' + uid(), clientId, name: raw, userId: null, lastModified: now });
     seen.set(key, clientId);
     added = true;
   });

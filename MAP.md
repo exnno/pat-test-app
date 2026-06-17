@@ -37,8 +37,8 @@ the existing same-origin SW fetch handler into Cache Storage (separate from the
 ---
 
 ## config.js (~445 ln) — constants & defaults, pure data
-`APP_VERSION` (V40); all `*_KEY` localStorage key names (incl. welcome keys,
-latest `V34_WELCOME_KEY`, and the v33 first-run `ONBOARD_KEY`);
+`APP_VERSION` (V43); all `*_KEY` localStorage key names (incl. welcome keys,
+latest `V43_WELCOME_KEY`, and the v33 first-run `ONBOARD_KEY`);
 `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`; v27 SQP tuning;
 `DEFAULT_ITEM_TYPES`, `DEFAULT_FAIL_REASONS`, `DEFAULT_DESCRIPTIONS`,
@@ -79,9 +79,13 @@ sheets welcome. No other config change.
 **v42:** `V42_WELCOME_KEY` (`pat:v42welcome`) — commercial onboarding welcome;
 `DEMO_SESSION_FLAG` (`'isExample'`) — marks the opt-in example session built on
 the fresh onboarding path (a harmless passthrough field). No data-model change.
+**v43:** `V43_WELCOME_KEY` (`pat:v43welcome`) — calibration reminder + cloud
+prep welcome; `PAT_AUTH_KEY` (`'pat:authUser'`) — mock OAuth auth state (userId,
+authToken). Both additive; no backupVersion bump.
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
+
 
 ## state.js (~290 ln) — the global `state` object
 The single `let state = { ... }` runtime shape: sessions, form, view, all the
@@ -126,6 +130,8 @@ stays transient.
 `contrastColor(rgb)` (black/white text by luminance), `safeHexColor(hex, fallback)`
 (validate/normalise to '#rrggbb'; 3-char shorthand only honoured when '#'-prefixed,
 so a bare hex-ish word can't slip through on the import path).
+**v43:** `setupLongPress(element, durationMs, onLongPress)` — reusable long-press
+detector (pointer events, default 2000ms). Returns cleanup function.
 *Touch to:* add a stateless formatting/escaping helper.
 
 ## storage.js (~640 ln) — persistence boundary
@@ -596,6 +602,13 @@ other settings change.
 **v42:** About changelog rolled (V42 top, V39 dropped; now lists V42/V41/V40); the
 About page gains a **"Show me around"** card with the `open-tour` button (replays
 the walkthrough), alongside the existing "Run first-time setup again".
+**v43:** About changelog rolled (V43 top, V40 dropped; now lists V43/V42/V41) and
+gains a **long-press hidden menu** (2-sec press on the title reveals cloud pages);
+three new cloud-prep pages (not wired to main nav yet, revealed via long-press):
+`renderCloudAccount` (mock user email, login timestamp, sign-out button),
+`renderCloudSync` (sync status, last-synced timestamp, "Sync now" button),
+`renderCloudSubscription` (plan/usage info, upgrade button). All three are stubs
+with mock data for now; will integrate real cloud backend in the PAT Cloud phase.
 *Touch to:* change any Settings page; the category structure (edit
 `SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META` in **config.js**, not here); search
 matching (aliases live in config); or roll the About changelog.

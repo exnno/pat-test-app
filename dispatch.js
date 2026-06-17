@@ -567,7 +567,31 @@ registerActions({
     onConfirm: () => window.location.reload()
   }),
 
-  // first-run wizard (v33; v42 guided commercial setup)
+  // v43: login (mock OAuth flow for now)
+  'login-google': () => {
+    state.authStatus = 'logging-in';
+    render();
+    // Simulate auth delay (200ms). Real OAuth redirect happens in cloud phase.
+    setTimeout(() => {
+      // Mock success: generate a fake user ID
+      const mockUserId = 'user_' + Math.random().toString(36).slice(2, 9);
+      const mockToken = 'token_' + Math.random().toString(36).slice(2, 9);
+      state.userId = mockUserId;
+      state.authToken = mockToken;
+      state.authStatus = 'logged-in';
+      // Persist auth
+      localStorage.setItem(PAT_AUTH_KEY, JSON.stringify({
+        userId: state.userId,
+        authToken: state.authToken,
+        loginTime: new Date().toISOString()
+      }));
+      // Jump to Sessions
+      state.view = 'sessions';
+      save();
+      render();
+      showToast('Signed in');
+    }, 500);
+  },
   'wizard-next': () => wizardNextStep(),
   'wizard-back': () => wizardBack(),
   'wizard-skip': () => skipOnboarding(),
@@ -585,7 +609,38 @@ registerActions({
   'tour-skip': () => closeTour(),
   'open-tour': () => openTour(),
 
-  // Backup reminder banner
+  // v43: cloud prep pages (long-press on About title reveals these)
+  'open-cloud-page': (arg) => {
+    if (arg === 'account') state.view = 'cloudAccount';
+    else if (arg === 'sync') state.view = 'cloudSync';
+    else if (arg === 'subscription') state.view = 'cloudSubscription';
+    render();
+  },
+  'cloud-sign-out': () => {
+    state.userId = null;
+    state.authToken = null;
+    state.authStatus = 'logged-out';
+    localStorage.removeItem(PAT_AUTH_KEY);
+    state.view = 'cloudAccount';
+    save();
+    render();
+  },
+  'cloud-sync-now': () => {
+    // Mock sync: just stamp lastBackupAt for now
+    state.lastBackupAt = new Date().toISOString();
+    save();
+    render();
+    showToast('Sync complete');
+  },
+  'cloud-upgrade': () => {
+    showToast('Upgrade plans coming soon');
+  },
+
+  // v43: calibration reminder (edit-cal-date button on entry screen)
+  'edit-cal-date': () => {
+    state.view = 'settingsUser';
+    render();
+  },
   'backup-banner-export': () => { downloadBackup(); render(); },
   'backup-banner-later': () => { snoozeBackupReminder(); render(); },
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },

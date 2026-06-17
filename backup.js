@@ -61,7 +61,11 @@ function buildBackup() {
     // backupVersion bump (the new session fields notes/certNo are also additive
     // and ride along inside `sessions`).
     reportTemplates: state.reportTemplates,
-    lastBackupAt: state.lastBackupAt
+    lastBackupAt: state.lastBackupAt,
+    // v43: cloud prep. Auth state (userId, authToken, loginTime). Passthrough
+    // for now; will persist server-side in cloud phase. Old backups without it
+    // restore with null (logged-out). Additive — no backupVersion bump.
+    authUser: state.userId ? { userId: state.userId, authToken: state.authToken, loginTime: new Date().toISOString() } : null
   };
 }
 
@@ -277,6 +281,15 @@ function restoreBackupFromFile(file) {
           name: (typeof t.name === 'string' && t.name.trim()) ? t.name.trim() : 'Untitled template',
           settings: normaliseReportSettings(t.settings)
         }));
+    }
+
+    // v43: cloud prep. Auth state (userId, authToken). If present in backup, restore;
+    // if absent (any pre-v43 backup), leave auth unchanged (the user stays in their
+    // current login state — we don't reset it on restore). Additive.
+    if (data.authUser && typeof data.authUser === 'object' && data.authUser.userId) {
+      state.userId = data.authUser.userId;
+      state.authToken = data.authUser.authToken || null;
+      state.authStatus = 'logged-in';
     }
 
     state.activeId = null;

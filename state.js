@@ -183,6 +183,17 @@ let state = {
   v40WelcomeSeen: false,
   v41WelcomeSeen: false,
   v42WelcomeSeen: false,
+  v43WelcomeSeen: false,
+  // v43: cloud prep. Auth state (transient — not persisted; will persist in cloud
+  // phase). userId (or null if logged out), authToken (or null), authStatus
+  // ('logged-out' | 'logged-in' | 'logging-in' | 'error'). Mock OAuth flow for V43.
+  userId: null,
+  authToken: null,
+  authStatus: 'logged-out',
+  // v43: cloud pages visibility. cloudPagesRevealed is a transient per-session flag
+  // set by long-pressing the About title; it resets when you navigate away from About
+  // but persists if you open one of the cloud pages and return. Never persisted.
+  cloudPagesRevealed: false,
   // v36: saved report templates (array of {id, name, settings}). Loaded from
   // REPORT_TEMPLATES_KEY; seeded with starters on first run. Applying one copies
   // its settings snapshot over the live reportSettings.

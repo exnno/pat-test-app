@@ -106,6 +106,12 @@ if (!bootIntegrityOK()) {
 } else {
 load();
 applyTheme(state.theme);
+// v43: cloud prep. Check if user is logged in. If not, show login view instead
+// of Sessions. Once logged in, the auth state persists (survives browser close via
+// localStorage backup), so the user only logs in once per device.
+if (!state.userId) {
+  state.view = 'login';
+}
 // v25 (E3): attach the single delegated click listener to #app once, before the
 // first render. It survives every innerHTML rewrite (it's on #app, not its
 // children), so clickable controls wired via data-action never need re-binding.

@@ -1111,27 +1111,39 @@ function renderSettingsCalculator() {
 }
 
 function renderSettingsAbout() {
+  // v43: cloud pages reveal via long-press on the title. This section only shows
+  // if cloudPagesRevealed is true (a transient per-session flag set by long-press).
+  const cloudPagesMenu = state.cloudPagesRevealed ? `
+    <div class="info-card cloud-pages-menu">
+      <h3>Cloud Pages (dev)</h3>
+      <p class="muted" style="font-size:11px">These pages are under development and not yet connected to the cloud.</p>
+      <button class="backup-action-btn" id="cloud-account-btn" data-action="open-cloud-page" data-arg="account" style="margin-top:8px">👤 Account</button>
+      <button class="backup-action-btn" id="cloud-sync-btn" data-action="open-cloud-page" data-arg="sync" style="margin-top:6px">☁ Sync</button>
+      <button class="backup-action-btn" id="cloud-subscription-btn" data-action="open-cloud-page" data-arg="subscription" style="margin-top:6px">💳 Subscription</button>
+    </div>
+  ` : '';
+
   return `
     <div class="screen">
       ${renderSettingsSubHeader('About')}
       <div class="info-card">
-        <h2>PAT Test ${APP_VERSION}</h2>
+        <h2 id="about-title" style="cursor:pointer;-webkit-user-select:none;user-select:none">PAT Test ${APP_VERSION}</h2>
         <p>A fast, offline-first portable appliance testing app for working PAT engineers. Built around speed of data entry — pass/fail decisions in two taps, no fighting the interface.</p>
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v42: rolled forward — V42 on top, V39 dropped. -->
+      <!-- v8: rolling 3-version changelog. v43: rolled forward — V43 on top, V40 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V43</strong> · June 2026</p>
+        <p class="muted">Calibration reminders now show on the entry screen so you're never testing with an out-of-date meter. Cloud prep work is underway for the commercial version — you'll be able to sync your data and back it up securely online.</p>
 
         <p><strong>V42</strong> · June 2026</p>
         <p class="muted">Setting up a new phone is now a proper guided walkthrough: your engineer details, your company branding for reports (name, logo and colour), and an optional example job so you can see how everything looks. There's also a quick in-app tour of the basics — Sessions, Quick Pick, the Overview, reports and backups — which you can run any time from the button just below. None of your existing data is affected.</p>
 
         <p><strong>V41</strong> · June 2026</p>
         <p class="muted">The last few system pop-ups are gone. Messages when importing a file, restoring a backup, or building a report now use the app's own slide-up panels instead of the phone's built-in pop-up boxes — reliable on iPhone and matching the rest of the app. If something goes wrong, the message now waits for you to tap OK rather than flashing past. None of your existing data is affected.</p>
-
-        <p><strong>V40</strong> · June 2026</p>
-        <p class="muted">The pop-up boxes for naming a report template and confirming things like "Delete this?" now use the app's own slide-up panels instead of the phone's system pop-ups — more reliable on iPhone and a cleaner, more consistent look. Quick confirmations such as restoring a backup now appear as a small message that fades away on its own. None of your existing data is affected.</p>
       </div>
 
       <div class="info-card">
@@ -1145,6 +1157,8 @@ function renderSettingsAbout() {
         <p class="muted">A quick guided tour of the basics — Sessions, Quick Pick, the Overview, reports and backups. Handy if you're getting started or showing someone else the ropes.</p>
         <button class="backup-action-btn" id="about-open-tour" data-action="open-tour" style="margin-top:8px">🧭 Show me around the app again</button>
       </div>
+
+      ${cloudPagesMenu}
 
       <div class="info-card">
         <h3>Privacy</h3>
@@ -1188,6 +1202,96 @@ function renderSettingsContact() {
         <h3>What to include in a bug report</h3>
         <p>If something's gone wrong, the more of this you can include the better:</p>
         <p class="muted">• What you were trying to do<br>• What happened instead<br>• Your phone model and OS version<br>• The app version (currently ${APP_VERSION})<br>• Any error messages on screen</p>
+      </div>
+    </div>
+  `;
+}
+
+// v43: cloud prep pages. Not yet wired into the main Settings nav — revealed via
+// long-press on the About title. Mock data for now; will persist to cloud in the
+// cloud phase.
+
+function renderCloudAccount() {
+  const email = state.userId ? `${state.userId}@example.com` : 'Not logged in';
+  const loginTime = state.userId ? new Date().toLocaleDateString() : '—';
+
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Account')}
+      <div class="info-card">
+        <h2>Cloud Account</h2>
+        <p class="muted" style="font-size:12px">Cloud features are coming soon. This page shows your account status.</p>
+      </div>
+
+      <div class="info-card">
+        <h3>Logged in as</h3>
+        <p class="muted">${escapeHTML(email)}</p>
+      </div>
+
+      <div class="info-card">
+        <h3>Account created</h3>
+        <p class="muted">${escapeHTML(loginTime)}</p>
+      </div>
+
+      <div class="info-card">
+        <button class="backup-action-btn" id="cloud-sign-out" data-action="cloud-sign-out" style="margin-top:8px">Sign out</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderCloudSync() {
+  const lastSync = state.lastBackupAt ? new Date(state.lastBackupAt).toLocaleString() : 'Never';
+  const syncStatus = state.authStatus === 'logged-in' ? 'Ready to sync' : 'Not logged in';
+
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Sync')}
+      <div class="info-card">
+        <h2>Cloud Sync</h2>
+        <p class="muted" style="font-size:12px">Sync your data to the cloud. This feature is under development.</p>
+      </div>
+
+      <div class="info-card">
+        <h3>Sync status</h3>
+        <p class="muted">${escapeHTML(syncStatus)}</p>
+      </div>
+
+      <div class="info-card">
+        <h3>Last synced</h3>
+        <p class="muted">${escapeHTML(lastSync)}</p>
+      </div>
+
+      <div class="info-card">
+        <button class="backup-action-btn" id="cloud-sync-now" data-action="cloud-sync-now" style="margin-top:8px">⟳ Sync now</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderCloudSubscription() {
+  const sessionCount = state.sessions.length;
+
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Subscription')}
+      <div class="info-card">
+        <h2>Plan & Usage</h2>
+        <p class="muted" style="font-size:12px">Cloud subscription plans are coming soon. Track your usage here.</p>
+      </div>
+
+      <div class="info-card">
+        <h3>Current plan</h3>
+        <p><strong>Free</strong></p>
+      </div>
+
+      <div class="info-card">
+        <h3>Sessions on this device</h3>
+        <p class="muted">${sessionCount} session${sessionCount === 1 ? '' : 's'}</p>
+      </div>
+
+      <div class="info-card">
+        <button class="backup-action-btn" id="cloud-upgrade" data-action="cloud-upgrade" style="margin-top:8px">Upgrade to Pro</button>
       </div>
     </div>
   `;

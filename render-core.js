@@ -48,6 +48,8 @@ function render() {
   else if (v === 'entry') html = renderEntry();
   else if (v === 'overview') html = renderOverview();
   else if (v === 'editSession') html = renderEditSession();
+  // v43: login page (pre-app, shown if not authenticated)
+  else if (v === 'login') html = renderLogin();
   else if (v === 'settings') html = renderSettingsHub();
   else if (v === 'settingsCategory') html = renderSettingsCategory();   // v32
   else if (v === 'settingsUser') html = renderSettingsUser();
@@ -65,6 +67,10 @@ function render() {
   else if (v === 'settingsCalculator') html = renderSettingsCalculator();
   else if (v === 'settingsAbout') html = renderSettingsAbout();
   else if (v === 'settingsContact') html = renderSettingsContact();
+  // v43: cloud prep pages (not wired into nav yet, revealed via long-press on About)
+  else if (v === 'cloudAccount') html = renderCloudAccount();
+  else if (v === 'cloudSync') html = renderCloudSync();
+  else if (v === 'cloudSubscription') html = renderCloudSubscription();
 
   // Update banner sits above the screen
   const banner = state.updateAvailable ? `
@@ -329,6 +335,16 @@ function render() {
   document.body.classList.remove('view-entry');
   bindFocusFields();
   if (state.signaturePadOpen) initSignaturePad();   // v34
+  // v43: set up long-press on About title for cloud pages reveal
+  if (state.view === 'settingsAbout') {
+    const aboutTitle = document.getElementById('about-title');
+    if (aboutTitle) {
+      setupLongPress(aboutTitle, 2000, () => {
+        state.cloudPagesRevealed = true;
+        render();
+      });
+    }
+  }
 }
 
 // v34: attach pointer drawing to the live signature-pad canvas. Created fresh on
@@ -836,6 +852,44 @@ function renderImportSummaryModal() {
   `;
 }
 
+// v43: login page. Pre-app screen shown if user is not logged in. Mock OAuth flow
+// for V43; real integration comes in the cloud phase.
+function renderLogin() {
+  const hasError = state.authStatus === 'error';
+  const isLoggingIn = state.authStatus === 'logging-in';
+
+  return `
+    <div class="screen login-screen">
+      <div class="login-container">
+        <div class="login-header">
+          <h1 style="margin:0 0 8px;font-size:28px;font-weight:700">PAT Test</h1>
+          <p style="margin:0;font-size:14px;color:var(--text-secondary)">Fast portable appliance testing</p>
+        </div>
+
+        <div class="login-content">
+          <p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:var(--text)">Sign in with your Google account to sync your data and back it up securely in the cloud. (Coming soon — for now this is a demo.)</p>
+
+          ${hasError ? `
+            <div class="login-error" style="margin:0 0 16px;padding:12px;background:#fef2f2;border-radius:8px;border-left:4px solid #dc2626;color:#7f1d1d;font-size:13px">
+              <strong>Sign-in failed.</strong> Check your connection and try again.
+            </div>
+          ` : ''}
+
+          <button class="login-button ${isLoggingIn ? 'disabled' : ''}" id="login-google-btn" data-action="login-google" ${isLoggingIn ? 'disabled' : ''}>
+            ${isLoggingIn ? '⟳ Signing in…' : '🔐 Sign in with Google'}
+          </button>
+
+          <p style="margin:12px 0 0;font-size:12px;text-align:center;color:var(--text-secondary)">Your data stays on your device until you choose to sync.</p>
+        </div>
+
+        <div class="login-footer">
+          <p style="margin:0;font-size:11px;color:var(--text-secondary);text-align:center">© 2026 Peter Birchley. All rights reserved.</p>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
 function renderEntry() {
   const sess = activeSession();
   if (!sess) { state.view = 'sessions'; return renderSessions(); }
@@ -947,6 +1001,36 @@ function renderEntry() {
     </div>
   ` : '';
 
+  // v43: calibration reminder. If a calibration due date is set, show a visual
+  // indicator (green = safe, yellow = due soon, red = overdue). Tappable to edit
+  // the cal date in Settings. No indicator if no cal date is set yet.
+  let calBanner = '';
+  if (state.calDue) {
+    const dueDate = new Date(state.calDue);
+    const today = new Date();
+    const daysUntil = Math.ceil((dueDate - today) / (1000 * 3600 * 24));
+    let bannerClass = 'cal-ok';
+    let bannerLabel = `Calibration due ${formatDate(state.calDue)}`;
+
+    if (daysUntil < 0) {
+      bannerClass = 'cal-overdue';
+      bannerLabel = `⚠ Calibration OVERDUE (${Math.abs(daysUntil)} day${Math.abs(daysUntil) === 1 ? '' : 's'} ago)`;
+    } else if (daysUntil <= CAL_DUE_SOON_DAYS) {
+      bannerClass = 'cal-due-soon';
+      bannerLabel = `⚠ Calibration due soon (${daysUntil} day${daysUntil === 1 ? '' : 's'})`;
+    } else {
+      bannerClass = 'cal-ok';
+      bannerLabel = `✓ Calibration due ${formatDate(state.calDue)}`;
+    }
+
+    calBanner = `
+      <div class="cal-banner ${bannerClass}" role="status">
+        <span class="cal-banner-text">${escapeHTML(bannerLabel)}</span>
+        <button class="cal-banner-action" id="cal-edit-btn" data-action="edit-cal-date">Edit</button>
+      </div>
+    `;
+  }
+
   const passFailDisabled = isLocked ? 'disabled' : '';
   const copyDisabled = (!hasLast || isLocked) ? 'disabled' : '';
 
@@ -1008,6 +1092,7 @@ function renderEntry() {
       </header>
 
       ${lockBanner}
+      ${calBanner}
       ${progressRow}
 
       <label class="label">Asset number</label>

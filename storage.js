@@ -431,6 +431,24 @@ function loadV11Settings() {
   state.v40WelcomeSeen = localStorage.getItem(V40_WELCOME_KEY) === '1';
   state.v41WelcomeSeen = localStorage.getItem(V41_WELCOME_KEY) === '1';
   state.v42WelcomeSeen = localStorage.getItem(V42_WELCOME_KEY) === '1';
+  state.v43WelcomeSeen = localStorage.getItem(V43_WELCOME_KEY) === '1';
+
+  // v43: cloud prep. Load mock auth state (userId, authToken from PAT_AUTH_KEY).
+  // This will persist in the cloud phase; for now it's a passthrough field that
+  // survives backup/restore. Defaults to logged-out (null userId/authToken).
+  try {
+    const authData = JSON.parse(localStorage.getItem(PAT_AUTH_KEY) || 'null');
+    if (authData && typeof authData === 'object' && authData.userId) {
+      state.userId = authData.userId;
+      state.authToken = authData.authToken || null;
+      state.authStatus = 'logged-in';
+    }
+  } catch {
+    // Corrupt auth key — default to logged-out
+    state.userId = null;
+    state.authToken = null;
+    state.authStatus = 'logged-out';
+  }
 
   // v33: first-run wizard gate. onboardedV33Seen is set true once the wizard is
   // completed OR skipped. We treat the install as "already onboarded" (so the

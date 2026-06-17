@@ -123,3 +123,45 @@ function safeHexColor(hex, fallback) {
   return '#' + h.toLowerCase();
 }
 
+// v43: reusable long-press detector. Attaches to an element and calls onLongPress()
+// if the pointer stays down for durationMs (default 2000 ms). Tracks via pointer events
+// so it works on both touch and mouse. Multiple calls on different elements are safe.
+// Returns a cleanup function to remove the listener.
+function setupLongPress(element, durationMs, onLongPress) {
+  if (!element) return () => {};
+  const duration = durationMs || 2000;
+  let timerId = null;
+  let isLongPress = false;
+
+  const onPointerDown = () => {
+    isLongPress = false;
+    timerId = setTimeout(() => {
+      isLongPress = true;
+      onLongPress();
+    }, duration);
+  };
+
+  const onPointerUp = () => {
+    if (timerId) clearTimeout(timerId);
+    timerId = null;
+  };
+
+  const onPointerCancel = () => {
+    if (timerId) clearTimeout(timerId);
+    timerId = null;
+  };
+
+  element.addEventListener('pointerdown', onPointerDown);
+  element.addEventListener('pointerup', onPointerUp);
+  element.addEventListener('pointercancel', onPointerCancel);
+
+  // Return cleanup function
+  return () => {
+    if (timerId) clearTimeout(timerId);
+    element.removeEventListener('pointerdown', onPointerDown);
+    element.removeEventListener('pointerup', onPointerUp);
+    element.removeEventListener('pointercancel', onPointerCancel);
+  };
+}
+
+

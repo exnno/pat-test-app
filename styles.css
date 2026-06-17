@@ -2524,3 +2524,127 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   color: var(--text-muted);
 }
 .empty-state-action { margin-top: 14px; }
+
+/* v43: Calibration due banner — sits on entry screen below lock banner.
+   Visual indicator of calibration status (green = ok, yellow = due soon, red = overdue). */
+.cal-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 14px;
+  margin: 0 0 12px;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.cal-banner.cal-ok {
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #15803d;
+}
+.cal-banner.cal-due-soon {
+  background: #fffbeb;
+  border-color: #fcd34d;
+  color: #92400e;
+}
+.cal-banner.cal-overdue {
+  background: #fef2f2;
+  border-color: #fca5a5;
+  color: #991b1b;
+}
+.cal-banner-text { font-size: 14px; font-weight: 600; }
+.cal-banner-action {
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 6px;
+  padding: 7px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* v43: Login page — pre-app authentication screen. Centered card layout. */
+.login-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 20px;
+  background: linear-gradient(135deg, #2563eb 0%, #1e40af 100%);
+}
+.login-container {
+  width: 100%;
+  max-width: 400px;
+  background: #fff;
+  border-radius: 16px;
+  padding: 32px 24px;
+  box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+  display: flex;
+  flex-direction: column;
+}
+.login-header {
+  text-align: center;
+  margin-bottom: 32px;
+}
+.login-header h1 {
+  color: #2563eb;
+  margin-bottom: 4px;
+}
+.login-header p {
+  color: #64748b;
+  font-size: 13px;
+}
+.login-content {
+  flex: 1;
+  margin-bottom: 24px;
+}
+.login-error {
+  margin-bottom: 16px;
+  padding: 12px;
+  background: #fef2f2;
+  border-radius: 8px;
+  border-left: 4px solid #dc2626;
+  color: #7f1d1d;
+  font-size: 13px;
+}
+.login-button {
+  width: 100%;
+  padding: 14px 16px;
+  background: #2563eb;
+  color: #fff;
+  border: none;
+  border-radius: 10px;
+  font-size: 16px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.login-button:active {
+  background: #1e40af;
+}
+.login-button.disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+.login-footer {
+  text-align: center;
+  padding-top: 16px;
+  border-top: 1px solid #e2e8f0;
+}
+
+/* v43: Cloud pages menu (hidden by default, revealed via long-press). */
+.cloud-pages-menu {
+  margin-top: 12px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+}
+.cloud-pages-menu h3 {
+  color: #1e293b;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
