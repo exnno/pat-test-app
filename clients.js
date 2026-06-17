@@ -221,7 +221,7 @@ function addClientFromDialog() {
   const name = state.clientsPage.clientDialog.name.trim();
   if (!name) return;
   if (findClientByName(name)) {
-    alert('A client with that name already exists.');
+    showToast('A client with that name already exists');
     return;
   }
   const client = ensureClient(name);
@@ -238,7 +238,7 @@ function renameClientFromDialog() {
   if (!client || !trimmed) return;
   const clash = findClientByName(trimmed);
   if (clash && clash.id !== client.id) {
-    alert('A client with that name already exists.');
+    showToast('A client with that name already exists');
     return;
   }
   client.name = trimmed;
@@ -252,16 +252,22 @@ function deleteClient(clientId) {
   if (!client) return;
   const childSites = sitesForClient(clientId);
   const msg = childSites.length
-    ? `Delete "${client.name}" and its ${childSites.length} site${childSites.length === 1 ? '' : 's'}?\n\nThis only removes them from your client list — sessions you've already created keep their site name.`
-    : `Delete "${client.name}"?\n\nThis only removes it from your client list — sessions you've already created keep their site name.`;
-  if (!confirm(msg)) return;
-  state.clients = state.clients.filter(c => c.id !== clientId);
-  state.sites = state.sites.filter(s => s.clientId !== clientId);
-  if (state.clientsPage.expandedClientId === clientId) {
-    state.clientsPage.expandedClientId = null;
-  }
-  save();
-  render();
+    ? `Delete "${client.name}" and its ${childSites.length} site${childSites.length === 1 ? '' : 's'}? This only removes them from your client list — sessions you've already created keep their site name.`
+    : `Delete "${client.name}"? This only removes it from your client list — sessions you've already created keep their site name.`;
+  openConfirmSheet({
+    title: 'Delete client?',
+    message: msg,
+    confirmLabel: 'Delete',
+    onConfirm: () => {
+      state.clients = state.clients.filter(c => c.id !== clientId);
+      state.sites = state.sites.filter(s => s.clientId !== clientId);
+      if (state.clientsPage.expandedClientId === clientId) {
+        state.clientsPage.expandedClientId = null;
+      }
+      save();
+      render();
+    }
+  });
 }
 
 function addSiteFromDialog() {
@@ -269,7 +275,7 @@ function addSiteFromDialog() {
   const trimmed = name.trim();
   if (!clientId || !trimmed) return;
   if (findSiteByName(clientId, trimmed)) {
-    alert('That client already has a site with that name.');
+    showToast('That client already has a site with that name');
     return;
   }
   ensureSite(clientId, trimmed);
@@ -286,7 +292,7 @@ function renameSiteFromDialog() {
   if (!site || !trimmed) return;
   const clash = findSiteByName(site.clientId, trimmed);
   if (clash && clash.id !== site.id) {
-    alert('That client already has a site with that name.');
+    showToast('That client already has a site with that name');
     return;
   }
   site.name = trimmed;
@@ -298,10 +304,16 @@ function renameSiteFromDialog() {
 function deleteSite(siteId) {
   const site = siteById(siteId);
   if (!site) return;
-  if (!confirm(`Delete site "${site.name}"?\n\nThis only removes it from your client list — sessions already created keep their site name.`)) return;
-  state.sites = state.sites.filter(s => s.id !== siteId);
-  save();
-  render();
+  openConfirmSheet({
+    title: 'Delete site?',
+    message: `Delete site "${site.name}"? This only removes it from your client list — sessions already created keep their site name.`,
+    confirmLabel: 'Delete',
+    onConfirm: () => {
+      state.sites = state.sites.filter(s => s.id !== siteId);
+      save();
+      render();
+    }
+  });
 }
 
 // v26 (Q3=B): open the "assign / move site to a client" sheet. Works for an

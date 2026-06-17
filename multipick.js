@@ -65,7 +65,7 @@ function multiPickFire(idx) {
   if (!cleanLocation) {
     state.multiPickSheetOpen = false;
     render();
-    alert('Please enter a location before using Multi Pick — it\'s applied to every item it adds.');
+    showToast('Enter a location first — Multi Pick applies it to every item');
     return;
   }
 

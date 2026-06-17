@@ -303,6 +303,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
    buttons beside them. Add a subtle press, consistent with .pass-btn/.fail-btn. */
 .btn-primary:active { background: var(--accent-hover); transform: translateY(1px); }
 .btn-secondary { flex: 1; padding: 14px 16px; font-size: 16px; font-weight: 600; background: var(--card-bg); color: var(--neutral-text); border: 1px solid var(--border-strong); border-radius: 10px; }
+/* v40: destructive confirm button for the in-app confirm sheet (Delete etc.). */
+.btn-danger { padding: 14px 16px; font-size: 16px; font-weight: 700; background: var(--fail); color: #fff; border: none; border-radius: 10px; }
+.btn-danger:active { background: var(--fail-shadow); transform: translateY(1px); }
 .btn-row { display: flex; gap: 8px; margin-top: 16px; }
 
 .muted { color: var(--text-muted); font-size: 14px; }

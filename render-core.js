@@ -98,24 +98,24 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v39: rolled forward — content covers the New Session polish.
-  // Key bumped to pat:v39welcome (gate uses v39WelcomeSeen). Still suppressed
+  // v40: rolled forward — content covers the in-app dialog replacements.
+  // Key bumped to pat:v40welcome (gate uses v40WelcomeSeen). Still suppressed
   // while the first-run wizard is showing and while the v9 migration prompt is up.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v39WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v40WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V39">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V40">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V39</h3>
+        <h3 class="bulk-sheet-title">What's new in V40</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>New session closes when you leave.</strong> Open the New Session form, switch to another screen, and it no longer stays open when you come back — you get a clean Sessions list as expected.</li>
-        <li><strong>Calmer client field.</strong> Opening New Session no longer pops the saved-clients list open straight away. It now appears only when you tap the Client field, so the form looks tidier to start with.</li>
+        <li><strong>Tidier pop-ups throughout.</strong> Naming a report template, and confirmations like "Delete this?", now use the app's own slide-up panels instead of the system pop-up boxes — more reliable on iPhone and a much cleaner look.</li>
+        <li><strong>Quick confirmation messages.</strong> Actions like restoring a backup now show a small message that slides up and fades away, instead of a pop-up you have to tap to dismiss.</li>
       </ul>
-      <button class="btn-primary" id="v39-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v40-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 

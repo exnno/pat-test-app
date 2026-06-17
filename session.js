@@ -430,7 +430,7 @@ function savePruneAge() {
   if (!el) return;
   const n = parseInt(el.value, 10);
   if (!Number.isFinite(n) || n < 1 || n > 120) {
-    alert('Enter a whole number of months between 1 and 120.');
+    showToast('Enter a whole number of months (1–120)');
     return;
   }
   state.pruneAgeMonths = n;
@@ -447,25 +447,26 @@ function savePruneAge() {
 function pruneOldSessions() {
   const targets = prunableSessions().filter(s => s.id !== state.activeId);
   if (targets.length === 0) {
-    alert('Nothing to clear.');
+    showToast('Nothing to clear');
     return;
   }
   const itemTotal = targets.reduce((n, s) => n + (s.items ? s.items.length : 0), 0);
-  const names = targets.slice(0, 8).map(s => `• ${s.site || s.name} (${formatDate(s.date)})`).join('\n');
-  const more = targets.length > 8 ? `\n…and ${targets.length - 8} more` : '';
-  const ok = confirm(
-    `Clear ${targets.length} exported session${targets.length === 1 ? '' : 's'} ` +
-    `(${itemTotal} item${itemTotal === 1 ? '' : 's'} in total)?\n\n` +
-    `${names}${more}\n\n` +
-    `These have all been exported to CSV and are older than ${state.pruneAgeMonths} month${state.pruneAgeMonths === 1 ? '' : 's'}. ` +
-    `This permanently removes them from this device and cannot be undone.\n\nContinue?`
-  );
-  if (!ok) return;
-  const ids = new Set(targets.map(s => s.id));
-  state.sessions = state.sessions.filter(s => !ids.has(s.id));
-  save();
-  render();
-  setTimeout(() => alert(`Cleared ${targets.length} session${targets.length === 1 ? '' : 's'}.`), 50);
+  openConfirmSheet({
+    title: 'Clear exported sessions?',
+    message:
+      `Clear ${targets.length} exported session${targets.length === 1 ? '' : 's'} ` +
+      `(${itemTotal} item${itemTotal === 1 ? '' : 's'} in total)? ` +
+      `These have all been exported to CSV and are older than ${state.pruneAgeMonths} month${state.pruneAgeMonths === 1 ? '' : 's'}. ` +
+      `This permanently removes them from this device and cannot be undone.`,
+    confirmLabel: 'Clear',
+    onConfirm: () => {
+      const ids = new Set(targets.map(s => s.id));
+      state.sessions = state.sessions.filter(s => !ids.has(s.id));
+      save();
+      render();
+      showToast(`Cleared ${targets.length} session${targets.length === 1 ? '' : 's'}`);
+    }
+  });
 }
 
 // ---------- Form helpers ----------
@@ -675,7 +676,7 @@ function saveItem(result) {
   const sess = activeSession();
   if (!sess) return;
   const err = validateBeforeSave();
-  if (err) { alert(err); return; }
+  if (err) { showToast(err); return; }
   const cleanLocation = normaliseLocation(state.form.location);
   const cleanType = normaliseItemType(state.form.itemType);
   const item = {
@@ -719,7 +720,7 @@ function passClicked() {
   const sess = activeSession();
   if (sess && sess.locked) return;
   const err = validateBeforeSave();
-  if (err) { alert(err); return; }
+  if (err) { showToast(err); return; }
   feedback('pass', 'pass-btn');   // v17: haptic + green flash + (opt-in) pass tone
   saveItem('pass');
 }
@@ -728,7 +729,7 @@ function failClicked() {
   const sess = activeSession();
   if (sess && sess.locked) return;
   const err = validateBeforeSave();
-  if (err) { alert(err); return; }
+  if (err) { showToast(err); return; }
   feedback('fail', 'fail-btn');   // v17: haptic + neutral flash + (opt-in) fail tone
   state.failModalStage = 'reasons';
   state.failOtherText = '';
@@ -767,7 +768,7 @@ function copyLastResult() {
   if (!sess || sess.items.length === 0) return;
   if (sess.locked) return;   // v8
   const err = validateBeforeSave({ skipItemType: true });
-  if (err) { alert(err); return; }
+  if (err) { showToast(err); return; }
   feedback('copy', 'copy-last-btn');   // v17: haptic + neutral flash + (opt-in) copy tone
   const last = sess.items[sess.items.length - 1];
   const item = {
@@ -935,7 +936,7 @@ function applyBulkLocation() {
   if (!sess) return;
   const newLoc = normaliseLocation(state.bulkLocationValue);
   if (!newLoc) {
-    alert('Please enter a location.');
+    showToast('Please enter a location');
     return;
   }
   let count = 0;
@@ -950,7 +951,7 @@ function applyBulkLocation() {
   save();
   render();
   // Brief confirmation — not blocking.
-  setTimeout(() => alert(`Updated location on ${count} item${count === 1 ? '' : 's'}.`), 50);
+  showToast(`Updated location on ${count} item${count === 1 ? '' : 's'}`);
 }
 
 // ---------- v11: extended bulk-edit ----------
@@ -1007,7 +1008,7 @@ function applyBulkType() {
   if (!sess) return;
   const newType = normaliseItemType(String(state.bulkEdit.typeValue || '').trim());
   if (!newType) {
-    alert('Please enter or pick an item type.');
+    showToast('Please enter or pick an item type');
     return;
   }
   let count = 0;
@@ -1023,7 +1024,7 @@ function applyBulkType() {
   exitSelectionMode();
   save();
   render();
-  setTimeout(() => alert(`Updated type on ${count} item${count === 1 ? '' : 's'}.`), 50);
+  showToast(`Updated type on ${count} item${count === 1 ? '' : 's'}`);
 }
 
 function applyBulkNotes() {
@@ -1034,7 +1035,7 @@ function applyBulkNotes() {
   // Allow an empty value ONLY in replace mode (i.e. "clear notes on these
   // items"). In append mode an empty string is a no-op and we should bounce.
   if (!text && mode === 'append') {
-    alert('Please enter some text to append.');
+    showToast('Please enter some text to append');
     return;
   }
   let count = 0;
@@ -1054,7 +1055,7 @@ function applyBulkNotes() {
   save();
   render();
   const verb = mode === 'replace' ? 'Replaced' : 'Appended to';
-  setTimeout(() => alert(`${verb} notes on ${count} item${count === 1 ? '' : 's'}.`), 50);
+  showToast(`${verb} notes on ${count} item${count === 1 ? '' : 's'}`);
 }
 
 function applyBulkDelete() {
@@ -1062,20 +1063,26 @@ function applyBulkDelete() {
   if (!sess) return;
   const n = state.selectedIndices.length;
   if (n === 0) return;
-  if (!confirm(`Delete ${n} item${n === 1 ? '' : 's'}? This can't be undone.`)) return;
-  // Sort descending so splicing doesn't shift the remaining indices.
-  const indices = state.selectedIndices.slice().sort((a, b) => b - a);
-  indices.forEach(i => {
-    if (sess.items[i]) sess.items.splice(i, 1);
+  openConfirmSheet({
+    title: 'Delete items?',
+    message: `Delete ${n} item${n === 1 ? '' : 's'}? This can't be undone.`,
+    confirmLabel: 'Delete',
+    onConfirm: () => {
+      // Sort descending so splicing doesn't shift the remaining indices.
+      const indices = state.selectedIndices.slice().sort((a, b) => b - a);
+      indices.forEach(i => {
+        if (sess.items[i]) sess.items.splice(i, 1);
+      });
+      markSessionDirty(sess);   // v14
+      // If the cursor was past the new end, pull it back.
+      if (state.cursor > sess.items.length) state.cursor = sess.items.length;
+      exitSelectionMode();
+      save();
+      loadFormForCursor();
+      render();
+      showToast(`Deleted ${n} item${n === 1 ? '' : 's'}`);
+    }
   });
-  markSessionDirty(sess);   // v14
-  // If the cursor was past the new end, pull it back.
-  if (state.cursor > sess.items.length) state.cursor = sess.items.length;
-  exitSelectionMode();
-  save();
-  loadFormForCursor();
-  render();
-  setTimeout(() => alert(`Deleted ${n} item${n === 1 ? '' : 's'}.`), 50);
 }
 
 // Edit-session flow
@@ -1099,7 +1106,7 @@ function saveSessionEdits() {
   if (!sess) return;
   const { name, site, engineer, prefix, date, locked } = state.editForm;
   if (!String(site).trim()) {
-    alert('Site is required.');
+    showToast('Site is required');
     return;
   }
   sess.name = String(name).trim() || sess.name;
@@ -1193,7 +1200,7 @@ function saveReportSettingsForm() {
   const rs = state.reportSettings;
   if (rs.retestEnabled && rs.retestMonths == null) {
     rs.retestEnabled = false;
-    alert('Recommended retest needs a period in months (1–120). It has been left off — set a value and save again to enable it.');
+    showToast('Retest needs a period in months (1–120) — left off for now');
   }
   saveReportSettings();
   // v35: if we came from the report preview's "Edit settings" deep-link, Save
@@ -1374,7 +1381,7 @@ function saveCsvColumnsSettings() {
     next.push({ id, header, visible });
   });
   if (!next.some(c => c.visible)) {
-    alert('At least one column must be visible. Tick at least one before saving.');
+    showToast('Tick at least one column before saving');
     return;
   }
   state.csvColumns = next;
@@ -1384,10 +1391,17 @@ function saveCsvColumnsSettings() {
 }
 
 function resetCsvColumnsSettings() {
-  if (!confirm('Reset CSV columns to defaults?\n\nThis restores the original 8-column order, default header names, and shows all columns. Cannot be undone.')) return;
-  state.csvColumns = DEFAULT_CSV_COLUMNS.map(c => ({ ...c }));
-  save();
-  render();
+  openConfirmSheet({
+    title: 'Reset CSV columns?',
+    message: 'This restores the original 8-column order, default header names, and shows all columns. Cannot be undone.',
+    confirmLabel: 'Reset',
+    onConfirm: () => {
+      state.csvColumns = DEFAULT_CSV_COLUMNS.map(c => ({ ...c }));
+      save();
+      render();
+      showToast('CSV columns reset');
+    }
+  });
 }
 
 // v11: move a CSV column up or down in the list and re-render the settings
@@ -1496,6 +1510,12 @@ function dismissV39Welcome() {
   render();
 }
 
+function dismissV40Welcome() {
+  state.v40WelcomeSeen = true;
+  localStorage.setItem(V40_WELCOME_KEY, '1');
+  render();
+}
+
 // ---------- v36: job notes, certificate override, report templates ----------
 
 // Save the per-session job note (from the Overview text area). Persists and
@@ -1514,16 +1534,21 @@ function setSessionCertNo(sessionId, value) {
   const s = state.sessions.find(x => x.id === sessionId);
   if (!s) return;
   const v = String(value || '').trim();
+  const commit = () => { s.certNo = v; save(); render(); };
   if (v) {
     const dupe = state.sessions.some(x => x.id !== sessionId && x.certNo === v);
-    if (dupe && !confirm(`Certificate number "${v}" is already used by another session. Use it anyway?`)) {
-      render();
+    if (dupe) {
+      openConfirmSheet({
+        title: 'Duplicate certificate number',
+        message: `Certificate number "${v}" is already used by another session. Use it anyway?`,
+        confirmLabel: 'Use it',
+        danger: false,
+        onConfirm: commit
+      });
       return;
     }
   }
-  s.certNo = v;
-  save();
-  render();
+  commit();
 }
 
 // Apply a saved template (C1=B: a full reportSettings snapshot). Overwrites the
@@ -1532,10 +1557,18 @@ function setSessionCertNo(sessionId, value) {
 function applyReportTemplate(templateId) {
   const tpl = (state.reportTemplates || []).find(t => t.id === templateId);
   if (!tpl) return;
-  if (!confirm(`Apply the "${tpl.name}" template? This replaces your current report settings (including logo, signature and colours).`)) return;
-  state.reportSettings = normaliseReportSettings(tpl.settings);
-  saveReportSettings();
-  render();
+  openConfirmSheet({
+    title: 'Apply template?',
+    message: `Apply the "${tpl.name}" template? This replaces your current report settings (including logo, signature and colours).`,
+    confirmLabel: 'Apply',
+    danger: false,
+    onConfirm: () => {
+      state.reportSettings = normaliseReportSettings(tpl.settings);
+      saveReportSettings();
+      render();
+      showToast(`Applied "${tpl.name}"`);
+    }
+  });
 }
 
 // Save the CURRENT live reportSettings as a new named template, or overwrite an
@@ -1557,6 +1590,7 @@ function saveCurrentAsTemplate(name) {
   }
   saveReportTemplates();
   render();
+  showToast(existing ? `Updated "${nm}"` : `Saved "${nm}"`);
 }
 
 function renameReportTemplate(templateId, name) {
@@ -1566,15 +1600,18 @@ function renameReportTemplate(templateId, name) {
   tpl.name = nm;
   saveReportTemplates();
   render();
+  showToast('Template renamed');
 }
 
+// v40: delete the template (no native confirm here — the confirm sheet in
+// dispatch.js gates this; this is the data operation only).
 function deleteReportTemplate(templateId) {
   const tpl = (state.reportTemplates || []).find(t => t.id === templateId);
   if (!tpl) return;
-  if (!confirm(`Delete the "${tpl.name}" template? This can't be undone.`)) return;
   state.reportTemplates = state.reportTemplates.filter(t => t.id !== templateId);
   saveReportTemplates();
   render();
+  showToast('Template deleted');
 }
 
 // ---------- v33: First-run wizard ----------
@@ -1788,25 +1825,46 @@ function saveDescriptionsSettings() {
 function resetItemsToDefaults() {
   const p = activePreset();
   if (!p) return;
-  if (!confirm(`Reset preset "${p.name}" to default items?\n\nThis replaces the current list with the 9 built-in defaults. Other presets are not affected.`)) return;
-  p.items = DEFAULT_ITEM_TYPES.slice();
-  syncItemTypesFromActivePreset();
-  save();
-  render();
+  openConfirmSheet({
+    title: 'Reset preset?',
+    message: `Reset preset "${p.name}" to default items? This replaces the current list with the 9 built-in defaults. Other presets are not affected.`,
+    confirmLabel: 'Reset',
+    onConfirm: () => {
+      p.items = DEFAULT_ITEM_TYPES.slice();
+      syncItemTypesFromActivePreset();
+      save();
+      render();
+      showToast('Preset reset to defaults');
+    }
+  });
 }
 
 function resetFailReasonsToDefaults() {
-  if (!confirm('Reset Quick Pick Fail to default reasons?\n\nThis replaces the current list with the built-in defaults.')) return;
-  state.failReasons = DEFAULT_FAIL_REASONS.slice();
-  save();
-  render();
+  openConfirmSheet({
+    title: 'Reset fail reasons?',
+    message: 'Reset Quick Pick Fail to the built-in default reasons? This replaces the current list.',
+    confirmLabel: 'Reset',
+    onConfirm: () => {
+      state.failReasons = DEFAULT_FAIL_REASONS.slice();
+      save();
+      render();
+      showToast('Fail reasons reset');
+    }
+  });
 }
 
 function resetDescriptionsToDefaults() {
-  if (!confirm('Reset Item Description List to defaults?\n\nThis replaces the current list with the built-in defaults. Items already saved in past sessions are unaffected.')) return;
-  state.descriptions = DEFAULT_DESCRIPTIONS.slice();
-  save();
-  render();
+  openConfirmSheet({
+    title: 'Reset descriptions?',
+    message: 'Reset the Item Description List to the built-in defaults? This replaces the current list. Items already saved in past sessions are unaffected.',
+    confirmLabel: 'Reset',
+    onConfirm: () => {
+      state.descriptions = DEFAULT_DESCRIPTIONS.slice();
+      save();
+      render();
+      showToast('Descriptions reset');
+    }
+  });
 }
 
 function setTheme(theme) {

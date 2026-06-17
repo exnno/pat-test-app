@@ -254,7 +254,7 @@ function clearSqpHistory() {
   invalidateSqpRow();   // v20: drop the frozen row built from the old history
   save();
   render();
-  setTimeout(() => alert('Smart Quick Pick history cleared.'), 50);
+  showToast('Smart Quick Pick history cleared');
 }
 
 // v18: rebuild the learned history from all current session data, replacing
@@ -266,7 +266,7 @@ function rebuildSqpHistory() {
   save();
   render();
   const locs = Object.keys(state.sqpHistory).length;
-  setTimeout(() => alert(`Smart Quick Pick history rebuilt from your data (${locs} location${locs === 1 ? '' : 's'}).`), 50);
+  showToast(`Smart Quick Pick history rebuilt (${locs} location${locs === 1 ? '' : 's'})`);
 }
 
 // v18: toggle handler. Turning it ON for the first time on a fresh/empty history

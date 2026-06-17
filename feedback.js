@@ -28,6 +28,115 @@ function showToast(message) {
   }, 1900);
 }
 
+// v40: in-app bottom-sheet dialogs replacing native prompt()/confirm() — those
+// are unreliable in iOS PWAs (can fail to show, appear behind the app, or be
+// suppressed), and on a destructive confirm a silent failure is a data-loss
+// risk. These reuse the proven .bulk-sheet pattern ("Name this setup" was the
+// template): a backdrop + bottom sheet, focus on open, backdrop/× to dismiss.
+// Self-contained, no state, no re-render — purely transient overlay UI.
+
+// Shared low-level builder. Returns { sheet, backdrop, cleanup }.
+function _openSheet(ariaLabel) {
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
+  backdrop.style.zIndex = '300';
+  const sheet = document.createElement('div');
+  sheet.className = 'bulk-sheet';
+  sheet.style.zIndex = '301';
+  sheet.setAttribute('role', 'dialog');
+  sheet.setAttribute('aria-modal', 'true');
+  sheet.setAttribute('aria-label', ariaLabel || 'Dialog');
+  let done = false;
+  function cleanup() {
+    if (done) return;
+    done = true;
+    backdrop.remove();
+    sheet.remove();
+  }
+  backdrop.addEventListener('click', cleanup);
+  return { sheet, backdrop, cleanup };
+}
+
+// A destructive/confirm dialog. opts: { title, message, confirmLabel='Delete',
+// cancelLabel='Cancel', danger=true, onConfirm }. onConfirm runs only on the
+// confirm tap; dismissing (× / backdrop / Cancel) just closes and does nothing.
+function openConfirmSheet(opts) {
+  opts = opts || {};
+  const title = opts.title || 'Are you sure?';
+  const message = opts.message || '';
+  const confirmLabel = opts.confirmLabel || 'Delete';
+  const cancelLabel = opts.cancelLabel || 'Cancel';
+  const danger = opts.danger !== false;
+  const { sheet, backdrop, cleanup } = _openSheet(title);
+  sheet.innerHTML = `
+    <div class="bulk-sheet-handle"></div>
+    <div class="bulk-sheet-header">
+      <span class="fail-close-spacer"></span>
+      <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+      <button class="fail-close-btn" id="confirm-sheet-cancel" aria-label="Cancel">&times;</button>
+    </div>
+    ${message ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
+    <div style="display:flex;gap:10px;margin-top:4px">
+      <button class="btn-secondary" id="confirm-sheet-no">${escapeHTML(cancelLabel)}</button>
+      <button class="${danger ? 'btn-danger' : 'btn-primary'}" id="confirm-sheet-yes" style="flex:1">${escapeHTML(confirmLabel)}</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+  const xBtn = document.getElementById('confirm-sheet-cancel');
+  const noBtn = document.getElementById('confirm-sheet-no');
+  const yesBtn = document.getElementById('confirm-sheet-yes');
+  if (xBtn) xBtn.addEventListener('click', cleanup);
+  if (noBtn) noBtn.addEventListener('click', cleanup);
+  if (yesBtn) yesBtn.addEventListener('click', () => {
+    cleanup();
+    if (typeof opts.onConfirm === 'function') opts.onConfirm();
+  });
+}
+
+// A single-line name/text input dialog. opts: { title, blurb, value='',
+// placeholder='', confirmLabel='Save', maxlength=60, onConfirm(value) }.
+// onConfirm receives the trimmed value and is only called on the confirm tap
+// (or Enter) with a non-empty value; an empty value shakes/keeps the sheet open.
+function openNameSheet(opts) {
+  opts = opts || {};
+  const title = opts.title || 'Name';
+  const blurb = opts.blurb || '';
+  const value = opts.value || '';
+  const placeholder = opts.placeholder || '';
+  const confirmLabel = opts.confirmLabel || 'Save';
+  const maxlength = opts.maxlength || 60;
+  const { sheet, backdrop, cleanup } = _openSheet(title);
+  sheet.innerHTML = `
+    <div class="bulk-sheet-handle"></div>
+    <div class="bulk-sheet-header">
+      <span class="fail-close-spacer"></span>
+      <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+      <button class="fail-close-btn" id="name-sheet-cancel" aria-label="Cancel">&times;</button>
+    </div>
+    ${blurb ? `<p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text-muted)">${escapeHTML(blurb)}</p>` : ''}
+    <input class="input" id="name-sheet-input" value="${escapeHTML(value)}" placeholder="${escapeHTML(placeholder)}" autocapitalize="on" autocomplete="off" maxlength="${maxlength}">
+    <button class="btn-primary" id="name-sheet-save" style="margin-top:12px">${escapeHTML(confirmLabel)}</button>
+  `;
+  document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+  const cancelBtn = document.getElementById('name-sheet-cancel');
+  const saveBtn = document.getElementById('name-sheet-save');
+  const inp = document.getElementById('name-sheet-input');
+  if (cancelBtn) cancelBtn.addEventListener('click', cleanup);
+  function commit() {
+    const v = inp ? inp.value.trim() : '';
+    if (!v) { if (inp) { try { inp.focus(); } catch (e) {} } return; }
+    cleanup();
+    if (typeof opts.onConfirm === 'function') opts.onConfirm(v);
+  }
+  if (saveBtn) saveBtn.addEventListener('click', commit);
+  if (inp) {
+    inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
+    try { inp.focus(); inp.select(); } catch (e) {}
+  }
+}
+
 // v9: confirm the migration prompt — sets the chosen name on the interim preset
 // created during load(). If name is blank we keep the placeholder 'My items'.
 function confirmMigrationPrompt() {

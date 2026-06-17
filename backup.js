@@ -136,16 +136,17 @@ function restoreBackupFromFile(file) {
       return;
     }
     const itemCount = data.sessions.reduce((n, s) => n + (Array.isArray(s.items) ? s.items.length : 0), 0);
-    const ok = confirm(
-      `Restore from backup?\n\n` +
-      `This file contains:\n` +
-      `• ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'}\n` +
-      `• ${itemCount} item${itemCount === 1 ? '' : 's'} in total\n` +
-      `• Exported ${data.exportedAt ? new Date(data.exportedAt).toLocaleString() : 'unknown date'}\n\n` +
-      `This will REPLACE all current data on this device. This cannot be undone.\n\n` +
-      `Continue?`
-    );
-    if (!ok) return;
+    // v40: in-app confirm sheet (was native confirm). The apply block runs only
+    // when the user confirms; dismissing leaves all current data untouched.
+    openConfirmSheet({
+      title: 'Restore from backup?',
+      message:
+        `This file contains ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'} ` +
+        `and ${itemCount} item${itemCount === 1 ? '' : 's'} in total` +
+        (data.exportedAt ? `, exported ${new Date(data.exportedAt).toLocaleString()}` : '') +
+        `. This will REPLACE all current data on this device and cannot be undone.`,
+      confirmLabel: 'Replace & restore',
+      onConfirm: () => {
     // Apply
     state.sessions = data.sessions;
     // v9: preset restoration. Three cases:
@@ -286,8 +287,10 @@ function restoreBackupFromFile(file) {
     // v11: stamp the restore as a fresh backup checkpoint so we don't nag the
     // user the moment they restore from a known-good file.
     markBackupExported();
-    alert(`Restored ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'} (${itemCount} item${itemCount === 1 ? '' : 's'}).`);
     render();
+    showToast(`Restored ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'} (${itemCount} item${itemCount === 1 ? '' : 's'})`);
+      }
+    });
   };
   reader.onerror = () => alert('Could not read that file.');
   reader.readAsText(file);

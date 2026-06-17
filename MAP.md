@@ -1,4 +1,4 @@
-# PAT App — Code Map (V39)
+# PAT App — Code Map (V40)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -37,7 +37,7 @@ the existing same-origin SW fetch handler into Cache Storage (separate from the
 ---
 
 ## config.js (~445 ln) — constants & defaults, pure data
-`APP_VERSION` (V39); all `*_KEY` localStorage key names (incl. welcome keys,
+`APP_VERSION` (V40); all `*_KEY` localStorage key names (incl. welcome keys,
 latest `V34_WELCOME_KEY`, and the v33 first-run `ONBOARD_KEY`);
 `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`; v27 SQP tuning;
@@ -72,6 +72,8 @@ template preset notes".
 No other config change (PDF.js paths are hard-coded in `pdfpreview.js`).
 **v39:** `V39_WELCOME_KEY` (`pat:v39welcome`) — New Session polish welcome. No
 other config change.
+**v40:** `V40_WELCOME_KEY` (`pat:v40welcome`) — in-app-dialogs welcome. No other
+config change.
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
@@ -101,6 +103,8 @@ change — the preview's per-open transients (render token, blob/url) are locals
 inside `openReportPreview`, not on global `state`.
 **v39:** `v39WelcomeSeen` (New Session polish welcome gate). No other state
 change.
+**v40:** `v40WelcomeSeen` (in-app-dialogs welcome gate). No other state change —
+the dialog helpers are stateless transient overlays (locals in feedback.js).
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -147,6 +151,8 @@ stored); `load` reads `V36_WELCOME_KEY` + `state.reportTemplates`. Per-session
 the codec passes unknown fields through unchanged.
 **v38:** `load` reads `V38_WELCOME_KEY` → `state.v38WelcomeSeen`. No codec or
 backup change (PDF.js is cache-stored, never in localStorage or backups).
+**v39/v40:** `load` reads `V39_WELCOME_KEY`/`V40_WELCOME_KEY` → the matching
+welcome gates. No codec or backup change (`backupVersion` stays 5).
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -163,6 +169,9 @@ sites). Settings→Clients page actions: `addClientFromDialog`,
 `openSiteAssignDialog`, `cancelSiteAssignDialog`, `commitSiteAssign`,
 `resolveAssignMerge`, `resolveAssignKeepBoth`, `finishSiteAssign`,
 `nextFreeSiteName`.
+**v40:** `deleteClient`/`deleteSite` now open `openConfirmSheet` (was native
+`confirm`); the duplicate-name guards in `addClientFromDialog`/`renameClientFromDialog`/
+`addSiteFromDialog`/`renameSiteFromDialog` now `showToast` (was native `alert`).
 *Touch to:* change how clients/sites are stored or managed.
 
 ## sqp.js (~245 ln) — Smart Quick Pick (v18, ordering-quality pass v27)
@@ -173,6 +182,8 @@ of greedy substring + exact-match full / partial half weighting),
 `smartOrderedItemTypes` (v27: swap-in floor `SQP_SWAP_IN_MIN` + staple protection
 `SQP_STAPLE_DEFENCE`), `sqpRowForLocation`, `invalidateSqpRow`, `clearSqpHistory`,
 `rebuildSqpHistory`, `setSqp`.
+**v40:** `clearSqpHistory`/`rebuildSqpHistory` end with `showToast` (was native
+`alert`); the confirm before each is now `openConfirmSheet` in dispatch.js.
 *Touch to:* change how the quick-pick row adapts to location. v27 tuning
 constants (`SQP_PARTIAL_WEIGHT`, `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`) live in
 config.js.
@@ -180,13 +191,24 @@ config.js.
 ## multipick.js (~125 ln) — Multi Pick (v16)
 `normaliseMultiPickConfig`, `loadMultiPickConfig`, `activeMultiPickSlots`,
 `multiPickFire`, `saveMultiPickSettings`.
+**v40:** the "enter a location first" guard in `multiPickFire` now `showToast`
+(was native `alert`).
 *Touch to:* change the multi-pick bottom sheet behaviour or its settings save.
 
-## feedback.js (~260 ln) — toast + haptic / flash / sound (v17)
+## feedback.js (~370 ln) — toast + dialogs + haptic / flash / sound (v17, v40)
 `showToast`, `confirmMigrationPrompt`; `_hapticOnce`, `haptic`, `flashEl`
 (+ `FLASH_MS`, `FLASH_TINT`), `_getAudioCtx`, `_beep`, `playSound`,
 `feedback` (+ `FEEDBACK_HAPTIC_COUNT`).
-*Touch to:* change pass/fail/copy feedback channels or toasts.
+**v40:** in-app bottom-sheet dialogs that replace native `prompt()`/`confirm()`
+(unreliable in iOS PWAs). `_openSheet(ariaLabel)` (shared backdrop+sheet builder
+→ `{sheet, backdrop, cleanup}`); `openConfirmSheet({title, message, confirmLabel,
+cancelLabel, danger=true, onConfirm})` (Cancel/confirm; `onConfirm` runs only on
+confirm tap; danger→`.btn-danger`, else `.btn-primary`); `openNameSheet({title,
+blurb, value, placeholder, confirmLabel, maxlength, onConfirm})` (single text
+input, focus+select on open, Enter commits, empty value ignored, passes trimmed
+value). All three reuse the proven `.bulk-sheet` pattern, no state, no re-render.
+*Touch to:* change pass/fail/copy feedback channels, toasts, or the shared
+confirm/name dialogs.
 
 ## csv.js (~600 ln) — CSV build + import (v10/v11, split v26)
 Build/share: `csvCellValue` (v26: `client` column + adaptive `site` column — full
@@ -214,6 +236,12 @@ rebuilds them (validated per-template) when present, else keeps the seeded
 starters. Per-session `notes`/`certNo` ride inside `sessions` automatically (no
 per-field work). `backupVersion` stays **5** — all v36 additions are additive and
 missing-field-tolerant (same precedent as reportSettings in v30).
+**v40:** the restore-confirm is now `openConfirmSheet` and the success message a
+`showToast` (both were native `confirm`/`alert`); the apply block moved inside the
+sheet's `onConfirm` so dismissing leaves all current data untouched. The three
+*import-error* alerts (bad JSON / unrecognised / read error) stay native this
+release — deferred to V41's import-error info-sheet pass (a toast can't be used
+for an error that must stay until read).
 *Touch to:* change the JSON backup shape or restore path. **Bump `backupVersion`
 if the shape changes; keep old-backup compatibility.**
 
@@ -304,6 +332,17 @@ re-renders).
 discipline it already applies to the fail sheet, multi-pick sheet, bulk-edit
 menus and client dialogs; fixes the form lingering open after navigating away
 and back to Sessions.
+**v40:** `dismissV40Welcome` (sets `v40WelcomeSeen` + persists `V40_WELCOME_KEY`).
+Native `prompt()`/`confirm()`/`alert()` removed from the routine flows in favour
+of `openConfirmSheet`/`openNameSheet`/`showToast` (feedback.js). Restructured to
+async sheets (work moved into `onConfirm`): `pruneOldSessions`, `applyBulkDelete`,
+`resetCsvColumnsSettings`, `setSessionCertNo` (dupe-warn), `applyReportTemplate`,
+`resetItemsToDefaults`, `resetFailReasonsToDefaults`, `resetDescriptionsToDefaults`.
+Success/validation messages (`applyBulkLocation`/`applyBulkType`/`applyBulkNotes`
+results, `savePruneAge`, `validateBeforeSave` errors via `saveItem`/edit paths,
+site-required, retest-period, column-visibility) now `showToast`. Template
+save/rename confirmations live in dispatch.js (which opens the name sheet); these
+functions just do the data write + a success toast.
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves, the first-run wizard, the signature,
 cert numbers / job notes / report templates.
@@ -422,6 +461,10 @@ pdfpreview.js, built directly into the DOM, not through render().
 by `v39WelcomeSeen`. Also: the New Session Client `<input>` (`nf-client`) lost its
 `autofocus` attribute — it no longer steals focus on render, so the saved-clients
 suggestion dropdown only opens when the user actually taps the field.
+**v40:** welcome modal rolled to **V40** "What's new" (in-app dialogs replacing
+native pop-ups), gated by `v40WelcomeSeen` (still suppressed while the wizard/
+migration prompt shows). No other render-core change — the new confirm/name sheets
+are built imperatively in feedback.js, not through render().
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
 Edit-session UI, the empty states, the welcome modal, the first-run wizard, or the
 signature draw pad.
@@ -537,6 +580,19 @@ pragmatic choice for low-frequency admin naming; a bottom-sheet input is the
 preview's canvas controls are wired directly in `openReportPreview` (report.js),
 not delegated.
 **v39:** `welcome-dismiss` now calls `dismissV39Welcome`. No new actions.
+**v40:** `welcome-dismiss` now calls `dismissV40Welcome`. Template handlers
+rewired to the in-app sheets (feedback.js): `report-template-rename`/`-save-new`
+open `openNameSheet` (save-new warns via `openConfirmSheet` on a duplicate name;
+rename warns on a name already used by another template), `report-template-delete`
+opens `openConfirmSheet`. Destructive clicks now open `openConfirmSheet` instead
+of native `confirm`: `delete-session`, `delete-current-item`, `delete-item`,
+`sqp-rebuild`, `sqp-clear`, `preset-delete`, `about-reload`, `clients-rebuild`
+(its result message → `showToast`); `preset-delete`'s "keep at least one preset"
+and `preset-dialog-confirm`'s "name cannot be empty" guards → `showToast`. NOT
+converted (deferred to V41's import-error pass): the preset-switch-on-change
+`confirm` in `handleDelegatedChange` — it must revert the `<select>` synchronously
+on cancel, which the async sheet can't do without a visible dropdown flip; left
+native and flagged.
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

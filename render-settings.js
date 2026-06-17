@@ -1120,18 +1120,18 @@ function renderSettingsAbout() {
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v39: rolled forward — V39 on top, V36 dropped. -->
+      <!-- v8: rolling 3-version changelog. v40: rolled forward — V40 on top, V37 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V40</strong> · June 2026</p>
+        <p class="muted">The pop-up boxes for naming a report template and confirming things like "Delete this?" now use the app's own slide-up panels instead of the phone's system pop-ups — more reliable on iPhone and a cleaner, more consistent look. Quick confirmations such as restoring a backup now appear as a small message that fades away on its own. None of your existing data is affected.</p>
 
         <p><strong>V39</strong> · June 2026</p>
         <p class="muted">Two small tidy-ups to the New Session screen. The New Session form now closes when you move to another screen, so you get a clean Sessions list when you come back instead of the form still being open. And the saved-clients list no longer pops open the moment you start a new session — it appears only when you tap the Client field. None of your existing data is affected.</p>
 
         <p><strong>V38</strong> · June 2026</p>
         <p class="muted">The report preview now shows the whole report, not just the first page — scroll through every page before you share or save it. The first time you open a preview, the app downloads a small viewer (about 1.5 MB) once while you're online; after that, previews work offline as before. The viewer is kept with the app's own files, well away from your sessions data, so nothing in your saved data has changed. If you happen to be offline the very first time, the preview simply shows page one until you're next online, then upgrades automatically.</p>
-
-        <p><strong>V37</strong> · June 2026</p>
-        <p class="muted">Small tidy-ups based on your feedback. The back button on the entry screen now uses the same arrow as everywhere else, and the session overview has been simplified — Share and Report stay at the top, while "Select items" and "Session settings" are now clearly labelled buttons just below, instead of a row of similar-looking icons. None of your existing data is affected.</p>
       </div>
 
       <div class="info-card">

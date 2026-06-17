@@ -171,7 +171,13 @@ registerActions({
   'delete-session': (arg, el, e) => {
     e.stopPropagation();
     const s = state.sessions.find(x => x.id === arg);
-    if (s && confirm(`Delete "${s.site || s.name}"? This cannot be undone.`)) deleteSession(arg);
+    if (!s) return;
+    openConfirmSheet({
+      title: 'Delete session?',
+      message: `Delete "${s.site || s.name}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      onConfirm: () => deleteSession(arg)
+    });
   },
   'clear-session-filters': () => {
     state.sessionFilter = 'all';
@@ -232,7 +238,12 @@ registerActions({
   'cursor-prev': () => moveCursor(-1),
   'cursor-next': () => moveCursor(1),
   'skip-new': () => skipToNew(),
-  'delete-current-item': () => { if (confirm('Are you sure you want to delete this item?\n\nThis cannot be undone.')) deleteItem(state.cursor); },
+  'delete-current-item': () => openConfirmSheet({
+    title: 'Delete item?',
+    message: 'Are you sure you want to delete this item? This cannot be undone.',
+    confirmLabel: 'Delete',
+    onConfirm: () => deleteItem(state.cursor)
+  }),
 
   // Lock banner shortcut
   'unlock-session': () => unlockActiveSession(),
@@ -304,7 +315,12 @@ registerActions({
 
   // Overview body rows
   'jump-to-item': (arg) => jumpTo(parseInt(arg, 10)),
-  'delete-item': (arg) => { if (confirm('Are you sure you want to delete this item?\n\nThis cannot be undone.')) deleteItem(parseInt(arg, 10)); },
+  'delete-item': (arg) => openConfirmSheet({
+    title: 'Delete item?',
+    message: 'Are you sure you want to delete this item? This cannot be undone.',
+    confirmLabel: 'Delete',
+    onConfirm: () => deleteItem(parseInt(arg, 10))
+  }),
   'row-toggle': (arg, el, e) => {
     if (e.target && e.target.tagName === 'INPUT') return;   // checkbox handles itself
     toggleSelected(parseInt(arg, 10));
@@ -384,21 +400,68 @@ registerActions({
   },
   'produce-report': (arg) => produceReport(arg),
 
-  // v36: report templates (apply/rename/delete/save-new) + bulk handled in
-  // session.js. Rename/save-new use a simple prompt for the name (Report
-  // Settings is a deep settings screen; a prompt is acceptable here and keeps
-  // the change minimal — these are low-frequency admin actions).
+  // v36: report templates (apply/rename/delete/save-new). v40: rename and
+  // save-new use the in-app name sheet (openNameSheet); delete uses the confirm
+  // sheet — native prompt()/confirm() are unreliable in iOS PWAs.
   'report-template-apply': (arg) => applyReportTemplate(arg),
   'report-template-rename': (arg) => {
     const tpl = (state.reportTemplates || []).find(t => t.id === arg);
     if (!tpl) return;
-    const name = prompt('Rename template:', tpl.name);
-    if (name !== null) renameReportTemplate(arg, name);
+    openNameSheet({
+      title: 'Rename template',
+      blurb: 'Give this report template a name.',
+      value: tpl.name,
+      confirmLabel: 'Rename',
+      onConfirm: (name) => {
+        const clash = (state.reportTemplates || []).find(
+          t => t.id !== arg && t.name.toLowerCase() === name.toLowerCase()
+        );
+        if (clash) {
+          openConfirmSheet({
+            title: 'Name already used',
+            message: `Another template is already called "${clash.name}". Use this name anyway? Both will share the name.`,
+            confirmLabel: 'Use it',
+            danger: false,
+            onConfirm: () => renameReportTemplate(arg, name)
+          });
+          return;
+        }
+        renameReportTemplate(arg, name);
+      }
+    });
   },
-  'report-template-delete': (arg) => deleteReportTemplate(arg),
+  'report-template-delete': (arg) => {
+    const tpl = (state.reportTemplates || []).find(t => t.id === arg);
+    if (!tpl) return;
+    openConfirmSheet({
+      title: 'Delete template?',
+      message: `Delete the "${tpl.name}" template? This can't be undone.`,
+      confirmLabel: 'Delete',
+      onConfirm: () => deleteReportTemplate(arg)
+    });
+  },
   'report-template-save-new': () => {
-    const name = prompt('Name this template (saves your current report settings):', '');
-    if (name !== null) saveCurrentAsTemplate(name);
+    openNameSheet({
+      title: 'Save as template',
+      blurb: 'Save your current report settings as a named template you can re-apply later.',
+      placeholder: 'e.g. Standard certificate',
+      confirmLabel: 'Save',
+      onConfirm: (name) => {
+        const clash = (state.reportTemplates || []).find(
+          t => t.name.toLowerCase() === name.toLowerCase()
+        );
+        if (clash) {
+          openConfirmSheet({
+            title: 'Overwrite template?',
+            message: `A template called "${clash.name}" already exists. Overwrite it with your current report settings?`,
+            confirmLabel: 'Overwrite',
+            onConfirm: () => saveCurrentAsTemplate(name)
+          });
+          return;
+        }
+        saveCurrentAsTemplate(name);
+      }
+    });
   },
 
   // v35: report colour theme (preset). Sets both header + accent, persists, and
@@ -444,14 +507,19 @@ registerActions({
   'settings-csv-reset': () => resetCsvColumnsSettings(),
 
   // Smart Quick Pick buttons (confirm before acting)
-  'sqp-rebuild': () => {
-    if (!confirm('Rebuild Smart Quick Pick history from all your current sessions?\n\nThis replaces the learned history with a fresh scan of your data.')) return;
-    rebuildSqpHistory();
-  },
-  'sqp-clear': () => {
-    if (!confirm('Clear all Smart Quick Pick history?\n\nThe buttons will go back to their normal order until it learns again. Re-enabling the feature rebuilds the history from your data.')) return;
-    clearSqpHistory();
-  },
+  'sqp-rebuild': () => openConfirmSheet({
+    title: 'Rebuild history?',
+    message: 'Rebuild Smart Quick Pick history from all your current sessions? This replaces the learned history with a fresh scan of your data.',
+    confirmLabel: 'Rebuild',
+    danger: false,
+    onConfirm: () => rebuildSqpHistory()
+  }),
+  'sqp-clear': () => openConfirmSheet({
+    title: 'Clear history?',
+    message: 'Clear all Smart Quick Pick history? The buttons go back to their normal order until it learns again. Re-enabling the feature rebuilds the history from your data.',
+    confirmLabel: 'Clear',
+    onConfirm: () => clearSqpHistory()
+  }),
 
   // Preset management
   'preset-new': () => { state.presetDialog = { mode: 'new', name: '', editingId: null }; render(); },
@@ -459,15 +527,18 @@ registerActions({
   'preset-delete': () => {
     const p = activePreset();
     if (!p) return;
-    if (state.itemPresets.length <= 1) { alert('You must have at least one preset.'); return; }
-    if (!confirm(`Delete preset "${p.name}"?\n\nThe items in this preset will be lost. Other presets are not affected.`)) return;
-    deletePreset(p.id);
-    render();
+    if (state.itemPresets.length <= 1) { showToast('You must keep at least one preset'); return; }
+    openConfirmSheet({
+      title: 'Delete preset?',
+      message: `Delete preset "${p.name}"? The items in this preset will be lost. Other presets are not affected.`,
+      confirmLabel: 'Delete',
+      onConfirm: () => { deletePreset(p.id); render(); }
+    });
   },
   'preset-dialog-cancel': () => { state.presetDialog = { mode: null, name: '', editingId: null }; render(); },
   'preset-dialog-confirm': () => {
     const name = (state.presetDialog.name || '').trim();
-    if (!name) { alert('Name cannot be empty.'); return; }
+    if (!name) { showToast('Name cannot be empty'); return; }
     if (state.presetDialog.mode === 'new') createPreset(name);
     else if (state.presetDialog.mode === 'rename' && state.presetDialog.editingId) renamePreset(state.presetDialog.editingId, name);
     state.presetDialog = { mode: null, name: '', editingId: null };
@@ -485,7 +556,13 @@ registerActions({
   'prune-review': () => pruneOldSessions(),
   'prune-age-save': () => savePruneAge(),
   'backup-import': () => { const f = document.getElementById('backup-import-file'); if (f) f.click(); },
-  'about-reload': () => { if (confirm('Reload the app? Your data is safe — only the app itself reloads.')) window.location.reload(); },
+  'about-reload': () => openConfirmSheet({
+    title: 'Reload the app?',
+    message: 'Your data is safe — only the app itself reloads.',
+    confirmLabel: 'Reload',
+    danger: false,
+    onConfirm: () => window.location.reload()
+  }),
 
   // v33: first-run wizard
   'wizard-next': () => { state.wizardStep = 2; render(); },
@@ -502,7 +579,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV39Welcome(),
+  'welcome-dismiss': () => dismissV40Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -530,16 +607,19 @@ registerActions({
     state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
     render();
   },
-  'clients-rebuild': () => {
-    if (!confirm('Scan all your sessions and add any clients and sites that aren\'t already listed? Nothing already here will be changed or removed.')) return;
-    const added = rebuildClientsFromSessions();
-    render();
-    setTimeout(() => alert(
-      added === 0
-        ? 'Nothing new to add — every client and site from your sessions is already listed.'
-        : `Added ${added} new ${added === 1 ? 'entry' : 'entries'} from your sessions.`
-    ), 50);
-  },
+  'clients-rebuild': () => openConfirmSheet({
+    title: 'Add from sessions?',
+    message: 'Scan all your sessions and add any clients and sites that aren\'t already listed? Nothing already here will be changed or removed.',
+    confirmLabel: 'Scan & add',
+    danger: false,
+    onConfirm: () => {
+      const added = rebuildClientsFromSessions();
+      render();
+      showToast(added === 0
+        ? 'Nothing new — all already listed'
+        : `Added ${added} new ${added === 1 ? 'entry' : 'entries'}`);
+    }
+  }),
   'client-toggle': (arg) => {
     state.clientsPage.expandedClientId = state.clientsPage.expandedClientId === arg ? null : arg;
     render();
