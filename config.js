@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V41';
+const APP_VERSION = 'V42';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -79,6 +79,13 @@ const V38_WELCOME_KEY = 'pat:v38welcome';   // v38: multi-page PDF preview
 const V39_WELCOME_KEY = 'pat:v39welcome';   // v39: New Session polish
 const V40_WELCOME_KEY = 'pat:v40welcome';   // v40: in-app dialogs (no native pop-ups)
 const V41_WELCOME_KEY = 'pat:v41welcome';   // v41: in-app dialogs for import/restore/report errors
+const V42_WELCOME_KEY = 'pat:v42welcome';   // v42: commercial onboarding (guided setup + walkthrough)
+// v42: the opt-in demo session created on the FRESH onboarding path (decision
+// 9A). Tagged with this flag on the session object so the app can label it as an
+// example and the user knows it is safe to delete. It is a perfectly ordinary
+// session in every other respect (rides through the codec, CSV, reports and
+// backups unchanged — the flag is just an extra passthrough field).
+const DEMO_SESSION_FLAG = 'isExample';
 // v33: First-run wizard "seen" flag. Set once the wizard is completed OR skipped,
 // so it never reappears. Distinct from the welcome modal key: a genuinely-new
 // install gets the WIZARD (gated by this key + an empty-install test); an

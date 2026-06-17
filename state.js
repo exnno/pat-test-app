@@ -182,6 +182,7 @@ let state = {
   v39WelcomeSeen: false,
   v40WelcomeSeen: false,
   v41WelcomeSeen: false,
+  v42WelcomeSeen: false,
   // v36: saved report templates (array of {id, name, settings}). Loaded from
   // REPORT_TEMPLATES_KEY; seeded with starters on first run. Applying one copies
   // its settings snapshot over the live reportSettings.
@@ -198,11 +199,26 @@ let state = {
   signaturePadOpen: false,
   signaturePadHasInk: false,
   onboardedV33Seen: false,
-  // Transient wizard nav (not persisted): which step is showing (1=intro,
-  // 2=choose path, 3=details) and which path the user chose ('' | 'import' |
-  // 'fresh'). Reset whenever the wizard opens.
+  // Transient wizard nav (not persisted): which step is showing and which path
+  // the user chose ('' | 'import' | 'fresh'). Reset whenever the wizard opens.
+  // v42 (commercial onboarding) EXPANDS the fresh path into a multi-step guided
+  // setup. Step numbering (fresh path):
+  //   1 intro → 2 choose path → 3 your details (engineer + cal date)
+  //   → 4 company / report branding → 5 add an example session? → 6 all set
+  // The import path still jumps straight out via onboardSetupImport. wizardStep
+  // is clamped against the step list, so an out-of-range value is harmless.
+  // v42: wizardSeedDemo — the step-5 opt-in toggle for the example session
+  // (decision 9A); transient, consumed at finish on the fresh path only.
   wizardStep: 1,
   wizardPath: '',
+  wizardSeedDemo: false,
+
+  // v42: full-screen feature walkthrough (decision 6-i). Transient — never
+  // persisted, never in backups (the tour keeps no data). tourOpen gates the
+  // dedicated 'tour' view; tourStep is the 0-based slide index. Opened from the
+  // setup finish step ("Show me around") or replayed from About.
+  tourOpen: false,
+  tourStep: 0,
 
   // v32: two-level Settings navigation + search (transient, not persisted).
   // settingsCategory: the category id currently open (view 'settingsCategory'),

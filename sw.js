@@ -204,7 +204,7 @@
 // localStorage data budget. After a cache bump they re-download once (the user is
 // already online pulling the new app version). No codec/backup change;
 // backupVersion unchanged (5). Cache bumped to pat-v39.
-const CACHE_VERSION = 'pat-v41';
+const CACHE_VERSION = 'pat-v42';
 const ASSETS = [
   './',
   './index.html',
@@ -221,6 +221,7 @@ const ASSETS = [
   './backup.js',
   './session.js',
   './setup.js',
+  './tour.js',
   './jspdf.umd.min.js',
   './jspdf.plugin.autotable.min.js',
   './report.js',

@@ -393,6 +393,9 @@ registerActions({
   'settings-report-save': () => saveReportSettingsForm(),
   'report-logo-pick': () => { const inp = document.getElementById('report-logo-file'); if (inp) inp.click(); },
   'report-logo-remove': () => {
+    // v42: preserve the wizard's company-name field across this re-render when
+    // logo removal happens during first-run onboarding.
+    if (!state.onboardedV33Seen && typeof captureWizardStep === 'function') captureWizardStep();
     state.reportSettings.logo = '';
     state.reportSettingsError = '';
     saveReportSettings();
@@ -564,14 +567,23 @@ registerActions({
     onConfirm: () => window.location.reload()
   }),
 
-  // v33: first-run wizard
-  'wizard-next': () => { state.wizardStep = 2; render(); },
+  // first-run wizard (v33; v42 guided commercial setup)
+  'wizard-next': () => wizardNextStep(),
   'wizard-back': () => wizardBack(),
   'wizard-skip': () => skipOnboarding(),
   'wizard-fresh': () => wizardChoosePath('fresh'),
   'wizard-import': () => { const f = document.getElementById('wizard-import-file'); if (f) f.click(); },
-  'wizard-finish': () => wizardFinishFresh(),
+  'wizard-theme': (arg) => wizardPickTheme(arg),
+  'wizard-finish': () => wizardFinishFresh(false),
+  'wizard-finish-tour': () => wizardFinishFresh(true),
   'restart-onboarding': () => restartOnboarding(),
+
+  // v42: feature walkthrough (full-screen tour)
+  'tour-next': () => tourNext(),
+  'tour-prev': () => tourPrev(),
+  'tour-goto': (arg) => tourGoTo(arg),
+  'tour-skip': () => closeTour(),
+  'open-tour': () => openTour(),
 
   // Backup reminder banner
   'backup-banner-export': () => { downloadBackup(); render(); },
@@ -579,7 +591,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV41Welcome(),
+  'welcome-dismiss': () => dismissV42Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -767,6 +779,10 @@ registerChangeActions({
     onboardSetupImport(file);
     el.value = '';
   },
+  // v42: step-5 example-session opt-in (decision 9A). In-memory only; consumed at
+  // finish on the fresh path. No re-render needed (the checkbox holds its own
+  // visual state), so just record the value.
+  'wizard-seed-demo': (checked) => { wizardToggleDemo(checked); },
 
   // Overview — fails-only toggle + the per-row selection checkbox
   // (checkbox was in render-core.js bindOverviewBodyEvents).

@@ -1,4 +1,4 @@
-# PAT App — Code Map (V41)
+# PAT App — Code Map (V42)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -10,12 +10,12 @@ exists — the modular split is complete.
 > every release — a stale map breaks the whole approach. If you ever open a file
 > the map didn't point you to, the map is out of date: fix it.
 
-## Load order (index.html) — 21 files (incl. 2 vendored libs)
+## Load order (index.html) — 22 files (incl. 2 vendored libs)
 `config.js` → `state.js` → `utils.js` → `storage.js` → `clients.js` → `sqp.js`
 → `multipick.js` → `feedback.js` → `csv.js` → `backup.js` → `session.js`
-→ **`setup.js`** → **`jspdf.umd.min.js`** → **`jspdf.plugin.autotable.min.js`**
-→ **`report.js`** → **`pdfpreview.js`** → `render-core.js` → `render-settings.js`
-→ `events.js` → `dispatch.js` → `boot.js`
+→ **`setup.js`** → **`tour.js`** → **`jspdf.umd.min.js`**
+→ **`jspdf.plugin.autotable.min.js`** → **`report.js`** → **`pdfpreview.js`**
+→ `render-core.js` → `render-settings.js` → `events.js` → `dispatch.js` → `boot.js`
 
 `boot.js` runs the startup block and must stay **last**. Later files may call
 functions defined in earlier ones; nothing executes until `boot.js` because
@@ -76,6 +76,9 @@ other config change.
 config change.
 **v41:** `V41_WELCOME_KEY` (`pat:v41welcome`) — import/restore/report error
 sheets welcome. No other config change.
+**v42:** `V42_WELCOME_KEY` (`pat:v42welcome`) — commercial onboarding welcome;
+`DEMO_SESSION_FLAG` (`'isExample'`) — marks the opt-in example session built on
+the fresh onboarding path (a harmless passthrough field). No data-model change.
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
@@ -109,6 +112,11 @@ change.
 the dialog helpers are stateless transient overlays (locals in feedback.js).
 **v41:** `v41WelcomeSeen` (error-sheets welcome gate). No other state change —
 `openInfoSheet` is a stateless transient overlay like its siblings.
+**v42:** `v42WelcomeSeen` (commercial-onboarding welcome gate); `wizardSeedDemo`
+(transient step-5 example-session opt-in); `tourOpen` + `tourStep` (transient
+full-screen walkthrough flags — never persisted, never in backups). The wizard
+fresh path is now 6 steps (intro/path/details/branding/demo/finish); step state
+stays transient.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -159,6 +167,10 @@ backup change (PDF.js is cache-stored, never in localStorage or backups).
 welcome gates. No codec or backup change (`backupVersion` stays 5).
 **v41:** `load` also reads `V41_WELCOME_KEY` → `state.v41WelcomeSeen`. No codec or
 backup change (`backupVersion` stays 5).
+**v42:** `load` also reads `V42_WELCOME_KEY` → `state.v42WelcomeSeen`. No codec or
+backup change (`backupVersion` stays 5). The example session is an ordinary
+session (the `isExample` marker rides through the codec as an unknown
+passthrough field — confirmed by a serialise→parse round-trip in the V42 harness).
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -285,6 +297,25 @@ the import confirm → `openConfirmSheet` (non-danger, "Import"), the success al
 `showToast`, the read error → `openInfoSheet`. The apply block (`applySetupBundle`
 + `save` + toast + nav) moved inside the confirm sheet's `onConfirm`.
 
+## tour.js (~210 ln) — guided feature walkthrough (v42) — NEW
+The self-contained, full-screen feature tour (decision 6-i). It does NOT overlay
+the live app or measure/point at real elements (the fragile iOS coachmark path we
+avoided); instead each slide renders a static HTML/CSS **mock** of a screen with
+one control highlighted (`.tour-hl`) plus a caption — built from the `.tour-*`
+classes in styles.css, which reuse the app's colour variables. `TOUR_SLIDES`
+(5 slides: sessions / quickpick / overview / reports / backup, each `{key, title,
+caption, mock()}`). Control: `openTour` (sets `state.tourOpen` + `view='tour'`),
+`tourNext`/`tourPrev`/`tourGoTo` (paging, clamped; advancing past the last slide
+finishes), `closeTour` (drops the flags, `setView('sessions')`). Render:
+`renderTour()` (the whole screen — counter, mock stage, caption, dot indicator,
+back/next nav). All state transient (`state.tourOpen`/`tourStep`) — never
+persisted, never in backups. Routed early in render-core's `render()` as a
+full-screen view that owns `#app` (no banner/modals). Reuses `escapeHTML`
+(utils), `setView`/`render` (session/render-core).
+*Touch to:* change the walkthrough slides, their mocks/copy, or paging. Entry
+points: the wizard finish step ("Show me around") and About ("Show me around the
+app again").
+
 ## session.js (~1320 ln) — sessions, items & most logic
 Presets (`activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
 `createPreset`, `renamePreset`, `deletePreset`); core helpers (`uid`, `todayISO`,
@@ -365,9 +396,25 @@ save/rename confirmations live in dispatch.js (which opens the name sheet); thes
 functions just do the data write + a success toast.
 **v41:** `dismissV41Welcome` (sets `v41WelcomeSeen` + persists `V41_WELCOME_KEY`).
 No other session.js change.
+**v42:** `dismissV42Welcome`. **First-run wizard rebuilt for commercial
+onboarding** (fresh path now 6 steps: intro → path → details → branding → example
+session? → all-set). `captureWizardStep` (saves the current step's engineer/cal/
+company inputs to state on every transition so paging never loses input);
+`wizardNextStep` (3→4→5→6, clamped); `wizardBack` (step-3 back returns to the path
+chooser); `wizardPickTheme(id)` (step-4 report colour from `REPORT_COLOR_THEMES`);
+`wizardToggleDemo(on)` (step-5 opt-in); `wizardFinishFresh(withTour)` (captures,
+seeds the demo if opted in, `save()`s, finishes, optionally `openTour()`);
+`seedDemoSession()` (builds ONE `isExample`-flagged session with 5 items / 1 fail,
+mirroring `saveItem`'s item shape — fresh path only). `onboardSetupImport`/
+`finishOnboarding`/`skipOnboarding`/`restartOnboarding` also reset `wizardSeedDemo`.
+`ONBOARD_KEY` unchanged (`pat:onboardedV33`) so prior-onboarded upgraders aren't
+re-onboarded. `handleReportLogoFile` (and the logo-remove handler in dispatch)
+now also call `captureWizardStep` when onboarding is in progress, so the
+company-name field survives the logo re-render.
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
-filtering, theme, bulk edit, settings saves, the first-run wizard, the signature,
-cert numbers / job notes / report templates.
+filtering, theme, bulk edit, settings saves, the first-run wizard / onboarding,
+the example-session seed, the signature, cert numbers / job notes / report
+templates.
 
 ## report.js (~310 ln) — PDF reports (v30) — NEW
 The PDF report builder + preview + share. `getJsPDF` (reads `window.jspdf`),
@@ -493,9 +540,19 @@ are built imperatively in feedback.js, not through render().
 **v41:** welcome modal rolled to **V41** "What's new" (import/restore/report error
 sheets), gated by `v41WelcomeSeen` (same wizard/migration suppression). Dismiss
 button id `v41-welcome-dismiss`. No other render-core change.
+**v42:** welcome modal rolled to **V42** "What's new" (commercial onboarding),
+gated by `v42WelcomeSeen` (still suppressed while the wizard/migration prompt
+shows — so upgraders see the modal, new installs see the wizard). The **first-run
+wizard block rebuilt** for the 6-step fresh path (intro → path → details →
+branding → example-session opt-in → all-set; the branding step reuses the report
+logo input + colour-theme chips, the all-set step offers the walkthrough). Also:
+`render()` routes the new full-screen **`tour`** view FIRST (before banners/
+modals) — `app.innerHTML = renderTour()` and return, since the tour owns the whole
+screen. Dismiss button id `v42-welcome-dismiss`.
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
-Edit-session UI, the empty states, the welcome modal, the first-run wizard, or the
-signature draw pad.
+Edit-session UI, the empty states, the welcome modal, the first-run wizard, the
+signature draw pad, or the full-screen walkthrough route (the tour itself lives
+in tour.js).
 **v29:** the two no-op binder shells left from V28
 (`bindSessionsListAreaEvents`, `bindOverviewBodyEvents`) and their last call
 sites in `refreshSessionsListAreaOnly` / `refreshOverviewBody` were deleted —
@@ -536,6 +593,9 @@ The Clients empty state uses the shared `emptyStateHTML` (render-core).
 **v39:** About changelog rolled (V39 top, V36 dropped) — no other settings change.
 **v41:** About changelog rolled (V41 top, V38 dropped; now lists V41/V40/V39) — no
 other settings change.
+**v42:** About changelog rolled (V42 top, V39 dropped; now lists V42/V41/V40); the
+About page gains a **"Show me around"** card with the `open-tour` button (replays
+the walkthrough), alongside the existing "Run first-time setup again".
 *Touch to:* change any Settings page; the category structure (edit
 `SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META` in **config.js**, not here); search
 matching (aliases live in config); or roll the About changelog.
@@ -629,6 +689,15 @@ native and flagged.
 never visibly jumps), THEN opens `openConfirmSheet` ("Discard & switch") whose
 `onConfirm` runs `switchPreset(newId)`. This removes the last native `confirm` in
 the app. No other dispatch change.
+**v42:** `welcome-dismiss` now calls `dismissV42Welcome`. Wizard actions rewired
+for the 6-step flow: `wizard-next` → `wizardNextStep`, plus new clicks
+`wizard-theme` (data-arg theme id → `wizardPickTheme`), `wizard-finish` →
+`wizardFinishFresh(false)`, `wizard-finish-tour` → `wizardFinishFresh(true)`;
+change `wizard-seed-demo` (step-5 opt-in → `wizardToggleDemo`). Branding step
+reuses the existing `report-logo-pick`/`report-logo-remove`/`report-logo-file`
+actions (logo-remove now captures the wizard company field first). New tour
+clicks: `tour-next`/`tour-prev`/`tour-goto` (data-arg index)/`tour-skip`, and
+`open-tour` (the About replay button).
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

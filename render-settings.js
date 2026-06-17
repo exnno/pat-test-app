@@ -1120,24 +1120,30 @@ function renderSettingsAbout() {
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v41: rolled forward — V41 on top, V38 dropped. -->
+      <!-- v8: rolling 3-version changelog. v42: rolled forward — V42 on top, V39 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V42</strong> · June 2026</p>
+        <p class="muted">Setting up a new phone is now a proper guided walkthrough: your engineer details, your company branding for reports (name, logo and colour), and an optional example job so you can see how everything looks. There's also a quick in-app tour of the basics — Sessions, Quick Pick, the Overview, reports and backups — which you can run any time from the button just below. None of your existing data is affected.</p>
 
         <p><strong>V41</strong> · June 2026</p>
         <p class="muted">The last few system pop-ups are gone. Messages when importing a file, restoring a backup, or building a report now use the app's own slide-up panels instead of the phone's built-in pop-up boxes — reliable on iPhone and matching the rest of the app. If something goes wrong, the message now waits for you to tap OK rather than flashing past. None of your existing data is affected.</p>
 
         <p><strong>V40</strong> · June 2026</p>
         <p class="muted">The pop-up boxes for naming a report template and confirming things like "Delete this?" now use the app's own slide-up panels instead of the phone's system pop-ups — more reliable on iPhone and a cleaner, more consistent look. Quick confirmations such as restoring a backup now appear as a small message that fades away on its own. None of your existing data is affected.</p>
-
-        <p><strong>V39</strong> · June 2026</p>
-        <p class="muted">Two small tidy-ups to the New Session screen. The New Session form now closes when you move to another screen, so you get a clean Sessions list when you come back instead of the form still being open. And the saved-clients list no longer pops open the moment you start a new session — it appears only when you tap the Client field. None of your existing data is affected.</p>
       </div>
 
       <div class="info-card">
         <h3>Set up another device</h3>
         <p class="muted">Walk through the first-time setup again on this phone — useful for re-importing a setup file or refreshing your details.</p>
         <button class="backup-action-btn" id="about-restart-onboarding" data-action="restart-onboarding" style="margin-top:8px">↻ Run first-time setup again</button>
+      </div>
+
+      <div class="info-card">
+        <h3>Show me around</h3>
+        <p class="muted">A quick guided tour of the basics — Sessions, Quick Pick, the Overview, reports and backups. Handy if you're getting started or showing someone else the ropes.</p>
+        <button class="backup-action-btn" id="about-open-tour" data-action="open-tour" style="margin-top:8px">🧭 Show me around the app again</button>
       </div>
 
       <div class="info-card">
