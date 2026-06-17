@@ -54,49 +54,36 @@ const TOUR_SLIDES = [
   {
     key: 'quickpick',
     title: 'Quick Pick & logging',
-    caption: 'Type the location once, pick an item type, then tap the big <strong>PASS</strong> (or FAIL) button. The item types reorder to put your usual ones first.',
+    caption: 'Type the location once, then tap an item to log a <strong>pass</strong> instantly. The buttons reorder to put your usual items first.',
     mock: () => `
       <div class="tour-screen">
         <div class="tour-bar">Riverside Café</div>
-        <div class="tour-field-label">ASSET NUMBER</div>
-        <input class="tour-input" value="26" readonly>
-        <div class="tour-field-label">LOCATION <span class="tour-field-hint">(carried from last)</span></div>
-        <input class="tour-input tour-input-strong" value="Kitchen" readonly>
-        <div class="tour-field-label">ITEM TYPE</div>
+        <input class="tour-input" value="Kitchen" readonly>
         <div class="tour-qp-grid">
-          <button class="tour-qp">Kettle</button>
+          <button class="tour-qp tour-hl">Kettle</button>
           <button class="tour-qp">Toaster</button>
           <button class="tour-qp">Microwave</button>
           <button class="tour-qp">Fridge</button>
           <button class="tour-qp">Mixer</button>
           <button class="tour-qp">Lamp</button>
         </div>
-        <div class="tour-passfail">
-          <button class="tour-pf tour-pf-pass tour-hl">✓ PASS</button>
-          <button class="tour-pf tour-pf-fail">✕ FAIL</button>
-        </div>
+        <button class="tour-cta tour-cta-fail">Log a fail</button>
       </div>`
   },
   {
     key: 'overview',
     title: 'Overview',
-    caption: 'See everything you’ve tested in this job at a glance, with a running pass/fail count. Failed items are flagged in red so nothing slips through.',
+    caption: 'See everything you’ve tested in this job. Failed items are flagged so nothing slips through.',
     mock: () => `
       <div class="tour-screen">
-        <div class="tour-bar">Overview</div>
-        <div class="tour-ov-summary">25 items · <span class="tour-ov-pass">21 pass</span> · <span class="tour-ov-fail">4 fail</span> · Riverside Café</div>
-        <div class="tour-ov-btnrow">
-          <button class="tour-ov-btn">Select items</button>
-          <button class="tour-ov-btn">Session settings</button>
+        <div class="tour-bar">Riverside Café · 12 items</div>
+        <div class="tour-stat-row">
+          <div class="tour-stat"><div class="tour-stat-n">11</div><div class="tour-stat-l">Pass</div></div>
+          <div class="tour-stat"><div class="tour-stat-n tour-stat-fail">1</div><div class="tour-stat-l">Fail</div></div>
         </div>
-        <input class="tour-input" value="" placeholder="Search asset, location, item…" readonly>
-        <div class="tour-ov-table tour-hl">
-          <div class="tour-ov-head"><span>#</span><span>ITEM</span><span>RESULT</span></div>
-          <div class="tour-ov-trow"><span>1</span><span>Kettle</span><span class="tour-ov-rpass">Pass</span></div>
-          <div class="tour-ov-trow"><span>2</span><span>Toaster</span><span class="tour-ov-rpass">Pass</span></div>
-          <div class="tour-ov-trow"><span>3</span><span>Extension lead</span><span class="tour-ov-rfail">Fail</span></div>
-          <div class="tour-ov-trow"><span>4</span><span>Desk lamp</span><span class="tour-ov-rpass">Pass</span></div>
-        </div>
+        <div class="tour-row"><div><div class="tour-row-title">Kettle</div><div class="tour-row-sub">Kitchen · 001</div></div><span class="tour-chip tour-chip-ok">Pass</span></div>
+        <div class="tour-row tour-hl"><div><div class="tour-row-title">Extension lead</div><div class="tour-row-sub">Office · 007</div></div><span class="tour-chip tour-chip-bad">Fail</span></div>
+        <div class="tour-row"><div><div class="tour-row-title">Toaster</div><div class="tour-row-sub">Kitchen · 002</div></div><span class="tour-chip tour-chip-ok">Pass</span></div>
       </div>`
   },
   {
