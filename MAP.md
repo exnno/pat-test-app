@@ -1,4 +1,4 @@
-# PAT App — Code Map (V40)
+# PAT App — Code Map (V41)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -74,6 +74,8 @@ No other config change (PDF.js paths are hard-coded in `pdfpreview.js`).
 other config change.
 **v40:** `V40_WELCOME_KEY` (`pat:v40welcome`) — in-app-dialogs welcome. No other
 config change.
+**v41:** `V41_WELCOME_KEY` (`pat:v41welcome`) — import/restore/report error
+sheets welcome. No other config change.
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
@@ -105,6 +107,8 @@ inside `openReportPreview`, not on global `state`.
 change.
 **v40:** `v40WelcomeSeen` (in-app-dialogs welcome gate). No other state change —
 the dialog helpers are stateless transient overlays (locals in feedback.js).
+**v41:** `v41WelcomeSeen` (error-sheets welcome gate). No other state change —
+`openInfoSheet` is a stateless transient overlay like its siblings.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -153,6 +157,8 @@ the codec passes unknown fields through unchanged.
 backup change (PDF.js is cache-stored, never in localStorage or backups).
 **v39/v40:** `load` reads `V39_WELCOME_KEY`/`V40_WELCOME_KEY` → the matching
 welcome gates. No codec or backup change (`backupVersion` stays 5).
+**v41:** `load` also reads `V41_WELCOME_KEY` → `state.v41WelcomeSeen`. No codec or
+backup change (`backupVersion` stays 5).
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -207,8 +213,13 @@ confirm tap; danger→`.btn-danger`, else `.btn-primary`); `openNameSheet({title
 blurb, value, placeholder, confirmLabel, maxlength, onConfirm})` (single text
 input, focus+select on open, Enter commits, empty value ignored, passes trimmed
 value). All three reuse the proven `.bulk-sheet` pattern, no state, no re-render.
+**v41:** `openInfoSheet({title, message, buttonLabel='OK', onClose})` — a
+**stays-until-tapped** info/error sheet (the last native `alert()` replacement).
+Same `.bulk-sheet` + backdrop, ONE `.btn-primary` button, and crucially **no
+auto-dismiss timer** (unlike `showToast`) — an error must wait for the user. `×`/
+backdrop/button all close; `onClose` (if given) runs once on any dismissal.
 *Touch to:* change pass/fail/copy feedback channels, toasts, or the shared
-confirm/name dialogs.
+confirm/name/info dialogs.
 
 ## csv.js (~600 ln) — CSV build + import (v10/v11, split v26)
 Build/share: `csvCellValue` (v26: `client` column + adaptive `site` column — full
@@ -224,6 +235,8 @@ on the Overview header and each sessions-list row). Import:
 `parseImportCSV` (v26: recognises a `Client` column, composes snapshot),
 `handleImportFile`, `commitImportedSession` (v26: learns client/site into lists),
 `cancelImportConflict`, `closeImportSummary` (+ `EXPECTED_CSV_HEADER`).
+**v41:** the two import errors (parse failure via `result.error`, read error) now
+open `openInfoSheet` instead of native `alert`.
 *Touch to:* change CSV columns, export, or import parsing.
 
 ## backup.js (~270 ln) — Backup / Restore (v7)
@@ -242,6 +255,8 @@ sheet's `onConfirm` so dismissing leaves all current data untouched. The three
 *import-error* alerts (bad JSON / unrecognised / read error) stay native this
 release — deferred to V41's import-error info-sheet pass (a toast can't be used
 for an error that must stay until read).
+**v41:** those three restore errors (bad JSON / unrecognised file / read error)
+now open `openInfoSheet`. No more native pop-ups in this file.
 *Touch to:* change the JSON backup shape or restore path. **Bump `backupVersion`
 if the shape changes; keep old-backup compatibility.**
 
@@ -264,6 +279,11 @@ Deliberately excludes `sqpHistory` (device-specific). Bundle marker `kind:
 `syncItemTypesFromActivePreset`, `todayISO` (session.js).
 *Touch to:* change what a shared setup carries, the import/merge behaviour, or
 the bundle format. **Config-only — must never read or write sessions.**
+**v41:** the whole `importSetupFromFile` `onload` flow is now native-free — the
+four errors (bad JSON / "that's a backup" / unrecognised / empty) → `openInfoSheet`,
+the import confirm → `openConfirmSheet` (non-danger, "Import"), the success alert →
+`showToast`, the read error → `openInfoSheet`. The apply block (`applySetupBundle`
++ `save` + toast + nav) moved inside the confirm sheet's `onConfirm`.
 
 ## session.js (~1320 ln) — sessions, items & most logic
 Presets (`activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
@@ -343,6 +363,8 @@ results, `savePruneAge`, `validateBeforeSave` errors via `saveItem`/edit paths,
 site-required, retest-period, column-visibility) now `showToast`. Template
 save/rename confirmations live in dispatch.js (which opens the name sheet); these
 functions just do the data write + a success toast.
+**v41:** `dismissV41Welcome` (sets `v41WelcomeSeen` + persists `V41_WELCOME_KEY`).
+No other session.js change.
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves, the first-run wizard, the signature,
 cert numbers / job notes / report templates.
@@ -370,7 +392,9 @@ already stamped),
 `reportFilename` (**v31:** builds from `reportSettings.reportFilenamePattern`
 with {site}/{client}/{date}/{engineer} token substitution + sanitisation; default
 pattern reproduces the exact pre-v31 name), `produceReport` (dispatch entry —
-gated by `reportSettings.enabled`; friendly alert if the engine hasn't loaded),
+gated by `reportSettings.enabled`; **v41:** the four problem messages — session
+not found, engine-not-loaded-yet, build error, and the in-preview rebuild error —
+now open `openInfoSheet` instead of native `alert`),
 `openReportPreview` (near-fullscreen iframe modal; **v31:** editable filename;
 **v35:** a multi-page note when the doc has >1 page, a "Quick adjust" chip row
 that flips `showFails`/`showCalibration`/`declaration`/`signaturePosition` and
@@ -390,6 +414,7 @@ the settings return hook), `triggerDownload`,
 `contrastColor` (utils.js), `todayISO`/`state` (session.js/state.js).
 *Touch to:* change the report layout/content, add reading columns (future), or
 change how the PDF is previewed/shared/named/coloured. **Uses the vendored MIT libs.**
+No native pop-ups remain here as of v41 (all four → `openInfoSheet`).
 
 ## pdfpreview.js (~140 ln) — multi-page PDF preview engine (v38) — NEW
 The lazy PDF.js loader + canvas renderer that powers the v38 multi-page preview.
@@ -465,6 +490,9 @@ suggestion dropdown only opens when the user actually taps the field.
 native pop-ups), gated by `v40WelcomeSeen` (still suppressed while the wizard/
 migration prompt shows). No other render-core change — the new confirm/name sheets
 are built imperatively in feedback.js, not through render().
+**v41:** welcome modal rolled to **V41** "What's new" (import/restore/report error
+sheets), gated by `v41WelcomeSeen` (same wizard/migration suppression). Dismiss
+button id `v41-welcome-dismiss`. No other render-core change.
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
 Edit-session UI, the empty states, the welcome modal, the first-run wizard, or the
 signature draw pad.
@@ -506,6 +534,8 @@ Delete rows + "Save current as template"); About changelog rolled (V36 top, V33
 dropped).
 The Clients empty state uses the shared `emptyStateHTML` (render-core).
 **v39:** About changelog rolled (V39 top, V36 dropped) — no other settings change.
+**v41:** About changelog rolled (V41 top, V38 dropped; now lists V41/V40/V39) — no
+other settings change.
 *Touch to:* change any Settings page; the category structure (edit
 `SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META` in **config.js**, not here); search
 matching (aliases live in config); or roll the About changelog.
@@ -593,6 +623,12 @@ converted (deferred to V41's import-error pass): the preset-switch-on-change
 `confirm` in `handleDelegatedChange` — it must revert the `<select>` synchronously
 on cancel, which the async sheet can't do without a visible dropdown flip; left
 native and flagged.
+**v41:** `welcome-dismiss` now calls `dismissV41Welcome`. The deferred
+`preset-switch` confirm is now resolved: on an unsaved-changes switch it reverts
+`el.value` to `state.activePresetId` **synchronously first** (so the dropdown
+never visibly jumps), THEN opens `openConfirmSheet` ("Discard & switch") whose
+`onConfirm` runs `switchPreset(newId)`. This removes the last native `confirm` in
+the app. No other dispatch change.
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

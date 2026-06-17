@@ -128,11 +128,11 @@ function restoreBackupFromFile(file) {
     try {
       data = JSON.parse(e.target.result);
     } catch (err) {
-      alert('That file isn\'t a valid backup — JSON could not be read.');
+      openInfoSheet({ title: 'Not a valid backup', message: 'That file couldn\u2019t be read as a backup \u2014 the data wasn\u2019t in the expected format.' });
       return;
     }
     if (!data || !Array.isArray(data.sessions)) {
-      alert('That file isn\'t a recognised PAT Test backup. Make sure you picked a file exported from this app.');
+      openInfoSheet({ title: 'Not a recognised backup', message: 'That file isn\u2019t a recognised PAT Test backup. Make sure you picked a file exported from this app.' });
       return;
     }
     const itemCount = data.sessions.reduce((n, s) => n + (Array.isArray(s.items) ? s.items.length : 0), 0);
@@ -292,6 +292,6 @@ function restoreBackupFromFile(file) {
       }
     });
   };
-  reader.onerror = () => alert('Could not read that file.');
+  reader.onerror = () => openInfoSheet({ title: 'Couldn\u2019t read that file', message: 'The file couldn\u2019t be opened. Please try again.' });
   reader.readAsText(file);
 }

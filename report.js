@@ -347,9 +347,9 @@ function stampCertNumber(session) {
 function produceReport(sessionId) {
   if (!state.reportSettings.enabled) { setView('settings'); return; }
   const session = state.sessions.find(s => s.id === sessionId);
-  if (!session) { alert('Could not find that session.'); return; }
+  if (!session) { openInfoSheet({ title: 'Session not found', message: 'Couldn\u2019t find that session. Please try again.' }); return; }
   if (!getJsPDF()) {
-    alert('The PDF engine has not finished loading yet. If you are offline on first use, reconnect once so it can cache, then try again.');
+    openInfoSheet({ title: 'Report engine still loading', message: 'The PDF engine hasn\u2019t finished loading yet. If you\u2019re offline on first use, reconnect once so it can save itself, then try again.' });
     return;
   }
   stampCertNumber(session);   // v36: assign-once cert number before building
@@ -357,7 +357,7 @@ function produceReport(sessionId) {
   try {
     doc = buildReportDoc(session);
   } catch (e) {
-    alert('Could not build the report. Please try again.');
+    openInfoSheet({ title: 'Couldn\u2019t build the report', message: 'Something went wrong building the report. Please try again.' });
     return;
   }
   openReportPreview(doc, session);
@@ -530,7 +530,7 @@ function openReportPreview(doc, session) {
     URL.revokeObjectURL(url);
     let d;
     try { d = buildReportDoc(session); }
-    catch (e) { alert('Could not rebuild the report.'); return; }
+    catch (e) { openInfoSheet({ title: 'Couldn\u2019t rebuild the report', message: 'Something went wrong rebuilding the report. Please try again.' }); return; }
     refreshDocState(d);
     sheet.innerHTML = buildSheetHTML();
     const inp = document.getElementById('report-filename-input');

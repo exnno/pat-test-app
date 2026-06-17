@@ -554,7 +554,7 @@ function handleImportFile(file) {
   reader.onload = e => {
     const result = parseImportCSV(String(e.target.result || ''));
     if (!result.ok) {
-      alert(result.error);
+      openInfoSheet({ title: 'Couldn\u2019t import that file', message: result.error });
       return;
     }
     // Check for an existing session with the same Site (case-insensitive) AND
@@ -575,7 +575,7 @@ function handleImportFile(file) {
     // No conflict — commit straight away.
     commitImportedSession(incoming, 'new', result.skipped);
   };
-  reader.onerror = () => alert('Could not read that file.');
+  reader.onerror = () => openInfoSheet({ title: 'Couldn\u2019t read that file', message: 'The file couldn\u2019t be opened. Please try again.' });
   reader.readAsText(file);
 }
 

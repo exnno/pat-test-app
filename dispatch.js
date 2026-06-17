@@ -579,7 +579,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV40Welcome(),
+  'welcome-dismiss': () => dismissV41Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -864,6 +864,11 @@ registerChangeActions({
   'calc-length': (v) => { state.calcLength = Number(v); render(); },
 
   // Quick Pick preset switcher — confirm-on-switch guard (was the big handler).
+  // v41: native confirm() replaced with the in-app confirm sheet. The async
+  // sheet can't revert the <select> on cancel the way the synchronous native
+  // confirm did, so we revert the dropdown to the still-active preset FIRST
+  // (synchronously, so it never visibly jumps), then ask. On confirm we run the
+  // real switch; on cancel the dropdown is already back where it belongs.
   'preset-switch': (v, el) => {
     const newId = v;
     const currentP = activePreset();
@@ -873,14 +878,14 @@ registerChangeActions({
       const taValueNorm = ta.value.replace(/\s+$/, '');
       const storedNorm = storedItems.replace(/\s+$/, '');
       if (taValueNorm !== storedNorm) {
-        const ok = confirm(
-          `You have unsaved changes to "${currentP.name}".\n\n` +
-          `Switch presets and discard the changes?`
-        );
-        if (!ok) {
-          el.value = state.activePresetId;   // revert dropdown to still-active preset
-          return;
-        }
+        el.value = state.activePresetId;   // revert immediately — no visible flip
+        openConfirmSheet({
+          title: 'Discard unsaved changes?',
+          message: `You have unsaved changes to \u201c${currentP.name}\u201d. Switch presets and discard the changes?`,
+          confirmLabel: 'Discard & switch',
+          onConfirm: () => switchPreset(newId)
+        });
+        return;
       }
     }
     switchPreset(newId);

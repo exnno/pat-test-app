@@ -133,7 +133,7 @@ function importSetupFromFile(file) {
     try {
       data = JSON.parse(e.target.result);
     } catch (err) {
-      alert('That file isn\'t a valid setup — JSON could not be read.');
+      openInfoSheet({ title: 'Not a valid setup', message: 'That file couldn\u2019t be read as a setup \u2014 the data wasn\u2019t in the expected format.' });
       return;
     }
     // File-kind guard: reject anything that isn't a setup bundle. A full backup
@@ -141,36 +141,38 @@ function importSetupFromFile(file) {
     // applied as a setup.
     if (!data || data.kind !== SETUP_KIND || typeof data.sections !== 'object' || !data.sections) {
       if (data && Array.isArray(data.sessions)) {
-        alert('That looks like a full backup, not a setup file. To restore a backup, use Restore (it replaces sessions too). Import setup only changes your configuration.');
+        openInfoSheet({ title: 'That\u2019s a backup, not a setup', message: 'To restore a backup, use Restore (it replaces sessions too). Import setup only changes your configuration.' });
       } else {
-        alert('That file isn\'t a recognised PAT setup. Make sure you picked a setup file exported from this app.');
+        openInfoSheet({ title: 'Not a recognised setup', message: 'That file isn\u2019t a recognised PAT setup. Make sure you picked a setup file exported from this app.' });
       }
       return;
     }
 
     const sectionLabels = describeSetupSections(data);
     if (sectionLabels.length === 0) {
-      alert('That setup file is empty — there\'s nothing to import.');
+      openInfoSheet({ title: 'Nothing to import', message: 'That setup file is empty \u2014 there\u2019s nothing to import.' });
       return;
     }
     const name = (typeof data.label === 'string' && data.label.trim()) ? data.label.trim() : 'this setup';
-    const ok = confirm(
-      `Import "${name}"?\n\n` +
-      `This will REPLACE the following on this device:\n` +
-      sectionLabels.map(l => `• ${l}`).join('\n') + '\n\n' +
-      `Your sessions, clients and sites will NOT be changed.\n\n` +
-      `Continue?`
-    );
-    if (!ok) return;
-
-    applySetupBundle(data);
-
-    save();
-    alert(`Setup "${name}" imported.\n\nUpdated: ${sectionLabels.join(', ')}.`);
-    state.view = 'settingsBackup';
-    render();
+    // v41: in-app confirm sheet (was native confirm). The apply block runs only
+    // on confirm; dismissing leaves all current configuration untouched.
+    openConfirmSheet({
+      title: `Import \u201c${name}\u201d?`,
+      message:
+        `This will REPLACE the following on this device: ${sectionLabels.join(', ')}. ` +
+        `Your sessions, clients and sites will NOT be changed.`,
+      confirmLabel: 'Import',
+      danger: false,
+      onConfirm: () => {
+        applySetupBundle(data);
+        save();
+        showToast(`Setup \u201c${name}\u201d imported`);
+        state.view = 'settingsBackup';
+        render();
+      }
+    });
   };
-  reader.onerror = () => alert('Could not read that file.');
+  reader.onerror = () => openInfoSheet({ title: 'Couldn\u2019t read that file', message: 'The file couldn\u2019t be opened. Please try again.' });
   reader.readAsText(file);
 }
 

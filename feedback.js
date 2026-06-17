@@ -137,6 +137,43 @@ function openNameSheet(opts) {
   }
 }
 
+// v41: a stays-until-tapped info/error sheet, replacing the last native alert()s
+// (import / restore / report errors). Unlike showToast (auto-fades in ~2s), an
+// error MUST stay on screen until the user acknowledges it — so this is a sheet
+// with a single button and NO timer. opts: { title, message, buttonLabel='OK',
+// onClose }. Dismissing (button / × / backdrop) closes; onClose (if given) runs
+// once on any dismissal.
+function openInfoSheet(opts) {
+  opts = opts || {};
+  const title = opts.title || 'Notice';
+  const message = opts.message || '';
+  const buttonLabel = opts.buttonLabel || 'OK';
+  const { sheet, backdrop, cleanup } = _openSheet(title);
+  function close() {
+    cleanup();
+    if (typeof opts.onClose === 'function') opts.onClose();
+  }
+  // Backdrop tap should also fire onClose — _openSheet wired cleanup only, so
+  // override it here for this sheet.
+  backdrop.addEventListener('click', () => { if (typeof opts.onClose === 'function') opts.onClose(); });
+  sheet.innerHTML = `
+    <div class="bulk-sheet-handle"></div>
+    <div class="bulk-sheet-header">
+      <span class="fail-close-spacer"></span>
+      <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+      <button class="fail-close-btn" id="info-sheet-close" aria-label="Close">&times;</button>
+    </div>
+    ${message ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
+    <button class="btn-primary" id="info-sheet-ok">${escapeHTML(buttonLabel)}</button>
+  `;
+  document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+  const xBtn = document.getElementById('info-sheet-close');
+  const okBtn = document.getElementById('info-sheet-ok');
+  if (xBtn) xBtn.addEventListener('click', close);
+  if (okBtn) okBtn.addEventListener('click', close);
+}
+
 // v9: confirm the migration prompt — sets the chosen name on the interim preset
 // created during load(). If name is blank we keep the placeholder 'My items'.
 function confirmMigrationPrompt() {

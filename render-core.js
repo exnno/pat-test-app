@@ -98,24 +98,24 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v40: rolled forward — content covers the in-app dialog replacements.
-  // Key bumped to pat:v40welcome (gate uses v40WelcomeSeen). Still suppressed
+  // v41: rolled forward — content covers the import/restore/report error sheets.
+  // Key bumped to pat:v41welcome (gate uses v41WelcomeSeen). Still suppressed
   // while the first-run wizard is showing and while the v9 migration prompt is up.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v40WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v41WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V40">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V41">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V40</h3>
+        <h3 class="bulk-sheet-title">What's new in V41</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Tidier pop-ups throughout.</strong> Naming a report template, and confirmations like "Delete this?", now use the app's own slide-up panels instead of the system pop-up boxes — more reliable on iPhone and a much cleaner look.</li>
-        <li><strong>Quick confirmation messages.</strong> Actions like restoring a backup now show a small message that slides up and fades away, instead of a pop-up you have to tap to dismiss.</li>
+        <li><strong>No more system pop-ups.</strong> The last few places that still used your phone's built-in pop-up boxes — import, restore and report messages — now use the app's own slide-up panels, so they're reliable on iPhone and match the rest of the app.</li>
+        <li><strong>Messages stay until you tap.</strong> If something goes wrong importing a file or building a report, the message now waits for you to tap OK instead of being a fleeting pop-up.</li>
       </ul>
-      <button class="btn-primary" id="v40-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v41-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
