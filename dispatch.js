@@ -567,31 +567,6 @@ registerActions({
     onConfirm: () => window.location.reload()
   }),
 
-  // v43: login (mock OAuth flow for now)
-  'login-google': () => {
-    state.authStatus = 'logging-in';
-    render();
-    // Simulate auth delay (200ms). Real OAuth redirect happens in cloud phase.
-    setTimeout(() => {
-      // Mock success: generate a fake user ID
-      const mockUserId = 'user_' + Math.random().toString(36).slice(2, 9);
-      const mockToken = 'token_' + Math.random().toString(36).slice(2, 9);
-      state.userId = mockUserId;
-      state.authToken = mockToken;
-      state.authStatus = 'logged-in';
-      // Persist auth
-      localStorage.setItem(PAT_AUTH_KEY, JSON.stringify({
-        userId: state.userId,
-        authToken: state.authToken,
-        loginTime: new Date().toISOString()
-      }));
-      // Jump to Sessions
-      state.view = 'sessions';
-      save();
-      render();
-      showToast('Signed in');
-    }, 500);
-  },
   'wizard-next': () => wizardNextStep(),
   'wizard-back': () => wizardBack(),
   'wizard-skip': () => skipOnboarding(),

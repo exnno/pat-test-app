@@ -1132,12 +1132,14 @@ function renderSettingsAbout() {
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
+      ${cloudPagesMenu}
+
       <!-- v8: rolling 3-version changelog. v43: rolled forward — V43 on top, V40 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
         <p><strong>V43</strong> · June 2026</p>
-        <p class="muted">Calibration reminders now show on the entry screen so you're never testing with an out-of-date meter. Cloud prep work is underway for the commercial version — you'll be able to sync your data and back it up securely online.</p>
+        <p class="muted">The Sessions screen now warns you when your tester's calibration is due within 30 days or has lapsed, so you're never testing with an out-of-date meter. Behind the scenes, groundwork is underway for the commercial cloud version. None of your existing data is affected.</p>
 
         <p><strong>V42</strong> · June 2026</p>
         <p class="muted">Setting up a new phone is now a proper guided walkthrough: your engineer details, your company branding for reports (name, logo and colour), and an optional example job so you can see how everything looks. There's also a quick in-app tour of the basics — Sessions, Quick Pick, the Overview, reports and backups — which you can run any time from the button just below. None of your existing data is affected.</p>
@@ -1157,8 +1159,6 @@ function renderSettingsAbout() {
         <p class="muted">A quick guided tour of the basics — Sessions, Quick Pick, the Overview, reports and backups. Handy if you're getting started or showing someone else the ropes.</p>
         <button class="backup-action-btn" id="about-open-tour" data-action="open-tour" style="margin-top:8px">🧭 Show me around the app again</button>
       </div>
-
-      ${cloudPagesMenu}
 
       <div class="info-card">
         <h3>Privacy</h3>

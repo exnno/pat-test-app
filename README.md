@@ -3,10 +3,11 @@
 A fast, offline-first portable appliance testing app. Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, flexible clients & sites, search, filters, bulk edit, JSON backup/restore, dark mode, CSV export/import, and branded PDF report generation.
 
 **Live:** <https://exnno.github.io/pat-test-app/>
-**Current version:** V42 · cache `pat-v42`
+**Current version:** V43 · cache `pat-v43`
 
 ## Key features
 
+- **Calibration warning (V43)** — the Sessions screen shows a warning banner when the tester's calibration date (set under Settings → User) falls due within 30 days, or has already lapsed. A healthy calibration shows nothing, so the banner only appears when it needs your attention; tapping **Update** jumps straight to the calibration date field. This release also lays quiet groundwork for the planned cloud version: sessions, clients and sites now carry inert sync-metadata fields (owner id, last-modified, last-synced) that ride through backups untouched and have no effect on the offline app. No data-model change that affects existing data (backup version stays 5).
 - **Single-item entry** — one appliance at a time, sticky location field, 9 Quick Pick type buttons, optional asset-number prefix, cross-session autocomplete, copy-last-result.
 - **Smart Quick Pick** — learns which item types you test at each location and reorders the Quick Pick buttons accordingly (opt-in). Matching is by shared whole words (an exact location match counts more than a word-overlap one), with a swap-in floor and staple protection so your everyday buttons aren’t displaced by a one-off (V27).
 - **Multi Pick** — pre-set sequences of item types for repetitive runs.

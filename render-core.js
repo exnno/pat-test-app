@@ -35,6 +35,16 @@ function render() {
 
   const v = state.view;
 
+  // v43: the cloud-pages secret menu (revealed by long-pressing the About title)
+  // must close as soon as you leave the About page. We keep it open only while on
+  // About itself or on one of the three cloud pages (so tapping in and back out
+  // doesn't lose it), and clear it on any other view.
+  if (state.cloudPagesRevealed &&
+      v !== 'settingsAbout' && v !== 'cloudAccount' &&
+      v !== 'cloudSync' && v !== 'cloudSubscription') {
+    state.cloudPagesRevealed = false;
+  }
+
   // v42: the feature walkthrough is a full-screen view that owns #app entirely —
   // no banner, no stacked modals. Short-circuit before the normal screen build.
   if (v === 'tour' && state.tourOpen) {
@@ -48,8 +58,6 @@ function render() {
   else if (v === 'entry') html = renderEntry();
   else if (v === 'overview') html = renderOverview();
   else if (v === 'editSession') html = renderEditSession();
-  // v43: login page (pre-app, shown if not authenticated)
-  else if (v === 'login') html = renderLogin();
   else if (v === 'settings') html = renderSettingsHub();
   else if (v === 'settingsCategory') html = renderSettingsCategory();   // v32
   else if (v === 'settingsUser') html = renderSettingsUser();
@@ -524,6 +532,35 @@ function emptyStateHTML(icon, title, body, actionLabel, actionName) {
     </div>`;
 }
 
+// v43: calibration warning banner for the Sessions screen. Shows ONLY when the
+// engineer's tester calibration falls due within CAL_DUE_SOON_DAYS (30 days) or
+// is already overdue. Otherwise returns '' (no banner) so a healthy cal date adds
+// nothing to the screen. Tappable to jump to Settings → User to update the date.
+function renderCalWarningBanner() {
+  if (!state.calDue) return '';
+  const dueDate = new Date(state.calDue);
+  if (isNaN(dueDate.getTime())) return '';
+  const today = new Date();
+  const daysUntil = Math.ceil((dueDate - today) / (1000 * 3600 * 24));
+  // Only warn within the 30-day window or when overdue. Healthy = no banner.
+  if (daysUntil > CAL_DUE_SOON_DAYS) return '';
+
+  let cls, label;
+  if (daysUntil < 0) {
+    cls = 'cal-overdue';
+    label = `⚠ Tester calibration overdue (${Math.abs(daysUntil)} day${Math.abs(daysUntil) === 1 ? '' : 's'} ago)`;
+  } else {
+    cls = 'cal-due-soon';
+    label = `⚠ Tester calibration due in ${daysUntil} day${daysUntil === 1 ? '' : 's'}`;
+  }
+  return `
+    <div class="cal-banner ${cls}" role="status">
+      <span class="cal-banner-text">${escapeHTML(label)}</span>
+      <button class="cal-banner-action" data-action="edit-cal-date">Update</button>
+    </div>
+  `;
+}
+
 function renderSessions() {
   const nfError = state.newFormError ? `
       <p class="nf-error" role="alert">${escapeHTML(state.newFormError)}</p>
@@ -598,6 +635,9 @@ function renderSessions() {
   // form is open or the sessions list is empty.
   const backupBanner = shouldShowBackupReminder() ? renderBackupReminderBanner() : '';
 
+  // v43: tester calibration warning — only present when due within 30 days or overdue.
+  const calWarning = renderCalWarningBanner();
+
   return `
     <div class="screen">
       <header class="header">
@@ -605,6 +645,7 @@ function renderSessions() {
         ${state.reportSettings.enabled ? '<button class="icon-btn" id="reports-btn" data-action="open-reports" aria-label="Reports">📄</button>' : ''}
         <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">⚙</button>
       </header>
+      ${calWarning}
       ${backupBanner}
       ${newForm}
       ${searchRow}
@@ -852,44 +893,6 @@ function renderImportSummaryModal() {
   `;
 }
 
-// v43: login page. Pre-app screen shown if user is not logged in. Mock OAuth flow
-// for V43; real integration comes in the cloud phase.
-function renderLogin() {
-  const hasError = state.authStatus === 'error';
-  const isLoggingIn = state.authStatus === 'logging-in';
-
-  return `
-    <div class="screen login-screen">
-      <div class="login-container">
-        <div class="login-header">
-          <h1 style="margin:0 0 8px;font-size:28px;font-weight:700">PAT Test</h1>
-          <p style="margin:0;font-size:14px;color:var(--text-secondary)">Fast portable appliance testing</p>
-        </div>
-
-        <div class="login-content">
-          <p style="margin:0 0 24px;font-size:15px;line-height:1.5;color:var(--text)">Sign in with your Google account to sync your data and back it up securely in the cloud. (Coming soon — for now this is a demo.)</p>
-
-          ${hasError ? `
-            <div class="login-error" style="margin:0 0 16px;padding:12px;background:#fef2f2;border-radius:8px;border-left:4px solid #dc2626;color:#7f1d1d;font-size:13px">
-              <strong>Sign-in failed.</strong> Check your connection and try again.
-            </div>
-          ` : ''}
-
-          <button class="login-button ${isLoggingIn ? 'disabled' : ''}" id="login-google-btn" data-action="login-google" ${isLoggingIn ? 'disabled' : ''}>
-            ${isLoggingIn ? '⟳ Signing in…' : '🔐 Sign in with Google'}
-          </button>
-
-          <p style="margin:12px 0 0;font-size:12px;text-align:center;color:var(--text-secondary)">Your data stays on your device until you choose to sync.</p>
-        </div>
-
-        <div class="login-footer">
-          <p style="margin:0;font-size:11px;color:var(--text-secondary);text-align:center">© 2026 Peter Birchley. All rights reserved.</p>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
 function renderEntry() {
   const sess = activeSession();
   if (!sess) { state.view = 'sessions'; return renderSessions(); }
@@ -1001,36 +1004,6 @@ function renderEntry() {
     </div>
   ` : '';
 
-  // v43: calibration reminder. If a calibration due date is set, show a visual
-  // indicator (green = safe, yellow = due soon, red = overdue). Tappable to edit
-  // the cal date in Settings. No indicator if no cal date is set yet.
-  let calBanner = '';
-  if (state.calDue) {
-    const dueDate = new Date(state.calDue);
-    const today = new Date();
-    const daysUntil = Math.ceil((dueDate - today) / (1000 * 3600 * 24));
-    let bannerClass = 'cal-ok';
-    let bannerLabel = `Calibration due ${formatDate(state.calDue)}`;
-
-    if (daysUntil < 0) {
-      bannerClass = 'cal-overdue';
-      bannerLabel = `⚠ Calibration OVERDUE (${Math.abs(daysUntil)} day${Math.abs(daysUntil) === 1 ? '' : 's'} ago)`;
-    } else if (daysUntil <= CAL_DUE_SOON_DAYS) {
-      bannerClass = 'cal-due-soon';
-      bannerLabel = `⚠ Calibration due soon (${daysUntil} day${daysUntil === 1 ? '' : 's'})`;
-    } else {
-      bannerClass = 'cal-ok';
-      bannerLabel = `✓ Calibration due ${formatDate(state.calDue)}`;
-    }
-
-    calBanner = `
-      <div class="cal-banner ${bannerClass}" role="status">
-        <span class="cal-banner-text">${escapeHTML(bannerLabel)}</span>
-        <button class="cal-banner-action" id="cal-edit-btn" data-action="edit-cal-date">Edit</button>
-      </div>
-    `;
-  }
-
   const passFailDisabled = isLocked ? 'disabled' : '';
   const copyDisabled = (!hasLast || isLocked) ? 'disabled' : '';
 
@@ -1092,7 +1065,6 @@ function renderEntry() {
       </header>
 
       ${lockBanner}
-      ${calBanner}
       ${progressRow}
 
       <label class="label">Asset number</label>
