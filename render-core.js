@@ -128,21 +128,21 @@ function render() {
   // suppressed while the first-run wizard or the v9 migration prompt is up — so an
   // UPGRADING user sees this modal and a genuinely-new install sees the wizard.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v45WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
-    <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V45">
+  const welcomeModal = (state.v46WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+    <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V46">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V45</h3>
+        <h3 class="bulk-sheet-title">What's new in V46</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>A smarter first-time setup.</strong> Setting up a new phone now feels properly guided — clearer steps, your report branding, and an optional example job — so a fresh device is ready in a couple of minutes.</li>
-        <li><strong>Setting up another phone?</strong> You can run that guided setup any time from <em>Settings → Help → About → “Set up another device”.</em></li>
-        <li><strong>A tidier guided tour.</strong> The quick walkthrough of the basics has had a polish too — replay it from <em>About → “Show me around the app again”.</em></li>
+        <li><strong>Pages start at the top.</strong> When you move to a different screen it now opens at the top, instead of staying scrolled halfway down where you left the last one.</li>
+        <li><strong>Your place is kept in the list.</strong> Open a session from a long list and tap back — you’ll land right where you were, not back at the top.</li>
+        <li><strong>Easier to tap.</strong> The small close and menu buttons now have bigger touch areas, and tapping outside a pop-up closes it.</li>
       </ul>
-      <button class="btn-primary" id="v45-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v46-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -307,7 +307,7 @@ function render() {
         ? "You've already exported this session, and it's been edited since. If you make further changes you'll need to export it again."
         : "You've already exported this session. If you make changes you'll need to export it again.";
       reopenWarnModal = `
-        <div class="modal-backdrop" style="z-index:300"></div>
+        <div class="modal-backdrop" data-action="reopen-cancel" style="z-index:300"></div>
         <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Already exported">
           <div class="bulk-sheet-handle"></div>
           <div class="bulk-sheet-header">
@@ -333,7 +333,7 @@ function render() {
   if (state.signaturePadOpen) {
     const saveDisabled = state.signaturePadHasInk ? '' : 'disabled';
     signaturePadModal = `
-      <div class="modal-backdrop" style="z-index:300"></div>
+      <div class="modal-backdrop" data-action="signature-pad-cancel" style="z-index:300"></div>
       <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Draw signature">
         <div class="bulk-sheet-handle"></div>
         <div class="bulk-sheet-header">
@@ -378,6 +378,16 @@ function render() {
   // class if it lingered from a previous v12 render, in case a hot-swap
   // mid-session leaves a stale body class.
   document.body.classList.remove('view-entry');
+  // v46: restore the remembered Sessions list offset when returning from a
+  // session (flag set in setView). The list HTML is already in #app at this
+  // point, so the scroll target exists. One-shot: clear the flag once consumed.
+  if (state.view === 'sessions' && state.restoreSessionsScroll) {
+    const top = state.sessionsScrollTop || 0;
+    const sc = document.scrollingElement || document.documentElement;
+    if (sc) sc.scrollTop = top;
+    window.scrollTo(0, top);
+    state.restoreSessionsScroll = false;
+  }
   bindFocusFields();
   if (state.signaturePadOpen) initSignaturePad();   // v34
   // v43: set up long-press on About title for cloud pages reveal

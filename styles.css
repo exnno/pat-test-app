@@ -188,7 +188,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .site-name { font-weight: 700; font-size: 16px; text-align: center; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 8px; color: var(--text); }
 
 .icon-btn { width: 40px; height: 40px; border: none; background: var(--neutral-bg); border-radius: 8px; display: inline-flex; align-items: center; justify-content: center; font-size: 20px; color: var(--neutral-text); }
-.icon-btn-sm { width: 36px; height: 36px; border: none; background: transparent; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 18px; }
+.icon-btn-sm { width: 44px; height: 44px; border: none; background: transparent; border-radius: 6px; display: inline-flex; align-items: center; justify-content: center; color: var(--text-muted); font-size: 18px; }
 
 .progress { font-size: 13px; color: var(--text-muted); margin: 8px 0 14px; }
 
@@ -455,14 +455,14 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   color: var(--text);
 }
 .fail-close-btn {
-  width: 32px; height: 32px;
+  width: 44px; height: 44px;
   background: transparent;
   border: none;
   font-size: 22px;
   color: var(--text-muted);
   border-radius: 6px;
 }
-.fail-close-spacer { width: 32px; }
+.fail-close-spacer { width: 44px; }
 .fail-reasons-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -811,7 +811,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   border: none;
   color: #fff;
   font-size: 20px;
-  padding: 4px 8px;
+  /* v46: 44px tap target without changing the banner's height — the extra
+     padding is pulled back by an equal negative margin, so the glyph and row
+     stay put while the hittable area grows. */
+  padding: 12px 14px;
+  margin: -12px -14px;
   line-height: 1;
 }
 /* Push the screen content down when banner is visible */
@@ -1492,8 +1496,10 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   color: inherit;
   font-size: 20px;
   line-height: 1;
-  padding: 2px 6px;
-  margin: -2px -6px 0 0;
+  /* v46: 44px tap target, pulled back by negative margin so the banner row
+     height and the glyph position are unchanged. */
+  padding: 12px 14px;
+  margin: -12px -14px -12px 0;
   opacity: 0.6;
   cursor: pointer;
 }

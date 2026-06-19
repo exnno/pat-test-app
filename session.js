@@ -883,6 +883,34 @@ function setView(v) {
     state.searchQuery = '';
     exitSelectionMode();
   }
+  // v46: scroll behaviour on page change. setView is the single funnel for every
+  // genuine page transition (re-renders for logging/toggles/dialogs/wizard/tour
+  // paging call render() directly and are deliberately NOT affected — they keep
+  // your scroll position). Rules:
+  //   • Leaving Sessions to open a session (→ entry) — remember where you were in
+  //     the list so returning restores it (decision 2A: Sessions only).
+  //   • Arriving back at Sessions from a session — restore that remembered offset.
+  //   • Every other genuine view change — reset to the top (the core ask, 1A/2A).
+  // When the view is unchanged we do nothing (re-tapping the current tab shouldn't
+  // jump you around).
+  const prevView = state.view;
+  if (v !== prevView) {
+    if (prevView === 'sessions' && v === 'entry') {
+      // Capture the live list offset before it's torn down by render().
+      const sc = document.scrollingElement || document.documentElement;
+      state.sessionsScrollTop = sc ? sc.scrollTop : 0;
+      state.restoreSessionsScroll = false;
+    } else if (v === 'sessions' && prevView === 'entry') {
+      // Returning to the list — let the Sessions render restore the offset.
+      state.restoreSessionsScroll = true;
+    } else {
+      // Any other genuine navigation: clean top, and a fresh entry into Sessions
+      // by any other route (Settings, etc.) should NOT restore a stale offset.
+      state.restoreSessionsScroll = false;
+      if (v === 'sessions') state.sessionsScrollTop = 0;
+      window.scrollTo(0, 0);
+    }
+  }
   state.view = v;
   render();
 }
@@ -1544,6 +1572,12 @@ function dismissV42Welcome() {
 function dismissV45Welcome() {
   state.v45WelcomeSeen = true;
   localStorage.setItem(V45_WELCOME_KEY, '1');
+  render();
+}
+
+function dismissV46Welcome() {
+  state.v46WelcomeSeen = true;
+  localStorage.setItem(V46_WELCOME_KEY, '1');
   render();
 }
 

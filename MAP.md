@@ -1,4 +1,4 @@
-# PAT App — Code Map (V45)
+# PAT App — Code Map (V46)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -37,8 +37,8 @@ the existing same-origin SW fetch handler into Cache Storage (separate from the
 ---
 
 ## config.js (~445 ln) — constants & defaults, pure data
-`APP_VERSION` (V44); all `*_KEY` localStorage key names (incl. welcome keys,
-latest `V43_WELCOME_KEY`, and the v33 first-run `ONBOARD_KEY`);
+`APP_VERSION` (V46); all `*_KEY` localStorage key names (incl. welcome keys,
+latest `V46_WELCOME_KEY`, and the v33 first-run `ONBOARD_KEY`);
 `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`; v27 SQP tuning;
 `DEFAULT_ITEM_TYPES`, `DEFAULT_FAIL_REASONS`, `DEFAULT_DESCRIPTIONS`,
@@ -90,6 +90,8 @@ and harmless — not removed, to avoid needless churn.
 welcome key actually WIRED since V42 (V43/V44 rolled none). Rolling it freshly
 also clears the long-standing "welcome modal still gates on `v42WelcomeSeen`"
 debt. Onboarding-polish release; no other config change.
+**v46:** `APP_VERSION` → 'V46'; `V46_WELCOME_KEY` (`pat:v46welcome`). Navigation
+& UI polish release. No other config change.
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
@@ -131,6 +133,10 @@ fresh path is now 6 steps (intro/path/details/branding/demo/finish); step state
 stays transient.
 **v45:** `v45WelcomeSeen` (the first wired welcome gate since V42). No other state
 change — the onboarding polish is markup/CSS/copy only.
+**v46:** `v46WelcomeSeen` (welcome gate); `sessionsScrollTop` (remembered Sessions
+list offset) and `restoreSessionsScroll` (one-shot flag telling the next Sessions
+render to restore that offset instead of top-resetting). Both scroll fields are
+transient — never persisted. No backup/codec change.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -192,6 +198,9 @@ read `V43_WELCOME_KEY` though that modal was never wired). No codec or backup
 change (`backupVersion` stays 5). The returning-user heuristic for the onboard
 gate was left unchanged — a fresh install can't have the V45 flag, and upgraders
 are already covered by the existing clauses.
+**v46:** `load` also reads `V46_WELCOME_KEY` → `state.v46WelcomeSeen`. No codec or
+backup change (`backupVersion` stays 5). Scroll-state fields are transient and not
+loaded/saved.
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -408,6 +417,13 @@ re-renders).
 discipline it already applies to the fail sheet, multi-pick sheet, bulk-edit
 menus and client dialogs; fixes the form lingering open after navigating away
 and back to Sessions.
+**v46:** `setView` is the home of the scroll-on-navigation behaviour. On a genuine
+view change only (when `v !== state.view`): leaving Sessions for `entry` captures
+the live list offset into `state.sessionsScrollTop`; returning to Sessions from
+`entry` sets `state.restoreSessionsScroll` (consumed by `render`); any other
+navigation calls `window.scrollTo(0,0)` and clears any stale Sessions offset.
+Same-view calls are a no-op for scroll. Deliberately NOT in `render()` — re-renders
+for logging/toggles/dialogs/wizard/tour paging must keep their scroll position.
 **v40:** `dismissV40Welcome` (sets `v40WelcomeSeen` + persists `V40_WELCOME_KEY`).
 Native `prompt()`/`confirm()`/`alert()` removed from the routine flows in favour
 of `openConfirmSheet`/`openNameSheet`/`showToast` (feedback.js). Restructured to
@@ -439,6 +455,8 @@ company-name field survives the logo re-render.
 **v45:** `dismissV45Welcome` (sets `v45WelcomeSeen` + persists `V45_WELCOME_KEY`)
 — the first wired dismiss handler since `dismissV42Welcome`. No other session.js
 change; the wizard copy/layout polish is in render-core + styles.
+**v46:** `dismissV46Welcome` (sets `v46WelcomeSeen` + persists `V46_WELCOME_KEY`),
+mirroring the V45 handler. Scroll behaviour added to `setView` (see above).
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves, the first-run wizard / onboarding,
 the example-session seed, the signature, cert numbers / job notes / report
@@ -605,6 +623,16 @@ heights; the finish step's tour card is restyled (`.wizard-finish-tour-title` +
 `-sub`) with the walkthrough as the clear primary action and a muted
 `.wizard-replay-note` ("replay from Settings → About"). All wizard handlers/actions
 unchanged — purely presentational.
+**v46:** **welcome modal rolled to V46** — gate keys off `v46WelcomeSeen`, dismiss
+id `v46-welcome-dismiss`, fresh "What's new in V46" copy (scroll-to-top, list
+position, tap targets). End of `render()` consumes `state.restoreSessionsScroll`:
+when returning to Sessions it sets the document scroll back to
+`state.sessionsScrollTop` (the list HTML is already in `#app` at that point) and
+clears the one-shot flag. **Tap-outside-to-close** added to three sheets whose
+backdrops previously did nothing — welcome (`welcome-dismiss`), reopen-warning
+(`reopen-cancel`), signature pad (`signature-pad-cancel`) — by putting the existing
+cancel action on the `.modal-backdrop`. The wizard and v9 migration prompt backdrops
+are deliberately left inert (forced-input flows must not be dismissed by a mis-tap).
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
 Edit-session UI, the empty states, the welcome modal, the first-run wizard, the
 signature draw pad, the calibration warning banner, or the full-screen
@@ -662,6 +690,8 @@ with mock data for now; will integrate real cloud backend in the PAT Cloud phase
 **v45:** About changelog rolled (V45 top, V42 dropped; now lists V45/V44/V43). No
 other settings change — the "Set up another device" and "Show me around" cards are
 unchanged.
+**v46:** About changelog rolled (V46 top, V43 dropped; now lists V46/V45/V44). No
+other settings change.
 *Touch to:* change any Settings page; the category structure (edit
 `SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META` in **config.js**, not here); search
 matching (aliases live in config); or roll the About changelog.
@@ -767,6 +797,9 @@ clicks: `tour-next`/`tour-prev`/`tour-goto` (data-arg index)/`tour-skip`, and
 **v45:** `welcome-dismiss` now calls `dismissV45Welcome` (was `dismissV42Welcome`).
 No other dispatch change — the wizard polish added no new actions (dots are
 non-interactive, the body/foot split and emoji headers are markup only).
+**v46:** `welcome-dismiss` now calls `dismissV46Welcome`. No new actions — the
+tap-outside-to-close sheets reuse their existing `welcome-dismiss` / `reopen-cancel`
+/ `signature-pad-cancel` actions, now also placed on the backdrops in render-core.
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

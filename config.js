@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V45';
+const APP_VERSION = 'V46';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -86,6 +86,7 @@ const V43_WELCOME_KEY = 'pat:v43welcome';   // v43: calibration reminder + cloud
 // setup AND clears the inherited "modal still gates on v42WelcomeSeen" debt — the
 // gate, dismiss handler and copy below are all freshly tied to V45.
 const V45_WELCOME_KEY = 'pat:v45welcome';   // v45: onboarding wizard + walkthrough polish
+const V46_WELCOME_KEY = 'pat:v46welcome';   // v46: navigation & UI polish (scroll-to-top, tap targets)
 // v42: the opt-in demo session created on the FRESH onboarding path (decision
 // 9A). Tagged with this flag on the session object so the app can label it as an
 // example and the user knows it is safe to delete. It is a perfectly ordinary

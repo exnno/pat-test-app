@@ -1134,18 +1134,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v45: rolled forward — V45 on top, V42 dropped. -->
+      <!-- v8: rolling 3-version changelog. v46: rolled forward — V46 on top, V43 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V46</strong> · June 2026</p>
+        <p class="muted">Moving between screens now starts you at the top of each page, instead of staying scrolled where you left the last one. Open a session from a long list and tap back, and you'll return to the same spot in the list. The small close and menu buttons are easier to tap, and tapping outside a pop-up now closes it. None of your existing data is affected.</p>
 
         <p><strong>V45</strong> · June 2026</p>
         <p class="muted">Setting up a new phone is smoother: the first-time setup has clearer steps and a tidier layout, and the quick guided tour has had a polish too. If you ever set up another phone, you can run the guided setup from “Set up another device” below. None of your existing data is affected.</p>
 
         <p><strong>V44</strong> · June 2026</p>
         <p class="muted">A maintenance update: tidied-up internal documentation and corrected the wording around the calibration reminder. No change to how the app works and none of your existing data is affected.</p>
-
-        <p><strong>V43</strong> · June 2026</p>
-        <p class="muted">The Sessions screen now warns you when your tester's calibration is due within 30 days or has lapsed, so you're never testing with an out-of-date meter. Behind the scenes, groundwork is underway for the commercial cloud version. None of your existing data is affected.</p>
       </div>
 
       <div class="info-card">
