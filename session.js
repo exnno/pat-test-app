@@ -73,6 +73,39 @@ function deletePreset(id) {
   save();
   return true;
 }
+
+// ---------- v47: entry-screen preset switcher (long-press) ----------
+// The quick-pick grid on the entry screen long-presses to a bottom sheet that
+// lists every item-type preset, so the active one can be switched without going
+// into Settings. It only switches the active preset (which 9 buttons show); it
+// does not log anything. Because the entry screen has no preset-editing textarea
+// (that lives only on the Settings page), there are never unsaved preset edits to
+// guard here — so switchPreset can be called directly, unlike the Settings
+// dropdown which must run the discard-changes confirm first.
+function openPresetSheet() {
+  const sess = activeSession();
+  if (!sess) return;
+  // Only meaningful when there's more than one preset to choose between, but we
+  // still open it for a single preset (it shows the one, ticked) so the gesture
+  // never feels dead. No harm either way.
+  state.presetSheetOpen = true;
+  render();
+}
+
+function closePresetSheet() {
+  state.presetSheetOpen = false;
+  render();
+}
+
+// Switch to the chosen preset and close the sheet. Switches only — never fires
+// items. A no-op (just closes) if the id is unknown or already active.
+function switchPresetFromSheet(id) {
+  state.presetSheetOpen = false;
+  if (!id || id === state.activePresetId) { render(); return; }
+  if (!state.itemPresets.find(p => p.id === id)) { render(); return; }
+  switchPreset(id);   // switchPreset already calls save() + render()
+}
+
 // ---------- Helpers ----------
 const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 const todayISO = () => new Date().toISOString().slice(0, 10);
@@ -498,6 +531,7 @@ function loadFormForCursor() {
   state.failModalStage = 'reasons';
   state.failOtherText = '';
   state.multiPickSheetOpen = false;   // v16
+  state.presetSheetOpen = false;      // v47
   // v20: the loaded item may carry a different location, so the frozen SQP row
   // must rebuild for it. Cheap no-op when the feature is off.
   invalidateSqpRow();
@@ -858,6 +892,7 @@ function setView(v) {
   state.failModalStage = 'reasons';
   state.failOtherText = '';
   state.multiPickSheetOpen = false;   // v16
+  state.presetSheetOpen = false;      // v47
   state.bulkLocationDialogOpen = false;
   state.bulkLocationValue = '';
   // v11: also clear the new bulk-edit menu + sub-dialog state.
@@ -1550,6 +1585,12 @@ function dismissV45Welcome() {
 function dismissV46Welcome() {
   state.v46WelcomeSeen = true;
   localStorage.setItem(V46_WELCOME_KEY, '1');
+  render();
+}
+
+function dismissV47Welcome() {
+  state.v47WelcomeSeen = true;
+  localStorage.setItem(V47_WELCOME_KEY, '1');
   render();
 }
 

@@ -434,6 +434,7 @@ function loadV11Settings() {
   state.v43WelcomeSeen = localStorage.getItem(V43_WELCOME_KEY) === '1';
   state.v45WelcomeSeen = localStorage.getItem(V45_WELCOME_KEY) === '1';
   state.v46WelcomeSeen = localStorage.getItem(V46_WELCOME_KEY) === '1';
+  state.v47WelcomeSeen = localStorage.getItem(V47_WELCOME_KEY) === '1';
 
   // v43: cloud prep. Load mock auth state (userId, authToken from PAT_AUTH_KEY).
   // This will persist in the cloud phase; for now it's a passthrough field that

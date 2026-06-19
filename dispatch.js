@@ -258,7 +258,15 @@ registerActions({
   // Multi Pick sheet
   'multipick-open': () => { const sess = activeSession(); if (sess && sess.locked) return; state.multiPickSheetOpen = true; render(); },
   'multipick-fire': (arg) => multiPickFire(parseInt(arg, 10)),
-  'multipick-close': () => { state.multiPickSheetOpen = false; render(); }
+  'multipick-close': () => { state.multiPickSheetOpen = false; render(); },
+
+  // v47: quick-pick preset switcher sheet (opened by long-press on the grid;
+  // the open is in events.js via openPresetSheet, not a click action).
+  'preset-sheet-close': () => closePresetSheet(),
+  'preset-sheet-pick': (arg) => switchPresetFromSheet(arg),
+  // Shortcut to the Settings preset page. Close the sheet, then navigate to the
+  // Quick Pick Items settings page (which hosts the preset dropdown/editor).
+  'preset-sheet-edit': () => { state.presetSheetOpen = false; setView('settingsItems'); }
 });
 
 // ---------------------------------------------------------------------------
@@ -621,7 +629,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV46Welcome(),
+  'welcome-dismiss': () => dismissV47Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 

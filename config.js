@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V46';
+const APP_VERSION = 'V47';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -87,6 +87,13 @@ const V43_WELCOME_KEY = 'pat:v43welcome';   // v43: calibration reminder + cloud
 // gate, dismiss handler and copy below are all freshly tied to V45.
 const V45_WELCOME_KEY = 'pat:v45welcome';   // v45: onboarding wizard + walkthrough polish
 const V46_WELCOME_KEY = 'pat:v46welcome';   // v46: navigation & UI polish (scroll-to-top, tap targets)
+const V47_WELCOME_KEY = 'pat:v47welcome';   // v47: long-press quick-pick preset switcher
+
+// v47: how long (ms) to hold the quick-pick grid before the preset switcher
+// sheet opens. Deliberately a single named constant so the threshold can be
+// tuned in one edit. NOTE: 2000ms is a long hold for touch — if it feels
+// unresponsive on the phone, drop this to ~600 (the usual long-press sweet spot).
+const QUICK_PICK_LONGPRESS_MS = 2000;
 // v42: the opt-in demo session created on the FRESH onboarding path (decision
 // 9A). Tagged with this flag on the session object so the app can label it as an
 // example and the user knows it is safe to delete. It is a perfectly ordinary

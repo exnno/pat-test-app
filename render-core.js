@@ -169,21 +169,21 @@ function render() {
   // suppressed while the first-run wizard or the v9 migration prompt is up — so an
   // UPGRADING user sees this modal and a genuinely-new install sees the wizard.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v46WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v47WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V46">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V47">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V46</h3>
+        <h3 class="bulk-sheet-title">What's new in V47</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Pages start at the top.</strong> When you move to a different screen it now opens at the top, instead of staying scrolled halfway down where you left the last one.</li>
-        <li><strong>Your place is kept in the list.</strong> Open a session from a long list and tap back — you’ll land right where you were, not back at the top.</li>
-        <li><strong>Easier to tap.</strong> The small close and menu buttons now have bigger touch areas, and tapping outside a pop-up closes it.</li>
+        <li><strong>Switch presets without leaving the test screen.</strong> Press and hold the row of quick-pick buttons for a couple of seconds and a list of your presets pops up — tap one to switch which buttons show.</li>
+        <li>It only switches the buttons — it never logs anything, so you can swap presets mid-job in a second.</li>
+        <li>Need to add or edit a preset? There’s a shortcut to the preset settings at the bottom of that pop-up.</li>
       </ul>
-      <button class="btn-primary" id="v46-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v47-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -1151,6 +1151,55 @@ function renderEntry() {
     `;
   }
 
+  // v47: quick-pick preset switcher. Opened by a long-press on the quick-pick
+  // grid (gesture bound in events.js). Lists every item-type preset; tapping one
+  // switches the active preset (which 9 buttons show) and closes. Switch only —
+  // it never logs. The current preset is ticked. A shortcut at the foot jumps to
+  // the Settings preset page to add/edit presets. Built on the same bottom-sheet
+  // pattern as Multi Pick.
+  let presetSheet = '';
+  if (state.presetSheetOpen) {
+    const presets = state.itemPresets || [];
+    const presetBody = presets.length ? `
+      <div class="preset-switch-list">
+        ${presets.map(p => {
+          const isActive = p.id === state.activePresetId;
+          const items = Array.isArray(p.items) ? p.items : [];
+          const preview = items.slice(0, 4).join(' · ');
+          const more = items.length > 4 ? ` +${items.length - 4} more` : '';
+          const sub = items.length
+            ? `${preview}${more}`
+            : 'No items yet';
+          return `
+            <button class="preset-switch-option${isActive ? ' active' : ''}" data-action="preset-sheet-pick" data-arg="${escapeHTML(p.id)}">
+              <span class="preset-switch-tick">${isActive ? '✓' : ''}</span>
+              <span class="preset-switch-text">
+                <span class="preset-switch-name">${escapeHTML(p.name || 'Untitled preset')}</span>
+                <span class="preset-switch-sub">${escapeHTML(sub)}</span>
+              </span>
+            </button>
+          `;
+        }).join('')}
+      </div>
+      <button class="preset-switch-edit" data-action="preset-sheet-edit">⚙ Edit presets</button>
+    ` : `
+      <p class="multipick-empty">No presets set up yet. Add them in Settings.</p>
+    `;
+    presetSheet = `
+      <div class="modal-backdrop" id="preset-sheet-backdrop" data-action="preset-sheet-close"></div>
+      <div class="fail-sheet preset-switch-sheet" role="dialog" aria-label="Switch preset">
+        <div class="fail-sheet-handle"></div>
+        <div class="fail-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="fail-sheet-title">Switch preset</h3>
+          <button class="fail-close-btn" id="preset-sheet-close" data-action="preset-sheet-close" aria-label="Cancel">×</button>
+        </div>
+        <p class="multipick-sheet-hint">Changes which quick-pick buttons show. It won’t log anything.</p>
+        ${presetBody}
+      </div>
+    `;
+  }
+
   return `
     <div class="screen">
       <header class="header-row">
@@ -1172,7 +1221,7 @@ function renderEntry() {
       </div>
 
       <label class="label">Item type</label>
-      <div class="quick-grid">${quickButtons}</div>
+      <div class="quick-grid" id="quick-grid">${quickButtons}</div>
       <div class="custom-type-wrap">
         <input class="input" id="f-type" value="${escapeHTML(state.form.itemType)}" placeholder="…or type custom" autocomplete="off" style="margin-top:8px">
         ${suggestionsBlock}
@@ -1199,6 +1248,7 @@ function renderEntry() {
 
       ${failModal}
       ${multiPickSheet}
+      ${presetSheet}
     </div>
   `;
 }

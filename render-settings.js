@@ -297,6 +297,9 @@ function renderSettingsItems() {
           <button class="preset-action-btn" id="preset-rename-btn" data-action="preset-rename">✎ Rename</button>
           <button class="preset-action-btn preset-action-danger" id="preset-delete-btn" data-action="preset-delete"${canDelete ? '' : ' disabled'}>🗑 Delete</button>
         </div>
+        <!-- v47: long-press shortcut tip. Tells the user about the hidden
+             entry-screen gesture (there is no on-screen hint there by design). -->
+        <p class="settings-tip">💡 <strong>Quick tip:</strong> on the test screen, press and hold the row of quick-pick buttons for a couple of seconds to switch presets without coming back here. It only changes the buttons — it never logs anything.</p>
       </div>
 
       <div class="settings-section">
@@ -1134,18 +1137,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v46: rolled forward — V46 on top, V43 dropped. -->
+      <!-- v8: rolling 3-version changelog. v47: rolled forward — V47 on top, V44 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V47</strong> · June 2026</p>
+        <p class="muted">Switch quick-pick presets without leaving the test screen: press and hold the row of quick-pick buttons for a couple of seconds and a list of your presets pops up — tap one to switch which buttons show. It only changes the buttons, it never logs anything. There's also a shortcut to the preset settings at the bottom of that pop-up. None of your existing data is affected.</p>
 
         <p><strong>V46</strong> · June 2026</p>
         <p class="muted">Moving between screens now starts you at the top of each page, instead of staying scrolled where you left the last one. Open a session from a long list and tap back, and you'll return to the same spot in the list. The small close and menu buttons are easier to tap, and tapping outside a pop-up now closes it. None of your existing data is affected.</p>
 
         <p><strong>V45</strong> · June 2026</p>
         <p class="muted">Setting up a new phone is smoother: the first-time setup has clearer steps and a tidier layout, and the quick guided tour has had a polish too. If you ever set up another phone, you can run the guided setup from “Set up another device” below. None of your existing data is affected.</p>
-
-        <p><strong>V44</strong> · June 2026</p>
-        <p class="muted">A maintenance update: tidied-up internal documentation and corrected the wording around the calibration reminder. No change to how the app works and none of your existing data is affected.</p>
       </div>
 
       <div class="info-card">

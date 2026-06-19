@@ -1,4 +1,4 @@
-# PAT App — Code Map (V46)
+# PAT App — Code Map (V47)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -92,6 +92,10 @@ also clears the long-standing "welcome modal still gates on `v42WelcomeSeen`"
 debt. Onboarding-polish release; no other config change.
 **v46:** `APP_VERSION` → 'V46'; `V46_WELCOME_KEY` (`pat:v46welcome`). Navigation
 & UI polish release. No other config change.
+**v47:** `APP_VERSION` → 'V47'; `V47_WELCOME_KEY` (`pat:v47welcome`);
+`QUICK_PICK_LONGPRESS_MS` (2000) — hold duration for the entry-screen quick-pick
+long-press preset switcher (single tunable constant; drop to ~600 if 2s feels
+unresponsive). Long-press preset-switcher release.
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
@@ -137,6 +141,9 @@ change — the onboarding polish is markup/CSS/copy only.
 list offset). Transient — never persisted. The view-change detection that drives
 the scroll restore lives in `render()` via a `_lastRenderedView` module variable,
 not in state. No backup/codec change.
+**v47:** `v47WelcomeSeen` (welcome gate); `presetSheetOpen` (entry-screen preset-
+switcher bottom-sheet visibility — transient, cleared in `setView` and
+`loadFormForCursor` exactly like `multiPickSheetOpen`). No backup/codec change.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -200,6 +207,9 @@ gate was left unchanged — a fresh install can't have the V45 flag, and upgrade
 are already covered by the existing clauses.
 **v46:** `load` also reads `V46_WELCOME_KEY` → `state.v46WelcomeSeen`. No codec or
 backup change (`backupVersion` stays 5). Scroll-state fields are transient and not
+loaded/saved.
+**v47:** `load` also reads `V47_WELCOME_KEY` → `state.v47WelcomeSeen`. No codec or
+backup change (`backupVersion` stays 5). `presetSheetOpen` is transient and not
 loaded/saved.
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
@@ -352,7 +362,11 @@ longer moves. Markup and slide content unchanged.
 
 ## session.js (~1320 ln) — sessions, items & most logic
 Presets (`activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
-`createPreset`, `renamePreset`, `deletePreset`); core helpers (`uid`, `todayISO`,
+`createPreset`, `renamePreset`, `deletePreset`, **v47** `openPresetSheet`/
+`closePresetSheet`/`switchPresetFromSheet` — the entry-screen long-press preset
+switcher: open/close the bottom sheet and switch the active preset from it
+(switch only, never logs; no unsaved-edit guard needed since the entry screen has
+no preset-editing textarea)); core helpers (`uid`, `todayISO`,
 `activeSession`, `normaliseItemType`, `normaliseLocation`, `calibrationStatus`,
 `nextAssetNo`, `getCarryForwardLocation`, `findDuplicateAssetIndex`,
 `computeSuggestions`, `computeLocationSuggestions`, `addDescriptionIfNew`,
@@ -454,6 +468,9 @@ company-name field survives the logo re-render.
 change; the wizard copy/layout polish is in render-core + styles.
 **v46:** `dismissV46Welcome` (sets `v46WelcomeSeen` + persists `V46_WELCOME_KEY`),
 mirroring the V45 handler. (Scroll behaviour lives in render-core, not session.js.)
+**v47:** `dismissV47Welcome` (sets `v47WelcomeSeen` + persists `V47_WELCOME_KEY`);
+the three preset-switcher helpers (listed in the Presets group above);
+`setView` + `loadFormForCursor` now also clear `state.presetSheetOpen`.
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves, the first-run wizard / onboarding,
 the example-session seed, the signature, cert numbers / job notes / report
@@ -642,6 +659,17 @@ did nothing — welcome (`welcome-dismiss`), reopen-warning (`reopen-cancel`),
 signature pad (`signature-pad-cancel`) — by putting the existing cancel action on
 the `.modal-backdrop`. The wizard and v9 migration prompt backdrops are
 deliberately left inert (forced-input flows must not be dismissed by a mis-tap).
+**v47:** **welcome modal rolled to V47** — gate keys off `v47WelcomeSeen`, dismiss
+id `v47-welcome-dismiss`, fresh "What's new in V47" copy. The entry-screen
+quick-pick grid gains `id="quick-grid"` (the long-press gesture hook bound in
+events.js). New **preset-switcher sheet** built in `renderEntry` (`presetSheet`,
+rendered when `state.presetSheetOpen`): a `.fail-sheet preset-switch-sheet`
+listing every `state.itemPresets` entry as a `.preset-switch-option` (active one
+gets `.active` + a ✓), a name + item-preview subtitle, an "Edit presets" footer
+(`preset-sheet-edit`), and a backdrop/✕ that close via `preset-sheet-close`. It
+contains `fail-sheet` + `modal-backdrop`, so the existing `_lastRenderHadModal`
+HTML-scan sweep tears it down on the next render automatically (no sweep-selector
+change needed).
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
 Edit-session UI, the empty states, the welcome modal, the first-run wizard, the
 signature draw pad, the calibration warning banner, or the full-screen
@@ -701,6 +729,10 @@ other settings change — the "Set up another device" and "Show me around" cards
 unchanged.
 **v46:** About changelog rolled (V46 top, V43 dropped; now lists V46/V45/V44). No
 other settings change.
+**v47:** About changelog rolled (V47 top, V44 dropped; now lists V47/V46/V45). The
+Quick Pick Items page (`renderSettingsItems`) gains a `.settings-tip` note in the
+Preset section explaining the entry-screen long-press preset switcher (there is no
+on-screen hint on the entry screen by design — decision 6B).
 *Touch to:* change any Settings page; the category structure (edit
 `SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META` in **config.js**, not here); search
 matching (aliases live in config); or roll the About changelog.
@@ -719,6 +751,16 @@ in `dispatch.js`; `bindEvents()` is gone — its non-focus handlers are now
 `data-input-action`/`data-change-action`. These four stay direct because
 focus/blur timing can't be safely delegated (the fragile iOS area). Called from
 render() and refreshEntryAfterLog() in render-core.js.
+**v47:** `bindFocusFields` also binds a **long-press gesture** on `#quick-grid`
+(the entry-screen quick-pick button grid). A timing-based hold can't go through
+the delegated click system, so it's a direct bind here, re-applied every entry
+paint like the focus fields. Touch/mouse start arms a `QUICK_PICK_LONGPRESS_MS`
+(config, 2000) timer; finger drift beyond a 12px slop, or an early release/cancel,
+aborts it; on fire it calls `openPresetSheet()` and sets a `didLongPress` flag
+that a capture-phase `click` handler on the grid uses to swallow the one
+follow-up tap (decision 2A — a preset switch must not also select that button's
+item type). A normal quick tap never sets the flag, so quick-pick selection is
+unchanged.
 
 ## dispatch.js (~600 ln) — delegated event handling (V25 clicks, V28 input/change)
 The full delegated event system + three action registries, all attached once to
@@ -809,6 +851,12 @@ non-interactive, the body/foot split and emoji headers are markup only).
 **v46:** `welcome-dismiss` now calls `dismissV46Welcome`. No new actions — the
 tap-outside-to-close sheets reuse their existing `welcome-dismiss` / `reopen-cancel`
 / `signature-pad-cancel` actions, now also placed on the backdrops in render-core.
+**v47:** `welcome-dismiss` now calls `dismissV47Welcome`. Three new click actions
+for the preset-switcher sheet: `preset-sheet-close` (→ `closePresetSheet`),
+`preset-sheet-pick` (data-arg = preset id → `switchPresetFromSheet`),
+`preset-sheet-edit` (closes the sheet, then `setView('settingsItems')` to the
+Quick Pick Items page). The sheet is OPENED from events.js (`openPresetSheet`, via
+the long-press gesture), not from a click action.
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

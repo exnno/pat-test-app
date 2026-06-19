@@ -157,6 +157,81 @@ function bindFocusFields() {
       setTimeout(() => { state.showSuggestions = false; renderSuggestionsOnly(); }, 150);
     };
   }
+
+  // v47: long-press the quick-pick grid → open the preset switcher sheet.
+  // Bound here (not via the delegated click system) because a hold is timing-
+  // based and delegation can't express it. Re-bound every entry-screen paint,
+  // same lifecycle as the focus fields above.
+  //
+  // Behaviour:
+  //   • A press that's held for QUICK_PICK_LONGPRESS_MS without moving too far
+  //     opens the sheet (openPresetSheet → render, which rebuilds the grid and
+  //     wipes these listeners — fine, they're rebound next paint).
+  //   • Decision 2A: when the long-press fires it SUPPRESSES the quick-btn's
+  //     normal tap, so switching presets never also changes the selected item
+  //     type. We do this by setting a flag the next click checks (capture phase),
+  //     then clearing it. A genuine quick tap (released before the timer) never
+  //     sets the flag, so normal taps still select as before.
+  //   • Any finger movement beyond a small slop, or an early release/cancel,
+  //     aborts the pending long-press.
+  const grid = $('quick-grid');
+  if (grid) {
+    let pressTimer = null;
+    let didLongPress = false;
+    let startX = 0, startY = 0;
+    const MOVE_SLOP = 12;   // px of finger drift allowed before we abort
+
+    const clearTimer = () => {
+      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+    };
+
+    const startPress = (x, y) => {
+      didLongPress = false;
+      startX = x; startY = y;
+      clearTimer();
+      pressTimer = setTimeout(() => {
+        pressTimer = null;
+        didLongPress = true;
+        openPresetSheet();   // re-renders; these handlers are rebound next paint
+      }, QUICK_PICK_LONGPRESS_MS);
+    };
+
+    const moveCheck = (x, y) => {
+      if (!pressTimer) return;
+      if (Math.abs(x - startX) > MOVE_SLOP || Math.abs(y - startY) > MOVE_SLOP) {
+        clearTimer();   // finger drifted — treat as a scroll/swipe, not a hold
+      }
+    };
+
+    // Touch (primary path on the phone)
+    grid.ontouchstart = e => {
+      const t = e.touches && e.touches[0];
+      if (t) startPress(t.clientX, t.clientY);
+    };
+    grid.ontouchmove = e => {
+      const t = e.touches && e.touches[0];
+      if (t) moveCheck(t.clientX, t.clientY);
+    };
+    grid.ontouchend = () => clearTimer();
+    grid.ontouchcancel = () => clearTimer();
+
+    // Mouse (desktop / dev)
+    grid.onmousedown = e => startPress(e.clientX, e.clientY);
+    grid.onmousemove = e => moveCheck(e.clientX, e.clientY);
+    grid.onmouseup = () => clearTimer();
+    grid.onmouseleave = () => clearTimer();
+
+    // Suppress the quick-btn tap that would otherwise fire on release after a
+    // long-press. Capture phase so we intercept before the delegated #app click
+    // handler. Only swallows the ONE click immediately following a long-press.
+    grid.addEventListener('click', e => {
+      if (didLongPress) {
+        e.stopPropagation();
+        e.preventDefault();
+        didLongPress = false;
+      }
+    }, true);
+  }
 }
 
 // Light re-render of just the suggestions dropdown so we don't lose input focus

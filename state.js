@@ -186,6 +186,7 @@ let state = {
   v43WelcomeSeen: false,
   v45WelcomeSeen: false,  // v45: onboarding polish welcome (first wired modal since V42)
   v46WelcomeSeen: false,  // v46: navigation & UI polish welcome
+  v47WelcomeSeen: false,  // v47: long-press quick-pick preset switcher welcome
   // v46: remembered Sessions-list scroll offset. Captured (in render) when
   // leaving Sessions for a session, restored when returning to Sessions. All
   // other navigation resets to the top. Transient — never persisted. The
@@ -328,6 +329,12 @@ let state = {
   // v16: Multi Pick bottom-sheet open flag on the entry screen. Cleared on every
   // view transition (setView) and in loadFormForCursor(), same as failModalOpen.
   multiPickSheetOpen: false,
+
+  // v47: quick-pick preset-switcher bottom-sheet open flag on the entry screen.
+  // Opened by a long-press on the quick-pick grid; lists all item-type presets so
+  // the active one can be switched without going into Settings. Cleared on every
+  // view transition (setView) and in loadFormForCursor(), same as the others.
+  presetSheetOpen: false,
 
   // v14: prune-age threshold in months. Sessions that are both exported and
   // older than this are offered for pruning in the storage indicator. Loaded
