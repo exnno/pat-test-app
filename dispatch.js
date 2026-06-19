@@ -611,7 +611,7 @@ registerActions({
     showToast('Upgrade plans coming soon');
   },
 
-  // v43: calibration reminder (edit-cal-date button on entry screen)
+  // v43: calibration reminder (Update button on the Sessions-screen cal banner)
   'edit-cal-date': () => {
     state.view = 'settingsUser';
     render();

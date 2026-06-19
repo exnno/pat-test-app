@@ -1,4 +1,4 @@
-# PAT App — Code Map (V42)
+# PAT App — Code Map (V44)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -37,7 +37,7 @@ the existing same-origin SW fetch handler into Cache Storage (separate from the
 ---
 
 ## config.js (~445 ln) — constants & defaults, pure data
-`APP_VERSION` (V43); all `*_KEY` localStorage key names (incl. welcome keys,
+`APP_VERSION` (V44); all `*_KEY` localStorage key names (incl. welcome keys,
 latest `V43_WELCOME_KEY`, and the v33 first-run `ONBOARD_KEY`);
 `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`; v27 SQP tuning;
@@ -81,7 +81,11 @@ sheets welcome. No other config change.
 the fresh onboarding path (a harmless passthrough field). No data-model change.
 **v43:** `V43_WELCOME_KEY` (`pat:v43welcome`) — calibration reminder + cloud
 prep welcome; `PAT_AUTH_KEY` (`'pat:authUser'`) — mock OAuth auth state (userId,
-authToken). Both additive; no backupVersion bump.
+authToken). Both additive; no backupVersion bump. **NOTE:** `V43_WELCOME_KEY`
+and `state.v43WelcomeSeen` were defined but the welcome modal was never actually
+wired to them (it still gates on `v42WelcomeSeen` and shows V42 copy). Left inert
+and harmless — not removed, to avoid needless churn.
+**v44:** `APP_VERSION` → 'V44'. No new keys; documentation/polish release.
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
@@ -555,10 +559,24 @@ logo input + colour-theme chips, the all-set step offers the walkthrough). Also:
 `render()` routes the new full-screen **`tour`** view FIRST (before banners/
 modals) — `app.innerHTML = renderTour()` and return, since the tour owns the whole
 screen. Dismiss button id `v42-welcome-dismiss`.
+**v43:** `renderCalWarningBanner()` — tester-calibration warning shown ONLY on
+the **Sessions** screen (called inside `renderSessions()`, next to the
+backup-reminder banner). Keys off `state.calDue` (the "Cal. Due" date, distinct
+from `state.calDate` the cert date): returns `''` when no date, when the date is
+unparseable, or when it is healthy (> `CAL_DUE_SOON_DAYS` = 30 days out), so a
+healthy tester adds zero markup. Yellow `cal-due-soon` within 30 days, red
+`cal-overdue` when past; an "Update" button (`edit-cal-date`) jumps to
+Settings → User. **NOTE:** there is NO entry-screen calibration banner and NO
+login/sign-in page — the V43 first build briefly added both, and both were
+removed before release. Boot goes straight to Sessions; do not reintroduce
+either. The V43 welcome modal was never wired (the modal still gates on
+`v42WelcomeSeen` and shows V42 copy) — left as-is, harmless; see config.js notes.
+**v44:** documentation/polish release — no render-core behaviour change. About
+changelog rolled to V44/V43/V42. No welcome modal.
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
 Edit-session UI, the empty states, the welcome modal, the first-run wizard, the
-signature draw pad, or the full-screen walkthrough route (the tour itself lives
-in tour.js).
+signature draw pad, the calibration warning banner, or the full-screen
+walkthrough route (the tour itself lives in tour.js).
 **v29:** the two no-op binder shells left from V28
 (`bindSessionsListAreaEvents`, `bindOverviewBodyEvents`) and their last call
 sites in `refreshSessionsListAreaOnly` / `refreshOverviewBody` were deleted —
