@@ -285,7 +285,7 @@ function render() {
       `;
     }
     wizardModal = `
-      <div class="modal-backdrop" style="z-index:300"></div>
+      <div class="modal-backdrop wizard-backdrop" style="z-index:300"></div>
       <div class="bulk-sheet wizard-sheet" style="z-index:301" role="dialog" aria-label="First-time setup">
         <div class="bulk-sheet-handle"></div>
         ${stepIndicator}

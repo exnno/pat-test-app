@@ -1522,6 +1522,13 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
    between steps of different heights. The sheet has a consistent min-height; the
    content sits in a scrolling .wizard-body and the actions in a pinned .wizard-foot
    that's always in the same place. */
+/* v45.1: paging the wizard calls render() which rebuilds #app, so the backdrop is
+   a new node each step and replayed its `fade-in` — a visible flash on every
+   Next/Back. Suppress it (the wizard opens once then just swaps content; other
+   modals keep their fade). Pairs with `animation:none` on .wizard-sheet. */
+.wizard-backdrop {
+  animation: none;
+}
 .wizard-sheet {
   display: flex;
   flex-direction: column;
