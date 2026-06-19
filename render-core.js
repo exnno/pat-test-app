@@ -25,6 +25,9 @@ const app = document.getElementById('app');
 // renders (entry logging, sessions list, settings pages) the sweep is skipped
 // entirely. The safety net is unchanged for every render that could need it.
 let _lastRenderHadModal = false;
+// v46: the view drawn by the previous render() call, used to detect genuine
+// page changes for scroll-on-navigation (see render()). null until first render.
+let _lastRenderedView = null;
 
 function render() {
   if (_lastRenderHadModal) {
@@ -34,6 +37,43 @@ function render() {
   }
 
   const v = state.view;
+
+  // v46 (fix): scroll-on-navigation lives HERE, not in setView. The app changes
+  // state.view from ~14 places (setView is only one — openSession/createSession/
+  // jumpTo/editSession/etc. set it directly), but every one of them ends by
+  // calling render(). So render() is the only reliable funnel. We compare the
+  // view about to be drawn (v) against the one drawn last render
+  // (_lastRenderedView):
+  //   • leaving Sessions → entry: remember the live list offset (read NOW, before
+  //     app.innerHTML is overwritten below, while the old list is still scrolled)
+  //     so returning can restore it. (decision 2A: Sessions only.)
+  //   • returning entry → Sessions: flag a restore, applied after the new HTML is
+  //     in the DOM (the scroll target must exist first).
+  //   • any other genuine view change: scroll to top.
+  //   • same view (an in-place re-render: logging an item, toggling a setting,
+  //     opening a dialog, paging the wizard/tour): do nothing — keep scroll pos.
+  // _pendingScrollTop is the deferred action for this render, applied at the end.
+  let _pendingScrollTop = 'none';   // 'none' | 'top' | 'restore'
+  // The "inside a session" views you reach from the Sessions list and return
+  // from. Treating them as a group means a detour (list → entry → overview →
+  // back to list) still restores your place, and only a move to a genuinely
+  // different area (Settings, Reports, the tour) tops out.
+  const inSession = (vw) => vw === 'entry' || vw === 'overview' || vw === 'editSession';
+  if (v !== _lastRenderedView) {
+    if (_lastRenderedView === 'sessions' && inSession(v)) {
+      const sc = document.scrollingElement || document.documentElement;
+      state.sessionsScrollTop = sc ? sc.scrollTop : 0;
+      // The view we're opening (entry/overview) is a fresh page — start it at the
+      // top, same as any other navigation. (Capturing the list offset above is
+      // only so we can restore it when the user comes BACK to the list.)
+      _pendingScrollTop = 'top';
+    } else if (v === 'sessions' && inSession(_lastRenderedView)) {
+      _pendingScrollTop = 'restore';
+    } else {
+      if (v === 'sessions') state.sessionsScrollTop = 0;
+      _pendingScrollTop = 'top';
+    }
+  }
 
   // v43: the cloud-pages secret menu (revealed by long-pressing the About title)
   // must close as soon as you leave the About page. We keep it open only while on
@@ -50,6 +90,7 @@ function render() {
   if (v === 'tour' && state.tourOpen) {
     app.innerHTML = renderTour();
     _lastRenderHadModal = false;
+    _lastRenderedView = v;   // v46: keep the view tracker honest across the early return
     return;
   }
 
@@ -378,16 +419,23 @@ function render() {
   // class if it lingered from a previous v12 render, in case a hot-swap
   // mid-session leaves a stale body class.
   document.body.classList.remove('view-entry');
-  // v46: restore the remembered Sessions list offset when returning from a
-  // session (flag set in setView). The list HTML is already in #app at this
-  // point, so the scroll target exists. One-shot: clear the flag once consumed.
-  if (state.view === 'sessions' && state.restoreSessionsScroll) {
+  // v46 (fix): apply the scroll decision made at the top of render(), now that
+  // the new view's HTML is in #app (so a restore target exists). Use state.view
+  // (not the captured v) because a guard at 935/1216 may have bounced the view
+  // to 'sessions' during the build — in that case we want top-of-list, which the
+  // 'top'/'restore' handling below still does correctly.
+  if (_pendingScrollTop === 'restore' && state.view === 'sessions') {
     const top = state.sessionsScrollTop || 0;
     const sc = document.scrollingElement || document.documentElement;
     if (sc) sc.scrollTop = top;
     window.scrollTo(0, top);
-    state.restoreSessionsScroll = false;
+  } else if (_pendingScrollTop === 'top') {
+    const sc = document.scrollingElement || document.documentElement;
+    if (sc) sc.scrollTop = 0;
+    window.scrollTo(0, 0);
   }
+  // Record the view actually committed this render, for next render's comparison.
+  _lastRenderedView = state.view;
   bindFocusFields();
   if (state.signaturePadOpen) initSignaturePad();   // v34
   // v43: set up long-press on About title for cloud pages reveal

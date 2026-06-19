@@ -186,14 +186,12 @@ let state = {
   v43WelcomeSeen: false,
   v45WelcomeSeen: false,  // v45: onboarding polish welcome (first wired modal since V42)
   v46WelcomeSeen: false,  // v46: navigation & UI polish welcome
-  // v46: remembered Sessions-list scroll offset. Captured when leaving Sessions
-  // for a session (forward), restored when returning to Sessions. All other
-  // navigation resets to the top (see setView). Transient — never persisted.
+  // v46: remembered Sessions-list scroll offset. Captured (in render) when
+  // leaving Sessions for a session, restored when returning to Sessions. All
+  // other navigation resets to the top. Transient — never persisted. The
+  // view-change detection that drives this lives in render() (_lastRenderedView),
+  // because state.view is set from many places, not just setView.
   sessionsScrollTop: 0,
-  // v46: when true, the next Sessions render should restore sessionsScrollTop
-  // instead of the default top-reset. Set on return-to-Sessions, cleared once
-  // consumed by the render. Transient.
-  restoreSessionsScroll: false,
   // v43: cloud prep. Auth state (transient — not persisted; will persist in cloud
   // phase). userId (or null if logged out), authToken (or null), authStatus
   // ('logged-out' | 'logged-in' | 'logging-in' | 'error'). Mock OAuth flow for V43.

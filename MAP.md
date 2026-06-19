@@ -134,9 +134,9 @@ stays transient.
 **v45:** `v45WelcomeSeen` (the first wired welcome gate since V42). No other state
 change — the onboarding polish is markup/CSS/copy only.
 **v46:** `v46WelcomeSeen` (welcome gate); `sessionsScrollTop` (remembered Sessions
-list offset) and `restoreSessionsScroll` (one-shot flag telling the next Sessions
-render to restore that offset instead of top-resetting). Both scroll fields are
-transient — never persisted. No backup/codec change.
+list offset). Transient — never persisted. The view-change detection that drives
+the scroll restore lives in `render()` via a `_lastRenderedView` module variable,
+not in state. No backup/codec change.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -417,13 +417,10 @@ re-renders).
 discipline it already applies to the fail sheet, multi-pick sheet, bulk-edit
 menus and client dialogs; fixes the form lingering open after navigating away
 and back to Sessions.
-**v46:** `setView` is the home of the scroll-on-navigation behaviour. On a genuine
-view change only (when `v !== state.view`): leaving Sessions for `entry` captures
-the live list offset into `state.sessionsScrollTop`; returning to Sessions from
-`entry` sets `state.restoreSessionsScroll` (consumed by `render`); any other
-navigation calls `window.scrollTo(0,0)` and clears any stale Sessions offset.
-Same-view calls are a no-op for scroll. Deliberately NOT in `render()` — re-renders
-for logging/toggles/dialogs/wizard/tour paging must keep their scroll position.
+**v46:** scroll-on-navigation does NOT live here. `state.view` is set from ~14
+places (`setView` is only one — `openSession`/`createSession`/`jumpTo`/
+`editSession` set it directly), so the behaviour lives in `render()`, the one
+funnel they all call. See render-core notes.
 **v40:** `dismissV40Welcome` (sets `v40WelcomeSeen` + persists `V40_WELCOME_KEY`).
 Native `prompt()`/`confirm()`/`alert()` removed from the routine flows in favour
 of `openConfirmSheet`/`openNameSheet`/`showToast` (feedback.js). Restructured to
@@ -456,7 +453,7 @@ company-name field survives the logo re-render.
 — the first wired dismiss handler since `dismissV42Welcome`. No other session.js
 change; the wizard copy/layout polish is in render-core + styles.
 **v46:** `dismissV46Welcome` (sets `v46WelcomeSeen` + persists `V46_WELCOME_KEY`),
-mirroring the V45 handler. Scroll behaviour added to `setView` (see above).
+mirroring the V45 handler. (Scroll behaviour lives in render-core, not session.js.)
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves, the first-run wizard / onboarding,
 the example-session seed, the signature, cert numbers / job notes / report
@@ -624,15 +621,27 @@ heights; the finish step's tour card is restyled (`.wizard-finish-tour-title` +
 `.wizard-replay-note` ("replay from Settings → About"). All wizard handlers/actions
 unchanged — purely presentational.
 **v46:** **welcome modal rolled to V46** — gate keys off `v46WelcomeSeen`, dismiss
-id `v46-welcome-dismiss`, fresh "What's new in V46" copy (scroll-to-top, list
-position, tap targets). End of `render()` consumes `state.restoreSessionsScroll`:
-when returning to Sessions it sets the document scroll back to
-`state.sessionsScrollTop` (the list HTML is already in `#app` at that point) and
-clears the one-shot flag. **Tap-outside-to-close** added to three sheets whose
-backdrops previously did nothing — welcome (`welcome-dismiss`), reopen-warning
-(`reopen-cancel`), signature pad (`signature-pad-cancel`) — by putting the existing
-cancel action on the `.modal-backdrop`. The wizard and v9 migration prompt backdrops
-are deliberately left inert (forced-input flows must not be dismissed by a mis-tap).
+id `v46-welcome-dismiss`, fresh "What's new in V46" copy. **Scroll-on-navigation
+is implemented here**, via a module-level `_lastRenderedView` tracker (alongside
+`_lastRenderHadModal`). At the TOP of `render()` it compares the view about to be
+drawn against the one drawn last render — this catches every transition because
+all ~14 `state.view =` sites end by calling `render()` (capturing it in `setView`
+missed `openSession` et al., which was the V46 first-cut bug). Rules: leaving the
+Sessions list for an in-session view (entry/overview/editSession) reads the live
+list `scrollTop` into `state.sessionsScrollTop` (read BEFORE `app.innerHTML` is
+overwritten) AND tops the new page; returning to Sessions from an in-session view
+restores that offset (applied at the END of render, after the list HTML exists);
+any other genuine change tops out; same-view re-renders (logging, toggles,
+dialogs, wizard/tour paging) do nothing. The `_pendingScrollTop` local carries the
+decision from top to bottom of the function; `_lastRenderedView` is recorded last
+from the final `state.view` (so a 935/1216 `!sess` bounce to sessions is handled).
+The tour early-return also records `_lastRenderedView`. `refreshEntryAfterLog`
+stays entry→entry so it intentionally leaves the tracker untouched and never
+scrolls. **Tap-outside-to-close** added to three sheets whose backdrops previously
+did nothing — welcome (`welcome-dismiss`), reopen-warning (`reopen-cancel`),
+signature pad (`signature-pad-cancel`) — by putting the existing cancel action on
+the `.modal-backdrop`. The wizard and v9 migration prompt backdrops are
+deliberately left inert (forced-input flows must not be dismissed by a mis-tap).
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
 Edit-session UI, the empty states, the welcome modal, the first-run wizard, the
 signature draw pad, the calibration warning banner, or the full-screen
