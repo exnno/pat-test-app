@@ -1134,18 +1134,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v44: rolled forward — V44 on top, V41 dropped. -->
+      <!-- v8: rolling 3-version changelog. v45: rolled forward — V45 on top, V42 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V45</strong> · June 2026</p>
+        <p class="muted">Setting up a new phone is smoother: the first-time setup has clearer steps and a tidier layout, and the quick guided tour has had a polish too. If you ever set up another phone, you can run the guided setup from “Set up another device” below. None of your existing data is affected.</p>
 
         <p><strong>V44</strong> · June 2026</p>
         <p class="muted">A maintenance update: tidied-up internal documentation and corrected the wording around the calibration reminder. No change to how the app works and none of your existing data is affected.</p>
 
         <p><strong>V43</strong> · June 2026</p>
         <p class="muted">The Sessions screen now warns you when your tester's calibration is due within 30 days or has lapsed, so you're never testing with an out-of-date meter. Behind the scenes, groundwork is underway for the commercial cloud version. None of your existing data is affected.</p>
-
-        <p><strong>V42</strong> · June 2026</p>
-        <p class="muted">Setting up a new phone is now a proper guided walkthrough: your engineer details, your company branding for reports (name, logo and colour), and an optional example job so you can see how everything looks. There's also a quick in-app tour of the basics — Sessions, Quick Pick, the Overview, reports and backups — which you can run any time from the button just below. None of your existing data is affected.</p>
       </div>
 
       <div class="info-card">

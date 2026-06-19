@@ -184,6 +184,7 @@ let state = {
   v41WelcomeSeen: false,
   v42WelcomeSeen: false,
   v43WelcomeSeen: false,
+  v45WelcomeSeen: false,  // v45: onboarding polish welcome (first wired modal since V42)
   // v43: cloud prep. Auth state (transient — not persisted; will persist in cloud
   // phase). userId (or null if logged out), authToken (or null), authStatus
   // ('logged-out' | 'logged-in' | 'logging-in' | 'error'). Mock OAuth flow for V43.

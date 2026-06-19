@@ -1538,6 +1538,15 @@ function dismissV42Welcome() {
   render();
 }
 
+// v45: the first welcome modal wired since V42 (V43/V44 rolled none). Marks the
+// V45 modal seen and persists the flag. Tying the gate/dismiss freshly to V45
+// also clears the long-standing "modal still keys off v42WelcomeSeen" debt.
+function dismissV45Welcome() {
+  state.v45WelcomeSeen = true;
+  localStorage.setItem(V45_WELCOME_KEY, '1');
+  render();
+}
+
 // ---------- v36: job notes, certificate override, report templates ----------
 
 // Save the per-session job note (from the Overview text area). Persists and

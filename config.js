@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V44';
+const APP_VERSION = 'V45';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -81,6 +81,11 @@ const V40_WELCOME_KEY = 'pat:v40welcome';   // v40: in-app dialogs (no native po
 const V41_WELCOME_KEY = 'pat:v41welcome';   // v41: in-app dialogs for import/restore/report errors
 const V42_WELCOME_KEY = 'pat:v42welcome';   // v42: commercial onboarding (guided setup + walkthrough)
 const V43_WELCOME_KEY = 'pat:v43welcome';   // v43: calibration reminder + cloud-prep groundwork (NOTE: defined but the welcome modal was never wired to it — still gates on v42)
+// v45: onboarding polish. This is the first welcome modal actually wired since
+// V42 (V43/V44 never rolled one), so it both announces the refreshed first-time
+// setup AND clears the inherited "modal still gates on v42WelcomeSeen" debt — the
+// gate, dismiss handler and copy below are all freshly tied to V45.
+const V45_WELCOME_KEY = 'pat:v45welcome';   // v45: onboarding wizard + walkthrough polish
 // v42: the opt-in demo session created on the FRESH onboarding path (decision
 // 9A). Tagged with this flag on the session object so the app can label it as an
 // example and the user knows it is safe to delete. It is a perfectly ordinary

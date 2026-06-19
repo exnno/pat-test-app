@@ -1,4 +1,4 @@
-# PAT App — Code Map (V44)
+# PAT App — Code Map (V45)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -86,6 +86,10 @@ and `state.v43WelcomeSeen` were defined but the welcome modal was never actually
 wired to them (it still gates on `v42WelcomeSeen` and shows V42 copy). Left inert
 and harmless — not removed, to avoid needless churn.
 **v44:** `APP_VERSION` → 'V44'. No new keys; documentation/polish release.
+**v45:** `APP_VERSION` → 'V45'; `V45_WELCOME_KEY` (`pat:v45welcome`) — the first
+welcome key actually WIRED since V42 (V43/V44 rolled none). Rolling it freshly
+also clears the long-standing "welcome modal still gates on `v42WelcomeSeen`"
+debt. Onboarding-polish release; no other config change.
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
@@ -125,6 +129,8 @@ the dialog helpers are stateless transient overlays (locals in feedback.js).
 full-screen walkthrough flags — never persisted, never in backups). The wizard
 fresh path is now 6 steps (intro/path/details/branding/demo/finish); step state
 stays transient.
+**v45:** `v45WelcomeSeen` (the first wired welcome gate since V42). No other state
+change — the onboarding polish is markup/CSS/copy only.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -181,6 +187,11 @@ backup change (`backupVersion` stays 5).
 backup change (`backupVersion` stays 5). The example session is an ordinary
 session (the `isExample` marker rides through the codec as an unknown
 passthrough field — confirmed by a serialise→parse round-trip in the V42 harness).
+**v45:** `load` also reads `V45_WELCOME_KEY` → `state.v45WelcomeSeen` (it already
+read `V43_WELCOME_KEY` though that modal was never wired). No codec or backup
+change (`backupVersion` stays 5). The returning-user heuristic for the onboard
+gate was left unchanged — a fresh install can't have the V45 flag, and upgraders
+are already covered by the existing clauses.
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -325,6 +336,10 @@ full-screen view that owns `#app` (no banner/modals). Reuses `escapeHTML`
 *Touch to:* change the walkthrough slides, their mocks/copy, or paging. Entry
 points: the wizard finish step ("Show me around") and About ("Show me around the
 app again").
+**v45:** no tour.js change. The tour's slide-to-slide "jump" (caption/nav shifting
+as each mock's height varied) was fixed in **styles.css** alone — `.tour-stage`
+now has a fixed `min-height` and centres the mock, so the caption below it no
+longer moves. Markup and slide content unchanged.
 
 ## session.js (~1320 ln) — sessions, items & most logic
 Presets (`activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
@@ -421,6 +436,9 @@ mirroring `saveItem`'s item shape — fresh path only). `onboardSetupImport`/
 re-onboarded. `handleReportLogoFile` (and the logo-remove handler in dispatch)
 now also call `captureWizardStep` when onboarding is in progress, so the
 company-name field survives the logo re-render.
+**v45:** `dismissV45Welcome` (sets `v45WelcomeSeen` + persists `V45_WELCOME_KEY`)
+— the first wired dismiss handler since `dismissV42Welcome`. No other session.js
+change; the wizard copy/layout polish is in render-core + styles.
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves, the first-run wizard / onboarding,
 the example-session seed, the signature, cert numbers / job notes / report
@@ -573,6 +591,20 @@ either. The V43 welcome modal was never wired (the modal still gates on
 `v42WelcomeSeen` and shows V42 copy) — left as-is, harmless; see config.js notes.
 **v44:** documentation/polish release — no render-core behaviour change. About
 changelog rolled to V44/V43/V42. No welcome modal.
+**v45:** **welcome modal RE-WIRED and rolled to V45** — gate now keys off
+`v45WelcomeSeen` (was still on `v42WelcomeSeen`), dismiss button id
+`v45-welcome-dismiss`, fresh "What's new in V45" copy. This is the first wired
+modal since V42 and clears that inherited debt. **First-run wizard polished**
+(copy/layout only, no new steps): each step now has an emoji header
+(`.wizard-icon`); the fresh path (steps 3–6) shows non-interactive progress DOTS
+(`.wizard-dots`/`-dot`/`-dot-on`) instead of "Step N of 6" text while steps 1–2
+keep the simple `.wizard-steps` label; every step is split into a scrolling
+`.wizard-body` + a pinned `.wizard-foot` (the action buttons) so the
+Continue/Back/Skip controls no longer jump as you page between steps of different
+heights; the finish step's tour card is restyled (`.wizard-finish-tour-title` +
+`-sub`) with the walkthrough as the clear primary action and a muted
+`.wizard-replay-note` ("replay from Settings → About"). All wizard handlers/actions
+unchanged — purely presentational.
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
 Edit-session UI, the empty states, the welcome modal, the first-run wizard, the
 signature draw pad, the calibration warning banner, or the full-screen
@@ -627,6 +659,9 @@ three new cloud-prep pages (not wired to main nav yet, revealed via long-press):
 `renderCloudSync` (sync status, last-synced timestamp, "Sync now" button),
 `renderCloudSubscription` (plan/usage info, upgrade button). All three are stubs
 with mock data for now; will integrate real cloud backend in the PAT Cloud phase.
+**v45:** About changelog rolled (V45 top, V42 dropped; now lists V45/V44/V43). No
+other settings change — the "Set up another device" and "Show me around" cards are
+unchanged.
 *Touch to:* change any Settings page; the category structure (edit
 `SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META` in **config.js**, not here); search
 matching (aliases live in config); or roll the About changelog.
@@ -729,6 +764,9 @@ reuses the existing `report-logo-pick`/`report-logo-remove`/`report-logo-file`
 actions (logo-remove now captures the wizard company field first). New tour
 clicks: `tour-next`/`tour-prev`/`tour-goto` (data-arg index)/`tour-skip`, and
 `open-tour` (the About replay button).
+**v45:** `welcome-dismiss` now calls `dismissV45Welcome` (was `dismissV42Welcome`).
+No other dispatch change — the wizard polish added no new actions (dots are
+non-interactive, the body/foot split and emoji headers are markup only).
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

@@ -1517,12 +1517,35 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 
 /* v33: first-run wizard — reuses the bottom-sheet shell; buttons stack full-width
-   with comfortable spacing, plus a step indicator and muted back/skip links. */
+   with comfortable spacing, plus a step indicator and muted back/skip links.
+   v45: given a STABLE SHAPE so the action buttons no longer jump as you page
+   between steps of different heights. The sheet has a consistent min-height; the
+   content sits in a scrolling .wizard-body and the actions in a pinned .wizard-foot
+   that's always in the same place. */
+.wizard-sheet {
+  display: flex;
+  flex-direction: column;
+  min-height: 72vh;
+  max-height: 92vh;
+}
+.wizard-body {
+  flex: 1 1 auto;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.wizard-foot {
+  flex: 0 0 auto;
+  padding-top: 10px;
+}
 .wizard-sheet .btn-primary,
 .wizard-sheet .btn-secondary {
   display: block;
   width: 100%;
   margin-top: 10px;
+}
+.wizard-foot .btn-primary:first-child,
+.wizard-foot .btn-secondary:first-child {
+  margin-top: 0;
 }
 .wizard-steps {
   font-size: 12px;
@@ -1532,6 +1555,32 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   color: var(--neutral-text);
   text-align: center;
   margin: 2px 0 12px;
+}
+/* v45: progress dots for the fresh-path steps (decision 1A/8A). Non-interactive
+   — setup is forward-only — and styled to match the tour's dot indicator. */
+.wizard-dots {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  margin: 2px 0 14px;
+}
+.wizard-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--border-strong);
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+.wizard-dot-on {
+  background: var(--accent);
+  transform: scale(1.25);
+}
+/* v45: a single large emoji header per step, for instant visual identity (3A). */
+.wizard-icon {
+  font-size: 34px;
+  line-height: 1;
+  text-align: center;
+  margin: 4px 0 10px;
 }
 .wizard-lead {
   font-size: 14px;
@@ -1554,6 +1603,14 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .wizard-skip {
   margin-top: 6px;
+}
+/* v45: the finish step's "you can replay this" reassurance line (decision 9B). */
+.wizard-replay-note {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--neutral-text);
+  text-align: center;
 }
 
 /* v42: first-run setup additions — branding step preview + the "show me around"
@@ -1591,18 +1648,28 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   border-radius: 4px;
   margin-bottom: 4px;
 }
+/* v45: finish-step tour offer restyled (decision 9A) — the walkthrough is the
+   clear primary action inside a soft accent card, with a title + one-line blurb. */
 .wizard-finish-tour {
   margin-top: 16px;
-  padding: 14px;
-  border: 1px dashed var(--accent-border);
-  border-radius: 10px;
+  padding: 16px 14px;
+  border: 1px solid var(--accent-border);
+  border-radius: 12px;
   background: var(--accent-soft);
   text-align: center;
 }
-.wizard-finish-tour p {
-  margin: 0 0 10px;
-  font-size: 14px;
+.wizard-finish-tour-title {
+  margin: 0 0 4px;
+  font-size: 15px;
+  font-weight: 700;
   color: var(--accent-text);
+}
+.wizard-finish-tour-sub {
+  margin: 0 0 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--accent-text);
+  opacity: 0.85;
 }
 
 /* v42: full-screen feature walkthrough (decision 6-i). Its own view, NOT a modal
@@ -1639,7 +1706,13 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .tour-stage {
   display: flex;
   justify-content: center;
+  align-items: center;
   padding: 8px 0 4px;
+  /* v45: give the stage a stable height and centre the mock inside it, so the
+     caption and the Back/Next row no longer jump as you page between slides whose
+     mocks are very different heights (the Quick Pick slide is tall, Reports short).
+     The mock keeps its natural height; the stage just reserves a consistent space. */
+  min-height: 360px;
 }
 /* The mock "phone screen" — a soft framed card the mock content sits inside. */
 .tour-mock {

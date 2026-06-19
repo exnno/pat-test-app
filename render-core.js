@@ -121,26 +121,28 @@ function render() {
   // Suppressed if the v9 migration prompt is currently showing (that one
   // takes priority because it requires a name commit) or if the user has
   // already dismissed this modal.
-  // v42: rolled forward — content covers the new commercial onboarding (guided
-  // first-time setup + the in-app walkthrough). Key bumped to pat:v42welcome
-  // (gate uses v42WelcomeSeen). Still suppressed while the first-run wizard is
-  // showing and while the v9 migration prompt is up — so in practice an UPGRADING
-  // user sees this modal, and a genuinely-new install sees the wizard instead.
+  // v45: rolled forward to V45 and — importantly — RE-WIRED. V43 and V44 never
+  // rolled a modal, and the V42 modal had drifted (gate + id + dismiss all keyed
+  // off v42). This release ties the gate (v45WelcomeSeen), the dismiss button id
+  // (v45-welcome-dismiss) and the copy all to V45, clearing that debt. Still
+  // suppressed while the first-run wizard or the v9 migration prompt is up — so an
+  // UPGRADING user sees this modal and a genuinely-new install sees the wizard.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v42WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v45WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V42">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V45">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V42</h3>
+        <h3 class="bulk-sheet-title">What's new in V45</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>A proper first-time setup.</strong> Setting up a new phone now walks you through your details, your company branding for reports, and an optional example job — so a new device is ready to go in a couple of minutes.</li>
-        <li><strong>Take a guided tour.</strong> There's now a quick walkthrough of the basics — Sessions, Quick Pick, the Overview, reports and backups. Run it any time from <em>Settings → Help → About → “Show me around the app again”.</em></li>
+        <li><strong>A smarter first-time setup.</strong> Setting up a new phone now feels properly guided — clearer steps, your report branding, and an optional example job — so a fresh device is ready in a couple of minutes.</li>
+        <li><strong>Setting up another phone?</strong> You can run that guided setup any time from <em>Settings → Help → About → “Set up another device”.</em></li>
+        <li><strong>A tidier guided tour.</strong> The quick walkthrough of the basics has had a polish too — replay it from <em>About → “Show me around the app again”.</em></li>
       </ul>
-      <button class="btn-primary" id="v42-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v45-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -159,43 +161,65 @@ function render() {
     const skipBtn = `<button class="wizard-skip" data-action="wizard-skip">Skip for now</button>`;
     const backBtn = `<button class="wizard-back" data-action="wizard-back">‹ Back</button>`;
     let bodyHTML = '';
-    let stepLabel = `Step ${step}`;
+    let footHTML = '';
+
+    // v45: the step indicator. Steps 1–2 are shared with the import path so they
+    // read as a simple "Step N"; the fresh path (steps 3–6) shows progress DOTS
+    // (decision 1A/8A). The dots are non-interactive — setup is forward-only so a
+    // tap can't skip past a step that still needs to capture input. They reuse the
+    // tour's dot styling (.wizard-dot / -on) for a consistent, finished feel.
+    let stepIndicator;
+    if (step >= 3) {
+      const FRESH_STEPS = 4; // steps 3,4,5,6 → four dots
+      const dotIndex = step - 3; // 0-based within the fresh path
+      const dots = Array.from({ length: FRESH_STEPS }, (_, i) =>
+        `<span class="wizard-dot${i === dotIndex ? ' wizard-dot-on' : ''}"></span>`
+      ).join('');
+      stepIndicator = `<div class="wizard-dots" aria-label="Step ${dotIndex + 1} of ${FRESH_STEPS}">${dots}</div>`;
+    } else {
+      stepIndicator = `<div class="wizard-steps">Step ${step}</div>`;
+    }
 
     if (step === 1) {
-      stepLabel = 'Welcome';
       bodyHTML = `
+        <div class="wizard-icon">👋</div>
         <h3 class="bulk-sheet-title">Welcome to PAT Test</h3>
-        <p class="wizard-lead">A fast, fully-offline way to log portable appliance tests in the field. Everything stays on this device.</p>
-        <p class="wizard-lead">Let's get this phone set up — it'll only take a couple of minutes, and you can change anything later.</p>
+        <p class="wizard-lead">A fast, fully-offline way to log portable appliance tests on site. Everything stays on this phone — no account, no signal needed.</p>
+        <p class="wizard-lead">Let's get this device ready. It takes a couple of minutes, and nothing here is final — you can change any of it later.</p>
+      `;
+      footHTML = `
         <button class="btn-primary" data-action="wizard-next">Get started</button>
         ${skipBtn}
       `;
     } else if (step === 2) {
-      stepLabel = 'Step 2';
       bodyHTML = `
+        <div class="wizard-icon">📲</div>
         <h3 class="bulk-sheet-title">Set up this device</h3>
-        <p class="wizard-lead">If another phone is already set up the way you like, bring its settings across. Otherwise, start fresh and we'll guide you through it.</p>
+        <p class="wizard-lead">Already got another phone set up how you like it? Bring its settings straight across. Starting from scratch? We'll walk you through it.</p>
         <input type="file" id="wizard-import-file" data-change-action="wizard-import-file" accept="application/json,.json" style="display:none">
+      `;
+      footHTML = `
         <button class="btn-primary" data-action="wizard-import">⬇ Import a setup file</button>
         <button class="btn-secondary" data-action="wizard-fresh">Start fresh</button>
         ${backBtn}
         ${skipBtn}
       `;
     } else if (step === 3) {
-      stepLabel = 'Step 3 of 6';
       bodyHTML = `
+        <div class="wizard-icon">👤</div>
         <h3 class="bulk-sheet-title">Your details</h3>
-        <p class="wizard-lead">These appear on your reports. Optional — you can change or add them any time in Settings.</p>
+        <p class="wizard-lead">These show up on your reports. Both are optional, and you can add or change them any time in Settings.</p>
         <label class="label">Your name (the engineer)</label>
         <input class="input" id="wizard-engineer" type="text" value="${escapeHTML(state.engineer || '')}" placeholder="e.g. Sam Taylor" autocomplete="name">
         <label class="label" style="margin-top:12px">Calibration date of your tester</label>
         <input class="input" id="wizard-caldate" type="date" value="${escapeHTML(state.calDate || '')}">
-        <button class="btn-primary" style="margin-top:16px" data-action="wizard-next">Continue</button>
+      `;
+      footHTML = `
+        <button class="btn-primary" data-action="wizard-next">Continue</button>
         ${backBtn}
         ${skipBtn}
       `;
     } else if (step === 4) {
-      stepLabel = 'Step 4 of 6';
       const logoPreview = rs.logo
         ? `<img class="wizard-logo-preview" src="${rs.logo}" alt="Company logo">
            <button class="btn-secondary" data-action="report-logo-remove">Remove logo</button>`
@@ -208,8 +232,9 @@ function render() {
                   </button>`;
         }).join('');
       bodyHTML = `
+        <div class="wizard-icon">🎨</div>
         <h3 class="bulk-sheet-title">Your report branding</h3>
-        <p class="wizard-lead">This is what clients see on your PDF reports. All optional — skip and set it up later if you'd rather.</p>
+        <p class="wizard-lead">This is what your clients see on every PDF report. All optional — leave it for now and set it up later if you'd rather.</p>
         <label class="label">Company name</label>
         <input class="input" id="wizard-company" type="text" value="${escapeHTML(rs.companyName || '')}" placeholder="e.g. Birchley PAT Services">
         <input type="file" id="report-logo-file" data-change-action="report-logo-file" accept="image/png,image/jpeg" style="display:none">
@@ -217,34 +242,45 @@ function render() {
         ${logoPreview}
         <label class="label" style="margin-top:12px">Report colour</label>
         <div class="wizard-theme-row">${themes}</div>
-        <button class="btn-primary" style="margin-top:8px" data-action="wizard-next">Continue</button>
+      `;
+      footHTML = `
+        <button class="btn-primary" data-action="wizard-next">Continue</button>
         ${backBtn}
         ${skipBtn}
       `;
     } else if (step === 5) {
-      stepLabel = 'Step 5 of 6';
       const checked = state.wizardSeedDemo ? 'checked' : '';
       bodyHTML = `
+        <div class="wizard-icon">📋</div>
         <h3 class="bulk-sheet-title">Add an example job?</h3>
-        <p class="wizard-lead">We can add one example session with a few test results, so you can see how Sessions, the Overview and reports look. It's clearly labelled and you can delete it any time.</p>
+        <p class="wizard-lead">Want to see how it all hangs together first? We can drop in one example session with a few test results, so you can explore Sessions, the Overview and a report straight away. It's clearly labelled, and you can delete it whenever you like.</p>
         <label class="label" style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;font-weight:600">
           <input type="checkbox" id="wizard-seed-demo" data-change-action="wizard-seed-demo" ${checked} style="width:auto">
           Add an example job
         </label>
-        <button class="btn-primary" style="margin-top:16px" data-action="wizard-next">Continue</button>
+      `;
+      footHTML = `
+        <button class="btn-primary" data-action="wizard-next">Continue</button>
         ${backBtn}
         ${skipBtn}
       `;
     } else {
-      stepLabel = 'Step 6 of 6';
+      // v45: finish step restyled (decision 9A+B). The walkthrough is the clear
+      // primary action with a one-line "what you'll see", "Go to the app" is a
+      // clean secondary, and a muted line reassures you can replay it later.
       bodyHTML = `
-        <h3 class="bulk-sheet-title">You're all set 🎉</h3>
-        <p class="wizard-lead">Your phone is ready. Start a new session whenever you're on a job — tap a location, then tap items to log them.</p>
+        <div class="wizard-icon">🎉</div>
+        <h3 class="bulk-sheet-title">You're all set</h3>
+        <p class="wizard-lead">Your phone's ready to go. Start a new session whenever you're on a job — pick a location, tap an item type, then tap PASS or FAIL.</p>
         <div class="wizard-finish-tour">
-          <p>New to the app? Take a 30-second tour of the basics.</p>
+          <p class="wizard-finish-tour-title">New here? Take the 30-second tour.</p>
+          <p class="wizard-finish-tour-sub">A quick look at Sessions, logging, the Overview, reports and backups.</p>
           <button class="btn-primary" data-action="wizard-finish-tour">Show me around</button>
         </div>
-        <button class="btn-secondary" style="margin-top:12px" data-action="wizard-finish">Go to the app</button>
+      `;
+      footHTML = `
+        <button class="btn-secondary" data-action="wizard-finish">Go straight to the app</button>
+        <p class="wizard-replay-note">You can run this tour again any time from Settings → About.</p>
         ${backBtn}
       `;
     }
@@ -252,8 +288,9 @@ function render() {
       <div class="modal-backdrop" style="z-index:300"></div>
       <div class="bulk-sheet wizard-sheet" style="z-index:301" role="dialog" aria-label="First-time setup">
         <div class="bulk-sheet-handle"></div>
-        <div class="wizard-steps">${stepLabel}</div>
-        ${bodyHTML}
+        ${stepIndicator}
+        <div class="wizard-body">${bodyHTML}</div>
+        <div class="wizard-foot">${footHTML}</div>
       </div>
     `;
   }
