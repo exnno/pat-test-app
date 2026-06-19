@@ -1527,6 +1527,13 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   flex-direction: column;
   min-height: 72vh;
   max-height: 92vh;
+  /* v45.1: the wizard is a persistent multi-step flow, but paging calls render()
+     which rebuilds #app — so the sheet is a NEW node each step and the shared
+     .bulk-sheet `slide-up` entry animation replayed every time, making the sheet
+     look like it popped up again on each Next/Back. Suppress that entry animation
+     here so paging just swaps the content in place. (The welcome modal and all
+     other one-shot sheets keep their slide-up.) */
+  animation: none;
 }
 .wizard-body {
   flex: 1 1 auto;
@@ -1706,13 +1713,13 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .tour-stage {
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   padding: 8px 0 4px;
-  /* v45: give the stage a stable height and centre the mock inside it, so the
-     caption and the Back/Next row no longer jump as you page between slides whose
-     mocks are very different heights (the Quick Pick slide is tall, Reports short).
-     The mock keeps its natural height; the stage just reserves a consistent space. */
-  min-height: 360px;
+  /* v45.1: the v45 min-height (360px) was shorter than the tallest mock (Quick
+     Pick), so that slide grew the stage and shifted everything below it — the jump
+     persisted. Size the stage to the TALLEST mock and top-align the mock, so every
+     slide reserves the same space and the caption/dots/nav never move. */
+  min-height: 440px;
 }
 /* The mock "phone screen" — a soft framed card the mock content sits inside. */
 .tour-mock {
@@ -1885,7 +1892,9 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   .tour-hl { animation: none; }
 }
 
-.tour-caption { padding: 16px 4px 4px; text-align: center; }
+/* v45.1: reserve space for up to ~3 caption lines so a 1-line caption doesn't let
+   the dots/nav ride up while a 3-line one pushes them down. */
+.tour-caption { padding: 16px 4px 4px; text-align: center; min-height: 92px; }
 .tour-caption-title { font-size: 20px; font-weight: 800; color: var(--text); margin: 0 0 6px; }
 .tour-caption-text { font-size: 15px; line-height: 1.5; color: var(--text-muted); margin: 0; }
 
