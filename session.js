@@ -966,13 +966,6 @@ function clearSelection() {
   render();
 }
 
-function openBulkLocationDialog() {
-  if (state.selectedIndices.length === 0) return;
-  state.bulkLocationDialogOpen = true;
-  state.bulkLocationValue = '';
-  render();
-}
-
 function applyBulkLocation() {
   const sess = activeSession();
   if (!sess) return;
@@ -1482,115 +1475,14 @@ function moveCsvColumn(id, delta) {
   render();
 }
 
-// v12: dismiss the welcome modal — sets the flag in localStorage so it
-// doesn't reappear, then re-renders to clear it from view. v19: writes
-// pat:v19welcome so v18 users see the modal once on update.
-function dismissV19Welcome() {
-  state.v19WelcomeSeen = true;
-  localStorage.setItem(V19_WELCOME_KEY, '1');
-  render();
-}
-
-// v26: dismiss the V26 "what's new" modal. Writes pat:v26welcome so users see
-// it once on update.
-function dismissV26Welcome() {
-  state.v26WelcomeSeen = true;
-  localStorage.setItem(V26_WELCOME_KEY, '1');
-  render();
-}
-
-// v30: dismiss the V30 "what's new" modal. Writes pat:v30welcome so users see
-// it once on update.
-function dismissV30Welcome() {
-  state.v30WelcomeSeen = true;
-  localStorage.setItem(V30_WELCOME_KEY, '1');
-  render();
-}
-
-function dismissV31Welcome() {
-  state.v31WelcomeSeen = true;
-  localStorage.setItem(V31_WELCOME_KEY, '1');
-  render();
-}
-
-function dismissV32Welcome() {
-  state.v32WelcomeSeen = true;
-  localStorage.setItem(V32_WELCOME_KEY, '1');
-  render();
-}
-
-function dismissV33Welcome() {
-  state.v33WelcomeSeen = true;
-  localStorage.setItem(V33_WELCOME_KEY, '1');
-  render();
-}
-
-function dismissV34Welcome() {
-  state.v34WelcomeSeen = true;
-  localStorage.setItem(V34_WELCOME_KEY, '1');
-  render();
-}
-
-function dismissV35Welcome() {
-  state.v35WelcomeSeen = true;
-  localStorage.setItem(V35_WELCOME_KEY, '1');
-  render();
-}
-
-function dismissV36Welcome() {
-  state.v36WelcomeSeen = true;
-  localStorage.setItem(V36_WELCOME_KEY, '1');
-  render();
-}
-
-function dismissV38Welcome() {
-  state.v38WelcomeSeen = true;
-  localStorage.setItem(V38_WELCOME_KEY, '1');
-  render();
-}
-
-function dismissV39Welcome() {
-  state.v39WelcomeSeen = true;
-  localStorage.setItem(V39_WELCOME_KEY, '1');
-  render();
-}
-
-function dismissV40Welcome() {
-  state.v40WelcomeSeen = true;
-  localStorage.setItem(V40_WELCOME_KEY, '1');
-  render();
-}
-
-function dismissV41Welcome() {
-  state.v41WelcomeSeen = true;
-  localStorage.setItem(V41_WELCOME_KEY, '1');
-  render();
-}
-
-function dismissV42Welcome() {
-  state.v42WelcomeSeen = true;
-  localStorage.setItem(V42_WELCOME_KEY, '1');
-  render();
-}
-
-// v45: the first welcome modal wired since V42 (V43/V44 rolled none). Marks the
-// V45 modal seen and persists the flag. Tying the gate/dismiss freshly to V45
-// also clears the long-standing "modal still keys off v42WelcomeSeen" debt.
-function dismissV45Welcome() {
-  state.v45WelcomeSeen = true;
-  localStorage.setItem(V45_WELCOME_KEY, '1');
-  render();
-}
-
-function dismissV46Welcome() {
-  state.v46WelcomeSeen = true;
-  localStorage.setItem(V46_WELCOME_KEY, '1');
-  render();
-}
-
-function dismissV49Welcome() {
-  state.v49WelcomeSeen = true;
-  localStorage.setItem(V49_WELCOME_KEY, '1');
+// v50: ONE parameterised welcome-dismiss, replacing the 17 near-identical
+// dismissVNNWelcome functions that had accumulated since v12. Sets the seen
+// flag in state and persists the matching key so the modal never reappears,
+// then re-renders to clear it from view. The current welcome is V49; future
+// feature releases pass their own (flag, key) pair and reuse this function.
+function dismissWelcome(seenFlag, key) {
+  state[seenFlag] = true;
+  localStorage.setItem(key, '1');
   render();
 }
 

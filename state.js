@@ -122,72 +122,14 @@ let state = {
   calCertNo: '',
   calDue: '',
 
-  // v13: First-launch welcome modal flag. Renamed from v12WelcomeSeen so the
-  // modal fires once for everyone on update to V13.
-  v13WelcomeSeen: false,
-
-  // v14: welcome modal flag (key pat:v14welcome). v15: retained for load-time
-  // completeness only — no longer gates anything.
-  v14WelcomeSeen: false,
-
-  // v15: welcome modal flag (key pat:v15welcome). v16: retained for load-time
-  // completeness only — no longer gates anything.
-  v15WelcomeSeen: false,
-
-  // v16: welcome modal flag (key pat:v16welcome). v17: retained for load-time
-  // completeness only — no longer gates anything.
-  v16WelcomeSeen: false,
-
-  // v17: welcome modal flag (key pat:v17welcome). v18: retained for load-time
-  // completeness only — no longer gates anything.
-  v17WelcomeSeen: false,
-
-  // v18: welcome modal flag (key pat:v18welcome). Gates the V18 "what's new"
-  // modal so v17 users see it once on update.
-  v18WelcomeSeen: false,
-
-  // v19: welcome modal flag (key pat:v19welcome). Gates the V19 "what's new"
-  // modal so v18 users see it once on update.
-  v19WelcomeSeen: false,
-  // v26: welcome modal flag (key pat:v26welcome). Gates the V26 "what's new"
-  // modal so users see it once on update.
-  v26WelcomeSeen: false,
-
-  // v27: welcome modal flag (key pat:v27welcome). Gates the V27 "what's new"
-  // modal (Smart Quick Pick ordering quality) so users see it once on update.
-  v27WelcomeSeen: false,
-
-  // v30: welcome modal flag (key pat:v30welcome). Gates the V30 "what's new"
-  // modal (PDF Reports) so users see it once on update.
-  v30WelcomeSeen: false,
-
-  // v31: welcome modal flag (key pat:v31welcome). Gates the V31 "what's new"
-  // modal (Export/Import Setup + named report files).
-  v31WelcomeSeen: false,
-
-  // v32: welcome modal flag (key pat:v32welcome). Gates the V32 "what's new"
-  // modal (settings restructure + search).
-  v32WelcomeSeen: false,
-
-  // v33: first-run wizard + its welcome modal (upgraders).
-  //   v33WelcomeSeen  — the "what's new in V33" modal (shown to UPGRADERS).
-  //   onboardedV33Seen — the first-run wizard has been completed OR skipped.
-  // A new install shows the WIZARD (and never the modal); an upgrader shows the
-  // MODAL (and never the wizard). Both flags load from localStorage.
-  v33WelcomeSeen: false,
-  v34WelcomeSeen: false,
-  v35WelcomeSeen: false,
-  v36WelcomeSeen: false,
-  v38WelcomeSeen: false,
-  v39WelcomeSeen: false,
-  v40WelcomeSeen: false,
-  v41WelcomeSeen: false,
-  v42WelcomeSeen: false,
-  v43WelcomeSeen: false,
-  v45WelcomeSeen: false,  // v45: onboarding polish welcome (first wired modal since V42)
-  v46WelcomeSeen: false,  // v46: navigation & UI polish welcome
-  v47WelcomeSeen: false,  // v47: long-press quick-pick preset switcher welcome
-  v48WelcomeSeen: false,  // v48: PATGo rebrand + icon fix + report credit toggle
+  // Welcome-modal "seen" flag. v50: only the CURRENT release's flag is kept; the
+  // 27 historical vNNWelcomeSeen flags (v13…v48) were removed — each was written
+  // once and never read again after its release. The first-run-wizard gate that
+  // used to read seven of them now detects past welcomes by scanning localStorage
+  // for any 'pat:v<n>welcome' key (see hasAnyLegacyWelcomeKey in storage.js), so a
+  // new install still shows the WIZARD and an upgrader still shows the MODAL —
+  // unchanged behaviour. Future feature releases roll a new flag here and pass it
+  // to dismissWelcome().
   v49WelcomeSeen: false,  // v49: PATGo footer logo + onboarding icon + tour note
   // v46: remembered Sessions-list scroll offset. Captured (in render) when
   // leaving Sessions for a session, restored when returning to Sessions. All

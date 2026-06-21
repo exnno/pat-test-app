@@ -158,16 +158,13 @@ function render() {
     </div>
   ` : '';
 
-  // v12: one-time "what's new" modal on first launch after an update.
-  // Suppressed if the v9 migration prompt is currently showing (that one
-  // takes priority because it requires a name commit) or if the user has
-  // already dismissed this modal.
-  // v45: rolled forward to V45 and — importantly — RE-WIRED. V43 and V44 never
-  // rolled a modal, and the V42 modal had drifted (gate + id + dismiss all keyed
-  // off v42). This release ties the gate (v45WelcomeSeen), the dismiss button id
-  // (v45-welcome-dismiss) and the copy all to V45, clearing that debt. Still
-  // suppressed while the first-run wizard or the v9 migration prompt is up — so an
-  // UPGRADING user sees this modal and a genuinely-new install sees the wizard.
+  // One-time "what's new" modal, shown once after an update until dismissed.
+  // Gates on the CURRENT release's seen flag (v49WelcomeSeen — V50 is a
+  // structural/cleanup release and rolls no new modal, so the V49 modal remains
+  // the latest). Suppressed while the v9 migration prompt is up (it needs a name
+  // commit first) or while the first-run wizard is showing — so an UPGRADING user
+  // sees this modal and a genuinely-new install sees the wizard instead.
+  // Dismissed via the shared dismissWelcome() (v50), wired in dispatch.js.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
   const welcomeModal = (state.v49WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>

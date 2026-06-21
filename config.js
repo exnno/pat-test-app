@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — config.js (constants & defaults)
- * v49 (June 2026)
+ * v50 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V49';
+const APP_VERSION = 'V50';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -57,38 +57,13 @@ const TESTER_MODEL_KEY = 'pat:testermodel'; // v13
 const CAL_DATE_KEY = 'pat:caldate';
 const CAL_CERT_KEY = 'pat:calcert';
 const CAL_DUE_KEY = 'pat:caldue';
-const V12_WELCOME_KEY = 'pat:v12welcome';   // v13: legacy. Not referenced; left documented.
-const V13_WELCOME_KEY = 'pat:v13welcome';   // v14: legacy. Orphaned, harmless.
-const V14_WELCOME_KEY = 'pat:v14welcome';   // v15: legacy. Orphaned, harmless.
-const V15_WELCOME_KEY = 'pat:v15welcome';   // v16: legacy. Orphaned, harmless.
-const V16_WELCOME_KEY = 'pat:v16welcome';   // v16
-const V17_WELCOME_KEY = 'pat:v17welcome';   // v17: legacy. Orphaned, harmless.
-const V18_WELCOME_KEY = 'pat:v18welcome';   // v18
-const V19_WELCOME_KEY = 'pat:v19welcome';   // v19
-const V20_WELCOME_KEY = 'pat:v20welcome';   // v20
-const V26_WELCOME_KEY = 'pat:v26welcome';   // v26: Clients & Sites flexibility + split CSV
-const V27_WELCOME_KEY = 'pat:v27welcome';   // v27: Smart Quick Pick ordering quality
-const V30_WELCOME_KEY = 'pat:v30welcome';   // v30: PDF Reports
-const V31_WELCOME_KEY = 'pat:v31welcome';   // v31: Export/Import Setup + named PDF files
-const V32_WELCOME_KEY = 'pat:v32welcome';   // v32: settings restructure + search
-const V33_WELCOME_KEY = 'pat:v33welcome';   // v33: first-run wizard (shown to UPGRADERS only)
-const V34_WELCOME_KEY = 'pat:v34welcome';   // v34: report signature (draw or upload)
-const V35_WELCOME_KEY = 'pat:v35welcome';   // v35: report colours + preview quick-adjust + date fix
-const V36_WELCOME_KEY = 'pat:v36welcome';   // v36: certificate numbers + job notes + report templates
-const V38_WELCOME_KEY = 'pat:v38welcome';   // v38: multi-page PDF preview
-const V39_WELCOME_KEY = 'pat:v39welcome';   // v39: New Session polish
-const V40_WELCOME_KEY = 'pat:v40welcome';   // v40: in-app dialogs (no native pop-ups)
-const V41_WELCOME_KEY = 'pat:v41welcome';   // v41: in-app dialogs for import/restore/report errors
-const V42_WELCOME_KEY = 'pat:v42welcome';   // v42: commercial onboarding (guided setup + walkthrough)
-const V43_WELCOME_KEY = 'pat:v43welcome';   // v43: calibration reminder + cloud-prep groundwork (NOTE: defined but the welcome modal was never wired to it — still gates on v42)
-// v45: onboarding polish. This is the first welcome modal actually wired since
-// V42 (V43/V44 never rolled one), so it both announces the refreshed first-time
-// setup AND clears the inherited "modal still gates on v42WelcomeSeen" debt — the
-// gate, dismiss handler and copy below are all freshly tied to V45.
-const V45_WELCOME_KEY = 'pat:v45welcome';   // v45: onboarding wizard + walkthrough polish
-const V46_WELCOME_KEY = 'pat:v46welcome';   // v46: navigation & UI polish (scroll-to-top, tap targets)
-const V47_WELCOME_KEY = 'pat:v47welcome';   // v47: long-press quick-pick preset switcher
-const V48_WELCOME_KEY = 'pat:v48welcome';   // v48: PATGo rebrand + icon fix + report credit toggle
+// Welcome-modal "seen" key. v50: only the CURRENT welcome key is kept. The 28
+// historical keys (V12…V48) were removed — each was a one-release marker that
+// nothing referenced after its version shipped. The keys still sit harmlessly in
+// existing users' localStorage; storage.js detects them by prefix for the
+// first-run-wizard gate, so nothing about upgrade behaviour changes. When a future
+// feature release rolls a new welcome, replace the line below with the new key
+// (e.g. V51_WELCOME_KEY) and pass it to dismissWelcome() — no new symbol pile.
 const V49_WELCOME_KEY = 'pat:v49welcome';   // v49: PATGo footer logo + onboarding icon + tour long-press note
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher

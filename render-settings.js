@@ -1141,18 +1141,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v49: rolled forward — V49 on top, V46 dropped. -->
+      <!-- v8: rolling 3-version changelog. v50: rolled forward — V50 on top, V47 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V50</strong> · June 2026</p>
+        <p class="muted">An under-the-hood spring clean. We've tidied and slimmed the app's code ahead of some bigger features coming soon — the app is leaner and a little quicker to start, with no changes to how anything works. All your data, settings and sessions are exactly as they were.</p>
 
         <p><strong>V49</strong> · June 2026</p>
         <p class="muted">Your PDF reports now carry the PATGo logo next to the credit line at the foot of each page — a small finishing touch. You can turn the logo on or off (or hide the whole credit line) under Settings → Reports → What to include. The first-time setup and the guided tour now show the PATGo logo too, and the tour explains the press-and-hold shortcut for switching quick-pick presets. None of your existing data is affected.</p>
 
         <p><strong>V48</strong> · June 2026</p>
         <p class="muted">The app is now called PATGo, with a new name and icon. Everything works exactly as before — your data, settings and sessions are all untouched. You'll see the new name on the home-screen icon, in Settings, and at the foot of your PDF certificates. New option: you can now turn the small “PATGo” credit line at the bottom of your PDF reports on or off, under Settings → Reports.</p>
-
-        <p><strong>V47</strong> · June 2026</p>
-        <p class="muted">Switch quick-pick presets without leaving the test screen: press and hold the row of quick-pick buttons for a couple of seconds and a list of your presets pops up — tap one to switch which buttons show. It only changes the buttons, it never logs anything. There's also a shortcut to the preset settings at the bottom of that pop-up. None of your existing data is affected.</p>
       </div>
 
       <div class="info-card">

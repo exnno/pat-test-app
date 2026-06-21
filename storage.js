@@ -217,6 +217,25 @@ function parseStoredSessions(raw) {
 
 
 // ---------- Persistence ----------
+
+// v50: returns true if localStorage holds ANY historical "what's new" welcome
+// key (pattern 'pat:v<number>welcome'). Used by the first-run-wizard gate to
+// recognise a returning user without keeping a state flag per version. Cheap —
+// localStorage on this app holds well under a hundred keys. Defensive: any
+// access error (private-mode quirks etc.) returns false so a blank install is
+// never wrongly treated as onboarded.
+function hasAnyLegacyWelcomeKey() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && /^pat:v\d+welcome$/.test(k)) return true;
+    }
+  } catch {
+    // ignore — treat as "no welcome key seen"
+  }
+  return false;
+}
+
 function load() {
   // v14: sessions are now stored compressed (key-shortened). parseStoredSessions
   // transparently handles both the new compressed wrapper and the legacy v13
@@ -406,36 +425,12 @@ function loadV11Settings() {
   state.calCertNo = localStorage.getItem(CAL_CERT_KEY) || '';
   state.calDue = localStorage.getItem(CAL_DUE_KEY) || '';
 
-  // v15: welcome modal flag — key bumped to pat:v15welcome so v14 users see the
-  // v15 modal once on update. v13/v14 flags kept loaded for completeness but no
-  // longer gate the modal.
-  // v16: key bumped again to pat:v16welcome; v15WelcomeSeen now load-only.
-  state.v13WelcomeSeen = localStorage.getItem(V13_WELCOME_KEY) === '1';
-  state.v14WelcomeSeen = localStorage.getItem(V14_WELCOME_KEY) === '1';
-  state.v15WelcomeSeen = localStorage.getItem(V15_WELCOME_KEY) === '1';
-  state.v16WelcomeSeen = localStorage.getItem(V16_WELCOME_KEY) === '1';
-  state.v17WelcomeSeen = localStorage.getItem(V17_WELCOME_KEY) === '1';
-  state.v18WelcomeSeen = localStorage.getItem(V18_WELCOME_KEY) === '1';
-  state.v19WelcomeSeen = localStorage.getItem(V19_WELCOME_KEY) === '1';
-  state.v26WelcomeSeen = localStorage.getItem(V26_WELCOME_KEY) === '1';
-  state.v27WelcomeSeen = localStorage.getItem(V27_WELCOME_KEY) === '1';
-  state.v30WelcomeSeen = localStorage.getItem(V30_WELCOME_KEY) === '1';
-  state.v31WelcomeSeen = localStorage.getItem(V31_WELCOME_KEY) === '1';
-  state.v32WelcomeSeen = localStorage.getItem(V32_WELCOME_KEY) === '1';
-  state.v33WelcomeSeen = localStorage.getItem(V33_WELCOME_KEY) === '1';
-  state.v34WelcomeSeen = localStorage.getItem(V34_WELCOME_KEY) === '1';
-  state.v35WelcomeSeen = localStorage.getItem(V35_WELCOME_KEY) === '1';
-  state.v36WelcomeSeen = localStorage.getItem(V36_WELCOME_KEY) === '1';
-  state.v38WelcomeSeen = localStorage.getItem(V38_WELCOME_KEY) === '1';
-  state.v39WelcomeSeen = localStorage.getItem(V39_WELCOME_KEY) === '1';
-  state.v40WelcomeSeen = localStorage.getItem(V40_WELCOME_KEY) === '1';
-  state.v41WelcomeSeen = localStorage.getItem(V41_WELCOME_KEY) === '1';
-  state.v42WelcomeSeen = localStorage.getItem(V42_WELCOME_KEY) === '1';
-  state.v43WelcomeSeen = localStorage.getItem(V43_WELCOME_KEY) === '1';
-  state.v45WelcomeSeen = localStorage.getItem(V45_WELCOME_KEY) === '1';
-  state.v46WelcomeSeen = localStorage.getItem(V46_WELCOME_KEY) === '1';
-  state.v47WelcomeSeen = localStorage.getItem(V47_WELCOME_KEY) === '1';
-  state.v48WelcomeSeen = localStorage.getItem(V48_WELCOME_KEY) === '1';
+  // Welcome modal flag. Only the CURRENT welcome (V49) gates the modal, so only
+  // its key is read. v50: the 27 historical per-version flag reads (v13…v48) were
+  // removed — they were write-once "seen" markers that nothing consumed once their
+  // release had passed. Old keys remain harmlessly in users' localStorage; the
+  // returning-user heuristic below detects them by prefix, so upgraders are still
+  // recognised without keeping a flag per version.
   state.v49WelcomeSeen = localStorage.getItem(V49_WELCOME_KEY) === '1';
 
   // v43: cloud prep. Load mock auth state (userId, authToken from PAT_AUTH_KEY).
@@ -459,17 +454,22 @@ function loadV11Settings() {
   // completed OR skipped. We treat the install as "already onboarded" (so the
   // wizard never shows) if EITHER the flag is set, OR this is clearly a returning
   // user — they already have sessions, an engineer name, or have dismissed any
-  // earlier welcome modal. That last clause means existing users upgrading to V33
-  // are never shown the wizard; they get the V33 welcome modal instead. The
+  // earlier welcome modal. That last clause means existing users upgrading are
+  // never shown the wizard; they get the current welcome modal instead. The
   // wizard is reserved for a genuinely blank install. (render-core reads
   // state.onboardedV33Seen to decide.)
+  // v50: the "dismissed an earlier modal" test used to read seven retained
+  // per-version flags (v18…v32). Those flags are gone; we now detect the same
+  // thing — and more thoroughly — by scanning localStorage for ANY historical
+  // 'pat:v<n>welcome' key. This is a strict superset of the old clause (it also
+  // catches v33…v48 dismissers), so no upgrader is ever mistaken for a new user,
+  // while a genuinely blank install still has none and correctly sees the wizard.
   const explicitlyOnboarded = localStorage.getItem(ONBOARD_KEY) === '1';
+  const seenAnyWelcome = hasAnyLegacyWelcomeKey();
   const looksLikeReturningUser =
     state.sessions.length > 0 ||
     !!state.engineer ||
-    state.v32WelcomeSeen || state.v31WelcomeSeen || state.v30WelcomeSeen ||
-    state.v27WelcomeSeen || state.v26WelcomeSeen || state.v19WelcomeSeen ||
-    state.v18WelcomeSeen;
+    seenAnyWelcome;
   state.onboardedV33Seen = explicitlyOnboarded || looksLikeReturningUser;
 
   // v17: Sound feedback + Item timestamps. Both default OFF; only an explicit
