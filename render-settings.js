@@ -1030,6 +1030,9 @@ function renderSettingsReport() {
         ${toggle('report-show-fails', 'List failed items', rs.showFails, rs.showFails ? 'All items listed' : 'Passes only')}
         ${toggle('report-declaration', 'Declaration line', rs.declaration)}
         ${toggle('report-show-appcredit', 'PATGo credit line', rs.showAppCredit, rs.showAppCredit ? 'Shown at the foot of the report' : 'Hidden')}
+        <div style="margin-left:16px${rs.showAppCredit ? '' : ';opacity:.5'}">
+          ${toggle('report-show-footerlogo', 'Show PATGo logo', rs.showFooterLogo, rs.showFooterLogo ? 'Small logo beside the credit line' : 'Text only')}
+        </div>
       </div>
 
       <div class="settings-section">
@@ -1138,18 +1141,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v48: rolled forward — V48 on top, V45 dropped. -->
+      <!-- v8: rolling 3-version changelog. v49: rolled forward — V49 on top, V46 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V49</strong> · June 2026</p>
+        <p class="muted">Your PDF reports now carry the PATGo logo next to the credit line at the foot of each page — a small finishing touch. You can turn the logo on or off (or hide the whole credit line) under Settings → Reports → What to include. The first-time setup and the guided tour now show the PATGo logo too, and the tour explains the press-and-hold shortcut for switching quick-pick presets. None of your existing data is affected.</p>
 
         <p><strong>V48</strong> · June 2026</p>
         <p class="muted">The app is now called PATGo, with a new name and icon. Everything works exactly as before — your data, settings and sessions are all untouched. You'll see the new name on the home-screen icon, in Settings, and at the foot of your PDF certificates. New option: you can now turn the small “PATGo” credit line at the bottom of your PDF reports on or off, under Settings → Reports.</p>
 
         <p><strong>V47</strong> · June 2026</p>
         <p class="muted">Switch quick-pick presets without leaving the test screen: press and hold the row of quick-pick buttons for a couple of seconds and a list of your presets pops up — tap one to switch which buttons show. It only changes the buttons, it never logs anything. There's also a shortcut to the preset settings at the bottom of that pop-up. None of your existing data is affected.</p>
-
-        <p><strong>V46</strong> · June 2026</p>
-        <p class="muted">Moving between screens now starts you at the top of each page, instead of staying scrolled where you left the last one. Open a session from a long list and tap back, and you'll return to the same spot in the list. The small close and menu buttons are easier to tap, and tapping outside a pop-up now closes it. None of your existing data is affected.</p>
       </div>
 
       <div class="info-card">

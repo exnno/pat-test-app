@@ -188,6 +188,7 @@ let state = {
   v46WelcomeSeen: false,  // v46: navigation & UI polish welcome
   v47WelcomeSeen: false,  // v47: long-press quick-pick preset switcher welcome
   v48WelcomeSeen: false,  // v48: PATGo rebrand + icon fix + report credit toggle
+  v49WelcomeSeen: false,  // v49: PATGo footer logo + onboarding icon + tour note
   // v46: remembered Sessions-list scroll offset. Captured (in render) when
   // leaving Sessions for a session, restored when returning to Sessions. All
   // other navigation resets to the top. Transient — never persisted. The

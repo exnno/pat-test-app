@@ -54,7 +54,7 @@ const TOUR_SLIDES = [
   {
     key: 'quickpick',
     title: 'Quick Pick & logging',
-    caption: 'Type the location once, pick an item type, then tap the big <strong>PASS</strong> (or FAIL) button. The item types reorder to put your usual ones first.',
+    caption: 'Type the location once, pick an item type, then tap the big <strong>PASS</strong> (or FAIL) button. The item types reorder to put your usual ones first. <strong>Tip:</strong> press and hold the row of item-type buttons for a couple of seconds to switch between your saved presets without leaving this screen.',
     mock: () => `
       <div class="tour-screen">
         <div class="tour-bar">Riverside Café</div>

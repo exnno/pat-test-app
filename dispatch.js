@@ -629,7 +629,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV48Welcome(),
+  'welcome-dismiss': () => dismissV49Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -875,6 +875,7 @@ registerChangeActions({
   'report-show-fails':       (checked) => { captureReportTextInputs(); state.reportSettings.showFails = checked; render(); },
   'report-declaration':      (checked) => { captureReportTextInputs(); state.reportSettings.declaration = checked; render(); },
   'report-show-appcredit':   (checked) => { captureReportTextInputs(); state.reportSettings.showAppCredit = checked; render(); },
+  'report-show-footerlogo':  (checked) => { captureReportTextInputs(); state.reportSettings.showFooterLogo = checked; render(); },
   'report-retest-enabled':   (checked) => { captureReportTextInputs(); state.reportSettings.retestEnabled = checked; render(); },
   // v36: certificate-numbers master toggle. Capture cert text inputs first so an
   // unsaved prefix/counter survives the re-render that enables/disables the

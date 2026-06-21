@@ -169,21 +169,22 @@ function render() {
   // suppressed while the first-run wizard or the v9 migration prompt is up — so an
   // UPGRADING user sees this modal and a genuinely-new install sees the wizard.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v48WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v49WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V48">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V49">
       <div class="bulk-sheet-handle"></div>
+      <div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V48</h3>
+        <h3 class="bulk-sheet-title">What's new in V49</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Say hello to PATGo.</strong> The app has a new name and a new icon. Everything works exactly as before — your data, settings and sessions are all untouched.</li>
-        <li>You’ll see the new name on the home-screen icon, in Settings, and on the bottom of your PDF certificates.</li>
-        <li><strong>New option:</strong> you can now turn the small “PATGo” line at the foot of your PDF reports on or off — find it in Settings → Reports.</li>
+        <li><strong>The PATGo logo is now on your reports.</strong> It prints next to the credit line at the foot of every page of your PDF reports — a small, professional finishing touch.</li>
+        <li>It's <strong>on by default</strong>. You can turn the logo off (or hide the whole credit line) under Settings → Reports → What to include.</li>
+        <li>The setup screens and the guided tour have had a polish too. As always, your data, settings and sessions are untouched.</li>
       </ul>
-      <button class="btn-primary" id="v48-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v49-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -223,7 +224,7 @@ function render() {
 
     if (step === 1) {
       bodyHTML = `
-        <div class="wizard-icon">👋</div>
+        <div class="wizard-logo-wrap"><img class="wizard-logo" src="icon-192.png" alt="PATGo" width="72" height="72"></div>
         <h3 class="bulk-sheet-title">Welcome to PATGo</h3>
         <p class="wizard-lead">A fast, fully-offline way to log portable appliance tests on site. Everything stays on this phone — no account, no signal needed.</p>
         <p class="wizard-lead">Let's get this device ready. It takes a couple of minutes, and nothing here is final — you can change any of it later.</p>

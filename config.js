@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — config.js (constants & defaults)
- * v24 (June 2026)
+ * v49 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V48';
+const APP_VERSION = 'V49';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -89,6 +89,7 @@ const V45_WELCOME_KEY = 'pat:v45welcome';   // v45: onboarding wizard + walkthro
 const V46_WELCOME_KEY = 'pat:v46welcome';   // v46: navigation & UI polish (scroll-to-top, tap targets)
 const V47_WELCOME_KEY = 'pat:v47welcome';   // v47: long-press quick-pick preset switcher
 const V48_WELCOME_KEY = 'pat:v48welcome';   // v48: PATGo rebrand + icon fix + report credit toggle
+const V49_WELCOME_KEY = 'pat:v49welcome';   // v49: PATGo footer logo + onboarding icon + tour long-press note
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
 // sheet opens. Deliberately a single named constant so the threshold can be
@@ -235,6 +236,13 @@ function makeDefaultReportSettings() {
     // through backup + setup as part of the reportSettings blob — additive, no
     // backupVersion bump.
     showAppCredit:    true,
+    // v49: print the small PATGo logo mark next to the footer app-credit text.
+    // Default true = on for everyone (decision Q1). It is SUBORDINATE to
+    // showAppCredit (decision Q2): the logo only draws when showAppCredit is
+    // also on, so the credit toggle is the single off-switch for all PATGo
+    // footer branding. Additive, rides the reportSettings blob, no backupVersion
+    // bump.
+    showFooterLogo:   true,
     declaration:      true,    // print the declaration/signature line
     declarationText:  REPORT_DECLARATION_DEFAULT,
     // v34: optional signature image (base64 PNG data URL, downscaled <=400px on
@@ -299,6 +307,13 @@ const REPORT_LOGO_MAX_PX = 600;
 // before base64 storage (drawn or uploaded). Signatures are smaller than logos,
 // so a tighter cap keeps localStorage + JSON backups lean.
 const REPORT_SIGNATURE_MAX_PX = 400;
+
+// v49: the PATGo footer logo, embedded as a small base64 PNG so it renders in
+// the PDF with zero network access (reports must work fully offline). This is a
+// 48x48 downscale of the app icon, drawn ~11pt square next to the footer credit
+// text when both `showAppCredit` and `showFooterLogo` are on. First-party asset,
+// not a vendored dependency. ~4.6 KB — trivial next to the user-logo data URL.
+const PATGO_FOOTER_LOGO = 'data:image/png;base64,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';
 
 // v31: Export/Import Setup. A "setup" is a shareable bundle of CONFIGURATION
 // only — no sessions, no clients/sites, no learned SQP history, no backup

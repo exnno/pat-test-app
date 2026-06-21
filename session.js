@@ -1588,9 +1588,9 @@ function dismissV46Welcome() {
   render();
 }
 
-function dismissV48Welcome() {
-  state.v48WelcomeSeen = true;
-  localStorage.setItem(V48_WELCOME_KEY, '1');
+function dismissV49Welcome() {
+  state.v49WelcomeSeen = true;
+  localStorage.setItem(V49_WELCOME_KEY, '1');
   render();
 }
 

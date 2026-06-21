@@ -1,4 +1,4 @@
-# PAT App — Code Map (V48)
+# PAT App — Code Map (V49)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -101,6 +101,12 @@ release. `makeStarterReportTemplates`: the "Client summary" template's `reportTi
 renamed 'PAT Test Summary' → 'PATGo Summary'. `makeDefaultReportSettings`: new
 `showAppCredit: true` field (gates the PDF footer app-credit line; default true =
 pre-v48 behaviour). No new storage key for it — rides in the reportSettings blob.
+**v49:** `APP_VERSION` → 'V49'; `V49_WELCOME_KEY` (`pat:v49welcome`).
+`makeDefaultReportSettings`: new `showFooterLogo: true` field (default true, Q1) —
+gates the small PATGo logo mark in the PDF footer, SUBORDINATE to `showAppCredit`
+at render time (Q2). `PATGO_FOOTER_LOGO` — a ~4.6 KB base64 PNG constant (48×48
+downscale of the app icon) embedded so the footer logo renders fully offline.
+No new storage key — `showFooterLogo` rides in the reportSettings blob.
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
@@ -151,6 +157,8 @@ switcher bottom-sheet visibility — transient, cleared in `setView` and
 `loadFormForCursor` exactly like `multiPickSheetOpen`). No backup/codec change.
 **v48:** `v48WelcomeSeen` (welcome gate for the PATGo rebrand modal). No other
 state change.
+**v49:** `v49WelcomeSeen` (welcome gate for the PATGo footer-logo modal). No other
+state change — the footer-logo flag lives on `reportSettings`, not top-level state.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -223,6 +231,10 @@ loaded/saved.
 data/backups/setups without the field backfill to true — the same shared
 normaliser used by the loader, backup restore, and template loading). No codec or
 backup change (`backupVersion` stays 5).
+**v49:** `load` also reads `V49_WELCOME_KEY` → `state.v49WelcomeSeen`.
+`normaliseReportSettings` gains `showFooterLogo` (default true via `!== false`;
+same backfill story as `showAppCredit`). No codec or backup change
+(`backupVersion` stays 5).
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -371,6 +383,9 @@ app again").
 as each mock's height varied) was fixed in **styles.css** alone — `.tour-stage`
 now has a fixed `min-height` and centres the mock, so the caption below it no
 longer moves. Markup and slide content unchanged.
+**v49:** the Quick Pick slide caption gained a sentence describing the
+press-and-hold preset-switch gesture (clears the V47-carried backlog item). No new
+slide, no mock change.
 
 ## session.js (~1320 ln) — sessions, items & most logic
 Presets (`activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
@@ -485,6 +500,8 @@ the three preset-switcher helpers (listed in the Presets group above);
 `setView` + `loadFormForCursor` now also clear `state.presetSheetOpen`.
 **v48:** `dismissV47Welcome` renamed → `dismissV48Welcome` (sets `v48WelcomeSeen`
 + persists `V48_WELCOME_KEY`); only referenced by the `welcome-dismiss` action.
+**v49:** `dismissV48Welcome` renamed → `dismissV49Welcome` (sets `v49WelcomeSeen`
++ persists `V49_WELCOME_KEY`); only referenced by the `welcome-dismiss` action.
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves, the first-run wizard / onboarding,
 the example-session seed, the signature, cert numbers / job notes / report
@@ -507,7 +524,12 @@ declaration Date line now prints the session test date instead of a blank rule;
 job-detail pair, and prints a "Notes" block from `session.notes` between the
 totals and the register when non-empty; **v48:** the page footer's left line is
 "Generated {date} · PATGo {version}" by default, but reads just "Generated {date}"
-when `reportSettings.showAppCredit === false`),
+when `reportSettings.showAppCredit === false`; **v49:** when the credit line is on
+AND `reportSettings.showFooterLogo !== false` (default true), the small embedded
+`PATGO_FOOTER_LOGO` PNG (config) is drawn ~11pt square to the LEFT of the credit
+text on every page and the text is nudged right of it — subordinate to the credit
+toggle (Q2), so turning the credit off also removes the logo; same try/catch image
+guard as the header/signature so a bad image never blocks the report),
 `stampCertNumber(session)` (**v36:** assigns `session.certNo` once on first report
 when cert numbers are on — `certPrefix` with `{year}` token + zero-padded
 `certNextNumber`, then increments the counter and persists; no-op if disabled or
@@ -690,6 +712,12 @@ change needed).
 `v48WelcomeSeen`, dismiss id `v48-welcome-dismiss`, aria-label "What's new in V48",
 fresh rebrand copy (name/icon change + the new report-credit toggle). The
 first-run wizard step 1 heading "Welcome to PAT Test" → "Welcome to PATGo".
+**v49:** welcome modal **rolled to V49** (PATGo footer logo) — gates off
+`v49WelcomeSeen`, dismiss id `v49-welcome-dismiss`, aria-label "What's new in V49".
+The modal now shows the PATGo icon (`icon-192.png`, `.welcome-logo`) above the
+title, and the wizard step-1 👋 emoji is replaced by the same icon (`.wizard-logo`)
+— both reference the cached icon by URL (no base64 needed on-screen, unlike the
+PDF footer). Copy covers the footer logo + the on/off toggle location.
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
 Edit-session UI, the empty states, the welcome modal, the first-run wizard, the
 signature draw pad, the calibration warning banner, or the full-screen
@@ -760,6 +788,12 @@ toggle in "What to include" (wired in dispatch via `registerChangeActions` →
 Brand strings → PATGo: About-row subtitle (`settingsAbout` subtitle), settings
 footer, and About-page `#about-title` heading (the secret cloud-scaffold long-press
 target is unaffected — only the visible text changed).
+**v49:** About changelog rolled (V49 top, V46 dropped; now lists V49/V48/V47). The
+Reports page "What to include" gains a `report-show-footerlogo` toggle, NESTED
+under the `report-show-appcredit` toggle (`margin-left:16px`, greyed via
+`opacity:.5` when the credit line is off) — reflecting that the logo is
+subordinate to the credit line. Wired in dispatch like its sibling, persisted by
+the Reports Save button.
 *Touch to:* change any Settings page; the category structure (edit
 `SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META` in **config.js**, not here); search
 matching (aliases live in config); or roll the About changelog.
@@ -884,6 +918,11 @@ for the preset-switcher sheet: `preset-sheet-close` (→ `closePresetSheet`),
 `preset-sheet-edit` (closes the sheet, then `setView('settingsItems')` to the
 Quick Pick Items page). The sheet is OPENED from events.js (`openPresetSheet`, via
 the long-press gesture), not from a click action.
+**v48:** `welcome-dismiss` now calls `dismissV48Welcome`. New CHANGE action
+`report-show-appcredit` (captures text inputs, flips `showAppCredit`, re-render).
+**v49:** `welcome-dismiss` now calls `dismissV49Welcome`. New CHANGE action
+`report-show-footerlogo` (captures text inputs, flips `showFooterLogo`,
+re-render) — sibling of `report-show-appcredit`.
 *Touch to:* add/route any delegated click/input/change handler. Only the four
 focus-sensitive fields are NOT here (see `bindFocusFields` in events.js).
 

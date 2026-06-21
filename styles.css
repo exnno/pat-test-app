@@ -1675,6 +1675,22 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   text-align: center;
   margin: 4px 0 10px;
 }
+/* v49: PATGo logo in onboarding. The icon already has its own rounded white
+   tile baked in, so it just needs centring and a soft radius to match. */
+.welcome-logo-wrap, .wizard-logo-wrap {
+  text-align: center;
+  margin: 2px 0 8px;
+}
+.welcome-logo {
+  width: 64px;
+  height: 64px;
+  border-radius: 14px;
+}
+.wizard-logo {
+  width: 72px;
+  height: 72px;
+  border-radius: 16px;
+}
 .wizard-lead {
   font-size: 14px;
   line-height: 1.55;

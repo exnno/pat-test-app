@@ -436,6 +436,7 @@ function loadV11Settings() {
   state.v46WelcomeSeen = localStorage.getItem(V46_WELCOME_KEY) === '1';
   state.v47WelcomeSeen = localStorage.getItem(V47_WELCOME_KEY) === '1';
   state.v48WelcomeSeen = localStorage.getItem(V48_WELCOME_KEY) === '1';
+  state.v49WelcomeSeen = localStorage.getItem(V49_WELCOME_KEY) === '1';
 
   // v43: cloud prep. Load mock auth state (userId, authToken from PAT_AUTH_KEY).
   // This will persist in the cloud phase; for now it's a passthrough field that
@@ -540,6 +541,11 @@ function normaliseReportSettings(stored) {
   // v48: app credit in PDF footer. Default true — old data/backups without the
   // field backfill to the pre-v48 behaviour (credit shown).
   out.showAppCredit   = stored.showAppCredit !== false;
+  // v49: PATGo footer logo. Default true (Q1) — old data/backups without the
+  // field backfill to "shown". Subordinate to showAppCredit at render time
+  // (report.js), but stored independently so the user's preference is preserved
+  // even while the credit line is temporarily off.
+  out.showFooterLogo  = stored.showFooterLogo !== false;
   out.declaration     = stored.declaration !== false;
   out.retestEnabled   = stored.retestEnabled === true;
   const rm = parseInt(stored.retestMonths, 10);

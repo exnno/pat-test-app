@@ -227,10 +227,26 @@ function buildReportDoc(session) {
     doc.text(`Page ${p} of ${pageCount}`, pageW - margin, pageH - 20, { align: 'right' });
     // v48: app credit is optional. When off, the footer shows just the generated
     // stamp; when on (default), it reads "Generated … · PATGo {version}".
-    const footerLeft = (state.reportSettings && state.reportSettings.showAppCredit === false)
-      ? `Generated ${genStamp}`
-      : `Generated ${genStamp} · PATGo ${APP_VERSION}`;
-    doc.text(footerLeft, margin, pageH - 20);
+    const creditOn = !(state.reportSettings && state.reportSettings.showAppCredit === false);
+    const footerLeft = creditOn
+      ? `Generated ${genStamp} · PATGo ${APP_VERSION}`
+      : `Generated ${genStamp}`;
+    // v49: the PATGo footer logo. Subordinate to the credit toggle (Q2): it only
+    // draws when the credit line is on AND showFooterLogo is on (default). Drawn
+    // as a small square mark to the LEFT of the credit text, vertically centred
+    // on the text baseline. A bad image never blocks the report (same guard as
+    // the header/signature logos). The text then starts to the right of the mark.
+    let textX = margin;
+    const footerLogoOn = creditOn && !(state.reportSettings && state.reportSettings.showFooterLogo === false);
+    if (footerLogoOn && typeof PATGO_FOOTER_LOGO === 'string' && PATGO_FOOTER_LOGO) {
+      try {
+        const sz = 11;                 // pt square — matches the 8pt text height band
+        const logoY = pageH - 20 - sz + 2;  // sit it on the text baseline
+        doc.addImage(PATGO_FOOTER_LOGO, 'PNG', margin, logoY, sz, sz);
+        textX = margin + sz + 5;       // nudge the text clear of the mark
+      } catch (e) { /* a bad footer logo never blocks the report */ }
+    }
+    doc.text(footerLeft, textX, pageH - 20);
     doc.setTextColor(0);
   }
 
