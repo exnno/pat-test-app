@@ -1,5 +1,5 @@
 /*!
- * PAT Test PWA — report.js (PDF reports)
+ * PATGo PWA — report.js (PDF reports)
  * v30 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
@@ -225,7 +225,12 @@ function buildReportDoc(session) {
     const pageH = doc.internal.pageSize.getHeight();
     doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(120);
     doc.text(`Page ${p} of ${pageCount}`, pageW - margin, pageH - 20, { align: 'right' });
-    doc.text(`Generated ${genStamp} · PAT Test ${APP_VERSION}`, margin, pageH - 20);
+    // v48: app credit is optional. When off, the footer shows just the generated
+    // stamp; when on (default), it reads "Generated … · PATGo {version}".
+    const footerLeft = (state.reportSettings && state.reportSettings.showAppCredit === false)
+      ? `Generated ${genStamp}`
+      : `Generated ${genStamp} · PATGo ${APP_VERSION}`;
+    doc.text(footerLeft, margin, pageH - 20);
     doc.setTextColor(0);
   }
 

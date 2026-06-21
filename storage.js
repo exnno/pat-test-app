@@ -1,5 +1,5 @@
 /*!
- * PAT Test PWA — storage.js (persistence layer)
+ * PATGo PWA — storage.js (persistence layer)
  * v23 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
@@ -435,6 +435,7 @@ function loadV11Settings() {
   state.v45WelcomeSeen = localStorage.getItem(V45_WELCOME_KEY) === '1';
   state.v46WelcomeSeen = localStorage.getItem(V46_WELCOME_KEY) === '1';
   state.v47WelcomeSeen = localStorage.getItem(V47_WELCOME_KEY) === '1';
+  state.v48WelcomeSeen = localStorage.getItem(V48_WELCOME_KEY) === '1';
 
   // v43: cloud prep. Load mock auth state (userId, authToken from PAT_AUTH_KEY).
   // This will persist in the cloud phase; for now it's a passthrough field that
@@ -536,6 +537,9 @@ function normaliseReportSettings(stored) {
   out.showInstrument  = stored.showInstrument !== false;
   out.showCalibration = stored.showCalibration !== false;
   out.showFails       = stored.showFails !== false;
+  // v48: app credit in PDF footer. Default true — old data/backups without the
+  // field backfill to the pre-v48 behaviour (credit shown).
+  out.showAppCredit   = stored.showAppCredit !== false;
   out.declaration     = stored.declaration !== false;
   out.retestEnabled   = stored.retestEnabled === true;
   const rm = parseInt(stored.retestMonths, 10);

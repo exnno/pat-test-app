@@ -33,7 +33,7 @@ const TOUR_SLIDES = [
     caption: 'Every job is a “session”. Tap <strong>New session</strong> to start one — give it a client or a site and you’re testing.',
     mock: () => `
       <div class="tour-screen">
-        <div class="tour-bar">PAT Test</div>
+        <div class="tour-bar">PATGo</div>
         <button class="tour-cta tour-hl">+ New session</button>
         <div class="tour-row">
           <div>

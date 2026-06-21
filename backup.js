@@ -1,12 +1,12 @@
 /*!
- * PAT Test PWA
+ * PATGo PWA
  * v22 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v22 — Backup / Restore ==============
+// ============== PATGo PWA — v22 — Backup / Restore ==============
 // Backup build/restore, export-state markers... NOTE only buildBackup/restore here.
 
 // ---------- Backup / Restore (v7) ----------
@@ -136,7 +136,7 @@ function restoreBackupFromFile(file) {
       return;
     }
     if (!data || !Array.isArray(data.sessions)) {
-      openInfoSheet({ title: 'Not a recognised backup', message: 'That file isn\u2019t a recognised PAT Test backup. Make sure you picked a file exported from this app.' });
+      openInfoSheet({ title: 'Not a recognised backup', message: 'That file isn\u2019t a recognised PATGo backup. Make sure you picked a file exported from this app.' });
       return;
     }
     const itemCount = data.sessions.reduce((n, s) => n + (Array.isArray(s.items) ? s.items.length : 0), 0);

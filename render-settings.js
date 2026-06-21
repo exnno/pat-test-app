@@ -1,12 +1,12 @@
 /*!
- * PAT Test PWA
+ * PATGo PWA
  * v23 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v23 — Render: settings ==============
+// ============== PATGo PWA — v23 — Render: settings ==============
 // All renderSettings* screens + the earth-resistance calculator page.
 
 // ===== Settings hub & sub-pages (v7) =====
@@ -73,7 +73,7 @@ function settingsPageSubtitle(pageId) {
     case 'settingsBackup':  return 'Back up and restore your data';
     case 'settingsSetup':   return 'Share your setup to another device';
     case 'settingsCalculator': return 'Earth continuity limit';
-    case 'settingsAbout':   return `PAT Test ${APP_VERSION}`;
+    case 'settingsAbout':   return `PATGo ${APP_VERSION}`;
     case 'settingsContact': return 'Get in touch';
     default: return '';
   }
@@ -146,7 +146,7 @@ function renderSettingsHub() {
       </header>
       ${searchBox}
       <div id="settings-hub-body">${renderSettingsHubBodyHTML()}</div>
-      <p class="settings-footer">PAT Test ${APP_VERSION} · © 2026 Peter Birchley<br>Data stored on this device only</p>
+      <p class="settings-footer">PATGo ${APP_VERSION} · © 2026 Peter Birchley<br>Data stored on this device only</p>
     </div>
   `;
 }
@@ -1029,6 +1029,7 @@ function renderSettingsReport() {
         ${toggle('report-show-calibration', 'Calibration details', rs.showCalibration)}
         ${toggle('report-show-fails', 'List failed items', rs.showFails, rs.showFails ? 'All items listed' : 'Passes only')}
         ${toggle('report-declaration', 'Declaration line', rs.declaration)}
+        ${toggle('report-show-appcredit', 'PATGo credit line', rs.showAppCredit, rs.showAppCredit ? 'Shown at the foot of the report' : 'Hidden')}
       </div>
 
       <div class="settings-section">
@@ -1130,25 +1131,25 @@ function renderSettingsAbout() {
     <div class="screen">
       ${renderSettingsSubHeader('About')}
       <div class="info-card">
-        <h2 id="about-title" style="cursor:pointer;-webkit-user-select:none;user-select:none">PAT Test ${APP_VERSION}</h2>
+        <h2 id="about-title" style="cursor:pointer;-webkit-user-select:none;user-select:none">PATGo ${APP_VERSION}</h2>
         <p>A fast, offline-first portable appliance testing app for working PAT engineers. Built around speed of data entry — pass/fail decisions in two taps, no fighting the interface.</p>
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v47: rolled forward — V47 on top, V44 dropped. -->
+      <!-- v8: rolling 3-version changelog. v48: rolled forward — V48 on top, V45 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V48</strong> · June 2026</p>
+        <p class="muted">The app is now called PATGo, with a new name and icon. Everything works exactly as before — your data, settings and sessions are all untouched. You'll see the new name on the home-screen icon, in Settings, and at the foot of your PDF certificates. New option: you can now turn the small “PATGo” credit line at the bottom of your PDF reports on or off, under Settings → Reports.</p>
 
         <p><strong>V47</strong> · June 2026</p>
         <p class="muted">Switch quick-pick presets without leaving the test screen: press and hold the row of quick-pick buttons for a couple of seconds and a list of your presets pops up — tap one to switch which buttons show. It only changes the buttons, it never logs anything. There's also a shortcut to the preset settings at the bottom of that pop-up. None of your existing data is affected.</p>
 
         <p><strong>V46</strong> · June 2026</p>
         <p class="muted">Moving between screens now starts you at the top of each page, instead of staying scrolled where you left the last one. Open a session from a long list and tap back, and you'll return to the same spot in the list. The small close and menu buttons are easier to tap, and tapping outside a pop-up now closes it. None of your existing data is affected.</p>
-
-        <p><strong>V45</strong> · June 2026</p>
-        <p class="muted">Setting up a new phone is smoother: the first-time setup has clearer steps and a tidier layout, and the quick guided tour has had a polish too. If you ever set up another phone, you can run the guided setup from “Set up another device” below. None of your existing data is affected.</p>
       </div>
 
       <div class="info-card">

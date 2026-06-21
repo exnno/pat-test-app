@@ -1,12 +1,12 @@
 /*!
- * PAT Test PWA
+ * PATGo PWA
  * v23 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v23 — Sessions & logic ==============
+// ============== PATGo PWA — v23 — Sessions & logic ==============
 // Presets, core helpers, theme, export-state, form, validation, session/item
 // actions, bulk-edit, selection, per-page settings saves. Reads global state.
 
@@ -1588,9 +1588,9 @@ function dismissV46Welcome() {
   render();
 }
 
-function dismissV47Welcome() {
-  state.v47WelcomeSeen = true;
-  localStorage.setItem(V47_WELCOME_KEY, '1');
+function dismissV48Welcome() {
+  state.v48WelcomeSeen = true;
+  localStorage.setItem(V48_WELCOME_KEY, '1');
   render();
 }
 

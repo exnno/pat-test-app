@@ -1,12 +1,12 @@
 /*!
- * PAT Test PWA
+ * PATGo PWA
  * v22 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v22 — Render: core screens ==============
+// ============== PATGo PWA — v22 — Render: core screens ==============
 // render() dispatcher + Sessions / Entry / Overview / Edit-session screens
 // and their partial refreshes. Owns: const app = #app.
 
@@ -169,21 +169,21 @@ function render() {
   // suppressed while the first-run wizard or the v9 migration prompt is up — so an
   // UPGRADING user sees this modal and a genuinely-new install sees the wizard.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v47WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v48WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V47">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V48">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V47</h3>
+        <h3 class="bulk-sheet-title">What's new in V48</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Switch presets without leaving the test screen.</strong> Press and hold the row of quick-pick buttons for a couple of seconds and a list of your presets pops up — tap one to switch which buttons show.</li>
-        <li>It only switches the buttons — it never logs anything, so you can swap presets mid-job in a second.</li>
-        <li>Need to add or edit a preset? There’s a shortcut to the preset settings at the bottom of that pop-up.</li>
+        <li><strong>Say hello to PATGo.</strong> The app has a new name and a new icon. Everything works exactly as before — your data, settings and sessions are all untouched.</li>
+        <li>You’ll see the new name on the home-screen icon, in Settings, and on the bottom of your PDF certificates.</li>
+        <li><strong>New option:</strong> you can now turn the small “PATGo” line at the foot of your PDF reports on or off — find it in Settings → Reports.</li>
       </ul>
-      <button class="btn-primary" id="v47-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v48-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -224,7 +224,7 @@ function render() {
     if (step === 1) {
       bodyHTML = `
         <div class="wizard-icon">👋</div>
-        <h3 class="bulk-sheet-title">Welcome to PAT Test</h3>
+        <h3 class="bulk-sheet-title">Welcome to PATGo</h3>
         <p class="wizard-lead">A fast, fully-offline way to log portable appliance tests on site. Everything stays on this phone — no account, no signal needed.</p>
         <p class="wizard-lead">Let's get this device ready. It takes a couple of minutes, and nothing here is final — you can change any of it later.</p>
       `;
@@ -1591,7 +1591,7 @@ function renderEditSession() {
   `;
 }
 
-// ============== PAT Test PWA — v30 — Reports hub ==============
+// ============== PATGo PWA — v30 — Reports hub ==============
 // Top-level Reports area: pick a session to turn into a PDF report. Reached from
 // the Sessions screen header (only when reportSettings.enabled) and linked to
 // Report Settings. Reuses the session-card visual style from the sessions list.

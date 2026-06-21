@@ -1,12 +1,12 @@
 /*!
- * PAT Test PWA
+ * PATGo PWA
  * v28 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v25 — Delegated dispatch (E3) ==============
+// ============== PATGo PWA — v25 — Delegated dispatch (E3) ==============
 //
 // WHY THIS EXISTS
 // Pre-v25, bindEvents() re-attached ~160 per-element handlers on EVERY render
@@ -629,7 +629,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissV47Welcome(),
+  'welcome-dismiss': () => dismissV48Welcome(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -874,6 +874,7 @@ registerChangeActions({
   'report-show-calibration': (checked) => { captureReportTextInputs(); state.reportSettings.showCalibration = checked; render(); },
   'report-show-fails':       (checked) => { captureReportTextInputs(); state.reportSettings.showFails = checked; render(); },
   'report-declaration':      (checked) => { captureReportTextInputs(); state.reportSettings.declaration = checked; render(); },
+  'report-show-appcredit':   (checked) => { captureReportTextInputs(); state.reportSettings.showAppCredit = checked; render(); },
   'report-retest-enabled':   (checked) => { captureReportTextInputs(); state.reportSettings.retestEnabled = checked; render(); },
   // v36: certificate-numbers master toggle. Capture cert text inputs first so an
   // unsaved prefix/counter survives the re-render that enables/disables the

@@ -1,4 +1,4 @@
-# PAT App — Code Map (V47)
+# PAT App — Code Map (V48)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -37,7 +37,7 @@ the existing same-origin SW fetch handler into Cache Storage (separate from the
 ---
 
 ## config.js (~445 ln) — constants & defaults, pure data
-`APP_VERSION` (V46); all `*_KEY` localStorage key names (incl. welcome keys,
+`APP_VERSION` (V48); all `*_KEY` localStorage key names (incl. welcome keys,
 latest `V46_WELCOME_KEY`, and the v33 first-run `ONBOARD_KEY`);
 `MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`; v27 SQP tuning;
@@ -96,6 +96,11 @@ debt. Onboarding-polish release; no other config change.
 `QUICK_PICK_LONGPRESS_MS` (2000) — hold duration for the entry-screen quick-pick
 long-press preset switcher (single tunable constant; drop to ~600 if 2s feels
 unresponsive). Long-press preset-switcher release.
+**v48:** `APP_VERSION` → 'V48'; `V48_WELCOME_KEY` (`pat:v48welcome`). PATGo rebrand
+release. `makeStarterReportTemplates`: the "Client summary" template's `reportTitle`
+renamed 'PAT Test Summary' → 'PATGo Summary'. `makeDefaultReportSettings`: new
+`showAppCredit: true` field (gates the PDF footer app-credit line; default true =
+pre-v48 behaviour). No new storage key for it — rides in the reportSettings blob.
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, **or restructure Settings / add a
 new settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`)**.
@@ -144,6 +149,8 @@ not in state. No backup/codec change.
 **v47:** `v47WelcomeSeen` (welcome gate); `presetSheetOpen` (entry-screen preset-
 switcher bottom-sheet visibility — transient, cleared in `setView` and
 `loadFormForCursor` exactly like `multiPickSheetOpen`). No backup/codec change.
+**v48:** `v48WelcomeSeen` (welcome gate for the PATGo rebrand modal). No other
+state change.
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~90 ln) — pure helpers (no state access)
@@ -211,6 +218,11 @@ loaded/saved.
 **v47:** `load` also reads `V47_WELCOME_KEY` → `state.v47WelcomeSeen`. No codec or
 backup change (`backupVersion` stays 5). `presetSheetOpen` is transient and not
 loaded/saved.
+**v48:** `load` also reads `V48_WELCOME_KEY` → `state.v48WelcomeSeen`.
+`normaliseReportSettings` gains `showAppCredit` (default true via `!== false`; old
+data/backups/setups without the field backfill to true — the same shared
+normaliser used by the loader, backup restore, and template loading). No codec or
+backup change (`backupVersion` stays 5).
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.**
 
@@ -471,6 +483,8 @@ mirroring the V45 handler. (Scroll behaviour lives in render-core, not session.j
 **v47:** `dismissV47Welcome` (sets `v47WelcomeSeen` + persists `V47_WELCOME_KEY`);
 the three preset-switcher helpers (listed in the Presets group above);
 `setView` + `loadFormForCursor` now also clear `state.presetSheetOpen`.
+**v48:** `dismissV47Welcome` renamed → `dismissV48Welcome` (sets `v48WelcomeSeen`
++ persists `V48_WELCOME_KEY`); only referenced by the `welcome-dismiss` action.
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
 filtering, theme, bulk edit, settings saves, the first-run wizard / onboarding,
 the example-session seed, the signature, cert numbers / job notes / report
@@ -491,7 +505,9 @@ rule + totals tie-in use `accentColor`/`headerColor` via `hexToRgb`, and the
 declaration Date line now prints the session test date instead of a blank rule;
 **v36:** when `certEnabled` and the session has a `certNo`, prints it as the first
 job-detail pair, and prints a "Notes" block from `session.notes` between the
-totals and the register when non-empty),
+totals and the register when non-empty; **v48:** the page footer's left line is
+"Generated {date} · PATGo {version}" by default, but reads just "Generated {date}"
+when `reportSettings.showAppCredit === false`),
 `stampCertNumber(session)` (**v36:** assigns `session.certNo` once on first report
 when cert numbers are on — `certPrefix` with `{year}` token + zero-padded
 `certNextNumber`, then increments the counter and persists; no-op if disabled or
@@ -670,6 +686,10 @@ gets `.active` + a ✓), a name + item-preview subtitle, an "Edit presets" foote
 contains `fail-sheet` + `modal-backdrop`, so the existing `_lastRenderHadModal`
 HTML-scan sweep tears it down on the next render automatically (no sweep-selector
 change needed).
+**v48:** welcome modal **rolled to V48** (PATGo rebrand) — gates off
+`v48WelcomeSeen`, dismiss id `v48-welcome-dismiss`, aria-label "What's new in V48",
+fresh rebrand copy (name/icon change + the new report-credit toggle). The
+first-run wizard step 1 heading "Welcome to PAT Test" → "Welcome to PATGo".
 *Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, the
 Edit-session UI, the empty states, the welcome modal, the first-run wizard, the
 signature draw pad, the calibration warning banner, or the full-screen
@@ -733,6 +753,13 @@ other settings change.
 Quick Pick Items page (`renderSettingsItems`) gains a `.settings-tip` note in the
 Preset section explaining the entry-screen long-press preset switcher (there is no
 on-screen hint on the entry screen by design — decision 6B).
+**v48:** About changelog rolled (V48 top, V45 dropped; now lists V48/V47/V46). The
+Reports settings page (`renderSettings` reports section) gains a `report-show-appcredit`
+toggle in "What to include" (wired in dispatch via `registerChangeActions` →
+`CHANGE_ACTIONS`, persisted by the Reports Save button like its sibling toggles).
+Brand strings → PATGo: About-row subtitle (`settingsAbout` subtitle), settings
+footer, and About-page `#about-title` heading (the secret cloud-scaffold long-press
+target is unaffected — only the visible text changed).
 *Touch to:* change any Settings page; the category structure (edit
 `SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META` in **config.js**, not here); search
 matching (aliases live in config); or roll the About changelog.

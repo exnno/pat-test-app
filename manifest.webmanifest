@@ -1,6 +1,6 @@
 {
-  "name": "PAT Test",
-  "short_name": "PAT Test",
+  "name": "PATGo",
+  "short_name": "PATGo",
   "description": "Fast offline PAT testing entry tool",
   "start_url": ".",
   "scope": ".",

@@ -1,5 +1,5 @@
 /*!
- * PAT Test PWA — config.js (constants & defaults)
+ * PATGo PWA — config.js (constants & defaults)
  * v24 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V47';
+const APP_VERSION = 'V48';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -88,6 +88,7 @@ const V43_WELCOME_KEY = 'pat:v43welcome';   // v43: calibration reminder + cloud
 const V45_WELCOME_KEY = 'pat:v45welcome';   // v45: onboarding wizard + walkthrough polish
 const V46_WELCOME_KEY = 'pat:v46welcome';   // v46: navigation & UI polish (scroll-to-top, tap targets)
 const V47_WELCOME_KEY = 'pat:v47welcome';   // v47: long-press quick-pick preset switcher
+const V48_WELCOME_KEY = 'pat:v48welcome';   // v48: PATGo rebrand + icon fix + report credit toggle
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
 // sheet opens. Deliberately a single named constant so the threshold can be
@@ -228,6 +229,12 @@ function makeDefaultReportSettings() {
     retestEnabled:    false,
     retestMonths:     null,    // no default (Q10=B); required when retestEnabled
     showFails:        true,    // false = passes-only register
+    // v48: print the "· PATGo {version}" app credit in the PDF footer. Default
+    // true = the footer reads exactly as before the rename (now with the new
+    // name). false = the footer shows just the generated date/time. Rides
+    // through backup + setup as part of the reportSettings blob — additive, no
+    // backupVersion bump.
+    showAppCredit:    true,
     declaration:      true,    // print the declaration/signature line
     declarationText:  REPORT_DECLARATION_DEFAULT,
     // v34: optional signature image (base64 PNG data URL, downscaled <=400px on
@@ -275,7 +282,7 @@ function makeStarterReportTemplates() {
   standard.enabled = true;
   const summary = makeDefaultReportSettings();
   summary.enabled = true;
-  summary.reportTitle = 'PAT Test Summary';
+  summary.reportTitle = 'PATGo Summary';
   summary.showFails = false;        // passes-only register
   summary.showInstrument = false;   // lighter client-facing copy
   return [
