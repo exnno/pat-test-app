@@ -165,3 +165,36 @@ function setupLongPress(element, durationMs, onLongPress) {
 }
 
 
+// v53: Test Readings — validate/normalise an item's readings object. Used at
+// every boundary where a readings object enters from outside trusted code: on
+// backup RESTORE (a hand-edited or corrupt file) and, in the future, on cloud
+// SYNC (data from the server). Returns a clean object with only known fields, or
+// null if there's nothing worth keeping — and a null/dropped result means the
+// item simply has no readings (reads as "feature was off for this item"), which
+// is always safe. This is the "garbage collapses to a safe default" rule applied
+// to the one structured field test readings adds.
+//
+//   • class      — kept only if it's one of READING_CLASSES; else dropped.
+//   • earth/insulation/leakage — kept as trimmed STRINGS (stored as-typed); any
+//     non-string coerces to '' (then drops if empty). No numeric parsing — the
+//     stored value is exactly what the engineer typed ('<0.1', '≥19.99', etc.).
+//   • A field that doesn't apply to the class is NOT forced out here — we keep
+//     any non-empty measurement the file carried rather than silently discarding
+//     data, but the entry sheet only ever WRITES applicable fields. Defensive,
+//     not destructive.
+//   • If, after cleaning, the object has no class AND no measurements, return
+//     null so the item carries no empty readings husk.
+function normaliseItemReadings(r) {
+  if (!r || typeof r !== 'object' || Array.isArray(r)) return null;
+  const out = {};
+  if (typeof r.class === 'string' && READING_CLASSES.indexOf(r.class) !== -1) {
+    out.class = r.class;
+  }
+  ['earth', 'insulation', 'leakage'].forEach(k => {
+    const v = (typeof r[k] === 'string') ? r[k].trim() : '';
+    if (v) out[k] = v;
+  });
+  const hasMeasurement = ('earth' in out) || ('insulation' in out) || ('leakage' in out);
+  if (!('class' in out) && !hasMeasurement) return null;
+  return out;
+}

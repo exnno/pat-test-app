@@ -2740,3 +2740,75 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   margin-bottom: 4px;
 }
 
+
+/* ===== v53: Test Readings ===== */
+/* The readings sheet reuses the .fail-sheet slide-up shell; these styles add the
+   class selector row, the labelled measurement inputs, and the commit button.
+   All colours come from theme vars so dark mode is automatic. */
+.readings-sheet .reading-field-label {
+  display: block;
+  margin: 14px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+.readings-sheet .reading-unit {
+  font-weight: 500;
+  color: var(--text-muted);
+}
+.reading-class-row {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+.reading-class-btn {
+  flex: 1;
+  padding: 12px 6px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--card-bg);
+  color: var(--neutral-text);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  text-align: center;
+}
+.reading-class-btn.active {
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border-color: var(--accent-border);
+}
+.reading-class-btn:active { background: var(--accent-hover); }
+.reading-input { margin-bottom: 2px; }
+.reading-ok-btn {
+  width: 100%;
+  margin-top: 20px;
+  padding: 16px 0;
+  font-size: 17px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  background: var(--accent);
+  color: #fff;
+  border: none;
+  border-radius: 12px;
+}
+.reading-ok-btn:active { transform: translateY(1px); }
+
+/* Settings → Quick Pick Fail: per-reason tag rows (shown only when readings on). */
+.reason-tag-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.reason-tag-row:last-child { border-bottom: none; }
+.reason-tag-name {
+  flex: 1;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.reason-tag-select { flex: 0 0 auto; max-width: 52%; }

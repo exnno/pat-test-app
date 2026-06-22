@@ -104,6 +104,7 @@ function render() {
   else if (v === 'settingsUser') html = renderSettingsUser();
   else if (v === 'settingsItems') html = renderSettingsItems();
   else if (v === 'settingsFails') html = renderSettingsFails();
+  else if (v === 'settingsReadings') html = renderSettingsReadings();   // v53
   else if (v === 'settingsMultiPick') html = renderSettingsMultiPick();   // v16
   else if (v === 'settingsDescriptions') html = renderSettingsDescriptions();
   else if (v === 'settingsDisplay') html = renderSettingsDisplay();
@@ -159,29 +160,29 @@ function render() {
   ` : '';
 
   // One-time "what's new" modal, shown once after an update until dismissed.
-  // Gates on the CURRENT release's seen flag (v49WelcomeSeen — V50 is a
-  // structural/cleanup release and rolls no new modal, so the V49 modal remains
-  // the latest). Suppressed while the v9 migration prompt is up (it needs a name
-  // commit first) or while the first-run wizard is showing — so an UPGRADING user
-  // sees this modal and a genuinely-new install sees the wizard instead.
-  // Dismissed via the shared dismissWelcome() (v50), wired in dispatch.js.
+  // Gates on the CURRENT release's seen flag (v53WelcomeSeen). Suppressed while
+  // the v9 migration prompt is up (it needs a name commit first) or while the
+  // first-run wizard is showing — so an UPGRADING user sees this modal and a
+  // genuinely-new install sees the wizard instead. Dismissed via the shared
+  // dismissWelcome() (v50), wired in dispatch.js.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v49WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v53WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V49">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V53">
       <div class="bulk-sheet-handle"></div>
       <div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V49</h3>
+        <h3 class="bulk-sheet-title">What's new in V53</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>The PATGo logo is now on your reports.</strong> It prints next to the credit line at the foot of every page of your PDF reports — a small, professional finishing touch.</li>
-        <li>It's <strong>on by default</strong>. You can turn the logo off (or hide the whole credit line) under Settings → Reports → What to include.</li>
-        <li>The setup screens and the guided tour have had a polish too. As always, your data, settings and sessions are untouched.</li>
+        <li><strong>You can now record test readings.</strong> Earth continuity, insulation resistance and leakage — with the equipment class (I, II or III) for each item.</li>
+        <li>It's <strong>completely optional and off to start with</strong>, so nothing changes unless you want it. Turn it on under Settings → Testing Setup → Test Readings.</li>
+        <li>When it's on, you tap PASS as normal and a short sheet pops up to confirm the numbers — pre-filled with typical pass values, so it's still just a tap if you're happy with them.</li>
+        <li>Your readings can be added to the CSV export (Settings → CSV Columns). They'll come to the PDF certificate in the next update.</li>
       </ul>
-      <button class="btn-primary" id="v49-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v53-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -1198,6 +1199,74 @@ function renderEntry() {
     `;
   }
 
+  // v53: Test Readings sheet. Shown (when the feature is on) after PASS or after
+  // a fail reason is picked — see openReadingsSheet(). Class selector at the top
+  // drives which measurement rows render. PASS mode shows every applicable field
+  // pre-filled (greyed editable placeholders via the value); FAIL mode shows only
+  // the box the chosen reason's tag points at (blank), or none for a visual/Other
+  // reason. Reuses the .fail-sheet bottom-sheet pattern (reliable on iOS PWA).
+  let readingsSheet = '';
+  if (state.readingsSheetOpen) {
+    const draft = state.readingsDraft || { class: READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '' };
+    const cls = (READING_CLASSES.indexOf(draft.class) !== -1) ? draft.class : READING_CLASS_DEFAULT;
+    const mode = state.readingsSheetMode === 'fail' ? 'fail' : 'pass';
+
+    // Which fields to show:
+    //   pass → all fields applicable to the class.
+    //   fail → only the field the reason's tag points at, IF it's applicable to
+    //          the class; a visual/Other reason (tag 'visual') shows none.
+    let fields;
+    if (mode === 'pass') {
+      fields = READING_FIELDS_BY_CLASS[cls] || [];
+    } else {
+      const tag = readingTagForReason(state.readingsPendingFailReason);
+      const applicable = READING_FIELDS_BY_CLASS[cls] || [];
+      fields = (tag !== 'visual' && applicable.indexOf(tag) !== -1) ? [tag] : [];
+    }
+
+    const classButtons = READING_CLASSES.map(c => `
+      <button class="reading-class-btn ${c === cls ? 'active' : ''}" data-action="readings-set-class" data-arg="${c}">Class ${c}</button>
+    `).join('');
+
+    const fieldRows = fields.map(k => {
+      const meta = READING_FIELD_META[k];
+      if (!meta) return '';
+      const val = (typeof draft[k] === 'string') ? draft[k] : '';
+      return `
+        <label class="reading-field-label">${escapeHTML(meta.label)} <span class="reading-unit">(${escapeHTML(meta.unit)})</span></label>
+        <input class="input reading-input" id="f-reading-${k}" data-input-action="f-reading-${k}" value="${escapeHTML(val)}" inputmode="text" autocomplete="off" placeholder="${escapeHTML(meta.passPlaceholder)}">
+      `;
+    }).join('');
+
+    const noFieldsNote = (fields.length === 0)
+      ? `<p class="multipick-sheet-hint">No electrical reading needed for this — just confirm the class and tap ${mode === 'fail' ? 'Save fail' : 'OK'}.</p>`
+      : '';
+
+    const title = mode === 'fail' ? 'Fail readings' : 'Readings';
+    const okLabel = mode === 'fail' ? 'Save fail' : 'OK';
+    const hint = mode === 'pass'
+      ? 'Pre-filled with typical pass values — edit if needed, or just tap OK.'
+      : 'Record the reading for this failure, then save.';
+
+    readingsSheet = `
+      <div class="modal-backdrop" id="readings-backdrop" data-action="readings-cancel"></div>
+      <div class="fail-sheet readings-sheet" role="dialog" aria-label="Test readings">
+        <div class="fail-sheet-handle"></div>
+        <div class="fail-sheet-header">
+          <button class="fail-close-btn" id="readings-cancel" data-action="readings-cancel" aria-label="Cancel">‹</button>
+          <h3 class="fail-sheet-title">${title}</h3>
+          <span class="fail-close-spacer"></span>
+        </div>
+        <p class="multipick-sheet-hint">${hint}</p>
+        <label class="reading-field-label">Equipment class</label>
+        <div class="reading-class-row">${classButtons}</div>
+        ${fieldRows}
+        ${noFieldsNote}
+        <button class="reading-ok-btn" id="readings-ok" data-action="readings-commit">${okLabel}</button>
+      </div>
+    `;
+  }
+
   return `
     <div class="screen">
       <header class="header-row">
@@ -1247,6 +1316,7 @@ function renderEntry() {
       ${failModal}
       ${multiPickSheet}
       ${presetSheet}
+      ${readingsSheet}
     </div>
   `;
 }

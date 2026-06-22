@@ -532,6 +532,7 @@ function loadFormForCursor() {
   state.failOtherText = '';
   state.multiPickSheetOpen = false;   // v16
   state.presetSheetOpen = false;      // v47
+  closeReadingsSheetState();          // v53
   // v20: the loaded item may carry a different location, so the frozen SQP row
   // must rebuild for it. Cheap no-op when the feature is off.
   invalidateSqpRow();
@@ -713,7 +714,7 @@ function deleteSession(id) {
   save(); render();
 }
 
-function saveItem(result) {
+function saveItem(result, readings) {
   const sess = activeSession();
   if (!sess) return;
   const err = validateBeforeSave();
@@ -727,12 +728,25 @@ function saveItem(result) {
     notes: state.form.notes.trim(),
     result
   };
+  // v53: attach test readings when the feature is on and a non-empty object was
+  // supplied (from the readings sheet). When the feature is off, `readings` is
+  // never passed, so the item shape is byte-for-byte the pre-v53 shape — the
+  // off-path guarantee. We normalise here too (belt and braces) so an all-blank
+  // draft never writes an empty husk; a null result simply omits the key.
+  if (state.readingsEnabled && readings) {
+    const clean = normaliseItemReadings(readings);
+    if (clean) item.readings = clean;
+  }
   if (state.cursor < sess.items.length) {
     // v17: editing an existing item must NOT change its original timestamp —
     // ts records when the item was FIRST logged, not last touched. We spread
     // the new fields over the old item, which leaves any existing .ts intact
     // (item, above, has no ts key, so it can't overwrite it).
-    sess.items[state.cursor] = { ...sess.items[state.cursor], ...item };
+    // v53: if the feature is on but this edit produced no readings object, we
+    // must not leave a stale one behind — spread first, then reconcile the key.
+    const merged = { ...sess.items[state.cursor], ...item };
+    if (state.readingsEnabled && !item.readings) delete merged.readings;
+    sess.items[state.cursor] = merged;
   } else {
     // v17: stamp the timestamp on first save, only when the setting is on.
     if (state.timestampsEnabled) item.ts = new Date().toISOString();
@@ -762,6 +776,16 @@ function passClicked() {
   if (sess && sess.locked) return;
   const err = validateBeforeSave();
   if (err) { showToast(err); return; }
+  // v53: when Test Readings is on, PASS no longer commits immediately — it opens
+  // the readings sheet (pass mode) so the engineer can confirm/edit the numbers.
+  // The PASS tap still happens first (muscle memory intact); the sheet is a
+  // confirm-with-numbers, not a gate. When the feature is off, this whole branch
+  // is skipped and PASS commits in one tap exactly as before.
+  if (state.readingsEnabled) {
+    feedback('pass', 'pass-btn');
+    openReadingsSheet('pass', null);
+    return;
+  }
   feedback('pass', 'pass-btn');   // v17: haptic + green flash + (opt-in) pass tone
   saveItem('pass');
 }
@@ -794,6 +818,15 @@ function pickFailReason(reasonOrNull) {
   state.failModalOpen = false;
   state.failModalStage = 'reasons';
   state.failOtherText = '';
+  // v53: when Test Readings is on, the fail reason drives a readings step before
+  // commit. The reason's tag decides which single box the sheet shows (earth /
+  // insulation / leakage), or — for a visual-tagged reason or "Other…" (null) —
+  // no electrical box at all, in which case the sheet still appears so the class
+  // can be recorded, but with no measurement fields. Off-path: commit as before.
+  if (state.readingsEnabled) {
+    openReadingsSheet('fail', reasonOrNull || null);
+    return;
+  }
   saveItem('fail');
 }
 
@@ -803,6 +836,143 @@ function cancelFailModal() {
   state.failOtherText = '';
   render();
 }
+
+// ---------- v53: Test Readings sheet ----------
+// The readings sheet is the confirm-with-numbers step shown after PASS (pass
+// mode) or after a fail reason is picked (fail mode), only when the feature is
+// on. It reuses the .fail-sheet bottom-sheet pattern (the reliable iOS PWA
+// modal). A class selector at the top drives which measurement rows show; the
+// chosen class is remembered for the next item (state.lastReadingsClass).
+//
+//   PASS mode  — show every field applicable to the class, PRE-FILLED with the
+//                class-appropriate typical-pass placeholder (editable). One OK
+//                commits. (The visual inspection is implied by PASS — not stored
+//                separately, per the locked spec.)
+//   FAIL mode  — show ONLY the single box the chosen reason's tag points at
+//                (earth/insulation/leakage), BLANK. A visual-tagged reason or
+//                "Other…" shows no measurement box (class only). OK commits.
+//
+// When EDITING an existing item that already has readings, we pre-fill the draft
+// from those stored readings instead of the pass placeholders, so re-opening an
+// item doesn't silently overwrite recorded values with defaults.
+function openReadingsSheet(mode, failReason) {
+  const sess = activeSession();
+  if (!sess) return;
+  const isExisting = state.cursor < sess.items.length;
+  const existing = isExisting ? sess.items[state.cursor] : null;
+  const existingReadings = (existing && existing.readings) ? existing.readings : null;
+
+  // Class: prefer the existing item's recorded class, else the last-used class.
+  const cls = (existingReadings && existingReadings.class) || state.lastReadingsClass || READING_CLASS_DEFAULT;
+  const draft = { class: cls, earth: '', insulation: '', leakage: '' };
+
+  if (existingReadings) {
+    // Re-opening an item with readings: show exactly what was stored.
+    ['earth', 'insulation', 'leakage'].forEach(k => {
+      if (typeof existingReadings[k] === 'string') draft[k] = existingReadings[k];
+    });
+  } else if (mode === 'pass') {
+    // Fresh PASS: pre-fill the applicable fields with their typical-pass values.
+    (READING_FIELDS_BY_CLASS[cls] || []).forEach(k => {
+      const meta = READING_FIELD_META[k];
+      if (meta) draft[k] = meta.passPlaceholder;
+    });
+  }
+  // Fresh FAIL: leave measurement fields blank (recording the actual reading).
+
+  state.readingsSheetMode = mode;
+  state.readingsPendingResult = (mode === 'fail') ? 'fail' : 'pass';
+  state.readingsPendingFailReason = (mode === 'fail') ? (failReason || null) : null;
+  state.readingsDraft = draft;
+  state.readingsSheetOpen = true;
+  render();
+}
+
+// v53: change the class while the sheet is open. Switching class re-derives the
+// visible fields. On a fresh PASS we re-seed placeholders for the new class's
+// fields (so switching I→II doesn't leave a stale earth value the new class
+// can't show); any field the user has already edited away from its placeholder
+// is preserved. We keep it simple and predictable: re-seed only the fields that
+// are still at their previous placeholder, blank the ones the new class drops.
+function setReadingsClass(cls) {
+  if (READING_CLASSES.indexOf(cls) === -1) return;
+  const d = state.readingsDraft || { class: cls, earth: '', insulation: '', leakage: '' };
+  const prevCls = d.class;
+  d.class = cls;
+  if (state.readingsSheetMode === 'pass') {
+    const nowFields = READING_FIELDS_BY_CLASS[cls] || [];
+    ['earth', 'insulation', 'leakage'].forEach(k => {
+      const meta = READING_FIELD_META[k];
+      const prevPlaceholder = meta ? meta.passPlaceholder : '';
+      if (nowFields.indexOf(k) === -1) {
+        // Field doesn't apply to the new class — clear it.
+        d[k] = '';
+      } else if (!d[k] || d[k] === prevPlaceholder) {
+        // Field applies and is empty or still at its default — (re)seed it.
+        d[k] = prevPlaceholder;
+      }
+      // else: user typed a custom value — keep it.
+    });
+  }
+  state.lastReadingsClass = cls;
+  state.readingsDraft = d;
+  render();
+}
+
+// v53: live-update a single reading field as the user types in the sheet. Bound
+// via data-input-action in events.js. Stored as-typed (trimmed at commit).
+function setReadingsField(field, value) {
+  if (['earth', 'insulation', 'leakage'].indexOf(field) === -1) return;
+  if (!state.readingsDraft) state.readingsDraft = { class: state.lastReadingsClass || READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '' };
+  state.readingsDraft[field] = value;
+  // No render — the input already holds the text; re-rendering would steal focus.
+}
+
+// v53: OK on the readings sheet — build the readings object (only fields that
+// apply to the chosen class AND were actually filled in) and commit via saveItem.
+// Readings are optional even when the feature is on (locked decision): an
+// all-blank sheet commits a pass/fail with just the class (or nothing) — never
+// blocked. lastReadingsClass is remembered for the next item.
+function commitReadingsSheet() {
+  const draft = state.readingsDraft || {};
+  const cls = (READING_CLASSES.indexOf(draft.class) !== -1) ? draft.class : READING_CLASS_DEFAULT;
+  const applicable = READING_FIELDS_BY_CLASS[cls] || [];
+  const readings = { class: cls };
+  applicable.forEach(k => {
+    const v = (typeof draft[k] === 'string') ? draft[k].trim() : '';
+    if (v) readings[k] = v;
+  });
+  state.lastReadingsClass = cls;
+
+  const result = state.readingsPendingResult || 'pass';
+  // Close the sheet BEFORE saving — saveItem → loadFormForCursor clears transient
+  // entry state, and refreshEntryAfterLog re-renders the entry screen without it.
+  closeReadingsSheetState();
+  saveItem(result, readings);
+  // saveItem persists + refreshes; nothing else to do.
+}
+
+// v53: cancel the readings sheet. The PASS/FAIL was NOT committed — we return to
+// the entry screen with the form intact so the engineer can retry or change the
+// result. (For a fail, the reason that was appended to notes in pickFailReason
+// stays on the form; cancelling readings doesn't unwind that text — the engineer
+// can clear it if they back out entirely. Kept simple deliberately.)
+function cancelReadingsSheet() {
+  closeReadingsSheetState();
+  render();
+}
+
+// v53: reset all transient readings-sheet state. Called on commit, on cancel,
+// and from loadFormForCursor()/setView() so navigating away never leaves the
+// sheet half-open (same discipline as failModalOpen / multiPickSheetOpen).
+function closeReadingsSheetState() {
+  state.readingsSheetOpen = false;
+  state.readingsSheetMode = 'pass';
+  state.readingsPendingResult = null;
+  state.readingsPendingFailReason = null;
+  state.readingsDraft = { class: state.lastReadingsClass || READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '' };
+}
+
 
 function copyLastResult() {
   const sess = activeSession();
@@ -893,6 +1063,7 @@ function setView(v) {
   state.failOtherText = '';
   state.multiPickSheetOpen = false;   // v16
   state.presetSheetOpen = false;      // v47
+  closeReadingsSheetState();          // v53
   state.bulkLocationDialogOpen = false;
   state.bulkLocationValue = '';
   // v11: also clear the new bulk-edit menu + sub-dialog state.

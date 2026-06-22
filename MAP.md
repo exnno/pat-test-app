@@ -1,4 +1,4 @@
-# PAT App — Code Map (V52)
+# PAT App — Code Map (V53)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -46,13 +46,25 @@ See `THIRD-PARTY-LICENSES.txt`.
 
 ---
 
-## config.js (~541 ln) — constants & defaults, pure data
-`APP_VERSION` ('V52'); all `*_KEY` localStorage key names; the calibration/backup
+## config.js (~600 ln) — constants & defaults, pure data
+`APP_VERSION` ('V53'); all `*_KEY` localStorage key names; the calibration/backup
 tuning constants (`MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`); SQP tuning (`SQP_PARTIAL_WEIGHT`,
 `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`); default lists (`DEFAULT_ITEM_TYPES`,
 `DEFAULT_FAIL_REASONS`, `DEFAULT_DESCRIPTIONS`, `DEFAULT_CSV_COLUMNS`); calculator
 tables (`CSA_RESISTANCE`, `CALC_LENGTHS`).
+
+**v53 Test Readings constants:** `READINGS_KEY` ('1'|'0' master flag, default off);
+`READING_CLASSES` (['I','II','III']) + `READING_CLASS_DEFAULT`;
+`READING_FIELDS_BY_CLASS` (which of earth/insulation/leakage each class shows — the
+single source of truth for "which boxes"); `READING_FIELD_META` (per-field label,
+unit, and typical-PASS placeholder: earth `<0.1`Ω, insulation `≥19.99`MΩ, leakage
+`<5`mA); `FAIL_REASON_TAGS_KEY` + `READING_FAIL_TAGS` (['visual','earth','insulation',
+'leakage']) + `READING_FAIL_TAG_DEFAULT` ('visual') + `DEFAULT_FAIL_REASON_TAGS`
+(built-in tags for the shipped fail reasons). `DEFAULT_CSV_COLUMNS` gained four
+default-hidden reading columns (`readingClass`, `readingEarth`, `readingInsulation`,
+`readingLeakage`). `SETTINGS_CATEGORIES` catTesting now lists `settingsReadings`;
+`SETTINGS_PAGE_META` has its entry. Welcome key is `V53_WELCOME_KEY`.
 
 Reports: `REPORT_SETTINGS_KEY`, `REPORT_DECLARATION_DEFAULT`, `REPORT_LOGO_MAX_PX`,
 `REPORT_SIGNATURE_MAX_PX`, `REPORT_FILENAME_DEFAULT` + `REPORT_FILENAME_TOKENS`,
@@ -95,19 +107,28 @@ preset-switcher sheet flag (`presetSheetOpen`), the bulk-edit state
 (`bulkLocationDialogOpen`, `bulkLocationValue`, plus the v11 bulk-edit menu fields),
 and the cloud-prep auth mirrors (`userId`, `authToken`, `authStatus`).
 
-**Welcome flag (v50):** ONLY the current `v49WelcomeSeen` is kept. The 27 historical
-`vNNWelcomeSeen` flags (v13…v48) were removed in v50 — each was written once and
-never read again after its release. The first-run-wizard gate that used to read
-seven of them now detects past welcomes via `hasAnyLegacyWelcomeKey()` (storage.js).
+**v53 Test Readings state:** `readingsEnabled` (master flag), `failReasonTags`
+(reason-text → tag map), `lastReadingsClass` (remembered class for the next item),
+and the transient readings-sheet block: `readingsSheetOpen`, `readingsSheetMode`
+('pass'|'fail'), `readingsDraft` ({class,earth,insulation,leakage}),
+`readingsPendingResult`, `readingsPendingFailReason`. All sheet transients reset on
+close and on navigation (loadFormForCursor / setView) via `closeReadingsSheetState()`.
+
+**Welcome flag (v50 pattern):** ONLY the current `v53WelcomeSeen` is kept. Historical
+`vNNWelcomeSeen` flags were removed in v50 — each was written once and never read
+after its release. The first-run-wizard gate detects past welcomes via
+`hasAnyLegacyWelcomeKey()` (storage.js).
 
 *Touch to:* add a new field to runtime state.
 
-## utils.js (~167 ln) — pure helpers (no state access)
+## utils.js (~190 ln) — pure helpers (no state access)
 `escapeHTML`, `capitalise`, `titleCase`, `formatDate`, `formatTimeShort`,
 `formatTimestampCSV`, `splitAssetNo`, `csvEscape`, `csvResultLabel`, `formatBytes`;
 colour helpers `hexToRgb(hex,fallback)`, `contrastColor(rgb)`, `safeHexColor(hex,
 fallback)`; `setupLongPress(element, durationMs, onLongPress)` (reusable pointer-
-event long-press detector, returns a cleanup fn).
+event long-press detector, returns a cleanup fn); **v53** `normaliseItemReadings(r)`
+(validate/clean an item's readings object — returns clean {class,earth,insulation,
+leakage} or null; the boundary validator used on backup restore and future cloud sync).
 *Touch to:* add a stateless formatting/escaping/colour helper.
 
 ## storage.js (~745 ln) — persistence boundary
@@ -117,6 +138,13 @@ Codec: `STORAGE_CODEC_VERSION`, `SESSION_KEY_MAP`, `ITEM_KEY_MAP` (+ `_REV`),
 `parseStoredSessions`. Lifecycle: `load`, `loadV11Settings`, `ensureAllCsvColumns`,
 `computeHistoryFromItems`. Saves: `save` (full), `saveSessions`, `saveSettings`,
 `saveSqpHistory`, `saveDescriptions`. Stats: `getStorageStats`.
+**v53:** `load` reads `READINGS_KEY` → `state.readingsEnabled` and calls
+`loadFailReasonTags()` → `state.failReasonTags`; `save` writes both. Helpers
+`loadFailReasonTags()` (validate stored tags against `READING_FAIL_TAGS`, drop
+unknowns, backfill `DEFAULT_FAIL_REASON_TAGS`), `saveFailReasonTags()`, and
+`readingTagForReason(reason)` (the single read path — any untagged/custom reason or
+"Other…" resolves to 'visual'). `ensureAllCsvColumns()` (unchanged code) auto-backfills
+the four new reading columns for existing users on next load.
 Report settings: `loadReportSettings`, `saveReportSettings`, and the shared
 validator `normaliseReportSettings` (coerces any candidate/garbage object to a
 complete type-safe report-settings object merged over defaults — used by load AND
@@ -125,10 +153,10 @@ backup restore AND template loading; validates the include toggles incl.
 `signature`/`signaturePosition`, `headerColor`/`accentColor` via `safeHexColor`, and
 the cert fields). Templates: `loadReportTemplates`/`saveReportTemplates`.
 
-**Welcome read + wizard gate (v50):** `load` reads ONLY `V49_WELCOME_KEY` →
-`state.v49WelcomeSeen` (the 27 historical reads were removed). `hasAnyLegacyWelcomeKey()`
-scans localStorage for any `pat:v<n>welcome` key — used by the first-run-wizard gate
-to recognise a returning user without keeping a per-version flag. The gate:
+**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V53_WELCOME_KEY` →
+`state.v53WelcomeSeen`. `hasAnyLegacyWelcomeKey()` scans localStorage for any
+`pat:v<n>welcome` key — used by the first-run-wizard gate to recognise a returning
+user without keeping a per-version flag. The gate:
 `onboardedV33Seen = explicitlyOnboarded || sessions>0 || engineerName || hasAnyLegacyWelcomeKey()`.
 This is a strict superset of the old seven-flag clause, so no upgrader is ever
 mistaken for a new user; a blank install has none and correctly sees the wizard.
@@ -177,8 +205,11 @@ onClose})` (stays until tapped — no auto-dismiss, for errors). All reuse the
 `.bulk-sheet` pattern, no state, no re-render.
 *Touch to:* change pass/fail/copy feedback channels, toasts, or the shared dialogs.
 
-## csv.js (~659 ln) — CSV build + import
-Build/share: `csvCellValue` (adaptive client/site columns), `buildCSV`,
+## csv.js (~665 ln) — CSV build + import
+Build/share: `csvCellValue` (adaptive client/site columns; **v53** four reading
+cases — `readingClass`/`readingEarth`/`readingInsulation`/`readingLeakage` — each
+emits blank when the feature is off, the column hidden, or the item has no reading;
+otherwise the as-typed value), `buildCSV`,
 `defaultHeaderFor`, `downloadCSV` (+ `SHARE_ICON_SVG`), `shareOrDownloadCSV`,
 `copyCSV` (clipboard with textarea/`execCommand` fallback; marks exported + toasts;
 wired to `copy-current`/`copy-session`). Import: `buildCsvHeaderLookup`, `parseCSV`,
@@ -187,16 +218,22 @@ wired to `copy-current`/`copy-session`). Import: `buildCsvHeaderLookup`, `parseC
 `closeImportSummary`. Import errors open `openInfoSheet`.
 *Touch to:* change CSV columns, export, or import parsing.
 
-## backup.js (~310 ln) — Backup / Restore
-`buildBackup` (includes `reportSettings` + `reportTemplates`; per-session
-`notes`/`certNo` ride inside `sessions`), `downloadBackup`, `markBackupExported`,
+## backup.js (~340 ln) — Backup / Restore
+`buildBackup` (includes `reportSettings` + `reportTemplates`; **v53** also
+`readingsEnabled` + `failReasonTags`; per-session `notes`/`certNo` and per-item
+`readings` ride inside `sessions`), `downloadBackup`, `markBackupExported`,
 `snoozeBackupReminder`, `shouldShowBackupReminder`, `restoreBackupFromFile`
-(restores reportSettings/templates via `normaliseReportSettings`; old backups with
-missing fields restore to defaults). Restore confirm = `openConfirmSheet`, success =
-`showToast`, the three import errors = `openInfoSheet`. `backupVersion` stays **5** —
-all additions are additive and missing-field-tolerant.
-*Touch to:* change the JSON backup shape or restore path. **Bump `backupVersion` if
-the shape changes; keep old-backup compatibility.**
+(restores reportSettings/templates via `normaliseReportSettings`; **v53** validates
+each restored item's `readings` via `normaliseItemReadings` — drops the key if junk
+— and restores the readings flag + tags with the same drop-unknown/backfill-defaults
+rule as load; old backups with missing fields restore to defaults). Restore confirm =
+`openConfirmSheet`, success = `showToast`, the three import errors = `openInfoSheet`.
+`backupVersion` stays **5** — readings are additive and missing-field-tolerant (items
+ride through wholesale; an old app ignores the unknown key, a new app reads it). The
+test-readings feature deliberately did NOT spend a bump; the earmarked 6 is reserved
+for a genuine incompatible schema change.
+*Touch to:* change the JSON backup shape or restore path. **Bump `backupVersion` only
+for a genuine incompatible change; keep old-backup compatibility.**
 
 ## setup.js (~260 ln) — Export/Import Setup
 Config-only shareable bundle (NOT sessions/clients/sites). `buildSetupBundle`,
@@ -261,7 +298,7 @@ are vendored but **not precached**; this loader fetches them lazily on first pre
 *Touch to:* change how the preview rasterises pages, the lazy-load, or the PDF.js
 version.
 
-## session.js (~1973 ln) — sessions, items & most logic
+## session.js (~2140 ln) — sessions, items & most logic
 Presets: `activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
 `createPreset`, `renamePreset`, `deletePreset`, and the entry-screen long-press
 switcher `openPresetSheet`/`closePresetSheet`/`switchPresetFromSheet` (switch only,
@@ -274,8 +311,23 @@ never logs). Core helpers: `uid`, `todayISO`, `activeSession`, `normaliseItemTyp
 `unexportedSessions`, `prunableSessions`, `savePruneAge`, `pruneOldSessions`. Form:
 `loadFormForCursor`. Validation: `validateBeforeSave`. Session/item actions:
 `createSession` (stamps empty `notes`+`certNo`), `openSession`, `requestOpenSession`,
-`confirmReopenWarning`, `cancelReopenWarning`, `deleteSession`, `saveItem`,
-`passClicked`, `failClicked`, `pickFailReason`, `cancelFailModal`, `copyLastResult`,
+`confirmReopenWarning`, `cancelReopenWarning`, `deleteSession`, `saveItem`
+(**v53** takes an optional `readings` arg — attached to the item only when the
+feature is on and the object is non-empty; off-path item shape is byte-identical to
+v52; on edit, a now-empty readings reconciles the stale key off),
+`passClicked` (**v53** when readings on, opens the readings sheet in 'pass' mode
+instead of committing — the PASS tap still fires first), `failClicked`,
+`pickFailReason` (**v53** when readings on, opens the sheet in 'fail' mode carrying
+the reason instead of committing), `cancelFailModal`, `copyLastResult`,
+**v53 readings sheet lifecycle:** `openReadingsSheet(mode, failReason)` (builds the
+draft — pass mode pre-fills class-applicable placeholders, fail mode leaves blank,
+re-opening an item pre-fills from its stored readings), `setReadingsClass(cls)`
+(re-derives visible fields; re-seeds placeholders for pass mode, preserving
+user-edited values), `setReadingsField(field, value)` (live text write, no render),
+`commitReadingsSheet()` (builds the readings object from applicable+filled fields and
+calls `saveItem`; remembers `lastReadingsClass`), `cancelReadingsSheet()`,
+`closeReadingsSheetState()` (resets all sheet transients; called on commit/cancel and
+from loadFormForCursor/setView).
 `deleteItem`, `moveCursor`, `skipToNew`, `jumpTo`, `setView`. Selection + bulk edit:
 `enterSelectionMode`, `exitSelectionMode`, `toggleSelected`, `selectAllVisible`,
 `clearSelection`, `applyBulkLocation`, `openBulkEditMenu`, `closeBulkEditMenu`,
@@ -315,20 +367,25 @@ filtering, theme, bulk edit, settings saves, the wizard/onboarding, the example
 seed, the signature, cert numbers / job notes / report templates, the welcome
 dismiss.
 
-## render-core.js (~1648 ln) — main screens
+## render-core.js (~1720 ln) — main screens
 Owns `const app = document.getElementById('app')` and the `render()` dispatcher
 (rebuilds `#app.innerHTML` on every interaction; scroll-to-top + the Sessions scroll
-restore live here via `_lastRenderedView`). Sessions: `renderSessions`,
+restore live here via `_lastRenderedView`; **v53** the view router includes
+`settingsReadings`). Sessions: `renderSessions`,
 `renderSessionsListAreaHTML`, `refreshSessionsListAreaOnly`,
 `renderBackupReminderBanner`. New-session form suggestions: `computeNfClientSuggestions`,
 `computeNfSiteSuggestions`, `nfSuggestionsHTML`. Import modals:
-`renderImportConflictModal`, `renderImportSummaryModal`. Entry: `renderEntry`,
+`renderImportConflictModal`, `renderImportSummaryModal`. Entry: `renderEntry`
+(**v53** builds the **readings sheet** when `readingsSheetOpen` — class-selector row
+drives which measurement inputs render: pass mode shows all class-applicable fields
+pre-filled, fail mode shows only the box the reason's tag points at, or none for a
+visual/Other reason; reuses the `.fail-sheet` shell),
 `refreshEntryAfterLog`. Overview: `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
 `renderOverview` (Produce Report button when reporting on), `refreshOverviewBody`,
 `refreshOverviewSelection`. Edit: `renderEditSession`. Reports hub: `renderReports`.
 Shared: `emptyStateHTML(icon,title,body,actionLabel,actionName)`;
 `refreshSettingsHubBodyOnly` (live settings search). The **welcome modal** block
-(gates on `v49WelcomeSeen`; suppressed while the migration prompt or first-run
+(**v53** gates on `v53WelcomeSeen`; suppressed while the migration prompt or first-run
 wizard is up; shows the PATGo icon; dismissed via the shared `welcome-dismiss`
 action → `dismissWelcome`). The **first-run wizard** modal block (`wizardModal`,
 renders when `!onboardedV33Seen && !migrationPrompt.show` — the 6-step commercial
@@ -336,9 +393,9 @@ onboarding). The **signature pad** modal (`signaturePadModal`, pointer-drawing w
 by `initSignaturePad()`/`clearSignaturePad()` after `app.innerHTML` is set). The
 calibration warning banner. The tour view is routed here but lives in tour.js.
 `render()` calls `bindFocusFields()` (events.js).
-*Touch to:* change the Sessions list, Entry screen, Overview, Reports hub, Edit-
-session UI, empty states, the welcome modal, the first-run wizard, the signature
-pad, the calibration banner, or the tour route.
+*Touch to:* change the Sessions list, Entry screen (incl. readings sheet), Overview,
+Reports hub, Edit-session UI, empty states, the welcome modal, the first-run wizard,
+the signature pad, the calibration banner, or the tour route.
 
 ## render-settings.js (~1305 ln) — settings screens
 Two-level Settings. `renderSettingsHub` (category list from `SETTINGS_CATEGORIES` +
@@ -346,15 +403,20 @@ search box), `renderSettingsHubBodyHTML` (search results across all pages OR the
 category list; re-rendered alone by `refreshSettingsHubBodyOnly` so the search box
 keeps focus), `renderSettingsCategory`, `settingsPageSubtitle(pageId)`,
 `settingsPageRowHTML(pageId, context)`, `renderSettingsSubHeader` + each
-`renderSettings*` sub-page (User, Items, Fails, MultiPick, Descriptions, Display,
-Backup, Csv, Clients, Report, Calculator, About, Contact, Setup) + calculator
-helpers. `renderSettingsReport` carries the Signature, Colours, Certificate-numbers,
+`renderSettings*` sub-page (User, Items, Fails, Readings, MultiPick, Descriptions,
+Display, Backup, Csv, Clients, Report, Calculator, About, Contact, Setup) + calculator
+helpers. **v53** `renderSettingsReadings` is the Test Readings page (single master
+toggle `readings-toggle`, default off, persists instantly + re-renders; on-only help
+text). `renderSettingsFails` (**v53**) shows per-reason tag `<select>`s
+(`fail-reason-tag`, data-reason carries the reason text) BELOW the reasons textarea,
+only when `readingsEnabled` — the tag decides which reading box a fail shows.
+`renderSettingsReport` carries the Signature, Colours, Certificate-numbers,
 Templates and "What to include" sections (the include toggles include
 `report-show-appcredit` and the nested `report-show-footerlogo`). `renderSettingsItems`
 carries the `.settings-tip` note about the entry-screen long-press preset switcher.
 `renderSetupSection()` is wrapped by `renderSettingsSetup()` (its own page in the
 Data category). **The About changelog lives here** (`renderSettingsAbout`) — a rolling
-3-version window; v52 shows V52/V51/V50. The About page also has the "Set up another
+3-version window; v53 shows V53/V52/V51. The About page also has the "Set up another
 device" (`restart-onboarding`) and "Show me around" (`open-tour`) cards, and a
 long-press hidden menu on the title revealing three cloud-prep stub pages
 (`renderCloudAccount`, `renderCloudSync`, `renderCloudSubscription` — mock data, for
@@ -393,7 +455,11 @@ selection + bulk edit, settings saves/toggles, report actions (incl.
 handlers, signature actions, Export/Import-Setup actions, the first-run wizard
 actions, the tour actions, the preset-switcher sheet actions, and the destructive
 confirms routed through `openConfirmSheet`/`openNameSheet`/`openInfoSheet`/`showToast`
-(no native pop-ups remain anywhere in the app). The preset-switch-on-change reverts
+(no native pop-ups remain anywhere in the app). **v53** adds the readings-sheet
+actions (`readings-set-class`, `readings-commit`, `readings-cancel`), the reading-field
+input actions (`f-reading-earth`/`-insulation`/`-leakage`), and two change actions
+(`readings-toggle` — master flag, persists + renders; `fail-reason-tag` — writes the
+reason→tag map and saves). The preset-switch-on-change reverts
 `el.value` synchronously then opens `openConfirmSheet` (the last native `confirm`,
 removed).
 

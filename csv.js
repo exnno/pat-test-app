@@ -45,6 +45,14 @@ function csvCellValue(colId, session, item) {
     // (even if the column is visible), and blank for items logged before the
     // feature was enabled.
     case 'time':        return state.timestampsEnabled ? formatTimestampCSV(item.ts) : '';
+    // v53: Test Readings columns. Emit blank when the feature is OFF (even if the
+    // column is visible) or when the item carries no readings — so turning a
+    // column on never invents data for items logged before readings existed or
+    // while the feature was off. Stored as-typed text goes straight out.
+    case 'readingClass':      return (state.readingsEnabled && item.readings && item.readings.class)      ? item.readings.class      : '';
+    case 'readingEarth':      return (state.readingsEnabled && item.readings && item.readings.earth)      ? item.readings.earth      : '';
+    case 'readingInsulation': return (state.readingsEnabled && item.readings && item.readings.insulation) ? item.readings.insulation : '';
+    case 'readingLeakage':    return (state.readingsEnabled && item.readings && item.readings.leakage)    ? item.readings.leakage    : '';
     default:            return '';
   }
 }

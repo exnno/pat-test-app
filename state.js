@@ -130,7 +130,7 @@ let state = {
   // new install still shows the WIZARD and an upgrader still shows the MODAL —
   // unchanged behaviour. Future feature releases roll a new flag here and pass it
   // to dismissWelcome().
-  v49WelcomeSeen: false,  // v49: PATGo footer logo + onboarding icon + tour note
+  v53WelcomeSeen: false,  // v53: Test Readings (opt-in per-item readings + equipment class)
   // v46: remembered Sessions-list scroll offset. Captured (in render) when
   // leaving Sessions for a session, restored when returning to Sessions. All
   // other navigation resets to the top. Transient — never persisted. The
@@ -254,6 +254,28 @@ let state = {
   // the feature is enabled (or rebuilt via the settings button).
   sqpEnabled: false,
   sqpHistory: {},
+
+  // v53: Test Readings. readingsEnabled gates the WHOLE feature (default OFF —
+  // when off the app is byte-for-byte V52). failReasonTags maps a fail-reason
+  // TEXT to its reading-field tag ('earth'|'insulation'|'leakage'|'visual'),
+  // seeded from DEFAULT_FAIL_REASON_TAGS and editable on Settings → Fails; any
+  // reason not present defaults to 'visual'. lastReadingsClass remembers the
+  // class picked on the previous item so the next sheet pre-selects it (defaults
+  // to READING_CLASS_DEFAULT). The readings SHEET is transient bottom-sheet
+  // state: readingsSheetOpen gates it; readingsSheetMode is 'pass'|'fail' (drives
+  // pre-fill vs blank and which fields show); readingsDraft holds the in-progress
+  // {class, earth, insulation, leakage} text being edited; readingsPendingResult
+  // and readingsPendingFailReason carry the click that opened the sheet through
+  // to the commit when OK is tapped. All transient sheet fields reset on close
+  // and on any view transition (setView / loadFormForCursor), same as failModal.
+  readingsEnabled: false,
+  failReasonTags: {},
+  lastReadingsClass: READING_CLASS_DEFAULT,
+  readingsSheetOpen: false,
+  readingsSheetMode: 'pass',          // 'pass' | 'fail'
+  readingsDraft: { class: READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '' },
+  readingsPendingResult: null,        // 'pass' | 'fail' — the result being logged
+  readingsPendingFailReason: null,    // the fail reason text (fail mode only)
   // v20: SQP row stability. The composed quick-pick row is FROZEN per location:
   // it is recomputed only when the confirmed location changes (or a session
   // opens), never mid-logging — so logging a PASS no longer reshuffles the

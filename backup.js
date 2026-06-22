@@ -49,6 +49,12 @@ function buildBackup() {
     // v18: Smart Quick Pick flag + learned history (readable long-key form).
     sqpEnabled: state.sqpEnabled,
     sqpHistory: state.sqpHistory,
+    // v53: Test Readings on/off flag + fail-reason tag map. The readings DATA
+    // itself rides along inside `sessions` (per-item item.readings) — additive,
+    // no backupVersion bump, and validated per item on restore. Old backups
+    // without these keys restore with the feature OFF and the default tags.
+    readingsEnabled: state.readingsEnabled,
+    failReasonTags: state.failReasonTags,
     // v19: Clients & Sites (readable long-key arrays).
     clients: state.clients,
     sites: state.sites,
@@ -153,6 +159,24 @@ function restoreBackupFromFile(file) {
       onConfirm: () => {
     // Apply
     state.sessions = data.sessions;
+    // v53: Test Readings — validate each item's readings object defensively on
+    // restore. Items ride through wholesale (additive, no backupVersion bump),
+    // but `readings` is a STRUCTURED field other code reads, so a hand-edited or
+    // corrupt backup could carry garbage. normaliseItemReadings returns a clean
+    // {class, earth, insulation, leakage} or null; we delete the key entirely
+    // when null so no empty husk remains. Items with no readings (any pre-v53
+    // backup) are untouched. This is also the boundary the future cloud-sync
+    // path will reuse for server data.
+    state.sessions.forEach(s => {
+      if (s && Array.isArray(s.items)) {
+        s.items.forEach(it => {
+          if (it && 'readings' in it) {
+            const clean = normaliseItemReadings(it.readings);
+            if (clean) it.readings = clean; else delete it.readings;
+          }
+        });
+      }
+    });
     // v9: preset restoration. Three cases:
     //   New backup with presets → use directly.
     //   Old backup with itemTypes only → convert to a single 'Default' preset.
@@ -237,6 +261,29 @@ function restoreBackupFromFile(file) {
       state.sqpEnabled = data.sqpEnabled;
     }
     state.sqpHistory = normaliseSqpHistory(data.sqpHistory);
+
+    // v53: Test Readings. Flag is a boolean (older backups without it leave the
+    // default OFF). The fail-reason tag map restores through the same validation
+    // loadFailReasonTags applies: drop unknown tags, backfill shipped defaults —
+    // so a pre-v53 backup restores with just the default tags, and a v53 backup
+    // restores the user's custom tagging. The readings DATA itself already came
+    // back inside `sessions` above (validated per item).
+    if (typeof data.readingsEnabled === 'boolean') {
+      state.readingsEnabled = data.readingsEnabled;
+    }
+    {
+      let incoming = {};
+      if (data.failReasonTags && typeof data.failReasonTags === 'object' && !Array.isArray(data.failReasonTags)) {
+        incoming = data.failReasonTags;
+      }
+      const merged = {};
+      Object.keys(DEFAULT_FAIL_REASON_TAGS).forEach(r => { merged[r] = DEFAULT_FAIL_REASON_TAGS[r]; });
+      Object.keys(incoming).forEach(r => {
+        const tag = incoming[r];
+        if (typeof tag === 'string' && READING_FAIL_TAGS.indexOf(tag) !== -1) merged[r] = tag;
+      });
+      state.failReasonTags = merged;
+    }
 
     // v19: Clients & Sites. Validate to the same shape the loaders enforce; any
     // missing/garbage value collapses to an empty list. Pre-v19 backups simply

@@ -431,7 +431,7 @@ function loadV11Settings() {
   // release had passed. Old keys remain harmlessly in users' localStorage; the
   // returning-user heuristic below detects them by prefix, so upgraders are still
   // recognised without keeping a flag per version.
-  state.v49WelcomeSeen = localStorage.getItem(V49_WELCOME_KEY) === '1';
+  state.v53WelcomeSeen = localStorage.getItem(V53_WELCOME_KEY) === '1';
 
   // v43: cloud prep. Load mock auth state (userId, authToken from PAT_AUTH_KEY).
   // This will persist in the cloud phase; for now it's a passthrough field that
@@ -481,6 +481,14 @@ function loadV11Settings() {
   // so a corrupt key can never wedge the entry screen (falls back to {}).
   state.sqpEnabled = localStorage.getItem(SQP_ENABLED_KEY) === '1';
   state.sqpHistory = loadSqpHistory();
+
+  // v53: Test Readings. Flag defaults OFF (only '1' enables). The fail-reason
+  // tag map is loaded and validated defensively: any stored tag that isn't one
+  // of READING_FAIL_TAGS is dropped, then the built-in defaults backfill any
+  // shipped reason the user hasn't overridden. A reason with no entry at all
+  // (e.g. a custom one) is treated as 'visual' at read time by readingTagForReason().
+  state.readingsEnabled = localStorage.getItem(READINGS_KEY) === '1';
+  state.failReasonTags = loadFailReasonTags();
 
   // v19: Clients & Sites. Validate defensively (any garbage collapses to []),
   // then seed from existing sessions if BOTH lists are empty — i.e. the first
@@ -695,6 +703,12 @@ function saveSettings() {
   // v18: Smart Quick Pick flag + learned history.
   localStorage.setItem(SQP_ENABLED_KEY, state.sqpEnabled ? '1' : '0');
   localStorage.setItem(SQP_HISTORY_KEY, JSON.stringify(state.sqpHistory || {}));
+  // v53: Test Readings on/off flag + fail-reason tag map. The readings DATA
+  // itself lives on items inside `sessions` (saved via saveSessions), so the
+  // hot logging path needs no change — only this flag and the tag map (both
+  // set in Settings, which calls full save()) are written here.
+  localStorage.setItem(READINGS_KEY, state.readingsEnabled ? '1' : '0');
+  localStorage.setItem(FAIL_REASON_TAGS_KEY, JSON.stringify(state.failReasonTags || {}));
   // v19: Clients & Sites (readable long-key arrays).
   localStorage.setItem(CLIENTS_KEY, JSON.stringify(state.clients || []));
   localStorage.setItem(SITES_KEY, JSON.stringify(state.sites || []));
@@ -722,6 +736,43 @@ function saveSqpHistory() {
 }
 function saveDescriptions() {
   localStorage.setItem(DESCRIPTIONS_KEY, JSON.stringify(state.descriptions));
+}
+
+// v53: Test Readings — fail-reason tag store. Tags are kept in their OWN map
+// (keyed by reason text) rather than on the failReasons string array, so the
+// existing array shape, its backup/setup serialisation, and old restores are
+// all unchanged. loadFailReasonTags validates every stored value against
+// READING_FAIL_TAGS (drop unknowns), then backfills the shipped defaults for any
+// reason the user hasn't explicitly set.
+function loadFailReasonTags() {
+  let stored = {};
+  try {
+    const raw = JSON.parse(localStorage.getItem(FAIL_REASON_TAGS_KEY) || 'null');
+    if (raw && typeof raw === 'object' && !Array.isArray(raw)) stored = raw;
+  } catch {}
+  const out = {};
+  // Seed defaults first, then let any valid stored override win.
+  Object.keys(DEFAULT_FAIL_REASON_TAGS).forEach(reason => {
+    out[reason] = DEFAULT_FAIL_REASON_TAGS[reason];
+  });
+  Object.keys(stored).forEach(reason => {
+    const tag = stored[reason];
+    if (typeof tag === 'string' && READING_FAIL_TAGS.indexOf(tag) !== -1) {
+      out[reason] = tag;
+    }
+  });
+  return out;
+}
+function saveFailReasonTags() {
+  localStorage.setItem(FAIL_REASON_TAGS_KEY, JSON.stringify(state.failReasonTags || {}));
+}
+// v53: resolve a fail reason's tag. Any reason with no explicit entry — every
+// custom reason the user adds, and "Other…" free text — is 'visual' (no
+// electrical box on the fail sheet). This is the single read path used by the
+// fail flow and the Settings → Fails UI.
+function readingTagForReason(reason) {
+  const t = state.failReasonTags && state.failReasonTags[reason];
+  return (typeof t === 'string' && READING_FAIL_TAGS.indexOf(t) !== -1) ? t : READING_FAIL_TAG_DEFAULT;
 }
 
 

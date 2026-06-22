@@ -344,6 +344,37 @@ function renderSettingsItems() {
 }
 
 function renderSettingsFails() {
+  // v53: when Test Readings is on, show a per-reason "what does this failure
+  // measure?" tag below the list. The tag decides which reading box the fail
+  // sheet shows (earth / insulation / leakage), or none for a visual failure.
+  // Tags are keyed by the reason TEXT and stored separately from the list, so a
+  // reason keeps its tag across edits as long as its text is unchanged. We show
+  // a row per CURRENTLY SAVED reason; after editing the text, Save first, then
+  // the tag rows refresh to match. Hidden entirely when the feature is off, so
+  // engineers who don't use readings never see this.
+  let tagsSection = '';
+  if (state.readingsEnabled) {
+    const tagLabel = { visual: 'Visual only', earth: 'Earth continuity (Ω)', insulation: 'Insulation (MΩ)', leakage: 'Leakage (mA)' };
+    const rows = (state.failReasons || []).map(reason => {
+      const current = readingTagForReason(reason);
+      const opts = READING_FAIL_TAGS.map(t =>
+        `<option value="${escapeHTML(t)}" ${t === current ? 'selected' : ''}>${escapeHTML(tagLabel[t] || t)}</option>`
+      ).join('');
+      return `
+        <div class="reason-tag-row">
+          <span class="reason-tag-name">${escapeHTML(reason)}</span>
+          <select class="sort-select reason-tag-select" data-change-action="fail-reason-tag" data-reason="${escapeHTML(reason)}">${opts}</select>
+        </div>
+      `;
+    }).join('');
+    tagsSection = `
+      <div class="settings-section">
+        <h2 class="h2">What each failure measures</h2>
+        <p class="muted">When Test Readings is on, this decides which reading box appears after you pick a fail reason. Pick <strong>Visual only</strong> for damage-type failures with no electrical reading. New reasons start as Visual only — change them here after saving.</p>
+        ${rows || '<p class="muted">Save your reasons above to tag them.</p>'}
+      </div>
+    `;
+  }
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Quick Pick Fail')}
@@ -356,6 +387,40 @@ function renderSettingsFails() {
         <button class="btn-secondary" id="settings-fails-reset" data-action="settings-fails-reset">↺ Reset to defaults</button>
         <button class="btn-primary" id="settings-fails-save" data-action="settings-fails-save">Save</button>
       </div>
+      ${tagsSection}
+    </div>
+  `;
+}
+
+// v53: Test Readings settings page. A single master toggle (default OFF) plus a
+// plain-language explanation of what turning it on does. Lives in the Testing
+// Setup category. The toggle persists instantly via its own change handler (like
+// the SQP/MultiPick toggles), not a Save button.
+function renderSettingsReadings() {
+  const on = !!state.readingsEnabled;
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Test Readings')}
+      <div class="settings-section">
+        <h2 class="h2">Record test readings</h2>
+        <p class="muted">Off by default. When on, tapping PASS or saving a FAIL opens a short sheet to record the equipment class (I, II or III) and the relevant readings — earth continuity, insulation resistance and leakage. Pass readings are pre-filled with typical values, so it's still just a tap if you're happy with them. Leave this off and the entry screen works exactly as before.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Record readings</div>
+            <div class="toggle-row-sub">${on ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="readings-toggle" data-change-action="readings-toggle" ${on ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      ${on ? `
+      <div class="settings-section">
+        <h2 class="h2">A few things to know</h2>
+        <p class="muted">The equipment class decides which boxes appear — Class II has no earth continuity, Class III is insulation only. You can tag each fail reason (on the Quick Pick Fail page) so the right box shows when something fails. Readings are optional even when this is on — an empty box just records no value.</p>
+        <p class="muted">To include readings in your CSV export, turn the reading columns on under Settings → Reports & Output → CSV Columns. Readings will appear on the PDF certificate in a future update.</p>
+      </div>` : ''}
     </div>
   `;
 }
@@ -1141,18 +1206,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v52: rolled forward — V52 on top, V49 dropped. -->
+      <!-- v8: rolling 3-version changelog. v53: rolled forward — V53 on top, V50 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V53</strong> · June 2026</p>
+        <p class="muted">You can now record test readings — earth continuity, insulation resistance and leakage, with the equipment class (I, II or III) for each item. It's completely optional and off to begin with; turn it on under Settings → Testing Setup → Test Readings. When it's on, you tap PASS as usual and a short sheet pops up to confirm the numbers, pre-filled with typical pass values. Readings can be added to your CSV export, and they'll come to the PDF certificate in the next update. Nothing changes unless you switch it on.</p>
 
         <p><strong>V52</strong> · June 2026</p>
         <p class="muted">Another under-the-hood tidy-up, following on from the last couple of releases. We've removed some leftover, unused code and styling that no longer did anything, keeping the app lean and easy to maintain ahead of bigger features to come. Nothing you see or do has changed, and all your data, settings and sessions are exactly as they were.</p>
 
         <p><strong>V51</strong> · June 2026</p>
         <p class="muted">The app now starts faster. The PDF report engine used to load every time you opened the app, even if you never made a report that session; now it loads only when you actually produce a report (you'll see a brief “Preparing report…” the first time, then it's instant). Reports still work fully offline exactly as before. Nothing else changed, and none of your data is affected.</p>
-
-        <p><strong>V50</strong> · June 2026</p>
-        <p class="muted">An under-the-hood spring clean. We've tidied and slimmed the app's code ahead of some bigger features coming soon — the app is leaner and a little quicker to start, with no changes to how anything works. All your data, settings and sessions are exactly as they were.</p>
       </div>
 
       <div class="info-card">

@@ -255,6 +255,12 @@ registerActions({
   'fail-other-save': () => { const reason = state.failOtherText.trim(); pickFailReason(reason || null); },
   'fail-cancel': () => cancelFailModal(),
 
+  // v53: Test Readings sheet (opened from passClicked / pickFailReason when the
+  // feature is on). Class selector, commit, and cancel.
+  'readings-set-class': (arg) => setReadingsClass(arg),
+  'readings-commit': () => commitReadingsSheet(),
+  'readings-cancel': () => cancelReadingsSheet(),
+
   // Multi Pick sheet
   'multipick-open': () => { const sess = activeSession(); if (sess && sess.locked) return; state.multiPickSheetOpen = true; render(); },
   'multipick-fire': (arg) => multiPickFire(parseInt(arg, 10)),
@@ -629,7 +635,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissWelcome('v49WelcomeSeen', V49_WELCOME_KEY),
+  'welcome-dismiss': () => dismissWelcome('v53WelcomeSeen', V53_WELCOME_KEY),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -751,6 +757,12 @@ registerInputActions({
   // Fail sheet — "other" reason free text
   'fail-other': (v) => { state.failOtherText = v; },
 
+  // v53: Test Readings sheet — measurement fields (stored as-typed; no render on
+  // each keystroke so the input keeps focus, same as fail-other).
+  'f-reading-earth': (v) => setReadingsField('earth', v),
+  'f-reading-insulation': (v) => setReadingsField('insulation', v),
+  'f-reading-leakage': (v) => setReadingsField('leakage', v),
+
   // Overview search — partial refresh
   'overview-search': (v) => {
     state.searchQuery = v;
@@ -855,6 +867,29 @@ registerChangeActions({
 
   // Smart Quick Pick on/off
   'sqp-toggle': (checked) => setSqp(checked),
+
+  // v53: Test Readings master toggle. Persists instantly (like sqp-toggle) and
+  // re-renders so the on-only help text and the Fails-page tag selectors appear/
+  // disappear immediately. Off = the entry screen reverts to the one-tap flow.
+  'readings-toggle': (checked) => {
+    state.readingsEnabled = !!checked;
+    localStorage.setItem(READINGS_KEY, state.readingsEnabled ? '1' : '0');
+    render();
+  },
+
+  // v53: per-fail-reason tag selector (Quick Pick Fail page, shown only when
+  // readings are on). Reads the reason text off the element's data-reason and
+  // the chosen tag off its value; writes the map and persists. No re-render — the
+  // <select> already shows the new value, and nothing else on the page depends
+  // on it until the next fail.
+  'fail-reason-tag': (value, el) => {
+    const reason = el && el.dataset ? el.dataset.reason : '';
+    if (!reason) return;
+    if (READING_FAIL_TAGS.indexOf(value) === -1) return;
+    if (!state.failReasonTags || typeof state.failReasonTags !== 'object') state.failReasonTags = {};
+    state.failReasonTags[reason] = value;
+    saveFailReasonTags();
+  },
 
   // v30: Report Settings toggles. The master switch and logo persist instantly
   // (the master gates other screens; logo is a discrete pick). The rest update

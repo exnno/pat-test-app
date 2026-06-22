@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — config.js (constants & defaults)
- * v52 (June 2026)
+ * v53 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V52';
+const APP_VERSION = 'V53';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -64,7 +64,7 @@ const CAL_DUE_KEY = 'pat:caldue';
 // first-run-wizard gate, so nothing about upgrade behaviour changes. When a future
 // feature release rolls a new welcome, replace the line below with the new key
 // (e.g. V51_WELCOME_KEY) and pass it to dismissWelcome() — no new symbol pile.
-const V49_WELCOME_KEY = 'pat:v49welcome';   // v49: PATGo footer logo + onboarding icon + tour long-press note
+const V53_WELCOME_KEY = 'pat:v53welcome';  // v53: Test Readings (opt-in per-item Ω / MΩ / mA + equipment class)
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
 // sheet opens. Deliberately a single named constant so the threshold can be
@@ -143,7 +143,7 @@ const SETTINGS_CATEGORIES = [
   { id: 'catUser',    icon: '👤', title: 'User & Calibration', blurb: 'Your engineer details and calibration',
     pages: ['settingsUser'] },
   { id: 'catTesting', icon: '⚡', title: 'Testing Setup', blurb: 'How Quick Pick, Multi Pick and descriptions behave',
-    pages: ['settingsItems', 'settingsFails', 'settingsMultiPick', 'settingsDescriptions'] },
+    pages: ['settingsItems', 'settingsFails', 'settingsReadings', 'settingsMultiPick', 'settingsDescriptions'] },
   { id: 'catReports', icon: '📄', title: 'Reports & Output', blurb: 'PDF reports, CSV export and your clients',
     pages: ['settingsReport', 'settingsCsv', 'settingsClients'] },
   { id: 'catApp',     icon: '🎨', title: 'App & Display', blurb: 'Appearance and the resistance calculator',
@@ -161,6 +161,7 @@ const SETTINGS_PAGE_META = {
   settingsUser:        { icon: '👤', title: 'User Settings',         aliases: 'engineer name calibration cal due instrument' },
   settingsItems:       { icon: '⚡', title: 'Quick Pick Items',      aliases: 'item types presets quick pick buttons' },
   settingsFails:       { icon: '⚠️', title: 'Quick Pick Fail',       aliases: 'fail reasons failure quick pick' },
+  settingsReadings:    { icon: '🔬', title: 'Test Readings',          aliases: 'test readings ohms megohms leakage insulation earth continuity class measurements' },
   settingsMultiPick:   { icon: '🧰', title: 'Multi Pick',            aliases: 'multi pick bulk multiple slots' },
   settingsDescriptions:{ icon: '📝', title: 'Item Description List', aliases: 'descriptions notes labels' },
   settingsReport:      { icon: '📄', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration signature sign colour color theme header accent cert number template preset notes' },
@@ -349,6 +350,78 @@ const SITES_KEY = 'pat:sites';              // v19: JSON [{id,clientId,name}]
 const SQP_ENABLED_KEY = 'pat:sqpenabled';   // v18: '1' | '0', default '0'
 const SQP_HISTORY_KEY = 'pat:sqphistory';   // v18: JSON { loc: { type: count } }
 
+// v53: Test Readings. A single on/off flag gating the WHOLE feature. Default
+// OFF — when off, the entry screen, the item data shape, the CSV and the backup
+// are byte-for-byte identical to V52: no readings sheet, no `readings` key ever
+// written to an item. Only an explicit '1' turns it on; absent/'0'/garbage all
+// read as off (same convention as SQP/timestamps). The readings DATA lives on
+// each item under item.readings (see normaliseItemReadings in utils.js) and
+// rides through backup/restore inside `sessions` — additive, NO backupVersion
+// bump (an old backup simply has items without the key; a new backup's readings
+// are ignored wholesale by an older app). The cloud schema (future) will mirror
+// item.readings, which is why it's a clean self-contained object of as-typed
+// text values, not parsed numbers.
+const READINGS_KEY = 'pat:readingsenabled';   // v53: '1' | '0', default '0'
+
+// v53: Equipment classes. The readings sheet shows a class selector at the top;
+// the chosen class decides which reading rows appear (Class II has no earth path
+// so no earth-continuity box; Class III is low-voltage so insulation only).
+// `default` is the class pre-selected on a fresh sheet before the user has
+// picked one in this session (we then remember their last pick in
+// state.lastReadingsClass). Stored on the item as item.readings.class.
+const READING_CLASSES = ['I', 'II', 'III'];
+const READING_CLASS_DEFAULT = 'I';
+
+// v53: which reading fields apply to each class, in display order. The PASS
+// sheet shows every applicable field for the chosen class, pre-filled with the
+// class-appropriate placeholder below. This map is the single source of truth
+// for "which boxes show" — the entry sheet, the validator, and the CSV all read
+// it, so changing a class's field set is a one-line edit here.
+//   earth      — earth continuity, ohms (Class I only — earthed appliances)
+//   insulation — insulation resistance, megohms (all classes)
+//   leakage    — leakage current, milliamps (Class I & II — mains-side)
+const READING_FIELDS_BY_CLASS = {
+  'I':   ['earth', 'insulation', 'leakage'],
+  'II':  ['insulation', 'leakage'],
+  'III': ['insulation']
+};
+
+// v53: per-field metadata — label, unit, and the typical-PASS placeholder shown
+// as greyed editable text on the PASS sheet (decision: pre-fill, editable). On a
+// FAIL the relevant box shows BLANK instead (you're recording the actual
+// out-of-spec measurement, so a placeholder would mislead). Values are stored
+// EXACTLY as typed (free text incl. the </>/≥ shorthand) — no parsing, straight
+// into the item and the CSV cell. Placeholder figures are Peter's conventions.
+const READING_FIELD_META = {
+  earth:      { key: 'earth',      label: 'Earth continuity', unit: 'Ω',  passPlaceholder: '<0.1'   },
+  insulation: { key: 'insulation', label: 'Insulation',       unit: 'MΩ', passPlaceholder: '≥19.99' },
+  leakage:    { key: 'leakage',    label: 'Leakage',          unit: 'mA', passPlaceholder: '<5'      }
+};
+
+// v53: fail-reason → reading-field "type tag". On a FAIL the chosen reason's tag
+// decides which single reading box the sheet shows:
+//   'earth' | 'insulation' | 'leakage' → that one box, blank
+//   'visual'                           → no electrical box (the reason IS the record)
+// The DEFAULT reasons are pre-tagged here so the feature works out of the box
+// with zero setup. CUSTOM reasons the user adds default to 'visual' (we don't
+// know what they evidence) and can be re-tagged on Settings → Fails. Tags live
+// in their own parallel store (FAIL_REASON_TAGS_KEY) keyed by the reason TEXT,
+// so the existing failReasons array (a plain string list) is unchanged and old
+// backups/setups keep restoring exactly as before.
+const FAIL_REASON_TAGS_KEY = 'pat:failreasontags';   // v53: JSON { "<reason>": "earth|insulation|leakage|visual" }
+const READING_FAIL_TAGS = ['visual', 'earth', 'insulation', 'leakage'];
+const READING_FAIL_TAG_DEFAULT = 'visual';
+// Built-in tags for the shipped DEFAULT_FAIL_REASONS (keyed by exact text). Any
+// reason not listed here — including every custom reason — defaults to 'visual'.
+const DEFAULT_FAIL_REASON_TAGS = {
+  'Damaged Plug':                 'visual',
+  'Damaged Lead':                 'visual',
+  'Damaged Casing':               'visual',
+  'Earth Continuity':             'earth',
+  'Insulation Resistance':        'insulation',
+  'Does Not Conform To BS 1363':  'visual'
+};
+
 // v27: Smart Quick Pick ordering-quality tuning. These shape how the learned
 // history is matched and scored against a typed location — no storage change,
 // they only affect how the existing history is read.
@@ -521,7 +594,19 @@ const DEFAULT_CSV_COLUMNS = [
   // column. Produces blanks when the Item Timestamps setting is OFF, or for
   // items logged before timestamps were enabled. Turn the column on via
   // Settings → CSV Columns; turn capture on via Settings → Display.
-  { id: 'time',        header: 'Time',          visible: false }
+  { id: 'time',        header: 'Time',          visible: false },
+  // v53: Test Readings columns. All default HIDDEN so existing users' exports
+  // are unchanged until they opt in (Settings → CSV Columns), exactly like the
+  // v12 tester/cal and v17 time columns. Each resolves from item.readings (see
+  // csvCellValue); they emit BLANK when the Test Readings feature is OFF, when
+  // the column is hidden, or for any item with no reading recorded for that
+  // field — so turning a column on never invents data. 'class' carries the
+  // equipment class (I/II/III); the three measurement columns carry the
+  // as-typed reading text.
+  { id: 'readingClass',      header: 'Class',           visible: false },
+  { id: 'readingEarth',      header: 'Earth (Ω)',       visible: false },
+  { id: 'readingInsulation', header: 'Insulation (MΩ)', visible: false },
+  { id: 'readingLeakage',    header: 'Leakage (mA)',    visible: false }
 ];
 
 // v8: Resistance calculator — IET Code of Practice Table V1.1 nominal values.
