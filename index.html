@@ -34,9 +34,12 @@
   <script src="session.js"></script>
   <script src="setup.js"></script>
   <script src="tour.js"></script>
-  <!-- v30: vendored PDF engine (jsPDF + autotable, MIT — see THIRD-PARTY-LICENSES.txt) -->
-  <script src="jspdf.umd.min.js"></script>
-  <script src="jspdf.plugin.autotable.min.js"></script>
+  <!-- v30: vendored PDF engine (jsPDF + autotable, MIT — see THIRD-PARTY-LICENSES.txt).
+       v51: NO LONGER loaded here. These ~350 KB libs only matter when a PDF report
+       is produced, so loading them on every cold start was wasted startup cost. They
+       remain in sw.js's ASSETS precache (downloaded at SW install, served from cache)
+       and are injected on first report by loadReportEngine() in report.js — so
+       reports still work fully offline from first install. -->
   <script src="report.js"></script>
   <script src="pdfpreview.js"></script>
   <script src="render-core.js"></script>

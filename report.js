@@ -28,6 +28,76 @@ function getJsPDF() {
   return ns && ns.jsPDF ? ns.jsPDF : null;
 }
 
+// ---- v51: LAZY ENGINE LOAD ------------------------------------------------
+// The two vendored jsPDF files (jspdf.umd.min.js + the autotable plugin, ~350 KB)
+// used to load synchronously in index.html's <script> chain on EVERY cold start,
+// even though they're only needed when a PDF report is produced. v51 removed those
+// two <script> tags; the files are still in sw.js's ASSETS precache (so they're
+// downloaded at SW install and served from cache — reports work fully offline from
+// first install, no "connect once" caveat). This loader injects them on first
+// report, mirroring the proven PDF.js lazy-load in pdfpreview.js.
+//
+// Order matters: jspdf.umd.min.js must run first (defines window.jspdf), THEN the
+// autotable plugin (self-applies onto it). One-shot shared promise so concurrent
+// or repeat produce-report taps share a single load. Rejects cleanly so the caller
+// can show a failure message rather than hang.
+const REPORT_JSPDF_SRC = './jspdf.umd.min.js';
+const REPORT_AUTOTABLE_SRC = './jspdf.plugin.autotable.min.js';
+let _reportEngineLoadPromise = null;
+
+// True once jsPDF AND its autotable plugin are live. autoTable attaches either as
+// a prototype method (doc.autoTable) or onto the jspdf namespace; the surest
+// parse-time signal that the plugin self-applied is jspdf.jsPDF.API.autoTable.
+function reportEngineReady() {
+  const ns = (typeof window !== 'undefined' && window.jspdf) ? window.jspdf
+           : (typeof jspdf !== 'undefined' ? jspdf : null);
+  if (!ns || !ns.jsPDF) return false;
+  const proto = ns.jsPDF.API;
+  return !!(proto && typeof proto.autoTable === 'function')
+      || typeof ns.autoTable === 'function';
+}
+
+// Inject one <script> and resolve on load / reject on error. Won't double-add if a
+// prior attempt already injected the same tag.
+function _injectScriptOnce(src, marker) {
+  return new Promise((resolve, reject) => {
+    const existing = document.querySelector('script[data-' + marker + '="1"]');
+    if (existing) { resolve(true); return; }
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = false; // preserve execution order across the two files
+    s.setAttribute('data-' + marker, '1');
+    s.onload = () => resolve(true);
+    s.onerror = () => {
+      if (s.parentNode) s.parentNode.removeChild(s);
+      reject(new Error('failed to load ' + src));
+    };
+    document.head.appendChild(s);
+  });
+}
+
+// Load the report engine (jsPDF then autotable) once. Resolves true when both are
+// live. Rejects if either script fails (e.g. corrupt cache) so produceReport can
+// surface a clear message and allow a retry.
+function loadReportEngine() {
+  if (reportEngineReady()) return Promise.resolve(true);
+  if (_reportEngineLoadPromise) return _reportEngineLoadPromise;
+
+  _reportEngineLoadPromise = _injectScriptOnce(REPORT_JSPDF_SRC, 'jspdf')
+    .then(() => _injectScriptOnce(REPORT_AUTOTABLE_SRC, 'jspdfat'))
+    .then(() => {
+      if (!reportEngineReady()) {
+        throw new Error('report engine globals missing after load');
+      }
+      return true;
+    })
+    .catch((e) => {
+      _reportEngineLoadPromise = null; // allow a later retry (e.g. after a reload)
+      throw e;
+    });
+  return _reportEngineLoadPromise;
+}
+
 // Run an autotable call against a doc, tolerant of both the v5 method form
 // (doc.autoTable, present after the UMD plugin self-applies) and the functional
 // form autoTable(doc, opts).
@@ -365,14 +435,29 @@ function stampCertNumber(session) {
   saveReportSettings();    // persists the advanced counter
 }
 
-function produceReport(sessionId) {
+async function produceReport(sessionId) {
   if (!state.reportSettings.enabled) { setView('settings'); return; }
   const session = state.sessions.find(s => s.id === sessionId);
   if (!session) { openInfoSheet({ title: 'Session not found', message: 'Couldn\u2019t find that session. Please try again.' }); return; }
-  if (!getJsPDF()) {
-    openInfoSheet({ title: 'Report engine still loading', message: 'The PDF engine hasn\u2019t finished loading yet. If you\u2019re offline on first use, reconnect once so it can save itself, then try again.' });
-    return;
+
+  // v51: the PDF engine is loaded lazily on first report rather than at startup.
+  // Show a brief "preparing" toast while it loads (near-instant once it's cached,
+  // which it is from first install — the files live in the SW precache). If the
+  // load genuinely fails (e.g. corrupt cache), surface a clear retryable message
+  // rather than silently doing nothing.
+  if (!reportEngineReady()) {
+    showToast('Preparing report\u2026');
+    try {
+      await loadReportEngine();
+    } catch (e) {
+      openInfoSheet({
+        title: 'Couldn\u2019t load the report engine',
+        message: 'The PDF engine didn\u2019t load. Close and reopen the app (reconnect once if you\u2019re offline so it can refresh), then try again.'
+      });
+      return;
+    }
   }
+
   stampCertNumber(session);   // v36: assign-once cert number before building
   let doc;
   try {

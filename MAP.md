@@ -1,4 +1,4 @@
-# PAT App — Code Map (V50)
+# PAT App — Code Map (V51)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -17,33 +17,32 @@ exists — the modular split is complete.
 > `PAThandoff_vNN.md` docs. The map now answers one question only: *where does
 > this thing live today?*
 
-## Load order (index.html) — 22 files (incl. 2 vendored libs)
+## Load order (index.html) — 20 first-party files
 `config.js` → `state.js` → `utils.js` → `storage.js` → `clients.js` → `sqp.js`
 → `multipick.js` → `feedback.js` → `csv.js` → `backup.js` → `session.js`
-→ `setup.js` → `tour.js` → `jspdf.umd.min.js`
-→ `jspdf.plugin.autotable.min.js` → `report.js` → `pdfpreview.js`
+→ `setup.js` → `tour.js` → `report.js` → `pdfpreview.js`
 → `render-core.js` → `render-settings.js` → `events.js` → `dispatch.js` → `boot.js`
 
 `boot.js` runs the startup block and must stay **last**. Later files may call
 functions defined in earlier ones; nothing executes until `boot.js` because
 every other file is function declarations sharing one global scope.
 
-The two vendored PDF libraries (jsPDF + autotable, MIT) load after `session.js`
-and before `report.js`, which uses them. They attach to `window.jspdf`; `report.js`
-reads them from there. See `THIRD-PARTY-LICENSES.txt`.
+**Vendored PDF libraries — both lazy-loaded, NEITHER in the startup `<script>`
+chain (v51).**
+- **jsPDF + autotable** (MIT, ~350 KB): in `sw.js` ASSETS (precached at install)
+  but NOT in index.html's chain. `report.js` injects them on the FIRST report via
+  `loadReportEngine()`, served from the precache so reports work fully offline from
+  first install. (v51 moved them off the cold-start path — before v51 they loaded
+  synchronously on every launch.)
+- **PDF.js** (`pdfjs.min.js` + `pdfjs.worker.min.js`, Apache-2.0, ~1.5 MB): in the
+  repo but NOT in index.html AND NOT in sw.js ASSETS. Fetched lazily from our own
+  origin on the FIRST report PREVIEW by `pdfpreview.js`; the same-origin SW fetch
+  handler auto-caches it. First preview needs a connection once; offline after.
 
-TWO more vendored files exist in the repo — `pdfjs.min.js` + `pdfjs.worker.min.js`
-(PDF.js legacy UMD, Apache-2.0, ~1.5 MB total) — but they are **NOT in this load
-order and NOT in sw.js ASSETS**. They are fetched lazily from the app's own origin
-on the FIRST report preview by `pdfpreview.js`, which IS in the chain. The lazy
-fetch is auto-cached by the same-origin SW fetch handler into Cache Storage
-(separate from the ~5 MB localStorage budget). After a cache bump they re-download
-once.
-
-> **Eager-load note (carried for the planned V51 perf pass):** the two jsPDF libs
-> (~350 KB) load on every cold start but are only needed when a PDF report is
-> produced. Candidate for the same lazy-load treatment PDF.js already gets. Not
-> done in V50 (cleanup-only); flagged in the handoff backlog.
+The difference between the two: jsPDF is a *core* feature (reports) so it's
+precached for guaranteed offline-from-install; PDF.js is the heavier *preview*
+enhancement so its download is deferred too. Both avoid the startup parse cost.
+See `THIRD-PARTY-LICENSES.txt`.
 
 ---
 
@@ -221,8 +220,14 @@ persisted. Routed early in `render()` as a full-screen view. Entry points: the
 wizard finish step and About → "Show me around".
 *Touch to:* change the walkthrough slides, mocks/copy, or paging.
 
-## report.js (~624 ln) — PDF reports — uses the vendored MIT libs
-`getJsPDF` (reads `window.jspdf`), `runAutoTable`, `addMonthsFormatted`,
+## report.js (~700 ln) — PDF reports — lazy-loads the vendored MIT libs
+**Lazy engine load (v51):** `REPORT_JSPDF_SRC`/`REPORT_AUTOTABLE_SRC` (same-origin
+paths); `reportEngineReady()` (true once `window.jspdf.jsPDF.API.autoTable` exists);
+`_injectScriptOnce(src, marker)` (appends a `<script>` once, resolve on load / reject
+on error, `async=false` to preserve order); `loadReportEngine()` (one-shot shared
+promise — injects jsPDF THEN autotable in order, resolves when both live, rejects +
+clears the promise on failure so a retry works; mirrors `loadPdfJsEngine` in
+pdfpreview.js). `getJsPDF` (reads `window.jspdf`), `runAutoTable`, `addMonthsFormatted`,
 `buildReportDoc` (logo/company header, title, job details, totals, the appliance-
 register autotable built from a COLUMN LIST, failed-row tint, declaration, optional
 signature on the side given by `signaturePosition`, header band fill from
@@ -233,7 +238,9 @@ draws the embedded `PATGO_FOOTER_LOGO` to the LEFT of the credit text — subord
 to the credit toggle; all images try/catch-guarded so a bad image never blocks the
 report), `stampCertNumber(session)` (assigns `session.certNo` once on first report
 when cert numbers are on), `reportFilename` (token substitution + sanitisation),
-`produceReport` (dispatch entry, gated by `reportSettings.enabled`; problem messages
+`produceReport` (**async** dispatch entry — v51: `await loadReportEngine()` with a
+brief "Preparing report…" toast before building, on genuine load failure shows a
+retryable info-sheet; gated by `reportSettings.enabled`; problem messages
 → `openInfoSheet`), `openReportPreview` (near-fullscreen modal; editable filename;
 multi-page CANVAS view via `renderPreviewView()` → pdfpreview.js, with an old
 single-page iframe fallback on any failure; a "Quick adjust" chip row that rebuilds

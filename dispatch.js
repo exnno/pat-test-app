@@ -409,7 +409,7 @@ registerActions({
     saveReportSettings();
     render();
   },
-  'produce-report': (arg) => produceReport(arg),
+  'produce-report': (arg) => { produceReport(arg).catch(() => {}); },
 
   // v36: report templates (apply/rename/delete/save-new). v40: rename and
   // save-new use the in-app name sheet (openNameSheet); delete uses the confirm
