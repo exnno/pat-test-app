@@ -1141,18 +1141,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v51: rolled forward — V51 on top, V48 dropped. -->
+      <!-- v8: rolling 3-version changelog. v52: rolled forward — V52 on top, V49 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V52</strong> · June 2026</p>
+        <p class="muted">Another under-the-hood tidy-up, following on from the last couple of releases. We've removed some leftover, unused code and styling that no longer did anything, keeping the app lean and easy to maintain ahead of bigger features to come. Nothing you see or do has changed, and all your data, settings and sessions are exactly as they were.</p>
 
         <p><strong>V51</strong> · June 2026</p>
         <p class="muted">The app now starts faster. The PDF report engine used to load every time you opened the app, even if you never made a report that session; now it loads only when you actually produce a report (you'll see a brief “Preparing report…” the first time, then it's instant). Reports still work fully offline exactly as before. Nothing else changed, and none of your data is affected.</p>
 
         <p><strong>V50</strong> · June 2026</p>
         <p class="muted">An under-the-hood spring clean. We've tidied and slimmed the app's code ahead of some bigger features coming soon — the app is leaner and a little quicker to start, with no changes to how anything works. All your data, settings and sessions are exactly as they were.</p>
-
-        <p><strong>V49</strong> · June 2026</p>
-        <p class="muted">Your PDF reports now carry the PATGo logo next to the credit line at the foot of each page — a small finishing touch. You can turn the logo on or off (or hide the whole credit line) under Settings → Reports → What to include. The first-time setup and the guided tour now show the PATGo logo too, and the tour explains the press-and-hold shortcut for switching quick-pick presets. None of your existing data is affected.</p>
       </div>
 
       <div class="info-card">

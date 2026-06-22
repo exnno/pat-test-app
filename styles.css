@@ -266,8 +266,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .fail-btn .icon { display: block; font-size: 22px; margin-bottom: 4px; }
 
 /* Result-coloured text (used in entry header badge and overview table) */
-.result-text.pass, .pass-text { color: var(--pass); }
-.result-text.fail, .fail-text { color: var(--fail); }
+.pass-text { color: var(--pass); }
+.fail-text { color: var(--fail); }
 .result-badge { margin-left: 8px; font-weight: 700; }
 .result-badge.pass { color: var(--pass); }
 .result-badge.fail { color: var(--fail); }
@@ -328,21 +328,6 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   margin: 0;
 }
 
-/* Sort row on sessions screen */
-.sort-row {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 12px;
-  padding: 0 2px;
-}
-.sort-label {
-  font-size: 11px;
-  font-weight: 600;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  letter-spacing: 0.05em;
-}
 .sort-select {
   padding: 8px 10px;
   font-size: 14px;
@@ -1701,7 +1686,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .wizard-skip {
   display: block;
   width: 100%;
-  margin-top: 12px;
+  margin-top: 6px;
   padding: 10px;
   font-size: 14px;
   font-weight: 600;
@@ -1709,9 +1694,6 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   border: none;
   color: var(--neutral-text);
   text-align: center;
-}
-.wizard-skip {
-  margin-top: 6px;
 }
 /* v45: the finish step's "you can replay this" reassurance line (decision 9B). */
 .wizard-replay-note {
@@ -2722,11 +2704,6 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   border-radius: 8px;
   font-size: 14px;
   font-weight: 600;
-}
-.cal-banner.cal-ok {
-  background: #f0fdf4;
-  border-color: #86efac;
-  color: #15803d;
 }
 .cal-banner.cal-due-soon {
   background: #fffbeb;

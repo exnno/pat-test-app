@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — config.js (constants & defaults)
- * v51 (June 2026)
+ * v52 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V51';
+const APP_VERSION = 'V52';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';

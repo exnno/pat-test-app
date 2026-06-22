@@ -260,11 +260,6 @@ async function bulkExportUnexported() {
 // Multi-session CSVs (someone manually concatenated two exports) are still
 // refused — see PAThandoff_v10.md flag 1 and PAThandoff_v11.md backlog.
 
-// v11: kept for backward compat (older release notes / handover doc reference
-// this), but no longer used as a strict template. Header lookup uses
-// buildCsvHeaderLookup() below.
-const EXPECTED_CSV_HEADER = ['Asset ID', 'Engineer name', 'Description', 'Site', 'Location', 'Date', 'Result', 'Notes'];
-
 // v11: build a map from (lowercased, trimmed) header text → canonical column
 // id, combining the defaults with whatever the user has configured locally.
 // Used by parseImportCSV() to identify columns by name in any order.

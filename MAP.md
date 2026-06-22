@@ -1,4 +1,4 @@
-# PAT App — Code Map (V51)
+# PAT App — Code Map (V52)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -47,7 +47,7 @@ See `THIRD-PARTY-LICENSES.txt`.
 ---
 
 ## config.js (~541 ln) — constants & defaults, pure data
-`APP_VERSION` ('V50'); all `*_KEY` localStorage key names; the calibration/backup
+`APP_VERSION` ('V52'); all `*_KEY` localStorage key names; the calibration/backup
 tuning constants (`MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`); SQP tuning (`SQP_PARTIAL_WEIGHT`,
 `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`); default lists (`DEFAULT_ITEM_TYPES`,
@@ -184,7 +184,7 @@ Build/share: `csvCellValue` (adaptive client/site columns), `buildCSV`,
 wired to `copy-current`/`copy-session`). Import: `buildCsvHeaderLookup`, `parseCSV`,
 `parseUkDateToIso`, `parseImportCSV` (recognises a `Client` column), `handleImportFile`,
 `commitImportedSession` (learns client/site into lists), `cancelImportConflict`,
-`closeImportSummary` (+ `EXPECTED_CSV_HEADER`). Import errors open `openInfoSheet`.
+`closeImportSummary`. Import errors open `openInfoSheet`.
 *Touch to:* change CSV columns, export, or import parsing.
 
 ## backup.js (~310 ln) — Backup / Restore
@@ -354,7 +354,7 @@ Templates and "What to include" sections (the include toggles include
 carries the `.settings-tip` note about the entry-screen long-press preset switcher.
 `renderSetupSection()` is wrapped by `renderSettingsSetup()` (its own page in the
 Data category). **The About changelog lives here** (`renderSettingsAbout`) — a rolling
-3-version window; v50 shows V50/V49/V48. The About page also has the "Set up another
+3-version window; v52 shows V52/V51/V50. The About page also has the "Set up another
 device" (`restart-onboarding`) and "Show me around" (`open-tour`) cards, and a
 long-press hidden menu on the title revealing three cloud-prep stub pages
 (`renderCloudAccount`, `renderCloudSync`, `renderCloudSubscription` — mock data, for
