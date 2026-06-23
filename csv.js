@@ -53,6 +53,7 @@ function csvCellValue(colId, session, item) {
     case 'readingEarth':      return (state.readingsEnabled && item.readings && item.readings.earth)      ? item.readings.earth      : '';
     case 'readingInsulation': return (state.readingsEnabled && item.readings && item.readings.insulation) ? item.readings.insulation : '';
     case 'readingLeakage':    return (state.readingsEnabled && item.readings && item.readings.leakage)    ? item.readings.leakage    : '';
+    case 'readingPolarity':   return (state.readingsEnabled && item.readings && item.readings.polarity === true) ? 'Yes' : '';
     default:            return '';
   }
 }

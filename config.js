@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V54';
+const APP_VERSION = 'V55';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -64,7 +64,7 @@ const CAL_DUE_KEY = 'pat:caldue';
 // first-run-wizard gate, so nothing about upgrade behaviour changes. When a future
 // feature release rolls a new welcome, replace the line below with the new key
 // (e.g. V51_WELCOME_KEY) and pass it to dismissWelcome() — no new symbol pile.
-const V54_WELCOME_KEY = 'pat:v54welcome';  // v54: readings on the PDF certificate + Class I polarity check + readings-sheet animation removed
+const V55_WELCOME_KEY = 'pat:v55welcome';  // v55: PDF symbol fix (Ohms/≥) + CSV polarity column
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
 // sheet opens. Deliberately a single named constant so the threshold can be
@@ -625,7 +625,10 @@ const DEFAULT_CSV_COLUMNS = [
   { id: 'readingClass',      header: 'Class',           visible: false },
   { id: 'readingEarth',      header: 'Earth (Ω)',       visible: false },
   { id: 'readingInsulation', header: 'Insulation (MΩ)', visible: false },
-  { id: 'readingLeakage',    header: 'Leakage (mA)',    visible: false }
+  { id: 'readingLeakage',    header: 'Leakage (mA)',    visible: false },
+  // v55: polarity (Class I only). 'Yes' when an item recorded a polarity tick,
+  // blank otherwise — same emit-only-real-data rule as the columns above.
+  { id: 'readingPolarity',   header: 'Polarity',        visible: false }
 ];
 
 // v8: Resistance calculator — IET Code of Practice Table V1.1 nominal values.

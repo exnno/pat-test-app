@@ -130,7 +130,7 @@ let state = {
   // new install still shows the WIZARD and an upgrader still shows the MODAL —
   // unchanged behaviour. Future feature releases roll a new flag here and pass it
   // to dismissWelcome().
-  v54WelcomeSeen: false,  // v54: readings on the PDF certificate + Class I polarity check + readings-sheet animation removed
+  v55WelcomeSeen: false,  // v55: PDF symbol fix + CSV polarity column
   // v46: remembered Sessions-list scroll offset. Captured (in render) when
   // leaving Sessions for a session, restored when returning to Sessions. All
   // other navigation resets to the top. Transient — never persisted. The

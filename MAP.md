@@ -1,4 +1,4 @@
-# PAT App — Code Map (V54)
+# PAT App — Code Map (V55)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -47,7 +47,7 @@ See `THIRD-PARTY-LICENSES.txt`.
 ---
 
 ## config.js (~600 ln) — constants & defaults, pure data
-`APP_VERSION` ('V54'); all `*_KEY` localStorage key names; the calibration/backup
+`APP_VERSION` ('V55'); all `*_KEY` localStorage key names; the calibration/backup
 tuning constants (`MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`); SQP tuning (`SQP_PARTIAL_WEIGHT`,
 `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`); default lists (`DEFAULT_ITEM_TYPES`,
@@ -61,9 +61,10 @@ single source of truth for "which boxes"); `READING_FIELD_META` (per-field label
 unit, and typical-PASS placeholder: earth `<0.1`Ω, insulation `≥19.99`MΩ, leakage
 `<5`mA); `FAIL_REASON_TAGS_KEY` + `READING_FAIL_TAGS` (['visual','earth','insulation',
 'leakage']) + `READING_FAIL_TAG_DEFAULT` ('visual') + `DEFAULT_FAIL_REASON_TAGS`
-(built-in tags for the shipped fail reasons). `DEFAULT_CSV_COLUMNS` gained four
+(built-in tags for the shipped fail reasons). `DEFAULT_CSV_COLUMNS` gained five
 default-hidden reading columns (`readingClass`, `readingEarth`, `readingInsulation`,
-`readingLeakage`). `SETTINGS_CATEGORIES` catTesting now lists `settingsReadings`;
+`readingLeakage`; **v55** added `readingPolarity` — 'Yes'/blank, Class I).
+`SETTINGS_CATEGORIES` catTesting now lists `settingsReadings`;
 `SETTINGS_PAGE_META` has its entry.
 
 **v54 constants:** `READING_POLARITY_CLASSES` (['I']) — which classes show the
@@ -71,6 +72,10 @@ polarity checkbox (Class I only). `makeDefaultReportSettings()` gained
 `showReadings` (default true) — prints reading columns on the PDF, gated at render
 time by `readingsEnabled` + actual data so it's a no-op for non-readings users.
 Welcome key is now `V54_WELCOME_KEY`.
+
+**v55 constants:** Welcome key rolled to `V55_WELCOME_KEY` (`pat:v55welcome`).
+No new structural constants — V55 added the `readingPolarity` CSV column (above)
+and a PDF glyph fix in report.js; both additive.
 
 Reports: `REPORT_SETTINGS_KEY`, `REPORT_DECLARATION_DEFAULT`, `REPORT_LOGO_MAX_PX`,
 `REPORT_SIGNATURE_MAX_PX`, `REPORT_FILENAME_DEFAULT` + `REPORT_FILENAME_TOKENS`,
@@ -220,7 +225,8 @@ onClose})` (stays until tapped — no auto-dismiss, for errors). All reuse the
 Build/share: `csvCellValue` (adaptive client/site columns; **v53** four reading
 cases — `readingClass`/`readingEarth`/`readingInsulation`/`readingLeakage` — each
 emits blank when the feature is off, the column hidden, or the item has no reading;
-otherwise the as-typed value), `buildCSV`,
+otherwise the as-typed value; **v55** a fifth case `readingPolarity` — emits 'Yes'
+when a Class I item recorded a polarity tick, blank otherwise), `buildCSV`,
 `defaultHeaderFor`, `downloadCSV` (+ `SHARE_ICON_SVG`), `shareOrDownloadCSV`,
 `copyCSV` (clipboard with textarea/`execCommand` fallback; marks exported + toasts;
 wired to `copy-current`/`copy-session`). Import: `buildCsvHeaderLookup`, `parseCSV`,
@@ -278,7 +284,10 @@ paths); `reportEngineReady()` (true once `window.jspdf.jsPDF.API.autoTable` exis
 on error, `async=false` to preserve order); `loadReportEngine()` (one-shot shared
 promise — injects jsPDF THEN autotable in order, resolves when both live, rejects +
 clears the promise on failure so a retry works; mirrors `loadPdfJsEngine` in
-pdfpreview.js). `getJsPDF` (reads `window.jspdf`), `runAutoTable`, `addMonthsFormatted`,
+pdfpreview.js). `getJsPDF` (reads `window.jspdf`), `pdfSafe(v)` (**v55** — swaps the
+few WinAnsi-incompatible glyphs that previously misprinted on the certificate: Ω→Ohms,
+MΩ→MOhms, ≥→`>=`, ≤→`<=`, ✓→Yes; applied to the autotable head + body only, so the
+on-screen sheet and CSV keep the real Unicode symbols), `runAutoTable`, `addMonthsFormatted`,
 `buildReportDoc` (**v54:** opens by computing the reading columns and choosing page
 ORIENTATION before creating the doc — see below; then) logo/company header, title,
 job details, totals, the appliance-register autotable built from a COLUMN LIST,

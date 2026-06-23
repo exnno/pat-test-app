@@ -166,23 +166,21 @@ function render() {
   // genuinely-new install sees the wizard instead. Dismissed via the shared
   // dismissWelcome() (v50), wired in dispatch.js.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v54WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v55WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V54">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V55">
       <div class="bulk-sheet-handle"></div>
       <div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V54</h3>
+        <h3 class="bulk-sheet-title">What's new in V55</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Your test readings now print on the PDF certificate.</strong> Earth continuity, insulation resistance, leakage and the equipment class each get their own column — and only the columns you've actually used appear, so a clean job stays tidy.</li>
-        <li>Detailed jobs <strong>switch to landscape automatically</strong> when there are too many columns for an upright page, so nothing gets cramped. You can turn the readings off the certificate any time under Settings → Report → What to include.</li>
-        <li>There's a new <strong>polarity check for Class I items</strong> — a simple tick on the readings sheet that prints as its own column when you've used it.</li>
-        <li>The readings sheet <strong>no longer slides up</strong> — it appears instantly, so tapping through a long list of passes feels quicker and calmer.</li>
+        <li><strong>The symbols on the PDF certificate now print correctly.</strong> The ohms and "greater-than-or-equal" symbols were showing as the wrong characters on the certificate — they now read clearly as <strong>Ohms</strong>, <strong>MOhms</strong> and <strong>&gt;=</strong> in the reading columns.</li>
+        <li>The CSV export can now include a <strong>Polarity column</strong> for Class I items. Like the other reading columns it's <strong>off by default</strong> — turn it on under Settings → CSV columns if you want it in your spreadsheet.</li>
       </ul>
-      <button class="btn-primary" id="v54-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v55-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 

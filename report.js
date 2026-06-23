@@ -28,6 +28,21 @@ function getJsPDF() {
   return ns && ns.jsPDF ? ns.jsPDF : null;
 }
 
+// ---- v55: WinAnsi-safe text for the PDF. jsPDF's standard Helvetica font uses
+// single-byte WinAnsi encoding, which has no glyph for Ω (U+03A9), ≥ (U+2265) or
+// ✓ (U+2713) — they previously rendered as ©, e and a fallback mark on the
+// certificate. We don't ship a Unicode font (it would bloat the offline bundle),
+// so we swap these few codepoints for plain-ASCII words/operators in the PDF
+// layer ONLY. The on-screen sheet and the CSV keep the proper Unicode symbols.
+function pdfSafe(v) {
+  return String(v == null ? '' : v)
+    .replace(/MΩ/g, 'MOhms')
+    .replace(/Ω/g, 'Ohms')
+    .replace(/≥/g, '>=')
+    .replace(/≤/g, '<=')
+    .replace(/✓/g, 'Yes');
+}
+
 // ---- v51: LAZY ENGINE LOAD ------------------------------------------------
 // The two vendored jsPDF files (jspdf.umd.min.js + the autotable plugin, ~350 KB)
 // used to load synchronously in index.html's <script> chain on EVERY cold start,
@@ -298,7 +313,7 @@ function buildReportDoc(session) {
   if (anyNotes) columns.push({ header: 'Notes', value: it => it.notes || '' });
 
   const rows = rs.showFails ? session.items : session.items.filter(i => i.result !== 'fail');
-  const body = rows.map(it => columns.map(c => c.value(it)));
+  const body = rows.map(it => columns.map(c => pdfSafe(c.value(it))));
 
   // v54: keep the reading columns compact and centred so the long headers
   // (e.g. "Insulation Resistance (MΩ)") wrap rather than steal width from
@@ -314,7 +329,7 @@ function buildReportDoc(session) {
 
   runAutoTable(doc, {
     startY: y + 6,
-    head: [columns.map(c => c.header)],
+    head: [columns.map(c => pdfSafe(c.header))],
     body: body.length ? body : [columns.map(() => '')],
     margin: { left: margin, right: margin },
     styles: { fontSize: 9, cellPadding: 4 },

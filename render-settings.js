@@ -1207,18 +1207,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v54: rolled forward — V54 on top, V51 dropped. -->
+      <!-- v8: rolling 3-version changelog. v55: rolled forward — V55 on top, V52 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V55</strong> · June 2026</p>
+        <p class="muted">A couple of small fixes. The symbols in the reading columns on the PDF certificate were printing as the wrong characters — the ohms and "greater-than-or-equal" symbols now read clearly as Ohms, MOhms and &gt;= on the certificate. And the CSV export can now include a Polarity column for Class I items; like the other reading columns it's off by default, so turn it on under Settings → CSV columns if you want it.</p>
 
         <p><strong>V54</strong> · June 2026</p>
         <p class="muted">Your test readings now print on the PDF certificate. Earth continuity, insulation resistance, leakage and the equipment class each get their own column, and only the columns you've actually used appear — so a clean job stays tidy. Detailed jobs switch to landscape automatically when there are too many columns for an upright page. There's also a new polarity check for Class I items: a simple tick on the readings sheet that prints as its own column when used. You can keep readings off the certificate any time under Settings → Report → What to include. Finally, the readings sheet no longer slides up — it appears instantly, so tapping through a long list of passes feels quicker.</p>
 
         <p><strong>V53</strong> · June 2026</p>
         <p class="muted">You can now record test readings — earth continuity, insulation resistance and leakage, with the equipment class (I, II or III) for each item. It's completely optional and off to begin with; turn it on under Settings → Testing Setup → Test Readings. When it's on, you tap PASS as usual and a short sheet pops up to confirm the numbers, pre-filled with typical pass values. Readings can be added to your CSV export. Nothing changes unless you switch it on.</p>
-
-        <p><strong>V52</strong> · June 2026</p>
-        <p class="muted">Another under-the-hood tidy-up, following on from the last couple of releases. We've removed some leftover, unused code and styling that no longer did anything, keeping the app lean and easy to maintain ahead of bigger features to come. Nothing you see or do has changed, and all your data, settings and sessions are exactly as they were.</p>
       </div>
 
       <div class="info-card">
