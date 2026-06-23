@@ -864,13 +864,15 @@ function openReadingsSheet(mode, failReason) {
 
   // Class: prefer the existing item's recorded class, else the last-used class.
   const cls = (existingReadings && existingReadings.class) || state.lastReadingsClass || READING_CLASS_DEFAULT;
-  const draft = { class: cls, earth: '', insulation: '', leakage: '' };
+  const draft = { class: cls, earth: '', insulation: '', leakage: '', polarity: false };
 
   if (existingReadings) {
     // Re-opening an item with readings: show exactly what was stored.
     ['earth', 'insulation', 'leakage'].forEach(k => {
       if (typeof existingReadings[k] === 'string') draft[k] = existingReadings[k];
     });
+    // v54: polarity (Class I checkbox) — restore the stored tick if present.
+    draft.polarity = existingReadings.polarity === true;
   } else if (mode === 'pass') {
     // Fresh PASS: pre-fill the applicable fields with their typical-pass values.
     (READING_FIELDS_BY_CLASS[cls] || []).forEach(k => {
@@ -896,7 +898,7 @@ function openReadingsSheet(mode, failReason) {
 // are still at their previous placeholder, blank the ones the new class drops.
 function setReadingsClass(cls) {
   if (READING_CLASSES.indexOf(cls) === -1) return;
-  const d = state.readingsDraft || { class: cls, earth: '', insulation: '', leakage: '' };
+  const d = state.readingsDraft || { class: cls, earth: '', insulation: '', leakage: '', polarity: false };
   const prevCls = d.class;
   d.class = cls;
   if (state.readingsSheetMode === 'pass') {
@@ -914,6 +916,10 @@ function setReadingsClass(cls) {
       // else: user typed a custom value — keep it.
     });
   }
+  // v54: polarity only applies to Class I (READING_POLARITY_CLASSES). If the new
+  // class doesn't support it, clear the tick so a stale Class I polarity can't
+  // ride out on a now-Class-II/III item.
+  if (READING_POLARITY_CLASSES.indexOf(cls) === -1) d.polarity = false;
   state.lastReadingsClass = cls;
   state.readingsDraft = d;
   render();
@@ -923,9 +929,22 @@ function setReadingsClass(cls) {
 // via data-input-action in events.js. Stored as-typed (trimmed at commit).
 function setReadingsField(field, value) {
   if (['earth', 'insulation', 'leakage'].indexOf(field) === -1) return;
-  if (!state.readingsDraft) state.readingsDraft = { class: state.lastReadingsClass || READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '' };
+  if (!state.readingsDraft) state.readingsDraft = { class: state.lastReadingsClass || READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '', polarity: false };
   state.readingsDraft[field] = value;
   // No render — the input already holds the text; re-rendering would steal focus.
+}
+
+// v54: toggle the Class I polarity checkbox on the readings sheet. Unlike the
+// numeric fields this DOES re-render (it's a tap, not typing — no focus to
+// lose, and the checkbox visual needs to flip). Guarded to polarity-eligible
+// classes so it can never set a tick on a Class II/III draft even if the action
+// somehow fires while the control is hidden.
+function toggleReadingsPolarity() {
+  if (!state.readingsDraft) state.readingsDraft = { class: state.lastReadingsClass || READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '', polarity: false };
+  const cls = state.readingsDraft.class;
+  if (READING_POLARITY_CLASSES.indexOf(cls) === -1) return;
+  state.readingsDraft.polarity = !state.readingsDraft.polarity;
+  render();
 }
 
 // v53: OK on the readings sheet — build the readings object (only fields that
@@ -942,6 +961,12 @@ function commitReadingsSheet() {
     const v = (typeof draft[k] === 'string') ? draft[k].trim() : '';
     if (v) readings[k] = v;
   });
+  // v54: polarity — write true only when the class supports it AND it's ticked.
+  // Absent/false otherwise (kept off the object entirely so a clean item stays
+  // byte-identical to the v53 shape; emit-only-if-used everywhere downstream).
+  if (READING_POLARITY_CLASSES.indexOf(cls) !== -1 && draft.polarity === true) {
+    readings.polarity = true;
+  }
   state.lastReadingsClass = cls;
 
   const result = state.readingsPendingResult || 'pass';
@@ -970,7 +995,7 @@ function closeReadingsSheetState() {
   state.readingsSheetMode = 'pass';
   state.readingsPendingResult = null;
   state.readingsPendingFailReason = null;
-  state.readingsDraft = { class: state.lastReadingsClass || READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '' };
+  state.readingsDraft = { class: state.lastReadingsClass || READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '', polarity: false };
 }
 
 

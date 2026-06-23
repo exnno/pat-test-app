@@ -129,7 +129,37 @@ function buildReportDoc(session) {
   if (!JsPDF) throw new Error('PDF engine not loaded');
   const rs = state.reportSettings;
 
-  const doc = new JsPDF({ unit: 'pt', format: 'a4', compress: true });
+  // v54: decide which reading columns this certificate needs BEFORE creating the
+  // doc, because the column count drives the page ORIENTATION (a detailed Class I
+  // job with every reading + notes is too wide for portrait). Reading columns are
+  // gated three ways (matching the CSV's emit rule): the feature must be ON
+  // (state.readingsEnabled), the report toggle must be ON (rs.showReadings), and
+  // some item must actually carry that reading — so a clean or readings-off job
+  // is byte-identical to v53 and stays portrait. polarity is Class I only and
+  // prints only when some Class I item has it ticked.
+  const readingsOn = !!state.readingsEnabled && rs.showReadings !== false;
+  const readingCols = [];
+  if (readingsOn) {
+    const has = (pred) => session.items.some(it => it.readings && pred(it.readings));
+    if (has(r => r.class)) readingCols.push({ header: 'Class', value: it => (it.readings && it.readings.class) || '' });
+    if (has(r => r.earth)) readingCols.push({ header: 'Earth Continuity (Ω)', value: it => (it.readings && it.readings.earth) || '' });
+    if (has(r => r.insulation)) readingCols.push({ header: 'Insulation Resistance (MΩ)', value: it => (it.readings && it.readings.insulation) || '' });
+    if (has(r => r.leakage)) readingCols.push({ header: 'Leakage (mA)', value: it => (it.readings && it.readings.leakage) || '' });
+    // Polarity (Class I only): a ticked box prints '✓', otherwise blank. The
+    // column appears only when at least one item actually recorded a tick.
+    if (has(r => r.polarity === true)) readingCols.push({ header: 'Polarity', value: it => (it.readings && it.readings.polarity === true) ? '✓' : '' });
+  }
+
+  // Base columns are Asset/Description/Location/Result (+ Notes if any). Once the
+  // reading columns push the total past a comfortable portrait count, render this
+  // certificate in landscape so nothing is cramped. Threshold of 6: the 4 base +
+  // Notes sit fine in portrait; any reading column beyond that tips to landscape.
+  const anyNotes = session.items.some(it => (it.notes || '').trim());
+  const baseColCount = 4 + (anyNotes ? 1 : 0);
+  const totalColCount = baseColCount + readingCols.length;
+  const orientation = (totalColCount > 6) ? 'landscape' : 'portrait';
+
+  const doc = new JsPDF({ unit: 'pt', format: 'a4', orientation, compress: true });
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 40;
   let y = margin;
@@ -251,20 +281,36 @@ function buildReportDoc(session) {
 
   // ----- Appliance register table -----
   // Column model (architected for V31): each col = { header, value(item) }.
-  // Adding earth/insulation/class later = push more entries here + widen.
+  // v54: reading columns (Class / Earth / Insulation / Leakage / Polarity) are
+  // computed at the top of buildReportDoc (they drive orientation) and spliced
+  // in here, after Result and before Notes so Notes stays rightmost. Each was
+  // already emit-only-if-used, so an empty column never appears.
   const columns = [
     { header: 'Asset ID',    value: it => it.assetNo || '' },
     { header: 'Description',  value: it => it.itemType || '' },
     { header: 'Location',     value: it => it.location || '' },
     { header: 'Result',       value: it => csvResultLabel(it.result) }
   ];
+  readingCols.forEach(c => columns.push(c));
   // Optional notes column — included when any item has notes, so a clean job
   // doesn't carry an empty column but a job with defect notes shows them.
-  const anyNotes = session.items.some(it => (it.notes || '').trim());
+  // (anyNotes computed above alongside the orientation decision.)
   if (anyNotes) columns.push({ header: 'Notes', value: it => it.notes || '' });
 
   const rows = rs.showFails ? session.items : session.items.filter(i => i.result !== 'fail');
   const body = rows.map(it => columns.map(c => c.value(it)));
+
+  // v54: keep the reading columns compact and centred so the long headers
+  // (e.g. "Insulation Resistance (MΩ)") wrap rather than steal width from
+  // Description/Location. The reading columns occupy indices 4..(4+n-1); Class
+  // and Polarity are the narrowest, the numeric ones a touch wider. autoTable
+  // wraps the header text within these caps. Base columns are left to flex.
+  const columnStyles = {};
+  readingCols.forEach((c, i) => {
+    const idx = 4 + i;
+    const narrow = (c.header === 'Class' || c.header === 'Polarity');
+    columnStyles[idx] = { halign: 'center', cellWidth: narrow ? 38 : 66 };
+  });
 
   runAutoTable(doc, {
     startY: y + 6,
@@ -272,6 +318,7 @@ function buildReportDoc(session) {
     body: body.length ? body : [columns.map(() => '')],
     margin: { left: margin, right: margin },
     styles: { fontSize: 9, cellPadding: 4 },
+    columnStyles,
     // v35: header band uses the chosen header colour, with auto-contrast text
     // (white on dark, black on light) so a light theme stays legible.
     headStyles: { fillColor: headerRgb, textColor: contrastColor(headerRgb) },

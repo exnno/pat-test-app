@@ -2793,6 +2793,59 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .reading-ok-btn:active { transform: translateY(1px); }
 
+/* v54: Class I polarity checkbox row. A full-width tappable row (whole label is
+   the hit target) styled to match the class buttons' language — neutral when
+   unticked, accent when ticked. */
+.reading-polarity-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  text-align: left;
+}
+.reading-polarity-row.checked {
+  background: var(--accent-soft);
+  border-color: var(--accent-border);
+}
+.reading-polarity-row:active { background: var(--accent-hover); }
+.reading-polarity-box {
+  flex: 0 0 auto;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--accent-text);
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 6px;
+}
+.reading-polarity-row.checked .reading-polarity-box {
+  border-color: var(--accent-border);
+}
+.reading-polarity-label {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--neutral-text);
+}
+
+/* v54: the readings sheet appears on EVERY pass, so the slide-up animation that
+   the shared .fail-sheet shell carries becomes fatiguing across a long list.
+   Remove it for this sheet ONLY — it appears instantly, no movement. Its
+   backdrop fade is dropped too so the whole thing lands in one frame. All other
+   bottom sheets keep their slide-up. (Override must beat .fail-sheet's
+   `animation: slide-up …`, so it sits after that rule in source order.) */
+.readings-sheet { animation: none; }
+#readings-backdrop { animation: none; }
+
 /* Settings → Quick Pick Fail: per-reason tag rows (shown only when readings on). */
 .reason-tag-row {
   display: flex;

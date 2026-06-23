@@ -194,7 +194,15 @@ function normaliseItemReadings(r) {
     const v = (typeof r[k] === 'string') ? r[k].trim() : '';
     if (v) out[k] = v;
   });
-  const hasMeasurement = ('earth' in out) || ('insulation' in out) || ('leakage' in out);
+  // v54: polarity — a Class I-only boolean tick. Carried through only when true
+  // AND the (normalised) class supports it, so a stale tick from a since-changed
+  // class can't survive, and false/absent never writes a key (keeps the object
+  // byte-identical to the v53 shape when unused). This runs on BOTH save and
+  // restore, so additive old backups (no polarity) round-trip untouched.
+  if (r.polarity === true && ('class' in out) && READING_POLARITY_CLASSES.indexOf(out.class) !== -1) {
+    out.polarity = true;
+  }
+  const hasMeasurement = ('earth' in out) || ('insulation' in out) || ('leakage' in out) || (out.polarity === true);
   if (!('class' in out) && !hasMeasurement) return null;
   return out;
 }

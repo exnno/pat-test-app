@@ -258,6 +258,7 @@ registerActions({
   // v53: Test Readings sheet (opened from passClicked / pickFailReason when the
   // feature is on). Class selector, commit, and cancel.
   'readings-set-class': (arg) => setReadingsClass(arg),
+  'readings-toggle-polarity': () => toggleReadingsPolarity(),
   'readings-commit': () => commitReadingsSheet(),
   'readings-cancel': () => cancelReadingsSheet(),
 
@@ -635,7 +636,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissWelcome('v53WelcomeSeen', V53_WELCOME_KEY),
+  'welcome-dismiss': () => dismissWelcome('v54WelcomeSeen', V54_WELCOME_KEY),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -908,6 +909,7 @@ registerChangeActions({
   'report-show-instrument':  (checked) => { captureReportTextInputs(); state.reportSettings.showInstrument = checked; render(); },
   'report-show-calibration': (checked) => { captureReportTextInputs(); state.reportSettings.showCalibration = checked; render(); },
   'report-show-fails':       (checked) => { captureReportTextInputs(); state.reportSettings.showFails = checked; render(); },
+  'report-show-readings':    (checked) => { captureReportTextInputs(); state.reportSettings.showReadings = checked; render(); },
   'report-declaration':      (checked) => { captureReportTextInputs(); state.reportSettings.declaration = checked; render(); },
   'report-show-appcredit':   (checked) => { captureReportTextInputs(); state.reportSettings.showAppCredit = checked; render(); },
   'report-show-footerlogo':  (checked) => { captureReportTextInputs(); state.reportSettings.showFooterLogo = checked; render(); },

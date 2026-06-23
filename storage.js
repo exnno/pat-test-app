@@ -431,7 +431,7 @@ function loadV11Settings() {
   // release had passed. Old keys remain harmlessly in users' localStorage; the
   // returning-user heuristic below detects them by prefix, so upgraders are still
   // recognised without keeping a flag per version.
-  state.v53WelcomeSeen = localStorage.getItem(V53_WELCOME_KEY) === '1';
+  state.v54WelcomeSeen = localStorage.getItem(V54_WELCOME_KEY) === '1';
 
   // v43: cloud prep. Load mock auth state (userId, authToken from PAT_AUTH_KEY).
   // This will persist in the cloud phase; for now it's a passthrough field that
@@ -546,6 +546,10 @@ function normaliseReportSettings(stored) {
   out.showInstrument  = stored.showInstrument !== false;
   out.showCalibration = stored.showCalibration !== false;
   out.showFails       = stored.showFails !== false;
+  // v54: readings on the PDF. Default true — old data/backups without the field
+  // backfill to "on". Gated at render time by readingsEnabled + actual data, so
+  // a true value is harmless for anyone not using the readings feature.
+  out.showReadings    = stored.showReadings !== false;
   // v48: app credit in PDF footer. Default true — old data/backups without the
   // field backfill to the pre-v48 behaviour (credit shown).
   out.showAppCredit   = stored.showAppCredit !== false;

@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V53';
+const APP_VERSION = 'V54';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -64,7 +64,7 @@ const CAL_DUE_KEY = 'pat:caldue';
 // first-run-wizard gate, so nothing about upgrade behaviour changes. When a future
 // feature release rolls a new welcome, replace the line below with the new key
 // (e.g. V51_WELCOME_KEY) and pass it to dismissWelcome() — no new symbol pile.
-const V53_WELCOME_KEY = 'pat:v53welcome';  // v53: Test Readings (opt-in per-item Ω / MΩ / mA + equipment class)
+const V54_WELCOME_KEY = 'pat:v54welcome';  // v54: readings on the PDF certificate + Class I polarity check + readings-sheet animation removed
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
 // sheet opens. Deliberately a single named constant so the threshold can be
@@ -206,6 +206,13 @@ function makeDefaultReportSettings() {
     retestEnabled:    false,
     retestMonths:     null,    // no default (Q10=B); required when retestEnabled
     showFails:        true,    // false = passes-only register
+    // v54: print the test-reading columns (earth Ω / insulation MΩ / leakage mA /
+    // class, plus the Class I polarity tick) on the appliance register. Default
+    // true — but it only has any effect when the Test Readings feature itself is
+    // ON (state.readingsEnabled) AND at least one item actually carries that
+    // reading, so for anyone not using readings nothing changes. Rides the
+    // reportSettings blob — additive, no backupVersion bump.
+    showReadings:     true,
     // v48: print the "· PATGo {version}" app credit in the PDF footer. Default
     // true = the footer reads exactly as before the rename (now with the new
     // name). false = the footer shows just the generated date/time. Rides
@@ -397,6 +404,18 @@ const READING_FIELD_META = {
   insulation: { key: 'insulation', label: 'Insulation',       unit: 'MΩ', passPlaceholder: '≥19.99' },
   leakage:    { key: 'leakage',    label: 'Leakage',          unit: 'mA', passPlaceholder: '<5'      }
 };
+
+// v54: Polarity check. Unlike the three numeric readings above, polarity is a
+// pass/fail observation (correct line/neutral/earth wiring), so it's a simple
+// CHECKBOX, not a typed value. It applies to CLASS I ONLY (earthed mains items
+// — the wiring-orientation check is meaningful there; Class II/III don't get
+// it). Stored as item.readings.polarity === true when ticked; the field is
+// absent/false otherwise. Default UNCHECKED (false). Purely additive on the
+// readings object — old items/backups without it read as false, so NO
+// backupVersion bump. The entry-sheet control shows only for Class I; the PDF
+// "Polarity" column emits only when some Class I item in the session has it
+// ticked (emit-only-if-used, mirroring the numeric reading columns).
+const READING_POLARITY_CLASSES = ['I'];
 
 // v53: fail-reason → reading-field "type tag". On a FAIL the chosen reason's tag
 // decides which single reading box the sheet shows:

@@ -166,23 +166,23 @@ function render() {
   // genuinely-new install sees the wizard instead. Dismissed via the shared
   // dismissWelcome() (v50), wired in dispatch.js.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v53WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v54WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V53">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V54">
       <div class="bulk-sheet-handle"></div>
       <div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V53</h3>
+        <h3 class="bulk-sheet-title">What's new in V54</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>You can now record test readings.</strong> Earth continuity, insulation resistance and leakage — with the equipment class (I, II or III) for each item.</li>
-        <li>It's <strong>completely optional and off to start with</strong>, so nothing changes unless you want it. Turn it on under Settings → Testing Setup → Test Readings.</li>
-        <li>When it's on, you tap PASS as normal and a short sheet pops up to confirm the numbers — pre-filled with typical pass values, so it's still just a tap if you're happy with them.</li>
-        <li>Your readings can be added to the CSV export (Settings → CSV Columns). They'll come to the PDF certificate in the next update.</li>
+        <li><strong>Your test readings now print on the PDF certificate.</strong> Earth continuity, insulation resistance, leakage and the equipment class each get their own column — and only the columns you've actually used appear, so a clean job stays tidy.</li>
+        <li>Detailed jobs <strong>switch to landscape automatically</strong> when there are too many columns for an upright page, so nothing gets cramped. You can turn the readings off the certificate any time under Settings → Report → What to include.</li>
+        <li>There's a new <strong>polarity check for Class I items</strong> — a simple tick on the readings sheet that prints as its own column when you've used it.</li>
+        <li>The readings sheet <strong>no longer slides up</strong> — it appears instantly, so tapping through a long list of passes feels quicker and calmer.</li>
       </ul>
-      <button class="btn-primary" id="v53-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v54-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -1242,6 +1242,18 @@ function renderEntry() {
       ? `<p class="multipick-sheet-hint">No electrical reading needed for this — just confirm the class and tap ${mode === 'fail' ? 'Save fail' : 'OK'}.</p>`
       : '';
 
+    // v54: polarity checkbox — Class I only (READING_POLARITY_CLASSES). A simple
+    // pass/fail tick (correct line/neutral/earth wiring), not a typed value.
+    // Toggled via data-action (a tap, full re-render — no input focus to lose).
+    // Rendered as a tappable row so the whole label is the hit target on mobile.
+    const polarityOn = draft.polarity === true;
+    const polarityRow = (READING_POLARITY_CLASSES.indexOf(cls) !== -1)
+      ? `<button class="reading-polarity-row${polarityOn ? ' checked' : ''}" data-action="readings-toggle-polarity" role="checkbox" aria-checked="${polarityOn ? 'true' : 'false'}">
+          <span class="reading-polarity-box">${polarityOn ? '✓' : ''}</span>
+          <span class="reading-polarity-label">Polarity correct</span>
+        </button>`
+      : '';
+
     const title = mode === 'fail' ? 'Fail readings' : 'Readings';
     const okLabel = mode === 'fail' ? 'Save fail' : 'OK';
     const hint = mode === 'pass'
@@ -1261,6 +1273,7 @@ function renderEntry() {
         <label class="reading-field-label">Equipment class</label>
         <div class="reading-class-row">${classButtons}</div>
         ${fieldRows}
+        ${polarityRow}
         ${noFieldsNote}
         <button class="reading-ok-btn" id="readings-ok" data-action="readings-commit">${okLabel}</button>
       </div>

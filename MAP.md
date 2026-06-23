@@ -1,4 +1,4 @@
-# PAT App — Code Map (V53)
+# PAT App — Code Map (V54)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -47,7 +47,7 @@ See `THIRD-PARTY-LICENSES.txt`.
 ---
 
 ## config.js (~600 ln) — constants & defaults, pure data
-`APP_VERSION` ('V53'); all `*_KEY` localStorage key names; the calibration/backup
+`APP_VERSION` ('V54'); all `*_KEY` localStorage key names; the calibration/backup
 tuning constants (`MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`); SQP tuning (`SQP_PARTIAL_WEIGHT`,
 `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`); default lists (`DEFAULT_ITEM_TYPES`,
@@ -64,7 +64,13 @@ unit, and typical-PASS placeholder: earth `<0.1`Ω, insulation `≥19.99`MΩ, le
 (built-in tags for the shipped fail reasons). `DEFAULT_CSV_COLUMNS` gained four
 default-hidden reading columns (`readingClass`, `readingEarth`, `readingInsulation`,
 `readingLeakage`). `SETTINGS_CATEGORIES` catTesting now lists `settingsReadings`;
-`SETTINGS_PAGE_META` has its entry. Welcome key is `V53_WELCOME_KEY`.
+`SETTINGS_PAGE_META` has its entry.
+
+**v54 constants:** `READING_POLARITY_CLASSES` (['I']) — which classes show the
+polarity checkbox (Class I only). `makeDefaultReportSettings()` gained
+`showReadings` (default true) — prints reading columns on the PDF, gated at render
+time by `readingsEnabled` + actual data so it's a no-op for non-readings users.
+Welcome key is now `V54_WELCOME_KEY`.
 
 Reports: `REPORT_SETTINGS_KEY`, `REPORT_DECLARATION_DEFAULT`, `REPORT_LOGO_MAX_PX`,
 `REPORT_SIGNATURE_MAX_PX`, `REPORT_FILENAME_DEFAULT` + `REPORT_FILENAME_TOKENS`,
@@ -110,11 +116,12 @@ and the cloud-prep auth mirrors (`userId`, `authToken`, `authStatus`).
 **v53 Test Readings state:** `readingsEnabled` (master flag), `failReasonTags`
 (reason-text → tag map), `lastReadingsClass` (remembered class for the next item),
 and the transient readings-sheet block: `readingsSheetOpen`, `readingsSheetMode`
-('pass'|'fail'), `readingsDraft` ({class,earth,insulation,leakage}),
+('pass'|'fail'), `readingsDraft` ({class,earth,insulation,leakage,**polarity** —
+v54 Class I bool, default false}),
 `readingsPendingResult`, `readingsPendingFailReason`. All sheet transients reset on
 close and on navigation (loadFormForCursor / setView) via `closeReadingsSheetState()`.
 
-**Welcome flag (v50 pattern):** ONLY the current `v53WelcomeSeen` is kept. Historical
+**Welcome flag (v50 pattern):** ONLY the current `v54WelcomeSeen` is kept. Historical
 `vNNWelcomeSeen` flags were removed in v50 — each was written once and never read
 after its release. The first-run-wizard gate detects past welcomes via
 `hasAnyLegacyWelcomeKey()` (storage.js).
@@ -128,7 +135,10 @@ colour helpers `hexToRgb(hex,fallback)`, `contrastColor(rgb)`, `safeHexColor(hex
 fallback)`; `setupLongPress(element, durationMs, onLongPress)` (reusable pointer-
 event long-press detector, returns a cleanup fn); **v53** `normaliseItemReadings(r)`
 (validate/clean an item's readings object — returns clean {class,earth,insulation,
-leakage} or null; the boundary validator used on backup restore and future cloud sync).
+leakage} or null; the boundary validator used on backup restore and future cloud sync.
+**v54:** also carries `polarity:true` through, but ONLY when the normalised class is in
+`READING_POLARITY_CLASSES` (Class I) — a stale tick on a since-changed class is dropped;
+false/absent writes no key. A Class I item with only polarity ticked is retained).
 *Touch to:* add a stateless formatting/escaping/colour helper.
 
 ## storage.js (~745 ln) — persistence boundary
@@ -149,12 +159,13 @@ Report settings: `loadReportSettings`, `saveReportSettings`, and the shared
 validator `normaliseReportSettings` (coerces any candidate/garbage object to a
 complete type-safe report-settings object merged over defaults — used by load AND
 backup restore AND template loading; validates the include toggles incl.
-`showAppCredit`/`showFooterLogo` via `!== false` back-compat, `reportFilenamePattern`,
+`showAppCredit`/`showFooterLogo` via `!== false` back-compat, **v54** `showReadings`
+likewise, `reportFilenamePattern`,
 `signature`/`signaturePosition`, `headerColor`/`accentColor` via `safeHexColor`, and
 the cert fields). Templates: `loadReportTemplates`/`saveReportTemplates`.
 
-**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V53_WELCOME_KEY` →
-`state.v53WelcomeSeen`. `hasAnyLegacyWelcomeKey()` scans localStorage for any
+**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V54_WELCOME_KEY` →
+`state.v54WelcomeSeen`. `hasAnyLegacyWelcomeKey()` scans localStorage for any
 `pat:v<n>welcome` key — used by the first-run-wizard gate to recognise a returning
 user without keeping a per-version flag. The gate:
 `onboardedV33Seen = explicitlyOnboarded || sessions>0 || engineerName || hasAnyLegacyWelcomeKey()`.
@@ -226,11 +237,14 @@ wired to `copy-current`/`copy-session`). Import: `buildCsvHeaderLookup`, `parseC
 (restores reportSettings/templates via `normaliseReportSettings`; **v53** validates
 each restored item's `readings` via `normaliseItemReadings` — drops the key if junk
 — and restores the readings flag + tags with the same drop-unknown/backfill-defaults
-rule as load; old backups with missing fields restore to defaults). Restore confirm =
+rule as load; old backups with missing fields restore to defaults. **v54:** the same
+`normaliseItemReadings` pass now also carries the Class I `polarity` tick through —
+additive, so older backups without it restore unchanged). Restore confirm =
 `openConfirmSheet`, success = `showToast`, the three import errors = `openInfoSheet`.
-`backupVersion` stays **5** — readings are additive and missing-field-tolerant (items
-ride through wholesale; an old app ignores the unknown key, a new app reads it). The
-test-readings feature deliberately did NOT spend a bump; the earmarked 6 is reserved
+`backupVersion` stays **5** — readings (incl. v54 polarity) are additive and
+missing-field-tolerant (items ride through wholesale; an old app ignores the unknown
+key, a new app reads it). The readings feature and v54's polarity deliberately did
+NOT spend a bump; the earmarked 6 is reserved
 for a genuine incompatible schema change.
 *Touch to:* change the JSON backup shape or restore path. **Bump `backupVersion` only
 for a genuine incompatible change; keep old-backup compatibility.**
@@ -265,8 +279,10 @@ on error, `async=false` to preserve order); `loadReportEngine()` (one-shot share
 promise — injects jsPDF THEN autotable in order, resolves when both live, rejects +
 clears the promise on failure so a retry works; mirrors `loadPdfJsEngine` in
 pdfpreview.js). `getJsPDF` (reads `window.jspdf`), `runAutoTable`, `addMonthsFormatted`,
-`buildReportDoc` (logo/company header, title, job details, totals, the appliance-
-register autotable built from a COLUMN LIST, failed-row tint, declaration, optional
+`buildReportDoc` (**v54:** opens by computing the reading columns and choosing page
+ORIENTATION before creating the doc — see below; then) logo/company header, title,
+job details, totals, the appliance-register autotable built from a COLUMN LIST,
+failed-row tint, declaration, optional
 signature on the side given by `signaturePosition`, header band fill from
 `headerColor` with auto-contrast text, cert number + notes block when enabled; the
 per-page footer prints "Generated {date} · PATGo {version}" unless
@@ -283,7 +299,23 @@ multi-page CANVAS view via `renderPreviewView()` → pdfpreview.js, with an old
 single-page iframe fallback on any failure; a "Quick adjust" chip row that rebuilds
 in place; an "Edit report settings" deep-link), `reopenReportPreview(sessionId)`,
 `triggerDownload`, `shareOrDownloadReport`.
-*Touch to:* change the report layout/content, add reading columns (future), or how
+
+**v54 reading columns + orientation (top of `buildReportDoc`):** reading columns are
+gated three ways — `state.readingsEnabled` AND `reportSettings.showReadings!==false`
+AND at least one item actually carries that reading (emit-only-if-used, mirroring the
+CSV rule). Columns, in order after Result: `Class`, `Earth Continuity (Ω)`,
+`Insulation Resistance (MΩ)`, `Leakage (mA)`, `Polarity` (prints `✓` for a ticked
+Class I item, blank otherwise; column appears only when some item ticked it). `Notes`
+stays rightmost. The column count then drives orientation: base cols (4 + Notes) plus
+reading cols; **>6 total → landscape**, else portrait. So a readings-off or clean job
+is byte-identical to v53 and stays portrait; a full Class I job goes landscape
+automatically. `columnStyles` keeps reading cols compact + centred (Class/Polarity
+38pt, numeric 66pt) so long headers wrap rather than crush Description/Location. All
+header/details/totals layout is width-relative (`pageW`/`margin`), so landscape needed
+no header rework. NOTE: Ω/MΩ/✓/≥ render in jsPDF's standard font at a fallback glyph
+width (acceptable in short header/cell text; pre-existing for ≥ since v53).
+*Touch to:* change the report layout/content, adjust reading columns or the
+orientation threshold, or how
 the PDF is previewed/shared/named/coloured.
 
 ## pdfpreview.js (~135 ln) — multi-page PDF preview engine — uses vendored PDF.js
@@ -321,13 +353,19 @@ instead of committing — the PASS tap still fires first), `failClicked`,
 the reason instead of committing), `cancelFailModal`, `copyLastResult`,
 **v53 readings sheet lifecycle:** `openReadingsSheet(mode, failReason)` (builds the
 draft — pass mode pre-fills class-applicable placeholders, fail mode leaves blank,
-re-opening an item pre-fills from its stored readings), `setReadingsClass(cls)`
+re-opening an item pre-fills from its stored readings; **v54** also restores the
+`polarity` tick), `setReadingsClass(cls)`
 (re-derives visible fields; re-seeds placeholders for pass mode, preserving
-user-edited values), `setReadingsField(field, value)` (live text write, no render),
-`commitReadingsSheet()` (builds the readings object from applicable+filled fields and
-calls `saveItem`; remembers `lastReadingsClass`), `cancelReadingsSheet()`,
-`closeReadingsSheetState()` (resets all sheet transients; called on commit/cancel and
-from loadFormForCursor/setView).
+user-edited values; **v54** clears `polarity` when the new class isn't in
+`READING_POLARITY_CLASSES`), `setReadingsField(field, value)` (live text write, no
+render), **v54** `toggleReadingsPolarity()` (flips the draft polarity bool — DOES
+render, since it's a tap not typing; guarded to Class I so it can't tick a
+non-polarity class), `commitReadingsSheet()` (builds the readings object from
+applicable+filled fields and calls `saveItem`; **v54** appends `polarity:true` only
+when class is Class I AND ticked; remembers `lastReadingsClass`),
+`cancelReadingsSheet()`,
+`closeReadingsSheetState()` (resets all sheet transients incl. polarity; called on
+commit/cancel and from loadFormForCursor/setView).
 `deleteItem`, `moveCursor`, `skipToNew`, `jumpTo`, `setView`. Selection + bulk edit:
 `enterSelectionMode`, `exitSelectionMode`, `toggleSelected`, `selectAllVisible`,
 `clearSelection`, `applyBulkLocation`, `openBulkEditMenu`, `closeBulkEditMenu`,
