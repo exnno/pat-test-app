@@ -70,6 +70,11 @@ function settingsPageSubtitle(pageId) {
       const rs = state.reportSettings;
       return !rs.enabled ? 'Off' : (rs.companyName ? `On · ${rs.companyName}` : 'On · no company name set');
     }
+    case 'settingsRetest': {
+      if (!state.retestRemindersEnabled) return 'Off';
+      const n = activeRetestCount();
+      return n === 0 ? 'On · nothing due' : `On · ${n} due`;
+    }
     case 'settingsBackup':  return 'Back up and restore your data';
     case 'settingsSetup':   return 'Share your setup to another device';
     case 'settingsCalculator': return 'Earth continuity limit';
@@ -729,7 +734,54 @@ function renderSettingsCsv() {
   `;
 }
 
-// ---------- v19: Clients & Sites settings page ----------
+// ---------- v56: Retest Reminders settings page ----------
+// The master switch for the commercial chase-list feature, plus a plain-language
+// explanation of what it does and the honest limitation that "reminders" means
+// in-app surfacing (no phone notifications — those are a future PAT Cloud thing).
+// When on, the per-session flag appears under each session's Edit screen, the
+// "Retest due" filter appears on the Sessions list, and a banner surfaces due
+// jobs. The active count is shown so the user can jump straight to the list.
+function renderSettingsRetest() {
+  const on = state.retestRemindersEnabled;
+  const activeCount = on ? activeRetestCount() : 0;
+  const defMonths = defaultRetestMonths();
+  const viewLink = (on && activeCount > 0) ? `
+      <div class="settings-section">
+        <button class="btn-primary" data-action="open-retest-reminders" style="width:100%">View ${activeCount} retest reminder${activeCount === 1 ? '' : 's'}</button>
+      </div>
+  ` : '';
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Retest Reminders')}
+      <div class="settings-section">
+        <h2 class="h2">Retest reminders</h2>
+        <p class="muted">A chase list to help you win repeat work. Flag a job you'd like to rebook, and when it comes due the app reminds you to contact the customer and book the retest. Built for solo and commercial engineers who own the client relationship.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Enable retest reminders</div>
+            <div class="toggle-row-sub">${on ? 'On' : 'Off — the feature is hidden everywhere'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="retest-reminders-toggle" data-change-action="retest-reminders-toggle" ${on ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+      ${on ? `
+      <div class="settings-section">
+        <h2 class="h2">How it works</h2>
+        <p class="muted">Open any session, tap <strong>Session settings</strong>, and switch on <strong>Remind me to chase this for retest</strong>. Only the jobs you flag appear on your chase list — so subcontract work and one-offs never clutter it.</p>
+        <p class="muted" style="margin-top:8px">Each flagged job's due date is its test date plus a retest interval. The interval is taken from your Report Settings default (currently <strong>${defMonths} month${defMonths === 1 ? '' : 's'}</strong>) at the moment you flag it, and you can change it per job. When a job is due, a banner appears on your Sessions screen and the job shows a 🔔 chip.</p>
+        <p class="muted" style="margin-top:8px">When you've contacted the customer, mark the job <strong>Rebooked</strong> or <strong>Declined</strong> to clear it from the list.</p>
+      </div>
+      <div class="settings-section">
+        <p class="muted" style="margin:0"><strong>Note:</strong> reminders show inside the app when you open it — they aren't push notifications to your phone. Scheduled notifications are planned for the upcoming PAT Cloud service.</p>
+      </div>
+      ` : ''}
+      ${viewLink}
+    </div>
+  `;
+}
 // Lists clients; tapping a client expands it to show its sites with add /
 // rename / delete. Add / rename use a bottom-sheet (the same .bulk-sheet
 // pattern used elsewhere) so the flow matches the rest of the app and works
@@ -1207,18 +1259,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v55: rolled forward — V55 on top, V52 dropped. -->
+      <!-- v8: rolling 3-version changelog. v56: rolled forward — V56 on top, V53 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V56</strong> · June 2026</p>
+        <p class="muted">A new Retest Reminders feature to help you win repeat work. Flag a job you'd like to rebook, and when it comes due the app reminds you to contact the customer and book the retest. It's off until you turn it on under Settings → Retest Reminders, and even then each job is opt-in — so subcontract work and one-offs never clutter your list. When a reminder is due, a banner appears on your Sessions screen; mark each job Rebooked or Declined to clear it. Reminders show inside the app when you open it (phone notifications are planned for the upcoming PAT Cloud service).</p>
 
         <p><strong>V55</strong> · June 2026</p>
         <p class="muted">A couple of small fixes. The symbols in the reading columns on the PDF certificate were printing as the wrong characters — the ohms and "greater-than-or-equal" symbols now read clearly as Ohms, MOhms and &gt;= on the certificate. And the CSV export can now include a Polarity column for Class I items; like the other reading columns it's off by default, so turn it on under Settings → CSV columns if you want it.</p>
 
         <p><strong>V54</strong> · June 2026</p>
         <p class="muted">Your test readings now print on the PDF certificate. Earth continuity, insulation resistance, leakage and the equipment class each get their own column, and only the columns you've actually used appear — so a clean job stays tidy. Detailed jobs switch to landscape automatically when there are too many columns for an upright page. There's also a new polarity check for Class I items: a simple tick on the readings sheet that prints as its own column when used. You can keep readings off the certificate any time under Settings → Report → What to include. Finally, the readings sheet no longer slides up — it appears instantly, so tapping through a long list of passes feels quicker.</p>
-
-        <p><strong>V53</strong> · June 2026</p>
-        <p class="muted">You can now record test readings — earth continuity, insulation resistance and leakage, with the equipment class (I, II or III) for each item. It's completely optional and off to begin with; turn it on under Settings → Testing Setup → Test Readings. When it's on, you tap PASS as usual and a short sheet pops up to confirm the numbers, pre-filled with typical pass values. Readings can be added to your CSV export. Nothing changes unless you switch it on.</p>
       </div>
 
       <div class="info-card">

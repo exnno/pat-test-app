@@ -1343,6 +1343,38 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   border-color: var(--warn-soft-border);
 }
 
+/* v56: retest chase chips (Sessions rows + reminders view) and the reminders-row
+   client subline. Colours mirror the calibration banner palette so urgency reads
+   consistently: red = overdue, amber = due soon, neutral blue = upcoming. */
+.retest-chip {
+  display: inline-block;
+  padding: 2px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid transparent;
+}
+.retest-chip-overdue {
+  background: #fef2f2;
+  color: #991b1b;
+  border-color: #fca5a5;
+}
+.retest-chip-soon {
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #fcd34d;
+}
+.retest-chip-upcoming {
+  background: #eff6ff;
+  color: #1e40af;
+  border-color: #bfdbfe;
+}
+.retest-row-client {
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 1px;
+}
+
 /* v14: "N sessions not yet exported" nudge above the sessions list. */
 /* v14/v15: the "N not yet exported" nudge is now a tappable button that
    bulk-exports every not-yet-cleanly-exported session. Keeps the amber

@@ -431,7 +431,12 @@ function loadV11Settings() {
   // release had passed. Old keys remain harmlessly in users' localStorage; the
   // returning-user heuristic below detects them by prefix, so upgraders are still
   // recognised without keeping a flag per version.
-  state.v55WelcomeSeen = localStorage.getItem(V55_WELCOME_KEY) === '1';
+  state.v56WelcomeSeen = localStorage.getItem(V56_WELCOME_KEY) === '1';
+
+  // v56: Retest reminders master switch. OFF unless the user has explicitly
+  // turned it on (key holds '1'). Absent / anything else = off, so a fresh
+  // install and every existing upgrading user start with the feature invisible.
+  state.retestRemindersEnabled = localStorage.getItem(RETEST_REMINDERS_KEY) === '1';
 
   // v43: cloud prep. Load mock auth state (userId, authToken from PAT_AUTH_KEY).
   // This will persist in the cloud phase; for now it's a passthrough field that
@@ -687,6 +692,8 @@ function saveSettings() {
   // v15: Sessions-list filters.
   localStorage.setItem(SESSION_FILTER_KEY, state.sessionFilter);
   localStorage.setItem(LOCK_FILTER_KEY, state.lockFilter);
+  // v56: retest reminders master switch.
+  localStorage.setItem(RETEST_REMINDERS_KEY, state.retestRemindersEnabled ? '1' : '0');
   localStorage.setItem(THEME_KEY, state.theme);
   localStorage.setItem(HAPTICS_KEY, state.hapticsEnabled ? '1' : '0');
   // v11

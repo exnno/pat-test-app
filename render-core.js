@@ -85,6 +85,12 @@ function render() {
     state.cloudPagesRevealed = false;
   }
 
+  // v56: the retest action sheet is bound to the reminders view only — clear its
+  // transient target on any other view so it can't resurface elsewhere.
+  if (state.retestActionSessionId && v !== 'retestReminders') {
+    state.retestActionSessionId = null;
+  }
+
   // v42: the feature walkthrough is a full-screen view that owns #app entirely —
   // no banner, no stacked modals. Short-circuit before the normal screen build.
   if (v === 'tour' && state.tourOpen) {
@@ -112,8 +118,10 @@ function render() {
   else if (v === 'settingsSetup') html = renderSettingsSetup();   // v33
   else if (v === 'settingsCsv') html = renderSettingsCsv();   // v11
   else if (v === 'settingsClients') html = renderSettingsClients();   // v19
+  else if (v === 'settingsRetest') html = renderSettingsRetest();   // v56
   else if (v === 'settingsReport') html = renderSettingsReport();   // v30
   else if (v === 'reports') html = renderReports();   // v30
+  else if (v === 'retestReminders') html = renderRetestReminders();   // v56
   else if (v === 'settingsCalculator') html = renderSettingsCalculator();
   else if (v === 'settingsAbout') html = renderSettingsAbout();
   else if (v === 'settingsContact') html = renderSettingsContact();
@@ -166,21 +174,22 @@ function render() {
   // genuinely-new install sees the wizard instead. Dismissed via the shared
   // dismissWelcome() (v50), wired in dispatch.js.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v55WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v56WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V55">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V56">
       <div class="bulk-sheet-handle"></div>
       <div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V55</h3>
+        <h3 class="bulk-sheet-title">What's new in V56</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>The symbols on the PDF certificate now print correctly.</strong> The ohms and "greater-than-or-equal" symbols were showing as the wrong characters on the certificate — they now read clearly as <strong>Ohms</strong>, <strong>MOhms</strong> and <strong>&gt;=</strong> in the reading columns.</li>
-        <li>The CSV export can now include a <strong>Polarity column</strong> for Class I items. Like the other reading columns it's <strong>off by default</strong> — turn it on under Settings → CSV columns if you want it in your spreadsheet.</li>
+        <li><strong>New: Retest reminders</strong> — a chase list to help you win repeat work. Flag a job you want to rebook, and when it's coming due the app reminds you to ring the customer.</li>
+        <li>It's <strong>off until you turn it on</strong> under Settings → Retest Reminders, and even then each job is opt-in — so subcontract work and one-offs never clutter the list.</li>
+        <li>When a reminder is due, a banner appears on your Sessions screen. Mark each one <strong>Booked</strong> or <strong>Declined</strong> to clear it.</li>
       </ul>
-      <button class="btn-primary" id="v55-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v56-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -653,6 +662,33 @@ function renderCalWarningBanner() {
   `;
 }
 
+// v56: retest-reminders banner for the Sessions screen. Shows ONLY when the
+// feature is on AND at least one tracked job is on the active chase list (overdue
+// / due-soon / upcoming, unresolved). Otherwise returns '' so the daily testing
+// flow stays clean. Tapping "View" opens the dedicated reminders view. Mirrors
+// the calibration banner styling/pattern. The count separates overdue from the
+// rest so the urgency reads at a glance.
+function renderRetestBanner() {
+  if (!state.retestRemindersEnabled) return '';
+  const due = activeRetestReminders();
+  if (due.length === 0) return '';
+  const overdue = due.filter(s => retestStatus(s) === 'overdue').length;
+  const cls = overdue > 0 ? 'cal-overdue' : 'cal-due-soon';
+  let label;
+  if (overdue > 0) {
+    label = `🔔 ${overdue} retest${overdue === 1 ? '' : 's'} overdue` +
+      (due.length > overdue ? ` · ${due.length - overdue} due soon` : '');
+  } else {
+    label = `🔔 ${due.length} client${due.length === 1 ? '' : 's'} due for retest`;
+  }
+  return `
+    <div class="cal-banner ${cls}" role="status">
+      <span class="cal-banner-text">${escapeHTML(label)}</span>
+      <button class="cal-banner-action" data-action="open-retest-reminders">View</button>
+    </div>
+  `;
+}
+
 function renderSessions() {
   const nfError = state.newFormError ? `
       <p class="nf-error" role="alert">${escapeHTML(state.newFormError)}</p>
@@ -730,6 +766,10 @@ function renderSessions() {
   // v43: tester calibration warning — only present when due within 30 days or overdue.
   const calWarning = renderCalWarningBanner();
 
+  // v56: retest reminders chase banner — only present when the feature is on and
+  // a tracked job is due. Sits below the calibration warning.
+  const retestBanner = renderRetestBanner();
+
   return `
     <div class="screen">
       <header class="header">
@@ -738,6 +778,7 @@ function renderSessions() {
         <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">⚙</button>
       </header>
       ${calWarning}
+      ${retestBanner}
       ${backupBanner}
       ${newForm}
       ${searchRow}
@@ -836,6 +877,7 @@ function renderSessionsListAreaHTML() {
           <option value="unexported"${state.sessionFilter === 'unexported' ? ' selected' : ''}>Not exported</option>
           <option value="exported"${state.sessionFilter === 'exported' ? ' selected' : ''}>Exported</option>
           <option value="modified"${state.sessionFilter === 'modified' ? ' selected' : ''}>Modified since</option>
+          ${state.retestRemindersEnabled ? `<option value="retestdue"${state.sessionFilter === 'retestdue' ? ' selected' : ''}>Retest due</option>` : ''}
         </select>
       </label>
       <label class="control-field">
@@ -879,6 +921,25 @@ function renderSessionsListAreaHTML() {
       const itemBadge = matchedItemIndex !== -1
         ? `<div><span class="session-match-badge">${itemMatchCount} match${itemMatchCount === 1 ? '' : 'es'} in items</span></div>`
         : '';
+      // v56: retest chase chip — only when the feature is on and this session is
+      // on the active chase list. Quiet for everything else so it never clutters.
+      const rStatus = state.retestRemindersEnabled ? retestStatus(s) : null;
+      let retestChip = '';
+      if (rStatus === 'overdue' || rStatus === 'duesoon' || rStatus === 'upcoming') {
+        const days = retestDaysUntil(s);
+        let rCls, rLabel;
+        if (rStatus === 'overdue') {
+          rCls = 'retest-chip-overdue';
+          rLabel = `🔔 Retest overdue (${Math.abs(days)}d)`;
+        } else if (rStatus === 'duesoon') {
+          rCls = 'retest-chip-soon';
+          rLabel = `🔔 Retest due in ${days}d`;
+        } else {
+          rCls = 'retest-chip-upcoming';
+          rLabel = `🔔 Retest in ${days}d`;
+        }
+        retestChip = `<div class="session-export-row"><span class="retest-chip ${rCls}">${escapeHTML(rLabel)}</span></div>`;
+      }
       const openAttr = matchedItemIndex !== -1
         ? `data-action="open-session" data-arg="${s.id}" data-open="${s.id}" data-open-at="${matchedItemIndex}"`
         : `data-action="open-session" data-arg="${s.id}" data-open="${s.id}"`;
@@ -888,6 +949,7 @@ function renderSessionsListAreaHTML() {
             <div class="session-title">${lockMark}${escapeHTML(s.site || s.name)}</div>
             <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span></div>
             ${exportBadge ? `<div class="session-export-row">${exportBadge}</div>` : ''}
+            ${retestChip}
             ${itemBadge}
           </div>
           <button class="icon-btn-sm" data-action="copy-session" data-arg="${s.id}" aria-label="Copy CSV" title="Copy CSV">📋</button>
@@ -1627,6 +1689,57 @@ function refreshOverviewSelection() {
 
 function renderEditSession() {
   const lockChecked = state.editForm.locked ? 'checked' : '';
+  const sess = activeSession();
+  // v56: per-session retest reminder control. Only shown when the feature is on.
+  // Instant-apply (not part of the editForm draft) — flagging/unflagging and the
+  // interval persist immediately via their own helpers, like the other toggles
+  // that act directly on the session. The due date shown uses the session's
+  // CURRENTLY-SAVED date; if the user is also editing the date above, the new due
+  // date appears once they Save (the chip/banner recompute on the next render).
+  let retestBlock = '';
+  if (state.retestRemindersEnabled && sess) {
+    const tracked = !!sess.retestTrack;
+    if (!tracked) {
+      retestBlock = `
+        <div class="lock-toggle-row">
+          <div class="lock-toggle-text">
+            <div class="lock-toggle-title">🔔 Remind me to chase this for retest</div>
+            <div class="lock-toggle-sub">Adds this job to your retest chase list so you're reminded to contact the customer and rebook when it's due. Use it for clients you want to win repeat work from.</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="ef-retest" data-change-action="ef-retest-toggle">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      `;
+    } else {
+      const months = Number(sess.retestMonths) || defaultRetestMonths();
+      const dueStr = addMonthsFormatted(sess.date, months);
+      const contact = sess.retestContact;
+      let contactLine = '';
+      if (contact && contact.status === 'booked') {
+        contactLine = `<div class="lock-toggle-sub" style="margin-top:6px;color:var(--pass)">✓ Marked as rebooked${contact.at ? ' on ' + escapeHTML(formatDate(contact.at.slice(0, 10))) : ''}. Clear it below to chase again.</div>`;
+      } else if (contact && contact.status === 'declined') {
+        contactLine = `<div class="lock-toggle-sub" style="margin-top:6px;color:var(--muted)">Marked as declined${contact.at ? ' on ' + escapeHTML(formatDate(contact.at.slice(0, 10))) : ''} (lost the job). Clear it below to chase again.</div>`;
+      }
+      retestBlock = `
+        <div class="lock-toggle-row">
+          <div class="lock-toggle-text">
+            <div class="lock-toggle-title">🔔 Retest reminder on</div>
+            <div class="lock-toggle-sub">Due ${dueStr ? '<strong>' + escapeHTML(dueStr) + '</strong>' : '—'} (this test date + the interval below). This job is on your chase list.</div>
+            ${contactLine}
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="ef-retest" data-change-action="ef-retest-toggle" checked>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <label class="label">Retest interval (months)</label>
+        <input class="input" id="ef-retest-months" data-input-action="ef-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(String(months))}">
+        <p class="muted" style="margin:6px 0 0;font-size:12px">Captured from your default when you switched this on; change it here for this job only.</p>
+      `;
+    }
+  }
   return `
     <div class="screen">
       <header class="header-row">
@@ -1660,6 +1773,7 @@ function renderEditSession() {
             <span class="toggle-slider"></span>
           </label>
         </div>
+        ${retestBlock}
 
         <div class="btn-row">
           <button class="btn-secondary" id="ef-cancel" data-action="edit-cancel">Cancel</button>
@@ -1670,7 +1784,97 @@ function renderEditSession() {
   `;
 }
 
-// ============== PATGo PWA — v30 — Reports hub ==============
+// ============== PATGo PWA — v56 — Retest reminders ==============
+// The commercial chase list: tracked jobs that are due (or overdue) for retest,
+// most-urgent first, each with the customer to ring and one-tap resolution. This
+// is the "sales headspace" screen — deliberately separate from the Sessions list
+// (the testing workspace). Reached from the Sessions banner and from Settings →
+// Retest Reminders. Gated by the master switch: if the feature is off we bounce
+// to Sessions (defence-in-depth — the entry points are already hidden).
+function renderRetestReminders() {
+  if (!state.retestRemindersEnabled) { state.view = 'sessions'; return renderSessions(); }
+  const due = activeRetestReminders();
+
+  // The contacted-action sheet (Booked / Declined / clear) for one row.
+  let actionSheet = '';
+  if (state.retestActionSessionId) {
+    const s = state.sessions.find(x => x.id === state.retestActionSessionId);
+    if (s) {
+      const name = s.site || s.name || 'this job';
+      actionSheet = `
+        <div class="modal-backdrop" id="retest-action-backdrop" data-action="retest-action-close" style="z-index:300"></div>
+        <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Retest reminder action">
+          <div class="bulk-sheet-handle"></div>
+          <div class="bulk-sheet-header">
+            <span class="fail-close-spacer"></span>
+            <h3 class="bulk-sheet-title">${escapeHTML(name)}</h3>
+            <button class="fail-close-btn" id="retest-action-close" data-action="retest-action-close" aria-label="Close">×</button>
+          </div>
+          <p style="margin:0 0 14px;font-size:14px;line-height:1.5;color:var(--text)">Once you've contacted the customer, mark the outcome to clear this from your chase list.</p>
+          <button class="btn-primary" style="margin-bottom:8px" data-action="retest-mark-booked" data-arg="${s.id}">✓ Rebooked — job won</button>
+          <button class="btn-secondary" style="margin-bottom:8px" data-action="retest-mark-declined" data-arg="${s.id}">Declined — lost the job</button>
+          <button class="btn-tertiary" data-action="retest-untrack" data-arg="${s.id}">Stop reminding me about this job</button>
+        </div>
+      `;
+    }
+  }
+
+  let list;
+  if (due.length === 0) {
+    list = emptyStateHTML('🔔', 'No retests due',
+      'When a job you\'ve flagged comes due, it\'ll appear here so you can ring the customer and rebook. Flag a job under its Session settings.');
+  } else {
+    list = due.map(s => {
+      const st = retestStatus(s);
+      const days = retestDaysUntil(s);
+      const months = Number(s.retestMonths) || defaultRetestMonths();
+      const dueStr = addMonthsFormatted(s.date, months);
+      let chipCls, chipLabel;
+      if (st === 'overdue') {
+        chipCls = 'retest-chip-overdue';
+        chipLabel = `Overdue by ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'}`;
+      } else if (st === 'duesoon') {
+        chipCls = 'retest-chip-soon';
+        chipLabel = `Due in ${days} day${days === 1 ? '' : 's'}`;
+      } else {
+        chipCls = 'retest-chip-upcoming';
+        chipLabel = `Due in ${days} day${days === 1 ? '' : 's'}`;
+      }
+      const client = clientNameForSession(s);
+      const titleLine = escapeHTML(s.site || s.name || 'Untitled session');
+      const clientLine = (client && client !== (s.site || s.name)) ? `<div class="retest-row-client">${escapeHTML(client)}</div>` : '';
+      const itemCount = Array.isArray(s.items) ? s.items.length : 0;
+      return `
+        <div class="session-card">
+          <div class="session-info" data-action="open-session" data-arg="${s.id}" data-open="${s.id}">
+            <div class="session-title">${titleLine}</div>
+            ${clientLine}
+            <div class="session-meta">Last tested ${formatDate(s.date)} · ${itemCount} item${itemCount === 1 ? '' : 's'} · due ${dueStr || '—'}</div>
+            <div class="session-export-row"><span class="retest-chip ${chipCls}">🔔 ${escapeHTML(chipLabel)}</span></div>
+          </div>
+          <button class="icon-btn-sm" data-action="retest-action-open" data-arg="${s.id}" aria-label="Mark contacted" title="Mark contacted">✓</button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  return `
+    <div class="screen">
+      <header class="header-row">
+        <button class="icon-btn" id="retest-back-btn" data-action="go-sessions" aria-label="Back">‹</button>
+        <div class="site-name">Retest reminders</div>
+        <button class="icon-btn" id="retest-settings-btn" data-action="settings-page" data-arg="settingsRetest" data-page="settingsRetest" aria-label="Retest settings">⚙</button>
+      </header>
+      <div class="settings-section" style="margin-top:4px">
+        <p class="muted" style="margin-top:0">Jobs you've flagged that are coming due for retest, most urgent first. Ring the customer to rebook, then mark each one done.</p>
+      </div>
+      <div class="sessions-list">${list}</div>
+      ${actionSheet}
+    </div>
+  `;
+}
+
+
 // Top-level Reports area: pick a session to turn into a PDF report. Reached from
 // the Sessions screen header (only when reportSettings.enabled) and linked to
 // Report Settings. Reuses the session-card visual style from the sessions list.

@@ -418,6 +418,16 @@ registerActions({
   },
   'produce-report': (arg) => { produceReport(arg).catch(() => {}); },
 
+  // v56: Retest reminders nav + chase-list actions. open-retest-reminders is
+  // defence-checked against the master switch (entry points are already hidden
+  // when off). The action sheet sets/clears a transient session id and re-renders.
+  'open-retest-reminders': () => { if (state.retestRemindersEnabled) setView('retestReminders'); else setView('settings'); },
+  'retest-action-open': (arg) => { state.retestActionSessionId = arg; render(); },
+  'retest-action-close': () => { state.retestActionSessionId = null; render(); },
+  'retest-mark-booked': (arg) => { retestSetContact(arg, 'booked'); state.retestActionSessionId = null; render(); },
+  'retest-mark-declined': (arg) => { retestSetContact(arg, 'declined'); state.retestActionSessionId = null; render(); },
+  'retest-untrack': (arg) => { retestUnflag(arg); state.retestActionSessionId = null; render(); },
+
   // v36: report templates (apply/rename/delete/save-new). v40: rename and
   // save-new use the in-app name sheet (openNameSheet); delete uses the confirm
   // sheet — native prompt()/confirm() are unreliable in iOS PWAs.
@@ -636,7 +646,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissWelcome('v55WelcomeSeen', V55_WELCOME_KEY),
+  'welcome-dismiss': () => dismissWelcome('v56WelcomeSeen', V56_WELCOME_KEY),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -781,6 +791,13 @@ registerInputActions({
   'ef-name': (v) => { state.editForm.name = v; },
   'ef-date': (v) => { state.editForm.date = v; },
   'ef-prefix': (v) => { state.editForm.prefix = v; },
+  // v56: per-session retest interval. Instant-apply (not editForm draft); persists
+  // via retestSetMonths which clamps 1–120 and ignores partial/invalid input, so
+  // mid-typing keystrokes are safe. No re-render — that would lose focus on iOS.
+  'ef-retest-months': (v) => {
+    const sess = activeSession();
+    if (sess) retestSetMonths(sess.id, v);
+  },
 
   // Settings dialogs
   'preset-name': (v) => { state.presetDialog.name = v; },
@@ -854,6 +871,27 @@ registerChangeActions({
 
   // Edit-session locked checkbox
   'ef-locked': (checked) => { state.editForm.locked = checked; },
+
+  // v56: per-session retest flag (instant-apply). Flagging captures the interval
+  // from the global default; unflagging clears all retest fields. Re-render so the
+  // interval input + due date (or the plain toggle) appear/disappear immediately.
+  'ef-retest-toggle': (checked) => {
+    const sess = activeSession();
+    if (!sess) return;
+    if (checked) retestFlag(sess.id); else retestUnflag(sess.id);
+    render();
+  },
+
+  // v56: master switch for the whole retest-reminders feature. Persists instantly.
+  // When turning OFF, also reset the Sessions "Retest due" filter back to 'all' so
+  // the now-hidden filter can't leave the list stuck showing nothing. Re-render so
+  // the banner, filter option, per-session control and help text all update.
+  'retest-reminders-toggle': (checked) => {
+    state.retestRemindersEnabled = checked;
+    if (!checked && state.sessionFilter === 'retestdue') state.sessionFilter = 'all';
+    save();
+    render();
+  },
 
   // Display settings toggles — each re-renders to refresh its On/Off sub-text
   'haptics': (checked) => { setHaptics(checked); render(); },

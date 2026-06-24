@@ -81,6 +81,15 @@ function seedClientsSitesFromSessions() {
 // Lookups + derived lists.
 function clientById(id) { return state.clients.find(c => c.id === id) || null; }
 function siteById(id) { return state.sites.find(s => s.id === id) || null; }
+// v56: resolve a human client name for a session, for the retest reminders list.
+// Prefers the structured clientId ref; returns '' when there's no distinct client
+// (the caller then just shows the site/name). Defensive — sessions predating the
+// structured refs simply have no clientId and return ''.
+function clientNameForSession(sess) {
+  if (!sess || !sess.clientId) return '';
+  const c = clientById(sess.clientId);
+  return c ? c.name : '';
+}
 function sitesForClient(clientId) {
   return state.sites
     .filter(s => s.clientId === clientId)

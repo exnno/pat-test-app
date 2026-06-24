@@ -23,9 +23,17 @@ let state = {
   descriptions: [],
   sort: 'date_desc',
   // v15: Sessions-list filters (persisted). Both combine with Sort + each other.
-  sessionFilter: 'all',   // 'all' | 'unexported' | 'exported' | 'modified'
+  sessionFilter: 'all',   // 'all' | 'unexported' | 'exported' | 'modified' | 'retestdue' (v56)
   lockFilter: 'all',      // 'all' | 'unlocked' | 'locked'
   view: 'sessions',
+  // v56: Retest reminders master switch. Loaded from RETEST_REMINDERS_KEY in
+  // storage.js (OFF by default). When false, the entire feature is invisible —
+  // no banner, no per-session control, no reminders view, no sessions filter.
+  retestRemindersEnabled: false,
+  // v56: transient id of the session whose contacted-action sheet (Booked /
+  // Declined / reset) is open in the reminders view; null = no sheet. Not
+  // persisted — purely view state, like other *Open flags.
+  retestActionSessionId: null,
   cursor: 0,
   form: { assetNo: '', location: '', itemType: '', notes: '', showNotes: false },
   newForm: { name: '', site: '', engineer: '', prefix: '', startNo: '1', show: false, clientId: '', siteId: '' },
@@ -130,7 +138,7 @@ let state = {
   // new install still shows the WIZARD and an upgrader still shows the MODAL —
   // unchanged behaviour. Future feature releases roll a new flag here and pass it
   // to dismissWelcome().
-  v55WelcomeSeen: false,  // v55: PDF symbol fix + CSV polarity column
+  v56WelcomeSeen: false,  // v56: Retest reminders (commercial chase list)
   // v46: remembered Sessions-list scroll offset. Captured (in render) when
   // leaving Sessions for a session, restored when returning to Sessions. All
   // other navigation resets to the top. Transient — never persisted. The

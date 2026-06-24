@@ -311,10 +311,17 @@ function sortedSessions() {
 // Applied only when not searching (see renderSessionsListAreaHTML).
 function sessionMatchesControlFilters(s) {
   if (state.sessionFilter !== 'all') {
-    const st = exportStatus(s);
-    if (state.sessionFilter === 'unexported' && st !== 'none') return false;
-    if (state.sessionFilter === 'exported' && st !== 'exported') return false;
-    if (state.sessionFilter === 'modified' && st !== 'modified') return false;
+    // v56: "Retest due" is an alternative status filter — show only sessions on
+    // the active chase list. Independent of export status; only meaningful when
+    // the feature is on (the option isn't offered otherwise).
+    if (state.sessionFilter === 'retestdue') {
+      if (!isRetestActive(s)) return false;
+    } else {
+      const st = exportStatus(s);
+      if (state.sessionFilter === 'unexported' && st !== 'none') return false;
+      if (state.sessionFilter === 'exported' && st !== 'exported') return false;
+      if (state.sessionFilter === 'modified' && st !== 'modified') return false;
+    }
   }
   if (state.lockFilter === 'unlocked' && s.locked) return false;
   if (state.lockFilter === 'locked' && !s.locked) return false;
@@ -444,6 +451,188 @@ function unexportedSessionCount() {
 function unexportedSessions() {
   return sortedSessions().filter(s => exportStatus(s) !== 'exported');
 }
+
+// ===== v56: Retest reminders (commercial chase list) =====
+// A reminder is the commercial engineer's prompt to ring a customer and rebook
+// the testing job. It is per-session opt-in: a session carries reminder data ONLY
+// because the engineer flagged it. Fields on a flagged session:
+//   retestTrack   — true once flagged. Absent/false = not a reminder (the default).
+//   retestMonths  — the interval (months) CAPTURED at flag time from the global
+//                   report-settings default, so changing the default later never
+//                   silently moves existing due dates. Editable per session.
+//   retestContact — null while outstanding, or { status, at } once the engineer
+//                   has acted: status 'booked' (rebooked — job won) or 'declined'
+//                   (lost the job / customer gone). Either resolves the reminder
+//                   off the active chase list. `at` is an ISO timestamp.
+// The due date itself is COMPUTED, never stored (single source of truth):
+//   dueISO = session.date + retestMonths.
+// All fields are additive — they ride through backup/restore wholesale and need
+// no backupVersion bump. normaliseSessionRetest() (below) is the restore guard.
+
+// Read the global default retest interval (months) to seed a newly-flagged
+// session. Falls back to 12 when reports/retest aren't configured — a sane PAT
+// annual cycle — so flagging always produces a usable due date.
+function defaultRetestMonths() {
+  const rs = state.reportSettings;
+  const m = rs && Number(rs.retestMonths);
+  return (Number.isFinite(m) && m >= 1 && m <= 120) ? m : 12;
+}
+
+// Add `months` calendar months to an ISO yyyy-mm-dd date; return a Date at local
+// midnight, or null if the input is unusable. Mirrors report.js addMonthsFormatted
+// but returns a Date object for day-math (that one returns a DD/MM/YYYY string).
+function retestDueDate(sess) {
+  if (!sess || !sess.retestTrack) return null;
+  const iso = sess.date;
+  const months = Number(sess.retestMonths);
+  if (!iso || !Number.isFinite(months)) return null;
+  const parts = String(iso).split('-');
+  if (parts.length !== 3) return null;
+  const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
+  if (isNaN(d.getTime())) return null;
+  d.setMonth(d.getMonth() + months);
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+// Whole days from today (local midnight) to a session's retest due date.
+// Negative = overdue. null when the session isn't a tracked reminder.
+function retestDaysUntil(sess) {
+  const due = retestDueDate(sess);
+  if (!due) return null;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.round((due - today) / (1000 * 3600 * 24));
+}
+
+// Urgency bucket for a tracked session, used by the banner, the filter and the
+// reminders view. Returns one of:
+//   'resolved' — engineer has booked or declined; off the active chase list.
+//   'overdue'  — due date has passed.
+//   'duesoon'  — due within RETEST_DUE_SOON_DAYS (the "ring them now" band).
+//   'upcoming' — due within RETEST_UPCOMING_DAYS (shown, but quiet — lead time).
+//   'later'    — tracked, but further out than the upcoming window.
+//   null       — not a tracked reminder at all.
+function retestStatus(sess) {
+  if (!sess || !sess.retestTrack) return null;
+  if (sess.retestContact && (sess.retestContact.status === 'booked' || sess.retestContact.status === 'declined')) {
+    return 'resolved';
+  }
+  const days = retestDaysUntil(sess);
+  if (days === null) return null;
+  if (days < 0) return 'overdue';
+  if (days <= RETEST_DUE_SOON_DAYS) return 'duesoon';
+  if (days <= RETEST_UPCOMING_DAYS) return 'upcoming';
+  return 'later';
+}
+
+// Does a session belong on the ACTIVE chase list (banner count, reminders view,
+// "Retest due" filter)? Active = tracked, unresolved, and within the upcoming
+// window or overdue. 'later' and 'resolved' don't surface — they exist but stay
+// quiet so the list is only ever the work worth doing now.
+function isRetestActive(sess) {
+  const st = retestStatus(sess);
+  return st === 'overdue' || st === 'duesoon' || st === 'upcoming';
+}
+
+// All sessions on the active chase list, most-urgent first (overdue before
+// due-soon before upcoming; within a bucket, earliest due date first). Drives the
+// reminders view and the banner count. Only meaningful when the feature is on.
+function activeRetestReminders() {
+  if (!state.retestRemindersEnabled) return [];
+  const rank = { overdue: 0, duesoon: 1, upcoming: 2 };
+  return state.sessions
+    .filter(isRetestActive)
+    .sort((a, b) => {
+      const ra = rank[retestStatus(a)], rb = rank[retestStatus(b)];
+      if (ra !== rb) return ra - rb;
+      const da = retestDaysUntil(a), db = retestDaysUntil(b);
+      return da - db;   // earlier due (smaller / more negative) first
+    });
+}
+
+// Count for the Sessions banner. 0 → no banner.
+function activeRetestCount() {
+  return activeRetestReminders().length;
+}
+
+// Flag a session as a reminder to chase. Captures the interval from the global
+// default at flag time (so it's stable). No-op if already tracked. Persists.
+function retestFlag(sessId) {
+  const sess = state.sessions.find(s => s.id === sessId);
+  if (!sess || sess.retestTrack) return;
+  sess.retestTrack = true;
+  sess.retestMonths = defaultRetestMonths();
+  sess.retestContact = null;
+  save();
+}
+
+// Remove a session from reminders entirely (the "this was never mine to chase /
+// I don't want reminding" escape hatch). Clears all three fields so no husk
+// remains. Persists.
+function retestUnflag(sessId) {
+  const sess = state.sessions.find(s => s.id === sessId);
+  if (!sess) return;
+  delete sess.retestTrack;
+  delete sess.retestMonths;
+  delete sess.retestContact;
+  save();
+}
+
+// Update the captured interval for one tracked session (e.g. a 6-month cycle for
+// a high-risk site). Clamped 1–120; out-of-range is ignored. Persists.
+function retestSetMonths(sessId, months) {
+  const sess = state.sessions.find(s => s.id === sessId);
+  if (!sess || !sess.retestTrack) return;
+  const m = Number(months);
+  if (!Number.isFinite(m) || m < 1 || m > 120) return;
+  sess.retestMonths = Math.round(m);
+  save();
+}
+
+// Resolve a reminder: 'booked' (rebooked the job) or 'declined' (lost it / gone).
+// Both drop it off the active chase list. Stamps the time so the reminders view
+// can show "Booked on …". Passing null clears the resolution (back to outstanding).
+// Persists.
+function retestSetContact(sessId, status) {
+  const sess = state.sessions.find(s => s.id === sessId);
+  if (!sess || !sess.retestTrack) return;
+  if (status === 'booked' || status === 'declined') {
+    sess.retestContact = { status, at: new Date().toISOString() };
+  } else {
+    sess.retestContact = null;
+  }
+  save();
+}
+
+// Restore guard (called from backup.js, mirroring normaliseItemReadings). A
+// hand-edited or corrupt backup could carry garbage in the retest fields, and
+// other code reads them structurally, so coerce to safe shapes or strip:
+//   • retestTrack truthy → keep as real boolean true; else strip all three.
+//   • retestMonths → valid 1–120 integer, else fall back to the global default.
+//   • retestContact → keep only a well-formed {status:'booked'|'declined', at},
+//     otherwise null (outstanding). Unknown statuses collapse to null.
+// Sessions with no retest fields (any pre-v56 backup) are left untouched.
+function normaliseSessionRetest(sess) {
+  if (!sess || typeof sess !== 'object') return;
+  if (!sess.retestTrack) {
+    // Not tracked — make sure no stray partial fields linger.
+    delete sess.retestTrack;
+    delete sess.retestMonths;
+    delete sess.retestContact;
+    return;
+  }
+  sess.retestTrack = true;
+  const m = Number(sess.retestMonths);
+  sess.retestMonths = (Number.isFinite(m) && m >= 1 && m <= 120) ? Math.round(m) : defaultRetestMonths();
+  const c = sess.retestContact;
+  if (c && typeof c === 'object' && (c.status === 'booked' || c.status === 'declined')) {
+    sess.retestContact = { status: c.status, at: typeof c.at === 'string' ? c.at : new Date().toISOString() };
+  } else {
+    sess.retestContact = null;
+  }
+}
+
 
 // v14: sessions eligible for pruning — exported AND older than the configured
 // age threshold. Age is measured from the session date (YYYY-MM-DD). Returns

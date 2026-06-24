@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V55';
+const APP_VERSION = 'V56';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -64,7 +64,7 @@ const CAL_DUE_KEY = 'pat:caldue';
 // first-run-wizard gate, so nothing about upgrade behaviour changes. When a future
 // feature release rolls a new welcome, replace the line below with the new key
 // (e.g. V51_WELCOME_KEY) and pass it to dismissWelcome() — no new symbol pile.
-const V55_WELCOME_KEY = 'pat:v55welcome';  // v55: PDF symbol fix (Ohms/≥) + CSV polarity column
+const V56_WELCOME_KEY = 'pat:v56welcome';  // v56: Retest reminders (commercial chase list)
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
 // sheet opens. Deliberately a single named constant so the threshold can be
@@ -145,7 +145,7 @@ const SETTINGS_CATEGORIES = [
   { id: 'catTesting', icon: '⚡', title: 'Testing Setup', blurb: 'How Quick Pick, Multi Pick and descriptions behave',
     pages: ['settingsItems', 'settingsFails', 'settingsReadings', 'settingsMultiPick', 'settingsDescriptions'] },
   { id: 'catReports', icon: '📄', title: 'Reports & Output', blurb: 'PDF reports, CSV export and your clients',
-    pages: ['settingsReport', 'settingsCsv', 'settingsClients'] },
+    pages: ['settingsReport', 'settingsCsv', 'settingsClients', 'settingsRetest'] },
   { id: 'catApp',     icon: '🎨', title: 'App & Display', blurb: 'Appearance and the resistance calculator',
     pages: ['settingsDisplay', 'settingsCalculator'] },
   { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Back up, restore and share your setup',
@@ -167,6 +167,7 @@ const SETTINGS_PAGE_META = {
   settingsReport:      { icon: '📄', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration signature sign colour color theme header accent cert number template preset notes' },
   settingsCsv:         { icon: '📊', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
   settingsClients:     { icon: '🏢', title: 'Clients',               aliases: 'clients sites customers addresses' },
+  settingsRetest:      { icon: '🔔', title: 'Retest Reminders',       aliases: 'retest reminders rebook chase due overdue recall renewal commercial repeat business follow up contact customer' },
   settingsDisplay:     { icon: '🎨', title: 'Display Settings',      aliases: 'theme dark light haptics sound timestamps appearance' },
   settingsCalculator:  { icon: '🧮', title: 'Resistance Calculator', aliases: 'earth continuity resistance limit ohms calculator csa' },
   settingsBackup:      { icon: '💾', title: 'Backup & Restore',      aliases: 'backup restore export import data save json' },
@@ -509,6 +510,26 @@ const CAL_DUE_SOON_DAYS = 30;
 
 const BACKUP_REMINDER_DAYS = 7;
 const BACKUP_SNOOZE_HOURS = 24;
+
+// v56: Retest reminders — the commercial "chase the customer to rebook" tool.
+// This is NOT a compliance due-date display; it's a business-development worklist
+// for solo/commercial engineers who own the client relationship. It is gated TWICE
+// so it never becomes noise:
+//   1. RETEST_REMINDERS_KEY — master feature switch, OFF by default. While off,
+//      nothing about reminders appears anywhere (no banner, no per-session control,
+//      no view). Subcontract-only and non-commercial users never see it.
+//   2. Per-session opt-in (session.retestTrack) — a reminder exists ONLY because the
+//      engineer flagged THAT job as worth chasing. Defaults off per session. This is
+//      what makes the list trustworthy: lost jobs, one-offs and subcontract work are
+//      simply never flagged (or flagged then resolved). See session.js retest helpers.
+// Urgency windows (days from today to the computed due date):
+//   • Overdue   — due date is in the past.
+//   • Due soon  — within RETEST_DUE_SOON_DAYS (the active "ring them now" band).
+//   • Upcoming  — within RETEST_UPCOMING_DAYS (shown, but quiet — lead time to plan).
+// Longer windows than calibration's 30 days because winning repeat work needs notice.
+const RETEST_REMINDERS_KEY = 'pat:retestReminders';   // '1' = feature on; absent/anything else = off
+const RETEST_DUE_SOON_DAYS = 60;
+const RETEST_UPCOMING_DAYS = 90;
 
 // v9: built-in defaults updated to Peter's working lists. These ship with fresh
 // installs and back stop the "Reset to defaults" button on each settings sub-page.

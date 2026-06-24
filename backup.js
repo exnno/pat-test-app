@@ -176,6 +176,11 @@ function restoreBackupFromFile(file) {
           }
         });
       }
+      // v56: retest reminder fields are additive and ride through restore, but
+      // they're structured fields the chase-list code reads, so coerce/strip
+      // any garbage from a hand-edited or corrupt backup. Untouched for any
+      // session that was never flagged (every pre-v56 backup).
+      normaliseSessionRetest(s);
     });
     // v9: preset restoration. Three cases:
     //   New backup with presets → use directly.

@@ -1,4 +1,4 @@
-# PAT App — Code Map (V55)
+# PAT App — Code Map (V56)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -46,8 +46,8 @@ See `THIRD-PARTY-LICENSES.txt`.
 
 ---
 
-## config.js (~600 ln) — constants & defaults, pure data
-`APP_VERSION` ('V55'); all `*_KEY` localStorage key names; the calibration/backup
+## config.js (~620 ln) — constants & defaults, pure data
+`APP_VERSION` ('V56'); all `*_KEY` localStorage key names; the calibration/backup
 tuning constants (`MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`); SQP tuning (`SQP_PARTIAL_WEIGHT`,
 `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`); default lists (`DEFAULT_ITEM_TYPES`,
@@ -73,9 +73,19 @@ polarity checkbox (Class I only). `makeDefaultReportSettings()` gained
 time by `readingsEnabled` + actual data so it's a no-op for non-readings users.
 Welcome key is now `V54_WELCOME_KEY`.
 
-**v55 constants:** Welcome key rolled to `V55_WELCOME_KEY` (`pat:v55welcome`).
+**v55 constants:** Welcome key rolled to `V55_WELCOME_KEY` — superseded by v56 below.
 No new structural constants — V55 added the `readingPolarity` CSV column (above)
 and a PDF glyph fix in report.js; both additive.
+
+**v56 constants (Retest reminders):** Welcome key rolled to `V56_WELCOME_KEY`
+(`pat:v56welcome`). `RETEST_REMINDERS_KEY` ('1'|'0' master feature flag, default
+off — the feature is invisible everywhere when off). `RETEST_DUE_SOON_DAYS` (60)
+and `RETEST_UPCOMING_DAYS` (90) — the chase-list urgency windows (wider than
+calibration's 30 because winning repeat work needs lead time). `SETTINGS_CATEGORIES`
+catReports now lists `settingsRetest`; `SETTINGS_PAGE_META` has its entry. No
+`makeDefaultReportSettings()` change — the retest interval is read from the existing
+`retestMonths` field and captured per-session in session.js. All retest data is
+additive on the session object → **`backupVersion` stays 5**.
 
 Reports: `REPORT_SETTINGS_KEY`, `REPORT_DECLARATION_DEFAULT`, `REPORT_LOGO_MAX_PX`,
 `REPORT_SIGNATURE_MAX_PX`, `REPORT_FILENAME_DEFAULT` + `REPORT_FILENAME_TOKENS`,
@@ -126,10 +136,17 @@ v54 Class I bool, default false}),
 `readingsPendingResult`, `readingsPendingFailReason`. All sheet transients reset on
 close and on navigation (loadFormForCursor / setView) via `closeReadingsSheetState()`.
 
-**Welcome flag (v50 pattern):** ONLY the current `v54WelcomeSeen` is kept. Historical
+**Welcome flag (v50 pattern):** ONLY the current `v56WelcomeSeen` is kept. Historical
 `vNNWelcomeSeen` flags were removed in v50 — each was written once and never read
 after its release. The first-run-wizard gate detects past welcomes via
 `hasAnyLegacyWelcomeKey()` (storage.js).
+
+**v56 Retest reminders state:** `retestRemindersEnabled` (master feature flag,
+loaded from `RETEST_REMINDERS_KEY`, default off) and `retestActionSessionId` (transient
+id of the session whose contacted-action sheet is open in the reminders view; null =
+none, cleared on any view change in `render()`). The Sessions `sessionFilter` gained a
+`'retestdue'` value. Per-session retest data (`retestTrack`, `retestMonths`,
+`retestContact`) lives ON the session objects, not in top-level state — see session.js.
 
 *Touch to:* add a new field to runtime state.
 
@@ -169,13 +186,17 @@ likewise, `reportFilenamePattern`,
 `signature`/`signaturePosition`, `headerColor`/`accentColor` via `safeHexColor`, and
 the cert fields). Templates: `loadReportTemplates`/`saveReportTemplates`.
 
-**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V54_WELCOME_KEY` →
-`state.v54WelcomeSeen`. `hasAnyLegacyWelcomeKey()` scans localStorage for any
+**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V56_WELCOME_KEY` →
+`state.v56WelcomeSeen`. `hasAnyLegacyWelcomeKey()` scans localStorage for any
 `pat:v<n>welcome` key — used by the first-run-wizard gate to recognise a returning
 user without keeping a per-version flag. The gate:
 `onboardedV33Seen = explicitlyOnboarded || sessions>0 || engineerName || hasAnyLegacyWelcomeKey()`.
 This is a strict superset of the old seven-flag clause, so no upgrader is ever
 mistaken for a new user; a blank install has none and correctly sees the wizard.
+
+**v56:** `load` reads `RETEST_REMINDERS_KEY` → `state.retestRemindersEnabled` (default
+off); `save` writes it. Per-session retest fields need no codec change (they ride the
+session object through encode/decode wholesale, like other additive fields).
 
 *Touch to:* change how data is stored/loaded/migrated. **Data integrity zone —
 always backup-round-trip after edits.** `backupVersion` is **5**.
@@ -184,6 +205,8 @@ always backup-round-trip after edits.** `backupVersion` is **5**.
 Data model: `loadClients`, `loadSites` (orphan sites allowed — clientId may be
 empty), `seedClientsSitesFromSessions`, `clientById`, `siteById`, `sitesForClient`,
 `sortedClients`, `findClientByName`, `findSiteByName`, `ensureClient`, `ensureSite`,
+`clientNameForSession` (**v56** — resolves a session's client name for the retest
+reminders list; '' when no distinct client),
 `rebuildClientsFromSessions`, `composeSiteSnapshot`, `splitSiteSnapshot` (snapshot →
 {client, site} for CSV split), `unassignedSites` + `ensureOrphanSite` +
 `findOrphanSiteByName`. Settings→Clients actions: `addClientFromDialog`,
@@ -245,12 +268,15 @@ each restored item's `readings` via `normaliseItemReadings` — drops the key if
 — and restores the readings flag + tags with the same drop-unknown/backfill-defaults
 rule as load; old backups with missing fields restore to defaults. **v54:** the same
 `normaliseItemReadings` pass now also carries the Class I `polarity` tick through —
-additive, so older backups without it restore unchanged). Restore confirm =
+additive, so older backups without it restore unchanged. **v56:** the restore loop also
+calls `normaliseSessionRetest(s)` per session — coerces/strips the retest fields
+(`retestTrack`/`retestMonths`/`retestContact`) so a hand-edited backup can't carry
+garbage; pre-v56 sessions without the fields are untouched). Restore confirm =
 `openConfirmSheet`, success = `showToast`, the three import errors = `openInfoSheet`.
-`backupVersion` stays **5** — readings (incl. v54 polarity) are additive and
-missing-field-tolerant (items ride through wholesale; an old app ignores the unknown
-key, a new app reads it). The readings feature and v54's polarity deliberately did
-NOT spend a bump; the earmarked 6 is reserved
+`backupVersion` stays **5** — readings (incl. v54 polarity) AND v56 retest fields are
+additive and missing-field-tolerant (items/sessions ride through wholesale; an old app
+ignores the unknown key, a new app reads it). The readings feature, v54's polarity and
+v56's retest fields deliberately did NOT spend a bump; the earmarked 6 is reserved
 for a genuine incompatible schema change.
 *Touch to:* change the JSON backup shape or restore path. **Bump `backupVersion` only
 for a genuine incompatible change; keep old-backup compatibility.**
@@ -349,7 +375,20 @@ never logs). Core helpers: `uid`, `todayISO`, `activeSession`, `normaliseItemTyp
 `addDescriptionIfNew`, `sortedSessions`, `sessionMatchesControlFilters`,
 `filteredSessions`. Theme: `applyTheme`. Export-state: `exportStatus`,
 `markSessionExported`, `markSessionDirty`, `unexportedSessionCount`,
-`unexportedSessions`, `prunableSessions`, `savePruneAge`, `pruneOldSessions`. Form:
+`unexportedSessions`, `prunableSessions`, `savePruneAge`, `pruneOldSessions`.
+**v56 Retest reminders (commercial chase list):** `defaultRetestMonths()` (reads the
+global `reportSettings.retestMonths`, falls back to 12), `retestDueDate(sess)` /
+`retestDaysUntil(sess)` (compute due date = session.date + captured months; days from
+today, negative = overdue), `retestStatus(sess)` (→ 'resolved'|'overdue'|'duesoon'|
+'upcoming'|'later'|null), `isRetestActive(sess)` (on the active chase list = overdue/
+duesoon/upcoming and unresolved), `activeRetestReminders()` (filtered + sorted most-
+urgent-first) / `activeRetestCount()`, and the mutators `retestFlag(id)` (captures the
+interval at flag time), `retestUnflag(id)` (clears all three fields), `retestSetMonths(
+id, m)` (clamped 1–120), `retestSetContact(id, status)` ('booked'|'declined'|null —
+both non-null statuses resolve it off the list), plus the restore guard
+`normaliseSessionRetest(sess)` (called from backup.js — coerces/strips garbage, mirrors
+normaliseItemReadings). Per-session fields: `retestTrack` (bool), `retestMonths` (int),
+`retestContact` ({status, at}|null). Form:
 `loadFormForCursor`. Validation: `validateBeforeSave`. Session/item actions:
 `createSession` (stamps empty `notes`+`certNo`), `openSession`, `requestOpenSession`,
 `confirmReopenWarning`, `cancelReopenWarning`, `deleteSession`, `saveItem`
@@ -414,13 +453,19 @@ filtering, theme, bulk edit, settings saves, the wizard/onboarding, the example
 seed, the signature, cert numbers / job notes / report templates, the welcome
 dismiss.
 
-## render-core.js (~1720 ln) — main screens
+## render-core.js (~1830 ln) — main screens
 Owns `const app = document.getElementById('app')` and the `render()` dispatcher
 (rebuilds `#app.innerHTML` on every interaction; scroll-to-top + the Sessions scroll
 restore live here via `_lastRenderedView`; **v53** the view router includes
-`settingsReadings`). Sessions: `renderSessions`,
-`renderSessionsListAreaHTML`, `refreshSessionsListAreaOnly`,
-`renderBackupReminderBanner`. New-session form suggestions: `computeNfClientSuggestions`,
+`settingsReadings`; **v56** adds `retestReminders` + `settingsRetest`, and clears the
+transient `retestActionSessionId` on any non-reminders view). Sessions: `renderSessions`,
+`renderSessionsListAreaHTML` (**v56** the session row shows a 🔔 retest chip when the
+feature is on and the session is on the active chase list; the Status filter gains a
+"Retest due" option, feature-gated), `refreshSessionsListAreaOnly`,
+`renderBackupReminderBanner`, **v56** `renderRetestBanner` (Sessions banner — only when
+feature on AND ≥1 active reminder; reuses `.cal-banner` styling; separates overdue from
+due-soon in the count; "View" → reminders view). New-session form suggestions:
+`computeNfClientSuggestions`,
 `computeNfSiteSuggestions`, `nfSuggestionsHTML`. Import modals:
 `renderImportConflictModal`, `renderImportSummaryModal`. Entry: `renderEntry`
 (**v53** builds the **readings sheet** when `readingsSheetOpen` — class-selector row
@@ -429,10 +474,16 @@ pre-filled, fail mode shows only the box the reason's tag points at, or none for
 visual/Other reason; reuses the `.fail-sheet` shell),
 `refreshEntryAfterLog`. Overview: `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
 `renderOverview` (Produce Report button when reporting on), `refreshOverviewBody`,
-`refreshOverviewSelection`. Edit: `renderEditSession`. Reports hub: `renderReports`.
+`refreshOverviewSelection`. Edit: `renderEditSession` (**v56** when the feature is on,
+adds the per-session retest control — a flag toggle + interval input + computed due
+date + the booked/declined status line; instant-apply, not part of the editForm draft).
+Reports hub: `renderReports`. **v56 Retest reminders view:** `renderRetestReminders`
+(the client/site-centric chase list, most-urgent-first, each row tappable to open the
+session, with a ✓ action opening the contacted-action sheet: Rebooked / Declined / stop
+reminding; defence-bounces to Sessions when the feature is off).
 Shared: `emptyStateHTML(icon,title,body,actionLabel,actionName)`;
 `refreshSettingsHubBodyOnly` (live settings search). The **welcome modal** block
-(**v53** gates on `v53WelcomeSeen`; suppressed while the migration prompt or first-run
+(**v56** gates on `v56WelcomeSeen`; suppressed while the migration prompt or first-run
 wizard is up; shows the PATGo icon; dismissed via the shared `welcome-dismiss`
 action → `dismissWelcome`). The **first-run wizard** modal block (`wizardModal`,
 renders when `!onboardedV33Seen && !migrationPrompt.show` — the 6-step commercial
@@ -451,8 +502,11 @@ category list; re-rendered alone by `refreshSettingsHubBodyOnly` so the search b
 keeps focus), `renderSettingsCategory`, `settingsPageSubtitle(pageId)`,
 `settingsPageRowHTML(pageId, context)`, `renderSettingsSubHeader` + each
 `renderSettings*` sub-page (User, Items, Fails, Readings, MultiPick, Descriptions,
-Display, Backup, Csv, Clients, Report, Calculator, About, Contact, Setup) + calculator
-helpers. **v53** `renderSettingsReadings` is the Test Readings page (single master
+Display, Backup, Csv, Clients, Report, Retest, Calculator, About, Contact, Setup) + calculator
+helpers. **v56** `renderSettingsRetest` is the Retest Reminders page (master toggle
+`retest-reminders-toggle`, default off, persists instantly + re-renders; on-only
+how-it-works text + the honest "in-app, not push" note + a "View N reminders" jump
+when any are active; `settingsPageSubtitle` shows Off / On · N due). **v53** `renderSettingsReadings` is the Test Readings page (single master
 toggle `readings-toggle`, default off, persists instantly + re-renders; on-only help
 text). `renderSettingsFails` (**v53**) shows per-reason tag `<select>`s
 (`fail-reason-tag`, data-reason carries the reason text) BELOW the reasons textarea,
@@ -463,7 +517,7 @@ Templates and "What to include" sections (the include toggles include
 carries the `.settings-tip` note about the entry-screen long-press preset switcher.
 `renderSetupSection()` is wrapped by `renderSettingsSetup()` (its own page in the
 Data category). **The About changelog lives here** (`renderSettingsAbout`) — a rolling
-3-version window; v53 shows V53/V52/V51. The About page also has the "Set up another
+3-version window; v56 shows V56/V55/V54. The About page also has the "Set up another
 device" (`restart-onboarding`) and "Show me around" (`open-tour`) cards, and a
 long-press hidden menu on the title revealing three cloud-prep stub pages
 (`renderCloudAccount`, `renderCloudSync`, `renderCloudSubscription` — mock data, for
@@ -506,12 +560,17 @@ confirms routed through `openConfirmSheet`/`openNameSheet`/`openInfoSheet`/`show
 actions (`readings-set-class`, `readings-commit`, `readings-cancel`), the reading-field
 input actions (`f-reading-earth`/`-insulation`/`-leakage`), and two change actions
 (`readings-toggle` — master flag, persists + renders; `fail-reason-tag` — writes the
-reason→tag map and saves). The preset-switch-on-change reverts
+reason→tag map and saves). **v56** adds the retest actions: clicks
+`open-retest-reminders`, `retest-action-open`/`-close`, `retest-mark-booked`/
+`-mark-declined`, `retest-untrack`; the input action `ef-retest-months` (instant-apply
+per-session interval, no render); and the change actions `ef-retest-toggle` (flag/unflag
+the active session + render) and `retest-reminders-toggle` (master switch; on OFF also
+resets a stuck `retestdue` filter to `all`). The preset-switch-on-change reverts
 `el.value` synchronously then opens `openConfirmSheet` (the last native `confirm`,
 removed).
 
-**Welcome dismiss (v50):** `'welcome-dismiss': () => dismissWelcome('v49WelcomeSeen',
-V49_WELCOME_KEY)` — was a per-version `dismissVNNWelcome()` call; now the one
+**Welcome dismiss (v50):** `'welcome-dismiss': () => dismissWelcome('v56WelcomeSeen',
+V56_WELCOME_KEY)` — was a per-version `dismissVNNWelcome()` call; now the one
 parameterised helper.
 *Touch to:* add/route any delegated click/input/change handler. Only the four focus-
 sensitive fields + the quick-pick long-press are NOT here (see events.js).
