@@ -1,4 +1,4 @@
-# PAT App — Code Map (V56)
+# PAT App — Code Map (V57)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -47,7 +47,7 @@ See `THIRD-PARTY-LICENSES.txt`.
 ---
 
 ## config.js (~620 ln) — constants & defaults, pure data
-`APP_VERSION` ('V56'); all `*_KEY` localStorage key names; the calibration/backup
+`APP_VERSION` ('V57'); all `*_KEY` localStorage key names; the calibration/backup
 tuning constants (`MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`); SQP tuning (`SQP_PARTIAL_WEIGHT`,
 `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`); default lists (`DEFAULT_ITEM_TYPES`,
@@ -77,8 +77,13 @@ Welcome key is now `V54_WELCOME_KEY`.
 No new structural constants — V55 added the `readingPolarity` CSV column (above)
 and a PDF glyph fix in report.js; both additive.
 
-**v56 constants (Retest reminders):** Welcome key rolled to `V56_WELCOME_KEY`
-(`pat:v56welcome`). `RETEST_REMINDERS_KEY` ('1'|'0' master feature flag, default
+**v57 constants:** Welcome key rolled to `V57_WELCOME_KEY` (`pat:v57welcome`) —
+supersedes the v56 key below. No other constant changes: V57 is a bug-fix release
+(bottom-sheet scrolling + suggestion-dropdown tap reliability), all behavioural, no
+new storage keys → **`backupVersion` stays 5**.
+
+**v56 constants (Retest reminders):** Welcome key was `V56_WELCOME_KEY`
+(`pat:v56welcome`) — superseded by v57 above. `RETEST_REMINDERS_KEY` ('1'|'0' master feature flag, default
 off — the feature is invisible everywhere when off). `RETEST_DUE_SOON_DAYS` (60)
 and `RETEST_UPCOMING_DAYS` (90) — the chase-list urgency windows (wider than
 calibration's 30 because winning repeat work needs lead time). `SETTINGS_CATEGORIES`
@@ -483,9 +488,11 @@ session, with a ✓ action opening the contacted-action sheet: Rebooked / Declin
 reminding; defence-bounces to Sessions when the feature is off).
 Shared: `emptyStateHTML(icon,title,body,actionLabel,actionName)`;
 `refreshSettingsHubBodyOnly` (live settings search). The **welcome modal** block
-(**v56** gates on `v56WelcomeSeen`; suppressed while the migration prompt or first-run
+(**v57** gates on `v57WelcomeSeen`; suppressed while the migration prompt or first-run
 wizard is up; shows the PATGo icon; dismissed via the shared `welcome-dismiss`
-action → `dismissWelcome`). The **first-run wizard** modal block (`wizardModal`,
+action → `dismissWelcome`). **v57:** the preset sheet's list carries
+`.sheet-scroll` (styles.css) — the class that makes a long list scroll inside the
+capped sheet shell instead of growing off the top of the screen. The **first-run wizard** modal block (`wizardModal`,
 renders when `!onboardedV33Seen && !migrationPrompt.show` — the 6-step commercial
 onboarding). The **signature pad** modal (`signaturePadModal`, pointer-drawing wired
 by `initSignaturePad()`/`clearSignaturePad()` after `app.innerHTML` is set). The
@@ -536,9 +543,30 @@ sensitive fields only: `nf-client`, `nf-site` (New Session autocomplete),
 drift slop or early release aborts; on fire calls `openPresetSheet()` and a capture-
 phase click handler swallows the one following tap). Everything else is delegated in
 dispatch.js. Called from `render()` and `refreshEntryAfterLog()`.
-*Touch to:* change one of the four autocomplete/casing fields, their dropdowns, or
-the quick-pick long-press gesture. These stay direct because focus/blur timing can't
-be safely delegated (the fragile iOS area).
+
+**v57 — dropdown tap reliability.** All three suggestion dropdowns
+(`renderSuggestionsOnly`, `renderNfSuggestionsOnly`, `renderLocationSuggestionsOnly`)
+now **commit the pick on `pointerdown`** via a local `commit(e)` handler
+(`el.onpointerdown = commit`), replacing the old
+`onmousedown→preventDefault` + `onclick` pair. The old pair raced the input's blur
+(which tears the list down on a 150ms timer) and on iOS the tap sometimes lost —
+the intermittent "sometimes it works, sometimes not" bug. `pointerdown` fires first
+and reliably for touch, so the choice is captured before any blur can cancel it.
+`click` is deliberately left unbound (the list is gone by then; nothing to
+double-fire). **Don't reintroduce an `onclick` here.**
+
+**v57 — bottom-sheet scroll-drag guard.** `sheetDragMoved` (top-level `let`),
+`SHEET_DRAG_SLOP` (10px) and `initSheetDragGuard()` — called ONCE from `boot.js`
+(not per-render), it binds capture-phase `touchstart`/`touchmove` on `document` and
+tracks whether the current gesture drifted far enough to be a scroll rather than a
+tap. Read by dispatch.js's `preset-sheet-pick`, which ignores the click if so —
+because now that the preset list scrolls (v57), a scroll-drag could otherwise end in
+a click on whichever row was under the finger and silently switch the preset.
+`touchstart` resets the flag, so a genuine tap always reads false.
+
+*Touch to:* change one of the four autocomplete/casing fields, their dropdowns, the
+quick-pick long-press gesture, or the sheet drag guard. These stay direct because
+focus/blur/pointer timing can't be safely delegated (the fragile iOS area).
 
 ## dispatch.js (~949 ln) — delegated event handling
 The full delegated event system + three action registries, attached once to `#app`
@@ -569,8 +597,11 @@ resets a stuck `retestdue` filter to `all`). The preset-switch-on-change reverts
 `el.value` synchronously then opens `openConfirmSheet` (the last native `confirm`,
 removed).
 
-**Welcome dismiss (v50):** `'welcome-dismiss': () => dismissWelcome('v56WelcomeSeen',
-V56_WELCOME_KEY)` — was a per-version `dismissVNNWelcome()` call; now the one
+**v57** `preset-sheet-pick` now short-circuits on `sheetDragMoved` (events.js) so a
+scroll-drag inside the now-scrollable preset list can't switch the preset by accident.
+
+**Welcome dismiss (v50):** `'welcome-dismiss': () => dismissWelcome('v57WelcomeSeen',
+V57_WELCOME_KEY)` — was a per-version `dismissVNNWelcome()` call; now the one
 parameterised helper.
 *Touch to:* add/route any delegated click/input/change handler. Only the four focus-
 sensitive fields + the quick-pick long-press are NOT here (see events.js).
@@ -585,5 +616,8 @@ cross-file functions (`load`, `save`, `render`, `applyTheme`, `initDelegation`,
 const data-loss class). Boot tail: the guard's else-branch runs `load()`,
 `applyTheme(state.theme)`, then the crash-fallback `try { loadFormForCursor();
 render(); } catch …`; `registerServiceWorker()` runs regardless.
+**v57:** the boot tail also calls `initSheetDragGuard()` (events.js) right after
+`initDelegation()` — same once-at-boot lifecycle, document-level capture listeners
+that survive every `innerHTML` rewrite.
 *Touch to:* change startup sequence, the SW update banner, or the integrity guard.
 The crash fallback that prevents a permanent blank screen lives here.

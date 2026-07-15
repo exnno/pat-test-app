@@ -138,7 +138,7 @@ let state = {
   // new install still shows the WIZARD and an upgrader still shows the MODAL —
   // unchanged behaviour. Future feature releases roll a new flag here and pass it
   // to dismissWelcome().
-  v56WelcomeSeen: false,  // v56: Retest reminders (commercial chase list)
+  v57WelcomeSeen: false,  // v57: field bug fixes (sheet scroll + dropdown taps)
   // v46: remembered Sessions-list scroll offset. Captured (in render) when
   // leaving Sessions for a session, restored when returning to Sessions. All
   // other navigation resets to the top. Transient — never persisted. The

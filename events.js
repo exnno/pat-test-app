@@ -234,6 +234,41 @@ function bindFocusFields() {
   }
 }
 
+// v57: scroll-drag guard for bottom sheets.
+//
+// Now that a long preset list scrolls (v57), a finger drag that scrolls the list
+// can still end in a `click` on whichever row happened to be under the finger —
+// so scrolling could silently switch the active preset. This tracks whether the
+// touch that began the current gesture moved far enough to count as a scroll
+// rather than a tap; the pick action consults it and ignores the click if so.
+//
+// `sheetDragMoved` is read by dispatch.js ('preset-sheet-pick'). It's reset on
+// every touchstart, so a genuine tap (no drift) always reads false and works
+// exactly as before. Mouse drags aren't tracked: desktop scrolls with a wheel or
+// scrollbar and doesn't produce this failure mode.
+let sheetDragMoved = false;
+const SHEET_DRAG_SLOP = 10;   // px of drift before a gesture counts as a scroll
+
+// Bound once at boot (not per-render) on the document, using the capture phase so
+// it sees the touch regardless of which sheet is open or when it was painted.
+function initSheetDragGuard() {
+  let sx = 0, sy = 0;
+  document.addEventListener('touchstart', e => {
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    sheetDragMoved = false;
+    sx = t.clientX; sy = t.clientY;
+  }, true);
+  document.addEventListener('touchmove', e => {
+    const t = e.touches && e.touches[0];
+    if (!t) return;
+    if (Math.abs(t.clientX - sx) > SHEET_DRAG_SLOP ||
+        Math.abs(t.clientY - sy) > SHEET_DRAG_SLOP) {
+      sheetDragMoved = true;
+    }
+  }, true);
+}
+
 // Light re-render of just the suggestions dropdown so we don't lose input focus
 function renderSuggestionsOnly() {
   const wrap = document.querySelector('.custom-type-wrap');
@@ -246,14 +281,28 @@ function renderSuggestionsOnly() {
     div.innerHTML = state.suggestions.map(s => `<button class="suggestion-item" data-suggest="${escapeHTML(s)}">${escapeHTML(s)}</button>`).join('');
     wrap.appendChild(div);
     div.querySelectorAll('[data-suggest]').forEach(el => {
-      el.onmousedown = (e) => { e.preventDefault(); };
-      el.onclick = () => {
+      // v57: commit on pointerdown, not click.
+      //
+      // The old path was: mousedown → preventDefault (to stop the input blurring
+      // and tearing the list down) → wait for click. On iOS that's a race the tap
+      // sometimes loses — the synthetic mouse events can be suppressed or delayed,
+      // blur wins, the 150ms blur timer removes the list, and the click never
+      // lands on anything. That's the intermittent "sometimes it works, sometimes
+      // not" the engineer reported.
+      //
+      // pointerdown fires first and reliably for touch, so committing there means
+      // the choice is captured before any blur can cancel it. preventDefault still
+      // stops the focus shift. `click` is left unbound: the list is already gone by
+      // then, so there's nothing left to double-fire.
+      const commit = (e) => {
+        e.preventDefault();
         state.form.itemType = el.dataset.suggest;
         const inp = document.getElementById('f-type');
         if (inp) inp.value = el.dataset.suggest;
         state.showSuggestions = false;
         renderSuggestionsOnly();
       };
+      el.onpointerdown = commit;
     });
   }
 }
@@ -281,10 +330,11 @@ function renderNfSuggestionsOnly(field) {
   div.innerHTML = state.nfSuggestions.map(s => `<button class="suggestion-item" ${attr}="${escapeHTML(s)}">${escapeHTML(s)}</button>`).join('');
   wrap.appendChild(div);
   div.querySelectorAll(`[${attr}]`).forEach(el => {
-    // preventDefault on mousedown so the input's blur doesn't fire and hide the
-    // list before the click lands.
-    el.onmousedown = (e) => { e.preventDefault(); };
-    el.onclick = () => {
+    // v57: commit on pointerdown rather than waiting for click — see the note in
+    // renderSuggestionsOnly. The mousedown→preventDefault→click path lost a race
+    // with the input's blur on iOS, making taps land only sometimes.
+    const commit = (e) => {
+      e.preventDefault();
       const picked = el.dataset[datasetKey];
       if (field === 'client') {
         state.newForm.clientId = picked;
@@ -299,6 +349,7 @@ function renderNfSuggestionsOnly(field) {
       state.nfSuggestions = [];
       renderNfSuggestionsOnly(field);
     };
+    el.onpointerdown = commit;
   });
 }
 
@@ -317,11 +368,11 @@ function renderLocationSuggestionsOnly() {
     div.innerHTML = state.locationSuggestions.map(s => `<button class="suggestion-item" data-loc-suggest="${escapeHTML(s)}">${escapeHTML(s)}</button>`).join('');
     wrap.appendChild(div);
     div.querySelectorAll('[data-loc-suggest]').forEach(el => {
-      // preventDefault on mousedown so the blur on the input doesn't fire
-      // before the click handler — without this, blur restores the original
-      // value and the click never lands.
-      el.onmousedown = (e) => { e.preventDefault(); };
-      el.onclick = () => {
+      // v57: commit on pointerdown rather than waiting for click — see the note in
+      // renderSuggestionsOnly. Without this the blur could win the race, restore
+      // the original value, and the tap would do nothing.
+      const commit = (e) => {
+        e.preventDefault();
         const picked = el.dataset.locSuggest;
         state.form.location = picked;
         const inp = document.getElementById('f-location');
@@ -337,6 +388,7 @@ function renderLocationSuggestionsOnly() {
         if (state.sqpEnabled) { invalidateSqpRow(); render(); }
         else renderLocationSuggestionsOnly();
       };
+      el.onpointerdown = commit;
     });
   }
 }

@@ -174,22 +174,22 @@ function render() {
   // genuinely-new install sees the wizard instead. Dismissed via the shared
   // dismissWelcome() (v50), wired in dispatch.js.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v56WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v57WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V56">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V57">
       <div class="bulk-sheet-handle"></div>
       <div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V56</h3>
+        <h3 class="bulk-sheet-title">What's new in V57</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>New: Retest reminders</strong> — a chase list to help you win repeat work. Flag a job you want to rebook, and when it's coming due the app reminds you to ring the customer.</li>
-        <li>It's <strong>off until you turn it on</strong> under Settings → Retest Reminders, and even then each job is opt-in — so subcontract work and one-offs never clutter the list.</li>
-        <li>When a reminder is due, a banner appears on your Sessions screen. Mark each one <strong>Booked</strong> or <strong>Declined</strong> to clear it.</li>
+        <li><strong>Fixed: the preset list now scrolls.</strong> If you press and hold Quick Pick and you've got a lot of presets, you can now scroll the list and reach every one — before, the ones at the top were out of reach.</li>
+        <li><strong>Fixed: typing suggestions now tap reliably.</strong> The list that appears as you type an item, location or client sometimes ignored your tap. It now picks first time, every time.</li>
+        <li>Scrolling a long preset list no longer risks switching your preset by accident.</li>
       </ul>
-      <button class="btn-primary" id="v56-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v57-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -1220,7 +1220,7 @@ function renderEntry() {
   if (state.presetSheetOpen) {
     const presets = state.itemPresets || [];
     const presetBody = presets.length ? `
-      <div class="preset-switch-list">
+      <div class="preset-switch-list sheet-scroll">
         ${presets.map(p => {
           const isActive = p.id === state.activePresetId;
           const items = Array.isArray(p.items) ? p.items : [];

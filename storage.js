@@ -431,7 +431,7 @@ function loadV11Settings() {
   // release had passed. Old keys remain harmlessly in users' localStorage; the
   // returning-user heuristic below detects them by prefix, so upgraders are still
   // recognised without keeping a flag per version.
-  state.v56WelcomeSeen = localStorage.getItem(V56_WELCOME_KEY) === '1';
+  state.v57WelcomeSeen = localStorage.getItem(V57_WELCOME_KEY) === '1';
 
   // v56: Retest reminders master switch. OFF unless the user has explicitly
   // turned it on (key holds '1'). Absent / anything else = off, so a fresh

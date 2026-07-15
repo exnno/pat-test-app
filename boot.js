@@ -110,6 +110,10 @@ applyTheme(state.theme);
 // first render. It survives every innerHTML rewrite (it's on #app, not its
 // children), so clickable controls wired via data-action never need re-binding.
 initDelegation();
+// v57: attach the bottom-sheet scroll-drag guard once, same lifecycle as the
+// delegated click listener. It listens on the document in the capture phase, so
+// it works for every sheet regardless of when that sheet was painted.
+initSheetDragGuard();
 // v16.1: boot-level safety net. A throw inside render() (e.g. a screen-specific
 // bug like the v16 entry-screen TDZ error) used to leave #app permanently
 // blank — and because the service worker serves the cached build, a plain

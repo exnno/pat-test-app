@@ -403,6 +403,12 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   from { opacity: 0; }
   to { opacity: 1; }
 }
+/* v57: the shell is capped at 85% of the viewport and lays its children out in a
+   column, so a long list inside can scroll instead of growing off the top of the
+   screen where it becomes unreachable (the V56 bug: with many presets, the ones
+   at the top of the list could not be reached). The shell itself never scrolls —
+   the handle/header stay pinned and only the designated body region scrolls (see
+   .sheet-scroll below). dvh with a vh fallback for older iOS. */
 .fail-sheet, .bulk-sheet {
   position: fixed;
   left: 0; right: 0; bottom: 0;
@@ -414,22 +420,45 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   max-width: 560px;
   margin: 0 auto;
   animation: slide-up 0.22s ease-out;
+  display: flex;
+  flex-direction: column;
+  max-height: 85vh;
+  max-height: 85dvh;
+  overflow: hidden;
+}
+
+/* v57: the scrolling body region inside a bottom sheet. Applied to the list that
+   can grow long; the sheet's header and handle sit outside it and stay put.
+   min-height:0 is required — without it a flex child refuses to shrink below its
+   content height and the overflow never engages. -webkit-overflow-scrolling gives
+   iOS momentum scrolling; overscroll-behavior stops a scroll that reaches the end
+   of the list from chaining through to the page behind the sheet. */
+.sheet-scroll {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 @keyframes slide-up {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
 }
+/* v57: flex-shrink:0 on both — the sheet is now a flex column, and without this
+   the handle and header would compress when the body is taller than the cap. */
 .fail-sheet-handle, .bulk-sheet-handle {
   width: 36px; height: 4px;
   background: var(--border-strong);
   border-radius: 2px;
   margin: 0 auto 10px;
+  flex-shrink: 0;
 }
 .fail-sheet-header, .bulk-sheet-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   margin-bottom: 14px;
+  flex-shrink: 0;
 }
 .fail-sheet-title, .bulk-sheet-title {
   font-size: 17px;
@@ -537,6 +566,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   border: 1px solid var(--accent-border);
   border-radius: 10px;
   text-align: left;
+  flex-shrink: 0;   /* v57: don't squash rows inside the scrolling list */
 }
 .preset-switch-option:active { background: var(--accent-hover); }
 .preset-switch-option.active {
@@ -578,6 +608,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   border: 1px dashed var(--accent-border);
   border-radius: 10px;
   text-align: center;
+  flex-shrink: 0;   /* v57: stays pinned below the scrolling list */
 }
 .preset-switch-edit:active { background: var(--accent-hover); }
 

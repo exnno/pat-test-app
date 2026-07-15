@@ -270,7 +270,11 @@ registerActions({
   // v47: quick-pick preset switcher sheet (opened by long-press on the grid;
   // the open is in events.js via openPresetSheet, not a click action).
   'preset-sheet-close': () => closePresetSheet(),
-  'preset-sheet-pick': (arg) => switchPresetFromSheet(arg),
+  // v57: the list scrolls now, so a drag that scrolls it can still end in a click
+  // on a row. If the gesture drifted (sheetDragMoved, events.js) it was a scroll,
+  // not a tap — ignore it rather than silently switching the preset. A real tap
+  // never drifts, so this is invisible in normal use.
+  'preset-sheet-pick': (arg) => { if (sheetDragMoved) return; switchPresetFromSheet(arg); },
   // Shortcut to the Settings preset page. Close the sheet, then navigate to the
   // Quick Pick Items settings page (which hosts the preset dropdown/editor).
   'preset-sheet-edit': () => { state.presetSheetOpen = false; setView('settingsItems'); }
@@ -646,7 +650,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissWelcome('v56WelcomeSeen', V56_WELCOME_KEY),
+  'welcome-dismiss': () => dismissWelcome('v57WelcomeSeen', V57_WELCOME_KEY),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 

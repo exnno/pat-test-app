@@ -1259,9 +1259,12 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v56: rolled forward — V56 on top, V53 dropped. -->
+      <!-- v8: rolling 3-version changelog. v57: rolled forward — V57 on top, V54 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V57</strong> · July 2026</p>
+        <p class="muted">Two fixes from the field. Press and hold Quick Pick and the preset list now scrolls properly — if you had a lot of presets, the ones at the top of the list were previously out of reach. And the suggestion list that drops down as you type an item, location or client name now responds to your tap first time; before, it would sometimes ignore it and you'd have to tap again. Scrolling a long preset list also no longer risks switching your preset by accident.</p>
 
         <p><strong>V56</strong> · June 2026</p>
         <p class="muted">A new Retest Reminders feature to help you win repeat work. Flag a job you'd like to rebook, and when it comes due the app reminds you to contact the customer and book the retest. It's off until you turn it on under Settings → Retest Reminders, and even then each job is opt-in — so subcontract work and one-offs never clutter your list. When a reminder is due, a banner appears on your Sessions screen; mark each job Rebooked or Declined to clear it. Reminders show inside the app when you open it (phone notifications are planned for the upcoming PAT Cloud service).</p>
@@ -1269,8 +1272,6 @@ function renderSettingsAbout() {
         <p><strong>V55</strong> · June 2026</p>
         <p class="muted">A couple of small fixes. The symbols in the reading columns on the PDF certificate were printing as the wrong characters — the ohms and "greater-than-or-equal" symbols now read clearly as Ohms, MOhms and &gt;= on the certificate. And the CSV export can now include a Polarity column for Class I items; like the other reading columns it's off by default, so turn it on under Settings → CSV columns if you want it.</p>
 
-        <p><strong>V54</strong> · June 2026</p>
-        <p class="muted">Your test readings now print on the PDF certificate. Earth continuity, insulation resistance, leakage and the equipment class each get their own column, and only the columns you've actually used appear — so a clean job stays tidy. Detailed jobs switch to landscape automatically when there are too many columns for an upright page. There's also a new polarity check for Class I items: a simple tick on the readings sheet that prints as its own column when used. You can keep readings off the certificate any time under Settings → Report → What to include. Finally, the readings sheet no longer slides up — it appears instantly, so tapping through a long list of passes feels quicker.</p>
       </div>
 
       <div class="info-card">
