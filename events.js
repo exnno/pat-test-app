@@ -249,6 +249,52 @@ function bindFocusFields() {
 let sheetDragMoved = false;
 const SHEET_DRAG_SLOP = 10;   // px of drift before a gesture counts as a scroll
 
+// v57.1 — suggestion pick: commit on pointerdown, then SWALLOW the trailing click.
+//
+// V57 moved the suggestion pick to `pointerdown` to beat the input-blur race, and
+// that half worked — but a touch tap still fires a real `click` after pointerup.
+// `preventDefault()` on a pointerdown does NOT cancel that click. So the commit ran,
+// the list was torn down and re-rendered, and then a ghost click landed at the same
+// screen point — now on whatever sits under where the option used to be. Directly
+// below the type field are the Notes control and the PASS button, which is exactly
+// what the field report described: taps that "jump to the note field" or "record the
+// item as Pass", plus picks that seemed not to register.
+//
+// The fix keeps the pointerdown commit (so the pick is reliable) and adds a
+// short-lived, capture-phase, one-shot global click swallow — the same technique the
+// V47 long-press already uses. After a commit we arm `swallowNextClick`; the very
+// next click anywhere is caught in the capture phase, cancelled, and disarms the
+// guard. A stray tap that produces no click (rare) is cleared by a short timeout so
+// the guard can never get stuck and eat a legitimate later click.
+let swallowNextClick = false;
+let swallowClickTimer = null;
+function armClickSwallow() {
+  swallowNextClick = true;
+  if (swallowClickTimer) clearTimeout(swallowClickTimer);
+  // Auto-disarm well after any synthetic click would have fired (~350ms on old iOS).
+  swallowClickTimer = setTimeout(() => { swallowNextClick = false; swallowClickTimer = null; }, 700);
+}
+function initSuggestionClickSwallow() {
+  document.addEventListener('click', (e) => {
+    if (!swallowNextClick) return;
+    swallowNextClick = false;
+    if (swallowClickTimer) { clearTimeout(swallowClickTimer); swallowClickTimer = null; }
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);   // capture phase — intercept before the delegated #app handler
+}
+
+// Shared pointerdown handler factory for every suggestion dropdown. `apply(el)` does
+// the field-specific state write; the wrapper handles the parts that are identical
+// across all three lists (hold focus, arm the click swallow, commit).
+function makeSuggestionCommit(apply) {
+  return (e) => {
+    e.preventDefault();     // hold input focus so blur doesn't tear the list down first
+    armClickSwallow();      // eat the trailing ghost click before it hits PASS/Notes
+    apply(e.currentTarget);
+  };
+}
+
 // Bound once at boot (not per-render) on the document, using the capture phase so
 // it sees the touch regardless of which sheet is open or when it was painted.
 function initSheetDragGuard() {
@@ -281,28 +327,17 @@ function renderSuggestionsOnly() {
     div.innerHTML = state.suggestions.map(s => `<button class="suggestion-item" data-suggest="${escapeHTML(s)}">${escapeHTML(s)}</button>`).join('');
     wrap.appendChild(div);
     div.querySelectorAll('[data-suggest]').forEach(el => {
-      // v57: commit on pointerdown, not click.
-      //
-      // The old path was: mousedown → preventDefault (to stop the input blurring
-      // and tearing the list down) → wait for click. On iOS that's a race the tap
-      // sometimes loses — the synthetic mouse events can be suppressed or delayed,
-      // blur wins, the 150ms blur timer removes the list, and the click never
-      // lands on anything. That's the intermittent "sometimes it works, sometimes
-      // not" the engineer reported.
-      //
-      // pointerdown fires first and reliably for touch, so committing there means
-      // the choice is captured before any blur can cancel it. preventDefault still
-      // stops the focus shift. `click` is left unbound: the list is already gone by
-      // then, so there's nothing left to double-fire.
-      const commit = (e) => {
-        e.preventDefault();
+      // v57.1: commit on pointerdown via the shared helper — see makeSuggestionCommit
+      // and initSuggestionClickSwallow above. pointerdown beats the input-blur race
+      // (the V57 fix); the click swallow kills the trailing ghost click that V57
+      // missed (which was landing on Notes / PASS below the field).
+      el.onpointerdown = makeSuggestionCommit((el) => {
         state.form.itemType = el.dataset.suggest;
         const inp = document.getElementById('f-type');
         if (inp) inp.value = el.dataset.suggest;
         state.showSuggestions = false;
         renderSuggestionsOnly();
-      };
-      el.onpointerdown = commit;
+      });
     });
   }
 }
@@ -330,11 +365,8 @@ function renderNfSuggestionsOnly(field) {
   div.innerHTML = state.nfSuggestions.map(s => `<button class="suggestion-item" ${attr}="${escapeHTML(s)}">${escapeHTML(s)}</button>`).join('');
   wrap.appendChild(div);
   div.querySelectorAll(`[${attr}]`).forEach(el => {
-    // v57: commit on pointerdown rather than waiting for click — see the note in
-    // renderSuggestionsOnly. The mousedown→preventDefault→click path lost a race
-    // with the input's blur on iOS, making taps land only sometimes.
-    const commit = (e) => {
-      e.preventDefault();
+    // v57.1: shared pointerdown commit + ghost-click swallow (see events.js top).
+    el.onpointerdown = makeSuggestionCommit((el) => {
       const picked = el.dataset[datasetKey];
       if (field === 'client') {
         state.newForm.clientId = picked;
@@ -348,8 +380,7 @@ function renderNfSuggestionsOnly(field) {
       state.showNfSuggestions = false;
       state.nfSuggestions = [];
       renderNfSuggestionsOnly(field);
-    };
-    el.onpointerdown = commit;
+    });
   });
 }
 
@@ -368,11 +399,8 @@ function renderLocationSuggestionsOnly() {
     div.innerHTML = state.locationSuggestions.map(s => `<button class="suggestion-item" data-loc-suggest="${escapeHTML(s)}">${escapeHTML(s)}</button>`).join('');
     wrap.appendChild(div);
     div.querySelectorAll('[data-loc-suggest]').forEach(el => {
-      // v57: commit on pointerdown rather than waiting for click — see the note in
-      // renderSuggestionsOnly. Without this the blur could win the race, restore
-      // the original value, and the tap would do nothing.
-      const commit = (e) => {
-        e.preventDefault();
+      // v57.1: shared pointerdown commit + ghost-click swallow (see events.js top).
+      el.onpointerdown = makeSuggestionCommit((el) => {
         const picked = el.dataset.locSuggest;
         state.form.location = picked;
         const inp = document.getElementById('f-location');
@@ -387,8 +415,7 @@ function renderLocationSuggestionsOnly() {
         // frozen row (v20) and full-render when Smart Quick Pick is on.
         if (state.sqpEnabled) { invalidateSqpRow(); render(); }
         else renderLocationSuggestionsOnly();
-      };
-      el.onpointerdown = commit;
+      });
     });
   }
 }

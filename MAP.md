@@ -544,16 +544,21 @@ drift slop or early release aborts; on fire calls `openPresetSheet()` and a capt
 phase click handler swallows the one following tap). Everything else is delegated in
 dispatch.js. Called from `render()` and `refreshEntryAfterLog()`.
 
-**v57 — dropdown tap reliability.** All three suggestion dropdowns
+**v57 / v57.1 — dropdown tap reliability.** All three suggestion dropdowns
 (`renderSuggestionsOnly`, `renderNfSuggestionsOnly`, `renderLocationSuggestionsOnly`)
-now **commit the pick on `pointerdown`** via a local `commit(e)` handler
-(`el.onpointerdown = commit`), replacing the old
-`onmousedown→preventDefault` + `onclick` pair. The old pair raced the input's blur
-(which tears the list down on a 150ms timer) and on iOS the tap sometimes lost —
-the intermittent "sometimes it works, sometimes not" bug. `pointerdown` fires first
-and reliably for touch, so the choice is captured before any blur can cancel it.
-`click` is deliberately left unbound (the list is gone by then; nothing to
-double-fire). **Don't reintroduce an `onclick` here.**
+**commit the pick on `pointerdown`**, via the shared `makeSuggestionCommit(apply)`
+factory (`el.onpointerdown = makeSuggestionCommit(el => {...})`). This replaced the
+old `onmousedown→preventDefault` + `onclick` pair, which raced the input's blur
+(list torn down on a 150ms timer) and on iOS sometimes lost the tap.
+**v57.1 completes the fix:** `pointerdown`'s `preventDefault()` does NOT cancel the
+`click` that a touch tap still fires afterwards, so V57 left a *ghost click* that
+landed on whatever sat under the option after the re-render (Notes / PASS below the
+field) — the "jumps to note / records Pass" regression. `makeSuggestionCommit` now
+also calls `armClickSwallow()`, and `initSuggestionClickSwallow()` (bound once at
+boot) is a one-shot capture-phase document click listener that cancels that single
+ghost click and disarms (700ms auto-disarm failsafe). Same technique as the V47
+long-press swallow. **Don't reintroduce an `onclick` here, and don't remove the
+click swallow.**
 
 **v57 — bottom-sheet scroll-drag guard.** `sheetDragMoved` (top-level `let`),
 `SHEET_DRAG_SLOP` (10px) and `initSheetDragGuard()` — called ONCE from `boot.js`
@@ -565,8 +570,9 @@ a click on whichever row was under the finger and silently switch the preset.
 `touchstart` resets the flag, so a genuine tap always reads false.
 
 *Touch to:* change one of the four autocomplete/casing fields, their dropdowns, the
-quick-pick long-press gesture, or the sheet drag guard. These stay direct because
-focus/blur/pointer timing can't be safely delegated (the fragile iOS area).
+quick-pick long-press gesture, the sheet drag guard, or the suggestion click-swallow.
+These stay direct because focus/blur/pointer timing can't be safely delegated (the
+fragile iOS area).
 
 ## dispatch.js (~949 ln) — delegated event handling
 The full delegated event system + three action registries, attached once to `#app`
@@ -618,6 +624,8 @@ const data-loss class). Boot tail: the guard's else-branch runs `load()`,
 render(); } catch …`; `registerServiceWorker()` runs regardless.
 **v57:** the boot tail also calls `initSheetDragGuard()` (events.js) right after
 `initDelegation()` — same once-at-boot lifecycle, document-level capture listeners
-that survive every `innerHTML` rewrite.
+that survive every `innerHTML` rewrite. **v57.1:** also calls
+`initSuggestionClickSwallow()` (events.js) alongside it — the one-shot ghost-click
+guard for suggestion picks.
 *Touch to:* change startup sequence, the SW update banner, or the integrity guard.
 The crash fallback that prevents a permanent blank screen lives here.

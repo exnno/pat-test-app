@@ -114,6 +114,9 @@ initDelegation();
 // delegated click listener. It listens on the document in the capture phase, so
 // it works for every sheet regardless of when that sheet was painted.
 initSheetDragGuard();
+// v57.1: arm the one-shot ghost-click swallow used by the suggestion dropdowns.
+// Document-level capture listener, same once-at-boot lifecycle as the others.
+initSuggestionClickSwallow();
 // v16.1: boot-level safety net. A throw inside render() (e.g. a screen-specific
 // bug like the v16 entry-screen TDZ error) used to leave #app permanently
 // blank — and because the service worker serves the cached build, a plain
