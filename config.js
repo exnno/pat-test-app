@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V58';
+const APP_VERSION = 'V59';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -64,7 +64,7 @@ const CAL_DUE_KEY = 'pat:caldue';
 // first-run-wizard gate, so nothing about upgrade behaviour changes. When a future
 // feature release rolls a new welcome, replace the line below with the new key
 // (e.g. V51_WELCOME_KEY) and pass it to dismissWelcome() — no new symbol pile.
-const V58_WELCOME_KEY = 'pat:v58welcome';  // v58: polish (contact details, faster long-press) + Glossary
+const V59_WELCOME_KEY = 'pat:v59welcome';  // v59: lifetime stats counter
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
 // sheet opens. Deliberately a single named constant so the threshold can be
@@ -77,6 +77,39 @@ const V58_WELCOME_KEY = 'pat:v58welcome';  // v58: polish (contact details, fast
 // long-press. If 1000 proves too eager in the field, ~1400 is the next step down
 // in aggression; ~600 is the usual long-press sweet spot if it still feels slow.
 const QUICK_PICK_LONGPRESS_MS = 1000;
+
+// ---------------------------------------------------------------------------
+// v59: lifetime stats counter (the muted line under the Settings hub footer).
+//
+// THE DESIGN, in one paragraph, because the "why" is the whole point:
+// the figure shown = LIVE (counted from the sessions currently in the app) plus
+// ARCHIVED (a small persisted bucket). Nothing is counted per-item as it's
+// logged. Instead, at the two — and only two — points where a session leaves the
+// app for good (deleteSession, pruneOldSessions), that session's tallies are
+// added into the bucket FIRST, then the session goes. That gives a running total
+// that survives pruning without any of the failure modes a per-item counter has:
+// no double-counting when an item is edited, no drift when a session is edited,
+// and no gap for CSV-imported sessions (they simply appear in the live half).
+// There are exactly four places state.sessions is reassigned — load, restore,
+// prune, delete — and the latter two are the hooks, so no path is unaccounted
+// for.
+//
+// Bucket shape: { items: int, fails: int, types: { 'Kettle': 12, … } }.
+const PAT_STATS_KEY = 'pat:archivedStats';
+
+// Cap on how many item-type names the archived bucket keeps. Only the top N by
+// count are retained on write; the tail is dropped. A dropped entry can never
+// win "most common" (it's by definition rarer than 50 others), and the cap stops
+// a one-off typo'd item type living in localStorage forever.
+const STATS_TYPE_MAP_MAX = 50;
+
+// The starting bucket for a user who has never had one — also the shape the
+// validator falls back to when stored data is missing or garbage. A factory, not
+// a shared object, so callers can't mutate the default (same pattern as
+// makeDefaultReportSettings).
+function makeEmptyArchivedStats() {
+  return { items: 0, fails: 0, types: {} };
+}
 // v42: the opt-in demo session created on the FRESH onboarding path (decision
 // 9A). Tagged with this flag on the session object so the app can label it as an
 // example and the user knows it is safe to delete. It is a perfectly ordinary

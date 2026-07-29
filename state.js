@@ -138,7 +138,15 @@ let state = {
   // new install still shows the WIZARD and an upgrader still shows the MODAL —
   // unchanged behaviour. Future feature releases roll a new flag here and pass it
   // to dismissWelcome().
-  v58WelcomeSeen: false,  // v58: polish (contact details, faster long-press) + Glossary
+  v59WelcomeSeen: false,  // v59: lifetime stats counter
+
+  // v59: the ARCHIVED half of the lifetime stats counter — the tallies of
+  // sessions that have been pruned or deleted, so the running total doesn't fall
+  // when old jobs are cleared out. { items, fails, types:{name:count} }.
+  // Persisted (PAT_STATS_KEY) and carried through backup/restore. The LIVE half
+  // is never stored — it's computed from state.sessions on demand by
+  // computeAppStats(), so it can't drift out of step with the actual data.
+  archivedStats: makeEmptyArchivedStats(),
   // v46: remembered Sessions-list scroll offset. Captured (in render) when
   // leaving Sessions for a session, restored when returning to Sessions. All
   // other navigation resets to the top. Transient — never persisted. The

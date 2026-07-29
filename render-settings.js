@@ -157,8 +157,24 @@ function renderSettingsHub() {
       ${searchBox}
       <div id="settings-hub-body">${renderSettingsHubBodyHTML()}</div>
       <p class="settings-footer">PATGo ${APP_VERSION} · © 2026 Peter Birchley<br>Data stored on this device only</p>
+      ${renderStatsFooterHTML()}
     </div>
   `;
+}
+
+// v59: the lifetime stats line, under the existing footer in the same muted
+// style. Returns '' when there is nothing to show (a blank install), so a new
+// user never sees "0 tested". Purely cosmetic — computeAppStats() returns null
+// rather than throwing if anything is off, and this returns '' on null.
+function renderStatsFooterHTML() {
+  const s = computeAppStats();
+  if (!s) return '';
+  const parts = [
+    `${s.items} tested`,
+    `${s.fails} failed (${s.failRate}%)`
+  ];
+  if (s.topType) parts.push(`Most common: ${escapeHTML(s.topType)}`);
+  return `<p class="settings-footer settings-stats">${parts.join(' · ')}</p>`;
 }
 
 // v32: a category sub-list — the pages within one category. Back returns to the
@@ -1264,18 +1280,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v58: rolled forward — V58 on top, V55 dropped. -->
+      <!-- v8: rolling 3-version changelog. v59: rolled forward — V59 on top, V56 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V59</strong> · July 2026</p>
+        <p class="muted">Your running totals now appear at the bottom of the Settings screen — how many items you've tested, how many failed and the percentage, and your most common item. The important part is that the total keeps climbing even when you tidy up: clearing out old exported jobs used to be invisible to any count, but those jobs are now tallied before they go, so a clear-out never costs you the numbers. Backups carry the totals too, so restoring puts them back exactly as they were. One honest limitation — it starts from the jobs you have on the phone right now, so anything you cleared out before this update isn't in the figure. From here on it's a true running total. The example job, if you still have one, is left out of the counts.</p>
 
         <p><strong>V58</strong> · July 2026</p>
         <p class="muted">A new Glossary under Settings → Help explains every term the app uses — Quick Pick, Smart Quick Pick, Multi Pick, presets, sessions, readings, backups and the rest — in plain English, so nothing in the app is guesswork. The press-and-hold on the Quick Pick row that opens the preset switcher now takes half as long, so it responds much sooner without any extra risk of opening by accident. And the Contact page now carries the real details — tap to email or to open the website.</p>
 
         <p><strong>V57</strong> · July 2026</p>
         <p class="muted">Two fixes from the field. Press and hold Quick Pick and the preset list now scrolls properly — if you had a lot of presets, the ones at the top of the list were previously out of reach. And the suggestion list that drops down as you type an item, location or client name now responds to your tap first time; before, it would sometimes ignore it and you'd have to tap again. Scrolling a long preset list also no longer risks switching your preset by accident.</p>
-
-        <p><strong>V56</strong> · June 2026</p>
-        <p class="muted">A new Retest Reminders feature to help you win repeat work. Flag a job you'd like to rebook, and when it comes due the app reminds you to contact the customer and book the retest. It's off until you turn it on under Settings → Retest Reminders, and even then each job is opt-in — so subcontract work and one-offs never clutter your list. When a reminder is due, a banner appears on your Sessions screen; mark each job Rebooked or Declined to clear it. Reminders show inside the app when you open it (phone notifications are planned for the upcoming PAT Cloud service).</p>
 
       </div>
 

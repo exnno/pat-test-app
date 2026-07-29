@@ -683,6 +683,10 @@ function pruneOldSessions() {
     confirmLabel: 'Clear',
     onConfirm: () => {
       const ids = new Set(targets.map(s => s.id));
+      // v59: archive the tallies of everything about to be cleared, BEFORE the
+      // filter removes them — otherwise a tidy-up would silently reduce the
+      // lifetime counter. `targets` is the exact set being removed.
+      archiveSessionStats(targets);
       state.sessions = state.sessions.filter(s => !ids.has(s.id));
       save();
       render();
@@ -894,7 +898,98 @@ function cancelReopenWarning() {
   render();
 }
 
+// ---------------------------------------------------------------------------
+// v59: lifetime stats counter
+//
+// Two halves. The LIVE half is counted from state.sessions every time it's
+// needed — never stored, so it can't drift from the actual data. The ARCHIVED
+// half (state.archivedStats) holds the tallies of sessions that have already
+// left the app via prune or delete. Displayed figure = live + archived.
+//
+// The demo/example session is excluded from BOTH halves, so a brand-new user who
+// accepted the example job doesn't start with inflated numbers, and deleting it
+// later doesn't archive its tallies either.
+// ---------------------------------------------------------------------------
+
+// Should this session count towards the stats at all?
+function sessionCountsForStats(sess) {
+  return !!sess && !sess[DEMO_SESSION_FLAG];
+}
+
+// Tally one array of sessions into { items, fails, types }. Pure — no state
+// access, no mutation of the input. Used by BOTH halves (the live count and the
+// archive hook), so the two can never disagree about what counts.
+function tallySessions(sessions) {
+  const out = { items: 0, fails: 0, types: {} };
+  (sessions || []).forEach(sess => {
+    if (!sessionCountsForStats(sess)) return;
+    (sess.items || []).forEach(it => {
+      if (!it) return;
+      out.items++;
+      if (it.result === 'fail') out.fails++;
+      const t = (it.itemType || '').trim();
+      if (t) out.types[t] = (out.types[t] || 0) + 1;
+    });
+  });
+  return out;
+}
+
+// Fold a set of sessions that are ABOUT TO BE REMOVED into the archived bucket.
+// MUST be called BEFORE the sessions are filtered out of state.sessions — it
+// reads their items. Does not save; both callers already call save() straight
+// after, which persists the bucket via saveSettings().
+//
+// Only ever called from the two removal paths (deleteSession, pruneOldSessions).
+// Calling it twice for the same session would double-count, which is why it is
+// deliberately NOT a general-purpose helper — it is paired with a removal.
+function archiveSessionStats(sessions) {
+  const add = tallySessions(sessions);
+  const bucket = state.archivedStats || makeEmptyArchivedStats();
+  bucket.items = (bucket.items || 0) + add.items;
+  bucket.fails = (bucket.fails || 0) + add.fails;
+  bucket.types = bucket.types || {};
+  Object.keys(add.types).forEach(t => {
+    bucket.types[t] = (bucket.types[t] || 0) + add.types[t];
+  });
+  state.archivedStats = bucket;
+}
+
+// The figure shown under the Settings hub footer. Returns null when there is
+// nothing to show, so the caller can omit the line entirely rather than render
+// "0 tested".
+// → { items, fails, failRate (string, 1dp), topType (string|'') }
+function computeAppStats() {
+  const live = tallySessions(state.sessions);
+  const arch = normaliseArchivedStats(state.archivedStats);
+
+  const items = live.items + arch.items;
+  if (items === 0) return null;
+
+  const fails = Math.min(live.fails + arch.fails, items);
+
+  const types = { ...arch.types };
+  Object.keys(live.types).forEach(t => {
+    types[t] = (types[t] || 0) + live.types[t];
+  });
+  // Ties broken alphabetically so the displayed winner is stable between renders
+  // rather than flipping on object key order.
+  const topType = Object.keys(types)
+    .sort((a, b) => types[b] - types[a] || a.localeCompare(b))[0] || '';
+
+  return {
+    items,
+    fails,
+    failRate: (items === 0 ? 0 : (fails / items) * 100).toFixed(1),
+    topType
+  };
+}
+
 function deleteSession(id) {
+  // v59: fold this session's tallies into the archived stats BEFORE it goes, so
+  // the lifetime counter doesn't fall when a job is deleted. Must run before the
+  // filter below — it reads the session's items.
+  const going = state.sessions.filter(s => s.id === id);
+  if (going.length) archiveSessionStats(going);
   state.sessions = state.sessions.filter(s => s.id !== id);
   if (id === state.activeId) {
     state.activeId = null;

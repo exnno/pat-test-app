@@ -1058,6 +1058,17 @@ body.has-update-banner .screen { padding-top: 64px; }
   color: var(--text-muted);
 }
 
+/* v59: the lifetime stats line, directly under the version/copyright footer.
+   Tighter top margin so it reads as part of the same block rather than a new
+   section, and slightly dimmed further — it's a bit of fun, not information the
+   user needs to act on. Wraps naturally on a narrow screen. */
+.settings-stats {
+  margin-top: 8px;
+  opacity: 0.75;
+  padding: 0 16px 4px;
+  line-height: 1.5;
+}
+
 /* Display Settings — radio group for theme, toggle for haptics */
 .theme-options {
   display: flex;

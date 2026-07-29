@@ -1,4 +1,4 @@
-# PAT App — Code Map (V58)
+# PAT App — Code Map (V59)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -47,7 +47,7 @@ See `THIRD-PARTY-LICENSES.txt`.
 ---
 
 ## config.js (~620 ln) — constants & defaults, pure data
-`APP_VERSION` ('V58'); all `*_KEY` localStorage key names; the calibration/backup
+`APP_VERSION` ('V59'); all `*_KEY` localStorage key names; the calibration/backup
 tuning constants (`MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`); SQP tuning (`SQP_PARTIAL_WEIGHT`,
 `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`); default lists (`DEFAULT_ITEM_TYPES`,
@@ -77,7 +77,17 @@ Welcome key is now `V54_WELCOME_KEY`.
 No new structural constants — V55 added the `readingPolarity` CSV column (above)
 and a PDF glyph fix in report.js; both additive.
 
-**v58 constants:** Welcome key rolled to `V58_WELCOME_KEY` (`pat:v58welcome`).
+**v59 constants (lifetime stats counter):** Welcome key rolled to
+`V59_WELCOME_KEY` (`pat:v59welcome`). `PAT_STATS_KEY` (`pat:archivedStats`) — the
+persisted ARCHIVED half of the stats counter. `STATS_TYPE_MAP_MAX` (50) — cap on
+how many item-type names the bucket keeps; only the top N by count survive a
+write, so a typo'd type can't live in storage forever and a dropped entry can
+never win "most common". `makeEmptyArchivedStats()` — factory (not a shared
+object) returning `{items:0, fails:0, types:{}}`, used as both the default and
+the validator's fallback. **`backupVersion` stays 5** — the bucket is additive on
+the backup and missing-field-tolerant.
+
+**v58 constants:** Welcome key was `V58_WELCOME_KEY` (`pat:v58welcome`).
 `QUICK_PICK_LONGPRESS_MS` 2000 → **1000** (see above). `SETTINGS_CATEGORIES`
 catHelp now lists `settingsGlossary` between `settingsAbout` and `settingsContact`;
 `SETTINGS_PAGE_META` has its entry (📖 / 'Glossary' / a wide alias string so
@@ -122,11 +132,11 @@ can't fire it) and the capture-phase click swallow that eats the tap following a
 fired long-press.
 
 **Welcome key (v50 pattern):** ONLY the current welcome key is defined — now
-`V58_WELCOME_KEY = 'pat:v58welcome'`. The 28 historical keys (V12…V48) were removed
+`V59_WELCOME_KEY = 'pat:v59welcome'`. The 28 historical keys (V12…V48) were removed
 in v50; they were one-release markers nothing referenced after shipping. Old keys
 remain harmlessly in users' localStorage and are detected by prefix in storage.js.
 Each feature release replaces this one line with its new key and passes it to
-`dismissWelcome()` — v58 is the current holder.
+`dismissWelcome()` — v59 is the current holder.
 
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, or restructure Settings / add a new
@@ -154,7 +164,13 @@ v54 Class I bool, default false}),
 `readingsPendingResult`, `readingsPendingFailReason`. All sheet transients reset on
 close and on navigation (loadFormForCursor / setView) via `closeReadingsSheetState()`.
 
-**Welcome flag (v50 pattern):** ONLY the current `v58WelcomeSeen` is kept. Historical
+**v59:** `archivedStats` (`{items, fails, types:{name:count}}`) — the ARCHIVED half
+of the lifetime stats counter, i.e. the tallies of sessions already pruned or
+deleted. Persisted via `PAT_STATS_KEY` and carried through backup/restore. The LIVE
+half is deliberately NOT in state — it's recomputed from `state.sessions` on demand
+by `computeAppStats()`, so it can never drift out of step with the real data.
+
+**Welcome flag (v50 pattern):** ONLY the current `v59WelcomeSeen` is kept. Historical
 `vNNWelcomeSeen` flags were removed in v50 — each was written once and never read
 after its release. The first-run-wizard gate detects past welcomes via
 `hasAnyLegacyWelcomeKey()` (storage.js).
@@ -204,8 +220,17 @@ likewise, `reportFilenamePattern`,
 `signature`/`signaturePosition`, `headerColor`/`accentColor` via `safeHexColor`, and
 the cert fields). Templates: `loadReportTemplates`/`saveReportTemplates`.
 
-**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V58_WELCOME_KEY` →
-`state.v58WelcomeSeen`. `hasAnyLegacyWelcomeKey()` scans localStorage for any
+**v59 stats bucket:** `loadArchivedStats()` (reads `PAT_STATS_KEY`, never throws —
+corrupt or absent yields a clean empty bucket) and the shared boundary validator
+`normaliseArchivedStats(candidate)` — used by load AND backup-restore AND on every
+write in `saveSettings`, so a bad value can neither be read in nor persisted out.
+Defensive on every field: non-object/array → empty; non-finite, negative or
+fractional counts → 0; `fails` clamped to `items` (keeps the displayed percentage
+inside 0–100); the type map keeps only string keys with a positive count and is
+capped to `STATS_TYPE_MAP_MAX`, highest counts first.
+
+**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V59_WELCOME_KEY` →
+`state.v59WelcomeSeen`. `hasAnyLegacyWelcomeKey()` scans localStorage for any
 `pat:v<n>welcome` key — used by the first-run-wizard gate to recognise a returning
 user without keeping a per-version flag. The gate:
 `onboardedV33Seen = explicitlyOnboarded || sessions>0 || engineerName || hasAnyLegacyWelcomeKey()`.
@@ -296,6 +321,13 @@ additive and missing-field-tolerant (items/sessions ride through wholesale; an o
 ignores the unknown key, a new app reads it). The readings feature, v54's polarity and
 v56's retest fields deliberately did NOT spend a bump; the earmarked 6 is reserved
 for a genuine incompatible schema change.
+**v59:** `buildBackup` carries `archivedStats`; the restore path sets
+`state.archivedStats = normaliseArchivedStats(data.archivedStats)` through the SAME
+storage.js validator as load. Restore means restore — the counter returns to exactly
+what it was when the backup was taken, so live + archived stays self-consistent
+instead of desyncing. A pre-v59 backup has no such key and correctly yields an empty
+bucket (the total then reflects exactly the sessions in that backup). Additive and
+missing-field-tolerant → **`backupVersion` stays 5**.
 *Touch to:* change the JSON backup shape or restore path. **Bump `backupVersion` only
 for a genuine incompatible change; keep old-backup compatibility.**
 
@@ -308,6 +340,9 @@ restore). Five groups: presets & lists / report settings (incl. templates) / CSV
 columns / tester & calibration / app preferences. Bundle marker `kind:"pat-setup"`,
 `setupVersion:1`, plus a user label. All native pop-ups → info/confirm sheets +
 toast.
+**v59 note:** the archived stats bucket is deliberately **NOT** in the setup bundle.
+Export Setup is config-only, and the stats are derived from job data — a shared setup
+must never carry another engineer's totals.
 *Touch to:* change what a shared setup carries or the bundle format. **Config-only —
 must never read or write sessions.**
 
@@ -391,7 +426,27 @@ never logs). Core helpers: `uid`, `todayISO`, `activeSession`, `normaliseItemTyp
 `normaliseLocation`, `calibrationStatus`, `nextAssetNo`, `getCarryForwardLocation`,
 `findDuplicateAssetIndex`, `computeSuggestions`, `computeLocationSuggestions`,
 `addDescriptionIfNew`, `sortedSessions`, `sessionMatchesControlFilters`,
-`filteredSessions`. Theme: `applyTheme`. Export-state: `exportStatus`,
+`filteredSessions`. **v59 lifetime stats counter:** `sessionCountsForStats(sess)` (excludes the
+demo/example session — `DEMO_SESSION_FLAG` — from BOTH halves, so a new user who
+accepted the example job doesn't start inflated and deleting it later archives
+nothing); `tallySessions(sessions)` (PURE — returns `{items, fails, types}` for an
+array of sessions; shared by the live count and the archive hook so the two can
+never disagree about what counts); `archiveSessionStats(sessions)` (folds the
+tallies of sessions ABOUT TO BE REMOVED into `state.archivedStats` — **must be
+called before they're filtered out**, and is deliberately paired with a removal
+rather than being a general helper, because calling it twice for one session would
+double-count); and `computeAppStats()` (the display figure — live + archived,
+returns `{items, fails, failRate (1dp string), topType}` or **null** when there's
+nothing to show, so the caller omits the line rather than printing "0 tested";
+ties on most-common break alphabetically so the winner is stable between renders).
+**The two hooks are the whole feature:** `deleteSession` archives the session
+before filtering it out, and `pruneOldSessions`'s `onConfirm` archives `targets`
+before removing them. Both already call `save()` immediately after, which persists
+the bucket via `saveSettings` — no new save path. There are exactly FOUR places
+`state.sessions` is reassigned (load, restore, prune, delete); the latter two are
+these hooks, so no removal path is unaccounted for. Item-level deletes are
+deliberately NOT archived — that's correcting a mis-entry, not history leaving.
+Theme: `applyTheme`. Export-state: `exportStatus`,
 `markSessionExported`, `markSessionDirty`, `unexportedSessionCount`,
 `unexportedSessions`, `prunableSessions`, `savePruneAge`, `pruneOldSessions`.
 **v56 Retest reminders (commercial chase list):** `defaultRetestMonths()` (reads the
@@ -460,7 +515,7 @@ Report signature: `storeSignatureFromSource`, `handleReportSignatureFile`,
 **Welcome dismiss (v50):** the 17 near-identical `dismissVNNWelcome` functions were
 replaced by ONE `dismissWelcome(seenFlag, key)` — sets `state[seenFlag]=true`,
 persists `key`, re-renders. The `welcome-dismiss` action (dispatch.js) calls it with the current pair —
-`('v58WelcomeSeen', V58_WELCOME_KEY)` as of v58. Each feature release passes its own.
+`('v59WelcomeSeen', V59_WELCOME_KEY)` as of v59. Each feature release passes its own.
 
 `setView` clears transient overlays on every transition (fail sheet, multi-pick
 sheet, bulk-edit menus, client dialogs, the New Session form, `presetSheetOpen`).
@@ -501,7 +556,7 @@ session, with a ✓ action opening the contacted-action sheet: Rebooked / Declin
 reminding; defence-bounces to Sessions when the feature is off).
 Shared: `emptyStateHTML(icon,title,body,actionLabel,actionName)`;
 `refreshSettingsHubBodyOnly` (live settings search). The **welcome modal** block
-(**v58** gates on `v58WelcomeSeen`; suppressed while the migration prompt or first-run
+(**v59** gates on `v59WelcomeSeen`; suppressed while the migration prompt or first-run
 wizard is up; shows the PATGo icon; dismissed via the shared `welcome-dismiss`
 action → `dismissWelcome`). **v57:** the preset sheet's list carries
 `.sheet-scroll` (styles.css) — the class that makes a long list scroll inside the
@@ -536,7 +591,12 @@ Templates and "What to include" sections (the include toggles include
 `report-show-appcredit` and the nested `report-show-footerlogo`). `renderSettingsItems`
 carries the `.settings-tip` note about the entry-screen long-press preset switcher.
 `renderSetupSection()` is wrapped by `renderSettingsSetup()` (its own page in the
-Data category). **v58** `GLOSSARY_GROUPS` (a top-level `const` in this file — five groups: Testing /
+Data category). **v59** `renderStatsFooterHTML()` — the lifetime stats line under the Settings hub
+footer (`renderSettingsHub` appends it). Reads `computeAppStats()` (session.js) and
+returns **`''`** when that's null, so a blank install shows nothing rather than
+"0 tested"; the "Most common" clause is also dropped when no item carries a type.
+Item types are `escapeHTML`-ed. Styled `.settings-footer .settings-stats`.
+**v58** `GLOSSARY_GROUPS` (a top-level `const` in this file — five groups: Testing /
 Test Readings / Jobs & sessions / Output / Data, each an array of `[term, definition]`
 pairs) and `renderSettingsGlossary()`, which maps it to `<dl class="glossary-list">`
 blocks. Static and read-only: no state, no actions, no storage, nothing in dispatch.
@@ -552,7 +612,7 @@ finger-sized hit area; the placeholder "Support hours" block was removed. Plain 
 elements are safe inside `#app` because `handleDelegatedClick` returns early when no
 ancestor carries `data-action`, leaving the link's default behaviour intact.
 **The About changelog lives here** (`renderSettingsAbout`) — a rolling
-3-version window; v58 shows V58/V57/V56 (V55 dropped). The About page also has the "Set up another
+3-version window; v59 shows V59/V58/V57 (V56 dropped). The About page also has the "Set up another
 device" (`restart-onboarding`) and "Show me around" (`open-tour`) cards, and a
 long-press hidden menu on the title revealing three cloud-prep stub pages
 (`renderCloudAccount`, `renderCloudSync`, `renderCloudSubscription` — mock data, for
@@ -636,8 +696,8 @@ removed).
 **v57** `preset-sheet-pick` now short-circuits on `sheetDragMoved` (events.js) so a
 scroll-drag inside the now-scrollable preset list can't switch the preset by accident.
 
-**Welcome dismiss (v50):** `'welcome-dismiss': () => dismissWelcome('v58WelcomeSeen',
-V58_WELCOME_KEY)` — was a per-version `dismissVNNWelcome()` call; now the one
+**Welcome dismiss (v50):** `'welcome-dismiss': () => dismissWelcome('v59WelcomeSeen',
+V59_WELCOME_KEY)` — was a per-version `dismissVNNWelcome()` call; now the one
 parameterised helper.
 *Touch to:* add/route any delegated click/input/change handler. Only the four focus-
 sensitive fields + the quick-pick long-press are NOT here (see events.js).

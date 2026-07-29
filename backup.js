@@ -68,6 +68,12 @@ function buildBackup() {
     // and ride along inside `sessions`).
     reportTemplates: state.reportTemplates,
     lastBackupAt: state.lastBackupAt,
+    // v59: archived half of the lifetime stats counter. Additive — old backups
+    // without it restore to an empty bucket, which is correct: the total then
+    // reflects exactly the sessions in that backup. No backupVersion bump.
+    // Deliberately NOT part of the Export Setup bundle — Export Setup is
+    // config-only and this is derived from job data.
+    archivedStats: state.archivedStats,
     // v43: cloud prep. Auth state (userId, authToken, loginTime). Passthrough
     // for now; will persist server-side in cloud phase. Old backups without it
     // restore with null (logged-out). Additive — no backupVersion bump.
@@ -182,6 +188,12 @@ function restoreBackupFromFile(file) {
       // session that was never flagged (every pre-v56 backup).
       normaliseSessionRetest(s);
     });
+    // v59: archived stats bucket. Restore means restore — the counter goes back
+    // to exactly what it was when this backup was taken, so live + archived
+    // stays self-consistent rather than desyncing. Routed through the SAME
+    // validator as load, so a hand-edited or corrupt backup can't poison it; a
+    // pre-v59 backup has no such key and correctly yields an empty bucket.
+    state.archivedStats = normaliseArchivedStats(data.archivedStats);
     // v9: preset restoration. Three cases:
     //   New backup with presets → use directly.
     //   Old backup with itemTypes only → convert to a single 'Default' preset.

@@ -169,28 +169,28 @@ function render() {
   ` : '';
 
   // One-time "what's new" modal, shown once after an update until dismissed.
-  // Gates on the CURRENT release's seen flag (v58WelcomeSeen). Suppressed while
+  // Gates on the CURRENT release's seen flag (v59WelcomeSeen). Suppressed while
   // the v9 migration prompt is up (it needs a name commit first) or while the
   // first-run wizard is showing — so an UPGRADING user sees this modal and a
   // genuinely-new install sees the wizard instead. Dismissed via the shared
   // dismissWelcome() (v50), wired in dispatch.js.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v58WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v59WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V58">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V59">
       <div class="bulk-sheet-handle"></div>
       <div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V58</h3>
+        <h3 class="bulk-sheet-title">What's new in V59</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>New: a Glossary.</strong> Settings › Help › Glossary explains every term the app uses — Quick Pick, Smart Quick Pick, Multi Pick, sessions, readings and the rest — in plain English.</li>
-        <li><strong>Faster preset switching.</strong> The press-and-hold on Quick Pick that opens the preset list now takes half as long, so it responds much sooner.</li>
-        <li>Contact details are now on the Contact page — tap to email or open the website.</li>
+        <li><strong>New: your running totals.</strong> At the bottom of the Settings screen you'll now find how many items you've tested, how many failed, and your most common item.</li>
+        <li>The count keeps going up even when you clear out old jobs — clearing exported sessions no longer loses them from your total.</li>
+        <li>It starts from the jobs you have right now, so anything cleared out before this update isn't included.</li>
       </ul>
-      <button class="btn-primary" id="v58-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v59-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 

@@ -431,7 +431,13 @@ function loadV11Settings() {
   // release had passed. Old keys remain harmlessly in users' localStorage; the
   // returning-user heuristic below detects them by prefix, so upgraders are still
   // recognised without keeping a flag per version.
-  state.v58WelcomeSeen = localStorage.getItem(V58_WELCOME_KEY) === '1';
+  state.v59WelcomeSeen = localStorage.getItem(V59_WELCOME_KEY) === '1';
+
+  // v59: archived half of the lifetime stats counter (tallies of pruned/deleted
+  // sessions). Absent on every pre-v59 install, which correctly yields an empty
+  // bucket — an upgrader's counter starts from whatever sessions they still have
+  // and becomes a true running total from here on.
+  state.archivedStats = loadArchivedStats();
 
   // v56: Retest reminders master switch. OFF unless the user has explicitly
   // turned it on (key holds '1'). Absent / anything else = off, so a fresh
@@ -524,6 +530,58 @@ function loadV11Settings() {
   // as ensureAllCsvColumns). enabled stays whatever was stored (default false).
   state.reportSettings = loadReportSettings();
   state.reportTemplates = loadReportTemplates();   // v36
+}
+
+// v59: read the archived stats bucket. Never throws — a corrupt or absent key
+// yields a clean empty bucket, so the stats line degrades to "live sessions
+// only" rather than breaking the Settings screen.
+function loadArchivedStats() {
+  let stored = null;
+  try {
+    stored = JSON.parse(localStorage.getItem(PAT_STATS_KEY) || 'null');
+  } catch (e) {
+    stored = null;
+  }
+  return normaliseArchivedStats(stored);
+}
+
+// v59: coerce any candidate object (from localStorage OR a restored backup) into
+// a clean archived-stats bucket. Shared by load AND backup-restore so both paths
+// enforce identical shape — the same contract normaliseReportSettings honours.
+//
+// Defensive on every field, because this number is cosmetic and must NEVER be
+// able to break a screen or poison a save:
+//   • non-object / null / array          → empty bucket
+//   • non-finite, negative or fractional  → 0
+//   • fails > items                       → clamped to items (an impossible
+//     state; clamping keeps the displayed percentage inside 0–100)
+//   • types: only string keys with a valid positive count survive; the map is
+//     capped to STATS_TYPE_MAP_MAX entries, keeping the highest counts.
+function normaliseArchivedStats(stored) {
+  const out = makeEmptyArchivedStats();
+  if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return out;
+
+  const cleanInt = (v) => {
+    const n = Number(v);
+    if (!Number.isFinite(n) || n < 0) return 0;
+    return Math.floor(n);
+  };
+
+  out.items = cleanInt(stored.items);
+  out.fails = cleanInt(stored.fails);
+  if (out.fails > out.items) out.fails = out.items;
+
+  const types = stored.types;
+  if (types && typeof types === 'object' && !Array.isArray(types)) {
+    const pairs = Object.keys(types)
+      .filter(k => typeof k === 'string' && k.trim() !== '')
+      .map(k => [k, cleanInt(types[k])])
+      .filter(([, n]) => n > 0)
+      .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+      .slice(0, STATS_TYPE_MAP_MAX);
+    pairs.forEach(([k, n]) => { out.types[k] = n; });
+  }
+  return out;
 }
 
 // v30: validate + merge stored report settings over defaults. Returns an
@@ -723,6 +781,10 @@ function saveSettings() {
   // v19: Clients & Sites (readable long-key arrays).
   localStorage.setItem(CLIENTS_KEY, JSON.stringify(state.clients || []));
   localStorage.setItem(SITES_KEY, JSON.stringify(state.sites || []));
+  // v59: archived stats bucket. Written through the same validator that reads
+  // it, so a bad in-memory value can never be persisted — and the type map is
+  // capped here as well as on read, which is what actually stops it growing.
+  localStorage.setItem(PAT_STATS_KEY, JSON.stringify(normaliseArchivedStats(state.archivedStats)));
   // v30: PDF report settings (single blob incl. logo).
   saveReportSettings();
   // lastBackupAt + backupSnoozedUntil are written via their own helpers
