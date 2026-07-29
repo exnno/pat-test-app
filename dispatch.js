@@ -650,7 +650,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissWelcome('v57WelcomeSeen', V57_WELCOME_KEY),
+  'welcome-dismiss': () => dismissWelcome('v58WelcomeSeen', V58_WELCOME_KEY),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 

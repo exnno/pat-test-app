@@ -1256,6 +1256,39 @@ body.has-update-banner .screen { padding-top: 64px; }
 .info-card .muted { color: var(--text-muted); font-size: 13px; }
 .info-card a { color: var(--accent); text-decoration: none; }
 
+/* v58: Contact page links (email / website). The .info-card a rule above gives
+   them the accent colour; this adds a finger-sized hit area and an underline so
+   they read as tappable rather than as coloured text. inline-block is what makes
+   the vertical padding count towards the tap target on iOS. */
+.contact-link {
+  display: inline-block;
+  padding: 6px 0;
+  font-size: 16px;
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  word-break: break-word;
+}
+
+/* v58: Glossary. A definition list per group — term on its own line, plain-English
+   definition beneath it. dl/dt/dd rather than paragraphs so it reads correctly to
+   a screen reader and needs no extra markup for the indent. */
+.glossary-group + .glossary-group { margin-top: 4px; }
+.glossary-list { margin: 0; }
+.glossary-list dt {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  margin-top: 14px;
+}
+.glossary-list dt:first-child { margin-top: 0; }
+.glossary-list dd {
+  margin: 3px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
 /* Selection mode (overview bulk-edit) */
 .selection-bar {
   position: fixed;

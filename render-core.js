@@ -124,6 +124,7 @@ function render() {
   else if (v === 'retestReminders') html = renderRetestReminders();   // v56
   else if (v === 'settingsCalculator') html = renderSettingsCalculator();
   else if (v === 'settingsAbout') html = renderSettingsAbout();
+  else if (v === 'settingsGlossary') html = renderSettingsGlossary();   // v58
   else if (v === 'settingsContact') html = renderSettingsContact();
   // v43: cloud prep pages (not wired into nav yet, revealed via long-press on About)
   else if (v === 'cloudAccount') html = renderCloudAccount();
@@ -168,28 +169,28 @@ function render() {
   ` : '';
 
   // One-time "what's new" modal, shown once after an update until dismissed.
-  // Gates on the CURRENT release's seen flag (v53WelcomeSeen). Suppressed while
+  // Gates on the CURRENT release's seen flag (v58WelcomeSeen). Suppressed while
   // the v9 migration prompt is up (it needs a name commit first) or while the
   // first-run wizard is showing — so an UPGRADING user sees this modal and a
   // genuinely-new install sees the wizard instead. Dismissed via the shared
   // dismissWelcome() (v50), wired in dispatch.js.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v57WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v58WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V57">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V58">
       <div class="bulk-sheet-handle"></div>
       <div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V57</h3>
+        <h3 class="bulk-sheet-title">What's new in V58</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Fixed: the preset list now scrolls.</strong> If you press and hold Quick Pick and you've got a lot of presets, you can now scroll the list and reach every one — before, the ones at the top were out of reach.</li>
-        <li><strong>Fixed: typing suggestions now tap reliably.</strong> The list that appears as you type an item, location or client sometimes ignored your tap. It now picks first time, every time.</li>
-        <li>Scrolling a long preset list no longer risks switching your preset by accident.</li>
+        <li><strong>New: a Glossary.</strong> Settings › Help › Glossary explains every term the app uses — Quick Pick, Smart Quick Pick, Multi Pick, sessions, readings and the rest — in plain English.</li>
+        <li><strong>Faster preset switching.</strong> The press-and-hold on Quick Pick that opens the preset list now takes half as long, so it responds much sooner.</li>
+        <li>Contact details are now on the Contact page — tap to email or open the website.</li>
       </ul>
-      <button class="btn-primary" id="v57-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v58-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 

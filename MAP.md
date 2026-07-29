@@ -1,4 +1,4 @@
-# PAT App — Code Map (V57)
+# PAT App — Code Map (V58)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -47,7 +47,7 @@ See `THIRD-PARTY-LICENSES.txt`.
 ---
 
 ## config.js (~620 ln) — constants & defaults, pure data
-`APP_VERSION` ('V57'); all `*_KEY` localStorage key names; the calibration/backup
+`APP_VERSION` ('V58'); all `*_KEY` localStorage key names; the calibration/backup
 tuning constants (`MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`); SQP tuning (`SQP_PARTIAL_WEIGHT`,
 `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`); default lists (`DEFAULT_ITEM_TYPES`,
@@ -77,7 +77,15 @@ Welcome key is now `V54_WELCOME_KEY`.
 No new structural constants — V55 added the `readingPolarity` CSV column (above)
 and a PDF glyph fix in report.js; both additive.
 
-**v57 constants:** Welcome key rolled to `V57_WELCOME_KEY` (`pat:v57welcome`) —
+**v58 constants:** Welcome key rolled to `V58_WELCOME_KEY` (`pat:v58welcome`).
+`QUICK_PICK_LONGPRESS_MS` 2000 → **1000** (see above). `SETTINGS_CATEGORIES`
+catHelp now lists `settingsGlossary` between `settingsAbout` and `settingsContact`;
+`SETTINGS_PAGE_META` has its entry (📖 / 'Glossary' / a wide alias string so
+settings-search finds it on 'jargon', 'terms', 'what does … mean' and on the
+individual term names). No new storage keys, no data-model change →
+**`backupVersion` stays 5**.
+
+**v57 constants:** Welcome key was `V57_WELCOME_KEY` (`pat:v57welcome`) —
 supersedes the v56 key below. No other constant changes: V57 is a bug-fix release
 (bottom-sheet scrolling + suggestion-dropdown tap reliability), all behavioural, no
 new storage keys → **`backupVersion` stays 5**.
@@ -106,14 +114,19 @@ Settings hub: `SETTINGS_CATEGORIES` (the six groups → page ids + icon/title/bl
 and `SETTINGS_PAGE_META` (per-page icon/title + search `aliases`) — the single
 source of truth for the two-level Settings hub, sub-lists, search and back-nav.
 First-run: `ONBOARD_KEY` (`pat:onboardedV33`). Cloud prep: `PAT_AUTH_KEY`.
-Quick-pick long-press: `QUICK_PICK_LONGPRESS_MS` (2000).
+Quick-pick long-press: `QUICK_PICK_LONGPRESS_MS` (**1000 since v58**, was 2000) —
+how long to hold the quick-pick grid before the preset switcher opens. The two
+guards against an accidental open are independent of this number and unchanged:
+the 12px drift slop in events.js (a moving finger aborts the timer, so scrolling
+can't fire it) and the capture-phase click swallow that eats the tap following a
+fired long-press.
 
-**Welcome key (v50):** ONLY the current welcome key is defined —
-`V49_WELCOME_KEY = 'pat:v49welcome'`. The 28 historical keys (V12…V48) were removed
+**Welcome key (v50 pattern):** ONLY the current welcome key is defined — now
+`V58_WELCOME_KEY = 'pat:v58welcome'`. The 28 historical keys (V12…V48) were removed
 in v50; they were one-release markers nothing referenced after shipping. Old keys
 remain harmlessly in users' localStorage and are detected by prefix in storage.js.
-A future feature release replaces this one line with its new key and passes it to
-`dismissWelcome()`.
+Each feature release replaces this one line with its new key and passes it to
+`dismissWelcome()` — v58 is the current holder.
 
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, or restructure Settings / add a new
@@ -141,7 +154,7 @@ v54 Class I bool, default false}),
 `readingsPendingResult`, `readingsPendingFailReason`. All sheet transients reset on
 close and on navigation (loadFormForCursor / setView) via `closeReadingsSheetState()`.
 
-**Welcome flag (v50 pattern):** ONLY the current `v56WelcomeSeen` is kept. Historical
+**Welcome flag (v50 pattern):** ONLY the current `v58WelcomeSeen` is kept. Historical
 `vNNWelcomeSeen` flags were removed in v50 — each was written once and never read
 after its release. The first-run-wizard gate detects past welcomes via
 `hasAnyLegacyWelcomeKey()` (storage.js).
@@ -191,8 +204,8 @@ likewise, `reportFilenamePattern`,
 `signature`/`signaturePosition`, `headerColor`/`accentColor` via `safeHexColor`, and
 the cert fields). Templates: `loadReportTemplates`/`saveReportTemplates`.
 
-**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V56_WELCOME_KEY` →
-`state.v56WelcomeSeen`. `hasAnyLegacyWelcomeKey()` scans localStorage for any
+**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V58_WELCOME_KEY` →
+`state.v58WelcomeSeen`. `hasAnyLegacyWelcomeKey()` scans localStorage for any
 `pat:v<n>welcome` key — used by the first-run-wizard gate to recognise a returning
 user without keeping a per-version flag. The gate:
 `onboardedV33Seen = explicitlyOnboarded || sessions>0 || engineerName || hasAnyLegacyWelcomeKey()`.
@@ -446,8 +459,8 @@ Report signature: `storeSignatureFromSource`, `handleReportSignatureFile`,
 
 **Welcome dismiss (v50):** the 17 near-identical `dismissVNNWelcome` functions were
 replaced by ONE `dismissWelcome(seenFlag, key)` — sets `state[seenFlag]=true`,
-persists `key`, re-renders. The `welcome-dismiss` action (dispatch.js) calls it with
-`('v49WelcomeSeen', V49_WELCOME_KEY)`. A future feature release passes its own pair.
+persists `key`, re-renders. The `welcome-dismiss` action (dispatch.js) calls it with the current pair —
+`('v58WelcomeSeen', V58_WELCOME_KEY)` as of v58. Each feature release passes its own.
 
 `setView` clears transient overlays on every transition (fail sheet, multi-pick
 sheet, bulk-edit menus, client dialogs, the New Session form, `presetSheetOpen`).
@@ -462,7 +475,7 @@ dismiss.
 Owns `const app = document.getElementById('app')` and the `render()` dispatcher
 (rebuilds `#app.innerHTML` on every interaction; scroll-to-top + the Sessions scroll
 restore live here via `_lastRenderedView`; **v53** the view router includes
-`settingsReadings`; **v56** adds `retestReminders` + `settingsRetest`, and clears the
+`settingsReadings`; **v58** adds `settingsGlossary`; **v56** adds `retestReminders` + `settingsRetest`, and clears the
 transient `retestActionSessionId` on any non-reminders view). Sessions: `renderSessions`,
 `renderSessionsListAreaHTML` (**v56** the session row shows a 🔔 retest chip when the
 feature is on and the session is on the active chase list; the Status filter gains a
@@ -488,7 +501,7 @@ session, with a ✓ action opening the contacted-action sheet: Rebooked / Declin
 reminding; defence-bounces to Sessions when the feature is off).
 Shared: `emptyStateHTML(icon,title,body,actionLabel,actionName)`;
 `refreshSettingsHubBodyOnly` (live settings search). The **welcome modal** block
-(**v57** gates on `v57WelcomeSeen`; suppressed while the migration prompt or first-run
+(**v58** gates on `v58WelcomeSeen`; suppressed while the migration prompt or first-run
 wizard is up; shows the PATGo icon; dismissed via the shared `welcome-dismiss`
 action → `dismissWelcome`). **v57:** the preset sheet's list carries
 `.sheet-scroll` (styles.css) — the class that makes a long list scroll inside the
@@ -509,8 +522,8 @@ category list; re-rendered alone by `refreshSettingsHubBodyOnly` so the search b
 keeps focus), `renderSettingsCategory`, `settingsPageSubtitle(pageId)`,
 `settingsPageRowHTML(pageId, context)`, `renderSettingsSubHeader` + each
 `renderSettings*` sub-page (User, Items, Fails, Readings, MultiPick, Descriptions,
-Display, Backup, Csv, Clients, Report, Retest, Calculator, About, Contact, Setup) + calculator
-helpers. **v56** `renderSettingsRetest` is the Retest Reminders page (master toggle
+Display, Backup, Csv, Clients, Report, Retest, Calculator, About, **Glossary**, Contact,
+Setup) + calculator helpers. **v56** `renderSettingsRetest` is the Retest Reminders page (master toggle
 `retest-reminders-toggle`, default off, persists instantly + re-renders; on-only
 how-it-works text + the honest "in-app, not push" note + a "View N reminders" jump
 when any are active; `settingsPageSubtitle` shows Off / On · N due). **v53** `renderSettingsReadings` is the Test Readings page (single master
@@ -523,14 +536,31 @@ Templates and "What to include" sections (the include toggles include
 `report-show-appcredit` and the nested `report-show-footerlogo`). `renderSettingsItems`
 carries the `.settings-tip` note about the entry-screen long-press preset switcher.
 `renderSetupSection()` is wrapped by `renderSettingsSetup()` (its own page in the
-Data category). **The About changelog lives here** (`renderSettingsAbout`) — a rolling
-3-version window; v56 shows V56/V55/V54. The About page also has the "Set up another
+Data category). **v58** `GLOSSARY_GROUPS` (a top-level `const` in this file — five groups: Testing /
+Test Readings / Jobs & sessions / Output / Data, each an array of `[term, definition]`
+pairs) and `renderSettingsGlossary()`, which maps it to `<dl class="glossary-list">`
+blocks. Static and read-only: no state, no actions, no storage, nothing in dispatch.
+The terms are DATA rather than hand-written HTML so adding one is a single line and the
+markup can't drift between entries; `settingsPageSubtitle('settingsGlossary')` counts
+the array so the row subtitle can never disagree with the page. NOTE: `GLOSSARY_GROUPS`
+is declared BELOW `settingsPageSubtitle` in this file — fine, because subtitles are only
+computed at render time (after every file has executed), never at load time. **v58**
+`renderSettingsContact` carries the real details — a `mailto:` link to
+`hello@patgo.co.uk` and a `target="_blank" rel="noopener noreferrer"` link to
+`https://www.patgo.co.uk` (displayed as `patgo.co.uk`), both `.contact-link` for a
+finger-sized hit area; the placeholder "Support hours" block was removed. Plain `<a>`
+elements are safe inside `#app` because `handleDelegatedClick` returns early when no
+ancestor carries `data-action`, leaving the link's default behaviour intact.
+**The About changelog lives here** (`renderSettingsAbout`) — a rolling
+3-version window; v58 shows V58/V57/V56 (V55 dropped). The About page also has the "Set up another
 device" (`restart-onboarding`) and "Show me around" (`open-tour`) cards, and a
 long-press hidden menu on the title revealing three cloud-prep stub pages
 (`renderCloudAccount`, `renderCloudSync`, `renderCloudSubscription` — mock data, for
 the PAT Cloud phase).
-*Touch to:* change any Settings page; the category structure (edit config.js, not
-here); search aliases (config); or roll the About changelog.
+*Touch to:* change any Settings page; add or reword a glossary term (edit
+`GLOSSARY_GROUPS` — one line per term, nothing else needs changing); the contact
+details; the category structure (edit config.js, not here); search aliases (config);
+or roll the About changelog.
 
 ## events.js (~342 ln) — focus-sensitive field binding (per-render)
 `bindFocusFields()` — direct `oninput`/`onfocus`/`onblur` binds for the FOUR focus-
@@ -606,8 +636,8 @@ removed).
 **v57** `preset-sheet-pick` now short-circuits on `sheetDragMoved` (events.js) so a
 scroll-drag inside the now-scrollable preset list can't switch the preset by accident.
 
-**Welcome dismiss (v50):** `'welcome-dismiss': () => dismissWelcome('v57WelcomeSeen',
-V57_WELCOME_KEY)` — was a per-version `dismissVNNWelcome()` call; now the one
+**Welcome dismiss (v50):** `'welcome-dismiss': () => dismissWelcome('v58WelcomeSeen',
+V58_WELCOME_KEY)` — was a per-version `dismissVNNWelcome()` call; now the one
 parameterised helper.
 *Touch to:* add/route any delegated click/input/change handler. Only the four focus-
 sensitive fields + the quick-pick long-press are NOT here (see events.js).

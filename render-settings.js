@@ -79,6 +79,11 @@ function settingsPageSubtitle(pageId) {
     case 'settingsSetup':   return 'Share your setup to another device';
     case 'settingsCalculator': return 'Earth continuity limit';
     case 'settingsAbout':   return `PATGo ${APP_VERSION}`;
+    case 'settingsGlossary': {
+      // v58: counted from the data so it can never disagree with the page.
+      const n = GLOSSARY_GROUPS.reduce((sum, g) => sum + g.terms.length, 0);
+      return `${n} terms explained`;
+    }
     case 'settingsContact': return 'Get in touch';
     default: return '';
   }
@@ -1259,18 +1264,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v57: rolled forward — V57 on top, V54 dropped. -->
+      <!-- v8: rolling 3-version changelog. v58: rolled forward — V58 on top, V55 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V58</strong> · July 2026</p>
+        <p class="muted">A new Glossary under Settings → Help explains every term the app uses — Quick Pick, Smart Quick Pick, Multi Pick, presets, sessions, readings, backups and the rest — in plain English, so nothing in the app is guesswork. The press-and-hold on the Quick Pick row that opens the preset switcher now takes half as long, so it responds much sooner without any extra risk of opening by accident. And the Contact page now carries the real details — tap to email or to open the website.</p>
 
         <p><strong>V57</strong> · July 2026</p>
         <p class="muted">Two fixes from the field. Press and hold Quick Pick and the preset list now scrolls properly — if you had a lot of presets, the ones at the top of the list were previously out of reach. And the suggestion list that drops down as you type an item, location or client name now responds to your tap first time; before, it would sometimes ignore it and you'd have to tap again. Scrolling a long preset list also no longer risks switching your preset by accident.</p>
 
         <p><strong>V56</strong> · June 2026</p>
         <p class="muted">A new Retest Reminders feature to help you win repeat work. Flag a job you'd like to rebook, and when it comes due the app reminds you to contact the customer and book the retest. It's off until you turn it on under Settings → Retest Reminders, and even then each job is opt-in — so subcontract work and one-offs never clutter your list. When a reminder is due, a banner appears on your Sessions screen; mark each job Rebooked or Declined to clear it. Reminders show inside the app when you open it (phone notifications are planned for the upcoming PAT Cloud service).</p>
-
-        <p><strong>V55</strong> · June 2026</p>
-        <p class="muted">A couple of small fixes. The symbols in the reading columns on the PDF certificate were printing as the wrong characters — the ohms and "greater-than-or-equal" symbols now read clearly as Ohms, MOhms and &gt;= on the certificate. And the CSV export can now include a Polarity column for Class I items; like the other reading columns it's off by default, so turn it on under Settings → CSV columns if you want it.</p>
 
       </div>
 
@@ -1307,6 +1312,99 @@ function renderSettingsAbout() {
   `;
 }
 
+// v58: Glossary. A static, read-only reference page — no state, no actions, no
+// storage. Grouped by area rather than A–Z because you look a term up in the
+// context you met it in ("what's that thing on the test screen?"), not by letter.
+// Terms are DATA (GLOSSARY_GROUPS below) rather than hand-written HTML so adding
+// one is a single line and the markup can never drift between entries.
+//
+// Definitions are deliberately plain-language per the app-wide copy rule: no
+// jargon explained with more jargon. Where a term has a regulatory meaning
+// (Class I/II, the readings) the wording describes what the APP does with it and
+// avoids stating anything that could read as a compliance instruction.
+const GLOSSARY_GROUPS = [
+  {
+    title: 'Testing',
+    terms: [
+      ['Quick Pick', 'The row of buttons on the test screen that fill in the item type with one tap, so you rarely have to type it. What sits on those buttons is your active preset.'],
+      ['Smart Quick Pick', 'An option that reorders the Quick Pick buttons based on the location you are in. If you usually test extension leads in the office, they drift to the front when you type that location. Turn it off and the order stays exactly as you set it.'],
+      ['Preset', 'A named set of Quick Pick buttons. You might have one for offices, one for a workshop, one for a kitchen. Press and hold the Quick Pick row to switch between them.'],
+      ['Multi Pick', 'Logs several identical items in one go — five identical monitors, say — instead of tapping through them one at a time.'],
+      ['Item type', 'What the appliance is: kettle, extension lead, monitor. Either tap a Quick Pick button or type it, and the app suggests item types you have used before.'],
+      ['Location', 'Where in the building the item is. It sticks between items, so you set it once per room and it carries down the list.'],
+      ['Asset number', 'The number identifying the item. The app fills in the next one automatically, and you can set a prefix so they come out as OFF-001, OFF-002 and so on.'],
+      ['Copy last', 'Repeats the item you just logged — same type, same location — so a run of identical items is one tap each.'],
+      ['Fail reason', 'The reason an item failed, chosen from your own list when you tap FAIL.'],
+      ['Fail tag', 'Only relevant when Test Readings is on. Each fail reason is tagged with the kind of test it relates to, so failing an item shows you the one measurement box that matters instead of all of them.']
+    ]
+  },
+  {
+    title: 'Test Readings',
+    terms: [
+      ['Test Readings', 'An optional feature, off by default. Turn it on to record the actual measured values against each item as well as the pass or fail.'],
+      ['Class', 'How the appliance is protected — Class I, II or III. Which measurement boxes you see depends on which one you pick.'],
+      ['Earth continuity', 'A measured resistance value, in ohms (Ω).'],
+      ['Insulation resistance', 'A measured resistance value, in megohms (MΩ).'],
+      ['Leakage', 'A measured current value, in milliamps (mA).'],
+      ['Polarity', 'A yes/no tick, shown for Class I items only.']
+    ]
+  },
+  {
+    title: 'Jobs & sessions',
+    terms: [
+      ['Session', 'One job — one visit to one site. Everything you test on that visit sits inside it. A session is the thing you export, report on and back up.'],
+      ['Client', 'The company you are working for. One client can have several sites.'],
+      ['Site', 'The building or address you are testing at. A site can sit under a client, or stand on its own if you have not assigned it to one.'],
+      ['Overview', 'The list of everything logged in the current session, where you can review, edit, select and bulk-edit items.'],
+      ['Locked session', 'A finished session. It is read-only so you cannot change it by accident. Unlock it if you genuinely need to edit it.'],
+      ['Retest reminder', 'An optional feature, off by default. Flags a session for a retest a set number of months out, and lists the ones coming due so you can chase the repeat work.'],
+      ['Calibration', 'Your tester\'s calibration due date. Set it and the app warns you when it is close or overdue.']
+    ]
+  },
+  {
+    title: 'Output',
+    terms: [
+      ['Report', 'The PDF certificate for a session — your details, the client\'s, and the full list of items tested. Preview it before you send it.'],
+      ['Report template', 'A saved set of report settings — logo, colours, declaration wording — so you can switch between looks without setting it all up again.'],
+      ['Certificate number', 'An optional reference stamped onto a session the first time you produce its report. Once assigned it does not change.'],
+      ['CSV export', 'A spreadsheet file of a session, for sending on or opening in Excel. You choose which columns it contains.'],
+      ['Exported', 'Marks whether a session has been sent out yet. If you change a session after exporting it, it goes back to needing export, so nothing quietly goes stale.']
+    ]
+  },
+  {
+    title: 'Data',
+    terms: [
+      ['Backup', 'A file containing everything — all sessions, clients, sites and settings. This is the one to keep safe. Restoring it puts the app back exactly as it was.'],
+      ['Export Setup', 'A file containing only your configuration — presets, lists, report settings, columns. No job data. Use it to set up a second phone or hand your setup to someone else.'],
+      ['Pruning', 'Deleting sessions older than an age you choose, to keep the app tidy. It will not prune anything you have not exported yet.'],
+      ['Offline', 'The app runs entirely on this phone and needs no signal. Your data is stored on the device, not on a server — which is exactly why backups matter.']
+    ]
+  }
+];
+
+function renderSettingsGlossary() {
+  const groups = GLOSSARY_GROUPS.map(g => `
+      <div class="info-card glossary-group">
+        <h3>${escapeHTML(g.title)}</h3>
+        <dl class="glossary-list">
+          ${g.terms.map(([term, def]) => `
+            <dt>${escapeHTML(term)}</dt>
+            <dd>${escapeHTML(def)}</dd>`).join('')}
+        </dl>
+      </div>`).join('');
+
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Glossary')}
+      <div class="info-card">
+        <h2>What the terms mean</h2>
+        <p class="muted">Plain-English explanations of the words used around the app.</p>
+      </div>
+      ${groups}
+    </div>
+  `;
+}
+
 function renderSettingsContact() {
   return `
     <div class="screen">
@@ -1316,13 +1414,10 @@ function renderSettingsContact() {
         <p>Feedback, bug reports, and feature requests are all welcome. Tell us what you're testing, where the app slowed you down, and what would have made it faster.</p>
 
         <h3>Email</h3>
-        <p class="muted">[contact email — to be added]</p>
+        <p><a class="contact-link" href="mailto:hello@patgo.co.uk">hello@patgo.co.uk</a></p>
 
         <h3>Web</h3>
-        <p class="muted">[website — to be added]</p>
-
-        <h3>Support hours</h3>
-        <p class="muted">[support hours — to be added]</p>
+        <p><a class="contact-link" href="https://www.patgo.co.uk" target="_blank" rel="noopener noreferrer">patgo.co.uk</a></p>
       </div>
       <div class="info-card">
         <h3>What to include in a bug report</h3>

@@ -1,4 +1,5 @@
 // Service worker — caches app shell for full offline use.
+// (c) 2026 Peter Birchley. All rights reserved.
 // Bump CACHE_VERSION when you change app files to force update.
 //
 // Per-version history lives in the PAThandoff_vNN.md docs, not here (v50: the
@@ -9,7 +10,7 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v57-3';
+const CACHE_VERSION = 'pat-v58';
 const ASSETS = [
   './',
   './index.html',

@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V57';
+const APP_VERSION = 'V58';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -64,13 +64,19 @@ const CAL_DUE_KEY = 'pat:caldue';
 // first-run-wizard gate, so nothing about upgrade behaviour changes. When a future
 // feature release rolls a new welcome, replace the line below with the new key
 // (e.g. V51_WELCOME_KEY) and pass it to dismissWelcome() — no new symbol pile.
-const V57_WELCOME_KEY = 'pat:v57welcome';  // v57: field bug fixes (sheet scroll + dropdown taps)
+const V58_WELCOME_KEY = 'pat:v58welcome';  // v58: polish (contact details, faster long-press) + Glossary
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
 // sheet opens. Deliberately a single named constant so the threshold can be
-// tuned in one edit. NOTE: 2000ms is a long hold for touch — if it feels
-// unresponsive on the phone, drop this to ~600 (the usual long-press sweet spot).
-const QUICK_PICK_LONGPRESS_MS = 2000;
+// tuned in one edit.
+// v58: dropped 2000 → 1000 for field testing. 2000ms was a long hold for touch
+// and made the gesture feel unresponsive. The two guards that stop an accidental
+// open are unchanged and independent of this number: the 12px drift slop in
+// events.js aborts the timer if the finger moves (so scrolling can't trigger it),
+// and the capture-phase click swallow eats the tap that follows a fired
+// long-press. If 1000 proves too eager in the field, ~1400 is the next step down
+// in aggression; ~600 is the usual long-press sweet spot if it still feels slow.
+const QUICK_PICK_LONGPRESS_MS = 1000;
 // v42: the opt-in demo session created on the FRESH onboarding path (decision
 // 9A). Tagged with this flag on the session object so the app can label it as an
 // example and the user knows it is safe to delete. It is a perfectly ordinary
@@ -150,8 +156,8 @@ const SETTINGS_CATEGORIES = [
     pages: ['settingsDisplay', 'settingsCalculator'] },
   { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Back up, restore and share your setup',
     pages: ['settingsBackup', 'settingsSetup'] },
-  { id: 'catHelp',    icon: 'ℹ️', title: 'Help', blurb: 'About this app and how to get in touch',
-    pages: ['settingsAbout', 'settingsContact'] }
+  { id: 'catHelp',    icon: 'ℹ️', title: 'Help', blurb: 'About this app, what the terms mean, and how to get in touch',
+    pages: ['settingsAbout', 'settingsGlossary', 'settingsContact'] }
 ];
 
 // Per-page metadata for the category sub-lists and for search. icon/title shown
@@ -173,7 +179,8 @@ const SETTINGS_PAGE_META = {
   settingsBackup:      { icon: '💾', title: 'Backup & Restore',      aliases: 'backup restore export import data save json' },
   settingsSetup:       { icon: '🔁', title: 'Export / Import Setup', aliases: 'setup share configuration new device employee copy presets transfer' },
   settingsAbout:       { icon: 'ℹ️', title: 'About',                 aliases: 'about version changelog whats new' },
-  settingsContact:     { icon: '✉️', title: 'Contact',              aliases: 'contact support email help feedback' }
+  settingsGlossary:    { icon: '📖', title: 'Glossary',              aliases: 'glossary terms jargon what does mean definitions help explain quick pick smart multi pick preset asset session client site overview readings class earth insulation leakage polarity fail reason tag retest certificate template csv backup setup calibration pruning' },
+  settingsContact:     { icon: '✉️', title: 'Contact',              aliases: 'contact support email help feedback website' }
 };
 
 // v35: report colour defaults reproduce the exact pre-v35 look — dark grey
