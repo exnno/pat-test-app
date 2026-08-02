@@ -1,12 +1,12 @@
 /*!
- * PAT Test PWA
+ * PATGo PWA
  * v27 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v27 — Smart Quick Pick ==============
+// ============== PATGo PWA — v27 — Smart Quick Pick ==============
 // Smart Quick Pick (v18): history, scoring, ordering, freeze cache, on/off.
 // v27: ordering-quality pass — word-token matching (not greedy substring),
 // exact-match weighting, a swap-in floor, and staple protection.

@@ -1,12 +1,12 @@
 /*!
- * PAT Test PWA
+ * PATGo PWA
  * v22 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v22 — Feedback ==============
+// ============== PATGo PWA — v22 — Feedback ==============
 // Toast + haptic / visual flash / sound feedback. Self-contained.
 
 let _toastTimer = null;

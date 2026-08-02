@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V59';
+const APP_VERSION = 'V60';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -64,7 +64,7 @@ const CAL_DUE_KEY = 'pat:caldue';
 // first-run-wizard gate, so nothing about upgrade behaviour changes. When a future
 // feature release rolls a new welcome, replace the line below with the new key
 // (e.g. V51_WELCOME_KEY) and pass it to dismissWelcome() — no new symbol pile.
-const V59_WELCOME_KEY = 'pat:v59welcome';  // v59: lifetime stats counter
+const V60_WELCOME_KEY = 'pat:v60welcome';  // v60: one-tap bug report + leading zeros
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
 // sheet opens. Deliberately a single named constant so the threshold can be
@@ -110,6 +110,85 @@ const STATS_TYPE_MAP_MAX = 50;
 function makeEmptyArchivedStats() {
   return { items: 0, fails: 0, types: {} };
 }
+// ---------------------------------------------------------------------------
+// v60: one-tap bug report (Settings → Contact).
+//
+// WHY mailto AND NOT A NETWORK POST: the app is offline-first and engineers are
+// usually in a plant room, a riser cupboard or a basement when something breaks
+// — i.e. exactly where an HTTP POST would fail. A mailto: hands the composed
+// message to the device's own mail client, which queues it in the outbox and
+// sends it when signal returns. The bug report therefore cannot be lost by
+// being offline, which is the whole point.
+const BUG_REPORT_EMAIL = 'hello@patgo.co.uk';
+
+// The three report types. `tag` is what lands in the SUBJECT line, so the inbox
+// can be sorted/filtered by type without opening anything.
+const BUG_REPORT_TYPES = [
+  { id: 'bug',      label: 'Bug',      tag: 'BUG' },
+  { id: 'idea',     label: 'Idea',     tag: 'IDEA' },
+  { id: 'feedback', label: 'Feedback', tag: 'FEEDBACK' }
+];
+const BUG_REPORT_TYPE_DEFAULT = 'bug';
+
+// Severity — BUG reports only. Deliberately plain language on screen (no P1/P2
+// jargon in front of an engineer); the short code is what goes in the subject
+// line for triage.
+const BUG_REPORT_SEVERITIES = [
+  { id: 'p1', code: 'P1', label: "The app won't work — I can't carry on testing" },
+  { id: 'p2', code: 'P2', label: "It works, but something's wrong or annoying" },
+  { id: 'p3', code: 'P3', label: 'Small thing — looks wrong, not urgent' }
+];
+const BUG_REPORT_SEVERITY_DEFAULT = 'p2';
+
+// "Can you make it happen again?" — one tap, and the single most useful triage
+// signal there is: "every time" and "happened once" are different problems.
+const BUG_REPORT_REPRO = [
+  { id: 'yes',   label: 'Every time',   text: 'Yes — happens every time' },
+  { id: 'no',    label: 'Just once',    text: 'No — only happened once' },
+  { id: 'unsure', label: "Haven't tried", text: "Not tried to repeat it" }
+];
+const BUG_REPORT_REPRO_DEFAULT = 'unsure';
+
+// Minimum characters in the description before Send unlocks. Stops a stray tap
+// firing an empty report; low enough not to nag.
+const BUG_REPORT_MIN_CHARS = 10;
+
+// How many recent runtime errors the in-memory catcher keeps (v60, decision
+// 10A). IN MEMORY ONLY — never written to localStorage, so it cannot grow, cannot
+// corrupt a save, and is gone on reload. Three is enough to show the original
+// throw plus the fallout it caused.
+const BUG_ERROR_BUFFER_MAX = 3;
+
+// Hard cap on the assembled mailto: body. Mail clients vary in what length of
+// mailto they'll accept; keeping the payload well under any of them matters more
+// than carrying a long essay. The description is truncated, never the
+// diagnostics, because the diagnostics are the part the user can't retype.
+const BUG_REPORT_MAX_BODY = 4000;
+
+// The empty report draft. A factory rather than a shared object (same reason as
+// makeEmptyArchivedStats / makeDefaultReportSettings — callers mutate it freely,
+// so they must each get their own). Lives HERE and not in bugreport.js because
+// state.js seeds state.bugDraft from it at load time, and state.js runs long
+// before bugreport.js is parsed; config.js is loaded first, so this is the only
+// safe home for it.
+function makeEmptyBugDraft() {
+  return {
+    type: BUG_REPORT_TYPE_DEFAULT,
+    severity: BUG_REPORT_SEVERITY_DEFAULT,
+    repro: BUG_REPORT_REPRO_DEFAULT,
+    description: '',
+    context: '',
+    cacheName: ''
+  };
+}
+
+// ---------------------------------------------------------------------------
+// v60: leading zeros in asset numbers (decisions 6B / 7 / 8A).
+//
+// Cap on the digit width the auto-increment will pad to. Guards against a
+// pathological stored value (e.g. a hand-edited backup claiming a width of
+// 5000) turning every asset number into a wall of zeros. Real jobs use 3–4.
+const ASSET_PAD_MAX = 12;
 // v42: the opt-in demo session created on the FRESH onboarding path (decision
 // 9A). Tagged with this flag on the session object so the app can label it as an
 // example and the user knows it is safe to delete. It is a perfectly ordinary

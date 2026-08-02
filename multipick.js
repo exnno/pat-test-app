@@ -1,12 +1,12 @@
 /*!
- * PAT Test PWA
+ * PATGo PWA
  * v23 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v23 — Multi Pick ==============
+// ============== PATGo PWA — v23 — Multi Pick ==============
 // Multi Pick: config validation, load, active-slots, fire, settings save.
 
 // ---------- v16: Multi Pick helpers ----------

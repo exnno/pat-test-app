@@ -650,7 +650,17 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissWelcome('v59WelcomeSeen', V59_WELCOME_KEY),
+  'welcome-dismiss': () => dismissWelcome('v60WelcomeSeen', V60_WELCOME_KEY),
+
+  // v60: bug report sheet (Settings -> Contact). The three setters re-render
+  // (taps, no caret to lose); the two textareas are input actions below.
+  'bug-open': () => openBugSheet(),
+  'bug-close': () => closeBugSheet(),
+  'bug-set-type': (arg) => setBugType(arg),
+  'bug-set-severity': (arg) => setBugSeverity(arg),
+  'bug-set-repro': (arg) => setBugRepro(arg),
+  'bug-send': () => sendBugReport(),
+  'bug-copy': () => copyBugReport(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
 
@@ -777,6 +787,12 @@ registerInputActions({
   'f-reading-earth': (v) => setReadingsField('earth', v),
   'f-reading-insulation': (v) => setReadingsField('insulation', v),
   'f-reading-leakage': (v) => setReadingsField('leakage', v),
+
+  // v60: bug report free text. No render on keystroke (same reason as the
+  // readings fields and fail-other -- the textarea would lose the caret).
+  // setBugField syncs the Send button's disabled state directly instead.
+  'bug-desc': (v) => setBugField('description', v),
+  'bug-context': (v) => setBugField('context', v),
 
   // Overview search — partial refresh
   'overview-search': (v) => {

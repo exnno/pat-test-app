@@ -138,7 +138,7 @@ let state = {
   // new install still shows the WIZARD and an upgrader still shows the MODAL —
   // unchanged behaviour. Future feature releases roll a new flag here and pass it
   // to dismissWelcome().
-  v59WelcomeSeen: false,  // v59: lifetime stats counter
+  v60WelcomeSeen: false,  // v60: one-tap bug report + leading zeros
 
   // v59: the ARCHIVED half of the lifetime stats counter — the tallies of
   // sessions that have been pruned or deleted, so the running total doesn't fall
@@ -147,6 +147,15 @@ let state = {
   // is never stored — it's computed from state.sessions on demand by
   // computeAppStats(), so it can't drift out of step with the actual data.
   archivedStats: makeEmptyArchivedStats(),
+
+  // v60: the bug-report sheet on Settings → Contact. PURELY TRANSIENT — never
+  // saved, never backed up, never restored. It exists only between opening the
+  // sheet and sending or cancelling, so there is no storage key, no validator
+  // and no migration for any of it. bugDraft holds the in-progress report
+  // (type/severity/repro taps plus the two typed boxes); cacheName is filled in
+  // asynchronously when the sheet opens by reading the live service-worker cache.
+  bugSheetOpen: false,
+  bugDraft: makeEmptyBugDraft(),
   // v46: remembered Sessions-list scroll offset. Captured (in render) when
   // leaving Sessions for a session, restored when returning to Sessions. All
   // other navigation resets to the top. Transient — never persisted. The

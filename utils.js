@@ -1,5 +1,5 @@
 /*!
- * PAT Test PWA — utils.js (pure helpers)
+ * PATGo PWA — utils.js (pure helpers)
  * v22 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
@@ -52,11 +52,45 @@ function formatTimestampCSV(iso) {
   return `${dd}/${mo}/${yy} ${hh}:${mm}`;
 }
 
+// v60: now also reports the WIDTH of the trailing digit run, so leading zeros
+// survive auto-increment. Before v60 this returned only {prefix, number} and the
+// parseInt threw the zeros away — type 001 and the next item came out as 2.
+//
+// `width` is the character count of the digit run as typed ('001' → 3), so
+// nextAssetNo can pad the incremented value back to the same width. It is
+// reported for EVERY asset number, not just zero-padded ones: '12' → width 2,
+// which pads to a no-op. That keeps the rule uniform ("pad to the previous
+// width") instead of needing a separate "did it have leading zeros?" branch.
 function splitAssetNo(s) {
-  if (!s) return { prefix: '', number: null };
+  if (!s) return { prefix: '', number: null, width: 0 };
   const m = String(s).match(/^(.*?)(\d+)$/);
-  if (!m) return { prefix: String(s), number: null };
-  return { prefix: m[1], number: parseInt(m[2], 10) };
+  if (!m) return { prefix: String(s), number: null, width: 0 };
+  return { prefix: m[1], number: parseInt(m[2], 10), width: m[2].length };
+}
+
+// v60: pad a number back to a digit width, NEVER truncating (decision 7).
+// 99 at width 3 → '099'; 100 at width 2 → '100', not '00'. Width only ever
+// grows, so a job can roll past its padding without the numbers going wrong —
+// the alternative (wrapping or clipping) would silently produce duplicate asset
+// numbers on a real job, which is the one outcome worth designing against.
+// v60: read a pad width off what the engineer typed into the New Session start
+// number box. Returns 0 unless the value BEGINS with a zero — i.e. padding is
+// opt-in by deliberate act (decision 8A: "if you've included leading zeros you
+// clearly want that; the default is without"). '001' → 3, '1' → 0, '10' → 0.
+// A lone '0' is not padding, so it returns 0 too.
+function assetPadFromInput(v) {
+  const s = String(v == null ? '' : v).trim();
+  if (!/^\d+$/.test(s)) return 0;
+  if (s.length < 2 || s[0] !== '0') return 0;
+  return Math.min(s.length, ASSET_PAD_MAX);
+}
+
+function padAssetNumber(n, width) {
+  const s = String(n);
+  const w = (typeof width === 'number' && isFinite(width) && width > 0)
+    ? Math.min(Math.floor(width), ASSET_PAD_MAX)
+    : 0;
+  return s.length >= w ? s : s.padStart(w, '0');
 }
 
 // ---------- CSV ----------

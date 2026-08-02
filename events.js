@@ -1,12 +1,12 @@
 /*!
- * PAT Test PWA
+ * PATGo PWA
  * v28 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v28 — Focus-sensitive field binding ==========
+// ============== PATGo PWA — v28 — Focus-sensitive field binding ==========
 //
 // E3-tail (v28) finished the delegation migration: every CLICK (v25) and now
 // every stateful INPUT/CHANGE handler (v28) lives in dispatch.js, attached once

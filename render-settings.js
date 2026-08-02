@@ -1280,9 +1280,12 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v59: rolled forward — V59 on top, V56 dropped. -->
+      <!-- v8: rolling 3-version changelog. v60: rolled forward — V60 on top, V57 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V60</strong> · August 2026</p>
+        <p class="muted">Settings &rarr; Contact now has a Report a problem button. Pick whether it's a bug, an idea or general feedback, say how bad it is and whether it happens every time, then describe it in your own words — the app attaches its own version, your phone and OS, your settings and any error it caught, so you don't have to go looking for any of it. You can check exactly what's being sent before it goes, and it's counts and settings only: no client names, sites, locations or asset numbers ever leave your phone. It works with no signal too — your email app holds the report and sends it once you're back online. If the app ever fails to start, that screen now carries a report link of its own. Also: leading zeros in asset numbers now stick. Start a job at 001 and it carries on 002, 003 rather than jumping to 2 — type a plain 1 and nothing changes.</p>
 
         <p><strong>V59</strong> · July 2026</p>
         <p class="muted">Your running totals now appear at the bottom of the Settings screen — how many items you've tested, how many failed and the percentage, and your most common item. The important part is that the total keeps climbing even when you tidy up: clearing out old exported jobs used to be invisible to any count, but those jobs are now tallied before they go, so a clear-out never costs you the numbers. Backups carry the totals too, so restoring puts them back exactly as they were. One honest limitation — it starts from the jobs you have on the phone right now, so anything you cleared out before this update isn't in the figure. From here on it's a true running total. The example job, if you still have one, is left out of the counts.</p>
@@ -1290,8 +1293,7 @@ function renderSettingsAbout() {
         <p><strong>V58</strong> · July 2026</p>
         <p class="muted">A new Glossary under Settings → Help explains every term the app uses — Quick Pick, Smart Quick Pick, Multi Pick, presets, sessions, readings, backups and the rest — in plain English, so nothing in the app is guesswork. The press-and-hold on the Quick Pick row that opens the preset switcher now takes half as long, so it responds much sooner without any extra risk of opening by accident. And the Contact page now carries the real details — tap to email or to open the website.</p>
 
-        <p><strong>V57</strong> · July 2026</p>
-        <p class="muted">Two fixes from the field. Press and hold Quick Pick and the preset list now scrolls properly — if you had a lot of presets, the ones at the top of the list were previously out of reach. And the suggestion list that drops down as you type an item, location or client name now responds to your tap first time; before, it would sometimes ignore it and you'd have to tap again. Scrolling a long preset list also no longer risks switching your preset by accident.</p>
+
 
       </div>
 
@@ -1436,10 +1438,93 @@ function renderSettingsContact() {
         <p><a class="contact-link" href="https://www.patgo.co.uk" target="_blank" rel="noopener noreferrer">patgo.co.uk</a></p>
       </div>
       <div class="info-card">
-        <h3>What to include in a bug report</h3>
-        <p>If something's gone wrong, the more of this you can include the better:</p>
-        <p class="muted">• What you were trying to do<br>• What happened instead<br>• Your phone model and OS version<br>• The app version (currently ${APP_VERSION})<br>• Any error messages on screen</p>
+        <h3>Report a problem</h3>
+        <p>Found a bug, or got an idea? Tap below. The app fills in your version, phone and settings automatically — you just describe what happened.</p>
+        <button class="bug-report-btn" id="bug-open" data-action="bug-open">🐞 Report a problem</button>
+        <p class="muted" style="font-size:12px;margin-top:10px">Your job data stays on your phone. Reports carry counts and settings only — never client names, sites or asset numbers.</p>
       </div>
+      ${renderBugSheet()}
+    </div>
+  `;
+}
+
+// v60: the report sheet. Markup lives here (render files own markup); all the
+// logic — diagnostics, composing, sending — lives in bugreport.js.
+//
+// Two rendering rules worth knowing before editing this:
+//   • The tap rows (type / severity / repeatable) use data-action and DO trigger
+//     a full re-render. That's fine: a tap has no caret to lose.
+//   • The two text boxes use data-input-action and do NOT re-render, because
+//     re-rendering on each keystroke would destroy the input and drop the caret.
+//     That's why the Send button's disabled state is synced directly on the
+//     element by _syncBugSendButton() rather than falling out of a render pass.
+function renderBugSheet() {
+  if (!state.bugSheetOpen) return '';
+  const d = state.bugDraft || makeEmptyBugDraft();
+  const isBug = d.type === 'bug';
+
+  const typeRow = BUG_REPORT_TYPES.map(t => `
+    <button class="bug-chip ${t.id === d.type ? 'active' : ''}" data-action="bug-set-type" data-arg="${t.id}">${escapeHTML(t.label)}</button>
+  `).join('');
+
+  const severityRows = isBug ? BUG_REPORT_SEVERITIES.map(s => `
+    <button class="bug-option ${s.id === d.severity ? 'active' : ''}" data-action="bug-set-severity" data-arg="${s.id}">
+      <span class="bug-option-dot">${s.id === d.severity ? '●' : '○'}</span>
+      <span class="bug-option-label">${escapeHTML(s.label)}</span>
+    </button>
+  `).join('') : '';
+
+  const reproRow = isBug ? `
+    <label class="label">Can you make it happen again?</label>
+    <div class="bug-chip-row">
+      ${BUG_REPORT_REPRO.map(r => `
+        <button class="bug-chip ${r.id === d.repro ? 'active' : ''}" data-action="bug-set-repro" data-arg="${r.id}">${escapeHTML(r.label)}</button>
+      `).join('')}
+    </div>
+  ` : '';
+
+  const severityBlock = isBug ? `
+    <label class="label">How bad is it?</label>
+    <div class="bug-option-list">${severityRows}</div>
+  ` : '';
+
+  const q1 = isBug ? 'What went wrong?' : 'What would you like?';
+  const q2 = isBug ? 'What were you doing at the time?' : 'Why would that help?';
+  const ready = bugDescriptionReady();
+
+  return `
+    <div class="modal-backdrop" id="bug-backdrop" data-action="bug-close"></div>
+    <div class="fail-sheet bug-sheet" role="dialog" aria-label="Report a problem">
+      <div class="fail-sheet-handle"></div>
+      <div class="fail-sheet-header">
+        <button class="fail-close-btn" id="bug-cancel" data-action="bug-close" aria-label="Cancel">‹</button>
+        <h3 class="fail-sheet-title">Report a problem</h3>
+        <span class="fail-close-spacer"></span>
+      </div>
+
+      <div class="bug-sheet-body">
+        <label class="label">What kind of report is this?</label>
+        <div class="bug-chip-row">${typeRow}</div>
+
+        ${severityBlock}
+        ${reproRow}
+
+        <label class="label">${q1}</label>
+        <textarea class="input bug-textarea" id="bug-desc" data-input-action="bug-desc" rows="3" placeholder="Describe it in your own words">${escapeHTML(d.description)}</textarea>
+
+        <label class="label">${q2} <span class="hint">(optional)</span></label>
+        <textarea class="input bug-textarea" id="bug-context" data-input-action="bug-context" rows="2" placeholder="e.g. logging item 14 on a big job">${escapeHTML(d.context)}</textarea>
+
+        <details class="bug-diag">
+          <summary>What gets sent with this (tap to check)</summary>
+          <pre class="bug-diag-pre">${escapeHTML(diagnosticsText())}</pre>
+          <p class="muted" style="font-size:12px">Counts and settings only. No client names, sites, locations, asset numbers or notes.</p>
+        </details>
+      </div>
+
+      <button class="bug-send-btn" id="bug-send" data-action="bug-send" ${ready ? '' : 'disabled'}>Send report</button>
+      <button class="bug-copy-btn" id="bug-copy" data-action="bug-copy">Copy instead</button>
+      <p class="muted bug-offline-note">No signal? Send it anyway — your email app will hold it and send when you're back online.</p>
     </div>
   `;
 }

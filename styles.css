@@ -1,5 +1,5 @@
 /*!
- * PAT Test PWA
+ * PATGo PWA
  * v23 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
@@ -2972,3 +2972,143 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   white-space: nowrap;
 }
 .reason-tag-select { flex: 0 0 auto; max-width: 52%; }
+
+/* ===================== v60: bug report (Settings → Contact) ===================== */
+
+/* The button on the Contact page. Full width and finger-sized — it's the one
+   control on that page anyone taps in a hurry, usually while annoyed. */
+.bug-report-btn {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 14px 16px;
+  font-size: 16px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.bug-report-btn:active { opacity: .85; }
+
+/* The sheet itself reuses .fail-sheet for position/shape; this only adds the
+   scrolling body, because the form is taller than the readings sheet and must
+   not trap its own content on a short screen (the v12 lesson). */
+.bug-sheet { max-height: 88vh; display: flex; flex-direction: column; }
+.bug-sheet-body {
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-bottom: 4px;
+}
+
+/* Type + repeatable pickers: small horizontal chips. */
+.bug-chip-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 4px; }
+.bug-chip {
+  flex: 1 1 auto;
+  min-width: 88px;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.bug-chip.active {
+  color: #fff;
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* Severity: stacked full-width rows, because the labels are sentences rather
+   than words and would wrap badly as chips. */
+.bug-option-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 4px; }
+.bug-option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  font-size: 14px;
+  text-align: left;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.bug-option.active { border-color: var(--accent); }
+.bug-option-dot { flex: 0 0 auto; color: var(--accent); font-size: 15px; }
+.bug-option-label { flex: 1; line-height: 1.35; }
+
+.bug-textarea {
+  width: 100%;
+  resize: vertical;
+  min-height: 64px;
+  font-family: inherit;
+  line-height: 1.4;
+}
+
+/* Collapsed-by-default diagnostics preview (decision 5A — nothing leaves the
+   phone unseen, but it doesn't dominate the sheet either). */
+.bug-diag { margin: 12px 0 4px; }
+.bug-diag summary {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  padding: 6px 0;
+}
+.bug-diag-pre {
+  margin: 6px 0;
+  padding: 10px;
+  font-size: 11px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: var(--text-muted);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  max-height: 190px;
+  overflow-y: auto;
+}
+
+.bug-send-btn {
+  flex: 0 0 auto;
+  width: 100%;
+  margin-top: 10px;
+  padding: 15px 16px;
+  font-size: 17px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 12px;
+  cursor: pointer;
+}
+.bug-send-btn:disabled { opacity: .45; cursor: default; }
+.bug-copy-btn {
+  flex: 0 0 auto;
+  width: 100%;
+  margin-top: 8px;
+  padding: 12px 16px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+  background: var(--card-bg);
+  border: 1.5px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+.bug-offline-note {
+  flex: 0 0 auto;
+  margin: 10px 0 0;
+  font-size: 12px;
+  text-align: center;
+  line-height: 1.4;
+}

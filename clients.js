@@ -1,12 +1,12 @@
 /*!
- * PAT Test PWA
+ * PATGo PWA
  * v22 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v22 — Clients & Sites ==============
+// ============== PATGo PWA — v22 — Clients & Sites ==============
 // Clients & Sites (v19): data model + Settings -> Clients page actions.
 
 // ---------- v19: Clients & Sites ----------

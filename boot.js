@@ -1,12 +1,12 @@
 /*!
- * PAT Test PWA
+ * PATGo PWA
  * v22 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  */
 
-// ============== PAT Test PWA — v22 — Boot ==============
+// ============== PATGo PWA — v22 — Boot ==============
 // Service-worker register/update + theme apply + crash-fallback boot block.
 // RUNS ON LOAD. Must be the LAST script in index.html.
 
@@ -92,6 +92,44 @@ function bootIntegrityOK() {
   return true;
 }
 
+// v60 (decision 10A): arm the in-memory error catcher BEFORE anything else boot
+// does, so a throw inside load()/render() below is captured and can be carried by
+// a bug report. Wrapped in its own try/catch and guarded on the function existing:
+// if bugreport.js failed to load, boot must still run normally. This records
+// nothing to storage and cannot affect a save.
+try {
+  if (typeof initErrorCapture === 'function') initErrorCapture();
+} catch (e) {
+  console.error('Error capture failed to arm (non-fatal).', e);
+}
+
+// v60 (decision 11A): a self-contained report link for the two crash screens
+// below. DELIBERATELY DUPLICATES a little of bugreport.js rather than calling it:
+// these screens are shown precisely when the app has failed to load, so they must
+// not depend on any other file having parsed. Everything here is inline string
+// building plus navigator.userAgent -- no app globals beyond an optional read of
+// APP_VERSION, itself typeof-guarded.
+function _crashReportLink(context) {
+  try {
+    var ver = (typeof APP_VERSION !== 'undefined') ? APP_VERSION : 'unknown';
+    var ua = (typeof navigator !== 'undefined') ? navigator.userAgent : 'unknown';
+    var body = 'The app would not start.\n\n'
+      + 'WHAT HAPPENED: ' + context + '\n\n'
+      + '--- DIAGNOSTICS (automatic) ---\n'
+      + 'APP: ' + ver + '\n'
+      + 'SENT: ' + new Date().toISOString() + '\n'
+      + 'DEVICE: ' + ua + '\n'
+      + 'ERRORS: ' + context + '\n'
+      + '--- END ---';
+    var href = 'mailto:hello@patgo.co.uk'
+      + '?subject=' + encodeURIComponent('[PATGo BUG P1] ' + ver + ' - app will not start')
+      + '&body=' + encodeURIComponent(body);
+    return '<p style="margin:16px 0 0"><a href="' + href + '" style="color:#2563eb;font-weight:600">Email a report about this</a></p>';
+  } catch (e) {
+    return '';
+  }
+}
+
 if (!bootIntegrityOK()) {
   const appEl = document.getElementById('app');
   if (appEl) {
@@ -100,6 +138,7 @@ if (!bootIntegrityOK()) {
       '<h2 style="margin:0 0 8px">Update needed</h2>' +
       '<p style="margin:0 0 16px">The app didn\'t load completely. Your saved data is safe and untouched. Tap Reload to finish updating.</p>' +
       '<button onclick="location.reload()" style="padding:12px 18px;font-size:16px;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
+      _crashReportLink('The app did not load completely (boot integrity check failed).') +
       '</div>';
   }
   // Deliberately stop here — do NOT call load()/render()/save() with a partial build.
@@ -144,6 +183,7 @@ try {
         '<h2 style="margin:0 0 8px">Something went wrong</h2>' +
         '<p style="margin:0 0 16px">The app hit an error while loading. Your saved data is safe. Tap Reload to try again.</p>' +
         '<button onclick="location.reload()" style="padding:12px 18px;font-size:16px;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
+        _crashReportLink('The app hit an error while loading: ' + ((e2 && e2.message) ? e2.message : 'unknown error')) +
         '</div>';
     }
   }

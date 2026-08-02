@@ -177,16 +177,28 @@ function calibrationStatus() {
   return { status: 'ok', days };
 }
 
+// v60: leading zeros now survive (decision 6B). Three paths, each padded:
+//   • First item of a job    → pad startNumber to session.startPad (the width the
+//                              engineer typed into New Session — '001' → 3).
+//   • Normal increment       → pad to the width of the PREVIOUS item's own digits,
+//                              so the padding follows what's actually on the labels
+//                              even if it was typed by hand mid-job.
+//   • Non-numeric last item  → fall back to the job's startPad, since there is no
+//                              previous width to copy.
+// startPad is absent on every pre-v60 session, so padAssetNumber gets undefined,
+// treats it as width 0, and returns the number unchanged — old jobs behave
+// exactly as they did before. No migration needed.
 function nextAssetNo(session) {
+  const pad = session.startPad;
   if (!session.items.length) {
-    return (session.prefix || '') + (session.startNumber || 1);
+    return (session.prefix || '') + padAssetNumber(session.startNumber || 1, pad);
   }
   const last = session.items[session.items.length - 1];
   const split = splitAssetNo(last.assetNo);
   if (split.number == null) {
-    return (session.prefix || '') + (session.startNumber + session.items.length);
+    return (session.prefix || '') + padAssetNumber(session.startNumber + session.items.length, pad);
   }
-  return split.prefix + (split.number + 1);
+  return split.prefix + padAssetNumber(split.number + 1, split.width);
 }
 
 function getCarryForwardLocation(sess, cursor) {
@@ -805,6 +817,14 @@ function createSession() {
     prefix: prefix.trim(),
     date: todayISO(),
     startNumber: parseInt(startNo, 10) || 1,
+    // v60: the digit width the engineer actually typed into New Session, so
+    // '001' starts the job at 001 rather than 1. Stored as a plain integer
+    // alongside startNumber rather than making startNumber a string — the
+    // number stays a number for every existing consumer (increment, CSV import,
+    // the codec), and this is a purely additive field the storage codec passes
+    // through unmapped. Only recorded when zeros were actually typed; a plain
+    // '1' stores nothing, so the default behaviour is unpadded (decision 8A).
+    startPad: assetPadFromInput(startNo),
     items: [],
     locked: false,  // v8
     // v36: optional job-level notes (printed on the report when non-empty) and

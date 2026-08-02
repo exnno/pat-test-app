@@ -1,5 +1,5 @@
 /*!
- * PAT Test PWA — setup.js (Export / Import Setup)
+ * PATGo PWA — setup.js (Export / Import Setup)
  * v31 (June 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.

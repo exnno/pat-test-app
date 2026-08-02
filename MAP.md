@@ -1,4 +1,4 @@
-# PAT App — Code Map (V59)
+# PATGo — Code Map (V60)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -17,11 +17,16 @@ exists — the modular split is complete.
 > `PAThandoff_vNN.md` docs. The map now answers one question only: *where does
 > this thing live today?*
 
-## Load order (index.html) — 20 first-party files
+## Load order (index.html) — 21 first-party files
 `config.js` → `state.js` → `utils.js` → `storage.js` → `clients.js` → `sqp.js`
-→ `multipick.js` → `feedback.js` → `csv.js` → `backup.js` → `session.js`
-→ `setup.js` → `tour.js` → `report.js` → `pdfpreview.js`
+→ `multipick.js` → `feedback.js` → **`bugreport.js`** → `csv.js` → `backup.js`
+→ `session.js` → `setup.js` → `tour.js` → `report.js` → `pdfpreview.js`
 → `render-core.js` → `render-settings.js` → `events.js` → `dispatch.js` → `boot.js`
+
+**v60 added `bugreport.js`**, placed immediately after `feedback.js` because it
+calls `showToast`, and before everything that might want to report an error.
+`index.html` now lists 21 scripts; `sw.js` ASSETS lists 23 `.js` entries
+(21 first-party + 2 lazy-loaded jsPDF).
 
 `boot.js` runs the startup block and must stay **last**. Later files may call
 functions defined in earlier ones; nothing executes until `boot.js` because
@@ -78,7 +83,8 @@ No new structural constants — V55 added the `readingPolarity` CSV column (abov
 and a PDF glyph fix in report.js; both additive.
 
 **v59 constants (lifetime stats counter):** Welcome key rolled to
-`V59_WELCOME_KEY` (`pat:v59welcome`). `PAT_STATS_KEY` (`pat:archivedStats`) — the
+`V59_WELCOME_KEY` (`pat:v59welcome`) — **superseded by v60 above**.
+`PAT_STATS_KEY` (`pat:archivedStats`) — the
 persisted ARCHIVED half of the stats counter. `STATS_TYPE_MAP_MAX` (50) — cap on
 how many item-type names the bucket keeps; only the top N by count survive a
 write, so a typo'd type can't live in storage forever and a dropped entry can
@@ -86,6 +92,23 @@ never win "most common". `makeEmptyArchivedStats()` — factory (not a shared
 object) returning `{items:0, fails:0, types:{}}`, used as both the default and
 the validator's fallback. **`backupVersion` stays 5** — the bucket is additive on
 the backup and missing-field-tolerant.
+
+**v60 constants (bug report + leading zeros):** Welcome key rolled to
+`V60_WELCOME_KEY` (`pat:v60welcome`). Bug report: `BUG_REPORT_EMAIL`
+(`hello@patgo.co.uk`), `BUG_REPORT_TYPES` (3 × `{id,label,tag}` — the `tag` is what
+lands in the email SUBJECT so an inbox sorts by type without being opened),
+`BUG_REPORT_SEVERITIES` (3 × `{id,code,label}` — plain-language labels on screen,
+`P1`/`P2`/`P3` codes in the subject), `BUG_REPORT_REPRO` (3 × `{id,label,text}`),
+their three `*_DEFAULT`s, `BUG_REPORT_MIN_CHARS` (10 — the Send gate),
+`BUG_ERROR_BUFFER_MAX` (3), `BUG_REPORT_MAX_BODY` (4000 — the mailto budget;
+the DESCRIPTION is truncated against it, never the diagnostics, because the
+diagnostics are the part a user cannot retype), and `makeEmptyBugDraft()`.
+**`makeEmptyBugDraft()` MUST live here, not in bugreport.js** — `state.js` seeds
+`state.bugDraft` from it at load time and runs long before bugreport.js is parsed;
+defining it there would be a fatal boot-time `ReferenceError`. Leading zeros:
+`ASSET_PAD_MAX` (12) — clamp so a hand-edited backup claiming a width of 5000
+can't turn every asset number into a wall of zeros. No new storage keys →
+**`backupVersion` stays 5**.
 
 **v58 constants:** Welcome key was `V58_WELCOME_KEY` (`pat:v58welcome`).
 `QUICK_PICK_LONGPRESS_MS` 2000 → **1000** (see above). `SETTINGS_CATEGORIES`
@@ -132,7 +155,7 @@ can't fire it) and the capture-phase click swallow that eats the tap following a
 fired long-press.
 
 **Welcome key (v50 pattern):** ONLY the current welcome key is defined — now
-`V59_WELCOME_KEY = 'pat:v59welcome'`. The 28 historical keys (V12…V48) were removed
+`V60_WELCOME_KEY = 'pat:v60welcome'`. The 28 historical keys (V12…V48) were removed
 in v50; they were one-release markers nothing referenced after shipping. Old keys
 remain harmlessly in users' localStorage and are detected by prefix in storage.js.
 Each feature release replaces this one line with its new key and passes it to
@@ -142,7 +165,13 @@ Each feature release replaces this one line with its new key and passes it to
 bump the version, change report/setup defaults, or restructure Settings / add a new
 settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`).
 
-## state.js (~318 ln) — the global `state` object
+## state.js (~330 ln) — the global `state` object
+**v60:** `v60WelcomeSeen` (replaces `v59WelcomeSeen`). Bug-report sheet state —
+`bugSheetOpen` (bool) and `bugDraft` (seeded from `makeEmptyBugDraft()` in
+**config.js**, which must load first). Both are **PURELY TRANSIENT**: never saved,
+never backed up, never restored, no storage key, no validator, no migration. They
+exist only between opening the sheet and sending or cancelling. Asserted in the
+harness against storage.js, backup.js and setup.js.
 The single `let state = { ... }` runtime shape: sessions, form, view, all UI
 transients, the welcome-modal gate, SQP/Multi Pick in-memory caches,
 `reportSettings` + `reportSettingsError`, `reportTemplates`, the two-level Settings
@@ -170,7 +199,7 @@ deleted. Persisted via `PAT_STATS_KEY` and carried through backup/restore. The L
 half is deliberately NOT in state — it's recomputed from `state.sessions` on demand
 by `computeAppStats()`, so it can never drift out of step with the real data.
 
-**Welcome flag (v50 pattern):** ONLY the current `v59WelcomeSeen` is kept. Historical
+**Welcome flag (v50 pattern):** ONLY the current `v60WelcomeSeen` is kept. Historical
 `vNNWelcomeSeen` flags were removed in v50 — each was written once and never read
 after its release. The first-run-wizard gate detects past welcomes via
 `hasAnyLegacyWelcomeKey()` (storage.js).
@@ -184,7 +213,18 @@ none, cleared on any view change in `render()`). The Sessions `sessionFilter` ga
 
 *Touch to:* add a new field to runtime state.
 
-## utils.js (~190 ln) — pure helpers (no state access)
+## utils.js (~250 ln) — pure helpers (no state access)
+**v60 asset-number padding:** `splitAssetNo(s)` now returns `{prefix, number, width}`
+— `width` is the character count of the trailing digit run as typed (`'001'` → 3).
+Before v60 it returned only `{prefix, number}` and the `parseInt` threw the zeros
+away, which is why typing `001` produced `2` next. Width is reported for EVERY asset
+number, not just padded ones (`'12'` → 2, which pads to a no-op), so the rule stays
+uniform: *pad to the previous width*. `padAssetNumber(n, width)` — pads, and **NEVER
+truncates** (`100` at width 2 → `'100'`, not `'00'`); width only ever grows, because
+clipping would silently produce duplicate asset numbers on a real job. Clamped to
+`ASSET_PAD_MAX`. `assetPadFromInput(v)` — derives a pad width from what was typed
+into New Session, returning 0 unless the value BEGINS with a zero: padding is
+**opt-in by deliberate act** (`'001'` → 3, `'1'` → 0, `'0'` → 0).
 `escapeHTML`, `capitalise`, `titleCase`, `formatDate`, `formatTimeShort`,
 `formatTimestampCSV`, `splitAssetNo`, `csvEscape`, `csvResultLabel`, `formatBytes`;
 colour helpers `hexToRgb(hex,fallback)`, `contrastColor(rgb)`, `safeHexColor(hex,
@@ -229,8 +269,8 @@ fractional counts → 0; `fails` clamped to `items` (keeps the displayed percent
 inside 0–100); the type map keeps only string keys with a positive count and is
 capped to `STATS_TYPE_MAP_MAX`, highest counts first.
 
-**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V59_WELCOME_KEY` →
-`state.v59WelcomeSeen`. `hasAnyLegacyWelcomeKey()` scans localStorage for any
+**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V60_WELCOME_KEY` →
+`state.v60WelcomeSeen`. `hasAnyLegacyWelcomeKey()` scans localStorage for any
 `pat:v<n>welcome` key — used by the first-run-wizard gate to recognise a returning
 user without keeping a per-version flag. The gate:
 `onboardedV33Seen = explicitlyOnboarded || sessions>0 || engineerName || hasAnyLegacyWelcomeKey()`.
@@ -286,6 +326,41 @@ confirmLabel,maxlength,onConfirm})`; `openInfoSheet({title,message,buttonLabel,
 onClose})` (stays until tapped — no auto-dismiss, for errors). All reuse the
 `.bulk-sheet` pattern, no state, no re-render.
 *Touch to:* change pass/fail/copy feedback channels, toasts, or the shared dialogs.
+
+## bugreport.js (~330 ln) — one-tap problem reporting (v60, NEW FILE)
+Three concerns, deliberately in one file because they only exist for each other.
+**Error capture:** `_bugErrors` (module-level `let`, IN MEMORY ONLY — never written
+to storage, so it cannot grow, corrupt a save or leak into a backup),
+`recordBugError(kind,msg,source,line)` (defensive throughout — it runs from a global
+error handler, so a throw in here would be an error inside the error handler),
+`initErrorCapture()` (binds `window.onerror` + `unhandledrejection`; called ONCE from
+`boot.js`, guarded there on `typeof` and wrapped in try/catch so it can never stop
+the app starting), `bugErrorSummary()`. KNOWN LIMIT: boot.js loads last, so a
+PARSE-time failure in an earlier file predates these handlers — that class is covered
+by the boot integrity guard's own screen instead.
+**Diagnostics:** `_bugStorageKB()`, `_bugDisplayMode()` (installed PWA vs browser tab),
+`refreshBugCacheName()` (async — reads the LIVE service-worker cache name off the
+device; the single most valuable line in a report, because a cache-first PWA can serve
+a build several versions old while About shows whatever its *cached* config claims),
+`collectDiagnostics()` (ordered `[KEY, value]` pairs), `diagnosticsText()`.
+**⚠ THE PRIVACY RULE — the reason this file reads as it does: diagnostics carry
+COUNTS AND FLAGS ONLY.** No client names, site names, asset numbers, locations, item
+types, notes or cert numbers. A support email must never be a route for a customer's
+data to leave an engineer's phone. If you add a field, check it against that rule
+first — the smoke harness asserts it (and is mutation-tested to prove the assertion
+can fail).
+**The report:** `openBugSheet`/`closeBugSheet`, `setBugType`/`setBugSeverity`/
+`setBugRepro` (taps — these DO render), `setBugField` (typing — deliberately does NOT
+render, or the textarea would lose its caret; it syncs the Send button's `disabled`
+directly via `_syncBugSendButton()` instead), `bugDescriptionReady()`,
+`bugSubjectLine()` (`[PATGo BUG P1] V60 — first 40 chars`), `bugBodyText()`,
+`sendBugReport()` (mailto — NOT a network POST, because the app is offline-first and
+engineers are usually somewhere with no signal when something breaks; the mail client
+queues it), `copyBugReport()` (clipboard fallback, same textarea/`execCommand`
+technique as `copyCSV`).
+*Touch to:* change what's collected, the report format, the severity/type options, or
+the error catcher. The SHEET MARKUP is not here — it's `renderBugSheet()` in
+render-settings.js (render files own markup).
 
 ## csv.js (~665 ln) — CSV build + import
 Build/share: `csvCellValue` (adaptive client/site columns; **v53** four reading
@@ -424,6 +499,16 @@ Presets: `activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
 switcher `openPresetSheet`/`closePresetSheet`/`switchPresetFromSheet` (switch only,
 never logs). Core helpers: `uid`, `todayISO`, `activeSession`, `normaliseItemType`,
 `normaliseLocation`, `calibrationStatus`, `nextAssetNo`, `getCarryForwardLocation`,
+**v60 leading zeros:** `nextAssetNo` pads via three paths — first item of a job pads
+`startNumber` to `session.startPad`; a normal increment pads to the width of the
+PREVIOUS item's own digits (so hand-typed padding mid-job is followed); a non-numeric
+last item falls back to `startNumber + items.length` at `startPad`. `startPad` is
+**absent on every pre-v60 session**, so `padAssetNumber` sees `undefined`, treats it
+as width 0, and returns the number unchanged — **old jobs behave exactly as before,
+no migration needed**. `createSession` records `startPad: assetPadFromInput(startNo)`.
+`findDuplicateAssetIndex` is **deliberately unchanged** (decision 8A): `'001'` and
+`'1'` remain DIFFERENT asset numbers, because the label on the appliance is the
+identity — if you typed the zeros, you meant them.
 `findDuplicateAssetIndex`, `computeSuggestions`, `computeLocationSuggestions`,
 `addDescriptionIfNew`, `sortedSessions`, `sessionMatchesControlFilters`,
 `filteredSessions`. **v59 lifetime stats counter:** `sessionCountsForStats(sess)` (excludes the
@@ -515,7 +600,7 @@ Report signature: `storeSignatureFromSource`, `handleReportSignatureFile`,
 **Welcome dismiss (v50):** the 17 near-identical `dismissVNNWelcome` functions were
 replaced by ONE `dismissWelcome(seenFlag, key)` — sets `state[seenFlag]=true`,
 persists `key`, re-renders. The `welcome-dismiss` action (dispatch.js) calls it with the current pair —
-`('v59WelcomeSeen', V59_WELCOME_KEY)` as of v59. Each feature release passes its own.
+`('v60WelcomeSeen', V60_WELCOME_KEY)` as of v60. Each feature release passes its own.
 
 `setView` clears transient overlays on every transition (fail sheet, multi-pick
 sheet, bulk-edit menus, client dialogs, the New Session form, `presetSheetOpen`).
@@ -556,7 +641,7 @@ session, with a ✓ action opening the contacted-action sheet: Rebooked / Declin
 reminding; defence-bounces to Sessions when the feature is off).
 Shared: `emptyStateHTML(icon,title,body,actionLabel,actionName)`;
 `refreshSettingsHubBodyOnly` (live settings search). The **welcome modal** block
-(**v59** gates on `v59WelcomeSeen`; suppressed while the migration prompt or first-run
+(**v60** gates on `v60WelcomeSeen`; suppressed while the migration prompt or first-run
 wizard is up; shows the PATGo icon; dismissed via the shared `welcome-dismiss`
 action → `dismissWelcome`). **v57:** the preset sheet's list carries
 `.sheet-scroll` (styles.css) — the class that makes a long list scroll inside the
@@ -611,8 +696,17 @@ computed at render time (after every file has executed), never at load time. **v
 finger-sized hit area; the placeholder "Support hours" block was removed. Plain `<a>`
 elements are safe inside `#app` because `handleDelegatedClick` returns early when no
 ancestor carries `data-action`, leaving the link's default behaviour intact.
+**v60** `renderSettingsContact` replaced the old static "what to include in a bug
+report" advice card with a **Report a problem** button (`data-action="bug-open"`) and
+a privacy line. `renderBugSheet()` (also here) is the sheet MARKUP — all its logic
+lives in bugreport.js. Two rendering rules before editing it: the type/severity/repro
+rows use `data-action` and DO trigger a full re-render (a tap has no caret to lose);
+the two `<textarea>`s use `data-input-action` and do NOT re-render, which is why the
+Send button's disabled state is synced on the element by `_syncBugSendButton()` rather
+than falling out of a render pass. Everything user-typed goes through `escapeHTML`,
+including the diagnostics preview (asserted in the harness).
 **The About changelog lives here** (`renderSettingsAbout`) — a rolling
-3-version window; v59 shows V59/V58/V57 (V56 dropped). The About page also has the "Set up another
+3-version window; v60 shows V60/V59/V58 (V57 dropped). The About page also has the "Set up another
 device" (`restart-onboarding`) and "Show me around" (`open-tour`) cards, and a
 long-press hidden menu on the title revealing three cloud-prep stub pages
 (`renderCloudAccount`, `renderCloudSync`, `renderCloudSubscription` — mock data, for
@@ -696,8 +790,12 @@ removed).
 **v57** `preset-sheet-pick` now short-circuits on `sheetDragMoved` (events.js) so a
 scroll-drag inside the now-scrollable preset list can't switch the preset by accident.
 
-**Welcome dismiss (v50):** `'welcome-dismiss': () => dismissWelcome('v59WelcomeSeen',
-V59_WELCOME_KEY)` — was a per-version `dismissVNNWelcome()` call; now the one
+**v60 bug report:** clicks `bug-open`, `bug-close`, `bug-set-type`,
+`bug-set-severity`, `bug-set-repro`, `bug-send`, `bug-copy`; input actions
+`bug-desc` and `bug-context` (no render on keystroke — same reason as the readings
+fields and `fail-other`).
+**Welcome dismiss (v50):** `'welcome-dismiss': () => dismissWelcome('v60WelcomeSeen',
+V60_WELCOME_KEY)` — was a per-version `dismissVNNWelcome()` call; now the one
 parameterised helper.
 *Touch to:* add/route any delegated click/input/change handler. Only the four focus-
 sensitive fields + the quick-pick long-press are NOT here (see events.js).
@@ -717,5 +815,14 @@ render(); } catch …`; `registerServiceWorker()` runs regardless.
 that survive every `innerHTML` rewrite. **v57.1:** also calls
 `initSuggestionClickSwallow()` (events.js) alongside it — the one-shot ghost-click
 guard for suggestion picks.
+**v60:** the boot tail arms `initErrorCapture()` (bugreport.js) as its FIRST action,
+guarded on `typeof` and wrapped in try/catch so a failure there can never stop the app
+starting. Also `_crashReportLink(context)` — a self-contained "Email a report" link
+added to BOTH crash screens (the integrity-guard screen and the render-failure
+fallback). It **deliberately duplicates** a little of bugreport.js rather than calling
+it: these screens appear precisely when the app has failed to load, so they must not
+depend on any other file having parsed. Everything in it is inline string building plus
+`navigator.userAgent`, with `APP_VERSION` itself `typeof`-guarded. **Don't "DRY" this
+by wiring it to bugreport.js** — the duplication is the point.
 *Touch to:* change startup sequence, the SW update banner, or the integrity guard.
 The crash fallback that prevents a permanent blank screen lives here.
