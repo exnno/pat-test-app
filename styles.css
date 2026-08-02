@@ -3112,3 +3112,8 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   text-align: center;
   line-height: 1.4;
 }
+
+/* v60.1: show/hide the bug-only blocks WITHOUT re-rendering the sheet. The
+   blocks are always in the DOM; only this class changes on a tap, so a focused
+   textarea below them is never torn down and the keyboard never drops. */
+.bug-hidden { display: none; }

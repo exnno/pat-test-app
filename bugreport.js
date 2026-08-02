@@ -211,22 +211,81 @@ function closeBugSheet() {
   render();
 }
 
-// Tap handlers — these DO re-render (a tap has no focus to lose, and the
-// severity row appears/disappears with the type).
+// Tap handlers.
+//
+// v60.1 FIX — these used to call render(). That tore down and rebuilt the whole
+// screen, which meant tapping a chip AFTER typing dropped the keyboard, lost the
+// caret, and visually reloaded the form. The original reasoning ("a tap has no
+// caret to lose") was simply wrong: the tap has no caret, but the TEXTAREA ABOVE
+// IT does, and a full render destroys it.
+//
+// Same class of bug as the V57 dropdown work — the rule for this sheet is now
+// blunt: NOTHING inside an open bug sheet calls render(). Open and close do
+// (they add/remove the sheet); everything in between mutates the DOM in place via
+// _applyBugSheetDOM(). If you add a control here, follow that pattern.
 function setBugType(id) {
   if (!BUG_REPORT_TYPES.some(t => t.id === id)) return;
   state.bugDraft.type = id;
-  render();
+  _applyBugSheetDOM();
 }
 function setBugSeverity(id) {
   if (!BUG_REPORT_SEVERITIES.some(s => s.id === id)) return;
   state.bugDraft.severity = id;
-  render();
+  _applyBugSheetDOM();
 }
 function setBugRepro(id) {
   if (!BUG_REPORT_REPRO.some(r => r.id === id)) return;
   state.bugDraft.repro = id;
-  render();
+  _applyBugSheetDOM();
+}
+
+// Reflect the whole draft onto the already-rendered sheet without rebuilding it.
+// Everything that can change from a tap is updated here:
+//   • which chip / option row carries .active
+//   • whether the severity and repeatable blocks are shown (type-dependent)
+//   • the two question labels, which reword for Idea/Feedback
+//   • the Send button's disabled state
+// Fully defensive: if the sheet isn't on screen, every lookup misses and this is
+// a no-op rather than a throw.
+function _applyBugSheetDOM() {
+  try {
+    const d = state.bugDraft || {};
+    const isBug = d.type === 'bug';
+
+    // Active states. data-arg carries the option id, so one loop covers all three
+    // groups without hard-coding the ids.
+    const mark = (selector, activeId) => {
+      const nodes = document.querySelectorAll(selector);
+      for (let i = 0; i < nodes.length; i++) {
+        const el = nodes[i];
+        const on = el.getAttribute('data-arg') === activeId;
+        el.classList.toggle('active', on);
+        // The severity rows show a radio glyph rather than a fill.
+        const dot = el.querySelector ? el.querySelector('.bug-option-dot') : null;
+        if (dot) dot.textContent = on ? '●' : '○';
+      }
+    };
+    mark('[data-action="bug-set-type"]', d.type);
+    mark('[data-action="bug-set-severity"]', d.severity);
+    mark('[data-action="bug-set-repro"]', d.repro);
+
+    // Show/hide the bug-only blocks. They are always RENDERED (so there is
+    // nothing to rebuild) and merely hidden with a class.
+    const sevBlock = document.getElementById('bug-severity-block');
+    const repBlock = document.getElementById('bug-repro-block');
+    if (sevBlock) sevBlock.classList.toggle('bug-hidden', !isBug);
+    if (repBlock) repBlock.classList.toggle('bug-hidden', !isBug);
+
+    // The two questions reword between Bug and Idea/Feedback.
+    const q1 = document.getElementById('bug-q1');
+    const q2 = document.getElementById('bug-q2');
+    if (q1) q1.textContent = isBug ? 'What went wrong?' : 'What would you like?';
+    if (q2) q2.textContent = isBug ? 'What were you doing at the time?' : 'Why would that help?';
+
+    _syncBugSendButton();
+  } catch (e) {
+    /* sheet not rendered — nothing to sync */
+  }
 }
 
 // Typing handlers — these deliberately do NOT re-render, because re-rendering on

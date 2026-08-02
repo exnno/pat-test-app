@@ -1,4 +1,4 @@
-# PATGo — Code Map (V60)
+# PATGo — Code Map (V60 · hotfix v60.1)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -349,15 +349,24 @@ types, notes or cert numbers. A support email must never be a route for a custom
 data to leave an engineer's phone. If you add a field, check it against that rule
 first — the smoke harness asserts it (and is mutation-tested to prove the assertion
 can fail).
-**The report:** `openBugSheet`/`closeBugSheet`, `setBugType`/`setBugSeverity`/
-`setBugRepro` (taps — these DO render), `setBugField` (typing — deliberately does NOT
-render, or the textarea would lose its caret; it syncs the Send button's `disabled`
-directly via `_syncBugSendButton()` instead), `bugDescriptionReady()`,
+**The report:** `openBugSheet`/`closeBugSheet` (these DO render — they add/remove the
+sheet), `setBugType`/`setBugSeverity`/`setBugRepro`, `setBugField`,
+`bugDescriptionReady()`, `_applyBugSheetDOM()`, `_syncBugSendButton()`,
 `bugSubjectLine()` (`[PATGo BUG P1] V60 — first 40 chars`), `bugBodyText()`,
 `sendBugReport()` (mailto — NOT a network POST, because the app is offline-first and
 engineers are usually somewhere with no signal when something breaks; the mail client
 queues it), `copyBugReport()` (clipboard fallback, same textarea/`execCommand`
 technique as `copyCSV`).
+**⚠ v60.1 — THE RULE FOR THIS SHEET: once it is open, NOTHING inside it calls
+`render()`.** Open and close do; everything in between mutates the DOM in place via
+`_applyBugSheetDOM()`, which reflects the whole draft onto the live sheet (active
+classes across all three button groups driven by `data-arg`, the severity radio
+glyphs, the `.bug-hidden` toggles on `#bug-severity-block`/`#bug-repro-block`, the
+`#bug-q1`/`#bug-q2` label text, and Send's disabled state). The v60 build called
+`render()` from the three tap setters on the reasoning that "a tap has no caret to
+lose" — **wrong: the tap has none, but the TEXTAREA ABOVE IT does**, so every tap
+tore down a focused input and dropped the keyboard. Same class as the V57 dropdown
+bug. Add a control here? Wire it through `_applyBugSheetDOM()`.
 *Touch to:* change what's collected, the report format, the severity/type options, or
 the error catcher. The SHEET MARKUP is not here — it's `renderBugSheet()` in
 render-settings.js (render files own markup).
@@ -699,11 +708,12 @@ ancestor carries `data-action`, leaving the link's default behaviour intact.
 **v60** `renderSettingsContact` replaced the old static "what to include in a bug
 report" advice card with a **Report a problem** button (`data-action="bug-open"`) and
 a privacy line. `renderBugSheet()` (also here) is the sheet MARKUP — all its logic
-lives in bugreport.js. Two rendering rules before editing it: the type/severity/repro
-rows use `data-action` and DO trigger a full re-render (a tap has no caret to lose);
-the two `<textarea>`s use `data-input-action` and do NOT re-render, which is why the
-Send button's disabled state is synced on the element by `_syncBugSendButton()` rather
-than falling out of a render pass. Everything user-typed goes through `escapeHTML`,
+lives in bugreport.js. **v60.1:** it paints the sheet ONCE, on open; nothing inside it
+re-renders. The severity and repeatable blocks are therefore **always rendered**,
+wrapped in `#bug-severity-block`/`#bug-repro-block` and hidden with `.bug-hidden`
+rather than omitted, so a type change has nothing to rebuild. The two question labels
+wrap their text in `#bug-q1`/`#bug-q2` **spans** so `textContent` can't clobber the
+`(optional)` hint beside q2. Everything user-typed goes through `escapeHTML`,
 including the diagnostics preview (asserted in the harness).
 **The About changelog lives here** (`renderSettingsAbout`) — a rolling
 3-version window; v60 shows V60/V59/V58 (V57 dropped). The About page also has the "Set up another

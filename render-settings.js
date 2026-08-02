@@ -1451,13 +1451,15 @@ function renderSettingsContact() {
 // v60: the report sheet. Markup lives here (render files own markup); all the
 // logic — diagnostics, composing, sending — lives in bugreport.js.
 //
-// Two rendering rules worth knowing before editing this:
-//   • The tap rows (type / severity / repeatable) use data-action and DO trigger
-//     a full re-render. That's fine: a tap has no caret to lose.
-//   • The two text boxes use data-input-action and do NOT re-render, because
-//     re-rendering on each keystroke would destroy the input and drop the caret.
-//     That's why the Send button's disabled state is synced directly on the
-//     element by _syncBugSendButton() rather than falling out of a render pass.
+// v60.1 — THE RULE FOR THIS SHEET: once it is open, NOTHING inside it triggers a
+// re-render. This function paints the sheet ONCE when it opens; every subsequent
+// change (chip taps, showing/hiding the bug-only blocks, rewording the two
+// questions, enabling Send) is applied straight to the DOM by _applyBugSheetDOM()
+// in bugreport.js. That is why the severity and repeatable blocks are ALWAYS
+// rendered here and merely hidden with `.bug-hidden` rather than being left out
+// of the markup — there is then nothing to rebuild, so a tap can never tear down
+// a focused textarea and drop the keyboard. Adding a control? Wire it the same
+// way. Do not reintroduce render() into this sheet.
 function renderBugSheet() {
   if (!state.bugSheetOpen) return '';
   const d = state.bugDraft || makeEmptyBugDraft();
@@ -1467,26 +1469,30 @@ function renderBugSheet() {
     <button class="bug-chip ${t.id === d.type ? 'active' : ''}" data-action="bug-set-type" data-arg="${t.id}">${escapeHTML(t.label)}</button>
   `).join('');
 
-  const severityRows = isBug ? BUG_REPORT_SEVERITIES.map(s => `
+  const severityRows = BUG_REPORT_SEVERITIES.map(s => `
     <button class="bug-option ${s.id === d.severity ? 'active' : ''}" data-action="bug-set-severity" data-arg="${s.id}">
       <span class="bug-option-dot">${s.id === d.severity ? '●' : '○'}</span>
       <span class="bug-option-label">${escapeHTML(s.label)}</span>
     </button>
-  `).join('') : '';
+  `).join('');
 
-  const reproRow = isBug ? `
-    <label class="label">Can you make it happen again?</label>
-    <div class="bug-chip-row">
-      ${BUG_REPORT_REPRO.map(r => `
-        <button class="bug-chip ${r.id === d.repro ? 'active' : ''}" data-action="bug-set-repro" data-arg="${r.id}">${escapeHTML(r.label)}</button>
-      `).join('')}
+  const reproRow = `
+    <div id="bug-repro-block" class="${isBug ? '' : 'bug-hidden'}">
+      <label class="label">Can you make it happen again?</label>
+      <div class="bug-chip-row">
+        ${BUG_REPORT_REPRO.map(r => `
+          <button class="bug-chip ${r.id === d.repro ? 'active' : ''}" data-action="bug-set-repro" data-arg="${r.id}">${escapeHTML(r.label)}</button>
+        `).join('')}
+      </div>
     </div>
-  ` : '';
+  `;
 
-  const severityBlock = isBug ? `
-    <label class="label">How bad is it?</label>
-    <div class="bug-option-list">${severityRows}</div>
-  ` : '';
+  const severityBlock = `
+    <div id="bug-severity-block" class="${isBug ? '' : 'bug-hidden'}">
+      <label class="label">How bad is it?</label>
+      <div class="bug-option-list">${severityRows}</div>
+    </div>
+  `;
 
   const q1 = isBug ? 'What went wrong?' : 'What would you like?';
   const q2 = isBug ? 'What were you doing at the time?' : 'Why would that help?';
@@ -1509,10 +1515,10 @@ function renderBugSheet() {
         ${severityBlock}
         ${reproRow}
 
-        <label class="label">${q1}</label>
+        <label class="label"><span id="bug-q1">${q1}</span></label>
         <textarea class="input bug-textarea" id="bug-desc" data-input-action="bug-desc" rows="3" placeholder="Describe it in your own words">${escapeHTML(d.description)}</textarea>
 
-        <label class="label">${q2} <span class="hint">(optional)</span></label>
+        <label class="label"><span id="bug-q2">${q2}</span> <span class="hint">(optional)</span></label>
         <textarea class="input bug-textarea" id="bug-context" data-input-action="bug-context" rows="2" placeholder="e.g. logging item 14 on a big job">${escapeHTML(d.context)}</textarea>
 
         <details class="bug-diag">
