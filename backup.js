@@ -77,7 +77,18 @@ function buildBackup() {
     // v43: cloud prep. Auth state (userId, authToken, loginTime). Passthrough
     // for now; will persist server-side in cloud phase. Old backups without it
     // restore with null (logged-out). Additive — no backupVersion bump.
-    authUser: state.userId ? { userId: state.userId, authToken: state.authToken, loginTime: new Date().toISOString() } : null
+    authUser: state.userId ? { userId: state.userId, authToken: state.authToken, loginTime: new Date().toISOString() } : null,
+    // v62: INFORMATIONAL ONLY — how many photos existed when this backup was
+    // taken. Photos themselves are a SEPARATE export file (decision 7A); see
+    // the reasoning at the top of the export section in photos.js. This number
+    // exists so a restore can tell the user their photos are elsewhere rather
+    // than let them assume the backup carried everything.
+    //
+    // Nothing reads it as data. Photo records key off item.id, and item ids
+    // already ride inside `sessions`, so the photo file re-links itself with no
+    // help from here. Additive and missing-field-tolerant on old backups →
+    // **backupVersion stays 5**.
+    photoCount: (typeof photoStatsSync === 'function') ? photoStatsSync().count : 0
   };
 }
 
@@ -366,6 +377,22 @@ function restoreBackupFromFile(file) {
     markBackupExported();
     render();
     showToast(`Restored ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'} (${itemCount} item${itemCount === 1 ? '' : 's'})`);
+    // v62: if this backup was taken on a device that had photos, say so — the
+    // photos are NOT in this file and the user needs to import them separately.
+    // Only shown when the photos aren't already here, so a same-device restore
+    // doesn't nag about something that never left.
+    const backedUpPhotos = (typeof data.photoCount === 'number') ? data.photoCount : 0;
+    const photosHere = (typeof photoStatsSync === 'function') ? photoStatsSync().count : 0;
+    if (backedUpPhotos > 0 && photosHere === 0) {
+      openInfoSheet({
+        title: 'Photos are in a separate file',
+        message:
+          `This backup was taken when you had ${backedUpPhotos} photo${backedUpPhotos === 1 ? '' : 's'}. ` +
+          `Photos aren't stored in the backup file — they're too large. ` +
+          `If you exported them, use Import photos on the Backup screen to bring them back. ` +
+          `Your jobs and items have all restored normally.`
+      });
+    }
       }
     });
   };

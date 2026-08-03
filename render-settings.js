@@ -593,6 +593,12 @@ function renderSettingsDisplay() {
 
 function renderSettingsBackup() {
   const stats = getStorageStats();
+  // v62: photos live in IndexedDB, NOT in the ~5MB localStorage budget the bar
+  // above measures, so they are reported as their own line and deliberately do
+  // NOT feed the percentage bar. Rolling them in would make the bar lie in both
+  // directions — it would show 400% for a normal photo user, and it would imply
+  // deleting photos frees the space the sessions blob is running out of.
+  const photoStats = (typeof photoStatsSync === 'function') ? photoStatsSync() : { count: 0, bytes: 0 };
   const barClass = stats.pct >= 90 ? 'danger' : (stats.pct >= 70 ? 'warn' : '');
   // v14: prune suggestion — sessions exported AND older than the threshold.
   const prunable = prunableSessions();
@@ -619,6 +625,8 @@ function renderSettingsBackup() {
         <button class="backup-action-btn danger" id="backup-import-btn" data-action="backup-import">⬆ Import backup (.json)</button>
       </div>
 
+      ${renderPhotoBackupSection()}
+
       <div class="settings-section">
         <h2 class="h2">Storage usage</h2>
         <div class="storage-card">
@@ -626,6 +634,8 @@ function renderSettingsBackup() {
           <div class="storage-stat"><span class="storage-stat-label">Items recorded</span><span class="storage-stat-value">${stats.items.toLocaleString()}</span></div>
           <div class="storage-stat"><span class="storage-stat-label">Storage used</span><span class="storage-stat-value">${formatBytes(stats.bytes)}</span></div>
           <div class="storage-stat"><span class="storage-stat-label">Approx. limit</span><span class="storage-stat-value">~5 MB</span></div>
+          ${photoStats.count ? `
+          <div class="storage-stat"><span class="storage-stat-label">Photos</span><span class="storage-stat-value">${photoStats.count} · ${escapeHTML(formatBytes(photoStats.bytes))}</span></div>` : ''}
           <div class="storage-bar-wrap"><div class="storage-bar ${barClass}" style="width:${stats.pct}%"></div></div>
           <p class="muted" style="margin-top:10px;font-size:12px">Browsers cap local data at around 5 MB. Export a backup and clear old sessions before you get close to the limit.</p>
           ${pruneBlock}
@@ -1281,9 +1291,12 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v60: rolled forward — V60 on top, V57 dropped. -->
+      <!-- v8: rolling 3-version changelog. v62: rolled forward — V62 on top, V59 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V62</strong> · August 2026</p>
+        <p class="muted">You can now attach photos to a failed item. Tap FAIL and there's an Add photo button in the reasons sheet — take up to three per item, of the damage, the plug, the rating label, whatever the evidence is. They save with that item, and failed items in the Overview show a small camera icon with a count; tap it to look through them, add another or delete one. Photos are for fails only, deliberately: it keeps logging a pass as fast as it has always been, and it keeps the storage sensible. Changing a fail to a pass gives up its photos, and the app tells you how many before it does it. Two things worth knowing. Photos stay on this phone — nothing is uploaded anywhere. And they are <strong>not</strong> in your normal backup: they're far too large for it, and putting them in would risk the backup itself failing to save. There's a separate Export photos button on the Backup screen — use it as well as your usual backup, not instead of it. Restore a backup on a new phone and the app will remind you if the photos are still to come.</p>
 
         <p><strong>V61</strong> · August 2026</p>
         <p class="muted">Two things you can now see that were always in your data. Search an asset number on the Sessions screen and, if you've tested it before, you're offered its full history — every job, date, result, location, readings and notes in one list, newest first, with a tap to open the original item. No more opening three jobs to piece together whether a machine has failed before. And every job now shows its testing time under Session settings: first item logged to last, with breaks included, so it's an honest span rather than time on tools. A job logged across more than one day says so instead of showing a misleading number. You can print the testing time on your certificate if you want it — it's off until you switch it on under Report settings → What to include, because how long a job took is your business, not automatically your customer's. Behind all this, the app now records the time each item is logged on every job. Your Item Timestamps setting still decides whether the Time column shows in your CSV; nothing about your exports changes unless you change it.</p>
@@ -1291,8 +1304,6 @@ function renderSettingsAbout() {
         <p><strong>V60</strong> · August 2026</p>
         <p class="muted">Settings &rarr; Contact now has a Report a problem button. Pick whether it's a bug, an idea or general feedback, say how bad it is and whether it happens every time, then describe it in your own words — the app attaches its own version, your phone and OS, your settings and any error it caught, so you don't have to go looking for any of it. You can check exactly what's being sent before it goes, and it's counts and settings only: no client names, sites, locations or asset numbers ever leave your phone. It works with no signal too — your email app holds the report and sends it once you're back online. If the app ever fails to start, that screen now carries a report link of its own. Also: leading zeros in asset numbers now stick. Start a job at 001 and it carries on 002, 003 rather than jumping to 2 — type a plain 1 and nothing changes.</p>
 
-        <p><strong>V59</strong> · July 2026</p>
-        <p class="muted">Your running totals now appear at the bottom of the Settings screen — how many items you've tested, how many failed and the percentage, and your most common item. The important part is that the total keeps climbing even when you tidy up: clearing out old exported jobs used to be invisible to any count, but those jobs are now tallied before they go, so a clear-out never costs you the numbers. Backups carry the totals too, so restoring puts them back exactly as they were. One honest limitation — it starts from the jobs you have on the phone right now, so anything you cleared out before this update isn't in the figure. From here on it's a true running total. The example job, if you still have one, is left out of the counts.</p>
 
 
 
@@ -1624,5 +1635,40 @@ function renderCloudSubscription() {
         <button class="backup-action-btn" id="cloud-upgrade" data-action="cloud-upgrade" style="margin-top:8px">Upgrade to Pro</button>
       </div>
     </div>
+  `;
+}
+
+// ---------- v62: photo export / import (lives on the Backup page) ----------
+//
+// A SEPARATE file from the main backup, by decision 7A. The copy here is
+// deliberately blunt about that: the single most damaging misunderstanding this
+// feature can produce is someone believing their normal backup carries their
+// photos, discovering otherwise only after they've lost the phone.
+//
+// The section hides itself entirely when the device can't store photos, rather
+// than offering buttons that can't work.
+function renderPhotoBackupSection() {
+  if (typeof photosSupported === 'function' && !photosSupported()) return '';
+  const stats = (typeof photoStatsSync === 'function') ? photoStatsSync() : { count: 0, bytes: 0 };
+
+  const exportBlock = stats.count
+    ? `<button class="backup-action-btn primary" id="photo-export-btn" data-action="photo-export">⬇ Export photos (.json)</button>
+       <p class="muted" style="margin-top:8px;font-size:12px">${stats.count} photo${stats.count === 1 ? '' : 's'} on this device · about ${escapeHTML(formatBytes(Math.round(stats.bytes * 1.37)))} as a file.</p>`
+    : `<p class="muted" style="font-size:12px">No photos on this device yet. Photos are added from the FAIL screen.</p>`;
+
+  const wipeBlock = stats.count
+    ? `<button class="backup-action-btn danger" id="photo-wipe-btn" data-action="photo-wipe" style="margin-top:10px">🗑 Delete all photos</button>`
+    : '';
+
+  return `
+      <div class="settings-section">
+        <h2 class="h2">Photos</h2>
+        <p class="muted"><strong>Photos are not included in your backup.</strong> They're far too large for it — putting them in would risk the backup itself failing to save. Export them separately and keep both files together.</p>
+        ${exportBlock}
+        <input type="file" id="photo-import-file" data-change-action="photo-import-file" accept="application/json,.json" style="display:none">
+        <button class="backup-action-btn" id="photo-import-btn" data-action="photo-import" style="margin-top:10px">⬆ Import photos (.json)</button>
+        <p class="muted" style="margin-top:8px;font-size:12px">Importing adds to what's already here — it never replaces your jobs. Restore your backup first, then import photos.</p>
+        ${wipeBlock}
+      </div>
   `;
 }

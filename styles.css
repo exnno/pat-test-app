@@ -3241,3 +3241,142 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   font-size: 12px;
   color: var(--text-muted);
 }
+
+/* ---------- v62: photo evidence ---------- */
+/* All colours come from the existing custom properties, so dark mode is
+   inherited rather than re-declared. Nothing here sets a fixed pixel height on
+   a container that holds a photo — thumbnails are square-cropped via
+   object-fit so a portrait and a landscape shot sit on the same row without
+   the strip jumping height as photos arrive. */
+
+/* The row inside the fail sheet. */
+.fail-photo-row {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.fail-photo-strip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+/* A staged thumbnail with its remove control. */
+.photo-thumb {
+  position: relative;
+  display: inline-block;
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-strong);
+  background: var(--neutral-bg);
+  flex: 0 0 auto;
+}
+.photo-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.photo-thumb-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  line-height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0,0,0,0.6);
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+/* Add control. Deliberately NOT styled as a primary action — logging the fail
+   is the primary action and the photo is optional; making this button loud
+   would compete with the reason buttons above it. */
+.photo-add-btn {
+  padding: 10px 14px;
+  font-size: 14px;
+  font-weight: 600;
+  border: 1px solid var(--border-strong);
+  border-radius: 10px;
+  background: var(--neutral-bg);
+  color: var(--neutral-text);
+  cursor: pointer;
+}
+.photo-add-btn:active { background: var(--neutral-bg-hover); }
+.photo-add-btn[disabled] { opacity: 0.5; }
+.photo-add-btn.wide { display: block; width: 100%; margin-top: 12px; }
+.photo-add-full {
+  font-size: 12px;
+  color: var(--text-hint);
+  padding: 6px 2px;
+}
+
+/* The Overview count chip. Sits inside the result cell next to FAIL. The
+   44px-ish tap target matters more than the visual size here — it's a small
+   control on a dense table row. */
+.photo-chip {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.2;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  vertical-align: middle;
+}
+.photo-chip.is-static { cursor: default; opacity: 0.65; }
+
+/* The strip sheet. */
+.photo-strip-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 12px;
+  margin-top: 4px;
+}
+.photo-strip-item {
+  margin: 0;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--card-bg);
+}
+.photo-strip-item img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  background: var(--neutral-bg);
+}
+.photo-strip-item figcaption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px;
+  border-top: 1px solid var(--border);
+}
+.photo-strip-size { font-size: 11px; color: var(--text-hint); }
+.photo-strip-delete {
+  padding: 4px 8px;
+  font-size: 12px;
+  font-weight: 600;
+  border: 1px solid var(--fail-soft-border);
+  border-radius: 8px;
+  background: var(--fail-soft-bg);
+  color: var(--fail-soft-text);
+  cursor: pointer;
+}
+.photo-strip-loading,
+.photo-strip-note { margin: 12px 0; font-size: 13px; }

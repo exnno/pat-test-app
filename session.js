@@ -699,6 +699,8 @@ function pruneOldSessions() {
       // filter removes them — otherwise a tidy-up would silently reduce the
       // lifetime counter. `targets` is the exact set being removed.
       archiveSessionStats(targets);
+      // v62: and their photos, on the same before-the-filter rule.
+      photosDeleteForSessions(Array.from(ids));
       state.sessions = state.sessions.filter(s => !ids.has(s.id));
       save();
       render();
@@ -738,6 +740,8 @@ function loadFormForCursor() {
   state.multiPickSheetOpen = false;   // v16
   state.presetSheetOpen = false;      // v47
   closeReadingsSheetState();          // v53
+  discardPendingPhotos();             // v62
+  closePhotoStripState();             // v62
   // v20: the loaded item may carry a different location, so the frozen SQP row
   // must rebuild for it. Cheap no-op when the feature is off.
   invalidateSqpRow();
@@ -1178,6 +1182,10 @@ function deleteSession(id) {
   // filter below — it reads the session's items.
   const going = state.sessions.filter(s => s.id === id);
   if (going.length) archiveSessionStats(going);
+  // v62: sweep every photo belonging to this job. Records carry sessionId as
+  // well as itemId precisely so this is one indexed lookup and does NOT depend
+  // on the session's items still being reachable.
+  if (going.length) photosDeleteForSessions([id]);
   state.sessions = state.sessions.filter(s => s.id !== id);
   if (id === state.activeId) {
     state.activeId = null;
@@ -1209,6 +1217,10 @@ function saveItem(result, readings) {
     const clean = normaliseItemReadings(readings);
     if (clean) item.readings = clean;
   }
+  // v62: we need the id of whichever item this call ends up writing, so any
+  // photos staged during the fail flow can be attached to it. Both branches set
+  // it — the edit branch reuses the existing id, the append branch mints one.
+  let savedItemId = '';
   if (state.cursor < sess.items.length) {
     // v17: editing an existing item must NOT change its original timestamp —
     // ts records when the item was FIRST logged, not last touched. We spread
@@ -1219,6 +1231,7 @@ function saveItem(result, readings) {
     const merged = { ...sess.items[state.cursor], ...item };
     if (state.readingsEnabled && !item.readings) delete merged.readings;
     sess.items[state.cursor] = merged;
+    savedItemId = merged.id || '';
   } else {
     // v17: stamp on first save (append only) — ts means "first logged", never
     // "last touched", which is why the edit branch above must not set it.
@@ -1227,7 +1240,9 @@ function saveItem(result, readings) {
     // Time column). See the capture/exposure note in config.js — this is the
     // line that changed, and it was a deliberate decision, not a slip.
     item.ts = new Date().toISOString();
-    sess.items.push({ id: uid(), ...item });
+    const appended = { id: uid(), ...item };
+    sess.items.push(appended);
+    savedItemId = appended.id;
     // v18: learn this (location, type) pairing on first log (pass OR fail — a
     // failed item still belongs to that location). No-op when SQP is off.
     recordSqpUsage(cleanLocation, cleanType);
@@ -1244,6 +1259,12 @@ function saveItem(result, readings) {
   // function can touch on append (learned SQP history, descriptions). Skips the
   // ~21 other unchanged settings keys a full save() would rewrite every tap.
   saveSessions(); saveSqpHistory(); saveDescriptions();
+  // v62: attach any photos staged during the fail flow to the item just written.
+  // Deliberately AFTER the save above — the item must exist in the sessions blob
+  // before anything points at its id. Async and fire-and-forget: it repaints
+  // itself when the writes land, and a photo-store failure cannot affect the
+  // item that has already been saved.
+  commitPendingPhotos(sess.id, savedItemId, result);
   refreshEntryAfterLog();
 }
 
@@ -1253,6 +1274,39 @@ function passClicked() {
   if (sess && sess.locked) return;
   const err = validateBeforeSave();
   if (err) { showToast(err); return; }
+
+  // v62 (decision 14B): photos only ever attach to a FAIL. Turning an existing
+  // fail into a pass therefore gives up its photos — but never silently. The
+  // confirm names the count and says plainly they cannot be recovered, because
+  // the realistic route here is correcting a mis-tap, and someone who mis-tapped
+  // needs to know what else that undo takes with it.
+  const existing = (sess && state.cursor < sess.items.length) ? sess.items[state.cursor] : null;
+  const losing = (existing && existing.result === 'fail') ? photoCountForItem(existing.id) : 0;
+  if (losing > 0) {
+    openConfirmSheet({
+      title: 'Change to PASS?',
+      message:
+        `This item is a FAIL with ${losing} photo${losing === 1 ? '' : 's'} attached. ` +
+        `Changing it to PASS will delete ${losing === 1 ? 'that photo' : 'those photos'} ` +
+        `from this device. They can't be recovered.`,
+      confirmLabel: 'Change and delete',
+      onConfirm: () => {
+        // Delete first, THEN commit the result change. If the delete fails the
+        // pass still records — an item carrying a stale photo is a far smaller
+        // problem than a result the engineer thinks they changed and didn't.
+        photosDeleteForItem(existing.id).then(() => commitPassResult());
+      }
+    });
+    return;
+  }
+  commitPassResult();
+}
+
+// The PASS commit itself, split out of passClicked so the v62 photo confirm can
+// resume it once the user agrees. Nothing else calls this.
+function commitPassResult() {
+  const sess = activeSession();
+  if (!sess) return;
   // v53: when Test Readings is on, PASS no longer commits immediately — it opens
   // the readings sheet (pass mode) so the engineer can confirm/edit the numbers.
   // The PASS tap still happens first (muscle memory intact); the sheet is a
@@ -1311,7 +1365,224 @@ function cancelFailModal() {
   state.failModalOpen = false;
   state.failModalStage = 'reasons';
   state.failOtherText = '';
+  // v62: nothing was logged, so any photo staged in the sheet is discarded and
+  // its object URL released. Staged photos are never written to the store until
+  // the item they belong to actually exists.
+  discardPendingPhotos();
   render();
+}
+
+// ---------- v62: photo evidence — staging, commit, and the strip sheet ----------
+//
+// Photos attach to FAILS ONLY (decision 15A). Two routes reach the store:
+//
+//   1. DURING the fail flow, from the fail sheet, before the item exists. The
+//      item has no id until saveItem() pushes it, so photos are STAGED in
+//      state.pendingPhotos and written the moment the item is saved.
+//   2. AFTER the fact, from the photo strip on an already-logged fail, where
+//      the item id is known and the write is immediate.
+//
+// Everything that talks to IndexedDB is in photos.js; this section is the UI
+// lifecycle around it.
+
+// Stage a photo chosen from the fail sheet. The cap is checked here for the
+// message and again inside photoAdd() at commit time, so neither a double-tap
+// nor a slow device can push a fourth photo past it.
+function addPendingPhotoFromFile(file) {
+  if (!file) return;
+  const cap = PHOTO_MAX_PER_ITEM;
+  if (state.pendingPhotos.length >= cap) {
+    showToast(`Up to ${cap} photos per item`);
+    return;
+  }
+  processPhotoFile(file).then((processed) => {
+    if (!processed) { showToast('Could not read that photo'); return; }
+    if (state.pendingPhotos.length >= cap) return;   // re-check after the async gap
+    processed.url = photoObjectUrl(processed.blob);
+    state.pendingPhotos.push(processed);
+    refreshFailPhotoStrip();
+  });
+}
+
+// Drop one staged photo before it has been committed.
+function removePendingPhoto(index) {
+  const photo = state.pendingPhotos[index];
+  if (!photo) return;
+  state.pendingPhotos.splice(index, 1);
+  refreshFailPhotoStrip();
+}
+
+// Discard every staged photo and release its object URL. Called when the fail
+// sheet is cancelled, on any view change, and after a successful commit.
+function discardPendingPhotos() {
+  if (!state.pendingPhotos || !state.pendingPhotos.length) {
+    state.pendingPhotos = [];
+    return;
+  }
+  state.pendingPhotos = [];
+  photoReleaseObjectUrls();
+}
+
+// ⚠ TARGETED DOM UPDATE, NOT render() — this is the v60.1 rule.
+//
+// The fail sheet's "Other…" stage contains a TEXTAREA. v60.1 established that a
+// full render() while a sheet holds a focused field tears the field down and
+// drops the keyboard, and the photo button is deliberately available on BOTH
+// stages (an unusual "Other" fail is exactly the kind worth photographing), so
+// this path can and will run with that textarea live. Rewriting only the strip
+// container leaves the textarea, its value and its caret completely untouched.
+//
+// The render() below is a fallback for the case where the sheet isn't painted —
+// it cannot fire while the sheet is open, which is the only time it would hurt.
+function refreshFailPhotoStrip() {
+  const strip = document.getElementById('fail-photo-strip');
+  if (strip && typeof renderFailPhotoStripInner === 'function') {
+    strip.innerHTML = renderFailPhotoStripInner();
+    return;
+  }
+  render();
+}
+
+// Write the staged photos against the item saveItem() has just written.
+// Fire-and-forget by design: the item is already saved, and a photo-store
+// failure must never propagate back into the logging path.
+function commitPendingPhotos(sessionId, itemId, result) {
+  if (!state.pendingPhotos || !state.pendingPhotos.length) return;
+
+  // Belt and braces on decision 15A. Staged photos can only be produced by the
+  // fail sheet, so a non-fail result here means something unexpected happened;
+  // discard rather than quietly attaching evidence to a pass.
+  if (result !== 'fail' || !itemId) { discardPendingPhotos(); return; }
+
+  const staged = state.pendingPhotos.slice();
+  // Clear the staging area immediately — the object URLs belong to thumbnails
+  // that are about to be replaced by the committed strip, and leaving them
+  // staged would show them twice if a render lands mid-write.
+  state.pendingPhotos = [];
+
+  // First photo ever added is where we ask for persistent storage (decision 9A)
+  // — at the point the user has demonstrably chosen to keep photos, not at boot.
+  if (photoStatsSync().count === 0) photoRequestPersistence();
+
+  staged.reduce(
+    (chain, processed) => chain.then(() => photoAdd(sessionId, itemId, processed)),
+    Promise.resolve()
+  ).then(() => {
+    photoReleaseObjectUrls();
+    // Repaint so the Overview chip and the entry screen reflect the new count.
+    render();
+  }).catch(() => {
+    photoReleaseObjectUrls();
+  });
+}
+
+// ---------- the photo strip sheet (viewing an existing item's photos) ----------
+
+// Open the strip for one item. Loads the blobs asynchronously and paints a
+// loading state first, so a slow disk never blocks the tap.
+function openPhotoStrip(itemId) {
+  if (!itemId) return;
+  state.photoStripOpen = true;
+  state.photoStripItemId = itemId;
+  state.photoStripPhotos = [];
+  state.photoStripLoading = true;
+  render();
+  photosForItem(itemId).then((records) => {
+    // The sheet may have been closed, or another item opened, while we waited.
+    if (!state.photoStripOpen || state.photoStripItemId !== itemId) return;
+    state.photoStripPhotos = records.map((r) => ({
+      id: r.id,
+      url: photoObjectUrl(r.blob),
+      bytes: r.bytes || 0,
+      at: r.at || ''
+    }));
+    state.photoStripLoading = false;
+    render();
+  });
+}
+
+// Clear the strip's state and release its object URLs. Separate from
+// closePhotoStrip() so the view-change paths can reset without a render.
+function closePhotoStripState() {
+  if (!state.photoStripOpen && !(state.photoStripPhotos || []).length) {
+    state.photoStripOpen = false;
+    state.photoStripItemId = '';
+    state.photoStripPhotos = [];
+    state.photoStripLoading = false;
+    return;
+  }
+  state.photoStripOpen = false;
+  state.photoStripItemId = '';
+  state.photoStripPhotos = [];
+  state.photoStripLoading = false;
+  photoReleaseObjectUrls();
+}
+
+// The strip is READ-MOSTLY — buttons only, no inputs, nothing focusable — so
+// like the v61 asset-history sheet it MAY call render(). The v60.1 no-render
+// rule is specific to sheets containing fields.
+function closePhotoStrip() {
+  closePhotoStripState();
+  render();
+}
+
+// Add a photo to an already-logged fail, straight from the strip.
+function addPhotoToItemFromFile(file) {
+  const itemId = state.photoStripItemId;
+  if (!file || !itemId) return;
+  if (photoCountForItem(itemId) >= PHOTO_MAX_PER_ITEM) {
+    showToast(`Up to ${PHOTO_MAX_PER_ITEM} photos per item`);
+    return;
+  }
+  const sess = activeSession();
+  state.photoStripLoading = true;
+  render();
+  processPhotoFile(file).then((processed) => {
+    if (!processed) {
+      state.photoStripLoading = false;
+      showToast('Could not read that photo');
+      render();
+      return;
+    }
+    if (photoStatsSync().count === 0) photoRequestPersistence();
+    return photoAdd(sess ? sess.id : '', itemId, processed).then((id) => {
+      if (!id) { showToast('Could not save that photo'); }
+      // Reload the strip from the store rather than patching it in memory, so
+      // what is on screen is always what is actually persisted.
+      photoReleaseObjectUrls();
+      state.photoStripPhotos = [];
+      return photosForItem(itemId).then((records) => {
+        state.photoStripPhotos = records.map((r) => ({
+          id: r.id, url: photoObjectUrl(r.blob), bytes: r.bytes || 0, at: r.at || ''
+        }));
+        state.photoStripLoading = false;
+        render();
+      });
+    });
+  });
+}
+
+// Delete one photo from the strip, with a confirm — a photo is evidence and a
+// mis-tap on a small thumbnail row is easy.
+function deletePhotoFromStrip(photoId) {
+  if (!photoId) return;
+  const itemId = state.photoStripItemId;
+  openConfirmSheet({
+    title: 'Delete photo?',
+    message: "This removes the photo from this device permanently. It can't be recovered.",
+    confirmLabel: 'Delete',
+    onConfirm: () => {
+      photoDelete(photoId).then(() => {
+        const gone = state.photoStripPhotos.find((p) => p.id === photoId);
+        if (gone && gone.url) { try { URL.revokeObjectURL(gone.url); } catch {} }
+        state.photoStripPhotos = state.photoStripPhotos.filter((p) => p.id !== photoId);
+        // Nothing left — close the sheet rather than leave an empty shell open.
+        if (!state.photoStripPhotos.length) { closePhotoStrip(); return; }
+        render();
+      });
+      void itemId;
+    }
+  });
 }
 
 // ---------- v53: Test Readings sheet ----------
@@ -1517,6 +1788,11 @@ function copyLastResult() {
 function deleteItem(idx) {
   const sess = activeSession();
   if (!sess) return;
+  // v62: sweep this item's photos BEFORE the splice — afterwards its id is gone
+  // and the photos would be orphaned in IndexedDB with nothing pointing at them.
+  // Same before-the-removal ordering rule as v59's archiveSessionStats().
+  const going = sess.items[idx];
+  if (going && going.id) photosDeleteForItem(going.id);
   sess.items.splice(idx, 1);
   markSessionDirty(sess);   // v14
   state.cursor = Math.min(state.cursor, sess.items.length);
@@ -1568,6 +1844,8 @@ function setView(v) {
   state.multiPickSheetOpen = false;   // v16
   state.presetSheetOpen = false;      // v47
   closeReadingsSheetState();          // v53
+  discardPendingPhotos();             // v62
+  closePhotoStripState();             // v62
   // v61: the asset-history sheet lives on the Sessions screen; leaving that
   // screen must not leave it armed to reappear on the way back.
   state.assetHistorySheetOpen = false;
@@ -1784,6 +2062,10 @@ function applyBulkDelete() {
     onConfirm: () => {
       // Sort descending so splicing doesn't shift the remaining indices.
       const indices = state.selectedIndices.slice().sort((a, b) => b - a);
+      // v62: collect the ids and sweep their photos BEFORE splicing — reading
+      // them afterwards would be reading items that no longer exist.
+      const goingIds = indices.map(i => sess.items[i] && sess.items[i].id).filter(Boolean);
+      if (goingIds.length) photosDeleteForItems(goingIds);
       indices.forEach(i => {
         if (sess.items[i]) sess.items.splice(i, 1);
       });

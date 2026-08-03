@@ -1,4 +1,4 @@
-# PATGo — Code Map (V61)
+# PATGo — Code Map (V62)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -17,21 +17,26 @@ exists — the modular split is complete.
 > `PAThandoff_vNN.md` docs. The map now answers one question only: *where does
 > this thing live today?*
 
-## Load order (index.html) — 21 first-party files
+## Load order (index.html) — 22 first-party files
 `config.js` → `state.js` → `utils.js` → `storage.js` → `clients.js` → `sqp.js`
-→ `multipick.js` → `feedback.js` → **`bugreport.js`** → `csv.js` → `backup.js`
-→ `session.js` → `setup.js` → `tour.js` → `report.js` → `pdfpreview.js`
-→ `render-core.js` → `render-settings.js` → `events.js` → `dispatch.js` → `boot.js`
+→ `multipick.js` → `feedback.js` → `bugreport.js` → **`photos.js`** → `csv.js`
+→ `backup.js` → `session.js` → `setup.js` → `tour.js` → `report.js`
+→ `pdfpreview.js` → `render-core.js` → `render-settings.js` → `events.js`
+→ `dispatch.js` → `boot.js`
 
 **v60 added `bugreport.js`**, placed immediately after `feedback.js` because it
 calls `showToast`, and before everything that might want to report an error.
-`index.html` lists 21 scripts; `sw.js` ASSETS lists 23 `.js` entries
-(21 first-party + 2 lazy-loaded jsPDF).
+`index.html` listed 21 scripts at v60; `sw.js` ASSETS listed 23 `.js` entries
+(21 first-party + 2 lazy-loaded jsPDF — precached but NOT `<script>` tags, since
+report.js loads them on demand).
 
-**v61 added NO files.** Both features live in the file that already owns their
-concern — derived figures and search go in `session.js`, their markup in the
-render files. The `ASSETS` list and the `<script>` chain are byte-identical to
-v60.
+**v62 added `photos.js`**, placed immediately after `bugreport.js`: it calls
+`showToast` / `openConfirmSheet` / `openInfoSheet` (feedback.js) and `uid` is
+resolved at call time, and it must load before `session.js`, `render-core.js`,
+`render-settings.js`, `backup.js` and `dispatch.js`, all of which call into it.
+`index.html` now lists **22** scripts; `sw.js` ASSETS lists **24** `.js` entries
+(22 first-party + the same 2 jsPDF). **The `ASSETS` list and the `<script>`
+chain both changed this release — upload `photos.js` BEFORE `index.html`.**
 
 `boot.js` runs the startup block and must stay **last**. Later files may call
 functions defined in earlier ones; nothing executes until `boot.js` because
@@ -56,8 +61,8 @@ See `THIRD-PARTY-LICENSES.txt`.
 
 ---
 
-## config.js (~620 ln) — constants & defaults, pure data
-`APP_VERSION` ('V59'); all `*_KEY` localStorage key names; the calibration/backup
+## config.js (~883 ln) — constants & defaults, pure data
+`APP_VERSION` ('V62'); all `*_KEY` localStorage key names; the calibration/backup
 tuning constants (`MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`); SQP tuning (`SQP_PARTIAL_WEIGHT`,
 `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`); default lists (`DEFAULT_ITEM_TYPES`,
@@ -97,6 +102,17 @@ never win "most common". `makeEmptyArchivedStats()` — factory (not a shared
 object) returning `{items:0, fails:0, types:{}}`, used as both the default and
 the validator's fallback. **`backupVersion` stays 5** — the bucket is additive on
 the backup and missing-field-tolerant.
+
+**v62 constants (photo evidence):** Welcome key rolled to `V62_WELCOME_KEY`
+(`pat:v62welcome`) — supersedes the v61 key below. `PHOTO_MAX_PER_ITEM` (3),
+`PHOTO_MAX_PX` (1280), `PHOTO_JPEG_QUALITY` (0.7 — note **JPEG**, unlike the
+PNG logo/signature paths: a photo has no transparency to preserve and PNG would
+be several times larger), `PHOTO_BUNDLE_KIND` (`'pat-photos'`) +
+`PHOTO_BUNDLE_VERSION` (1) — a DIFFERENT kind string from the backup and the
+setup bundle so each file-kind guard can reject the others, and
+`PHOTO_EXPORT_WARN_BYTES` (25MB — the threshold at which the export warns about
+file size BEFORE the encode rather than after). No new localStorage keys →
+**`backupVersion` stays 5**.
 
 **v60 constants (bug report + leading zeros):** Welcome key rolled to
 `V60_WELCOME_KEY` (`pat:v60welcome`). Bug report: `BUG_REPORT_EMAIL`
@@ -194,7 +210,21 @@ Each feature release replaces this one line with its new key and passes it to
 bump the version, change report/setup defaults, or restructure Settings / add a new
 settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`).
 
-## state.js (~340 ln) — the global `state` object
+## state.js (~408 ln) — the global `state` object
+**v62 (photo evidence):** `v62WelcomeSeen` (replaces `v61WelcomeSeen`).
+`photoIndex` (`{ [itemId]: count }`) and `photoBytes` — a **DERIVED IN-MEMORY
+MIRROR** of the IndexedDB store, rebuilt at boot by `photoIndexLoad()` and kept
+in step by every add and delete in photos.js. They exist because `render()` is
+SYNCHRONOUS and the Overview must draw a photo count without awaiting a
+database. **Never saved, never backed up, never validated on restore** — the
+object store is the source of truth; persisting the mirror would let it drift,
+exactly what v59's stats counter avoided by recomputing its live half.
+`pendingPhotos` — photos taken in the fail sheet BEFORE the item exists (it has
+no id until `saveItem` pushes it), held as `{blob,w,h,bytes,url}` and written on
+save. `photoStripOpen` / `photoStripItemId` / `photoStripPhotos` /
+`photoStripLoading` — the strip sheet. All PURELY TRANSIENT, cleared by both
+`setView` and `loadFormForCursor`, with object URLs revoked on the way out.
+
 **v61:** `v61WelcomeSeen` (replaces `v60WelcomeSeen`). Asset-history sheet state —
 `assetHistorySheetOpen` (bool) and `assetHistoryAsset` (the asset number being
 shown). **PURELY TRANSIENT**: never saved, never backed up, no storage key, no
@@ -313,8 +343,11 @@ fractional counts → 0; `fails` clamped to `items` (keeps the displayed percent
 inside 0–100); the type map keeps only string keys with a positive count and is
 capped to `STATS_TYPE_MAP_MAX`, highest counts first.
 
-**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V60_WELCOME_KEY` →
-`state.v60WelcomeSeen`. `hasAnyLegacyWelcomeKey()` scans localStorage for any
+**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V62_WELCOME_KEY` →
+`state.v62WelcomeSeen`. ⚠ **This line, `config.js`'s key definition, `state.js`'s
+flag, `dispatch.js`'s dismiss call and `boot.js`'s integrity guard must ALL roll
+together every release** — landing them out of step is what caused the v61
+white screen. (Designing this coupling away is scheduled for **V63**.) `hasAnyLegacyWelcomeKey()` scans localStorage for any
 `pat:v<n>welcome` key — used by the first-run-wizard gate to recognise a returning
 user without keeping a per-version flag. The gate:
 `onboardedV33Seen = explicitlyOnboarded || sessions>0 || engineerName || hasAnyLegacyWelcomeKey()`.
@@ -425,6 +458,66 @@ The `time` CSV case and the Overview time line still read
 `state.timestampsEnabled` — that is the exposure gate, and it is correct that it
 survived v61 untouched.
 
+## photos.js (~625 ln) — photo evidence store (v62, NEW FILE)
+**The app's ONLY IndexedDB code.** Everything that touches the database is here,
+so the async surface is one contained boundary instead of being smeared across
+session.js and the render files.
+
+**Why IndexedDB and not localStorage:** localStorage is a ~5MB SYNCHRONOUS
+string store. One 1280px JPEG is ~200KB and base64 inflates it by a third —
+three photos on twenty fails would exhaust the budget the sessions blob lives
+in, and take the sessions blob down with it.
+
+⚠ **THE SYNCHRONOUS-RENDER PROBLEM.** `render()` cannot await a database, but the
+Overview draws a photo count. Hence the in-memory count index in `state`
+(`photoIndex`/`photoBytes`). **If you add a render path needing photo data, add
+it to the index — do NOT make `render()` async.**
+
+Record shape `{id, itemId, sessionId, blob, w, h, bytes, at}`, two non-unique
+indexes (`itemId`, `sessionId`). **`sessionId` is denormalised deliberately** so
+deleting a job sweeps its photos in one indexed lookup without needing the
+session's items, which by then may already be gone.
+
+Availability + db: `photosSupported()` (sync, safe from `render()`),
+`openPhotoDb()` (memoised; resolves a db **or null**, never rejects),
+`_photoTx(mode, fn)`.
+⚠ **`_photoTx` always resolves `{ok, result}`, never a bare value.** An earlier
+version returned the request result with a `fallback` on failure, which made "the
+transaction failed" indistinguishable from "this batch issued several requests
+and has no single result" — so **every** multi-delete read as a failure and
+silently skipped its index update, leaving stale counts on screen until restart.
+`oncomplete` is the only success signal. Caught by the smoke harness; keep the
+two signals separate.
+Index: `photoIndexLoad()` (rebuild from the store — called once from boot),
+`photoCountForItem(itemId)` (**the only thing `render()` may call**),
+`photoStatsSync()`, `_photoIndexAdd`/`_photoIndexRemove`.
+Processing: `processPhotoFile(file)` — FileReader → `<img>` → canvas, the same
+recipe proven on iOS since v34 by `handleReportLogoFile` (session.js), with two
+deliberate differences: **JPEG** output and the much larger `PHOTO_MAX_PX` cap.
+Fills white first, so a transparent PNG source doesn't flatten to black.
+Writes/reads/deletes: `photoAdd` (re-checks the cap so a double-tap can't beat
+it), `photosForItem`, `photoDelete`, `photosDeleteForItem`, `photosDeleteForItems`
+(bulk-delete path, sequential — forty parallel transactions on a phone is a
+memory spike for no gain), `photosDeleteForSessions`, `photosDeleteAll`.
+Object URLs: `photoObjectUrl` / `photoReleaseObjectUrls` — **every** URL handed
+to the UI is tracked here and revoked on close. Nothing else in the app should
+call `createObjectURL` on a photo blob.
+Persistence: `photoRequestPersistence()` — `navigator.storage.persist()`, called
+on the FIRST photo ever added (not at boot: asking before the user has shown
+intent produces a needless desktop prompt).
+Export/import (decision 7A): `_photoBlobToBase64`, `_photoBase64ToBlob` (via
+`atob`, **not** `fetch` — must work offline inside a cached page),
+`buildPhotoBundle`, `downloadPhotoBundle` (warns on size BEFORE the encode),
+`importPhotosFromFile` (kind-guarded; re-runs `photoIndexLoad()` afterwards
+rather than counting writes, because `put()` over an existing id REPLACES and
+counting would over-report a re-import).
+
+**FAILURE POSTURE: everything here fails SOFT.** Photos are evidence, not core
+data. No IndexedDB, a blocked open, or a throw → callers get null/0/empty, the
+photo UI hides itself, and logging works exactly as before. **Nothing in this
+file may break the fail flow.**
+*Touch to:* anything about photo storage, processing, or the photo export file.
+
 ## csv.js (~665 ln) — CSV build + import
 Build/share: `csvCellValue` (adaptive client/site columns; **v53** four reading
 cases — `readingClass`/`readingEarth`/`readingInsulation`/`readingLeakage` — each
@@ -466,6 +559,14 @@ what it was when the backup was taken, so live + archived stays self-consistent
 instead of desyncing. A pre-v59 backup has no such key and correctly yields an empty
 bucket (the total then reflects exactly the sessions in that backup). Additive and
 missing-field-tolerant → **`backupVersion` stays 5**.
+**v62 (photos):** `buildBackup` carries `photoCount` — **INFORMATIONAL ONLY**.
+Photos are a SEPARATE export file (see photos.js); the backup never carries
+image data. It needs no photo bookkeeping at all because photo records key off
+`item.id` and item ids already ride inside `sessions`, so a photo file re-links
+itself after a restore with no help from the backup format. The restore path
+shows an info sheet when `photoCount > 0` and the device has none, so nobody
+assumes their backup carried their photos. Additive and missing-field-tolerant
+→ **`backupVersion` stays 5**.
 *Touch to:* change the JSON backup shape or restore path. **Bump `backupVersion` only
 for a genuine incompatible change; keep old-backup compatibility.**
 
@@ -561,7 +662,33 @@ are vendored but **not precached**; this loader fetches them lazily on first pre
 *Touch to:* change how the preview rasterises pages, the lazy-load, or the PDF.js
 version.
 
-## session.js (~2140 ln) — sessions, items & most logic
+## session.js (~2940 ln) — sessions, items & most logic
+**v62 (photo evidence) — the UI lifecycle around photos.js:**
+Staging: `addPendingPhotoFromFile` (cap-checked before AND after the async gap),
+`removePendingPhoto`, `discardPendingPhotos`, `refreshFailPhotoStrip`.
+⚠ **`refreshFailPhotoStrip` does a TARGETED DOM WRITE into `#fail-photo-strip`,
+not a `render()`** — the v60.1 rule. The photo button is on BOTH fail-sheet
+stages (an "Other…" fail is exactly the unusual kind worth photographing), and
+the Other stage holds a textarea a full render would tear down.
+Commit: `commitPendingPhotos(sessionId, itemId, result)` — called from
+`saveItem` AFTER the save (the item must exist before anything points at its
+id). Fire-and-forget; discards rather than attaching if `result !== 'fail'` or
+there's no id. `saveItem` now captures `savedItemId` in BOTH branches.
+Strip sheet: `openPhotoStrip`, `closePhotoStripState`, `closePhotoStrip`,
+`addPhotoToItemFromFile`, `deletePhotoFromStrip`.
+**Decision 14B:** `passClicked` was SPLIT — it now runs the confirm when an
+existing FAIL with photos is being turned into a PASS, and `commitPassResult()`
+holds the actual commit so the confirm can resume it. The delete runs BEFORE the
+result change: if the delete fails the pass still records, because an item with
+a stale photo is a far smaller problem than a result the engineer believes they
+changed and didn't.
+⚠ **FOUR removal paths carry the photo cascade, and every one sweeps BEFORE the
+splice/filter** (same ordering rule as v59's `archiveSessionStats` — afterwards
+the ids are gone and the photos are orphaned with nothing pointing at them):
+`deleteItem` → `photosDeleteForItem`; `applyBulkDelete` → `photosDeleteForItems`;
+`deleteSession` and `pruneOldSessions` → `photosDeleteForSessions`.
+`setView` and `loadFormForCursor` both clear staged photos and the strip.
+
 Presets: `activePreset`, `syncItemTypesFromActivePreset`, `switchPreset`,
 `createPreset`, `renamePreset`, `deletePreset`, and the entry-screen long-press
 switcher `openPresetSheet`/`closePresetSheet`/`switchPresetFromSheet` (switch only,
@@ -719,7 +846,18 @@ filtering, theme, bulk edit, settings saves, the wizard/onboarding, the example
 seed, the signature, cert numbers / job notes / report templates, the welcome
 dismiss.
 
-## render-core.js (~1830 ln) — main screens
+## render-core.js (~2170 ln) — main screens
+**v62:** welcome modal rolled to V62 / `v62WelcomeSeen`. `renderFailPhotoStripInner()`
+— the fail sheet's photo row contents; rendered BOTH inside the sheet AND on its
+own by session.js's targeted DOM update, so it must stay self-contained and
+produce valid markup with no surrounding context. `renderPhotoStripSheet()` —
+the view/manage sheet, injected into BOTH the entry screen and the Overview;
+buttons only, **no inputs**, so unlike the fail sheet it MAY be rebuilt by
+`render()` (the v60.1 no-render rule is specific to sheets holding fields).
+`renderOverviewBodyHTML` gains the 📷 count chip on fail rows, read
+SYNCHRONOUSLY via `photoCountForItem` — in selection mode it renders as an inert
+span so a tap toggles the row rather than opening a sheet.
+
 Owns `const app = document.getElementById('app')` and the `render()` dispatcher
 (rebuilds `#app.innerHTML` on every interaction; scroll-to-top + the Sessions scroll
 restore live here via `_lastRenderedView`; **v53** the view router includes
@@ -779,7 +917,17 @@ calibration warning banner. The tour view is routed here but lives in tour.js.
 Reports hub, Edit-session UI, empty states, the welcome modal, the first-run wizard,
 the signature pad, the calibration banner, or the tour route.
 
-## render-settings.js (~1305 ln) — settings screens
+## render-settings.js (~1675 ln) — settings screens
+**v62:** `renderPhotoBackupSection()` — the Photos block on the Backup page
+(export / import / delete-all), which hides itself entirely when the device
+can't store photos rather than offering buttons that can't work. Its copy is
+deliberately blunt that photos are NOT in the backup: the most damaging possible
+misunderstanding here is someone discovering that only after losing the phone.
+The Storage-usage card gains a Photos line, reported SEPARATELY and deliberately
+**not** fed into the percentage bar — photos live in IndexedDB, not the ~5MB
+localStorage budget the bar measures, so rolling them in would make the bar lie
+in both directions. About changelog rolled to V62/V61/V60 (V59 dropped).
+
 Two-level Settings. `renderSettingsHub` (category list from `SETTINGS_CATEGORIES` +
 search box), `renderSettingsHubBodyHTML` (search results across all pages OR the
 category list; re-rendered alone by `refreshSettingsHubBodyOnly` so the search box
@@ -891,7 +1039,15 @@ quick-pick long-press gesture, the sheet drag guard, or the suggestion click-swa
 These stay direct because focus/blur/pointer timing can't be safely delegated (the
 fragile iOS area).
 
-## dispatch.js (~949 ln) — delegated event handling
+## dispatch.js (~1100 ln) — delegated event handling
+**v62 actions.** Clicks: `fail-photo-pick`, `fail-photo-remove`,
+`photo-strip-open`, `photo-strip-close`, `photo-strip-add`, `photo-delete`,
+`photo-export`, `photo-import`, `photo-wipe`. Changes: `fail-photo-file`,
+`photo-strip-file`, `photo-import-file` — all three clear `el.value` immediately
+so re-choosing the SAME file fires a change event (without it, a retaken photo
+with an identical filename silently does nothing). `welcome-dismiss` rolled to
+`v62WelcomeSeen` / `V62_WELCOME_KEY`.
+
 The full delegated event system + three action registries, attached once to `#app`
 at boot via `initDelegation`:
 - **Clicks:** `ACTIONS` + `registerActions` + `handleDelegatedClick` (ancestor-walk
@@ -935,7 +1091,14 @@ parameterised helper.
 *Touch to:* add/route any delegated click/input/change handler. Only the four focus-
 sensitive fields + the quick-pick long-press are NOT here (see events.js).
 
-## boot.js (~146 ln) — startup, RUNS ON LOAD, must load LAST
+## boot.js (~283 ln) — startup, RUNS ON LOAD, must load LAST
+**v62:** the integrity guard's welcome-key check rolled to `V62_WELCOME_KEY`.
+The boot tail calls `photoIndexLoad()` **AFTER** the first `render()`, then
+repaints only if photos were actually found — deliberately after, because it is
+async and the app must never wait on a database to paint its first screen, and
+because photos are evidence, not core data: it is `typeof`-guarded and wrapped,
+so a missing or failing `photos.js` can never stop the app starting.
+
 Service worker: `registerServiceWorker`, `showUpdateBanner`, `applyUpdate`,
 `dismissUpdateBanner`. Boot integrity guard `bootIntegrityOK()` verifies the critical
 cross-file functions (`load`, `save`, `render`, `applyTheme`, `initDelegation`,

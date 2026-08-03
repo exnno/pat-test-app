@@ -431,7 +431,7 @@ function loadV11Settings() {
   // release had passed. Old keys remain harmlessly in users' localStorage; the
   // returning-user heuristic below detects them by prefix, so upgraders are still
   // recognised without keeping a flag per version.
-  state.v61WelcomeSeen = localStorage.getItem(V61_WELCOME_KEY) === '1';
+  state.v62WelcomeSeen = localStorage.getItem(V62_WELCOME_KEY) === '1';
 
   // v59: archived half of the lifetime stats counter (tallies of pruned/deleted
   // sessions). Absent on every pre-v59 install, which correctly yields an empty

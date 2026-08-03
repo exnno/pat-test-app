@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V61';
+const APP_VERSION = 'V62';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -64,7 +64,7 @@ const CAL_DUE_KEY = 'pat:caldue';
 // first-run-wizard gate, so nothing about upgrade behaviour changes. When a future
 // feature release rolls a new welcome, replace the line below with the new key
 // (e.g. V51_WELCOME_KEY) and pass it to dismissWelcome() — no new symbol pile.
-const V61_WELCOME_KEY = 'pat:v61welcome';  // v61: asset history + testing time
+const V62_WELCOME_KEY = 'pat:v62welcome';  // v62: photo evidence on fails
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
 // sheet opens. Deliberately a single named constant so the threshold can be
@@ -470,6 +470,41 @@ const REPORT_LOGO_MAX_PX = 600;
 // before base64 storage (drawn or uploaded). Signatures are smaller than logos,
 // so a tighter cap keeps localStorage + JSON backups lean.
 const REPORT_SIGNATURE_MAX_PX = 400;
+
+// ---------- v62: photo evidence (fails only) ----------
+// Photos are stored in IndexedDB (see photos.js), NOT localStorage, so these
+// caps protect the device's disk and the photo export file size — not the ~5MB
+// localStorage budget the rest of the app lives in.
+
+// How many photos one item may carry. Three covers the real evidence case for a
+// fail — the plug, the rating label, the damage — without letting one item
+// become a photo album. Enforced in the UI *and* in photoAdd(), so a double-tap
+// on a slow device can't push a fourth in behind the check.
+const PHOTO_MAX_PER_ITEM = 3;
+
+// Longest edge, in pixels, after downscaling. 1280 is enough to read a rating
+// plate or show a scorched plug clearly, and lands around 150-250KB per photo at
+// the quality below. Twenty fails with three photos each is roughly 12MB — fine
+// for IndexedDB, and a photo export file that still moves over email.
+const PHOTO_MAX_PX = 1280;
+
+// JPEG quality. 0.7 is the point where artefacts stop being visible on a phone
+// screen for photographic content. Note JPEG, not PNG: the logo and signature
+// paths use PNG to preserve transparency, which a photo has none of, and PNG
+// would be several times larger here.
+const PHOTO_JPEG_QUALITY = 0.7;
+
+// Photo export/import bundle marker + version. Deliberately a DIFFERENT kind
+// string from the backup ('pat-backup') and the setup bundle ('pat-setup') so
+// the file-kind guard can reject a photo file imported as a backup and vice
+// versa, exactly as setup.js already does for its own bundle.
+const PHOTO_BUNDLE_KIND = 'pat-photos';
+const PHOTO_BUNDLE_VERSION = 1;
+
+// Soft warning threshold for the photo export. Past this, the export confirm
+// warns about the file size before building it, because a 60MB attachment is a
+// surprise worth having in advance rather than after a two-minute encode.
+const PHOTO_EXPORT_WARN_BYTES = 25 * 1024 * 1024;
 
 // v49: the PATGo footer logo, embedded as a small base64 PNG so it renders in
 // the PDF with zero network access (reports must work fully offline). This is a

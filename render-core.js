@@ -169,28 +169,29 @@ function render() {
   ` : '';
 
   // One-time "what's new" modal, shown once after an update until dismissed.
-  // Gates on the CURRENT release's seen flag (v61WelcomeSeen). Suppressed while
+  // Gates on the CURRENT release's seen flag (v62WelcomeSeen). Suppressed while
   // the v9 migration prompt is up (it needs a name commit first) or while the
   // first-run wizard is showing — so an UPGRADING user sees this modal and a
   // genuinely-new install sees the wizard instead. Dismissed via the shared
   // dismissWelcome() (v50), wired in dispatch.js.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v61WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v62WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V61">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V62">
       <div class="bulk-sheet-handle"></div>
       <div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V61</h3>
+        <h3 class="bulk-sheet-title">What's new in V62</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Asset history.</strong> Search an asset number on the Sessions screen. If you've tested it before, you'll be offered its full history — every job, date and result in one place, instead of opening each job to piece it together.</li>
-        <li><strong>Testing time.</strong> Open a job &rarr; Session settings and you'll see how long it took, from the first item logged to the last. You can also print it on your certificate — it's off until you turn it on in Report settings.</li>
-        <li>The app now records the time each item is logged on every job. Your Item Timestamps setting still decides whether the Time column appears in your CSV — nothing about your exports changes unless you change it.</li>
+        <li><strong>Photos on fails.</strong> When you tap FAIL, there's now an <strong>Add photo</strong> button in the reasons sheet. Take up to three per item — the damage, the plug, the rating label — and they're saved with that item.</li>
+        <li><strong>Finding them again.</strong> Failed items in the Overview show a 📷 with a count. Tap it to view the photos, add another, or delete one.</li>
+        <li><strong>Photos are not in your normal backup.</strong> They're far too big for it. There's a separate <strong>Export photos</strong> button in Settings &rarr; Backup — use it alongside your usual backup, not instead of it.</li>
+        <li>Photos stay on this phone and are only kept for fails. Changing a fail to a pass deletes its photos, and it'll ask you first.</li>
       </ul>
-      <button class="btn-primary" id="v61-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v62-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -1224,6 +1225,19 @@ function renderEntry() {
     `;
   }
 
+  // v62: the photo row sits BELOW the reason controls and is present on BOTH
+  // stages — an "Other…" fail is exactly the unusual kind worth photographing,
+  // so losing the button on that stage would be the wrong trade. The strip's
+  // container id is what session.js's refreshFailPhotoStrip() targets for its
+  // DOM-only update, which is what keeps the "Other…" textarea and its keyboard
+  // alive when a photo lands (the v60.1 rule).
+  const failPhotoRow = `
+    <div class="fail-photo-row">
+      <div class="fail-photo-strip" id="fail-photo-strip">${renderFailPhotoStripInner()}</div>
+      <input type="file" id="fail-photo-file" data-change-action="fail-photo-file" accept="image/*" style="display:none">
+    </div>
+  `;
+
   const failModal = state.failModalOpen ? `
     <div class="modal-backdrop" id="fail-backdrop" data-action="fail-cancel"></div>
     <div class="fail-sheet" role="dialog" aria-label="Why did it fail?">
@@ -1234,6 +1248,7 @@ function renderEntry() {
         <button class="fail-close-btn" id="fail-close" data-action="fail-cancel" aria-label="Cancel">×</button>
       </div>
       ${failSheetInner}
+      ${failPhotoRow}
     </div>
   ` : '';
 
@@ -1491,6 +1506,7 @@ function renderEntry() {
       ${multiPickSheet}
       ${presetSheet}
       ${readingsSheet}
+      ${renderPhotoStripSheet()}
     </div>
   `;
 }
@@ -1545,13 +1561,24 @@ function renderOverviewBodyHTML(sess) {
           const timeLine = (state.timestampsEnabled && it.ts)
             ? `<div class="item-time">${escapeHTML(formatTimeShort(it.ts))}</div>`
             : '';
+          // v62: photo count on fail rows. Read SYNCHRONOUSLY from the in-memory
+          // index (state.photoIndex) — render() cannot await IndexedDB. Before
+          // the index has loaded, and for anyone with no photos, this is 0 and
+          // the markup is empty, so the table is untouched for existing users.
+          // In selection mode it renders as an inert span: tapping a row there
+          // must toggle the selection, not open a sheet.
+          const photoN = (it.result === 'fail' && it.id) ? photoCountForItem(it.id) : 0;
+          const photoChip = !photoN ? ''
+            : (sel
+              ? `<span class="photo-chip is-static">📷 ${photoN}</span>`
+              : `<button class="photo-chip" data-action="photo-strip-open" data-arg="${escapeHTML(it.id)}" aria-label="View ${photoN} photo${photoN === 1 ? '' : 's'}">📷 ${photoN}</button>`);
           return `
             <tr class="${rowClass}" ${rowAttr}>
               ${checkCol}
               <td class="td">${escapeHTML(it.assetNo)}</td>
               <td class="td">${escapeHTML(it.location)}</td>
               <td class="td">${escapeHTML(it.itemType)}${timeLine}</td>
-              <td class="td td-result ${it.result || ''}">${capitalise(it.result || '')}</td>
+              <td class="td td-result ${it.result || ''}">${capitalise(it.result || '')}${photoChip}</td>
               ${actionCol}
             </tr>
           `;
@@ -1746,6 +1773,7 @@ function renderOverview() {
       ${selectionBar}
       ${bulkMenu}
       ${bulkDialog}
+      ${renderPhotoStripSheet()}
       ${bulkTypeDialog}
       ${bulkNotesDialog}
     </div>
@@ -2051,6 +2079,92 @@ function renderReports() {
       </div>
       ${needsCompany}
       <div class="sessions-list">${list}</div>
+    </div>
+  `;
+}
+
+// ---------- v62: photo evidence markup ----------
+
+// The contents of the fail sheet's photo row: thumbnails of anything staged so
+// far, plus the Add button (or a "3 max" note once full).
+//
+// ⚠ This is rendered BOTH by the fail sheet's full render AND, on its own, by
+// session.js's refreshFailPhotoStrip() writing straight into #fail-photo-strip.
+// That is deliberate: it lets a photo appear while the "Other…" textarea is
+// focused without a render() tearing the field down (the v60.1 rule). Keep it
+// self-contained — it must produce valid markup with no surrounding context.
+function renderFailPhotoStripInner() {
+  // No IndexedDB (or the store failed to open) → no photo UI at all, rather
+  // than a button that silently does nothing.
+  if (typeof photosSupported === 'function' && !photosSupported()) return '';
+
+  const photos = state.pendingPhotos || [];
+  const cap = (typeof PHOTO_MAX_PER_ITEM === 'number') ? PHOTO_MAX_PER_ITEM : 3;
+
+  const thumbs = photos.map((p, i) => `
+    <span class="photo-thumb">
+      <img src="${p.url}" alt="Photo ${i + 1}">
+      <button class="photo-thumb-remove" data-action="fail-photo-remove" data-arg="${i}" aria-label="Remove photo ${i + 1}">×</button>
+    </span>
+  `).join('');
+
+  const addControl = (photos.length >= cap)
+    ? `<span class="photo-add-full">${cap} photo maximum</span>`
+    : `<button class="photo-add-btn" id="fail-photo-pick-btn" data-action="fail-photo-pick">📷 ${photos.length ? 'Add another' : 'Add photo'}</button>`;
+
+  return thumbs + addControl;
+}
+
+// The photo strip sheet — viewing and managing the photos on an item that has
+// already been logged. Reached from the 📷 chip in the Overview.
+//
+// Buttons only, no inputs, nothing focusable — so like the v61 asset-history
+// sheet this one MAY be rebuilt by render(). The v60.1 no-render rule applies to
+// sheets containing fields, which this is not.
+function renderPhotoStripSheet() {
+  if (!state.photoStripOpen) return '';
+
+  const cap = (typeof PHOTO_MAX_PER_ITEM === 'number') ? PHOTO_MAX_PER_ITEM : 3;
+  const photos = state.photoStripPhotos || [];
+  const count = photos.length;
+
+  let body;
+  if (state.photoStripLoading && !count) {
+    body = `<p class="muted photo-strip-loading">Loading photos…</p>`;
+  } else if (!count) {
+    body = `<p class="muted photo-strip-loading">No photos on this item.</p>`;
+  } else {
+    body = `
+      <div class="photo-strip-grid">
+        ${photos.map((p, i) => `
+          <figure class="photo-strip-item">
+            <img src="${p.url}" alt="Photo ${i + 1}" loading="lazy">
+            <figcaption>
+              <span class="photo-strip-size">${escapeHTML(formatBytes(p.bytes || 0))}</span>
+              <button class="photo-strip-delete" data-action="photo-delete" data-arg="${escapeHTML(p.id)}" aria-label="Delete photo ${i + 1}">Delete</button>
+            </figcaption>
+          </figure>
+        `).join('')}
+      </div>
+    `;
+  }
+
+  const addControl = (count >= cap)
+    ? `<p class="muted photo-strip-note">${cap} photo maximum reached.</p>`
+    : `<button class="photo-add-btn wide" id="photo-strip-add-btn" data-action="photo-strip-add" ${state.photoStripLoading ? 'disabled' : ''}>📷 Add another photo</button>`;
+
+  return `
+    <div class="modal-backdrop" id="photo-strip-backdrop" data-action="photo-strip-close"></div>
+    <div class="bulk-sheet sheet-scroll" role="dialog" aria-label="Photos on this item">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">Photos${count ? ` (${count})` : ''}</h3>
+        <button class="fail-close-btn" id="photo-strip-close" data-action="photo-strip-close" aria-label="Close">×</button>
+      </div>
+      ${body}
+      ${addControl}
+      <input type="file" id="photo-strip-file" data-change-action="photo-strip-file" accept="image/*" style="display:none">
     </div>
   `;
 }

@@ -105,8 +105,8 @@ function bootIntegrityOK() {
   // is safe and never throws.
   //
   // ⚠ WHEN YOU ROLL THE WELCOME KEY NEXT RELEASE, ROLL IT HERE TOO.
-  if (typeof V61_WELCOME_KEY === 'undefined') {
-    console.error('Boot integrity check failed: V61_WELCOME_KEY missing — config.js and storage.js are out of step (partial deploy or stale cache)');
+  if (typeof V62_WELCOME_KEY === 'undefined') {
+    console.error('Boot integrity check failed: V62_WELCOME_KEY missing — config.js and storage.js are out of step (partial deploy or stale cache)');
     return false;
   }
   return true;
@@ -248,6 +248,28 @@ try {
         '</div>';
     }
   }
+}
+// v62: build the in-memory photo count index from IndexedDB, then repaint so
+// the Overview's photo chips appear. Deliberately placed AFTER the first
+// render(), not before it:
+//   - it is async, and the app must not wait on a database to show its first
+//     screen. A cold start with a slow disk would otherwise stall behind it.
+//   - photos are evidence, not core data. If IndexedDB is unavailable, blocked,
+//     or throws, photoIndexLoad() resolves false, the counts stay at zero, the
+//     photo UI simply doesn't appear, and everything else works exactly as
+//     before. It is wrapped and guarded on typeof as well, so a missing or
+//     failed photos.js can never stop the app starting — the same posture as
+//     initErrorCapture() above.
+try {
+  if (typeof photoIndexLoad === 'function') {
+    photoIndexLoad().then((loaded) => {
+      // Only repaint if something was actually found. A user with no photos —
+      // which is everyone on the day this ships — gets no second render at all.
+      if (loaded && state.photoIndex && Object.keys(state.photoIndex).length) render();
+    }).catch(() => {});
+  }
+} catch (e) {
+  console.error('Photo index failed to load (non-fatal).', e);
 }
 }   // end if (_bootLoadOK)  — v61.2
 }   // end else (boot integrity OK)

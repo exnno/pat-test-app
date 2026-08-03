@@ -158,6 +158,35 @@ registerActions({
   'asset-history-close': () => closeAssetHistory(),
   'asset-history-row':   (arg) => openAssetHistoryRow(arg),
 
+  // v62: photo evidence. The two *-pick actions just click the hidden file
+  // input (same pattern as report-logo-pick); the file itself arrives through
+  // the change registry below.
+  'fail-photo-pick':    () => { const inp = document.getElementById('fail-photo-file'); if (inp) inp.click(); },
+  'fail-photo-remove':  (arg) => removePendingPhoto(parseInt(arg, 10)),
+  'photo-strip-open':   (arg) => openPhotoStrip(arg),
+  'photo-strip-close':  () => closePhotoStrip(),
+  'photo-strip-add':    () => { const inp = document.getElementById('photo-strip-file'); if (inp) inp.click(); },
+  'photo-delete':       (arg) => deletePhotoFromStrip(arg),
+  'photo-export':       () => downloadPhotoBundle(),
+  'photo-import':       () => { const inp = document.getElementById('photo-import-file'); if (inp) inp.click(); },
+  'photo-wipe':         () => {
+    const n = photoStatsSync().count;
+    openConfirmSheet({
+      title: 'Delete all photos?',
+      message:
+        `This permanently deletes all ${n} photo${n === 1 ? '' : 's'} from this device. ` +
+        `Your jobs, items and results are not affected. ` +
+        `If you haven't exported them, they can't be recovered.`,
+      confirmLabel: 'Delete all',
+      onConfirm: () => {
+        photosDeleteAll().then((removed) => {
+          render();
+          showToast(`Deleted ${removed} photo${removed === 1 ? '' : 's'}`);
+        });
+      }
+    });
+  },
+
   'open-session': (arg, el) => {
     if (el.dataset.openAt !== undefined && el.dataset.openAt !== '') {
       requestOpenSession(arg, { cursor: parseInt(el.dataset.openAt, 10) });
@@ -657,7 +686,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissWelcome('v61WelcomeSeen', V61_WELCOME_KEY),
+  'welcome-dismiss': () => dismissWelcome('v62WelcomeSeen', V62_WELCOME_KEY),
 
   // v60: bug report sheet (Settings -> Contact). The three setters re-render
   // (taps, no caret to lose); the two textareas are input actions below.
@@ -997,6 +1026,24 @@ registerChangeActions({
     const file = el.files && el.files[0];
     el.value = '';
     handleReportLogoFile(file);
+  },
+  // v62: photo evidence. el.value is cleared immediately in both, so choosing
+  // the SAME file twice in a row still fires a change event — without it, a
+  // retaken photo with an identical filename would silently do nothing.
+  'fail-photo-file': (v, el) => {
+    const file = el.files && el.files[0];
+    el.value = '';
+    addPendingPhotoFromFile(file);
+  },
+  'photo-strip-file': (v, el) => {
+    const file = el.files && el.files[0];
+    el.value = '';
+    addPhotoToItemFromFile(file);
+  },
+  'photo-import-file': (v, el) => {
+    const file = el.files && el.files[0];
+    el.value = '';
+    importPhotosFromFile(file);
   },
   // v35: custom colour pickers. The value is the chosen hex; persist instantly
   // and re-render so the theme-chip "active" highlight updates. Capture text

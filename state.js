@@ -46,6 +46,39 @@ let state = {
   failModalOpen: false,
   failModalStage: 'reasons',
   failOtherText: '',
+
+  // ---------- v62: photo evidence (fails only) ----------
+  //
+  // photoIndex / photoBytes are a DERIVED IN-MEMORY MIRROR of the IndexedDB
+  // photo store — item id -> how many photos it has, plus a running byte total.
+  // They exist for one reason: render() is synchronous and cannot await a
+  // database, but the Overview needs to draw a 📷 count on fail rows. Rebuilt
+  // from the store once at boot by photoIndexLoad() and kept in step by every
+  // add and delete in photos.js.
+  //
+  // NEVER saved to localStorage, NEVER in a backup, NEVER validated on restore.
+  // They are not a source of truth — the object store is. If they were persisted
+  // they could drift out of step with the real photos, which is exactly the
+  // failure the v59 stats counter avoided by recomputing its live half.
+  photoIndex: {},
+  photoBytes: 0,
+
+  // Photos taken DURING the fail flow, before the item exists. The item has no
+  // id until saveItem() pushes it, so these are held here as
+  // { blob, w, h, bytes, url } and written to the store against the new item's
+  // id the moment it is saved. `url` is a tracked object URL for the thumbnail.
+  //
+  // PURELY TRANSIENT. Discarded — and their object URLs revoked — if the fail
+  // sheet is cancelled, because nothing was ever logged.
+  pendingPhotos: [],
+
+  // The photo strip sheet (viewing/managing an existing item's photos).
+  // photoStripPhotos holds { id, url, bytes, at } once loaded async; until then
+  // the sheet shows its loading state. All transient, cleared on any view change.
+  photoStripOpen: false,
+  photoStripItemId: '',
+  photoStripPhotos: [],
+  photoStripLoading: false,
   showFailsOnly: false,
   searchQuery: '',
   // v7
@@ -138,7 +171,7 @@ let state = {
   // new install still shows the WIZARD and an upgrader still shows the MODAL —
   // unchanged behaviour. Future feature releases roll a new flag here and pass it
   // to dismissWelcome().
-  v61WelcomeSeen: false,  // v61: cross-session asset history + testing time
+  v62WelcomeSeen: false,  // v62: photo evidence on fails
 
   // v61: cross-session asset history sheet. PURELY TRANSIENT — never saved,
   // never backed up, no storage key, no validator, no migration. The sheet is
