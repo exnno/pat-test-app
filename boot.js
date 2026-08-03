@@ -89,6 +89,26 @@ function bootIntegrityOK() {
     console.error('Boot integrity check failed: state missing');
     return false;
   }
+  // v61.2: ALSO CHECK CRITICAL CONSTANTS. This is the gap that produced the v61
+  // white screen, and it is worth understanding rather than just patching.
+  //
+  // Top-level `const` does NOT attach to `window`, so the function loop above is
+  // structurally blind to a missing constant. Every feature release rolls a new
+  // welcome key, coupling FOUR files at once: config.js defines it, storage.js
+  // reads it inside load(), state.js holds its flag, dispatch.js passes it to
+  // dismissWelcome(). Land config.js and storage.js out of step — one file not
+  // committed, or one still served from a stale cache — and load() throws a
+  // ReferenceError with nothing to catch it.
+  //
+  // Checking it here converts a silent white screen into the designed recovery
+  // path, BEFORE any storage call is made. `typeof` on an undeclared identifier
+  // is safe and never throws.
+  //
+  // ⚠ WHEN YOU ROLL THE WELCOME KEY NEXT RELEASE, ROLL IT HERE TOO.
+  if (typeof V61_WELCOME_KEY === 'undefined') {
+    console.error('Boot integrity check failed: V61_WELCOME_KEY missing — config.js and storage.js are out of step (partial deploy or stale cache)');
+    return false;
+  }
   return true;
 }
 
@@ -143,7 +163,48 @@ if (!bootIntegrityOK()) {
   }
   // Deliberately stop here — do NOT call load()/render()/save() with a partial build.
 } else {
-load();
+// v61.2: load() is now INSIDE a try/catch. It never was, which is why a throw in
+// here produced a blank screen with no message rather than the recovery prompt
+// the app has had since v16.1 for render() failures.
+let _bootLoadOK = true;
+try {
+  load();
+} catch (e) {
+  _bootLoadOK = false;
+  console.error('load() failed during boot — not rendering, and NOT saving.', e);
+
+  // ⚠ NEUTRALISE save() AND render() FOR THE REST OF THIS PAGE'S LIFE.
+  //
+  // This is the part that matters most, and it is not paranoia. A failed load()
+  // leaves `state` holding its EMPTY DEFAULTS — no sessions, no clients, no
+  // settings. Anything that subsequently calls save() would write those empties
+  // straight over the user's real data. Anything that calls render() would paint
+  // an empty but usable-looking app over the error message below, inviting the
+  // user to start working in it — and the first log would save().
+  //
+  // The concrete route is not hypothetical: registerServiceWorker() runs after
+  // this block (deliberately — see below), and when it finds an update it calls
+  // showUpdateBanner(), which calls render(). So without this, a failed boot
+  // could repaint itself into an empty app on its own.
+  //
+  // Replacing both with no-ops makes the empty state physically unwritable and
+  // the error screen unpaintable-over. The page can do nothing except show the
+  // message and reload.
+  try { save = function () {}; } catch (e2) {}
+  try { render = function () {}; } catch (e2) {}
+
+  const failEl = document.getElementById('app');
+  if (failEl) {
+    failEl.innerHTML =
+      '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;line-height:1.5">' +
+      '<h2 style="margin:0 0 8px">Update needed</h2>' +
+      '<p style="margin:0 0 16px">The app didn\'t finish updating, so it couldn\'t start. <strong>Your saved data is safe and untouched</strong> — nothing has been changed or overwritten. Tap Reload to finish updating. If it keeps happening, fully close the app from the app switcher and open it again.</p>' +
+      '<button onclick="location.reload()" style="padding:12px 18px;font-size:16px;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
+      _crashReportLink('load() threw during boot: ' + (e && e.message ? e.message : 'unknown')) +
+      '</div>';
+  }
+}
+if (_bootLoadOK) {
 applyTheme(state.theme);
 // v25 (E3): attach the single delegated click listener to #app once, before the
 // first render. It survives every innerHTML rewrite (it's on #app, not its
@@ -188,5 +249,13 @@ try {
     }
   }
 }
-}
+}   // end if (_bootLoadOK)  — v61.2
+}   // end else (boot integrity OK)
+// registerServiceWorker() runs REGARDLESS of everything above, and MUST stay
+// outside both blocks. It is the mechanism by which a broken cached build gets
+// replaced. In v61 a throw in load() killed this line too, so the page could
+// never register, never receive an update, and never message SKIP_WAITING — the
+// new worker waited forever and the stale cache kept being served. The app was
+// deadlocked and could not recover itself. Keeping this reachable on every path
+// is what makes a bad release survivable without a one-off recovery deploy.
 registerServiceWorker();

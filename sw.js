@@ -10,7 +10,7 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v61-2';
+const CACHE_VERSION = 'pat-v61-3';
 const ASSETS = [
   './',
   './index.html',
@@ -49,21 +49,17 @@ const ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then(cache => cache.addAll(ASSETS))
-      // ⚠ v61.2 RECOVERY ONLY — REMOVE THIS LINE ONCE THE APP IS BACK.
-      //
-      // Normally this worker waits for the PAGE to post SKIP_WAITING when the
-      // user taps the update banner, so an update never swaps under an engineer
-      // mid-job. That design has one failure mode, which is what stranded v61:
-      // if the page dies before boot.js registers the worker, nobody can ever
-      // send that message, the new worker waits forever, the stale cache keeps
-      // being served, and the app cannot pull itself out. A deadlock.
-      //
-      // Activating on install breaks the deadlock unconditionally — it needs no
-      // cooperation from a page that may be dead. The cost, and the reason this
-      // is temporary: controllerchange in boot.js reloads the page, so a future
-      // update would reload the app while someone is working. Acceptable for one
-      // recovery deploy, not acceptable as the standing behaviour.
-      .then(() => self.skipWaiting())
+    // v61.2: the temporary install-time skipWaiting() used to recover from the
+    // v61 deadlock has been REMOVED, deliberately. It has to go: with it in
+    // place, every future update activates immediately, and the controllerchange
+    // listener in boot.js reloads the page — so an engineer mid-job would have
+    // the app reload under them. The update banner exists precisely so THEY
+    // choose the moment. Waiting is the correct behaviour.
+    //
+    // What makes waiting safe again is the v61.2 boot.js: registerServiceWorker()
+    // is now reachable even when load() throws, so a page can always register,
+    // always receive the update, and always post SKIP_WAITING. The deadlock that
+    // made the recovery necessary can no longer form.
   );
 });
 
