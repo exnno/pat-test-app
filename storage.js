@@ -431,7 +431,7 @@ function loadV11Settings() {
   // release had passed. Old keys remain harmlessly in users' localStorage; the
   // returning-user heuristic below detects them by prefix, so upgraders are still
   // recognised without keeping a flag per version.
-  state.v60WelcomeSeen = localStorage.getItem(V60_WELCOME_KEY) === '1';
+  state.v61WelcomeSeen = localStorage.getItem(V61_WELCOME_KEY) === '1';
 
   // v59: archived half of the lifetime stats counter (tallies of pruned/deleted
   // sessions). Absent on every pre-v59 install, which correctly yields an empty
@@ -621,6 +621,12 @@ function normaliseReportSettings(stored) {
   // (report.js), but stored independently so the user's preference is preserved
   // even while the credit line is temporarily off.
   out.showFooterLogo  = stored.showFooterLogo !== false;
+  // v61: testing time on the PDF. Note the `=== true` — this is the ONLY "show"
+  // flag here that defaults OFF (decision Q11=B), so it must NOT use the
+  // `!== false` pattern its neighbours use. A settings blob saved before v61 has
+  // no such key, and `undefined === true` is false, so every existing user's
+  // certificate is byte-identical until they deliberately switch it on.
+  out.showDuration    = stored.showDuration === true;
   out.declaration     = stored.declaration !== false;
   out.retestEnabled   = stored.retestEnabled === true;
   const rm = parseInt(stored.retestMonths, 10);

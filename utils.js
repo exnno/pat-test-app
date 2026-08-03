@@ -52,6 +52,27 @@ function formatTimestampCSV(iso) {
   return `${dd}/${mo}/${yy} ${hh}:${mm}`;
 }
 
+// v61: plain-language elapsed time for the testing-time figure. Takes
+// milliseconds, returns e.g. "3h 12m", "47m", "under a minute". Deliberately
+// never shows seconds — nobody testing appliances cares, and a figure like
+// "0h 3m 41s" reads like a stopwatch rather than a working day.
+//
+// PURE: takes a number, returns a string, touches no state. The DECISION about
+// whether there is a duration at all (multi-day spans, too few timestamps) is
+// made by sessionDuration() in session.js — this only formats a number it has
+// already been told is worth showing.
+function formatDurationShort(ms) {
+  const n = Number(ms);
+  if (!Number.isFinite(n) || n < 0) return '';
+  if (n < DURATION_MIN_MS) return 'under a minute';
+  const totalMins = Math.round(n / 60000);
+  const hours = Math.floor(totalMins / 60);
+  const mins = totalMins % 60;
+  if (hours === 0) return `${mins}m`;
+  if (mins === 0) return `${hours}h`;
+  return `${hours}h ${mins}m`;
+}
+
 // v60: now also reports the WIDTH of the trailing digit run, so leading zeros
 // survive auto-increment. Before v60 this returned only {prefix, number} and the
 // parseInt threw the zeros away — type 001 and the next item came out as 2.

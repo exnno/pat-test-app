@@ -3117,3 +3117,127 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
    blocks are always in the DOM; only this class changes on a tap, so a focused
    textarea below them is never torn down and the keyboard never drops. */
 .bug-hidden { display: none; }
+
+/* ============== PATGo PWA — v61 — Asset history + testing time ============== */
+
+/* The offer card above the sessions list when a searched asset number turns up
+   in two or more jobs. Styled as a quiet tappable card rather than a result row
+   so it reads as an answer to the search, not another session. */
+.asset-history-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  margin: 8px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 12px;
+  background: var(--card-bg);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.asset-history-card:active { opacity: .75; }
+.asset-history-card-text { flex: 1; min-width: 0; }
+.asset-history-card-title {
+  display: block;
+  font-weight: 600;
+  font-size: 15px;
+}
+.asset-history-card-sub {
+  display: block;
+  margin-top: 2px;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+.asset-history-card-cta {
+  flex: none;
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--accent);
+}
+
+/* The sheet itself. Reuses the .fail-sheet shell (the reliable iOS bottom-sheet
+   pattern) plus .sheet-scroll on the list, so a long history scrolls inside the
+   capped shell instead of growing off the top of the screen. */
+.asset-history-sheet .asset-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+.asset-history-trimmed {
+  margin: 4px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-align: center;
+}
+.asset-history-row {
+  display: block;
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--card-bg);
+  color: var(--text);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+.asset-history-row:active { opacity: .75; }
+.asset-history-row-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.asset-history-date { font-size: 13px; color: var(--text-muted); }
+.asset-history-result {
+  flex: none;
+  font-size: 12px;
+  font-weight: 700;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+.asset-history-result.pass { color: var(--pass); background: rgba(22, 163, 74, .12); }
+.asset-history-result.fail { color: var(--fail); background: rgba(220, 38, 38, .12); }
+.asset-history-job {
+  margin-top: 4px;
+  font-weight: 600;
+  font-size: 15px;
+}
+.asset-history-meta,
+.asset-history-readings,
+.asset-history-notes {
+  margin-top: 3px;
+  font-size: 13px;
+  color: var(--text-muted);
+  word-break: break-word;
+}
+.asset-history-readings { font-variant-numeric: tabular-nums; }
+.asset-history-notes { font-style: italic; }
+
+/* Testing time on the Session settings screen. Derived and read-only, so it is
+   deliberately styled as information rather than as a control — no toggle, no
+   border, sitting quietly below the other rows. */
+.session-duration-row {
+  margin-top: 14px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.session-duration-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+.session-duration-value {
+  margin-top: 2px;
+  font-size: 20px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.session-duration-sub {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--text-muted);
+}

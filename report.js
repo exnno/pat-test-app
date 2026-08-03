@@ -247,6 +247,18 @@ function buildReportDoc(session) {
     const rd = addMonthsFormatted(session.date, rs.retestMonths);
     if (rd) detailPairs.push(['Recommended retest', rd]);
   }
+  // v61: testing time. Gated TWO ways, and both matter:
+  //   1. rs.showDuration — opt-in, default OFF (decision Q11B). The certificate
+  //      is client-facing and "this job took 3h 12m" tells a customer how fast
+  //      you worked, so it is never added to anyone's output without them asking.
+  //   2. sessionDuration() returning non-null — a job with fewer than two
+  //      timestamped items (any pre-v61 job logged with Item Timestamps off) has
+  //      no figure, and the row is simply omitted rather than printing "0m".
+  // So a report from a user who hasn't opted in is byte-identical to v60.
+  if (rs.showDuration === true) {
+    const dur = sessionDuration(session);
+    if (dur) detailPairs.push(['Testing time', dur.text]);
+  }
 
   // Two-column label/value layout. The value is placed just after the label's
   // measured width (min 96pt) so a long label like "Recommended retest" never

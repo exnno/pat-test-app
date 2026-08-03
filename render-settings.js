@@ -575,7 +575,7 @@ function renderSettingsDisplay() {
 
       <div class="settings-section">
         <h2 class="h2">Item timestamps</h2>
-        <p class="muted">Record the time each item was first logged. When on, the time shows beneath the item in a session's overview, and a Time column becomes available for CSV export (switch it on under Settings → CSV Columns). Items logged while this is off have no time recorded. Off by default.</p>
+        <p class="muted">Shows the time each item was first logged. When on, the time appears beneath the item in a session's overview and a Time column becomes available for CSV export (switch it on under Settings → CSV Columns). Since V61 the app records item times on every job whether this is on or not, so switching it on will show times for everything logged from V61 onwards — not only from the moment you switch it. This setting decides what you see and export, nothing else.</p>
         <div class="toggle-row">
           <div class="toggle-row-text">
             <div class="toggle-row-title">Record item times</div>
@@ -1167,6 +1167,7 @@ function renderSettingsReport() {
         ${toggle('report-show-calibration', 'Calibration details', rs.showCalibration)}
         ${toggle('report-show-fails', 'List failed items', rs.showFails, rs.showFails ? 'All items listed' : 'Passes only')}
         ${state.readingsEnabled ? toggle('report-show-readings', 'Test readings', rs.showReadings, rs.showReadings ? 'Readings columns shown when recorded' : 'Readings kept off the certificate') : ''}
+        ${toggle('report-show-duration', 'Testing time', rs.showDuration, rs.showDuration ? 'Prints how long the job took' : 'Kept off the certificate')}
         ${toggle('report-declaration', 'Declaration line', rs.declaration)}
         ${toggle('report-show-appcredit', 'PATGo credit line', rs.showAppCredit, rs.showAppCredit ? 'Shown at the foot of the report' : 'Hidden')}
         <div style="margin-left:16px${rs.showAppCredit ? '' : ';opacity:.5'}">
@@ -1284,14 +1285,15 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V61</strong> · August 2026</p>
+        <p class="muted">Two things you can now see that were always in your data. Search an asset number on the Sessions screen and, if you've tested it before, you're offered its full history — every job, date, result, location, readings and notes in one list, newest first, with a tap to open the original item. No more opening three jobs to piece together whether a machine has failed before. And every job now shows its testing time under Session settings: first item logged to last, with breaks included, so it's an honest span rather than time on tools. A job logged across more than one day says so instead of showing a misleading number. You can print the testing time on your certificate if you want it — it's off until you switch it on under Report settings → What to include, because how long a job took is your business, not automatically your customer's. Behind all this, the app now records the time each item is logged on every job. Your Item Timestamps setting still decides whether the Time column shows in your CSV; nothing about your exports changes unless you change it.</p>
+
         <p><strong>V60</strong> · August 2026</p>
         <p class="muted">Settings &rarr; Contact now has a Report a problem button. Pick whether it's a bug, an idea or general feedback, say how bad it is and whether it happens every time, then describe it in your own words — the app attaches its own version, your phone and OS, your settings and any error it caught, so you don't have to go looking for any of it. You can check exactly what's being sent before it goes, and it's counts and settings only: no client names, sites, locations or asset numbers ever leave your phone. It works with no signal too — your email app holds the report and sends it once you're back online. If the app ever fails to start, that screen now carries a report link of its own. Also: leading zeros in asset numbers now stick. Start a job at 001 and it carries on 002, 003 rather than jumping to 2 — type a plain 1 and nothing changes.</p>
 
         <p><strong>V59</strong> · July 2026</p>
         <p class="muted">Your running totals now appear at the bottom of the Settings screen — how many items you've tested, how many failed and the percentage, and your most common item. The important part is that the total keeps climbing even when you tidy up: clearing out old exported jobs used to be invisible to any count, but those jobs are now tallied before they go, so a clear-out never costs you the numbers. Backups carry the totals too, so restoring puts them back exactly as they were. One honest limitation — it starts from the jobs you have on the phone right now, so anything you cleared out before this update isn't in the figure. From here on it's a true running total. The example job, if you still have one, is left out of the counts.</p>
 
-        <p><strong>V58</strong> · July 2026</p>
-        <p class="muted">A new Glossary under Settings → Help explains every term the app uses — Quick Pick, Smart Quick Pick, Multi Pick, presets, sessions, readings, backups and the rest — in plain English, so nothing in the app is guesswork. The press-and-hold on the Quick Pick row that opens the preset switcher now takes half as long, so it responds much sooner without any extra risk of opening by accident. And the Contact page now carries the real details — tap to email or to open the website.</p>
 
 
 

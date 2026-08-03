@@ -1,4 +1,4 @@
-# PATGo — Code Map (V60 · hotfix v60.1)
+# PATGo — Code Map (V61)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -25,8 +25,13 @@ exists — the modular split is complete.
 
 **v60 added `bugreport.js`**, placed immediately after `feedback.js` because it
 calls `showToast`, and before everything that might want to report an error.
-`index.html` now lists 21 scripts; `sw.js` ASSETS lists 23 `.js` entries
+`index.html` lists 21 scripts; `sw.js` ASSETS lists 23 `.js` entries
 (21 first-party + 2 lazy-loaded jsPDF).
+
+**v61 added NO files.** Both features live in the file that already owns their
+concern — derived figures and search go in `session.js`, their markup in the
+render files. The `ASSETS` list and the `<script>` chain are byte-identical to
+v60.
 
 `boot.js` runs the startup block and must stay **last**. Later files may call
 functions defined in earlier ones; nothing executes until `boot.js` because
@@ -110,6 +115,30 @@ defining it there would be a fatal boot-time `ReferenceError`. Leading zeros:
 can't turn every asset number into a wall of zeros. No new storage keys →
 **`backupVersion` stays 5**.
 
+**v61 constants (asset history + testing time):** Welcome key rolled to
+`V61_WELCOME_KEY` (`pat:v61welcome`) — supersedes the v60 key above.
+Asset history: `ASSET_HISTORY_MIN_JOBS` (2 — how many DIFFERENT jobs must contain
+an asset number before the Sessions search offers its history; one job you can
+just open, two is where piecing it together by hand starts to hurt) and
+`ASSET_HISTORY_MAX_ROWS` (60 — cap so a pathological case can't build a wall of
+DOM inside a bottom sheet; the sheet says when it has trimmed).
+Testing time: `DURATION_MULTIDAY_MIN_DAYS` (2) and `DURATION_MIN_MS` (60000).
+`makeDefaultReportSettings()` gained **`showDuration` — DEFAULT `false`**, the
+only "show" flag on that object that defaults off (decision Q11B: the
+certificate is client-facing, and how long a job took is the engineer's business
+before it is the customer's).
+
+**⚠ THE CAPTURE/EXPOSURE SPLIT — the one thing to read before touching
+`item.ts`.** config.js carries the full note at the constants; the short version:
+before v61 the Item Timestamps setting gated BOTH capture and display, and the
+code documented an off-path guarantee that nothing was written at all. **That
+guarantee is deliberately gone as of v61.** `ts` is now stamped on every item's
+first log unconditionally; the setting gates EXPOSURE only (the CSV Time column
+and the per-item time line in the Overview). Capture is cheap — `ts` is
+codec-mapped to a single character, roughly 30 bytes an item — and it compounds,
+because a derived figure is worthless without history to derive it from. No new
+storage keys → **`backupVersion` stays 5**.
+
 **v58 constants:** Welcome key was `V58_WELCOME_KEY` (`pat:v58welcome`).
 `QUICK_PICK_LONGPRESS_MS` 2000 → **1000** (see above). `SETTINGS_CATEGORIES`
 catHelp now lists `settingsGlossary` between `settingsAbout` and `settingsContact`;
@@ -155,18 +184,28 @@ can't fire it) and the capture-phase click swallow that eats the tap following a
 fired long-press.
 
 **Welcome key (v50 pattern):** ONLY the current welcome key is defined — now
-`V60_WELCOME_KEY = 'pat:v60welcome'`. The 28 historical keys (V12…V48) were removed
+`V61_WELCOME_KEY = 'pat:v61welcome'`. The 28 historical keys (V12…V48) were removed
 in v50; they were one-release markers nothing referenced after shipping. Old keys
 remain harmlessly in users' localStorage and are detected by prefix in storage.js.
 Each feature release replaces this one line with its new key and passes it to
-`dismissWelcome()` — v59 is the current holder.
+`dismissWelcome()` — v61 is the current holder.
 
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, or restructure Settings / add a new
 settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`).
 
-## state.js (~330 ln) — the global `state` object
-**v60:** `v60WelcomeSeen` (replaces `v59WelcomeSeen`). Bug-report sheet state —
+## state.js (~340 ln) — the global `state` object
+**v61:** `v61WelcomeSeen` (replaces `v60WelcomeSeen`). Asset-history sheet state —
+`assetHistorySheetOpen` (bool) and `assetHistoryAsset` (the asset number being
+shown). **PURELY TRANSIENT**: never saved, never backed up, no storage key, no
+validator, no migration; cleared by `setView` on any view change. Asserted in the
+harness against storage.js, backup.js, setup.js and csv.js.
+**Why this sheet MAY re-render, unlike the v60.1 bug sheet:** it is read-only —
+no inputs, no textarea, nothing focusable — so there is no caret or keyboard for
+a `render()` to tear down. The v60.1 rule is specific to sheets containing
+fields, not a blanket ban.
+
+**v60:** `v60WelcomeSeen` (replaced by v61 above). Bug-report sheet state —
 `bugSheetOpen` (bool) and `bugDraft` (seeded from `makeEmptyBugDraft()` in
 **config.js**, which must load first). Both are **PURELY TRANSIENT**: never saved,
 never backed up, never restored, no storage key, no validator, no migration. They
@@ -199,7 +238,7 @@ deleted. Persisted via `PAT_STATS_KEY` and carried through backup/restore. The L
 half is deliberately NOT in state — it's recomputed from `state.sessions` on demand
 by `computeAppStats()`, so it can never drift out of step with the real data.
 
-**Welcome flag (v50 pattern):** ONLY the current `v60WelcomeSeen` is kept. Historical
+**Welcome flag (v50 pattern):** ONLY the current `v61WelcomeSeen` is kept. Historical
 `vNNWelcomeSeen` flags were removed in v50 — each was written once and never read
 after its release. The first-run-wizard gate detects past welcomes via
 `hasAnyLegacyWelcomeKey()` (storage.js).
@@ -214,6 +253,11 @@ none, cleared on any view change in `render()`). The Sessions `sessionFilter` ga
 *Touch to:* add a new field to runtime state.
 
 ## utils.js (~250 ln) — pure helpers (no state access)
+**v61:** `formatDurationShort(ms)` — plain-language elapsed time ("3h 12m",
+"47m", "under a minute"). Never shows seconds. PURE: formats a number it has
+already been told is worth showing; the DECISION about whether a duration exists
+at all lives in `sessionDuration()` (session.js).
+
 **v60 asset-number padding:** `splitAssetNo(s)` now returns `{prefix, number, width}`
 — `width` is the character count of the trailing digit run as typed (`'001'` → 3).
 Before v60 it returned only `{prefix, number}` and the `parseInt` threw the zeros
@@ -371,6 +415,16 @@ bug. Add a control here? Wire it through `_applyBugSheetDOM()`.
 the error catcher. The SHEET MARKUP is not here — it's `renderBugSheet()` in
 render-settings.js (render files own markup).
 
+**v61 note (storage.js):** `normaliseReportSettings` gained
+`out.showDuration = stored.showDuration === true;` — **note the `=== true`**. Every
+neighbouring flag uses `!== false` because they default ON; this one defaults OFF,
+so a settings blob saved before v61 (which has no such key) must backfill to
+false. Copying the neighbours' pattern here would silently switch the row on for
+every existing user's certificate. The harness mutation-tests exactly this.
+The `time` CSV case and the Overview time line still read
+`state.timestampsEnabled` — that is the exposure gate, and it is correct that it
+survived v61 untouched.
+
 ## csv.js (~665 ln) — CSV build + import
 Build/share: `csvCellValue` (adaptive client/site columns; **v53** four reading
 cases — `readingClass`/`readingEarth`/`readingInsulation`/`readingLeakage` — each
@@ -486,6 +540,11 @@ automatically. `columnStyles` keeps reading cols compact + centred (Class/Polari
 header/details/totals layout is width-relative (`pageW`/`margin`), so landscape needed
 no header rework. NOTE: Ω/MΩ/✓/≥ render in jsPDF's standard font at a fallback glyph
 width (acceptable in short header/cell text; pre-existing for ≥ since v53).
+**v61 testing time on the certificate:** one optional row in the job-details
+block, gated TWO ways — `rs.showDuration === true` (opt-in, default OFF) AND
+`sessionDuration(session)` returning non-null. A report from a user who hasn't
+opted in is byte-identical to v60.
+
 *Touch to:* change the report layout/content, adjust reading columns or the
 orientation threshold, or how
 the PDF is previewed/shared/named/coloured.
@@ -518,6 +577,39 @@ no migration needed**. `createSession` records `startPad: assetPadFromInput(star
 `findDuplicateAssetIndex` is **deliberately unchanged** (decision 8A): `'001'` and
 `'1'` remain DIFFERENT asset numbers, because the label on the appliance is the
 identity — if you typed the zeros, you meant them.
+**v61 testing time:** `sessionDuration(sess)` — PURE, returns `null` when there is
+nothing worth showing (fewer than two timestamped items) so the caller omits the
+whole line rather than printing "0m", same contract as `computeAppStats()`.
+Otherwise returns `{multiDay, days, ms, text}`. **The span is EARLIEST-to-LATEST
+`ts`, not first-array-element to last** — items can be edited and re-ordered, a
+CSV import brings in items with no `ts` at all, and jobs straddling v61 have some
+stamped items and some bare ones; a min/max scan is correct in all three cases and
+indexing `[0]`/`[n-1]` is wrong in all three. A span crossing calendar days
+returns "spread across N days" instead of a misleading elapsed figure, where
+**N is DAYS WORKED, not calendar span** (a job on the 10th and 12th says 2, not 3
+— nothing was logged on the 11th). Unparseable `ts` values are skipped, not
+allowed to poison the span.
+
+**v61 cross-session asset history:** `assetHistoryCandidate(query)` — does this
+query match an asset number in `ASSET_HISTORY_MIN_JOBS`+ DIFFERENT jobs? Returns
+`{assetNo, jobCount}` or null. **Deliberately NOT the same match as
+`filteredSessions()`**, which also matches location, item type and notes: offering
+"history for kettle" would be meaningless, because a kettle is a hundred
+appliances, not one. Match is EXACT text, case-insensitive and trimmed — not a
+substring (typing `1` must not claim to be the history of asset `1024`) and not
+zero-insensitive (`001` and `1` stay different assets, exactly as
+`findDuplicateAssetIndex` has treated them since v60 decision 8A). Runs on every
+keystroke of the Sessions search, so it stays one cheap pass.
+`assetHistoryFor(assetNo)` — `{rows, total}`, newest job first, capped at
+`ASSET_HISTORY_MAX_ROWS` with `total` reporting the truth so the sheet can say it
+trimmed. Each row carries `{sessionId, sessionTitle, date, index, item}`.
+Sheet lifecycle: `openAssetHistory`/`closeAssetHistory` (these DO `render()` — the
+sheet is read-only, so there is nothing focusable to lose) and
+`openAssetHistoryRow(arg)` (parses `"sessionId|index"`, closes the sheet, hands
+off to `requestOpenSession` so the edited-since-export warning still applies).
+All PURE reads over `state.sessions` — nothing here writes, saves or migrates, which
+is why the whole feature needed no storage work and no `backupVersion` bump.
+
 `findDuplicateAssetIndex`, `computeSuggestions`, `computeLocationSuggestions`,
 `addDescriptionIfNew`, `sortedSessions`, `sessionMatchesControlFilters`,
 `filteredSessions`. **v59 lifetime stats counter:** `sessionCountsForStats(sess)` (excludes the
@@ -593,7 +685,13 @@ remain, driven by that path + the `bulk-location-apply` action.) Edit-session:
 `saveUserSettings`, `saveCsvColumnsSettings`, `resetCsvColumnsSettings`,
 `moveCsvColumn`, `saveItemTypesSettings`, `saveFailReasonsSettings`,
 `saveDescriptionsSettings`, `resetItemsToDefaults`, `resetFailReasonsToDefaults`,
-`resetDescriptionsToDefaults`, `setTheme`, `setHaptics`, `setSound`, `setTimestamps`.
+`resetDescriptionsToDefaults`, `setTheme`, `setHaptics`, `setSound`, `setTimestamps` (**v61: this no longer gates
+capture** — see the capture/exposure note under config.js. It now controls the CSV
+Time column and the Overview per-item time line only).
+**v61 `ts` is stamped unconditionally in the two append paths** — `saveItem` and
+`copyLastResult` — plus `seedDemoSession`. The EDIT branches must never stamp:
+`ts` means "first logged", not "last touched", and they spread the new fields over
+the old item precisely so an existing `ts` survives.
 Report settings: `captureReportTextInputs`, `saveReportSettingsForm` (returns to the
 report preview when `reportPreviewReturnSessionId` is set), `handleReportLogoFile`.
 Report signature: `storeSignatureFromSource`, `handleReportSignatureFile`,
@@ -612,7 +710,8 @@ persists `key`, re-renders. The `welcome-dismiss` action (dispatch.js) calls it 
 `('v60WelcomeSeen', V60_WELCOME_KEY)` as of v60. Each feature release passes its own.
 
 `setView` clears transient overlays on every transition (fail sheet, multi-pick
-sheet, bulk-edit menus, client dialogs, the New Session form, `presetSheetOpen`).
+sheet, bulk-edit menus, client dialogs, the New Session form, `presetSheetOpen`,
+**v61** the asset-history sheet).
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
 (scroll reset) live in `render()` via `_lastRenderedView`, NOT in `setView`.
 *Touch to:* most logic changes — session/item lifecycle, suggestions, sorting,
@@ -648,9 +747,25 @@ Reports hub: `renderReports`. **v56 Retest reminders view:** `renderRetestRemind
 (the client/site-centric chase list, most-urgent-first, each row tappable to open the
 session, with a ✓ action opening the contacted-action sheet: Rebooked / Declined / stop
 reminding; defence-bounces to Sessions when the feature is off).
+**v61 asset history:** `renderSessionsListAreaHTML` builds the offer card (class
+`.asset-history-card`) between the match count and the list — it appears ONLY when
+`assetHistoryCandidate()` returns a hit, so a search for a site, a location or an
+item type never offers a "history". `renderAssetHistorySheet()` (this file) is the
+sheet: `.fail-sheet` shell + `.sheet-scroll` list, one tappable row per past
+instance carrying `data-arg="sessionId|index"`. Rows show date, job, result chip,
+location, item type, readings (gated on `state.readingsEnabled` AND the item
+actually carrying them, mirroring the CSV/PDF rule) and notes — the fail reason
+rides in notes for free, so it needs no special case. Everything user-typed goes
+through `escapeHTML`. **The sheet contains no inputs**, which is why a plain
+`render()` on open/close is safe here.
+**v61 testing time:** `renderEditSession` (Session settings) carries the
+`.session-duration-row` block — always shown when `sessionDuration()` returns
+non-null, deliberately NOT gated on the Item Timestamps setting (decision Q8A),
+and omitted entirely otherwise.
+
 Shared: `emptyStateHTML(icon,title,body,actionLabel,actionName)`;
 `refreshSettingsHubBodyOnly` (live settings search). The **welcome modal** block
-(**v60** gates on `v60WelcomeSeen`; suppressed while the migration prompt or first-run
+(**v61** gates on `v61WelcomeSeen`; suppressed while the migration prompt or first-run
 wizard is up; shows the PATGo icon; dismissed via the shared `welcome-dismiss`
 action → `dismissWelcome`). **v57:** the preset sheet's list carries
 `.sheet-scroll` (styles.css) — the class that makes a long list scroll inside the
@@ -705,6 +820,14 @@ computed at render time (after every file has executed), never at load time. **v
 finger-sized hit area; the placeholder "Support hours" block was removed. Plain `<a>`
 elements are safe inside `#app` because `handleDelegatedClick` returns early when no
 ancestor carries `data-action`, leaving the link's default behaviour intact.
+**v61** `renderSettingsReport`'s "What to include" section gained the
+`report-show-duration` toggle (Testing time). It is the one toggle there that
+defaults OFF. `renderSettingsDisplay`'s Item timestamps copy was rewritten to
+describe the new capture/exposure split honestly — including the consequence that
+switching the setting on now reveals times for everything logged since v61, not
+only from the moment it was switched. The About changelog rolled to
+**V61 / V60 / V59** (V58 dropped).
+
 **v60** `renderSettingsContact` replaced the old static "what to include in a bug
 report" advice card with a **Report a problem** button (`data-action="bug-open"`) and
 a privacy line. `renderBugSheet()` (also here) is the sheet MARKUP — all its logic
@@ -716,7 +839,7 @@ wrap their text in `#bug-q1`/`#bug-q2` **spans** so `textContent` can't clobber 
 `(optional)` hint beside q2. Everything user-typed goes through `escapeHTML`,
 including the diagnostics preview (asserted in the harness).
 **The About changelog lives here** (`renderSettingsAbout`) — a rolling
-3-version window; v60 shows V60/V59/V58 (V57 dropped). The About page also has the "Set up another
+3-version window; v61 shows V61/V60/V59 (V58 dropped). The About page also has the "Set up another
 device" (`restart-onboarding`) and "Show me around" (`open-tour`) cards, and a
 long-press hidden menu on the title revealing three cloud-prep stub pages
 (`renderCloudAccount`, `renderCloudSync`, `renderCloudSubscription` — mock data, for
@@ -804,8 +927,10 @@ scroll-drag inside the now-scrollable preset list can't switch the preset by acc
 `bug-set-severity`, `bug-set-repro`, `bug-send`, `bug-copy`; input actions
 `bug-desc` and `bug-context` (no render on keystroke — same reason as the readings
 fields and `fail-other`).
-**Welcome dismiss (v50):** `'welcome-dismiss': () => dismissWelcome('v60WelcomeSeen',
-V60_WELCOME_KEY)` — was a per-version `dismissVNNWelcome()` call; now the one
+**v61:** clicks `asset-history-open`, `asset-history-close`, `asset-history-row`;
+change action `report-show-duration`.
+**Welcome dismiss (v50):** `'welcome-dismiss': () => dismissWelcome('v61WelcomeSeen',
+V61_WELCOME_KEY)` — was a per-version `dismissVNNWelcome()` call; now the one
 parameterised helper.
 *Touch to:* add/route any delegated click/input/change handler. Only the four focus-
 sensitive fields + the quick-pick long-press are NOT here (see events.js).

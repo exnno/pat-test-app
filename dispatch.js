@@ -151,6 +151,13 @@ registerActions({
   'import-session': () => { const inp = document.getElementById('import-session-file'); if (inp) inp.click(); },
 
   // Sessions list area — row open / per-card export / per-card delete.
+  // v61: cross-session asset history. The sheet is read-only, so open/close can
+  // render() freely — there is no focused field to tear down (contrast the v60.1
+  // bug sheet rule, which exists because that sheet contains a textarea).
+  'asset-history-open':  (arg) => openAssetHistory(arg),
+  'asset-history-close': () => closeAssetHistory(),
+  'asset-history-row':   (arg) => openAssetHistoryRow(arg),
+
   'open-session': (arg, el) => {
     if (el.dataset.openAt !== undefined && el.dataset.openAt !== '') {
       requestOpenSession(arg, { cursor: parseInt(el.dataset.openAt, 10) });
@@ -650,7 +657,7 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissWelcome('v60WelcomeSeen', V60_WELCOME_KEY),
+  'welcome-dismiss': () => dismissWelcome('v61WelcomeSeen', V61_WELCOME_KEY),
 
   // v60: bug report sheet (Settings -> Contact). The three setters re-render
   // (taps, no caret to lose); the two textareas are input actions below.
@@ -971,6 +978,8 @@ registerChangeActions({
   'report-declaration':      (checked) => { captureReportTextInputs(); state.reportSettings.declaration = checked; render(); },
   'report-show-appcredit':   (checked) => { captureReportTextInputs(); state.reportSettings.showAppCredit = checked; render(); },
   'report-show-footerlogo':  (checked) => { captureReportTextInputs(); state.reportSettings.showFooterLogo = checked; render(); },
+  // v61: testing time on the certificate. Opt-in — defaults off (decision Q11B).
+  'report-show-duration':    (checked) => { captureReportTextInputs(); state.reportSettings.showDuration = checked; render(); },
   'report-retest-enabled':   (checked) => { captureReportTextInputs(); state.reportSettings.retestEnabled = checked; render(); },
   // v36: certificate-numbers master toggle. Capture cert text inputs first so an
   // unsaved prefix/counter survives the re-render that enables/disables the

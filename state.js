@@ -138,7 +138,17 @@ let state = {
   // new install still shows the WIZARD and an upgrader still shows the MODAL —
   // unchanged behaviour. Future feature releases roll a new flag here and pass it
   // to dismissWelcome().
-  v60WelcomeSeen: false,  // v60: one-tap bug report + leading zeros
+  v61WelcomeSeen: false,  // v61: cross-session asset history + testing time
+
+  // v61: cross-session asset history sheet. PURELY TRANSIENT — never saved,
+  // never backed up, no storage key, no validator, no migration. The sheet is
+  // read-only (it has no inputs at all), so unlike the v60.1 bug sheet it is
+  // perfectly safe for it to be built by a normal render(): there is no focused
+  // field for a re-render to tear down.
+  //   assetHistorySheetOpen — is the sheet showing
+  //   assetHistoryAsset     — the asset number whose history is being shown
+  assetHistorySheetOpen: false,
+  assetHistoryAsset: '',
 
   // v59: the ARCHIVED half of the lifetime stats counter — the tallies of
   // sessions that have been pruned or deleted, so the running total doesn't fall

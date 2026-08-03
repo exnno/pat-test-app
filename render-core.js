@@ -169,28 +169,28 @@ function render() {
   ` : '';
 
   // One-time "what's new" modal, shown once after an update until dismissed.
-  // Gates on the CURRENT release's seen flag (v60WelcomeSeen). Suppressed while
+  // Gates on the CURRENT release's seen flag (v61WelcomeSeen). Suppressed while
   // the v9 migration prompt is up (it needs a name commit first) or while the
   // first-run wizard is showing — so an UPGRADING user sees this modal and a
   // genuinely-new install sees the wizard instead. Dismissed via the shared
   // dismissWelcome() (v50), wired in dispatch.js.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v60WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  const welcomeModal = (state.v61WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V60">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V61">
       <div class="bulk-sheet-handle"></div>
       <div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V60</h3>
+        <h3 class="bulk-sheet-title">What's new in V61</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>New: report a problem in a couple of taps.</strong> Settings &rarr; Contact now has a Report a problem button. Describe what happened and the app fills in your version, phone and settings for you.</li>
-        <li>It works with no signal — your email app holds the report and sends it when you're back online.</li>
-        <li><strong>Leading zeros now stick.</strong> Start a job at 001 and the next items carry on 002, 003 — instead of jumping to 2.</li>
+        <li><strong>Asset history.</strong> Search an asset number on the Sessions screen. If you've tested it before, you'll be offered its full history — every job, date and result in one place, instead of opening each job to piece it together.</li>
+        <li><strong>Testing time.</strong> Open a job &rarr; Session settings and you'll see how long it took, from the first item logged to the last. You can also print it on your certificate — it's off until you turn it on in Report settings.</li>
+        <li>The app now records the time each item is logged on every job. Your Item Timestamps setting still decides whether the Time column appears in your CSV — nothing about your exports changes unless you change it.</li>
       </ul>
-      <button class="btn-primary" id="v60-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" id="v61-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 
@@ -789,8 +789,88 @@ function renderSessions() {
       ${newForm}
       ${searchRow}
       ${sessionsListArea}
+      ${renderAssetHistorySheet()}
       ${importConflict}
       ${importSummary}
+    </div>
+  `;
+}
+
+// ============== PATGo PWA — v61 — Asset history sheet ==============
+// Every job one asset number has appeared in, newest first, in one place.
+// Read-only: no inputs, no typing, nothing focusable — so unlike the v60.1 bug
+// sheet it is safe for this to be built by a normal render(). There is no caret
+// and no keyboard for a re-render to drop.
+//
+// Rows are tappable and jump to that exact item in that job (decision Q5C).
+function renderAssetHistorySheet() {
+  if (!state.assetHistorySheetOpen || !state.assetHistoryAsset) return '';
+  const asset = state.assetHistoryAsset;
+  const { rows, total } = assetHistoryFor(asset);
+
+  // Defensive: the sheet can only be opened from a card that found 2+ jobs, but
+  // a session deleted underneath it would leave nothing to show.
+  const body = rows.length ? rows.map(r => {
+    const it = r.item;
+    const isFail = it.result === 'fail';
+    const resultChip = `<span class="asset-history-result ${isFail ? 'fail' : 'pass'}">${isFail ? '✗ FAIL' : '✓ PASS'}</span>`;
+    // A fail reason is stored in the item's notes (that's where pickFailReason
+    // puts it), so notes carry it for free — no special case needed.
+    const metaBits = [];
+    if (it.location) metaBits.push(escapeHTML(it.location));
+    if (it.itemType) metaBits.push(escapeHTML(it.itemType));
+    const metaLine = metaBits.length
+      ? `<div class="asset-history-meta">${metaBits.join(' · ')}</div>` : '';
+
+    // Readings, gated exactly as the CSV and PDF gate them: only when the
+    // feature is on AND this item actually carries them. A user who has never
+    // touched readings sees a sheet with no trace of the feature.
+    let readingsLine = '';
+    if (state.readingsEnabled && it.readings) {
+      const rd = it.readings;
+      const bits = [];
+      if (rd.class) bits.push(`Class ${escapeHTML(String(rd.class))}`);
+      if (rd.earth) bits.push(`${escapeHTML(String(rd.earth))} Ω`);
+      if (rd.insulation) bits.push(`${escapeHTML(String(rd.insulation))} MΩ`);
+      if (rd.leakage) bits.push(`${escapeHTML(String(rd.leakage))} mA`);
+      if (rd.polarity) bits.push('Polarity ✓');
+      if (bits.length) {
+        readingsLine = `<div class="asset-history-readings">${bits.join(' · ')}</div>`;
+      }
+    }
+    const notesLine = it.notes
+      ? `<div class="asset-history-notes">${escapeHTML(it.notes)}</div>` : '';
+
+    return `
+      <button type="button" class="asset-history-row" data-action="asset-history-row" data-arg="${escapeHTML(r.sessionId)}|${r.index}">
+        <div class="asset-history-row-top">
+          <span class="asset-history-date">${escapeHTML(r.date ? formatDate(r.date) : 'No date')}</span>
+          ${resultChip}
+        </div>
+        <div class="asset-history-job">${escapeHTML(r.sessionTitle)}</div>
+        ${metaLine}
+        ${readingsLine}
+        ${notesLine}
+      </button>
+    `;
+  }).join('') : `<p class="multipick-empty">Nothing recorded for this asset number.</p>`;
+
+  const trimmedNote = total > rows.length
+    ? `<p class="asset-history-trimmed">Showing the ${rows.length} most recent of ${total} records.</p>`
+    : '';
+
+  return `
+    <div class="modal-backdrop" id="asset-history-backdrop" data-action="asset-history-close"></div>
+    <div class="fail-sheet asset-history-sheet" role="dialog" aria-label="Asset history">
+      <div class="fail-sheet-handle"></div>
+      <div class="fail-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="fail-sheet-title">Asset ${escapeHTML(asset)}</h3>
+        <button class="fail-close-btn" id="asset-history-close" data-action="asset-history-close" aria-label="Close">×</button>
+      </div>
+      <p class="multipick-sheet-hint">Every time this asset number has been tested. Tap one to open that job.</p>
+      ${trimmedNote}
+      <div class="asset-history-list sheet-scroll">${body}</div>
     </div>
   `;
 }
@@ -843,6 +923,21 @@ function renderSessionsListAreaHTML() {
   const countHTML = queryTrimmed
     ? `<span class="sessions-search-count">${filtered.length} of ${sortedAll.length} session${sortedAll.length === 1 ? '' : 's'} match</span>`
     : '';
+
+  // v61: cross-session asset history offer. Appears ONLY when what was typed is
+  // an exact asset number found in two or more different jobs (decision Q3A) —
+  // so searching "kettle" or "Office 1" never offers a "history", because those
+  // aren't assets. Sits directly under the match count, above the list, so it
+  // reads as an answer to the search rather than as another result.
+  const historyOffer = queryTrimmed ? assetHistoryCandidate(queryTrimmed) : null;
+  const historyCardHTML = historyOffer ? `
+    <button type="button" class="asset-history-card" data-action="asset-history-open" data-arg="${escapeHTML(historyOffer.assetNo)}">
+      <span class="asset-history-card-text">
+        <span class="asset-history-card-title">🕘 Asset ${escapeHTML(historyOffer.assetNo)}</span>
+        <span class="asset-history-card-sub">Tested in ${historyOffer.jobCount} jobs — see the full history</span>
+      </span>
+      <span class="asset-history-card-cta">View →</span>
+    </button>` : '';
 
   // v15: when a control filter is narrowing the list (and we're not searching),
   // show an "X of Y shown" line so a filtered list never looks like data loss.
@@ -966,7 +1061,7 @@ function renderSessionsListAreaHTML() {
     }).join('');
   }
 
-  return `${nudgeHTML}${countHTML}${filterCountHTML}${controls}<div>${list}</div>`;
+  return `${nudgeHTML}${countHTML}${historyCardHTML}${filterCountHTML}${controls}<div>${list}</div>`;
 }
 
 // v10: Partial refresh used by the sessions-search oninput. Replaces only
@@ -1702,6 +1797,30 @@ function renderEditSession() {
   // that act directly on the session. The due date shown uses the session's
   // CURRENTLY-SAVED date; if the user is also editing the date above, the new due
   // date appears once they Save (the chip/banner recompute on the next render).
+  // v61: testing time. ALWAYS shown when it can be computed — deliberately NOT
+  // gated on the Item Timestamps setting (decision Q8A), because a derived
+  // figure nobody can see unless they enabled an unrelated setting is not a
+  // feature. The setting now gates the CSV Time column only.
+  //
+  // sessionDuration() returns null when there's nothing worth showing (fewer
+  // than two timestamped items — e.g. any job logged before v61 with the setting
+  // off), and this block then renders nothing at all rather than "0m". Same
+  // omit-the-line pattern as the v59 stats footer.
+  let durationBlock = '';
+  const dur = sess ? sessionDuration(sess) : null;
+  if (dur) {
+    const sub = dur.multiDay
+      ? 'This job was logged over more than one day, so there is no single elapsed time to show.'
+      : 'From the first item logged to the last. It includes any breaks, so it is not time on tools.';
+    durationBlock = `
+      <div class="session-duration-row">
+        <div class="session-duration-label">⏱ Testing time</div>
+        <div class="session-duration-value">${escapeHTML(dur.text)}</div>
+        <div class="session-duration-sub">${sub}</div>
+      </div>
+    `;
+  }
+
   let retestBlock = '';
   if (state.retestRemindersEnabled && sess) {
     const tracked = !!sess.retestTrack;
@@ -1780,6 +1899,7 @@ function renderEditSession() {
           </label>
         </div>
         ${retestBlock}
+        ${durationBlock}
 
         <div class="btn-row">
           <button class="btn-secondary" id="ef-cancel" data-action="edit-cancel">Cancel</button>

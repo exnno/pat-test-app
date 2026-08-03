@@ -1004,6 +1004,174 @@ function computeAppStats() {
   };
 }
 
+// ============== PATGo PWA — v61 — Testing time ==============
+// How long a job took, derived entirely from item timestamps. Nothing new is
+// stored: `ts` is an existing field that v61 simply populates on every item
+// instead of only when a setting was on (see config.js).
+//
+// PURE — reads a session, returns an object or null, touches no state and saves
+// nothing. Same shape of contract as computeAppStats(): return null when there
+// is nothing worth showing, and let the caller omit the whole line rather than
+// print a meaningless "0m".
+//
+// THE SPAN IS EARLIEST-TO-LATEST, NOT FIRST-ELEMENT-TO-LAST. This matters and is
+// not defensive over-engineering:
+//   • items can be edited and re-ordered, so array position is not chronology;
+//   • a CSV import brings in items with no `ts` at all, which must be skipped
+//     rather than treated as time zero;
+//   • jobs that straddle v61 have some stamped items and some bare ones.
+// Scanning for min/max is correct in all three cases; indexing [0] and [n-1] is
+// wrong in all three.
+//
+// Returns:
+//   null                                   — fewer than two timestamped items
+//   { multiDay:true,  days:N }             — the span crosses calendar days
+//   { multiDay:false, ms:N, text:'3h 12m' } — a single day's elapsed time
+function sessionDuration(sess) {
+  if (!sess || !Array.isArray(sess.items)) return null;
+  let min = null, max = null, stamped = 0;
+  const dayKeys = {};
+  for (const it of sess.items) {
+    if (!it || !it.ts) continue;
+    const t = Date.parse(it.ts);
+    if (!Number.isFinite(t)) continue;   // garbage ts in a hand-edited backup
+    stamped++;
+    if (min === null || t < min) min = t;
+    if (max === null || t > max) max = t;
+    // Local calendar day, not UTC — an engineer finishing at 00:30 has worked
+    // into the next day by their own reckoning, and by their phone's.
+    const d = new Date(t);
+    dayKeys[`${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`] = true;
+  }
+  // One stamp gives a span of zero, which is not a duration — it's one item.
+  if (stamped < 2 || min === null || max === null) return null;
+
+  const days = Object.keys(dayKeys).length;
+  if (days >= DURATION_MULTIDAY_MIN_DAYS) {
+    // A job reopened two days later has a raw elapsed time of ~26 hours, which
+    // is a worse answer than no answer. Say what actually happened instead
+    // (decision Q9A).
+    //
+    // `days` is DAYS WORKED, not calendar span — deliberately. A job logged on
+    // the 10th and the 12th reports "2 days", not "3": nothing was logged on the
+    // 11th, so claiming three days would overstate the work. Counting distinct
+    // stamped days is the only figure here that is true of every job, including
+    // one picked up again a month later.
+    return { multiDay: true, days, ms: max - min, text: `spread across ${days} days` };
+  }
+  const ms = max - min;
+  return { multiDay: false, days: 1, ms, text: formatDurationShort(ms) };
+}
+
+// ============== PATGo PWA — v61 — Cross-session asset history ==============
+// Searching the Sessions screen has matched item asset numbers across every
+// session since v10 — that part was never the gap. The gap was PRESENTATION: a
+// match opened its own job, so an asset tested in three jobs meant opening three
+// jobs and piecing the history together by hand. These two functions build the
+// consolidated view.
+//
+// Both are PURE reads over state.sessions. Nothing here writes, saves or
+// migrates anything, which is why this whole feature needed no storage work and
+// no backupVersion bump.
+
+// Does this asset number appear on items in ASSET_HISTORY_MIN_JOBS or more
+// DIFFERENT jobs? Returns the canonical asset number to offer history for, or
+// null. Called on every keystroke of the Sessions search, so it stays a cheap
+// single pass and bails as soon as it can.
+//
+// ⚠ ASSET NUMBERS ONLY (decision Q3A) — deliberately NOT the same match as
+// filteredSessions(), which also matches location, item type and notes. Offering
+// "history for kettle" would be meaningless: kettle is not an asset, it's a
+// hundred different appliances. The history card only appears when the thing you
+// typed identifies ONE physical item.
+function assetHistoryCandidate(query) {
+  const q = (query || '').trim().toLowerCase();
+  if (!q) return null;
+  const jobIds = {};
+  let canonical = '';
+  for (const s of state.sessions) {
+    if (!s || !Array.isArray(s.items)) continue;
+    for (const it of s.items) {
+      if (!it) continue;
+      const a = (it.assetNo || '').trim();
+      // Q4A: exact text, case-insensitive and trimmed. NOT a substring match —
+      // typing "1" must not claim to be the history of asset "1024". And NOT
+      // zero-insensitive: '001' and '1' stay different assets, exactly as
+      // findDuplicateAssetIndex has treated them since v60 (decision 8A). The
+      // label on the appliance is its identity; if you typed the zeros, you
+      // meant them.
+      if (a && a.toLowerCase() === q) {
+        jobIds[s.id] = true;
+        if (!canonical) canonical = a;   // first seen wins the display casing
+      }
+    }
+  }
+  const jobCount = Object.keys(jobIds).length;
+  return jobCount >= ASSET_HISTORY_MIN_JOBS ? { assetNo: canonical, jobCount } : null;
+}
+
+// Every past instance of one asset number, newest first, with everything the
+// history sheet needs to render a row and jump to the original item.
+// Returns { rows, total } — `total` is the true count so the sheet can say when
+// it has trimmed to ASSET_HISTORY_MAX_ROWS.
+function assetHistoryFor(assetNo) {
+  const q = (assetNo || '').trim().toLowerCase();
+  if (!q) return { rows: [], total: 0 };
+  const rows = [];
+  for (const s of state.sessions) {
+    if (!s || !Array.isArray(s.items)) continue;
+    for (let i = 0; i < s.items.length; i++) {
+      const it = s.items[i];
+      if (!it) continue;
+      if ((it.assetNo || '').trim().toLowerCase() !== q) continue;
+      rows.push({
+        sessionId: s.id,
+        sessionTitle: s.site || s.name || 'Untitled job',
+        date: s.date || '',
+        index: i,
+        item: it
+      });
+    }
+  }
+  // Newest job first. Ties (two jobs the same day) fall back to nothing in
+  // particular, which is fine — same-day ordering carries no information.
+  rows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  const total = rows.length;
+  return { rows: rows.slice(0, ASSET_HISTORY_MAX_ROWS), total };
+}
+
+// Sheet lifecycle. The sheet is READ-ONLY — no inputs, no typing, nothing
+// focusable to lose — so a plain render() on open and close is safe here. (The
+// v60.1 rule about never re-rendering an open sheet exists because the bug sheet
+// contains a textarea; that hazard genuinely does not apply to this one.)
+function openAssetHistory(assetNo) {
+  const a = (assetNo || '').trim();
+  if (!a) return;
+  state.assetHistoryAsset = a;
+  state.assetHistorySheetOpen = true;
+  render();
+}
+
+function closeAssetHistory() {
+  state.assetHistorySheetOpen = false;
+  state.assetHistoryAsset = '';
+  render();
+}
+
+// Jump from a history row to the original item in its own job. `arg` arrives as
+// "sessionId|itemIndex" from the row's data-arg.
+function openAssetHistoryRow(arg) {
+  const bits = String(arg || '').split('|');
+  const id = bits[0];
+  const idx = parseInt(bits[1], 10);
+  if (!id) return;
+  state.assetHistorySheetOpen = false;
+  state.assetHistoryAsset = '';
+  // requestOpenSession handles the "edited since export" warning for us, and
+  // carries the cursor through if the user confirms it.
+  requestOpenSession(id, Number.isFinite(idx) ? { cursor: idx } : undefined);
+}
+
 function deleteSession(id) {
   // v59: fold this session's tallies into the archived stats BEFORE it goes, so
   // the lifetime counter doesn't fall when a job is deleted. Must run before the
@@ -1052,8 +1220,13 @@ function saveItem(result, readings) {
     if (state.readingsEnabled && !item.readings) delete merged.readings;
     sess.items[state.cursor] = merged;
   } else {
-    // v17: stamp the timestamp on first save, only when the setting is on.
-    if (state.timestampsEnabled) item.ts = new Date().toISOString();
+    // v17: stamp on first save (append only) — ts means "first logged", never
+    // "last touched", which is why the edit branch above must not set it.
+    // v61: capture is now UNCONDITIONAL. It used to be gated on
+    // state.timestampsEnabled; that setting now gates EXPOSURE only (the CSV
+    // Time column). See the capture/exposure note in config.js — this is the
+    // line that changed, and it was a deliberate decision, not a slip.
+    item.ts = new Date().toISOString();
     sess.items.push({ id: uid(), ...item });
     // v18: learn this (location, type) pairing on first log (pass OR fail — a
     // failed item still belongs to that location). No-op when SQP is off.
@@ -1322,8 +1495,10 @@ function copyLastResult() {
     // v17: overwrite keeps the existing item's original ts (item has no ts key).
     sess.items[state.cursor] = { ...sess.items[state.cursor], ...item };
   } else {
-    // v17: stamp on first save (append), only when timestamps are enabled.
-    if (state.timestampsEnabled) item.ts = new Date().toISOString();
+    // v17: stamp on first save (append). v61: unconditional — see saveItem and
+    // the capture/exposure note in config.js. Copy-last is a genuine first log
+    // of a new item, so it stamps exactly like any other.
+    item.ts = new Date().toISOString();
     sess.items.push({ id: uid(), ...item });
     // v18: learn the copied (location, type) pairing as a fresh log.
     recordSqpUsage(item.location, item.itemType);
@@ -1393,6 +1568,10 @@ function setView(v) {
   state.multiPickSheetOpen = false;   // v16
   state.presetSheetOpen = false;      // v47
   closeReadingsSheetState();          // v53
+  // v61: the asset-history sheet lives on the Sessions screen; leaving that
+  // screen must not leave it armed to reappear on the way back.
+  state.assetHistorySheetOpen = false;
+  state.assetHistoryAsset = '';
   state.bulkLocationDialogOpen = false;
   state.bulkLocationValue = '';
   // v11: also clear the new bulk-edit menu + sub-dialog state.
@@ -2230,7 +2409,10 @@ function restartOnboarding() {
 // result, ts?}) so Overview, CSV and reports all render it like real data.
 function seedDemoSession() {
   const eng = (state.engineer || '').trim();
-  const stamp = state.timestampsEnabled ? new Date().toISOString() : undefined;
+  // v61: the demo items stamp unconditionally too, so the example job matches
+  // the shape of real data (and so a brand-new user's first look at the Session
+  // settings screen shows a testing time rather than a gap).
+  const stamp = new Date().toISOString();
   const now = new Date().toISOString();
   const mk = (assetNo, location, itemType, result, notes) => {
     const it = { id: uid(), assetNo, location, itemType, notes: notes || '', result };
@@ -2464,9 +2646,14 @@ function setSound(enabled) {
   if (state.soundEnabled) playSound('pass');
 }
 
-// v17: item timestamps on/off. Gates both capture (future items) and display.
-// Existing items are untouched either way — turning it on doesn't backfill old
-// items, turning it off doesn't strip stamps already recorded.
+// v17: item timestamps on/off.
+// v61: this NO LONGER GATES CAPTURE. `ts` is now stamped on every item's first
+// log regardless of this flag (see saveItem and the note in config.js); the flag
+// gates EXPOSURE only — the Time line under an item in the Overview, and the
+// Time column in the CSV. Existing items are untouched either way: turning it on
+// doesn't backfill anything, turning it off doesn't strip stamps already
+// recorded. Nothing here needed to change for v61 — this comment did, because
+// the old one now describes behaviour the app no longer has.
 function setTimestamps(enabled) {
   state.timestampsEnabled = !!enabled;
   save();
