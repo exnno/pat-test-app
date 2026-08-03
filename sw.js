@@ -10,7 +10,7 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v61-11';
+const CACHE_VERSION = 'pat-v61-2';
 const ASSETS = [
   './',
   './index.html',
@@ -49,6 +49,21 @@ const ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then(cache => cache.addAll(ASSETS))
+      // ⚠ v61.2 RECOVERY ONLY — REMOVE THIS LINE ONCE THE APP IS BACK.
+      //
+      // Normally this worker waits for the PAGE to post SKIP_WAITING when the
+      // user taps the update banner, so an update never swaps under an engineer
+      // mid-job. That design has one failure mode, which is what stranded v61:
+      // if the page dies before boot.js registers the worker, nobody can ever
+      // send that message, the new worker waits forever, the stale cache keeps
+      // being served, and the app cannot pull itself out. A deadlock.
+      //
+      // Activating on install breaks the deadlock unconditionally — it needs no
+      // cooperation from a page that may be dead. The cost, and the reason this
+      // is temporary: controllerchange in boot.js reloads the page, so a future
+      // update would reload the app while someone is working. Acceptable for one
+      // recovery deploy, not acceptable as the standing behaviour.
+      .then(() => self.skipWaiting())
   );
 });
 
