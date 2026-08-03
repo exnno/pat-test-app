@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V60';
+const APP_VERSION = 'V61';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -64,7 +64,7 @@ const CAL_DUE_KEY = 'pat:caldue';
 // first-run-wizard gate, so nothing about upgrade behaviour changes. When a future
 // feature release rolls a new welcome, replace the line below with the new key
 // (e.g. V51_WELCOME_KEY) and pass it to dismissWelcome() — no new symbol pile.
-const V60_WELCOME_KEY = 'pat:v60welcome';  // v60: one-tap bug report + leading zeros
+const V61_WELCOME_KEY = 'pat:v61welcome';  // v61: asset history + testing time
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
 // sheet opens. Deliberately a single named constant so the threshold can be
@@ -189,6 +189,57 @@ function makeEmptyBugDraft() {
 // pathological stored value (e.g. a hand-edited backup claiming a width of
 // 5000) turning every asset number into a wall of zeros. Real jobs use 3–4.
 const ASSET_PAD_MAX = 12;
+
+// ---------------------------------------------------------------------------
+// v61: cross-session asset history (decisions Q2A / Q3A / Q4A / Q5C).
+//
+// How many DIFFERENT jobs must contain the same asset number before the
+// Sessions search offers the consolidated history view. Two is the point at
+// which "open the job" stops being good enough — one job you can just open; two
+// or more is when piecing the history together by hand starts to hurt.
+const ASSET_HISTORY_MIN_JOBS = 2;
+
+// Cap on how many past instances the history sheet renders. A pathological case
+// (the same asset number typed onto hundreds of items) must not build a wall of
+// DOM inside a bottom sheet on a phone. The sheet says so plainly when it trims.
+const ASSET_HISTORY_MAX_ROWS = 60;
+
+// ---------------------------------------------------------------------------
+// v61: testing time (decisions Q7A / Q8A / Q9A / Q10 / Q11B).
+//
+// ⚠ THE CAPTURE/EXPOSURE SPLIT — READ THIS BEFORE TOUCHING item.ts.
+//
+// Before v61, the "Item Timestamps" setting (TIMESTAMPS_KEY) gated BOTH capture
+// and display: with it off, no `ts` was ever written and the stored item shape
+// was byte-for-byte what it had been before timestamps existed. That guarantee
+// is deliberately GONE as of v61.
+//
+// From v61: `ts` is stamped on EVERY item's first log, always, regardless of the
+// setting. The setting now gates EXPOSURE ONLY — whether the Time column appears
+// in the CSV. Nothing else about it changed.
+//
+// WHY: testing time is computed from `ts`, and a derived figure nobody can see
+// unless they found and enabled an unrelated setting years ago is not a feature.
+// Capture is cheap (`ts` is codec-mapped to a single character in storage.js, so
+// roughly 30 bytes an item — a thousand items is ~30 KB of a 5 MB budget) and it
+// compounds: every day capture is on is another day of history to compute from.
+//
+// CONSEQUENCE worth knowing: someone who has always had Item Timestamps off and
+// later switches it on will find the CSV Time column populated for everything
+// logged since v61, not just from the moment they flipped it. That is an
+// improvement, but it looks like the setting acted retrospectively — so it is
+// called out in the v61 welcome copy and the handoff rather than left to
+// surprise someone.
+
+// A session whose first and last stamps fall on different calendar days doesn't
+// have a meaningful elapsed time — a job reopened two days later would read
+// "26h 14m", which is worse than useless. Past this many distinct days we label
+// the span instead of timing it (decision Q9A).
+const DURATION_MULTIDAY_MIN_DAYS = 2;
+
+// Below this, elapsed time is noise rather than information (two items logged
+// forty seconds apart). Shown as "under a minute" rather than "0m".
+const DURATION_MIN_MS = 60 * 1000;
 // v42: the opt-in demo session created on the FRESH onboarding path (decision
 // 9A). Tagged with this flag on the session object so the app can label it as an
 // example and the user knows it is safe to delete. It is a perfectly ordinary
@@ -346,6 +397,15 @@ function makeDefaultReportSettings() {
     // footer branding. Additive, rides the reportSettings blob, no backupVersion
     // bump.
     showFooterLogo:   true,
+    // v61: print the testing time (first item logged → last item logged) in the
+    // job-details block. Default FALSE — deliberately the opposite of the other
+    // "show" flags here (decision Q11=B). The certificate is client-facing, and
+    // "this job took 3h 12m" tells a customer how fast you worked; adding that to
+    // everyone's existing certificate without asking would be a silent change to
+    // their output. Opt in from Report settings → What to include. Read with
+    // `=== true` (storage.js) rather than `!== false`, so a saved settings blob
+    // from before v61 backfills to OFF, not ON.
+    showDuration:     false,
     declaration:      true,    // print the declaration/signature line
     declarationText:  REPORT_DECLARATION_DEFAULT,
     // v34: optional signature image (base64 PNG data URL, downscaled <=400px on
