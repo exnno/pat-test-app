@@ -564,9 +564,10 @@ function refreshEntryAfterLog() {
   document.body.classList.remove('has-selection-bar');
   document.body.classList.remove('view-entry');
   app.innerHTML = renderEntry();
-  // v24 (E4): the entry screen never contains a modal/sheet, so a subsequent
-  // render() has nothing to sweep. Keep the flag accurate.
-  _lastRenderHadModal = false;
+  // v24 (E4): the entry screen used to contain no modal/sheet at all, so this
+  // was hard-coded false. v62 put the photo strip sheet on this screen, so the
+  // flag must now tell the truth or a subsequent render() won't sweep it.
+  _lastRenderHadModal = !!state.photoStripOpen;
   bindFocusFields();
 }
 // v20: New Session Client / Site autocomplete. These replace the v19 native
@@ -1207,6 +1208,26 @@ function renderEntry() {
     ? ` (${escapeHTML(sess.items[sess.items.length - 1].itemType)} · ${capitalise(sess.items[sess.items.length - 1].result)})`
     : '';
 
+  // v62.1: decision 13A said photos must be reachable from the entry form when
+  // you tap back into an existing fail. v62.0 shipped the strip sheet on this
+  // screen but never gave it a trigger, so there was no way in — the photos were
+  // there and unreachable. This is that trigger.
+  //
+  // Shown ONLY on an existing item whose result is a fail (decision 15A). It
+  // also appears at a count of zero, so tapping back into a fail you logged
+  // without a photo still lets you add one — the strip's own Add button handles
+  // it from there.
+  const entryItem = isExisting ? sess.items[state.cursor] : null;
+  const entryPhotoCount = (entryItem && entryItem.result === 'fail' && entryItem.id)
+    ? photoCountForItem(entryItem.id) : 0;
+  const showEntryPhotoRow = !!(entryItem && entryItem.result === 'fail' && entryItem.id
+    && (typeof photosSupported !== 'function' || photosSupported()));
+  const entryPhotoRow = showEntryPhotoRow ? `
+      <button class="entry-photo-btn" id="entry-photo-btn" data-action="photo-strip-open" data-arg="${escapeHTML(entryItem.id)}">
+        📷 ${entryPhotoCount ? `Photos (${entryPhotoCount})` : 'Add a photo'}
+      </button>
+  ` : '';
+
   let failSheetInner = '';
   if (state.failModalStage === 'reasons') {
     failSheetInner = `
@@ -1489,6 +1510,8 @@ function renderEntry() {
         <button class="pass-btn" id="pass-btn" data-action="log-pass" ${passFailDisabled}><span class="icon">✓</span>PASS</button>
         <button class="fail-btn" id="fail-btn" data-action="log-fail" ${passFailDisabled}><span class="icon">✗</span>FAIL</button>
       </div>
+
+      ${entryPhotoRow}
 
       <button class="copy-last-btn" id="copy-last-btn" data-action="copy-last" ${copyDisabled}>
         ⎘ Copy last result${lastInfo}

@@ -670,10 +670,16 @@ Staging: `addPendingPhotoFromFile` (cap-checked before AND after the async gap),
 not a `render()`** — the v60.1 rule. The photo button is on BOTH fail-sheet
 stages (an "Other…" fail is exactly the unusual kind worth photographing), and
 the Other stage holds a textarea a full render would tear down.
-Commit: `commitPendingPhotos(sessionId, itemId, result)` — called from
+Commit: `commitPendingPhotos(sessionId, itemId, result, staged)` — called from
 `saveItem` AFTER the save (the item must exist before anything points at its
 id). Fire-and-forget; discards rather than attaching if `result !== 'fail'` or
-there's no id. `saveItem` now captures `savedItemId` in BOTH branches.
+there's no id. `saveItem` captures `savedItemId` in BOTH branches.
+⚠ **`staged` is passed IN, and `saveItem` captures it into a local BEFORE calling
+`loadFormForCursor()`.** This is not stylistic. `loadFormForCursor()` calls
+`discardPendingPhotos()`, and it runs *earlier in `saveItem`* than the commit
+does — so in v62.0, where the commit read `state.pendingPhotos` itself, the array
+was always empty by the time it looked and **every photo on every logged fail was
+silently dropped**. Do not reintroduce the read.
 Strip sheet: `openPhotoStrip`, `closePhotoStripState`, `closePhotoStrip`,
 `addPhotoToItemFromFile`, `deletePhotoFromStrip`.
 **Decision 14B:** `passClicked` was SPLIT — it now runs the confirm when an
@@ -857,6 +863,14 @@ buttons only, **no inputs**, so unlike the fail sheet it MAY be rebuilt by
 `renderOverviewBodyHTML` gains the 📷 count chip on fail rows, read
 SYNCHRONOUSLY via `photoCountForItem` — in selection mode it renders as an inert
 span so a tap toggles the row rather than opening a sheet.
+**v62.1:** `renderEntry` gains `entryPhotoRow` (`.entry-photo-btn`) — the
+decision-13A route into an existing fail's photos from the entry form. v62.0
+shipped the strip sheet on this screen but **no trigger for it**, so the photos
+were stored and unreachable. It shows at a count of zero too, so tapping back
+into a fail logged without a photo still lets you add one.
+⚠ `refreshEntryAfterLog` sets `_lastRenderHadModal = !!state.photoStripOpen`, not
+the hard-coded `false` it carried since v24 — the entry screen can now hold a
+sheet, and a stale `false` would stop a later `render()` sweeping it.
 
 Owns `const app = document.getElementById('app')` and the `render()` dispatcher
 (rebuilds `#app.innerHTML` on every interaction; scroll-to-top + the Sessions scroll

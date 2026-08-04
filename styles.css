@@ -3380,3 +3380,21 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .photo-strip-loading,
 .photo-strip-note { margin: 12px 0; font-size: 13px; }
+
+/* v62.1: entry-screen route into an existing fail's photos. Styled like the
+   Copy-last button it sits above — a secondary navigation control, not a
+   result action, so it must not compete with PASS/FAIL. */
+.entry-photo-btn {
+  display: block;
+  width: 100%;
+  margin-top: 10px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 600;
+  border: 1px solid var(--border-strong);
+  border-radius: 12px;
+  background: var(--card-bg);
+  color: var(--neutral-text);
+  cursor: pointer;
+}
+.entry-photo-btn:active { background: var(--neutral-bg-hover); }

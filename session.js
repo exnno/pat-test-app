@@ -1221,6 +1221,15 @@ function saveItem(result, readings) {
   // photos staged during the fail flow can be attached to it. Both branches set
   // it — the edit branch reuses the existing id, the append branch mints one.
   let savedItemId = '';
+  // ⚠ v62.1 BUG FIX — TAKE THE STAGED PHOTOS NOW, NOT LATER.
+  // `loadFormForCursor()` runs below (before the save block) and calls
+  // discardPendingPhotos() as part of clearing transient entry state. That wiped
+  // state.pendingPhotos before commitPendingPhotos() ever ran, so a fail logged
+  // with photos silently committed none of them: no chip, nothing in the store.
+  // Reading them into a LOCAL here makes the commit independent of anything that
+  // clears state in between. Revoking the object URLs does not invalidate the
+  // Blobs, so the captured entries stay usable.
+  const stagedPhotos = (state.pendingPhotos || []).slice();
   if (state.cursor < sess.items.length) {
     // v17: editing an existing item must NOT change its original timestamp —
     // ts records when the item was FIRST logged, not last touched. We spread
@@ -1264,7 +1273,7 @@ function saveItem(result, readings) {
   // before anything points at its id. Async and fire-and-forget: it repaints
   // itself when the writes land, and a photo-store failure cannot affect the
   // item that has already been saved.
-  commitPendingPhotos(sess.id, savedItemId, result);
+  commitPendingPhotos(sess.id, savedItemId, result, stagedPhotos);
   refreshEntryAfterLog();
 }
 
@@ -1446,25 +1455,28 @@ function refreshFailPhotoStrip() {
 // Write the staged photos against the item saveItem() has just written.
 // Fire-and-forget by design: the item is already saved, and a photo-store
 // failure must never propagate back into the logging path.
-function commitPendingPhotos(sessionId, itemId, result) {
-  if (!state.pendingPhotos || !state.pendingPhotos.length) return;
+// ⚠ `staged` is passed IN by the caller, deliberately. It used to read
+// state.pendingPhotos itself, which broke in v62.0 because saveItem's
+// loadFormForCursor() clears that array before this ever runs. The list must be
+// captured at the top of saveItem and handed over. Do not reintroduce the read.
+function commitPendingPhotos(sessionId, itemId, result, staged) {
+  const list = (staged && staged.length) ? staged : [];
+  if (!list.length) return;
 
   // Belt and braces on decision 15A. Staged photos can only be produced by the
   // fail sheet, so a non-fail result here means something unexpected happened;
   // discard rather than quietly attaching evidence to a pass.
   if (result !== 'fail' || !itemId) { discardPendingPhotos(); return; }
 
-  const staged = state.pendingPhotos.slice();
-  // Clear the staging area immediately — the object URLs belong to thumbnails
-  // that are about to be replaced by the committed strip, and leaving them
-  // staged would show them twice if a render lands mid-write.
+  // Make sure nothing is left staged — the thumbnails are about to be replaced
+  // by the committed count.
   state.pendingPhotos = [];
 
   // First photo ever added is where we ask for persistent storage (decision 9A)
   // — at the point the user has demonstrably chosen to keep photos, not at boot.
   if (photoStatsSync().count === 0) photoRequestPersistence();
 
-  staged.reduce(
+  list.reduce(
     (chain, processed) => chain.then(() => photoAdd(sessionId, itemId, processed)),
     Promise.resolve()
   ).then(() => {
