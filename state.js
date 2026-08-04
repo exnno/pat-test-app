@@ -351,6 +351,30 @@ let state = {
   readingsDraft: { class: READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '', polarity: false },
   readingsPendingResult: null,        // 'pass' | 'fail' — the result being logged
   readingsPendingFailReason: null,    // the fail reason text (fail mode only)
+
+  // v65: HID barcode scanner. ONE persisted flag; everything else here is
+  // transient and deliberately so.
+  //   scannerEnabled     — the only thing saved. DEFAULT ON (see SCANNER_KEY in
+  //                        config.js for why this one defaults the opposite way
+  //                        to every other feature flag).
+  //   scanFilledAsset    — did the asset number CURRENTLY in the form come off a
+  //                        barcode? Set when a scan lands, cleared by
+  //                        loadFormForCursor on every fresh form.
+  //   lastLogWasScanned  — decision 6B. Did the item we just logged carry a
+  //   lastScanSessionId    SCANNED asset number? If so the next asset box is left
+  //                        EMPTY rather than pre-filled, because nextAssetNo()
+  //                        would otherwise offer barcode + 1 — a number that
+  //                        looks authoritative and is almost certainly not on any
+  //                        appliance. The session id is stored alongside so the
+  //                        blanking dies when you switch jobs, without every
+  //                        session-opening path having to remember to clear it.
+  //   scannerTestLog     — the last few scans shown on the settings test page.
+  //                        Display only; never saved, never backed up.
+  scannerEnabled: true,
+  scanFilledAsset: false,
+  lastLogWasScanned: false,
+  lastScanSessionId: '',
+  scannerTestLog: [],
   // v20: SQP row stability. The composed quick-pick row is FROZEN per location:
   // it is recomputed only when the confirmed location changes (or a session
   // opens), never mid-logging — so logging a PASS no longer reshuffles the

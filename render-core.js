@@ -111,6 +111,7 @@ function render() {
   else if (v === 'settingsItems') html = renderSettingsItems();
   else if (v === 'settingsFails') html = renderSettingsFails();
   else if (v === 'settingsReadings') html = renderSettingsReadings();   // v53
+  else if (v === 'settingsScanner') html = renderSettingsScanner();   // v65
   else if (v === 'settingsMultiPick') html = renderSettingsMultiPick();   // v16
   else if (v === 'settingsDescriptions') html = renderSettingsDescriptions();
   else if (v === 'settingsDisplay') html = renderSettingsDisplay();
@@ -197,10 +198,10 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Photos can go on the report.</strong> Every photo you've taken on a job can now be printed at the end of the certificate, grouped under the asset it belongs to with the fail reason underneath.</li>
-        <li><strong>It's off until you switch it on.</strong> Settings &rarr; Report settings &rarr; What to include &rarr; <strong>Photos</strong>. Your certificate doesn't change unless you ask it to — the register, totals and declaration all read exactly as they do now, and the photos come after them.</li>
-        <li><strong>Or just for one job.</strong> There's a <strong>Photos</strong> button in the report preview, next to List all items and Declaration, so you can add them to one report without changing your settings.</li>
-        <li>Photos are shrunk down for printing so the file stays small enough to send from your phone. On a very big job they're shrunk further so all of them still fit, and past 150 the report says clearly how many are shown and how many aren't.</li>
+        <li><strong>Barcode scanners now work.</strong> If you have a Bluetooth barcode scanner — the sort that pairs with your phone like a keyboard — scan an asset label on the test screen and the number goes straight into the box. No tapping the box first, and no on-screen keyboard covering your Quick Pick buttons.</li>
+        <li><strong>Scan on the Sessions list too.</strong> Scan an old label there and it searches for that asset, so you can pull up where and when you last tested it.</li>
+        <li><strong>Nothing changes if you don't have one.</strong> The app can tell a scanner from a thumb by how fast the characters arrive, so typing a number by hand works exactly as it always has.</li>
+        <li>There's a new <strong>Barcode Scanner</strong> page under Settings &rarr; Testing Setup, with a box you can scan into to check your scanner is talking to the app properly.</li>
       </ul>
       <button class="btn-primary" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -1500,7 +1501,7 @@ function renderEntry() {
       ${progressRow}
 
       <label class="label">Asset number</label>
-      <input class="input-big" id="f-asset" data-input-action="f-asset" value="${escapeHTML(state.form.assetNo)}">
+      <input class="input-big" id="f-asset" data-input-action="f-asset" value="${escapeHTML(state.form.assetNo)}"${state.scannerEnabled ? ' placeholder="Scan or type"' : ''}>
 
       <label class="label">Location ${carriedHint}</label>
       <div class="location-input-wrap">

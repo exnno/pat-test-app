@@ -3398,3 +3398,44 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   cursor: pointer;
 }
 .entry-photo-btn:active { background: var(--neutral-bg-hover); }
+
+/* ---------------------------------------------------------------------------
+   v65: HID barcode scanner.
+   The flash is the acknowledgement that a scan landed — deliberately visual
+   rather than a toast, because fifty toasts on a fifty-item job is noise and
+   the scanner has its own beeper anyway. Colours are LITERAL rgba, not var()s:
+   CSS-variable @keyframes have a history of silently not running in iOS PWAs,
+   and this animation must be the one thing that always works. The accent blue
+   reads correctly against both the light and dark input backgrounds.
+--------------------------------------------------------------------------- */
+@keyframes scanFlash {
+  0%   { box-shadow: 0 0 0 0 rgba(37, 99, 235, 0.55); }
+  70%  { box-shadow: 0 0 0 8px rgba(37, 99, 235, 0.10); }
+  100% { box-shadow: 0 0 0 12px rgba(37, 99, 235, 0); }
+}
+.scan-flash { animation: scanFlash 600ms ease-out; }
+
+/* The scanner test log on Settings → Testing Setup → Barcode Scanner. */
+.scanner-log { margin-top: 12px; }
+.scanner-log-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 11px;
+  margin-bottom: 6px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+}
+.scanner-log-text {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 15px;
+  word-break: break-all;
+  color: var(--text);
+}
+.scanner-log-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}

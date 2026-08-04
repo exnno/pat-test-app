@@ -975,6 +975,16 @@ registerChangeActions({
     render();
   },
 
+  // v65: barcode scanner master toggle. Persists instantly (same pattern as
+  // sqp-toggle / readings-toggle) and re-renders so the test box and the
+  // troubleshooting notes appear or disappear straight away. Turning it off also
+  // drops the "Scan or type" placeholder from the entry screen's asset box.
+  'scanner-toggle': (checked) => {
+    state.scannerEnabled = !!checked;
+    localStorage.setItem(SCANNER_KEY, state.scannerEnabled ? '1' : '0');
+    render();
+  },
+
   // v53: per-fail-reason tag selector (Quick Pick Fail page, shown only when
   // readings are on). Reads the reason text off the element's data-reason and
   // the chosen tag off its value; writes the map and persists. No re-render — the

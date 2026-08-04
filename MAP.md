@@ -1,4 +1,4 @@
-# PATGo — Code Map (V64)
+# PATGo — Code Map (V65)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -17,12 +17,24 @@ exists — the modular split is complete.
 > `PAThandoff_vNN.md` docs. The map now answers one question only: *where does
 > this thing live today?*
 
-## Load order (index.html) — 22 first-party files
+## Load order (index.html) — 23 first-party files
 `config.js` → `state.js` → `utils.js` → `storage.js` → `clients.js` → `sqp.js`
-→ `multipick.js` → `feedback.js` → `bugreport.js` → **`photos.js`** → `csv.js`
+→ `multipick.js` → `feedback.js` → `bugreport.js` → `photos.js` → `csv.js`
 → `backup.js` → `session.js` → `setup.js` → `tour.js` → `report.js`
-→ `pdfpreview.js` → `render-core.js` → `render-settings.js` → `events.js`
-→ `dispatch.js` → `boot.js`
+→ `pdfpreview.js` → `render-core.js` → `render-settings.js` → **`scanner.js`**
+→ `events.js` → `dispatch.js` → `boot.js`
+
+**v65 added `scanner.js`**, placed immediately AFTER `render-settings.js` and
+BEFORE `events.js`. After the render files because a scan writes into fields
+those files paint (`#f-asset`, `#sessions-search`, `#scanner-test`) and calls
+`refreshSessionsListAreaOnly` / `renderScannerTestLogHTML`; before `events.js`
+purely so the three document-level capture listeners (scanner keydown, sheet
+drag guard, suggestion click swallow) read together. Nothing depends on the
+position for correctness — every cross-file call resolves at call time — so this
+is a readability choice, not a load-order constraint. `index.html` now lists
+**23** scripts; `sw.js` ASSETS lists **25** `.js` entries (23 first-party + the
+same 2 lazy jsPDF). **The `ASSETS` list and the `<script>` chain both changed
+this release — upload `scanner.js` BEFORE `index.html`.**
 
 **v60 added `bugreport.js`**, placed immediately after `feedback.js` because it
 calls `showToast`, and before everything that might want to report an error.
@@ -116,6 +128,30 @@ page. `REPORT_PHOTO_COLS` (3) — matches `PHOTO_MAX_PER_ITEM`, so one item's
 evidence is always one row. `makeDefaultReportSettings()` gained `showPhotos`,
 **default FALSE** — opt-in, the second flag here to default off, for the same
 reason as `showDuration`. No new localStorage keys → **`backupVersion` stays 5**.
+
+**v65 constants (HID barcode scanner):** `SCANNER_KEY` (`pat:scanner`) — the
+on/off flag. ⚠ **This is the ONLY feature flag in the app that DEFAULTS ON, and
+the only one read as `!== '0'` rather than `=== '1'`.** That is deliberate: with
+no scanner paired the feature is completely inert (the sole cost is a keydown
+listener that discards everything a human types), so there is nothing to opt in
+to — and defaulting it off would mean the one engineer who owns a scanner must
+find a setting they have no reason to look for. The toggle exists to switch it
+OFF if it ever misbehaves, and to give the test box a home.
+`SCAN_MAX_CHAR_GAP_MS` (40) — the speed test, and the whole safety mechanism: a
+wedge scanner emits characters ~5–20ms apart, a fast typist ~80–150ms, so 40
+sits between the two. **This is the number to raise if a real scanner proves too
+slow**; up to ~70 is still safe, above that it overlaps fast typing.
+`SCAN_END_MS` (120) — how long a silence ends a burst, and the fallback
+terminator for a scanner sending no suffix. ⚠ **These two constants cover
+DIFFERENT speed bands and both matter**: typing slower than `SCAN_END_MS` never
+accumulates a buffer at all (each keystroke resets it, so it dies on length),
+and only typing in the 40–120ms band reaches the gap test. A test written at
+130ms therefore does not exercise the speed test — v65's mutation run caught
+exactly that hole in its own harness. `SCAN_MIN_LENGTH` (3) / `SCAN_MAX_LENGTH`
+(64) — the maximum only rejects a runaway, not long barcodes.
+`SCANNER_TEST_LOG_MAX` (5). `SETTINGS_CATEGORIES` catTesting gained
+`settingsScanner`; `SETTINGS_PAGE_META` has its entry. **No new backup schema →
+`backupVersion` stays 5.**
 
 **v62 constants (photo evidence):** ⚠ *Historical — the welcome key described here
 was REPLACED in v63 by the derived `WELCOME_VERSION`/`WELCOME_KEY` pair documented
@@ -243,6 +279,18 @@ bump the version, change report/setup defaults, or restructure Settings / add a 
 settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`).
 
 ## state.js (~408 ln) — the global `state` object
+**v65 (barcode scanner):** `scannerEnabled` — the ONLY persisted field of the
+five, default ON (see `SCANNER_KEY`). `scanFilledAsset` — did the asset number
+currently in the form come off a barcode? Set when a scan lands, cleared by
+`loadFormForCursor` on every fresh form. `lastLogWasScanned` + `lastScanSessionId`
+— **decision 6B**: did the item just logged carry a SCANNED number? If so the
+next asset box is left EMPTY rather than pre-filled, because `nextAssetNo()`
+would otherwise offer barcode + 1 — a number that looks authoritative and is
+almost certainly not on any appliance. ⚠ **The session id is stored alongside on
+purpose**: it scopes the blanking to one job, so switching jobs restores the
+counter without every session-opening path having to remember to clear a flag.
+`scannerTestLog` — display only, never saved, never backed up.
+
 **v63:** `welcomeSeen` — the welcome flag's PERMANENT name (was `v62WelcomeSeen`). ⚠ **Never rename this back to a per-version name**; that was one of the six coupling points behind the V61 white screen.
 
 **v62 (photo evidence):**
@@ -348,6 +396,12 @@ false/absent writes no key. A Class I item with only polarity ticked is retained
 *Touch to:* add a stateless formatting/escaping/colour helper.
 
 ## storage.js (~745 ln) — persistence boundary
+**v65:** `load()` reads `state.scannerEnabled = localStorage.getItem(SCANNER_KEY)
+!== '0'` — ⚠ **note the inverted comparison**; absent and garbage both mean ON,
+only an explicit `'0'` means off. `save()` writes `'1'`/`'0'` **explicitly**
+rather than omitting the key when on, because an omitted key would read back as
+on and switching the feature off would silently not persist.
+
 Codec: `STORAGE_CODEC_VERSION`, `SESSION_KEY_MAP`, `ITEM_KEY_MAP` (+ `_REV`),
 `encodeWithMap`/`decodeWithMap`, `encodeItem`/`decodeItem`,
 `encodeSession`/`decodeSession`, `_sessionSig`, `serialiseSessions`,
@@ -433,6 +487,11 @@ in config.js.
 ## multipick.js (~127 ln) — Multi Pick
 `normaliseMultiPickConfig`, `loadMultiPickConfig`, `activeMultiPickSlots`,
 `multiPickFire` (the "enter a location first" guard `showToast`s), `saveMultiPickSettings`.
+**v65:** `multiPickFire` clears `lastLogWasScanned` / `lastScanSessionId` before
+`loadFormForCursor()`. It computes every asset number itself from `nextAssetNo()`
+and never reads the form, so the counter is authoritative again after a batch —
+without this the next box would be left blank on the strength of a scan that
+happened before it.
 *Touch to:* change the multi-pick bottom sheet behaviour or its settings save.
 
 ## feedback.js (~405 ln) — toast + dialogs + haptic / flash / sound
@@ -590,6 +649,12 @@ wired to `copy-current`/`copy-session`). Import: `buildCsvHeaderLookup`, `parseC
 *Touch to:* change CSV columns, export, or import parsing.
 
 ## backup.js (~340 ln) — Backup / Restore
+**v65:** `buildBackup` carries `scannerEnabled`; the restore applies it **only
+when the backup actually holds a boolean**. ⚠ **The `typeof` guard is the whole
+point**: absence says nothing about the engineer's preference, so an old backup
+must leave the loaded value alone rather than being read as "off" (asserted both
+ways — an old backup neither turns it off nor forces it on).
+
 `buildBackup` (includes `reportSettings` + `reportTemplates`; **v53** also
 `readingsEnabled` + `failReasonTags`; per-session `notes`/`certNo` and per-item
 `readings` ride inside `sessions`), `downloadBackup`, `markBackupExported`,
@@ -750,6 +815,30 @@ are vendored but **not precached**; this loader fetches them lazily on first pre
 version.
 
 ## session.js (~2940 ln) — sessions, items & most logic
+**v65 (decision 6B — the asset box after a scanned log).** Three touch points,
+all pure state, no cross-file dependency (deliberately — `saveItem` is the hot
+logging path and must not gain a call into `scanner.js` that could throw if that
+file failed to load):
+- `loadFormForCursor()` new-item branch computes
+  `afterScan = state.lastLogWasScanned && state.lastScanSessionId === sess.id`
+  and uses `assetNo: afterScan ? '' : nextAssetNo(sess)`. It also clears
+  `state.scanFilledAsset` on **both** branches — a fresh form has not been
+  scanned into yet however it was built.
+- `saveItem()` sets `lastLogWasScanned` / `lastScanSessionId` from
+  `state.scanFilledAsset` ⚠ **immediately BEFORE `loadFormForCursor()`**, which
+  clears the source flag. Same ordering trap as the v62.1 staged-photos bug: read
+  it before the thing that wipes it.
+- `copyLastResult()` does the same, because it also takes its asset number from
+  the form (`state.form.assetNo.trim() || nextAssetNo(sess)`), so a scanned
+  number can be logged through that path too.
+
+**Why blank rather than increment:** `nextAssetNo()` increments the LAST item's
+trailing digits, so after scanning `PAT-004821` it offers `PAT-004822` — fine
+when numbers are hand-typed and sequential, wrong when they come off labels.
+**There is deliberately NO hard stop** (spec decision): an empty box still logs,
+falling back to the counter exactly as it always has. The placeholder carries the
+message instead.
+
 **v62 (photo evidence) — the UI lifecycle around photos.js:**
 Staging: `addPendingPhotoFromFile` (cap-checked before AND after the async gap),
 `removePendingPhoto`, `discardPendingPhotos`, `refreshFailPhotoStrip`.
@@ -940,6 +1029,12 @@ seed, the signature, cert numbers / job notes / report templates, the welcome
 dismiss.
 
 ## render-core.js (~2170 ln) — main screens
+**v65:** welcome modal copy is the V65 scanner text. `renderEntry()`'s `#f-asset`
+gains `placeholder="Scan or type"` **only when `state.scannerEnabled`** — the
+placeholder is what tells the engineer why the box is empty after a scanned log
+(decision 6B), so it would be misleading with the feature off. Router gained
+`settingsScanner` → `renderSettingsScanner()`.
+
 **v63:** the modal gates on the fixed `state.welcomeSeen` and its heading derives from `WELCOME_VERSION` (config.js); the dead `id="v62-welcome-dismiss"` was removed (nothing referenced it). This file was the SIXTH and quietest member of the old version-named coupling — it read `state.v62WelcomeSeen`, so a stale copy never crashed, it just read `undefined`, which is falsy, and showed the modal on every render forever. Only `WELCOME_VERSION` and the copy below it change when a welcome is rolled.
 
 **v62:** welcome modal copy is the V62 photo-evidence text. `renderFailPhotoStripInner()`
@@ -1021,6 +1116,19 @@ Reports hub, Edit-session UI, empty states, the welcome modal, the first-run wiz
 the signature pad, the calibration banner, or the tour route.
 
 ## render-settings.js (~1675 ln) — settings screens
+**v65:** `renderSettingsScanner()` — the new Barcode Scanner page (Testing
+Setup). Two jobs: the off switch, and a **live test box**. The test box is the
+more important of the two and is the answer to the discoverability problem a
+wedge scanner creates — there is no on-screen button and nothing to press, so
+without it the only way to find out whether a scanner works is to try it on a
+real job. It takes a scan anywhere on the page (no need to tap in first) and
+shows the raw text plus a character count, which is how a scanner adding a prefix
+or clipping a digit becomes visible rather than mysterious. The test box and the
+troubleshooting notes are hidden entirely when the toggle is off. Glossary gained
+a **Barcode scanner** term. About changelog rolled to V65/V64/V63 (V62 dropped).
+⚠ The log markup itself is `renderScannerTestLogHTML()` in **scanner.js**, not
+here — that file owns the data and repaints the log directly without a render.
+
 **v64:** Report settings → What to include gains the `report-show-photos` toggle
 (+ an on-only plain-language note about shrinking and the 150 ceiling). About
 changelog rolled to V64/V63/V62 (V61 dropped).
@@ -1103,6 +1211,69 @@ the PAT Cloud phase).
 `GLOSSARY_GROUPS` — one line per term, nothing else needs changing); the contact
 details; the category structure (edit config.js, not here); search aliases (config);
 or roll the About changelog.
+
+## scanner.js (~300 ln) — HID barcode scanner (v65, NEW FILE)
+`initScanner()` (bound ONCE from boot.js — capture-phase `keydown` on
+`document`), `handleScannerKeydown`, `_scanTarget`, `_scanLooksLikeScan`,
+`_scanReset`, `_scanTimeoutCommit`, `applyScan`, `_scanIntoAsset`,
+`_scanIntoSearch`, `_scanIntoTest`, `_scanFlash`, `_scanClock`,
+`renderScannerTestLogHTML`. Burst state (`_scanChars`, `_scanGapMax`,
+`_scanLastTs`, `_scanTimer`, `_scanSwallowEnterUntil`, `_scannerBound`) is
+module-level `let`, **not** `state` — it is the last ~100ms of keyboard, and must
+never be persisted, backed up, or survive a render.
+
+**What a HID scanner actually is.** Not a camera and not an API: it pairs with
+the phone as a Bluetooth KEYBOARD and TYPES the barcode, usually followed by
+Enter. There is no permission to grant and no button to press. This file listens
+to the keyboard, notices bursts far too fast to be human, and puts the result in
+the right box. Nothing else in the app knows a scanner exists.
+
+⚠ **CHARACTER KEYS ARE NEVER `preventDefault`ed — ONLY THE TERMINATOR.** This is
+the single most important thing in the file and the reason it cannot break normal
+typing. At the moment each character arrives we do not yet know whether the burst
+will turn out to be a scan, so swallowing it would be a guess. Characters are
+allowed to land wherever they were going AND copied into the buffer in parallel;
+only on the terminator (or the silence timeout) is the burst judged, and if it
+was a scan the target field is overwritten **wholesale**, which cleans up
+whatever the characters did on the way past. If it wasn't a scan, nothing
+happened at all. **Do not "optimise" this into swallowing keys early.**
+
+⚠ **OVERWRITE, NEVER APPEND.** The asset box is pre-filled when a scan arrives,
+so writing over the field rather than into it is the entire point — otherwise
+every scan reads `001PAT-004821` (asserted; the mutation costs 12 assertions).
+
+⚠ **`e.repeat` is excluded explicitly.** A held key auto-repeats at ~30ms, which
+is machine-speed and would otherwise sail straight through the timing test. It is
+the only non-scanner source of a fast burst.
+
+**Where scans are accepted (decision 2B):** entry screen → `#f-asset`; Sessions
+list → `#sessions-search` (which gets the v61 cross-session asset history card
+for free); Barcode Scanner settings page → `#scanner-test`. `_scanTarget()`
+returns null — and the burst is dropped, the keystroke untouched — everywhere
+else, while ANY entry-screen sheet is open (all five flags are checked; `#f-asset`
+is still in the DOM underneath them), on a locked job, while the welcome panel /
+first-run wizard / migration prompt is up, and when the feature is off.
+
+**KNOWN LIMIT, accepted at spec time:** if the cursor is in some OTHER text field
+(Location, Item type, Notes), `_scanTarget()` bails entirely and the characters
+type into that field as they normally would. Hijacking a field the engineer had
+deliberately focused would be worse than the occasional barcode landing in the
+Location box, which is visible and one clear-and-retype to fix. Focus in the
+target field itself is fine — we still take over, so behaviour is identical
+whether or not they tapped the box first.
+
+Entry-screen delivery is a **TARGETED DOM WRITE, not a `render()`** (the v60.1
+rule) — a render on every scan would rebuild the entry screen fifty times a job
+and take the cursor with it. Acknowledgement is a CSS glow (`.scan-flash`,
+literal rgba **not** `var()`s, per the iOS keyframes history), deliberately not a
+toast: fifty toasts on a fifty-item job is noise and the scanner has its own
+beeper. Toasts are reserved for the duplicate warning (decision 4B), which fires
+at SCAN time rather than at save, because that is when the engineer is still
+stood at the appliance and can look at the label again.
+
+*Touch to:* change scan detection, timing, where scans are accepted, or the
+settings test log. **Don't** put the settings PAGE here (render-settings.js) or
+the 6B carry-forward here (session.js).
 
 ## events.js (~342 ln) — focus-sensitive field binding (per-render)
 `bindFocusFields()` — direct `oninput`/`onfocus`/`onblur` binds for the FOUR focus-
@@ -1192,6 +1363,11 @@ scroll-drag inside the now-scrollable preset list can't switch the preset by acc
 fields and `fail-other`).
 **v61:** clicks `asset-history-open`, `asset-history-close`, `asset-history-row`;
 change action `report-show-duration`.
+**v65:** change action `scanner-toggle` — writes `SCANNER_KEY` instantly and
+`render()`s, so the test box and troubleshooting notes appear/disappear at once
+and the entry screen's placeholder follows. Same shape as `sqp-toggle` /
+`readings-toggle`. **No click actions were added** — the scanner has no on-screen
+control by design.
 **v64:** change action `report-show-photos` (opt-in photo appendix). The
 `back-to-settings` deep-link now calls `reopenReportPreview(sid).catch(() => {})`
 — that function became async in v64 because returning from Report Settings may
@@ -1219,6 +1395,12 @@ cross-file functions (`load`, `save`, `render`, `applyTheme`, `initDelegation`,
 const data-loss class). Boot tail: the guard's else-branch runs `load()`,
 `applyTheme(state.theme)`, then the crash-fallback `try { loadFormForCursor();
 render(); } catch …`; `registerServiceWorker()` runs regardless.
+**v65:** the boot tail also calls `initScanner()` (scanner.js) right after
+`initSuggestionClickSwallow()` — the third document-level capture listener, same
+once-at-boot lifecycle. ⚠ **`typeof`-guarded and wrapped in try/catch**, like
+`initErrorCapture()` and `photoIndexLoad()`: a missing or broken `scanner.js`
+must never stop the app starting, and the worst case is that scans stop being
+recognised and asset numbers get typed by hand exactly as before v65.
 **v57:** the boot tail also calls `initSheetDragGuard()` (events.js) right after
 `initDelegation()` — same once-at-boot lifecycle, document-level capture listeners
 that survive every `innerHTML` rewrite. **v57.1:** also calls

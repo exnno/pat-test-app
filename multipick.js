@@ -91,6 +91,12 @@ function multiPickFire(idx) {
   markSessionDirty(sess);            // v14: new entries invalidate a prior export
   state.multiPickSheetOpen = false;
   state.cursor = sess.items.length;  // drop onto a fresh new item after the batch
+  // v65 (decision 6B): Multi Pick computes every asset number itself from
+  // nextAssetNo() and never looks at the form, so the counter is authoritative
+  // again after a batch. Clear the scan carry-forward or the next box would be
+  // left blank on the strength of a scan that happened before the batch.
+  state.lastLogWasScanned = false;
+  state.lastScanSessionId = '';
   loadFormForCursor();
   // v17: copy-style feedback (double-buzz / copy tone), matching its existing
   // haptic. The sheet has just closed, so flash the entry-screen Multi Pick

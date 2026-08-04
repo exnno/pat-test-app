@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V64';
+const APP_VERSION = 'V65';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -94,7 +94,7 @@ const CAL_DUE_KEY = 'pat:caldue';
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V64';
+const WELCOME_VERSION = 'V65';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -343,7 +343,7 @@ const SETTINGS_CATEGORIES = [
   { id: 'catUser',    icon: '👤', title: 'User & Calibration', blurb: 'Your engineer details and calibration',
     pages: ['settingsUser'] },
   { id: 'catTesting', icon: '⚡', title: 'Testing Setup', blurb: 'How Quick Pick, Multi Pick and descriptions behave',
-    pages: ['settingsItems', 'settingsFails', 'settingsReadings', 'settingsMultiPick', 'settingsDescriptions'] },
+    pages: ['settingsItems', 'settingsFails', 'settingsReadings', 'settingsMultiPick', 'settingsDescriptions', 'settingsScanner'] },
   { id: 'catReports', icon: '📄', title: 'Reports & Output', blurb: 'PDF reports, CSV export and your clients',
     pages: ['settingsReport', 'settingsCsv', 'settingsClients', 'settingsRetest'] },
   { id: 'catApp',     icon: '🎨', title: 'App & Display', blurb: 'Appearance and the resistance calculator',
@@ -364,6 +364,7 @@ const SETTINGS_PAGE_META = {
   settingsReadings:    { icon: '🔬', title: 'Test Readings',          aliases: 'test readings ohms megohms leakage insulation earth continuity class measurements' },
   settingsMultiPick:   { icon: '🧰', title: 'Multi Pick',            aliases: 'multi pick bulk multiple slots' },
   settingsDescriptions:{ icon: '📝', title: 'Item Description List', aliases: 'descriptions notes labels' },
+  settingsScanner:     { icon: '🏷️', title: 'Barcode Scanner',      aliases: 'barcode scanner scan wedge hid bluetooth label qr code reader asset number' },
   settingsReport:      { icon: '📄', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration signature sign colour color theme header accent cert number template preset notes' },
   settingsCsv:         { icon: '📊', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
   settingsClients:     { icon: '🏢', title: 'Clients',               aliases: 'clients sites customers addresses' },
@@ -664,6 +665,41 @@ const SQP_HISTORY_KEY = 'pat:sqphistory';   // v18: JSON { loc: { type: count } 
 // item.readings, which is why it's a clean self-contained object of as-typed
 // text values, not parsed numbers.
 const READINGS_KEY = 'pat:readingsenabled';   // v53: '1' | '0', default '0'
+
+// ---------------------------------------------------------------------------
+// v65: HID barcode scanner ("keyboard wedge").
+//
+// ⚠ NOTE THE DEFAULT IS **ON**, and note that it is read differently from every
+// other flag here. The others are `=== '1'` (opt-in). This one is `!== '0'`, so
+// an absent key means ON. That is deliberate: with no scanner paired the
+// feature is entirely inert — nothing on any screen changes, and the only code
+// that runs is a keydown listener that discards everything a human types. There
+// is nothing to opt in to. Defaulting it off would instead mean the one
+// engineer who does own a scanner has to find a setting they have no reason to
+// look for. The toggle exists to switch it OFF if it ever misbehaves, and to
+// give the test box somewhere to live.
+const SCANNER_KEY = 'pat:scanner';       // v65: '1' | '0', DEFAULT ON (absent = on)
+
+// The speed test, which is the whole safety mechanism (see scanner.js header).
+// A wedge scanner emits characters ~5–20ms apart; a fast human typist is
+// ~80–150ms. 40ms sits comfortably between the two — slack enough for a sluggish
+// Bluetooth link, still far quicker than any thumb. If a real scanner ever turns
+// out to be slower than this, THIS is the number to raise, and raising it toward
+// ~70 is still safe. Above that it starts to overlap fast typing.
+const SCAN_MAX_CHAR_GAP_MS = 40;
+
+// How long a silence ends a burst. Doubles as the fallback terminator for a
+// scanner configured to send no suffix at all.
+const SCAN_END_MS = 120;
+
+// Length bounds. The minimum stops a stray double-keypress being read as a
+// scan; the maximum only rejects a runaway (a stuck key), not long barcodes —
+// 64 characters is far beyond any asset label.
+const SCAN_MIN_LENGTH = 3;
+const SCAN_MAX_LENGTH = 64;
+
+// How many recent scans the settings test box shows.
+const SCANNER_TEST_LOG_MAX = 5;
 
 // v53: Equipment classes. The readings sheet shows a class selector at the top;
 // the chosen class decides which reading rows appear (Class II has no earth path

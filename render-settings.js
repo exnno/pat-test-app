@@ -451,6 +451,51 @@ function renderSettingsReadings() {
   `;
 }
 
+// v65: Barcode Scanner. Two jobs — an off switch, and a place to prove the
+// scanner is actually talking to the app. The second is the more important of
+// the two: a wedge scanner has no on-screen button and nothing to press, so
+// without this page the only way to find out whether it works is to try it on a
+// real job. The test box takes a scan anywhere on this page (you don't have to
+// tap into it first) and shows exactly what arrived, character count included,
+// which is how you spot a scanner that's adding a prefix or clipping a digit.
+function renderSettingsScanner() {
+  const on = !!state.scannerEnabled;
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Barcode Scanner')}
+      <div class="settings-section">
+        <h2 class="h2">Scan asset labels</h2>
+        <p class="muted">If you have a Bluetooth barcode scanner that pairs with your phone as a keyboard — sometimes called a "wedge" or HID scanner — the app will pick up what it sends. On the test screen a scan fills in the asset number; on the Sessions list it searches for that asset, so you can see where it was last tested. You don't have to tap the box first, and the on-screen keyboard stays out of the way.</p>
+        <p class="muted">Leave this on even if you don't own a scanner — it does nothing at all until one is paired. Typing a number by hand is unaffected: the app tells a scanner apart from a person by how fast the characters arrive, so nothing you type can be mistaken for a scan.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Accept barcode scans</div>
+            <div class="toggle-row-sub">${on ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="scanner-toggle" data-change-action="scanner-toggle" ${on ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      ${on ? `
+      <div class="settings-section">
+        <h2 class="h2">Test your scanner</h2>
+        <p class="muted">Scan any barcode while this page is open. What your scanner sent appears below — check it matches the number printed on the label.</p>
+        <input class="input-big" id="scanner-test" placeholder="Scan a label…" autocomplete="off" inputmode="none">
+        <div class="scanner-log" id="scanner-test-log">${renderScannerTestLogHTML()}</div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">If nothing appears</h2>
+        <p class="muted">Check the scanner is paired in your phone's Bluetooth settings and shows as connected. Most scanners have a setup barcode in their manual for "HID" or "keyboard" mode — if yours is set to a different mode it won't type anything. It's also worth checking it's set to send a carriage return (Enter) after each scan, though the app copes without one.</p>
+        <p class="muted">A scan replaces whatever is in the asset box rather than adding to it, so you never need to clear it first.</p>
+      </div>` : ''}
+    </div>
+  `;
+}
+
 function renderSettingsMultiPick() {
   const enabled = !!(state.multiPick && state.multiPick.enabled);
   const slots = state.multiPick.slots || [];
@@ -1293,18 +1338,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v64: rolled forward — V64 on top, V61 dropped. -->
+      <!-- v8: rolling 3-version changelog. v65: rolled forward — V65 on top, V62 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V65</strong> · August 2026</p>
+        <p class="muted">The app now works with a Bluetooth barcode scanner &mdash; the kind that pairs with your phone as a keyboard, often sold as a "wedge" or HID scanner. Scan an asset label on the test screen and the number drops straight into the asset box: no tapping the box first, and no on-screen keyboard sliding up over your Quick Pick buttons. Scan on the Sessions list instead and it searches for that asset, which is a quick way to see where and when you last tested it. If the number you scan is already on the job, the app says so there and then rather than waiting until you try to log it. Nothing changes if you don't own a scanner. The app distinguishes a scanner from a person by how quickly the characters arrive, so a number typed by hand behaves exactly as it always has, and there is a new <strong>Barcode Scanner</strong> page under Settings &rarr; Testing Setup with a box you can scan into to check yours is working. One deliberate change if you do scan: after logging a scanned item the asset box is left empty rather than counting on to the next number, because barcodes rarely run in order and a number guessed from the last label would look far more official than it deserves.</p>
 
         <p><strong>V64</strong> · August 2026</p>
         <p class="muted">Your photos can now go on the report. Switch <strong>Photos</strong> on under Settings &rarr; Report settings &rarr; What to include, and every photo you've taken on that job is added to the end of the certificate, grouped under the asset it belongs to with the fail reason underneath. The certificate itself is untouched &mdash; the register, the totals and the declaration all read exactly as before, and the photos follow after them as clearly-labelled evidence pages. It's off until you turn it on, because you may have been sending certificates for weeks and quietly adding four pages of photographs to them isn't our decision to make. There's also a <strong>Photos</strong> button in the report preview so you can put them on or leave them off for one particular job without changing your settings. Photos are shrunk down for printing, so the file stays small enough to send from your phone; on a very large job they're shrunk further so that all of them still fit. Beyond 150 photos the report states plainly, on the first photo page, exactly how many are shown and how many aren't.</p>
 
         <p><strong>V63</strong> · August 2026</p>
         <p class="muted">A reliability fix under the bonnet, with nothing to change in how you use the app. The "what's new" note you're reading is shown once per update and then remembered, and the way the app kept track of that had grown fragile: six separate files all had to be updated together on every release, and if even one of them arrived late or was still being served from your phone's cache, the app could fail to open at all. That was the cause of the start-up failure some of you hit on V61. The app now works it out from a single setting in one place, so those files can never drift apart again — and in the worst case you'd see this note an extra time rather than a screen that won't load. There is no change to your data, your jobs, your photos or your settings.</p>
-
-        <p><strong>V62</strong> · August 2026</p>
-        <p class="muted">You can now attach photos to a failed item. Tap FAIL and there's an Add photo button in the reasons sheet — take up to three per item, of the damage, the plug, the rating label, whatever the evidence is. They save with that item, and failed items in the Overview show a small camera icon with a count; tap it to look through them, add another or delete one. Photos are for fails only, deliberately: it keeps logging a pass as fast as it has always been, and it keeps the storage sensible. Changing a fail to a pass gives up its photos, and the app tells you how many before it does it. Two things worth knowing. Photos stay on this phone — nothing is uploaded anywhere. And they are <strong>not</strong> in your normal backup: they're far too large for it, and putting them in would risk the backup itself failing to save. There's a separate Export photos button on the Backup screen — use it as well as your usual backup, not instead of it. Restore a backup on a new phone and the app will remind you if the photos are still to come.</p>
 
               </div>
 
@@ -1363,6 +1408,7 @@ const GLOSSARY_GROUPS = [
       ['Location', 'Where in the building the item is. It sticks between items, so you set it once per room and it carries down the list.'],
       ['Asset number', 'The number identifying the item. The app fills in the next one automatically, and you can set a prefix so they come out as OFF-001, OFF-002 and so on.'],
       ['Copy last', 'Repeats the item you just logged — same type, same location — so a run of identical items is one tap each.'],
+      ['Barcode scanner', 'A Bluetooth scanner that pairs with your phone as a keyboard — often sold as a "wedge" or HID scanner. Scan an asset label on the test screen and the number goes into the asset box without you touching the phone; scan on the Sessions list and it searches for that asset. There is no button to press: it works because the scanner types. See Settings → Testing Setup → Barcode Scanner.'],
       ['Fail reason', 'The reason an item failed, chosen from your own list when you tap FAIL.'],
       ['Fail tag', 'Only relevant when Test Readings is on. Each fail reason is tagged with the kind of test it relates to, so failing an item shows you the one measurement box that matters instead of all of them.']
     ]

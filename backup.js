@@ -55,6 +55,10 @@ function buildBackup() {
     // without these keys restore with the feature OFF and the default tags.
     readingsEnabled: state.readingsEnabled,
     failReasonTags: state.failReasonTags,
+    // v65: barcode scanner on/off. Additive and missing-field-tolerant, so NO
+    // backupVersion bump — a pre-v65 backup simply has no key and restores with
+    // the default (ON), which is also what a fresh install gets.
+    scannerEnabled: state.scannerEnabled,
     // v19: Clients & Sites (readable long-key arrays).
     clients: state.clients,
     sites: state.sites,
@@ -298,6 +302,14 @@ function restoreBackupFromFile(file) {
     // back inside `sessions` above (validated per item).
     if (typeof data.readingsEnabled === 'boolean') {
       state.readingsEnabled = data.readingsEnabled;
+    }
+
+    // v65: barcode scanner flag. Restored only when the backup actually carries
+    // a boolean — an older backup leaves the loaded default (ON) alone, which
+    // is correct: the absence of the key says nothing about the engineer's
+    // preference, so it must not be read as "off".
+    if (typeof data.scannerEnabled === 'boolean') {
+      state.scannerEnabled = data.scannerEnabled;
     }
     {
       let incoming = {};

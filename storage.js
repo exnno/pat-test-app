@@ -524,6 +524,13 @@ function loadV11Settings() {
   state.readingsEnabled = localStorage.getItem(READINGS_KEY) === '1';
   state.failReasonTags = loadFailReasonTags();
 
+  // v65: HID barcode scanner. ⚠ Note the comparison — this flag DEFAULTS ON, so
+  // only an explicit '0' turns it off. Absent (every install before v65) and
+  // any garbage value both read as on. See SCANNER_KEY in config.js for the
+  // reasoning; the short version is that with no scanner paired the feature is
+  // completely inert, so there is nothing to opt in to.
+  state.scannerEnabled = localStorage.getItem(SCANNER_KEY) !== '0';
+
   // v19: Clients & Sites. Validate defensively (any garbage collapses to []),
   // then seed from existing sessions if BOTH lists are empty — i.e. the first
   // V19 load on an install that has sessions but no client/site data yet. The
@@ -812,6 +819,10 @@ function saveSettings() {
   // set in Settings, which calls full save()) are written here.
   localStorage.setItem(READINGS_KEY, state.readingsEnabled ? '1' : '0');
   localStorage.setItem(FAIL_REASON_TAGS_KEY, JSON.stringify(state.failReasonTags || {}));
+  // v65: barcode scanner on/off. Written explicitly as '1'/'0' (rather than
+  // relying on the absent-means-on default) so that switching it OFF actually
+  // persists — an omitted key would read back as on.
+  localStorage.setItem(SCANNER_KEY, state.scannerEnabled ? '1' : '0');
   // v19: Clients & Sites (readable long-key arrays).
   localStorage.setItem(CLIENTS_KEY, JSON.stringify(state.clients || []));
   localStorage.setItem(SITES_KEY, JSON.stringify(state.sites || []));

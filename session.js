@@ -721,14 +721,24 @@ function loadFormForCursor() {
       notes: it.notes, showNotes: !!it.notes
     };
   } else {
+    // v65 (decision 6B): if the item we just logged carried a SCANNED asset
+    // number, leave this box EMPTY instead of pre-filling it. nextAssetNo()
+    // increments the last item's trailing digits, so after a scan of
+    // 'PAT-004821' it would offer 'PAT-004822' — arithmetic on someone else's
+    // label, which looks like an answer and almost certainly isn't on any
+    // appliance. Blank plus the "Scan or type" placeholder says what it is.
+    // The session id must match, so the blanking dies when you switch jobs.
+    const afterScan = state.lastLogWasScanned && state.lastScanSessionId === sess.id;
     state.form = {
-      assetNo: nextAssetNo(sess),
+      assetNo: afterScan ? '' : nextAssetNo(sess),
       location: getCarryForwardLocation(sess, state.cursor),
       itemType: '',
       notes: '',
       showNotes: false
     };
   }
+  // v65: a fresh form has not been scanned into yet, whichever branch built it.
+  state.scanFilledAsset = false;
   state.suggestions = [];
   state.showSuggestions = false;
   // v10: location suggestions follow the same lifecycle
@@ -1259,6 +1269,12 @@ function saveItem(result, readings) {
   markSessionDirty(sess);   // v14: edits invalidate a prior export
   addDescriptionIfNew(cleanType);
   state.cursor++;
+  // v65 (decision 6B): remember whether THIS item's asset number came off a
+  // barcode, because loadFormForCursor() — called on the very next line — uses
+  // it to decide whether to pre-fill the next box or leave it empty. It must be
+  // read before that call, since loadFormForCursor clears scanFilledAsset.
+  state.lastLogWasScanned = !!state.scanFilledAsset;
+  state.lastScanSessionId = state.lastLogWasScanned ? sess.id : '';
   loadFormForCursor();
   // v19 (efficiency item 4): on the entry screen with no modal open (the state
   // after any save — pass, fail-commit, or edit-overwrite), use the lightweight
@@ -1788,6 +1804,11 @@ function copyLastResult() {
   }
   markSessionDirty(sess);   // v14
   state.cursor++;
+  // v65 (decision 6B): copy-last takes its asset number from the form too
+  // (`state.form.assetNo.trim() || nextAssetNo(sess)` above), so a scanned
+  // number can be logged through this path and the same carry-forward applies.
+  state.lastLogWasScanned = !!state.scanFilledAsset;
+  state.lastScanSessionId = state.lastLogWasScanned ? sess.id : '';
   loadFormForCursor();
   // v19 (efficiency item 4): lightweight entry-only refresh (see saveItem).
   // v23 (E2): hot path — sessions blob plus the one cold key this can touch on
