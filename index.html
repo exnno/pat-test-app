@@ -47,6 +47,11 @@
   <script src="pdfpreview.js"></script>
   <script src="render-core.js"></script>
   <script src="render-settings.js"></script>
+  <!-- v65: HID barcode scanner. Placed with the other input-handling files and
+       AFTER the render files, because a scan writes into fields those render —
+       and before events.js/dispatch.js purely so the three document-level
+       capture listeners read together. boot.js arms it. -->
+  <script src="scanner.js"></script>
   <script src="events.js"></script>
   <script src="dispatch.js"></script>
   <script src="boot.js"></script>
