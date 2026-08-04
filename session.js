@@ -149,33 +149,13 @@ function normaliseLocation(s) {
 
 
 
-// v12: Compute the calibration-due status from state.calDue. Returns null when
-// no due date is set (so callers can skip rendering the chip/subtitle entirely)
-// or a {status, days} object otherwise. days is always non-negative:
-//   - 'overdue' → days past the due date (e.g. {status:'overdue', days:12})
-//   - 'soon'    → days remaining until due (e.g. {status:'soon', days:7})
-//   - 'ok'      → days remaining (no chip rendered for this state)
-// Day count uses date-only comparison (both sides normalised to midnight) so
-// the chip flips from 'soon' to 'overdue' at midnight local time, not after a
-// rolling 24h window from when the user saved the date.
-function calibrationStatus() {
-  if (!state.calDue) return null;
-  const parts = state.calDue.split('-');
-  if (parts.length !== 3) return null;
-  const yyyy = parseInt(parts[0], 10);
-  const mm   = parseInt(parts[1], 10);
-  const dd   = parseInt(parts[2], 10);
-  if (!yyyy || !mm || !dd) return null;
-  const due = new Date(yyyy, mm - 1, dd);
-  if (isNaN(due.getTime())) return null;
-  due.setHours(0, 0, 0, 0);
-  const now = new Date();
-  now.setHours(0, 0, 0, 0);
-  const days = Math.round((due.getTime() - now.getTime()) / 86400000);
-  if (days < 0) return { status: 'overdue', days: -days };
-  if (days <= CAL_DUE_SOON_DAYS) return { status: 'soon', days };
-  return { status: 'ok', days };
-}
+// v66: calibrationStatus() MOVED to instruments.js and parameterised as
+// calibrationStatusFor(instrument). The zero-argument name still exists there as
+// a thin wrapper over the ACTIVE instrument, so every existing caller reads the
+// same. ⚠ Do not reintroduce a copy here — two function declarations of the same
+// name across files is legal JavaScript (last one loaded silently wins), so this
+// class of duplication does NOT show up as a syntax error the way a duplicate
+// const does. It would just quietly shadow the real one.
 
 // v60: leading zeros now survive (decision 6B). Three paths, each padded:
 //   • First item of a job    → pad startNumber to session.startPad (the width the
@@ -839,6 +819,12 @@ function createSession() {
     // through unmapped. Only recorded when zeros were actually typed; a plain
     // '1' stores nothing, so the default behaviour is unpadded (decision 8A).
     startPad: assetPadFromInput(startNo),
+    // v66: stamp the instrument in use at the moment the job is created, so its
+    // certificate always names the tester that actually did the work — even
+    // after recalibration or a change of instrument. Empty when the user has no
+    // instruments saved, which resolves to "whichever is active" exactly as
+    // every pre-v66 session does.
+    instrumentId: state.activeInstrumentId || '',
     items: [],
     locked: false,  // v8
     // v36: optional job-level notes (printed on the report when non-empty) and
@@ -2124,7 +2110,8 @@ function startEditSession() {
     engineer: sess.engineer || '',
     prefix: sess.prefix || '',
     date: sess.date || '',
-    locked: !!sess.locked   // v8
+    locked: !!sess.locked,   // v8
+    instrumentId: sess.instrumentId || ''   // v66
   };
   state.view = 'editSession';
   render();
@@ -2133,7 +2120,7 @@ function startEditSession() {
 function saveSessionEdits() {
   const sess = activeSession();
   if (!sess) return;
-  const { name, site, engineer, prefix, date, locked } = state.editForm;
+  const { name, site, engineer, prefix, date, locked, instrumentId } = state.editForm;
   if (!String(site).trim()) {
     showToast('Site is required');
     return;
@@ -2147,6 +2134,20 @@ function saveSessionEdits() {
   sess.prefix = String(prefix).trim();
   sess.date = date || sess.date;
   sess.locked = !!locked;   // v8
+  // v66: the per-session instrument stamp (decision 2A).
+  // ⚠ The snapshot describes the PREVIOUS stamp and nothing else, so it is
+  // dropped whenever the stamp actually changes — unconditionally. An earlier
+  // draft only dropped it when the new id resolved to a live instrument; that
+  // guard turned out to protect nothing reachable (the only way to keep a dead
+  // id is to leave the stamp alone, which this branch already skips) while
+  // leaving orphaned data behind when the user chose "whichever I'm using now".
+  // Mutation testing is what surfaced it — the guard could be deleted with every
+  // assertion still green.
+  const newInstId = String(instrumentId || '');
+  if (newInstId !== String(sess.instrumentId || '')) {
+    sess.instrumentId = newInstId;
+    delete sess.instrumentSnapshot;
+  }
   state.view = 'overview';
   save(); render();
 }
@@ -2164,21 +2165,11 @@ function unlockActiveSession() {
 function saveUserSettings() {
   state.engineer = document.getElementById('settings-engineer').value.trim();
   state.newForm.engineer = state.engineer;
-  // v11: tester type + calibration info. All optional. Empty strings stored
-  // as empty so the UI doesn't show stale values from previous edits.
-  // v13: tester now read from two separate inputs (Manufacturer + Model).
-  // The legacy single 'tester' field is no longer in state — split into
-  // testerMake + testerModel.
-  const $tm = document.getElementById('settings-tester-make');
-  const $tmod = document.getElementById('settings-tester-model');
-  const $cd = document.getElementById('settings-cal-date');
-  const $cc = document.getElementById('settings-cal-cert');
-  const $cdu = document.getElementById('settings-cal-due');
-  if ($tm) state.testerMake = $tm.value.trim();
-  if ($tmod) state.testerModel = $tmod.value.trim();
-  if ($cd) state.calDate = $cd.value.trim();
-  if ($cc) state.calCertNo = $cc.value.trim();
-  if ($cdu) state.calDue = $cdu.value.trim();
+  // v66: the tester make/model and calibration inputs are GONE from this page —
+  // they moved to the per-instrument editor (renderSettingsInstrument in
+  // instruments.js), which saves itself. The five flat state fields are now a
+  // mirror of the active instrument and must never be written from here, or the
+  // next syncActiveInstrumentMirror() would overwrite the write anyway.
   save();
   setView('settings');
 }
@@ -2601,7 +2592,13 @@ function captureWizardStep() {
     state.engineer = (nameEl.value || '').trim();
     state.newForm.engineer = state.engineer;
   }
-  if (calEl && calEl.value) state.calDate = calEl.value;
+  // v66: the wizard is a LEGACY WRITER of the flat mirror — it still sets
+  // state.calDate directly, so it must push that into the instruments list or
+  // the next sync silently discards it.
+  if (calEl && calEl.value) {
+    state.calDate = calEl.value;
+    if (typeof adoptMirrorIntoInstruments === 'function') adoptMirrorIntoInstruments();
+  }
   if (coEl && state.reportSettings) state.reportSettings.companyName = coEl.value.trim();
 }
 

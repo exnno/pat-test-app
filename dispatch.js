@@ -565,6 +565,18 @@ registerActions({
 
   // Sub-page Save / Reset buttons
   'settings-user-save': () => saveUserSettings(),
+
+  // v66: test instruments. All CRUD lives in instruments.js; these are pure
+  // routing. `instrument-clear-date` is the ONLY one that does not re-render —
+  // it is a targeted DOM write, because re-rendering the editor would throw away
+  // every other unsaved field on the screen (the v60.1 rule).
+  'instrument-add': () => addInstrument(),
+  'instrument-open': (arg) => openInstrumentEditor(arg),
+  'instrument-editor-close': () => closeInstrumentEditor(),
+  'instrument-save': () => saveInstrumentFromEditor(),
+  'instrument-delete': (arg) => deleteInstrument(arg),
+  'instrument-make-active': (arg) => setActiveInstrument(arg),
+  'instrument-clear-date': (arg) => clearInstrumentDateField(arg),
   'settings-items-save': () => saveItemTypesSettings(),
   'settings-fails-save': () => saveFailReasonsSettings(),
   'settings-descriptions-save': () => saveDescriptionsSettings(),
@@ -934,6 +946,11 @@ registerChangeActions({
   // v56: per-session retest flag (instant-apply). Flagging captures the interval
   // from the global default; unflagging clears all retest fields. Re-render so the
   // interval input + due date (or the plain toggle) appear/disappear immediately.
+  // v66: the per-session instrument stamp. Draft-only — it writes editForm and
+  // is committed by saveSessionEdits(), exactly like the other ef-* fields. No
+  // render: it is a <select>, so the browser already shows the new choice.
+  'ef-instrument': (v) => { state.editForm.instrumentId = String(v || ''); },
+
   'ef-retest-toggle': (checked) => {
     const sess = activeSession();
     if (!sess) return;

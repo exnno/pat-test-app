@@ -211,22 +211,15 @@ function renderSettingsSubHeader(title) {
 }
 
 function renderSettingsUser() {
-  // v12: build the calibration-due chip if a due date is set and is either
-  // overdue or within CAL_DUE_SOON_DAYS. Placed in the label for the "Next
-  // calibration due" field so it sits visually next to the date input that
-  // drives it. Empty string when there's nothing to flag (no date set, or
-  // 'ok' status).
-  const calSt = calibrationStatus();
-  let calChip = '';
-  if (calSt && calSt.status === 'overdue') {
-    calChip = ` <span class="cal-chip overdue">Overdue · ${calSt.days} day${calSt.days === 1 ? '' : 's'}</span>`;
-  } else if (calSt && calSt.status === 'soon') {
-    // v15: "Due today" when the due date is today (days === 0).
-    calChip = calSt.days === 0
-      ? ` <span class="cal-chip soon">Due today</span>`
-      : ` <span class="cal-chip soon">Due in ${calSt.days} day${calSt.days === 1 ? '' : 's'}</span>`;
-  }
-
+  // v66: the single test instrument + calibration block that used to live here
+  // became a LIST. Each entry opens its own editor screen
+  // (renderSettingsInstrument in instruments.js), which is where the make/model,
+  // the calibration fields and the new Clear links live. This page keeps only the
+  // engineer name and the list itself.
+  //
+  // ⚠ The calibration chip is no longer built here — each row builds its own from
+  // calibrationStatusFor(instrument), because with several instruments a single
+  // global chip would be meaningless.
   return `
     <div class="screen">
       ${renderSettingsSubHeader('User Settings')}
@@ -236,34 +229,10 @@ function renderSettingsUser() {
         <input class="input" id="settings-engineer" value="${escapeHTML(state.engineer)}" placeholder="Your name">
       </div>
 
-      <!-- v11: tester type + calibration info. All optional. Stored locally
-           and included in JSON backups. v12 update: exports to CSV via four
-           default-hidden columns under Settings → CSV Columns. v13: tester
-           split into Manufacturer + Model — combined back into a single
-           space-separated value at CSV export time. -->
       <div class="settings-section">
-        <h2 class="h2">Test instrument</h2>
-        <p class="muted">The make and model of your PAT tester, if you'd like to record it. Combined as a single value on the CSV export when the "Test Instrument" column is enabled in Settings → CSV Columns.</p>
-
-        <label class="label">Manufacturer</label>
-        <input class="input" id="settings-tester-make" value="${escapeHTML(state.testerMake)}" placeholder="e.g. Megger, Seaward, Kewtech">
-
-        <label class="label">Model</label>
-        <input class="input" id="settings-tester-model" value="${escapeHTML(state.testerModel)}" placeholder="e.g. PAT250, Apollo 600, KT77">
-      </div>
-
-      <div class="settings-section">
-        <h2 class="h2">Calibration</h2>
-        <p class="muted">Calibration details for your tester. All optional. v12: exports to CSV when the matching columns are enabled in Settings → CSV Columns.</p>
-
-        <label class="label">Last calibration date</label>
-        <input class="input" id="settings-cal-date" type="date" value="${escapeHTML(state.calDate)}">
-
-        <label class="label">Certificate number</label>
-        <input class="input" id="settings-cal-cert" value="${escapeHTML(state.calCertNo)}" placeholder="e.g. CAL-2026-0142">
-
-        <label class="label">Next calibration due${calChip}</label>
-        <input class="input" id="settings-cal-due" type="date" value="${escapeHTML(state.calDue)}">
+        <h2 class="h2">Test instruments</h2>
+        <p class="muted">The PAT testers you use, and their calibration details. The one marked <strong>In use</strong> is recorded against every new job you start, and its details print on that job's certificate — even if you recalibrate or switch instrument later.</p>
+        ${typeof renderInstrumentListHTML === 'function' ? renderInstrumentListHTML() : ''}
       </div>
 
       <button class="btn-primary" id="settings-user-save" data-action="settings-user-save" style="margin-top:24px">Save</button>
@@ -1338,18 +1307,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v65: rolled forward — V65 on top, V62 dropped. -->
+      <!-- v8: rolling 3-version changelog. v66: rolled forward — V66 on top, V63 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V66</strong> &middot; August 2026</p>
+        <p class="muted">You can now save more than one test instrument, and every job records which one you used. Settings &rarr; User Settings holds a list of your testers instead of a single set of boxes &mdash; up to five, each with its own calibration date, certificate number and due date. Tap <strong>Use this one</strong> to switch to whichever tester you have with you, and new jobs are recorded against it from then on. The important part is what that fixes: until now a certificate always printed your <em>current</em> calibration details, so reprinting a job from months ago after you'd had the tester recalibrated showed the wrong dates against that day's results. Each job now keeps the instrument that actually did the work, and its certificate and CSV export keep showing that one no matter what you change afterwards. Jobs done before this update carry on printing exactly as they did. If you picked up the wrong tester, open the job &rarr; <strong>Session settings</strong> and change it there. Calibration warnings now cover every instrument you've saved rather than just the one in use, and name the one that's due. And a small annoyance is gone: a calibration date you'd typed in couldn't be removed once entered, and there's now a <strong>Clear</strong> link beside each date.</p>
 
         <p><strong>V65</strong> · August 2026</p>
         <p class="muted">The app now works with a Bluetooth barcode scanner &mdash; the kind that pairs with your phone as a keyboard, often sold as a "wedge" or HID scanner. Scan an asset label on the test screen and the number drops straight into the asset box: no tapping the box first, and no on-screen keyboard sliding up over your Quick Pick buttons. Scan on the Sessions list instead and it searches for that asset, which is a quick way to see where and when you last tested it. If the number you scan is already on the job, the app says so there and then rather than waiting until you try to log it. Nothing changes if you don't own a scanner. The app distinguishes a scanner from a person by how quickly the characters arrive, so a number typed by hand behaves exactly as it always has, and there is a new <strong>Barcode Scanner</strong> page under Settings &rarr; Testing Setup with a box you can scan into to check yours is working. One deliberate change if you do scan: after logging a scanned item the asset box is left empty rather than counting on to the next number, because barcodes rarely run in order and a number guessed from the last label would look far more official than it deserves.</p>
 
         <p><strong>V64</strong> · August 2026</p>
         <p class="muted">Your photos can now go on the report. Switch <strong>Photos</strong> on under Settings &rarr; Report settings &rarr; What to include, and every photo you've taken on that job is added to the end of the certificate, grouped under the asset it belongs to with the fail reason underneath. The certificate itself is untouched &mdash; the register, the totals and the declaration all read exactly as before, and the photos follow after them as clearly-labelled evidence pages. It's off until you turn it on, because you may have been sending certificates for weeks and quietly adding four pages of photographs to them isn't our decision to make. There's also a <strong>Photos</strong> button in the report preview so you can put them on or leave them off for one particular job without changing your settings. Photos are shrunk down for printing, so the file stays small enough to send from your phone; on a very large job they're shrunk further so that all of them still fit. Beyond 150 photos the report states plainly, on the first photo page, exactly how many are shown and how many aren't.</p>
-
-        <p><strong>V63</strong> · August 2026</p>
-        <p class="muted">A reliability fix under the bonnet, with nothing to change in how you use the app. The "what's new" note you're reading is shown once per update and then remembered, and the way the app kept track of that had grown fragile: six separate files all had to be updated together on every release, and if even one of them arrived late or was still being served from your phone's cache, the app could fail to open at all. That was the cause of the start-up failure some of you hit on V61. The app now works it out from a single setting in one place, so those files can never drift apart again — and in the worst case you'd see this note an extra time rather than a screen that won't load. There is no change to your data, your jobs, your photos or your settings.</p>
 
               </div>
 
@@ -1433,7 +1402,8 @@ const GLOSSARY_GROUPS = [
       ['Overview', 'The list of everything logged in the current session, where you can review, edit, select and bulk-edit items.'],
       ['Locked session', 'A finished session. It is read-only so you cannot change it by accident. Unlock it if you genuinely need to edit it.'],
       ['Retest reminder', 'An optional feature, off by default. Flags a session for a retest a set number of months out, and lists the ones coming due so you can chase the repeat work.'],
-      ['Calibration', 'Your tester\'s calibration due date. Set it and the app warns you when it is close or overdue.']
+      ['Calibration', 'Your tester\'s calibration due date. Set it and the app warns you when it is close or overdue. From V66 the warning covers every instrument you have saved, and names the one that is due.'],
+      ['Test instrument', 'The PAT tester itself. You can save up to five under Settings → User Settings, each with its own calibration details, and mark one as In use. Every job you start is recorded against the instrument in use at that moment, so its certificate keeps naming that tester even after you recalibrate or switch to another one. Change it for a single job under Session settings.']
     ]
   },
   {

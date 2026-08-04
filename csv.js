@@ -37,10 +37,21 @@ function csvCellValue(colId, session, item) {
     // v13: 'tester' now combines testerMake + testerModel into a single
     // space-separated string. Either field on its own is fine — empty
     // strings drop out via the trim, no leading/trailing whitespace.
-    case 'tester':      return [state.testerMake, state.testerModel].filter(Boolean).join(' ').trim();
-    case 'calDate':     return state.calDate ? formatDate(state.calDate) : '';
-    case 'calCertNo':   return state.calCertNo || '';
-    case 'calDue':      return state.calDue ? formatDate(state.calDue) : '';
+    // v66: resolved from the SESSION's stamped instrument via the same helper the
+    // PDF uses, so an export of an old job carries the instrument that job was
+    // actually tested with. Pre-v66 sessions have no stamp and fall back to the
+    // active instrument — identical output to before. ⚠ Do not read state.* here.
+    case 'tester':
+    case 'calDate':
+    case 'calCertNo':
+    case 'calDue': {
+      const inst = (typeof instrumentForSession === 'function') ? instrumentForSession(session) : null;
+      if (!inst) return '';
+      if (colId === 'tester') return [inst.make, inst.model].filter(Boolean).join(' ').trim();
+      if (colId === 'calDate') return inst.calDate ? formatDate(inst.calDate) : '';
+      if (colId === 'calCertNo') return inst.calCertNo || '';
+      return inst.calDue ? formatDate(inst.calDue) : '';
+    }
     // v17: per-item timestamp. Blank when the Item Timestamps setting is OFF
     // (even if the column is visible), and blank for items logged before the
     // feature was enabled.

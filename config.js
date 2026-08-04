@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V65';
+const APP_VERSION = 'V66';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -57,6 +57,24 @@ const TESTER_MODEL_KEY = 'pat:testermodel'; // v13
 const CAL_DATE_KEY = 'pat:caldate';
 const CAL_CERT_KEY = 'pat:calcert';
 const CAL_DUE_KEY = 'pat:caldue';
+
+// v66: multiple test instruments. The five keys above are NOT retired — they
+// remain the persisted mirror of whichever instrument is ACTIVE, so the legacy
+// load/save path in storage.js is untouched and old backups still restore.
+// The list itself is the source of truth and lives here.
+//   INSTRUMENTS_KEY        JSON array of { id, make, model, calDate,
+//                          calCertNo, calDue }
+//   ACTIVE_INSTRUMENT_KEY  the id of the instrument new jobs are stamped with
+// ⚠ Absence of INSTRUMENTS_KEY means "pre-v66, migrate the flat fields". An
+// EMPTY ARRAY means "the user deleted them all" — the two must stay
+// distinguishable or emptying the list resurrects it on next launch. See
+// loadInstruments() in instruments.js.
+const INSTRUMENTS_KEY = 'pat:instruments';
+const ACTIVE_INSTRUMENT_KEY = 'pat:activeinstrument';
+
+// Cap on saved instruments (decision 6A). Enough for a sole trader with a spare
+// and a loaner; keeps the list a list rather than a database.
+const INSTRUMENTS_MAX = 5;
 // ---------- Welcome-modal "seen" key (v63: DERIVED, not version-named) ----------
 //
 // ⚠ READ THIS BEFORE ROLLING A WELCOME MODAL. It is now a ONE-LINE edit, in this
@@ -94,7 +112,7 @@ const CAL_DUE_KEY = 'pat:caldue';
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V65';
+const WELCOME_VERSION = 'V66';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -358,7 +376,7 @@ const SETTINGS_CATEGORIES = [
 // on the row; `aliases` widen search matching. Subtitles are computed live in
 // renderSettingsCategory (counts/status), so they're not stored here.
 const SETTINGS_PAGE_META = {
-  settingsUser:        { icon: '👤', title: 'User Settings',         aliases: 'engineer name calibration cal due instrument' },
+  settingsUser:        { icon: '👤', title: 'User Settings',         aliases: 'engineer name calibration cal due instrument tester testers multiple megger seaward kewtech' },
   settingsItems:       { icon: '⚡', title: 'Quick Pick Items',      aliases: 'item types presets quick pick buttons' },
   settingsFails:       { icon: '⚠️', title: 'Quick Pick Fail',       aliases: 'fail reasons failure quick pick' },
   settingsReadings:    { icon: '🔬', title: 'Test Readings',          aliases: 'test readings ohms megohms leakage insulation earth continuity class measurements' },
@@ -404,8 +422,8 @@ function makeDefaultReportSettings() {
     logo:             '',      // base64 data URL, downscaled <=600px on upload
     reportTitle:      'Portable Appliance Test Report',
     showEngineer:     true,
-    showInstrument:   true,    // sources state.testerMake / testerModel
-    showCalibration:  true,    // sources state.calDate / calCertNo / calDue
+    showInstrument:   true,    // v66: sources instrumentForSession(session)
+    showCalibration:  true,    // v66: sources instrumentForSession(session)
     retestEnabled:    false,
     retestMonths:     null,    // no default (Q10=B); required when retestEnabled
     showFails:        true,    // false = passes-only register
@@ -955,6 +973,8 @@ const DEFAULT_CSV_COLUMNS = [
   // match the User Settings copy; the column id stays 'tester' so existing
   // saved column configs migrate cleanly via ensureAllCsvColumns(). Existing
   // users who customised the header keep their customisation.
+  // v66: resolves from the SESSION's stamped instrument (falling back to the
+  // active one for pre-v66 jobs), not from the global fields.
   { id: 'tester',      header: 'Test Instrument', visible: false },
   { id: 'calDate',     header: 'Cal. Date',     visible: false },
   { id: 'calCertNo',   header: 'Cal. Cert No.', visible: false },

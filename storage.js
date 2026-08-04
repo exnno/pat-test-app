@@ -56,7 +56,13 @@ const SESSION_KEY_MAP = {
   locked:      'l',
   // v14 export-state fields (see below)
   exportedAt:  'xa',
-  exportDirty: 'xd'
+  exportDirty: 'xd',
+  // v66: which test instrument this job was tested with. Additive — pre-v66
+  // sessions simply lack it and resolve to the active instrument, which is what
+  // they printed before (decision 3A). `instrumentSnapshot` (the frozen copy
+  // written when a referenced instrument is deleted) is deliberately NOT mapped:
+  // it is rare, nested, and the codec passes unlisted fields through unchanged.
+  instrumentId: 'ii'
 };
 
 // Item-level field map. Long name → short code.
@@ -424,6 +430,12 @@ function loadV11Settings() {
   state.calDate = localStorage.getItem(CAL_DATE_KEY) || '';
   state.calCertNo = localStorage.getItem(CAL_CERT_KEY) || '';
   state.calDue = localStorage.getItem(CAL_DUE_KEY) || '';
+
+  // v66: the instruments list. MUST run AFTER the five flat fields above, because
+  // a pre-v66 install has no INSTRUMENTS_KEY and migrates those exact values into
+  // its first instrument (decision 10A). loadInstruments() then syncs the mirror
+  // back, so the flat fields stay correct for every legacy consumer.
+  if (typeof loadInstruments === 'function') loadInstruments();
 
   // Welcome modal flag. Only the CURRENT welcome (V49) gates the modal, so only
   // its key is read. v50: the 27 historical per-version flag reads (v13…v48) were
@@ -797,6 +809,11 @@ function saveSettings() {
   localStorage.setItem(HAPTICS_KEY, state.hapticsEnabled ? '1' : '0');
   // v11
   localStorage.setItem(CSV_COLUMNS_KEY, JSON.stringify(state.csvColumns));
+  // v66: the instruments list + which one is active. ⚠ Runs BEFORE the five
+  // legacy keys below, not after: saveInstruments() may prune an abandoned blank
+  // record, which re-syncs the mirror — so writing the mirror first would persist
+  // a value that is stale by the time this line finishes.
+  if (typeof saveInstruments === 'function') saveInstruments();
   // v13: split tester keys; legacy TESTER_KEY is not written.
   localStorage.setItem(TESTER_MAKE_KEY, state.testerMake);
   localStorage.setItem(TESTER_MODEL_KEY, state.testerModel);

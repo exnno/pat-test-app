@@ -475,14 +475,23 @@ function buildReportDoc(session, photoData) {
   detailPairs.push(['Site', site]);
   detailPairs.push(['Test date', formatDate(session.date)]);
   if (rs.showEngineer && session.engineer) detailPairs.push(['Engineer', session.engineer]);
-  if (rs.showInstrument) {
-    const instr = [state.testerMake, state.testerModel].filter(Boolean).join(' ').trim();
+  // v66: THE DEFECT FIX. These five values used to be read straight off global
+  // state, so reprinting an old certificate printed TODAY's instrument and
+  // calibration dates against THAT DAY's results. They now resolve through the
+  // session's own stamp. instrumentForSession() falls back to the active
+  // instrument for pre-v66 jobs, so nothing about an old certificate changes.
+  // ⚠ Do not "simplify" this back to state.* — that is the bug.
+  const reportInstrument = (typeof instrumentForSession === 'function')
+    ? instrumentForSession(session)
+    : null;
+  if (rs.showInstrument && reportInstrument) {
+    const instr = [reportInstrument.make, reportInstrument.model].filter(Boolean).join(' ').trim();
     if (instr) detailPairs.push(['Test instrument', instr]);
   }
-  if (rs.showCalibration) {
-    if (state.calDate) detailPairs.push(['Tester calibrated', formatDate(state.calDate)]);
-    if (state.calCertNo) detailPairs.push(['Calibration cert', state.calCertNo]);
-    if (state.calDue) detailPairs.push(['Calibration due', formatDate(state.calDue)]);
+  if (rs.showCalibration && reportInstrument) {
+    if (reportInstrument.calDate) detailPairs.push(['Tester calibrated', formatDate(reportInstrument.calDate)]);
+    if (reportInstrument.calCertNo) detailPairs.push(['Calibration cert', reportInstrument.calCertNo]);
+    if (reportInstrument.calDue) detailPairs.push(['Calibration due', formatDate(reportInstrument.calDue)]);
   }
   if (rs.retestEnabled && rs.retestMonths) {
     const rd = addMonthsFormatted(session.date, rs.retestMonths);

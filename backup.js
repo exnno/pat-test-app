@@ -41,6 +41,14 @@ function buildBackup() {
     calDate: state.calDate,
     calCertNo: state.calCertNo,
     calDue: state.calDue,
+    // v66: the full instruments list + which one is active. The five flat fields
+    // above are kept as the ACTIVE instrument's mirror so a v66 backup still
+    // restores meaningfully into anything that only understands them. Additive
+    // and missing-field-tolerant both ways, so NO backupVersion bump — a pre-v66
+    // backup has no key and rebuilds a single instrument from its flat fields
+    // (see restoreInstrumentsFromBackup in instruments.js).
+    instruments: state.instruments,
+    activeInstrumentId: state.activeInstrumentId,
     // v16: Multi Pick config.
     multiPick: state.multiPick,
     // v17: feedback + timestamp settings.
@@ -272,6 +280,12 @@ function restoreBackupFromFile(file) {
     state.calDate = typeof data.calDate === 'string' ? data.calDate : '';
     state.calCertNo = typeof data.calCertNo === 'string' ? data.calCertNo : '';
     state.calDue = typeof data.calDue === 'string' ? data.calDue : '';
+
+    // v66: instruments. ⚠ MUST run AFTER the five flat fields above — the
+    // pre-v66 branch inside builds its single instrument from exactly those
+    // just-restored values. Replaces the list wholesale rather than merging, so a
+    // restore describes the backup exactly, like everything else here.
+    if (typeof restoreInstrumentsFromBackup === 'function') restoreInstrumentsFromBackup(data);
 
     // v16: Multi Pick config — validate through the same normaliser used on
     // load. Missing/old backups collapse to { enabled:false, slots:[] }.

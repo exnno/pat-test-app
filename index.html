@@ -27,6 +27,13 @@
   <script src="utils.js"></script>
   <script src="storage.js"></script>
   <script src="clients.js"></script>
+  <!-- v66: instruments.js — the test-instrument list, its CRUD and its two
+       settings renders. Placed immediately after clients.js because it is the
+       same kind of thing (a managed list of records with its own persistence and
+       settings UI) and, like clients, storage.js's load()/save() call into it.
+       Every cross-file call resolves at call time, so the position is a
+       readability choice, not a load-order constraint. -->
+  <script src="instruments.js"></script>
   <script src="sqp.js"></script>
   <script src="multipick.js"></script>
   <script src="feedback.js"></script>

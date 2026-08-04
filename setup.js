@@ -54,7 +54,12 @@ function buildSetupBundle(label, include) {
       testerModel: state.testerModel,
       calDate: state.calDate,
       calCertNo: state.calCertNo,
-      calDue: state.calDue
+      calDue: state.calDue,
+      // v66: the instruments list rides in the same 'tester' section, so an
+      // existing Setup file (which has no key) still imports via the legacy
+      // flat-field path below.
+      instruments: state.instruments,
+      activeInstrumentId: state.activeInstrumentId
     };
   }
   if (inc.prefs) {
@@ -242,6 +247,10 @@ function applySetupBundle(data) {
     if (typeof t.calDate === 'string') state.calDate = t.calDate;
     if (typeof t.calCertNo === 'string') state.calCertNo = t.calCertNo;
     if (typeof t.calDue === 'string') state.calDue = t.calDue;
+    // v66: same helper as backup restore, and for the same reason it must run
+    // AFTER the flat fields — an older Setup file rebuilds one instrument from
+    // them.
+    if (typeof restoreInstrumentsFromBackup === 'function') restoreInstrumentsFromBackup(t);
   }
 
   // --- app preferences ---

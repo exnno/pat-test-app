@@ -40,7 +40,8 @@ let state = {
   // v26 (Q1=A): inline validation message for the New Session form (e.g. when
   // neither client nor site is entered). '' = no error shown.
   newFormError: '',
-  editForm: { name: '', site: '', engineer: '', prefix: '', date: '', locked: false },
+  // v66: instrumentId added — the per-session instrument stamp, editable here.
+  editForm: { name: '', site: '', engineer: '', prefix: '', date: '', locked: false, instrumentId: '' },
   suggestions: [],
   showSuggestions: false,
   failModalOpen: false,
@@ -162,6 +163,25 @@ let state = {
   calDate: '',
   calCertNo: '',
   calDue: '',
+
+  // ---- v66: multiple test instruments ----------------------------------
+  // ⚠ THE FIVE FIELDS ABOVE ARE NOW A MIRROR, NOT THE TRUTH. `instruments` is
+  // the source of truth; the flat fields are refreshed from whichever entry is
+  // active by syncActiveInstrumentMirror() (instruments.js) after every change,
+  // so storage.js's legacy keys, old backups, old Setup files and the first-run
+  // wizard all keep working untouched. Anything that writes a flat field
+  // directly MUST call adoptMirrorIntoInstruments() afterwards.
+  //
+  //   instruments          — [{ id, make, model, calDate, calCertNo, calDue }],
+  //                          capped at INSTRUMENTS_MAX. Persisted as JSON under
+  //                          INSTRUMENTS_KEY.
+  //   activeInstrumentId   — the one new jobs are stamped with. Persisted.
+  //   instrumentEditorId   — transient: which instrument the editor screen is
+  //                          bound to. NOT persisted, and its emptiness is what
+  //                          lets saveInstruments() prune abandoned blank rows.
+  instruments: [],
+  activeInstrumentId: '',
+  instrumentEditorId: '',
 
   // Welcome-modal "seen" flag. v50: only the CURRENT release's flag is kept; the
   // 27 historical vNNWelcomeSeen flags (v13…v48) were removed — each was written

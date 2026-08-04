@@ -108,6 +108,7 @@ function render() {
   else if (v === 'settings') html = renderSettingsHub();
   else if (v === 'settingsCategory') html = renderSettingsCategory();   // v32
   else if (v === 'settingsUser') html = renderSettingsUser();
+  else if (v === 'settingsInstrument') html = renderSettingsInstrument();   // v66
   else if (v === 'settingsItems') html = renderSettingsItems();
   else if (v === 'settingsFails') html = renderSettingsFails();
   else if (v === 'settingsReadings') html = renderSettingsReadings();   // v53
@@ -198,10 +199,11 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Barcode scanners now work.</strong> If you have a Bluetooth barcode scanner — the sort that pairs with your phone like a keyboard — scan an asset label on the test screen and the number goes straight into the box. No tapping the box first, and no on-screen keyboard covering your Quick Pick buttons.</li>
-        <li><strong>Scan on the Sessions list too.</strong> Scan an old label there and it searches for that asset, so you can pull up where and when you last tested it.</li>
-        <li><strong>Nothing changes if you don't have one.</strong> The app can tell a scanner from a thumb by how fast the characters arrive, so typing a number by hand works exactly as it always has.</li>
-        <li>There's a new <strong>Barcode Scanner</strong> page under Settings &rarr; Testing Setup, with a box you can scan into to check your scanner is talking to the app properly.</li>
+        <li><strong>More than one test instrument.</strong> Settings &rarr; User Settings now holds a list of your testers instead of just one. Save up to five, and tap "Use this one" to switch to whichever you've got with you.</li>
+        <li><strong>Every job remembers which tester did it.</strong> This is the important bit. Before now, a certificate always printed your <em>current</em> calibration details — so reprinting an old job after recalibrating showed the wrong dates. From now on each job records the instrument used at the time, and its certificate keeps showing that one.</li>
+        <li><strong>You can change it on a job.</strong> Open a job &rarr; Session settings, and there's a Test instrument picker if you grabbed the wrong one.</li>
+        <li><strong>Calibration dates can be cleared.</strong> A date you'd typed in couldn't be removed before — there's now a Clear link next to each one.</li>
+        <li>Calibration warnings now cover <strong>every</strong> instrument you've saved, not just the one in use, and tell you which is due.</li>
       </ul>
       <button class="btn-primary" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -648,26 +650,31 @@ function emptyStateHTML(icon, title, body, actionLabel, actionName) {
     </div>`;
 }
 
-// v43: calibration warning banner for the Sessions screen. Shows ONLY when the
-// engineer's tester calibration falls due within CAL_DUE_SOON_DAYS (30 days) or
-// is already overdue. Otherwise returns '' (no banner) so a healthy cal date adds
-// nothing to the screen. Tappable to jump to Settings → User to update the date.
+// v43: calibration warning banner for the Sessions screen. Shows ONLY when a
+// tester calibration falls due within CAL_DUE_SOON_DAYS (30 days) or is already
+// overdue. Otherwise returns '' (no banner) so a healthy cal date adds nothing
+// to the screen. Tappable to jump to Settings -> User to update the date.
+//
+// v66 (decision 5B): checks EVERY saved instrument, not just the one in use, and
+// names the offender. ⚠ ONE banner only — worst first, with "+N more" when
+// several are due. Two stacked banners on the Sessions screen would be worse than
+// the problem they warn about. The ranking lives in worstCalibrationStatus()
+// (instruments.js): overdue always beats due-soon, most-overdue first.
 function renderCalWarningBanner() {
-  if (!state.calDue) return '';
-  const dueDate = new Date(state.calDue);
-  if (isNaN(dueDate.getTime())) return '';
-  const today = new Date();
-  const daysUntil = Math.ceil((dueDate - today) / (1000 * 3600 * 24));
-  // Only warn within the 30-day window or when overdue. Healthy = no banner.
-  if (daysUntil > CAL_DUE_SOON_DAYS) return '';
+  const worst = (typeof worstCalibrationStatus === 'function') ? worstCalibrationStatus() : null;
+  if (!worst) return '';
 
+  const more = worst.others > 0 ? ` (+${worst.others} more)` : '';
   let cls, label;
-  if (daysUntil < 0) {
+  if (worst.status === 'overdue') {
     cls = 'cal-overdue';
-    label = `⚠ Tester calibration overdue (${Math.abs(daysUntil)} day${Math.abs(daysUntil) === 1 ? '' : 's'} ago)`;
+    label = `⚠ ${worst.name} calibration overdue (${worst.days} day${worst.days === 1 ? '' : 's'} ago)${more}`;
+  } else if (worst.days === 0) {
+    cls = 'cal-due-soon';
+    label = `⚠ ${worst.name} calibration due today${more}`;
   } else {
     cls = 'cal-due-soon';
-    label = `⚠ Tester calibration due in ${daysUntil} day${daysUntil === 1 ? '' : 's'}`;
+    label = `⚠ ${worst.name} calibration due in ${worst.days} day${worst.days === 1 ? '' : 's'}${more}`;
   }
   return `
     <div class="cal-banner ${cls}" role="status">
@@ -1961,6 +1968,7 @@ function renderEditSession() {
             <span class="toggle-slider"></span>
           </label>
         </div>
+        ${typeof renderEditSessionInstrumentBlock === 'function' ? renderEditSessionInstrumentBlock() : ''}
         ${retestBlock}
         ${durationBlock}
 

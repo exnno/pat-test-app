@@ -1,4 +1,4 @@
-# PATGo — Code Map (V65)
+# PATGo — Code Map (V66)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -17,12 +17,22 @@ exists — the modular split is complete.
 > `PAThandoff_vNN.md` docs. The map now answers one question only: *where does
 > this thing live today?*
 
-## Load order (index.html) — 23 first-party files
-`config.js` → `state.js` → `utils.js` → `storage.js` → `clients.js` → `sqp.js`
-→ `multipick.js` → `feedback.js` → `bugreport.js` → `photos.js` → `csv.js`
-→ `backup.js` → `session.js` → `setup.js` → `tour.js` → `report.js`
-→ `pdfpreview.js` → `render-core.js` → `render-settings.js` → **`scanner.js`**
-→ `events.js` → `dispatch.js` → `boot.js`
+## Load order (index.html) — 24 first-party files
+`config.js` → `state.js` → `utils.js` → `storage.js` → `clients.js`
+→ **`instruments.js`** → `sqp.js` → `multipick.js` → `feedback.js` → `bugreport.js`
+→ `photos.js` → `csv.js` → `backup.js` → `session.js` → `setup.js` → `tour.js`
+→ `report.js` → `pdfpreview.js` → `render-core.js` → `render-settings.js`
+→ `scanner.js` → `events.js` → `dispatch.js` → `boot.js`
+
+**v66 added `instruments.js`**, placed immediately AFTER `clients.js`: it is the
+same kind of thing (a managed list of records with its own persistence, CRUD and
+settings UI) and, like clients, `storage.js`'s `load()`/`save()` call into it.
+Every cross-file call resolves at call time — `uid` (a `const` in session.js,
+which loads later) is `typeof`-guarded for the same reason photos.js guards it —
+so the position is a readability choice, not a load-order constraint.
+`index.html` now lists **24** scripts; `sw.js` ASSETS lists **26** `.js` entries
+(24 first-party + the same 2 lazy jsPDF). **The `ASSETS` list and the `<script>`
+chain both changed this release — upload `instruments.js` BEFORE `index.html`.**
 
 **v65 added `scanner.js`**, placed immediately AFTER `render-settings.js` and
 BEFORE `events.js`. After the render files because a scan writes into fields
@@ -73,8 +83,8 @@ See `THIRD-PARTY-LICENSES.txt`.
 
 ---
 
-## config.js (~883 ln) — constants & defaults, pure data
-`APP_VERSION` ('V62'); all `*_KEY` localStorage key names; the calibration/backup
+## config.js (~900 ln) — constants & defaults, pure data
+`APP_VERSION` ('V66'); all `*_KEY` localStorage key names; the calibration/backup
 tuning constants (`MULTIPICK_MAX_SLOTS`, `PRUNE_AGE_DEFAULT`, `CAL_DUE_SOON_DAYS`,
 `BACKUP_REMINDER_DAYS`, `BACKUP_SNOOZE_HOURS`); SQP tuning (`SQP_PARTIAL_WEIGHT`,
 `SQP_SWAP_IN_MIN`, `SQP_STAPLE_DEFENCE`); default lists (`DEFAULT_ITEM_TYPES`,
@@ -114,6 +124,17 @@ never win "most common". `makeEmptyArchivedStats()` — factory (not a shared
 object) returning `{items:0, fails:0, types:{}}`, used as both the default and
 the validator's fallback. **`backupVersion` stays 5** — the bucket is additive on
 the backup and missing-field-tolerant.
+
+**v66 constants (multiple test instruments):** `INSTRUMENTS_KEY`
+(`pat:instruments`) — the JSON list, the source of truth. `ACTIVE_INSTRUMENT_KEY`
+(`pat:activeinstrument`) — the id new jobs are stamped with. `INSTRUMENTS_MAX`
+(5, decision 6A). ⚠ The five legacy keys (`TESTER_MAKE_KEY`, `TESTER_MODEL_KEY`,
+`CAL_DATE_KEY`, `CAL_CERT_KEY`, `CAL_DUE_KEY`) are **NOT retired** — they persist
+the MIRROR of whichever instrument is active, which is what lets storage.js's
+legacy path, old backups and old Setup files keep working untouched. ⚠ Absence
+of `INSTRUMENTS_KEY` means "pre-v66, migrate"; an EMPTY ARRAY means "the user
+deleted them all" — the two must stay distinguishable. `WELCOME_VERSION` → 'V66'.
+`backupVersion` **stays 5**.
 
 **v64 constants (photos on the certificate):** `REPORT_PHOTO_TIERS` — the
 encode ladder (≤24 → 640px/q0.65, ≤60 → 512px/q0.60, beyond → 400px/q0.55) and
@@ -278,7 +299,15 @@ still detected by prefix in storage.js.
 bump the version, change report/setup defaults, or restructure Settings / add a new
 settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`).
 
-## state.js (~408 ln) — the global `state` object
+## state.js (~430 ln) — the global `state` object
+**v66:** `instruments` (the list), `activeInstrumentId` (persisted), and
+`instrumentEditorId` (transient — which record the editor screen is bound to;
+its emptiness is what lets `saveInstruments()` prune abandoned blank rows).
+⚠ `testerMake` / `testerModel` / `calDate` / `calCertNo` / `calDue` are now a
+**MIRROR of the active instrument, not the truth** — see instruments.js.
+`editForm` gained `instrumentId` (the per-session stamp, drafted then committed
+by `saveSessionEdits`).
+
 **v65 (barcode scanner):** `scannerEnabled` — the ONLY persisted field of the
 five, default ON (see `SCANNER_KEY`). `scanFilledAsset` — did the asset number
 currently in the form come off a barcode? Set when a scan lands, cleared by
@@ -395,7 +424,15 @@ leakage} or null; the boundary validator used on backup restore and future cloud
 false/absent writes no key. A Class I item with only polarity ticked is retained).
 *Touch to:* add a stateless formatting/escaping/colour helper.
 
-## storage.js (~745 ln) — persistence boundary
+## storage.js (~755 ln) — persistence boundary
+**v66:** `SESSION_KEY_MAP` gained `instrumentId: 'ii'`. `instrumentSnapshot` is
+deliberately NOT mapped (rare, nested, and the codec passes unlisted fields
+through). `load()` calls `loadInstruments()` **AFTER** the five legacy tester
+keys — a pre-v66 install migrates from exactly those values. `save()` calls
+`saveInstruments()` **BEFORE** writing the legacy keys, because a prune inside it
+re-syncs the mirror and writing first would persist a stale value. ⚠ Both
+orderings matter and are asserted in the harness.
+
 **v65:** `load()` reads `state.scannerEnabled = localStorage.getItem(SCANNER_KEY)
 !== '0'` — ⚠ **note the inverted comparison**; absent and garbage both mean ON,
 only an explicit `'0'` means off. `save()` writes `'1'`/`'0'` **explicitly**
@@ -473,6 +510,62 @@ reminders list; '' when no distinct client),
 `commitSiteAssign`, `resolveAssignMerge`, `resolveAssignKeepBoth`, `finishSiteAssign`,
 `nextFreeSiteName`.
 *Touch to:* change how clients/sites are stored or managed.
+
+## instruments.js (~490 ln) — test instruments (v66, NEW FILE)
+The list of PAT testers, which one is in use, and **the rule that decides which
+instrument a given job's certificate names**.
+
+**⚠ THE DEFECT THIS FIXED.** Before v66 the instrument and its calibration
+details were five flat globals read at PDF render time, and nothing was recorded
+on the session — so reprinting a March certificate after a June recalibration
+printed JUNE's dates against MARCH's results. Sessions now carry
+`session.instrumentId`, stamped at creation.
+
+**⚠ THE FLAT FIELDS ARE A MIRROR, NOT THE TRUTH.** `state.instruments` is the
+source of truth. Three sync entry points, and confusing them is the main hazard:
+- `syncActiveInstrumentMirror()` — instruments → flat. After ANY CRUD.
+- `adoptMirrorIntoInstruments()` — flat → the active instrument, **in place** so
+  its id (which sessions reference) survives. For legacy writers: the first-run
+  wizard is the only one.
+- `restoreInstrumentsFromBackup(data)` — a whole incoming payload → the list.
+  Used by BOTH backup restore and Setup import; its pre-v66 branch depends on the
+  caller having already restored the flat fields.
+
+⚠ **Any new code that writes a flat field directly MUST call
+`adoptMirrorIntoInstruments()` afterwards** or the write is silently discarded.
+
+**⚠ THE THREE-TIER RESOLUTION RULE** — `instrumentForSession(sess)` is the single
+helper report.js, csv.js and the UI all call: stamped instrument → frozen
+snapshot → active instrument. Tier three is why every pre-v66 job prints exactly
+as it did (decision 3A). ⚠ **Do not read `state.testerMake` anywhere — that is
+the bug.**
+
+**⚠ DELETING SNAPSHOTS ONTO THE JOBS THAT USED IT.** `deleteInstrument()` freezes
+a copy onto every referencing session (`session.instrumentSnapshot`) *before*
+removing it, or those certificates silently revert to today's instrument.
+Blocking deletion instead would trap the user with every tester they've owned.
+
+Shape/helpers: `normaliseInstrumentDate`, `makeInstrument`, `_instrumentUid`,
+`instrumentHasData`, `instrumentDisplayName`, `instrumentList`, `findInstrument`,
+`activeInstrument`, `instrumentUseCount`, `instrumentForSession`,
+`instrumentNameForSession`.
+Calibration: `calibrationStatusFor(inst)` (moved here from session.js and
+parameterised), `calibrationStatus()` (thin wrapper over the active one, so every
+old caller reads the same), `_calFlagSortKey`, `worstCalibrationStatus()`
+(decision 5B — every instrument, worst first, ONE banner).
+Persistence: `loadInstruments`, `saveInstruments`, `restoreInstrumentsFromBackup`,
+`pruneBlankInstruments`.
+CRUD: `addInstrument`, `openInstrumentEditor`, `closeInstrumentEditor`,
+`saveInstrumentFromEditor`, `setActiveInstrument`, `deleteInstrument`,
+`clearInstrumentDateField` (⚠ a targeted DOM write, NOT a render — the v60.1
+rule; re-rendering would discard every other unsaved field).
+Render: `_calChipHTML`, `renderInstrumentListHTML` (embedded in User Settings),
+`renderSettingsInstrument` (the editor screen — reached only from User Settings,
+so deliberately NOT in `SETTINGS_CATEGORIES`/`SETTINGS_PAGE_META`, with its own
+back action), `renderEditSessionInstrumentBlock` (the per-session picker; renders
+nothing at all when the list is empty).
+*Touch to:* anything about instruments, calibration status, or which instrument a
+certificate names.
 
 ## sqp.js (~286 ln) — Smart Quick Pick
 `normaliseSqpLocation`, `sqpTokens`, `normaliseSqpHistory`, `loadSqpHistory`,
@@ -635,6 +728,11 @@ file may break the fail flow.**
 *Touch to:* anything about photo storage, processing, or the photo export file.
 
 ## csv.js (~665 ln) — CSV build + import
+**v66:** the four instrument/calibration columns (`tester`, `calDate`,
+`calCertNo`, `calDue`) now resolve through `instrumentForSession(session)`
+instead of `state.*`, so exporting an old job carries the tester that job was
+actually done with. ⚠ Guarded at source level in the harness — do not read
+`state.testerMake` here again.
 Build/share: `csvCellValue` (adaptive client/site columns; **v53** four reading
 cases — `readingClass`/`readingEarth`/`readingInsulation`/`readingLeakage` — each
 emits blank when the feature is off, the column hidden, or the item has no reading;
@@ -649,6 +747,11 @@ wired to `copy-current`/`copy-session`). Import: `buildCsvHeaderLookup`, `parseC
 *Touch to:* change CSV columns, export, or import parsing.
 
 ## backup.js (~340 ln) — Backup / Restore
+**v66:** `buildBackup` carries `instruments` + `activeInstrumentId` alongside the
+five flat mirror fields (kept for forward compatibility). Restore calls
+`restoreInstrumentsFromBackup(data)` ⚠ **AFTER** the flat fields, because a
+pre-v66 backup rebuilds a single instrument from exactly those. `backupVersion`
+**stays 5** — additive and missing-field-tolerant in both directions.
 **v65:** `buildBackup` carries `scannerEnabled`; the restore applies it **only
 when the backup actually holds a boolean**. ⚠ **The `typeof` guard is the whole
 point**: absence says nothing about the engineer's preference, so an old backup
@@ -693,6 +796,10 @@ assumes their backup carried their photos. Additive and missing-field-tolerant
 for a genuine incompatible change; keep old-backup compatibility.**
 
 ## setup.js (~260 ln) — Export/Import Setup
+**v66:** the `tester` section carries `instruments` + `activeInstrumentId`, and
+`applySetupBundle` calls the same `restoreInstrumentsFromBackup` helper, with the
+same after-the-flat-fields ordering requirement. An older Setup file has no key
+and rebuilds one instrument from its flat fields.
 Config-only shareable bundle (NOT sessions/clients/sites). `buildSetupBundle`,
 `setupFilename`, `describeSetupSections`, `shareSetup`, `importSetupFromFile` (file-
 kind guard: rejects a full backup imported as a setup and vice versa),
@@ -718,6 +825,13 @@ wizard finish step and About → "Show me around".
 *Touch to:* change the walkthrough slides, mocks/copy, or paging.
 
 ## report.js (~700 ln) — PDF reports — lazy-loads the vendored MIT libs
+**v66 — THE DEFECT FIX.** The `Test instrument` / `Tester calibrated` /
+`Calibration cert` / `Calibration due` detail pairs resolve from
+`instrumentForSession(session)` (bound once as `reportInstrument`) instead of
+reading `state.*`. ⚠ **Do not simplify this back to `state.testerMake` — that IS
+the bug.** Source-guarded in the harness because `buildReportDoc` can't run
+headlessly. ⚠ v64 rules still current: do NOT make `buildReportDoc` async, and
+the footer pass must stay last.
 **Lazy engine load (v51):** `REPORT_JSPDF_SRC`/`REPORT_AUTOTABLE_SRC` (same-origin
 paths); `reportEngineReady()` (true once `window.jspdf.jsPDF.API.autoTable` exists);
 `_injectScriptOnce(src, marker)` (appends a `<script>` once, resolve on load / reject
@@ -815,6 +929,17 @@ are vendored but **not precached**; this loader fetches them lazily on first pre
 version.
 
 ## session.js (~2940 ln) — sessions, items & most logic
+**v66:** ⚠ `calibrationStatus()` **MOVED OUT** to instruments.js and
+parameterised as `calibrationStatusFor(inst)`. Do not reintroduce a copy here —
+duplicate *function* declarations across files are legal JavaScript (last loaded
+silently wins), so unlike a duplicate `const` this does NOT surface as a syntax
+error. `createSession()` stamps `instrumentId: state.activeInstrumentId`.
+`startEditSession()` loads it into `editForm`; `saveSessionEdits()` commits it and
+drops `instrumentSnapshot` whenever the stamp actually changes (unconditionally —
+an earlier `findInstrument` guard protected nothing reachable and was removed
+after mutation testing). `saveUserSettings()` now saves ONLY the engineer name.
+`captureWizardStep()` calls `adoptMirrorIntoInstruments()` after writing
+`state.calDate` — it is the one remaining legacy writer of the flat mirror.
 **v65 (decision 6B — the asset box after a scanned log).** Three touch points,
 all pure state, no cross-file dependency (deliberately — `saveItem` is the hot
 logging path and must not gain a call into `scanner.js` that could throw if that
@@ -1029,6 +1154,12 @@ seed, the signature, cert numbers / job notes / report templates, the welcome
 dismiss.
 
 ## render-core.js (~2170 ln) — main screens
+**v66:** router gained `settingsInstrument` → `renderSettingsInstrument()`.
+`renderCalWarningBanner()` rewritten onto `worstCalibrationStatus()` — it now
+warns about EVERY saved instrument (decision 5B) and names the offender, ⚠ as
+**ONE** banner with "+N more", never stacked. `renderEditSession()` renders
+`renderEditSessionInstrumentBlock()` above the retest block. Welcome copy rolled
+to V66.
 **v65:** welcome modal copy is the V65 scanner text. `renderEntry()`'s `#f-asset`
 gains `placeholder="Scan or type"` **only when `state.scannerEnabled`** — the
 placeholder is what tells the engineer why the box is empty after a scanned log
@@ -1116,6 +1247,12 @@ Reports hub, Edit-session UI, empty states, the welcome modal, the first-run wiz
 the signature pad, the calibration banner, or the tour route.
 
 ## render-settings.js (~1675 ln) — settings screens
+**v66:** `renderSettingsUser()` rebuilt — the single instrument + calibration
+blocks are GONE, replaced by the engineer name plus `renderInstrumentListHTML()`.
+⚠ The old input ids (`settings-tester-make`, `settings-cal-date`, …) no longer
+exist anywhere; the fields live in the per-instrument editor in instruments.js.
+About changelog rolled **V66 / V65 / V64** (V63 dropped). Glossary gained
+"Test instrument" and its "Calibration" entry was updated.
 **v65:** `renderSettingsScanner()` — the new Barcode Scanner page (Testing
 Setup). Two jobs: the off switch, and a **live test box**. The test box is the
 more important of the two and is the answer to the discoverability problem a
@@ -1318,6 +1455,13 @@ These stay direct because focus/blur/pointer timing can't be safely delegated (t
 fragile iOS area).
 
 ## dispatch.js (~1100 ln) — delegated event handling
+**v66 actions.** Clicks: `instrument-add`, `instrument-open`,
+`instrument-editor-close`, `instrument-save`, `instrument-delete`,
+`instrument-make-active`, `instrument-clear-date`. Change: `ef-instrument` (the
+per-session stamp — draft-only, committed by `saveSessionEdits`, no render since
+it is a `<select>`). ⚠ `instrument-clear-date` is the ONLY one that does not
+re-render: it is a targeted DOM write, or the editor's other unsaved fields would
+be discarded (the v60.1 rule).
 **v62 actions.** Clicks: `fail-photo-pick`, `fail-photo-remove`,
 `photo-strip-open`, `photo-strip-close`, `photo-strip-add`, `photo-delete`,
 `photo-export`, `photo-import`, `photo-wipe`. Changes: `fail-photo-file`,
