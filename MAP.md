@@ -1,4 +1,4 @@
-# PATGo — Code Map (V62)
+# PATGo — Code Map (V63)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -103,8 +103,10 @@ object) returning `{items:0, fails:0, types:{}}`, used as both the default and
 the validator's fallback. **`backupVersion` stays 5** — the bucket is additive on
 the backup and missing-field-tolerant.
 
-**v62 constants (photo evidence):** Welcome key rolled to `V62_WELCOME_KEY`
-(`pat:v62welcome`) — supersedes the v61 key below. `PHOTO_MAX_PER_ITEM` (3),
+**v62 constants (photo evidence):** ⚠ *Historical — the welcome key described here
+was REPLACED in v63 by the derived `WELCOME_VERSION`/`WELCOME_KEY` pair documented
+above. `V62_WELCOME_KEY` no longer exists.* Welcome key was `V62_WELCOME_KEY`
+(`pat:v62welcome`). `PHOTO_MAX_PER_ITEM` (3),
 `PHOTO_MAX_PX` (1280), `PHOTO_JPEG_QUALITY` (0.7 — note **JPEG**, unlike the
 PNG logo/signature paths: a photo has no transparency to preserve and PNG would
 be several times larger), `PHOTO_BUNDLE_KIND` (`'pat-photos'`) +
@@ -199,19 +201,37 @@ the 12px drift slop in events.js (a moving finger aborts the timer, so scrolling
 can't fire it) and the capture-phase click swallow that eats the tap following a
 fired long-press.
 
-**Welcome key (v50 pattern):** ONLY the current welcome key is defined — now
-`V61_WELCOME_KEY = 'pat:v61welcome'`. The 28 historical keys (V12…V48) were removed
-in v50; they were one-release markers nothing referenced after shipping. Old keys
-remain harmlessly in users' localStorage and are detected by prefix in storage.js.
-Each feature release replaces this one line with its new key and passes it to
-`dismissWelcome()` — v61 is the current holder.
+**Welcome key (v63 pattern — DERIVED, read this before rolling a welcome):**
+Two constants, and the ONLY place a welcome roll now touches:
+`WELCOME_VERSION` (a plain string, currently `'V62'`) and
+`WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome'`.
+
+⚠ **To roll a welcome modal: change `WELCOME_VERSION` here and write the new copy
+in render-core.js. That is the entire job — no other file changes, ever.**
+
+`WELCOME_VERSION` is deliberately NOT derived from `APP_VERSION`, because most
+releases bump the version WITHOUT shipping a welcome (hotfixes, structural
+releases like V63 itself). Deriving from `APP_VERSION` would re-show the last
+modal to everyone who had already dismissed it, every release.
+
+**Why this exists (v63).** Up to v62 the key was a version-NAMED identifier
+(`V62_WELCOME_KEY`) written into SIX files — config, storage, state, dispatch,
+boot and render-core — all of which had to roll in lockstep. One landing late or
+served from a stale cache meant storage.js referenced an identifier config.js no
+longer declared, which threw a `ReferenceError` inside `load()` with nothing to
+catch it: **the V61 white screen**. The identifier names are now fixed forever and
+only a string VALUE changes, and a wrong value cannot throw. The 28 historical
+keys (V12…V48) removed in v50 remain harmlessly in users' localStorage and are
+still detected by prefix in storage.js.
 
 *Touch to:* add a storage key, change a default list, edit the calculator tables,
 bump the version, change report/setup defaults, or restructure Settings / add a new
 settings page (edit `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META`).
 
 ## state.js (~408 ln) — the global `state` object
-**v62 (photo evidence):** `v62WelcomeSeen` (replaces `v61WelcomeSeen`).
+**v63:** `welcomeSeen` — the welcome flag's PERMANENT name (was `v62WelcomeSeen`). ⚠ **Never rename this back to a per-version name**; that was one of the six coupling points behind the V61 white screen.
+
+**v62 (photo evidence):**
 `photoIndex` (`{ [itemId]: count }`) and `photoBytes` — a **DERIVED IN-MEMORY
 MIRROR** of the IndexedDB store, rebuilt at boot by `photoIndexLoad()` and kept
 in step by every add and delete in photos.js. They exist because `render()` is
@@ -268,10 +288,12 @@ deleted. Persisted via `PAT_STATS_KEY` and carried through backup/restore. The L
 half is deliberately NOT in state — it's recomputed from `state.sessions` on demand
 by `computeAppStats()`, so it can never drift out of step with the real data.
 
-**Welcome flag (v50 pattern):** ONLY the current `v61WelcomeSeen` is kept. Historical
-`vNNWelcomeSeen` flags were removed in v50 — each was written once and never read
-after its release. The first-run-wizard gate detects past welcomes via
-`hasAnyLegacyWelcomeKey()` (storage.js).
+**Welcome flag (v63 pattern):** ONE fixed property, `welcomeSeen`. It carries no
+version and never changes name again — which release's welcome is current is a
+VALUE (`WELCOME_VERSION`, config.js), not an identifier. Historical
+`vNNWelcomeSeen` flags were removed in v50. The first-run-wizard gate detects past
+welcomes via `hasAnyLegacyWelcomeKey()` (storage.js), whose `pat:v<n>welcome`
+regex still matches the derived key.
 
 **v56 Retest reminders state:** `retestRemindersEnabled` (master feature flag,
 loaded from `RETEST_REMINDERS_KEY`, default off) and `retestActionSessionId` (transient
@@ -343,11 +365,18 @@ fractional counts → 0; `fails` clamped to `items` (keeps the displayed percent
 inside 0–100); the type map keeps only string keys with a positive count and is
 capped to `STATS_TYPE_MAP_MAX`, highest counts first.
 
-**Welcome read + wizard gate (v50 pattern):** `load` reads ONLY `V62_WELCOME_KEY` →
-`state.v62WelcomeSeen`. ⚠ **This line, `config.js`'s key definition, `state.js`'s
-flag, `dispatch.js`'s dismiss call and `boot.js`'s integrity guard must ALL roll
-together every release** — landing them out of step is what caused the v61
-white screen. (Designing this coupling away is scheduled for **V63**.) `hasAnyLegacyWelcomeKey()` scans localStorage for any
+**Welcome read + wizard gate (v63 pattern):** `load` reads the DERIVED
+`WELCOME_KEY` → `state.welcomeSeen`, behind a `typeof` guard in a try/catch.
+**This is the exact line that produced the V61 white screen** — it referenced a
+version-named constant, and when config.js was a release behind, that identifier
+did not exist and the `ReferenceError` killed `load()`. Two things now prevent it:
+the name is fixed forever so the files cannot go out of step, and `typeof` on an
+undeclared identifier never throws.
+
+⚠ **The fallback is `true` (suppress the modal), not `false`, and that is
+deliberate.** If the key is missing we also cannot PERSIST a dismissal, so showing
+the modal would produce one that returns on every launch. An undismissable modal
+is a trap; a missed "what's new" is a non-event. `hasAnyLegacyWelcomeKey()` scans localStorage for any
 `pat:v<n>welcome` key — used by the first-run-wizard gate to recognise a returning
 user without keeping a per-version flag. The gate:
 `onboardedV33Seen = explicitlyOnboarded || sessions>0 || engineerName || hasAnyLegacyWelcomeKey()`.
@@ -839,7 +868,7 @@ Report signature: `storeSignatureFromSource`, `handleReportSignatureFile`,
 
 **Welcome dismiss (v50):** the 17 near-identical `dismissVNNWelcome` functions were
 replaced by ONE `dismissWelcome(seenFlag, key)` — sets `state[seenFlag]=true`,
-persists `key`, re-renders. The `welcome-dismiss` action (dispatch.js) calls it with the current pair —
+persists `key`, re-renders. **v63:** its two arguments are now permanent (`'welcomeSeen'`, `WELCOME_KEY`), so neither this function nor its caller changes when a welcome is rolled. The `welcome-dismiss` action (dispatch.js) calls it with that fixed pair —
 `('v60WelcomeSeen', V60_WELCOME_KEY)` as of v60. Each feature release passes its own.
 
 `setView` clears transient overlays on every transition (fail sheet, multi-pick
@@ -853,7 +882,9 @@ seed, the signature, cert numbers / job notes / report templates, the welcome
 dismiss.
 
 ## render-core.js (~2170 ln) — main screens
-**v62:** welcome modal rolled to V62 / `v62WelcomeSeen`. `renderFailPhotoStripInner()`
+**v63:** the modal gates on the fixed `state.welcomeSeen` and its heading derives from `WELCOME_VERSION` (config.js); the dead `id="v62-welcome-dismiss"` was removed (nothing referenced it). This file was the SIXTH and quietest member of the old version-named coupling — it read `state.v62WelcomeSeen`, so a stale copy never crashed, it just read `undefined`, which is falsy, and showed the modal on every render forever. Only `WELCOME_VERSION` and the copy below it change when a welcome is rolled.
+
+**v62:** welcome modal copy is the V62 photo-evidence text. `renderFailPhotoStripInner()`
 — the fail sheet's photo row contents; rendered BOTH inside the sheet AND on its
 own by session.js's targeted DOM update, so it must stay self-contained and
 produce valid markup with no surrounding context. `renderPhotoStripSheet()` —
@@ -1059,7 +1090,7 @@ fragile iOS area).
 `photo-export`, `photo-import`, `photo-wipe`. Changes: `fail-photo-file`,
 `photo-strip-file`, `photo-import-file` — all three clear `el.value` immediately
 so re-choosing the SAME file fires a change event (without it, a retaken photo
-with an identical filename silently does nothing). `welcome-dismiss` rolled to
+with an identical filename silently does nothing). **v63 supersedes the next sentence:** `welcome-dismiss` no longer rolls at all. Historically it rolled to
 `v62WelcomeSeen` / `V62_WELCOME_KEY`.
 
 The full delegated event system + three action registries, attached once to `#app`
@@ -1099,14 +1130,14 @@ scroll-drag inside the now-scrollable preset list can't switch the preset by acc
 fields and `fail-other`).
 **v61:** clicks `asset-history-open`, `asset-history-close`, `asset-history-row`;
 change action `report-show-duration`.
-**Welcome dismiss (v50):** `'welcome-dismiss': () => dismissWelcome('v61WelcomeSeen',
-V61_WELCOME_KEY)` — was a per-version `dismissVNNWelcome()` call; now the one
-parameterised helper.
+**Welcome dismiss (v50, decoupled v63):**
+`'welcome-dismiss': () => dismissWelcome('welcomeSeen', WELCOME_KEY)` — both
+arguments are permanent, so this line no longer changes when a welcome is rolled.
 *Touch to:* add/route any delegated click/input/change handler. Only the four focus-
 sensitive fields + the quick-pick long-press are NOT here (see events.js).
 
 ## boot.js (~283 ln) — startup, RUNS ON LOAD, must load LAST
-**v62:** the integrity guard's welcome-key check rolled to `V62_WELCOME_KEY`.
+**v63:** the integrity guard's constant check now targets the fixed `WELCOME_KEY` and **never needs rolling again** — the old "roll it here too" warning is gone. Retargeting it was the point: while it named a version, a stale boot.js checked the PREVIOUS release's name, passed happily, and `load()` threw anyway — so the guard was a sixth coupled file rather than a fix. It is kept because it is still a cheap probe for "did config.js parse at all".
 The boot tail calls `photoIndexLoad()` **AFTER** the first `render()`, then
 repaints only if photos were actually found — deliberately after, because it is
 async and the app must never wait on a database to paint its first screen, and

@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V62';
+const APP_VERSION = 'V63';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -57,14 +57,45 @@ const TESTER_MODEL_KEY = 'pat:testermodel'; // v13
 const CAL_DATE_KEY = 'pat:caldate';
 const CAL_CERT_KEY = 'pat:calcert';
 const CAL_DUE_KEY = 'pat:caldue';
-// Welcome-modal "seen" key. v50: only the CURRENT welcome key is kept. The 28
-// historical keys (V12…V48) were removed — each was a one-release marker that
-// nothing referenced after its version shipped. The keys still sit harmlessly in
-// existing users' localStorage; storage.js detects them by prefix for the
-// first-run-wizard gate, so nothing about upgrade behaviour changes. When a future
-// feature release rolls a new welcome, replace the line below with the new key
-// (e.g. V51_WELCOME_KEY) and pass it to dismissWelcome() — no new symbol pile.
-const V62_WELCOME_KEY = 'pat:v62welcome';  // v62: photo evidence on fails
+// ---------- Welcome-modal "seen" key (v63: DERIVED, not version-named) ----------
+//
+// ⚠ READ THIS BEFORE ROLLING A WELCOME MODAL. It is now a ONE-LINE edit, in this
+// file only. Nothing else in the codebase ever needs to change again.
+//
+// THE PROBLEM V63 FIXED. Up to v62 the key was a version-NAMED identifier
+// (`V62_WELCOME_KEY`), and that identifier was written into SIX files: here,
+// storage.js (reads it in load()), state.js (its matching flag), dispatch.js
+// (passes it to dismissWelcome), boot.js (the integrity guard) and render-core.js
+// (the modal gate). All six had to roll together, every single feature release.
+//
+// Land them out of step — one file not committed, or one still served from a
+// stale service-worker cache — and storage.js referenced an identifier config.js
+// no longer declared. A bare undeclared identifier throws a ReferenceError, it
+// threw INSIDE load(), and nothing caught it. That is the V61 white screen.
+// v61.2 added the boot guard, which helped, but it only moved the coupling from
+// five files to six: a stale boot.js checks the OLD name, passes happily, and
+// load() still throws.
+//
+// THE FIX. The identifier names are now FIXED FOREVER — `WELCOME_KEY` here,
+// `state.welcomeSeen` in state.js. Only a string VALUE changes between releases,
+// and a wrong string cannot throw. The worst a mismatch can now do is show or
+// suppress a "what's new" modal. It can no longer stop the app opening.
+//
+// WELCOME_VERSION is deliberately its own constant rather than being derived from
+// APP_VERSION, because most releases roll a version WITHOUT rolling a welcome —
+// hotfixes and structural releases like V63 itself. Deriving from APP_VERSION
+// would re-show the last modal to everyone who had already dismissed it, every
+// time. So: bump this ONLY on a release that genuinely ships a new welcome, and
+// leave it alone otherwise.
+//
+// TO ROLL A WELCOME: change WELCOME_VERSION below to the new release, and write
+// the new copy in render-core.js. That is the whole job.
+//
+// v63 keeps it at 'V62': V63 is a pure structural release and ships no welcome of
+// its own, so the key stays 'pat:v62welcome'. Anyone who dismissed the V62 modal
+// stays dismissed; anyone who has not opened since V62 still gets it. Both correct.
+const WELCOME_VERSION = 'V62';
+const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
 // sheet opens. Deliberately a single named constant so the threshold can be

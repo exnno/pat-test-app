@@ -431,7 +431,30 @@ function loadV11Settings() {
   // release had passed. Old keys remain harmlessly in users' localStorage; the
   // returning-user heuristic below detects them by prefix, so upgraders are still
   // recognised without keeping a flag per version.
-  state.v62WelcomeSeen = localStorage.getItem(V62_WELCOME_KEY) === '1';
+  //
+  // v63: reads the DERIVED key (config.js) behind a typeof guard. This single
+  // line is where the V61 white screen actually happened: it referenced a
+  // version-named constant, and when config.js was a release behind, that
+  // identifier did not exist. An undeclared identifier throws a ReferenceError,
+  // it threw here inside load(), and nothing above caught it.
+  //
+  // Two things now make that impossible. The name `WELCOME_KEY` is fixed forever,
+  // so config.js and storage.js cannot go out of step on it. And `typeof` on an
+  // undeclared identifier is safe and never throws, so even config.js failing to
+  // load at all degrades to a missed modal instead of a dead app.
+  //
+  // The fallback is deliberately TRUE (suppress the modal), not false. If the key
+  // is missing we also cannot PERSIST a dismissal — dismissWelcome would have
+  // nothing valid to write — so showing it would produce a modal that returns on
+  // every single launch. An undismissable modal is a trap; a missed "what's new"
+  // is a non-event. Fail towards the harmless one.
+  try {
+    state.welcomeSeen = (typeof WELCOME_KEY === 'string')
+      ? localStorage.getItem(WELCOME_KEY) === '1'
+      : true;
+  } catch (e) {
+    state.welcomeSeen = true;
+  }
 
   // v59: archived half of the lifetime stats counter (tallies of pruned/deleted
   // sessions). Absent on every pre-v59 install, which correctly yields an empty

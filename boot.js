@@ -89,24 +89,26 @@ function bootIntegrityOK() {
     console.error('Boot integrity check failed: state missing');
     return false;
   }
-  // v61.2: ALSO CHECK CRITICAL CONSTANTS. This is the gap that produced the v61
-  // white screen, and it is worth understanding rather than just patching.
+  // v61.2: ALSO CHECK CRITICAL CONSTANTS. Top-level `const` does NOT attach to
+  // `window`, so the function loop above is structurally blind to a missing
+  // constant — which is how the V61 white screen got past it.
   //
-  // Top-level `const` does NOT attach to `window`, so the function loop above is
-  // structurally blind to a missing constant. Every feature release rolls a new
-  // welcome key, coupling FOUR files at once: config.js defines it, storage.js
-  // reads it inside load(), state.js holds its flag, dispatch.js passes it to
-  // dismissWelcome(). Land config.js and storage.js out of step — one file not
-  // committed, or one still served from a stale cache — and load() throws a
-  // ReferenceError with nothing to catch it.
+  // ✅ v63: THE OLD WARNING HERE IS GONE, AND THAT IS THE POINT OF THE RELEASE.
+  // This check used to name a version-specific constant (`V62_WELCOME_KEY`) and
+  // carried a warning to roll it every release. That made the guard itself a
+  // SIXTH coupled file rather than a fix: if boot.js was the stale one, it
+  // checked the previous release's name, passed happily, and load() threw anyway.
   //
-  // Checking it here converts a silent white screen into the designed recovery
-  // path, BEFORE any storage call is made. `typeof` on an undeclared identifier
-  // is safe and never throws.
+  // `WELCOME_KEY` is now a fixed, derived name (config.js) that never changes
+  // between releases. There is nothing to roll here, and nothing to forget.
   //
-  // ⚠ WHEN YOU ROLL THE WELCOME KEY NEXT RELEASE, ROLL IT HERE TOO.
-  if (typeof V62_WELCOME_KEY === 'undefined') {
-    console.error('Boot integrity check failed: V62_WELCOME_KEY missing — config.js and storage.js are out of step (partial deploy or stale cache)');
+  // The check is KEPT because it still earns its place: it is now a cheap probe
+  // for "did config.js parse at all", which is the remaining way constants can go
+  // missing. Catching that here converts a silent white screen into the designed
+  // recovery path, BEFORE any storage call is made. `typeof` on an undeclared
+  // identifier is safe and never throws.
+  if (typeof WELCOME_KEY === 'undefined') {
+    console.error('Boot integrity check failed: WELCOME_KEY missing — config.js did not load or did not parse (partial deploy or stale cache)');
     return false;
   }
   return true;

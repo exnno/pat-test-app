@@ -169,9 +169,16 @@ let state = {
   // used to read seven of them now detects past welcomes by scanning localStorage
   // for any 'pat:v<n>welcome' key (see hasAnyLegacyWelcomeKey in storage.js), so a
   // new install still shows the WIZARD and an upgrader still shows the MODAL —
-  // unchanged behaviour. Future feature releases roll a new flag here and pass it
-  // to dismissWelcome().
-  v62WelcomeSeen: false,  // v62: photo evidence on fails
+  // unchanged behaviour.
+  //
+  // v63: THIS PROPERTY NAME IS NOW FIXED AND MUST NEVER BE RENAMED AGAIN. It used
+  // to carry the version (`v62WelcomeSeen`), which meant state.js, storage.js,
+  // dispatch.js and render-core.js all had to be edited in lockstep every release
+  // — one of the six coupling points behind the V61 white screen. Which release's
+  // welcome is current is now a VALUE (WELCOME_VERSION in config.js), not an
+  // identifier. Renaming this back to a per-version name would reintroduce the
+  // exact fault V63 exists to remove.
+  welcomeSeen: false,
 
   // v61: cross-session asset history sheet. PURELY TRANSIENT — never saved,
   // never backed up, no storage key, no validator, no migration. The sheet is

@@ -686,7 +686,9 @@ registerActions({
   'backup-banner-dismiss': () => { snoozeBackupReminder(); render(); },
 
   // Welcome + reopen-warning modals
-  'welcome-dismiss': () => dismissWelcome('v62WelcomeSeen', V62_WELCOME_KEY),
+  // v63: both arguments are now permanent — the fixed flag name and the derived
+  // key from config.js. This line no longer changes when a welcome is rolled.
+  'welcome-dismiss': () => dismissWelcome('welcomeSeen', WELCOME_KEY),
 
   // v60: bug report sheet (Settings -> Contact). The three setters re-render
   // (taps, no caret to lose); the two textareas are input actions below.

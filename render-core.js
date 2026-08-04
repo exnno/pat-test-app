@@ -169,20 +169,31 @@ function render() {
   ` : '';
 
   // One-time "what's new" modal, shown once after an update until dismissed.
-  // Gates on the CURRENT release's seen flag (v62WelcomeSeen). Suppressed while
-  // the v9 migration prompt is up (it needs a name commit first) or while the
-  // first-run wizard is showing — so an UPGRADING user sees this modal and a
-  // genuinely-new install sees the wizard instead. Dismissed via the shared
-  // dismissWelcome() (v50), wired in dispatch.js.
+  // Suppressed while the v9 migration prompt is up (it needs a name commit first)
+  // or while the first-run wizard is showing — so an UPGRADING user sees this
+  // modal and a genuinely-new install sees the wizard instead. Dismissed via the
+  // shared dismissWelcome() (v50), wired in dispatch.js.
+  //
+  // v63: gates on the FIXED flag `state.welcomeSeen`, and the heading derives from
+  // WELCOME_VERSION (config.js). This file was the sixth — and quietest — member
+  // of the old version-named coupling: it read `state.v62WelcomeSeen`, so a stale
+  // copy never crashed, it just read undefined, which is falsy, and showed the
+  // modal on every render forever. Silent failures are why it was never counted
+  // among the coupled files. Neither the flag name nor the heading needs editing
+  // when a welcome is rolled now — only WELCOME_VERSION and the copy below.
   const wizardShowing = !state.onboardedV33Seen && !state.migrationPrompt.show;
-  const welcomeModal = (state.v62WelcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
+  // Escape the INTERPOLATED value only — the static English is ours, and running
+  // it through escapeHTML would turn the apostrophe in "What's" into &#39;.
+  // Renders the same either way, but there is no reason to mangle our own copy.
+  const welcomeTitle = `What's new in ${escapeHTML(typeof WELCOME_VERSION === 'string' ? WELCOME_VERSION : '')}`.trim();
+  const welcomeModal = (state.welcomeSeen || state.migrationPrompt.show || wizardShowing) ? '' : `
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="What's new in V62">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="${welcomeTitle}">
       <div class="bulk-sheet-handle"></div>
       <div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">What's new in V62</h3>
+        <h3 class="bulk-sheet-title">${welcomeTitle}</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
@@ -191,7 +202,7 @@ function render() {
         <li><strong>Photos are not in your normal backup.</strong> They're far too big for it. There's a separate <strong>Export photos</strong> button in Settings &rarr; Backup — use it alongside your usual backup, not instead of it.</li>
         <li>Photos stay on this phone and are only kept for fails. Changing a fail to a pass deletes its photos, and it'll ask you first.</li>
       </ul>
-      <button class="btn-primary" id="v62-welcome-dismiss" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 

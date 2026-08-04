@@ -1291,9 +1291,12 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v62: rolled forward — V62 on top, V59 dropped. -->
+      <!-- v8: rolling 3-version changelog. v63: rolled forward — V63 on top, V60 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V63</strong> · August 2026</p>
+        <p class="muted">A reliability fix under the bonnet, with nothing to change in how you use the app. The "what's new" note you're reading is shown once per update and then remembered, and the way the app kept track of that had grown fragile: six separate files all had to be updated together on every release, and if even one of them arrived late or was still being served from your phone's cache, the app could fail to open at all. That was the cause of the start-up failure some of you hit on V61. The app now works it out from a single setting in one place, so those files can never drift apart again — and in the worst case you'd see this note an extra time rather than a screen that won't load. There is no change to your data, your jobs, your photos or your settings.</p>
 
         <p><strong>V62</strong> · August 2026</p>
         <p class="muted">You can now attach photos to a failed item. Tap FAIL and there's an Add photo button in the reasons sheet — take up to three per item, of the damage, the plug, the rating label, whatever the evidence is. They save with that item, and failed items in the Overview show a small camera icon with a count; tap it to look through them, add another or delete one. Photos are for fails only, deliberately: it keeps logging a pass as fast as it has always been, and it keeps the storage sensible. Changing a fail to a pass gives up its photos, and the app tells you how many before it does it. Two things worth knowing. Photos stay on this phone — nothing is uploaded anywhere. And they are <strong>not</strong> in your normal backup: they're far too large for it, and putting them in would risk the backup itself failing to save. There's a separate Export photos button on the Backup screen — use it as well as your usual backup, not instead of it. Restore a backup on a new phone and the app will remind you if the photos are still to come.</p>
@@ -1301,14 +1304,7 @@ function renderSettingsAbout() {
         <p><strong>V61</strong> · August 2026</p>
         <p class="muted">Two things you can now see that were always in your data. Search an asset number on the Sessions screen and, if you've tested it before, you're offered its full history — every job, date, result, location, readings and notes in one list, newest first, with a tap to open the original item. No more opening three jobs to piece together whether a machine has failed before. And every job now shows its testing time under Session settings: first item logged to last, with breaks included, so it's an honest span rather than time on tools. A job logged across more than one day says so instead of showing a misleading number. You can print the testing time on your certificate if you want it — it's off until you switch it on under Report settings → What to include, because how long a job took is your business, not automatically your customer's. Behind all this, the app now records the time each item is logged on every job. Your Item Timestamps setting still decides whether the Time column shows in your CSV; nothing about your exports changes unless you change it.</p>
 
-        <p><strong>V60</strong> · August 2026</p>
-        <p class="muted">Settings &rarr; Contact now has a Report a problem button. Pick whether it's a bug, an idea or general feedback, say how bad it is and whether it happens every time, then describe it in your own words — the app attaches its own version, your phone and OS, your settings and any error it caught, so you don't have to go looking for any of it. You can check exactly what's being sent before it goes, and it's counts and settings only: no client names, sites, locations or asset numbers ever leave your phone. It works with no signal too — your email app holds the report and sends it once you're back online. If the app ever fails to start, that screen now carries a report link of its own. Also: leading zeros in asset numbers now stick. Start a job at 001 and it carries on 002, 003 rather than jumping to 2 — type a plain 1 and nothing changes.</p>
-
-
-
-
-
-      </div>
+              </div>
 
       <div class="info-card">
         <h3>Set up another device</h3>
