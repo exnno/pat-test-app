@@ -650,6 +650,11 @@ function normaliseReportSettings(stored) {
   // no such key, and `undefined === true` is false, so every existing user's
   // certificate is byte-identical until they deliberately switch it on.
   out.showDuration    = stored.showDuration === true;
+  // v64: photo appendix on the PDF. The SECOND flag here to default OFF, and for
+  // the same reason as showDuration above — `=== true`, NOT `!== false`. A
+  // settings blob, backup or setup bundle written before v64 has no such key, so
+  // every existing certificate stays byte-identical until it is switched on.
+  out.showPhotos      = stored.showPhotos === true;
   out.declaration     = stored.declaration !== false;
   out.retestEnabled   = stored.retestEnabled === true;
   const rm = parseInt(stored.retestMonths, 10);

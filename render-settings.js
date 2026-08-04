@@ -1178,6 +1178,8 @@ function renderSettingsReport() {
         ${toggle('report-show-fails', 'List failed items', rs.showFails, rs.showFails ? 'All items listed' : 'Passes only')}
         ${state.readingsEnabled ? toggle('report-show-readings', 'Test readings', rs.showReadings, rs.showReadings ? 'Readings columns shown when recorded' : 'Readings kept off the certificate') : ''}
         ${toggle('report-show-duration', 'Testing time', rs.showDuration, rs.showDuration ? 'Prints how long the job took' : 'Kept off the certificate')}
+        ${toggle('report-show-photos', 'Photos', rs.showPhotos, rs.showPhotos ? 'Photo pages added after the declaration' : 'Kept off the certificate')}
+        ${rs.showPhotos ? `<p class="muted" style="margin-left:16px">Any photos you've taken are added at the end of the report, under the asset they belong to. The certificate itself doesn't change. Photos are made smaller for printing so the file stays small enough to send — on a very big job they're made smaller still, and past 150 photos the report says clearly that not all of them are shown.</p>` : ''}
         ${toggle('report-declaration', 'Declaration line', rs.declaration)}
         ${toggle('report-show-appcredit', 'PATGo credit line', rs.showAppCredit, rs.showAppCredit ? 'Shown at the foot of the report' : 'Hidden')}
         <div style="margin-left:16px${rs.showAppCredit ? '' : ';opacity:.5'}">
@@ -1291,18 +1293,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v63: rolled forward — V63 on top, V60 dropped. -->
+      <!-- v8: rolling 3-version changelog. v64: rolled forward — V64 on top, V61 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V64</strong> · August 2026</p>
+        <p class="muted">Your photos can now go on the report. Switch <strong>Photos</strong> on under Settings &rarr; Report settings &rarr; What to include, and every photo you've taken on that job is added to the end of the certificate, grouped under the asset it belongs to with the fail reason underneath. The certificate itself is untouched &mdash; the register, the totals and the declaration all read exactly as before, and the photos follow after them as clearly-labelled evidence pages. It's off until you turn it on, because you may have been sending certificates for weeks and quietly adding four pages of photographs to them isn't our decision to make. There's also a <strong>Photos</strong> button in the report preview so you can put them on or leave them off for one particular job without changing your settings. Photos are shrunk down for printing, so the file stays small enough to send from your phone; on a very large job they're shrunk further so that all of them still fit. Beyond 150 photos the report states plainly, on the first photo page, exactly how many are shown and how many aren't.</p>
 
         <p><strong>V63</strong> · August 2026</p>
         <p class="muted">A reliability fix under the bonnet, with nothing to change in how you use the app. The "what's new" note you're reading is shown once per update and then remembered, and the way the app kept track of that had grown fragile: six separate files all had to be updated together on every release, and if even one of them arrived late or was still being served from your phone's cache, the app could fail to open at all. That was the cause of the start-up failure some of you hit on V61. The app now works it out from a single setting in one place, so those files can never drift apart again — and in the worst case you'd see this note an extra time rather than a screen that won't load. There is no change to your data, your jobs, your photos or your settings.</p>
 
         <p><strong>V62</strong> · August 2026</p>
         <p class="muted">You can now attach photos to a failed item. Tap FAIL and there's an Add photo button in the reasons sheet — take up to three per item, of the damage, the plug, the rating label, whatever the evidence is. They save with that item, and failed items in the Overview show a small camera icon with a count; tap it to look through them, add another or delete one. Photos are for fails only, deliberately: it keeps logging a pass as fast as it has always been, and it keeps the storage sensible. Changing a fail to a pass gives up its photos, and the app tells you how many before it does it. Two things worth knowing. Photos stay on this phone — nothing is uploaded anywhere. And they are <strong>not</strong> in your normal backup: they're far too large for it, and putting them in would risk the backup itself failing to save. There's a separate Export photos button on the Backup screen — use it as well as your usual backup, not instead of it. Restore a backup on a new phone and the app will remind you if the photos are still to come.</p>
-
-        <p><strong>V61</strong> · August 2026</p>
-        <p class="muted">Two things you can now see that were always in your data. Search an asset number on the Sessions screen and, if you've tested it before, you're offered its full history — every job, date, result, location, readings and notes in one list, newest first, with a tap to open the original item. No more opening three jobs to piece together whether a machine has failed before. And every job now shows its testing time under Session settings: first item logged to last, with breaks included, so it's an honest span rather than time on tools. A job logged across more than one day says so instead of showing a misleading number. You can print the testing time on your certificate if you want it — it's off until you switch it on under Report settings → What to include, because how long a job took is your business, not automatically your customer's. Behind all this, the app now records the time each item is logged on every job. Your Item Timestamps setting still decides whether the Time column shows in your CSV; nothing about your exports changes unless you change it.</p>
 
               </div>
 

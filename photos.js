@@ -301,6 +301,70 @@ function photosForItem(itemId) {
     .catch(() => []);
 }
 
+// v64: every photo belonging to one job, oldest first. Uses the DENORMALISED
+// sessionId index — the same index photosDeleteForSessions relies on, and the
+// reason that field exists at all. Returns [] on any failure, like its sibling:
+// a report must still build when the photo store is unavailable.
+function photosForSession(sessionId) {
+  if (!sessionId) return Promise.resolve([]);
+  return _photoTx('readonly', (store) => store.index('sessionId').getAll(sessionId))
+    .then(({ result }) => {
+      const list = (result || []).slice();
+      list.sort((a, b) => String(a.at || '').localeCompare(String(b.at || '')));
+      return list;
+    })
+    .catch(() => []);
+}
+
+// v64: re-encode one stored photo down to print size for the PDF appendix.
+// Same canvas recipe as processPhotoFile (proven on iOS since v34) with two
+// differences: the source is a Blob already in the store rather than a picked
+// File, and the output is a DATA URL rather than a Blob, because that is what
+// jsPDF's addImage takes.
+//
+// Resolves { dataUrl, w, h } or NULL on any failure — a photo that will not
+// decode is skipped and the rest of the report is unaffected.
+function photoPrintDataUrl(blob, maxPx, quality) {
+  return new Promise((resolve) => {
+    if (!blob) { resolve(null); return; }
+    let objUrl = '';
+    const done = (val) => {
+      if (objUrl) { try { URL.revokeObjectURL(objUrl); } catch (e) {} }
+      resolve(val);
+    };
+    try {
+      // Object URL rather than a FileReader data URL: the source is already a
+      // Blob, and going via base64 first would double peak memory for no gain.
+      // NOT routed through photoObjectUrl() — that tracker is for URLs handed to
+      // the UI and revoked on sheet close; this one is revoked here, immediately.
+      objUrl = URL.createObjectURL(blob);
+      const img = new Image();
+      img.onload = () => {
+        try {
+          const cap = (typeof maxPx === 'number' && maxPx > 0) ? maxPx : 640;
+          const q = (typeof quality === 'number' && quality > 0) ? quality : 0.65;
+          let { width, height } = img;
+          if (!width || !height) { done(null); return; }
+          if (width > cap || height > cap) {
+            const scale = cap / Math.max(width, height);
+            width = Math.round(width * scale);
+            height = Math.round(height * scale);
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = width; canvas.height = height;
+          const cx = canvas.getContext('2d');
+          cx.fillStyle = '#ffffff';
+          cx.fillRect(0, 0, width, height);
+          cx.drawImage(img, 0, 0, width, height);
+          done({ dataUrl: canvas.toDataURL('image/jpeg', q), w: width, h: height });
+        } catch (e) { done(null); }
+      };
+      img.onerror = () => done(null);
+      img.src = objUrl;
+    } catch (e) { done(null); }
+  });
+}
+
 // ---------- deletes ----------
 
 // Delete one photo by id. Resolves true if it went.

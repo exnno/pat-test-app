@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V63';
+const APP_VERSION = 'V64';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -91,10 +91,10 @@ const CAL_DUE_KEY = 'pat:caldue';
 // TO ROLL A WELCOME: change WELCOME_VERSION below to the new release, and write
 // the new copy in render-core.js. That is the whole job.
 //
-// v63 keeps it at 'V62': V63 is a pure structural release and ships no welcome of
-// its own, so the key stays 'pat:v62welcome'. Anyone who dismissed the V62 modal
-// stays dismissed; anyone who has not opened since V62 still gets it. Both correct.
-const WELCOME_VERSION = 'V62';
+// v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
+// line that changes to do it (plus the copy in render-core.js). The key becomes
+// 'pat:v64welcome'; nothing else in the codebase names a version.
+const WELCOME_VERSION = 'V64';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -437,6 +437,14 @@ function makeDefaultReportSettings() {
     // `=== true` (storage.js) rather than `!== false`, so a saved settings blob
     // from before v61 backfills to OFF, not ON.
     showDuration:     false,
+    // v64: print the photographic evidence appendix after the declaration.
+    // Default FALSE — opt-in, the same posture as showDuration and for the same
+    // reason (decision Q6A). Anyone who has been taking photos since V62 has a
+    // certificate they are already sending to clients; quietly adding four pages
+    // of photographs to it would be a silent change to their output. The V64
+    // welcome modal tells them the switch exists. Read with `=== true`
+    // (storage.js) so a pre-v64 settings blob backfills to OFF, not ON.
+    showPhotos:       false,
     declaration:      true,    // print the declaration/signature line
     declarationText:  REPORT_DECLARATION_DEFAULT,
     // v34: optional signature image (base64 PNG data URL, downscaled <=400px on
@@ -536,6 +544,47 @@ const PHOTO_BUNDLE_VERSION = 1;
 // warns about the file size before building it, because a 60MB attachment is a
 // surprise worth having in advance rather than after a two-minute encode.
 const PHOTO_EXPORT_WARN_BYTES = 25 * 1024 * 1024;
+
+// ---------------------------------------------------------------------------
+// v64: photographic evidence appendix on the PDF certificate.
+//
+// Photos are STORED at PHOTO_MAX_PX (1280px) because the on-screen strip and any
+// future upload want the detail. The certificate does not: three photos across a
+// portrait A4 page is a printed slot about 165pt wide, so anything past ~500px is
+// resolution nobody will ever see. They are therefore RE-ENCODED at build time,
+// smaller, and the size is chosen from how many the job has (decision Q8A).
+//
+// WHY A LADDER AND NOT A FIXED SIZE + A HARD CAP: a hard cap silently drops a big
+// job's evidence, which is the one thing a photo appendix must not do. Shrinking
+// instead of dropping means every photo still prints; a fifty-fail job just gets
+// smaller pictures. Even the bottom rung is over 170dpi at the printed size, which
+// is fine for "this plug top is cracked".
+const REPORT_PHOTO_TIERS = [
+  { upTo: 24,       maxPx: 640, quality: 0.65 },   // ~45KB each  → ~1.1MB
+  { upTo: 60,       maxPx: 512, quality: 0.60 },   // ~30KB each  → ~1.8MB
+  { upTo: Infinity, maxPx: 400, quality: 0.55 }    // ~18KB each  → ~2.7MB at the ceiling
+];
+
+// The absolute ceiling (decision Q9A). 150 photos is fifty failed items carrying
+// three shots each — a very large job. A ceiling has to exist somewhere: past it
+// the PDF stops being something an iOS share sheet will handle, and a certificate
+// that cannot be sent has failed at the only job it has. When it bites, the report
+// says so LOUDLY — a boxed notice on the FIRST appendix page (not buried on page
+// fifty) and a second line at the end. See _appendPhotoPages in report.js.
+const REPORT_PHOTO_HARD_MAX = 150;
+
+// Photos across one row of the appendix. Three fits the per-item cap exactly, so
+// one item's evidence is always one row.
+const REPORT_PHOTO_COLS = 3;
+
+// Pick the encode tier for a given photo count.
+function reportPhotoTierFor(count) {
+  const n = Number(count) || 0;
+  for (let i = 0; i < REPORT_PHOTO_TIERS.length; i++) {
+    if (n <= REPORT_PHOTO_TIERS[i].upTo) return REPORT_PHOTO_TIERS[i];
+  }
+  return REPORT_PHOTO_TIERS[REPORT_PHOTO_TIERS.length - 1];
+}
 
 // v49: the PATGo footer logo, embedded as a small base64 PNG so it renders in
 // the PDF with zero network access (reports must work fully offline). This is a

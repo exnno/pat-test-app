@@ -139,7 +139,248 @@ function addMonthsFormatted(iso, months) {
 
 // Build the jsPDF document for a session. Returns the doc, or throws if the
 // libraries failed to load (caller surfaces a friendly message).
-function buildReportDoc(session) {
+// ---------------------------------------------------------------------------
+// v64: photographic evidence appendix.
+//
+// ⚠ THE STRUCTURAL PROBLEM THIS SOLVES. Photos live in IndexedDB, which is
+// ASYNC. buildReportDoc() is SYNCHRONOUS and has three call sites, two of which
+// (the preview's rebuild() and reopenReportPreview) are themselves sync. The V62
+// rule — never make a render path wait on a database — applies just as hard here.
+//
+// So the photos are read and re-encoded ONCE, up front, in the already-async
+// produceReport(), and cached against the session id. buildReportDoc then takes
+// them as a plain second argument: a list of groups holding ready-made data URLs.
+// Building a report never touches the database. Quick-adjust rebuilds re-use the
+// cache and cost nothing.
+// ---------------------------------------------------------------------------
+
+// The cache. One session's worth; produceReport refreshes it, the preview reuses
+// it. `groups` is [{ item, photos: [{dataUrl, w, h}] }] in REGISTER order.
+const _reportPhotoCache = {
+  sessionId: null, groups: [], total: 0, printed: 0, omitted: 0, hitCap: false
+};
+
+function _emptyPhotoData(sessionId) {
+  return { sessionId: sessionId || null, groups: [], total: 0, printed: 0, omitted: 0, hitCap: false };
+}
+
+function _setReportPhotoCache(data) {
+  _reportPhotoCache.sessionId = data.sessionId;
+  _reportPhotoCache.groups    = data.groups;
+  _reportPhotoCache.total     = data.total;
+  _reportPhotoCache.printed   = data.printed;
+  _reportPhotoCache.omitted   = data.omitted;
+  _reportPhotoCache.hitCap    = data.hitCap;
+  return data;
+}
+
+// Read every photo for the job, group it by item in register order, and re-encode
+// each one down to print size. Resolves to the shape above — NEVER rejects, and
+// resolves empty on any failure, because a photo problem must never stop a
+// certificate being produced (the photos.js failure posture, unchanged).
+async function collectReportPhotos(session) {
+  const empty = _emptyPhotoData(session ? session.id : null);
+  if (!session) return empty;
+  if (typeof photosSupported !== 'function' || !photosSupported()) return empty;
+  if (typeof photosForSession !== 'function' || typeof photoPrintDataUrl !== 'function') return empty;
+
+  let records = [];
+  try { records = await photosForSession(session.id); } catch (e) { return empty; }
+  if (!records || !records.length) return empty;
+
+  // Group by item and walk in ITEM order, so the appendix reads in the same
+  // order as the register above it. A photo whose item has since been deleted
+  // has no group to join and is skipped — deliberate: there is nothing to
+  // caption it with.
+  const byItem = {};
+  records.forEach((r) => {
+    if (!r || !r.itemId || !r.blob) return;
+    (byItem[r.itemId] = byItem[r.itemId] || []).push(r);
+  });
+  const ordered = [];
+  (session.items || []).forEach((it) => {
+    const list = byItem[it.id];
+    if (list && list.length) ordered.push({ item: it, records: list });
+  });
+  if (!ordered.length) return empty;
+
+  const total = ordered.reduce((n, g) => n + g.records.length, 0);
+  const tier = (typeof reportPhotoTierFor === 'function')
+    ? reportPhotoTierFor(total)
+    : { maxPx: 640, quality: 0.65 };
+  const cap = (typeof REPORT_PHOTO_HARD_MAX === 'number') ? REPORT_PHOTO_HARD_MAX : 150;
+
+  const groups = [];
+  let printed = 0;
+  let hitCap = false;
+  let seen = 0;
+
+  for (let gi = 0; gi < ordered.length; gi++) {
+    if (printed >= cap) { hitCap = true; break; }
+    const photos = [];
+    for (let pi = 0; pi < ordered[gi].records.length; pi++) {
+      if (printed >= cap) { hitCap = true; break; }
+      // Sequential, one at a time. Forty parallel canvas encodes on a phone is a
+      // memory spike for no gain — the same reasoning as the bulk photo delete.
+      const enc = await photoPrintDataUrl(ordered[gi].records[pi].blob, tier.maxPx, tier.quality);
+      seen++;
+      if (enc && enc.dataUrl) { photos.push(enc); printed++; }
+      // Each photo is a canvas pass, so a big job is several seconds of apparent
+      // nothing. showToast replaces itself on each call, so it can count up.
+      if (total > 8 && seen % 5 === 0 && typeof showToast === 'function') {
+        showToast(`Adding photos\u2026 ${seen} of ${total}`);
+      }
+    }
+    if (photos.length) groups.push({ item: ordered[gi].item, photos });
+  }
+
+  return {
+    sessionId: session.id,
+    groups,
+    total,
+    printed,
+    omitted: Math.max(0, total - printed),
+    hitCap
+  };
+}
+
+// Reuse the cache when it already holds this session; otherwise collect fresh.
+// Used by the preview's quick-adjust and by reopenReportPreview, so flipping the
+// chip off and on again doesn't re-encode a hundred photos.
+async function ensureReportPhotos(session) {
+  if (!session) return _emptyPhotoData(null);
+  if (_reportPhotoCache.sessionId === session.id) return _reportPhotoCache;
+  return _setReportPhotoCache(await collectReportPhotos(session));
+}
+
+// Should this document carry an appendix at all? Three gates, matching the house
+// pattern for every other optional block: the setting is on, AND there is photo
+// data, AND that data actually contains something printable.
+function _photoAppendixWanted(data) {
+  return !!(state.reportSettings && state.reportSettings.showPhotos === true
+    && data && data.groups && data.groups.length);
+}
+
+// Draw the appendix onto the END of the document, after the declaration. Returns
+// nothing; the caller runs the footer pass afterwards so these pages are numbered
+// and footed like every other page.
+function _appendPhotoPages(doc, session, data, margin, headerRgb) {
+  const pageW = doc.internal.pageSize.getWidth();
+  const pageH = doc.internal.pageSize.getHeight();
+  const contentW = pageW - margin * 2;
+  const cols = (typeof REPORT_PHOTO_COLS === 'number') ? REPORT_PHOTO_COLS : 3;
+  const gap = 10;
+  const colW = (contentW - gap * (cols - 1)) / cols;
+  const boxH = colW;                 // square slot; portrait and landscape shots both fit
+  const bottomLimit = pageH - 46;    // clear of the footer band at pageH-20
+
+  doc.addPage();
+  let y = margin;
+
+  // ----- Appendix title -----
+  doc.setFontSize(14); doc.setFont(undefined, 'bold');
+  doc.setTextColor(headerRgb[0], headerRgb[1], headerRgb[2]);
+  doc.text(pdfSafe('Photographic evidence'), margin, y + 12);
+  doc.setTextColor(0);
+  y += 22;
+  doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+  const introLines = doc.splitTextToSize(
+    pdfSafe('Photographs recorded during testing, listed against the asset each belongs to.'),
+    contentW
+  );
+  doc.text(introLines, margin, y + 8);
+  y += introLines.length * 11 + 8;
+  doc.setTextColor(0);
+
+  // ----- The "not everything is here" notice (decision Q9A: make it clear) -----
+  // Printed on the FIRST appendix page, boxed, not buried at the end of fifty
+  // pages where nobody would reach it. It is repeated at the end as well.
+  const omitted = data.omitted || 0;
+  if (omitted > 0) {
+    const msg = data.hitCap
+      ? `IMPORTANT: this report shows the first ${data.printed} of ${data.total} photographs. `
+        + `${omitted} ${omitted === 1 ? 'photograph is' : 'photographs are'} NOT printed here, because a report `
+        + `containing all of them would be too large to send. The full set is still on the testing device and can be `
+        + `supplied separately on request.`
+      : `IMPORTANT: ${omitted} of ${data.total} ${omitted === 1 ? 'photograph' : 'photographs'} could not be read and `
+        + `${omitted === 1 ? 'is' : 'are'} NOT printed here. The full set is still on the testing device.`;
+    doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(140, 20, 20);
+    const noticeLines = doc.splitTextToSize(pdfSafe(msg), contentW - 16);
+    const noticeH = noticeLines.length * 11 + 14;
+    doc.setFillColor(253, 235, 235); doc.setDrawColor(200, 120, 120);
+    doc.rect(margin, y, contentW, noticeH, 'FD');
+    doc.text(noticeLines, margin + 8, y + 15);
+    y += noticeH + 14;
+    doc.setTextColor(0); doc.setFont(undefined, 'normal'); doc.setDrawColor(0);
+  }
+
+  // ----- One block per item -----
+  data.groups.forEach((g) => {
+    const it = g.item || {};
+    const headBits = [];
+    if (it.assetNo) headBits.push(String(it.assetNo));
+    if (it.itemType) headBits.push(String(it.itemType));
+    let head = pdfSafe(headBits.join('  \u00b7  ') || 'Item');
+    if (it.location) head += pdfSafe('   \u2014 ' + it.location);
+
+    doc.setFontSize(9); doc.setFont(undefined, 'normal');
+    const noteText = (it.notes || '').trim();
+    const noteLines = noteText ? doc.splitTextToSize(pdfSafe(noteText), contentW) : [];
+
+    // Rows of up to `cols` photos (the per-item cap is 3 and cols is 3, so this
+    // is one row today — written as a loop so raising PHOTO_MAX_PER_ITEM later
+    // doesn't silently drop photos off the side of the page).
+    const rowCount = Math.max(1, Math.ceil(g.photos.length / cols));
+    const blockH = 14 + (noteLines.length * 11) + 6 + (rowCount * (boxH + 10)) + 8;
+
+    if (y + blockH > bottomLimit) { doc.addPage(); y = margin; }
+
+    doc.setFontSize(10); doc.setFont(undefined, 'bold'); doc.setTextColor(0);
+    doc.text(head, margin, y + 10);
+    y += 14;
+    if (noteLines.length) {
+      doc.setFontSize(9); doc.setFont(undefined, 'italic'); doc.setTextColor(90);
+      doc.text(noteLines, margin, y + 8);
+      y += noteLines.length * 11;
+      doc.setTextColor(0); doc.setFont(undefined, 'normal');
+    }
+    y += 6;
+
+    for (let r = 0; r < rowCount; r++) {
+      const row = g.photos.slice(r * cols, (r + 1) * cols);
+      // A row that would fall off the bottom starts a new page.
+      if (y + boxH > bottomLimit) { doc.addPage(); y = margin; }
+      row.forEach((p, i) => {
+        const x = margin + i * (colW + gap);
+        doc.setDrawColor(215); doc.setLineWidth(0.5);
+        doc.rect(x, y, colW, boxH);
+        try {
+          const scale = Math.min(colW / p.w, boxH / p.h);
+          const iw = p.w * scale, ih = p.h * scale;
+          doc.addImage(p.dataUrl, 'JPEG', x + (colW - iw) / 2, y + (boxH - ih) / 2, iw, ih);
+        } catch (e) { /* a bad photo never blocks the report — house rule */ }
+      });
+      doc.setDrawColor(0); doc.setLineWidth(0.2);
+      y += boxH + 10;
+    }
+    y += 8;
+  });
+
+  // ----- Repeat the omission notice at the end -----
+  if (omitted > 0) {
+    if (y + 30 > bottomLimit) { doc.addPage(); y = margin; }
+    doc.setFontSize(9); doc.setFont(undefined, 'bold'); doc.setTextColor(140, 20, 20);
+    const tail = doc.splitTextToSize(
+      pdfSafe(`End of photographs. ${omitted} of ${data.total} `
+        + `${omitted === 1 ? 'photograph is' : 'photographs are'} not printed in this report \u2014 see the notice on the first page of this appendix.`),
+      contentW
+    );
+    doc.text(tail, margin, y + 10);
+    doc.setTextColor(0); doc.setFont(undefined, 'normal');
+  }
+}
+
+function buildReportDoc(session, photoData) {
   const JsPDF = getJsPDF();
   if (!JsPDF) throw new Error('PDF engine not loaded');
   const rs = state.reportSettings;
@@ -361,42 +602,11 @@ function buildReportDoc(session) {
     }
   });
 
-  // ----- Footer on every page: page numbers + generated stamp + declaration -----
-  const pageCount = doc.internal.getNumberOfPages();
-  const genStamp = formatDate(todayISO());
-  for (let p = 1; p <= pageCount; p++) {
-    doc.setPage(p);
-    const pageH = doc.internal.pageSize.getHeight();
-    doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(120);
-    doc.text(`Page ${p} of ${pageCount}`, pageW - margin, pageH - 20, { align: 'right' });
-    // v48: app credit is optional. When off, the footer shows just the generated
-    // stamp; when on (default), it reads "Generated … · PATGo {version}".
-    const creditOn = !(state.reportSettings && state.reportSettings.showAppCredit === false);
-    const footerLeft = creditOn
-      ? `Generated ${genStamp} · PATGo ${APP_VERSION}`
-      : `Generated ${genStamp}`;
-    // v49: the PATGo footer logo. Subordinate to the credit toggle (Q2): it only
-    // draws when the credit line is on AND showFooterLogo is on (default). Drawn
-    // as a small square mark to the LEFT of the credit text, vertically centred
-    // on the text baseline. A bad image never blocks the report (same guard as
-    // the header/signature logos). The text then starts to the right of the mark.
-    let textX = margin;
-    const footerLogoOn = creditOn && !(state.reportSettings && state.reportSettings.showFooterLogo === false);
-    if (footerLogoOn && typeof PATGO_FOOTER_LOGO === 'string' && PATGO_FOOTER_LOGO) {
-      try {
-        const sz = 11;                 // pt square — matches the 8pt text height band
-        const logoY = pageH - 20 - sz + 2;  // sit it on the text baseline
-        doc.addImage(PATGO_FOOTER_LOGO, 'PNG', margin, logoY, sz, sz);
-        textX = margin + sz + 5;       // nudge the text clear of the mark
-      } catch (e) { /* a bad footer logo never blocks the report */ }
-    }
-    doc.text(footerLeft, textX, pageH - 20);
-    doc.setTextColor(0);
-  }
-
-  // Declaration + signature on the LAST page, above the footer.
+  // Declaration + signature on the LAST page of the CERTIFICATE, above the footer.
+  // v64: this block, and the photo appendix below it, now run BEFORE the footer
+  // pass rather than after it. See the note on that pass for why.
   if (rs.declaration) {
-    doc.setPage(pageCount);
+    doc.setPage(doc.internal.getNumberOfPages());
     const pageH = doc.internal.pageSize.getHeight();
     // v34: does a signature image exist? If so we need extra headroom above the
     // signing rule for it.
@@ -437,6 +647,64 @@ function buildReportDoc(session) {
     const dateStr = session.date ? formatDate(session.date) : '';
     const dateLabel = dateStr ? `Date: ${dateStr}` : 'Date: ______________';
     doc.text(dateLabel, pageW - margin - 150, dy);
+  }
+
+  // ----- v64: photographic evidence appendix (decision Q1A) -----
+  // Last in the document, after the declaration, on its own pages. Placing it
+  // here means the certificate itself never moves: page 1 is identical, the
+  // register is identical, and a job with no photos (or the setting off) produces
+  // a byte-identical PDF to V63.
+  //
+  // `photoData` is passed in by produceReport, which collected it asynchronously
+  // before calling us. When called without it (the preview's in-place rebuild) we
+  // fall back to the cache, which holds this same session's photos already.
+  const _photos = (photoData !== undefined && photoData !== null)
+    ? photoData
+    : ((_reportPhotoCache.sessionId === session.id) ? _reportPhotoCache : null);
+  if (_photoAppendixWanted(_photos)) {
+    // Guarded: an appendix that throws must not cost the engineer the whole
+    // certificate. Worst case the report prints without its photos.
+    try { _appendPhotoPages(doc, session, _photos, margin, headerRgb); }
+    catch (e) { console.error('Photo appendix failed (non-fatal).', e); }
+  }
+
+  // ----- Footer on every page: page numbers + generated stamp + declaration -----
+  // v64: THIS PASS MOVED. It used to run before the declaration block, which
+  // meant `pageCount` was captured too early: a declaration pushed onto a fresh
+  // page got no footer at all, and every other page said "of N" when the document
+  // actually had N+1. Appending photo pages after it would have made that wrong on
+  // every photo report, so the pass now runs LAST, once the document is complete.
+  // Existing output changes only in the case that was already wrong.
+  const pageCount = doc.internal.getNumberOfPages();
+  const genStamp = formatDate(todayISO());
+  for (let p = 1; p <= pageCount; p++) {
+    doc.setPage(p);
+    const pageH = doc.internal.pageSize.getHeight();
+    doc.setFontSize(8); doc.setFont(undefined, 'normal'); doc.setTextColor(120);
+    doc.text(`Page ${p} of ${pageCount}`, pageW - margin, pageH - 20, { align: 'right' });
+    // v48: app credit is optional. When off, the footer shows just the generated
+    // stamp; when on (default), it reads "Generated … · PATGo {version}".
+    const creditOn = !(state.reportSettings && state.reportSettings.showAppCredit === false);
+    const footerLeft = creditOn
+      ? `Generated ${genStamp} · PATGo ${APP_VERSION}`
+      : `Generated ${genStamp}`;
+    // v49: the PATGo footer logo. Subordinate to the credit toggle (Q2): it only
+    // draws when the credit line is on AND showFooterLogo is on (default). Drawn
+    // as a small square mark to the LEFT of the credit text, vertically centred
+    // on the text baseline. A bad image never blocks the report (same guard as
+    // the header/signature logos). The text then starts to the right of the mark.
+    let textX = margin;
+    const footerLogoOn = creditOn && !(state.reportSettings && state.reportSettings.showFooterLogo === false);
+    if (footerLogoOn && typeof PATGO_FOOTER_LOGO === 'string' && PATGO_FOOTER_LOGO) {
+      try {
+        const sz = 11;                 // pt square — matches the 8pt text height band
+        const logoY = pageH - 20 - sz + 2;  // sit it on the text baseline
+        doc.addImage(PATGO_FOOTER_LOGO, 'PNG', margin, logoY, sz, sz);
+        textX = margin + sz + 5;       // nudge the text clear of the mark
+      } catch (e) { /* a bad footer logo never blocks the report */ }
+    }
+    doc.text(footerLeft, textX, pageH - 20);
+    doc.setTextColor(0);
   }
 
   return doc;
@@ -480,12 +748,21 @@ function reportFilename(session, patternOverride) {
 // v35: reopen the preview for a session id (used by the settings deep-link
 // return). Rebuilds the doc from current settings so any edits show immediately.
 // Silently no-ops if the session/engine is unavailable.
-function reopenReportPreview(sessionId) {
+// v64: async, because returning from Report Settings may have just switched the
+// photo appendix ON — in which case the photos have to be read before the rebuilt
+// preview can show them. ensureReportPhotos reuses the cache when this session's
+// photos were already collected, so the common case costs nothing.
+async function reopenReportPreview(sessionId) {
   if (!sessionId) return;
   const session = state.sessions.find(s => s.id === sessionId);
   if (!session || !getJsPDF()) return;
+  let photoData = _emptyPhotoData(session.id);
+  if (state.reportSettings.showPhotos === true) {
+    try { photoData = await ensureReportPhotos(session); }
+    catch (e) { console.error('Photo collection failed (non-fatal).', e); }
+  }
   let doc;
-  try { doc = buildReportDoc(session); } catch (e) { return; }
+  try { doc = buildReportDoc(session, photoData); } catch (e) { return; }
   openReportPreview(doc, session);
 }
 
@@ -533,9 +810,28 @@ async function produceReport(sessionId) {
   }
 
   stampCertNumber(session);   // v36: assign-once cert number before building
+
+  // v64: read and re-encode the job's photos BEFORE building. This is the only
+  // place that talks to the photo database on the report path — buildReportDoc
+  // stays synchronous and the preview's rebuilds reuse what this produces.
+  // Always a fresh collect (not ensureReportPhotos): photos may have been added
+  // since the last report for this job. Wrapped, because a photo failure must
+  // never cost the certificate.
+  let photoData = _emptyPhotoData(session.id);
+  if (state.reportSettings.showPhotos === true) {
+    try { photoData = await collectReportPhotos(session); }
+    catch (e) { console.error('Photo collection failed (non-fatal).', e); }
+  }
+  _setReportPhotoCache(photoData);
+  // Say so plainly if the ceiling bit, rather than leaving it to be discovered in
+  // the PDF (decision Q9A — make it clear).
+  if (photoData.hitCap && photoData.omitted > 0) {
+    showToast(`Report shows the first ${photoData.printed} of ${photoData.total} photos`);
+  }
+
   let doc;
   try {
-    doc = buildReportDoc(session);
+    doc = buildReportDoc(session, photoData);
   } catch (e) {
     openInfoSheet({ title: 'Couldn\u2019t build the report', message: 'Something went wrong building the report. Please try again.' });
     return;
@@ -597,6 +893,7 @@ function openReportPreview(doc, session) {
         ${chip('fails', rs.showFails, 'List all items')}
         ${chip('calibration', rs.showCalibration, 'Calibration')}
         ${chip('signature', rs.declaration, 'Declaration')}
+        ${chip('photos', rs.showPhotos, 'Photos')}
         ${hasSig ? chip('sigside', rs.signaturePosition === 'right', 'Signature right') : ''}
       </div>
     `;
@@ -709,7 +1006,7 @@ function openReportPreview(doc, session) {
     const keepName = currentBaseName();
     URL.revokeObjectURL(url);
     let d;
-    try { d = buildReportDoc(session); }
+    try { d = buildReportDoc(session, (_reportPhotoCache.sessionId === session.id) ? _reportPhotoCache : null); }
     catch (e) { openInfoSheet({ title: 'Couldn\u2019t rebuild the report', message: 'Something went wrong rebuilding the report. Please try again.' }); return; }
     refreshDocState(d);
     sheet.innerHTML = buildSheetHTML();
@@ -720,12 +1017,21 @@ function openReportPreview(doc, session) {
   }
 
   // v35: quick-adjust handler — flip the field, persist, rebuild.
-  function onQuickAdjust(action) {
+  // v64: async, for the Photos chip only. Every other chip is a pure settings
+  // flip and rebuilds instantly; switching photos ON for the first time in this
+  // preview has to read and re-encode them first. ensureReportPhotos caches, so
+  // toggling off and back on never re-encodes.
+  async function onQuickAdjust(action) {
     if (action === 'fails')        state.reportSettings.showFails = !state.reportSettings.showFails;
     else if (action === 'calibration') state.reportSettings.showCalibration = !state.reportSettings.showCalibration;
     else if (action === 'signature')   state.reportSettings.declaration = !state.reportSettings.declaration;
     else if (action === 'sigside')      state.reportSettings.signaturePosition = (state.reportSettings.signaturePosition === 'right') ? 'left' : 'right';
+    else if (action === 'photos')       state.reportSettings.showPhotos = !state.reportSettings.showPhotos;
     saveReportSettings();
+    if (action === 'photos' && state.reportSettings.showPhotos === true) {
+      try { _setReportPhotoCache(await ensureReportPhotos(session)); }
+      catch (e) { console.error('Photo collection failed (non-fatal).', e); }
+    }
     rebuild();
   }
 
@@ -739,7 +1045,7 @@ function openReportPreview(doc, session) {
       await shareOrDownloadReport(blob, currentFilename());
     });
     sheet.querySelectorAll('[data-qa]').forEach(btn => {
-      btn.addEventListener('click', () => onQuickAdjust(btn.getAttribute('data-qa')));
+      btn.addEventListener('click', () => { onQuickAdjust(btn.getAttribute('data-qa')).catch(() => {}); });
     });
     // Deep-link to Report Settings, returning to a fresh preview afterwards.
     const editBtn = document.getElementById('report-edit-settings');

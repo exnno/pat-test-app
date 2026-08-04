@@ -1,4 +1,4 @@
-# PATGo — Code Map (V63)
+# PATGo — Code Map (V64)
 
 Where each thing lives, so a feature change reads one or two small files instead
 of the old monolithic `app.js`. Load order = the order below. `app.js` no longer
@@ -102,6 +102,20 @@ never win "most common". `makeEmptyArchivedStats()` — factory (not a shared
 object) returning `{items:0, fails:0, types:{}}`, used as both the default and
 the validator's fallback. **`backupVersion` stays 5** — the bucket is additive on
 the backup and missing-field-tolerant.
+
+**v64 constants (photos on the certificate):** `REPORT_PHOTO_TIERS` — the
+encode ladder (≤24 → 640px/q0.65, ≤60 → 512px/q0.60, beyond → 400px/q0.55) and
+`reportPhotoTierFor(count)` which picks a rung. Photos are STORED at
+`PHOTO_MAX_PX` (1280) but a printed slot is ~165pt wide, so anything past ~500px
+is resolution nobody sees. ⚠ **The ladder exists so a big job SHRINKS rather than
+DROPS** — a fixed size plus a hard cap silently loses evidence, which is the one
+thing a photo appendix must not do. `REPORT_PHOTO_HARD_MAX` (150) is the absolute
+ceiling that still has to exist (past it the PDF outgrows what an iOS share sheet
+will handle), and when it bites the report says so loudly on the FIRST appendix
+page. `REPORT_PHOTO_COLS` (3) — matches `PHOTO_MAX_PER_ITEM`, so one item's
+evidence is always one row. `makeDefaultReportSettings()` gained `showPhotos`,
+**default FALSE** — opt-in, the second flag here to default off, for the same
+reason as `showDuration`. No new localStorage keys → **`backupVersion` stays 5**.
 
 **v62 constants (photo evidence):** ⚠ *Historical — the welcome key described here
 was REPLACED in v63 by the derived `WELCOME_VERSION`/`WELCOME_KEY` pair documented
@@ -477,6 +491,12 @@ bug. Add a control here? Wire it through `_applyBugSheetDOM()`.
 the error catcher. The SHEET MARKUP is not here — it's `renderBugSheet()` in
 render-settings.js (render files own markup).
 
+**v64 note (storage.js):** `normaliseReportSettings` gained
+`out.showPhotos = stored.showPhotos === true;` — the SECOND `=== true` flag here,
+for exactly the reason spelled out below for `showDuration`. Also mutation-tested:
+flipping it to `!== false` fails three assertions, led by *"an OLD backup with no
+showPhotos restores to OFF"*.
+
 **v61 note (storage.js):** `normaliseReportSettings` gained
 `out.showDuration = stored.showDuration === true;` — **note the `=== true`**. Every
 neighbouring flag uses `!== false` because they default ON; this one defaults OFF,
@@ -517,6 +537,14 @@ and has no single result" — so **every** multi-delete read as a failure and
 silently skipped its index update, leaving stale counts on screen until restart.
 `oncomplete` is the only success signal. Caught by the smoke harness; keep the
 two signals separate.
+**v64 reads/encode for the PDF:** `photosForSession(sessionId)` — every photo for
+one job, oldest first, via the DENORMALISED `sessionId` index (the reason that
+field exists). `photoPrintDataUrl(blob, maxPx, quality)` — re-encodes ONE stored
+photo down to print size and returns a **data URL** (what jsPDF's `addImage`
+takes), same canvas recipe as `processPhotoFile` but sourced from a Blob via an
+object URL that it revokes itself. **Deliberately NOT routed through
+`photoObjectUrl`** — that tracker is for URLs handed to the UI and revoked on
+sheet close; this one lives for milliseconds. Both resolve empty/null on failure.
 Index: `photoIndexLoad()` (rebuild from the store — called once from boot),
 `photoCountForItem(itemId)` (**the only thing `render()` may call**),
 `photoStatsSync()`, `_photoIndexAdd`/`_photoIndexRemove`.
@@ -670,6 +698,36 @@ automatically. `columnStyles` keeps reading cols compact + centred (Class/Polari
 header/details/totals layout is width-relative (`pageW`/`margin`), so landscape needed
 no header rework. NOTE: Ω/MΩ/✓/≥ render in jsPDF's standard font at a fallback glyph
 width (acceptable in short header/cell text; pre-existing for ≥ since v53).
+**v64 photographic evidence appendix.** ⚠ **THE ASYNC BOUNDARY — read this before
+touching the report path.** Photos live in IndexedDB (async); `buildReportDoc` is
+SYNCHRONOUS and has three call sites, two of them sync (the preview's `rebuild()`
+and `reopenReportPreview`). So photos are read and re-encoded ONCE, up front, in
+the already-async `produceReport`, and passed in as a second argument.
+**`buildReportDoc` never touches the database. Do not make it async.**
+- `_reportPhotoCache` (+ `_emptyPhotoData`, `_setReportPhotoCache`) — one job's
+  worth of `{groups:[{item, photos:[{dataUrl,w,h}]}], total, printed, omitted,
+  hitCap}`. `buildReportDoc(session, photoData)` falls back to the cache when
+  called with no argument, but ONLY when `_reportPhotoCache.sessionId` matches —
+  so another job can never inherit these photos.
+- `collectReportPhotos(session)` — reads, groups by item **in register order**
+  (a photo whose item was deleted has nothing to caption it and is skipped),
+  picks the tier from the total, then encodes **sequentially** (parallel canvas
+  encodes are a memory spike on a phone) with a counting toast past 8 photos.
+  Never rejects; resolves empty on any failure.
+- `ensureReportPhotos(session)` — cache-or-collect, used by the quick-adjust chip
+  and `reopenReportPreview` so toggling off/on never re-encodes.
+- `_photoAppendixWanted(data)`, `_appendPhotoPages(doc, session, data, margin,
+  headerRgb)` — the drawing. Square slots, aspect-fitted, item heading + notes,
+  page-break aware. Every `addImage` try/caught (house rule: a bad image never
+  blocks a report), and the whole call is wrapped in `buildReportDoc`.
+- ⚠ **THE FOOTER PASS MOVED, and it had to.** It used to run BEFORE the
+  declaration block, capturing `pageCount` too early — a declaration pushed onto a
+  fresh page got no footer and the others said "of N" on an N+1 page document. Add
+  photo pages after it and that is wrong on *every* photo report. It now runs
+  **last**, once the document is complete. `reopenReportPreview` is **async** as of
+  v64; its dispatch caller swallows the promise. Mutation-tested: restoring the old
+  order gives a 4-page report two footers reading "Page 1 of 2".
+
 **v61 testing time on the certificate:** one optional row in the job-details
 block, gated TWO ways — `rs.showDuration === true` (opt-in, default OFF) AND
 `sessionDuration(session)` returning non-null. A report from a user who hasn't
@@ -963,6 +1021,10 @@ Reports hub, Edit-session UI, empty states, the welcome modal, the first-run wiz
 the signature pad, the calibration banner, or the tour route.
 
 ## render-settings.js (~1675 ln) — settings screens
+**v64:** Report settings → What to include gains the `report-show-photos` toggle
+(+ an on-only plain-language note about shrinking and the 150 ceiling). About
+changelog rolled to V64/V63/V62 (V61 dropped).
+
 **v62:** `renderPhotoBackupSection()` — the Photos block on the Backup page
 (export / import / delete-all), which hides itself entirely when the device
 can't store photos rather than offering buttons that can't work. Its copy is
@@ -1130,6 +1192,10 @@ scroll-drag inside the now-scrollable preset list can't switch the preset by acc
 fields and `fail-other`).
 **v61:** clicks `asset-history-open`, `asset-history-close`, `asset-history-row`;
 change action `report-show-duration`.
+**v64:** change action `report-show-photos` (opt-in photo appendix). The
+`back-to-settings` deep-link now calls `reopenReportPreview(sid).catch(() => {})`
+— that function became async in v64 because returning from Report Settings may
+have just switched the appendix on.
 **Welcome dismiss (v50, decoupled v63):**
 `'welcome-dismiss': () => dismissWelcome('welcomeSeen', WELCOME_KEY)` — both
 arguments are permanent, so this line no longer changes when a welcome is rolled.

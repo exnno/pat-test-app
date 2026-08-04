@@ -197,10 +197,10 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Photos on fails.</strong> When you tap FAIL, there's now an <strong>Add photo</strong> button in the reasons sheet. Take up to three per item — the damage, the plug, the rating label — and they're saved with that item.</li>
-        <li><strong>Finding them again.</strong> Failed items in the Overview show a 📷 with a count. Tap it to view the photos, add another, or delete one.</li>
-        <li><strong>Photos are not in your normal backup.</strong> They're far too big for it. There's a separate <strong>Export photos</strong> button in Settings &rarr; Backup — use it alongside your usual backup, not instead of it.</li>
-        <li>Photos stay on this phone and are only kept for fails. Changing a fail to a pass deletes its photos, and it'll ask you first.</li>
+        <li><strong>Photos can go on the report.</strong> Every photo you've taken on a job can now be printed at the end of the certificate, grouped under the asset it belongs to with the fail reason underneath.</li>
+        <li><strong>It's off until you switch it on.</strong> Settings &rarr; Report settings &rarr; What to include &rarr; <strong>Photos</strong>. Your certificate doesn't change unless you ask it to — the register, totals and declaration all read exactly as they do now, and the photos come after them.</li>
+        <li><strong>Or just for one job.</strong> There's a <strong>Photos</strong> button in the report preview, next to List all items and Declaration, so you can add them to one report without changing your settings.</li>
+        <li>Photos are shrunk down for printing so the file stays small enough to send from your phone. On a very big job they're shrunk further so all of them still fit, and past 150 the report says clearly how many are shown and how many aren't.</li>
       </ul>
       <button class="btn-primary" data-action="welcome-dismiss">Continue</button>
     </div>

@@ -429,7 +429,8 @@ registerActions({
       const sid = state.reportPreviewReturnSessionId;
       state.reportPreviewReturnSessionId = null;
       setView('reports');   // a sensible underlay behind the preview overlay
-      reopenReportPreview(sid);
+      // v64: async now (it may need to read photos before rebuilding the preview).
+      reopenReportPreview(sid).catch(() => {});
       return;
     }
     if (state.view === 'settingsCategory') {
@@ -1011,6 +1012,9 @@ registerChangeActions({
   'report-show-footerlogo':  (checked) => { captureReportTextInputs(); state.reportSettings.showFooterLogo = checked; render(); },
   // v61: testing time on the certificate. Opt-in — defaults off (decision Q11B).
   'report-show-duration':    (checked) => { captureReportTextInputs(); state.reportSettings.showDuration = checked; render(); },
+  // v64: photographic evidence appendix. Opt-in — defaults off (decision Q6A),
+  // for the same reason as showDuration: it changes a client-facing certificate.
+  'report-show-photos':      (checked) => { captureReportTextInputs(); state.reportSettings.showPhotos = checked; render(); },
   'report-retest-enabled':   (checked) => { captureReportTextInputs(); state.reportSettings.retestEnabled = checked; render(); },
   // v36: certificate-numbers master toggle. Capture cert text inputs first so an
   // unsaved prefix/counter survives the re-render that enables/disables the
