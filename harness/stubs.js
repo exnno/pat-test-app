@@ -178,6 +178,13 @@ class StubElement {
   }
   focus()  { this.ownerDocument_activeElement = true; STUB_DOC.activeElement = this; }
   blur()   { if (STUB_DOC.activeElement === this) STUB_DOC.activeElement = null; }
+  // v67: real methods, not omissions. focusAssetForScan() calls focus() then
+  // select() inside one try/catch — with select() missing, the TypeError was
+  // caught and the test still saw a focused element, i.e. the right result via
+  // the wrong mechanism. Recording the calls lets a test assert the SELECTION
+  // happened, which is the half that stops an unrecognised scan appending.
+  select() { this.selectionStart = 0; this.selectionEnd = String(this.value || '').length; this.wasSelected = true; }
+  setSelectionRange(a, b) { this.selectionStart = a; this.selectionEnd = b; this.wasSelected = false; }
   click()  { this.dispatchEvent(makeEvent('click')); }
   scrollIntoView() {}
   getBoundingClientRect() { return { top: 0, left: 0, right: 0, bottom: 0, width: 0, height: 0, x: 0, y: 0 }; }

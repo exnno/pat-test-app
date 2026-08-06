@@ -171,6 +171,87 @@ const MUTATIONS = [
     to:   'function archiveSessionStats(sessions) { return;',
     why:  'the lifetime counter would go backwards every time Peter prunes',
   },
+
+  /* ---- V67: barcode scanner. Every one of these is a break that SHIPPED in
+     v65 and went undetected, or the same class of break arriving by a new
+     door. The suite had no keydown coverage at all before this release. ---- */
+  {
+    name: 'M21 a modifier keydown wipes the burst again (the v65 bug)',
+    file: 'scanner.js',
+    from: '  if (SCAN_MODIFIER_KEYS[key]) return;',
+    to:   '  if (false) return;',
+    why:  'this is the exact break that made a barcode with capitals destroy its own scan',
+  },
+  {
+    name: 'M22 unreadable keys are skipped instead of ending the burst',
+    file: 'scanner.js',
+    from: "  if (typeof key !== 'string' || key.length !== 1) { _scanReset(); return; }",
+    to:   "  if (typeof key !== 'string' || key.length !== 1) { return; }",
+    why:  'the tempting over-fix: it silently drops a character and delivers a SHORT asset number',
+  },
+  {
+    name: 'M23 the speed preset is ignored and the old 40ms is hard-coded',
+    file: 'scanner.js',
+    from: '  return typeof preset === \'number\' ? preset : SCAN_GAP_PRESETS[SCAN_SPEED_DEFAULT];',
+    to:   '  return 40;',
+    why:  'the setting would look like it worked and change nothing — invisible from the UI',
+  },
+  {
+    name: 'M24 an unknown speed preset resolves to undefined',
+    file: 'scanner.js',
+    from: '  const preset = SCAN_GAP_PRESETS[state.scanSpeed];',
+    to:   '  const preset = SCAN_GAP_PRESETS[state.scanSpeed] || undefined; if (true) return preset;',
+    why:  'every comparison against undefined is false, so scanning dies permanently and silently',
+  },
+  {
+    name: 'M25 the double-terminator window is not armed on the terminator path',
+    file: 'scanner.js',
+    from: '      _scanSwallowEnterUntil = now + SCAN_DOUBLE_TERMINATOR_MS;',
+    to:   '      _scanSwallowEnterUntil = 0;',
+    why:  'a CR+LF scanner sends two Enters and the second used to escape (the v65 gap)',
+  },
+  {
+    name: 'M26 rejected bursts stop being logged',
+    file: 'scanner.js',
+    from: "  if (!ctx || ctx.kind !== 'test' || !verdict) return;",
+    to:   '  if (!ctx || true) return;',
+    why:  'a failing scanner becomes indistinguishable from an absent one — the whole v67 diagnosis problem',
+  },
+  {
+    name: 'M27 paired mode reads the default-ON polarity (rule 9)',
+    file: 'storage.js',
+    from: "  state.scannerPaired = localStorage.getItem(SCANNER_PAIRED_KEY) === '1';",
+    to:   "  state.scannerPaired = localStorage.getItem(SCANNER_PAIRED_KEY) !== '0';",
+    why:  'it sits one line below a !== \'0\' read; copying the neighbour focuses a field for every user',
+  },
+  {
+    name: 'M28 paired mode focuses but does not select',
+    file: 'scanner.js',
+    from: '    if (document.activeElement !== el) el.focus({ preventScroll: true });\n    el.select();',
+    to:   '    if (document.activeElement !== el) el.focus({ preventScroll: true });',
+    why:  'without the selection an unrecognised scan APPENDS to the pre-filled number',
+  },
+  {
+    name: 'M29 focus is not restored after a log',
+    file: 'render-core.js',
+    from: "  if (typeof focusAssetForScan === 'function') { try { focusAssetForScan(); } catch (e) {} }\n}\n// v20: New Session Client / Site autocomplete.",
+    to:   '}\n// v20: New Session Client / Site autocomplete.',
+    why:  '"the scan after a PASS goes nowhere" — the exact reported symptom',
+  },
+  {
+    name: 'M30 the keyboard override survives into the next item',
+    file: 'session.js',
+    from: '  state.scanKeyboardOn = false;\n  state.suggestions = [];',
+    to:   '  state.suggestions = [];',
+    why:  'one hand-typed asset number would leave the keyboard covering PASS/FAIL for the rest of the job',
+  },
+  {
+    name: 'M31 a garbage speed preset in a backup is adopted',
+    file: 'backup.js',
+    from: '    if (Object.prototype.hasOwnProperty.call(SCAN_GAP_PRESETS, data.scanSpeed)) {',
+    to:   "    if (typeof data.scanSpeed === 'string') {",
+    why:  'a backup is untrusted input; an unrecognised preset kills scanning on the restored device',
+  },
 ];
 
 function main() {
