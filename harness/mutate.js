@@ -185,8 +185,8 @@ const MUTATIONS = [
   {
     name: 'M22 unreadable keys are skipped instead of ending the burst',
     file: 'scanner.js',
-    from: "  if (typeof key !== 'string' || key.length !== 1) { _scanReset(); return; }",
-    to:   "  if (typeof key !== 'string' || key.length !== 1) { return; }",
+    from: "      _scanLogBurst(ctx, _scanChars.join(''), v);\n    }\n    _scanReset();\n    return;",
+    to:   "      _scanLogBurst(ctx, _scanChars.join(''), v);\n    }\n    return;",
     why:  'the tempting over-fix: it silently drops a character and delivers a SHORT asset number',
   },
   {
@@ -251,6 +251,25 @@ const MUTATIONS = [
     from: '    if (Object.prototype.hasOwnProperty.call(SCAN_GAP_PRESETS, data.scanSpeed)) {',
     to:   "    if (typeof data.scanSpeed === 'string') {",
     why:  'a backup is untrusted input; an unrecognised preset kills scanning on the restored device',
+  },
+
+  /* ---- V67.1: the wiring. M32 is the single most important mutation in this
+     file — it reproduces a bug that shipped in three consecutive releases and
+     that 24 green assertions failed to notice, because they all called the
+     handler instead of dispatching to it. ---- */
+  {
+    name: 'M32 the scanner listener is never bound (the V65–V67 bug)',
+    file: 'boot.js',
+    from: "if (typeof initScanner === 'function') initScanner();",
+    to:   "if (false) initScanner();",
+    why:  'exactly what shipped for three releases: scanner.js loaded, cached, and attached to nothing',
+  },
+  {
+    name: 'M33 a burst ended by an unexpected key is dropped silently',
+    file: 'scanner.js',
+    from: '    const v = _scanVerdict();\n    if (v) {',
+    to:   '    const v = null;\n    if (v) {',
+    why:  'the last silent rejection path — a wrong scanner suffix would give no clue at all',
   },
 ];
 
