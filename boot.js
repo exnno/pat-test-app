@@ -219,6 +219,25 @@ initSheetDragGuard();
 // v57.1: arm the one-shot ghost-click swallow used by the suggestion dropdowns.
 // Document-level capture listener, same once-at-boot lifecycle as the others.
 initSuggestionClickSwallow();
+// v67.1: bind the HID barcode scanner's keydown listener. Same once-at-boot,
+// document-capture lifecycle as the three above.
+//
+// ⚠ THIS LINE WAS MISSING FROM V65 THROUGH V67. scanner.js was written, loaded,
+// cached and shipped, and handleScannerKeydown() was never attached to anything
+// — so not one scan was ever detected, in any release. It presented as a series
+// of unrelated-looking faults (had to tap the box first; a re-scan appended
+// instead of replacing; the scan after a PASS did nothing; the settings test log
+// stayed empty) and each one got diagnosed on its own merits, because the
+// symptoms were all real. They were all this.
+//
+// typeof-guarded because scanner.js is an optional subsystem (MAP rule 6) — a
+// missing or unparsed scanner.js must never stop the app booting. ⚠ But note
+// what that guard cost here: an absent function and an unbound listener look
+// identical at runtime, which is precisely why nothing complained for three
+// releases. The harness now asserts the binding by dispatching a real keydown
+// through document rather than by calling the handler, which is the only shape
+// of test that could have caught it.
+if (typeof initScanner === 'function') initScanner();
 // v16.1: boot-level safety net. A throw inside render() (e.g. a screen-specific
 // bug like the v16 entry-screen TDZ error) used to leave #app permanently
 // blank — and because the service worker serves the cached build, a plain

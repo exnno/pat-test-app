@@ -284,7 +284,25 @@ function handleScannerKeydown(e) {
   // number — plausible-looking and wrong, on a certificate. Dropping the whole
   // burst is visible and harmless by comparison. Only keys that are known to
   // produce nothing may be skipped. ---
-  if (typeof key !== 'string' || key.length !== 1) { _scanReset(); return; }
+  if (typeof key !== 'string' || key.length !== 1) {
+    // v67.1: log it before dropping it. This was the LAST silent path left, and
+    // it is the one a misconfigured scanner is most likely to hit — a suffix
+    // that is neither Enter nor Tab (F-keys, Escape, a keypad Enter reported
+    // under another name) discards a perfectly good burst and, before this,
+    // said nothing whatsoever. That directly contradicts the rule v67 was
+    // written around: a mechanism that can reject must be able to say why.
+    // Named separately from the speed and length reasons because it sends the
+    // engineer somewhere different — to the scanner's suffix setting, not to
+    // the app's.
+    const v = _scanVerdict();
+    if (v) {
+      v.ok = false;
+      v.why = 'ended by an unexpected key (' + key + ') — check the scanner\'s prefix/suffix setting';
+      _scanLogBurst(ctx, _scanChars.join(''), v);
+    }
+    _scanReset();
+    return;
+  }
 
   if (_scanChars.length) {
     const gap = now - _scanLastTs;
