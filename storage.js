@@ -543,6 +543,25 @@ function loadV11Settings() {
   // completely inert, so there is nothing to opt in to.
   state.scannerEnabled = localStorage.getItem(SCANNER_KEY) !== '0';
 
+  // v67: paired mode. ⚠ ORDINARY POLARITY — `=== '1'`, opt-in, default OFF. It
+  // sits one line below a `!== '0'` read on purpose, and that is exactly the
+  // neighbour-copying hazard MAP rule 9 describes, so the difference is spelled
+  // out rather than left to be noticed: scannerEnabled is "accept scans if any
+  // arrive" (harmless with no scanner), scannerPaired is "put the cursor in the
+  // asset box for me" (actively wrong with no scanner). The harness asserts
+  // SCANNER_KEY remains the only `!== '0'` read in this file.
+  state.scannerPaired = localStorage.getItem(SCANNER_PAIRED_KEY) === '1';
+
+  // v67: burst speed preset. Anything unrecognised — absent, renamed, corrupted
+  // — collapses to the default rather than being trusted, because an unknown
+  // value here would resolve to an undefined threshold and every burst would
+  // silently fail the test.
+  {
+    const sp = localStorage.getItem(SCAN_SPEED_KEY);
+    state.scanSpeed = Object.prototype.hasOwnProperty.call(SCAN_GAP_PRESETS, sp)
+      ? sp : SCAN_SPEED_DEFAULT;
+  }
+
   // v19: Clients & Sites. Validate defensively (any garbage collapses to []),
   // then seed from existing sessions if BOTH lists are empty — i.e. the first
   // V19 load on an install that has sessions but no client/site data yet. The
@@ -840,6 +859,13 @@ function saveSettings() {
   // relying on the absent-means-on default) so that switching it OFF actually
   // persists — an omitted key would read back as on.
   localStorage.setItem(SCANNER_KEY, state.scannerEnabled ? '1' : '0');
+  // v67: paired mode and the speed preset. The preset is written through the
+  // same whitelist that reads it, so an in-memory value that somehow went bad
+  // cannot be persisted and poison the next load.
+  localStorage.setItem(SCANNER_PAIRED_KEY, state.scannerPaired ? '1' : '0');
+  localStorage.setItem(SCAN_SPEED_KEY,
+    Object.prototype.hasOwnProperty.call(SCAN_GAP_PRESETS, state.scanSpeed)
+      ? state.scanSpeed : SCAN_SPEED_DEFAULT);
   // v19: Clients & Sites (readable long-key arrays).
   localStorage.setItem(CLIENTS_KEY, JSON.stringify(state.clients || []));
   localStorage.setItem(SITES_KEY, JSON.stringify(state.sites || []));

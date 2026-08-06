@@ -199,11 +199,11 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>More than one test instrument.</strong> Settings &rarr; User Settings now holds a list of your testers instead of just one. Save up to five, and tap "Use this one" to switch to whichever you've got with you.</li>
-        <li><strong>Every job remembers which tester did it.</strong> This is the important bit. Before now, a certificate always printed your <em>current</em> calibration details — so reprinting an old job after recalibrating showed the wrong dates. From now on each job records the instrument used at the time, and its certificate keeps showing that one.</li>
-        <li><strong>You can change it on a job.</strong> Open a job &rarr; Session settings, and there's a Test instrument picker if you grabbed the wrong one.</li>
-        <li><strong>Calibration dates can be cleared.</strong> A date you'd typed in couldn't be removed before — there's now a Clear link next to each one.</li>
-        <li>Calibration warnings now cover <strong>every</strong> instrument you've saved, not just the one in use, and tell you which is due.</li>
+        <li><strong>Barcode scanning actually works now.</strong> The first real scanner we tried didn't work at all &mdash; the app was quietly throwing away good scans. Barcodes with capital letters no longer break themselves halfway through, the speed limit was too tight and has been relaxed, and a scanner that sends two Enters no longer sets something off by accident.</li>
+        <li><strong>New "Scanner paired" switch.</strong> Settings &rarr; Testing Setup &rarr; Barcode Scanner. Turn it on when you've got a scanner with you and the asset box takes the cursor by itself &mdash; on every item, and again straight after each PASS or FAIL. Scan down a row of appliances without touching the screen.</li>
+        <li><strong>The test box now shows the scans it turned down,</strong> and why. A scanner that isn't connected used to look exactly like one that just needed a setting changed. It doesn't any more.</li>
+        <li><strong>Scan speed is adjustable.</strong> If the test box says "too slow", move it one notch and scan again &mdash; no waiting for an update.</li>
+        <li><strong>Need to type a number by hand?</strong> There's a &#9000; button beside the asset box. Worth knowing: while a Bluetooth scanner is connected your phone hides its own keyboard in <em>every</em> app &mdash; most scanners pop it back up if you double-click their trigger button.</li>
       </ul>
       <button class="btn-primary" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -470,6 +470,12 @@ function render() {
       });
     }
   }
+  // v67: paired mode puts the cursor in the asset box so a scan lands with no
+  // tap. Last in the render tail on purpose — it must run after the scroll
+  // restore above, or focusing would fight it. The function itself bails on
+  // every view but 'entry', and on every state where a scan would be refused
+  // anyway. typeof-guarded (rule 6).
+  if (typeof focusAssetForScan === 'function') { try { focusAssetForScan(); } catch (e) {} }
 }
 
 // v34: attach pointer drawing to the live signature-pad canvas. Created fresh on
@@ -583,6 +589,11 @@ function refreshEntryAfterLog() {
   // flag must now tell the truth or a subsequent render() won't sweep it.
   _lastRenderHadModal = !!state.photoStripOpen;
   bindFocusFields();
+  // v67: this innerHTML rewrite is what dropped the cursor after every PASS or
+  // FAIL, which presented as "the next scan goes nowhere". Paired mode puts it
+  // back. typeof-guarded — scanner.js is an optional subsystem (rule 6) and a
+  // missing one must never break logging an item.
+  if (typeof focusAssetForScan === 'function') { try { focusAssetForScan(); } catch (e) {} }
 }
 // v20: New Session Client / Site autocomplete. These replace the v19 native
 // <datalist> pickers, which were unreliable in iOS PWA mode (frequently showed
@@ -1169,6 +1180,39 @@ function renderImportSummaryModal() {
   `;
 }
 
+// v67: the asset box, extracted from renderEntry() because paired mode gives it
+// three moving parts instead of one.
+//
+// inputmode="none" tells the browser this field is filled by something other
+// than the on-screen keyboard. It is what lets paired mode focus the box without
+// a keyboard sliding up over the PASS/FAIL buttons — and it works on a phone
+// with no scanner attached too, which is what makes the setting safe to leave on
+// if the scanner's battery dies mid-job.
+//
+// ⚠ THE KEYBOARD BUTTON IS AN ESCAPE HATCH, NOT A KEYBOARD SUMMONER. It removes
+// OUR suppression so the phone's own keyboard can appear. It cannot help while a
+// Bluetooth scanner is actually connected — iOS hides the on-screen keyboard
+// system-wide whenever a hardware keyboard is paired and there is no web API
+// that overrides that. For the connected case the answer is on the scanner: the
+// NETUM C750 pops the iOS keyboard on a double-click of its trigger button.
+// This button is for the disconnected case, and the settings page says so.
+function assetFieldHTML() {
+  const paired = !!(state.scannerEnabled && state.scannerPaired);
+  const suppressKeyboard = paired && !state.scanKeyboardOn;
+  const input = `<input class="input-big" id="f-asset" data-input-action="f-asset"` +
+    ` value="${escapeHTML(state.form.assetNo)}"` +
+    `${state.scannerEnabled ? ' placeholder="Scan or type"' : ''}` +
+    `${suppressKeyboard ? ' inputmode="none"' : ''}>`;
+  if (!paired) return input;
+  return `
+      <div class="asset-input-wrap">
+        ${input}
+        <button class="asset-kbd-btn${state.scanKeyboardOn ? ' is-on' : ''}" data-action="scan-keyboard"
+                aria-label="${state.scanKeyboardOn ? 'Back to scanning' : 'Type by hand'}"
+                title="${state.scanKeyboardOn ? 'Back to scanning' : 'Type by hand'}">⌨</button>
+      </div>`;
+}
+
 function renderEntry() {
   const sess = activeSession();
   if (!sess) { state.view = 'sessions'; return renderSessions(); }
@@ -1508,7 +1552,7 @@ function renderEntry() {
       ${progressRow}
 
       <label class="label">Asset number</label>
-      <input class="input-big" id="f-asset" data-input-action="f-asset" value="${escapeHTML(state.form.assetNo)}"${state.scannerEnabled ? ' placeholder="Scan or type"' : ''}>
+      ${assetFieldHTML()}
 
       <label class="label">Location ${carriedHint}</label>
       <div class="location-input-wrap">

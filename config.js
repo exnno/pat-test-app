@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V66';
+const APP_VERSION = 'V67';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -112,7 +112,7 @@ const INSTRUMENTS_MAX = 5;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V66';
+const WELCOME_VERSION = 'V67';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -698,17 +698,53 @@ const READINGS_KEY = 'pat:readingsenabled';   // v53: '1' | '0', default '0'
 // give the test box somewhere to live.
 const SCANNER_KEY = 'pat:scanner';       // v65: '1' | '0', DEFAULT ON (absent = on)
 
+// v67: SCANNER PAIRED MODE. Separate from SCANNER_KEY above, and DEFAULT OFF
+// (`=== '1'`, the ordinary opt-in shape — see rule 9 in MAP.md). SCANNER_KEY
+// says "accept scans if any arrive", which is safe for everyone and therefore
+// on by default. THIS key says "a scanner is physically paired right now", and
+// it changes the entry screen: the asset box takes focus by itself so a scan
+// lands without a tap. That is exactly wrong for the engineer with no scanner —
+// a focused field on every entry screen — so it must be opted into, and it must
+// be a second switch rather than a redefinition of the first.
+const SCANNER_PAIRED_KEY = 'pat:scannerPaired';   // v67: '1' | '0', DEFAULT OFF
+
+// v67: which speed preset the burst test uses. See SCAN_GAP_PRESETS below.
+const SCAN_SPEED_KEY = 'pat:scanSpeed';           // v67: 'strict'|'normal'|'relaxed'
+
 // The speed test, which is the whole safety mechanism (see scanner.js header).
 // A wedge scanner emits characters ~5–20ms apart; a fast human typist is
-// ~80–150ms. 40ms sits comfortably between the two — slack enough for a sluggish
-// Bluetooth link, still far quicker than any thumb. If a real scanner ever turns
-// out to be slower than this, THIS is the number to raise, and raising it toward
-// ~70 is still safe. Above that it starts to overlap fast typing.
+// ~80–150ms.
+//
+// ⚠ v67 RAISED THE DEFAULT FROM 40ms TO 60ms, and made it choosable. 40 was set
+// from the spec sheet, not from a scanner: the first real device (a NETUM C750
+// over Bluetooth HID on iOS) had bursts rejected, and a rejected burst is
+// invisible — the app simply does nothing, which looks identical to a scanner
+// that is not connected at all. 60 is still comfortably clear of a fast thumb.
+// The preset exists because we cannot measure every scanner from here, and
+// waiting for a release to change one number is a bad way to debug a device
+// that is in someone's hand. 'relaxed' at 90ms starts to approach a very fast
+// typist and is a diagnostic setting, not a recommendation — the settings page
+// says so.
+const SCAN_GAP_PRESETS = { strict: 40, normal: 60, relaxed: 90 };
+const SCAN_SPEED_DEFAULT = 'normal';
+
+// Kept as the floor used by the strict preset, and as the name the rest of the
+// codebase referred to before v67. Nothing reads it directly any more — read
+// scanMaxGapMs() in scanner.js, which resolves the chosen preset.
 const SCAN_MAX_CHAR_GAP_MS = 40;
 
 // How long a silence ends a burst. Doubles as the fallback terminator for a
 // scanner configured to send no suffix at all.
 const SCAN_END_MS = 120;
+
+// v67: after a scan commits, ignore any further terminator arriving inside this
+// window. TWO cases, and v65 only covered the first:
+//   1. The silence timer committed and the scanner's Enter caught up late.
+//   2. The scanner is set to CR+LF and sends TWO Enters (the NETUM C750 has a
+//      one-barcode shortcut for exactly this, so it is a realistic setup, not a
+//      theoretical one). The first commits the scan; the second used to sail
+//      straight through onto whatever was underneath.
+const SCAN_DOUBLE_TERMINATOR_MS = 250;
 
 // Length bounds. The minimum stops a stray double-keypress being read as a
 // scan; the maximum only rejects a runaway (a stuck key), not long barcodes —
@@ -716,8 +752,10 @@ const SCAN_END_MS = 120;
 const SCAN_MIN_LENGTH = 3;
 const SCAN_MAX_LENGTH = 64;
 
-// How many recent scans the settings test box shows.
-const SCANNER_TEST_LOG_MAX = 5;
+// How many recent scans the settings test box shows. v67 raised 5 → 8: the log
+// now records REJECTED bursts too, so a diagnostic session fills it faster and
+// the useful comparison (three good scans then a bad one) needs more room.
+const SCANNER_TEST_LOG_MAX = 8;
 
 // v53: Equipment classes. The readings sheet shows a class selector at the top;
 // the chosen class decides which reading rows appear (Class II has no earth path

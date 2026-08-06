@@ -429,12 +429,22 @@ function renderSettingsReadings() {
 // which is how you spot a scanner that's adding a prefix or clipping a digit.
 function renderSettingsScanner() {
   const on = !!state.scannerEnabled;
+  const paired = !!state.scannerPaired;
+  const speed = Object.prototype.hasOwnProperty.call(SCAN_GAP_PRESETS, state.scanSpeed)
+    ? state.scanSpeed : SCAN_SPEED_DEFAULT;
+  const speedOptions = [
+    ['strict',  'Strict',  'Fewest false positives. Try this only if hand-typing is ever mistaken for a scan.'],
+    ['normal',  'Normal',  'The default, and the right setting for almost everyone.'],
+    ['relaxed', 'Relaxed', 'For a slow or flaky Bluetooth link. A very fast typist could occasionally trip it.'],
+  ];
+  const speedNote = (speedOptions.find(o => o[0] === speed) || speedOptions[1])[2];
+
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Barcode Scanner')}
       <div class="settings-section">
         <h2 class="h2">Scan asset labels</h2>
-        <p class="muted">If you have a Bluetooth barcode scanner that pairs with your phone as a keyboard — sometimes called a "wedge" or HID scanner — the app will pick up what it sends. On the test screen a scan fills in the asset number; on the Sessions list it searches for that asset, so you can see where it was last tested. You don't have to tap the box first, and the on-screen keyboard stays out of the way.</p>
+        <p class="muted">If you have a Bluetooth barcode scanner that pairs with your phone as a keyboard — sometimes called a "wedge" or HID scanner — the app will pick up what it sends. On the entry screen a scan fills in the asset number; on the Sessions list it searches for that asset, so you can see where it was last tested.</p>
         <p class="muted">Leave this on even if you don't own a scanner — it does nothing at all until one is paired. Typing a number by hand is unaffected: the app tells a scanner apart from a person by how fast the characters arrive, so nothing you type can be mistaken for a scan.</p>
         <div class="toggle-row">
           <div class="toggle-row-text">
@@ -450,15 +460,49 @@ function renderSettingsScanner() {
 
       ${on ? `
       <div class="settings-section">
+        <h2 class="h2">Hands-free mode</h2>
+        <p class="muted">Turn this on when you actually have a scanner paired. The asset number box then takes the cursor by itself on the entry screen and again after every PASS or FAIL, so you can scan the next appliance without tapping anything first. The on-screen keyboard is kept out of the way while it's on.</p>
+        <p class="muted">Leave it off if you don't carry a scanner — otherwise you'd get a box with the cursor already in it on every item, for no reason.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Scanner paired</div>
+            <div class="toggle-row-sub">${paired ? 'On — asset box takes the cursor' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="scanner-paired-toggle" data-change-action="scanner-paired-toggle" ${paired ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        ${paired ? `<p class="muted">A keyboard button (⌨) sits beside the asset box so you can still type a number by hand when you need to. See "Typing while a scanner is connected" below.</p>` : ''}
+      </div>
+
+      <div class="settings-section">
         <h2 class="h2">Test your scanner</h2>
-        <p class="muted">Scan any barcode while this page is open. What your scanner sent appears below — check it matches the number printed on the label.</p>
+        <p class="muted">Scan any barcode while this page is open. Every burst appears below — including ones the app decided were <em>not</em> a scan, with the reason. That's the quickest way to tell a scanner that isn't connected from one that's sending too slowly.</p>
         <input class="input-big" id="scanner-test" placeholder="Scan a label…" autocomplete="off" inputmode="none">
         <div class="scanner-log" id="scanner-test-log">${renderScannerTestLogHTML()}</div>
       </div>
 
       <div class="settings-section">
+        <h2 class="h2">Scan speed</h2>
+        <p class="muted">The app spots a scanner by how quickly the characters arrive. If the test above says "too slow", move this one notch down the list and scan again.</p>
+        <select class="input" id="scan-speed" data-change-action="scan-speed">
+          ${speedOptions.map(o => `<option value="${o[0]}"${o[0] === speed ? ' selected' : ''}>${escapeHTML(o[1])} — ${SCAN_GAP_PRESETS[o[0]]}ms</option>`).join('')}
+        </select>
+        <p class="muted" style="margin-top:8px">${escapeHTML(speedNote)}</p>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Typing while a scanner is connected</h2>
+        <p class="muted">When a Bluetooth scanner is paired, your phone treats it as the keyboard and hides the on-screen one — in every app, not just this one. That's the phone's decision and no app can override it.</p>
+        <p class="muted">Most scanners can bring the keyboard back themselves. On a NETUM, double-click the scanner's trigger button and the keyboard pops up without scanning anything; there's also a setup barcode in the manual that does the same. Check your manual for "show iOS keyboard".</p>
+        <p class="muted">The ⌨ button beside the asset box turns off this app's own keyboard suppression, which helps when the scanner is switched off or out of range. It can't force the keyboard up while the scanner is still connected.</p>
+      </div>
+
+      <div class="settings-section">
         <h2 class="h2">If nothing appears</h2>
-        <p class="muted">Check the scanner is paired in your phone's Bluetooth settings and shows as connected. Most scanners have a setup barcode in their manual for "HID" or "keyboard" mode — if yours is set to a different mode it won't type anything. It's also worth checking it's set to send a carriage return (Enter) after each scan, though the app copes without one.</p>
+        <p class="muted">Check the scanner is paired in your phone's Bluetooth settings and shows as connected. Most scanners have a setup barcode in their manual for "HID" or "keyboard" mode — if yours is set to a different mode it won't type anything.</p>
+        <p class="muted">If scans show up in the test box as "Rejected", the scanner is talking to the app and the settings just need adjusting — try the scan speed above. If nothing appears at all, it's the pairing.</p>
         <p class="muted">A scan replaces whatever is in the asset box rather than adding to it, so you never need to clear it first.</p>
       </div>` : ''}
     </div>
@@ -1307,18 +1351,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v66: rolled forward — V66 on top, V63 dropped. -->
+      <!-- v8: rolling 3-version changelog. v67: rolled forward — V67 on top, V64 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V67</strong> &middot; August 2026</p>
+        <p class="muted">Barcode scanning now works properly with a real scanner. The first one we got our hands on didn't work at all, and it turned out the app was throwing away perfectly good scans without saying anything &mdash; which looked like three different faults and was really only one. Three things are fixed. Barcodes containing capital letters no longer break themselves halfway through. The app was also being too fussy about how fast a scan had to arrive, so the limit has been relaxed and you can now adjust it yourself under Settings &rarr; Testing Setup &rarr; Barcode Scanner if your scanner is on the slow side. And a scanner set to send two Enters after each scan no longer sets something off by accident. The test box on that page now shows you <em>every</em> scan it sees, including the ones it turned down and why &mdash; so a scanner that isn't connected no longer looks the same as one that just needs a setting changed. There's also a new <strong>Scanner paired</strong> switch: turn it on when you've actually got a scanner with you and the asset box takes the cursor by itself, on every item and again straight after each PASS or FAIL, so you can work down a row of appliances scanning one after another without touching the screen. A &#9000; button sits beside the box for when you do need to type a number by hand. Worth knowing: while a Bluetooth scanner is connected your phone hides its own keyboard in every app, not just this one &mdash; most scanners will pop it back up if you double-click their trigger button.</p>
 
         <p><strong>V66</strong> &middot; August 2026</p>
         <p class="muted">You can now save more than one test instrument, and every job records which one you used. Settings &rarr; User Settings holds a list of your testers instead of a single set of boxes &mdash; up to five, each with its own calibration date, certificate number and due date. Tap <strong>Use this one</strong> to switch to whichever tester you have with you, and new jobs are recorded against it from then on. The important part is what that fixes: until now a certificate always printed your <em>current</em> calibration details, so reprinting a job from months ago after you'd had the tester recalibrated showed the wrong dates against that day's results. Each job now keeps the instrument that actually did the work, and its certificate and CSV export keep showing that one no matter what you change afterwards. Jobs done before this update carry on printing exactly as they did. If you picked up the wrong tester, open the job &rarr; <strong>Session settings</strong> and change it there. Calibration warnings now cover every instrument you've saved rather than just the one in use, and name the one that's due. And a small annoyance is gone: a calibration date you'd typed in couldn't be removed once entered, and there's now a <strong>Clear</strong> link beside each date.</p>
 
         <p><strong>V65</strong> · August 2026</p>
         <p class="muted">The app now works with a Bluetooth barcode scanner &mdash; the kind that pairs with your phone as a keyboard, often sold as a "wedge" or HID scanner. Scan an asset label on the test screen and the number drops straight into the asset box: no tapping the box first, and no on-screen keyboard sliding up over your Quick Pick buttons. Scan on the Sessions list instead and it searches for that asset, which is a quick way to see where and when you last tested it. If the number you scan is already on the job, the app says so there and then rather than waiting until you try to log it. Nothing changes if you don't own a scanner. The app distinguishes a scanner from a person by how quickly the characters arrive, so a number typed by hand behaves exactly as it always has, and there is a new <strong>Barcode Scanner</strong> page under Settings &rarr; Testing Setup with a box you can scan into to check yours is working. One deliberate change if you do scan: after logging a scanned item the asset box is left empty rather than counting on to the next number, because barcodes rarely run in order and a number guessed from the last label would look far more official than it deserves.</p>
-
-        <p><strong>V64</strong> · August 2026</p>
-        <p class="muted">Your photos can now go on the report. Switch <strong>Photos</strong> on under Settings &rarr; Report settings &rarr; What to include, and every photo you've taken on that job is added to the end of the certificate, grouped under the asset it belongs to with the fail reason underneath. The certificate itself is untouched &mdash; the register, the totals and the declaration all read exactly as before, and the photos follow after them as clearly-labelled evidence pages. It's off until you turn it on, because you may have been sending certificates for weeks and quietly adding four pages of photographs to them isn't our decision to make. There's also a <strong>Photos</strong> button in the report preview so you can put them on or leave them off for one particular job without changing your settings. Photos are shrunk down for printing, so the file stays small enough to send from your phone; on a very large job they're shrunk further so that all of them still fit. Beyond 150 photos the report states plainly, on the first photo page, exactly how many are shown and how many aren't.</p>
 
               </div>
 

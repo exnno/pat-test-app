@@ -388,9 +388,26 @@ let state = {
   //                        appliance. The session id is stored alongside so the
   //                        blanking dies when you switch jobs, without every
   //                        session-opening path having to remember to clear it.
-  //   scannerTestLog     — the last few scans shown on the settings test page.
-  //                        Display only; never saved, never backed up.
+  //   scannerTestLog     — the last few bursts shown on the settings test page.
+  //                        Display only; never saved, never backed up. v67 puts
+  //                        REJECTED bursts in here too, with the reason.
+  //
+  // v67 adds two more persisted fields and one transient:
+  //   scannerPaired      — "a scanner is paired right now". DEFAULT OFF. Drives
+  //                        the entry screen taking focus on the asset box by
+  //                        itself. Separate from scannerEnabled on purpose; see
+  //                        SCANNER_PAIRED_KEY in config.js.
+  //   scanSpeed          — 'strict' | 'normal' | 'relaxed'. Which gap threshold
+  //                        the burst test uses.
+  //   scanKeyboardOn     — TRANSIENT. The engineer tapped the keyboard button to
+  //                        type into the asset box by hand, so the inputmode
+  //                        suppression comes off for this item only. Cleared by
+  //                        loadFormForCursor and setView like every other
+  //                        transient — see MAP rule 4.
   scannerEnabled: true,
+  scannerPaired: false,
+  scanSpeed: 'normal',
+  scanKeyboardOn: false,
   scanFilledAsset: false,
   lastLogWasScanned: false,
   lastScanSessionId: '',

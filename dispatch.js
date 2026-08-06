@@ -267,6 +267,48 @@ registerActions({
   // Notes toggle
   'show-notes': () => { state.form.showNotes = true; render(); document.getElementById('f-notes')?.focus(); },
 
+  // v67: the keyboard escape hatch on the asset box (paired mode only). Toggles
+  // OUR inputmode="none" suppression off and on for the current item.
+  //
+  // ⚠ NO render() HERE, DELIBERATELY. Re-rendering the entry screen would tear
+  // down the field we are about to focus and take the keyboard with it — the
+  // v60.1 no-render rule, in the one place it is easiest to forget because this
+  // is not a sheet. Everything below is a targeted DOM write.
+  //
+  // ⚠ THE blur/focus PAIR IS LOAD-BEARING. iOS decides whether to show the
+  // on-screen keyboard at the moment a field takes focus, and it does not
+  // re-evaluate when inputmode changes underneath an already-focused element.
+  // The field has to lose focus and take it again for the new attribute to be
+  // read. This runs inside a real tap, which is what makes the focus() legal.
+  //
+  // This cannot raise the keyboard while a Bluetooth scanner is connected — iOS
+  // suppresses it system-wide for as long as a hardware keyboard is paired, and
+  // no web API overrides that. On the C750, double-clicking the scanner's own
+  // trigger button pops the keyboard up. See assetFieldHTML() in render-core.js.
+  'scan-keyboard': () => {
+    state.scanKeyboardOn = !state.scanKeyboardOn;
+    const el = document.getElementById('f-asset');
+    const btn = document.querySelector('[data-action="scan-keyboard"]');
+    if (btn) {
+      btn.classList.toggle('is-on', state.scanKeyboardOn);
+      const label = state.scanKeyboardOn ? 'Back to scanning' : 'Type by hand';
+      btn.setAttribute('aria-label', label);
+      btn.setAttribute('title', label);
+    }
+    if (!el) return;
+    if (state.scanKeyboardOn) el.removeAttribute('inputmode');
+    else el.setAttribute('inputmode', 'none');
+    try { el.blur(); } catch (e) {}
+    try {
+      el.focus();
+      // Caret to the end rather than selecting: the engineer tapped this to
+      // EDIT what is there, so wiping it on the first keypress would be wrong.
+      // That is the opposite of focusAssetForScan(), which selects on purpose.
+      const n = el.value.length;
+      el.setSelectionRange(n, n);
+    } catch (e) {}
+  },
+
   // Log actions
   'log-pass': () => passClicked(),
   'log-fail': () => failClicked(),
@@ -1000,6 +1042,30 @@ registerChangeActions({
     state.scannerEnabled = !!checked;
     localStorage.setItem(SCANNER_KEY, state.scannerEnabled ? '1' : '0');
     render();
+  },
+
+  // v67: scanner paired mode. Persists instantly, same pattern as above, and
+  // re-renders so the speed picker and the explanation appear or disappear.
+  // Turning it ON is what makes the entry screen focus the asset box by itself,
+  // so it also changes a screen the engineer is not currently looking at — the
+  // settings copy is explicit about that.
+  'scanner-paired-toggle': (checked) => {
+    state.scannerPaired = !!checked;
+    localStorage.setItem(SCANNER_PAIRED_KEY, state.scannerPaired ? '1' : '0');
+    render();
+  },
+
+  // v67: burst speed preset. Validated against the whitelist before it is
+  // stored — a value outside SCAN_GAP_PRESETS would resolve to an undefined
+  // threshold and reject every scan, which is the exact silent failure this
+  // release exists to remove. No re-render: the <select> already shows the new
+  // value, the threshold is read fresh on the next burst, and re-rendering would
+  // only cost the page its scroll position.
+  'scan-speed': (value) => {
+    if (!Object.prototype.hasOwnProperty.call(SCAN_GAP_PRESETS, value)) return;
+    state.scanSpeed = value;
+    localStorage.setItem(SCAN_SPEED_KEY, value);
+    showToast('Scan speed set to ' + value + ' (' + SCAN_GAP_PRESETS[value] + 'ms)');
   },
 
   // v53: per-fail-reason tag selector (Quick Pick Fail page, shown only when

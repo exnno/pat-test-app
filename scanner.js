@@ -47,6 +47,49 @@
  * a field the engineer had deliberately focused would be worse than the
  * occasional barcode landing in the Location box, which is visible and one
  * clear-and-retype to fix.
+ *
+ * ---------------------------------------------------------------------------
+ * v67 — WHAT THE FIRST REAL SCANNER TAUGHT US
+ * ---------------------------------------------------------------------------
+ * v65 was written against spec sheets. The first physical device (a NETUM C750,
+ * Bluetooth HID, iOS) failed, and it failed in the most confusing way possible:
+ * silently. Three separate-looking symptoms turned out to be ONE cause.
+ *
+ *   "I have to tap the box first."      Nothing focused → the raw characters
+ *                                       had nowhere to land.
+ *   "A re-scan appends instead of
+ *    replacing."                        Raw characters typing into a focused
+ *                                       box at the caret. The overwrite below
+ *                                       never ran.
+ *   "After PASS the next scan does
+ *    nothing."                          Logging rebuilds the entry screen,
+ *                                       which drops focus again.
+ *
+ * All three are what "the burst was rejected" looks like from outside. That is
+ * the real lesson and it drove every change here:
+ *
+ * 1. A REJECTED BURST MUST NOT BE SILENT. The settings test page now logs
+ *    rejected bursts too, with the character count, the slowest gap measured
+ *    and the reason. A failing scanner and an unpaired scanner used to look
+ *    identical; now they don't.
+ *
+ * 2. MODIFIER KEYS MUST NOT KILL THE BUFFER. A scanner sending an uppercase
+ *    character emits a Shift keydown first. v65 treated any non-single-character
+ *    key as "burst over" and cleared the buffer — so a barcode with capitals
+ *    part-way through destroyed its own scan. True modifiers are now skipped
+ *    without touching the buffer. Everything else still ends the burst, and
+ *    deliberately so: dropping a character we could not read would produce a
+ *    SHORT asset number that looks plausible and is wrong, which is far worse
+ *    than no scan at all.
+ *
+ * 3. THE SPEED THRESHOLD IS TUNABLE. 40ms was a guess. The default is now 60ms
+ *    and the engineer can pick strict/normal/relaxed on the settings page,
+ *    because a device in someone's hand should not need a release to debug.
+ *
+ * 4. PAIRED MODE. Opt-in (state.scannerPaired). When on, the entry screen puts
+ *    the cursor in the asset box by itself and keeps the on-screen keyboard out
+ *    of the way with inputmode="none" — so a scan lands with no tap, before and
+ *    after every log. See focusAssetForScan() at the foot of this file.
  */
 
 // ---------------------------------------------------------------------------
@@ -61,6 +104,15 @@ let _scanTimer = null;          // silence timer (for scanners with no suffix)
 let _scanSwallowEnterUntil = 0; // see _scanTimeoutCommit
 let _scannerBound = false;      // initScanner is idempotent
 
+// v67: keys that a keyboard emits WITHOUT producing a character. These pass
+// through the burst without ending it and without being counted. The list is
+// deliberately closed and short — see the ⚠ note at the reset in
+// handleScannerKeydown for why anything not on it must still end the burst.
+const SCAN_MODIFIER_KEYS = {
+  Shift: 1, Control: 1, Alt: 1, Meta: 1, AltGraph: 1,
+  CapsLock: 1, NumLock: 1, ScrollLock: 1, Symbol: 1, SymbolLock: 1,
+};
+
 function _scanReset() {
   _scanChars = [];
   _scanGapMax = 0;
@@ -68,14 +120,51 @@ function _scanReset() {
   if (_scanTimer) { clearTimeout(_scanTimer); _scanTimer = null; }
 }
 
-// Does the buffer look like something a machine typed? Length AND speed both
-// have to pass — see the header note on why speed is the safety mechanism.
-// SCAN_MAX_LENGTH exists only to reject a runaway (a stuck key, a paste), not
-// because long barcodes are suspicious.
-function _scanLooksLikeScan() {
+// v67: the chosen speed preset, resolved at judgement time rather than read
+// once, so changing it on the settings page takes effect on the very next scan.
+// Anything unrecognised falls back to the default — an undefined threshold here
+// would make every comparison false and reject every burst forever, which is
+// precisely the silent failure this release exists to remove.
+function scanMaxGapMs() {
+  const preset = SCAN_GAP_PRESETS[state.scanSpeed];
+  return typeof preset === 'number' ? preset : SCAN_GAP_PRESETS[SCAN_SPEED_DEFAULT];
+}
+
+// v67: judge the buffer AND say why. v65 returned a bare boolean, which is what
+// made a failing scanner indistinguishable from an absent one — there was
+// nothing to show the engineer. The verdict object carries the numbers the
+// settings test page prints.
+//
+// Length AND speed both have to pass — see the header note on why speed is the
+// safety mechanism. SCAN_MAX_LENGTH exists only to reject a runaway (a stuck
+// key, a paste), not because long barcodes are suspicious.
+//
+// Returns null when there is nothing to judge at all, which is different from a
+// rejection and must not be logged as one.
+function _scanVerdict() {
   const n = _scanChars.length;
-  if (n < SCAN_MIN_LENGTH || n > SCAN_MAX_LENGTH) return false;
-  return _scanGapMax <= SCAN_MAX_CHAR_GAP_MS;
+  const gap = _scanGapMax;
+  const limit = scanMaxGapMs();
+  if (n === 0) return null;
+  if (n < SCAN_MIN_LENGTH) {
+    return { ok: false, n: n, gap: gap, limit: limit,
+             why: 'too short — ' + n + ' character' + (n === 1 ? '' : 's') + ', minimum ' + SCAN_MIN_LENGTH };
+  }
+  if (n > SCAN_MAX_LENGTH) {
+    return { ok: false, n: n, gap: gap, limit: limit,
+             why: 'too long — ' + n + ' characters, maximum ' + SCAN_MAX_LENGTH };
+  }
+  if (gap > limit) {
+    return { ok: false, n: n, gap: gap, limit: limit,
+             why: 'too slow — ' + gap + 'ms between characters, limit ' + limit + 'ms' };
+  }
+  return { ok: true, n: n, gap: gap, limit: limit, why: '' };
+}
+
+// Kept for readability at the call sites that only need the yes/no.
+function _scanLooksLikeScan() {
+  const v = _scanVerdict();
+  return !!(v && v.ok);
 }
 
 // ---------------------------------------------------------------------------
@@ -150,28 +239,51 @@ function handleScannerKeydown(e) {
 
   // --- Terminator. Most scanners send Enter; some are configured for Tab. ---
   if (key === 'Enter' || key === 'Tab') {
-    const isScan = _scanLooksLikeScan();
+    const verdict = _scanVerdict();
     const text = _scanChars.join('');
     _scanReset();
-    if (isScan) {
+    _scanLogBurst(ctx, text, verdict);
+    if (verdict && verdict.ok) {
       // Swallow the terminator so it can't do anything else on the way past.
       // preventDefault only — NOT stopPropagation, because other Enter handlers
       // (the name sheet in feedback.js) live in contexts we have already
       // declined above, and blocking them here would be a bug waiting to happen.
       e.preventDefault();
+      // v67: arm the window HERE too, not only on the silence-timer path. A
+      // scanner set to CR+LF sends two Enters; without this the second one used
+      // to escape and act on whatever was underneath.
+      _scanSwallowEnterUntil = now + SCAN_DOUBLE_TERMINATOR_MS;
       applyScan(ctx, text);
     } else if (now < _scanSwallowEnterUntil) {
-      // A scan already committed on the silence timer and the terminator has
-      // only just caught up. Eat it rather than let it act on an empty buffer.
+      // A scan already committed (silence timer, or the first half of a CR+LF)
+      // and this terminator is the straggler. Eat it rather than let it act on
+      // an empty buffer.
       e.preventDefault();
+      _scanSwallowEnterUntil = 0;
+    } else {
+      _scanSwallowEnterUntil = 0;
     }
-    _scanSwallowEnterUntil = 0;
     return;
   }
 
+  // --- Modifiers. v67. A scanner sending an uppercase character emits a Shift
+  // keydown of its own first, and v65 fell through to the reset below and threw
+  // the half-collected barcode away. These keys produce no character, so they
+  // are skipped WITHOUT touching the buffer or the timing — they are not part of
+  // the burst and they do not end it. ---
+  if (SCAN_MODIFIER_KEYS[key]) return;
+
   // --- Ordinary characters. Anything that isn't a single printable character
   // (arrows, F-keys, Escape, Backspace…) ends the burst: a scanner emits only
-  // the barcode. ---
+  // the barcode.
+  //
+  // ⚠ THIS STAYS A RESET, NOT A SKIP. It is tempting to ignore unreadable keys
+  // the way we now ignore modifiers, but the failure modes are not symmetrical.
+  // Skipping a key that DID produce a character would leave that character out
+  // of the buffer, and we would then overwrite the asset box with a SHORT
+  // number — plausible-looking and wrong, on a certificate. Dropping the whole
+  // burst is visible and harmless by comparison. Only keys that are known to
+  // produce nothing may be skipped. ---
   if (typeof key !== 'string' || key.length !== 1) { _scanReset(); return; }
 
   if (_scanChars.length) {
@@ -197,16 +309,50 @@ function handleScannerKeydown(e) {
 // merely slow to send its suffix can't double-fire.
 function _scanTimeoutCommit() {
   _scanTimer = null;
-  const isScan = _scanLooksLikeScan();
+  const verdict = _scanVerdict();
   const text = _scanChars.join('');
   _scanChars = [];
   _scanGapMax = 0;
   _scanLastTs = 0;
-  if (!isScan) return;
+  // v67: the target is resolved BEFORE the accept/reject branch now, because a
+  // rejected burst still has to be logged on the test page. v65 returned early
+  // and that is exactly why a scanner failing the speed test looked identical
+  // to one that was not connected.
   const ctx = _scanTarget();
   if (!ctx) return;
-  _scanSwallowEnterUntil = Date.now() + 250;
+  _scanLogBurst(ctx, text, verdict);
+  if (!verdict || !verdict.ok) return;
+  _scanSwallowEnterUntil = Date.now() + SCAN_DOUBLE_TERMINATOR_MS;
   applyScan(ctx, text);
+}
+
+// ---------------------------------------------------------------------------
+// v67 — the diagnostic log. ONLY on the settings test page (ctx.kind 'test').
+//
+// Why not everywhere: on the entry screen a human typing an asset number
+// produces a rejected burst on every pause, so logging globally would fill the
+// list with the engineer's own thumbs and bury the one entry that matters. The
+// test page is the diagnostic surface and the page copy says so.
+//
+// Both the accepted and the rejected case land here, with the numbers, which is
+// the whole point — "8 characters, slowest gap 74ms, limit 60ms" tells you to
+// move the speed setting up one notch. Nothing else in the app could have told
+// you that.
+// ---------------------------------------------------------------------------
+function _scanLogBurst(ctx, text, verdict) {
+  if (!ctx || ctx.kind !== 'test' || !verdict) return;
+  if (!Array.isArray(state.scannerTestLog)) state.scannerTestLog = [];
+  state.scannerTestLog.unshift({
+    text: String(text == null ? '' : text),
+    len: verdict.n,
+    gap: verdict.gap,
+    ok: !!verdict.ok,
+    why: verdict.why,
+    at: _scanClock(),
+  });
+  state.scannerTestLog = state.scannerTestLog.slice(0, SCANNER_TEST_LOG_MAX);
+  const log = document.getElementById('scanner-test-log');
+  if (log) log.innerHTML = renderScannerTestLogHTML();
 }
 
 // ---------------------------------------------------------------------------
@@ -264,14 +410,13 @@ function _scanIntoSearch(el, text) {
 // Shows the raw text, how many characters arrived, and when, so a scanner that
 // is adding a prefix or dropping the last digit is visible rather than
 // mysterious.
+// v67: this no longer writes the log. _scanLogBurst() owns it and has already
+// run by the time we get here — it must, because it also records the bursts
+// that never reach this function at all. Writing in both places would double
+// every accepted scan.
 function _scanIntoTest(el, text) {
   el.value = text;
   _scanFlash(el);
-  if (!Array.isArray(state.scannerTestLog)) state.scannerTestLog = [];
-  state.scannerTestLog.unshift({ text: text, len: text.length, at: _scanClock() });
-  state.scannerTestLog = state.scannerTestLog.slice(0, SCANNER_TEST_LOG_MAX);
-  const log = document.getElementById('scanner-test-log');
-  if (log) log.innerHTML = renderScannerTestLogHTML();
 }
 
 function _scanClock() {
@@ -285,14 +430,24 @@ function _scanClock() {
 function renderScannerTestLogHTML() {
   const rows = Array.isArray(state.scannerTestLog) ? state.scannerTestLog : [];
   if (!rows.length) {
-    return '<p class="muted">Nothing scanned yet. Pull the trigger on your scanner with this page open — what it sends will appear here.</p>';
+    return '<p class="muted">Nothing scanned yet. Pull the trigger on your scanner with this page open — what it sends will appear here, whether or not the app accepted it.</p>';
   }
-  return rows.map(r => `
-    <div class="scanner-log-row">
+  return rows.map(r => {
+    const ok = r.ok !== false;   // pre-v67 shaped rows (no flag) read as accepted
+    const gap = (typeof r.gap === 'number' && r.gap > 0) ? ' · slowest gap ' + r.gap + 'ms' : '';
+    // The reason line only appears on a rejection. On an accepted scan the
+    // numbers alone are the reassurance, and a second line would be noise on
+    // every single row.
+    const reason = ok ? '' :
+      `<span class="scanner-log-reason">Not treated as a scan: ${escapeHTML(r.why || 'burst rejected')}</span>`;
+    return `
+    <div class="scanner-log-row${ok ? '' : ' is-rejected'}">
       <span class="scanner-log-text">${escapeHTML(r.text)}</span>
-      <span class="scanner-log-meta">${r.len} char${r.len === 1 ? '' : 's'} · ${escapeHTML(r.at)}</span>
+      <span class="scanner-log-meta">${ok ? 'Accepted' : 'Rejected'} · ${r.len} char${r.len === 1 ? '' : 's'}${gap} · ${escapeHTML(r.at)}</span>
+      ${reason}
     </div>
-  `).join('');
+  `;
+  }).join('');
 }
 
 // A brief glow so a scan is visibly acknowledged even if the box is scrolled
@@ -316,4 +471,52 @@ function initScanner() {
   if (_scannerBound) return;
   _scannerBound = true;
   document.addEventListener('keydown', handleScannerKeydown, true);
+}
+
+// ---------------------------------------------------------------------------
+// v67 — PAIRED MODE: put the cursor in the asset box so a scan needs no tap.
+//
+// Called by render() and refreshEntryAfterLog() (render-core.js), typeof-guarded
+// at both call sites like every other optional subsystem (rule 6). It has to run
+// after BOTH, because the two together are every path that rebuilds the entry
+// screen — and "the scan after a PASS goes nowhere" was caused by exactly the
+// second one dropping focus.
+//
+// ⚠ WHY THIS IS GATED ON state.scannerPaired AND NOT state.scannerEnabled.
+// Scanning is on by default for everybody. Focusing a field by itself is only
+// ever right when a hardware keyboard is attached; for the engineer with no
+// scanner it would mean a focused box, and on some devices a keyboard, on every
+// entry screen and after every log. It has to be opted into.
+//
+// ⚠ WHY select() AND NOT JUST focus(). Belt and braces. If a burst is somehow
+// still not recognised as a scan, the characters type in by hand — and with the
+// existing value selected the first one REPLACES it instead of appending. That
+// is the difference between a wrong asset number on a certificate and a right
+// one, on the exact failure this release is fixing.
+//
+// The on-screen keyboard is kept down by inputmode="none" on the field itself
+// (render-core.js), not from here — iOS decides that at focus time from the
+// attribute, so it must already be on the element.
+// ---------------------------------------------------------------------------
+function focusAssetForScan() {
+  if (!state.scannerEnabled || !state.scannerPaired) return;
+  if (state.view !== 'entry') return;
+  // Reuse the real target resolver rather than re-deriving the rules: it
+  // already declines a locked job, every sheet that can cover this screen, the
+  // first-run wizard, and — importantly — a field the engineer has deliberately
+  // focused themselves. If a scan would not be accepted right now, we have no
+  // business moving the cursor either.
+  let ctx = null;
+  try { ctx = _scanTarget(); } catch (e) { return; }
+  if (!ctx || ctx.kind !== 'asset' || !ctx.el) return;
+  const el = ctx.el;
+  try {
+    // preventScroll matters: without it, focusing a field that sits above the
+    // fold on a long entry screen jerks the page. Older engines ignore the
+    // option object entirely, hence the fallback.
+    if (document.activeElement !== el) el.focus({ preventScroll: true });
+    el.select();
+  } catch (err) {
+    try { el.focus(); el.select(); } catch (e2) {}
+  }
 }

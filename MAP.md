@@ -1,4 +1,4 @@
-# PATGo — Code Map (V66)
+# PATGo — Code Map (V67)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -63,7 +63,8 @@ is discoverable from the file you happen to be editing.
 9. **Feature-flag polarity.** Default-ON flags read `!== false`; default-OFF flags
    read `=== true`. Copying the wrong neighbour silently switches a feature on for
    every existing user. `SCANNER_KEY` is the only default-ON flag and the only one
-   read as `!== '0'`.
+   read as `!== '0'`. ⚠ `SCANNER_PAIRED_KEY` (v67) sits on the NEXT LINE in
+   storage.js and is ordinary opt-in `=== '1'`. Harness-asserted both ways.
 
 10. **`backupVersion` is 5.** Additive fields ride through encode/decode wholesale
     and do not spend a bump. Bump only for a genuinely incompatible schema change.
@@ -94,6 +95,19 @@ identifiers from later files (e.g. `uid`) are `typeof`-guarded where used early.
 
 **Adding a file:** update `index.html` `<script>` chain AND `sw.js` ASSETS, and
 upload the new file to GitHub **before** either of them.
+
+---
+
+## Not shipped
+
+### harness/ — the committed test harness
+Stub layer, load-order runner, fixtures, standing assertions, mutation runner.
+NOT in `index.html`, NOT in `sw.js` ASSETS — test 01c fails if either changes.
+**Touch to:** validate a release (`node harness/run.js`, `node harness/mutate.js`),
+or add this release's assertions and mutations. Never delete from `tests/`.
+**Coupling:** derives load order from `index.html`; source-guards `report.js`,
+`csv.js` and the flat-field writers (rule 7); asserts rules 1, 8, 9, 11.
+See `harness/README.md`.
 
 ---
 
@@ -306,11 +320,12 @@ render). Bug sheet logic lives in **bugreport.js**. Instrument settings live in
 returns `''` when null.
 *Split candidate — see BACKLOG.md.*
 
-### scanner.js (~300 ln) — HID barcode scanner
+### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This
 file watches for bursts too fast to be human and routes the result. Burst state is
 module-level `let`, never `state` — it is the last ~100ms of keyboard.
-**Touch to:** change scan detection, timing, or where scans are accepted.
+**Touch to:** change scan detection, timing, where scans are accepted, the
+diagnostic log, or paired-mode focus.
 **⚠ CHARACTER KEYS ARE NEVER `preventDefault`ed — ONLY THE TERMINATOR.** At the
 moment a character arrives we don't yet know if the burst is a scan. Characters
 land wherever they were going *and* are copied to the buffer; only the terminator
@@ -319,11 +334,28 @@ cleaning up what the characters did on the way past. Do not optimise this into
 swallowing keys early — it is the reason normal typing cannot break.
 **⚠ OVERWRITE, NEVER APPEND** (the asset box is pre-filled).
 **⚠ `e.repeat` is excluded** — a held key auto-repeats at machine speed.
+**⚠ v67: TRUE MODIFIERS SKIP, EVERYTHING ELSE RESETS.** `SCAN_MODIFIER_KEYS` keys
+pass through without ending the burst (a Shift keydown used to destroy a barcode
+containing capitals). Any OTHER non-single-character key must still drop the
+whole burst: skipping a key that did produce a character delivers a plausible
+SHORT asset number, which is worse than no scan. Asymmetric on purpose.
+**⚠ v67: A REJECTED BURST MUST NOT BE SILENT.** `_scanVerdict()` returns numbers
+and a reason, not a boolean, and `_scanLogBurst()` records rejections on the
+settings test page — but ONLY there (`ctx.kind === 'test'`), or a human typing on
+the entry screen fills the log. `_scanIntoTest()` must NOT write the log too.
 **Coupling:** accepts scans in three targets only (`#f-asset`, `#sessions-search`,
 `#scanner-test`) and bails everywhere else, including with any entry sheet open or
 a locked job. Delivery is a targeted DOM write (rule 3). Bound once from boot.js
 (rule 6). The settings PAGE is in render-settings.js; the post-scan asset
-carry-forward is in session.js.
+carry-forward is in session.js. `scanMaxGapMs()` resolves `state.scanSpeed`
+against `SCAN_GAP_PRESETS` (config) fresh on every burst — an unknown preset must
+fall back, never resolve to `undefined`.
+`focusAssetForScan()` (v67, paired mode) is called by **`render()` AND
+`refreshEntryAfterLog()`** in render-core.js, typeof-guarded at both. Both are
+required: the second is what fixed "the scan after a PASS goes nowhere". It
+routes through `_scanTarget()` so it inherits every bail-out, and it `select()`s
+as well as focusing — the selection is what makes an *unrecognised* scan replace
+rather than append.
 
 ### events.js (~342 ln) — focus-sensitive binding, per render
 Direct binds for the four focus-sensitive fields only (`nf-client`, `nf-site`,

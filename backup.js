@@ -67,6 +67,12 @@ function buildBackup() {
     // backupVersion bump — a pre-v65 backup simply has no key and restores with
     // the default (ON), which is also what a fresh install gets.
     scannerEnabled: state.scannerEnabled,
+    // v67: paired mode and the burst speed preset. Same posture as the line
+    // above — additive, missing-field-tolerant, NO backupVersion bump. A
+    // pre-v67 backup has neither key and restores with the loaded defaults
+    // (paired OFF, speed 'normal'), which is what a fresh install gets.
+    scannerPaired: state.scannerPaired,
+    scanSpeed: state.scanSpeed,
     // v19: Clients & Sites (readable long-key arrays).
     clients: state.clients,
     sites: state.sites,
@@ -324,6 +330,17 @@ function restoreBackupFromFile(file) {
     // preference, so it must not be read as "off".
     if (typeof data.scannerEnabled === 'boolean') {
       state.scannerEnabled = data.scannerEnabled;
+    }
+
+    // v67: same rule — restore only what the backup actually carries, and
+    // validate the preset against the whitelist rather than trusting the file.
+    // A backup is an untrusted input: an unrecognised preset name would resolve
+    // to an undefined threshold and quietly kill every scan.
+    if (typeof data.scannerPaired === 'boolean') {
+      state.scannerPaired = data.scannerPaired;
+    }
+    if (Object.prototype.hasOwnProperty.call(SCAN_GAP_PRESETS, data.scanSpeed)) {
+      state.scanSpeed = data.scanSpeed;
     }
     {
       let incoming = {};

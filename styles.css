@@ -3440,6 +3440,58 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   white-space: nowrap;
 }
 
+/* v67 — the log now carries rejected bursts as well as accepted ones, so a row
+   needs to say which it is at a glance and has a third line when it was turned
+   down. The row switches from a single baseline-aligned line to a wrapping
+   block, because "too slow — 74ms between characters, limit 60ms" will not sit
+   on one line on a phone. */
+.scanner-log-row { flex-wrap: wrap; }
+.scanner-log-row.is-rejected {
+  border-color: var(--fail-soft-border);
+  background: var(--fail-soft-bg);
+}
+.scanner-log-row.is-rejected .scanner-log-meta { color: var(--fail-soft-text); }
+.scanner-log-reason {
+  flex: 1 0 100%;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--fail-soft-text);
+  white-space: normal;
+}
+
+/* v67 — the keyboard escape hatch beside the asset box, shown only in scanner
+   paired mode. Sized to the 44px touch minimum and pinned to the field's own
+   height so the row reads as one control rather than an input with a stray
+   button after it. The input keeps flex:1 so a long asset number still gets the
+   full width it had before paired mode existed. */
+.asset-input-wrap {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
+.asset-input-wrap .input-big { flex: 1 1 auto; min-width: 0; }
+.asset-kbd-btn {
+  flex: 0 0 auto;
+  width: 52px;
+  min-height: 44px;
+  font-size: 22px;
+  line-height: 1;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+  color: var(--text-muted);
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+/* On = "this app's keyboard suppression is off for this item". Accent rather
+   than a colour with a pass/fail meaning — it is a mode, not a result. */
+.asset-kbd-btn.is-on {
+  border-color: var(--accent);
+  color: var(--accent);
+  background: var(--card-bg);
+}
+
 /* ============== v66 — Test instruments ==============
    The User Settings instrument list. Deliberately mirrors the .client-card
    pattern (same tokens, same shape) rather than inventing a second list style —
