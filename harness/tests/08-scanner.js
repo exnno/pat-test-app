@@ -435,4 +435,58 @@ module.exports = async function run() {
     t.eq(app.state().scannerPaired, true,
       'an absent key says nothing, so the loaded value is left alone');
   });
+  /* ------------------------------------------------------------------
+     v67.1 — WIRING. Read this before adding anything to this file.
+
+     Every group below drives handleScannerKeydown() DIRECTLY. That proved the
+     burst logic was correct and said nothing at all about whether the handler
+     was attached to anything — and it was not. initScanner() was never called
+     from boot.js in V65, V66 or V67, so the listener never existed and not one
+     scan was ever detected in a shipped build. 24 green groups, a dead feature.
+
+     A test that calls the function tests the function. Only a test that
+     dispatches through the same surface the browser uses tests the wiring.
+     ------------------------------------------------------------------ */
+
+  t.group('08w — the keydown listener is actually bound at boot', () => {
+    // ⚠ Dispatches on document. Does NOT call handleScannerKeydown. That
+    // distinction is the entire point of this group; do not "simplify" it.
+    const app = onEntryScreen();
+    const clock = withClock(app);
+    'PAT004821'.split('').forEach((c, i) => {
+      if (i > 0) clock.advance(10);
+      app.doc.dispatchEvent({
+        type: 'keydown', key: c, repeat: false,
+        ctrlKey: false, metaKey: false, altKey: false, shiftKey: false,
+        defaultPrevented: false, preventDefault() { this.defaultPrevented = true; },
+        stopPropagation() {},
+      });
+    });
+    clock.advance(10);
+    app.doc.dispatchEvent({
+      type: 'keydown', key: 'Enter', repeat: false,
+      ctrlKey: false, metaKey: false, altKey: false, shiftKey: false,
+      defaultPrevented: false, preventDefault() { this.defaultPrevented = true; },
+      stopPropagation() {},
+    });
+    t.eq(app.doc.getElementById('f-asset').value, 'PAT004821',
+      'a real keydown on document reached the scanner — the listener exists');
+  });
+
+  t.group('08x — a burst ended by an unexpected key is reported, not dropped silently', () => {
+    // v67.1. The last silent rejection path, and the one a misconfigured
+    // scanner suffix hits. Before this it discarded the burst and said nothing,
+    // which is the exact failure shape v67 existed to remove.
+    const app = onScannerPage();
+    const clock = withClock(app);
+    'PAT004821'.split('').forEach((c, i) => { if (i > 0) clock.advance(10); key(app, c); });
+    clock.advance(10);
+    key(app, 'F5');                       // not a terminator, not a modifier
+    const log = app.state().scannerTestLog;
+    t.eq(log.length, 1, 'the discarded burst was recorded');
+    t.eq(log[0].ok, false, 'as a rejection');
+    t.includes(log[0].why, 'unexpected key', 'naming the cause');
+    t.includes(log[0].why, 'F5', 'and the key itself, so it can be looked up');
+  });
+
 };
