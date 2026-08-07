@@ -6,6 +6,74 @@
  * See LICENSE.txt for full terms.
  */
 
+/* ============================================================================
+   SECTION INDEX  (v68)
+
+   This file is ordered by the release that added each block, not by screen, so
+   an area can appear in more than one place. Every section below is marked in
+   place with a banner line carrying the token `@@`. To navigate:
+
+       grep -n '^/\* @@' styles.css        list every section and its line
+       grep -n '^/\* @@ settings' styles.css  just the settings blocks
+       sed -n '1200,1260p' styles.css       read one region
+
+   ⚠ DO NOT REORDER THIS FILE TO MATCH THE INDEX. CSS is order-sensitive and
+   several rules here depend on being overridden by a later block. The banners
+   describe the existing order; they do not license changing it.
+
+   Sections, in file order:
+      1. tokens & theme
+      2. forms & inputs
+      3. quick pick grid
+      4. entry: pass/fail + copy last
+      5. buttons: shared
+      6. sessions list: controls
+      7. overview: header + filters
+      8. sheets: shell
+      9. multi pick
+     10. quick pick: presets
+     11. toast
+     12. settings: shared
+     13. report: signature
+     14. entry: progress + nav
+     15. fail flow
+     16. banners: update
+     17. banners: session lock
+     18. calculator
+     19. settings: hub
+     20. settings: display
+     21. settings: backup & storage
+     22. settings: about/contact/glossary
+     23. overview: selection mode
+     24. icons
+     25. sessions list: search & badges
+     26. new session form
+     27. import
+     28. banners: backup reminder
+     29. welcome modal
+     30. onboarding wizard
+     31. tour
+     32. overview: bulk edit
+     33. settings: csv columns
+     34. instruments: calibration chip
+     35. sessions list: search jump
+     36. action feedback flash
+     37. clients & sites
+     38. report: preview & settings
+     39. settings: export/import setup
+     40. settings: search
+     41. empty states
+     42. banners: calibration due
+     43. cloud pages menu
+     44. test readings
+     45. bug report
+     46. asset history & testing time
+     47. photos
+     48. scanner
+     49. instruments: list
+============================================================================ */
+
+/* @@ tokens & theme */
 /* ===== Theme tokens =====
    :root carries the LIGHT theme by default. The dark theme is applied either via
    the prefers-color-scheme media query (state.theme === 'system') or via the
@@ -198,6 +266,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .input-big { width: 100%; padding: 14px 16px; font-size: 18px; font-weight: 600; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--input-bg); color: var(--text); }
 .textarea { width: 100%; padding: 12px 14px; font-size: 15px; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--input-bg); color: var(--text); resize: vertical; min-height: 60px; }
 
+/* @@ forms & inputs */
 /* v8: iOS Safari renders <input type="date"> with native picker chrome that's
    noticeably taller than text inputs. Strip the appearance and pin the height
    to match the rest of .input. .input-date is also applied so we don't catch
@@ -222,6 +291,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   opacity: 0.6;
 }
 
+/* @@ quick pick grid */
 /* 3x3 grid for up to 9 quick-pick items */
 .quick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .quick-btn { padding: 14px 4px; font-size: 14px; font-weight: 600; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--quick-bg); color: var(--quick-text); }
@@ -257,6 +327,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .notes-toggle { background: transparent; border: none; color: var(--accent); font-size: 13px; font-weight: 600; padding: 8px 0; margin-top: 4px; text-align: left; display: block; }
 
+/* @@ entry: pass/fail + copy last */
 /* Pass/Fail 75/25 split, same height */
 .pass-fail-row { display: grid; grid-template-columns: 3fr 1fr; gap: 10px; margin-top: 22px; }
 .pass-btn { padding: 26px 0; font-size: 22px; font-weight: 800; letter-spacing: 0.05em; background: var(--pass); color: #fff; border: none; border-radius: 12px; box-shadow: 0 2px 0 var(--pass-shadow); }
@@ -298,6 +369,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .session-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
 
 .btn-primary { width: 100%; padding: 14px 16px; font-size: 16px; font-weight: 700; background: var(--accent); color: #fff; border: none; border-radius: 10px; }
+/* @@ buttons: shared */
 /* v25.1: .btn-primary had no press state, so primary buttons (e.g. the prune
    Save on Backup & Restore) didn't give tap feedback like the .backup-action-btn
    buttons beside them. Add a subtle press, consistent with .pass-btn/.fail-btn. */
@@ -338,6 +410,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   flex: 1;
 }
 
+/* @@ sessions list: controls */
 /* v15: Sessions-list controls row — Sort + Status + Lock, side by side. Each
    field is a label stacking a small caption over its select. Wraps on narrow
    screens so all three stay usable on a phone. */
@@ -367,6 +440,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   flex: none;
 }
 
+/* @@ overview: header + filters */
 /* Header actions cluster (overview right side) */
 .header-actions {
   display: flex;
@@ -391,6 +465,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   margin: 0;
 }
 
+/* @@ sheets: shell */
 /* Modal sheets (used by fail-reason picker and bulk-location dialog) */
 .modal-backdrop {
   position: fixed;
@@ -496,6 +571,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .fail-reason-btn:active { background: var(--fail-soft-hover); }
 
+/* @@ multi pick */
 /* ===== v16: Multi Pick ===== */
 /* Entry-screen button — full width at the very bottom. Distinct from Copy last
    (which is accent-soft); uses the neutral card surface with a strong border so
@@ -550,6 +626,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   border-radius: 10px;
 }
 
+/* @@ quick pick: presets */
 /* v47: quick-pick preset switcher sheet (long-press on the entry grid).
    Modelled on the Multi Pick option rows, with a leading tick column so the
    active preset reads at a glance, and an "Edit presets" footer link. */
@@ -653,6 +730,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .mp-slot .mp-slot-name { margin-bottom: 8px; }
 
+/* @@ toast */
 /* Transient toast — dark pill, fixed near the bottom, fades in/out. Lives on
    <body> outside #app so it survives a re-render. Dark in both themes by
    design (a notification pill), so fixed colours rather than theme tokens. */
@@ -679,6 +757,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   transform: translateX(-50%) translateY(0);
 }
 
+/* @@ settings: shared */
 /* Settings sections spacing (used inside individual settings sub-pages) */
 .settings-section + .settings-section { margin-top: 28px; }
 .settings-section h2 { margin-top: 0; }
@@ -707,6 +786,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .preset-action-danger { color: var(--fail); border-color: var(--fail-soft-border); }
 .preset-action-danger:active { background: var(--fail-soft-bg); }
 
+/* @@ report: signature */
 /* v34: report signature — preview, draw pad, position segmented control. */
 .report-sig-preview img { border: 1px solid var(--border-strong); }
 .sig-position-row {
@@ -753,6 +833,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   pointer-events: none;
 }
 
+/* @@ entry: progress + nav */
 /* Progress row with inline delete bin (entry screen) */
 .progress-row {
   display: flex;
@@ -804,6 +885,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   appearance: searchfield-cancel-button;
 }
 
+/* @@ fail flow */
 /* Fail modal stage 1: full-width "Other..." button replacing old Skip */
 .fail-other-btn {
   width: 100%;
@@ -856,6 +938,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* ===== v7 additions ===== */
 
+/* @@ banners: update */
 /* Update banner — sticky bar at top of viewport */
 .update-banner {
   position: fixed;
@@ -910,6 +993,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* Push the screen content down when banner is visible */
 body.has-update-banner .screen { padding-top: 64px; }
 
+/* @@ banners: session lock */
 /* v8: Lock-session banner — sits inline at the top of the entry screen when
    the active session is locked. Uses neutral colours rather than fail-red to
    make clear it's a guard, not an error. */
@@ -971,6 +1055,7 @@ body.has-update-banner .screen { padding-top: 64px; }
   opacity: 0.85;
 }
 
+/* @@ calculator */
 /* v8: Resistance calculator result card */
 .calc-result-card {
   margin-top: 18px;
@@ -1002,6 +1087,7 @@ body.has-update-banner .screen { padding-top: 64px; }
   font-variant-numeric: tabular-nums;
 }
 
+/* @@ settings: hub */
 /* Settings hub — list of sub-page rows, iOS-Settings style */
 .settings-list {
   background: var(--card-bg);
@@ -1069,6 +1155,7 @@ body.has-update-banner .screen { padding-top: 64px; }
   line-height: 1.5;
 }
 
+/* @@ settings: display */
 /* Display Settings — radio group for theme, toggle for haptics */
 .theme-options {
   display: flex;
@@ -1177,6 +1264,7 @@ body.has-update-banner .screen { padding-top: 64px; }
   transform: translateX(20px);
 }
 
+/* @@ settings: backup & storage */
 /* Backup & Restore — action buttons */
 .backup-action-btn {
   width: 100%;
@@ -1236,6 +1324,7 @@ body.has-update-banner .screen { padding-top: 64px; }
 .storage-bar.warn { background: #f59e0b; }
 .storage-bar.danger { background: var(--fail); }
 
+/* @@ settings: about/contact/glossary */
 /* About / Contact / Calculator — readable static text pages */
 .info-card {
   background: var(--card-bg);
@@ -1300,6 +1389,7 @@ body.has-update-banner .screen { padding-top: 64px; }
   color: var(--text-muted);
 }
 
+/* @@ overview: selection mode */
 /* Selection mode (overview bulk-edit) */
 .selection-bar {
   position: fixed;
@@ -1354,6 +1444,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 
 /* ===== v10 additions ===== */
 
+/* @@ icons */
 /* Inline SVG share-glyph (replaces the ⬇ unicode arrow on Export buttons).
    Uses currentColor so it inherits whatever colour the surrounding button has
    (--text-muted inside .icon-btn-sm on the sessions list, --neutral-text on
@@ -1367,6 +1458,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .icon-btn .share-icon { width: 20px; height: 20px; }
 
+/* @@ sessions list: search & badges */
 /* v10: Sessions list — sticky search bar above the sort row. Reuses .search-input
    from the overview but sits in its own container so we can show the result
    count next to it. */
@@ -1535,6 +1627,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   position: relative;
 }
 
+/* @@ new session form */
 /* v20: New Session form Client / Site fields. Each input sits in a relative
    wrapper so its tappable .suggestions list (which is position:absolute) anchors
    to the field — same approach as .location-input-wrap on the entry screen. */
@@ -1550,6 +1643,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   font-size: 12px;
 }
 
+/* @@ import */
 /* v10: Import-summary modal body — narrow list of skipped rows with reason. */
 .import-summary-list {
   max-height: 160px;
@@ -1592,6 +1686,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 
 /* ===== v11 additions ===== */
 
+/* @@ banners: backup reminder */
 /* v11: Backup-reminder banner on the Sessions list. Sits inline above the
    sessions area when shouldShowBackupReminder() returns true. Uses neutral
    warm tones (not accent blue, not fail red) — it's a nudge, not an alarm.
@@ -1670,6 +1765,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .backup-banner-dismiss:hover { opacity: 1; }
 
+/* @@ welcome modal */
 /* v11: Welcome modal bullet list — shown inside the existing .bulk-sheet
    bottom-sheet container. Keep it tight so it fits on a short viewport
    without scrolling. */
@@ -1687,6 +1783,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   margin-bottom: 0;
 }
 
+/* @@ onboarding wizard */
 /* v33: first-run wizard — reuses the bottom-sheet shell; buttons stack full-width
    with comfortable spacing, plus a step indicator and muted back/skip links.
    v45: given a STABLE SHAPE so the action buttons no longer jump as you page
@@ -1870,6 +1967,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   opacity: 0.85;
 }
 
+/* @@ tour */
 /* v42: full-screen feature walkthrough (decision 6-i). Its own view, NOT a modal
    over the live app — it owns #app for its duration. Each slide shows a static
    MOCK of a screen (the .tour-mock block) with one control highlighted, plus a
@@ -2123,6 +2221,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .tour-next { flex: 1; }
 
+/* @@ overview: bulk edit */
 /* v11: Bulk-edit menu sheet — vertical stack of options inside a bottom sheet,
    plus a Delete option styled as destructive. Matches the import-conflict-actions
    pattern from v10. */
@@ -2185,6 +2284,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   font-weight: 700;
 }
 
+/* @@ settings: csv columns */
 /* v11: CSV Columns settings page. Each row is a self-contained card with
    reorder arrows, a visibility checkbox, and a header-text input. */
 .csv-cols-list {
@@ -2257,6 +2357,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
    v12 additions
    ============================================================ */
 
+/* @@ instruments: calibration chip */
 /* Calibration-due chip — appears next to the "Next calibration due" field
    on User Settings, and in the User Settings subtitle on the settings hub.
    Two variants:
@@ -2287,6 +2388,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   border: 1px solid var(--warn-soft-border);
 }
 
+/* @@ sessions list: search jump */
 /* Sessions-list search-jump highlight. When openSession() is called with an
    explicit cursor (i.e. the user tapped an item-level search result), the
    progress row on the entry screen gets data-search-jump="1" for the
@@ -2312,6 +2414,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
    recover. Reverted to v11 scroll behaviour. The body class strip in
    render() is defensive cleanup only. */
 
+/* @@ action feedback flash */
 /* ===== v17: action feedback flash (overlay) =====
    Channel 2 of the v17 feedback engine (see app.js). On a Pass / Fail / Copy /
    Multi Pick tap, JS reads the button's rectangle and spawns a .flash-overlay
@@ -2390,6 +2493,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   padding: 0 16px 12px;
 }
 
+/* @@ clients & sites */
 /* Text-style action buttons used for Rename / Delete on clients + sites. */
 .link-btn {
   background: none;
@@ -2445,6 +2549,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .client-site-actions { display: flex; gap: 14px; flex-shrink: 0; }
 .client-add-site-btn { margin-top: 4px; width: 100%; }
 
+/* @@ report: preview & settings */
 /* ============== v30: PDF report preview + Report Settings ============== */
 /* The report preview is a near-fullscreen sheet (a PDF iframe needs real
    height, unlike the short bottom-sheets). Built directly in the DOM by
@@ -2673,6 +2778,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   background: #fff;
 }
 
+/* @@ settings: export/import setup */
 /* ============== v31: Export/Import Setup + filename tokens ============== */
 
 /* "Choose what to include" disclosure button on the Backup page. */
@@ -2741,6 +2847,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .report-filename-row .report-filename-input { flex: 1 1 auto; }
 .report-filename-ext { font-size: 14px; color: var(--text-muted); flex: 0 0 auto; }
 
+/* @@ settings: search */
 /* ===================== v32: settings restructure + search ===================== */
 
 /* Settings hub search box */
@@ -2769,6 +2876,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   margin-top: 1px;
 }
 
+/* @@ empty states */
 /* ===================== v32: empty states ===================== */
 .empty-state {
   display: flex;
@@ -2798,6 +2906,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .empty-state-action { margin-top: 14px; }
 
+/* @@ banners: calibration due */
 /* v43: Calibration due banner — sits on entry screen below lock banner.
    Visual indicator of calibration status (green = ok, yellow = due soon, red = overdue). */
 .cal-banner {
@@ -2834,6 +2943,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   flex-shrink: 0;
 }
 
+/* @@ cloud pages menu */
 /* v43: Cloud pages menu (hidden by default, revealed via long-press). */
 .cloud-pages-menu {
   margin-top: 12px;
@@ -2848,6 +2958,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 
 
+/* @@ test readings */
 /* ===== v53: Test Readings ===== */
 /* The readings sheet reuses the .fail-sheet slide-up shell; these styles add the
    class selector row, the labelled measurement inputs, and the commit button.
@@ -2973,6 +3084,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .reason-tag-select { flex: 0 0 auto; max-width: 52%; }
 
+/* @@ bug report */
 /* ===================== v60: bug report (Settings → Contact) ===================== */
 
 /* The button on the Contact page. Full width and finger-sized — it's the one
@@ -3118,6 +3230,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
    textarea below them is never torn down and the keyboard never drops. */
 .bug-hidden { display: none; }
 
+/* @@ asset history & testing time */
 /* ============== PATGo PWA — v61 — Asset history + testing time ============== */
 
 /* The offer card above the sessions list when a searched asset number turns up
@@ -3242,6 +3355,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   color: var(--text-muted);
 }
 
+/* @@ photos */
 /* ---------- v62: photo evidence ---------- */
 /* All colours come from the existing custom properties, so dark mode is
    inherited rather than re-declared. Nothing here sets a fixed pixel height on
@@ -3399,6 +3513,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .entry-photo-btn:active { background: var(--neutral-bg-hover); }
 
+/* @@ scanner */
 /* ---------------------------------------------------------------------------
    v65: HID barcode scanner.
    The flash is the acknowledgement that a scan landed — deliberately visual
@@ -3460,38 +3575,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   white-space: normal;
 }
 
-/* v67 — the keyboard escape hatch beside the asset box, shown only in scanner
-   paired mode. Sized to the 44px touch minimum and pinned to the field's own
-   height so the row reads as one control rather than an input with a stray
-   button after it. The input keeps flex:1 so a long asset number still gets the
-   full width it had before paired mode existed. */
-.asset-input-wrap {
-  display: flex;
-  align-items: stretch;
-  gap: 8px;
-}
-.asset-input-wrap .input-big { flex: 1 1 auto; min-width: 0; }
-.asset-kbd-btn {
-  flex: 0 0 auto;
-  width: 52px;
-  min-height: 44px;
-  font-size: 22px;
-  line-height: 1;
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  background: var(--card-bg);
-  color: var(--text-muted);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-/* On = "this app's keyboard suppression is off for this item". Accent rather
-   than a colour with a pass/fail meaning — it is a mode, not a result. */
-.asset-kbd-btn.is-on {
-  border-color: var(--accent);
-  color: var(--accent);
-  background: var(--card-bg);
-}
-
+/* @@ instruments: list */
 /* ============== v66 — Test instruments ==============
    The User Settings instrument list. Deliberately mirrors the .client-card
    pattern (same tokens, same shape) rather than inventing a second list style —

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V67)
+# PATGo — Code Map (V68)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -138,7 +138,10 @@ flat fields) are never saved, backed up or validated. Rule 7 applies.
 Formatting, escaping, colour, asset-number splitting/padding, long-press
 detector, boundary validators for item readings.
 **Touch to:** add a stateless helper.
-**Coupling:** none by design — nothing here reads `state`.
+**Coupling:** none by design — nothing here reads `state`. ⚠ `titleCase()` is
+NOT display-only: it runs on locations and item types at save time, so its
+output reaches certificates and CSV exports. v68 fixed the possessive
+("Bob's Office"); the fix must keep capitalising O'Brien. Harness: 06e2.
 
 ### storage.js (~755 ln) — persistence boundary
 The key-shortening codec (`SESSION_KEY_MAP`, `ITEM_KEY_MAP`), `load`/`save` and
@@ -204,6 +207,10 @@ files own markup); logic is here. Rule 3 applies to the sheet.
 `initErrorCapture()` is called once from boot.js (rule 6). Known limit: boot.js
 loads last, so a parse-time failure in an earlier file predates these handlers —
 covered by the boot integrity guard instead.
+v68: captured error TEXT is the one field the privacy rule can't cover by
+construction, so `_scrubCustomerData()` redacts known customer strings at
+report-build time. ⚠ It FAILS CLOSED — an incomplete term list withholds the
+message rather than passing it through. Do not add a raw-text fallback.
 
 ### photos.js (~625 ln) — photo evidence store
 **The app's only IndexedDB code.** Record store, count index, image processing,
@@ -392,6 +399,17 @@ guard.
 **Coupling:** the integrity guard verifies the critical cross-file functions
 loaded before any storage write and skips `load()`/`render()`/`save()` if not —
 this is the guard against the duplicate-`const` data-loss class (rule 1).
+⚠ v68 (D1): `bootIntegrityOK()` CAN THROW — `typeof state` hits a TDZ binding
+when config.js fails to parse. Its call site is wrapped and a throw counts as a
+FAILED check. Never call it bare in an `if`; the throw escapes and the recovery
+screen never paints (white screen). Two "Update needed" screens exist and read
+almost identically — the guard's says "load completely", the v61.2 load() net
+says "finish updating". Harness 02c depends on that wording to tell them apart.
+
+⚠ **Two independent nets, not one.** Even if the guard were wrong, the load()
+try/catch below no-ops `save()` and `render()` and paints its own screen. That
+redundancy is deliberate — do not remove either on the grounds the other covers
+it.
 Boot tail order matters: error capture first, then delegation, drag guard, click
 swallow, scanner, then `load()` → `applyTheme` → `loadFormForCursor`/`render` in a
 try/catch, then `photoIndexLoad()` **after** the first paint. Every optional init
@@ -404,8 +422,15 @@ another file having parsed. Don't "DRY" this.
 
 ## Not code, but read the same way
 
-- `styles.css` (~97KB) — no section index yet; grep for the class before opening.
-  *See BACKLOG.md.*
+- `styles.css` (~95KB, 3578 ln) — **has a section index as of v68.** Ordered by
+  the release that added each block, NOT by screen, so one area can appear in
+  several places. 49 banner lines carry the token `@@`.
+  `grep -n '^/\* @@' styles.css` lists every section; `grep -n '^/\* @@ settings'`
+  narrows; then `sed` the region. The index block at the top of the file lists
+  all sections in file order.
+  ⚠ Do NOT reorder the file to match the index — several rules depend on being
+  overridden by a later block. The banners describe the order, they don't
+  license changing it.
 - `index.html` (~3KB) — the `<script>` chain. Small enough to read whole.
 - `sw.js` (~3.5KB) — `CACHE_VERSION` + `ASSETS`. Read whole.
 - `manifest.webmanifest` — icons, name, display mode.

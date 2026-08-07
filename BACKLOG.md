@@ -8,75 +8,67 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### V68 — candidate: in-app keypad (only if the scanner shortcut isn't enough)
-V67 shipped a ⌨ button that lifts PATGo's own `inputmode="none"` suppression on
-the asset box. It cannot raise the iOS keyboard while a scanner is connected —
-iOS hides the software keyboard system-wide whenever a hardware keyboard is
-paired, and no web API overrides that. Platform limit, not a defect.
+### V69 — candidate: split session.js
+The highest remaining token win and the highest-risk item on this list. It is a
+STRUCTURAL release: one file per release, no behaviour changes in the same
+release, byte-identity check on every extracted body, no welcome modal. See
+"Token efficiency" item 1 below for the seams.
 
-The free answer, and the one to try FIRST: the NETUM C750 pops the iOS keyboard
-on a **double-click of its trigger button**, and there is a command barcode in
-the manual that does the same. Works in every app. If that covers Peter's
-typing (notes, "other" fail reasons, descriptions), this item dies here.
+The V68 styles.css index proves the pattern that makes this safe to deliver:
+insert-only edits, then strip the additions back out and byte-compare against
+the original. Anything that cannot be proved that way is not a structural
+change and does not belong in a structural release.
 
-If it doesn't, the only thing fully under our control is a **custom in-app
-keypad** — a tappable QWERTY sheet writing into the focused field. Real build,
-own release, do not bolt it onto anything else.
-⚠ Carry into that session:
-- `.bulk-sheet` is the reliable modal pattern (MAP rule 11 — no `prompt()`).
-- A sheet containing inputs must NOT `render()` while open (MAP rule 3).
-- The fields that actually need it are notes and the fail "other" box, not the
-  asset box — scope to those before building a general keyboard.
-
-### D1 is the other standing candidate
-Fold it into whatever V68 turns out to be, unless that release is large. It was
-labelled a V67 candidate and deliberately left out: V67's scope was locked to
-scanner work and D1 is a boot-path change.
+### ~~V68 — in-app keypad~~ — DEAD, do not revive
+The NETUM C750's double-click-trigger shortcut covers Peter's typing in the
+field, which was the stated condition for this item existing at all. Confirmed
+on real hardware, August 2026. The ⌨ button it would have replaced was itself
+removed in V68 for the same reason: it could not work while a scanner was
+connected, and the "Scanner paired" toggle already covers the disconnected case.
 
 ---
 
 ## Defects found by the harness (open)
 
-### D1. Boot integrity guard throws instead of returning false — WHITE SCREEN
-**Still open after V67** — deliberately deferred, not forgotten. It was labelled
-"Fix in V67" in the harness `known()` list; V67's scope was locked to scanner
-work and this is a boot-path change, so it did not go in. The `known()` note
-should be re-labelled when it does ship.
-If `config.js` is missing or stale, `state.js` throws while evaluating
-`let state = {…}`, leaving `state` permanently in the temporal dead zone.
-`bootIntegrityOK()` then throws on its own `typeof state === 'undefined'` line —
-`typeof` is safe on an *undeclared* identifier, but `state` here is declared and
-uninitialised. `if (!bootIntegrityOK())` at `boot.js:155` is unwrapped, so the
-throw escapes and the "Update needed" recovery screen never paints. Blank screen,
-no message, no crash-report link. The V61 failure class through a different door.
+### ~~D1. Boot integrity guard throws instead of returning false~~ — FIXED V68
+Call site wrapped; a throw now counts as a failed check. ⚠ The trap that made
+this survive review is recorded in `MAP.md` (boot.js entry) and in the code
+comment: `typeof` is safe on an UNDECLARED identifier but NOT on a declared,
+uninitialised one. Harness 02c, mutations M34/M35.
 
-Fix, one line:
-```js
-let _ok = false;
-try { _ok = bootIntegrityOK(); } catch (e) { _ok = false; }
-if (!_ok) { …recovery screen… }
-```
-⚠ The comment in `boot.js` currently asserts that `typeof` never throws here.
-Correct it in the same edit or the trap gets reintroduced.
+### ~~D2. `titleCase()` capitalises after an apostrophe~~ — FIXED V68
+Only a single letter following an apostrophe is now skipped, so O'Brien still
+capitalises. Harness 06e2, mutations M36/M37.
 
-### D2. `titleCase()` capitalises after an apostrophe
-`utils.js` uses `/\b\w/g`, and an apostrophe is a word boundary, so a location
-typed as "Bob's Office" is stored and printed as "Bob'S Office". Reaches
-certificates and CSV exports. ⚠ The behaviour is *correct* for names like
-O'Brien, so the fix must skip only a trailing single letter (the possessive),
-not all apostrophes.
+### ~~D3. Captured error text copied verbatim into the bug email~~ — FIXED V68
+`_scrubCustomerData()` redacts known customer strings at report-build time and
+FAILS CLOSED. Harness 05f/05g/05h, mutations M38/M39.
 
-### D3. Captured error text is copied verbatim into the bug email
-If a runtime error message interpolates a client or site name, it reaches the
-support email despite the privacy rule. Low likelihood, real. Scrub or truncate.
-
-### D4. A post-boot render throw is not covered by the v16.1 net
+### D4. A post-boot render throw is not covered by the v16.1 net — STILL OPEN
 The net wraps the *first* render at startup. A view renderer that throws later,
 on navigation, propagates to the caller. Whether that reaches the user depends on
 the caller — the delegated click handler may absorb it. **Confirm on-device
-before treating this as a defect.**
+before treating this as a defect.** The only remaining `known()` entry.
 
 ---
+
+## Standing lesson from V68 — a safety mechanism must be tested for its FAILURE mode
+
+Three separate things in V68 looked correct and were not, all in the same shape:
+a guard that produced the right-looking outcome via the wrong mechanism.
+
+1. `bootIntegrityOK()` returned false correctly in every case anyone had tried —
+   the one case that mattered made it throw instead.
+2. The first D3 scrub redacted correctly whenever it had a term list. With no
+   list it passed the raw text through, which is the case it existed for.
+3. The first D1 test asserted a recovery screen appeared. It did — but the
+   *wrong* recovery screen, painted by a different net downstream, so a mutation
+   inverting the guard survived.
+
+The rule: **for anything whose job is to fail safely, the test must drive the
+failure, not the success.** Asserting a guard works when nothing is wrong says
+nothing at all. And when two mechanisms can produce the same visible outcome,
+the assertion has to name which one produced it.
 
 ## Standing lesson from V67 — hardware features need hardware
 
@@ -111,12 +103,12 @@ win, highest risk — take it slowly. The harness now covers the session flows
 About/Glossary/Contact help pages in render-settings. Do not start until the
 session.js split has shipped and survived a release in the field.
 
-### 3. Section index for styles.css
-~97KB with no read strategy and no entry in `MAP.md`, so any CSS change risks a
-large blind read. Add banner comments (`/* ==== entry screen ==== */`) at each
-area boundary so `grep`+`sed` works on it the way it does on the JS files, then
-give it a routing entry in `MAP.md`. Cheap, no behaviour risk, but it edits a
-cached asset so it needs a cache bump — good filler alongside a small release.
+### ~~3. Section index for styles.css~~ — SHIPPED V68
+49 `@@` banner comments plus a header index block.
+`grep -n '^/\* @@' styles.css` lists every section. Insert-only: proved
+comment-only by stripping the banners back out and byte-comparing against the
+original. ⚠ The file was NOT reordered to match the index and must not be —
+several rules depend on being overridden by a later block.
 
 ### 4. Split the data tables out of config.js
 66KB described as "pure data", but the big tables (glossary groups, default item
@@ -137,8 +129,9 @@ Remove from the Claude project:
 - `PATGo_V61_V62_Roadmap.md` (overtaken; everything still live from it is
   consolidated below, so nothing is lost by deleting it)
 
-Old `PAThandoff_vNN.md` files are already pruned — only v66 remains. Keep it that
-way: only the latest is ever read, and older ones invite expensive wrong reads.
+Old `PAThandoff_vNN.md` files are already pruned — only v68 should remain. Keep
+it that way: only the latest is ever read, and older ones invite expensive wrong
+reads. **Remove `PAThandoff_v67.md` from the project.**
 
 ---
 
@@ -152,7 +145,6 @@ survives those documents being archived.
 | Home-screen shortcuts | Liked ("big yes"), never scheduled. Android/desktop only — revisit if an Android tester appears |
 | "Log this item ×N" | Liked in principle, shelved on UI clutter. Proposed resolution: long-press on the existing Copy-last button, so no new control competes for space |
 | Weekly/batch PDF export | Parked pending a direct tester ask — good idea, but wanted from testers before committing time |
-| Camera barcode scanning | Conditional on the HID path actually being used. V67 made it work on real hardware, so the evidence starts accumulating now — decide after a few real jobs, not before |
 | Per-instrument "in service" toggle | Only if overdue calibration nags on a retired instrument prove annoying in practice |
 | Scan into other fields (location, item type) | Raised implicitly by V67. Currently a scan is refused when any other text field has focus (the deliberate V65 "known limit"). Only worth revisiting if Peter starts labelling locations |
 
@@ -161,6 +153,7 @@ Kept so these don't get re-raised and re-argued from scratch.
 
 | Idea | Why not |
 |---|---|
+| Camera barcode scanning | **Decided against, V68.** Holding the camera open to decode barcodes is continuous processing on a device already running a full day in the field, and the battery cost is real, not theoretical. The HID scanner path works on real hardware and costs the phone nothing. Revisit only if a tester without a scanner asks for it directly |
 | Site-level default presets | Overlaps what Smart Quick Pick already does. Auto-apply can silently change buttons on a one-off visit to a familiar site |
 | Client-facing report permalinks | Sending a file is simpler and matches what people expect from a certificate |
 | Cross-device history / sync | No local equivalent is possible — there is no "other device" for a single-phone PWA. Cloud-only |

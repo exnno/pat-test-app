@@ -399,15 +399,13 @@ let state = {
   //                        SCANNER_PAIRED_KEY in config.js.
   //   scanSpeed          — 'strict' | 'normal' | 'relaxed'. Which gap threshold
   //                        the burst test uses.
-  //   scanKeyboardOn     — TRANSIENT. The engineer tapped the keyboard button to
-  //                        type into the asset box by hand, so the inputmode
-  //                        suppression comes off for this item only. Cleared by
-  //                        loadFormForCursor and setView like every other
-  //                        transient — see MAP rule 4.
+  // v68: `scanKeyboardOn` was REMOVED along with the ⌨ escape-hatch button it
+  // drove. It could not do its main job (iOS suppresses the on-screen keyboard
+  // system-wide while a hardware keyboard is paired), and the working answer is
+  // the "Scanner paired" setting itself. See assetFieldHTML() in render-core.js.
   scannerEnabled: true,
   scannerPaired: false,
   scanSpeed: 'normal',
-  scanKeyboardOn: false,
   scanFilledAsset: false,
   lastLogWasScanned: false,
   lastScanSessionId: '',

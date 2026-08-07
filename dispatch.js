@@ -267,48 +267,6 @@ registerActions({
   // Notes toggle
   'show-notes': () => { state.form.showNotes = true; render(); document.getElementById('f-notes')?.focus(); },
 
-  // v67: the keyboard escape hatch on the asset box (paired mode only). Toggles
-  // OUR inputmode="none" suppression off and on for the current item.
-  //
-  // ⚠ NO render() HERE, DELIBERATELY. Re-rendering the entry screen would tear
-  // down the field we are about to focus and take the keyboard with it — the
-  // v60.1 no-render rule, in the one place it is easiest to forget because this
-  // is not a sheet. Everything below is a targeted DOM write.
-  //
-  // ⚠ THE blur/focus PAIR IS LOAD-BEARING. iOS decides whether to show the
-  // on-screen keyboard at the moment a field takes focus, and it does not
-  // re-evaluate when inputmode changes underneath an already-focused element.
-  // The field has to lose focus and take it again for the new attribute to be
-  // read. This runs inside a real tap, which is what makes the focus() legal.
-  //
-  // This cannot raise the keyboard while a Bluetooth scanner is connected — iOS
-  // suppresses it system-wide for as long as a hardware keyboard is paired, and
-  // no web API overrides that. On the C750, double-clicking the scanner's own
-  // trigger button pops the keyboard up. See assetFieldHTML() in render-core.js.
-  'scan-keyboard': () => {
-    state.scanKeyboardOn = !state.scanKeyboardOn;
-    const el = document.getElementById('f-asset');
-    const btn = document.querySelector('[data-action="scan-keyboard"]');
-    if (btn) {
-      btn.classList.toggle('is-on', state.scanKeyboardOn);
-      const label = state.scanKeyboardOn ? 'Back to scanning' : 'Type by hand';
-      btn.setAttribute('aria-label', label);
-      btn.setAttribute('title', label);
-    }
-    if (!el) return;
-    if (state.scanKeyboardOn) el.removeAttribute('inputmode');
-    else el.setAttribute('inputmode', 'none');
-    try { el.blur(); } catch (e) {}
-    try {
-      el.focus();
-      // Caret to the end rather than selecting: the engineer tapped this to
-      // EDIT what is there, so wiping it on the first keypress would be wrong.
-      // That is the opposite of focusAssetForScan(), which selects on purpose.
-      const n = el.value.length;
-      el.setSelectionRange(n, n);
-    } catch (e) {}
-  },
-
   // Log actions
   'log-pass': () => passClicked(),
   'log-fail': () => failClicked(),

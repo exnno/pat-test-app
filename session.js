@@ -719,10 +719,6 @@ function loadFormForCursor() {
   }
   // v65: a fresh form has not been scanned into yet, whichever branch built it.
   state.scanFilledAsset = false;
-  // v67: the keyboard escape hatch is per-item. Having typed one asset number by
-  // hand should not silently leave the next fifty in typing mode — the engineer
-  // would be back to the keyboard covering PASS/FAIL with no idea why.
-  state.scanKeyboardOn = false;
   state.suggestions = [];
   state.showSuggestions = false;
   // v10: location suggestions follow the same lifecycle
@@ -1869,10 +1865,6 @@ function setView(v) {
   closeReadingsSheetState();          // v53
   discardPendingPhotos();             // v62
   closePhotoStripState();             // v62
-  // v67: the asset-box keyboard escape hatch. It only exists on the entry
-  // screen, so leaving it must not leave the flag set — coming back would show
-  // a typing-mode field with no memory of having asked for one.
-  state.scanKeyboardOn = false;
   // v61: the asset-history sheet lives on the Sessions screen; leaving that
   // screen must not leave it armed to reappear on the way back.
   state.assetHistorySheetOpen = false;

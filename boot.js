@@ -105,8 +105,17 @@ function bootIntegrityOK() {
   // The check is KEPT because it still earns its place: it is now a cheap probe
   // for "did config.js parse at all", which is the remaining way constants can go
   // missing. Catching that here converts a silent white screen into the designed
-  // recovery path, BEFORE any storage call is made. `typeof` on an undeclared
-  // identifier is safe and never throws.
+  // recovery path, BEFORE any storage call is made.
+  //
+  // ⚠ v68 CORRECTION. This comment used to end "`typeof` on an undeclared
+  // identifier is safe and never throws." That is true of an UNDECLARED
+  // identifier and it is why this line is written with `typeof` — but it is NOT
+  // true of the `state` check further up, and the distinction is the whole of
+  // defect D1. `state` is DECLARED (`let state = {…}` in state.js). If config.js
+  // fails to parse, that initialiser throws, `state` is left in the temporal
+  // dead zone, and `typeof state` throws a ReferenceError rather than returning
+  // 'undefined'. So this function CAN throw, and the caller below must not
+  // assume otherwise. Do not reintroduce the old claim.
   if (typeof WELCOME_KEY === 'undefined') {
     console.error('Boot integrity check failed: WELCOME_KEY missing — config.js did not load or did not parse (partial deploy or stale cache)');
     return false;
@@ -152,7 +161,23 @@ function _crashReportLink(context) {
   }
 }
 
-if (!bootIntegrityOK()) {
+// v68 (D1): the guard call is WRAPPED. bootIntegrityOK() can itself throw — see
+// the correction note inside it — and this `if` was unprotected, so the throw
+// escaped, the recovery screen below never painted, and the user got a blank
+// white screen with no message and no report link. That is the exact failure
+// this whole block exists to prevent, arriving through the front door.
+//
+// A throw is treated as a FAILED check, never a passed one. Anything that stops
+// the guard from completing is by definition a build we must not run load() on.
+let _bootIntegrity = false;
+try {
+  _bootIntegrity = bootIntegrityOK();
+} catch (e) {
+  console.error('Boot integrity check threw — treating as failed.', e);
+  _bootIntegrity = false;
+}
+
+if (!_bootIntegrity) {
   const appEl = document.getElementById('app');
   if (appEl) {
     appEl.innerHTML =

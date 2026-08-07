@@ -14,8 +14,24 @@ const escapeHTML = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp
 
 const capitalise = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 
+// v68 (D2): an apostrophe is a word boundary, so the old /\b\w/g turned
+// "Bob's Office" into "Bob'S Office" — and because this runs on locations and
+// item types it reached certificates and CSV exports, not just the screen.
+//
+// ⚠ THE FIX MUST NOT SIMPLY IGNORE APOSTROPHES. "o'brien" → "O'Brien" is
+// CORRECT and people are named that. The only thing that must be left alone is
+// a SINGLE letter following an apostrophe — the English possessive. Anything
+// longer is a real name fragment and still gets capitalised.
+//
+// The optional leading apostrophe is captured with the word run so the two can
+// be judged together. No lookbehind: Safari only gained it in 16.4 and this
+// file has to run on whatever a tester is carrying.
 function titleCase(s) {
-  return String(s || '').replace(/\b\w/g, c => c.toUpperCase());
+  return String(s || '').replace(/('?)(\w+)/g, (m, apo, word) =>
+    (apo && word.length === 1)
+      ? m
+      : apo + word.charAt(0).toUpperCase() + word.slice(1)
+  );
 }
 
 function formatDate(iso) {

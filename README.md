@@ -3,7 +3,7 @@
 A fast, offline-first portable appliance testing app (formerly "PAT Test"; renamed PATGo in V48, with the last internal code references swept in V60). Records pass/fail decisions on-site, with full offline support, autocomplete from session history, sticky locations, asset prefixing, Quick Pick and Smart Quick Pick item buttons, Multi Pick sequences, flexible clients & sites, search, filters, bulk edit, cross-session asset history, per-job testing time, photo evidence on fails, JSON backup/restore, dark mode, CSV export/import, and branded PDF report generation with an optional photographic evidence appendix.
 
 **Live:** <https://exnno.github.io/pat-test-app/>
-**Current version:** V66 · cache `pat-v67`
+**Current version:** V68 · cache `pat-v68`
 
 ## What it does
 

@@ -199,11 +199,10 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Barcode scanning actually works now.</strong> The first real scanner we tried didn't work at all &mdash; the app was quietly throwing away good scans. Barcodes with capital letters no longer break themselves halfway through, the speed limit was too tight and has been relaxed, and a scanner that sends two Enters no longer sets something off by accident.</li>
-        <li><strong>New "Scanner paired" switch.</strong> Settings &rarr; Testing Setup &rarr; Barcode Scanner. Turn it on when you've got a scanner with you and the asset box takes the cursor by itself &mdash; on every item, and again straight after each PASS or FAIL. Scan down a row of appliances without touching the screen.</li>
-        <li><strong>The test box now shows the scans it turned down,</strong> and why. A scanner that isn't connected used to look exactly like one that just needed a setting changed. It doesn't any more.</li>
-        <li><strong>Scan speed is adjustable.</strong> If the test box says "too slow", move it one notch and scan again &mdash; no waiting for an update.</li>
-        <li><strong>Need to type a number by hand?</strong> There's a &#9000; button beside the asset box. Worth knowing: while a Bluetooth scanner is connected your phone hides its own keyboard in <em>every</em> app &mdash; most scanners pop it back up if you double-click their trigger button.</li>
+        <li><strong>Apostrophes in place names are fixed.</strong> A location typed as "Bob's Office" was being stored as "Bob'S Office" &mdash; and it came out that way on certificates and in CSV exports, not just on screen. Names like O'Brien still capitalise correctly.</li>
+        <li><strong>The &#9000; keyboard button has been removed.</strong> It couldn't do what people wanted it for: your phone hides its own keyboard whenever a scanner is paired, in every app, and no app can overrule that. To type an asset number by hand, either double-click your scanner's trigger to pop the keyboard up, or turn <strong>Scanner paired</strong> off under Settings &rarr; Testing Setup &rarr; Barcode Scanner. That page now explains both.</li>
+        <li><strong>If the app ever fails to start,</strong> you'll now always get the "Update needed" screen with a Reload button and a link to report it &mdash; there was a rare case that showed a blank screen instead. Your saved data was never at risk either way, but a blank screen tells you nothing.</li>
+        <li><strong>Bug reports are more private.</strong> Client and site names are now stripped out of the technical details before a report is sent, so a fault report can't carry a customer's name off your phone.</li>
       </ul>
       <button class="btn-primary" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -1189,28 +1188,29 @@ function renderImportSummaryModal() {
 // with no scanner attached too, which is what makes the setting safe to leave on
 // if the scanner's battery dies mid-job.
 //
-// ⚠ THE KEYBOARD BUTTON IS AN ESCAPE HATCH, NOT A KEYBOARD SUMMONER. It removes
-// OUR suppression so the phone's own keyboard can appear. It cannot help while a
-// Bluetooth scanner is actually connected — iOS hides the on-screen keyboard
-// system-wide whenever a hardware keyboard is paired and there is no web API
-// that overrides that. For the connected case the answer is on the scanner: the
-// NETUM C750 pops the iOS keyboard on a double-click of its trigger button.
-// This button is for the disconnected case, and the settings page says so.
+// v68: THE ⌨ ESCAPE-HATCH BUTTON WAS REMOVED, and the reasoning matters because
+// the obvious instinct is to add it back. It removed our own suppression so the
+// phone's keyboard could appear — but iOS hides the on-screen keyboard
+// system-wide whenever a hardware keyboard is paired, and no web API overrides
+// that, so in the case people actually hit (scanner connected, want to type) the
+// button could not work and never did. It only helped when the scanner was off
+// or out of range, and there is already a better answer for that: turn "Scanner
+// paired" off in Settings, which clears the suppression at its source.
+//
+// The two real answers, both documented on the settings page:
+//   scanner connected    → double-click the scanner's own trigger (NETUM C750)
+//   scanner off/no signal → Settings → Testing Setup → Barcode Scanner → paired off
+//
+// ⚠ Do not reintroduce a per-item keyboard toggle without new evidence that iOS
+// has changed. `state.scanKeyboardOn` was removed with the button; a toggle that
+// cannot work in its main case is worse than no toggle, because it teaches the
+// engineer the app is broken rather than the platform is.
 function assetFieldHTML() {
   const paired = !!(state.scannerEnabled && state.scannerPaired);
-  const suppressKeyboard = paired && !state.scanKeyboardOn;
-  const input = `<input class="input-big" id="f-asset" data-input-action="f-asset"` +
+  return `<input class="input-big" id="f-asset" data-input-action="f-asset"` +
     ` value="${escapeHTML(state.form.assetNo)}"` +
     `${state.scannerEnabled ? ' placeholder="Scan or type"' : ''}` +
-    `${suppressKeyboard ? ' inputmode="none"' : ''}>`;
-  if (!paired) return input;
-  return `
-      <div class="asset-input-wrap">
-        ${input}
-        <button class="asset-kbd-btn${state.scanKeyboardOn ? ' is-on' : ''}" data-action="scan-keyboard"
-                aria-label="${state.scanKeyboardOn ? 'Back to scanning' : 'Type by hand'}"
-                title="${state.scanKeyboardOn ? 'Back to scanning' : 'Type by hand'}">⌨</button>
-      </div>`;
+    `${paired ? ' inputmode="none"' : ''}>`;
 }
 
 function renderEntry() {

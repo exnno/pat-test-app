@@ -75,11 +75,98 @@ function initErrorCapture() {
   });
 }
 
+// ---------- 1b. Customer-data scrub (v68, defect D3) ----------
+//
+// THE HOLE THIS CLOSES. Everything else in this file is a count, a flag or an
+// enum, and so obeys the privacy rule by construction. The captured error text
+// is the one field that is neither — it is whatever the browser or a throw
+// happened to say, and a message that interpolates a value ("Cannot read
+// properties of undefined (reading 'Coleman Joinery')") carries a customer's
+// name straight into a support email. Low likelihood, but a real route out.
+//
+// ⚠ THIS FAILS CLOSED, DELIBERATELY. If the scrub itself throws, the caller
+// gets a placeholder, NOT the raw text. Losing one diagnostic string is a bad
+// afternoon; leaking a client list is a bad company. Do not "improve" this by
+// falling back to the original message.
+const _BUG_SCRUB_MIN_LEN = 4;   // below this, matches are coincidence not data
+const _BUG_SCRUB_MAX_TERMS = 800;
+
+// Every string in memory that belongs to a customer rather than to the app.
+// Deliberately over-inclusive: it costs nothing to redact a word that was not
+// actually sensitive, and it costs a great deal to miss one that was.
+// Returns { terms, complete }. `complete` is the load-bearing half: a partial
+// term list is NOT good enough to scrub against, because the name that was
+// missed is exactly the one that leaks. Callers must treat complete === false
+// as "cannot verify" and withhold the text entirely.
+function _bugSensitiveTerms() {
+  const out = [];
+  const add = (v) => {
+    const s = String(v == null ? '' : v).trim();
+    if (s.length >= _BUG_SCRUB_MIN_LEN) out.push(s);
+  };
+  let complete = false;
+  try {
+    if (typeof state === 'undefined' || !state) {
+      // No state at all is a legitimately complete answer: there is no customer
+      // data in memory to leak. This is the early-boot error case.
+      return { terms: [], complete: true };
+    }
+    (state.clients || []).forEach(c => add(c && c.name));
+    (state.sites || []).forEach(s => add(s && s.name));
+    (state.itemTypes || []).forEach(add);
+    (state.sessions || []).forEach(sess => {
+      if (!sess) return;
+      add(sess.name);
+      add(sess.site);
+      (sess.items || []).forEach(it => {
+        if (!it) return;
+        add(it.assetNo); add(it.location); add(it.itemType); add(it.notes);
+      });
+    });
+    complete = true;
+  } catch (e) {
+    complete = false;
+  }
+  // Longest first, so "Coleman Joinery Ltd" is removed whole rather than being
+  // half-eaten by a shorter "Coleman" match and leaving "Joinery Ltd" behind.
+  const uniq = Array.from(new Set(out));
+  uniq.sort((a, b) => b.length - a.length);
+  return { terms: uniq.slice(0, _BUG_SCRUB_MAX_TERMS), complete };
+}
+
+const _BUG_SCRUB_WITHHELD = '[error text withheld — could not be checked for customer data]';
+
+function _scrubCustomerData(text) {
+  try {
+    const s = String(text == null ? '' : text);
+    if (!s) return s;
+    const { terms, complete } = _bugSensitiveTerms();
+    // ⚠ FAIL CLOSED. An incomplete term list means we do not know what is in
+    // memory, so we cannot claim the message is clean. Withhold it. The first
+    // version of this returned the raw text when the list came back empty,
+    // which turned a scrub into a passthrough on exactly the failure it was
+    // written for — the harness caught it (05h). Do not reinstate that.
+    if (!complete) return _BUG_SCRUB_WITHHELD;
+    if (!terms.length) return s;
+    const escaped = terms.map(t => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    // One pass, case-insensitive. Built fresh each call because the data can
+    // change between one report and the next.
+    const re = new RegExp('(' + escaped.join('|') + ')', 'gi');
+    return s.replace(re, '[removed]');
+  } catch (e) {
+    return _BUG_SCRUB_WITHHELD;
+  }
+}
+
 // Human-readable summary for the report body, or a clear "nothing to see".
+// v68: the message is scrubbed here, at the point it enters the report, rather
+// than at capture time — state may not have loaded when an early error fires,
+// and the in-memory buffer stays raw so the console still shows the truth.
+// `kind` is a fixed enum and `where` is a filename, so neither needs scrubbing.
 function bugErrorSummary() {
   if (!_bugErrors.length) return 'none recorded';
   return _bugErrors
-    .map(e => `${e.kind}: ${e.message}${e.where ? ' (' + e.where + ')' : ''}`)
+    .map(e => `${e.kind}: ${_scrubCustomerData(e.message)}${e.where ? ' (' + e.where + ')' : ''}`)
     .join(' | ');
 }
 
