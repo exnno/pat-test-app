@@ -74,11 +74,30 @@ module.exports = function run() {
       notes: 'Frayed, "borderline" — recheck', result: 'pass',
     });
     t.eq(item.assetNo, 'A/123-4', 'slashes and dashes survive');
-    t.known(item.location === "Bob'S Office",
-      "titleCase() capitalises the letter after an apostrophe: \"Bob's Office\" becomes \"Bob'S Office\"",
-      'utils.js titleCase uses /\\b\\w/g and an apostrophe is a word boundary. Reaches locations, and so reaches certificates and CSV exports. Note it is CORRECT for names like O\'Brien, so the fix must skip only a trailing single letter (the possessive), not all apostrophes.');
+    t.eq(item.location, "Bob's Office", 'the possessive is left alone (D2, fixed V68)');
     t.eq(item.itemType, 'Kettle & Urn', 'ampersands survive');
     t.eq(item.notes, 'Frayed, "borderline" — recheck', 'commas, quotes and em dashes survive');
+  });
+
+  t.group('06e2 — titleCase handles apostrophes both ways (D2)', () => {
+    // The fix must NOT be "ignore apostrophes". O'Brien is a real name and must
+    // still capitalise; only a single letter after an apostrophe (the English
+    // possessive) is left alone. Both directions asserted so a future
+    // simplification to either extreme goes red.
+    const app = freshApp();
+    const tc = app.fn('titleCase');
+    t.eq(tc("bob's office"), "Bob's Office", 'possessive s stays lowercase');
+    t.eq(tc("o'brien"), "O'Brien", "but O'Brien still capitalises");
+    t.eq(tc("o'brien's desk"), "O'Brien's Desk", 'and both rules apply in one string');
+    t.eq(tc("james' office"), "James' Office", 'a trailing apostrophe is harmless');
+    t.eq(tc('main hall - west'), 'Main Hall - West', 'ordinary words unaffected');
+    t.eq(tc('unit 3b'), 'Unit 3b', 'digits unaffected');
+    t.eq(tc(''), '', 'empty in, empty out');
+
+    // The real-world route: this reaches certificates and CSV via locations.
+    withSession(app);
+    const it = withItem(app, { assetNo: '1', location: "bob's office", itemType: 'Kettle', result: 'pass' });
+    t.eq(it.location, "Bob's Office", 'and it holds through the actual save path');
   });
 
   t.group('06f — stats tally correctly', () => {

@@ -348,33 +348,37 @@ module.exports = async function run() {
       'a locked job does not get the cursor');
   });
 
-  t.group('08r — the keyboard suppression and button appear only in paired mode', () => {
+  t.group('08r — keyboard suppression appears only in paired mode', () => {
     const off = onEntryScreen();
     const offHTML = off.fn('renderEntry')();
     t.excludes(offHTML, 'inputmode="none"', 'no keyboard suppression when not paired');
-    t.excludes(offHTML, 'scan-keyboard', 'and no keyboard button');
 
     const on = onEntryScreen({ localStorage: { 'pat:scannerPaired': '1' } });
     const onHTML = on.fn('renderEntry')();
     t.includes(onHTML, 'inputmode="none"', 'suppressed in paired mode');
-    t.includes(onHTML, 'data-action="scan-keyboard"', 'and the escape hatch is offered');
-
-    on.state().scanKeyboardOn = true;
-    const typing = on.fn('renderEntry')();
-    t.excludes(typing, 'inputmode="none"', 'the escape hatch lifts the suppression');
   });
 
-  t.group('08s — the keyboard override is per-item, not sticky', () => {
-    // Having typed one asset number by hand must not leave the next fifty in
-    // typing mode with the keyboard covering PASS and FAIL.
-    const app = onEntryScreen({ localStorage: { 'pat:scannerPaired': '1' } });
-    app.state().scanKeyboardOn = true;
-    app.fn('loadFormForCursor')();
-    t.eq(app.state().scanKeyboardOn, false, 'cleared by loadFormForCursor');
+  t.group('08s — the v67 keyboard escape hatch is GONE and stays gone', () => {
+    // v68 removed the ⌨ button. It could not raise the keyboard in the case
+    // people actually hit (scanner connected — iOS suppresses system-wide), so
+    // it taught the engineer the app was broken. These assertions exist to stop
+    // it being reintroduced by a well-meaning future release; the working
+    // answers are the scanner's own trigger shortcut and the paired toggle.
+    const on = onEntryScreen({ localStorage: { 'pat:scannerPaired': '1' } });
+    const onHTML = on.fn('renderEntry')();
+    t.excludes(onHTML, 'scan-keyboard', 'no keyboard button in paired mode');
+    t.excludes(onHTML, 'asset-kbd-btn', 'and no button styling hook');
+    t.excludes(onHTML, 'asset-input-wrap', 'and no wrapper left behind');
 
-    app.state().scanKeyboardOn = true;
-    app.fn('setView')('sessions');
-    t.eq(app.state().scanKeyboardOn, false, 'and by setView');
+    // The transient it drove must be gone from the state shape too — a dead
+    // flag nothing clears is exactly how MAP rule 4 bugs get planted.
+    t.eq('scanKeyboardOn' in on.state(), false, 'scanKeyboardOn removed from state');
+
+    // And the suppression must NOT be liftable by setting the old flag: if a
+    // future edit reads it again, this goes red.
+    on.state().scanKeyboardOn = true;
+    t.includes(on.fn('renderEntry')(), 'inputmode="none"',
+      'setting the old flag no longer lifts the suppression');
   });
 
   /* ------------------------------------------------------------------

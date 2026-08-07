@@ -54,21 +54,61 @@ module.exports = function run() {
     // point of the guard — never paints. Blank white screen, no message, no
     // crash-report link. Exactly the V61 failure class, through a different door.
     //
-    // FIX (V67, one line): wrap the call, treat a throw as failure —
-    //   let _ok = false; try { _ok = bootIntegrityOK(); } catch (e) { _ok = false; }
-    //   if (!_ok) { …recovery screen… }
+    // FIXED IN V68. The guard CALL is now wrapped and a throw is treated as a
+    // failed check, so the recovery screen paints either way. The two halves are
+    // asserted separately on purpose: the function may still throw (that is a
+    // language fact about TDZ, not something boot.js can prevent) — what must
+    // never happen again is that throw escaping to the top level.
     const app = bootApp({ skip: ['config.js'], tolerateLoadErrors: true });
     let result;
     try { result = app.fn('bootIntegrityOK')(); } catch { result = 'threw'; }
+    t.notEq(result, true, 'missing config.js is never reported as a healthy build');
 
-    t.known(result === 'threw',
-      'missing config.js → bootIntegrityOK() throws (should return false)',
-      'boot.js:155 is unguarded, so the recovery screen never paints. Fix in V67.');
+    // THE ONE THAT MATTERS: the source must not call the guard bare. Asserted
+    // against the source rather than by running boot, because the headless
+    // harness cannot reproduce a real top-level script abort — a runtime-only
+    // check here would be one of the documented false-confidence shapes.
+    const fs = require('fs');
+    const path = require('path');
+    const { APP_DIR } = require('../load');
+    const bootSrc = fs.readFileSync(path.join(APP_DIR, 'boot.js'), 'utf8');
+    t.excludes(bootSrc, 'if (!bootIntegrityOK())',
+      'the guard is not called bare in an if — a throw would escape (D1)');
+    t.ok(/try\s*\{[^}]*bootIntegrityOK\(\)/.test(bootSrc),
+      'the guard call sits inside a try block');
+
+    const appEl = app.doc.getElementById('app');
+    const recovered = String((appEl && appEl.innerHTML) || '');
+
+    // THE BEHAVIOURAL HALF, and the one that actually earns its keep. The two
+    // source checks above BOTH stay true if the catch branch sets the flag to
+    // TRUE instead of false — a mutation proved exactly that (M35 survived the
+    // first version of this group, which is the "right result via the wrong
+    // mechanism" shape from the harness README). What cannot be faked is the
+    // outcome: with config.js missing, the recovery screen must be on the page.
+    t.includes(recovered, 'Update needed', 'the recovery screen actually paints');
+    t.includes(recovered, 'location.reload()', 'with a working Reload button');
+    t.includes(recovered, 'mailto:', 'and a route to report it');
+
+    // ⚠ AND IT MUST BE THE *GUARD'S* SCREEN, NOT THE LOAD-FAILURE ONE. This is
+    // the assertion that catches M35, and the distinction is subtle enough to
+    // be worth spelling out: if a throw were treated as a PASSED check, boot
+    // would fall through to load(), load() would throw, and the v61.2 net would
+    // paint its own near-identical "Update needed" screen. Same title, same
+    // button, same mailto — all three assertions above would still pass while
+    // the guard was doing the opposite of its job.
+    //
+    // The two screens differ in one place only: their explanatory sentence.
+    // "didn't load completely" is the guard's; "didn't finish updating" is the
+    // load-failure net's. Asserting the guard's wording proves boot STOPPED at
+    // the guard rather than being rescued downstream by a different mechanism.
+    // If this copy is ever reworded, update it here — do not delete it.
+    t.includes(recovered, "load completely",
+      'and it is the integrity guard that stopped boot, not the load() net downstream');
 
     // This half is a HARD assertion and must never be softened: whatever the
     // guard does internally, a partial build must not reach the app.
-    const appEl = app.doc.getElementById('app');
-    t.notOk(/data-action|sessions-list-area/.test(appEl.innerHTML || ''),
+    t.notOk(/data-action|sessions-list-area/.test(recovered),
       'a partial build never paints a usable app');
   });
 

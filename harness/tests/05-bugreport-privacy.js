@@ -105,8 +105,26 @@ module.exports = function run() {
     const app = populated();
     app.fn('recordBugError')('error', `Cannot read site ${CANARY.site}`, 'session.js', 1);
     const body = app.fn('bugBodyText')();
-    t.known(body.includes(CANARY.site),
-      'a captured error message is copied into the email body verbatim',
-      'If a runtime error interpolates a client/site name, it reaches the support email. Low likelihood, real. Consider scrubbing in a future release.');
+    t.excludes(body, CANARY.site, 'the site name is scrubbed out of the error text (D3)');
+    t.includes(body, '[removed]', 'and is visibly marked as removed rather than silently dropped');
+    t.includes(body, 'Cannot read site', 'while the diagnostic part of the message survives');
+  });
+
+  t.group('05g — the scrub covers every customer-data field, not just sites', () => {
+    const app = populated();
+    app.fn('recordBugError')('error', `failed on ${CANARY.client}`, 'clients.js', 1);
+    t.excludes(app.fn('bugBodyText')(), CANARY.client, 'client names are scrubbed too');
+  });
+
+  t.group('05h — the scrub fails CLOSED, never open', () => {
+    // If the scrub itself throws, the raw text must NOT be used as a fallback.
+    // Losing a diagnostic string is survivable; leaking a client list is not.
+    const app = populated();
+    app.fn('recordBugError')('error', `broke on ${CANARY.site}`, 'session.js', 1);
+    const st = app.state();
+    Object.defineProperty(st, 'clients', { get() { throw new Error('boom'); } });
+    let out;
+    try { out = app.fn('bugErrorSummary')(); } catch (e) { out = 'THREW: ' + e.message; }
+    t.excludes(out, CANARY.site, 'a broken scrub still does not emit the raw message');
   });
 };
