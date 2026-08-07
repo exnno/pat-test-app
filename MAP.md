@@ -138,10 +138,15 @@ flat fields) are never saved, backed up or validated. Rule 7 applies.
 Formatting, escaping, colour, asset-number splitting/padding, long-press
 detector, boundary validators for item readings.
 **Touch to:** add a stateless helper.
-**Coupling:** none by design — nothing here reads `state`. ⚠ `titleCase()` is
-NOT display-only: it runs on locations and item types at save time, so its
-output reaches certificates and CSV exports. v68 fixed the possessive
-("Bob's Office"); the fix must keep capitalising O'Brien. Harness: 06e2.
+**Coupling:** none by design — nothing here reads `state`.
+⚠ `titleCase()` is NOT display-only: it runs on locations and item types at save
+time, so its output reaches certificates and CSV exports.
+⚠⚠ **THERE IS MORE THAN ONE APOSTROPHE CHARACTER.** iOS smart punctuation types
+U+2019 (’), NOT U+0027 ('). v68 matched only U+0027 and was therefore broken on
+every phone while passing every test — because test files are ASCII source.
+`APOSTROPHES` in utils.js lists all three accepted (U+0027, U+2019, U+02BC).
+Any test touching apostrophes MUST assert against U+2019, not a bare `'`.
+Harness 06e2 loops all three; mutations M40/M41. Fixed v68.1.
 
 ### storage.js (~755 ln) — persistence boundary
 The key-shortening codec (`SESSION_KEY_MAP`, `ITEM_KEY_MAP`), `load`/`save` and

@@ -36,9 +36,12 @@ this survive review is recorded in `MAP.md` (boot.js entry) and in the code
 comment: `typeof` is safe on an UNDECLARED identifier but NOT on a declared,
 uninitialised one. Harness 02c, mutations M34/M35.
 
-### ~~D2. `titleCase()` capitalises after an apostrophe~~ — FIXED V68
-Only a single letter following an apostrophe is now skipped, so O'Brien still
-capitalises. Harness 06e2, mutations M36/M37.
+### ~~D2. `titleCase()` capitalises after an apostrophe~~ — FIXED V68.1
+V68's fix matched only the ASCII apostrophe (U+0027) and so did nothing on a
+real phone, where iOS smart punctuation types U+2019. V68.1 accepts U+0027,
+U+2019 and U+02BC, and preserves whichever the user typed.
+Harness 06e2 (loops all three), mutations M36/M37/M40/M41.
+⚠ Pre-V68.1 stored values are NOT repaired — see D5.
 
 ### ~~D3. Captured error text copied verbatim into the bug email~~ — FIXED V68
 `_scrubCustomerData()` redacts known customer strings at report-build time and
@@ -50,25 +53,53 @@ on navigation, propagates to the caller. Whether that reaches the user depends o
 the caller — the delegated click handler may absorb it. **Confirm on-device
 before treating this as a defect.** The only remaining `known()` entry.
 
+### D5. Locations and item types saved before V68.1 are still mangled — OPEN
+`titleCase()` runs at SAVE time only, so every location stored under V67 or
+earlier keeps its `Bob'S Office` form. Re-running `titleCase` cannot repair
+them: it only ever uppercases, so the wrong capital survives untouched.
+Two consequences: existing jobs still print wrong on certificates and CSV, and
+`computeLocationSuggestions()` offers the stored bad value as an autocomplete
+suggestion, so tapping it writes the mangled string into a NEW item on a fixed
+build. Needs a one-time repair pass.
+⚠ Not a trivial regex. Lowercasing any single capital after an apostrophe would
+damage deliberate caps (`BOB'S OFFICE` → `BOB's OFFICE`), and the repair must
+handle BOTH apostrophe characters. Rewrites stored data, so: its own release,
+backup-first, spec round before code.
+
 ---
 
-## Standing lesson from V68 — a safety mechanism must be tested for its FAILURE mode
+## Standing lesson from V68 — test the CHARACTER THE DEVICE SENDS, and the failure mode
 
-Three separate things in V68 looked correct and were not, all in the same shape:
-a guard that produced the right-looking outcome via the wrong mechanism.
+V68 shipped a `titleCase()` fix for the apostrophe bug with 421 green assertions
+and a mutation suite behind it. It did not work on a single iPhone. iOS smart
+punctuation types U+2019 (’); the fix matched only U+0027 ('). Every test was a
+JavaScript string literal in an ASCII source file, so every test used the one
+character the device never produces. **The tests and the app agreed with each
+other and both were wrong about reality.**
 
-1. `bootIntegrityOK()` returned false correctly in every case anyone had tried —
+The rule, and it is stronger than "drive the real path":
+
+> **Where input comes from a device, the test must use the bytes the device
+> actually sends — not the bytes that are convenient to type in a source file.**
+
+Applies beyond apostrophes: smart quotes (“ ”), en/em dashes inserted by
+autocorrect, non-breaking spaces pasted from other apps, and the scanner's own
+character set. If a value can arrive from a keyboard, a paste or a scanner,
+at least one assertion must use the real-world encoding of it.
+
+The second half of the V68 lesson still stands, and the two are the same shape —
+a check that agrees with itself while missing the real case:
+
+1. `bootIntegrityOK()` returned false correctly in every case anyone tried —
    the one case that mattered made it throw instead.
 2. The first D3 scrub redacted correctly whenever it had a term list. With no
    list it passed the raw text through, which is the case it existed for.
 3. The first D1 test asserted a recovery screen appeared. It did — but the
-   *wrong* recovery screen, painted by a different net downstream, so a mutation
-   inverting the guard survived.
+   *wrong* one, painted by a different net, so an inverting mutation survived.
 
-The rule: **for anything whose job is to fail safely, the test must drive the
-failure, not the success.** Asserting a guard works when nothing is wrong says
-nothing at all. And when two mechanisms can produce the same visible outcome,
-the assertion has to name which one produced it.
+> **For anything whose job is to fail safely, the test must drive the FAILURE,
+> not the success.** And when two mechanisms can produce the same visible
+> outcome, the assertion has to name which one produced it.
 
 ## Standing lesson from V67 — hardware features need hardware
 

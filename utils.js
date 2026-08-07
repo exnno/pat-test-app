@@ -18,16 +18,35 @@ const capitalise = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 // "Bob's Office" into "Bob'S Office" — and because this runs on locations and
 // item types it reached certificates and CSV exports, not just the screen.
 //
+// ⚠⚠ v68.1: THERE IS MORE THAN ONE APOSTROPHE CHARACTER, AND THE PHONE DOES NOT
+// TYPE THE ONE YOU EXPECT. iOS smart punctuation silently substitutes a RIGHT
+// SINGLE QUOTATION MARK (U+2019, ’) for the ASCII apostrophe (U+0027, ') as you
+// type. The v68 fix only matched U+0027, so on an actual iPhone the curly
+// apostrophe was not recognised as an apostrophe at all, the "s" read as a
+// separate word, and the bug behaved exactly as it had in v67.
+//
+// The v68 harness did not catch this because every assertion was a JavaScript
+// string literal in a source file, which means every one of them used U+0027 —
+// the character the device never produces. Testing the function is not testing
+// the path. Tests for this function MUST include U+2019 (see harness 06e2).
+//
+// U+02BC (ʼ, modifier letter apostrophe) is included too: some third-party and
+// non-English keyboards emit it, and it costs nothing to accept here.
+//
 // ⚠ THE FIX MUST NOT SIMPLY IGNORE APOSTROPHES. "o'brien" → "O'Brien" is
 // CORRECT and people are named that. The only thing that must be left alone is
 // a SINGLE letter following an apostrophe — the English possessive. Anything
 // longer is a real name fragment and still gets capitalised.
 //
-// The optional leading apostrophe is captured with the word run so the two can
-// be judged together. No lookbehind: Safari only gained it in 16.4 and this
-// file has to run on whatever a tester is carrying.
+// The character the user typed is PRESERVED, not normalised to ASCII — what
+// goes on the certificate should be what they entered.
+//
+// No lookbehind: Safari only gained it in 16.4 and this file has to run on
+// whatever a tester is carrying.
+const APOSTROPHES = "'\u2019\u02BC";   // U+0027, U+2019, U+02BC
+
 function titleCase(s) {
-  return String(s || '').replace(/('?)(\w+)/g, (m, apo, word) =>
+  return String(s || '').replace(/(['\u2019\u02BC]?)(\w+)/g, (m, apo, word) =>
     (apo && word.length === 1)
       ? m
       : apo + word.charAt(0).toUpperCase() + word.slice(1)
