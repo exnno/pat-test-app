@@ -12,6 +12,20 @@ const { CANARY, freshApp, withInstrument, addInstrument, withSession, withItem, 
 
 module.exports = function run() {
 
+  // ⚠⚠ READ THIS BEFORE EDITING THE APOSTROPHE TESTS.
+  //
+  // These constants exist because v68 shipped a titleCase "fix" that could
+  // never work on a phone, and 421 green assertions said it was fine. Every
+  // test was a JS string literal, so every apostrophe in them was U+0027 —
+  // the ASCII one. iOS smart punctuation types U+2019 instead. The character
+  // the device actually produces appeared in ZERO tests.
+  //
+  // Do not write a bare ' in an apostrophe assertion. Use these, and assert
+  // every rule against BOTH, or the next person repeats v68 exactly.
+  const APOS_ASCII = '\u0027';   // '  physical keyboard
+  const APOS_CURLY = '\u2019';   // ’  iOS smart punctuation — THE REAL CASE
+  const APOS_MOD   = '\u02BC';   // ʼ  some third-party keyboards
+
   t.group('06a — a job needs a client or a site, not neither', () => {
     const app = freshApp();
     const before = app.state().sessions.length;
@@ -75,6 +89,11 @@ module.exports = function run() {
     });
     t.eq(item.assetNo, 'A/123-4', 'slashes and dashes survive');
     t.eq(item.location, "Bob's Office", 'the possessive is left alone (D2, fixed V68)');
+    // Same item, curly apostrophe — the case a real phone produces (v68.1).
+    const curlyItem = withItem(app, {
+      assetNo: 'A/123-5', location: `bob${APOS_CURLY}s office`, itemType: 'Kettle', result: 'pass',
+    });
+    t.eq(curlyItem.location, `Bob${APOS_CURLY}s Office`, 'and with the apostrophe iOS actually types');
     t.eq(item.itemType, 'Kettle & Urn', 'ampersands survive');
     t.eq(item.notes, 'Frayed, "borderline" — recheck', 'commas, quotes and em dashes survive');
   });
@@ -86,18 +105,30 @@ module.exports = function run() {
     // simplification to either extreme goes red.
     const app = freshApp();
     const tc = app.fn('titleCase');
-    t.eq(tc("bob's office"), "Bob's Office", 'possessive s stays lowercase');
-    t.eq(tc("o'brien"), "O'Brien", "but O'Brien still capitalises");
-    t.eq(tc("o'brien's desk"), "O'Brien's Desk", 'and both rules apply in one string');
-    t.eq(tc("james' office"), "James' Office", 'a trailing apostrophe is harmless');
+
+    // Every rule asserted against EACH apostrophe character. The loop is the
+    // point: a fix that handles one and not the others goes red here.
+    for (const [name, A] of [['ASCII', APOS_ASCII], ['curly', APOS_CURLY], ['modifier', APOS_MOD]]) {
+      t.eq(tc(`bob${A}s office`), `Bob${A}s Office`, `${name}: possessive s stays lowercase`);
+      t.eq(tc(`o${A}brien`), `O${A}Brien`, `${name}: but O'Brien still capitalises`);
+      t.eq(tc(`o${A}brien${A}s desk`), `O${A}Brien${A}s Desk`, `${name}: both rules in one string`);
+      t.eq(tc(`james${A} office`), `James${A} Office`, `${name}: trailing apostrophe is harmless`);
+      // The character the user typed is preserved, never swapped for ASCII —
+      // the certificate should show what they entered.
+      t.includes(tc(`bob${A}s office`), A, `${name}: the typed character is preserved`);
+    }
+
     t.eq(tc('main hall - west'), 'Main Hall - West', 'ordinary words unaffected');
     t.eq(tc('unit 3b'), 'Unit 3b', 'digits unaffected');
     t.eq(tc(''), '', 'empty in, empty out');
 
     // The real-world route: this reaches certificates and CSV via locations.
+    // Driven with the CURLY apostrophe specifically, because that is what a
+    // phone produces — the ASCII version of this assertion passed all through
+    // v68 while the app was broken on every device.
     withSession(app);
-    const it = withItem(app, { assetNo: '1', location: "bob's office", itemType: 'Kettle', result: 'pass' });
-    t.eq(it.location, "Bob's Office", 'and it holds through the actual save path');
+    const it = withItem(app, { assetNo: '1', location: `bob${APOS_CURLY}s office`, itemType: 'Kettle', result: 'pass' });
+    t.eq(it.location, `Bob${APOS_CURLY}s Office`, 'and it holds through the actual save path');
   });
 
   t.group('06f — stats tally correctly', () => {
