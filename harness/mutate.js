@@ -288,9 +288,26 @@ const MUTATIONS = [
     why:  'boot falls through to load() instead of stopping at the guard; the v61.2 net happens to paint a near-identical screen, so ONLY the guard-specific wording distinguishes them',
   },
   {
+    // ⚠ THE v68 BUG ITSELF. This is the mutation that would have caught the
+    // release if it had existed. Reverting to an ASCII-only character class
+    // leaves the app broken on every iPhone while reading as a correct fix.
+    name: 'M40 (v68.1) titleCase only recognises the ASCII apostrophe',
+    file: 'utils.js',
+    from: "  return String(s || '').replace(/(['\\u2019\\u02BC]?)(\\w+)/g, (m, apo, word) =>",
+    to:   "  return String(s || '').replace(/('?)(\\w+)/g, (m, apo, word) =>",
+    why:  'iOS smart punctuation types U+2019, so the possessive breaks on the actual device while every ASCII test still passes',
+  },
+  {
+    name: 'M41 (v68.1) the typed apostrophe is normalised to ASCII',
+    file: 'utils.js',
+    from: "      : apo + word.charAt(0).toUpperCase() + word.slice(1)",
+    to:   "      : '\\u0027' + word.charAt(0).toUpperCase() + word.slice(1)",
+    why:  'the certificate would show a character the engineer never typed',
+  },
+  {
     name: 'M36 (D2) titleCase goes back to capitalising after any apostrophe',
     file: 'utils.js',
-    from: "  return String(s || '').replace(/('?)(\\w+)/g, (m, apo, word) =>\n    (apo && word.length === 1)\n      ? m\n      : apo + word.charAt(0).toUpperCase() + word.slice(1)\n  );",
+    from: "  return String(s || '').replace(/(['\\u2019\\u02BC]?)(\\w+)/g, (m, apo, word) =>\n    (apo && word.length === 1)\n      ? m\n      : apo + word.charAt(0).toUpperCase() + word.slice(1)\n  );",
     to:   "  return String(s || '').replace(/\\b\\w/g, c => c.toUpperCase());",
     why:  "\"Bob's Office\" reaches certificates and CSV exports as \"Bob'S Office\"",
   },
