@@ -239,11 +239,13 @@ const MUTATIONS = [
     why:  '"the scan after a PASS goes nowhere" — the exact reported symptom',
   },
   {
-    name: 'M30 the keyboard override survives into the next item',
-    file: 'session.js',
-    from: '  state.scanKeyboardOn = false;\n  state.suggestions = [];',
-    to:   '  state.suggestions = [];',
-    why:  'one hand-typed asset number would leave the keyboard covering PASS/FAIL for the rest of the job',
+    // v68: M30 used to mutate the ⌨ escape hatch, which no longer exists. It is
+    // reused here for the removal itself — reintroducing the button must go red.
+    name: 'M30 the removed keyboard button comes back',
+    file: 'render-core.js',
+    from: "    `${paired ? ' inputmode=\"none\"' : ''}>`;",
+    to:   "    `${paired ? ' inputmode=\"none\"' : ''}>` + (paired ? '<button data-action=\"scan-keyboard\">K</button>' : '');",
+    why:  'a control that cannot work in its main case teaches the engineer the app is broken',
   },
   {
     name: 'M31 a garbage speed preset in a backup is adopted',
@@ -271,6 +273,49 @@ const MUTATIONS = [
     to:   '    const v = null;\n    if (v) {',
     why:  'the last silent rejection path — a wrong scanner suffix would give no clue at all',
   },
+  {
+    name: 'M34 (D1) the boot integrity guard is called bare again',
+    file: 'boot.js',
+    from: 'let _bootIntegrity = false;\ntry {\n  _bootIntegrity = bootIntegrityOK();\n} catch (e) {\n  console.error(\'Boot integrity check threw — treating as failed.\', e);\n  _bootIntegrity = false;\n}\n\nif (!_bootIntegrity) {',
+    to:   'if (!bootIntegrityOK()) {',
+    why:  'the throw escapes and the user gets a blank white screen instead of the recovery prompt',
+  },
+  {
+    name: 'M35 (D1) a throw is treated as a PASSED integrity check',
+    file: 'boot.js',
+    from: "  console.error('Boot integrity check threw — treating as failed.', e);\n  _bootIntegrity = false;",
+    to:   "  console.error('Boot integrity check threw.', e);\n  _bootIntegrity = true;",
+    why:  'boot falls through to load() instead of stopping at the guard; the v61.2 net happens to paint a near-identical screen, so ONLY the guard-specific wording distinguishes them',
+  },
+  {
+    name: 'M36 (D2) titleCase goes back to capitalising after any apostrophe',
+    file: 'utils.js',
+    from: "  return String(s || '').replace(/('?)(\\w+)/g, (m, apo, word) =>\n    (apo && word.length === 1)\n      ? m\n      : apo + word.charAt(0).toUpperCase() + word.slice(1)\n  );",
+    to:   "  return String(s || '').replace(/\\b\\w/g, c => c.toUpperCase());",
+    why:  "\"Bob's Office\" reaches certificates and CSV exports as \"Bob'S Office\"",
+  },
+  {
+    name: 'M37 (D2) titleCase ignores apostrophes entirely',
+    file: 'utils.js',
+    from: '    (apo && word.length === 1)',
+    to:   '    (apo)',
+    why:  "over-correcting breaks real names — O'Brien would come out as O'brien",
+  },
+  {
+    name: 'M38 (D3) the error scrub falls back to the raw message',
+    file: 'bugreport.js',
+    from: '    if (!complete) return _BUG_SCRUB_WITHHELD;',
+    to:   '    if (!complete) return s;',
+    why:  'the scrub becomes a passthrough on exactly the failure it was written for',
+  },
+  {
+    name: 'M39 (D3) the error text bypasses the scrub on the way into the email',
+    file: 'bugreport.js',
+    from: '.map(e => `${e.kind}: ${_scrubCustomerData(e.message)}${e.where',
+    to:   '.map(e => `${e.kind}: ${e.message}${e.where',
+    why:  'a client or site name interpolated into an error reaches the support inbox verbatim',
+  },
+
 ];
 
 function main() {
