@@ -53,6 +53,46 @@ function titleCase(s) {
   );
 }
 
+// v69 (D5): repair a string that was title-cased by a PRE-V68.1 build.
+//
+// titleCase() only ever uppercases, so re-running it cannot undo its own old
+// mistake — `Bob'S Office` stays `Bob'S Office` forever. This is the inverse
+// operation, and it is the only function in the app that lowercases a letter
+// the user might have typed deliberately. That makes the guard below the whole
+// design, not a detail.
+//
+// THE TRAP: `BOB'S OFFICE` is deliberate shouting, not the bug. Lowercasing
+// blindly turns it into `BOB's OFFICE`, which is a NEW defect introduced by the
+// repair — strictly worse than the one being fixed, because the user typed that
+// string on purpose and we would be overruling them.
+//
+// The rule (Q2 = A): only lowercase a lone capital after an apostrophe when the
+// word BEFORE the apostrophe is not itself all-caps. `Bob'S` is mixed case, so
+// the trailing capital can only have come from titleCase() — repair it. `BOB'S`
+// is all-caps throughout, so the capital is consistent with what was typed —
+// leave it alone. A user who genuinely wants `Bob'S` loses; that string has no
+// legitimate meaning in English and the alternative loses real data.
+//
+// Only a SINGLE letter followed by a non-letter qualifies (Q3 = A), which is the
+// same test titleCase() uses to decide what to skip. `O'Brien` and `D'Angelo`
+// have multi-letter suffixes and are never touched, in either direction.
+//
+// All three apostrophe characters are handled, because iOS types U+2019 and a
+// paste can carry U+02BC. The character itself is PRESERVED, never normalised —
+// same principle as titleCase(): what goes on the certificate is what was typed.
+//
+// No lookbehind (Safari 16.4), so the word before the apostrophe is captured and
+// re-emitted rather than asserted.
+function repairApostropheCase(s) {
+  return String(s || '').replace(
+    /([A-Za-z]+)(['\u2019\u02BC])([A-Z])(?![A-Za-z])/g,
+    (m, word, apo, letter) =>
+      word === word.toUpperCase()
+        ? m                                    // BOB'S — deliberate caps, untouched
+        : word + apo + letter.toLowerCase()    // Bob'S → Bob's
+  );
+}
+
 function formatDate(iso) {
   if (!iso) return '';
   const parts = iso.split('-');

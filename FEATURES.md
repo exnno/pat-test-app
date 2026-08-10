@@ -8,6 +8,54 @@ Every capability and release entry, one `##` section each.
 
 ---
 
+## Apostrophes: repairing what the fix left behind (V69)
+
+V68.1 stopped the app mangling apostrophes; **it did not repair anything already
+stored.** `titleCase()` runs at SAVE time only, so every location and item type
+written under V68 or earlier kept its `Bob'S Office` form, kept printing that way
+on certificates and CSV exports, and — the part that made it more than cosmetic —
+kept being offered back by the location autocomplete, so tapping a suggestion on
+a *fixed* build wrote the old bad string into a brand-new item. The bug outlived
+its own fix through the suggestion list. V69 is a one-time rewrite of stored data,
+the first this app has done.
+
+**The repair is `titleCase()`'s inverse and the only code here that lowercases a
+letter the user might have typed on purpose**, which makes its two guards the
+whole design rather than details. The word before the apostrophe must not be
+all-caps, so `BOB'S OFFICE` — deliberate shouting — survives untouched; blindly
+lowercasing would have introduced a *worse* defect than the one being fixed, on a
+string the engineer typed intentionally. And the suffix must be a single letter,
+so `O'Brien`, `Sant'Angelo` and `Dell'Arte` are never touched. All three
+apostrophe characters are handled and the typed one is preserved, never
+normalised. Scope is item locations, item types and preset entries; client and
+site names never passed through `titleCase()` and were never mangled, and Smart
+Quick Pick lowercases its keys before storage so its buckets were always correct.
+
+**A file backup could not be taken before the rewrite, and that constraint is
+permanent.** `downloadBackup()` fires a synthetic anchor click — it needs a user
+gesture and on iOS opens the share sheet, so nothing silent is possible at boot.
+Instead the repair records only the strings it changed as a diff, surfaced as an
+**Undo the correction** button on the Backup page, and trips the existing 7-day
+backup reminder so the user is pushed toward a real off-device copy at a moment
+when a gesture is available.
+
+**The trap that nearly made the whole release a no-op:** `serialiseSessions()`
+reuses a session's cached encoding when the items array reference and a signature
+covering item *count* are unchanged. The repair edits strings inside existing item
+objects, so all three checks passed and the repaired data would have been written
+back from the stale encoding — appearing to work, then reverting on the next
+reload. It only bites NON-ACTIVE sessions, because the active one always
+re-encodes fresh, which is exactly why the first test of it passed against broken
+code. Old jobs are the real case, and old jobs are where the mangled data lives.
+
+Also fixed, defect **D4**: `handleDelegatedClick` called each action bare, so a
+throw from a view renderer escaped. It never showed as a blank screen —
+`render()` assigns `#app.innerHTML` in one statement at the end — but the action
+had already changed `state.view`, so state and screen disagreed and the next tap
+ran the wrong screen's actions. Now caught and recovered to the Sessions list.
+No new files, no `backupVersion` bump (stays 5). Two new storage keys, both
+additive. Validated at 486 assertions and 51 mutations, 0 survived.
+
 ## Three defects, a removed button and a navigable stylesheet (V68)
 
 A cleanup release with no new capability, and the interesting part is what the harness did to it. **`titleCase()` had been capitalising the letter after an apostrophe since the function was written** — `/\b\w/g`, and an apostrophe is a word boundary, so "Bob's Office" was stored as "Bob'S Office". It was not a display bug: `normaliseLocation()` runs at save time, so the mangled string reached certificates and CSV exports and had been doing so for every customer with a possessive in a place name. The fix had to be narrower than it first appears — "ignore apostrophes" would break O'Brien, which is a real name people have — so only a **single** letter following an apostrophe is left alone, and both directions are asserted plus mutated (M36 reverts it, M37 over-corrects it). **The boot integrity guard could throw instead of returning false**, which is the failure it exists to prevent arriving through the front door: if `config.js` fails to parse, `state.js` throws while evaluating `let state = {…}`, leaving `state` in the temporal dead zone, and `typeof state` on a declared-but-uninitialised binding throws ReferenceError rather than returning `'undefined'`. A comment in `boot.js` asserted the opposite, which is why it survived review — `typeof` is safe on an *undeclared* identifier, and the distinction is easy to read past. The call site is now wrapped and a throw counts as a failed check. Writing the test for it surfaced a second, subtler point: **two "Update needed" screens exist** — the guard's and the v61.2 `load()` net's — and they share a title, a Reload button and a mailto link, so a mutation that made a throw count as a *passed* check still produced a correct-looking recovery screen and survived. Only the explanatory sentence differs, and the assertion now depends on that wording to prove boot stopped at the guard rather than being rescued downstream. **Captured error text was reaching the support email verbatim**, the one field in the bug report the privacy rule could not cover by construction: everything else is a count, a flag or an enum, but an error message is whatever the browser happened to say, and one that interpolates a value carries a client name off the phone. It is now scrubbed against every customer string in memory at report-build time. The first version of that scrub **failed open** — a term list that came back empty meant "nothing to redact", so a throw while gathering terms turned the whole thing into a passthrough on exactly the case it was written for. The harness caught it on the first run; it now fails closed and withholds the message rather than guessing. Also removed: **the V67 ⌨ escape-hatch button**, which could not work in the case people actually hit. iOS hides the on-screen keyboard system-wide whenever a hardware keyboard is paired and no web API overrides that, so the button was only ever useful when the scanner was off or out of range — a case the "Scanner paired" setting already covers properly, by removing the suppression at its source. A control that fails in its main use teaches the engineer the app is broken rather than the platform is, so it is gone along with its state flag, and the settings page now names the two things that do work: the scanner's own double-click-trigger shortcut, and turning the paired switch off. Finally, `styles.css` gained a **section index** — 49 banner comments and a header block, proved comment-only by stripping the banners back out and byte-comparing against the original. The file is ordered by release rather than by screen and was not reordered to match: CSS is order-sensitive, several rules depend on being overridden later, and a navigable stylesheet is not worth a cascade bug.

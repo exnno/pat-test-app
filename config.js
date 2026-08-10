@@ -11,7 +11,7 @@
  * Loaded first; everything else may reference these globals.
  */
 
-const APP_VERSION = 'V68';
+const APP_VERSION = 'V69';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -112,7 +112,7 @@ const INSTRUMENTS_MAX = 5;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V68';
+const WELCOME_VERSION = 'V69';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -710,6 +710,34 @@ const SCANNER_PAIRED_KEY = 'pat:scannerPaired';   // v67: '1' | '0', DEFAULT OFF
 
 // v67: which speed preset the burst test uses. See SCAN_GAP_PRESETS below.
 const SCAN_SPEED_KEY = 'pat:scanSpeed';           // v67: 'strict'|'normal'|'relaxed'
+
+// v69: THE APOSTROPHE DATA REPAIR (defect D5). Two keys.
+//
+// Background: titleCase() runs at SAVE time only. Every location and item type
+// stored under V68.1 or earlier kept the mangled `Bob'S Office` form, and the
+// autocomplete offered it straight back — so on a FIXED build, tapping a
+// suggestion wrote the old bad string into a brand-new item. The bug outlived
+// its own fix through the suggestion list. Hence a one-time rewrite of stored
+// data, which is the first time this app has done such a thing.
+//
+// REPAIR_DONE_KEY is the run-once latch. Its value is the APP_VERSION that ran
+// the repair, not '1' — so if a future release ever needs to re-run a repair it
+// can compare versions instead of inventing a second key. Absent means never run.
+const REPAIR_DONE_KEY = 'pat:apostropheRepair';     // v69: APP_VERSION string
+
+// REPAIR_UNDO_KEY holds the pre-repair values of ONLY the strings that changed,
+// as [{s: sessionId, i: itemIndex, f: 'location'|'itemType', v: oldValue}] plus
+// preset entries as {p: presetId, x: itemIndex, v: oldValue}.
+//
+// ⚠ Why a diff and not a full backup: a real file export can't run here. See
+// backup.js downloadBackup() — it fires a synthetic anchor click, which needs a
+// user gesture and on iOS opens the share sheet. Nothing silent is possible at
+// boot. Storing only the changed strings costs a few KB instead of megabytes,
+// needs no gesture, and makes undo one tap rather than find-the-file-and-restore.
+// Off-device safety is covered separately: a repair that changed anything trips
+// the existing 7-day backup reminder, which already knows how to nag with a
+// gesture behind it.
+const REPAIR_UNDO_KEY = 'pat:apostropheRepairUndo'; // v69: JSON array, or absent
 
 // The speed test, which is the whole safety mechanism (see scanner.js header).
 // A wedge scanner emits characters ~5–20ms apart; a fast human typist is

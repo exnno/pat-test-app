@@ -8,7 +8,7 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### V69 — candidate: split session.js
+### V70 — candidate: split session.js
 The highest remaining token win and the highest-risk item on this list. It is a
 STRUCTURAL release: one file per release, no behaviour changes in the same
 release, byte-identity check on every extracted body, no welcome modal. See
@@ -28,7 +28,7 @@ connected, and the "Scanner paired" toggle already covers the disconnected case.
 
 ---
 
-## Defects found by the harness (open)
+## Defects found by the harness — ALL CLOSED as of V69
 
 ### ~~D1. Boot integrity guard throws instead of returning false~~ — FIXED V68
 Call site wrapped; a throw now counts as a failed check. ⚠ The trap that made
@@ -47,26 +47,64 @@ Harness 06e2 (loops all three), mutations M36/M37/M40/M41.
 `_scrubCustomerData()` redacts known customer strings at report-build time and
 FAILS CLOSED. Harness 05f/05g/05h, mutations M38/M39.
 
-### D4. A post-boot render throw is not covered by the v16.1 net — STILL OPEN
-The net wraps the *first* render at startup. A view renderer that throws later,
-on navigation, propagates to the caller. Whether that reaches the user depends on
-the caller — the delegated click handler may absorb it. **Confirm on-device
-before treating this as a defect.** The only remaining `known()` entry.
+### ~~D4. A post-boot render throw is not covered by the v16.1 net~~ — FIXED V69
+Closed by reading rather than by an on-device repro, which was never obtainable:
+reproducing it needs a render bug you do not already have. `handleDelegatedClick`
+called the action bare, so a throw escaped. It never showed as a blank screen —
+`render()` assigns `#app.innerHTML` in ONE statement at the end, so a throw while
+building leaves the old screen up and the tap just does nothing. The damage was
+the mismatch: the action had already set `state.view`, so state and screen
+disagreed and the next tap ran the wrong screen's actions. Now caught and
+recovered to the Sessions list. Harness 07i, mutations M50/M51.
+⚠ The `known()` list is now EMPTY. Keep it that way, or find out why not.
 
-### D5. Locations and item types saved before V68.1 are still mangled — OPEN
-`titleCase()` runs at SAVE time only, so every location stored under V67 or
-earlier keeps its `Bob'S Office` form. Re-running `titleCase` cannot repair
-them: it only ever uppercases, so the wrong capital survives untouched.
-Two consequences: existing jobs still print wrong on certificates and CSV, and
-`computeLocationSuggestions()` offers the stored bad value as an autocomplete
-suggestion, so tapping it writes the mangled string into a NEW item on a fixed
-build. Needs a one-time repair pass.
-⚠ Not a trivial regex. Lowercasing any single capital after an apostrophe would
-damage deliberate caps (`BOB'S OFFICE` → `BOB's OFFICE`), and the repair must
-handle BOTH apostrophe characters. Rewrites stored data, so: its own release,
-backup-first, spec round before code.
+### ~~D5. Locations and item types saved before V68.1 are still mangled~~ — FIXED V69
+One-time repair pass over item locations, item types and preset entries, run at
+boot after `load()` and latched on `REPAIR_DONE_KEY`. `repairApostropheCase()`
+is guarded two ways: the word before the apostrophe must not be all-caps
+(`BOB'S OFFICE` is deliberate and survives), and the suffix must be a single
+letter (`O'Brien`, `Sant'Angelo` untouched). Undo is a diff of changed strings
+in `REPAIR_UNDO_KEY`, surfaced as a button on the Backup page.
+Harness 06e3–06e6, mutations M42–M49.
+
+⚠ A real file backup could NOT be taken before the rewrite: `downloadBackup()`
+fires a synthetic anchor click, which needs a user gesture and on iOS opens the
+share sheet — nothing silent is possible at boot. The on-device undo diff plus
+tripping the existing 7-day backup reminder is the substitute. **Any future
+data-rewrite release faces the same constraint — do not spec an automatic file
+export, it cannot be built.**
 
 ---
+
+## Standing lesson from V69 — the shared cache that made the repair a no-op
+
+The V69 repair edits strings INSIDE existing item objects. `serialiseSessions()`
+reuses a cached encoding when the items array reference and `_sessionSig()` are
+unchanged — and the sig covers item COUNT, not item CONTENTS. All three checks
+passed, so the repaired data would have been written back from the stale
+encoding and the entire release would have silently un-happened on reload.
+
+Two things generalise:
+
+> **An in-place edit to nested data does not invalidate a cache keyed on the
+> container.** Before editing anything below the level a cache is keyed at, find
+> out what is memoising it.
+
+And the harder half — the first test of this passed against the broken code,
+because the repaired job was the ACTIVE one, and the active session always
+re-encodes fresh. The immune case looked like the normal case:
+
+> **When a mechanism has a fast path and a cached path, a test that only
+> exercises the fast path proves nothing about the cached one.** Name which path
+> the fixture is on. At boot the repair walks every job while at most one is
+> active, so old jobs — the cached path — are the real case.
+
+A third, from the same run: `StubElement` had no `nodeType`, and
+`handleDelegatedClick` bails on `el.nodeType === 1`. Every delegated-click test
+written against a constructed element returned before reaching the action and
+passed in both directions. Fixed in `stubs.js`. This is the third instance of
+the "path that cannot execute headlessly" shape — check for it by mutation, not
+by reading.
 
 ## Standing lesson from V68 — test the CHARACTER THE DEVICE SENDS, and the failure mode
 
@@ -154,15 +192,13 @@ factories at load time.
 across 7 test files, and a 20-mutation runner. Each release now **extends** it
 rather than recreating it. See `harness/README.md`.
 
-### 6. Documentation hygiene — PETER'S ACTION
-Remove from the Claude project:
-- `REFACTOR_PLAN_v21.md` (complete, ~11KB)
-- `PATGo_V61_V62_Roadmap.md` (overtaken; everything still live from it is
-  consolidated below, so nothing is lost by deleting it)
+### ~~6. Documentation hygiene~~ — DONE
+`REFACTOR_PLAN_v21.md`, `PATGo_V61_V62_Roadmap.md` and `PAThandoff_v67.md` are
+all out of the project.
 
-Old `PAThandoff_vNN.md` files are already pruned — only v68 should remain. Keep
-it that way: only the latest is ever read, and older ones invite expensive wrong
-reads. **Remove `PAThandoff_v67.md` from the project.**
+Old `PAThandoff_vNN.md` files are already pruned — only the latest should remain.
+Keep it that way: only the latest is ever read, and older ones invite expensive
+wrong reads. **Remove `PAThandoff_v68.md` from the project once V69 is deployed.**
 
 ---
 

@@ -63,7 +63,37 @@ function handleDelegatedClick(e) {
   const fn = ACTIONS[name];
   if (!fn) return;            // unknown action → ignore (old direct binding, if any, still ran)
   const arg = el.dataset.arg !== undefined ? el.dataset.arg : '';
-  fn(arg, el, e);
+  // v69 (D4): the post-boot half of the v16.1 safety net.
+  //
+  // v16.1 wraps the FIRST render only. Every render after that happens inside an
+  // action called from here, and this call used to be bare — so a throw in a view
+  // renderer escaped to the browser with nothing to catch it.
+  //
+  // What that actually looked like, which is milder than it sounds and is why it
+  // went unreported: render() builds the entire HTML string and assigns
+  // #app.innerHTML in ONE statement at the end, so a throw while building leaves
+  // the previous screen intact. The tap simply did nothing.
+  //
+  // The real damage is the mismatch. The action has usually already written
+  // state.view before calling render(), so state now says 'overview' while the
+  // screen still shows the entry form — and the NEXT tap runs overview actions
+  // against entry-screen markup. Recovering to the Sessions list is the same
+  // move v16.1 makes: a known-good screen that always renders, so state and
+  // screen agree again.
+  try {
+    fn(arg, el, e);
+  } catch (err) {
+    console.error('Action "' + name + '" threw; recovering to the Sessions list.', err);
+    try {
+      state.multiPickSheetOpen = false;
+      state.failModalOpen = false;
+      state.view = 'sessions';
+      render();
+      if (typeof showToast === 'function') showToast('Something went wrong — back to your jobs');
+    } catch (e2) {
+      console.error('Recovery render also failed.', e2);
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -634,6 +664,25 @@ registerActions({
 
   // Backup & Restore + prune + about
   'backup-export': () => downloadBackup(),
+  // v69 (D5): put the pre-repair spellings back. Confirmed first — it rewrites
+  // saved data, same as the repair did, and the user is choosing to reintroduce
+  // strings the app considers wrong. render() runs inside undoApostropheRepair's
+  // caller here rather than in the function itself, keeping storage.js free of
+  // UI calls.
+  'repair-undo': () => {
+    const n = apostropheRepairUndoCount();
+    if (!n) return;
+    openConfirmSheet({
+      title: 'Undo the correction?',
+      message: `This puts back the original spelling of ${n} location${n === 1 ? '' : 's'} and item type${n === 1 ? '' : 's'}, including the stray capitals after apostrophes. This cannot be reversed afterwards.`,
+      confirmLabel: 'Put them back',
+      onConfirm: () => {
+        const restored = undoApostropheRepair();
+        render();
+        showToast(`Restored ${restored} original spelling${restored === 1 ? '' : 's'}`);
+      }
+    });
+  },
   'prune-review': () => pruneOldSessions(),
   'prune-age-save': () => savePruneAge(),
   'backup-import': () => { const f = document.getElementById('backup-import-file'); if (f) f.click(); },

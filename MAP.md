@@ -1,4 +1,4 @@
-# PATGo — Code Map (V68)
+# PATGo — Code Map (V69)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -141,6 +141,10 @@ detector, boundary validators for item readings.
 **Coupling:** none by design — nothing here reads `state`.
 ⚠ `titleCase()` is NOT display-only: it runs on locations and item types at save
 time, so its output reaches certificates and CSV exports.
+⚠ v69: `repairApostropheCase()` is titleCase's INVERSE and the only function in
+the app that lowercases a user-typed letter. It is guarded on the preceding word
+not being all-caps (`BOB'S` is deliberate, `Bob'S` is the bug) and on a
+single-letter suffix (`O'Brien` untouched). Callers: storage.js repair pass only.
 ⚠⚠ **THERE IS MORE THAN ONE APOSTROPHE CHARACTER.** iOS smart punctuation types
 U+2019 (’), NOT U+0027 ('). v68 matched only U+0027 and was therefore broken on
 every phone while passing every test — because test files are ASCII source.
@@ -154,6 +158,16 @@ the per-area save paths, the shared boundary validators
 (`normaliseReportSettings`, `normaliseArchivedStats`), storage stats.
 **Touch to:** change how data is stored, loaded or migrated.
 **⚠ Data-integrity zone — backup round-trip after every edit.**
+⚠⚠ v69: `_encodedSessionCache` reuses a session's encoding when the items ARRAY
+REFERENCE and `_sessionSig()` are unchanged — and the sig covers item COUNT, not
+item CONTENTS. Anything that edits strings INSIDE existing item objects must call
+`_invalidateSessionEncoding(sess)` or the stale encoding is written back and the
+edit silently un-happens on reload. Only bites NON-ACTIVE sessions (the active
+one always re-encodes fresh), which is why it is easy to miss in a test.
+⚠ v69 (D5): `runApostropheRepair()` / `apostropheRepairUndoCount()` /
+`undoApostropheRepair()` — one-time rewrite of stored locations, item types and
+preset entries, latched on `REPAIR_DONE_KEY`, undo diff in `REPAIR_UNDO_KEY`.
+Called from boot.js after `load()`, before the first `render()`.
 **Coupling:** ⚠ ordering inside `load()`/`save()` matters and is harness-asserted
 — `loadInstruments()` runs **after** the legacy tester keys (migration source);
 `saveInstruments()` runs **before** writing them (a prune re-syncs the mirror).
@@ -395,10 +409,14 @@ are **not** here (events.js). Text-input actions must not `render()` on keystrok
 File inputs must clear `el.value` immediately or re-choosing the same file fires
 nothing. `handleDelegatedClick` returns early when no ancestor carries
 `data-action`, which is why plain `<a>` links work inside `#app`.
+⚠ v69 (D4): the action call is wrapped — a throw inside any action (including the
+`render()` it triggers) is caught here and recovered to the Sessions list. This is
+the post-boot half of the v16.1 net, which covers the FIRST render only. Assert
+this through `handleDelegatedClick`, never through `render()` directly.
 
-### boot.js (~283 ln) — startup, RUNS ON LOAD, must load LAST
+### boot.js (~300 ln) — startup, RUNS ON LOAD, must load LAST
 Service-worker registration and update banner, `bootIntegrityOK()`, the boot tail,
-the crash fallback screens.
+the crash fallback screens, the v69 one-time data repair call.
 **Touch to:** change the startup sequence, the SW update banner or the integrity
 guard.
 **Coupling:** the integrity guard verifies the critical cross-file functions

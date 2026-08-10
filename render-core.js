@@ -199,10 +199,10 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Apostrophes in place names are fixed.</strong> A location typed as "Bob's Office" was being stored as "Bob'S Office" &mdash; and it came out that way on certificates and in CSV exports, not just on screen. Names like O'Brien still capitalise correctly.</li>
-        <li><strong>The &#9000; keyboard button has been removed.</strong> It couldn't do what people wanted it for: your phone hides its own keyboard whenever a scanner is paired, in every app, and no app can overrule that. To type an asset number by hand, either double-click your scanner's trigger to pop the keyboard up, or turn <strong>Scanner paired</strong> off under Settings &rarr; Testing Setup &rarr; Barcode Scanner. That page now explains both.</li>
-        <li><strong>If the app ever fails to start,</strong> you'll now always get the "Update needed" screen with a Reload button and a link to report it &mdash; there was a rare case that showed a blank screen instead. Your saved data was never at risk either way, but a blank screen tells you nothing.</li>
-        <li><strong>Bug reports are more private.</strong> Client and site names are now stripped out of the technical details before a report is sent, so a fault report can't carry a customer's name off your phone.</li>
+        <li><strong>Your saved locations have been corrected.</strong> The last update stopped the app putting a stray capital after an apostrophe &mdash; "Bob's Office" being saved as "Bob'S Office" &mdash; but only for things typed from that point on. Everything already in your jobs stayed wrong, printed wrong on certificates, and kept being offered back by the suggestions list. This update has gone through your saved jobs and item type presets once and corrected them.</li>
+        <li><strong>Names in full capitals are left alone.</strong> "BOB'S OFFICE" is how you typed it, so it stays that way. Names like O'Brien are untouched too.</li>
+        <li><strong>You can put it back.</strong> If you'd rather have the old spellings, there's an <strong>Undo the correction</strong> button under Settings &rarr; Back up and restore. It's worth exporting a backup while you're on that page.</li>
+        <li><strong>A tap that hits an error no longer leaves you stranded.</strong> If a screen fails to draw, the app now returns you to your jobs list with a short message instead of doing nothing while quietly losing track of which screen you're on.</li>
       </ul>
       <button class="btn-primary" data-action="welcome-dismiss">Continue</button>
     </div>

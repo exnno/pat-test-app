@@ -171,6 +171,23 @@ function _sessionSig(s) {
   ].join('\u0001');
 }
 
+// v69: drop a session's cached encoding.
+//
+// ⚠ WHY THIS EXISTS. The reuse test above is `itemsRef === s.items && sig
+// unchanged`, and _sessionSig() covers session-level fields plus items.LENGTH —
+// deliberately not item CONTENTS, which are guarded by the array-reference
+// check instead. That guard assumes the only way item contents change is
+// through a path that also replaces the array or touches the active session.
+//
+// The v69 apostrophe repair breaks that assumption: it rewrites strings INSIDE
+// existing item objects, same array reference, same length, same session fields.
+// A cached session would therefore be re-serialised from its STALE encoding and
+// the repair would silently un-happen on the next reload. Any future code that
+// edits item contents in place across many sessions must call this too.
+function _invalidateSessionEncoding(sess) {
+  if (sess) _encodedSessionCache.delete(sess);
+}
+
 // Serialise the sessions array for localStorage in compressed form.
 // v23: reuses each session's cached encoding when provably unchanged (see above).
 function serialiseSessions(sessions) {
@@ -884,6 +901,149 @@ function saveSettings() {
 function save() {
   saveSessions();
   saveSettings();
+}
+
+// ---------------------------------------------------------------------------
+// v69 (D5): ONE-TIME APOSTROPHE DATA REPAIR
+//
+// The only code in this app that rewrites data the user already saved. Three
+// rules follow from that, and all three are load-bearing:
+//
+//   1. It runs ONCE, latched on REPAIR_DONE_KEY. A repair that can run twice is
+//      a repair that can be re-run against already-repaired data, and while this
+//      particular one happens to be idempotent, relying on that is how a future
+//      edit turns a safe pass into a destructive one.
+//   2. It records what it changed BEFORE changing it, so there is a way back.
+//   3. It touches nothing it does not have to. Every skipped string is a string
+//      that cannot be damaged.
+//
+// It runs at boot AFTER load() and BEFORE the first render, so the very first
+// screen the user sees is already correct — see boot.js.
+//
+// Scope (Q5 = A): item locations, item types, and the item lists inside presets.
+// state.itemTypes is a derived mirror of the active preset (see session.js
+// syncItemTypesFromPreset) so repairing presets fixes it for free — do NOT
+// repair the mirror as well, or the entry would be recorded twice in the undo
+// and restoring would fight itself.
+//
+// NOT in scope, and deliberately: client and site names never pass through
+// titleCase() (grep it — the only call sites are normaliseLocation and
+// normaliseItemType), so they were never mangled. Smart Quick Pick history is
+// also unaffected: normaliseSqpLocation() lowercases every key before storage,
+// so `Bob'S Office` and `Bob's Office` were always the same bucket.
+function runApostropheRepair() {
+  if (localStorage.getItem(REPAIR_DONE_KEY)) return 0;
+
+  const undo = [];
+
+  (state.sessions || []).forEach(sess => {
+    if (!sess || !Array.isArray(sess.items)) return;
+    let touched = false;
+    sess.items.forEach((it, idx) => {
+      if (!it) return;
+      ['location', 'itemType'].forEach(field => {
+        const before = it[field];
+        if (typeof before !== 'string' || !before) return;
+        const after = repairApostropheCase(before);
+        if (after !== before) {
+          undo.push({ s: sess.id, i: idx, f: field, v: before });
+          it[field] = after;
+          touched = true;
+        }
+      });
+    });
+    // In-place item edits do not invalidate the encode cache by themselves.
+    if (touched) _invalidateSessionEncoding(sess);
+  });
+
+  (state.itemPresets || []).forEach(p => {
+    if (!p || !Array.isArray(p.items)) return;
+    p.items.forEach((val, x) => {
+      if (typeof val !== 'string' || !val) return;
+      const after = repairApostropheCase(val);
+      if (after !== val) {
+        undo.push({ p: p.id, x: x, v: val });
+        p.items[x] = after;
+      }
+    });
+  });
+
+  // Latch first, then persist. If the write below throws (quota), the latch is
+  // already set and the repair does not retry on every boot forever — the data
+  // in memory is correct, the next ordinary save() writes it, and a repair that
+  // silently half-ran is preferable to a boot loop the user cannot escape.
+  localStorage.setItem(REPAIR_DONE_KEY, APP_VERSION);
+
+  if (undo.length) {
+    try {
+      localStorage.setItem(REPAIR_UNDO_KEY, JSON.stringify(undo));
+    } catch (e) {
+      // No undo snapshot is survivable; a failed repair is not. Carry on.
+      console.warn('Apostrophe repair: undo snapshot could not be stored.', e);
+    }
+    // v69 (Q4-A'): the undo above is on-device only. Nudge toward a real file
+    // backup by clearing the "last exported" stamp, which is what the existing
+    // 7-day reminder banner reads. That banner has a user gesture behind it and
+    // can therefore do the thing this function cannot.
+    state.lastBackupAt = null;
+    localStorage.removeItem(LAST_BACKUP_KEY);
+    // v69: syncItemTypesFromPreset() rebuilds the derived mirror from the
+    // now-repaired active preset. Without this the entry screen's quick-pick
+    // buttons keep the mangled labels until the next preset switch.
+    if (typeof syncItemTypesFromActivePreset === 'function') syncItemTypesFromActivePreset();
+    save();
+  }
+
+  return undo.length;
+}
+
+// v69: does an undo snapshot exist, and how big is it? Drives the Settings
+// button's visibility and its count.
+function apostropheRepairUndoCount() {
+  try {
+    const raw = localStorage.getItem(REPAIR_UNDO_KEY);
+    if (!raw) return 0;
+    const arr = JSON.parse(raw);
+    return Array.isArray(arr) ? arr.length : 0;
+  } catch (e) { return 0; }
+}
+
+// v69: put every recorded string back exactly as it was, then discard the
+// snapshot. Entries whose session, item or preset no longer exists are skipped
+// rather than treated as an error — a job deleted since the repair is a normal
+// thing to have happened, not a corrupt snapshot.
+function undoApostropheRepair() {
+  let raw;
+  try { raw = localStorage.getItem(REPAIR_UNDO_KEY); } catch (e) { raw = null; }
+  if (!raw) return 0;
+  let arr;
+  try { arr = JSON.parse(raw); } catch (e) { arr = null; }
+  if (!Array.isArray(arr)) { localStorage.removeItem(REPAIR_UNDO_KEY); return 0; }
+
+  let restored = 0;
+  arr.forEach(rec => {
+    if (!rec || typeof rec.v !== 'string') return;
+    if (rec.p !== undefined) {
+      const p = (state.itemPresets || []).find(x => x && x.id === rec.p);
+      if (p && Array.isArray(p.items) && typeof p.items[rec.x] === 'string') {
+        p.items[rec.x] = rec.v;
+        restored++;
+      }
+      return;
+    }
+    const sess = (state.sessions || []).find(x => x && x.id === rec.s);
+    if (!sess || !Array.isArray(sess.items)) return;
+    const it = sess.items[rec.i];
+    if (!it || (rec.f !== 'location' && rec.f !== 'itemType')) return;
+    it[rec.f] = rec.v;
+    _invalidateSessionEncoding(sess);
+    restored++;
+  });
+
+  localStorage.removeItem(REPAIR_UNDO_KEY);
+  if (typeof syncItemTypesFromActivePreset === 'function') syncItemTypesFromActivePreset();
+  save();
+  return restored;
 }
 
 // v23 (E2): targeted single-key writers. The hot loggers (saveItem,

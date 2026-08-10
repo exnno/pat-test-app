@@ -263,6 +263,24 @@ initSuggestionClickSwallow();
 // through document rather than by calling the handler, which is the only shape
 // of test that could have caught it.
 if (typeof initScanner === 'function') initScanner();
+
+// v69 (D5): one-time apostrophe repair on stored locations and item types.
+//
+// Placement is deliberate on both sides. AFTER load(), because it rewrites the
+// data load() just read — and it is inside the `else` branch of the integrity
+// guard, so a half-loaded build never reaches it and never rewrites data it may
+// have read incorrectly. BEFORE the first render(), so the very first screen the
+// user sees is already correct rather than flickering from wrong to right.
+//
+// try/catch because this is a data rewrite running before the user can do
+// anything: a throw here must not be the reason the app fails to start. The
+// repair latches itself, so a failure is a job left undone, not a boot loop.
+try {
+  if (typeof runApostropheRepair === 'function') runApostropheRepair();
+} catch (e) {
+  console.error('Apostrophe repair failed; continuing with unrepaired data.', e);
+}
+
 // v16.1: boot-level safety net. A throw inside render() (e.g. a screen-specific
 // bug like the v16 entry-screen TDZ error) used to leave #app permanently
 // blank — and because the service worker serves the cached build, a plain
