@@ -101,24 +101,45 @@ module.exports = function run() {
     t.includes(html, 'data-action', 'the delegated-action wiring is present');
   });
 
-  t.group('07i — a view that throws after boot is not covered by the boot-level net', () => {
-    // The v16.1 safety net wraps the FIRST render at startup. This characterises
-    // what happens when a view renderer throws later, on navigation.
+  t.group('07i — a post-boot render throw is caught by the delegated handler (D4)', () => {
+    // FIXED V69. The v16.1 net wraps the FIRST render at startup only; every
+    // render after that happens inside an action dispatched from
+    // handleDelegatedClick, which used to call the action bare.
+    //
+    // ⚠ THE ASSERTION HAS TO GO THROUGH THE HANDLER, not through render().
+    // render() still throws — that is correct and unchanged, it is not its job
+    // to catch its own bugs. What V69 added is the catch at the CALL SITE, so a
+    // test that calls render() directly would go green on the old code too and
+    // prove nothing. This is the same shape of mistake as V67's scanner tests,
+    // which called the handler directly and missed a listener that was never
+    // bound for three releases.
     const app = populated();
     app.fn('setView')('sessions');
     app.fn('render')();
-    const before = app.doc.getElementById('app').innerHTML;
-    t.ok(before.length > 200, 'a healthy view painted first');
+    t.ok(app.doc.getElementById('app').innerHTML.length > 200, 'a healthy view painted first');
 
+    // render() itself is still expected to propagate. Characterised, not fixed.
+    app.run('var ORIGINAL_RENDER_SESSIONS = renderSessions;');
     app.run('renderSessions = function () { throw new Error("deliberate render failure"); };');
-    let threw = false;
-    try { app.fn('render')(); } catch { threw = true; }
+    let threwDirect = false;
+    try { app.fn('render')(); } catch { threwDirect = true; }
+    t.ok(threwDirect, 'render() itself still throws — the fix is at the call site, not here');
 
-    t.known(threw,
-      'a post-boot render throw propagates to the caller rather than falling back',
-      'The v16.1 net wraps the FIRST render only. Whether this reaches the user depends on the caller — the delegated click handler may absorb it. Confirm on-device before treating as a defect; recorded so it is not forgotten.');
+    // Now the real path: an action that throws, dispatched the way a tap does.
+    app.run('renderSessions = ORIGINAL_RENDER_SESSIONS;');
+    app.run('ACTIONS["harness-throw"] = function () { state.view = "overview"; throw new Error("deliberate action failure"); };');
 
-    const after = app.doc.getElementById('app').innerHTML;
-    t.ok(after.length === 0 || after.length > 0, 'app element still exists after the failure');
+    const el = app.doc.createElement('button');
+    el.dataset.action = 'harness-throw';
+    let escaped = false;
+    try {
+      app.fn('handleDelegatedClick')({ target: el });
+    } catch { escaped = true; }
+
+    t.notOk(escaped, 'the throw does NOT escape the delegated click handler');
+    t.eq(app.state().view, 'sessions',
+      'and state is recovered to the Sessions list, so state and screen agree again');
+    t.ok(app.doc.getElementById('app').innerHTML.length > 200,
+      'a usable screen is painted rather than leaving a dead one');
   });
 };

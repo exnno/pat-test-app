@@ -131,6 +131,163 @@ module.exports = function run() {
     t.eq(it.location, `Bob${APOS_CURLY}s Office`, 'and it holds through the actual save path');
   });
 
+  // ---------------------------------------------------------------------
+  // v69 (D5): the one-time repair of data stored by pre-V68.1 builds.
+  //
+  // ⚠ Every assertion below is parameterised across all three apostrophe
+  // characters, for the reason recorded at the top of this file. A repair that
+  // handles ASCII only would reproduce v68 exactly: green here, useless on a
+  // phone, because iOS types U+2019.
+  // ---------------------------------------------------------------------
+
+  t.group('06e3 — repairApostropheCase fixes the mangle without breaking caps', () => {
+    const app = freshApp();
+    const rp = app.fn('repairApostropheCase');
+
+    for (const [name, A] of [['ASCII', APOS_ASCII], ['curly', APOS_CURLY], ['modifier', APOS_MOD]]) {
+      t.eq(rp(`Bob${A}S Office`), `Bob${A}s Office`, `${name}: the mangled capital is lowered`);
+      // THE TRAP. Deliberate shouting must survive untouched — repairing it
+      // would be a NEW defect, and a worse one, because the user typed it.
+      t.eq(rp(`BOB${A}S OFFICE`), `BOB${A}S OFFICE`, `${name}: all-caps is left alone`);
+      t.eq(rp(`O${A}Brien`), `O${A}Brien`, `${name}: multi-letter suffix untouched`);
+      // ⚠ O'Brien alone does NOT exercise the multi-letter guard: "O" is
+      // all-caps, so it escapes through the deliberate-caps branch instead and
+      // the assertion passes even with the guard deleted (mutation M44 survived
+      // on exactly this). It needs a MIXED-CASE word before the apostrophe and
+      // more than one letter after it — Sant'Angelo, Dell'Arte, All'Aperto are
+      // all real place-name shapes an engineer could type as a location.
+      t.eq(rp(`Sant${A}Angelo Room`), `Sant${A}Angelo Room`,
+        `${name}: mixed-case word with a multi-letter suffix is untouched`);
+      t.eq(rp(`Dell${A}Arte`), `Dell${A}Arte`, `${name}: and again with another real name shape`);
+      t.eq(rp(`Bob${A}s Office`), `Bob${A}s Office`, `${name}: already-correct is a no-op`);
+      t.eq(rp(rp(`Bob${A}S Office`)), `Bob${A}s Office`, `${name}: running twice changes nothing more`);
+      // Mixed in one string: only the mixed-case word is touched.
+      t.eq(rp(`BOB${A}S Office And Sue${A}S Desk`), `BOB${A}S Office And Sue${A}s Desk`,
+        `${name}: all-caps and mangled in the same string are told apart`);
+      t.includes(rp(`Bob${A}S Office`), A, `${name}: the typed character is preserved, not normalised`);
+    }
+
+    t.eq(rp(''), '', 'empty in, empty out');
+    t.eq(rp('Reception'), 'Reception', 'a string with no apostrophe is untouched');
+  });
+
+  // ⚠ boot.js RUNS during harness boot, and it calls runApostropheRepair() — so
+  // by the time a test gets the app, the latch is already set against the empty
+  // starting data. Any test that wants to observe a repair must clear the latch
+  // first, or it silently measures a no-op and passes for the wrong reason.
+  // (06e5 did exactly that on its first run: green, and testing nothing.)
+  // ⚠ REPAIR_DONE_KEY is a top-level const, which does NOT attach to the vm
+  // context — it has to come through the bridge. app.val() alone returns
+  // undefined until refresh() has pulled it across, and removeItem(undefined)
+  // is a silent no-op, which is exactly how this helper failed the first time.
+  const unlatch = app => app.storage.removeItem(app.refresh('REPAIR_DONE_KEY').REPAIR_DONE_KEY);
+
+  t.group('06e4 — the repair runs once, over items and presets, and can be undone', () => {
+    const app = freshApp();
+    const A = APOS_CURLY;   // the character the device actually sends
+    const repaired = withSession(app);
+    const repairedId = repaired.id;
+    const findRepaired = () => app.state().sessions.find(x => x.id === repairedId);
+    const it = withItem(app, { assetNo: '1', location: 'Reception', itemType: 'Kettle', result: 'pass' });
+
+    // Simulate pre-V68.1 stored data: write the mangled forms straight onto the
+    // saved item, bypassing titleCase() exactly as an old build's data would.
+    it.location = `Bob${A}S Office`;
+    it.itemType = `Sue${A}S Kettle`;
+    const st = app.state();
+    st.itemPresets[0].items[0] = `Bob${A}S Lamp`;
+    const keptCaps = `BOB${A}S SHED`;
+    st.itemPresets[0].items[1] = keptCaps;
+
+    // ⚠ THE REPAIRED JOB MUST BE NON-ACTIVE WHEN THE REPAIR RUNS. runApostropheRepair
+    // ends with save(), and serialiseSessions always re-encodes the ACTIVE session
+    // fresh — so repairing the active job refreshes its cache entry as a side
+    // effect and the stale-encoding trap can never fire. Mutation M47 survived on
+    // exactly that. At boot the repair walks EVERY job while at most one is
+    // active, so old jobs are the real case, and this is what reproduces it.
+    withSession(app, { client: 'Second Job', site: 'Elsewhere' });
+    t.notEq(app.state().activeId, repairedId,
+      'the mangled job is non-active when the repair runs, as an old job would be');
+    app.fn('save')();
+
+    unlatch(app);
+    const changed = app.fn('runApostropheRepair')();
+    t.eq(changed, 3, 'three strings repaired — two on the item, one in the preset');
+    t.eq(it.location, `Bob${A}s Office`, 'the stored location is repaired');
+    t.eq(it.itemType, `Sue${A}s Kettle`, 'the stored item type is repaired');
+    t.eq(st.itemPresets[0].items[0], `Bob${A}s Lamp`, 'preset entries are repaired too');
+    t.eq(st.itemPresets[0].items[1], keptCaps, 'an all-caps preset entry is left alone');
+    t.eq(st.itemTypes[0], `Bob${A}s Lamp`, 'the derived itemTypes mirror is rebuilt');
+
+    // Run-once latch. A second call must be a no-op even though the function
+    // would otherwise happily walk the data again.
+    it.location = `Jim${A}S Van`;
+    t.eq(app.fn('runApostropheRepair')(), 0, 'a second run does nothing — the latch holds');
+    t.eq(it.location, `Jim${A}S Van`, 'and it really did not touch the data');
+
+    it.location = `Bob${A}s Office`;   // put the test data back
+
+    // ⚠ THE CACHE TRAP (v69). serialiseSessions reuses a cached encoding when
+    // the items ARRAY REFERENCE and the session signature are unchanged — and
+    // the signature covers item COUNT, not item contents. The repair edits
+    // strings inside existing item objects, so without an explicit cache drop
+    // the repaired data would be written back from the stale encoding and the
+    // whole release would silently un-happen on the next reload. Assert through
+    // a real save + reload, which is the only shape of test that catches it.
+    app.fn('save')();
+    app.fn('load')();
+    const reloaded = findRepaired().items[0];
+    t.eq(reloaded.location, `Bob${A}s Office`, 'the repair survives a save/reload round-trip');
+    t.eq(reloaded.itemType, `Sue${A}s Kettle`, 'both repaired fields survive it');
+
+    // The undo snapshot restores the ORIGINAL strings, stray capitals included.
+    t.eq(app.fn('apostropheRepairUndoCount')(), 3, 'the undo snapshot holds all three');
+    const restored = app.fn('undoApostropheRepair')();
+    t.eq(restored, 3, 'all three are restored');
+    const after = findRepaired().items[0];
+    t.eq(after.location, `Bob${A}S Office`, 'the original mangled location is back');
+    t.eq(app.state().itemPresets[0].items[0], `Bob${A}S Lamp`, 'and the original preset entry');
+    t.eq(app.fn('apostropheRepairUndoCount')(), 0, 'the snapshot is consumed, so the button disappears');
+
+    app.fn('save')();
+    app.fn('load')();
+    t.eq(findRepaired().items[0].location, `Bob${A}S Office`,
+      'the undo survives a reload too (same cache trap, other direction)');
+  });
+
+  t.group('06e5 — a repair that changes nothing leaves no undo and no nudge', () => {
+    const app = freshApp();
+    withSession(app);
+    withItem(app, { assetNo: '1', location: 'Reception', itemType: 'Kettle', result: 'pass' });
+    const st = app.state();
+    st.lastBackupAt = '2026-08-01T00:00:00.000Z';
+    app.fn('save')();
+
+    unlatch(app);
+    t.eq(app.fn('runApostropheRepair')(), 0, 'clean data means nothing to repair');
+    t.eq(app.fn('apostropheRepairUndoCount')(), 0, 'no undo snapshot is written');
+    // The backup nudge exists to push toward an off-device copy AFTER a rewrite.
+    // Tripping it when nothing was rewritten would be a nag with no cause.
+    t.eq(app.state().lastBackupAt, '2026-08-01T00:00:00.000Z',
+      'the backup reminder is NOT tripped when nothing changed');
+  });
+
+  t.group('06e6 — a repair that changes something trips the backup reminder', () => {
+    const app = freshApp();
+    const A = APOS_CURLY;
+    withSession(app);
+    const it = withItem(app, { assetNo: '1', location: 'Reception', itemType: 'Kettle', result: 'pass' });
+    it.location = `Bob${A}S Office`;
+    const st = app.state();
+    st.lastBackupAt = '2026-08-01T00:00:00.000Z';
+    app.fn('save')();
+
+    unlatch(app);
+    t.ok(app.fn('runApostropheRepair')() > 0, 'something was repaired');
+    t.eq(app.state().lastBackupAt, null,
+      'the 7-day backup reminder is tripped, because the on-device undo is not off-device safety');
+  });
+
   t.group('06f — stats tally correctly', () => {
     const app = populated();
     const stats = app.fn('computeAppStats')();
