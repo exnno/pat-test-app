@@ -333,6 +333,78 @@ const MUTATIONS = [
     why:  'a client or site name interpolated into an error reaches the support inbox verbatim',
   },
 
+  // ---- v69 (D5): the one-time apostrophe data repair ----
+  {
+    name: 'M42 (D5) the repair lowercases after an apostrophe unconditionally',
+    file: 'utils.js',
+    from: "      word === word.toUpperCase()\n        ? m                                    // BOB'S — deliberate caps, untouched",
+    to:   "      false\n        ? m",
+    why:  "BOB'S OFFICE becomes BOB's OFFICE — the repair introduces a worse defect than the one it fixes, on a string the user typed deliberately",
+  },
+  {
+    name: 'M43 (D5) the repair only recognises the ASCII apostrophe',
+    file: 'utils.js',
+    from: "    /([A-Za-z]+)(['\\u2019\\u02BC])([A-Z])(?![A-Za-z])/g,",
+    to:   "    /([A-Za-z]+)(['])([A-Z])(?![A-Za-z])/g,",
+    why:  'exactly the V68 failure repeated — iOS types U+2019, so the repair would do nothing on any real phone while the ASCII assertions stayed green',
+  },
+  {
+    name: 'M44 (D5) the repair also rewrites multi-letter suffixes',
+    file: 'utils.js',
+    from: "([A-Z])(?![A-Za-z])/g,",
+    to:   "([A-Z])/g,",
+    why:  "O'Brien and D'Angelo would be rewritten to O'brien and D'angelo — real names damaged by a repair pass",
+  },
+  {
+    name: 'M45 (D5) the run-once latch is never set',
+    file: 'storage.js',
+    from: '  localStorage.setItem(REPAIR_DONE_KEY, APP_VERSION);',
+    to:   '  /* latch removed */',
+    why:  'the repair re-runs on every boot, so it can be applied to data a user has since deliberately edited back',
+  },
+  {
+    name: 'M46 (D5) no undo snapshot is recorded',
+    file: 'storage.js',
+    from: '      localStorage.setItem(REPAIR_UNDO_KEY, JSON.stringify(undo));',
+    to:   '      /* snapshot removed */',
+    why:  'the only way back from a data rewrite disappears, and the Settings button silently never appears',
+  },
+  {
+    name: 'M47 (D5) the stale session encoding is written back over the repair',
+    file: 'storage.js',
+    from: '    if (touched) _invalidateSessionEncoding(sess);',
+    to:   '    if (false) _invalidateSessionEncoding(sess);',
+    why:  'THE TRAP THIS RELEASE ALMOST SHIPPED — serialiseSessions reuses a cached encoding when the items array reference and item COUNT are unchanged, which is exactly the case here, so the whole repair silently un-happens on the next reload',
+  },
+  {
+    name: 'M48 (D5) presets are left out of the repair',
+    file: 'storage.js',
+    from: '  (state.itemPresets || []).forEach(p => {',
+    to:   '  ([]).forEach(p => {',
+    why:  'the quick-pick buttons keep the mangled labels, and every item logged from one writes the bad string back into fresh data',
+  },
+  {
+    name: 'M49 (D5) the backup reminder is not tripped after a rewrite',
+    file: 'storage.js',
+    from: '    state.lastBackupAt = null;\n    localStorage.removeItem(LAST_BACKUP_KEY);',
+    to:   '    /* nudge removed */',
+    why:  'the on-device undo is the ONLY safety net left, and it dies with the browser data it lives in',
+  },
+  {
+    name: 'M50 (D4) the delegated click handler stops catching action throws',
+    file: 'dispatch.js',
+    from: '  try {\n    fn(arg, el, e);\n  } catch (err) {',
+    to:   '  if (true) {\n    fn(arg, el, e);\n  } else if (err) {',
+    why:  'a throwing view renderer leaves state pointing at one screen while the previous screen is still on display, so the next tap runs the wrong actions',
+  },
+  {
+    name: 'M51 (D4) the recovery leaves the view where the failed action put it',
+    file: 'dispatch.js',
+    from: "      state.view = 'sessions';\n      render();\n      if (typeof showToast === 'function') showToast('Something went wrong — back to your jobs');",
+    to:   '      render();',
+    why:  'recovering by re-rendering the very view that just threw either throws again or repaints the broken screen — state and screen still disagree',
+  },
+
 ];
 
 function main() {

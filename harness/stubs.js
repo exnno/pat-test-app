@@ -48,6 +48,11 @@ class ClassList {
 class StubElement {
   constructor(tag) {
     this.tagName    = String(tag || 'div').toUpperCase();
+    // ⚠ v69: a real element IS nodeType 1, and handleDelegatedClick's very first
+    // guard is `el.nodeType === 1`. Without this the walk bailed immediately and
+    // EVERY delegated-click test passed without ever reaching the action — the
+    // "path that cannot execute headlessly" shape. Text nodes override it below.
+    this.nodeType   = tag === '#text' ? 3 : 1;
     this.children   = [];
     this.parentNode = null;
     this.style      = {};
