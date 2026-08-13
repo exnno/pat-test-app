@@ -404,6 +404,34 @@ const MUTATIONS = [
     to:   '      render();',
     why:  'recovering by re-rendering the very view that just threw either throws again or repaints the broken screen — state and screen still disagree',
   },
+  {
+    name: 'M52 (V70) an extracted function is lost on the way out of session.js',
+    file: 'settings-actions.js',
+    from: 'function saveReportSettingsForm(',
+    to:   'function saveReportSettingsForm_LOST(',
+    why:  'THE failure mode of a split: every file still parses, the load order is intact, nothing is duplicated — and the Save button on Report Settings throws on tap. Nothing before V70 caught this',
+  },
+  {
+    name: 'M53 (V70) the wizard constant is left behind in the old file',
+    file: 'onboarding.js',
+    from: 'const WIZARD_LAST_STEP = 6;',
+    to:   'const WIZARD_LAST_STEP = 5;',
+    why:  'a top-level const does not attach to window, so a mis-moved constant is invisible to the boot guard — the exact shape of the V61 white screen',
+  },
+  {
+    name: 'M54 (V70) a new file is referenced but never uploaded',
+    file: 'boot.js',
+    from: "    'saveReportSettingsForm', 'wizardNextStep'",
+    to:   "    'saveReportSettingsForm'",
+    why:  'one probe per script file is what turns a partial deploy into the designed recovery screen instead of a silent failure a user finds by tapping',
+  },
+  {
+    name: 'M55 (V70) a split file drops out of the service-worker precache',
+    file: 'sw.js',
+    from: "  './onboarding.js',        // v70",
+    to:   '  // dropped',
+    why:  'a file in index.html but not in ASSETS loads online and 404s offline — the app would work in the office and break in the field, which is the worst possible failure shape for this app',
+  },
 
 ];
 
