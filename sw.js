@@ -10,7 +10,7 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v69';
+const CACHE_VERSION = 'pat-v70';
 const ASSETS = [
   './',
   './index.html',
@@ -29,8 +29,10 @@ const ASSETS = [
   './csv.js',
   './backup.js',
   './session.js',
+  './settings-actions.js',   // v70
   './setup.js',
   './tour.js',
+  './onboarding.js',        // v70
   // v51: jsPDF + autotable stay PRECACHED but are no longer in index.html's
   // <script> chain — report.js injects them lazily on first report (from this
   // cache, so reports work offline from first install). See loadReportEngine().
