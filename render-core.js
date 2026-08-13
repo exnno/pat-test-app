@@ -29,6 +29,23 @@ let _lastRenderHadModal = false;
 // page changes for scroll-on-navigation (see render()). null until first render.
 let _lastRenderedView = null;
 
+// v70: MOVED HERE FROM session.js, byte identical. MAP rule 8 says rolling a
+// welcome touches config.js (WELCOME_VERSION) and render-core.js (the copy) and
+// nothing else. That was true of the modal but not of its dismiss handler, which
+// sat 2,400 lines into session.js between the CSV-column reordering and the job
+// notes — findable only by grep, and nowhere near anything it related to. It now
+// sits beside the markup whose button calls it.
+// v50: ONE parameterised welcome-dismiss, replacing the 17 near-identical
+// dismissVNNWelcome functions that had accumulated since v12. Sets the seen
+// flag in state and persists the matching key so the modal never reappears,
+// then re-renders to clear it from view. The current welcome is V49; future
+// feature releases pass their own (flag, key) pair and reuse this function.
+function dismissWelcome(seenFlag, key) {
+  state[seenFlag] = true;
+  localStorage.setItem(key, '1');
+  render();
+}
+
 function render() {
   if (_lastRenderHadModal) {
     document.querySelectorAll(

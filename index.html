@@ -42,8 +42,17 @@
   <script src="csv.js"></script>
   <script src="backup.js"></script>
   <script src="session.js"></script>
+  <!-- v70: settings-actions.js — the save/reset handlers behind the Settings
+       screens, extracted from session.js. Sits immediately after its parent
+       file. Every cross-file call resolves at call time, so the position is a
+       readability choice, not a load-order constraint. -->
+  <script src="settings-actions.js"></script>
   <script src="setup.js"></script>
   <script src="tour.js"></script>
+  <!-- v70: onboarding.js — the first-run wizard and the example-session seed,
+       extracted from session.js. Placed next to tour.js, the walkthrough the
+       wizard can hand off to on its final step. -->
+  <script src="onboarding.js"></script>
   <!-- v30: vendored PDF engine (jsPDF + autotable, MIT — see THIRD-PARTY-LICENSES.txt).
        v51: NO LONGER loaded here. These ~350 KB libs only matter when a PDF report
        is produced, so loading them on every cold start was wasted startup cost. They

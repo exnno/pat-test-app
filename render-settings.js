@@ -1365,18 +1365,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v69: rolled forward — V69 on top, V66 dropped. -->
+      <!-- v8: rolling 3-version changelog. v70: rolled forward — V70 on top, V67 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V70</strong> &middot; August 2026</p>
+        <p class="muted">Housekeeping only &mdash; nothing has changed in how the app works or looks. The settings screens and the first-time setup have been moved into files of their own behind the scenes, so future updates to them are quicker to make and less likely to disturb anything else. Every line of the moved code was checked to be identical to the last version before this was released.</p>
 
         <p><strong>V69</strong> &middot; August 2026</p>
         <p class="muted">Locations you saved before the last update have been corrected. V68 stopped the app putting a stray capital after an apostrophe &mdash; "Bob's Office" being saved as "Bob'S Office" &mdash; but it only fixed things typed from that point on, so everything already in your jobs stayed wrong, kept printing wrong on certificates, and kept being offered back to you by the suggestions list. This update goes through your saved jobs and item type presets once and corrects them. Names you typed in full capitals, like "BOB'S OFFICE", are left exactly as they are. If you'd rather have the old spellings back, there's an <strong>Undo the correction</strong> button under Settings &rarr; Back up and restore. Also fixed: if a screen ever hits an error when you tap something, the app now takes you back to your jobs list with a short message instead of leaving the tap doing nothing while it quietly loses track of which screen you're on.</p>
 
         <p><strong>V68</strong> &middot; August 2026</p>
         <p class="muted">Housekeeping and three fixes. Place names with an apostrophe are no longer mangled &mdash; a location typed as "Bob's Office" came out as "Bob'S Office" and, worse, it came out that way on certificates and in CSV exports too. If the app ever fails to start it now always shows the "Update needed" screen with a Reload button and a link to report it, instead of occasionally showing nothing at all; your data was never at risk either way, but a blank screen tells you nothing. Bug reports sent from the app now have client and site names stripped out of the technical details before they're sent, so a fault report can't carry a customer's name off your phone. The &#9000; keyboard button beside the asset box has been removed: it couldn't do the job people wanted it for, because your phone hides its own keyboard whenever a scanner is paired and no app can overrule that. If you need to type an asset number by hand, either double-click your scanner's trigger to pop the keyboard up, or turn <strong>Scanner paired</strong> off under Settings &rarr; Testing Setup &rarr; Barcode Scanner. That page now says so plainly.</p>
-
-        <p><strong>V67</strong> &middot; August 2026</p>
-        <p class="muted">Barcode scanning now works properly with a real scanner. The first one we got our hands on didn't work at all, and it turned out the app was throwing away perfectly good scans without saying anything &mdash; which looked like three different faults and was really only one. Three things are fixed. Barcodes containing capital letters no longer break themselves halfway through. The app was also being too fussy about how fast a scan had to arrive, so the limit has been relaxed and you can now adjust it yourself under Settings &rarr; Testing Setup &rarr; Barcode Scanner if your scanner is on the slow side. And a scanner set to send two Enters after each scan no longer sets something off by accident. The test box on that page now shows you <em>every</em> scan it sees, including the ones it turned down and why &mdash; so a scanner that isn't connected no longer looks the same as one that just needs a setting changed. There's also a new <strong>Scanner paired</strong> switch: turn it on when you've actually got a scanner with you and the asset box takes the cursor by itself, on every item and again straight after each PASS or FAIL, so you can work down a row of appliances scanning one after another without touching the screen. Worth knowing: while a Bluetooth scanner is connected your phone hides its own keyboard in every app, not just this one &mdash; most scanners will pop it back up if you double-click their trigger button.</p>
 
               </div>
 

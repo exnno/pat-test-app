@@ -8,16 +8,30 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### V70 — candidate: split session.js
-The highest remaining token win and the highest-risk item on this list. It is a
-STRUCTURAL release: one file per release, no behaviour changes in the same
-release, byte-identity check on every extracted body, no welcome modal. See
-"Token efficiency" item 1 below for the seams.
+### V71 — split render-core.js, then render-settings.js
+Peter's stated order (V70): finish every structural release before any new
+feature. So the queue is V71 render-core.js → V72 render-settings.js → V73
+config.js/data.js, then features.
 
-The V68 styles.css index proves the pattern that makes this safe to deliver:
-insert-only edits, then strip the additions back out and byte-compare against
-the original. Anything that cannot be proved that way is not a structural
-change and does not belong in a structural release.
+⚠ The old rule said do not start the render splits until the session split had
+"survived a release in the field". Running V71 straight after V70 spends that
+soak. Accept it knowingly or put the config.js/data.js split (item 4 below) in
+front — it touches a different file entirely, so it gives V70 its soak for free
+without pausing structural work. Recommended: data.js first, renders after.
+
+The V70 method is the one to repeat, in this order:
+1. Pick contiguous line ranges; extract mechanically, never by retyping.
+2. Reassemble the stripped file plus every extracted block at the original
+   offsets and byte-compare against the previous release. Anything that fails
+   that is not a structural change.
+3. Add the moved names to `harness/tests/09-module-split.js` and one mutation
+   that loses a function on the way out.
+4. One probe per new file in `requiredFns` (boot.js).
+
+### ~~V70 — split session.js~~ — SHIPPED
+807 lines out (27%): `settings-actions.js` (604) and `onboarding.js` (193),
+plus `dismissWelcome()` to render-core.js. Byte-identity proved by reassembly.
+`session.js` 2,972 → 2,162 lines.
 
 ### ~~V68 — in-app keypad~~ — DEAD, do not revive
 The NETUM C750's double-click-trigger shortcut covers Peter's typing in the
@@ -158,19 +172,18 @@ Two rules out of it, both already applied:
 
 ## Token efficiency (agreed in the V66 doc restructure)
 
-### 1. Split session.js — STRUCTURAL RELEASE, ON ITS OWN
-2,972 lines, the largest file and the one most tasks have to open. Candidate
-seams: retest reminders, the readings sheet lifecycle, the first-run wizard,
-report-settings/signature capture. Each is already self-contained.
-**Rules:** one file per release, no behaviour changes in the same release,
-byte-identity check on every extracted body, no welcome modal. Highest remaining
-win, highest risk — take it slowly. The harness now covers the session flows
-(`tests/06`), which makes this materially safer than it was.
+### ~~1. Split session.js~~ — SHIPPED V70
+See the V70 entry above for the method, which is the template for items 2 and 4.
+Two seams the original plan named were NOT used and are still available if
+session.js needs splitting again: retest reminders (~185 ln) and the readings
+sheet lifecycle (~160 ln). Both are genuinely session logic and coupled to
+sorting/filtering, which is why the settings/onboarding tail went first instead.
 
 ### 2. Split render-core.js and render-settings.js — SAME PATTERN, AFTER (1)
 2,213 and 1,688 lines. Natural seams: the modal/sheet block in render-core; the
-About/Glossary/Contact help pages in render-settings. Do not start until the
-session.js split has shipped and survived a release in the field.
+About/Glossary/Contact help pages in render-settings. ⚠ render-core owns
+`const app` and the `render()` dispatcher — those stay put, and rule 2
+(`render()` is synchronous) has to survive the move. One file per release.
 
 ### ~~3. Section index for styles.css~~ — SHIPPED V68
 49 `@@` banner comments plus a header index block.

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V69)
+# PATGo — Code Map (V70)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -57,7 +57,9 @@ is discoverable from the file you happen to be editing.
    writing a flat field must call `adoptMirrorIntoInstruments()` after.
 
 8. **Rolling a welcome modal = change `WELCOME_VERSION` (config.js) + write the
-   copy (render-core.js).** Nothing else, ever. The key and the state flag have
+   copy (render-core.js).** Nothing else, ever. v70 made this literally true:
+   `dismissWelcome()` moved from session.js to render-core.js, so every part of
+   the welcome now sits in those two files. Harness 09c pins it there. The key and the state flag have
    permanent names. Version-named identifiers here caused the V61 white screen.
 
 9. **Feature-flag polarity.** Default-ON flags read `!== false`; default-OFF flags
@@ -78,14 +80,15 @@ is discoverable from the file you happen to be editing.
 
 ---
 
-## Load order (index.html) — 24 first-party files
+## Load order (index.html) — 26 first-party files
 
 `config` → `state` → `utils` → `storage` → `clients` → `instruments` → `sqp`
 → `multipick` → `feedback` → `bugreport` → `photos` → `csv` → `backup`
-→ `session` → `setup` → `tour` → `report` → `pdfpreview` → `render-core`
-→ `render-settings` → `scanner` → `events` → `dispatch` → `boot`
+→ `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
+→ `pdfpreview` → `render-core` → `render-settings` → `scanner` → `events`
+→ `dispatch` → `boot`
 
-`sw.js` ASSETS lists **26** `.js` entries: these 24 plus the 2 lazy-loaded jsPDF
+`sw.js` ASSETS lists **28** `.js` entries: these 26 plus the 2 lazy-loaded jsPDF
 files (precached, not `<script>` tags — report.js injects them on demand).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
 
@@ -94,7 +97,10 @@ choice, not a correctness constraint — cross-file calls resolve at call time, 
 identifiers from later files (e.g. `uid`) are `typeof`-guarded where used early.
 
 **Adding a file:** update `index.html` `<script>` chain AND `sw.js` ASSETS, and
-upload the new file to GitHub **before** either of them.
+upload the new file to GitHub **before** either of them. Also add ONE function
+from it to `requiredFns` in `bootIntegrityOK()` (boot.js) — without a probe, a
+file referenced but never uploaded fails silently until a user taps something.
+Harness 09e/09f and mutations M54/M55 hold all three.
 
 ---
 
@@ -297,13 +303,15 @@ sequential for iOS memory.
 **Touch to:** change preview rasterising, the lazy load, or the PDF.js version.
 **Coupling:** throws on parse failure so report.js falls back to its iframe view.
 
-### session.js (~2940 ln) — sessions, items and most logic
-The largest file. Session/item lifecycle, form and cursor, validation,
-suggestions, sorting/filtering, presets, selection + bulk edit, export state and
-pruning, retest reminders, lifetime stats, asset history, testing duration,
-readings sheet lifecycle, photo staging/commit, report settings & signature
-capture, cert numbers & templates, first-run wizard, theme and settings saves.
-**Touch to:** most logic changes.
+### session.js (~2160 ln) — sessions and items
+Session/item lifecycle, form and cursor, validation, suggestions,
+sorting/filtering, presets, selection + bulk edit, export state and pruning,
+retest reminders, lifetime stats, asset history, testing duration, readings
+sheet lifecycle, photo staging/commit.
+⚠ **v70 split it.** Settings saves, report settings, signature capture, cert
+numbers and templates → `settings-actions.js`. First-run wizard and demo seed →
+`onboarding.js`. `dismissWelcome()` → `render-core.js`. Bodies byte identical.
+**Touch to:** session and item logic changes.
 **Coupling:** the busiest file in the app —
 - `setView` and `loadFormForCursor` clear transient overlays; new transients must
   be added there (rules 3, 4).
@@ -317,12 +325,35 @@ capture, cert numbers & templates, first-run wizard, theme and settings saves.
   and calls `adoptMirrorIntoInstruments()` (rule 7).
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
 (scroll reset) live in `render()` via `_lastRenderedView`, not in `setView`.
-*Split candidate — see BACKLOG.md.*
+
+### settings-actions.js (~620 ln) — the write half of the Settings screens — NEW v70
+Per-page saves, Report Settings (text, logo, filename tokens), signature capture
+(draw and upload), CSV column ordering, Export/Import Setup UI handlers, the
+editable list settings (item types, fail reasons, descriptions) and the
+appearance/feedback toggles. Job notes, certificate-number override and report
+templates live here too — saved from the same screens, same shape.
+**Touch to:** change what a Settings screen SAVES. To change how one is drawn,
+go to render-settings.js; to change a default, config.js.
+**Coupling:** `saveReportSettingsForm()` reads the DOM, so any re-render must
+call `captureReportTextInputs()` first or unsaved text is lost (dispatch.js
+depends on this). `setTheme` delegates to `applyTheme` (session.js). Extracted
+from session.js in v70, byte identical.
+
+### onboarding.js (~195 ln) — first-run wizard — NEW v70
+The wizard state machine (step capture, paging, fresh/import fork, theme pick,
+demo toggle, finish, skip), `restartOnboarding()`, and `seedDemoSession()`.
+Holds `WIZARD_LAST_STEP`.
+**Touch to:** change the first-run flow. The wizard's MARKUP is render-core.js.
+**Coupling:** ⚠ `captureWizardStep()` is the last legacy writer of the
+instrument flat mirror and must keep calling `adoptMirrorIntoInstruments()`
+(rule 7). `onboardSetupImport()` delegates to setup.js; the final step can hand
+off to tour.js. Extracted from session.js in v70, byte identical.
 
 ### render-core.js (~2170 ln) — main screens
 Owns `const app` and the `render()` dispatcher. Sessions list, entry screen,
-overview, reports hub, edit-session, empty states, welcome modal, first-run
-wizard, signature pad, calibration banner, asset-history sheet, photo strip
+overview, reports hub, edit-session, empty states, welcome modal AND its
+`dismissWelcome()` handler (moved here v70 — see rule 8), first-run wizard
+markup, signature pad, calibration banner, asset-history sheet, photo strip
 sheet, tour route.
 **Touch to:** change any main screen or modal.
 **Coupling:** `render()` calls `bindFocusFields()` (events.js) after setting
@@ -422,6 +453,8 @@ guard.
 **Coupling:** the integrity guard verifies the critical cross-file functions
 loaded before any storage write and skips `load()`/`render()`/`save()` if not —
 this is the guard against the duplicate-`const` data-loss class (rule 1).
+⚠ v70: `requiredFns` is ONE PROBE PER SCRIPT FILE, not a list of important
+functions. Adding a script file means adding a probe — see "Adding a file".
 ⚠ v68 (D1): `bootIntegrityOK()` CAN THROW — `typeof state` hits a TDZ binding
 when config.js fails to parse. Its call site is wrapped and a throw counts as a
 FAILED check. Never call it bare in an `if`; the throw escapes and the recovery

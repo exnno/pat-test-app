@@ -73,9 +73,18 @@ function dismissUpdateBanner() {
 // we DO NOT run load()/save() (which is what overwrote data); we show a safe
 // reload prompt instead. Cheap insurance against that whole class of bug.
 function bootIntegrityOK() {
+  // v70: ONE PROBE PER SCRIPT FILE IS THE RULE HERE. This list is not "important
+  // functions" — it is "did each file execute", and the two entries added in v70
+  // (saveReportSettingsForm from settings-actions.js, wizardNextStep from
+  // onboarding.js) earn their place only because they are the sole probes for
+  // files that did not exist before. The V70 split made a new partial-deploy
+  // shape possible: index.html can ship referencing a file that was never
+  // uploaded, and without a probe that failure is silent until a user taps
+  // something on a settings screen. Add a probe whenever a script file is added.
   const requiredFns = [
     'load', 'save', 'render', 'applyTheme', 'initDelegation', 'loadFormForCursor',
-    'loadMultiPickConfig', 'loadClients', 'loadSites', 'composeSiteSnapshot'
+    'loadMultiPickConfig', 'loadClients', 'loadSites', 'composeSiteSnapshot',
+    'saveReportSettingsForm', 'wizardNextStep'
   ];
   for (const name of requiredFns) {
     if (typeof window[name] !== 'function') {
