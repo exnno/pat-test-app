@@ -433,6 +433,42 @@ const MUTATIONS = [
     why:  'a file in index.html but not in ASSETS loads online and 404s offline — the app would work in the office and break in the field, which is the worst possible failure shape for this app',
   },
 
+  {
+    name: 'M56 (V70.1) the click swallow stops disarming on a new pointerdown',
+    file: 'events.js',
+    from: "  document.addEventListener('pointerdown', () => { disarmClickSwallow(); }, true);",
+    to:   '  // disarm removed',
+    why:  'this is the V70.1 repair itself — without it a pick that produces no ghost click leaves the guard armed and eats the engineer\'s next PASS tap, which is the two-taps-of-Pass field report',
+  },
+  {
+    name: 'M57 (V70.1) the swallow is disarmed by the tap that arms it',
+    file: 'events.js',
+    from: '    armClickSwallow();      // eat the trailing ghost click before it hits PASS/Notes',
+    to:   '    armClickSwallow(); disarmClickSwallow();',
+    why:  'inverting the disarm/arm order makes the guard cancel itself, so the ghost click reaches PASS again — the exact V57.1 bug, reintroduced silently',
+  },
+  {
+    name: 'M58 (V70.1) the painter repaints an unchanged list',
+    file: 'events.js',
+    from: '  if (existing && currentHTML === html) return;          // unchanged — do not touch the DOM',
+    to:   '  // identity skip removed',
+    why:  'rebuilding the list on every keystroke destroys the row the finger is travelling towards, which is half of "I tapped it and it did not select"',
+  },
+  {
+    name: 'M59 (V70.1) the shrink lands immediately again',
+    file: 'events.js',
+    from: '  if (onDefer && newRows < oldRows) {',
+    to:   '  if (false) {',
+    why:  'without hysteresis a narrowing list pulls the aimed-at row out from under the finger, and the tap falls through to the PASS button the dropdown was covering',
+  },
+  {
+    name: 'M60 (V70.1) the location blur full-renders unconditionally',
+    file: 'events.js',
+    from: '        if (state.sqpEnabled && locationChanged) { invalidateSqpRow(); render(); }',
+    to:   '        if (state.sqpEnabled) { invalidateSqpRow(); render(); }',
+    why:  'a render() 150ms after blur rebuilds #app.innerHTML and destroys whatever is mid-tap — the second route to PASS needing two presses',
+  },
+
 ];
 
 function main() {

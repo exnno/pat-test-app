@@ -45,6 +45,9 @@ class ClassList {
   }
 }
 
+/* Markup that is nothing but autocomplete rows. See the innerHTML setter. */
+const SUGGESTION_ROWS_ONLY = /^\s*(?:<button class="suggestion-item"[^>]*>[\s\S]*?<\/button>\s*)+$/;
+
 class StubElement {
   constructor(tag) {
     this.tagName    = String(tag || 'div').toUpperCase();
@@ -88,6 +91,20 @@ class StubElement {
   // ⚠ Registered elements are SYNTHETIC — flat, unparented, no real structure.
   // getElementById finds them and listeners fire on .click(). Do not write
   // assertions that depend on their position in a tree; they have none.
+  // v70.1 — ONE narrow exception to "no parsing", for .suggestion-item rows.
+  //
+  // The three autocomplete dropdowns build their rows as an innerHTML string and
+  // then wire each one with `div.querySelectorAll('[data-suggest]').forEach(el =>
+  // el.onpointerdown = ...)`. With no children that loop iterates nothing, the
+  // wiring silently does not happen, and every assertion about a tap on a
+  // suggestion becomes untestable while reporting green — the same false-green
+  // class the id registration above exists to prevent. Suggestion picks are
+  // precisely what V70.1 repairs, so they have to be reachable.
+  //
+  // Kept deliberately tiny and opt-in by shape: it fires ONLY when the markup is
+  // nothing but suggestion-item buttons. Anything else — every existing caller,
+  // including the wholesale #app rebuild — takes the unchanged path below. Do not
+  // widen this into a general parser; that was rejected as a large fragile job.
   get innerHTML()  { return this._innerHTML; }
   set innerHTML(v) {
     this._innerHTML = String(v == null ? '' : v);
@@ -97,6 +114,15 @@ class StubElement {
         // Re-registering replaces the previous element, which correctly drops
         // listeners from a torn-down sheet rather than leaking them.
         STUB_DOC.register(m[1]);
+      }
+    }
+    if (this._innerHTML && SUGGESTION_ROWS_ONLY.test(this._innerHTML)) {
+      for (const m of this._innerHTML.matchAll(/<button\s([^>]*)>([\s\S]*?)<\/button>/g)) {
+        const el = new StubElement('button');
+        el.textContent = m[2];
+        for (const a of m[1].matchAll(/([A-Za-z-]+)="([^"]*)"/g)) el.setAttribute(a[1], a[2]);
+        el.parentNode = this;
+        this.children.push(el);
       }
     }
   }
