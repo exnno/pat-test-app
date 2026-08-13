@@ -414,7 +414,7 @@ routes through `_scanTarget()` so it inherits every bail-out, and it `select()`s
 as well as focusing — the selection is what makes an *unrecognised* scan replace
 rather than append.
 
-### events.js (~342 ln) — focus-sensitive binding, per render
+### events.js (~400 ln) — focus-sensitive binding, per render
 Direct binds for the four focus-sensitive fields only (`nf-client`, `nf-site`,
 `f-location`, `f-type`), the three suggestion dropdowns, the quick-pick long-press
 gesture, the sheet drag guard, the suggestion click swallow.
@@ -424,6 +424,12 @@ drag guard or the click swallow.
 teardown and iOS loses the tap), **and `armClickSwallow()` must stay** — a touch
 tap still fires a ghost `click` afterwards that lands on whatever is underneath.
 Don't reintroduce an `onclick` here and don't remove the swallow.
+**⚠ The swallow disarms on the next `pointerdown` (v70.1)** and that ordering is
+load-bearing: the document listener is capture-phase so it runs BEFORE the
+button's own handler arms it. Arm from capture and the guard cancels itself.
+**⚠ All three dropdowns paint through `paintSuggestionList()` (v70.1)** — identity
+skip plus shrink hysteresis. `fromTyping` is passed only from `oninput`/`onfocus`;
+picks, blur-hides and dispatch.js's quick-pick paint instantly.
 **Coupling:** called from `render()` and `refreshEntryAfterLog()`.
 `initSheetDragGuard()` and `initSuggestionClickSwallow()` are bound once from
 boot.js. `sheetDragMoved` is read by dispatch.js's preset picker. Everything else
