@@ -8,30 +8,50 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### V72 — split render-core.js, then V73 render-settings.js
-Peter's stated order (V70): finish every structural release before any new
-feature. The queue is now V72 render-core.js → V73 render-settings.js, then
-features. The config.js/data.js split took the V71 slot instead (see below) so
-that V70's session split and V70.1's tap-timing fixes both got a release in the
-field before anything touched `render()`.
+### V73 — split render-settings.js
+The last item in the structural queue. Peter's stated order (V70): finish every
+structural release before any new feature. V70 session.js ✓, V71 config.js ✓,
+V72 render-core.js ✓ — render-settings.js is what's left, then features.
 
-⚠ The render splits are the ones with real behaviour risk in them: render-core
-owns `const app` and the `render()` dispatcher, and cross-cutting rule 2
-(`render()` stays synchronous) has to survive the move. One file per release,
-and do not fold a behaviour change in alongside.
+`render-settings.js` is 1,675 lines / 103 KB. Natural seams: the About /
+Glossary / Contact help pages (`GLOSSARY_GROUPS` is a large data array that
+belongs with them), and the cloud-prep stub pages. Suggested name by the V72
+precedent: `render-help.js`.
 
-⚠ Before starting V72, confirm the V70.1 suggestion-tap report has not recurred.
-If it has, that is an events.js problem and it comes first — chasing it through
-a release that has just rewritten render-core is a much worse position to be in.
+⚠ Unlike V72 this one has no `render()` surgery risk at all — every
+`renderSettings*` function is a leaf called from the dispatcher. The V72 hazard
+that DOES carry over: these screens are reached through `render()`, not through
+the ACTIONS table, so 09d cannot see a lost one. Extend the 09m/09n pattern —
+drive `render()` per view with a marker string, not a length check.
 
-The V70/V71 method is the one to repeat, in this order:
+⚠ Two traps V72 hit, both worth re-reading before starting:
+- `html.length > 200` proves nothing. The first-run wizard modal paints ~1.5 KB
+  over the top of any screen, so a length-only smoke check goes green on a view
+  that never rendered.
+- Read `state.view` AFTER `render()`. A screen with a disabled-feature guard
+  bounces to the sessions list and paints 4 KB of valid markup while the
+  assertion sails past. `renderRetestReminders()` did exactly this.
+
+The V70/V71/V72 method is the one to repeat, in this order:
 1. Pick contiguous line ranges; extract mechanically, never by retyping.
 2. Reassemble the stripped file plus every extracted block at the original
    offsets and byte-compare against the previous release. Anything that fails
    that is not a structural change.
-3. Add the moved names to `harness/tests/09-module-split.js` and one mutation
-   that loses a function on the way out.
+3. Add the moved names to `harness/tests/09-module-split.js` and mutations that
+   (a) lose a function on the way out and (b) lose the dispatcher branch to it.
 4. One probe per new file in `requiredFns` (boot.js).
+
+### ~~V72 — split render-core.js~~ — SHIPPED
+658 lines / 36 KB out to `render-review.js` (Overview + its body/refresh
+helpers, Edit Session, Retest Reminders, Reports hub, shared photo markup).
+`render-core.js` 2,278 → 1,620 lines, 125 KB → 88 KB (−29%). Byte identical,
+proved by reassembly (SHA-256 match against the shipped V71 file).
+⚠ `render()` was NOT edited — that was the whole point of picking this seam, and
+MAP rule 2 survives untouched. The one edit to render-core.js outside the
+extraction was its banner comment.
+⚠ The coupling this created runs BOTH ways: `renderEntry()` stayed in
+render-core.js and calls the two photo helpers that left. Harness 09m–09q,
+mutations M69–M75.
 
 ### ~~V71 — split the data tables out of config.js~~ — SHIPPED
 285 lines / 24 KB out to `data.js`, byte identical, proved by reassembly.
@@ -193,11 +213,12 @@ session.js needs splitting again: retest reminders (~185 ln) and the readings
 sheet lifecycle (~160 ln). Both are genuinely session logic and coupled to
 sorting/filtering, which is why the settings/onboarding tail went first instead.
 
-### 2. Split render-core.js and render-settings.js — SAME PATTERN, AFTER (1)
-2,213 and 1,688 lines. Natural seams: the modal/sheet block in render-core; the
-About/Glossary/Contact help pages in render-settings. ⚠ render-core owns
-`const app` and the `render()` dispatcher — those stay put, and rule 2
-(`render()` is synchronous) has to survive the move. One file per release.
+### 2. Split render-core.js ✓ V72, render-settings.js — V73 NEXT
+render-core.js is done: 2,278 → 1,620 lines, see the V72 entry above. `const app`
+and the `render()` dispatcher stayed put and render() was not edited at all,
+which is what made a 658-line move safe in one release.
+render-settings.js (1,675 ln) is the remaining half — see the V73 entry above.
+One file per release; no behaviour change folded in alongside.
 
 ### ~~3. Section index for styles.css~~ — SHIPPED V68
 49 `@@` banner comments plus a header index block.

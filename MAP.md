@@ -1,4 +1,4 @@
-# PATGo — Code Map (V71)
+# PATGo — Code Map (V72)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -80,20 +80,20 @@ is discoverable from the file you happen to be editing.
 
 ---
 
-## Load order (index.html) — 27 first-party files
+## Load order (index.html) — 28 first-party files
 
 `config` → `data` → `state` → `utils` → `storage` → `clients` → `instruments` → `sqp`
 → `multipick` → `feedback` → `bugreport` → `photos` → `csv` → `backup`
 → `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
-→ `pdfpreview` → `render-core` → `render-settings` → `scanner` → `events`
-→ `dispatch` → `boot`
+→ `pdfpreview` → `render-core` → `render-review` → `render-settings` → `scanner`
+→ `events` → `dispatch` → `boot`
 
 ⚠ `data` → `state` is the one adjacency in this chain that is NOT a readability
 choice. `state.js` seeds `itemTypes`/`failReasons` from `DEFAULT_ITEM_TYPES` /
 `DEFAULT_FAIL_REASONS` in its top-level initialiser, which runs at load, so
 `data.js` must precede it. Harness 09h/09i, mutation M61.
 
-`sw.js` ASSETS lists **29** `.js` entries: these 27 plus the 2 lazy-loaded jsPDF
+`sw.js` ASSETS lists **30** `.js` entries: these 28 plus the 2 lazy-loaded jsPDF
 files (precached, not `<script>` tags — report.js injects them on demand).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
 
@@ -372,20 +372,40 @@ instrument flat mirror and must keep calling `adoptMirrorIntoInstruments()`
 (rule 7). `onboardSetupImport()` delegates to setup.js; the final step can hand
 off to tour.js. Extracted from session.js in v70, byte identical.
 
-### render-core.js (~2170 ln) — main screens
+### render-core.js (~1620 ln) — dispatcher + the logging screens
 Owns `const app` and the `render()` dispatcher. Sessions list, entry screen,
-overview, reports hub, edit-session, empty states, welcome modal AND its
-`dismissWelcome()` handler (moved here v70 — see rule 8), first-run wizard
-markup, signature pad, calibration banner, asset-history sheet, photo strip
-sheet, tour route.
-**Touch to:** change any main screen or modal.
+empty states, welcome modal AND its `dismissWelcome()` handler (moved here
+v70 — see rule 8), first-run wizard markup, signature pad, calibration banner,
+retest/backup banners, asset-history sheet, import conflict/summary modals,
+client/site suggestion markup, tour route.
+**Touch to:** change the Sessions list, the entry screen, or any modal render()
+emits. For Overview / Edit Session / Reports / Retest reminders, go to
+render-review.js.
 **Coupling:** `render()` calls `bindFocusFields()` (events.js) after setting
 `innerHTML`. Rules 2, 3 and 8 all bite here. `refreshEntryAfterLog` must set
 `_lastRenderHadModal` from live sheet state, not a constant. Sheets that hold
 inputs get targeted refresh helpers; read-only sheets may render.
 The **calibration banner is ONE banner** covering the worst instrument with
 "+N more", never stacked.
-*Split candidate — see BACKLOG.md.*
+⚠ v72: `renderEntry()` calls `renderFailPhotoStripInner()` and
+`renderPhotoStripSheet()`, which now live in **render-review.js**.
+
+### render-review.js (~690 ln) — review & manage screens — NEW v72
+Overview (+ `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
+`refreshOverviewBody`, `refreshOverviewSelection`), Edit Session, Retest
+Reminders, the Reports hub, and the shared photo-evidence markup
+(`renderFailPhotoStripInner`, `renderPhotoStripSheet`).
+**Touch to:** change the Overview, edit-session, retest reminders or reports
+screens, or the fail-sheet/overview photo strip.
+**Coupling:** reached only through `render()`'s dispatcher — NOT through the
+dispatch.js ACTIONS table, so 09d's generic guard is blind to these; 09m–09q
+cover them instead. `dispatch.js` calls `refreshOverviewBody()` /
+`refreshOverviewSelection()`; `session.js` calls `computeVisibleOverviewItems()`
+/ `renderFailPhotoStripInner()`; `render-core.js` (renderEntry) calls both photo
+helpers. Declares NO top-level bindings, so its load position is free.
+`renderRetestReminders()` bounces to the sessions list when the retest feature
+is off — any test of it must turn the flag on first.
+Boot probe: `renderOverview` in `requiredFns`.
 
 ### render-settings.js (~1675 ln) — settings screens
 The two-level Settings hub, search, every `renderSettings*` sub-page, the About
@@ -398,7 +418,7 @@ from config.js in v71), not here. Scanner test-log markup lives in **scanner.js*
 render). Bug sheet logic lives in **bugreport.js**. Instrument settings live in
 **instruments.js**. The stats footer reads `computeAppStats()` (session.js) and
 returns `''` when null.
-*Split candidate — see BACKLOG.md.*
+*Split candidate — see BACKLOG.md (V73).*
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

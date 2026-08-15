@@ -1365,18 +1365,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v71: rolled forward — V71 on top, V68 dropped. -->
+      <!-- v8: rolling 3-version changelog. v72: rolled forward — V72 on top, V69 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V72</strong> &middot; August 2026</p>
+        <p class="muted">Housekeeping only &mdash; nothing has changed in how the app works or looks. The screens you use to look back over a job &mdash; the Overview, editing a job's details, retest reminders and the Reports page &mdash; have been moved into a file of their own behind the scenes. That makes the main screen file a third smaller and future changes to it quicker and safer. Every line that moved was checked to be identical to the last version before this was released.</p>
 
         <p><strong>V71</strong> &middot; August 2026</p>
         <p class="muted">Housekeeping only &mdash; nothing has changed in how the app works or looks. The app's long built-in lists (item types, fail reasons, item descriptions, CSV columns, the resistance calculator tables) have been moved into a file of their own behind the scenes. Your own lists and settings are untouched; these are only the built-in starting points a brand-new install begins with. Every line that moved was checked to be identical to the last version before this was released.</p>
 
         <p><strong>V70</strong> &middot; August 2026</p>
         <p class="muted">Housekeeping only &mdash; nothing has changed in how the app works or looks. The settings screens and the first-time setup have been moved into files of their own behind the scenes, so future updates to them are quicker to make and less likely to disturb anything else. Every line of the moved code was checked to be identical to the last version before this was released.</p>
-
-        <p><strong>V69</strong> &middot; August 2026</p>
-        <p class="muted">Locations you saved before the last update have been corrected. V68 stopped the app putting a stray capital after an apostrophe &mdash; "Bob's Office" being saved as "Bob'S Office" &mdash; but it only fixed things typed from that point on, so everything already in your jobs stayed wrong, kept printing wrong on certificates, and kept being offered back to you by the suggestions list. This update goes through your saved jobs and item type presets once and corrects them. Names you typed in full capitals, like "BOB'S OFFICE", are left exactly as they are. If you'd rather have the old spellings back, there's an <strong>Undo the correction</strong> button under Settings &rarr; Back up and restore. Also fixed: if a screen ever hits an error when you tap something, the app now takes you back to your jobs list with a short message instead of leaving the tap doing nothing while it quietly loses track of which screen you're on.</p>
 
               </div>
 

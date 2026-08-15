@@ -67,6 +67,11 @@
   <script src="report.js"></script>
   <script src="pdfpreview.js"></script>
   <script src="render-core.js"></script>
+  <!-- v72: the review screens (Overview, Edit Session, Retest Reminders, Reports
+       and the shared photo markup) split out of render-core.js. Nothing here
+       runs at load and nothing is read at load, so this position is a
+       readability choice — it sits with the other render files. -->
+  <script src="render-review.js"></script>
   <script src="render-settings.js"></script>
   <!-- v65: HID barcode scanner. Placed with the other input-handling files and
        AFTER the render files, because a scan writes into fields those render —

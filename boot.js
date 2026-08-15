@@ -84,7 +84,14 @@ function bootIntegrityOK() {
   const requiredFns = [
     'load', 'save', 'render', 'applyTheme', 'initDelegation', 'loadFormForCursor',
     'loadMultiPickConfig', 'loadClients', 'loadSites', 'composeSiteSnapshot',
-    'saveReportSettingsForm', 'wizardNextStep'
+    'saveReportSettingsForm', 'wizardNextStep',
+    // v72: sole probe for render-review.js (Overview / Edit Session / Retest
+    // Reminders / Reports / photo markup, split out of render-core.js). Unlike
+    // data.js this file DOES declare functions, so an ordinary requiredFns entry
+    // is correct here — no constant probe needed. Without it, a deploy that
+    // uploads index.html but not render-review.js boots looking healthy and dies
+    // the first time anyone opens a session's Overview.
+    'renderOverview'
   ];
   for (const name of requiredFns) {
     if (typeof window[name] !== 'function') {
