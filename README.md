@@ -35,7 +35,7 @@ GitHub Pages, auto-deploys on commit to `main`. Edit via the GitHub web UI for q
 1. **Always bump `CACHE_VERSION` in `sw.js`** when any file changes (`pat-vN`; hotfix `pat-vN-1`). This is the step that must never be skipped — a stale cache serves old/broken files.
 1. **Always bump `APP_VERSION` in `config.js`** for the user-visible version label.
 1. If scripts are added/removed, update both the `<script>` tags in `index.html` and the `ASSETS` list in `sw.js` (keep load order; `boot.js` stays last).
-1. Roll the About changelog in `render-settings.js` (most recent 3 versions). For feature releases, roll the welcome modal — **since V63 this is a one-line change to `WELCOME_VERSION` in `config.js` plus the new copy in `render-core.js`, and nothing else**; skip it entirely for pure structural/refactor releases (leave `WELCOME_VERSION` alone).
+1. Roll the About changelog in `render-help.js` (most recent 3 versions — it moved out of `render-settings.js` in V73). For feature releases, roll the welcome modal — **since V63 this is a one-line change to `WELCOME_VERSION` in `config.js` plus the new copy in `render-core.js`, and nothing else**; skip it entirely for pure structural/refactor releases (leave `WELCOME_VERSION` alone).
 1. If the storage schema changes, bump `backupVersion` in `backup.js` and confirm older backups still restore.
 1. Replace the changed files via the GitHub web UI and commit each.
 1. Wait ~1 min for Pages to redeploy, then verify in incognito before testing the installed PWA.

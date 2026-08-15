@@ -8,38 +8,54 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### V73 — split render-settings.js
-The last item in the structural queue. Peter's stated order (V70): finish every
-structural release before any new feature. V70 session.js ✓, V71 config.js ✓,
-V72 render-core.js ✓ — render-settings.js is what's left, then features.
+### V74 — PATGo Scan findings, then the scanner poison-window port
+⚠ **GATE: Peter has a findings file from the PATGo Scan build and will drop it
+in at the start of the V74 chat.** Do not spec V74 before reading it. It is the
+first input to that release, not a supplement to it.
 
-`render-settings.js` is 1,675 lines / 103 KB. Natural seams: the About /
-Glossary / Contact help pages (`GLOSSARY_GROUPS` is a large data array that
-belongs with them), and the cloud-prep stub pages. Suggested name by the V72
-precedent: `render-help.js`.
+Read it, then propose the split: anything in it that is a genuine defect in
+PATGo goes first, anything that is a feature idea joins the feature backlog
+below and is scheduled separately. No-merge-back still applies — nothing is
+copied across from patgoscan, it is rebuilt by hand from a spec.
 
-⚠ Unlike V72 this one has no `render()` surgery risk at all — every
-`renderSettings*` function is a leaf called from the dispatcher. The V72 hazard
-that DOES carry over: these screens are reached through `render()`, not through
-the ACTIONS table, so 09d cannot see a lost one. Extend the 09m/09n pattern —
-drive `render()` per view with a marker string, not a length check.
+Already known to be in that pile, so expect it to be confirmed rather than
+discovered:
 
-⚠ Two traps V72 hit, both worth re-reading before starting:
-- `html.length > 200` proves nothing. The first-run wizard modal paints ~1.5 KB
-  over the top of any screen, so a length-only smoke check goes green on a view
-  that never rendered.
-- Read `state.view` AFTER `render()`. A screen with a disabled-feature guard
-  bounces to the sessions list and paints 4 KB of valid markup while the
-  assertion sails past. `renderRetestReminders()` did exactly this.
+**Scanner poison-window hotfix.** The `_scanPoisonUntil` fix applied in PATGo
+Scan addresses a bug that also exists here: a burst dropped on an unreadable key
+mid-barcode leaves the remaining characters forming a plausible short scan,
+which is then accepted as a real asset number. Ships as a behaviour fix with its
+own harness group and mutation. ⚠ Scanner tests must drive `document` dispatch,
+never call `handleScannerKeydown()` directly — the V67 three-release listener
+bug is the standing lesson.
 
-The V70/V71/V72 method is the one to repeat, in this order:
-1. Pick contiguous line ranges; extract mechanically, never by retyping.
-2. Reassemble the stripped file plus every extracted block at the original
-   offsets and byte-compare against the previous release. Anything that fails
-   that is not a structural change.
-3. Add the moved names to `harness/tests/09-module-split.js` and mutations that
-   (a) lose a function on the way out and (b) lose the dispatcher branch to it.
-4. One probe per new file in `requiredFns` (boot.js).
+### The structural queue is CLOSED as of V73
+V70 session.js ✓, V71 config.js ✓, V72 render-core.js ✓, V73 render-settings.js ✓.
+Peter's V70 instruction — every structural release before any new feature — is
+now discharged. Features from here.
+
+⚠ One honest note for whoever picks this up: `session.js` is now the largest file
+in the app at ~2,160 lines, larger than anything that was split. It was NOT
+scheduled, deliberately — Peter's call at V73 was to close the queue and move to
+features. Raise it again only if a session.js change becomes painful in
+practice, and never fold it into a feature release.
+
+### ~~V73 — split render-settings.js~~ — SHIPPED
+369 lines / 21 KB out to `render-help.js`: About (+ the rolling changelog),
+Glossary (+ `GLOSSARY_GROUPS`), Contact, the bug-sheet markup and the three
+cloud-prep stubs. `render-settings.js` 1,746 → 1,377 lines, 103 KB → 81 KB
+(−21%). Byte identical, proved by reassembly (SHA-256 match against V72).
+⚠ The seam split the Settings screens by whether they OWN a setting: everything
+in render-help.js is read-only reference with no write handler behind it. That
+is the line to keep if either file is ever split again.
+⚠ Coupling created, one-way and invisible from either file alone: every page in
+render-help.js calls `renderSettingsSubHeader()`, which stayed in
+render-settings.js. Mutation M79 covers the silent-duplicate hazard.
+⚠ The About changelog moved. It is in **render-help.js** now, and README's
+release-process line was corrected to say so.
+Harness 09r–09w, mutations M76–M82. M66 and M73 had to be re-pointed — both were
+anchored on lines this release moved, and both correctly ABORTED rather than
+passing.
 
 ### ~~V72 — split render-core.js~~ — SHIPPED
 658 lines / 36 KB out to `render-review.js` (Overview + its body/refresh
@@ -213,12 +229,13 @@ session.js needs splitting again: retest reminders (~185 ln) and the readings
 sheet lifecycle (~160 ln). Both are genuinely session logic and coupled to
 sorting/filtering, which is why the settings/onboarding tail went first instead.
 
-### 2. Split render-core.js ✓ V72, render-settings.js — V73 NEXT
-render-core.js is done: 2,278 → 1,620 lines, see the V72 entry above. `const app`
-and the `render()` dispatcher stayed put and render() was not edited at all,
-which is what made a 658-line move safe in one release.
-render-settings.js (1,675 ln) is the remaining half — see the V73 entry above.
-One file per release; no behaviour change folded in alongside.
+### ~~2. Split render-core.js and render-settings.js~~ — SHIPPED V72 / V73
+render-core.js: 2,278 → 1,620 lines (V72). `const app` and the `render()`
+dispatcher stayed put and render() was not edited at all, which is what made a
+658-line move safe in one release.
+render-settings.js: 1,746 → 1,377 lines (V73), the help screens out to
+render-help.js. One file per release; no behaviour change folded in alongside.
+The whole token-efficiency splitting programme is complete.
 
 ### ~~3. Section index for styles.css~~ — SHIPPED V68
 49 `@@` banner comments plus a header index block.

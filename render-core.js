@@ -227,10 +227,11 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Your saved locations have been corrected.</strong> The last update stopped the app putting a stray capital after an apostrophe &mdash; "Bob's Office" being saved as "Bob'S Office" &mdash; but only for things typed from that point on. Everything already in your jobs stayed wrong, printed wrong on certificates, and kept being offered back by the suggestions list. This update has gone through your saved jobs and item type presets once and corrected them.</li>
-        <li><strong>Names in full capitals are left alone.</strong> "BOB'S OFFICE" is how you typed it, so it stays that way. Names like O'Brien are untouched too.</li>
-        <li><strong>You can put it back.</strong> If you'd rather have the old spellings, there's an <strong>Undo the correction</strong> button under Settings &rarr; Back up and restore. It's worth exporting a backup while you're on that page.</li>
-        <li><strong>A tap that hits an error no longer leaves you stranded.</strong> If a screen fails to draw, the app now returns you to your jobs list with a short message instead of doing nothing while quietly losing track of which screen you're on.</li>
+        <li><strong>Nothing you use has changed.</strong> Every screen, setting and job is exactly where you left it. This update is entirely under the bonnet &mdash; but it's the biggest piece of work the app has had, so it's worth telling you about.</li>
+        <li><strong>Four releases of tidying up, finished.</strong> The app was built up over a long run of features, and four of its files had grown very large. Over V70 to V73 those four have been taken apart into smaller files that each do one job: the settings actions, the built-in lists, the review screens, and now the help and reference pages you're reading this on.</li>
+        <li><strong>Why it matters to you.</strong> Smaller files mean a change can be made in one place without disturbing anything nearby. Fixes land faster and carry far less risk of breaking something unrelated &mdash; which is the whole point as the app gets closer to being something other engineers pay for.</li>
+        <li><strong>Every moved line was checked.</strong> Nothing was retyped. The code was lifted out mechanically and then reassembled and compared character by character against the previous version to prove it came out identical, before this was released.</li>
+        <li><strong>Features are next.</strong> The tidy-up queue is now empty. From here it's back to things you'll actually see.</li>
       </ul>
       <button class="btn-primary" data-action="welcome-dismiss">Continue</button>
     </div>

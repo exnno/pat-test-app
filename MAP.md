@@ -1,4 +1,4 @@
-# PATGo — Code Map (V72)
+# PATGo — Code Map (V73)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -57,7 +57,8 @@ is discoverable from the file you happen to be editing.
    writing a flat field must call `adoptMirrorIntoInstruments()` after.
 
 8. **Rolling a welcome modal = change `WELCOME_VERSION` (config.js) + write the
-   copy (render-core.js).** Nothing else, ever. v70 made this literally true:
+   copy (render-core.js).** (The About *changelog* is a separate thing and lives
+   in **render-help.js** from v73.) Nothing else, ever. v70 made this literally true:
    `dismissWelcome()` moved from session.js to render-core.js, so every part of
    the welcome now sits in those two files. Harness 09c pins it there. The key and the state flag have
    permanent names. Version-named identifiers here caused the V61 white screen.
@@ -80,20 +81,20 @@ is discoverable from the file you happen to be editing.
 
 ---
 
-## Load order (index.html) — 28 first-party files
+## Load order (index.html) — 29 first-party files
 
 `config` → `data` → `state` → `utils` → `storage` → `clients` → `instruments` → `sqp`
 → `multipick` → `feedback` → `bugreport` → `photos` → `csv` → `backup`
 → `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
-→ `pdfpreview` → `render-core` → `render-review` → `render-settings` → `scanner`
-→ `events` → `dispatch` → `boot`
+→ `pdfpreview` → `render-core` → `render-review` → `render-settings` → `render-help`
+→ `scanner` → `events` → `dispatch` → `boot`
 
 ⚠ `data` → `state` is the one adjacency in this chain that is NOT a readability
 choice. `state.js` seeds `itemTypes`/`failReasons` from `DEFAULT_ITEM_TYPES` /
 `DEFAULT_FAIL_REASONS` in its top-level initialiser, which runs at load, so
 `data.js` must precede it. Harness 09h/09i, mutation M61.
 
-`sw.js` ASSETS lists **30** `.js` entries: these 28 plus the 2 lazy-loaded jsPDF
+`sw.js` ASSETS lists **31** `.js` entries: these 29 plus the 2 lazy-loaded jsPDF
 files (precached, not `<script>` tags — report.js injects them on demand).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
 
@@ -250,8 +251,8 @@ Global error capture, device diagnostics, the mailto report builder.
 **⚠ THE PRIVACY RULE: diagnostics carry COUNTS AND FLAGS ONLY** — never client
 names, sites, asset numbers, locations, item types, notes or cert numbers. Check
 any new field against this; the harness asserts it.
-**Coupling:** sheet MARKUP is `renderBugSheet()` in render-settings.js (render
-files own markup); logic is here. Rule 3 applies to the sheet.
+**Coupling:** sheet MARKUP is `renderBugSheet()` in render-help.js — moved there
+from render-settings.js in v73 (render files own markup); logic is here. Rule 3 applies to the sheet.
 `initErrorCapture()` is called once from boot.js (rule 6). Known limit: boot.js
 loads last, so a parse-time failure in an earlier file predates these handlers —
 covered by the boot integrity guard instead.
@@ -407,18 +408,35 @@ helpers. Declares NO top-level bindings, so its load position is free.
 is off — any test of it must turn the flag on first.
 Boot probe: `renderOverview` in `requiredFns`.
 
-### render-settings.js (~1675 ln) — settings screens
-The two-level Settings hub, search, every `renderSettings*` sub-page, the About
-changelog, the glossary (`GLOSSARY_GROUPS` data array), the bug sheet markup, the
-cloud-prep stub pages behind a long-press on the About title.
-**Touch to:** change any Settings page, add or reword a glossary term, roll the
-About changelog.
+### render-settings.js (~1377 ln) — settings screens that own a setting
+The two-level Settings hub, its search, every `renderSettings*` sub-page with a
+write handler behind it, `renderSettingsSubHeader()`, the earth-resistance
+calculator, and `renderPhotoBackupSection()` (which paints inside the Backup
+page).
+**Touch to:** change any Settings page that changes a setting.
 **Coupling:** category structure and search aliases live in **data.js** (moved
-from config.js in v71), not here. Scanner test-log markup lives in **scanner.js** (it repaints without a
-render). Bug sheet logic lives in **bugreport.js**. Instrument settings live in
-**instruments.js**. The stats footer reads `computeAppStats()` (session.js) and
-returns `''` when null.
-*Split candidate — see BACKLOG.md (V73).*
+from config.js in v71), not here. Scanner test-log markup lives in **scanner.js**
+(it repaints without a render). Bug sheet logic lives in **bugreport.js**.
+Instrument settings live in **instruments.js**. The stats footer reads
+`computeAppStats()` (session.js) and returns `''` when null.
+⚠ v73: About, Glossary, Contact, the bug-sheet markup and the cloud stubs left
+for **render-help.js**, and those pages still call `renderSettingsSubHeader()`
+from here. The About changelog is no longer in this file.
+
+### render-help.js (~408 ln) — help, about & cloud-prep — NEW v73
+About (+ the rolling 3-version changelog), Glossary (page + the
+`GLOSSARY_GROUPS` data array), Contact, `renderBugSheet()` markup, and the three
+cloud-prep stub pages revealed by a long-press on the About title.
+**Touch to:** roll the About changelog, add or reword a glossary term, change the
+Contact page or the bug sheet's markup, or work on the cloud stubs.
+**Coupling:** reached only through `render()`'s dispatcher — NOT through the
+dispatch.js ACTIONS table, so 09d's generic guard is blind to these; 09r–09w
+cover them instead. Calls `renderSettingsSubHeader()` back across the seam into
+render-settings.js. `renderBugSheet()` is markup only — its logic and state are
+in **bugreport.js**, and it returns `''` unless `state.bugSheetOpen`. Declares
+ONE top-level binding, `GLOSSARY_GROUPS`, read only inside a function body, so
+its load position is free.
+Boot probe: `renderSettingsAbout` in `requiredFns`.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

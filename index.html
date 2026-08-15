@@ -73,6 +73,11 @@
        readability choice — it sits with the other render files. -->
   <script src="render-review.js"></script>
   <script src="render-settings.js"></script>
+  <!-- v73: the read-only help screens (About + changelog, Glossary, Contact, the
+       bug-sheet markup and the cloud-prep stubs) split out of render-settings.js.
+       Declares one top-level const, GLOSSARY_GROUPS, read only inside a function
+       body — so like render-review.js this position is a readability choice. -->
+  <script src="render-help.js"></script>
   <!-- v65: HID barcode scanner. Placed with the other input-handling files and
        AFTER the render files, because a scan writes into fields those render —
        and before events.js/dispatch.js purely so the three document-level

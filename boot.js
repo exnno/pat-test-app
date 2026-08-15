@@ -91,7 +91,14 @@ function bootIntegrityOK() {
     // is correct here — no constant probe needed. Without it, a deploy that
     // uploads index.html but not render-review.js boots looking healthy and dies
     // the first time anyone opens a session's Overview.
-    'renderOverview'
+    'renderOverview',
+    // v73: sole probe for render-help.js (About / Glossary / Contact / bug-sheet
+    // markup / cloud stubs, split out of render-settings.js). Same reasoning as
+    // renderOverview above — this file declares functions, so an ordinary entry
+    // is correct. It also declares one const, GLOSSARY_GROUPS, which a
+    // requiredFns entry could NOT see (see the data.js note below); the function
+    // probe covers the file either way.
+    'renderSettingsAbout'
   ];
   for (const name of requiredFns) {
     if (typeof window[name] !== 'function') {
