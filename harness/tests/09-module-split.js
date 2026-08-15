@@ -85,6 +85,27 @@ const MOVED_TO_RENDER_REVIEW = [
   { name: 'renderPhotoStripSheet',        view: null,              marker: null                 },
 ];
 
+/* The V73 extraction manifest: every function that left render-settings.js for
+   render-help.js, paired with the render() view that reaches it and a marker
+   string taken from inside that function's own markup.
+
+   Same two traps as V72, and they apply verbatim here — a length check proves
+   nothing (the first-run wizard paints over any screen), and `state.view` is
+   read AFTER render() so a guard that bounces to another screen is visible.
+
+   `view: null` marks renderBugSheet, which no view reaches: renderSettingsContact
+   embeds it, and it returns '' unless state.bugSheetOpen — so it is driven with
+   the flag set rather than by navigating to it. */
+const MOVED_TO_RENDER_HELP = [
+  { name: 'renderSettingsAbout',    view: 'settingsAbout',      marker: 'id="about-title"'       },
+  { name: 'renderSettingsGlossary', view: 'settingsGlossary',   marker: 'class="info-card glossary-group"' },
+  { name: 'renderSettingsContact',  view: 'settingsContact',    marker: 'id="bug-open"'          },
+  { name: 'renderBugSheet',         view: null,                 marker: null                     },
+  { name: 'renderCloudAccount',     view: 'cloudAccount',       marker: 'id="cloud-sign-out"'    },
+  { name: 'renderCloudSync',        view: 'cloudSync',          marker: 'id="cloud-sync-now"'    },
+  { name: 'renderCloudSubscription',view: 'cloudSubscription',  marker: 'id="cloud-upgrade"'     },
+];
+
 /* The V71 extraction manifest: every top-level const that left config.js for
    data.js. Paired with a sample value where an empty-but-present binding would
    otherwise pass — a name existing proves the const survived, it does NOT prove
@@ -419,5 +440,101 @@ module.exports = function run() {
     try { result = broken.fn('bootIntegrityOK')(); } catch (e) { result = 'threw'; }
     t.eq(result, false, 'render-review.js missing → the guard returns false');
     t.eq(app.fn('bootIntegrityOK')(), true, 'a complete build still passes the guard');
+  });
+
+  t.group('09r — every screen moved out of render-settings.js is still reachable', () => {
+    for (const { name } of MOVED_TO_RENDER_HELP) {
+      t.doesNotThrow(() => app.fn(name), `${name} is defined after a full load`);
+    }
+  });
+
+  t.group('09s — render() still reaches each help screen, THROUGH render()', () => {
+    // As with 09n: none of these are delegated actions, so 09d is blind to a
+    // lost dispatcher branch. Only driving render() per view and looking for a
+    // string that ONLY that function emits can see it.
+    const a = populated();
+    for (const { name, view, marker } of MOVED_TO_RENDER_HELP) {
+      if (!view) continue;
+      t.doesNotThrow(() => { a.fn('setView')(view); a.fn('render')(); },
+        `render() survives view "${view}" (${name})`);
+      t.eq(a.val('state').view, view, `render() stayed on "${view}" — no bounce to another screen`);
+      t.includes(a.doc.getElementById('app').innerHTML, marker,
+        `"${view}" painted markup that only ${name}() emits`);
+    }
+  });
+
+  t.group('09t — the bug sheet still paints, from its new file, on the Contact page', () => {
+    // renderBugSheet() has no view of its own: renderSettingsContact() embeds it
+    // and it returns '' unless the flag is set. Both halves moved together, so
+    // the risk is not the seam — it is that the sheet's own guard survived. Both
+    // states are checked, because an assertion that only tests the open case
+    // would pass on a build where the guard was lost entirely.
+    const a = populated();
+    a.fn('setView')('settingsContact');
+    a.fn('render')();
+    t.excludes(a.doc.getElementById('app').innerHTML, 'id="bug-backdrop"',
+      'the sheet stays closed when state.bugSheetOpen is false');
+
+    a.val('state').bugSheetOpen = true;
+    a.fn('render')();
+    const open = a.doc.getElementById('app').innerHTML;
+    t.includes(open, 'id="bug-backdrop"', 'the sheet paints when the flag is set');
+    t.includes(open, 'data-action="bug-set-type"', 'and it painted its own controls, not an empty shell');
+  });
+
+  t.group('09u — the help screens still call BACK across the seam', () => {
+    // The one coupling this split created, and it is invisible from either file
+    // alone: every page that moved calls renderSettingsSubHeader(), which stayed
+    // behind in render-settings.js. Same shape as V72's photo helpers, opposite
+    // direction. 09s would still pass if the sub-header were quietly duplicated
+    // into render-help.js — and a duplicated top-level function is legal and
+    // SILENT (MAP rule 1), so nothing else would catch it either.
+    const rs = fs.readFileSync(path.join(APP_DIR, 'render-settings.js'), 'utf8');
+    const rh = fs.readFileSync(path.join(APP_DIR, 'render-help.js'), 'utf8');
+    t.includes(rs, 'function renderSettingsSubHeader(', 'renderSettingsSubHeader stayed in render-settings.js');
+    t.excludes(rh, 'function renderSettingsSubHeader(', 'and was NOT duplicated into render-help.js');
+    t.includes(rh, 'renderSettingsSubHeader(', 'render-help.js still CALLS it across the seam');
+    for (const { name } of MOVED_TO_RENDER_HELP) {
+      t.excludes(rs, `function ${name}(`, `${name} is gone from render-settings.js`);
+      t.includes(rh, `function ${name}(`, `and declared in render-help.js`);
+    }
+    // GLOSSARY_GROUPS is the only top-level binding that moved. A second
+    // declaration of it in a loaded file would be a fatal SyntaxError.
+    t.includes(rh, 'const GLOSSARY_GROUPS', 'GLOSSARY_GROUPS moved with the page that reads it');
+    t.excludes(rs, 'const GLOSSARY_GROUPS', 'and is not left declared in render-settings.js');
+    t.deepEq(rh.split('\n').filter(l => /^(const|let|var) /.test(l)), ['const GLOSSARY_GROUPS = ['],
+      'GLOSSARY_GROUPS is the ONLY top-level binding in render-help.js');
+  });
+
+  t.group('09v — render-help.js is wired in, and a missing one is CAUGHT', () => {
+    const order = scriptOrderFromIndex();
+    t.ok(order.includes('render-help.js'), 'render-help.js is in the index.html load chain');
+    t.ok(order.indexOf('render-help.js') > order.indexOf('render-settings.js'),
+      'it loads after render-settings.js');
+    const assets = swAssetScripts();
+    t.ok(assets.includes('render-help.js'), 'render-help.js is precached by the service worker');
+
+    const boot = fs.readFileSync(path.join(APP_DIR, 'boot.js'), 'utf8');
+    const fnList = boot.slice(boot.indexOf('const requiredFns'), boot.indexOf('];', boot.indexOf('const requiredFns')));
+    t.includes(fnList, 'renderSettingsAbout', 'the guard probes render-help.js via requiredFns');
+
+    const broken = bootApp({ skip: ['render-help.js'], tolerateLoadErrors: true });
+    let result;
+    try { result = broken.fn('bootIntegrityOK')(); } catch (e) { result = 'threw'; }
+    t.eq(result, false, 'render-help.js missing → the guard returns false');
+    t.eq(app.fn('bootIntegrityOK')(), true, 'a complete build still passes the guard');
+  });
+
+  t.group('09w — the About changelog rolled with the file it moved in', () => {
+    // The one deliberate content edit made after the byte-identity proof. It is
+    // asserted because the changelog is the only user-visible thing in V73 and
+    // it now lives in a different file from where anyone would look for it.
+    const rh = fs.readFileSync(path.join(APP_DIR, 'render-help.js'), 'utf8');
+    const cfg = fs.readFileSync(path.join(APP_DIR, 'config.js'), 'utf8');
+    const ver = (cfg.match(/const APP_VERSION = '([^']+)'/) || [])[1];
+    t.ok(!!ver, 'APP_VERSION is readable from config.js');
+    t.includes(rh, `<strong>${ver}</strong>`, 'the current release is the top changelog entry');
+    t.eq((rh.match(/<p><strong>V\d+<\/strong> &middot;/g) || []).length, 3,
+      'the changelog is exactly three entries — rolled, not appended to');
   });
 };
