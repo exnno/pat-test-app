@@ -511,8 +511,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V72';",
-    to:   "const APP_VERSION = 'V72';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V73';",
+    to:   "const APP_VERSION = 'V73';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -563,8 +563,8 @@ const MUTATIONS = [
   {
     name: 'M73 (V72) the boot guard stops probing for render-review.js',
     file: 'boot.js',
-    from: "    'renderOverview'\n  ];",
-    to:   '  ];',
+    from: "    'renderOverview',",
+    to:   '',
     why:  'one probe per script file is the rule. Without it, a deploy that commits index.html but never uploads render-review.js boots looking completely healthy and dies the first time anyone opens an Overview — the exact partial-deploy shape V70 made possible',
   },
   {
@@ -580,6 +580,58 @@ const MUTATIONS = [
     from: 'function render() {',
     to:   'async function render() {',
     why:  'MAP rule 2 had to survive a release that rewrote the file around render(). An async render() returns a promise instead of painting, so every caller that renders and then reads the DOM sees the old screen',
+  },
+
+  /* ---------- V73: the render-settings.js -> render-help.js split ---------- */
+
+  {
+    name: 'M76 (V73) a moved help screen is lost on the way out',
+    file: 'render-help.js',
+    from: 'function renderSettingsGlossary() {',
+    to:   'function renderSettingsGlossary_LOST() {',
+    why:  'the V73 shape of the standing failure. Everything parses, no const is duplicated, every delegated action resolves — and tapping Glossary throws ReferenceError on a phone. 09d is blind to it because these screens are reached through render(), not the ACTIONS table',
+  },
+  {
+    name: 'M77 (V73) render() loses its branch to a moved help screen',
+    file: 'render-core.js',
+    from: "  else if (v === 'settingsContact') html = renderSettingsContact();",
+    to:   '',
+    why:  'presence, not reachability. renderSettingsContact() still exists and still passes a lookup — the dispatcher just stopped calling it, so the Contact page paints whatever the previous view left behind with no error anywhere. This is what forces 09s to drive render() per view and check a marker string',
+  },
+  {
+    name: 'M78 (V73) a help screen paints an empty shell',
+    file: 'render-help.js',
+    from: 'function renderSettingsGlossary() {',
+    to:   "function renderSettingsGlossary() {\n  return '<div class=\"screen\"><div class=\"info-card\"><h2>Glossary</h2></div></div>';",
+    why:  "proves 09s's marker assertions are not hollow. The function exists, render() does not throw, state.view does not bounce, and the screen paints perfectly valid markup — it is just not the glossary. Presence, reachability and length checks all go green; only a string taken from inside the moved function's own output can see it",
+  },
+  {
+    name: 'M79 (V73) the sub-header is copied across the seam, not called',
+    file: 'render-help.js',
+    from: 'function renderSettingsAbout() {',
+    to:   "function renderSettingsSubHeader(title) { return ''; }\n\nfunction renderSettingsAbout() {",
+    why:  'the same silent hazard as M72, in the direction V73 created. A duplicate top-level FUNCTION is legal and silent (MAP rule 1) — render-help.js loads last, so this stub quietly wins and every settings sub-header in the app empties at once, with nothing thrown',
+  },
+  {
+    name: 'M80 (V73) the boot guard stops probing for render-help.js',
+    file: 'boot.js',
+    from: "    'renderSettingsAbout'\n  ];",
+    to:   "  ];",
+    why:  'one probe per script file. Without it a deploy that commits index.html but never uploads render-help.js boots looking healthy and dies the first time anyone opens About — which is also the page users are told to open to check the version',
+  },
+  {
+    name: 'M81 (V73) render-help.js drops out of the service-worker precache',
+    file: 'sw.js',
+    from: "  './render-help.js',",
+    to:   '',
+    why:  'works for whoever deployed it, fails for every installed PWA on the next cold start with no signal. Same shape as M67 and M74',
+  },
+  {
+    name: 'M82 (V73) the About changelog is appended to rather than rolled',
+    file: 'render-help.js',
+    from: '        <p><strong>V71</strong> &middot; August 2026</p>',
+    to:   '        <p><strong>V70</strong> &middot; August 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V71</strong> &middot; August 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
 ];
