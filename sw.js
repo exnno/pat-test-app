@@ -10,12 +10,13 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v70-1';
+const CACHE_VERSION = 'pat-v71';
 const ASSETS = [
   './',
   './index.html',
   './styles.css',
   './config.js',
+  './data.js',          // v71 — must stay directly after config.js, before state.js
   './state.js',
   './utils.js',
   './storage.js',
