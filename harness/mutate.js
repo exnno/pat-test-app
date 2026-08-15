@@ -508,8 +508,11 @@ const MUTATIONS = [
   {
     name: 'M66 (V71) config.js grows a top-level read of a data.js name',
     file: 'config.js',
-    from: "const APP_VERSION = 'V71';",
-    to:   "const APP_VERSION = 'V71';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
+    // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
+    // failing loudly. V72 is the first release that had to do this.
+    from: "const APP_VERSION = 'V72';",
+    to:   "const APP_VERSION = 'V72';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -525,6 +528,58 @@ const MUTATIONS = [
     from: "const RETEST_UPCOMING_DAYS = 90;",
     to:   "const RETEST_UPCOMING_DAYS = 90;\nconst READING_CLASSES = ['I', 'II', 'III'];",
     why:  'a copy-not-move leaves a duplicate top-level const across two loaded files, which is a fatal SyntaxError that kills a whole file. This proves the existing duplicate-declaration scan actually covers the new file',
+  },
+
+  /* ---------- V72: the render-core.js -> render-review.js split ---------- */
+
+  {
+    name: 'M69 (V72) a moved screen is lost on the way out',
+    file: 'render-review.js',
+    from: 'function renderOverview() {',
+    to:   'function renderOverview_LOST() {',
+    why:  'the failure the whole 09 file exists for, in its V72 shape. Every file still parses, no const is duplicated, the load order is intact, every delegated action still resolves — and opening a session Overview throws ReferenceError on a phone. 09d cannot see it: the moved screens are reached through render(), not through the ACTIONS table',
+  },
+  {
+    name: 'M70 (V72) render() loses its branch to a moved screen',
+    file: 'render-core.js',
+    from: "  else if (v === 'overview') html = renderOverview();",
+    to:   '',
+    why:  'presence, not reachability. renderOverview() still exists and still passes a lookup — the dispatcher just stopped calling it, so the screen paints the previous view or an empty shell with no error. This is what forces 09n to drive render() per view and to check a marker string rather than a length',
+  },
+  {
+    name: 'M71 (V72) a moved screen bounces to the sessions list instead',
+    file: 'render-review.js',
+    from: "  if (!state.retestRemindersEnabled) { state.view = 'sessions'; return renderSessions(); }",
+    to:   "  if (true) { state.view = 'sessions'; return renderSessions(); }",
+    why:  "proves 09n's no-bounce assertion is not hollow. A bounced render still paints ~4 KB of perfectly valid sessions-list markup, so every length-based smoke check goes green on it — this is exactly how the first draft of 09n passed on a view it never reached",
+  },
+  {
+    name: 'M72 (V72) the shared photo markup is copied, not moved',
+    file: 'render-core.js',
+    from: 'function refreshEntryAfterLog() {',
+    to:   "function renderPhotoStripSheet() { return ''; }\n\nfunction refreshEntryAfterLog() {",
+    why:  'the sneakier half of MAP rule 1. A duplicate top-level FUNCTION is legal and silent — last loaded wins — so render-core.js loading first means the real one in render-review.js quietly replaces this stub and nothing looks wrong. Reverse the load order and the photo strip silently empties',
+  },
+  {
+    name: 'M73 (V72) the boot guard stops probing for render-review.js',
+    file: 'boot.js',
+    from: "    'renderOverview'\n  ];",
+    to:   '  ];',
+    why:  'one probe per script file is the rule. Without it, a deploy that commits index.html but never uploads render-review.js boots looking completely healthy and dies the first time anyone opens an Overview — the exact partial-deploy shape V70 made possible',
+  },
+  {
+    name: 'M74 (V72) render-review.js drops out of the service-worker precache',
+    file: 'sw.js',
+    from: "  './render-review.js',",
+    to:   '',
+    why:  'works for whoever deployed it, fails for every installed PWA on the next cold start with no signal. Same shape as M67 — the new file has to be covered by the same check',
+  },
+  {
+    name: 'M75 (V72) render() is made async in the file it stayed in',
+    file: 'render-core.js',
+    from: 'function render() {',
+    to:   'async function render() {',
+    why:  'MAP rule 2 had to survive a release that rewrote the file around render(). An async render() returns a promise instead of painting, so every caller that renders and then reads the DOM sees the old screen',
   },
 
 ];
