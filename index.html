@@ -23,6 +23,11 @@
        data/state/utils/storage → feature files → render → events → boot.
        boot.js runs the startup block and MUST stay LAST. -->
   <script src="config.js"></script>
+  <!-- v71: data.js — the static tables split out of config.js. MUST load here,
+       after config.js and BEFORE state.js: state.js seeds itemTypes and
+       failReasons from DEFAULT_ITEM_TYPES / DEFAULT_FAIL_REASONS in its
+       top-level initialiser, which runs at load. -->
+  <script src="data.js"></script>
   <script src="state.js"></script>
   <script src="utils.js"></script>
   <script src="storage.js"></script>

@@ -38,8 +38,12 @@ let _lastRenderedView = null;
 // v50: ONE parameterised welcome-dismiss, replacing the 17 near-identical
 // dismissVNNWelcome functions that had accumulated since v12. Sets the seen
 // flag in state and persists the matching key so the modal never reappears,
-// then re-renders to clear it from view. The current welcome is V49; future
-// feature releases pass their own (flag, key) pair and reuse this function.
+// then re-renders to clear it from view. Feature releases pass their own
+// (flag, key) pair and reuse this function.
+// v71: this comment used to name a specific version ("the current welcome is
+// V49"), which went stale within one release and stayed stale for twenty-two.
+// The live answer is WELCOME_VERSION in config.js — a derived, self-rolling
+// name since v63. Do not write a version number back into this comment.
 function dismissWelcome(seenFlag, key) {
   state[seenFlag] = true;
   localStorage.setItem(key, '1');

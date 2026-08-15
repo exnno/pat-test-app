@@ -1,4 +1,4 @@
-# PATGo — Code Map (V70)
+# PATGo — Code Map (V71)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -80,15 +80,20 @@ is discoverable from the file you happen to be editing.
 
 ---
 
-## Load order (index.html) — 26 first-party files
+## Load order (index.html) — 27 first-party files
 
-`config` → `state` → `utils` → `storage` → `clients` → `instruments` → `sqp`
+`config` → `data` → `state` → `utils` → `storage` → `clients` → `instruments` → `sqp`
 → `multipick` → `feedback` → `bugreport` → `photos` → `csv` → `backup`
 → `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
 → `pdfpreview` → `render-core` → `render-settings` → `scanner` → `events`
 → `dispatch` → `boot`
 
-`sw.js` ASSETS lists **28** `.js` entries: these 26 plus the 2 lazy-loaded jsPDF
+⚠ `data` → `state` is the one adjacency in this chain that is NOT a readability
+choice. `state.js` seeds `itemTypes`/`failReasons` from `DEFAULT_ITEM_TYPES` /
+`DEFAULT_FAIL_REASONS` in its top-level initialiser, which runs at load, so
+`data.js` must precede it. Harness 09h/09i, mutation M61.
+
+`sw.js` ASSETS lists **29** `.js` entries: these 27 plus the 2 lazy-loaded jsPDF
 files (precached, not `<script>` tags — report.js injects them on demand).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
 
@@ -97,10 +102,13 @@ choice, not a correctness constraint — cross-file calls resolve at call time, 
 identifiers from later files (e.g. `uid`) are `typeof`-guarded where used early.
 
 **Adding a file:** update `index.html` `<script>` chain AND `sw.js` ASSETS, and
-upload the new file to GitHub **before** either of them. Also add ONE function
-from it to `requiredFns` in `bootIntegrityOK()` (boot.js) — without a probe, a
-file referenced but never uploaded fails silently until a user taps something.
-Harness 09e/09f and mutations M54/M55 hold all three.
+upload the new file to GitHub **before** either of them. Also add ONE probe for
+it to `bootIntegrityOK()` (boot.js) — without a probe, a file referenced but
+never uploaded fails silently until a user taps something.
+⚠ v71: the probe goes in `requiredFns` for a file with functions, but a
+DATA-ONLY file needs a CONSTANT probe instead — top-level `const` never attaches
+to `window`, so the `requiredFns` loop cannot see it whatever name you use.
+Harness 09e/09f/09k/09l and mutations M54/M55/M64/M65 hold all of this.
 
 ---
 
@@ -119,17 +127,32 @@ See `harness/README.md`.
 
 ## Files
 
-### config.js (~900 ln) — constants & defaults, pure data
+### config.js (~830 ln) — constants & factories
 All `*_KEY` localStorage names, `APP_VERSION`, `WELCOME_VERSION`/`WELCOME_KEY`,
-tuning constants, default lists, calculator tables, `SETTINGS_CATEGORIES` +
-`SETTINGS_PAGE_META` (single source of truth for the Settings hub, sub-lists,
-search aliases and back-nav), `makeDefaultReportSettings()`,
-`makeStarterReportTemplates()`, `makeEmptyBugDraft()`, `makeEmptyArchivedStats()`.
-**Touch to:** add a storage key, change a default list or tuning number, bump the
-version, roll a welcome, add a Settings page.
+tuning constants, caps, timeouts, feature-flag keys, `REPORT_COLOR_THEMES`,
+`makeDefaultReportSettings()`, `makeStarterReportTemplates()`,
+`makeEmptyBugDraft()`, `makeEmptyArchivedStats()`, `reportPhotoTierFor()`.
+**Touch to:** add a storage key, change a tuning number, bump the version, roll a
+welcome. To change a default LIST, go to data.js.
 **Coupling:** ⚠ `makeEmptyBugDraft()` must live here, not bugreport.js —
 `state.js` seeds from it at load time, long before bugreport.js parses.
+⚠ v71: config.js loads BEFORE data.js, so nothing at this file's top level may
+read a data.js name. Inside a function body is fine and is what
+`makeEmptyBugDraft()` does. Harness 09j, mutation M66.
 Rules 8, 9, 10 above all originate here.
+
+### data.js (~380 ln) — static tables and lists
+Split out of config.js in V71, byte identical. Built-in defaults
+(`DEFAULT_ITEM_TYPES`, `DEFAULT_FAIL_REASONS`, `DEFAULT_DESCRIPTIONS`,
+`DEFAULT_CSV_COLUMNS`), the v53 reading-field tables and fail-reason tags,
+`SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META` (single source of truth for the
+Settings hub, sub-lists, search aliases and back-nav), `SETUP_SECTIONS`, the
+bug-report option lists, `PATGO_FOOTER_LOGO`, `CSA_RESISTANCE`/`CALC_LENGTHS`.
+**Touch to:** change a default list, add a Settings page, retag a fail reason,
+edit the calculator tables.
+**Coupling:** ⚠ must load immediately after config.js and BEFORE state.js — see
+the load-order note above. Contains NO functions, deliberately, which is why its
+boot probe is a constant. Nothing here touches storage or the DOM.
 
 ### state.js (~430 ln) — the global `state` object
 The single `let state = {…}` runtime shape. Persisted fields, UI transients,
@@ -370,8 +393,8 @@ changelog, the glossary (`GLOSSARY_GROUPS` data array), the bug sheet markup, th
 cloud-prep stub pages behind a long-press on the About title.
 **Touch to:** change any Settings page, add or reword a glossary term, roll the
 About changelog.
-**Coupling:** category structure and search aliases live in **config.js**, not
-here. Scanner test-log markup lives in **scanner.js** (it repaints without a
+**Coupling:** category structure and search aliases live in **data.js** (moved
+from config.js in v71), not here. Scanner test-log markup lives in **scanner.js** (it repaints without a
 render). Bug sheet logic lives in **bugreport.js**. Instrument settings live in
 **instruments.js**. The stats footer reads `computeAppStats()` (session.js) and
 returns `''` when null.
@@ -459,8 +482,12 @@ guard.
 **Coupling:** the integrity guard verifies the critical cross-file functions
 loaded before any storage write and skips `load()`/`render()`/`save()` if not —
 this is the guard against the duplicate-`const` data-loss class (rule 1).
-⚠ v70: `requiredFns` is ONE PROBE PER SCRIPT FILE, not a list of important
+⚠ v70: the guard is ONE PROBE PER SCRIPT FILE, not a list of important
 functions. Adding a script file means adding a probe — see "Adding a file".
+⚠ v71: a data-only file gets a CONSTANT probe, not a `requiredFns` entry, and
+the data.js probe must stay ABOVE the `state` check — data.js failing takes
+state.js's initialiser with it, so checked the other way round the guard throws
+(D1's mechanism) and the console blames the wrong file. Harness 09k/09l.
 ⚠ v68 (D1): `bootIntegrityOK()` CAN THROW — `typeof state` hits a TDZ binding
 when config.js fails to parse. Its call site is wrapped and a throw counts as a
 FAILED check. Never call it bare in an `if`; the throw escapes and the recovery

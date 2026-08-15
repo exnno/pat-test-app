@@ -8,18 +8,23 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### V71 — split render-core.js, then render-settings.js
+### V72 — split render-core.js, then V73 render-settings.js
 Peter's stated order (V70): finish every structural release before any new
-feature. So the queue is V71 render-core.js → V72 render-settings.js → V73
-config.js/data.js, then features.
+feature. The queue is now V72 render-core.js → V73 render-settings.js, then
+features. The config.js/data.js split took the V71 slot instead (see below) so
+that V70's session split and V70.1's tap-timing fixes both got a release in the
+field before anything touched `render()`.
 
-⚠ The old rule said do not start the render splits until the session split had
-"survived a release in the field". Running V71 straight after V70 spends that
-soak. Accept it knowingly or put the config.js/data.js split (item 4 below) in
-front — it touches a different file entirely, so it gives V70 its soak for free
-without pausing structural work. Recommended: data.js first, renders after.
+⚠ The render splits are the ones with real behaviour risk in them: render-core
+owns `const app` and the `render()` dispatcher, and cross-cutting rule 2
+(`render()` stays synchronous) has to survive the move. One file per release,
+and do not fold a behaviour change in alongside.
 
-The V70 method is the one to repeat, in this order:
+⚠ Before starting V72, confirm the V70.1 suggestion-tap report has not recurred.
+If it has, that is an events.js problem and it comes first — chasing it through
+a release that has just rewritten render-core is a much worse position to be in.
+
+The V70/V71 method is the one to repeat, in this order:
 1. Pick contiguous line ranges; extract mechanically, never by retyping.
 2. Reassemble the stripped file plus every extracted block at the original
    offsets and byte-compare against the previous release. Anything that fails
@@ -27,6 +32,15 @@ The V70 method is the one to repeat, in this order:
 3. Add the moved names to `harness/tests/09-module-split.js` and one mutation
    that loses a function on the way out.
 4. One probe per new file in `requiredFns` (boot.js).
+
+### ~~V71 — split the data tables out of config.js~~ — SHIPPED
+285 lines / 24 KB out to `data.js`, byte identical, proved by reassembly.
+`config.js` 1,086 → 831 lines, 71 KB → 49 KB. Two seams named in the old plan
+were deliberately NOT taken: `makeDefaultReportSettings()` and
+`makeStarterReportTemplates()` stayed, because config keeps its factories.
+⚠ The load-order constraint turned out to be the whole risk of the release:
+`data.js` must sit between `config.js` and `state.js`. Harness 09g–09l,
+mutations M61–M68.
 
 ### ~~V70 — split session.js~~ — SHIPPED
 807 lines out (27%): `settings-actions.js` (604) and `onboarding.js` (193),
@@ -192,13 +206,16 @@ comment-only by stripping the banners back out and byte-comparing against the
 original. ⚠ The file was NOT reordered to match the index and must not be —
 several rules depend on being overridden by a later block.
 
-### 4. Split the data tables out of config.js
-66KB described as "pure data", but the big tables (glossary groups, default item
-types, fail reasons, descriptions, calculator tables) sit alongside the constants,
-so looking up one tuning number drags the tables along. Proposed: `config.js`
-keeps constants and factories; a new `data.js` (loaded immediately after) holds
-the lists. ⚠ Watch the load-order constraint — `state.js` seeds from config
-factories at load time.
+### ~~4. Split the data tables out of config.js~~ — SHIPPED V71
+See the V71 entry above. Two corrections to what this item used to say, kept
+because both were wrong in ways that would have cost time:
+- It listed "glossary groups" among config.js's big tables. `GLOSSARY_GROUPS`
+  has always lived in `render-settings.js` — it is part of the V73 split, not
+  this one.
+- The load-order warning named the wrong dependency. `state.js` does not seed
+  from config's FACTORIES at load; it seeds `itemTypes`/`failReasons` from the
+  default LISTS, which is exactly what moved. That is what made the ordering
+  load-bearing rather than cosmetic.
 
 ### ~~5. A persistent smoke harness~~ — SHIPPED
 `harness/` — stub layer, load-order runner, fixtures, 345 standing assertions
@@ -211,7 +228,7 @@ all out of the project.
 
 Old `PAThandoff_vNN.md` files are already pruned — only the latest should remain.
 Keep it that way: only the latest is ever read, and older ones invite expensive
-wrong reads. **Remove `PAThandoff_v68.md` from the project once V69 is deployed.**
+wrong reads. **Remove `PAThandoff_v70.md` from the project once V71 is deployed.**
 
 ---
 

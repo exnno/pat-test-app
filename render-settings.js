@@ -1365,18 +1365,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v70: rolled forward — V70 on top, V67 dropped. -->
+      <!-- v8: rolling 3-version changelog. v71: rolled forward — V71 on top, V68 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V71</strong> &middot; August 2026</p>
+        <p class="muted">Housekeeping only &mdash; nothing has changed in how the app works or looks. The app's long built-in lists (item types, fail reasons, item descriptions, CSV columns, the resistance calculator tables) have been moved into a file of their own behind the scenes. Your own lists and settings are untouched; these are only the built-in starting points a brand-new install begins with. Every line that moved was checked to be identical to the last version before this was released.</p>
 
         <p><strong>V70</strong> &middot; August 2026</p>
         <p class="muted">Housekeeping only &mdash; nothing has changed in how the app works or looks. The settings screens and the first-time setup have been moved into files of their own behind the scenes, so future updates to them are quicker to make and less likely to disturb anything else. Every line of the moved code was checked to be identical to the last version before this was released.</p>
 
         <p><strong>V69</strong> &middot; August 2026</p>
         <p class="muted">Locations you saved before the last update have been corrected. V68 stopped the app putting a stray capital after an apostrophe &mdash; "Bob's Office" being saved as "Bob'S Office" &mdash; but it only fixed things typed from that point on, so everything already in your jobs stayed wrong, kept printing wrong on certificates, and kept being offered back to you by the suggestions list. This update goes through your saved jobs and item type presets once and corrects them. Names you typed in full capitals, like "BOB'S OFFICE", are left exactly as they are. If you'd rather have the old spellings back, there's an <strong>Undo the correction</strong> button under Settings &rarr; Back up and restore. Also fixed: if a screen ever hits an error when you tap something, the app now takes you back to your jobs list with a short message instead of leaving the tap doing nothing while it quietly loses track of which screen you're on.</p>
-
-        <p><strong>V68</strong> &middot; August 2026</p>
-        <p class="muted">Housekeeping and three fixes. Place names with an apostrophe are no longer mangled &mdash; a location typed as "Bob's Office" came out as "Bob'S Office" and, worse, it came out that way on certificates and in CSV exports too. If the app ever fails to start it now always shows the "Update needed" screen with a Reload button and a link to report it, instead of occasionally showing nothing at all; your data was never at risk either way, but a blank screen tells you nothing. Bug reports sent from the app now have client and site names stripped out of the technical details before they're sent, so a fault report can't carry a customer's name off your phone. The &#9000; keyboard button beside the asset box has been removed: it couldn't do the job people wanted it for, because your phone hides its own keyboard whenever a scanner is paired and no app can overrule that. If you need to type an asset number by hand, either double-click your scanner's trigger to pop the keyboard up, or turn <strong>Scanner paired</strong> off under Settings &rarr; Testing Setup &rarr; Barcode Scanner. That page now says so plainly.</p>
 
               </div>
 

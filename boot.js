@@ -94,6 +94,26 @@ function bootIntegrityOK() {
       return false;
     }
   }
+  // v71: probe for data.js, the tables split out of config.js.
+  //
+  // ⚠ THIS CANNOT BE A `requiredFns` ENTRY. data.js declares NO FUNCTIONS AT
+  // ALL — deliberately — so the loop above is structurally blind to it whatever
+  // name you put in the list. Only a constant probe can see it. Putting the name
+  // in requiredFns instead looks right in review and is worse than no check:
+  // `typeof window['DEFAULT_ITEM_TYPES']` is never 'function', so the guard would
+  // fail on every healthy boot.
+  //
+  // ⚠ IT MUST STAY ABOVE THE `state` CHECK, and that ordering is the whole value
+  // of it. A missing data.js takes state.js's initialiser down with it (state.js
+  // seeds itemTypes from DEFAULT_ITEM_TYPES at load), leaving `state` in the
+  // temporal dead zone — so if the state check ran first it would THROW here
+  // (D1's mechanism) and the console would blame state.js for a data.js problem.
+  // Checked in this order, the guard returns false cleanly and names the file
+  // that is actually missing.
+  if (typeof DEFAULT_ITEM_TYPES === 'undefined') {
+    console.error('Boot integrity check failed: DEFAULT_ITEM_TYPES missing — data.js did not load or did not parse (partial deploy or stale cache)');
+    return false;
+  }
   if (typeof state === 'undefined' || !state) {
     console.error('Boot integrity check failed: state missing');
     return false;
