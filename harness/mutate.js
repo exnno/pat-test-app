@@ -469,6 +469,64 @@ const MUTATIONS = [
     why:  'a render() 150ms after blur rebuilds #app.innerHTML and destroys whatever is mid-tap — the second route to PASS needing two presses',
   },
 
+  /* ---- V71: the config.js -> data.js split ---- */
+  {
+    name: 'M61 (V71) data.js loads after state.js instead of before it',
+    file: 'index.html',
+    from: '  <script src="data.js"></script>\n  <script src="state.js"></script>',
+    to:   '  <script src="state.js"></script>\n  <script src="data.js"></script>',
+    why:  'state.js seeds itemTypes/failReasons from DEFAULT_ITEM_TYPES in a TOP-LEVEL initialiser, so one line of load order is the difference between a working app and one that never starts. This is the single most likely way to break V71, and the least visible in review',
+  },
+  {
+    name: 'M62 (V71) a moved table arrives empty',
+    file: 'data.js',
+    from: 'const DEFAULT_ITEM_TYPES = [',
+    to:   'const DEFAULT_ITEM_TYPES = [].concat([]) || [',
+    why:  'the binding still exists and the app still boots — an extraction that loses the CONTENTS passes every "is it defined" check. The length floors and sample members in 09g are the only things that see it',
+  },
+  {
+    name: 'M63 (V71) the footer logo is truncated on the way across',
+    file: 'data.js',
+    from: "const PATGO_FOOTER_LOGO = 'data:image/png;base64,",
+    to:   "const PATGO_FOOTER_LOGO = 'data:image/png;base64,TRUNCATED'; const _PATGO_FOOTER_LOGO_REST = 'x",
+    why:  'a clipped 5 KB single-line base64 value is still a non-empty string that starts with the right prefix, and renders nothing in the PDF footer. Copy-paste truncation is exactly how this would happen',
+  },
+  {
+    name: 'M64 (V71) the boot guard stops probing for data.js',
+    file: 'boot.js',
+    from: "  if (typeof DEFAULT_ITEM_TYPES === 'undefined') {",
+    to:   '  if (false) {',
+    why:  'without it a partial deploy that omits data.js falls through to the state check, which throws on a TDZ binding instead of returning false — the D1 mechanism, reached through a new door',
+  },
+  {
+    name: 'M65 (V71) the data.js probe is moved below the state check',
+    file: 'boot.js',
+    from: "  if (typeof DEFAULT_ITEM_TYPES === 'undefined') {\n    console.error('Boot integrity check failed: DEFAULT_ITEM_TYPES missing",
+    to:   "  if (typeof state === 'undefined' || !state) { return false; }\n  if (typeof DEFAULT_ITEM_TYPES === 'undefined') {\n    console.error('Boot integrity check failed: DEFAULT_ITEM_TYPES missing",
+    why:  'ordering, not presence. The probe still exists and still reads correctly, but state.js is already dead by the time it runs, so the guard throws and the console names the wrong file',
+  },
+  {
+    name: 'M66 (V71) config.js grows a top-level read of a data.js name',
+    file: 'config.js',
+    from: "const APP_VERSION = 'V71';",
+    to:   "const APP_VERSION = 'V71';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
+  },
+  {
+    name: 'M67 (V71) data.js drops out of the service-worker precache',
+    file: 'sw.js',
+    from: "  './data.js',",
+    to:   '',
+    why:  'the app would work for whoever deployed it and fail for every installed PWA on the next cold start, offline — the worst-shaped bug this project can ship',
+  },
+  {
+    name: 'M68 (V71) a moved table is left behind in config.js as well',
+    file: 'config.js',
+    from: "const RETEST_UPCOMING_DAYS = 90;",
+    to:   "const RETEST_UPCOMING_DAYS = 90;\nconst READING_CLASSES = ['I', 'II', 'III'];",
+    why:  'a copy-not-move leaves a duplicate top-level const across two loaded files, which is a fatal SyntaxError that kills a whole file. This proves the existing duplicate-declaration scan actually covers the new file',
+  },
+
 ];
 
 function main() {
