@@ -19,7 +19,17 @@
    Its assertions therefore go through constants, through load POSITION (which
    is load-bearing here, not cosmetic), and through the one observable proof
    that the ordering actually works — state.js seeding itself from the moved
-   tables at load time. */
+   tables at load time.
+
+   V72 extended it for the render-core.js -> render-review.js split. Its hazard
+   is different again from both: the moved screens are reached through render(),
+   NOT through the delegated ACTIONS table, so 09d — the generic guard that has
+   covered every extraction so far — is structurally blind to losing any of them.
+   A lost renderOverview leaves a build where every file parses, every action
+   resolves, the boot guard passes, and opening a session's Overview throws on a
+   phone. The V72 assertions therefore drive render() itself for each moved view
+   rather than looking the functions up, per the listener-wiring rule: go through
+   the surface the app actually uses. */
 
 'use strict';
 
@@ -27,6 +37,7 @@ const fs   = require('fs');
 const path = require('path');
 const t = require('../assert');
 const { APP_DIR, bootApp, scriptOrderFromIndex, swAssetScripts } = require('../load');
+const { populated } = require('../fixture');
 
 /* The V70 extraction manifest. Every name here was defined in session.js in
    V69 and must still be reachable after a full load. Names, not line counts —
@@ -53,6 +64,26 @@ const MOVED_TO_ONBOARDING = [
 ];
 
 const MOVED_TO_RENDER_CORE = ['dismissWelcome'];
+
+/* The V72 extraction manifest: every function that left render-core.js for
+   render-review.js. Paired with the render() view that reaches it, where there
+   is one — the view is what makes the assertion go through render() rather than
+   through a lookup. `view: null` marks the two shared photo-markup helpers,
+   which no view reaches directly: renderEntry() (still in render-core.js) and
+   renderOverview() (now here) each emit one of them, so they are checked by
+   declaration site and through the entry render instead. */
+const MOVED_TO_RENDER_REVIEW = [
+  { name: 'computeVisibleOverviewItems',  view: null,              marker: null                 },
+  { name: 'renderOverviewBodyHTML',       view: null,              marker: null                 },
+  { name: 'renderOverview',               view: 'overview',        marker: 'id="edit-session-btn"' },
+  { name: 'refreshOverviewBody',          view: null,              marker: null                 },
+  { name: 'refreshOverviewSelection',     view: null,              marker: null                 },
+  { name: 'renderEditSession',            view: 'editSession',     marker: 'data-action="edit-save"' },
+  { name: 'renderRetestReminders',        view: 'retestReminders', marker: 'id="retest-back-btn"' },
+  { name: 'renderReports',                view: 'reports',         marker: 'id="reports-back-btn"' },
+  { name: 'renderFailPhotoStripInner',    view: null,              marker: null                 },
+  { name: 'renderPhotoStripSheet',        view: null,              marker: null                 },
+];
 
 /* The V71 extraction manifest: every top-level const that left config.js for
    data.js. Paired with a sample value where an empty-but-present binding would
@@ -294,5 +325,99 @@ module.exports = function run() {
     t.deepEq(data.split('\n').filter(l => /^function /.test(l)), [],
       'data.js declares no top-level functions — which is why the probe must be a constant');
     t.excludes(data, 'localStorage', 'data.js touches no storage');
+  });
+
+  /* ---------- V72: the render-core.js -> render-review.js split ---------- */
+
+  t.group('09m — every screen moved out of render-core.js is still reachable', () => {
+    for (const { name } of MOVED_TO_RENDER_REVIEW) {
+      t.doesNotThrow(() => app.fn(name), `${name} is defined after a full load`);
+    }
+  });
+
+  t.group('09n — render() still reaches each moved screen, THROUGH render()', () => {
+    // The assertion that earns its place. 09m would pass on a build where the
+    // functions exist but render()'s dispatcher lost its else-if branch on the
+    // way past — the screen would then paint the previous view's markup, or the
+    // sessions list, with no error anywhere. And 09d cannot help here at all:
+    // none of these are delegated actions, so the generic guard never looks at
+    // them.
+    //
+    // ⚠ TWO TRAPS, both hit while writing this, both of which made the first
+    // draft green on code it could not have caught a fault in:
+    //   1. `html.length > 200` passes on ANY render — the first-run wizard modal
+    //      alone paints ~1.5 KB over the top of whatever screen is (or isn't)
+    //      there. Hence a per-view MARKER string, taken from inside the moved
+    //      function itself.
+    //   2. renderRetestReminders() bounces to the sessions list when the retest
+    //      feature is off, and it is off by default. The fixture therefore turns
+    //      it on, and the view is re-read AFTER render() so a bounce is visible
+    //      rather than silently passing on the wrong screen's markup.
+    const a = populated({ localStorage: { 'pat:retestReminders': '1' } });
+    for (const { name, view, marker } of MOVED_TO_RENDER_REVIEW) {
+      if (!view) continue;
+      t.doesNotThrow(() => { a.fn('setView')(view); a.fn('render')(); },
+        `render() survives view "${view}" (${name})`);
+      t.eq(a.val('state').view, view, `render() stayed on "${view}" — no bounce to another screen`);
+      t.includes(a.doc.getElementById('app').innerHTML, marker,
+        `"${view}" painted markup that only ${name}() emits`);
+    }
+  });
+
+  t.group('09o — the shared photo markup crosses the seam in both directions', () => {
+    // renderEntry() stayed in render-core.js; the two photo helpers it calls did
+    // not. That is the one genuinely two-way coupling this split created, and it
+    // is invisible from either file on its own.
+    const rc = fs.readFileSync(path.join(APP_DIR, 'render-core.js'), 'utf8');
+    const rr = fs.readFileSync(path.join(APP_DIR, 'render-review.js'), 'utf8');
+    for (const name of ['renderFailPhotoStripInner', 'renderPhotoStripSheet']) {
+      t.includes(rr, `function ${name}(`, `${name} is declared in render-review.js`);
+      t.excludes(rc, `function ${name}(`, `and NOT left behind in render-core.js`);
+      t.includes(rc, `${name}()`, `render-core.js still CALLS ${name} across the seam`);
+    }
+    // Drive it: the entry screen is in render-core.js and must still paint the
+    // strip that now lives in the other file.
+    const a = populated();
+    t.doesNotThrow(() => { a.fn('setView')('entry'); a.fn('render')(); },
+      'the entry screen renders with the photo markup living in another file');
+  });
+
+  t.group('09p — render() and `const app` stayed put, and render() is still sync', () => {
+    // MAP rule 2 had to survive the move; the split was specced so render() was
+    // not edited at all, and this is what holds that true in later releases.
+    const rc = fs.readFileSync(path.join(APP_DIR, 'render-core.js'), 'utf8');
+    const rr = fs.readFileSync(path.join(APP_DIR, 'render-review.js'), 'utf8');
+    t.includes(rc, 'function render() {', 'render() is declared in render-core.js');
+    t.excludes(rc, 'async function render(', 'render() is not async (MAP rule 2)');
+    t.excludes(rr, 'function render() {', 'render() did not get duplicated into render-review.js');
+    t.includes(rc, "const app = document.getElementById('app')", '`const app` stayed in render-core.js');
+    // A second top-level `const app` in a loaded file is a fatal SyntaxError
+    // that kills the whole file (MAP rule 1). 01e is the general scan; this is
+    // the named case for the file most likely to acquire one.
+    t.excludes(rr, "const app = document.getElementById", 'render-review.js does not redeclare `const app`');
+    t.deepEq(rr.split('\n').filter(l => /^(const|let|var) /.test(l)), [],
+      'render-review.js declares no top-level bindings at all — which is why its load position is free');
+  });
+
+  t.group('09q — render-review.js is wired in, and a missing one is CAUGHT', () => {
+    const order = scriptOrderFromIndex();
+    t.ok(order.includes('render-review.js'), 'render-review.js is in the index.html load chain');
+    t.ok(order.indexOf('render-review.js') > order.indexOf('render-core.js'),
+      'it loads after render-core.js');
+    const assets = swAssetScripts();
+    t.ok(assets.includes('render-review.js'), 'render-review.js is precached by the service worker');
+
+    // The probe. Unlike data.js this file DOES declare functions, so an ordinary
+    // requiredFns entry is right — and 09l's warning does not apply here.
+    const boot = fs.readFileSync(path.join(APP_DIR, 'boot.js'), 'utf8');
+    const fnList = boot.slice(boot.indexOf('const requiredFns'), boot.indexOf('];', boot.indexOf('const requiredFns')));
+    t.includes(fnList, 'renderOverview', 'the guard probes render-review.js via requiredFns');
+
+    // Drive the partial deploy: index.html references the file, nobody uploaded it.
+    const broken = bootApp({ skip: ['render-review.js'], tolerateLoadErrors: true });
+    let result;
+    try { result = broken.fn('bootIntegrityOK')(); } catch (e) { result = 'threw'; }
+    t.eq(result, false, 'render-review.js missing → the guard returns false');
+    t.eq(app.fn('bootIntegrityOK')(), true, 'a complete build still passes the guard');
   });
 };
