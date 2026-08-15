@@ -11,14 +11,22 @@
    file parses, the load order is intact, nothing is duplicated — and the button
    that calls it throws ReferenceError on tap. That is the failure this file is
    for, and it is written to hold for the render-core/render-settings and
-   config.js splits still to come, not just for V70. */
+   config.js splits still to come, not just for V70.
+
+   V71 extended it for the config.js -> data.js split. That extraction has a
+   hazard V70's did not: data.js declares NO FUNCTIONS, so every generic guard
+   in this file that works by looking a function up is structurally blind to it.
+   Its assertions therefore go through constants, through load POSITION (which
+   is load-bearing here, not cosmetic), and through the one observable proof
+   that the ordering actually works — state.js seeding itself from the moved
+   tables at load time. */
 
 'use strict';
 
 const fs   = require('fs');
 const path = require('path');
 const t = require('../assert');
-const { APP_DIR, bootApp, scriptOrderFromIndex } = require('../load');
+const { APP_DIR, bootApp, scriptOrderFromIndex, swAssetScripts } = require('../load');
 
 /* The V70 extraction manifest. Every name here was defined in session.js in
    V69 and must still be reachable after a full load. Names, not line counts —
@@ -45,6 +53,41 @@ const MOVED_TO_ONBOARDING = [
 ];
 
 const MOVED_TO_RENDER_CORE = ['dismissWelcome'];
+
+/* The V71 extraction manifest: every top-level const that left config.js for
+   data.js. Paired with a sample value where an empty-but-present binding would
+   otherwise pass — a name existing proves the const survived, it does NOT prove
+   the table came with it. `sample` is a member that must still be in the list,
+   `size` a floor on its length. */
+const MOVED_TO_DATA = [
+  { name: 'DEFAULT_ITEM_TYPES',        sample: 'Extension',            size: 9  },
+  { name: 'DEFAULT_FAIL_REASONS',      sample: 'Damaged Plug',         size: 6  },
+  { name: 'DEFAULT_DESCRIPTIONS',      sample: 'Kettle',               size: 40 },
+  { name: 'DEFAULT_CSV_COLUMNS',       sample: null,                   size: 10 },
+  { name: 'CALC_LENGTHS',              sample: 0.25,                   size: 20 },
+  { name: 'READING_CLASSES',           sample: 'II',                   size: 3  },
+  { name: 'READING_FAIL_TAGS',         sample: 'insulation',           size: 4  },
+  { name: 'SETTINGS_CATEGORIES',       sample: null,                   size: 6  },
+  { name: 'SETUP_SECTIONS',            sample: null,                   size: 5  },
+  { name: 'BUG_REPORT_TYPES',          sample: null,                   size: 3  },
+  { name: 'BUG_REPORT_SEVERITIES',     sample: null,                   size: 3  },
+  { name: 'BUG_REPORT_REPRO',          sample: null,                   size: 3  },
+];
+
+/* Objects, not arrays — checked by key rather than by length. */
+const MOVED_TO_DATA_MAPS = [
+  { name: 'READING_FIELDS_BY_CLASS',   key: 'I'                     },
+  { name: 'READING_FIELD_META',        key: null                    },
+  { name: 'DEFAULT_FAIL_REASON_TAGS',  key: 'Earth Continuity'      },
+  { name: 'SETTINGS_PAGE_META',        key: 'settingsGlossary'      },
+  { name: 'CSA_RESISTANCE',            key: '1.5'                   },
+];
+
+const MOVED_TO_DATA_SCALARS = [
+  'READING_CLASS_DEFAULT', 'READING_FAIL_TAG_DEFAULT', 'READING_POLARITY_CLASSES',
+  'BUG_REPORT_TYPE_DEFAULT', 'BUG_REPORT_SEVERITY_DEFAULT', 'BUG_REPORT_REPRO_DEFAULT',
+  'PATGO_FOOTER_LOGO',
+];
 
 /* Pull the identifiers the delegated ACTIONS table actually calls. The table is
    `'action-name': (arg) => someFunction(...)`, so the callee of each arrow is
@@ -131,5 +174,125 @@ module.exports = function run() {
     const guard = boot.slice(boot.indexOf('const requiredFns'), boot.indexOf('const requiredFns') + 900);
     t.includes(guard, 'saveReportSettingsForm', 'the guard probes settings-actions.js');
     t.includes(guard, 'wizardNextStep', 'the guard probes onboarding.js');
+  });
+
+  /* ---------- V71: the config.js -> data.js split ---------- */
+
+  t.group('09g — every table moved out of config.js survived the move', () => {
+    const names = MOVED_TO_DATA.map(m => m.name)
+      .concat(MOVED_TO_DATA_MAPS.map(m => m.name))
+      .concat(MOVED_TO_DATA_SCALARS);
+    const b = app.refresh(names);
+
+    for (const { name, sample, size } of MOVED_TO_DATA) {
+      t.ok(Array.isArray(b[name]), `${name} is defined and is an array after a full load`);
+      // An emptied array still passes an Array.isArray check and still lets the
+      // app boot. The length floor and the sample member are what make this
+      // assertion fail on a table that arrived as `[]`.
+      t.ok((b[name] || []).length >= size, `${name} still holds at least ${size} entries`);
+      if (sample !== null) {
+        t.ok((b[name] || []).includes(sample), `${name} still contains ${JSON.stringify(sample)}`);
+      }
+    }
+    for (const { name, key } of MOVED_TO_DATA_MAPS) {
+      const v = b[name];
+      t.ok(v && typeof v === 'object', `${name} is defined and is an object`);
+      t.ok(Object.keys(v || {}).length > 0, `${name} is not an empty object`);
+      if (key !== null) t.ok(key in (v || {}), `${name} still has the ${key} entry`);
+    }
+    for (const name of MOVED_TO_DATA_SCALARS) {
+      t.ok(b[name] !== undefined && b[name] !== '', `${name} is defined and non-empty`);
+    }
+    // The logo is the one value where "present" and "intact" are furthest apart:
+    // a truncated data URL is still a non-empty string and still renders nothing.
+    t.ok(String(b.PATGO_FOOTER_LOGO).startsWith('data:image/png;base64,'),
+      'PATGO_FOOTER_LOGO is still a complete PNG data URL');
+    t.ok(String(b.PATGO_FOOTER_LOGO).length > 4000,
+      'PATGO_FOOTER_LOGO was not truncated on the way across');
+  });
+
+  t.group('09h — data.js loads between config.js and state.js, in both manifests', () => {
+    // Not a tidiness assertion. state.js seeds itemTypes/failReasons from the
+    // moved tables in a TOP-LEVEL initialiser, so data.js arriving one line late
+    // is a boot failure, not a style problem.
+    const order = scriptOrderFromIndex();
+    t.ok(order.includes('data.js'), 'data.js is in the index.html load chain');
+    t.eq(order.indexOf('data.js'), order.indexOf('config.js') + 1,
+      'data.js loads immediately after config.js');
+    t.ok(order.indexOf('data.js') < order.indexOf('state.js'),
+      'data.js loads before state.js, which seeds from it at load time');
+
+    const assets = swAssetScripts();
+    t.ok(assets.includes('data.js'), 'data.js is precached by the service worker');
+    t.ok(assets.indexOf('data.js') < assets.indexOf('state.js'),
+      'and sits before state.js in the ASSETS list too');
+  });
+
+  t.group('09i — state.js really did seed itself from the moved tables', () => {
+    // The only assertion here that exercises the ORDERING rather than asserting
+    // it from a manifest. If data.js ever loads after state.js this goes red on
+    // its own, without anyone remembering to update a list.
+    const b = app.refresh(['DEFAULT_ITEM_TYPES', 'DEFAULT_FAIL_REASONS']);
+    const st = app.val('state');
+    t.deepEq(st.itemTypes, b.DEFAULT_ITEM_TYPES, 'state.itemTypes seeded from DEFAULT_ITEM_TYPES');
+    t.deepEq(st.failReasons, b.DEFAULT_FAIL_REASONS, 'state.failReasons seeded from DEFAULT_FAIL_REASONS');
+    // .slice() not a shared reference — editing a preset must never rewrite the
+    // shipped default it was seeded from.
+    t.ok(st.itemTypes !== b.DEFAULT_ITEM_TYPES, 'state.itemTypes is a copy, not the shared table');
+  });
+
+  t.group('09j — config.js still loads on its own, with no data.js present', () => {
+    // The dependency has to stay ONE WAY. config.js runs first, so a top-level
+    // read of any data.js name there is a ReferenceError at boot for every user.
+    // Reading the source and hunting for the names cannot tell a top-level read
+    // from one inside a function body; running the file alone can.
+    const vm = require('vm');
+    const ctx = vm.createContext({ console });
+    const src = fs.readFileSync(path.join(APP_DIR, 'config.js'), 'utf8');
+    t.doesNotThrow(() => vm.runInContext(src, ctx, { filename: 'config.js' }),
+      'config.js evaluates with data.js absent — no top-level dependency on it');
+    t.eq(ctx.APP_VERSION, undefined, 'sanity: top-level const did not leak to the context (bridge is still required)');
+    // And the reverse dependency is real and must keep working in that order.
+    const dataSrc = fs.readFileSync(path.join(APP_DIR, 'data.js'), 'utf8');
+    t.doesNotThrow(() => vm.runInContext(dataSrc, ctx, { filename: 'data.js' }),
+      'data.js evaluates cleanly once config.js has run');
+  });
+
+  t.group('09k — a missing data.js is CAUGHT, cleanly, and named', () => {
+    // Driving the failure, not the success. A probe that returns the right
+    // answer on a healthy build proves nothing — the case it exists for is the
+    // partial deploy where data.js is referenced but never uploaded.
+    const broken = bootApp({ skip: ['data.js'], tolerateLoadErrors: true });
+    let result;
+    try { result = broken.fn('bootIntegrityOK')(); } catch (e) { result = 'threw'; }
+    t.eq(result, false, 'data.js missing → the guard returns false');
+    // NOT 'threw'. If the probe ever moves back below the `state` check, this is
+    // what changes: state.js dies with data.js, `state` is left in the temporal
+    // dead zone, and `typeof state` throws instead (D1's mechanism). The guard
+    // call site is wrapped so the user still gets the recovery screen either
+    // way, but the console then blames state.js for a data.js problem.
+    t.notEq(result, 'threw', 'and returns it rather than throwing on the way past state');
+    // Healthy build still reads healthy — the other half of a fail-safe check.
+    t.eq(app.fn('bootIntegrityOK')(), true, 'a complete build still passes the guard');
+  });
+
+  t.group('09l — the data.js probe is a CONSTANT probe, and has to be', () => {
+    const boot = fs.readFileSync(path.join(APP_DIR, 'boot.js'), 'utf8');
+    const start = boot.indexOf('const requiredFns');
+    const fnList = boot.slice(start, boot.indexOf('];', start));
+    // The trap this exists for: adding the name to requiredFns instead. It reads
+    // correctly, and `typeof window['DEFAULT_ITEM_TYPES']` is never 'function',
+    // so the guard would fail on every healthy boot and nobody could start the
+    // app. 09k's healthy-build assertion is what would actually go red; this one
+    // says why, in the place someone would be editing.
+    t.excludes(fnList, 'DEFAULT_ITEM_TYPES',
+      'the data.js probe is not a requiredFns entry');
+    t.ok(boot.indexOf('DEFAULT_ITEM_TYPES') < boot.indexOf("typeof state === 'undefined'"),
+      'the data.js probe runs BEFORE the state check');
+
+    const data = fs.readFileSync(path.join(APP_DIR, 'data.js'), 'utf8');
+    t.deepEq(data.split('\n').filter(l => /^function /.test(l)), [],
+      'data.js declares no top-level functions — which is why the probe must be a constant');
+    t.excludes(data, 'localStorage', 'data.js touches no storage');
   });
 };
