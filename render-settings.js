@@ -442,7 +442,7 @@ function renderSettingsScanner() {
   const speedOptions = [
     ['strict',  'Strict',  'Fewest false positives. Try this only if hand-typing is ever mistaken for a scan.'],
     ['normal',  'Normal',  'The default, and the right setting for almost everyone.'],
-    ['relaxed', 'Relaxed', 'For a slow or flaky Bluetooth link. A very fast typist could occasionally trip it.'],
+    ['relaxed', 'Relaxed', 'For a slow scanner or a flaky Bluetooth link. Wide enough that fast typing in the asset box could occasionally be read as a scan — use it to get a stubborn scanner working, then try Normal again.'],
   ];
   const speedNote = (speedOptions.find(o => o[0] === speed) || speedOptions[1])[2];
 

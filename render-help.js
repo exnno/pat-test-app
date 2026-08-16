@@ -65,14 +65,14 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V74</strong> &middot; August 2026</p>
+        <p class="muted">Two barcode scanner fixes, both found in the field. Scanners that send their characters slightly slowly were being ignored altogether &mdash; the trigger would do nothing at all &mdash; so the speeds the app accepts have been widened on every setting, with no change needed at your end. And if a scan was interrupted part way through, the remainder could arrive on its own and be written into the asset box as a short but believable number; the app now waits for the scanner to finish and fall silent before it will accept anything. Nothing outside the scanner has changed.</p>
+
         <p><strong>V73</strong> &middot; August 2026</p>
         <p class="muted">Housekeeping only &mdash; nothing has changed in how the app works or looks. The reference pages you're reading right now &mdash; About, the Glossary, Contact and the report-a-problem form &mdash; have been moved into a file of their own behind the scenes, away from the pages that actually change a setting. That completes a run of four tidy-up releases that between them have taken the app's four biggest files apart into smaller, single-purpose ones. Every line that moved was checked to be identical to the last version before this was released.</p>
 
         <p><strong>V72</strong> &middot; August 2026</p>
         <p class="muted">Housekeeping only &mdash; nothing has changed in how the app works or looks. The screens you use to look back over a job &mdash; the Overview, editing a job's details, retest reminders and the Reports page &mdash; have been moved into a file of their own behind the scenes. That makes the main screen file a third smaller and future changes to it quicker and safer. Every line that moved was checked to be identical to the last version before this was released.</p>
-
-        <p><strong>V71</strong> &middot; August 2026</p>
-        <p class="muted">Housekeeping only &mdash; nothing has changed in how the app works or looks. The app's long built-in lists (item types, fail reasons, item descriptions, CSV columns, the resistance calculator tables) have been moved into a file of their own behind the scenes. Your own lists and settings are untouched; these are only the built-in starting points a brand-new install begins with. Every line that moved was checked to be identical to the last version before this was released.</p>
 
               </div>
 

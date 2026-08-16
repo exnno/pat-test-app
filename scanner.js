@@ -16,11 +16,21 @@
  * "was that a scanner?" — a wedge scanner is indistinguishable from a keyboard
  * by design. What we CAN measure is speed: a scanner emits characters roughly
  * 5–20ms apart, while even a very fast typist sits around 80–150ms. So the rule
- * is: every gap in the burst must be under SCAN_MAX_CHAR_GAP_MS, and the burst
- * must be at least SCAN_MIN_LENGTH characters. One slow gap means a human
- * paused, and the buffer is discarded rather than treated as a scan. This is
- * what stops someone hand-typing an asset number and pressing return on the
- * on-screen keyboard from being treated as a scan.
+ * is: every gap in the burst must be under the gap limit currently in force
+ * (scanMaxGapMs(), resolved from the chosen preset), and the burst must be at
+ * least SCAN_MIN_LENGTH characters. One slow gap means a human paused, and the
+ * buffer is discarded rather than treated as a scan. This is what stops someone
+ * hand-typing an asset number and pressing return on the on-screen keyboard from
+ * being treated as a scan.
+ *
+ * ⚠ THERE ARE TWO TIMING CEILINGS, NOT ONE, AND THEY ARE NOT INDEPENDENT.
+ * scanMaxGapMs() judges whether the burst was fast enough. scanEndMs() decides
+ * where one burst ENDS and the next begins. The second must always exceed the
+ * first, or a burst restarts on every character and arrives at the length check
+ * one character long — the "too slow" failure quietly becomes a "too short" one.
+ * v74 made the second derive from the first so the invariant cannot be broken by
+ * changing a preset. See the SCAN_END_PAD_MS note in config.js for the full
+ * story; it cost a release to find.
  *
  * ⚠ WE DO NOT preventDefault THE CHARACTER KEYS — ONLY THE TERMINATOR.
  * That is deliberate, and it is the reason this can't break normal typing. At
@@ -102,7 +112,39 @@ let _scanGapMax = 0;            // the LARGEST gap seen between them (ms)
 let _scanLastTs = 0;            // when the previous character arrived
 let _scanTimer = null;          // silence timer (for scanners with no suffix)
 let _scanSwallowEnterUntil = 0; // see _scanTimeoutCommit
+let _scanPoisonUntil = 0;       // v74 — see the note below
 let _scannerBound = false;      // initScanner is idempotent
+
+// ---------------------------------------------------------------------------
+// v74 — THE POISON WINDOW. What it prevents, in one example.
+//
+// A scanner is part-way through typing PAT-004821 when one keystroke arrives as
+// something we cannot read — a stray modifier the device emitted, a suffix key
+// that is neither Enter nor Tab, a Bluetooth hiccup. The burst is correctly
+// dropped: we do not know what that key was, so we cannot trust the buffer.
+//
+// The problem is what happens NEXT. The scanner does not know anything went
+// wrong and keeps typing. Before v74 the remaining characters — say '4821' —
+// formed a brand-new burst of their own: short, fast, above the three-character
+// minimum, and entirely plausible as an asset number. It passed every test we
+// had and was written into the asset box. A WRONG asset number, on a
+// certificate, with nothing on screen to suggest anything had happened.
+//
+// So dropping the burst in progress is not enough. We must also refuse to
+// collect ANYTHING until the keyboard has fallen silent for a full end-of-burst
+// window — long enough that the tail of the poisoned scan has certainly
+// finished arriving. The window SLIDES: every character that lands inside it
+// pushes it out again, so a scanner that keeps typing keeps being ignored until
+// it genuinely stops.
+//
+// ⚠ WHY ONLY THIS PATH ARMS IT. The other place a burst is discarded is the
+// _scanTarget() bail, which fires on ordinary keystrokes many times a second
+// whenever you are typing anywhere that is not a scan target. Arming there
+// would blank a genuine scan for a fifth of a second after every field you
+// leave, to guard against a case that cannot happen — nothing was collected, so
+// there is no tail to protect against. Asymmetric on purpose, same as the
+// modifier/reset asymmetry below.
+// ---------------------------------------------------------------------------
 
 // v67: keys that a keyboard emits WITHOUT producing a character. These pass
 // through the burst without ending it and without being counted. The list is
@@ -128,6 +170,22 @@ function _scanReset() {
 function scanMaxGapMs() {
   const preset = SCAN_GAP_PRESETS[state.scanSpeed];
   return typeof preset === 'number' ? preset : SCAN_GAP_PRESETS[SCAN_SPEED_DEFAULT];
+}
+
+// v74: where one burst ends and the next begins, DERIVED from whichever preset
+// is in force rather than declared as a number. This is the fix for the
+// two-ceilings trap described in the file header and at SCAN_END_PAD_MS in
+// config.js: the boundary must always sit above the gap limit, so it is defined
+// as the gap limit plus a pad, floored.
+//
+// ⚠ Do not be tempted to inline this back into a constant "for speed". It is
+// two arithmetic operations on a keystroke, and the constant is exactly what
+// made a preset change silently counterproductive.
+//
+// It resolves fresh on every call for the same reason scanMaxGapMs() does —
+// changing the setting takes effect on the very next scan, not the next reload.
+function scanEndMs() {
+  return Math.max(scanMaxGapMs() + SCAN_END_PAD_MS, SCAN_END_FLOOR_MS);
 }
 
 // v67: judge the buffer AND say why. v65 returned a bare boolean, which is what
@@ -301,12 +359,25 @@ function handleScannerKeydown(e) {
       _scanLogBurst(ctx, _scanChars.join(''), v);
     }
     _scanReset();
+    // v74: and refuse to start collecting again until the keyboard is quiet.
+    // ⚠ ORDER MATTERS — this must come AFTER _scanReset(), which clears the
+    // timer but deliberately does not touch the poison window (reset is called
+    // from three other paths that must not arm it).
+    _scanPoisonUntil = now + scanEndMs();
+    return;
+  }
+
+  // v74: inside the poison window. Push it out and swallow nothing — the
+  // characters still land wherever they were going, exactly as they do when we
+  // are collecting. All we are refusing to do is BELIEVE them.
+  if (now < _scanPoisonUntil) {
+    _scanPoisonUntil = now + scanEndMs();
     return;
   }
 
   if (_scanChars.length) {
     const gap = now - _scanLastTs;
-    if (gap > SCAN_END_MS) {
+    if (gap > scanEndMs()) {
       // Long enough that this is the start of something new, not a continuation.
       _scanChars = [];
       _scanGapMax = 0;
@@ -318,7 +389,7 @@ function handleScannerKeydown(e) {
   _scanLastTs = now;
 
   if (_scanTimer) clearTimeout(_scanTimer);
-  _scanTimer = setTimeout(_scanTimeoutCommit, SCAN_END_MS);
+  _scanTimer = setTimeout(_scanTimeoutCommit, scanEndMs());
 }
 
 // Fallback for a scanner configured with NO suffix at all: the burst simply

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V73)
+# PATGo — Code Map (V74)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -140,6 +140,11 @@ welcome. To change a default LIST, go to data.js.
 ⚠ v71: config.js loads BEFORE data.js, so nothing at this file's top level may
 read a data.js name. Inside a function body is fine and is what
 `makeEmptyBugDraft()` does. Harness 09j, mutation M66.
+⚠ v74: `SCAN_GAP_PRESETS` values are the ONLY way to retune scanning for an
+existing fleet. `saveSettings()` writes `SCAN_SPEED_KEY` on every settings save,
+so every phone holds an explicit preset name and never reads
+`SCAN_SPEED_DEFAULT` again — changing a DEFAULT reaches nobody but a fresh
+install. Applies to any tuning value with a stored counterpart. Mutation M85.
 Rules 8, 9, 10 above all originate here.
 
 ### data.js (~380 ln) — static tables and lists
@@ -457,6 +462,20 @@ pass through without ending the burst (a Shift keydown used to destroy a barcode
 containing capitals). Any OTHER non-single-character key must still drop the
 whole burst: skipping a key that did produce a character delivers a plausible
 SHORT asset number, which is worse than no scan. Asymmetric on purpose.
+**⚠⚠ v74: TWO TIMING CEILINGS, AND THE SECOND MUST EXCEED THE FIRST.**
+`scanMaxGapMs()` judges whether the burst was fast enough; `scanEndMs()` decides
+where one burst ENDS. `scanEndMs()` is DERIVED (`gap limit + SCAN_END_PAD_MS`,
+floored at `SCAN_END_FLOOR_MS`) — it was a flat `SCAN_END_MS = 120` until v74 and
+that silently capped every preset: above it a burst restarts on each character
+and fails as "too short" instead of "too slow", so RAISING a preset made things
+worse. Do not reintroduce a constant. Harness 08z/08z2/08z4, mutations M86/M87.
+**⚠ v74: THE POISON WINDOW.** `_scanPoisonUntil` — after a burst is dropped by an
+unreadable key, collection is refused until the keyboard is silent for a full
+`scanEndMs()`, and the window SLIDES (each character re-arms it). Without it the
+tail of an interrupted scan formed a plausible SHORT asset number and reached a
+certificate. Armed on the unreadable-key path ONLY, never on the `_scanTarget()`
+bail (which fires constantly during ordinary typing). Harness 08y–08y5,
+mutations M83/M84/M88.
 **⚠ v67: A REJECTED BURST MUST NOT BE SILENT.** `_scanVerdict()` returns numbers
 and a reason, not a boolean, and `_scanLogBurst()` records rejections on the
 settings test page — but ONLY there (`ctx.kind === 'test'`), or a human typing on

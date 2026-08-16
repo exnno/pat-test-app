@@ -8,26 +8,71 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### V74 — PATGo Scan findings, then the scanner poison-window port
-⚠ **GATE: Peter has a findings file from the PATGo Scan build and will drop it
-in at the start of the V74 chat.** Do not spec V74 before reading it. It is the
-first input to that release, not a supplement to it.
+### V75 — bottom sheets versus the on-screen keyboard
+From the PATGo Scan findings file (item 1), confirmed present here but NOT fixed
+in V74 — it was split out deliberately because it touches CSS plus a new shared
+mechanism plus every sheet in the app, and V74 was scanner-only.
 
-Read it, then propose the split: anything in it that is a genuine defect in
-PATGo goes first, anything that is a feature idea joins the feature backlog
-below and is scheduled separately. No-merge-back still applies — nothing is
-copied across from patgoscan, it is rebuilt by hand from a spec.
+**Symptom:** open a sheet with a text field and the bottom of it — including its
+buttons — sits underneath the keyboard, while the whole screen slides about as
+you type.
 
-Already known to be in that pile, so expect it to be confirmed rather than
-discovered:
+**Cause.** A bottom sheet is `position: fixed` and anchored to the bottom of the
+viewport. On iOS the keyboard does not shrink the LAYOUT viewport, only the
+VISUAL one, so a fixed element keeps its full-screen geometry and its lower part
+ends up under the keyboard. iOS then tries to rescue the focused field by
+scrolling the document, which drags the fixed overlay around, while the sheet's
+own `overflow-y: auto` scrolls independently. Two scrollers plus a mispositioned
+overlay is what the jumping is.
 
-**Scanner poison-window hotfix.** The `_scanPoisonUntil` fix applied in PATGo
-Scan addresses a bug that also exists here: a burst dropped on an unreadable key
-mid-barcode leaves the remaining characters forming a plausible short scan,
-which is then accepted as a real asset number. Ships as a behaviour fix with its
-own harness group and mutation. ⚠ Scanner tests must drive `document` dispatch,
-never call `handleScannerKeydown()` directly — the V67 three-release listener
-bug is the standing lesson.
+**⚠ PATGo's shape differs from Scan's and the port is NOT mechanical.** Scan's
+sheets are `inset: 0` with `align-items: flex-end`, so its single most deceptive
+trap — `bottom` must be explicitly released to `auto`, because a fixed box pinned
+top *and* bottom ignores any height you set — **does not apply here.** PATGo's
+`.fail-sheet, .bulk-sheet` is `left/right/bottom: 0` with no `top`, so `bottom`
+is the anchor we actually want to move. Read the findings file for the reasoning,
+not for the code.
+
+What does carry across:
+- Size from `window.visualViewport`, on open and on that object's own `resize`
+  and `scroll` events. Keyboard inset =
+  `window.innerHeight - (visualViewport.height + visualViewport.offsetTop)`.
+- **`max-height: 85dvh` cannot simply be reduced.** `dvh`/`vh` are fractions of
+  the SCREEN, so with the keyboard up the cap still exceeds the space that
+  exists and the sheet overflows off the **top** of itself — the title vanishes
+  upward, which looks like a completely different bug. It has to become a
+  percentage of the space actually available.
+- **`preventScroll` on every focus inside a sheet.** ⚠ `focusAssetForScan()`
+  (scanner.js) has had this guard with its reasoning since v67 and the sheets
+  never inherited it — exactly the gap the findings file predicted. Bare focus
+  calls today: `feedback.js` 129 and 136 (name sheet, focuses AND selects on
+  open — the worst case), `dispatch.js` 319 (`fail-other-input`),
+  `settings-actions.js` 457 and 513. `dispatch.js` 298 (`f-notes`) is on the
+  entry screen, not in a sheet. Route them all through one shared helper with a
+  `try/catch` fallback to a bare `focus()`.
+- `overscroll-behavior: contain` so a drag that runs out of sheet is not handed
+  to the page underneath.
+
+**Deliberately NOT done, and this is not negotiable:** locking body scroll while
+a sheet is open. It is the obvious fourth part and it is the same family of trick
+as the `100dvh + overflow:hidden` layout this app BANNED after it trapped content
+behind the keyboard (shipped v12, rolled back v12.1). The other three parts solve
+it without touching the page.
+
+**Fails soft.** No `visualViewport` means no styles are written and the current
+CSS stands, i.e. exactly today's behaviour. Nothing in the fix is load-bearing
+for a sheet opening.
+
+⚠ Scope: ~25 sheet render sites across five files. Do NOT edit them one by one —
+one shared mechanism that finds the open sheet, plus the CSS change. Needs its
+own spec round.
+
+### ~~V74 — scanner timing and the poison window~~ — SHIPPED
+Both scanner items from the PATGo Scan findings file. The poison window
+(`_scanPoisonUntil`) stops the tail of an interrupted burst being read as a scan
+of its own; the end-of-burst boundary became derived (`scanEndMs()`) instead of a
+flat `SCAN_END_MS = 120`, which had been silently capping every preset. Presets
+40/60/90 → 60/90/150. See FEATURES.md and PAThandoff_v74.md.
 
 ### The structural queue is CLOSED as of V73
 V70 session.js ✓, V71 config.js ✓, V72 render-core.js ✓, V73 render-settings.js ✓.

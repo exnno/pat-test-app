@@ -227,11 +227,11 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list">
-        <li><strong>Nothing you use has changed.</strong> Every screen, setting and job is exactly where you left it. This update is entirely under the bonnet &mdash; but it's the biggest piece of work the app has had, so it's worth telling you about.</li>
-        <li><strong>Four releases of tidying up, finished.</strong> The app was built up over a long run of features, and four of its files had grown very large. Over V70 to V73 those four have been taken apart into smaller files that each do one job: the settings actions, the built-in lists, the review screens, and now the help and reference pages you're reading this on.</li>
-        <li><strong>Why it matters to you.</strong> Smaller files mean a change can be made in one place without disturbing anything nearby. Fixes land faster and carry far less risk of breaking something unrelated &mdash; which is the whole point as the app gets closer to being something other engineers pay for.</li>
-        <li><strong>Every moved line was checked.</strong> Nothing was retyped. The code was lifted out mechanically and then reassembled and compared character by character against the previous version to prove it came out identical, before this was released.</li>
-        <li><strong>Features are next.</strong> The tidy-up queue is now empty. From here it's back to things you'll actually see.</li>
+        <li><strong>Two barcode scanner fixes.</strong> Both were found on a real job with a real scanner, and both were the kind that say nothing when they go wrong. If you don't use a scanner, nothing in this update affects you.</li>
+        <li><strong>Scanners that were being ignored now work.</strong> Some scanners send their characters a little slower than others, and the app was quietly deciding they were too slow to be a scan &mdash; so you'd pull the trigger and simply nothing would happen. The speeds it accepts have been widened on all three settings. You don't need to change anything: whatever you already have selected has been made more forgiving.</li>
+        <li><strong>A dropped scan can no longer leave a wrong number behind.</strong> If a scan got interrupted half way through, the tail end of it could land in the asset box on its own &mdash; a short number that looked perfectly normal but was missing its first few characters. The app now ignores everything until the scanner has finished and gone quiet.</li>
+        <li><strong>Worth a quick check.</strong> If a scanner has ever seemed unreliable on your phone, try it again on Normal before reaching for Relaxed. Settings &rarr; Barcode Scanner has a test box that shows you exactly what arrives.</li>
+        <li><strong>Nothing else has changed.</strong> Every screen, setting and job is exactly where you left it.</li>
       </ul>
       <button class="btn-primary" data-action="welcome-dismiss">Continue</button>
     </div>

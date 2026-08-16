@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V73';
+const APP_VERSION = 'V74';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -124,7 +124,7 @@ const INSTRUMENTS_MAX = 5;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V73';
+const WELCOME_VERSION = 'V74';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -679,23 +679,52 @@ const REPAIR_UNDO_KEY = 'pat:apostropheRepairUndo'; // v69: JSON array, or absen
 // from the spec sheet, not from a scanner: the first real device (a NETUM C750
 // over Bluetooth HID on iOS) had bursts rejected, and a rejected burst is
 // invisible — the app simply does nothing, which looks identical to a scanner
-// that is not connected at all. 60 is still comfortably clear of a fast thumb.
-// The preset exists because we cannot measure every scanner from here, and
-// waiting for a release to change one number is a bad way to debug a device
-// that is in someone's hand. 'relaxed' at 90ms starts to approach a very fast
-// typist and is a diagnostic setting, not a recommendation — the settings page
-// says so.
-const SCAN_GAP_PRESETS = { strict: 40, normal: 60, relaxed: 90 };
+// that is not connected at all. The preset exists because we cannot measure
+// every scanner from here, and waiting for a release to change one number is a
+// bad way to debug a device that is in someone's hand.
+//
+// ⚠⚠ v74 RAISED ALL THREE AGAIN — 40/60/90 became 60/90/150 — after a second
+// HID scanner was measured emitting characters 100–115ms apart. Every preset
+// PATGo had rejected it, on every setting, silently.
+//
+// ⚠ WHY THE PRESET VALUES MOVED AND NOT SCAN_SPEED_DEFAULT. Changing the default
+// would have fixed nobody. saveSettings() (storage.js) writes SCAN_SPEED_KEY
+// unconditionally on every settings save, so every phone that has ever opened
+// Settings already holds an explicit 'normal' and never consults the default
+// again. Moving the NUMBERS behind the names is what reaches an existing fleet
+// without anyone touching a setting. The same reasoning applies to any future
+// tuning value you are tempted to change via its default.
+//
+// 'relaxed' at 150ms genuinely overlaps a very fast typist and is a diagnostic
+// setting, not a recommendation — the settings page says so. Two things keep the
+// exposure small: SCAN_MIN_LENGTH below, and the focus rule in _scanTarget()
+// (scanner.js), which declines outright while any OTHER text field is focused.
+const SCAN_GAP_PRESETS = { strict: 60, normal: 90, relaxed: 150 };
 const SCAN_SPEED_DEFAULT = 'normal';
-
-// Kept as the floor used by the strict preset, and as the name the rest of the
-// codebase referred to before v67. Nothing reads it directly any more — read
-// scanMaxGapMs() in scanner.js, which resolves the chosen preset.
-const SCAN_MAX_CHAR_GAP_MS = 40;
 
 // How long a silence ends a burst. Doubles as the fallback terminator for a
 // scanner configured to send no suffix at all.
-const SCAN_END_MS = 120;
+//
+// ⚠⚠ THIS WAS A FLAT CONSTANT (SCAN_END_MS = 120) UNTIL v74, AND THAT WAS A BUG
+// WITH NOTHING IN THE CODE TO SAY SO. There are two independent ceilings on a
+// burst: the gap preset judges whether it was fast enough to be a scan, and this
+// one decides where one burst ends and the next begins. A gap above THIS wipes
+// the buffer and starts over. So a flat 120 silently capped how far any preset
+// could ever be relaxed: raise the preset past it and the burst stops failing as
+// "too slow" and starts failing as "too short", because the buffer restarts on
+// every single character and a one-character burst is what reaches the length
+// check. Worse rather than better, from a change that looks correct.
+//
+// THE INVARIANT: the end-of-burst window must ALWAYS exceed the gap limit in
+// force. Hence a derivation rather than a number — see scanEndMs() in
+// scanner.js, which is `active gap limit + pad, floored`. Widening a preset now
+// widens the boundary with it, permanently and without a second edit.
+//
+// The floor only bites the strict preset (60 + 70 = 130, already above it); it
+// exists so that a future preset lower than 50ms cannot produce a window so
+// tight that a scanner's own inter-character jitter splits its burst.
+const SCAN_END_PAD_MS = 70;
+const SCAN_END_FLOOR_MS = 120;
 
 // v67: after a scan commits, ignore any further terminator arriving inside this
 // window. TWO cases, and v65 only covered the first:
