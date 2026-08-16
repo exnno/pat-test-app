@@ -185,8 +185,11 @@ const MUTATIONS = [
   {
     name: 'M22 unreadable keys are skipped instead of ending the burst',
     file: 'scanner.js',
-    from: "      _scanLogBurst(ctx, _scanChars.join(''), v);\n    }\n    _scanReset();\n    return;",
-    to:   "      _scanLogBurst(ctx, _scanChars.join(''), v);\n    }\n    return;",
+    // ⚠ V74 re-pointed: the drop path now also arms the poison window, so the
+    // anchor spans both. Removing only the reset would leave a half-mutated
+    // build that tests nothing anyone would ever write.
+    from: "    _scanReset();\n    // v74: and refuse to start collecting again until the keyboard is quiet.\n    // ⚠ ORDER MATTERS — this must come AFTER _scanReset(), which clears the\n    // timer but deliberately does not touch the poison window (reset is called\n    // from three other paths that must not arm it).\n    _scanPoisonUntil = now + scanEndMs();\n    return;",
+    to:   "    return;",
     why:  'the tempting over-fix: it silently drops a character and delivers a SHORT asset number',
   },
   {
@@ -511,8 +514,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V73';",
-    to:   "const APP_VERSION = 'V73';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V74';",
+    to:   "const APP_VERSION = 'V74';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -629,9 +632,54 @@ const MUTATIONS = [
   {
     name: 'M82 (V73) the About changelog is appended to rather than rolled',
     file: 'render-help.js',
-    from: '        <p><strong>V71</strong> &middot; August 2026</p>',
-    to:   '        <p><strong>V70</strong> &middot; August 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V71</strong> &middot; August 2026</p>',
+    // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
+    // the current oldest each version, same maintenance as M66.
+    from: '        <p><strong>V72</strong> &middot; August 2026</p>',
+    to:   '        <p><strong>V71</strong> &middot; August 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V72</strong> &middot; August 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
+  },
+
+  {
+    name: 'M83 (V74) the poison window is never armed after a dropped burst',
+    file: 'scanner.js',
+    from: "    _scanPoisonUntil = now + scanEndMs();\n    return;\n  }\n\n  // v74: inside the poison window.",
+    to:   "    return;\n  }\n\n  // v74: inside the poison window.",
+    why:  'restores the exact V73 defect: the tail of an interrupted scan forms a short, fast, plausible burst of its own and is written into the asset box. A WRONG asset number on a certificate, with nothing on screen to suggest it happened — the only fault in this file with a data-correctness consequence',
+  },
+  {
+    name: 'M84 (V74) the poison window is set once instead of sliding',
+    file: 'scanner.js',
+    from: "  if (now < _scanPoisonUntil) {\n    _scanPoisonUntil = now + scanEndMs();\n    return;\n  }",
+    to:   "  if (now < _scanPoisonUntil) {\n    return;\n  }",
+    why:  'a fixed window expires while a long barcode is still arriving, so the last few characters form a burst after all. Same wrong-number bug, reachable with a longer label — and it passes the simple version of the test, which is why 08y2 types for 400ms',
+  },
+  {
+    name: 'M85 (V74) the gap presets go back to the values that failed in the field',
+    file: 'config.js',
+    from: "const SCAN_GAP_PRESETS = { strict: 60, normal: 90, relaxed: 150 };",
+    to:   "const SCAN_GAP_PRESETS = { strict: 40, normal: 60, relaxed: 90 };",
+    why:  'the measured scanner emitted characters 100–115ms apart and was refused on every one of these settings, silently. A rejected burst looks identical to a scanner that is not connected — the engineer pulls the trigger and nothing happens at all',
+  },
+  {
+    name: 'M86 (V74) the end-of-burst boundary goes back to a flat constant',
+    file: 'scanner.js',
+    from: "  return Math.max(scanMaxGapMs() + SCAN_END_PAD_MS, SCAN_END_FLOOR_MS);",
+    to:   "  return SCAN_END_FLOOR_MS;",
+    why:  'the two-ceilings trap, restored. A flat boundary silently caps how far any preset can be relaxed: past it the burst stops failing as too slow and starts failing as TOO SHORT, because the buffer restarts on every character. Raising a preset then makes things worse, and nothing in the code says so',
+  },
+  {
+    name: 'M87 (V74) the silence timer keeps its own copy of the old flat boundary',
+    file: 'scanner.js',
+    from: "  _scanTimer = setTimeout(_scanTimeoutCommit, scanEndMs());",
+    to:   "  _scanTimer = setTimeout(_scanTimeoutCommit, 120);",
+    why:  'the half-fix. Deriving the boundary in the gap check but leaving the timer flat looks correct and quietly caps the no-suffix scanner at the old value — one of two call sites, which is exactly how the original bug survived',
+  },
+  {
+    name: 'M88 (V74) an ordinary target bail arms the poison window too',
+    file: 'scanner.js',
+    from: "  const ctx = _scanTarget();\n  if (!ctx) { _scanReset(); return; }",
+    to:   "  const ctx = _scanTarget();\n  if (!ctx) { _scanReset(); _scanPoisonUntil = Date.now() + 200; return; }",
+    why:  'the over-correction. _scanTarget() declines many times a second during normal typing, so arming there blanks a genuine scan for a fifth of a second after every field the engineer leaves — trading a rare wrong number for frequent missing ones',
   },
 
 ];
