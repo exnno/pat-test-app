@@ -484,11 +484,40 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
    at the top of the list could not be reached). The shell itself never scrolls —
    the handle/header stay pinned and only the designated body region scrolls (see
    .sheet-scroll below). dvh with a vh fallback for older iOS. */
+/* v75: THE THREE CUSTOM PROPERTIES BELOW ARE THE WHOLE KEYBOARD FIX, and every
+   one of them is written ONLY by initKeyboardInset() (events.js) and ONLY while
+   the on-screen keyboard is up. When it is down they are removed from <html>
+   entirely, the `var()` fallbacks apply, and this rule is byte-for-byte what it
+   was in v74. No visualViewport (old iOS) means they are never written at all.
+   That is the fail-soft: doing nothing restores today's behaviour exactly.
+
+   --kb-inset  how far the keyboard has eaten into the bottom of the screen.
+   --sheet-max the height that ACTUALLY EXISTS above the keyboard.
+   --sheet-pad bottom padding, flattened while the keyboard is up.
+
+   ⚠ WHY max-height CANNOT JUST BE A SMALLER dvh. `dvh` and `vh` are fractions
+   of the SCREEN, and iOS does not shrink the layout viewport when the keyboard
+   opens — so with the keyboard up, 85dvh still exceeds the space that exists and
+   the sheet overflows off its own TOP. The title disappears upward and it reads
+   as a completely different bug. The cap has to become a real pixel measurement
+   of the remaining space, which is what --sheet-max is.
+
+   ⚠ WHY bottom MOVES rather than the sheet being repositioned in JS. This is a
+   `position: fixed` box anchored bottom with no `top`, so `bottom` is the only
+   anchor there is — raising it lifts the whole sheet clear of the keyboard and
+   the flex column re-lays itself. Nothing needs to find the open sheet.
+
+   NOT DONE, DELIBERATELY: locking body scroll while a sheet is open. It is the
+   obvious fourth part and it is the same family of trick as the
+   `100dvh + overflow:hidden` layout this app BANNED after it trapped content
+   behind the keyboard (shipped v12, rolled back v12.1). The parts above solve
+   it without touching the page. Do not add it. */
 .fail-sheet, .bulk-sheet {
   position: fixed;
-  left: 0; right: 0; bottom: 0;
+  left: 0; right: 0;
+  bottom: var(--kb-inset, 0px);
   background: var(--card-bg);
-  padding: 8px 16px calc(20px + env(safe-area-inset-bottom));
+  padding: 8px 16px var(--sheet-pad, calc(20px + env(safe-area-inset-bottom)));
   border-radius: 16px 16px 0 0;
   box-shadow: 0 -4px 20px var(--modal-shadow);
   z-index: 100;
@@ -498,8 +527,12 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   display: flex;
   flex-direction: column;
   max-height: 85vh;
-  max-height: 85dvh;
+  max-height: var(--sheet-max, 85dvh);
   overflow: hidden;
+  /* v75: .sheet-scroll has carried this since v57; the SHELL never did, so a
+     drag that started on the handle or header chained straight through to the
+     page behind the sheet. */
+  overscroll-behavior: contain;
 }
 
 /* v57: the scrolling body region inside a bottom sheet. Applied to the list that
@@ -1767,8 +1800,18 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 
 /* @@ welcome modal */
 /* v11: Welcome modal bullet list — shown inside the existing .bulk-sheet
-   bottom-sheet container. Keep it tight so it fits on a short viewport
-   without scrolling. */
+   bottom-sheet container.
+   ⚠ v75: THE ORIGINAL v11 NOTE HERE SAID "keep it tight so it fits on a short
+   viewport without scrolling", AND THAT ASSUMPTION SHIPPED A BUG IN V74. The
+   shell has been capped at 85dvh with `overflow: hidden` since v57, and the rule
+   there is that the one child which can grow long must be marked `.sheet-scroll`
+   — that is what scrolls. This list never was, because in v11 nothing could grow.
+   V74's copy ran to five long bullets, the list pushed past the cap, the shell
+   clipped it, and the Continue button (last child in the column) was clipped off
+   the bottom with nothing to scroll. Unreadable AND undismissable.
+   The list now carries `.sheet-scroll` in the markup (render-core.js) and the
+   button is pinned below. Keeping the copy short is still good discipline, but
+   it is no longer what stands between a user and the button. */
 .welcome-list {
   margin: 4px 0 14px;
   padding-left: 20px;
@@ -1781,6 +1824,12 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .welcome-list li:last-child {
   margin-bottom: 0;
+}
+/* v75: the dismiss button must never be the thing that gets pushed out of a
+   flex column that has run out of room — it is the only way out of the modal.
+   Pinned, so the list above it scrolls instead. */
+.welcome-continue {
+  flex-shrink: 0;
 }
 
 /* @@ onboarding wizard */
@@ -1800,8 +1849,15 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .wizard-sheet {
   display: flex;
   flex-direction: column;
-  min-height: 72vh;
-  max-height: 92vh;
+  /* v75: ⚠ THE min-height IS THE SHARPER TRAP OF THE TWO, and it is the reason
+     the wizard could not have been fixed by the shell change alone. A cap that
+     is too big merely fails to help; a FLOOR of 72vh actively FORCES the sheet
+     taller than the space above the keyboard, so it overflows off its own top
+     however small the cap gets. Both have to become the measured space, and the
+     floor has to give way first. `min-height: 0` is the released state, not a
+     smaller floor — the flex column then sizes to its content. */
+  min-height: var(--sheet-min-release, 72vh);
+  max-height: var(--sheet-max, 92vh);
   /* v45.1: the wizard is a persistent multi-step flow, but paging calls render()
      which rebuilds #app — so the sheet is a NEW node each step and the shared
      .bulk-sheet `slide-up` entry animation replayed every time, making the sheet
@@ -1869,6 +1925,10 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .welcome-logo-wrap, .wizard-logo-wrap {
   text-align: center;
   margin: 2px 0 8px;
+  /* v75: the shell is a flex column, so without this the logo squashes when the
+     body is taller than the cap instead of the body scrolling. Same reason
+     .bulk-sheet-handle and .bulk-sheet-header have carried it since v57. */
+  flex-shrink: 0;
 }
 .welcome-logo {
   width: 64px;
@@ -3107,7 +3167,11 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 /* The sheet itself reuses .fail-sheet for position/shape; this only adds the
    scrolling body, because the form is taller than the readings sheet and must
    not trap its own content on a short screen (the v12 lesson). */
-.bug-sheet { max-height: 88vh; display: flex; flex-direction: column; }
+/* v75: this cap OVERRIDES the shell's, so without its own var() the bug sheet
+   would have ignored the keyboard fix entirely — and it is one of the two sheets
+   that most needs it, because it is a form with a text area. Same fallback shape
+   as the shell: no keyboard, no property, 88vh stands. */
+.bug-sheet { max-height: var(--sheet-max, 88vh); display: flex; flex-direction: column; }
 .bug-sheet-body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;

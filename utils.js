@@ -336,3 +336,29 @@ function normaliseItemReadings(r) {
   if (!('class' in out) && !hasMeasurement) return null;
   return out;
 }
+
+// v75: the ONE way anything inside a bottom sheet takes focus.
+//
+// A bare `.focus()` on a field inside a `position: fixed` sheet makes iOS scroll
+// the document to "reveal" it — which drags the fixed overlay around the screen
+// while the sheet's own scroller is also moving. That document scroll is the
+// jumping, and it is never wanted here: the sheet is already fully visible, and
+// v75's CSS keeps it that way above the keyboard.
+//
+// ⚠ scanner.js's focusAssetForScan() has carried this guard, with its reasoning,
+// since v67 — and the sheets never inherited it. That gap is the whole reason
+// this helper exists: the knowledge was in the codebase, in a comment, in one
+// file, where nothing made the other five call sites pick it up.
+//
+// `preventScroll` is not universally supported and older WebKit throws on the
+// options object rather than ignoring it, so the fallback is a bare focus() —
+// which is precisely v74's behaviour. Failing back to the old bug beats failing
+// to focus at all: a field that never takes focus is a dead form.
+function focusInSheet(el) {
+  if (!el) return;
+  try {
+    el.focus({ preventScroll: true });
+  } catch (e) {
+    try { el.focus(); } catch (e2) {}
+  }
+}

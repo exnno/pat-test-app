@@ -454,7 +454,10 @@ function insertReportFilenameToken(token) {
   state.reportSettings.reportFilenamePattern = inp.value.trim() || REPORT_FILENAME_DEFAULT;
   // Restore caret just after the inserted token.
   const pos = start + token.length;
-  try { inp.focus(); inp.setSelectionRange(pos, pos); } catch (e) {}
+  // v75: focus without the document scroll; the caret restore stays separate so
+  // a browser that rejects the focus options object still gets its selection set.
+  focusInSheet(inp);
+  try { inp.setSelectionRange(pos, pos); } catch (e) {}
 }
 
 // Share setup. Builds a default name from the company name (if set) and opens a
@@ -510,7 +513,7 @@ function startShareSetup() {
     await shareSetup(label || defaultName, state.setupInclude);
   });
   const nameInput = document.getElementById('setup-name-input');
-  if (nameInput) { try { nameInput.focus(); nameInput.select(); } catch (e) {} }
+  if (nameInput) { focusInSheet(nameInput); try { nameInput.select(); } catch (e) {} }
 }
 
 function saveItemTypesSettings() {

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V74)
+# PATGo — Code Map (V75)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -78,6 +78,25 @@ is discoverable from the file you happen to be editing.
 12. **iOS keyframes.** CSS-variable `@keyframes` on freshly inserted
     `position:fixed` nodes silently fail — use literal values, inline styles,
     forced reflow, next-frame RAF.
+
+13. **Sheet geometry is published, not assigned (v75).** `applyKeyboardInset()`
+    (events.js) writes `--kb-inset` / `--sheet-max` / `--sheet-pad` /
+    `--sheet-min-release` onto `<html>`; the sheet rules in styles.css read them
+    with `var()` fallbacks. Nothing finds the open sheet. Two consequences:
+    a sheet rule that OVERRIDES `max-height`/`min-height` opts itself OUT unless
+    it also uses the var (`.bug-sheet`, `.wizard-sheet` do); and keyboard-down
+    must REMOVE the properties, never set them to `0px`, or the fallback is
+    shadowed and the no-keyboard case silently changes.
+
+14. **A sheet child that can grow long must be marked `.sheet-scroll`.** The
+    shell is capped with `overflow: hidden`, so an unmarked body clips instead of
+    scrolling and takes whatever follows it — usually the buttons — with it. This
+    is what broke V74's welcome modal. Not enforced anywhere; check by eye when
+    adding a sheet.
+
+15. **Banned: locking body scroll while a sheet is open.** Same family as the
+    `100dvh + overflow:hidden` layout rolled back in v12.1. Harness 11i asserts
+    on the shipped source, comments stripped.
 
 ---
 
@@ -174,6 +193,11 @@ Formatting, escaping, colour, asset-number splitting/padding, long-press
 detector, boundary validators for item readings.
 **Touch to:** add a stateless helper.
 **Coupling:** none by design — nothing here reads `state`.
+⚠ v75: `focusInSheet()` is the ONE way anything inside a bottom sheet takes
+focus (`preventScroll`, try/catch fallback to bare `focus()`). Callers:
+feedback.js ×2, dispatch.js (`fail-other-input`), settings-actions.js ×2.
+NOT for fields outside a sheet — dispatch.js's `f-notes` is on the entry screen
+and deliberately keeps a plain `focus()`. scanner.js keeps its own v67 guard.
 ⚠ `titleCase()` is NOT display-only: it runs on locations and item types at save
 time, so its output reaches certificates and CSV exports.
 ⚠ v69: `repairApostropheCase()` is titleCase's INVERSE and the only function in
@@ -497,9 +521,10 @@ rather than append.
 ### events.js (~400 ln) — focus-sensitive binding, per render
 Direct binds for the four focus-sensitive fields only (`nf-client`, `nf-site`,
 `f-location`, `f-type`), the three suggestion dropdowns, the quick-pick long-press
-gesture, the sheet drag guard, the suggestion click swallow.
+gesture, the sheet drag guard, the suggestion click swallow. Plus (v75, and NOT
+per-render) the keyboard-inset publisher.
 **Touch to:** change one of those four fields, their dropdowns, the long-press, the
-drag guard or the click swallow.
+drag guard, the click swallow or how sheets react to the on-screen keyboard.
 **⚠ Suggestions commit on `pointerdown`, not `click`** (a click races the blur
 teardown and iOS loses the tap), **and `armClickSwallow()` must stay** — a touch
 tap still fires a ghost `click` afterwards that lands on whatever is underneath.
@@ -510,9 +535,17 @@ button's own handler arms it. Arm from capture and the guard cancels itself.
 **⚠ All three dropdowns paint through `paintSuggestionList()` (v70.1)** — identity
 skip plus shrink hysteresis. `fromTyping` is passed only from `oninput`/`onfocus`;
 picks, blur-hides and dispatch.js's quick-pick paint instantly.
+**⚠ `initKeyboardInset()` / `applyKeyboardInset()` (v75) are the odd pair in this
+file** — everything else here is per-render, these are once-at-boot and never
+re-run. They bind BOTH `resize` and `scroll` on `window.visualViewport`: iOS
+fires scroll, not resize, when it shifts the view to reveal a focused field, and
+binding only resize leaves the sheet correctly sized in the wrong place. No
+`visualViewport` → returns before binding, nothing is ever written, v74 CSS
+stands. See cross-cutting rule 13 for the contract with styles.css.
 **Coupling:** called from `render()` and `refreshEntryAfterLog()`.
-`initSheetDragGuard()` and `initSuggestionClickSwallow()` are bound once from
-boot.js. `sheetDragMoved` is read by dispatch.js's preset picker. Everything else
+`initSheetDragGuard()`, `initSuggestionClickSwallow()` and `initKeyboardInset()`
+are bound once from boot.js. `applyKeyboardInset()` is consumed entirely by
+styles.css — no JS reads its output. `sheetDragMoved` is read by dispatch.js's preset picker. Everything else
 is delegated in dispatch.js — these stay direct because focus/blur/pointer timing
 can't be safely delegated.
 

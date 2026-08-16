@@ -8,64 +8,41 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### V75 — bottom sheets versus the on-screen keyboard
-From the PATGo Scan findings file (item 1), confirmed present here but NOT fixed
-in V74 — it was split out deliberately because it touches CSS plus a new shared
-mechanism plus every sheet in the app, and V74 was scanner-only.
+### Sheet-scroller audit — the V75 spill-over
 
-**Symptom:** open a sheet with a text field and the bottom of it — including its
-buttons — sits underneath the keyboard, while the whole screen slides about as
-you type.
+**Not scheduled; sized and understood.** V75 fixed the welcome modal, which
+could not be dismissed because its body was never marked `.sheet-scroll` and the
+shell (capped with `overflow: hidden` since V57) clipped it and took the Continue
+button with it. That was one instance of a class, and the class is not enforced
+anywhere.
 
-**Cause.** A bottom sheet is `position: fixed` and anchored to the bottom of the
-viewport. On iOS the keyboard does not shrink the LAYOUT viewport, only the
-VISUAL one, so a fixed element keeps its full-screen geometry and its lower part
-ends up under the keyboard. iOS then tries to rescue the focused field by
-scrolling the document, which drags the fixed overlay around, while the sheet's
-own `overflow-y: auto` scrolls independently. Two scrollers plus a mispositioned
-overlay is what the jumping is.
+The rule: **a sheet child that can grow long must carry `.sheet-scroll`, and
+anything below it must be `flex-shrink: 0`.** Around 28 sheet render sites across
+five files. Most are short and fixed-height and genuinely fine; the ones to check
+are any whose body length depends on data (preset lists, client/site pickers,
+bulk menus, asset history) or on copy that a future release might lengthen.
 
-**⚠ PATGo's shape differs from Scan's and the port is NOT mechanical.** Scan's
-sheets are `inset: 0` with `align-items: flex-end`, so its single most deceptive
-trap — `bottom` must be explicitly released to `auto`, because a fixed box pinned
-top *and* bottom ignores any height you set — **does not apply here.** PATGo's
-`.fail-sheet, .bulk-sheet` is `left/right/bottom: 0` with no `top`, so `bottom`
-is the anchor we actually want to move. Read the findings file for the reasoning,
-not for the code.
+⚠ Do this as a read-and-list pass FIRST, and do not fix as you go — the output
+should be a table of "sheet / body element / can it grow / marked?" so the actual
+fix is one reviewed change set rather than 28 judgement calls made while reading.
+A test is possible but not trivial: the shape would be a source guard asserting
+every `.fail-sheet`/`.bulk-sheet` block contains either a `.sheet-scroll` child
+or a fixed-height body, which needs the markup parsed rather than grepped.
 
-What does carry across:
-- Size from `window.visualViewport`, on open and on that object's own `resize`
-  and `scroll` events. Keyboard inset =
-  `window.innerHeight - (visualViewport.height + visualViewport.offsetTop)`.
-- **`max-height: 85dvh` cannot simply be reduced.** `dvh`/`vh` are fractions of
-  the SCREEN, so with the keyboard up the cap still exceeds the space that
-  exists and the sheet overflows off the **top** of itself — the title vanishes
-  upward, which looks like a completely different bug. It has to become a
-  percentage of the space actually available.
-- **`preventScroll` on every focus inside a sheet.** ⚠ `focusAssetForScan()`
-  (scanner.js) has had this guard with its reasoning since v67 and the sheets
-  never inherited it — exactly the gap the findings file predicted. Bare focus
-  calls today: `feedback.js` 129 and 136 (name sheet, focuses AND selects on
-  open — the worst case), `dispatch.js` 319 (`fail-other-input`),
-  `settings-actions.js` 457 and 513. `dispatch.js` 298 (`f-notes`) is on the
-  entry screen, not in a sheet. Route them all through one shared helper with a
-  `try/catch` fallback to a bare `focus()`.
-- `overscroll-behavior: contain` so a drag that runs out of sheet is not handed
-  to the page underneath.
+⚠ Note the V11 lesson while doing it: the welcome list was safe when written and
+became unsafe when the copy grew, four years of releases later. "It fits today"
+is not the same property as "it cannot overflow".
 
-**Deliberately NOT done, and this is not negotiable:** locking body scroll while
-a sheet is open. It is the obvious fourth part and it is the same family of trick
-as the `100dvh + overflow:hidden` layout this app BANNED after it trapped content
-behind the keyboard (shipped v12, rolled back v12.1). The other three parts solve
-it without touching the page.
-
-**Fails soft.** No `visualViewport` means no styles are written and the current
-CSS stands, i.e. exactly today's behaviour. Nothing in the fix is load-bearing
-for a sheet opening.
-
-⚠ Scope: ~25 sheet render sites across five files. Do NOT edit them one by one —
-one shared mechanism that finds the open sheet, plus the CSS change. Needs its
-own spec round.
+### ~~V75 — bottom sheets versus the on-screen keyboard~~ — SHIPPED
+Sheets now measure `window.visualViewport` and publish four custom properties to
+`<html>` which the sheet CSS reads, so no sheet has to be found or hooked.
+`.bug-sheet` and `.wizard-sheet` had to opt in explicitly (they override the
+shell's caps) — and the wizard's `min-height: 72vh` FLOOR was the sharper trap of
+the two. Keyboard-down removes the properties rather than zeroing them, which is
+what preserves the `var()` fallbacks. `focusInSheet()` closes the `preventScroll`
+gap the scanner had documented since V67. Body-scroll lock deliberately NOT done
+(v12.1 ban). Welcome modal scroller folded in. See FEATURES.md and
+PAThandoff_v75.md. Harness 11a–11m, mutations M89–M96.
 
 ### ~~V74 — scanner timing and the poison window~~ — SHIPPED
 Both scanner items from the PATGo Scan findings file. The poison window
@@ -326,6 +303,7 @@ survives those documents being archived.
 | "Log this item ×N" | Liked in principle, shelved on UI clutter. Proposed resolution: long-press on the existing Copy-last button, so no new control competes for space |
 | Weekly/batch PDF export | Parked pending a direct tester ask — good idea, but wanted from testers before committing time |
 | Per-instrument "in service" toggle | Only if overdue calibration nags on a retired instrument prove annoying in practice |
+| Sheet-scroller audit | See "Next release" above — sized, not scheduled |
 | Scan into other fields (location, item type) | Raised implicitly by V67. Currently a scan is refused when any other text field has focus (the deliberate V65 "known limit"). Only worth revisiting if Peter starts labelling locations |
 
 ### Discussed and NOT proceeding

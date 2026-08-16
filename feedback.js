@@ -126,14 +126,17 @@ function openNameSheet(opts) {
   if (cancelBtn) cancelBtn.addEventListener('click', cleanup);
   function commit() {
     const v = inp ? inp.value.trim() : '';
-    if (!v) { if (inp) { try { inp.focus(); } catch (e) {} } return; }
+    if (!v) { if (inp) focusInSheet(inp); return; }
     cleanup();
     if (typeof opts.onConfirm === 'function') opts.onConfirm(v);
   }
   if (saveBtn) saveBtn.addEventListener('click', commit);
   if (inp) {
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
-    try { inp.focus(); inp.select(); } catch (e) {}
+    // v75: the worst case of the five — this focuses AND selects on open, so a
+    // bare focus() here scrolled the document the instant the sheet appeared.
+    focusInSheet(inp);
+    try { inp.select(); } catch (e) {}
   }
 }
 

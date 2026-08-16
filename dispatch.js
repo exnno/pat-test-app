@@ -316,7 +316,10 @@ registerActions({
 
   // Fail sheet
   'fail-reason': (arg) => pickFailReason(arg),
-  'fail-other': () => { state.failModalStage = 'other'; render(); document.getElementById('fail-other-input')?.focus(); },
+  // v75: focusInSheet, not a bare focus() — this field lives in the fail sheet.
+  // (The 'show-notes' handler above is deliberately NOT converted: f-notes is on
+  // the entry screen, not inside a sheet, so it has no fixed overlay to drag.)
+  'fail-other': () => { state.failModalStage = 'other'; render(); focusInSheet(document.getElementById('fail-other-input')); },
   'fail-other-back': () => { state.failModalStage = 'reasons'; state.failOtherText = ''; render(); },
   'fail-other-save': () => { const reason = state.failOtherText.trim(); pickFailReason(reason || null); },
   'fail-cancel': () => cancelFailModal(),

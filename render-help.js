@@ -61,18 +61,18 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v73: rolled forward — V73 on top, V70 dropped. -->
+      <!-- v8: rolling 3-version changelog. v75: rolled forward — V75 on top, V72 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V75</strong> &middot; August 2026</p>
+        <p class="muted">Panels that slide up from the bottom of the screen &mdash; the fail reason picker, the bug report form, first-time setup and the rest &mdash; used to sit underneath the on-screen keyboard whenever they contained something to type into, with the whole screen sliding about as you typed and the buttons at the bottom out of reach. They now measure the space the keyboard leaves and sit above it. A panel taller than the room it has scrolls in the middle while its buttons stay put. The same fault had also crept into this app's own What's New panel, whose Continue button could be clipped off the bottom on a long update; it can now always be reached. Nothing about how the app records a test has changed.</p>
 
         <p><strong>V74</strong> &middot; August 2026</p>
         <p class="muted">Two barcode scanner fixes, both found in the field. Scanners that send their characters slightly slowly were being ignored altogether &mdash; the trigger would do nothing at all &mdash; so the speeds the app accepts have been widened on every setting, with no change needed at your end. And if a scan was interrupted part way through, the remainder could arrive on its own and be written into the asset box as a short but believable number; the app now waits for the scanner to finish and fall silent before it will accept anything. Nothing outside the scanner has changed.</p>
 
         <p><strong>V73</strong> &middot; August 2026</p>
         <p class="muted">Housekeeping only &mdash; nothing has changed in how the app works or looks. The reference pages you're reading right now &mdash; About, the Glossary, Contact and the report-a-problem form &mdash; have been moved into a file of their own behind the scenes, away from the pages that actually change a setting. That completes a run of four tidy-up releases that between them have taken the app's four biggest files apart into smaller, single-purpose ones. Every line that moved was checked to be identical to the last version before this was released.</p>
-
-        <p><strong>V72</strong> &middot; August 2026</p>
-        <p class="muted">Housekeeping only &mdash; nothing has changed in how the app works or looks. The screens you use to look back over a job &mdash; the Overview, editing a job's details, retest reminders and the Reports page &mdash; have been moved into a file of their own behind the scenes. That makes the main screen file a third smaller and future changes to it quicker and safer. Every line that moved was checked to be identical to the last version before this was released.</p>
 
               </div>
 

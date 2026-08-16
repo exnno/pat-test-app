@@ -226,14 +226,12 @@ function render() {
         <h3 class="bulk-sheet-title">${welcomeTitle}</h3>
         <span class="fail-close-spacer"></span>
       </div>
-      <ul class="welcome-list">
-        <li><strong>Two barcode scanner fixes.</strong> Both were found on a real job with a real scanner, and both were the kind that say nothing when they go wrong. If you don't use a scanner, nothing in this update affects you.</li>
-        <li><strong>Scanners that were being ignored now work.</strong> Some scanners send their characters a little slower than others, and the app was quietly deciding they were too slow to be a scan &mdash; so you'd pull the trigger and simply nothing would happen. The speeds it accepts have been widened on all three settings. You don't need to change anything: whatever you already have selected has been made more forgiving.</li>
-        <li><strong>A dropped scan can no longer leave a wrong number behind.</strong> If a scan got interrupted half way through, the tail end of it could land in the asset box on its own &mdash; a short number that looked perfectly normal but was missing its first few characters. The app now ignores everything until the scanner has finished and gone quiet.</li>
-        <li><strong>Worth a quick check.</strong> If a scanner has ever seemed unreliable on your phone, try it again on Normal before reaching for Relaxed. Settings &rarr; Barcode Scanner has a test box that shows you exactly what arrives.</li>
+      <ul class="welcome-list sheet-scroll">
+        <li><strong>Pop-up panels stay above the keyboard.</strong> Anywhere you type into a panel that slides up from the bottom, it now sits clear of the keyboard instead of hiding underneath it, and the screen stops sliding about as you type.</li>
+        <li><strong>Buttons in those panels can always be reached.</strong> If a panel is taller than the space it has, the middle of it now scrolls and the buttons stay put at the bottom &mdash; including this one.</li>
         <li><strong>Nothing else has changed.</strong> Every screen, setting and job is exactly where you left it.</li>
       </ul>
-      <button class="btn-primary" data-action="welcome-dismiss">Continue</button>
+      <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
   `;
 

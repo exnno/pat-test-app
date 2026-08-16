@@ -287,6 +287,13 @@ initSheetDragGuard();
 // v57.1: arm the one-shot ghost-click swallow used by the suggestion dropdowns.
 // Document-level capture listener, same once-at-boot lifecycle as the others.
 initSuggestionClickSwallow();
+// v75: publish the on-screen keyboard's height to <html> so bottom sheets can lift
+// clear of it. Same once-at-boot lifecycle as the three above. NOT typeof-guarded:
+// events.js is not an optional subsystem (it also owns initDelegation, called two
+// lines up), so a missing events.js has already taken the app down before here —
+// a guard would only hide which line noticed. The function itself returns
+// immediately when there is no visualViewport, so old iOS costs nothing.
+initKeyboardInset();
 // v67.1: bind the HID barcode scanner's keydown listener. Same once-at-boot,
 // document-capture lifecycle as the three above.
 //

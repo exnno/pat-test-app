@@ -512,3 +512,97 @@ function renderLocationSuggestionsOnly(fromTyping) {
     });
   }, 'location-suggestions', fromTyping ? () => renderLocationSuggestionsOnly(false) : null);
 }
+
+// ===========================================================================
+// v75: bottom sheets versus the on-screen keyboard
+// ===========================================================================
+//
+// THE PROBLEM. A bottom sheet is `position: fixed` anchored to the bottom of the
+// viewport. On iOS the keyboard does NOT shrink the layout viewport, only the
+// VISUAL one — so a fixed element keeps its full-screen geometry and its lower
+// part, including its buttons, ends up underneath the keyboard. iOS then tries to
+// rescue the focused field by scrolling the document, which drags the fixed
+// overlay around, while the sheet's own `overflow-y: auto` scrolls independently.
+// Two scrollers plus a mispositioned overlay is what the jumping is.
+//
+// THE FIX. `window.visualViewport` is the only thing that knows the true visible
+// rectangle. We measure it and publish three custom properties on <html>; the
+// sheet CSS reads them (see the long note on `.fail-sheet, .bulk-sheet` in
+// styles.css for what each one does and why a smaller `dvh` cannot substitute).
+//
+// ⚠ WHY THIS IS ONE DOCUMENT-LEVEL LISTENER AND NOT PER-SHEET. There are ~28
+// sheet-open sites across five files. Hooking each one would be 28 chances to
+// forget one — and forgetting one produces exactly the bug we are fixing, in one
+// sheet only, which is the hardest possible thing to notice. Publishing to <html>
+// instead means the mechanism does not need to know a sheet exists: any sheet
+// that reads the properties is fixed the moment it is painted, including sheets
+// that do not exist yet. Nothing here queries the DOM for an open sheet.
+//
+// ⚠ SAFE WHEN NO SHEET IS OPEN. The properties only appear in sheet rules, so
+// writing them while the user is typing on an ordinary screen changes nothing.
+// That is what lets this run unconditionally instead of being armed and disarmed.
+//
+// FAILS SOFT, AND THAT IS LOAD-BEARING. No visualViewport (older iOS) means we
+// return before binding anything and no property is ever written, so every
+// `var()` falls back and the CSS is v74's. Nothing in a sheet's ability to open,
+// paint or be dismissed depends on any of this.
+
+// Below this, the difference is the browser UI settling rather than a keyboard —
+// writing pixel geometry for that would make sheets twitch during ordinary
+// scrolling. iOS keyboards are several hundred px, so this is not a close call.
+const KB_MIN_INSET_PX = 120;
+
+// The sheet is capped slightly under the space that exists so it does not sit
+// flush against the top of the visible area with its title touching the edge.
+const KB_SHEET_MAX_RATIO = 0.94;
+
+function applyKeyboardInset() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  const root = document.documentElement;
+
+  // Keyboard height = what the visual viewport has lost from the bottom of the
+  // window. offsetTop matters: when iOS scrolls the visual viewport up to reveal
+  // a field, height alone under-reports and the sheet lands too low.
+  const inset = Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)));
+
+  if (inset < KB_MIN_INSET_PX) {
+    // ⚠ REMOVE, DO NOT SET TO ZERO. Removing restores the var() fallbacks —
+    // 85dvh, the safe-area padding, the wizard's 72vh floor — which is the exact
+    // v74 rule. Writing `0px` would instead pin real values over the top of them
+    // and quietly change the no-keyboard case, which is most of the app's life.
+    root.style.removeProperty('--kb-inset');
+    root.style.removeProperty('--sheet-max');
+    root.style.removeProperty('--sheet-pad');
+    root.style.removeProperty('--sheet-min-release');
+    return;
+  }
+
+  root.style.setProperty('--kb-inset', inset + 'px');
+  root.style.setProperty('--sheet-max', Math.round(vv.height * KB_SHEET_MAX_RATIO) + 'px');
+  // The safe-area strip is reserved for the home indicator, which is behind the
+  // keyboard right now — so it is pure wasted height on the one screen that has
+  // none to spare. Flatten it to the plain padding until the keyboard goes.
+  root.style.setProperty('--sheet-pad', '20px');
+  // Releasing the wizard's floor. See the .wizard-sheet note in styles.css.
+  root.style.setProperty('--sheet-min-release', '0px');
+}
+
+// Bound once at boot, same lifecycle as initDelegation / initSheetDragGuard /
+// initSuggestionClickSwallow. `scroll` is not optional alongside `resize`: iOS
+// fires scroll on the visual viewport (not resize) when it shifts the view to
+// reveal a focused field, and without it the sheet is correctly sized but sitting
+// in the wrong place. rAF-coalesced because both can fire many times per second.
+function initKeyboardInset() {
+  const vv = window.visualViewport;
+  if (!vv) return;
+  let pending = false;
+  const onChange = () => {
+    if (pending) return;
+    pending = true;
+    requestAnimationFrame(() => { pending = false; applyKeyboardInset(); });
+  };
+  vv.addEventListener('resize', onChange);
+  vv.addEventListener('scroll', onChange);
+  applyKeyboardInset();
+}
