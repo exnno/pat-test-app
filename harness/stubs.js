@@ -48,6 +48,19 @@ class ClassList {
 /* Markup that is nothing but autocomplete rows. See the innerHTML setter. */
 const SUGGESTION_ROWS_ONLY = /^\s*(?:<button class="suggestion-item"[^>]*>[\s\S]*?<\/button>\s*)+$/;
 
+/* v75: minimal CSSStyleDeclaration. Custom properties live in their own bag,
+   exactly as they do in the DOM: setProperty/removeProperty/getPropertyValue are
+   the only way to reach them, and getPropertyValue returns '' when absent. */
+function makeStyle() {
+  const custom = Object.create(null);
+  return {
+    _custom: custom,
+    setProperty(name, value) { custom[name] = String(value); },
+    removeProperty(name) { const v = custom[name]; delete custom[name]; return v === undefined ? '' : v; },
+    getPropertyValue(name) { return Object.prototype.hasOwnProperty.call(custom, name) ? custom[name] : ''; },
+  };
+}
+
 class StubElement {
   constructor(tag) {
     this.tagName    = String(tag || 'div').toUpperCase();
@@ -58,7 +71,12 @@ class StubElement {
     this.nodeType   = tag === '#text' ? 3 : 1;
     this.children   = [];
     this.parentNode = null;
-    this.style      = {};
+    // v75: style is a real (small) CSSStyleDeclaration rather than a bare object.
+    // The keyboard-inset fix writes and REMOVES custom properties on <html>, and
+    // the difference between "removed" and "set to 0px" is the whole fail-soft
+    // contract — a plain {} cannot express it, so a test against it would have
+    // been unable to see the distinction it most needs to check.
+    this.style      = makeStyle();
     this.dataset    = {};
     this.attributes = {};
     this._className = '';
@@ -525,6 +543,13 @@ function makeEnvironment(opts = {}) {
     devicePixelRatio: 3,
     innerWidth: 390,
     innerHeight: 844,
+
+    // v75: ABSENT BY DEFAULT, AND THAT IS DELIBERATE — it makes the fail-soft
+    // path (older iOS, no visualViewport) the harness's default state, so any
+    // test that forgets to install one is exercising "the app must still work
+    // with no keyboard support at all" rather than silently exercising nothing.
+    // opts.visualViewport installs one; tests move it with app.win.__vvSet().
+    visualViewport: opts.visualViewport || undefined,
     scrollX: 0,
     scrollY: 0,
     _listeners: {},

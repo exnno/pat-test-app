@@ -514,8 +514,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V74';",
-    to:   "const APP_VERSION = 'V74';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V75';",
+    to:   "const APP_VERSION = 'V75';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -634,8 +634,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V72</strong> &middot; August 2026</p>',
-    to:   '        <p><strong>V71</strong> &middot; August 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V72</strong> &middot; August 2026</p>',
+    from: '        <p><strong>V73</strong> &middot; August 2026</p>',
+    to:   '        <p><strong>V73</strong> &middot; August 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V72</strong> &middot; August 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -680,6 +680,63 @@ const MUTATIONS = [
     from: "  const ctx = _scanTarget();\n  if (!ctx) { _scanReset(); return; }",
     to:   "  const ctx = _scanTarget();\n  if (!ctx) { _scanReset(); _scanPoisonUntil = Date.now() + 200; return; }",
     why:  'the over-correction. _scanTarget() declines many times a second during normal typing, so arming there blanks a genuine scan for a fifth of a second after every field the engineer leaves — trading a rare wrong number for frequent missing ones',
+  },
+
+  {
+    name: 'M89 (V75) the keyboard inset is zeroed instead of removed',
+    file: 'events.js',
+    from: "    root.style.removeProperty('--kb-inset');",
+    to:   "    root.style.setProperty('--kb-inset', '0px');",
+    why:  'the plausible wrong fix, and the one that would have shipped. Every keyboard-UP test passes identically; what breaks is the keyboard-DOWN case, because a pinned 0px overrides the var() fallback instead of restoring it. Most of the app\'s life is spent with the keyboard down, so this is the state that matters most and the only one that shows it',
+  },
+  {
+    name: 'M90 (V75) offsetTop is dropped from the inset measurement',
+    file: 'events.js',
+    from: "  const inset = Math.max(0, Math.round(window.innerHeight - (vv.height + vv.offsetTop)));",
+    to:   "  const inset = Math.max(0, Math.round(window.innerHeight - vv.height));",
+    why:  'the naive measurement. Correct whenever iOS has not shifted the view, wrong by exactly the shift amount when it has — so the sheet lands partly back under the keyboard on the one occasion the fix was needed, and reads as "it did not work" rather than as an arithmetic error',
+  },
+  {
+    name: 'M91 (V75) only resize is bound, not scroll',
+    file: 'events.js',
+    from: "  vv.addEventListener('scroll', onChange);",
+    to:   "  void 0;",
+    why:  'the half-binding. iOS fires scroll, not resize, when it shifts the visual viewport to reveal a focused field — so the sheet is correctly sized but sitting in the wrong place, which is one of the two halves of the original bug left intact',
+  },
+  {
+    name: 'M92 (V75) the wizard height floor is never released',
+    file: 'events.js',
+    from: "  root.style.setProperty('--sheet-min-release', '0px');",
+    to:   "  void 0;",
+    why:  'the sheet nobody re-checks. Everything else is a CAP, and a cap that is too generous merely fails to help; a FLOOR of 72vh actively forces the wizard taller than the space above the keyboard, so it overflows off its own top — the title vanishes upward and it presents as an entirely different fault',
+  },
+  {
+    name: 'M93 (V75) the shell stops reading the inset',
+    file: 'styles.css',
+    from: "  bottom: var(--kb-inset, 0px);",
+    to:   "  bottom: 0;",
+    why:  'the disconnected half. The JS still publishes perfect values and nothing consumes them, so every behavioural assertion about the measurement stays green while no sheet moves at all. This is why the CSS seam is asserted separately from the mechanism',
+  },
+  {
+    name: 'M94 (V75) the welcome list loses its scroller',
+    file: 'render-core.js',
+    from: 'class="welcome-list sheet-scroll"',
+    to:   'class="welcome-list"',
+    why:  'V74\'s actual shipped bug, restored. The shell has been capped with overflow:hidden since v57, so an unmarked list clips instead of scrolling and takes the Continue button with it — the modal announcing the release cannot be dismissed',
+  },
+  {
+    name: 'M95 (V75) focusInSheet stops preventing the document scroll',
+    file: 'utils.js',
+    from: "    el.focus({ preventScroll: true });",
+    to:   "    el.focus();",
+    why:  'the helper reduced to a wrapper around the bug it exists to fix. Focus still lands, the form still works, and iOS still drags the fixed sheet around the screen on every open — the failure is invisible to anything that only checks the field got focus',
+  },
+  {
+    name: 'M96 (V75) a bare focus() creeps back into a sheet',
+    file: 'feedback.js',
+    from: "    if (!v) { if (inp) focusInSheet(inp); return; }",
+    to:   "    if (!v) { if (inp) { try { inp.focus(); } catch (e) {} } return; }",
+    why:  'the regression shape this release is most exposed to. Five call sites were converted by hand; one reverting looks like tidy defensive code and reintroduces the jump on a single path, which is the hardest kind to notice in the field',
   },
 
 ];
