@@ -1,4 +1,4 @@
-# PATGo — Code Map (V75)
+# PATGo — Code Map (V76)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -88,11 +88,30 @@ is discoverable from the file you happen to be editing.
     must REMOVE the properties, never set them to `0px`, or the fallback is
     shadowed and the no-keyboard case silently changes.
 
-14. **A sheet child that can grow long must be marked `.sheet-scroll`.** The
-    shell is capped with `overflow: hidden`, so an unmarked body clips instead of
-    scrolling and takes whatever follows it — usually the buttons — with it. This
-    is what broke V74's welcome modal. Not enforced anywhere; check by eye when
-    adding a sheet.
+14. **A sheet child that can grow long must be marked `.sheet-scroll`, and
+    anything BELOW it must be marked `.sheet-pin`.** The shell is capped with
+    `overflow: hidden`, so an unmarked body clips instead of scrolling and takes
+    whatever follows it — usually the buttons — with it. This is what broke V74's
+    welcome modal and, from v33 until V76, the first-run wizard. Both halves are
+    needed: the sheet is a flex column, so an unpinned sibling under a scroller is
+    compressed away instead of clipped, which looks different and is just as bad.
+
+    `.sheet-scroll` is now the ONLY sheet scroller in the stylesheet — V76 deleted
+    `.wizard-body`'s private copy (it omitted `min-height: 0`, which is the whole
+    defect: a flex child will not shrink below its content without it) and reduced
+    `.bug-sheet-body` to its padding. Do not write a third. The only other flex
+    scroller in the file is `.report-preview-view`, which is a full-screen view
+    rather than a sheet.
+
+    ⚠ `.sheet-pin` must be applied in the MARKUP, per site, never as
+    `flex-shrink: 0` on the element's own class. The things needing pins include
+    `.btn-primary`, `.input-big` and `.quick-grid`, all used all over the app
+    outside sheets. Harness 12g fails if one of those rules grows a `flex-shrink`.
+
+    Enforced by harness test 12: per-site assertions for the marked sites, plus
+    12d, which parses the stylesheet and fails on ANY rule that declares
+    `overflow-y: auto` with `flex: 1 1 auto` and no `min-height: 0` — including
+    rules for sheets that do not exist yet.
 
 15. **Banned: locking body scroll while a sheet is open.** Same family as the
     `100dvh + overflow:hidden` layout rolled back in v12.1. Harness 11i asserts
@@ -140,7 +159,11 @@ NOT in `index.html`, NOT in `sw.js` ASSETS — test 01c fails if either changes.
 **Touch to:** validate a release (`node harness/run.js`, `node harness/mutate.js`),
 or add this release's assertions and mutations. Never delete from `tests/`.
 **Coupling:** derives load order from `index.html`; source-guards `report.js`,
-`csv.js` and the flat-field writers (rule 7); asserts rules 1, 8, 9, 11.
+`csv.js` and the flat-field writers (rule 7); asserts rules 1, 8, 9, 11, 14, 15.
+⚠ Two mutations are anchored on text that ROLLS every release and abort silently
+if not re-pointed: **M66** (`APP_VERSION` in config.js) and **M82** (the oldest
+About changelog entry). Re-point both as part of the release, and treat a non-zero
+abort count as a failed run — an aborted mutation is not a caught one.
 See `harness/README.md`.
 
 ---

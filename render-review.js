@@ -221,6 +221,13 @@ function renderOverview() {
   // v11: bulk-edit Type dialog. Shows the active preset's quick-picks above a
   // free-text input — same pattern as the entry screen but laid out for a
   // bottom sheet. Tapping a quick-pick fills the input.
+  //
+  // v76: the grid scrolls; the input and Apply button are pinned. ⚠ THIS IS THE
+  // WORST OF THE THREE growth cases, for two reasons that compound. The grid is
+  // EVERY item type in the active preset — the entry screen shows nine, a preset
+  // can hold far more — and this sheet also puts the keyboard up, so it is
+  // fighting the reduced --sheet-max at the same time. The pins go on the markup
+  // and not on .input-big or .btn-primary, which are used all over the app.
   const typeQuickButtons = (state.itemTypes || []).map(t =>
     `<button class="quick-btn" data-action="bulk-type-quick" data-arg="${escapeHTML(t)}" data-bulk-type-quick="${escapeHTML(t)}">${escapeHTML(t)}</button>`
   ).join('');
@@ -233,9 +240,9 @@ function renderOverview() {
         <h3 class="bulk-sheet-title">Change type for ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</h3>
         <button class="fail-close-btn" id="bulk-type-cancel" data-action="bulk-cancel" aria-label="Cancel">×</button>
       </div>
-      <div class="quick-grid" style="margin-bottom:10px">${typeQuickButtons}</div>
-      <input class="input-big" id="bulk-type-input" data-input-action="bulk-type" value="${escapeHTML(state.bulkEdit.typeValue)}" placeholder="…or type custom" autocomplete="off" style="margin-bottom:14px">
-      <button class="btn-primary" id="bulk-type-apply" data-action="bulk-type-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
+      <div class="quick-grid sheet-scroll" style="margin-bottom:10px">${typeQuickButtons}</div>
+      <input class="input-big sheet-pin" id="bulk-type-input" data-input-action="bulk-type" value="${escapeHTML(state.bulkEdit.typeValue)}" placeholder="…or type custom" autocomplete="off" style="margin-bottom:14px">
+      <button class="btn-primary sheet-pin" id="bulk-type-apply" data-action="bulk-type-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
     </div>
   ` : '';
 

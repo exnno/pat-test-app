@@ -8,30 +8,44 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Sheet-scroller audit — the V75 spill-over
+### ~~Sheet-scroller audit + fix — the V75 spill-over~~ — SHIPPED IN V76
+The audit ran across all 30 sheet render sites and the fix followed in the same
+release. Found: three sheets whose body grows from USER DATA with no scroller
+(fail-reason picker, Multi Pick, bulk Change type), one half-done (preset
+switcher, list marked but the Edit button under it unpinned), three
+caller-supplied copy sheets in `feedback.js`, and one genuine defect — the
+first-run wizard's `.wizard-body` hand-rolled the scroller and omitted
+`min-height: 0`, so it never scrolled and the shell clipped its buttons, from
+v33 until V76.
 
-**Not scheduled; sized and understood.** V75 fixed the welcome modal, which
-could not be dismissed because its body was never marked `.sheet-scroll` and the
-shell (capped with `overflow: hidden` since V57) clipped it and took the Continue
-button with it. That was one instance of a class, and the class is not enforced
-anywhere.
+Root cause recorded because it outlives the instances: there were THREE scroller
+implementations (`.sheet-scroll`, `.bug-sheet-body`, `.wizard-body`), so a sheet
+could opt out of the rule by accident. V76 collapsed them to one and added
+`.sheet-pin` for the sibling-below half. See MAP.md rule 14.
 
-The rule: **a sheet child that can grow long must carry `.sheet-scroll`, and
-anything below it must be `flex-shrink: 0`.** Around 28 sheet render sites across
-five files. Most are short and fixed-height and genuinely fine; the ones to check
-are any whose body length depends on data (preset lists, client/site pickers,
-bulk menus, asset history) or on copy that a future release might lengthen.
+Deliberately NOT changed, and still true: the Photos sheet carries `.sheet-scroll`
+on the SHELL rather than a body child — it works only because that rule sits later
+in the stylesheet than the shell's `overflow: hidden`, and its header scrolls away
+with the content. Correct by coincidence. Photo count is capped so it cannot grow
+unboundedly; tidy it if that sheet is ever touched for another reason.
 
-⚠ Do this as a read-and-list pass FIRST, and do not fix as you go — the output
-should be a table of "sheet / body element / can it grow / marked?" so the actual
-fix is one reviewed change set rather than 28 judgement calls made while reading.
-A test is possible but not trivial: the shape would be a source guard asserting
-every `.fail-sheet`/`.bulk-sheet` block contains either a `.sheet-scroll` child
-or a fixed-height body, which needs the markup parsed rather than grepped.
+### General sheet-markup guard — the part of the audit not built
 
-⚠ Note the V11 lesson while doing it: the welcome list was safe when written and
-became unsafe when the copy grew, four years of releases later. "It fits today"
-is not the same property as "it cannot overflow".
+**Not scheduled.** Harness 12d catches any CSS rule that hand-rolls a scroller
+without `min-height: 0`, which covers sheets nobody has written yet. What it does
+NOT catch is a new sheet whose growing body is never marked at all — there is no
+rule to inspect, because the mistake is an absence.
+
+The shape would be a source guard that parses every `.fail-sheet`/`.bulk-sheet`
+block in the render files and asserts each contains either a `.sheet-scroll` child
+or a body that cannot grow. That needs the markup parsed rather than grepped.
+
+⚠ Why this was left out of V76 rather than bolted on: "can this body grow" is a
+judgement about DATA, not a property visible in the markup — a `<p>` of fixed copy
+and a `<p>` of caller-supplied text look identical. A guard that guesses wrong in
+the permissive direction goes green while proving nothing, which is the exact
+hollow-assertion shape the harness exists to prevent. It wants its own spec round,
+starting with how the test decides "can grow" without being told per site.
 
 ### ~~V75 — bottom sheets versus the on-screen keyboard~~ — SHIPPED
 Sheets now measure `window.visualViewport` and publish four custom properties to

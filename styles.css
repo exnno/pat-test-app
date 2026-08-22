@@ -548,6 +548,19 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   flex: 1 1 auto;
   min-height: 0;
 }
+/* v76: the other half of the .sheet-scroll rule, and the half that kept getting
+   forgotten. Marking the growing child is not enough on its own — the sheet is a
+   flex column, so a sibling BELOW the scroller compresses instead of holding its
+   size, and what gets compressed is always the button you need to tap. The v74
+   welcome modal was exactly this, and the v75 fix for it invented a one-off
+   `.welcome-continue` rule; this is that rule generalised.
+   ⚠ WHY A UTILITY CLASS AND NOT A RULE PER ELEMENT. Several of the things needing
+   a pin are SHARED classes — .btn-primary, .input-big, .quick-grid — used all
+   over the app outside sheets. Giving them flex-shrink:0 globally would reach far
+   past the sheets. The pin has to be applied per SITE, in the markup, and that
+   means it has to be a class you add. It is also greppable, which is what lets
+   harness test 12 assert on it. */
+.sheet-pin { flex-shrink: 0; }
 @keyframes slide-up {
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
@@ -1838,7 +1851,8 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
    v45: given a STABLE SHAPE so the action buttons no longer jump as you page
    between steps of different heights. The sheet has a consistent min-height; the
    content sits in a scrolling .wizard-body and the actions in a pinned .wizard-foot
-   that's always in the same place. */
+   that's always in the same place. v76: .wizard-body's scrolling now comes from
+   the shared .sheet-scroll class, not from a rule of its own — see below. */
 /* v45.1: paging the wizard calls render() which rebuilds #app, so the backdrop is
    a new node each step and replayed its `fade-in` — a visible flash on every
    Next/Back. Suppress it (the wizard opens once then just swaps content; other
@@ -1866,11 +1880,21 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
      other one-shot sheets keep their slide-up.) */
   animation: none;
 }
-.wizard-body {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-}
+/* v76: ⚠ THE .wizard-body RULE THAT USED TO SIT HERE IS GONE, AND ITS ABSENCE IS
+   THE FIX. It hand-rolled the scroller — `flex: 1 1 auto; overflow-y: auto;
+   -webkit-overflow-scrolling: touch` — and omitted `min-height: 0`. That single
+   missing property is the whole defect: a flex child will not shrink below its
+   content height without it, so the wizard body never shrank, never scrolled,
+   and the shell's `overflow: hidden` clipped it. Because .wizard-foot IS pinned,
+   what got clipped was the buttons — Continue, Back and Skip — on the very first
+   screen a new install shows. Identical in effect to the v74 welcome modal.
+   The markup now carries `.sheet-scroll` (render-core.js) instead, so there is
+   one scroller implementation in this stylesheet rather than three. The
+   `.wizard-body` class stays in the markup as the semantic name for the region;
+   it just no longer carries behaviour of its own.
+   ⚠ DO NOT re-add a .wizard-body rule with layout properties. If the wizard needs
+   its own padding or spacing some day, add it under a name that cannot be
+   mistaken for the scroller. */
 .wizard-foot {
   flex: 0 0 auto;
   padding-top: 10px;
@@ -3172,11 +3196,12 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
    that most needs it, because it is a form with a text area. Same fallback shape
    as the shell: no keyboard, no property, 88vh stands. */
 .bug-sheet { max-height: var(--sheet-max, 88vh); display: flex; flex-direction: column; }
+/* v76: this rule was CORRECT — it had min-height:0 and everything else the shared
+   class has. It was converted anyway, and only because it was the third copy: with
+   .wizard-body's version deleted and this one reduced to its padding, .sheet-scroll
+   is the only scroller in the stylesheet, so "did this sheet opt out" becomes one
+   grep instead of three. Nothing about the bug sheet's behaviour changes. */
 .bug-sheet-body {
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
-  flex: 1 1 auto;
-  min-height: 0;
   padding-bottom: 4px;
 }
 

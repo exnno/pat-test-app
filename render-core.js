@@ -227,8 +227,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Pop-up panels stay above the keyboard.</strong> Anywhere you type into a panel that slides up from the bottom, it now sits clear of the keyboard instead of hiding underneath it, and the screen stops sliding about as you type.</li>
-        <li><strong>Buttons in those panels can always be reached.</strong> If a panel is taller than the space it has, the middle of it now scrolls and the buttons stay put at the bottom &mdash; including this one.</li>
+        <li><strong>Long lists in pop-up panels now scroll properly.</strong> The fail-reason panel, Multi Pick and bulk &ldquo;Change type&rdquo; used to cut off the bottom of the list if you'd set up a lot of items. The list scrolls and the buttons stay put.</li>
+        <li><strong>First-time setup can't lose its buttons.</strong> On a small screen the setup screens could push Continue off the bottom. Fixed.</li>
         <li><strong>Nothing else has changed.</strong> Every screen, setting and job is exactly where you left it.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
@@ -378,7 +378,7 @@ function render() {
       <div class="bulk-sheet wizard-sheet" style="z-index:301" role="dialog" aria-label="First-time setup">
         <div class="bulk-sheet-handle"></div>
         ${stepIndicator}
-        <div class="wizard-body">${bodyHTML}</div>
+        <div class="wizard-body sheet-scroll">${bodyHTML}</div>
         <div class="wizard-foot">${footHTML}</div>
       </div>
     `;
@@ -1320,13 +1320,22 @@ function renderEntry() {
 
   let failSheetInner = '';
   if (state.failModalStage === 'reasons') {
+    // v76: the grid scrolls and the "Other…" button is pinned below it. The reason
+    // list is USER-EDITABLE (Settings → Fail Reasons), so this grid's height is
+    // set by data, not by us — at two columns and 18px of padding a button, a
+    // long list runs past the shell's cap and everything after it is lost.
+    // ⚠ WHY THE BOUNDARY IS HERE and not around the grid AND the button: "Other…"
+    // is the escape hatch for a fail that matches none of the listed reasons, so
+    // it is exactly the control a user with a long custom list still needs to
+    // reach. Scrolling it away would make a long reason list actively worse than
+    // a short one.
     failSheetInner = `
-      <div class="fail-reasons-grid">
+      <div class="fail-reasons-grid sheet-scroll">
         ${state.failReasons.map(r => `
           <button class="fail-reason-btn" data-action="fail-reason" data-arg="${escapeHTML(r)}" data-reason="${escapeHTML(r)}">${escapeHTML(r)}</button>
         `).join('')}
       </div>
-      <button class="fail-other-btn" id="fail-other-btn" data-action="fail-other">Other…</button>
+      <button class="fail-other-btn sheet-pin" id="fail-other-btn" data-action="fail-other">Other…</button>
     `;
   } else {
     failSheetInner = `
@@ -1342,8 +1351,12 @@ function renderEntry() {
   // container id is what session.js's refreshFailPhotoStrip() targets for its
   // DOM-only update, which is what keeps the "Other…" textarea and its keyboard
   // alive when a photo lands (the v60.1 rule).
+  // v76: pinned. This row is the LAST child of the fail sheet on both stages, so
+  // it is the first thing a flex column gives up when the grid above it grows.
+  // On the "Other…" stage there is nothing above it that can grow, and the pin is
+  // harmless there — flex-shrink:0 on a child that was never being shrunk.
   const failPhotoRow = `
-    <div class="fail-photo-row">
+    <div class="fail-photo-row sheet-pin">
       <div class="fail-photo-strip" id="fail-photo-strip">${renderFailPhotoStripInner()}</div>
       <input type="file" id="fail-photo-file" data-change-action="fail-photo-file" accept="image/*" style="display:none">
     </div>
@@ -1404,8 +1417,12 @@ function renderEntry() {
   let multiPickSheet = '';
   if (state.multiPickSheetOpen) {
     const slots = activeMultiPickSlots();
+    // v76: scroller. One two-line row per configured multi-pick, and the count is
+    // the user's — nothing below it in this sheet, so an overlong list does not
+    // hide a button, it just makes the later options unreachable, which is the
+    // same bug wearing a quieter face.
     const body = slots.length ? `
-      <div class="multipick-list">
+      <div class="multipick-list sheet-scroll">
         ${slots.map((s, i) => {
           const seqText = s.items.join(' · ');
           const hasName = !!s.name;
@@ -1467,7 +1484,7 @@ function renderEntry() {
           `;
         }).join('')}
       </div>
-      <button class="preset-switch-edit" data-action="preset-sheet-edit">⚙ Edit presets</button>
+      <button class="preset-switch-edit sheet-pin" data-action="preset-sheet-edit">⚙ Edit presets</button>
     ` : `
       <p class="multipick-empty">No presets set up yet. Add them in Settings.</p>
     `;

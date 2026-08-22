@@ -36,6 +36,17 @@ function showToast(message) {
 // Self-contained, no state, no re-render — purely transient overlay UI.
 
 // Shared low-level builder. Returns { sheet, backdrop, cleanup }.
+//
+// v76: all three sheets built on this — confirm, name, info — now mark their
+// message paragraph `.sheet-scroll` and pin whatever sits below it. ⚠ THE REASON
+// IS NOT THAT ANY CURRENT CALLER OVERFLOWS. None does. The message is supplied by
+// the CALLER, so its length is not a property of this file and cannot be checked
+// here; the info sheet in particular is the app's error reporter, where a long
+// message is the normal case rather than the odd one. This is the v11 welcome-list
+// lesson applied before it bites: that list was safe when written and became
+// unsafe when someone added a bullet.
+// Note the flex-grow in .sheet-scroll cannot stretch a short message — the sheet
+// is sized by its content up to the cap, so there is no free space to distribute.
 function _openSheet(ariaLabel) {
   const backdrop = document.createElement('div');
   backdrop.className = 'modal-backdrop';
@@ -75,8 +86,8 @@ function openConfirmSheet(opts) {
       <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
       <button class="fail-close-btn" id="confirm-sheet-cancel" aria-label="Cancel">&times;</button>
     </div>
-    ${message ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
-    <div style="display:flex;gap:10px;margin-top:4px">
+    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
+    <div class="sheet-pin" style="display:flex;gap:10px;margin-top:4px">
       <button class="btn-secondary" id="confirm-sheet-no">${escapeHTML(cancelLabel)}</button>
       <button class="${danger ? 'btn-danger' : 'btn-primary'}" id="confirm-sheet-yes" style="flex:1">${escapeHTML(confirmLabel)}</button>
     </div>
@@ -114,9 +125,9 @@ function openNameSheet(opts) {
       <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
       <button class="fail-close-btn" id="name-sheet-cancel" aria-label="Cancel">&times;</button>
     </div>
-    ${blurb ? `<p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text-muted)">${escapeHTML(blurb)}</p>` : ''}
-    <input class="input" id="name-sheet-input" value="${escapeHTML(value)}" placeholder="${escapeHTML(placeholder)}" autocapitalize="on" autocomplete="off" maxlength="${maxlength}">
-    <button class="btn-primary" id="name-sheet-save" style="margin-top:12px">${escapeHTML(confirmLabel)}</button>
+    ${blurb ? `<p class="sheet-scroll" style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text-muted)">${escapeHTML(blurb)}</p>` : ''}
+    <input class="input sheet-pin" id="name-sheet-input" value="${escapeHTML(value)}" placeholder="${escapeHTML(placeholder)}" autocapitalize="on" autocomplete="off" maxlength="${maxlength}">
+    <button class="btn-primary sheet-pin" id="name-sheet-save" style="margin-top:12px">${escapeHTML(confirmLabel)}</button>
   `;
   document.body.appendChild(backdrop);
   document.body.appendChild(sheet);
@@ -166,8 +177,8 @@ function openInfoSheet(opts) {
       <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
       <button class="fail-close-btn" id="info-sheet-close" aria-label="Close">&times;</button>
     </div>
-    ${message ? `<p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
-    <button class="btn-primary" id="info-sheet-ok">${escapeHTML(buttonLabel)}</button>
+    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
+    <button class="btn-primary sheet-pin" id="info-sheet-ok">${escapeHTML(buttonLabel)}</button>
   `;
   document.body.appendChild(backdrop);
   document.body.appendChild(sheet);

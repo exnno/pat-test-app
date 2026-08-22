@@ -8,6 +8,18 @@ Every capability and release entry, one `##` section each.
 
 ---
 
+## Sheet scrollers, audited and unified (V76)
+
+**The follow-on V75 promised.** V75 fixed the welcome modal and said plainly that other sheets might carry the same latent risk, and that a proper audit belonged on the backlog rather than being half-done in that release. This is that audit and its fix, in one change set.
+
+**What the audit found.** All 30 sheet render sites were read. Most are genuinely fine. Three have a body whose height is set by the USER'S OWN DATA and no scroller at all: the fail-reason picker (the reason list is editable in Settings, and "Other…" plus the camera button sit below it), Multi Pick, and bulk "Change type" on the Overview — which is the worst of them, because it shows every item type in the active preset AND puts the keyboard up, so it fights the reduced cap at the same time. One was half-done: the preset switcher's list was marked in v47 but the "Edit presets" button below it never was, so it compresses instead of clipping — a different symptom of the same fault. Three more in `feedback.js` take their message text from whoever calls them, including the app's own error reporter, where long text is the normal case rather than the odd one.
+
+**And one real defect, shipped since v33.** The first-run wizard's body hand-rolled its own scroller and omitted a single property, `min-height: 0`. A flex child will not shrink below its content height without it, so the body never shrank, never scrolled, and the shell clipped it — and because the wizard's button row IS pinned, the clipped part was Continue, Back and Skip. On the first screen a new install ever shows. It survived four dozen releases because it only bites on a short screen or with the keyboard up, and the rule it broke was written down but not enforced.
+
+**The root cause, which mattered more than the instances.** There were three separate scroller implementations in the stylesheet — the shared class and two hand-rolled copies. A rule only helps if it is the only way to do the thing; two private copies is precisely how a sheet opts out of it by accident. V76 deletes one, reduces the other to the padding it actually needed, and adds `.sheet-pin` for the other half of the rule (the sibling below a scroller, which V75 had solved with a one-off). The harness now fails on any rule anywhere that scrolls, takes the free space and omits `min-height: 0` — including rules for sheets nobody has written yet, which is the only part of this that does not decay.
+
+Nothing about how the app records a test changed.
+
 ## Bottom sheets and the on-screen keyboard (V75)
 
 Every panel that slides up from the bottom of the screen — the fail reason picker, the readings sheet, bulk edit, the bug report form, first-time setup, the confirm dialogs — is `position: fixed` and anchored to the bottom of the viewport. **On iOS the keyboard does not shrink the layout viewport, only the visual one**, so a fixed element keeps its full-screen geometry and its lower part, buttons included, ends up underneath the keyboard. iOS then tries to rescue the focused field by scrolling the document, which drags the fixed overlay around, while the sheet's own scroller moves independently. Two scrollers plus a mispositioned overlay is what the sliding-about was. The fix measures `window.visualViewport` — the only thing that knows the true visible rectangle — and publishes four custom properties onto `<html>`, which the sheet CSS reads: how far the keyboard has eaten into the bottom, how much height actually exists above it, a flattened bottom padding, and a release for the wizard's height floor.
