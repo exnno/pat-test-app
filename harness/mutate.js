@@ -514,8 +514,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V75';",
-    to:   "const APP_VERSION = 'V75';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V76';",
+    to:   "const APP_VERSION = 'V76';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -634,8 +634,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V73</strong> &middot; August 2026</p>',
-    to:   '        <p><strong>V73</strong> &middot; August 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V72</strong> &middot; August 2026</p>',
+    from: '        <p><strong>V74</strong> &middot; August 2026</p>',
+    to:   '        <p><strong>V74</strong> &middot; August 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V73</strong> &middot; August 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -737,6 +737,69 @@ const MUTATIONS = [
     from: "    if (!v) { if (inp) focusInSheet(inp); return; }",
     to:   "    if (!v) { if (inp) { try { inp.focus(); } catch (e) {} } return; }",
     why:  'the regression shape this release is most exposed to. Five call sites were converted by hand; one reverting looks like tidy defensive code and reintroduces the jump on a single path, which is the hardest kind to notice in the field',
+  },
+  {
+    name: 'M97 (V76) the wizard body loses the shared scroller',
+    file: 'render-core.js',
+    from: 'class="wizard-body sheet-scroll"',
+    to:   'class="wizard-body"',
+    why:  "V76's actual shipped defect, restored. With no scroller and .wizard-foot pinned, the shell's overflow:hidden clips the buttons — Continue, Back and Skip — off the bottom of the first screen a new install ever shows. The wizard still LOOKS right on a tall phone, which is why it survived from v33 to v76",
+  },
+  {
+    name: 'M98 (V76) the shared scroller loses min-height:0',
+    file: 'styles.css',
+    from: '  flex: 1 1 auto;\n  min-height: 0;\n}\n/* v76: the other half',
+    to:   '  flex: 1 1 auto;\n}\n/* v76: the other half',
+    why:  'one property, every sheet. A flex child will not shrink below its content height without it, so nothing scrolls anywhere and every marked sheet clips instead — and the rule still reads as a scroller at a glance, which is exactly how it went unnoticed in .wizard-body',
+  },
+  {
+    name: 'M99 (V76) a new hand-rolled scroller appears without min-height:0',
+    file: 'styles.css',
+    from: '.sheet-pin { flex-shrink: 0; }',
+    to:   '.sheet-pin { flex-shrink: 0; }\n.some-new-sheet-body { overflow-y: auto; flex: 1 1 auto; -webkit-overflow-scrolling: touch; }',
+    why:  'the FUTURE version of this release\'s bug, and the only mutation here that no per-site assertion can catch. A later release adds a sheet, gives its body a private scroller rule, and omits the one property — 12d has to notice a rule it has never been told about',
+  },
+  {
+    name: 'M100 (V76) the fail-reason grid loses its scroller',
+    file: 'render-core.js',
+    from: 'class="fail-reasons-grid sheet-scroll"',
+    to:   'class="fail-reasons-grid"',
+    why:  'the most-used sheet on the entry screen, and its height belongs to the user — the reason list is editable in Settings. Unmarked, a long list pushes Other… and the camera button off the bottom, so the fails that need a photo are the ones that cannot get one',
+  },
+  {
+    name: 'M101 (V76) the Other… button loses its pin',
+    file: 'render-core.js',
+    from: 'class="fail-other-btn sheet-pin"',
+    to:   'class="fail-other-btn"',
+    why:  'the half-fix, and the shape V75 shipped in .welcome-continue before it was generalised. The grid scrolls correctly and the escape hatch below it is compressed away instead — a user with a long custom reason list is left worse off than one with a short list',
+  },
+  {
+    name: 'M102 (V76) the bulk-type grid loses its scroller',
+    file: 'render-review.js',
+    from: 'class="quick-grid sheet-scroll"',
+    to:   'class="quick-grid"',
+    why:  'the worst of the three growth cases: every item type in the preset AND a keyboard sheet, so it is fighting the reduced --sheet-max at the same time. The custom-type input and the Apply button are what get lost, which means the bulk edit cannot be completed at all',
+  },
+  {
+    name: 'M103 (V76) the info sheet OK button loses its pin',
+    file: 'feedback.js',
+    from: 'class="btn-primary sheet-pin" id="info-sheet-ok"',
+    to:   'class="btn-primary" id="info-sheet-ok"',
+    why:  'this sheet is the app\'s error reporter and has NO timer by design — it must stay until acknowledged. An unpinned button under a long error message is a dialog that cannot be dismissed, on the exact path where the user is already being told something went wrong',
+  },
+  {
+    name: 'M104 (V76) the pin is applied globally to a shared class instead',
+    file: 'styles.css',
+    from: '.btn-primary { width: 100%;',
+    to:   '.btn-primary { flex-shrink: 0; width: 100%;',
+    why:  'the tempting shortcut. It fixes every sheet at once and reaches every .btn-primary in the app, including ones in flex rows on screens nobody was testing — a layout change disguised as a sheet fix. 12g exists so the pin stays a per-site decision',
+  },
+  {
+    name: 'M105 (V76) the scroller class is misspelled at one site',
+    file: 'render-core.js',
+    from: 'class="multipick-list sheet-scroll"',
+    to:   'class="multipick-list sheet-scoll"',
+    why:  'the failure that looks like success. A near-miss spelling matches no rule, so the sheet behaves exactly as it did before the fix, and a grep for the correct class simply finds one fewer than it should — nothing about the markup looks wrong',
   },
 
 ];
