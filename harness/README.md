@@ -109,9 +109,11 @@ went red. No browser returns 0 from `setTimeout`; a stub that does is modelling
 something impossible and inventing a bug to match. That was the sixth time in
 this suite a red assertion turned out to be the test's fault.
 
-⚠ **This file and the repo-root `README.md` are near-duplicates and have already
-drifted** — V76's abort paragraph landed in one of them only. Edit both, or split
-them properly in a release that has documentation as its concern.
+The repo-root `README.md` used to be a stale copy of THIS file — same document in
+two places, already drifted by one release (V76's abort paragraph landed in one of
+them only). V77 split them: the root README describes the app, its stack and the
+release process; this one describes the harness. They are no longer duplicates and
+should not be re-synced.
 
 ---
 
