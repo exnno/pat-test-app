@@ -187,10 +187,23 @@ class StubElement {
   }
   // Synchronous dispatch. Real browsers are synchronous for dispatchEvent too,
   // so tests that fire an event can assert on the result on the next line.
+  //
+  // ⚠ v77: a real element fires BOTH its addEventListener registrations and its
+  // `on<type>` property handler. This stub used to fire only the former, which
+  // made every `el.ontouchstart = …` binding in the app invisible to
+  // dispatchEvent — so a test for one had no choice but to reach in and call the
+  // property by hand, which is the V67 "listener was never bound" shape wearing
+  // a disguise: a handler that is written but never attached passes a hand-call
+  // and fails on the phone. Firing both means a hold gesture, or anything else
+  // bound by property, can be driven through the same surface the browser uses.
+  // Property handler runs after the listeners, matching registration order for
+  // the common case where only one of the two exists.
   dispatchEvent(ev) {
     ev.target ||= this;
     ev.currentTarget = this;
     (this._listeners[ev.type] || []).forEach(fn => fn.call(this, ev));
+    const prop = this['on' + ev.type];
+    if (typeof prop === 'function') prop.call(this, ev);
     return !ev.defaultPrevented;
   }
 

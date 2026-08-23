@@ -514,8 +514,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V76';",
-    to:   "const APP_VERSION = 'V76';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V77';",
+    to:   "const APP_VERSION = 'V77';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -634,8 +634,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V74</strong> &middot; August 2026</p>',
-    to:   '        <p><strong>V74</strong> &middot; August 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V73</strong> &middot; August 2026</p>',
+    from: '        <p><strong>V75</strong> &middot; August 2026</p>',
+    to:   '        <p><strong>V75</strong> &middot; August 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V74</strong> &middot; August 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -800,6 +800,126 @@ const MUTATIONS = [
     from: 'class="multipick-list sheet-scroll"',
     to:   'class="multipick-list sheet-scoll"',
     why:  'the failure that looks like success. A near-miss spelling matches no rule, so the sheet behaves exactly as it did before the fix, and a grep for the correct class simply finds one fewer than it should — nothing about the markup looks wrong',
+  },
+
+  {
+    name: 'M106 (V77) the hold gesture is written but never bound to the grid',
+    file: 'events.js',
+    from: "  attachHoldGesture($('quick-grid'), QUICK_PICK_LONGPRESS_MS, () => {",
+    to:   "  attachHoldGesture(null, QUICK_PICK_LONGPRESS_MS, () => {",
+    why:  'THE V67 SHAPE, reproduced exactly. The helper is perfect, the callback is perfect, and nothing is attached to anything — which is how an unbound initScanner() survived three releases. Only a test that fires a real event at the real painted element can tell this from working code',
+  },
+  {
+    name: 'M107 (V77) the hold fires on touch DOWN instead of after the threshold',
+    file: 'events.js',
+    from: "    pressTimer = setTimeout(() => {\n      pressTimer = null;\n      didHold = true;\n      onHold();\n    }, ms);",
+    to:   "    didHold = true;\n    onHold();",
+    why:  'a different feature wearing the same name. Every "does the sheet open" assertion still passes; what breaks is that touching a quick-pick button to SELECT an item type now opens the preset switcher instead. The gate assertion in 13a is the only thing between these two',
+  },
+  {
+    name: 'M108 (V77) finger drift no longer aborts a pending hold',
+    file: 'events.js',
+    from: "    if (Math.abs(x - startX) > MOVE_SLOP || Math.abs(y - startY) > MOVE_SLOP) {",
+    to:   '    if (false) {',
+    why:  'scrolling the entry screen with a finger that happens to start on the grid now opens the preset sheet. Invisible in any test that presses and holds without moving, which is every test anyone writes first',
+  },
+  {
+    name: 'M109 (V77) the tap that follows a fired hold is no longer swallowed',
+    file: 'events.js',
+    from: "    if (didHold) {\n      e.stopPropagation();\n      e.preventDefault();\n      didHold = false;\n    }",
+    to:   '    if (false) {}',
+    why:  'the v47 decision-2A behaviour, silently undone. Holding Copy-last would open the ×N sheet AND log a copy behind it; holding the grid would switch preset AND change the selected item type. Both leave the app in a state the user did not ask for and did not see happen',
+  },
+  {
+    name: 'M110 (V77) the batch overwrites the item under the cursor instead of appending',
+    file: 'session.js',
+    from: "  for (let i = 0; i < total; i++) {\n    const item = {\n      id: uid(),\n      assetNo: nextAssetNo(sess),",
+    to:   "  if (state.cursor < sess.items.length) sess.items.length = state.cursor;\n  for (let i = 0; i < total; i++) {\n    const item = {\n      id: uid(),\n      assetNo: nextAssetNo(sess),",
+    why:  'THE DATA-LOSS MUTATION, and the reason repeatLastResult is modelled on multiPickFire rather than on copyLastResult. Copy-last overwrites at the cursor; a batch doing the same destroys every item after it. The count still goes up, so the toast reads correct',
+  },
+  {
+    name: 'M111 (V77) the batch takes its asset number from the form',
+    file: 'session.js',
+    from: "      assetNo: nextAssetNo(sess),   // recomputed each push off the growing list\n      location: cleanLocation,\n      itemType: cleanType,\n      notes: last.notes || '',",
+    to:   "      assetNo: state.form.assetNo.trim() || nextAssetNo(sess),\n      location: cleanLocation,\n      itemType: cleanType,\n      notes: last.notes || '',",
+    why:  'copies the line out of copyLastResult, which is correct there and wrong here: with a scanned number in the box every copy in the batch gets the SAME asset number, and duplicate asset numbers on a certificate are a real-world defect nobody notices until the client does',
+  },
+  {
+    name: 'M112 (V77) the batch blanks notes, the way copy-last does',
+    file: 'session.js',
+    from: "      notes: last.notes || '',",
+    to:   "      notes: '',",
+    why:  "a fail's REASON lives in the notes field (pickFailReason appends it there). Blanking it turns a batch of failures into a run of bare fails with no reason on the certificate — the one outcome this feature must not produce",
+  },
+  {
+    name: 'M113 (V77) the count cap stops being applied',
+    file: 'session.js',
+    from: '  const total = Math.min(count, REPEAT_MAX_N);',
+    to:   '  const total = count;',
+    why:  'a mistyped 100 in the custom box buries the job in 100 rows, and there is no undo for a batch append. The cap is a damage limit, not a technical one',
+  },
+  {
+    name: 'M114 (V77) the batch is logged without a location',
+    file: 'session.js',
+    from: "  const cleanLocation = normaliseLocation(state.form.location);\n  if (!cleanLocation) {",
+    to:   "  const cleanLocation = normaliseLocation(state.form.location);\n  if (false) {",
+    why:  'location has been mandatory per item since v13. N items with a blank location is N rows that fail the same validation every other path enforces, arriving all at once',
+  },
+  {
+    name: 'M115 (V77) batch items are only timestamped when the setting is on',
+    file: 'session.js',
+    from: "    // v61: every item is stamped on first log, always. The setting gates EXPOSURE\n    // only (see config.js). Copy-last and saveItem both stamp unconditionally.\n    item.ts = new Date().toISOString();",
+    to:   "    if (state.timestampsEnabled) item.ts = new Date().toISOString();",
+    why:  'restores the exact defect V77 fixed in multipick.js. It reads as the obviously-correct thing (why stamp what is switched off?) and it permanently loses capture: turning the setting on later cannot recover a timestamp that was never written',
+  },
+  {
+    name: 'M116 (V77) multiPickFire goes back to gating timestamp capture',
+    file: 'multipick.js',
+    from: '    item.ts = new Date().toISOString();',
+    to:   '    if (state.timestampsEnabled) item.ts = new Date().toISOString();',
+    why:  'the V77 fix itself, undone. This is the line that was missed when v61 changed the rule, and it survived six releases precisely because nothing asserted on the setting being OFF',
+  },
+  {
+    name: 'M117 (V77) the preset-edit deep link leaves no return marker',
+    file: 'dispatch.js',
+    from: "    state.presetEditReturnView = 'entry';\n    setView('settingsItems');",
+    to:   "    setView('settingsItems');",
+    why:  'the reported V76 bug, restored. Back climbs into the Settings hierarchy the user never walked down. Nothing throws, nothing looks broken, and the user simply ends up somewhere else',
+  },
+  {
+    name: 'M118 (V77) the return marker is set but never honoured',
+    file: 'dispatch.js',
+    from: "    if (state.presetEditReturnView && state.view === 'settingsItems') {",
+    to:   '    if (false) {',
+    why:  'the half-fix. State is written, threaded and cleared correctly, and the branch that reads it is dead — so every test that checks the marker gets SET still passes while the user-visible behaviour is unchanged',
+  },
+  {
+    name: 'M119 (V77) the return marker survives navigating away',
+    file: 'session.js',
+    from: "  if (v !== 'settingsItems') state.presetEditReturnView = null;",
+    to:   '',
+    why:  'the staleness half, which is the one that is easy to leave out because it fixes nothing visible. Without it the marker stays armed after the user wanders off, and Back from an ordinarily-reached Quick Pick Items page later jumps them to the entry screen for no reason they can see',
+  },
+  {
+    name: 'M120 (V77) the quick-pick buttons lose their selection suppression',
+    file: 'styles.css',
+    from: '.quick-btn { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }',
+    to:   '.quick-btn { -webkit-touch-callout: none; }',
+    why:  'the reported bug, restored, and restored in the shape that is hardest to see: the callout is still suppressed so the magnifier is gone, but the labels still highlight. Asserting on the rule EXISTING rather than on its three properties would miss this',
+  },
+  {
+    name: 'M121 (V77) a fourth hold site hand-rolls the gesture',
+    file: 'render-core.js',
+    from: 'function renderEntry() {',
+    to:   "function renderEntry() {\n  const _el = document.getElementById('pass-btn');\n  if (_el) { _el.ontouchstart = () => { setTimeout(() => {}, 800); }; }",
+    why:  'THE ANTI-DECAY MUTATION. Nothing is broken and nothing behaves wrongly — a reasonable person adds a hold to one more control the direct way. That is precisely how the app reached three sheet-scroller implementations before V76, and 13n exists so the fourth one is refused rather than reviewed',
+  },
+  {
+    name: 'M122 (V77) the ×N sheet keeps its flag but loses its markup',
+    file: 'render-core.js',
+    from: '      ${repeatSheet}\n',
+    to:   '',
+    why:  'the sheet opens in state and paints nothing. Every assertion driving repeatLastResult() directly still passes, and the gesture on the phone appears to do nothing at all — the same class of miss as a data-action with no handler',
   },
 
 ];
