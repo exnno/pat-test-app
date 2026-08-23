@@ -60,6 +60,12 @@ Adding coverage for a release:
 2. **Add a matching mutation to `mutate.js`.** An assertion nobody has tried to
    break is an assertion nobody knows works.
 3. Run both. Green suite *and* zero survivors, or it isn't done.
+4. **Zero ABORTS too.** An abort means the mutation's anchor text no longer
+   exists, so nothing was broken and nothing was proved — it is not a pass, and
+   the runner reports it separately so it cannot be read as one. Two mutations
+   are anchored on text that rolls every release and will abort every time if
+   nobody re-points them: **M66** (`APP_VERSION`) and **M82** (the oldest About
+   changelog entry). Re-point them as part of the release, not afterwards.
 
 ### Before you write an assertion, ask whether it could pass on broken code
 
@@ -85,6 +91,27 @@ through a confirm sheet, `applySetupBundle()` reconciles via
 `restoreInstrumentsFromBackup()` rather than the adopt helper, and the CSV column
 flag is `visible`, not `enabled`. Inspect the actual output before "fixing"
 correct code.
+
+### v77 — the stub fires `on<type>` handlers, and why that mattered
+
+`StubElement.dispatchEvent` used to invoke only `addEventListener`
+registrations. Plenty of this app binds by PROPERTY instead
+(`el.ontouchstart = …`), and for those the only way to reach a handler was to
+call it by hand — which is the V67 "listener was never bound" blind spot in
+disguise: a handler that is written but never attached passes a hand-call and
+fails on the phone. `dispatchEvent` now fires the property handler too, after the
+listeners, the way a real element does. Do not narrow it back.
+
+The V77 timer capture (`tests/13-…`) hands out **1-based** ids. The first version
+returned 0 for the first timer, and `attachHoldGesture` guards its cancel with
+`if (pressTimer)` — so every drift-abort silently did nothing and a correct app
+went red. No browser returns 0 from `setTimeout`; a stub that does is modelling
+something impossible and inventing a bug to match. That was the sixth time in
+this suite a red assertion turned out to be the test's fault.
+
+⚠ **This file and the repo-root `README.md` are near-duplicates and have already
+drifted** — V76's abort paragraph landed in one of them only. Edit both, or split
+them properly in a release that has documentation as its concern.
 
 ---
 
