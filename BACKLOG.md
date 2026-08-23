@@ -23,16 +23,14 @@ carry no `ts` for anyone with the setting off. Not recoverable retrospectively.
 Harness 13k asserts both batch paths with the setting explicitly OFF, which is the
 case nothing had ever driven.
 
-### Documentation hygiene — the two READMEs — NOT SCHEDULED
-`README.md` (repo root) and `harness/README.md` are near-duplicate copies of the
-same harness document, and they had already drifted: V76's "zero aborts" paragraph
-went into one of them only. V77 re-synced them and added the same note to both,
-which is a patch on the symptom.
-
-The root README should describe the APP — stack, deploy process, release process
-— which is what the skill points at it for; the harness one should describe the
-harness. Splitting them is a documentation release's job, not a feature release's,
-and it wants doing before the next person edits one and not the other. Small.
+### ~~Documentation hygiene — the two READMEs~~ — SHIPPED IN V77
+`README.md` (repo root) was a stale copy of `harness/README.md` — the same
+document in two places, already drifted by one release (V76's "zero aborts"
+paragraph landed in one of them only). The root README now describes the APP:
+what it does, the stack and why there is no build step, repo layout and load
+order, how to run it and the harness, the release checklist and the deploy order.
+`harness/README.md` keeps the harness. They are different documents now and must
+not be re-synced.
 
 ### ~~Sheet-scroller audit + fix — the V75 spill-over~~ — SHIPPED IN V76
 The audit ran across all 30 sheet render sites and the fix followed in the same

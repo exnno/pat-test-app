@@ -1,137 +1,186 @@
-# PATGo test harness
+# PATGo
 
-Not shipped. Not referenced by `index.html`, not listed in `sw.js` ASSETS.
-GitHub Pages will serve these files, which is harmless — the app source is
-already public — but nothing in the app loads them.
+A portable appliance testing (PAT) app for field engineers. Offline-first
+progressive web app, built to be used one-handed on an iPhone in a plant room
+with no signal.
 
-(c) 2026 Peter Birchley. All rights reserved.
+**Live:** <https://exnno.github.io/pat-test-app>
+**Landing page:** <https://patgo.co.uk> · `hello@patgo.co.uk`
+
+(c) 2026 Peter Birchley. All rights reserved. See `LICENSE.txt` — this is
+proprietary source, published so it can be served, not for reuse.
 
 ---
 
-## Running it
+## What it does
+
+Log a job, log items against it as pass or fail, and produce the paperwork.
+Everything works in aeroplane mode; nothing needs an account.
+
+- Sessions (jobs) against a client and site, with asset numbering and retest dates
+- Quick Pick — up to nine one-tap item types, switchable presets, and Smart Quick
+  Pick, which learns what gets logged where
+- Multi Pick for a fixed mixed sequence; "Log again ×N" for a run of the same item
+- A fail flow with reasons, optional test readings, and photo evidence
+- PDF certificates and CSV export/import
+- Backup and restore to a file, and an Export/Import Setup bundle for a new phone
+- Bluetooth HID barcode scanner support (keyboard-wedge mode)
+
+`FEATURES.md` is the full reference — one `##` section per capability and per
+release. Don't read it whole: `grep -n '^## ' FEATURES.md`, then `sed` the section.
+
+---
+
+## Stack
+
+Deliberately plain. **No build step, no framework, no bundler, no `package.json`**
+in the shipped app — the files in the repo root are the files the browser loads.
+
+| | |
+|---|---|
+| Language | Vanilla HTML / CSS / JavaScript |
+| Persistence | `localStorage` for all records; IndexedDB for photo blobs |
+| Offline | Service worker (`sw.js`) precaching every asset |
+| PDF | jsPDF 3.0.3 + jsPDF-AutoTable 5.0.2, vendored and self-hosted (MIT) |
+| PDF preview | PDF.js 3.11.174 legacy UMD, vendored, lazy-loaded (Apache-2.0) |
+| Hosting | GitHub Pages from `main` |
+| Tests | `harness/` — Node, no dependencies |
+
+Third-party licences are reproduced in `THIRD-PARTY-LICENSES.txt`.
+
+The no-build choice is load-bearing rather than nostalgic: the deployed artefact
+is readable, a fix can be made from a phone through the GitHub web UI, and there
+is no toolchain to rot between releases.
+
+---
+
+## Repo layout
 
 ```
-node harness/run.js            # every standing test
+index.html            script tags, in a load order that matters
+config.js … boot.js   29 first-party modules (see below)
+styles.css            one stylesheet, ordered by release, banner-indexed
+sw.js                 service worker + the precache ASSETS list
+manifest.webmanifest  PWA manifest
+icon-192.png  icon-512.png
+jspdf.*.min.js        vendored PDF engine — precached, not <script>-tagged
+harness/              the committed test harness — NOT shipped
+MAP.md  FEATURES.md  BACKLOG.md
+PAThandoff_vNN.md     the canonical state block for the current release
+```
+
+### Load order — 29 files, and it is not arbitrary
+
+```
+config → data → state → utils → storage → clients → instruments → sqp
+→ multipick → feedback → bugreport → photos → csv → backup → session
+→ settings-actions → setup → tour → onboarding → report → pdfpreview
+→ render-core → render-review → render-settings → render-help
+→ scanner → events → dispatch → boot
+```
+
+`data` → `state` is the one adjacency that is a hard dependency rather than a
+readability choice: `state.js` seeds itself from `data.js` constants in a
+top-level initialiser that runs at load. `boot.js` must be last — it runs on load.
+
+`sw.js` ASSETS lists **31** `.js` entries: these 29 plus the two jsPDF files,
+which are precached but injected on demand rather than script-tagged.
+
+**`MAP.md` is the routing table** — which file owns what, plus the cross-cutting
+rules that no single file makes discoverable. Read it before editing anything.
+
+---
+
+## Working on it
+
+Nothing to install to run the app. Serve the repo root over HTTP — a service
+worker will not register over `file://` — and open it:
+
+```
+python3 -m http.server 8000
+```
+
+The tests need Node, and nothing else:
+
+```
+node harness/run.js            # every standing assertion
 node harness/run.js 04 06      # only matching test files
 node harness/mutate.js         # prove the assertions aren't hollow
 node harness/mutate.js M07     # one mutation
 ```
 
 `run.js` exits non-zero on any failure. `mutate.js` exits non-zero if any
-mutation survives **or** any mutation fails to apply.
+mutation survives **or** fails to apply. Both must be clean before a release, and
+**an aborted mutation is not a caught one**. See `harness/README.md`.
+
+### Before changing anything
+
+1. Read `MAP.md`'s cross-cutting rules, then the current `PAThandoff_vNN.md`.
+2. **Fetch the live repo and byte-compare.** The source of truth is what is
+   deployed, not what a document says about it. Code wins over docs.
+3. Establish a green harness baseline *first*, so a red result later is
+   attributable to the change.
+
+Rule 1 in `MAP.md` is the one that has caused real data loss: a duplicate
+top-level `const` across two loaded files is a `SyntaxError` that kills the whole
+file, after which the app can save defaults over good config. Duplicate top-level
+`function` declarations are legal and silent — last loaded wins. Scan for both
+before delivering:
+
+```
+grep -hoE "^(const|let|function) [A-Za-z_$][A-Za-z0-9_$]*" *.js \
+  | sed -E 's/^(const|let|function) //' | sort | uniq -d
+
+for f in *.js; do node --check "$f" || echo "FAIL $f"; done
+```
 
 ---
 
-## Why this folder exists
+## Releasing
 
-Before it, the smoke harness was rebuilt from scratch every release and deleted
-at delivery. Every release therefore re-derived the same `document`,
-`localStorage` and IndexedDB stubs and rediscovered the same traps, and every
-release's assertions — 177 of them in V66 — were thrown away.
+Versions are sequential integers — `V76`, `V77` — with a matching cache tag
+(`pat-v77`). One focused concern per release; structural refactors ship
+separately from behaviour changes.
 
-Persistence is the fix. Model capability only affects the first pass; a
-bulletproof harness written once and binned still leaves the next release
-starting from nothing.
+**Every release:**
 
----
+- `APP_VERSION` (config.js) and `CACHE_VERSION` (sw.js) bumped together
+- `WELCOME_VERSION` plus the modal copy in `render-core.js`, on any feature or
+  behaviour release
+- About changelog rolled — three versions, oldest dropped (`render-help.js`)
+- `MAP.md` accurate, `FEATURES.md` gains a section, `BACKLOG.md` reconciled
+- New assertions in `harness/tests/`, and **a matching mutation for each**
+- Re-point the release-anchored mutations **M66** and **M82**, or they abort
+- A new `PAThandoff_vNN.md`, including the post-commit test checklist
 
-## Files
+`backupVersion` bumps only for a genuinely incompatible schema change — additive
+fields ride through the codec and never spend a bump. It is its own event and is
+never bundled with a feature release.
 
-| File | What it is |
-|---|---|
-| `stubs.js` | The browser environment. DOM, localStorage, IndexedDB, navigator, Blob/File/FileReader, caches, URL. |
-| `load.js` | Loads the app into one vm context in the real load order. Derives that order from `index.html`. |
-| `assert.js` | Assertions, grouping, the report, and `known()`. |
-| `fixture.js` | Standard app states, built through real app functions. |
-| `run.js` | Entry point. Picks up `tests/*.js` automatically. |
-| `mutate.js` | Deliberately breaks the app and checks the suite goes red. |
-| `tests/` | The standing assertions. |
+### Deploy
 
----
+Commit through the GitHub web UI, in this order:
 
-## Extending it — the one rule that matters
+1. Any **new** files first
+2. Changed modules
+3. `index.html` before `sw.js`
+4. **`sw.js` LAST** — it carries the cache tag, and committing it is what triggers
+   the cache bust for every installed PWA
 
-**Add to `tests/`, never delete from it.** A release's own assertions become the
-next release's regression cover. That is the entire point.
+Deploying `sw.js` early publishes a new cache pointing at files that have not
+landed yet. Afterwards, wait about a minute, fully close the PWA from the app
+switcher, and reopen it twice.
 
-Adding coverage for a release:
+### Hotfixes
 
-1. Add `tests/NN-thing.js` (or a group to an existing file). `run.js` finds it.
-2. **Add a matching mutation to `mutate.js`.** An assertion nobody has tried to
-   break is an assertion nobody knows works.
-3. Run both. Green suite *and* zero survivors, or it isn't done.
-4. **Zero ABORTS too.** An abort means the mutation's anchor text no longer
-   exists, so nothing was broken and nothing was proved — it is not a pass, and
-   the runner reports it separately so it cannot be read as one. Two mutations
-   are anchored on text that rolls every release and will abort every time if
-   nobody re-points them: **M66** (`APP_VERSION`) and **M82** (the oldest About
-   changelog entry). Re-point them as part of the release, not afterwards.
-
-### Before you write an assertion, ask whether it could pass on broken code
-
-V65 shipped two assertions that tested nothing. V66 shipped four. Every one
-looked green. The specific ways they were hollow:
-
-- **The right result via the wrong mechanism.** A deleted-instrument test passed
-  because deletion also blanked the mirror, so the check it claimed to make
-  never ran. Construct the state directly rather than reaching it through a
-  side effect.
-- **Testing a path that cannot execute.** `buildReportDoc` needs jsPDF and can't
-  run headlessly, so reintroducing the exact V66 defect passed 151/151. Paths
-  like that get **source guards** (`04h`, `04i`, `04j`) — not a promise to test
-  them properly later.
-- **Never reaching the code at all.** Test data that doesn't hit the branch.
-
-### If a test fails, suspect the harness first
-
-Most failures during a build are harness defects, not app bugs. On the first run
-of this suite, six of the eight failures were mine: `adoptMirrorIntoInstruments()`
-updates in place rather than creating a second record, `deleteInstrument()` goes
-through a confirm sheet, `applySetupBundle()` reconciles via
-`restoreInstrumentsFromBackup()` rather than the adopt helper, and the CSV column
-flag is `visible`, not `enabled`. Inspect the actual output before "fixing"
-correct code.
+Bump the cache key only, not `APP_VERSION`. Amend the existing handoff rather
+than writing a new one.
 
 ---
 
-## `known()` — real defects, recorded not hidden
+## Related
 
-A bug that's understood but not being fixed this release goes in `known()`. It
-prints under KNOWN DEFECTS, doesn't fail the run, and reports **"APPEARS FIXED,
-promote to a hard assertion"** once repaired. Deleting the assertion hides a
-bug; leaving it red trains everyone to ignore the suite.
-
----
-
-## Traps already solved here — don't re-derive them
-
-- **Top-level `const`/`let` do not attach to the vm context.** `ctx.state` is
-  undefined even though the code works. `load.js` bridges them; `app.val(name)`
-  reads them. Top-level `function` declarations *do* attach — `app.fn(name)`.
-- **`state` is reassigned by `load()`.** Capturing it before `load()` gives a
-  stale object. Use `app.state()`.
-- **IndexedDB callbacks must fire asynchronously.** App code assigns
-  `onsuccess` *after* calling `get()`. Firing synchronously means it never runs.
-- **`group()` must be awaited when its body is async.** An un-awaited async
-  group prints a tick having run zero assertions. `report()` now fails any empty
-  group outright.
-- **`innerHTML` registers element ids.** The whole `.bulk-sheet` pattern writes
-  markup then calls `getElementById(...).addEventListener(...)`. Without
-  registration that returns null, the wiring silently doesn't happen, and every
-  sheet-driven flow is untestable while reporting green.
-- **Mutation scoring.** V66's runner matched the substring `"0 failed"`, so
-  `"10 failed"` scored as a pass; and a mutation that failed to apply also
-  scored as a pass. Both are fixed permanently in `mutate.js` — the anchor is
-  checked before every run, and the summary is matched as a whole phrase.
-
----
-
-## What is deliberately not covered
-
-- **The PDF path.** jsPDF is injected on demand and is deliberately absent from
-  the stub environment. `report.js` is covered by source guards only.
-- **Real rendering.** `innerHTML` is stored as a string, not parsed. `render()`
-  is tested for "does it throw" and "did it produce markup".
-- **Touch interaction.** Stubbed DOM cannot reproduce pointer-then-click
-  sequencing. Long-press, Quick Pick timing and scroll-drag need a real device.
-- **Service worker behaviour.** Cache-first update semantics need a real browser.
+- **PATGo Scan** (`exnno/patgoscan`) — a separate barcode-first app for one
+  client's audit workflow. Explicitly no merge-back; anything shared is
+  hand-rebuilt from a spec.
+- **PAT Cloud** — planned SaaS product, separate codebase. Not started.
