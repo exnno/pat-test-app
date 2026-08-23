@@ -8,6 +8,20 @@ Every capability and release entry, one `##` section each.
 
 ---
 
+## Log again ×N, and two hold-gesture fixes (V77)
+
+**The new thing: a run of identical items in one gesture.** A room with ten of the same item used to mean tapping *Copy last result* ten times. Now you log the first one, press and hold that button, and pick how many more to add — +2, +3, +5, +10, or type a number up to 20. The sheet shows exactly what it is about to copy: the item type, the result, and the notes attached to it.
+
+**Why the preview, rather than a rule.** The copies carry the source item's NOTES, which is where a fail's reason lives (the fail picker appends it there). Blanking them — which is what *Copy last result* does for a single item — would turn a batch of failures into a run of bare fails with no reason on the certificate. But copying an item-specific pass note ten times is also wrong, and no rule gets both cases right. So the sheet shows what it will duplicate and lets you back out, instead of deciding for you.
+
+**What it deliberately does NOT do.** It always adds to the END of the job, never over the item you happen to be sitting on — *Copy last result* overwrites at the cursor, and a batch doing the same would silently destroy the items after it. It numbers every copy on from the last one and ignores anything sitting in the asset box, because a scanned number cannot sensibly be shared by ten items. The location comes from the form, as with Multi Pick, and is required.
+
+**Two fixes to the older hold gesture.** Holding the quick-pick buttons to switch presets used to start selecting the button labels at the same time — iOS answers a hold on a text-bearing control that way. It had been fixed once, inline, on the only other hold in the app (the About title, v43) and never applied to the grid. And opening "⚙ Edit presets" from that panel left you stranded: Back climbed into the Settings hierarchy you had never walked down, rather than returning to the test screen you came from. It now returns you there.
+
+**One thing behind the scenes.** Both holds now run through a single shared implementation rather than a copy each. The drift guard and the tap suppression are the parts easy to leave out of a second copy, and this app has already been through a version of that problem with sheet scrolling (V76). A third hand-rolled hold now fails the test suite.
+
+**And one defect found while checking a rule.** Items added by Multi Pick were only having their time recorded when the "Item Timestamps" setting happened to be on. Since V61 that setting controls *display* only and every item is supposed to be timed regardless — Multi Pick was missed at the time. A job's testing time could therefore read short, and no amount of switching the setting on afterwards could recover a time that was never written. Fixed.
+
 ## Sheet scrollers, audited and unified (V76)
 
 **The follow-on V75 promised.** V75 fixed the welcome modal and said plainly that other sheets might carry the same latent risk, and that a proper audit belonged on the backlog rather than being half-done in that release. This is that audit and its fix, in one change set.

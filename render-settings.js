@@ -562,6 +562,16 @@ function renderSettingsMultiPick() {
         ${slotRows.join('')}
       </div>
 
+      <!-- v77: discoverability for the "Log again ×N" hold. Placed here, on the
+           page about logging several items at once, for the same reason the v47
+           preset tip sits on the Quick Pick Items page: the person reading this
+           is exactly the person who wants it, and a gesture with no visible
+           control is otherwise findable only from a welcome modal they have
+           already dismissed. Multi Pick is for a fixed MIXED list; this is for a
+           run of the SAME item, which is why they are different features and why
+           saying so here is useful rather than noise. -->
+      <p class="settings-tip">💡 <strong>Quick tip:</strong> for a run of the <em>same</em> item — ten identical desk lamps, say — you don't need a multi-pick. Log the first one, then press and hold <strong>Copy last result</strong> on the test screen and choose how many more to add.</p>
+
       <button class="btn-primary" id="settings-multipick-save" data-action="settings-multipick-save" style="margin-top:24px">Save</button>
     </div>
   `;

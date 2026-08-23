@@ -169,79 +169,115 @@ function bindFocusFields() {
   }
 
   // v47: long-press the quick-pick grid → open the preset switcher sheet.
-  // Bound here (not via the delegated click system) because a hold is timing-
-  // based and delegation can't express it. Re-bound every entry-screen paint,
-  // same lifecycle as the focus fields above.
+  // v77: long-press the Copy-last button → open the "Log again ×N" sheet.
   //
-  // Behaviour:
-  //   • A press that's held for QUICK_PICK_LONGPRESS_MS without moving too far
-  //     opens the sheet (openPresetSheet → render, which rebuilds the grid and
-  //     wipes these listeners — fine, they're rebound next paint).
-  //   • Decision 2A: when the long-press fires it SUPPRESSES the quick-btn's
-  //     normal tap, so switching presets never also changes the selected item
-  //     type. We do this by setting a flag the next click checks (capture phase),
-  //     then clearing it. A genuine quick tap (released before the timer) never
-  //     sets the flag, so normal taps still select as before.
-  //   • Any finger movement beyond a small slop, or an early release/cancel,
-  //     aborts the pending long-press.
-  const grid = $('quick-grid');
-  if (grid) {
-    let pressTimer = null;
-    let didLongPress = false;
-    let startX = 0, startY = 0;
-    const MOVE_SLOP = 12;   // px of finger drift allowed before we abort
+  // Both are bound here rather than through the delegated click system, because a
+  // hold is timing-based and delegation cannot express it. Re-bound every
+  // entry-screen paint, same lifecycle as the focus fields above.
+  //
+  // ⚠ v77 EXTRACTED the shared mechanics into attachHoldGesture() below rather
+  // than writing a second copy of them for the new site. That is not tidiness:
+  // the drift slop and the capture-phase tap swallow are exactly the parts that
+  // are easy to omit, and a per-site implementation is how the app ended up with
+  // three sheet scrollers before V76. There is now ONE hold implementation for
+  // interactive controls. (utils.js's setupLongPress is the other one and is
+  // deliberately left alone — it is pointer-based, has no tap suppression, and
+  // serves the About-title reveal, which is a plain heading with no click action
+  // to swallow. Do not add a third; extend one of these two.)
+  attachHoldGesture($('quick-grid'), QUICK_PICK_LONGPRESS_MS, () => {
+    openPresetSheet();   // re-renders; handlers are rebound on the next paint
+  });
 
-    const clearTimer = () => {
-      if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
-    };
+  // The Copy-last hold. Guarded on the button's own disabled state so a locked
+  // session or an empty job cannot open a sheet offering to duplicate an item
+  // that does not exist — the tap path is already disabled by the attribute, but
+  // a hold is not a click and the attribute alone would not stop it.
+  const copyBtn = $('copy-last-btn');
+  attachHoldGesture(copyBtn, QUICK_PICK_LONGPRESS_MS, () => {
+    if (!copyBtn || copyBtn.disabled) return;
+    const sess = activeSession();
+    if (!sess || sess.locked || sess.items.length === 0) return;
+    state.repeatSheetOpen = true;
+    render();
+  });
+}
 
-    const startPress = (x, y) => {
-      didLongPress = false;
-      startX = x; startY = y;
-      clearTimer();
-      pressTimer = setTimeout(() => {
-        pressTimer = null;
-        didLongPress = true;
-        openPresetSheet();   // re-renders; these handlers are rebound next paint
-      }, QUICK_PICK_LONGPRESS_MS);
-    };
+// v77: the hold gesture, extracted from the v47 quick-grid implementation and
+// otherwise unchanged in behaviour. Attaches to `el` and calls onHold() once the
+// press has been held for `ms` without the finger drifting.
+//
+// Three things this does that a naive setTimeout does not, all of which were
+// learned on the grid and all of which the Copy-last site needs too:
+//
+//   • MOVE_SLOP — any drift beyond 12px aborts the pending hold, so a scroll that
+//     happens to start on the element never fires it.
+//   • The capture-phase tap swallow — when the hold fires, the element's normal
+//     click would ALSO fire on release. On the grid that meant switching preset
+//     and changing the selected item type in one gesture; on Copy-last it would
+//     mean opening the ×N sheet and logging a copy behind it. Exactly one click
+//     is swallowed, and only the one immediately following a fired hold, so an
+//     ordinary quick tap is untouched.
+//   • Mouse as well as touch, for desktop and for the harness.
+//
+// A null element is a no-op: the entry screen does not always have both of these
+// (Copy-last is absent from no paint, but the grid can be, and callers should not
+// have to check).
+function attachHoldGesture(el, ms, onHold) {
+  if (!el) return;
+  let pressTimer = null;
+  let didHold = false;
+  let startX = 0, startY = 0;
+  const MOVE_SLOP = 12;   // px of finger drift allowed before we abort
 
-    const moveCheck = (x, y) => {
-      if (!pressTimer) return;
-      if (Math.abs(x - startX) > MOVE_SLOP || Math.abs(y - startY) > MOVE_SLOP) {
-        clearTimer();   // finger drifted — treat as a scroll/swipe, not a hold
-      }
-    };
+  const clearTimer = () => {
+    if (pressTimer) { clearTimeout(pressTimer); pressTimer = null; }
+  };
 
-    // Touch (primary path on the phone)
-    grid.ontouchstart = e => {
-      const t = e.touches && e.touches[0];
-      if (t) startPress(t.clientX, t.clientY);
-    };
-    grid.ontouchmove = e => {
-      const t = e.touches && e.touches[0];
-      if (t) moveCheck(t.clientX, t.clientY);
-    };
-    grid.ontouchend = () => clearTimer();
-    grid.ontouchcancel = () => clearTimer();
+  const startPress = (x, y) => {
+    didHold = false;
+    startX = x; startY = y;
+    clearTimer();
+    pressTimer = setTimeout(() => {
+      pressTimer = null;
+      didHold = true;
+      onHold();
+    }, ms);
+  };
 
-    // Mouse (desktop / dev)
-    grid.onmousedown = e => startPress(e.clientX, e.clientY);
-    grid.onmousemove = e => moveCheck(e.clientX, e.clientY);
-    grid.onmouseup = () => clearTimer();
-    grid.onmouseleave = () => clearTimer();
+  const moveCheck = (x, y) => {
+    if (!pressTimer) return;
+    if (Math.abs(x - startX) > MOVE_SLOP || Math.abs(y - startY) > MOVE_SLOP) {
+      clearTimer();   // finger drifted — treat as a scroll/swipe, not a hold
+    }
+  };
 
-    // Suppress the quick-btn tap that would otherwise fire on release after a
-    // long-press. Capture phase so we intercept before the delegated #app click
-    // handler. Only swallows the ONE click immediately following a long-press.
-    grid.addEventListener('click', e => {
-      if (didLongPress) {
-        e.stopPropagation();
-        e.preventDefault();
-        didLongPress = false;
-      }
-    }, true);
-  }
+  // Touch (primary path on the phone)
+  el.ontouchstart = e => {
+    const t = e.touches && e.touches[0];
+    if (t) startPress(t.clientX, t.clientY);
+  };
+  el.ontouchmove = e => {
+    const t = e.touches && e.touches[0];
+    if (t) moveCheck(t.clientX, t.clientY);
+  };
+  el.ontouchend = () => clearTimer();
+  el.ontouchcancel = () => clearTimer();
+
+  // Mouse (desktop / dev)
+  el.onmousedown = e => startPress(e.clientX, e.clientY);
+  el.onmousemove = e => moveCheck(e.clientX, e.clientY);
+  el.onmouseup = () => clearTimer();
+  el.onmouseleave = () => clearTimer();
+
+  // Suppress the click that would otherwise fire on release after a hold.
+  // Capture phase so we intercept before the delegated #app click handler.
+  el.addEventListener('click', e => {
+    if (didHold) {
+      e.stopPropagation();
+      e.preventDefault();
+      didHold = false;
+    }
+  }, true);
 }
 
 // v57: scroll-drag guard for bottom sheets.

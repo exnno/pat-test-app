@@ -79,8 +79,16 @@ function multiPickFire(idx) {
       notes: '',
       result: 'pass'
     };
-    // v17: stamp each item on creation, only when timestamps are enabled.
-    if (state.timestampsEnabled) item.ts = new Date().toISOString();
+    // v77: stamp each item on creation, unconditionally. This line used to read
+    // `if (state.timestampsEnabled)`, which was the v17 rule and was missed when
+    // v61 changed it: from v61, `ts` is captured on EVERY item's first log and
+    // the setting gates EXPOSURE only (the CSV column and the Overview line).
+    // saveItem and copyLastResult were both converted; this one was not, so any
+    // item added through Multi Pick with the setting off carried no timestamp at
+    // all and could never be shown or exported even after the user turned it on.
+    // Capture-only change: nothing displays a ts that the setting doesn't already
+    // gate, so no existing user sees anything new because of this.
+    item.ts = new Date().toISOString();
     sess.items.push(item);
     addDescriptionIfNew(cleanType);
     // v18: learn each (location, type) pairing in the batch.

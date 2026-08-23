@@ -737,6 +737,7 @@ function loadFormForCursor() {
   state.failOtherText = '';
   state.multiPickSheetOpen = false;   // v16
   state.presetSheetOpen = false;      // v47
+  state.repeatSheetOpen = false;      // v77
   closeReadingsSheetState();          // v53
   discardPendingPhotos();             // v62
   closePhotoStripState();             // v62
@@ -1812,6 +1813,95 @@ function copyLastResult() {
   refreshEntryAfterLog();
 }
 
+// ---------- v77: "Log again ×N" ----------
+// Hold the Copy-last button → a sheet asking how many MORE copies to add. This
+// exists for a run of genuinely identical items (ten identical desk lamps in one
+// room), where tapping Copy last ten times is the only alternative.
+//
+// It is modelled on multiPickFire(), NOT on copyLastResult(), and the three
+// places it deliberately differs from Copy-last are the whole design:
+//
+//   • It always APPENDS to the end of the session. Copy-last will overwrite the
+//     item under the cursor when the cursor is parked mid-list; a batch that did
+//     that would destroy N-1 existing rows silently. Appending can always be
+//     undone by deleting rows; overwriting cannot.
+//   • It ignores the form's asset box and numbers every copy off nextAssetNo(),
+//     recomputed each push so the numbers run on. Copy-last takes a scanned or
+//     typed number for its single item, which has no meaning for a batch — the
+//     scan carry-forward is cleared afterwards for the same reason Multi Pick
+//     clears it.
+//   • It carries the source item's NOTES across, where Copy-last blanks them.
+//     Copy-last blanking is defensible for one item; for a batch it is not,
+//     because a fail's reason lives in the notes (pickFailReason appends it
+//     there) and a run of fails with no reason is unusable on a certificate.
+//     The sheet previews the notes it is about to duplicate, so the case where
+//     copying them is wrong — an item-specific pass note — is visible before the
+//     user commits rather than being decided for them by a rule.
+//
+// Location comes from the FORM and is mandatory, exactly as in Multi Pick: the
+// engineer may have moved on since the last item, and the form is what they can
+// see. Item type and result come from the last item.
+function repeatLastResult(n) {
+  const sess = activeSession();
+  if (!sess || sess.items.length === 0) return;
+  if (sess.locked) return;   // belt-and-braces; the button is disabled too
+
+  // Clamp rather than reject. The presets can't be out of range and the custom
+  // box is already capped in the markup, so anything arriving outside 1..MAX is
+  // a hand-edited DOM or a future caller, and silently doing nothing would be
+  // the worse failure — this path appends, so a clamp cannot destroy anything.
+  const count = Math.floor(Number(n));
+  if (!isFinite(count) || count < 1) return;
+  const total = Math.min(count, REPEAT_MAX_N);
+
+  const cleanLocation = normaliseLocation(state.form.location);
+  if (!cleanLocation) {
+    // Close first so the toast clears to the entry screen with the Location box
+    // in view, rather than leaving the sheet sitting over the field it names.
+    state.repeatSheetOpen = false;
+    render();
+    showToast('Enter a location first — it applies to every copy');
+    return;
+  }
+
+  const last = sess.items[sess.items.length - 1];
+  const cleanType = normaliseItemType(last.itemType);
+
+  for (let i = 0; i < total; i++) {
+    const item = {
+      id: uid(),
+      assetNo: nextAssetNo(sess),   // recomputed each push off the growing list
+      location: cleanLocation,
+      itemType: cleanType,
+      notes: last.notes || '',
+      result: last.result
+    };
+    // v61: every item is stamped on first log, always. The setting gates EXPOSURE
+    // only (see config.js). Copy-last and saveItem both stamp unconditionally.
+    item.ts = new Date().toISOString();
+    sess.items.push(item);
+    // v18: each copy is a genuine fresh log of this (location, type) pairing.
+    recordSqpUsage(cleanLocation, cleanType);
+  }
+
+  markSessionDirty(sess);             // v14: new entries invalidate a prior export
+  state.repeatSheetOpen = false;
+  state.cursor = sess.items.length;   // land on a fresh new item after the batch
+  // Every asset number here came from nextAssetNo(), never from the form, so the
+  // counter is authoritative again. Leaving the scan carry-forward armed would
+  // blank the next asset box on the strength of a scan from before the batch.
+  state.lastLogWasScanned = false;
+  state.lastScanSessionId = '';
+  loadFormForCursor();
+  feedback('copy', 'copy-last-btn');  // same cue as the gesture's own button
+  // v23 (E2): hot path. The type is copied from an existing item, so it is
+  // already in the description list — no saveDescriptions() needed here (same
+  // reasoning as copyLastResult, and unlike Multi Pick which invents types).
+  saveSessions(); saveSqpHistory();
+  render();
+  showToast(`Added ${total} more`);
+}
+
 function deleteItem(idx) {
   const sess = activeSession();
   if (!sess) return;
@@ -1870,6 +1960,16 @@ function setView(v) {
   state.failOtherText = '';
   state.multiPickSheetOpen = false;   // v16
   state.presetSheetOpen = false;      // v47
+  state.repeatSheetOpen = false;      // v77
+  // v77: the preset-edit return marker is the one flag here that must NOT be
+  // cleared unconditionally — it is set immediately BEFORE setView('settingsItems')
+  // and would erase itself on the way in. So it survives a transition TO that page
+  // and dies on any transition away from it, which means it cannot still be armed
+  // if the user later reaches Quick Pick Items by another route (hub, category,
+  // settings search). Clearing on arrival-elsewhere rather than only on
+  // consumption is deliberate: consumption alone would leave it set if the user
+  // left the page by a path that never reads it.
+  if (v !== 'settingsItems') state.presetEditReturnView = null;
   closeReadingsSheetState();          // v53
   discardPendingPhotos();             // v62
   closePhotoStripState();             // v62

@@ -251,6 +251,19 @@ let state = {
   // straight to a freshly-rebuilt preview instead of the settings hub. Cleared
   // once consumed. null = normal settings navigation.
   reportPreviewReturnSessionId: null,
+  // v77: the same deep-link-return idea as reportPreviewReturnSessionId above,
+  // for the entry screen's preset switcher. When "⚙ Edit presets" is tapped in
+  // that sheet we remember where the user actually came from, so Back on the
+  // Quick Pick Items page returns them to the entry screen instead of climbing
+  // into the Settings hierarchy they never walked down. Holds a view name
+  // ('entry') rather than a boolean so a second entry point could reuse it.
+  // Cleared the moment it is consumed, and by setView() on any navigation away
+  // from settingsItems — see the note there, which is what stops it going stale.
+  presetEditReturnView: null,
+  // v77: "Log again ×N" sheet, opened by holding the Copy-last button. Transient,
+  // never persisted. Its one input is read from the DOM at fire time, not mirrored
+  // here, because the sheet must not re-render while open (MAP rule 3).
+  repeatSheetOpen: false,
   // v34: transient signature draw-pad state (not persisted). signaturePadOpen
   // gates the draw-pad bottom-sheet; signaturePadHasInk tracks whether at least
   // one stroke has been made (gates the pad's Save button so a blank pad can't

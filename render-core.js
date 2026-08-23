@@ -227,8 +227,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Long lists in pop-up panels now scroll properly.</strong> The fail-reason panel, Multi Pick and bulk &ldquo;Change type&rdquo; used to cut off the bottom of the list if you'd set up a lot of items. The list scrolls and the buttons stay put.</li>
-        <li><strong>First-time setup can't lose its buttons.</strong> On a small screen the setup screens could push Continue off the bottom. Fixed.</li>
+        <li><strong>New: log a run of identical items in one go.</strong> Got ten of the same thing in a room? Log the first, then <strong>press and hold Copy last result</strong> and pick how many more to add &mdash; +2, +3, +5, +10, or type a number. It shows you exactly what it's about to copy first.</li>
+        <li><strong>Holding the quick-pick buttons no longer highlights the text.</strong> Holding them to switch presets used to select the button labels at the same time, which looked like something had gone wrong. It doesn't now.</li>
+        <li><strong>Back goes where you came from.</strong> If you open <em>Edit presets</em> from the press-and-hold panel, Back now returns you straight to the test screen instead of dropping you in Settings.</li>
         <li><strong>Nothing else has changed.</strong> Every screen, setting and job is exactly where you left it.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
@@ -1503,6 +1504,55 @@ function renderEntry() {
     `;
   }
 
+  // v77: "Log again ×N". Opened by HOLDING the Copy-last button (gesture in
+  // events.js). Adds more copies of the item just logged, for a run of genuinely
+  // identical items. Same bottom-sheet pattern as Multi Pick and the preset
+  // switcher.
+  //
+  // ⚠ No .sheet-scroll here, and that is correct rather than an omission: every
+  // part of this sheet is fixed — four preset buttons, one label, one input, one
+  // Add button. Nothing in it grows from user data, which is the test MAP rule 14
+  // actually applies. It DOES raise the keyboard for the custom box, so it is an
+  // E-group sheet in the V76 audit's terms and inherits the v75 keyboard vars
+  // from .fail-sheet without opting out of them.
+  //
+  // The preview line is load-bearing, not decoration. This sheet duplicates the
+  // source item's notes, which is right for a fail (the reason lives there) and
+  // can be wrong for an item-specific pass note — so it shows exactly what is
+  // about to be copied and lets the user back out, rather than encoding a rule
+  // about which case they are in.
+  let repeatSheet = '';
+  if (state.repeatSheetOpen && hasLast) {
+    const src = sess.items[sess.items.length - 1];
+    const srcNotes = String(src.notes || '').trim();
+    const notesLine = srcNotes
+      ? `<p class="repeat-preview-notes">Notes copied too: “${escapeHTML(srcNotes)}”</p>`
+      : '';
+    repeatSheet = `
+      <div class="modal-backdrop" id="repeat-backdrop" data-action="repeat-close"></div>
+      <div class="fail-sheet repeat-sheet" role="dialog" aria-label="Log again">
+        <div class="fail-sheet-handle"></div>
+        <div class="fail-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="fail-sheet-title">Log again</h3>
+          <button class="fail-close-btn" id="repeat-close" data-action="repeat-close" aria-label="Cancel">×</button>
+        </div>
+        <p class="multipick-sheet-hint">Adds more copies of <strong>${escapeHTML(src.itemType)} · ${escapeHTML(capitalise(src.result))}</strong>, numbered on from the last one and using the location on the form.</p>
+        ${notesLine}
+        <div class="repeat-count-grid">
+          ${REPEAT_PRESET_COUNTS.map(n => `
+            <button class="repeat-count-btn" data-action="repeat-fire" data-arg="${n}">+${n}</button>
+          `).join('')}
+        </div>
+        <label class="label" for="repeat-custom">Or a number (1–${REPEAT_MAX_N})</label>
+        <div class="repeat-custom-row">
+          <input class="input" id="repeat-custom" type="number" inputmode="numeric" min="1" max="${REPEAT_MAX_N}" placeholder="e.g. 12">
+          <button class="btn-primary repeat-custom-add" id="repeat-custom-add" data-action="repeat-fire-custom">Add</button>
+        </div>
+      </div>
+    `;
+  }
+
   // v53: Test Readings sheet. Shown (when the feature is on) after PASS or after
   // a fail reason is picked — see openReadingsSheet(). Class selector at the top
   // drives which measurement rows render. PASS mode shows every applicable field
@@ -1635,6 +1685,7 @@ function renderEntry() {
       ${failModal}
       ${multiPickSheet}
       ${presetSheet}
+      ${repeatSheet}
       ${readingsSheet}
       ${renderPhotoStripSheet()}
     </div>

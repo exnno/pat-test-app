@@ -1,4 +1,4 @@
-# PATGo — Code Map (V76)
+# PATGo — Code Map (V77)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -117,6 +117,25 @@ is discoverable from the file you happen to be editing.
     `100dvh + overflow:hidden` layout rolled back in v12.1. Harness 11i asserts
     on the shipped source, comments stripped.
 
+16. **One hold gesture implementation, and it is `attachHoldGesture()` in
+    events.js.** A hold on an interactive control needs three things that are
+    each easy to omit: a 12px drift slop so a scroll starting on the element does
+    not fire it, a capture-phase swallow of the ONE click that follows a fired
+    hold, and touch plus mouse. Wiring `el.ontouchstart` directly at a new site
+    gets one or two of the three. There is exactly one `.ontouchstart =` in the
+    whole app and harness 13n fails if a second appears.
+
+    The other implementation, `setupLongPress()` (utils.js), is pointer-based
+    with no tap suppression and serves the About-title cloud reveal — a plain
+    heading with no click action to swallow. Two, with that division stated, is
+    the shipped state. A third is the defect; extend one of these instead.
+
+    ⚠ A control carrying a hold must also declare `-webkit-touch-callout: none`
+    and BOTH forms of `user-select: none` in styles.css, per site — iOS answers a
+    hold on a text-bearing control by starting a text selection. There is no
+    global rule doing this; adding a fourth hold site means adding those
+    properties too. Harness 13m.
+
 ---
 
 ## Load order (index.html) — 29 first-party files
@@ -159,7 +178,11 @@ NOT in `index.html`, NOT in `sw.js` ASSETS — test 01c fails if either changes.
 **Touch to:** validate a release (`node harness/run.js`, `node harness/mutate.js`),
 or add this release's assertions and mutations. Never delete from `tests/`.
 **Coupling:** derives load order from `index.html`; source-guards `report.js`,
-`csv.js` and the flat-field writers (rule 7); asserts rules 1, 8, 9, 11, 14, 15.
+`csv.js` and the flat-field writers (rule 7); asserts rules 1, 8, 9, 11, 14, 15, 16.
+⚠ v77: the stub's `dispatchEvent` now fires `on<type>` PROPERTY handlers as well
+as `addEventListener` registrations, the way a real element does. Without it a
+property-bound handler could only be tested by hand-calling it — the V67
+"listener never bound" blind spot. Do not narrow it back.
 ⚠ Two mutations are anchored on text that ROLLS every release and abort silently
 if not re-pointed: **M66** (`APP_VERSION` in config.js) and **M82** (the oldest
 About changelog entry). Re-point both as part of the release, and treat a non-zero
@@ -284,11 +307,14 @@ Location→item-type learning, scoring, ordering, history persistence.
 **Coupling:** tuning constants in config.js. Toasts via feedback.js; confirms in
 dispatch.js.
 
-### multipick.js (~127 ln) — Multi Pick
+### multipick.js (~135 ln) — Multi Pick
 Slot config, the batch-log fire path, settings save.
 **Touch to:** change the multi-pick sheet or its settings.
 **Coupling:** computes asset numbers via `nextAssetNo()` and clears the scan
-carry-forward flags before `loadFormForCursor()` (rule 4).
+carry-forward flags before `loadFormForCursor()` (rule 4). Stamps `ts`
+unconditionally since v77 — see the session.js entry.
+**⚠ Not the same feature as "Log again ×N"** (session.js): Multi Pick fires a
+fixed MIXED list of types as passes; ×N repeats ONE item, whatever its result.
 
 ### feedback.js (~405 ln) — toast, dialogs, haptic / flash / sound
 `showToast`, the shared `.bulk-sheet` dialog builders (`openConfirmSheet`,
@@ -393,8 +419,17 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   be added there (rules 3, 4).
 - Four removal paths cascade to photos.js and two archive stats before removing
   (rule 5).
-- Append paths (`saveItem`, `copyLastResult`, `seedDemoSession`) stamp `ts`
-  unconditionally; **edit branches must never stamp** — `ts` means "first logged".
+- Append paths (`saveItem`, `copyLastResult`, `repeatLastResult`, `multiPickFire`,
+  `seedDemoSession`) stamp `ts` unconditionally; **edit branches must never
+  stamp** — `ts` means "first logged". ⚠ v77 fixed `multiPickFire`, which was
+  missed when v61 changed this rule and still gated CAPTURE on
+  `state.timestampsEnabled`. The setting gates exposure only. Harness 13k,
+  mutations M115/M116.
+- ⚠ `repeatLastResult()` (v77, "Log again ×N") is modelled on `multiPickFire`,
+  NOT on `copyLastResult` beside it: it always APPENDS (copy-last overwrites at
+  the cursor, which for a batch would destroy N−1 rows), ignores the form's asset
+  box, and CARRIES the source item's notes because a fail's reason lives there.
+  Mutations M110–M114.
 - `state.sessions` is reassigned in exactly four places: load, restore, prune,
   delete. Any new removal path needs the same hooks.
 - `captureWizardStep()` is the last legacy writer of the instrument flat mirror
@@ -541,13 +576,18 @@ routes through `_scanTarget()` so it inherits every bail-out, and it `select()`s
 as well as focusing — the selection is what makes an *unrecognised* scan replace
 rather than append.
 
-### events.js (~400 ln) — focus-sensitive binding, per render
+### events.js (~490 ln) — focus-sensitive binding, per render
 Direct binds for the four focus-sensitive fields only (`nf-client`, `nf-site`,
-`f-location`, `f-type`), the three suggestion dropdowns, the quick-pick long-press
-gesture, the sheet drag guard, the suggestion click swallow. Plus (v75, and NOT
-per-render) the keyboard-inset publisher.
-**Touch to:** change one of those four fields, their dropdowns, the long-press, the
-drag guard, the click swallow or how sheets react to the on-screen keyboard.
+`f-location`, `f-type`), the three suggestion dropdowns, the two hold gestures
+and the shared `attachHoldGesture()` helper behind them, the sheet drag guard,
+the suggestion click swallow. Plus (v75, and NOT per-render) the keyboard-inset
+publisher.
+**Touch to:** change one of those four fields, their dropdowns, either hold
+gesture, the drag guard, the click swallow or how sheets react to the on-screen
+keyboard.
+**⚠ v77: both holds go through `attachHoldGesture()`** — the quick-pick grid
+(preset switcher) and `copy-last-btn` ("Log again ×N"). See cross-cutting rule 16
+before adding a third; do not bind `ontouchstart` at a site.
 **⚠ Suggestions commit on `pointerdown`, not `click`** (a click races the blur
 teardown and iOS loses the tap), **and `armClickSwallow()` must stay** — a touch
 tap still fires a ghost `click` afterwards that lands on whatever is underneath.
@@ -568,7 +608,8 @@ stands. See cross-cutting rule 13 for the contract with styles.css.
 **Coupling:** called from `render()` and `refreshEntryAfterLog()`.
 `initSheetDragGuard()`, `initSuggestionClickSwallow()` and `initKeyboardInset()`
 are bound once from boot.js. `applyKeyboardInset()` is consumed entirely by
-styles.css — no JS reads its output. `sheetDragMoved` is read by dispatch.js's preset picker. Everything else
+styles.css — no JS reads its output. `sheetDragMoved` is read by dispatch.js's preset picker. Both hold callbacks read
+and write `state` and call `render()`. Everything else
 is delegated in dispatch.js — these stay direct because focus/blur/pointer timing
 can't be safely delegated.
 
@@ -577,8 +618,8 @@ Three registries attached once to `#app` at boot: `ACTIONS` (click, ancestor-wal
 by `data-action`/`data-arg`), `INPUT_ACTIONS` (`data-input-action`),
 `CHANGE_ACTIONS` (`data-change-action`).
 **Touch to:** add or route any delegated click / input / change handler.
-**Coupling:** only the four focus-sensitive fields and the quick-pick long-press
-are **not** here (events.js). Text-input actions must not `render()` on keystroke.
+**Coupling:** only the four focus-sensitive fields and the two hold gestures are
+**not** here (events.js). Text-input actions must not `render()` on keystroke.
 File inputs must clear `el.value` immediately or re-choosing the same file fires
 nothing. `handleDelegatedClick` returns early when no ancestor carries
 `data-action`, which is why plain `<a>` links work inside `#app`.

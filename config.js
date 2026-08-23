@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V76';
+const APP_VERSION = 'V77';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -124,7 +124,7 @@ const INSTRUMENTS_MAX = 5;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V76';
+const WELCOME_VERSION = 'V77';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -138,6 +138,20 @@ const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 // long-press. If 1000 proves too eager in the field, ~1400 is the next step down
 // in aggression; ~600 is the usual long-press sweet spot if it still feels slow.
 const QUICK_PICK_LONGPRESS_MS = 1000;
+
+// v77: "Log again ×N" — hold the Copy-last button to add several more copies of
+// the item just logged. Same hold threshold as the quick-pick grid on purpose:
+// two gestures on one screen that behave differently would be a worse problem
+// than either threshold being slightly wrong, so they share the constant above
+// rather than getting one each.
+//
+// REPEAT_MAX_N caps the custom box. 20 is not a technical limit — a batch of 100
+// would append fine — it is a damage limit. There is no undo for a batch append
+// (Multi Pick has none either; you delete the rows from the Overview), so the
+// cap exists so a mistyped "100" cannot bury a job. The preset buttons stay well
+// under it; the box is for the occasional 12 or 15.
+const REPEAT_MAX_N = 20;
+const REPEAT_PRESET_COUNTS = [2, 3, 5, 10];
 
 // ---------------------------------------------------------------------------
 // v59: lifetime stats counter (the muted line under the Settings hub footer).

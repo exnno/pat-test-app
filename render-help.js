@@ -61,9 +61,12 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v76: rolled forward — V76 on top, V73 dropped. -->
+      <!-- v8: rolling 3-version changelog. v77: rolled forward — V77 on top, V74 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V77</strong> &middot; August 2026</p>
+        <p class="muted">A new shortcut for repeat items, and two fixes to the press-and-hold gesture. If a room has a run of identical items, you no longer have to tap Copy last result once for each: log the first one, then press and hold that button and choose how many more to add. It shows you the item and the result it is about to copy, and any notes attached to it, so a failure keeps its reason rather than arriving as a bare fail. The copies are numbered on from the last one and use whatever location is on the form. Separately, holding the quick-pick buttons to switch presets no longer highlights the button text while it does so, and opening &ldquo;Edit presets&rdquo; from that panel now returns you to the test screen when you press Back, rather than leaving you part-way into Settings. One fix behind the scenes as well: items added by Multi Pick were not having their time recorded unless the timestamp setting happened to be switched on, so a job's testing time could read short. They are now recorded like every other item.</p>
 
         <p><strong>V76</strong> &middot; August 2026</p>
         <p class="muted">A follow-on from V75, from a check of every pop-up panel in the app rather than the handful that had been reported. Three panels whose contents come from your own settings &mdash; the fail reason picker, Multi Pick, and bulk &ldquo;Change type&rdquo; on the Overview &mdash; could run off the bottom of the screen if you'd set up a long list, taking the later entries and in two cases a button with them; those lists now scroll while the buttons stay put. First-time setup had the same fault in a form that could clip its own Continue button on a short screen, which is a poor first impression for a new phone. Behind the scenes the three slightly different ways panels used to handle scrolling have been reduced to one, so a panel added in future can't quietly miss it. Nothing about how the app records a test has changed.</p>
@@ -71,8 +74,6 @@ function renderSettingsAbout() {
         <p><strong>V75</strong> &middot; August 2026</p>
         <p class="muted">Panels that slide up from the bottom of the screen &mdash; the fail reason picker, the bug report form, first-time setup and the rest &mdash; used to sit underneath the on-screen keyboard whenever they contained something to type into, with the whole screen sliding about as you typed and the buttons at the bottom out of reach. They now measure the space the keyboard leaves and sit above it. A panel taller than the room it has scrolls in the middle while its buttons stay put. The same fault had also crept into this app's own What's New panel, whose Continue button could be clipped off the bottom on a long update; it can now always be reached. Nothing about how the app records a test has changed.</p>
 
-        <p><strong>V74</strong> &middot; August 2026</p>
-        <p class="muted">Two barcode scanner fixes, both found in the field. Scanners that send their characters slightly slowly were being ignored altogether &mdash; the trigger would do nothing at all &mdash; so the speeds the app accepts have been widened on every setting, with no change needed at your end. And if a scan was interrupted part way through, the remainder could arrive on its own and be written into the asset box as a short but believable number; the app now waits for the scanner to finish and fall silent before it will accept anything. Nothing outside the scanner has changed.</p>
 
               </div>
 

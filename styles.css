@@ -71,6 +71,7 @@
      47. photos
      48. scanner
      49. instruments: list
+     50. log again x N
 ============================================================================ */
 
 /* @@ tokens & theme */
@@ -295,6 +296,17 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* 3x3 grid for up to 9 quick-pick items */
 .quick-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
 .quick-btn { padding: 14px 4px; font-size: 14px; font-weight: 600; border: 1px solid var(--border-strong); border-radius: 8px; background: var(--quick-bg); color: var(--quick-text); }
+/* v77: these buttons carry a HOLD gesture (the preset switcher — see events.js),
+   and iOS answers a hold on a text-bearing control by starting a text selection
+   and raising the callout bubble. The sheet still opened, but with the button
+   labels highlighted behind it. Suppress both.
+   ⚠ Applied PER SITE, not to `button` globally (decision 1A). The other hold
+   site, .copy-last-btn, carries the same pair below, and the third — the About
+   title — has carried it inline since v43. A FOURTH hold gesture must be given
+   these two properties as part of adding it; there is no global rule that will
+   do it automatically. -webkit- prefixes are required: iOS Safari does not
+   honour the unprefixed forms for touch selection. */
+.quick-btn { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .quick-btn.active { background: var(--accent); color: #fff; border-color: var(--accent); }
 
 /* Custom type input + autocomplete suggestions */
@@ -355,6 +367,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   border: 1px solid var(--accent-border);
   border-radius: 10px;
 }
+/* v77: hold gesture — see the note on .quick-btn above. */
+.copy-last-btn { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .copy-last-btn:active { background: var(--accent-hover); }
 .copy-last-btn:disabled { background: var(--neutral-bg); color: var(--text-hint); border-color: var(--border); }
 
@@ -3732,3 +3746,48 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   padding: 0 0 0 4px;
   vertical-align: baseline;
 }
+
+/* @@ log again x N */
+/* v77: "Log again ×N" sheet (hold the Copy-last button). Reuses the .fail-sheet
+   shell and the .multipick-sheet-hint line; these add the count buttons and the
+   custom row. No scroller and no pins on purpose — every child is fixed content
+   (see the note in render-core.js). */
+.repeat-preview-notes {
+  margin: -6px 0 12px;
+  padding: 8px 12px;
+  font-size: 13px;
+  line-height: 1.4;
+  color: var(--text-muted);
+  background: var(--neutral-bg);
+  border-radius: 8px;
+  text-align: center;
+}
+.repeat-count-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+  margin-bottom: 16px;
+}
+.repeat-count-btn {
+  padding: 16px 4px;
+  font-size: 17px;
+  font-weight: 700;
+  background: var(--accent-soft);
+  color: var(--accent-text);
+  border: 1px solid var(--accent-border);
+  border-radius: 10px;
+  /* Hold-safe by inheritance? No — these are ordinary tap targets, but they sit
+     directly under a control the user has just been holding, and a stray hold
+     here selecting "+10" looks like a bug. Cheap to prevent. */
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+.repeat-count-btn:active { background: var(--accent-hover); }
+.repeat-custom-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.repeat-custom-row .input { flex: 1 1 auto; min-width: 0; }
+.repeat-custom-add { flex: 0 0 auto; width: auto; padding-left: 22px; padding-right: 22px; margin-top: 0; }

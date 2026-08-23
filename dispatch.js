@@ -346,7 +346,33 @@ registerActions({
   'preset-sheet-pick': (arg) => { if (sheetDragMoved) return; switchPresetFromSheet(arg); },
   // Shortcut to the Settings preset page. Close the sheet, then navigate to the
   // Quick Pick Items settings page (which hosts the preset dropdown/editor).
-  'preset-sheet-edit': () => { state.presetSheetOpen = false; setView('settingsItems'); }
+  // v77: leave a return marker first. Without it, Back on that page fell through
+  // to the ordinary Settings hierarchy and climbed to the hub or the category —
+  // a place the user had never been, since they arrived from the entry screen by
+  // a shortcut. Same mechanism as the report-preview deep link in
+  // 'back-to-settings' below. ⚠ Order matters: setView() clears this marker for
+  // any target that is not settingsItems, so it must be set BEFORE the call, and
+  // the call must be to settingsItems.
+  'preset-sheet-edit': () => {
+    state.presetSheetOpen = false;
+    state.presetEditReturnView = 'entry';
+    setView('settingsItems');
+  },
+
+  // v77: "Log again ×N" sheet (opened by holding Copy-last; the gesture lives in
+  // events.js, not here — a hold is not a click).
+  'repeat-close': () => { state.repeatSheetOpen = false; render(); },
+  'repeat-fire': (arg) => repeatLastResult(parseInt(arg, 10)),
+  // The custom box is read from the DOM, not from state: this sheet holds an
+  // input, so it must not re-render while open (MAP rule 3) and therefore has no
+  // oninput mirroring its value anywhere. An empty or junk box is a no-op rather
+  // than an error — the four preset buttons are right there.
+  'repeat-fire-custom': () => {
+    const el = document.getElementById('repeat-custom');
+    const n = el ? parseInt(el.value, 10) : NaN;
+    if (!isFinite(n) || n < 1) { showToast(`Enter a number between 1 and ${REPEAT_MAX_N}`); return; }
+    repeatLastResult(n);
+  }
 });
 
 // ---------------------------------------------------------------------------
@@ -464,6 +490,18 @@ registerActions({
       setView('reports');   // a sensible underlay behind the preview overlay
       // v64: async now (it may need to read photos before rebuilding the preview).
       reopenReportPreview(sid).catch(() => {});
+      return;
+    }
+    // v77: if we arrived at Quick Pick Items from the entry screen's preset
+    // switcher ("⚙ Edit presets"), Back returns there rather than climbing into
+    // the Settings hierarchy the user never walked down. Consume the marker
+    // BEFORE setView, exactly as the report-preview branch above does — setView
+    // would clear it on the way out anyway, but reading it first is what makes
+    // the two branches the same shape.
+    if (state.presetEditReturnView && state.view === 'settingsItems') {
+      const back = state.presetEditReturnView;
+      state.presetEditReturnView = null;
+      setView(back);
       return;
     }
     if (state.view === 'settingsCategory') {

@@ -8,6 +8,32 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### ~~Log again ×N + two hold-gesture fixes~~ — SHIPPED IN V77
+The "Log this item ×N" item below is now built, as a hold on Copy-last exactly as
+the proposed resolution said. Plus the two reported defects: the quick-pick grid
+never carried the selection suppression that the About-title hold has had inline
+since v43, and the "⚙ Edit presets" deep link left no return marker so Back
+climbed into Settings. Both hold gestures now share `attachHoldGesture()`; harness
+13n refuses a third hand-rolled one. See MAP rule 16.
+
+⚠ Found and fixed in passing: `multiPickFire` still gated timestamp CAPTURE on
+`state.timestampsEnabled`. v61 changed that rule — the setting gates exposure only
+— and Multi Pick was missed at the time, so six releases of Multi Pick items
+carry no `ts` for anyone with the setting off. Not recoverable retrospectively.
+Harness 13k asserts both batch paths with the setting explicitly OFF, which is the
+case nothing had ever driven.
+
+### Documentation hygiene — the two READMEs — NOT SCHEDULED
+`README.md` (repo root) and `harness/README.md` are near-duplicate copies of the
+same harness document, and they had already drifted: V76's "zero aborts" paragraph
+went into one of them only. V77 re-synced them and added the same note to both,
+which is a patch on the symptom.
+
+The root README should describe the APP — stack, deploy process, release process
+— which is what the skill points at it for; the harness one should describe the
+harness. Splitting them is a documentation release's job, not a feature release's,
+and it wants doing before the next person edits one and not the other. Small.
+
 ### ~~Sheet-scroller audit + fix — the V75 spill-over~~ — SHIPPED IN V76
 The audit ran across all 30 sheet render sites and the fix followed in the same
 release. Found: three sheets whose body grows from USER DATA with no scroller
@@ -314,10 +340,10 @@ survives those documents being archived.
 | Item | Status |
 |---|---|
 | Home-screen shortcuts | Liked ("big yes"), never scheduled. Android/desktop only — revisit if an Android tester appears |
-| "Log this item ×N" | Liked in principle, shelved on UI clutter. Proposed resolution: long-press on the existing Copy-last button, so no new control competes for space |
+| ~~"Log this item ×N"~~ | **SHIPPED V77.** Built exactly as the proposed resolution said — a hold on Copy-last, no new control. Counts +2/+3/+5/+10 or a custom number capped at 20 |
 | Weekly/batch PDF export | Parked pending a direct tester ask — good idea, but wanted from testers before committing time |
 | Per-instrument "in service" toggle | Only if overdue calibration nags on a retired instrument prove annoying in practice |
-| Sheet-scroller audit | See "Next release" above — sized, not scheduled |
+| ~~Sheet-scroller audit~~ | **SHIPPED V76.** The general sheet-markup guard, the part deliberately not built, is still open above |
 | Scan into other fields (location, item type) | Raised implicitly by V67. Currently a scan is refused when any other text field has focus (the deliberate V65 "known limit"). Only worth revisiting if Peter starts labelling locations |
 
 ### Discussed and NOT proceeding
