@@ -36,9 +36,10 @@ module.exports = function run() {
     // but deliberately NOT precached.
     const missing = order.filter(f => !sw.includes(f));
     t.deepEq(missing, [], 'every index.html script is precached by sw.js');
+    // v79: supabase.umd.js joins them — same pattern, injected by cloud.js.
     const extra = sw.filter(f => !order.includes(f));
-    t.ok(extra.every(f => /jspdf/i.test(f)),
-      `sw-only entries are jsPDF lazies only (got ${JSON.stringify(extra)})`);
+    t.ok(extra.every(f => /jspdf/i.test(f) || f === 'supabase.umd.js'),
+      `sw-only entries are the vendored lazies only (got ${JSON.stringify(extra)})`);
     t.eq(sw.length, order.length + extra.length, 'no duplicate ASSETS entries');
   });
 

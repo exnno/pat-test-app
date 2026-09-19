@@ -101,9 +101,9 @@ const MOVED_TO_RENDER_HELP = [
   { name: 'renderSettingsGlossary', view: 'settingsGlossary',   marker: 'class="info-card glossary-group"' },
   { name: 'renderSettingsContact',  view: 'settingsContact',    marker: 'id="bug-open"'          },
   { name: 'renderBugSheet',         view: null,                 marker: null                     },
-  { name: 'renderCloudAccount',     view: 'cloudAccount',       marker: 'id="cloud-sign-out"'    },
-  { name: 'renderCloudSync',        view: 'cloudSync',          marker: 'id="cloud-sync-now"'    },
-  { name: 'renderCloudSubscription',view: 'cloudSubscription',  marker: 'id="cloud-upgrade"'     },
+  { name: 'renderCloudAccount',     view: 'cloudAccount',       marker: 'id="cloud-account-page"'},
+  { name: 'renderCloudSync',        view: 'cloudSync',          marker: 'id="cloud-sync-placeholder"'},
+  { name: 'renderCloudSubscription',view: 'cloudSubscription',  marker: 'id="cloud-subscription-placeholder"'},
 ];
 
 /* The V71 extraction manifest: every top-level const that left config.js for
