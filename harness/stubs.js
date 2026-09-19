@@ -451,7 +451,7 @@ function makeNavigator(opts = {}) {
   return {
     _calls: calls,
     userAgent: opts.userAgent || 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_0 like Mac OS X) AppleWebKit/605.1.15',
-    onLine: true,
+    onLine: opts.onLine ?? true,   // v79: 15-cloud boots offline
     standalone: opts.standalone ?? true,
     // canShare/share default to PRESENT because the iPhone PWA is the primary
     // target. Tests that need the fallback path delete these explicitly.
@@ -546,6 +546,10 @@ function makeEnvironment(opts = {}) {
     location: {
       href: 'https://exnno.github.io/pat-test-app/',
       origin: 'https://exnno.github.io',
+      // v79: config.js picks the cloud environment from hostname. The default is
+      // the real test host, so every standing test boots the build a field user
+      // on GitHub Pages gets. 15-cloud overrides it to prove unknown = off.
+      hostname: opts.hostname ?? 'exnno.github.io',
       pathname: '/pat-test-app/',
       search: '',
       hash: '',
@@ -634,7 +638,9 @@ function makeEnvironment(opts = {}) {
     // fetch is DENIED by default. The app must work fully offline; a test that
     // silently succeeds because fetch returned a stub response is testing the
     // stub. Tests that need it install their own.
-    fetch: async (url) => { throw new Error(`harness: unexpected network fetch to ${url}`); },
+    // v79: opts.fetch lets 15-cloud install a spy BEFORE boot.js runs, which is
+    // the only way to prove boot itself makes no request.
+    fetch: opts.fetch || (async (url) => { throw new Error(`harness: unexpected network fetch to ${url}`); }),
 
     alert()   { throw new Error('harness: alert() is banned in this app (MAP rule 11)'); },
     confirm() { throw new Error('harness: confirm() is banned in this app (MAP rule 11)'); },

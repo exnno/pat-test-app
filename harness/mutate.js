@@ -514,8 +514,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V77';",
-    to:   "const APP_VERSION = 'V77';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V79';",
+    to:   "const APP_VERSION = 'V79';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -634,8 +634,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V75</strong> &middot; August 2026</p>',
-    to:   '        <p><strong>V75</strong> &middot; August 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V74</strong> &middot; August 2026</p>',
+    from: '        <p><strong>V77</strong> &middot; August 2026</p>',
+    to:   '        <p><strong>V77</strong> &middot; August 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V76</strong> &middot; August 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -833,8 +833,10 @@ const MUTATIONS = [
   {
     name: 'M110 (V77) the batch overwrites the item under the cursor instead of appending',
     file: 'session.js',
-    from: "  for (let i = 0; i < total; i++) {\n    const item = {\n      id: uid(),\n      assetNo: nextAssetNo(sess),",
-    to:   "  if (state.cursor < sess.items.length) sess.items.length = state.cursor;\n  for (let i = 0; i < total; i++) {\n    const item = {\n      id: uid(),\n      assetNo: nextAssetNo(sess),",
+    // V79: re-pointed — V78 changed uid() to newId() here and this anchor
+    // silently aborted for a release. Anchored on the loop head only now.
+    from: "  for (let i = 0; i < total; i++) {\n    const item = {\n      id: newId(),",
+    to:   "  if (state.cursor < sess.items.length) sess.items.length = state.cursor;\n  for (let i = 0; i < total; i++) {\n    const item = {\n      id: newId(),",
     why:  'THE DATA-LOSS MUTATION, and the reason repeatLastResult is modelled on multiPickFire rather than on copyLastResult. Copy-last overwrites at the cursor; a batch doing the same destroys every item after it. The count still goes up, so the toast reads correct',
   },
   {
@@ -971,6 +973,92 @@ const MUTATIONS = [
     why:  'a reasonable-looking revert. uid() is still defined and still works, so nothing breaks on one device — it reintroduces the collision window that only opens once two devices write into one database',
   },
 
+
+  // ---- V79: cloud sign-in (tests/15-cloud.js) ----
+  {
+    name: 'M130 (V79) an unknown host falls back to the test project',
+    file: 'config.js',
+    from: "CLOUD_HOSTS[location.hostname]) || 'off';",
+    to:   "CLOUD_HOSTS[location.hostname]) || 'test';",
+    why:  'unknown = OFF is what stops a stray copy of the app (localhost, a preview URL, somebody else\'s mirror) from talking to a real database',
+  },
+  {
+    name: 'M131 (V79) sign-in is allowed to create accounts',
+    file: 'cloud.js',
+    from: 'options: { shouldCreateUser: false }',
+    to:   'options: { shouldCreateUser: true }',
+    why:  'the test deploy is the public URL free users already have; anyone could create an account in the test project',
+  },
+  {
+    name: 'M132 (V79) boot loads the library for a signed-out user',
+    file: 'cloud.js',
+    from: "if (!stored) { state.cloud.status = 'signed-out'; return; }",
+    to:   "if (!stored) { state.cloud.status = 'signed-out'; cloudClient().catch(() => {}); return; }",
+    why:  'spec decision 3: with nobody signed in the app must be exactly what it was — no library, no request',
+  },
+  {
+    name: 'M133 (V79) boot checks the session even when offline',
+    file: 'cloud.js',
+    from: "  if (typeof navigator !== 'undefined' && navigator.onLine === false) return;\n  cloudClient()",
+    to:   "  cloudClient()",
+    why:  'offline always: a signed-in phone with no signal must not start network work at boot',
+  },
+  {
+    name: 'M134 (V79) a backup carries the session again',
+    file: 'backup.js',
+    from: '    // gone — restore ignores it in old backups (see restoreBackupFromFile).\n',
+    to:   '    // gone — restore ignores it in old backups (see restoreBackupFromFile).\n    authUser: { session: localStorage.getItem(CLOUD_AUTH_STORAGE_KEY) },\n',
+    why:  'a backup is a file engineers email around; a refresh token in it is a working login for anyone who reads it',
+  },
+  {
+    name: 'M135 (V79) load() stops clearing the V43 mock key',
+    file: 'storage.js',
+    from: '  try { localStorage.removeItem(PAT_AUTH_KEY); } catch {}\n',
+    to:   '',
+    why:  'the leftover mock user/token must not linger where anything could mistake it for a sign-in',
+  },
+  {
+    name: 'M136 (V79) async cloud results render over a focused field',
+    file: 'cloud.js',
+    from: "if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) return;",
+    to:   "if (false) return;",
+    why:  'MAP rule 3 — a render from a promise tears down the field being typed in and drops the keyboard',
+  },
+  {
+    name: 'M137 (V79) a cloud dispatch handler loses its typeof guard',
+    file: 'dispatch.js',
+    from: "'cloud-sign-out':   () => { if (typeof cloudSignOut === 'function') cloudSignOut(); },",
+    to:   "'cloud-sign-out':   () => { cloudSignOut(); },",
+    why:  'MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError',
+  },
+  {
+    name: 'M138 (V79) the TEST strip shows whenever the host is test',
+    file: 'cloud.js',
+    from: "&& state.cloud && state.cloud.status === 'signed-in';",
+    to:   "&& state.cloud;",
+    why:  'decision 3A: free users on the same URL who never sign in must never see a TEST strip',
+  },
+  {
+    name: 'M139 (V79) sign-out relies on the library alone',
+    file: 'cloud.js',
+    from: '      doomed.forEach((k) => localStorage.removeItem(k));\n',
+    to:   '',
+    why:  'signing out offline (library never loaded) would silently leave the session in place',
+  },
+  {
+    name: 'M140 (V79) cloudBoot is written but never called',
+    file: 'boot.js',
+    from: "  if (typeof cloudBoot === 'function') cloudBoot();\n",
+    to:   '',
+    why:  'the V65-V67 scanner lesson: an unbound subsystem and a missing one look identical at runtime',
+  },
+  {
+    name: 'M141 (V79) supabase.umd.js dropped from the precache',
+    file: 'sw.js',
+    from: "  './supabase.umd.js',\n",
+    to:   '',
+    why:  'after an update a signed-in phone opened offline could not load the library',
+  },
 ];
 
 function main() {
