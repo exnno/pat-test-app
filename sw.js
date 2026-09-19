@@ -10,7 +10,7 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v78';
+const CACHE_VERSION = 'pat-v79';
 const ASSETS = [
   './',
   './index.html',
@@ -45,6 +45,11 @@ const ASSETS = [
   './render-review.js',
   './render-settings.js',
   './render-help.js',
+  './cloud.js',          // v79
+  // v79: supabase-js, PRECACHED but not a <script> tag — cloud.js injects it
+  // only when someone signs in (or already is). Precached so a signed-in
+  // phone keeps working offline after an update, same reasoning as jsPDF.
+  './supabase.umd.js',
   './scanner.js',
   './events.js',
   './dispatch.js',

@@ -78,6 +78,10 @@
        Declares one top-level const, GLOSSARY_GROUPS, read only inside a function
        body — so like render-review.js this position is a readability choice. -->
   <script src="render-help.js"></script>
+  <!-- v79: cloud sign-in. Optional subsystem: every call into it is
+       typeof-guarded and boot wraps cloudBoot(). After report.js (it reuses
+       _injectScriptOnce to lazy-load supabase.umd.js) and before boot.js. -->
+  <script src="cloud.js"></script>
   <!-- v65: HID barcode scanner. Placed with the other input-handling files and
        AFTER the render files, because a scan writes into fields those render —
        and before events.js/dispatch.js purely so the three document-level
