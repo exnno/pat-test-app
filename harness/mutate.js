@@ -921,6 +921,55 @@ const MUTATIONS = [
     to:   '',
     why:  'the sheet opens in state and paints nothing. Every assertion driving repeatLastResult() directly still passes, and the gesture on the phone appears to do nothing at all — the same class of miss as a data-action with no handler',
   },
+  {
+    name: 'M123 (V78) deleting a job stops leaving a tombstone',
+    file: 'session.js',
+    from: "  if (going.length) recordTombstone('session', id);",
+    to:   '',
+    why:  'the whole point of the release. Nothing visible breaks — the job still deletes, every pre-V78 assertion still passes — and the failure only appears on a second device months later, when the deleted job comes back',
+  },
+  {
+    name: 'M124 (V78) the client cascade marks the parent but not its sites',
+    file: 'clients.js',
+    from: "      state.sites.forEach(s => { if (s.clientId === clientId) recordTombstone('site', s.id); });",
+    to:   '',
+    why:  'THE PARTIAL-CASCADE MISS. deleteClient looks correct: a tombstone is written, the client and its sites both vanish locally. Only the children are unrecorded, so a sync resurrects the sites of a client that no longer exists — orphans with no parent to delete them again',
+  },
+  {
+    name: 'M125 (V78) the ledger call moves to AFTER the filter',
+    file: 'clients.js',
+    from: "      recordTombstone('client', clientId);\n      state.sites.forEach(s => { if (s.clientId === clientId) recordTombstone('site', s.id); });\n      state.clients = state.clients.filter(c => c.id !== clientId);\n      state.sites = state.sites.filter(s => s.clientId !== clientId);",
+    to:   "      state.clients = state.clients.filter(c => c.id !== clientId);\n      state.sites = state.sites.filter(s => s.clientId !== clientId);\n      recordTombstone('client', clientId);\n      state.sites.forEach(s => { if (s.clientId === clientId) recordTombstone('site', s.id); });",
+    why:  'sweep-before-you-remove (cross-cutting rule 5), restored as a bug. The client tombstone is still written and looks right; the site sweep now iterates a list the filter has already emptied and silently marks nothing. 14h asserts on ORDER precisely because presence passes here',
+  },
+  {
+    name: 'M126 (V78) the ledger call is hoisted out of the confirm callback',
+    file: 'clients.js',
+    from: "  openConfirmSheet({\n    title: 'Delete client?',",
+    to:   "  recordTombstone('client', clientId);\n  openConfirmSheet({\n    title: 'Delete client?',",
+    why:  'the tidying edit that looks like a simplification — pull the ledger call up beside the thing it describes, out of the callback. The client is now marked deleted the moment the SHEET OPENS, so pressing Cancel keeps it on this device and deletes it from every other one. 14d exists for exactly this and nothing else would catch it',
+  },
+  {
+    name: 'M127 (V78) the ledger stops being persisted',
+    file: 'storage.js',
+    from: '  localStorage.setItem(TOMBSTONES_KEY, JSON.stringify(normaliseTombstones(state.tombstones)));',
+    to:   '',
+    why:  'deletions survive in memory for exactly as long as the app stays open. Every in-session assertion passes; the record of what was deleted is gone by the next launch, which is the only moment it was ever needed',
+  },
+  {
+    name: 'M128 (V78) the retention purge drops entries it cannot date',
+    file: 'storage.js',
+    from: '    return isNaN(ms) ? true : ms >= cutoff;',
+    to:   '    return isNaN(ms) ? false : ms >= cutoff;',
+    why:  'the ambiguous case flipped the wrong way. A tombstone with an unparseable timestamp is discarded rather than kept, and discarding a tombstone resurrects a deleted record — the exact failure the ledger exists to prevent. A one-word change with no visible symptom',
+  },
+  {
+    name: 'M129 (V78) new records go back to the old short ids',
+    file: 'clients.js',
+    from: "  const client = { id: 'client_' + newId(), name: trimmed };",
+    to:   "  const client = { id: 'client_' + uid(), name: trimmed };",
+    why:  'a reasonable-looking revert. uid() is still defined and still works, so nothing breaks on one device — it reintroduces the collision window that only opens once two devices write into one database',
+  },
 
 ];
 
