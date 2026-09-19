@@ -330,6 +330,11 @@ let state = {
   // saved work.
   clients: [],
   sites: [],
+  // v78: sync prep. Deletion ledger — [{kind,id,at}] where kind is one of
+  // TOMBSTONE_KINDS (storage.js). Written by recordTombstone() as things are
+  // deleted, purged at load() once entries pass TOMBSTONE_RETAIN_DAYS. Persisted
+  // (TOMBSTONES_KEY) and carried through backup export/restore.
+  tombstones: [],
 
   // v19: Settings → Clients page UI state. expandedClientId tracks which client
   // row is open to show its sites; the *Dialog objects drive the add/rename

@@ -138,8 +138,8 @@ for f in *.js; do node --check "$f" || echo "FAIL $f"; done
 
 ## Releasing
 
-Versions are sequential integers — `V76`, `V77` — with a matching cache tag
-(`pat-v77`). One focused concern per release; structural refactors ship
+Versions are sequential integers — `V77`, `V78` — with a matching cache tag
+(`pat-v78`). One focused concern per release; structural refactors ship
 separately from behaviour changes.
 
 **Every release:**

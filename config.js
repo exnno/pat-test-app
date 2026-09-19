@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V77';
+const APP_VERSION = 'V78';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -597,6 +597,22 @@ const SETUP_BUNDLE_VERSION = 1;
 // deleting a client/site never alters any saved session, CSV, or import.
 const CLIENTS_KEY = 'pat:clients';          // v19: JSON [{id,name}]
 const SITES_KEY = 'pat:sites';              // v19: JSON [{id,clientId,name}]
+
+// v78: sync prep. THE DELETION LEDGER — a record of what the engineer has
+// deleted, kept after the record itself is gone.
+//
+// Sync cannot work without it. On a pull, a record the server has and this
+// device does not is indistinguishable from a record this device deleted, so
+// without a ledger every delete is undone by the next sync.
+//
+// Deliberately a SEPARATE list rather than a `deleted` flag on the record. A
+// flag means every read path in the app — session lists, client and site
+// pickers, CSV export, report generation, SQP source lists — has to remember to
+// filter it out, and the single one that gets forgotten shows the engineer a
+// client they deleted last month. The ledger keeps deleted records out of state
+// entirely, exactly as today, so no read path changes at all.
+const TOMBSTONES_KEY = 'pat:tombstones';    // v78: JSON [{kind,id,at}]
+const TOMBSTONE_RETAIN_DAYS = 90;
 
 // v18: Smart Quick Pick. An OPT-IN feature (default OFF) that reorders the
 // entry-screen quick-pick buttons so the item types you've most often logged at

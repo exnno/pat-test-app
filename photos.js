@@ -270,7 +270,7 @@ function photoAdd(sessionId, itemId, processed) {
   if (photoCountForItem(itemId) >= cap) return Promise.resolve(null);
 
   const record = {
-    id: (typeof uid === 'function') ? uid() : String(Date.now()) + Math.random().toString(36).slice(2),
+    id: (typeof newId === 'function') ? newId() : String(Date.now()) + Math.random().toString(36).slice(2),
     itemId,
     sessionId: sessionId || '',
     blob: processed.blob,

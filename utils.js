@@ -14,6 +14,21 @@ const escapeHTML = (s) => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp
 
 const capitalise = s => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 
+/* v78: id for any NEW record, in place of uid() (session.js).
+ *
+ * uid() is a timestamp plus five random base-36 characters. That is fine while
+ * one device owns the data, and marginal once two devices write into the same
+ * database — which is exactly what sync introduces. crypto.randomUUID is
+ * available in every browser this app runs in over HTTPS; the uid() shape is
+ * kept inline as the fallback so this never throws on a stray http:// origin.
+ *
+ * Ids ALREADY STORED ARE NEVER REWRITTEN. They stay valid forever: server-side
+ * the primary key is (user_id, id), so an id only has to be unique within one
+ * engineer's own data, which every existing uid() already is. */
+const newId = () => (typeof self !== 'undefined' && self.crypto && typeof self.crypto.randomUUID === 'function')
+  ? self.crypto.randomUUID()
+  : (Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
+
 // v68 (D2): an apostrophe is a word boundary, so the old /\b\w/g turned
 // "Bob's Office" into "Bob'S Office" — and because this runs on locations and
 // item types it reached certificates and CSV exports, not just the screen.

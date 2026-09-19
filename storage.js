@@ -266,6 +266,12 @@ function load() {
   state.sessions = parseStoredSessions(localStorage.getItem(STORAGE_KEY));
   state.activeId = localStorage.getItem(ACTIVE_KEY) || null;
 
+  // v78: the deletion ledger, purged on the way IN rather than on the way out.
+  // Purging at load means the retention window is measured from the moment the
+  // app is opened, not from whenever a save happened to fire, and it guarantees
+  // a bad stored value can never reach the rest of the app.
+  state.tombstones = purgeTombstones(parseTombstones(localStorage.getItem(TOMBSTONES_KEY)));
+
   // v9: presets first — migration logic for users coming from v8 or earlier.
   // Three cases on first v9 load:
   //  (1) Already migrated: ITEM_PRESETS_KEY exists → just load it.
@@ -299,7 +305,7 @@ function load() {
       // usable while the prompt sits — fall back name 'My items' if they cancel.
       // The prompt overwrites the name on confirm.
       const interim = {
-        id: 'preset_' + uid(),
+        id: 'preset_' + newId(),
         name: 'My items',
         items: legacyItems.slice(0, 9)
       };
@@ -313,7 +319,7 @@ function load() {
     } else {
       // Case 3: fresh install.
       const defaultPreset = {
-        id: 'preset_' + uid(),
+        id: 'preset_' + newId(),
         name: 'Default',
         items: DEFAULT_ITEM_TYPES.slice()
       };
@@ -886,6 +892,11 @@ function saveSettings() {
   // v19: Clients & Sites (readable long-key arrays).
   localStorage.setItem(CLIENTS_KEY, JSON.stringify(state.clients || []));
   localStorage.setItem(SITES_KEY, JSON.stringify(state.sites || []));
+  // v78: the deletion ledger is written alongside clients and sites because it
+  // is their counterpart — the record of what is NOT in those lists any more.
+  // Normalised on the way out through the same validator that reads it, so an
+  // in-memory value that somehow went bad cannot be persisted.
+  localStorage.setItem(TOMBSTONES_KEY, JSON.stringify(normaliseTombstones(state.tombstones)));
   // v59: archived stats bucket. Written through the same validator that reads
   // it, so a bad in-memory value can never be persisted — and the type map is
   // capped here as well as on read, which is what actually stops it growing.
@@ -901,6 +912,95 @@ function saveSettings() {
 function save() {
   saveSessions();
   saveSettings();
+}
+
+// ---------------------------------------------------------------------------
+// v78: TOMBSTONES — the deletion ledger
+//
+// Four rules, all load-bearing:
+//
+//   1. recordTombstone() DOES NOT SAVE. Every call site already calls save()
+//      after mutating state, and a helper that saves independently would write
+//      a ledger entry for a delete whose own state change later failed.
+//
+//   2. IT IS CALLED BEFORE THE REMOVAL, never after — cross-cutting rule 5
+//      ("sweep before you remove"). Once the record is spliced out of state its
+//      id is unreachable, and for a client its child sites are unreachable too.
+//
+//   3. RE-DELETING AN ID UPDATES ITS TIMESTAMP rather than appending a second
+//      entry. Ids can recur through a restore of an old backup, and a ledger
+//      that grows an entry per attempt is a ledger that grows without bound.
+//
+//   4. PURGE AT LOAD, NOT AT DELETE. The retention window only has to outlast
+//      the longest plausible gap between a device deleting something and every
+//      other device seeing that delete. 90 days is generous for that and short
+//      enough that the ledger stays small.
+//
+// Nothing in the app READS this ledger yet — that is the sync layer's job. It is
+// built now because the alternative is reconstructing deletions that were never
+// recorded, which cannot be done after the fact.
+const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset'];
+
+// Whitelisting validator. Used on both read and write, so a hand-edited or
+// corrupted value collapses to a clean list rather than propagating.
+function normaliseTombstones(list) {
+  if (!Array.isArray(list)) return [];
+  const seen = Object.create(null);
+  const out = [];
+  for (let i = 0; i < list.length; i++) {
+    const t = list[i];
+    if (!t || typeof t !== 'object') continue;
+    const kind = String(t.kind || '');
+    const id = String(t.id || '');
+    if (!id || TOMBSTONE_KINDS.indexOf(kind) === -1) continue;
+    const at = (typeof t.at === 'string' && t.at) ? t.at : new Date().toISOString();
+    const key = kind + '\u0000' + id;
+    if (seen[key]) {
+      // Keep the LATER timestamp — a duplicate means the same thing was deleted
+      // twice and the most recent delete is the one sync must win with.
+      const prev = out[seen[key] - 1];
+      if (at > prev.at) prev.at = at;
+      continue;
+    }
+    out.push({ kind, id, at });
+    seen[key] = out.length;
+  }
+  return out;
+}
+
+function parseTombstones(raw) {
+  try {
+    return normaliseTombstones(JSON.parse(raw || '[]'));
+  } catch {
+    return [];
+  }
+}
+
+// Drop entries older than the retention window. Anything with an unparseable
+// timestamp is KEPT, not discarded — losing a tombstone resurrects a deleted
+// record, which is the failure this whole mechanism exists to prevent, so the
+// ambiguous case errs towards keeping it.
+function purgeTombstones(list) {
+  const arr = normaliseTombstones(list);
+  const days = (typeof TOMBSTONE_RETAIN_DAYS === 'number' && TOMBSTONE_RETAIN_DAYS > 0)
+    ? TOMBSTONE_RETAIN_DAYS : 90;
+  const cutoff = Date.now() - days * 24 * 60 * 60 * 1000;
+  return arr.filter(t => {
+    const ms = Date.parse(t.at);
+    return isNaN(ms) ? true : ms >= cutoff;
+  });
+}
+
+function recordTombstone(kind, id) {
+  if (!id || TOMBSTONE_KINDS.indexOf(kind) === -1) return;
+  if (!Array.isArray(state.tombstones)) state.tombstones = [];
+  const sid = String(id);
+  const now = new Date().toISOString();
+  for (let i = 0; i < state.tombstones.length; i++) {
+    const t = state.tombstones[i];
+    if (t && t.kind === kind && String(t.id) === sid) { t.at = now; return; }
+  }
+  state.tombstones.push({ kind, id: sid, at: now });
 }
 
 // ---------------------------------------------------------------------------

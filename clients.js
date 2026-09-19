@@ -68,10 +68,10 @@ function seedClientsSitesFromSessions() {
     if (!raw) return;
     const key = raw.toLowerCase();
     if (seen.has(key)) return;
-    const clientId = 'client_' + uid();
+    const clientId = 'client_' + newId();
     // v43: add userId (null for now, set when synced) and lastModified timestamp
     state.clients.push({ id: clientId, name: raw, userId: null, lastModified: now });
-    state.sites.push({ id: 'site_' + uid(), clientId, name: raw, userId: null, lastModified: now });
+    state.sites.push({ id: 'site_' + newId(), clientId, name: raw, userId: null, lastModified: now });
     seen.set(key, clientId);
     added = true;
   });
@@ -125,7 +125,7 @@ function ensureOrphanSite(name) {
   if (!trimmed) return null;
   const existing = findOrphanSiteByName(trimmed);
   if (existing) return existing;
-  const site = { id: 'site_' + uid(), clientId: '', name: trimmed };
+  const site = { id: 'site_' + newId(), clientId: '', name: trimmed };
   state.sites.push(site);
   return site;
 }
@@ -151,7 +151,7 @@ function ensureClient(name) {
   if (!trimmed) return null;
   const existing = findClientByName(trimmed);
   if (existing) return existing;
-  const client = { id: 'client_' + uid(), name: trimmed };
+  const client = { id: 'client_' + newId(), name: trimmed };
   state.clients.push(client);
   return client;
 }
@@ -160,7 +160,7 @@ function ensureSite(clientId, name) {
   if (!trimmed || !clientId) return null;
   const existing = findSiteByName(clientId, trimmed);
   if (existing) return existing;
-  const site = { id: 'site_' + uid(), clientId, name: trimmed };
+  const site = { id: 'site_' + newId(), clientId, name: trimmed };
   state.sites.push(site);
   return site;
 }
@@ -280,6 +280,11 @@ function deleteClient(clientId) {
     message: msg,
     confirmLabel: 'Delete',
     onConfirm: () => {
+      // v78: ledger BEFORE the filters (cross-cutting rule 5). Child site ids
+      // are read from state here rather than from `childSites` captured when the
+      // sheet opened, so a site added while the sheet was up is not missed.
+      recordTombstone('client', clientId);
+      state.sites.forEach(s => { if (s.clientId === clientId) recordTombstone('site', s.id); });
       state.clients = state.clients.filter(c => c.id !== clientId);
       state.sites = state.sites.filter(s => s.clientId !== clientId);
       if (state.clientsPage.expandedClientId === clientId) {
@@ -330,6 +335,7 @@ function deleteSite(siteId) {
     message: `Delete site "${site.name}"? This only removes it from your client list — sessions already created keep their site name.`,
     confirmLabel: 'Delete',
     onConfirm: () => {
+      recordTombstone('site', siteId);   // v78: before the filter
       state.sites = state.sites.filter(s => s.id !== siteId);
       save();
       render();
@@ -395,6 +401,9 @@ function resolveAssignMerge() {
   const targetId = ad.clash && ad.clash.targetClientId;
   if (!site || !targetId) return;
   // Drop the moving site; the target's existing same-named site stands.
+  // v78: a merge IS a delete of the moving site as far as any other device is
+  // concerned, so it earns a tombstone like any other removal.
+  recordTombstone('site', site.id);
   state.sites = state.sites.filter(s => s.id !== site.id);
   finishSiteAssign(targetId);
 }

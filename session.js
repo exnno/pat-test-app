@@ -45,7 +45,7 @@ function createPreset(name) {
   const trimmed = (name || '').trim();
   if (!trimmed) return null;
   const preset = {
-    id: 'preset_' + uid(),
+    id: 'preset_' + newId(),
     name: trimmed,
     items: DEFAULT_ITEM_TYPES.slice()
   };
@@ -72,6 +72,7 @@ function deletePreset(id) {
   const idx = state.itemPresets.findIndex(p => p.id === id);
   if (idx === -1) return false;
   const wasActive = state.activePresetId === id;
+  recordTombstone('preset', id);   // v78: before the splice
   state.itemPresets.splice(idx, 1);
   if (wasActive) {
     // Pick the previous one (or first if we deleted the first).
@@ -811,7 +812,7 @@ function createSession() {
 
   const now = new Date().toISOString();
   const s = {
-    id: uid(),
+    id: newId(),
     name: name.trim() || `Session ${state.sessions.length + 1}`,
     site: snapshot,                              // combined text snapshot (back-compat)
     clientId: clientRec ? clientRec.id : '',     // v19: structured refs (convenience)
@@ -1191,6 +1192,10 @@ function deleteSession(id) {
   // well as itemId precisely so this is one indexed lookup and does NOT depend
   // on the session's items still being reachable.
   if (going.length) photosDeleteForSessions([id]);
+  // v78: ledger before the filter, on the same before-the-removal rule as the
+  // two sweeps above. Only recorded when the session actually existed — a call
+  // for an unknown id must not leave a tombstone for a record that never was.
+  if (going.length) recordTombstone('session', id);
   state.sessions = state.sessions.filter(s => s.id !== id);
   if (id === state.activeId) {
     state.activeId = null;
@@ -1254,7 +1259,7 @@ function saveItem(result, readings) {
     // Time column). See the capture/exposure note in config.js — this is the
     // line that changed, and it was a deliberate decision, not a slip.
     item.ts = new Date().toISOString();
-    const appended = { id: uid(), ...item };
+    const appended = { id: newId(), ...item };
     sess.items.push(appended);
     savedItemId = appended.id;
     // v18: learn this (location, type) pairing on first log (pass OR fail — a
@@ -1793,7 +1798,7 @@ function copyLastResult() {
     // the capture/exposure note in config.js. Copy-last is a genuine first log
     // of a new item, so it stamps exactly like any other.
     item.ts = new Date().toISOString();
-    sess.items.push({ id: uid(), ...item });
+    sess.items.push({ id: newId(), ...item });
     // v18: learn the copied (location, type) pairing as a fresh log.
     recordSqpUsage(item.location, item.itemType);
   }
@@ -1869,7 +1874,7 @@ function repeatLastResult(n) {
 
   for (let i = 0; i < total; i++) {
     const item = {
-      id: uid(),
+      id: newId(),
       assetNo: nextAssetNo(sess),   // recomputed each push off the growing list
       location: cleanLocation,
       itemType: cleanType,

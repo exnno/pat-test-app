@@ -92,6 +92,14 @@ function buildBackup() {
     // Deliberately NOT part of the Export Setup bundle — Export Setup is
     // config-only and this is derived from job data.
     archivedStats: state.archivedStats,
+    // v78: the deletion ledger. Carried so a restore onto a second device does
+    // not resurrect everything that device's owner deleted — without it, a
+    // backup taken before a delete is a backup that undoes the delete. Additive
+    // and missing-field-tolerant (an old backup restores to an empty ledger,
+    // which is correct: it predates the mechanism), so **backupVersion stays 5**.
+    tombstones: (typeof normaliseTombstones === 'function')
+      ? normaliseTombstones(state.tombstones)
+      : (state.tombstones || []),
     // v43: cloud prep. Auth state (userId, authToken, loginTime). Passthrough
     // for now; will persist server-side in cloud phase. Old backups without it
     // restore with null (logged-out). Additive — no backupVersion bump.
@@ -376,6 +384,12 @@ function restoreBackupFromFile(file) {
           }))
           .filter(s => s.id && s.name)   // v26: clientId no longer required (orphan sites)
       : [];
+    // v78: restore the deletion ledger, purged on the way in on the same rule as
+    // load() — a backup restored a year later must not reinstate tombstones that
+    // have long since outlived their window. Absent key → empty list.
+    state.tombstones = (typeof purgeTombstones === 'function')
+      ? purgeTombstones(data.tombstones)
+      : (Array.isArray(data.tombstones) ? data.tombstones : []);
     if (state.clients.length === 0 && state.sites.length === 0) {
       seedClientsSitesFromSessions();
     }

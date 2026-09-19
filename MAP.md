@@ -1,4 +1,4 @@
-# PATGo — Code Map (V77)
+# PATGo — Code Map (V78)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -234,10 +234,15 @@ in-memory caches and mirrors.
 survives navigation. Derived mirrors (`photoIndex`, `photoBytes`, the instrument
 flat fields) are never saved, backed up or validated. Rule 7 applies.
 
-### utils.js (~250 ln) — pure helpers, no state access
+### utils.js (~265 ln) — pure helpers, no state access
 Formatting, escaping, colour, asset-number splitting/padding, long-press
-detector, boundary validators for item readings.
+detector, boundary validators for item readings, `newId()`.
 **Touch to:** add a stateless helper.
+⚠ v78: `newId()` (crypto.randomUUID, uid()-shaped fallback) is the ONLY way a
+NEW record gets an id. Minting sites: clients.js ×5, session.js ×5 (session,
+items ×3, preset), storage.js ×2 (seeded presets), photos.js, instruments.js.
+`uid()` (session.js) still exists and still works — which is exactly why a
+revert to it is invisible. Ids already stored are never rewritten.
 **Coupling:** none by design — nothing here reads `state`.
 ⚠ v75: `focusInSheet()` is the ONE way anything inside a bottom sheet takes
 focus (`preventScroll`, try/catch fallback to bare `focus()`). Callers:
@@ -263,6 +268,15 @@ the per-area save paths, the shared boundary validators
 (`normaliseReportSettings`, `normaliseArchivedStats`), storage stats.
 **Touch to:** change how data is stored, loaded or migrated.
 **⚠ Data-integrity zone — backup round-trip after every edit.**
+⚠ v78: the TOMBSTONE LEDGER (`state.tombstones`, TOMBSTONES_KEY) lives here —
+`normaliseTombstones` / `parseTombstones` / `purgeTombstones` / `recordTombstone`,
+plus TOMBSTONE_KINDS. Deleted records are kept OUT of state entirely (no
+`deleted` flag on any record), so NO read path filters them — that is the design
+and 14g fails if a flag ever appears. `recordTombstone()` does NOT save, and is
+always called BEFORE the removal (cross-cutting rule 5). Callers: clients.js ×4
+(deleteClient + its site cascade, deleteSite, resolveAssignMerge), session.js ×2
+(deleteSession, deletePreset). Prune deliberately does NOT record — decision C,
+revisit in the sync release. Nothing in the shipped app READS the ledger yet.
 ⚠⚠ v69: `_encodedSessionCache` reuses a session's encoding when the items ARRAY
 REFERENCE and `_sessionSig()` are unchanged — and the sig covers item COUNT, not
 item CONTENTS. Anything that edits strings INSIDE existing item objects must call

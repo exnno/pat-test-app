@@ -99,8 +99,8 @@ function makeInstrument(fields) {
 // nothing and keeps this file usable in isolation — same defensive shape as
 // photos.js uses for the identical reason.
 function _instrumentUid() {
-  return (typeof uid === 'function')
-    ? uid()
+  return (typeof newId === 'function')
+    ? newId()
     : Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 }
 
