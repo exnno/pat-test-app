@@ -232,12 +232,21 @@ let state = {
   // view-change detection that drives this lives in render() (_lastRenderedView),
   // because state.view is set from many places, not just setView.
   sessionsScrollTop: 0,
-  // v43: cloud prep. Auth state (transient — not persisted; will persist in cloud
-  // phase). userId (or null if logged out), authToken (or null), authStatus
-  // ('logged-out' | 'logged-in' | 'logging-in' | 'error'). Mock OAuth flow for V43.
-  userId: null,
-  authToken: null,
-  authStatus: 'logged-out',
+  // v79: cloud sign-in. TRANSIENT — never saved, never in a backup. The real
+  // session lives in localStorage under CLOUD_AUTH_STORAGE_KEY, owned by
+  // supabase-js; cloudBoot() (cloud.js) derives this from it on every start.
+  //   status: 'off'        this host has no cloud project (CLOUD_ENV 'off' or
+  //                        empty keys) — every cloud UI is hidden
+  //           'signed-out' | 'code-sent' | 'signed-in'
+  //   busy:   a request is in flight (buttons disable, no double-sends)
+  //   email:  signed-in address, or the address a code was sent to
+  //   plan / trialEndsAt / checkedAt: last "Check connection" result
+  //   message: one plain-language line for the Account page (errors included)
+  // Replaces the V43 mock's userId/authToken/authStatus.
+  cloud: {
+    status: 'off', busy: false, email: '',
+    plan: null, trialEndsAt: null, checkedAt: null, message: '',
+  },
   // v43: cloud pages visibility. cloudPagesRevealed is a transient per-session flag
   // set by long-pressing the About title; it resets when you navigate away from About
   // but persists if you open one of the cloud pages and return. Never persisted.

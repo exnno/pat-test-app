@@ -759,25 +759,16 @@ registerActions({
     else if (arg === 'subscription') state.view = 'cloudSubscription';
     render();
   },
-  'cloud-sign-out': () => {
-    state.userId = null;
-    state.authToken = null;
-    state.authStatus = 'logged-out';
-    localStorage.removeItem(PAT_AUTH_KEY);
-    state.view = 'cloudAccount';
-    save();
-    render();
-  },
-  'cloud-sync-now': () => {
-    // Mock sync: just stamp lastBackupAt for now
-    state.lastBackupAt = new Date().toISOString();
-    save();
-    render();
-    showToast('Sync complete');
-  },
-  'cloud-upgrade': () => {
-    showToast('Upgrade plans coming soon');
-  },
+  // v79: real sign-in (cloud.js). The V43 mock actions are gone — its "Sync now"
+  // stamped lastBackupAt, which silently quietened the backup reminder without
+  // any backup being made. Every handler here is typeof-guarded: cloud.js is an
+  // optional subsystem (MAP rule 6) and a missing one must be a no-op, not a
+  // ReferenceError on a tap.
+  'cloud-send-code':  () => { if (typeof cloudSendCode === 'function') cloudSendCode(); },
+  'cloud-verify-code':() => { if (typeof cloudVerifyCode === 'function') cloudVerifyCode(); },
+  'cloud-change-email':() => { if (typeof cloudChangeEmail === 'function') cloudChangeEmail(); },
+  'cloud-check':      () => { if (typeof cloudCheckConnection === 'function') cloudCheckConnection(); },
+  'cloud-sign-out':   () => { if (typeof cloudSignOut === 'function') cloudSignOut(); },
 
   // v43: calibration reminder (Update button on the Sessions-screen cal banner)
   'edit-cal-date': () => {

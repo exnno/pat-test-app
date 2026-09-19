@@ -40,10 +40,13 @@
 function renderSettingsAbout() {
   // v43: cloud pages reveal via long-press on the title. This section only shows
   // if cloudPagesRevealed is true (a transient per-session flag set by long-press).
-  const cloudPagesMenu = state.cloudPagesRevealed ? `
+  // v79 (decision 1A): and only on a host that HAS a cloud — on any other host
+  // the long-press reveals nothing at all.
+  const cloudOn = state.cloud && state.cloud.status !== 'off';
+  const cloudPagesMenu = (state.cloudPagesRevealed && cloudOn) ? `
     <div class="info-card cloud-pages-menu">
-      <h3>Cloud Pages (dev)</h3>
-      <p class="muted" style="font-size:11px">These pages are under development and not yet connected to the cloud.</p>
+      <h3>Cloud (test)</h3>
+      <p class="muted" style="font-size:11px">Sign-in only for now. Nothing from your jobs is sent anywhere.</p>
       <button class="backup-action-btn" id="cloud-account-btn" data-action="open-cloud-page" data-arg="account" style="margin-top:8px">👤 Account</button>
       <button class="backup-action-btn" id="cloud-sync-btn" data-action="open-cloud-page" data-arg="sync" style="margin-top:6px">☁ Sync</button>
       <button class="backup-action-btn" id="cloud-subscription-btn" data-action="open-cloud-page" data-arg="subscription" style="margin-top:6px">💳 Subscription</button>
@@ -54,24 +57,23 @@ function renderSettingsAbout() {
     <div class="screen">
       ${renderSettingsSubHeader('About')}
       <div class="info-card">
-        <h2 id="about-title" style="cursor:pointer;-webkit-user-select:none;user-select:none">PATGo ${APP_VERSION}</h2>
+        <h2 id="about-title" style="cursor:pointer;-webkit-user-select:none;user-select:none">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}</h2>
         <p>A fast, offline-first portable appliance testing app for working PAT engineers. Built around speed of data entry — pass/fail decisions in two taps, no fighting the interface.</p>
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v78: rolled forward — V78 on top, V75 dropped. -->
+      <!-- v8: rolling 3-version changelog. v79: rolled forward — V79 on top, V76 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V79</strong> &middot; September 2026</p>
+        <p class="muted">Housekeeping you won't see, plus the first piece of the cloud version, switched off for everyone. Backups no longer include a leftover sign-in field from an old experiment &mdash; a backup is a file you email around, and it should never carry anything that looks like a login. Restoring an older backup that has one simply ignores it. Nothing about your jobs, clients, settings or reports has changed, nothing is sent anywhere, and the app works exactly as before with or without a signal.</p>
         <p><strong>V78</strong> &middot; September 2026</p>
         <p class="muted">Groundwork, with nothing to see on screen. Until now, deleting a job, a client or a site simply removed it &mdash; which is all a single phone needs to know. Once your records can live on more than one device, that isn't enough: the other device still holds the thing you deleted, and would put it back. The app now keeps a quiet record of what you've deleted and when, so a deletion made here stays deleted everywhere. New records are also given stronger identifiers, so two devices writing at the same moment can't produce two records claiming to be the same one. Everything already saved keeps the identifier it has. No screen, setting or job has changed, and the app still makes no network calls.</p>
         <p><strong>V77</strong> &middot; August 2026</p>
         <p class="muted">A new shortcut for repeat items, and two fixes to the press-and-hold gesture. If a room has a run of identical items, you no longer have to tap Copy last result once for each: log the first one, then press and hold that button and choose how many more to add. It shows you the item and the result it is about to copy, and any notes attached to it, so a failure keeps its reason rather than arriving as a bare fail. The copies are numbered on from the last one and use whatever location is on the form. Separately, holding the quick-pick buttons to switch presets no longer highlights the button text while it does so, and opening &ldquo;Edit presets&rdquo; from that panel now returns you to the test screen when you press Back, rather than leaving you part-way into Settings. One fix behind the scenes as well: items added by Multi Pick were not having their time recorded unless the timestamp setting happened to be switched on, so a job's testing time could read short. They are now recorded like every other item.</p>
-
-        <p><strong>V76</strong> &middot; August 2026</p>
-        <p class="muted">A follow-on from V75, from a check of every pop-up panel in the app rather than the handful that had been reported. Three panels whose contents come from your own settings &mdash; the fail reason picker, Multi Pick, and bulk &ldquo;Change type&rdquo; on the Overview &mdash; could run off the bottom of the screen if you'd set up a long list, taking the later entries and in two cases a button with them; those lists now scroll while the buttons stay put. First-time setup had the same fault in a form that could clip its own Continue button on a short screen, which is a poor first impression for a new phone. Behind the scenes the three slightly different ways panels used to handle scrolling have been reduced to one, so a panel added in future can't quietly miss it. Nothing about how the app records a test has changed.</p>
 
 
               </div>
@@ -316,91 +318,93 @@ function renderBugSheet() {
   `;
 }
 
-// v43: cloud prep pages. Not yet wired into the main Settings nav — revealed via
-// long-press on the About title. Mock data for now; will persist to cloud in the
-// cloud phase.
+// v43: cloud pages, revealed via long-press on the About title (never in the
+// main Settings nav). v79: the Account page is REAL — email-code sign-in via
+// cloud.js. Sync and Subscription are honest placeholders until those releases.
+//
+// ⚠ This page has inputs. Async results reach it only through _cloudRepaint()
+// (cloud.js), which will not render while a field is focused — MAP rule 3.
 
 function renderCloudAccount() {
-  const email = state.userId ? `${state.userId}@example.com` : 'Not logged in';
-  const loginTime = state.userId ? new Date().toLocaleDateString() : '—';
+  const c = state.cloud || {};
+  const busy = !!c.busy;
+  const dis = busy ? 'disabled' : '';
+  const msg = c.message ? `<p class="muted cloud-msg" id="cloud-msg" role="status">${escapeHTML(c.message)}</p>` : '';
+  let body = '';
+
+  if (c.status === 'off') {
+    body = `
+      <div class="info-card">
+        <p class="muted">Cloud isn't available on this copy of the app.</p>
+      </div>`;
+  } else if (c.status === 'signed-in') {
+    const plan = c.plan
+      ? `<p class="muted" id="cloud-plan">Plan: <strong>${escapeHTML(c.plan)}</strong>${c.trialEndsAt ? ` &middot; trial ends ${escapeHTML(new Date(c.trialEndsAt).toLocaleDateString())}` : ''}</p>`
+      : '';
+    body = `
+      <div class="info-card">
+        <h3>Signed in as</h3>
+        <p id="cloud-signed-in-email"><strong>${escapeHTML(c.email || '(unknown)')}</strong></p>
+        ${plan}
+        ${msg}
+        <button class="backup-action-btn" id="cloud-check" data-action="cloud-check" ${dis} style="margin-top:8px">${busy ? 'Checking…' : 'Check connection'}</button>
+        <button class="backup-action-btn" id="cloud-sign-out" data-action="cloud-sign-out" ${dis} style="margin-top:6px">Sign out</button>
+      </div>`;
+  } else if (c.status === 'code-sent') {
+    body = `
+      <div class="info-card">
+        <h3>Enter your code</h3>
+        <p class="muted" style="font-size:13px">We emailed a code to <strong>${escapeHTML(c.email)}</strong>.</p>
+        <label class="label" for="cloud-code">Code</label>
+        <input class="input cloud-code-input" id="cloud-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" ${dis}>
+        ${msg}
+        <button class="btn-primary" id="cloud-verify-code" data-action="cloud-verify-code" ${dis} style="margin-top:10px">${busy ? 'Checking…' : 'Sign in'}</button>
+        <button class="backup-action-btn" id="cloud-resend" data-action="cloud-send-code" ${dis} style="margin-top:8px">Send a new code</button>
+        <button class="backup-action-btn" id="cloud-change-email" data-action="cloud-change-email" ${dis} style="margin-top:6px">Use a different email</button>
+      </div>`;
+  } else {
+    body = `
+      <div class="info-card">
+        <h3>Sign in</h3>
+        <p class="muted" style="font-size:13px">We'll email you a code. No password.</p>
+        <label class="label" for="cloud-email">Email</label>
+        <input class="input" id="cloud-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" value="${escapeHTML(c.email || '')}" placeholder="you@example.com" ${dis}>
+        ${msg}
+        <button class="btn-primary" id="cloud-send-code" data-action="cloud-send-code" ${dis} style="margin-top:10px">${busy ? 'Sending…' : 'Email me a code'}</button>
+      </div>`;
+  }
 
   return `
-    <div class="screen">
+    <div class="screen" id="cloud-account-page">
       ${renderSettingsSubHeader('Account')}
       <div class="info-card">
-        <h2>Cloud Account</h2>
-        <p class="muted" style="font-size:12px">Cloud features are coming soon. This page shows your account status.</p>
+        <h2>Cloud account (test)</h2>
+        <p class="muted" style="font-size:12px">This proves sign-in works. Nothing from your jobs, clients or settings leaves this phone yet, and the app works exactly the same signed in or not.</p>
       </div>
-
-      <div class="info-card">
-        <h3>Logged in as</h3>
-        <p class="muted">${escapeHTML(email)}</p>
-      </div>
-
-      <div class="info-card">
-        <h3>Account created</h3>
-        <p class="muted">${escapeHTML(loginTime)}</p>
-      </div>
-
-      <div class="info-card">
-        <button class="backup-action-btn" id="cloud-sign-out" data-action="cloud-sign-out" style="margin-top:8px">Sign out</button>
-      </div>
+      ${body}
     </div>
   `;
 }
 
 function renderCloudSync() {
-  const lastSync = state.lastBackupAt ? new Date(state.lastBackupAt).toLocaleString() : 'Never';
-  const syncStatus = state.authStatus === 'logged-in' ? 'Ready to sync' : 'Not logged in';
-
   return `
-    <div class="screen">
+    <div class="screen" id="cloud-sync-placeholder">
       ${renderSettingsSubHeader('Sync')}
       <div class="info-card">
-        <h2>Cloud Sync</h2>
-        <p class="muted" style="font-size:12px">Sync your data to the cloud. This feature is under development.</p>
-      </div>
-
-      <div class="info-card">
-        <h3>Sync status</h3>
-        <p class="muted">${escapeHTML(syncStatus)}</p>
-      </div>
-
-      <div class="info-card">
-        <h3>Last synced</h3>
-        <p class="muted">${escapeHTML(lastSync)}</p>
-      </div>
-
-      <div class="info-card">
-        <button class="backup-action-btn" id="cloud-sync-now" data-action="cloud-sync-now" style="margin-top:8px">⟳ Sync now</button>
+        <h2>Sync</h2>
+        <p class="muted">Not built yet. Nothing is being synced &mdash; your records are on this phone only, as always. Keep making backups as normal.</p>
       </div>
     </div>
   `;
 }
 
 function renderCloudSubscription() {
-  const sessionCount = state.sessions.length;
-
   return `
-    <div class="screen">
+    <div class="screen" id="cloud-subscription-placeholder">
       ${renderSettingsSubHeader('Subscription')}
       <div class="info-card">
-        <h2>Plan & Usage</h2>
-        <p class="muted" style="font-size:12px">Cloud subscription plans are coming soon. Track your usage here.</p>
-      </div>
-
-      <div class="info-card">
-        <h3>Current plan</h3>
-        <p><strong>Free</strong></p>
-      </div>
-
-      <div class="info-card">
-        <h3>Sessions on this device</h3>
-        <p class="muted">${sessionCount} session${sessionCount === 1 ? '' : 's'}</p>
-      </div>
-
-      <div class="info-card">
-        <button class="backup-action-btn" id="cloud-upgrade" data-action="cloud-upgrade" style="margin-top:8px">Upgrade to Pro</button>
+        <h2>Subscription</h2>
+        <p class="muted">Not built yet. Nothing is charged and there is nothing to sign up to.</p>
       </div>
     </div>
   `;

@@ -8,6 +8,20 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Cloud track — V79 built (sign-in), V80 next
+V78 ledger → V79 email-code sign-in (test host only, nothing syncs) → V80 the
+first data-moving release. **Spec round first**; the open question is push
+before pull (see `PATGo_Sync_Spec_v1_2.md` section 8). Carried: prune semantics
+(decision C), settle in the push release. Every cloud release runs
+`supabase/isolation-test.sql` (all PASS) before promotion to `Release`.
+
+### Harness — three mutation anchors were stale through V78
+M66/M82 (rolling anchors) and M110 (the V77 data-loss mutation, broken by
+V78's uid()→newId()) all aborted in V78 and proved nothing. Re-pointed in V79;
+15j now fails the suite if M66/M82 aren't re-pointed. Lesson: run the FULL
+mutate every release (detached — it outlasts one 300 s command).
+
+
 ### ~~Log again ×N + two hold-gesture fixes~~ — SHIPPED IN V77
 The "Log this item ×N" item below is now built, as a hold on Copy-last exactly as
 the proposed resolution said. Plus the two reported defects: the quick-pick grid

@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — config.js (constants & factories)
- * v71 (August 2026)
+ * v79 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V78';
+const APP_VERSION = 'V79';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -297,10 +297,47 @@ const DURATION_MIN_MS = 60 * 1000;
 // session in every other respect (rides through the codec, CSV, reports and
 // backups unchanged — the flag is just an extra passthrough field).
 const DEMO_SESSION_FLAG = 'isExample';
-// v43: cloud/authentication prep. Stores {userId, authToken, loginTime} for
-// mock OAuth flow. Survives backup/restore. Not persisted between sessions yet
-// (will be in cloud phase) but structured for future cloud sync.
+// v43: the MOCK sign-in's storage key. ⚠ V79 retired the mock: nothing writes
+// this key any more, load() deletes it if an older version left one behind, and
+// backups no longer carry sign-in details at all (a backup is a file people
+// email around — it must never hold a credential). Kept only so load() can
+// clear it. Real sign-in state is owned by cloud.js; see CLOUD_* below.
 const PAT_AUTH_KEY = 'pat:authUser';
+
+// ---- v79: cloud environment -------------------------------------------------
+// Which Supabase project this copy of the app talks to is decided by the HOST
+// it is served from, never by a hardcoded switch — so the test build cannot
+// reach production data even if every visual cue is ignored.
+//
+// ⚠ EXPLICIT LIST, UNKNOWN = OFF. Any host not named here (localhost, a preview
+// URL, a copy someone has put up elsewhere) gets NO cloud at all: no library
+// load, no sign-in, no network. Adding a host is a deliberate one-line edit.
+//
+// exnno.github.io is the TEST deploy (branch main). The product (branch
+// Release) runs on workers.dev and has no project yet — its entry is empty, so
+// cloud is off there until the Pro project exists. An empty url or key is the
+// same as off; cloudAvailable() in cloud.js is the single place that decides.
+const CLOUD_HOSTS = {
+  'exnno.github.io': 'test',
+  'pat-test-app.peterbirchley.workers.dev': 'prod',
+};
+const CLOUD_PROJECTS = {
+  // The publishable key is DESIGNED to sit in public source; row-level security
+  // on the server is what protects the data (see supabase/schema.sql).
+  test: {
+    url: 'https://wawxhlltbddkjkuyfake.supabase.co',
+    publishableKey: 'sb_publishable_AWbG-DWBU1Z7mcasPIwT9g_eM-DfxRX',
+  },
+  prod: { url: '', publishableKey: '' },   // created at the Pro upgrade
+};
+const CLOUD_ENV = (typeof location !== 'undefined' && location && CLOUD_HOSTS[location.hostname]) || 'off';
+const CLOUD = CLOUD_PROJECTS[CLOUD_ENV] || { url: '', publishableKey: '' };
+// Where supabase-js keeps its sign-in session. Per-environment, so a test
+// sign-in can never be mistaken for a production one. Owned by the library —
+// the app only ever reads it (cloudBoot) or deletes it (sign-out fallback).
+const CLOUD_AUTH_STORAGE_KEY = 'patgo:cloudAuth:' + CLOUD_ENV;
+// Flip to true at commercial launch (spec decision 5). Nothing reads it yet.
+const REQUIRE_ACCOUNT = false;
 // v33: First-run wizard "seen" flag. Set once the wizard is completed OR skipped,
 // so it never reappears. Distinct from the welcome modal key: a genuinely-new
 // install gets the WIZARD (gated by this key + an empty-install test); an
