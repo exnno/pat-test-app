@@ -11,7 +11,8 @@
 --
 -- It signs in as account B (by impersonation — no email needed), tries to see
 -- and change account A's data, and records what happened. It cleans up after
--- itself: nothing is left behind in either account.
+-- itself: nothing is left behind in either account. (Only if check 4a FAILS
+-- is a test file record left in storage — the detail column says where.)
 
 drop table if exists pg_temp._iso_result;
 create temp table _iso_result (n int, check_name text, result text, detail text);
@@ -92,12 +93,22 @@ begin
   -- 4. Storage: B cannot put a file in A's photo folder, and B cannot list
   --    anything in anyone else's folder. (A download test needs a real
   --    uploaded photo; that arrives with photo sync — see the handoff.)
+  -- ⚠ PASS only if the refusal is OUR row-level security policy. Supabase
+  -- puts its own guards on storage tables (e.g. it blocks SQL deletes), so
+  -- "some error" would prove nothing. Anything else is INCONCLUSIVE.
+  -- The insert is inside this sub-block; on PASS it never happened. On FAIL
+  -- it did, and is left in place because Supabase forbids deleting storage
+  -- rows by SQL — delete iso-test.jpg in Storage → photos by hand.
   begin
     insert into storage.objects (bucket_id, name, owner)
     values ('photos', a::text || '/iso-test.jpg', b);
-    res := res || array['4a|B cannot write into A''s photo folder|FAIL|insert was accepted'];
+    res := res || array['4a|B cannot write into A''s photo folder|FAIL|insert was accepted — also delete ' || a::text || '/iso-test.jpg under Storage → photos'];
   exception when others then
-    res := res || array['4a|B cannot write into A''s photo folder|PASS|rejected: ' || sqlerrm];
+    if sqlerrm ilike '%row-level security%' then
+      res := res || array['4a|B cannot write into A''s photo folder|PASS|rejected by RLS'];
+    else
+      res := res || array['4a|B cannot write into A''s photo folder|INCONCLUSIVE|blocked by something other than RLS: ' || sqlerrm];
+    end if;
   end;
   begin
     select count(*) into n from storage.objects
@@ -130,7 +141,8 @@ begin
                 || case when msg = 'A' then 'PASS|' else 'FAIL|content now ' || coalesce(msg,'(gone)') end];
 
   delete from public.sessions where id like 'iso-test-%';
-  delete from storage.objects where bucket_id = 'photos' and name like '%/iso-test.jpg';
+  -- (No storage cleanup: Supabase blocks SQL deletes on storage tables, and on
+  -- a PASS the 4a insert never happened, so there is nothing to clean.)
 
   insert into _iso_result
   select row_number() over (), split_part(x, '|', 2), split_part(x, '|', 3),
