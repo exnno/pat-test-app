@@ -514,8 +514,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V80';",
-    to:   "const APP_VERSION = 'V80';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V81';",
+    to:   "const APP_VERSION = 'V81';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -634,8 +634,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V78</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V78</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V77</strong> &middot; August 2026</p>',
+    from: '        <p><strong>V79</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V79</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V78</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1071,7 +1071,7 @@ const MUTATIONS = [
   {
     name: 'M143 (V80) the fingerprint comparison is dropped — every job, every push',
     file: 'sync.js',
-    from: '      if (!force && st.sent[id] === hash) continue;\n',
+    from: '      if (!force && !st.resend[id] && st.sent[id] === hash) continue;\n',
     to:   '',
     why:  'every save would re-upload every job the engineer has — a quota and battery drain that looks like it works',
   },
@@ -1092,7 +1092,7 @@ const MUTATIONS = [
   {
     name: 'M146 (V80) deletes are sent for jobs the server never had',
     file: 'sync.js',
-    from: '      if (!st.sent[id] && !st.gone[id]) continue;    // server never had it\n',
+    from: '      if (!st.sent[id] && !st.gone[id] && !st.resend[id]) continue;  // server never had it\n',
     to:   '',
     why:  'empty deleted rows for jobs that were never uploaded — noise, and it leaks ids of deleted work',
   },
@@ -1155,7 +1155,7 @@ const MUTATIONS = [
   {
     name: 'M155 (V80) sign-in is not followed by a push',
     file: 'cloud.js',
-    from: "          if (typeof syncPushSoon === 'function') { try { syncPushSoon(0); } catch (e) { console.error(e); } }\n",
+    from: "          if (typeof syncPushSoon === 'function') { try { syncPushSoon(0, { pull: true }); } catch (e) { console.error(e); } }\n",
     to:   '',
     why:  'first sign-in on a phone would send nothing until the engineer happened to save or reopen',
   },
@@ -1169,7 +1169,7 @@ const MUTATIONS = [
   {
     name: 'M157 (V80) the app-reopen listener does nothing',
     file: 'sync.js',
-    from: "      if (document.visibilityState === 'hidden') return;\n      syncPushSoon(SYNC_RESUME_DELAY_MS);",
+    from: "      if (document.visibilityState === 'hidden') return;\n      syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true });",
     to:   "      if (document.visibilityState === 'hidden') return;",
     why:  'reopening the app is the main moment a job reaches the cloud after a day offline',
   },
@@ -1194,6 +1194,141 @@ const MUTATIONS = [
     to:   '  if (false) {\n    if (o.manual) {',
     why:  'every save with no signal would fire a doomed request and a confusing error',
   },
+  /* ---- V81: pull ---------------------------------------------------------- */
+  {
+    name: 'M161 (V81) a pulled job is applied without setting its fingerprint',
+    file: 'sync.js',
+    from: "      state.sessions.unshift(doc);\n      st.sent[id] = hash;",
+    to:   "      state.sessions.unshift(doc);",
+    why:  'the job arrives and looks right, then the push in the same run sees no fingerprint, decides it is unsent work and sends it back. Harmless once; a loop the moment the other phone does the same. The §8 must-do, and invisible from the screen',
+  },
+  {
+    name: 'M162 (V81) the pull ignores jobs cleared from this phone',
+    file: 'sync.js',
+    from: "    if (pruned.has(id)) return;",
+    to:   "",
+    why:  'every job ever cleared floods back on the next pull, which is exactly what V80 decision 5A promised would not happen. The cloud is an archive by design, so the rows are all still there to come back',
+  },
+  {
+    name: 'M163 (V81) the pull rewrites the job that is open on screen',
+    file: 'sync.js',
+    from: "    if (id === state.activeId) { blocked = true; return; }",
+    to:   "",
+    why:  'the items under the engineer\u2019s thumb change between one tap and the next, mid-job, with a keyboard open. Decision 7A, and the kind of fault that only ever shows up on a real site',
+  },
+  {
+    name: 'M164 (V81) the cursor advances even when a row was left undecided',
+    file: 'sync.js',
+    from: "    if (!blocked) st.pulledAt = high;",
+    to:   "    st.pulledAt = high;",
+    why:  'the mark steps over a row nobody looked at, so the change it carried is never offered again. Everything on screen looks correct \u2014 this is a silent permanent gap, not a visible failure',
+  },
+  {
+    name: 'M165 (V81) a job changed in both places is applied rather than held',
+    file: 'sync.js',
+    from: "    if (st.sent[id] !== localHash) {\n      _syncHeldNote({ id, reason: 'both-changed', name,",
+    to:   "    if (false) {\n      _syncHeldNote({ id, reason: 'both-changed', name,",
+    why:  'the one failure this app cannot have. Unsent work on the phone is overwritten by the cloud copy with nothing asked and nothing said \u2014 decision 2A exists for this single line',
+  },
+  {
+    name: 'M166 (V81) a remote delete skips the photo sweep',
+    file: 'sync.js',
+    from: "  archiveSessionStats(going);\n  photosDeleteForSessions([id]);",
+    to:   "  archiveSessionStats(going);",
+    why:  'the job goes, its photos stay in IndexedDB for ever with no owner and no way to reach them. The same orphaning deleteSession was written to avoid (MAP rule 5)',
+  },
+  {
+    name: 'M167 (V81) a remote delete removes the job before the sweeps run',
+    file: 'sync.js',
+    from: "  const going = state.sessions.filter(s => s.id === id);\n  if (!going.length) return false;\n  archiveSessionStats(going);",
+    to:   "  const going = state.sessions.filter(s => s.id === id);\n  if (!going.length) return false;\n  state.sessions = state.sessions.filter(s => s.id !== id);\n  archiveSessionStats(going);",
+    why:  'ordering, not presence. All three sweeps still run and the job still disappears, so nothing looks wrong \u2014 but the cascades key off a list the id has already left. This is MAP rule 5 stated as a mutation',
+  },
+  {
+    name: 'M168 (V81) the item-count guard is dropped',
+    file: 'sync.js',
+    from: "    if (doc.items.length < local.items.length) {",
+    to:   "    if (false) {",
+    why:  'a truncated or half-written cloud row replaces a longer local one without a word. Decision 3A is deliberately stricter than the fingerprint rule needs, precisely so that a bug on the other side of the wire cannot shorten a job here',
+  },
+  {
+    name: 'M169 (V81) the incoming validator accepts anything',
+    file: 'sync.js',
+    from: "  if (!Array.isArray(doc.items)) return false;",
+    to:   "",
+    why:  'a row whose items are not an array is written into the sessions list, and the next render indexes it. A crash on the jobs screen for every job, recovered only by a reinstall \u2014 the app reads items unguarded in dozens of places',
+  },
+  {
+    name: 'M170 (V81) an applied job is edited in place instead of replaced',
+    file: 'sync.js',
+    from: "  _invalidateSessionEncoding(oldSess);\n  state.sessions[i] = doc;",
+    to:   "  oldSess.items = doc.items;",
+    why:  'the exact v69 defect, restored. Same array length, same session fields, so _sessionSig() sees no change and the STALE encoding is written back: the pulled change is on screen until the next reload and gone after it',
+  },
+  {
+    name: 'M171 (V81) saving on the logging hot path triggers a pull',
+    file: 'sync.js',
+    from: "  syncPushSoon(SYNC_DEBOUNCE_MS);\n}",
+    to:   "  syncPushSoon(SYNC_DEBOUNCE_MS, { pull: true });\n}",
+    why:  'a download every few seconds all day while logging, for changes that can only have come from this phone. Decision 6A \u2014 it works, it is just wrong, which is why it needs an assertion rather than a bug report',
+  },
+  {
+    name: 'M172 (V81) the held list carries whatever it is given',
+    file: 'sync.js',
+    from: "    out.push({\n      id, at, reason: e.reason,",
+    to:   "    out.push({\n      ...e, id, at, reason: e.reason,",
+    why:  'the whitelist is the only thing stopping a held row becoming a second store of the engineer\u2019s work. Drop it and any document a buggy or older build put there is carried straight back out, into the page and into the next write \u2014 in localStorage, against a decision that may sit for days',
+  },
+  {
+    name: 'M173 (V81) the push sends a job that is waiting on a decision',
+    file: 'sync.js',
+    from: "      if (heldIds.has(id)) continue;\n      const json = JSON.stringify(s);",
+    to:   "      const json = JSON.stringify(s);",
+    why:  'the real bug 17k found during this release. The question is answered on the server, in this phone\u2019s favour, before anyone is asked \u2014 so choosing "use the cloud copy" fetches back what the push has just overwritten it with',
+  },
+  {
+    name: 'M174 (V81) answering "keep this phone\u2019s copy" does not mark it for sending',
+    file: 'sync.js',
+    from: "    st.resend[sid] = true;\n    delete st.gone[sid];",
+    to:   "    delete st.gone[sid];",
+    why:  'the question disappears from the screen and nothing is sent: the local copy still hashes to what was last sent, so the push sees no work. The engineer is told the cloud now matches, and it does not',
+  },
+  {
+    name: 'M175 (V81) the re-send marker is never cleared',
+    file: 'sync.js',
+    from: "            delete st.resend[w.id];",
+    to:   "",
+    why:  'one job is re-uploaded on every push for ever after, and on a long job that is hundreds of KB of mobile data a day. Nothing on screen is wrong, which is why only an assertion finds it',
+  },
+  {
+    name: 'M176 (V81) a job decided in the phone\u2019s favour is re-raised by the next pull',
+    file: 'sync.js',
+    from: "    if (st.resend[id]) return;",
+    to:   "",
+    why:  'the deadlock this release nearly shipped: the pull re-asks a question it has been given the answer to, the push then skips the job for being held, and the job can never be sent again. Both halves individually look correct',
+  },
+  {
+    name: 'M177 (V81) the Sync page leaves off the held-jobs card',
+    file: 'render-help.js',
+    from: "      ${renderSyncHeld(sy)}`;",
+    to:   "      `;",
+    why:  'the jobs are held safely and correctly, and nobody is ever asked. Sync quietly stops making progress because the cursor is waiting on a decision no screen offers',
+  },
+  {
+    name: 'M178 (V81) signing in sends but does not read',
+    file: 'cloud.js',
+    from: "syncPushSoon(0, { pull: true })",
+    to:   "syncPushSoon(0)",
+    why:  'the one moment a second phone has everything to fetch \u2014 a fresh sign-in \u2014 fetches nothing, and stays empty until something else happens to trigger a run',
+  },
+  {
+    name: 'M179 (V81) reopening the app sends but does not read',
+    file: 'sync.js',
+    from: "      syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true });",
+    to:   "      syncPushSoon(SYNC_RESUME_DELAY_MS);",
+    why:  'reopening is the trigger an engineer actually notices \u2014 it is how you check the other phone\u2019s work arrived. Push still works, so the failure is one-directional and easy to miss',
+  },
+
 ];
 
 function main() {
