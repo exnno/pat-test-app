@@ -76,6 +76,12 @@ function fakeServer(o = {}) {
     const headers = new Headers(init.headers || {});
     calls.push({ url: u, method: init.method || 'GET', body, prefer: headers.get('prefer') || '' });
     if (u.includes('/rest/v1/sessions')) {
+      // v81: this group is the PUSH test. The pull now runs on the same
+      // triggers, so a GET means "check for updates" — answered with an empty
+      // account, which is what a push-only test is entitled to assume.
+      if ((init.method || 'GET') === 'GET') {
+        return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+      }
       if (o.sessions) return o.sessions(body, calls);
       return new Response(null, { status: 201 });
     }
@@ -85,9 +91,13 @@ function fakeServer(o = {}) {
     }
     return new Response(JSON.stringify({ message: 'unexpected ' + u }), { status: 404 });
   };
-  const posts = () => calls.filter(c => c.url.includes('/rest/v1/sessions'));
+  // v81: POST only. Before the pull existed every sessions call was an upload,
+  // and counting them all was the same thing as counting sends; it is not any
+  // more, and an assertion whose meaning quietly changed is worse than a red one.
+  const posts = () => calls.filter(c => c.url.includes('/rest/v1/sessions') && c.method === 'POST');
+  const gets  = () => calls.filter(c => c.url.includes('/rest/v1/sessions') && c.method === 'GET');
   const rows = () => posts().flatMap(c => Array.isArray(c.body) ? c.body : []);
-  return { calls, fetchImpl, posts, rows };
+  return { calls, fetchImpl, posts, gets, rows };
 }
 
 function job(app, site) {
