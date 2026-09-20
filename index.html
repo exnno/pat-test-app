@@ -82,6 +82,9 @@
        typeof-guarded and boot wraps cloudBoot(). After report.js (it reuses
        _injectScriptOnce to lazy-load supabase.umd.js) and before boot.js. -->
   <script src="cloud.js"></script>
+  <!-- v80: sync (push only). Optional subsystem like cloud.js; right after it
+       because it asks cloud.js who is signed in. boot wraps syncBoot(). -->
+  <script src="sync.js"></script>
   <!-- v65: HID barcode scanner. Placed with the other input-handling files and
        AFTER the render files, because a scan writes into fields those render —
        and before events.js/dispatch.js purely so the three document-level

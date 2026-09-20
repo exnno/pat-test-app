@@ -8,12 +8,25 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Cloud track — V79 built (sign-in), V80 next
-V78 ledger → V79 email-code sign-in (test host only, nothing syncs) → V80 the
-first data-moving release. **Spec round first**; the open question is push
-before pull (see `PATGo_Sync_Spec_v1_2.md` section 8). Carried: prune semantics
-(decision C), settle in the push release. Every cloud release runs
+### Cloud track — V80 built (push, jobs only), V81 next
+V78 ledger → V79 sign-in → V80 push (sessions, one way, fingerprint change
+detection; decision C settled: clearing is local, cloud keeps the job) → **V81
+pull, spec round first**: second device, the item-count conflict guard, skip ids
+in SYNC_PRUNED_KEY, `_invalidateSessionEncoding` on any in-place apply, set the
+fingerprint on pull so a pulled job isn't pushed straight back. Then remaining
+record kinds (clients, sites, presets, settings, instruments) → photos (+ the
+cross-account download isolation check) → status UI. Every cloud release runs
 `supabase/isolation-test.sql` (all PASS) before promotion to `Release`.
+
+### Cloud — permanent delete of cleared jobs (Peter, V80 spec)
+Clearing old jobs leaves them in the cloud archive (5A). Peter wants a way to
+delete them from the cloud too, at some point. Needs a view of what the cloud
+holds first, so after pull. Would send an emptied deleted row, as a job delete does.
+
+### Cloud — sync timestamps are "noticed", not "edited" (V80 note)
+`last_modified` on the server is the push time, because sessions have no edit
+timestamp. Harmless for push; V81's last-write-wins compares these. Revisit if a
+conflict ever resolves the wrong way.
 
 ### Harness — three mutation anchors were stale through V78
 M66/M82 (rolling anchors) and M110 (the V77 data-loss mutation, broken by

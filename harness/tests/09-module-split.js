@@ -102,7 +102,7 @@ const MOVED_TO_RENDER_HELP = [
   { name: 'renderSettingsContact',  view: 'settingsContact',    marker: 'id="bug-open"'          },
   { name: 'renderBugSheet',         view: null,                 marker: null                     },
   { name: 'renderCloudAccount',     view: 'cloudAccount',       marker: 'id="cloud-account-page"'},
-  { name: 'renderCloudSync',        view: 'cloudSync',          marker: 'id="cloud-sync-placeholder"'},
+  { name: 'renderCloudSync',        view: 'cloudSync',          marker: 'id="cloud-sync-page"'       },   // v80: real page
   { name: 'renderCloudSubscription',view: 'cloudSubscription',  marker: 'id="cloud-subscription-placeholder"'},
 ];
 

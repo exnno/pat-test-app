@@ -769,6 +769,10 @@ registerActions({
   'cloud-change-email':() => { if (typeof cloudChangeEmail === 'function') cloudChangeEmail(); },
   'cloud-check':      () => { if (typeof cloudCheckConnection === 'function') cloudCheckConnection(); },
   'cloud-sign-out':   () => { if (typeof cloudSignOut === 'function') cloudSignOut(); },
+  // v80: sync (sync.js), same guarding. "Re-send all" ignores the fingerprints
+  // and sends every job again — the fix for a cloud copy that looks wrong.
+  'sync-push':        () => { if (typeof syncPush === 'function') syncPush({ manual: true }); },
+  'sync-resend-all':  () => { if (typeof syncPush === 'function') syncPush({ manual: true, force: true }); },
 
   // v43: calibration reminder (Update button on the Sessions-screen cal banner)
   'edit-cal-date': () => {

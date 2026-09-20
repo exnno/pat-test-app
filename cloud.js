@@ -1,13 +1,14 @@
 /*!
  * PATGo PWA — cloud.js (cloud sign-in)
- * v79 (September 2026)
+ * v80 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  *
  * Email-code sign-in to the cloud project chosen by config.js (CLOUD_ENV /
- * CLOUD). V79 is SIGN-IN ONLY: nothing about a job, client, site or setting
- * leaves the phone. Sync arrives in later releases, in its own file (sync.js).
+ * CLOUD). This file is SIGN-IN ONLY. Sending data is sync.js's job (V80: jobs,
+ * one way); this file only tells it who is signed in (cloudUserId) and when a
+ * sign-in has just happened.
  *
  * ⚠ OPTIONAL SUBSYSTEM (MAP rule 6). Every call INTO this file from elsewhere
  * is typeof-guarded, and boot wraps cloudBoot() in try/catch. A missing or
@@ -48,10 +49,21 @@ function _cloudReadStoredSession() {
     const s = JSON.parse(raw);
     if (!s || typeof s !== 'object' || !s.refresh_token) return null;
     const email = (s.user && typeof s.user.email === 'string') ? s.user.email : '';
-    return { email };
+    const id = (s.user && typeof s.user.id === 'string') ? s.user.id : '';
+    return { email, id };
   } catch {
     return null;   // unreadable = not signed in; the library will tidy it up
   }
+}
+
+// v80: the signed-in account's id, read synchronously from the stored session
+// (no library, no network). sync.js uses it to tell whose sync state is on the
+// phone. The id actually written to the server always comes from the library's
+// live session at push time, never from here.
+function cloudUserId() {
+  if (!cloudAvailable() || !state.cloud || state.cloud.status !== 'signed-in') return '';
+  const s = _cloudReadStoredSession();
+  return s ? s.id : '';
 }
 
 // Lazy library load. The UMD file defines the global `supabase` when run. It is
@@ -228,8 +240,14 @@ function cloudVerifyCode() {
     .catch((e) => { _cloudSet({ busy: false, message: cloudErrorMessage(e, 'verify') }); return false; })
     .then((ok) => {
       _cloudRepaint();
-      // Prove the round trip straight away: read our own profile row.
-      if (ok) return cloudCheckConnection().then(() => ok);
+      // Prove the round trip straight away: read our own profile row. v80: then
+      // send this phone's jobs (sync.js; optional, so guarded).
+      if (ok) {
+        return cloudCheckConnection().then(() => {
+          if (typeof syncPushSoon === 'function') { try { syncPushSoon(0); } catch (e) { console.error(e); } }
+          return ok;
+        });
+      }
       return ok;
     });
 }

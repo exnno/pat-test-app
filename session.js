@@ -668,9 +668,30 @@ function savePruneAge() {
 // after the last edit — but we still guard by skipping state.activeId to be
 // safe). Deletion is permanent; we strongly word the confirm.
 function pruneOldSessions() {
-  const targets = prunableSessions().filter(s => s.id !== state.activeId);
+  const candidates = prunableSessions().filter(s => s.id !== state.activeId);
+  // v80 (decision 5A): while signed in to the cloud, clearing is local
+  // housekeeping and the cloud keeps the job — so only a job whose LATEST
+  // version is in the cloud may go; the rest wait for a push. Signed out, or
+  // sync.js absent, every candidate is clearable exactly as before V80. A throw
+  // falls back to that pre-V80 behaviour: the jobs are all CSV-exported, which
+  // is what this page has always required before clearing.
+  let targets = candidates;
+  let keptForCloud = 0;
+  let cloudKeepsThem = false;
+  if (typeof syncPruneFilter === 'function') {
+    try {
+      const g = syncPruneFilter(candidates);
+      if (g && Array.isArray(g.clear)) {
+        targets = g.clear;
+        keptForCloud = candidates.length - g.clear.length;
+        cloudKeepsThem = !!g.active;
+      }
+    } catch (e) { console.error('Sync prune check failed; clearing as before.', e); }
+  }
   if (targets.length === 0) {
-    showToast('Nothing to clear');
+    showToast(keptForCloud
+      ? `${keptForCloud} old job${keptForCloud === 1 ? ' hasn\u2019t' : 's haven\u2019t'} reached the cloud yet \u2014 push first`
+      : 'Nothing to clear');
     return;
   }
   const itemTotal = targets.reduce((n, s) => n + (s.items ? s.items.length : 0), 0);
@@ -680,7 +701,12 @@ function pruneOldSessions() {
       `Clear ${targets.length} exported session${targets.length === 1 ? '' : 's'} ` +
       `(${itemTotal} item${itemTotal === 1 ? '' : 's'} in total)? ` +
       `These have all been exported to CSV and are older than ${state.pruneAgeMonths} month${state.pruneAgeMonths === 1 ? '' : 's'}. ` +
-      `This permanently removes them from this device and cannot be undone.`,
+      (keptForCloud
+        ? `${keptForCloud} more ${keptForCloud === 1 ? 'is' : 'are'} kept for now because the latest changes haven\u2019t reached the cloud yet. `
+        : '') +
+      (cloudKeepsThem
+        ? `This removes them from this phone. Your cloud copy keeps them.`
+        : `This permanently removes them from this device and cannot be undone.`),
     confirmLabel: 'Clear',
     onConfirm: () => {
       const ids = new Set(targets.map(s => s.id));
@@ -690,6 +716,11 @@ function pruneOldSessions() {
       archiveSessionStats(targets);
       // v62: and their photos, on the same before-the-filter rule.
       photosDeleteForSessions(Array.from(ids));
+      // v80: remember which of these the cloud still holds, so the pull
+      // doesn't bring them back. Not a deletion — see harness 14i / 16.
+      if (typeof syncNotePruned === 'function') {
+        try { syncNotePruned(Array.from(ids)); } catch (e) { console.error('Cleared-jobs note failed (non-fatal).', e); }
+      }
       state.sessions = state.sessions.filter(s => !ids.has(s.id));
       save();
       render();

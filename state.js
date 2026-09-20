@@ -247,6 +247,11 @@ let state = {
     status: 'off', busy: false, email: '',
     plan: null, trialEndsAt: null, checkedAt: null, message: '',
   },
+  // v80: sync (sync.js). TRANSIENT, like `cloud` — the durable part (what was
+  // sent, and when) lives in SYNC_STATE_KEY, owned by sync.js.
+  //   busy:    a push is in flight (Sync page buttons disable)
+  //   message: one plain-language line for the Sync page (errors included)
+  sync: { busy: false, message: '' },
   // v43: cloud pages visibility. cloudPagesRevealed is a transient per-session flag
   // set by long-pressing the About title; it resets when you navigate away from About
   // but persists if you open one of the cloud pages and return. Never persisted.

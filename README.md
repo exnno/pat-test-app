@@ -43,7 +43,7 @@ in the shipped app — the files in the repo root are the files the browser load
 | Offline | Service worker (`sw.js`) precaching every asset |
 | PDF | jsPDF 3.0.3 + jsPDF-AutoTable 5.0.2, vendored and self-hosted (MIT) |
 | PDF preview | PDF.js 3.11.174 legacy UMD, vendored, lazy-loaded (Apache-2.0) |
-| Cloud sign-in | supabase-js 2.116.0 UMD, vendored, lazy-loaded (MIT) — v79, test host only |
+| Cloud | supabase-js 2.116.0 UMD, vendored, lazy-loaded (MIT) — sign-in v79, job push v80; test host only |
 | Hosting | `main` → GitHub Pages (test); `Release` → Cloudflare (the product) |
 | Tests | `harness/` — Node, no dependencies |
 
@@ -59,7 +59,7 @@ is no toolchain to rot between releases.
 
 ```
 index.html            script tags, in a load order that matters
-config.js … boot.js   30 first-party modules (see below)
+config.js … boot.js   31 first-party modules (see below)
 styles.css            one stylesheet, ordered by release, banner-indexed
 sw.js                 service worker + the precache ASSETS list
 manifest.webmanifest  PWA manifest
@@ -72,21 +72,21 @@ MAP.md  FEATURES.md  BACKLOG.md
 PAThandoff_vNN.md     the canonical state block for the current release
 ```
 
-### Load order — 30 files, and it is not arbitrary
+### Load order — 31 files, and it is not arbitrary
 
 ```
 config → data → state → utils → storage → clients → instruments → sqp
 → multipick → feedback → bugreport → photos → csv → backup → session
 → settings-actions → setup → tour → onboarding → report → pdfpreview
 → render-core → render-review → render-settings → render-help
-→ cloud → scanner → events → dispatch → boot
+→ cloud → sync → scanner → events → dispatch → boot
 ```
 
 `data` → `state` is the one adjacency that is a hard dependency rather than a
 readability choice: `state.js` seeds itself from `data.js` constants in a
 top-level initialiser that runs at load. `boot.js` must be last — it runs on load.
 
-`sw.js` ASSETS lists **33** `.js` entries: these 30 plus the two jsPDF files and
+`sw.js` ASSETS lists **34** `.js` entries: these 31 plus the two jsPDF files and
 `supabase.umd.js`, which are precached but injected on demand rather than
 script-tagged.
 
@@ -205,4 +205,5 @@ than writing a new one.
   client's audit workflow. Explicitly no merge-back; anything shared is
   hand-rebuilt from a spec.
 - **PATGo cloud** — the same codebase with a sync layer added (spec:
-  `PATGo_Sync_Spec_v1_2.md`). V79 is sign-in only; sync follows release by release.
+  `PATGo_Sync_Spec_v1_2.md`). V79 sign-in; V80 pushes jobs one way (phone → cloud); pull and the other
+  record kinds follow release by release.
