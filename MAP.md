@@ -385,6 +385,8 @@ harness). Import learns new clients/sites into clients.js.
 incompatible change (rule 10).**
 ⚠ v79: NO sign-in data in a backup, ever; restore ignores a V43 `authUser`
 block (harness 15d, M134).
+⚠ v81: `pat:syncHeld` is NOT in backups (nor is the pull cursor) — it records a
+disagreement with a server, not the engineer's work (17o).
 ⚠ v80: `syncPruned` rides in the backup (via sync.js `syncPrunedList`, omitted
 when empty) and is MERGED on restore (`syncPrunedMerge`), never replaced. The
 sync fingerprints (SYNC_STATE_KEY) are NEVER in a backup. Harness 16j.
@@ -572,24 +574,36 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~390 ln) — cloud sync, PUSH ONLY — NEW v80
-Jobs (sessions) one way, phone → cloud, while signed in. Change detection is a
-per-job FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no
-edit timestamp exists. Deletes (session tombstones) send an emptied row. Prune
-guard (`syncPruneFilter`) + cleared-ids list (SYNC_PRUNED_KEY). Sync page logic.
-**Touch to:** change what syncs, when, or how; add pull (V81) or record kinds.
+### sync.js (~720 ln) — cloud sync, PUSH AND PULL — v80/v81
+Jobs (sessions) both ways while signed in. Change detection is a per-job
+FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
+timestamp exists, so pull compares hashes, not times. Deletes (session
+tombstones) send an emptied row both directions. Prune guard
+(`syncPruneFilter`) + cleared-ids list (SYNC_PRUNED_KEY). v81: pull cursor
+(`st.pulledAt`), held jobs awaiting a decision (SYNC_HELD_KEY), re-send set
+(`st.resend`), `syncHeldResolve`. Sync page logic.
+**Touch to:** change what syncs, when, or how; add record kinds or photos.
 **Coupling:** asks **cloud.js** who is signed in (`cloudAvailable`,
 `cloudUserId`, `cloudClient`). Triggers: **storage.js** `saveSessions()` (one
-line), **cloud.js** after sign-in, **boot.js** `syncBoot()` after `cloudBoot()`.
-Prune guard/note called from **session.js** `pruneOldSessions()`; backup hooks in
-**backup.js**; page markup in **render-help.js** `renderCloudSync()`; actions
-`sync-push`/`sync-resend-all` in **dispatch.js**. Reads `state.sessions`,
-`state.tombstones`; writes ONLY its own two keys — never app data.
+line, push only), **cloud.js** after sign-in, **boot.js** `syncBoot()` after
+`cloudBoot()`. Prune guard/note called from **session.js** `pruneOldSessions()`;
+backup hooks in **backup.js**; page markup in **render-help.js**
+`renderCloudSync()` + `renderSyncHeld()`; actions `sync-push`,
+`sync-resend-all`, `sync-pull`, `sync-keep-phone`, `sync-keep-cloud` in
+**dispatch.js**. v81 WRITES APP DATA: adds, replaces and removes
+`state.sessions`, and on a remote delete duplicates **session.js**
+`deleteSession()`'s three sweeps (`archiveSessionStats`,
+`photosDeleteForSessions`, `recordTombstone`) — deliberately, because
+deleteSession ends in save()+render(). Keep the two in step (17f).
 ⚠ The hash is captured when the row is BUILT, not after upload (16f, M148).
 ⚠ Results land through `_syncRepaint()` — Sync page only, never over a focused
-field (rules 2/3). ⚠ Pull (V81) must call `_invalidateSessionEncoding` on any
-session it edits in place (storage.js v69 trap).
-Not probed at boot (optional subsystem). Harness 16a–16n, mutations M142–M160.
+field (rules 2/3). ⚠ An applied row REPLACES the session object; it is never
+edited in place (storage.js v69 encoding-cache trap, 17l, M170).
+⚠ Held and push are mutually exclusive: nothing held is sent, and nothing in
+`resend` is re-held. Break either half and the job can never sync again
+(M173, M176).
+Not probed at boot (optional subsystem). Harness 16a–16n and 17a–17p,
+mutations M142–M179.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

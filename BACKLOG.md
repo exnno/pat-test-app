@@ -8,25 +8,31 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Cloud track — V80 built (push, jobs only), V81 next
-V78 ledger → V79 sign-in → V80 push (sessions, one way, fingerprint change
-detection; decision C settled: clearing is local, cloud keeps the job) → **V81
-pull, spec round first**: second device, the item-count conflict guard, skip ids
-in SYNC_PRUNED_KEY, `_invalidateSessionEncoding` on any in-place apply, set the
-fingerprint on pull so a pulled job isn't pushed straight back. Then remaining
-record kinds (clients, sites, presets, settings, instruments) → photos (+ the
-cross-account download isolation check) → status UI. Every cloud release runs
-`supabase/isolation-test.sql` (all PASS) before promotion to `Release`.
+### Cloud track — V81 built (pull, jobs only), records next
+V78 ledger → V79 sign-in → V80 push → **V81 pull** (fingerprint decides, held
+jobs for anything it will not guess at, remote deletes applied, cursor stops at
+the first unresolved row). **Next: the remaining record kinds** (clients, sites,
+presets, settings, instruments) → photos (+ the cross-account download isolation
+check) → status UI. Every cloud release runs `supabase/isolation-test.sql`
+(all PASS) before promotion to `Release`.
+
+### Cloud — photos do not sync yet (V81 note)
+A job pulled onto a second device shows its photos as missing — same as a backup
+restored onto a new phone, and it fails soft the same way. Fix lands with the
+photo-sync release; until then it is a known gap to explain, not a bug.
 
 ### Cloud — permanent delete of cleared jobs (Peter, V80 spec)
 Clearing old jobs leaves them in the cloud archive (5A). Peter wants a way to
-delete them from the cloud too, at some point. Needs a view of what the cloud
-holds first, so after pull. Would send an emptied deleted row, as a job delete does.
+delete them from the cloud too, at some point. Pull now exists, so the blocker
+is gone — what is still missing is a view of what the cloud holds. Would send an
+emptied deleted row, as a job delete does, and must also drop the id from
+SYNC_PRUNED_KEY or the row is skipped for ever.
 
-### Cloud — sync timestamps are "noticed", not "edited" (V80 note)
+### Cloud — sync timestamps are "noticed", not "edited" (V80 note, closed V81)
 `last_modified` on the server is the push time, because sessions have no edit
-timestamp. Harmless for push; V81's last-write-wins compares these. Revisit if a
-conflict ever resolves the wrong way.
+timestamp. V81 does NOT compare them: the fingerprint decides instead, so the
+stamp is display only. Keep the note — anything added later that reaches for a
+timestamp comparison is reaching for a value that does not mean what it says.
 
 ### Harness — three mutation anchors were stale through V78
 M66/M82 (rolling anchors) and M110 (the V77 data-loss mutation, broken by

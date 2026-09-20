@@ -771,8 +771,15 @@ registerActions({
   'cloud-sign-out':   () => { if (typeof cloudSignOut === 'function') cloudSignOut(); },
   // v80: sync (sync.js), same guarding. "Re-send all" ignores the fingerprints
   // and sends every job again — the fix for a cloud copy that looks wrong.
-  'sync-push':        () => { if (typeof syncPush === 'function') syncPush({ manual: true }); },
+  'sync-push':        () => { if (typeof syncPush === 'function') syncPush({ manual: true, pull: true }); },
   'sync-resend-all':  () => { if (typeof syncPush === 'function') syncPush({ manual: true, force: true }); },
+  // v81: pull. "Check for updates" is the same run as Push now — the button
+  // exists because "send" and "check" are different questions to the engineer,
+  // not because they are different operations underneath.
+  'sync-pull':        () => { if (typeof syncPull === 'function') syncPull({ manual: true }); },
+  // arg is the job id: which copy of a held job wins (decision 2A).
+  'sync-keep-phone':  (arg) => { if (typeof syncHeldResolve === 'function') syncHeldResolve(arg, 'phone'); },
+  'sync-keep-cloud':  (arg) => { if (typeof syncHeldResolve === 'function') syncHeldResolve(arg, 'cloud'); },
 
   // v43: calibration reminder (Update button on the Sessions-screen cal banner)
   'edit-cal-date': () => {

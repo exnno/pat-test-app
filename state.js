@@ -248,10 +248,15 @@ let state = {
     plan: null, trialEndsAt: null, checkedAt: null, message: '',
   },
   // v80: sync (sync.js). TRANSIENT, like `cloud` — the durable part (what was
-  // sent, and when) lives in SYNC_STATE_KEY, owned by sync.js.
-  //   busy:    a push is in flight (Sync page buttons disable)
-  //   message: one plain-language line for the Sync page (errors included)
-  sync: { busy: false, message: '' },
+  // sent, what was read, and when) lives in SYNC_STATE_KEY, owned by sync.js.
+  // The jobs awaiting a decision are durable too, in SYNC_HELD_KEY — they must
+  // survive a reload, or closing the app would silently drop the question.
+  //   busy:      a run is in flight (Sync page buttons disable)
+  //   message:   one plain-language line for the Sync page (errors included)
+  //   resolving: v81 — the id of the held job whose decision is being carried
+  //              out, so that one row can show a spinner without disabling
+  //              every other decision on the page
+  sync: { busy: false, message: '', resolving: null },
   // v43: cloud pages visibility. cloudPagesRevealed is a transient per-session flag
   // set by long-pressing the About title; it resets when you navigate away from About
   // but persists if you open one of the cloud pages and return. Never persisted.

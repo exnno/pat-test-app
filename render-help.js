@@ -64,17 +64,17 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v80: rolled forward — V80 on top, V77 dropped. -->
+      <!-- v8: rolling 3-version changelog. v81: rolled forward — V81 on top, V78 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V81</strong> &middot; September 2026</p>
+        <p class="muted">Nothing changes for you. Another piece of the cloud version, switched on only for a small invite-only test: for those test accounts, jobs now travel both ways, so two phones on the same account keep up with each other. If the same job has been changed in two places at once, nothing on the phone is overwritten &mdash; it holds the job and asks which copy to keep. For everyone else the app is exactly as it was: nothing is sent anywhere, no account is needed, and it works the same with or without a signal.</p>
         <p><strong>V80</strong> &middot; September 2026</p>
         <p class="muted">Nothing changes for you. This release is the next piece of the cloud version, which is switched on only for a small invite-only test: for those test accounts, jobs are now copied from the phone to the cloud in the background. For everyone else the app is exactly as it was &mdash; nothing is sent anywhere, no account is needed, and it works the same with or without a signal.</p>
         <p><strong>V79</strong> &middot; September 2026</p>
         <p class="muted">Housekeeping you won't see, plus the first piece of the cloud version, switched off for everyone. Backups no longer include a leftover sign-in field from an old experiment &mdash; a backup is a file you email around, and it should never carry anything that looks like a login. Restoring an older backup that has one simply ignores it. Nothing about your jobs, clients, settings or reports has changed, nothing is sent anywhere, and the app works exactly as before with or without a signal.</p>
-        <p><strong>V78</strong> &middot; September 2026</p>
-        <p class="muted">Groundwork, with nothing to see on screen. Until now, deleting a job, a client or a site simply removed it &mdash; which is all a single phone needs to know. Once your records can live on more than one device, that isn't enough: the other device still holds the thing you deleted, and would put it back. The app now keeps a quiet record of what you've deleted and when, so a deletion made here stays deleted everywhere. New records are also given stronger identifiers, so two devices writing at the same moment can't produce two records claiming to be the same one. Everything already saved keeps the identifier it has. No screen, setting or job has changed, and the app still makes no network calls.</p>
-              </div>
+                      </div>
 
       <div class="info-card">
         <h3>Set up another device</h3>
@@ -413,30 +413,75 @@ function renderCloudSync() {
     const sum = syncStatusSummary();
     const busy = !!sy.busy;
     const dis = busy ? 'disabled' : '';
-    const last = sum.lastPushAt
-      ? escapeHTML(new Date(sum.lastPushAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))
+    const stamp = (v) => v
+      ? escapeHTML(new Date(v).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))
       : 'never';
     const msg = sy.message ? `<p class="muted cloud-msg" id="sync-msg" role="status">${escapeHTML(sy.message)}</p>` : '';
     body = `
       <div class="info-card">
         <h3>Jobs</h3>
         <p id="sync-counts"><strong>${sum.upToDate}</strong> of ${sum.total} job${sum.total === 1 ? '' : 's'} in the cloud and up to date${sum.waiting ? ` &middot; <strong>${sum.waiting}</strong> waiting to send` : ''}</p>
-        <p class="muted" id="sync-last" style="font-size:13px">Last sent: ${last}</p>
+        <p class="muted" id="sync-last" style="font-size:13px">Last sent: ${stamp(sum.lastPushAt)}</p>
+        <p class="muted" id="sync-last-pull" style="font-size:13px">Last checked: ${stamp(sum.lastPullAt)}</p>
         ${msg}
-        <button class="btn-primary" id="sync-push" data-action="sync-push" ${dis} style="margin-top:10px">${busy ? 'Sending…' : 'Push now'}</button>
+        <button class="btn-primary" id="sync-push" data-action="sync-push" ${dis} style="margin-top:10px">${busy ? 'Working…' : 'Push now'}</button>
+        <button class="backup-action-btn" id="sync-pull" data-action="sync-pull" ${dis} style="margin-top:8px">↓ Check for updates</button>
         <button class="link-btn" id="sync-resend-all" data-action="sync-resend-all" ${dis} style="margin-top:8px">Re-send all jobs</button>
-      </div>`;
+      </div>
+      ${renderSyncHeld(sy)}`;
   }
   return `
     <div class="screen" id="cloud-sync-page">
       ${renderSettingsSubHeader('Sync')}
       <div class="info-card">
         <h2>Sync (test)</h2>
-        <p class="muted" style="font-size:12px">Jobs are copied one way, from this phone to the cloud, a few seconds after you stop logging, whenever you reopen the app, and when signal comes back. The example job is never sent. Deleting a job deletes the cloud copy too; clearing old jobs only removes them from this phone, and the cloud keeps them. This phone is still the master copy &mdash; keep making backups as normal.</p>
+        <p class="muted" style="font-size:12px">Jobs are copied both ways between this phone and the cloud: sent a few seconds after you stop logging, and checked for whenever you sign in, reopen the app or get signal back. The example job is never sent. Deleting a job deletes it on your other device too; clearing old jobs only removes them from this phone, and the cloud keeps them. Photos don't travel yet, so a job that arrives from another device will show its photos as missing. This phone is still the master copy &mdash; keep making backups as normal.</p>
       </div>
       ${body}
     </div>
   `;
+}
+
+// v81 decision 2A. The jobs the app would not decide on its own. This card is
+// the whole reason a held job is safe: nothing was overwritten, and the question
+// is asked in the two terms an engineer can actually answer — which copy, and
+// how many items each one has. Plain language throughout; "fingerprint",
+// "conflict" and "cursor" are our words, not his.
+function renderSyncHeld(sy) {
+  if (typeof syncHeldList !== 'function') return '';
+  const held = syncHeldList();
+  if (!held.length) return '';
+  const resolving = (sy && sy.resolving) || null;
+  const rows = held.map((h) => {
+    const name = h.name ? escapeHTML(h.name) : 'Untitled job';
+    const busy = resolving === h.id;
+    const dis = busy ? 'disabled' : '';
+    let what;
+    if (h.reason === 'deleted-elsewhere') {
+      what = `Deleted on your other device, but this phone has changes that were never sent${h.localItems == null ? '' : ` (${h.localItems} item${h.localItems === 1 ? '' : 's'} here)`}.`;
+    } else if (h.reason === 'deleted-here') {
+      what = `You deleted this job on this phone, and it's back in the cloud${h.cloudItems == null ? '' : ` with ${h.cloudItems} item${h.cloudItems === 1 ? '' : 's'}`}.`;
+    } else if (h.reason === 'fewer-items') {
+      what = `The cloud copy has fewer items than this phone: ${h.cloudItems} against ${h.localItems}.`;
+    } else if (h.reason === 'unreadable') {
+      what = `The cloud copy of this job can't be read. Nothing on this phone has been touched.`;
+    } else {
+      what = `Changed in both places since it was last sent: ${h.localItems} item${h.localItems === 1 ? '' : 's'} here, ${h.cloudItems} in the cloud.`;
+    }
+    return `
+      <div class="info-card sync-held-row" data-held-id="${escapeHTML(h.id)}" style="margin-top:8px">
+        <p><strong>${name}</strong></p>
+        <p class="muted" style="font-size:13px">${what}</p>
+        <button class="backup-action-btn" data-action="sync-keep-phone" data-arg="${escapeHTML(h.id)}" ${dis} style="margin-top:8px">📱 Keep this phone's copy</button>
+        <button class="link-btn" data-action="sync-keep-cloud" data-arg="${escapeHTML(h.id)}" ${dis} style="margin-top:8px">☁ Use the cloud copy</button>
+      </div>`;
+  }).join('');
+  return `
+    <div class="info-card" id="sync-held" style="margin-top:12px">
+      <h3>Needs a decision</h3>
+      <p class="muted" style="font-size:13px">Nothing has been changed on this phone. ${held.length === 1 ? 'This job' : 'These jobs'} can't be settled automatically without the risk of losing work, so pick which copy to keep.</p>
+    </div>
+    ${rows}`;
 }
 
 function renderCloudSubscription() {

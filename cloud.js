@@ -241,10 +241,12 @@ function cloudVerifyCode() {
     .then((ok) => {
       _cloudRepaint();
       // Prove the round trip straight away: read our own profile row. v80: then
-      // send this phone's jobs (sync.js; optional, so guarded).
+      // send this phone's jobs (sync.js; optional, so guarded). v81: and read
+      // the account's jobs back — signing in on a second phone is the moment
+      // there is most to fetch, so this trigger pulls as well as pushes.
       if (ok) {
         return cloudCheckConnection().then(() => {
-          if (typeof syncPushSoon === 'function') { try { syncPushSoon(0); } catch (e) { console.error(e); } }
+          if (typeof syncPushSoon === 'function') { try { syncPushSoon(0, { pull: true }); } catch (e) { console.error(e); } }
           return ok;
         });
       }
