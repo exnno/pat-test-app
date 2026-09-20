@@ -444,7 +444,10 @@ function render() {
     `;
   }
 
-  const finalHTML = banner + html + migrationModal + welcomeModal + wizardModal + signaturePadModal + reopenWarnModal;
+  // v79: the TEST strip (decision 3A) sits above everything, and only exists
+  // while signed in to the test cloud. typeof-guarded — cloud.js is optional.
+  const cloudStrip = (typeof cloudTestStripHTML === 'function') ? cloudTestStripHTML() : '';
+  const finalHTML = cloudStrip + banner + html + migrationModal + welcomeModal + wizardModal + signaturePadModal + reopenWarnModal;
   app.innerHTML = finalHTML;
   // v24 (E4): record whether THIS render put any modal/sheet into the DOM, so the
   // next render knows whether the orphan-sweep above could find anything. Cheap

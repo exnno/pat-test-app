@@ -85,7 +85,7 @@ function settingsPageSubtitle(pageId) {
     case 'settingsBackup':  return 'Back up and restore your data';
     case 'settingsSetup':   return 'Share your setup to another device';
     case 'settingsCalculator': return 'Earth continuity limit';
-    case 'settingsAbout':   return `PATGo ${APP_VERSION}`;
+    case 'settingsAbout':   return `PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}`;
     case 'settingsGlossary': {
       // v58: counted from the data so it can never disagree with the page.
       const n = GLOSSARY_GROUPS.reduce((sum, g) => sum + g.terms.length, 0);
@@ -163,7 +163,7 @@ function renderSettingsHub() {
       </header>
       ${searchBox}
       <div id="settings-hub-body">${renderSettingsHubBodyHTML()}</div>
-      <p class="settings-footer">PATGo ${APP_VERSION} · © 2026 Peter Birchley<br>Data stored on this device only</p>
+      <p class="settings-footer">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''} · © 2026 Peter Birchley<br>Data stored on this device only</p>
       ${renderStatsFooterHTML()}
     </div>
   `;

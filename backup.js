@@ -100,10 +100,10 @@ function buildBackup() {
     tombstones: (typeof normaliseTombstones === 'function')
       ? normaliseTombstones(state.tombstones)
       : (state.tombstones || []),
-    // v43: cloud prep. Auth state (userId, authToken, loginTime). Passthrough
-    // for now; will persist server-side in cloud phase. Old backups without it
-    // restore with null (logged-out). Additive — no backupVersion bump.
-    authUser: state.userId ? { userId: state.userId, authToken: state.authToken, loginTime: new Date().toISOString() } : null,
+    // v79: NO sign-in details in a backup, ever. V43 wrote a mock `authUser`
+    // {userId, authToken} here; with real cloud sign-in that would put a live
+    // credential in a file people email to each other. The field is simply
+    // gone — restore ignores it in old backups (see restoreBackupFromFile).
     // v62: INFORMATIONAL ONLY — how many photos existed when this backup was
     // taken. Photos themselves are a SEPARATE export file (decision 7A); see
     // the reasoning at the top of the export section in photos.js. This number
@@ -415,14 +415,9 @@ function restoreBackupFromFile(file) {
         }));
     }
 
-    // v43: cloud prep. Auth state (userId, authToken). If present in backup, restore;
-    // if absent (any pre-v43 backup), leave auth unchanged (the user stays in their
-    // current login state — we don't reset it on restore). Additive.
-    if (data.authUser && typeof data.authUser === 'object' && data.authUser.userId) {
-      state.userId = data.authUser.userId;
-      state.authToken = data.authUser.authToken || null;
-      state.authStatus = 'logged-in';
-    }
+    // v79: an older backup may carry a V43 mock `authUser` block. It is IGNORED
+    // deliberately — restoring a file must never sign anyone in. Sign-in state
+    // is untouched by restore: whoever is signed in on this phone stays so.
 
     state.activeId = null;
     state.view = 'sessions';

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V78)
+# PATGo — Code Map (V79)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -47,8 +47,8 @@ is discoverable from the file you happen to be editing.
    archiving) must run before the `splice`/`filter`, or the ids are gone and the
    dependents are orphaned.
 
-6. **Optional subsystems fail soft.** `photos.js`, `scanner.js`, `bugreport.js`
-   are `typeof`-guarded and try/catch-wrapped at their boot call sites. A missing
+6. **Optional subsystems fail soft.** `photos.js`, `scanner.js`, `bugreport.js`,
+   `cloud.js` are `typeof`-guarded and try/catch-wrapped at their boot call sites. A missing
    or broken one must never stop the app starting or break the fail flow.
 
 7. **Instrument fields on `state` are a MIRROR, not the truth.** Never read
@@ -138,21 +138,22 @@ is discoverable from the file you happen to be editing.
 
 ---
 
-## Load order (index.html) — 29 first-party files
+## Load order (index.html) — 30 first-party files
 
 `config` → `data` → `state` → `utils` → `storage` → `clients` → `instruments` → `sqp`
 → `multipick` → `feedback` → `bugreport` → `photos` → `csv` → `backup`
 → `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
 → `pdfpreview` → `render-core` → `render-review` → `render-settings` → `render-help`
-→ `scanner` → `events` → `dispatch` → `boot`
+→ `cloud` → `scanner` → `events` → `dispatch` → `boot`
 
 ⚠ `data` → `state` is the one adjacency in this chain that is NOT a readability
 choice. `state.js` seeds `itemTypes`/`failReasons` from `DEFAULT_ITEM_TYPES` /
 `DEFAULT_FAIL_REASONS` in its top-level initialiser, which runs at load, so
 `data.js` must precede it. Harness 09h/09i, mutation M61.
 
-`sw.js` ASSETS lists **31** `.js` entries: these 29 plus the 2 lazy-loaded jsPDF
-files (precached, not `<script>` tags — report.js injects them on demand).
+`sw.js` ASSETS lists **33** `.js` entries: these 30 plus 3 lazy-loaded vendored
+files (precached, not `<script>` tags): the jsPDF pair (report.js injects them)
+and `supabase.umd.js` (cloud.js injects it, v79).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
 
 `boot.js` runs on load and must be last. Every other position is a readability
@@ -167,6 +168,9 @@ never uploaded fails silently until a user taps something.
 DATA-ONLY file needs a CONSTANT probe instead — top-level `const` never attaches
 to `window`, so the `requiredFns` loop cannot see it whatever name you use.
 Harness 09e/09f/09k/09l and mutations M54/M55/M64/M65 hold all of this.
+⚠ EXCEPT an optional subsystem (rule 6): `photos.js`, `scanner.js`,
+`bugreport.js`, `cloud.js` are deliberately NOT probed — a probe would make a
+missing optional file block boot, which is the opposite of the rule.
 
 ---
 
@@ -376,6 +380,8 @@ harness). Import learns new clients/sites into clients.js.
 **Touch to:** change the JSON backup shape or restore path.
 **⚠ Keep old-backup compatibility; bump `backupVersion` only for a genuine
 incompatible change (rule 10).**
+⚠ v79: NO sign-in data in a backup, ever; restore ignores a V43 `authUser`
+block (harness 15d, M134).
 **Coupling:** restores through the SAME validators as `load()`
 (`normaliseReportSettings`, `normaliseArchivedStats`, `normaliseItemReadings`,
 `normaliseSessionRetest`, `restoreInstrumentsFromBackup`) — never write a second
@@ -524,10 +530,12 @@ Instrument settings live in **instruments.js**. The stats footer reads
 for **render-help.js**, and those pages still call `renderSettingsSubHeader()`
 from here. The About changelog is no longer in this file.
 
-### render-help.js (~408 ln) — help, about & cloud-prep — NEW v73
+### render-help.js (~412 ln) — help, about & cloud pages — NEW v73
 About (+ the rolling 3-version changelog), Glossary (page + the
 `GLOSSARY_GROUPS` data array), Contact, `renderBugSheet()` markup, and the three
-cloud-prep stub pages revealed by a long-press on the About title.
+cloud pages revealed by a long-press on the About title (v79: only on a host
+with a cloud). Account is real (logic in **cloud.js**); Sync/Subscription are
+placeholders.
 **Touch to:** roll the About changelog, add or reword a glossary term, change the
 Contact page or the bug sheet's markup, or work on the cloud stubs.
 **Coupling:** reached only through `render()`'s dispatcher — NOT through the
@@ -538,6 +546,23 @@ in **bugreport.js**, and it returns `''` unless `state.bugSheetOpen`. Declares
 ONE top-level binding, `GLOSSARY_GROUPS`, read only inside a function body, so
 its load position is free.
 Boot probe: `renderSettingsAbout` in `requiredFns`.
+
+### cloud.js (~315 ln) — cloud sign-in — NEW v79
+Email-code sign-in (Supabase), session state in `state.cloud`, the TEST strip
+and version tag, lazy load of `supabase.umd.js`. Sign-in ONLY — nothing syncs.
+**Touch to:** change sign-in, the Account page's behaviour, cloud errors, or add
+the next cloud step (sync goes in a NEW file, `sync.js`, not here).
+**Coupling:** environment comes from **config.js** (`CLOUD_HOSTS` →
+`CLOUD_ENV`/`CLOUD`, `CLOUD_AUTH_STORAGE_KEY`) — host decides, unknown = off.
+Reuses `_injectScriptOnce` from **report.js**. Account page markup lives in
+**render-help.js**; strip in **render-core.js** `render()`; version tag also in
+**render-settings.js**; actions in **dispatch.js** (all typeof-guarded);
+`cloudBoot()` in **boot.js** after `load()`, before first render.
+⚠ Every async result lands through `_cloudRepaint()` — never call `render()` from
+a cloud promise directly (rules 2/3). ⚠ Signed out = no library, no request;
+harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
+`supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
+Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This
@@ -690,4 +715,8 @@ another file having parsed. Don't "DRY" this.
   license changing it.
 - `index.html` (~3KB) — the `<script>` chain. Small enough to read whole.
 - `sw.js` (~3.5KB) — `CACHE_VERSION` + `ASSETS`. Read whole.
+- `supabase.umd.js` — vendored supabase-js (MIT). NEVER read or grep it (218 KB,
+  one minified line — it floods context). Exclude it: `grep --exclude=supabase.umd.js`.
+- `supabase/schema.sql`, `supabase/isolation-test.sql` — server side (v79). Pasted
+  into the Supabase SQL editor by hand; not loaded by the app.
 - `manifest.webmanifest` — icons, name, display mode.

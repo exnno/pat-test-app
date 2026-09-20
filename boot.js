@@ -331,6 +331,18 @@ try {
   console.error('Apostrophe repair failed; continuing with unrepaired data.', e);
 }
 
+// v79: cloud sign-in state. AFTER load() and BEFORE the first render(), so the
+// TEST strip is right on the very first paint. The synchronous part only reads
+// localStorage; it makes no network request and does not load the library
+// unless someone is already signed in (then a background session check runs,
+// online only). Optional subsystem (MAP rule 6): typeof-guarded and wrapped —
+// a broken cloud.js must never be the reason the app fails to start.
+try {
+  if (typeof cloudBoot === 'function') cloudBoot();
+} catch (e) {
+  console.error('Cloud sign-in state failed to load (non-fatal).', e);
+}
+
 // v16.1: boot-level safety net. A throw inside render() (e.g. a screen-specific
 // bug like the v16 entry-screen TDZ error) used to leave #app permanently
 // blank — and because the service worker serves the cached build, a plain

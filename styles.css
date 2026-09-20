@@ -72,6 +72,7 @@
      48. scanner
      49. instruments: list
      50. log again x N
+     51. cloud sign-in (v79)
 ============================================================================ */
 
 /* @@ tokens & theme */
@@ -3791,3 +3792,23 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .repeat-custom-row .input { flex: 1 1 auto; min-width: 0; }
 .repeat-custom-add { flex: 0 0 auto; width: auto; padding-left: 22px; padding-right: 22px; margin-top: 0; }
+
+/* @@ cloud sign-in (v79) */
+/* v79: cloud sign-in. The TEST strip is IN FLOW (not position:fixed) on
+   purpose — a fixed bar would sit over every screen's header and need its own
+   safe-area and keyboard handling. It exists only while signed in to the test
+   cloud (cloudTestStripHTML in cloud.js). */
+.cloud-test-strip {
+  background: var(--warn-soft-bg);
+  color: var(--warn-soft-text);
+  border-bottom: 2px solid var(--warn-soft-border);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-align: center;
+  padding: 6px 12px;
+  margin: 0 0 8px;
+  border-radius: 8px;
+}
+.cloud-msg { margin: 10px 0 0; font-size: 13px; }
+.cloud-code-input { font-size: 22px; letter-spacing: 0.2em; text-align: center; }

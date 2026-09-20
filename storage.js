@@ -502,22 +502,11 @@ function loadV11Settings() {
   // install and every existing upgrading user start with the feature invisible.
   state.retestRemindersEnabled = localStorage.getItem(RETEST_REMINDERS_KEY) === '1';
 
-  // v43: cloud prep. Load mock auth state (userId, authToken from PAT_AUTH_KEY).
-  // This will persist in the cloud phase; for now it's a passthrough field that
-  // survives backup/restore. Defaults to logged-out (null userId/authToken).
-  try {
-    const authData = JSON.parse(localStorage.getItem(PAT_AUTH_KEY) || 'null');
-    if (authData && typeof authData === 'object' && authData.userId) {
-      state.userId = authData.userId;
-      state.authToken = authData.authToken || null;
-      state.authStatus = 'logged-in';
-    }
-  } catch {
-    // Corrupt auth key — default to logged-out
-    state.userId = null;
-    state.authToken = null;
-    state.authStatus = 'logged-out';
-  }
+  // v79: the V43 MOCK sign-in is retired. An older version may have left its
+  // key behind (holding a made-up user id and token) — delete it so nothing
+  // ever mistakes it for a real sign-in. Real sign-in state is derived in
+  // cloudBoot() (cloud.js) from supabase-js's own storage, never from here.
+  try { localStorage.removeItem(PAT_AUTH_KEY); } catch {}
 
   // v33: first-run wizard gate. onboardedV33Seen is set true once the wizard is
   // completed OR skipped. We treat the install as "already onboarded" (so the

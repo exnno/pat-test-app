@@ -6,9 +6,12 @@ The PAT Test PWA application code is © 2026 Peter Birchley, all rights reserved
 permissive open-source licenses (MIT and Apache-2.0). Each library's own
 copyright/permission notice is preserved verbatim inside its minified file (do
 not strip those headers — that preservation is a license condition).
+supabase-js ships its UMD build without a header, so a one-line notice was
+added as the first line of supabase.umd.js; the rest of the file is unmodified.
 
 Introduced in: V30 (June 2026), for PDF report generation.
 Added in:      V38 (June 2026), PDF.js for the multi-page report preview.
+Added in:      V79 (September 2026), supabase-js for cloud sign-in.
 
 ---------------------------------------------------------------------------
 1. jsPDF
@@ -79,3 +82,12 @@ Notes
   multi-page preview works offline after that first (online) use.
 - When the project later adopts a build step (e.g. the planned SaaS version),
   these can be pulled from npm and this manifest regenerated automatically.
+
+---------------------------------------------------------------------------
+4. supabase-js  (added V79, for cloud sign-in)
+---------------------------------------------------------------------------
+File:        supabase.umd.js  (npm @supabase/supabase-js, dist/umd/supabase.js)
+Version:     2.116.0
+Copyright:   (c) 2020 Supabase
+Project:     https://github.com/supabase/supabase-js
+License:     MIT (text as reproduced above for jsPDF, which applies verbatim)

@@ -43,7 +43,8 @@ in the shipped app — the files in the repo root are the files the browser load
 | Offline | Service worker (`sw.js`) precaching every asset |
 | PDF | jsPDF 3.0.3 + jsPDF-AutoTable 5.0.2, vendored and self-hosted (MIT) |
 | PDF preview | PDF.js 3.11.174 legacy UMD, vendored, lazy-loaded (Apache-2.0) |
-| Hosting | GitHub Pages from `main` |
+| Cloud sign-in | supabase-js 2.116.0 UMD, vendored, lazy-loaded (MIT) — v79, test host only |
+| Hosting | `main` → GitHub Pages (test); `Release` → Cloudflare (the product) |
 | Tests | `harness/` — Node, no dependencies |
 
 Third-party licences are reproduced in `THIRD-PARTY-LICENSES.txt`.
@@ -58,33 +59,36 @@ is no toolchain to rot between releases.
 
 ```
 index.html            script tags, in a load order that matters
-config.js … boot.js   29 first-party modules (see below)
+config.js … boot.js   30 first-party modules (see below)
 styles.css            one stylesheet, ordered by release, banner-indexed
 sw.js                 service worker + the precache ASSETS list
 manifest.webmanifest  PWA manifest
 icon-192.png  icon-512.png
 jspdf.*.min.js        vendored PDF engine — precached, not <script>-tagged
+supabase.umd.js       vendored cloud client — precached, not <script>-tagged
+supabase/             server SQL: schema.sql (run once), isolation-test.sql (every release)
 harness/              the committed test harness — NOT shipped
 MAP.md  FEATURES.md  BACKLOG.md
 PAThandoff_vNN.md     the canonical state block for the current release
 ```
 
-### Load order — 29 files, and it is not arbitrary
+### Load order — 30 files, and it is not arbitrary
 
 ```
 config → data → state → utils → storage → clients → instruments → sqp
 → multipick → feedback → bugreport → photos → csv → backup → session
 → settings-actions → setup → tour → onboarding → report → pdfpreview
 → render-core → render-review → render-settings → render-help
-→ scanner → events → dispatch → boot
+→ cloud → scanner → events → dispatch → boot
 ```
 
 `data` → `state` is the one adjacency that is a hard dependency rather than a
 readability choice: `state.js` seeds itself from `data.js` constants in a
 top-level initialiser that runs at load. `boot.js` must be last — it runs on load.
 
-`sw.js` ASSETS lists **31** `.js` entries: these 29 plus the two jsPDF files,
-which are precached but injected on demand rather than script-tagged.
+`sw.js` ASSETS lists **33** `.js` entries: these 30 plus the two jsPDF files and
+`supabase.umd.js`, which are precached but injected on demand rather than
+script-tagged.
 
 **`MAP.md` is the routing table** — which file owns what, plus the cross-cutting
 rules that no single file makes discoverable. Read it before editing anything.
@@ -152,6 +156,8 @@ separately from behaviour changes.
 - New assertions in `harness/tests/`, and **a matching mutation for each**
 - Re-point the release-anchored mutations **M66** and **M82**, or they abort
 - A new `PAThandoff_vNN.md`, including the post-commit test checklist
+- From v79: `supabase/isolation-test.sql` run in the test project, all PASS,
+  result recorded in the handoff — before any promotion to `Release`
 
 `backupVersion` bumps only for a genuinely incompatible schema change — additive
 fields ride through the codec and never spend a bump. It is its own event and is
@@ -171,6 +177,21 @@ Deploying `sw.js` early publishes a new cache pointing at files that have not
 landed yet. Afterwards, wait about a minute, fully close the PWA from the app
 switcher, and reopen it twice.
 
+### Promotion to the product (`Release` branch, from v79)
+
+`main` is the test deploy (GitHub Pages). `Release` is the product (Cloudflare).
+Every change lands on `main` first as above and is checked there. Promotion is a
+pull request, done in the GitHub web UI:
+
+1. **Pull requests** → **New pull request**
+2. **base: `Release`** ← **compare: `main`** (base is where it's going)
+3. **Create pull request**, give it the version as a title, **Create**
+4. **Merge pull request** → **Confirm merge**. Never delete the branch.
+
+Cloudflare rebuilds from `Release` within a minute or two. Never commit directly
+to `Release` — everything goes through `main`, so the two can't drift apart.
+Branch names are case-sensitive: it is `Release`, capital R.
+
 ### Hotfixes
 
 Bump the cache key only, not `APP_VERSION`. Amend the existing handoff rather
@@ -183,4 +204,5 @@ than writing a new one.
 - **PATGo Scan** (`exnno/patgoscan`) — a separate barcode-first app for one
   client's audit workflow. Explicitly no merge-back; anything shared is
   hand-rebuilt from a spec.
-- **PAT Cloud** — planned SaaS product, separate codebase. Not started.
+- **PATGo cloud** — the same codebase with a sync layer added (spec:
+  `PATGo_Sync_Spec_v1_2.md`). V79 is sign-in only; sync follows release by release.
