@@ -514,8 +514,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V79';",
-    to:   "const APP_VERSION = 'V79';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V80';",
+    to:   "const APP_VERSION = 'V80';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -634,8 +634,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V77</strong> &middot; August 2026</p>',
-    to:   '        <p><strong>V77</strong> &middot; August 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V76</strong> &middot; August 2026</p>',
+    from: '        <p><strong>V78</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V78</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V77</strong> &middot; August 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1058,6 +1058,141 @@ const MUTATIONS = [
     from: "  './supabase.umd.js',\n",
     to:   '',
     why:  'after an update a signed-in phone opened offline could not load the library',
+  },
+
+  // ---- V80: sync, push only (harness 16) --------------------------------------
+  {
+    name: 'M142 (V80) saveSessions stops telling sync about saves',
+    file: 'storage.js',
+    from: "  if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error('Sync trigger failed (non-fatal).', e); } }\n",
+    to:   '',
+    why:  'the hot-path trigger: without it, jobs only go on reopen and nobody notices the gap',
+  },
+  {
+    name: 'M143 (V80) the fingerprint comparison is dropped — every job, every push',
+    file: 'sync.js',
+    from: '      if (!force && st.sent[id] === hash) continue;\n',
+    to:   '',
+    why:  'every save would re-upload every job the engineer has — a quota and battery drain that looks like it works',
+  },
+  {
+    name: 'M144 (V80) the example job is sent',
+    file: 'sync.js',
+    from: "&& !s[flag]);",
+    to:   ');',
+    why:  'the demo job would appear in every engineer\u2019s cloud data',
+  },
+  {
+    name: 'M145 (V80) a delete keeps the job\u2019s contents in the cloud',
+    file: 'sync.js',
+    from: "row: { id, user_id: uid, doc: {}, deleted: true, last_modified: at } });",
+    to:   "row: { id, user_id: uid, doc: (state.sessions.find(x => String(x.id) === id) || { gone: id, site: 'ZZDELETEME' }), deleted: true, last_modified: at } });",
+    why:  'decision 4A: delete means delete — the client data must not linger server-side',
+  },
+  {
+    name: 'M146 (V80) deletes are sent for jobs the server never had',
+    file: 'sync.js',
+    from: '      if (!st.sent[id] && !st.gone[id]) continue;    // server never had it\n',
+    to:   '',
+    why:  'empty deleted rows for jobs that were never uploaded — noise, and it leaks ids of deleted work',
+  },
+  {
+    name: 'M147 (V80) a job that is live AND in the ledger is sent as deleted',
+    file: 'sync.js',
+    from: "      if (live.has(id)) continue;                    // restored since: it's live\n",
+    to:   '',
+    why:  'a restored job would be wiped from the cloud straight after being re-sent',
+  },
+  {
+    name: 'M148 (V80) the hash is recomputed after the upload',
+    file: 'sync.js',
+    from: '            else { st.sent[w.id] = w.hash; delete st.gone[w.id]; sent++; }',
+    to:   '            else { const cur = state.sessions.find(x => String(x.id) === w.id); st.sent[w.id] = cur ? syncHash(JSON.stringify(cur)) : w.hash; delete st.gone[w.id]; sent++; }',
+    why:  'an edit made while a push is in flight would be marked sent and never reach the cloud',
+  },
+  {
+    name: 'M149 (V80) sync state is used whoever it belongs to',
+    file: 'sync.js',
+    from: '  return (userId && st.userId === userId) ? st : _syncEmpty(userId);',
+    to:   '  st.userId = userId; return st;',
+    why:  'a second account on the same phone would believe the first account\u2019s jobs were already in ITS cloud',
+  },
+  {
+    name: 'M150 (V80) an upload error is treated as success',
+    file: 'sync.js',
+    from: '          if (r && r.error) throw r.error;\n',
+    to:   '',
+    why:  'jobs the server refused would be marked sent and never retried',
+  },
+  {
+    name: 'M151 (V80) clearing ignores whether the cloud has the latest version',
+    file: 'sync.js',
+    from: "    const ok = mine && s && st.sent[String(s.id)] === syncHash(JSON.stringify(s));",
+    to:   '    const ok = true;',
+    why:  'decision 5A: clearing an unsent edit while signed in destroys the only copy of it',
+  },
+  {
+    name: 'M152 (V80) cleared jobs are not remembered',
+    file: 'session.js',
+    from: "        try { syncNotePruned(Array.from(ids)); } catch (e) { console.error('Cleared-jobs note failed (non-fatal).', e); }\n",
+    to:   '',
+    why:  'the V81 pull would download every cleared job straight back onto the phone',
+  },
+  {
+    name: 'M153 (V80) restore replaces the cleared list instead of merging',
+    file: 'sync.js',
+    from: '  const list = _syncPrunedLoad();\n  const have = new Set(list.map(e => e.id));',
+    to:   '  const list = [];\n  const have = new Set(list.map(e => e.id));',
+    why:  'restoring an older backup would forget jobs cleared since, and the pull would bring them back',
+  },
+  {
+    name: 'M154 (V80) the cleared list is left out of backups',
+    file: 'backup.js',
+    from: "    syncPruned: (typeof syncPrunedList === 'function') ? syncPrunedList() : undefined,\n",
+    to:   '',
+    why:  'a restore onto a new phone would lose the list and the pull would resurrect cleared jobs',
+  },
+  {
+    name: 'M155 (V80) sign-in is not followed by a push',
+    file: 'cloud.js',
+    from: "          if (typeof syncPushSoon === 'function') { try { syncPushSoon(0); } catch (e) { console.error(e); } }\n",
+    to:   '',
+    why:  'first sign-in on a phone would send nothing until the engineer happened to save or reopen',
+  },
+  {
+    name: 'M156 (V80) syncBoot is written but never called',
+    file: 'boot.js',
+    from: "  if (typeof syncBoot === 'function') syncBoot();\n",
+    to:   '',
+    why:  'the V65-V67 lesson again: no reopen trigger, no boot push, and nothing looks broken',
+  },
+  {
+    name: 'M157 (V80) the app-reopen listener does nothing',
+    file: 'sync.js',
+    from: "      if (document.visibilityState === 'hidden') return;\n      syncPushSoon(SYNC_RESUME_DELAY_MS);",
+    to:   "      if (document.visibilityState === 'hidden') return;",
+    why:  'reopening the app is the main moment a job reaches the cloud after a day offline',
+  },
+  {
+    name: 'M158 (V80) the Sync page assumes sync.js loaded',
+    file: 'render-help.js',
+    from: "  } else if (typeof syncStatusSummary !== 'function') {",
+    to:   '  } else if (false) {',
+    why:  'a missing optional file would throw inside render() — MAP rule 6',
+  },
+  {
+    name: 'M159 (V80) sync.js dropped from the precache',
+    file: 'sw.js',
+    from: "  './sync.js',           // v80\n",
+    to:   '',
+    why:  'after an update, a phone opened offline would run without sync until next online load',
+  },
+  {
+    name: 'M160 (V80) offline push attempts the request anyway',
+    file: 'sync.js',
+    from: '  if (_syncOffline()) {\n    if (o.manual) {',
+    to:   '  if (false) {\n    if (o.manual) {',
+    why:  'every save with no signal would fire a doomed request and a confusing error',
   },
 ];
 
