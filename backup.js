@@ -100,6 +100,12 @@ function buildBackup() {
     tombstones: (typeof normaliseTombstones === 'function')
       ? normaliseTombstones(state.tombstones)
       : (state.tombstones || []),
+    // v80: ids of jobs cleared from this phone that the cloud still keeps
+    // (sync.js), so a restore does not let the pull bring them back. Absent —
+    // not an empty array — on any phone that never synced, so those backups
+    // are unchanged. Additive: **backupVersion stays 5**. The sync FINGERPRINTS
+    // are deliberately NOT here (see SYNC_STATE_KEY in config.js).
+    syncPruned: (typeof syncPrunedList === 'function') ? syncPrunedList() : undefined,
     // v79: NO sign-in details in a backup, ever. V43 wrote a mock `authUser`
     // {userId, authToken} here; with real cloud sign-in that would put a live
     // credential in a file people email to each other. The field is simply
@@ -390,6 +396,11 @@ function restoreBackupFromFile(file) {
     state.tombstones = (typeof purgeTombstones === 'function')
       ? purgeTombstones(data.tombstones)
       : (Array.isArray(data.tombstones) ? data.tombstones : []);
+    // v80: MERGED into this phone's list, never replacing it — see sync.js.
+    // Garbage or absent → nothing added. Wrapped: sync is optional (rule 6).
+    if (typeof syncPrunedMerge === 'function') {
+      try { syncPrunedMerge(data.syncPruned); } catch (e) { console.error('Cleared-jobs list not restored (non-fatal).', e); }
+    }
     if (state.clients.length === 0 && state.sites.length === 0) {
       seedClientsSitesFromSessions();
     }

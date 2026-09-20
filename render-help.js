@@ -64,18 +64,16 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v79: rolled forward — V79 on top, V76 dropped. -->
+      <!-- v8: rolling 3-version changelog. v80: rolled forward — V80 on top, V77 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V80</strong> &middot; September 2026</p>
+        <p class="muted">Nothing changes for you. This release is the next piece of the cloud version, which is switched on only for a small invite-only test: for those test accounts, jobs are now copied from the phone to the cloud in the background. For everyone else the app is exactly as it was &mdash; nothing is sent anywhere, no account is needed, and it works the same with or without a signal.</p>
         <p><strong>V79</strong> &middot; September 2026</p>
         <p class="muted">Housekeeping you won't see, plus the first piece of the cloud version, switched off for everyone. Backups no longer include a leftover sign-in field from an old experiment &mdash; a backup is a file you email around, and it should never carry anything that looks like a login. Restoring an older backup that has one simply ignores it. Nothing about your jobs, clients, settings or reports has changed, nothing is sent anywhere, and the app works exactly as before with or without a signal.</p>
         <p><strong>V78</strong> &middot; September 2026</p>
         <p class="muted">Groundwork, with nothing to see on screen. Until now, deleting a job, a client or a site simply removed it &mdash; which is all a single phone needs to know. Once your records can live on more than one device, that isn't enough: the other device still holds the thing you deleted, and would put it back. The app now keeps a quiet record of what you've deleted and when, so a deletion made here stays deleted everywhere. New records are also given stronger identifiers, so two devices writing at the same moment can't produce two records claiming to be the same one. Everything already saved keeps the identifier it has. No screen, setting or job has changed, and the app still makes no network calls.</p>
-        <p><strong>V77</strong> &middot; August 2026</p>
-        <p class="muted">A new shortcut for repeat items, and two fixes to the press-and-hold gesture. If a room has a run of identical items, you no longer have to tap Copy last result once for each: log the first one, then press and hold that button and choose how many more to add. It shows you the item and the result it is about to copy, and any notes attached to it, so a failure keeps its reason rather than arriving as a bare fail. The copies are numbered on from the last one and use whatever location is on the form. Separately, holding the quick-pick buttons to switch presets no longer highlights the button text while it does so, and opening &ldquo;Edit presets&rdquo; from that panel now returns you to the test screen when you press Back, rather than leaving you part-way into Settings. One fix behind the scenes as well: items added by Multi Pick were not having their time recorded unless the timestamp setting happened to be switched on, so a job's testing time could read short. They are now recorded like every other item.</p>
-
-
               </div>
 
       <div class="info-card">
@@ -320,7 +318,8 @@ function renderBugSheet() {
 
 // v43: cloud pages, revealed via long-press on the About title (never in the
 // main Settings nav). v79: the Account page is REAL — email-code sign-in via
-// cloud.js. Sync and Subscription are honest placeholders until those releases.
+// cloud.js. v80: so is Sync (push only, sync.js). Subscription is still an
+// honest placeholder.
 //
 // ⚠ This page has inputs. Async results reach it only through _cloudRepaint()
 // (cloud.js), which will not render while a field is focused — MAP rule 3.
@@ -379,21 +378,63 @@ function renderCloudAccount() {
       ${renderSettingsSubHeader('Account')}
       <div class="info-card">
         <h2>Cloud account (test)</h2>
-        <p class="muted" style="font-size:12px">This proves sign-in works. Nothing from your jobs, clients or settings leaves this phone yet, and the app works exactly the same signed in or not.</p>
+        <p class="muted" style="font-size:12px">While you're signed in, your jobs are copied to the cloud test (see Sync). Clients, sites and settings stay on this phone for now, and the app works exactly the same signed in or not, signal or not.</p>
       </div>
       ${body}
     </div>
   `;
 }
 
+// v80: REAL — the push half of sync (sync.js). Read-only page (no inputs), so
+// async results may repaint it; they still go through _syncRepaint(), which
+// checks it is the page on screen. Hashing every job to count them is only
+// affordable here, on a page nobody logs from.
 function renderCloudSync() {
+  const c = state.cloud || {};
+  const sy = state.sync || {};
+  let body = '';
+  if (c.status === 'off') {
+    body = `
+      <div class="info-card">
+        <p class="muted">Cloud isn't available on this copy of the app.</p>
+      </div>`;
+  } else if (typeof syncStatusSummary !== 'function') {
+    body = `
+      <div class="info-card">
+        <p class="muted">Sync didn't load on this phone. Your jobs are safe here as always &mdash; fully close the app and reopen it to pick up the update.</p>
+      </div>`;
+  } else if (c.status !== 'signed-in') {
+    body = `
+      <div class="info-card">
+        <p class="muted" id="sync-signed-out">Sign in on the Account page first. Until you do, nothing leaves this phone.</p>
+        <button class="backup-action-btn" id="sync-go-account" data-action="open-cloud-page" data-arg="account" style="margin-top:8px">👤 Account</button>
+      </div>`;
+  } else {
+    const sum = syncStatusSummary();
+    const busy = !!sy.busy;
+    const dis = busy ? 'disabled' : '';
+    const last = sum.lastPushAt
+      ? escapeHTML(new Date(sum.lastPushAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))
+      : 'never';
+    const msg = sy.message ? `<p class="muted cloud-msg" id="sync-msg" role="status">${escapeHTML(sy.message)}</p>` : '';
+    body = `
+      <div class="info-card">
+        <h3>Jobs</h3>
+        <p id="sync-counts"><strong>${sum.upToDate}</strong> of ${sum.total} job${sum.total === 1 ? '' : 's'} in the cloud and up to date${sum.waiting ? ` &middot; <strong>${sum.waiting}</strong> waiting to send` : ''}</p>
+        <p class="muted" id="sync-last" style="font-size:13px">Last sent: ${last}</p>
+        ${msg}
+        <button class="btn-primary" id="sync-push" data-action="sync-push" ${dis} style="margin-top:10px">${busy ? 'Sending…' : 'Push now'}</button>
+        <button class="link-btn" id="sync-resend-all" data-action="sync-resend-all" ${dis} style="margin-top:8px">Re-send all jobs</button>
+      </div>`;
+  }
   return `
-    <div class="screen" id="cloud-sync-placeholder">
+    <div class="screen" id="cloud-sync-page">
       ${renderSettingsSubHeader('Sync')}
       <div class="info-card">
-        <h2>Sync</h2>
-        <p class="muted">Not built yet. Nothing is being synced &mdash; your records are on this phone only, as always. Keep making backups as normal.</p>
+        <h2>Sync (test)</h2>
+        <p class="muted" style="font-size:12px">Jobs are copied one way, from this phone to the cloud, a few seconds after you stop logging, whenever you reopen the app, and when signal comes back. The example job is never sent. Deleting a job deletes the cloud copy too; clearing old jobs only removes them from this phone, and the cloud keeps them. This phone is still the master copy &mdash; keep making backups as normal.</p>
       </div>
+      ${body}
     </div>
   `;
 }

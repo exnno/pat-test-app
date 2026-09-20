@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — config.js (constants & factories)
- * v79 (September 2026)
+ * v80 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V79';
+const APP_VERSION = 'V80';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -338,6 +338,21 @@ const CLOUD = CLOUD_PROJECTS[CLOUD_ENV] || { url: '', publishableKey: '' };
 const CLOUD_AUTH_STORAGE_KEY = 'patgo:cloudAuth:' + CLOUD_ENV;
 // Flip to true at commercial launch (spec decision 5). Nothing reads it yet.
 const REQUIRE_ACCOUNT = false;
+
+// ---- v80: sync (push only — see sync.js) ------------------------------------
+// SYNC_STATE_KEY: which account the phone last sent to, a fingerprint of every
+// job as it was last sent, the jobs whose deletion was sent, and when. Local
+// bookkeeping — NEVER in a backup: a restore onto another phone must send
+// everything afresh, not believe it already has.
+// SYNC_PRUNED_KEY: ids of jobs cleared from this phone that the cloud still
+// keeps, so the pull (V81) does not bring them back. This one IS in backups.
+const SYNC_STATE_KEY = 'pat:syncState';     // v80: JSON {userId,sent,gone,lastPushAt}
+const SYNC_PRUNED_KEY = 'pat:syncPruned';   // v80: JSON [{id,at}]
+const SYNC_DEBOUNCE_MS = 5000;      // quiet time after the last save before a push
+const SYNC_BOOT_DELAY_MS = 3000;    // after the first paint, not during it
+const SYNC_RESUME_DELAY_MS = 1000;  // app reopened / signal back
+const SYNC_BATCH_ROWS = 25;         // rows per upload request…
+const SYNC_BATCH_BYTES = 400000;    // …or roughly this much JSON, whichever first
 // v33: First-run wizard "seen" flag. Set once the wizard is completed OR skipped,
 // so it never reappears. Distinct from the welcome modal key: a genuinely-new
 // install gets the WIZARD (gated by this key + an empty-install test); an

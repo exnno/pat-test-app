@@ -342,6 +342,15 @@ try {
 } catch (e) {
   console.error('Cloud sign-in state failed to load (non-fatal).', e);
 }
+// v80: sync (push only). AFTER cloudBoot, which decides whether anyone is signed
+// in. Registers the reopen / back-online triggers and, if signed in and online,
+// schedules one push a few seconds after the first paint — never during it. On a
+// host with no cloud it does nothing at all. Optional subsystem, same wrapping.
+try {
+  if (typeof syncBoot === 'function') syncBoot();
+} catch (e) {
+  console.error('Sync failed to start (non-fatal).', e);
+}
 
 // v16.1: boot-level safety net. A throw inside render() (e.g. a screen-specific
 // bug like the v16 entry-screen TDZ error) used to leave #app permanently

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V79)
+# PATGo — Code Map (V80)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -48,7 +48,7 @@ is discoverable from the file you happen to be editing.
    dependents are orphaned.
 
 6. **Optional subsystems fail soft.** `photos.js`, `scanner.js`, `bugreport.js`,
-   `cloud.js` are `typeof`-guarded and try/catch-wrapped at their boot call sites. A missing
+   `cloud.js`, `sync.js` are `typeof`-guarded and try/catch-wrapped at their boot call sites. A missing
    or broken one must never stop the app starting or break the fail flow.
 
 7. **Instrument fields on `state` are a MIRROR, not the truth.** Never read
@@ -138,20 +138,20 @@ is discoverable from the file you happen to be editing.
 
 ---
 
-## Load order (index.html) — 30 first-party files
+## Load order (index.html) — 31 first-party files
 
 `config` → `data` → `state` → `utils` → `storage` → `clients` → `instruments` → `sqp`
 → `multipick` → `feedback` → `bugreport` → `photos` → `csv` → `backup`
 → `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
 → `pdfpreview` → `render-core` → `render-review` → `render-settings` → `render-help`
-→ `cloud` → `scanner` → `events` → `dispatch` → `boot`
+→ `cloud` → `sync` → `scanner` → `events` → `dispatch` → `boot`
 
 ⚠ `data` → `state` is the one adjacency in this chain that is NOT a readability
 choice. `state.js` seeds `itemTypes`/`failReasons` from `DEFAULT_ITEM_TYPES` /
 `DEFAULT_FAIL_REASONS` in its top-level initialiser, which runs at load, so
 `data.js` must precede it. Harness 09h/09i, mutation M61.
 
-`sw.js` ASSETS lists **33** `.js` entries: these 30 plus 3 lazy-loaded vendored
+`sw.js` ASSETS lists **34** `.js` entries: these 31 plus 3 lazy-loaded vendored
 files (precached, not `<script>` tags): the jsPDF pair (report.js injects them)
 and `supabase.umd.js` (cloud.js injects it, v79).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
@@ -169,7 +169,7 @@ DATA-ONLY file needs a CONSTANT probe instead — top-level `const` never attach
 to `window`, so the `requiredFns` loop cannot see it whatever name you use.
 Harness 09e/09f/09k/09l and mutations M54/M55/M64/M65 hold all of this.
 ⚠ EXCEPT an optional subsystem (rule 6): `photos.js`, `scanner.js`,
-`bugreport.js`, `cloud.js` are deliberately NOT probed — a probe would make a
+`bugreport.js`, `cloud.js`, `sync.js` are deliberately NOT probed — a probe would make a
 missing optional file block boot, which is the opposite of the rule.
 
 ---
@@ -280,7 +280,10 @@ and 14g fails if a flag ever appears. `recordTombstone()` does NOT save, and is
 always called BEFORE the removal (cross-cutting rule 5). Callers: clients.js ×4
 (deleteClient + its site cascade, deleteSite, resolveAssignMerge), session.js ×2
 (deleteSession, deletePreset). Prune deliberately does NOT record — decision C,
-revisit in the sync release. Nothing in the shipped app READS the ledger yet.
+settled V80: clearing is local, the cloud keeps the job (sync.js remembers the
+id in SYNC_PRUNED_KEY instead). sync.js READS the ledger (session kind only).
+⚠ v80: `saveSessions()` carries the ONE sync line (`syncNoteSave`, guarded and
+wrapped). Every session save passes through it — keep it cheap.
 ⚠⚠ v69: `_encodedSessionCache` reuses a session's encoding when the items ARRAY
 REFERENCE and `_sessionSig()` are unchanged — and the sig covers item COUNT, not
 item CONTENTS. Anything that edits strings INSIDE existing item objects must call
@@ -382,6 +385,9 @@ harness). Import learns new clients/sites into clients.js.
 incompatible change (rule 10).**
 ⚠ v79: NO sign-in data in a backup, ever; restore ignores a V43 `authUser`
 block (harness 15d, M134).
+⚠ v80: `syncPruned` rides in the backup (via sync.js `syncPrunedList`, omitted
+when empty) and is MERGED on restore (`syncPrunedMerge`), never replaced. The
+sync fingerprints (SYNC_STATE_KEY) are NEVER in a backup. Harness 16j.
 **Coupling:** restores through the SAME validators as `load()`
 (`normaliseReportSettings`, `normaliseArchivedStats`, `normaliseItemReadings`,
 `normaliseSessionRetest`, `restoreInstrumentsFromBackup`) — never write a second
@@ -534,8 +540,8 @@ from here. The About changelog is no longer in this file.
 About (+ the rolling 3-version changelog), Glossary (page + the
 `GLOSSARY_GROUPS` data array), Contact, `renderBugSheet()` markup, and the three
 cloud pages revealed by a long-press on the About title (v79: only on a host
-with a cloud). Account is real (logic in **cloud.js**); Sync/Subscription are
-placeholders.
+with a cloud). Account is real (logic in **cloud.js**); Sync is real from v80
+(logic in **sync.js**); Subscription is a placeholder.
 **Touch to:** roll the About changelog, add or reword a glossary term, change the
 Contact page or the bug sheet's markup, or work on the cloud stubs.
 **Coupling:** reached only through `render()`'s dispatcher — NOT through the
@@ -551,7 +557,9 @@ Boot probe: `renderSettingsAbout` in `requiredFns`.
 Email-code sign-in (Supabase), session state in `state.cloud`, the TEST strip
 and version tag, lazy load of `supabase.umd.js`. Sign-in ONLY — nothing syncs.
 **Touch to:** change sign-in, the Account page's behaviour, cloud errors, or add
-the next cloud step (sync goes in a NEW file, `sync.js`, not here).
+the next cloud step (sync lives in `sync.js`, not here).
+⚠ v80: `cloudUserId()` (sync reads it) and a guarded `syncPushSoon(0)` after a
+successful sign-in.
 **Coupling:** environment comes from **config.js** (`CLOUD_HOSTS` →
 `CLOUD_ENV`/`CLOUD`, `CLOUD_AUTH_STORAGE_KEY`) — host decides, unknown = off.
 Reuses `_injectScriptOnce` from **report.js**. Account page markup lives in
@@ -563,6 +571,25 @@ a cloud promise directly (rules 2/3). ⚠ Signed out = no library, no request;
 harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
+
+### sync.js (~390 ln) — cloud sync, PUSH ONLY — NEW v80
+Jobs (sessions) one way, phone → cloud, while signed in. Change detection is a
+per-job FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no
+edit timestamp exists. Deletes (session tombstones) send an emptied row. Prune
+guard (`syncPruneFilter`) + cleared-ids list (SYNC_PRUNED_KEY). Sync page logic.
+**Touch to:** change what syncs, when, or how; add pull (V81) or record kinds.
+**Coupling:** asks **cloud.js** who is signed in (`cloudAvailable`,
+`cloudUserId`, `cloudClient`). Triggers: **storage.js** `saveSessions()` (one
+line), **cloud.js** after sign-in, **boot.js** `syncBoot()` after `cloudBoot()`.
+Prune guard/note called from **session.js** `pruneOldSessions()`; backup hooks in
+**backup.js**; page markup in **render-help.js** `renderCloudSync()`; actions
+`sync-push`/`sync-resend-all` in **dispatch.js**. Reads `state.sessions`,
+`state.tombstones`; writes ONLY its own two keys — never app data.
+⚠ The hash is captured when the row is BUILT, not after upload (16f, M148).
+⚠ Results land through `_syncRepaint()` — Sync page only, never over a focused
+field (rules 2/3). ⚠ Pull (V81) must call `_invalidateSessionEncoding` on any
+session it edits in place (storage.js v69 trap).
+Not probed at boot (optional subsystem). Harness 16a–16n, mutations M142–M160.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

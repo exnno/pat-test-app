@@ -819,6 +819,9 @@ function saveSessions() {
   // v23: serialiseSessions reuses cached encodings for unchanged sessions.
   localStorage.setItem(STORAGE_KEY, serialiseSessions(state.sessions));
   localStorage.setItem(ACTIVE_KEY, state.activeId || '');
+  // v80: the ONE line sync adds to saving. A status check and a timer reset;
+  // guarded and wrapped so a broken sync.js can never make a save fail.
+  if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error('Sync trigger failed (non-fatal).', e); } }
 }
 
 // COLD: all settings/config keys. Called when a setting changes (and by save()).
