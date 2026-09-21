@@ -478,26 +478,30 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 17m */
-  await t.group('17m — saving schedules a send, never a read (decision 6A)', async () => {
-    const app = signedIn();
-    const local = sentJob(app, 'ZZNOPULLONSAVE');
-    const before = app.srv.gets().length;
+  // ⚠ REVERSED at v81.1. V81 asserted the opposite — that a save pushes without
+  // reading — on hot-path grounds. That left a window with no open job in it:
+  // the other phone pushes, this phone edits, its debounce fires before anything
+  // has pulled, and it overwrites work it never saw. Decision 2A: every run
+  // reads before it writes, so a push can only ever follow a look.
+  await t.group('17m — every run reads before it writes, the save trigger included (decision 2A)', async () => {
+    const app = signedIn({ server: { rows: [cloudJob('ZZBEFOREPUSH', 'ZZOTHER', ['A'])] } });
+    const local = sentJob(app, 'ZZSAVEPULLS');
     app.fn('openSession')(local.id);
     withItem(app, { assetNo: 'ZZHOTPATH', result: 'pass' });
     t.notEq(app.run('_syncTimer'), null, 'a save still schedules a run');
     app.stopTimer();
-    await app.fn('syncPush')({});
+
+    const before = app.srv.gets().length;
+    await app.fn('syncPush')({ pull: true });
     await tick(5);
-    t.eq(app.srv.gets().length, before,
-      'a plain push reads nothing \u2014 the change being saved is this phone\u2019s own');
-    t.ok(app.srv.posts().length > 0, 'but it does send');
+    t.ok(app.srv.gets().length > before, 'the run reads first');
+    t.ok(app.srv.posts().length > 0, 'and then sends');
+    t.ok(jobById(app, 'ZZBEFOREPUSH'), 'picking up the other device\u2019s job on the way');
 
     const src = fs.readFileSync(path.join(APP_DIR, 'sync.js'), 'utf8');
     const fn = src.slice(src.indexOf('function syncNoteSave('), src.indexOf('function syncPushSoon('));
-    t.includes(fn, 'syncPushSoon(SYNC_DEBOUNCE_MS);',
-      'and the save trigger schedules a bare push \u2014 source-guarded on the CALL, not on prose that merely mentions pulling');
-    t.excludes(fn.replace(/\/\/[^\n]*/g, ''), '{ pull',
-      'with no pull option anywhere in its code');
+    t.includes(fn.replace(/\/\/[^\n]*/g, ''), '{ pull: true }',
+      'and the save trigger itself asks for the read \u2014 source-guarded on the CALL, because a debounce that never fires headlessly proves nothing');
   });
 
   /* ------------------------------------------------------------------ 17n */
@@ -527,8 +531,94 @@ module.exports = async function () {
     t.eq(held(app).length, 0, 'and tapping it answers the question');
   });
 
+  /* ------------------------------------------------------------------ 17q */
+  // Peter's two-phone test, V81. Phone A is standing in the job; phone B adds a
+  // different item and sends it. V81 skipped the open job in the PULL and then
+  // sent it anyway in the PUSH — so B's item was overwritten, silently, with no
+  // question asked. Decision 1A (V81.1): the open job is still judged, only its
+  // application is deferred.
+  await t.group('17q — an open job with unsent changes is never sent over the cloud copy', async () => {
+    const app = signedIn();
+    const local = sentJob(app, 'ZZTWOPHONE');          // one item: the first Lead
+    const id = String(local.id);
+
+    // Phone B, online, logs an AC adapter against the same job.
+    app.srv.cloud.push(cloudJob(id, 'ZZTWOPHONE', ['LEAD-1', 'AC-ADAPTER'], T2));
+
+    // Phone A is inside the job and logs a second Lead of its own.
+    app.fn('openSession')(id);
+    withItem(app, { assetNo: 'ZZLEAD-2', result: 'pass' });
+    app.stopTimer();
+    t.eq(app.state().activeId, id, 'precondition: the job is open on this phone');
+
+    await app.fn('syncPull')();
+    await tick(5);
+
+    const sentBack = app.srv.rows().filter(r => String(r.id) === id);
+    t.eq(sentBack.length, 0,
+      'the phone did NOT send its copy over the other device\u2019s \u2014 a push is an unconditional overwrite, and nothing has decided which copy wins');
+    t.includes(JSON.stringify(app.srv.cloud.find(r => String(r.id) === id)), 'AC-ADAPTER',
+      'so the other device\u2019s item is still in the cloud');
+
+    const h = held(app);
+    t.eq(h.length, 1, 'and it is raised as a question rather than settled quietly');
+    t.eq(h[0].reason, 'both-changed', 'for the right reason');
+
+    t.includes(JSON.stringify(jobById(app, id).items), 'ZZLEAD-2',
+      'while this phone\u2019s own item stays exactly where it was');
+    t.eq(jobById(app, id).items.length, 2,
+      'and the open job is not rewritten under the engineer\u2019s thumb \u2014 deciding is not applying');
+  });
+
+  /* ------------------------------------------------------------------ 17r */
+  await t.group('17r — the open job says when something is waiting for it (decision 3A)', async () => {
+    const app = signedIn();
+    const local = sentJob(app, 'ZZWAITING');
+    const id = String(local.id);
+    app.fn('openSession')(id);
+    app.stopTimer();
+
+    // Deleted on the other device while this phone sits in it.
+    app.srv.cloud.push({ id, doc: {}, deleted: true, last_modified: T2, updated_at: T2 });
+    await app.fn('syncPull')();
+    await tick(5);
+
+    t.ok(jobById(app, id), 'the job is still here while it is open \u2014 it does not vanish mid-tap');
+    const html = app.fn('renderEntry')();
+    t.includes(html, 'Deleted on your other device',
+      'but the screen says so, instead of letting it disappear the moment you leave');
+
+    // And it does leave, once you do.
+    app.run('state.activeId = null');
+    await app.fn('syncPull')();
+    await tick(5);
+    t.notOk(jobById(app, id), 'once out of the job, the delete applies');
+    t.eq(app.state().sync.waiting, null,
+      'and the notice goes with it \u2014 a line that outlives what it described trains the engineer to ignore it');
+
+    // It must also never appear against a DIFFERENT job.
+    const other = sentJob(app, 'ZZUNRELATED');
+    app.fn('openSession')(other.id);
+    app.stopTimer();
+    t.excludes(app.fn('renderEntry')(), 'other device',
+      'and says nothing at all on a job with nothing waiting for it');
+
+    // The other half: a waiting change rather than a waiting delete.
+    const app2 = signedIn();
+    const l2 = sentJob(app2, 'ZZWAITING2');
+    const id2 = String(l2.id);
+    app2.srv.cloud.push(cloudJob(id2, 'ZZWAITING2', ['A', 'B', 'C'], T2));
+    app2.fn('openSession')(id2);
+    app2.stopTimer();
+    await app2.fn('syncPull')();
+    await tick(5);
+    t.eq(jobById(app2, id2).items.length, 1, 'the open job is untouched');
+    t.includes(app2.fn('renderEntry')(), 'other device',
+      'and says a change is waiting for it');
+  });
+
   /* ------------------------------------------------------------------ 17p */
-  await t.group('17p — the triggers that read, and the one that does not (decision 6A)', async () => {
+  await t.group('17p — every trigger reads before it writes (decision 2A)', async () => {
     const app = signedIn({ server: { rows: [cloudJob('ZZREOPEN', 'ZZREOPENSITE', ['A'])] } });
 
     // Reopening the app is a real listener, so drive the real event.
@@ -543,6 +633,7 @@ module.exports = async function () {
 
     // Sign-in is in cloud.js, not this file — source-guarded, because driving a
     // whole sign-in here would prove the sign-in flow, not the trigger.
+    // v81.1: the save trigger joined this list (decision 2A); 17m covers it.
     const cloudSrc = fs.readFileSync(path.join(APP_DIR, 'cloud.js'), 'utf8');
     t.includes(cloudSrc, 'syncPushSoon(0, { pull: true })',
       'signing in reads the account \u2014 the moment on a second phone when there is most to fetch');
