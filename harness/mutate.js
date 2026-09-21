@@ -514,8 +514,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V81';",
-    to:   "const APP_VERSION = 'V81';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V81.1';",
+    to:   "const APP_VERSION = 'V81.1';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -634,8 +634,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V79</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V79</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V78</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V80</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V80</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V79</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1210,11 +1210,11 @@ const MUTATIONS = [
     why:  'every job ever cleared floods back on the next pull, which is exactly what V80 decision 5A promised would not happen. The cloud is an archive by design, so the rows are all still there to come back',
   },
   {
-    name: 'M163 (V81) the pull rewrites the job that is open on screen',
+    name: 'M163 (V81.1) the pull rewrites the job that is open on screen',
     file: 'sync.js',
-    from: "    if (id === state.activeId) { blocked = true; return; }",
-    to:   "",
-    why:  'the items under the engineer\u2019s thumb change between one tap and the next, mid-job, with a keyboard open. Decision 7A, and the kind of fault that only ever shows up on a real site',
+    from: "      if (!isOpen) return false;",
+    to:   "      if (true) return false;",
+    why:  'the items under the engineer\u2019s thumb change between one tap and the next, mid-job, with a keyboard open. Decision 3A defers applying, and this is the line that defers it \u2014 the kind of fault that only ever shows up on a real site',
   },
   {
     name: 'M164 (V81) the cursor advances even when a row was left undecided',
@@ -1266,11 +1266,11 @@ const MUTATIONS = [
     why:  'the exact v69 defect, restored. Same array length, same session fields, so _sessionSig() sees no change and the STALE encoding is written back: the pulled change is on screen until the next reload and gone after it',
   },
   {
-    name: 'M171 (V81) saving on the logging hot path triggers a pull',
+    name: 'M171 (V81.1) saving pushes without reading first',
     file: 'sync.js',
-    from: "  syncPushSoon(SYNC_DEBOUNCE_MS);\n}",
-    to:   "  syncPushSoon(SYNC_DEBOUNCE_MS, { pull: true });\n}",
-    why:  'a download every few seconds all day while logging, for changes that can only have come from this phone. Decision 6A \u2014 it works, it is just wrong, which is why it needs an assertion rather than a bug report',
+    from: "  syncPushSoon(SYNC_DEBOUNCE_MS, { pull: true });",
+    to:   "  syncPushSoon(SYNC_DEBOUNCE_MS);",
+    why:  'the V81 behaviour, restored. The other phone pushes, this phone edits, and its debounce fires before anything has pulled \u2014 so it overwrites work it never saw, with no open job involved and no question raised. Decision 2A exists for exactly this window',
   },
   {
     name: 'M172 (V81) the held list carries whatever it is given',
@@ -1327,6 +1327,36 @@ const MUTATIONS = [
     from: "      syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true });",
     to:   "      syncPushSoon(SYNC_RESUME_DELAY_MS);",
     why:  'reopening is the trigger an engineer actually notices \u2014 it is how you check the other phone\u2019s work arrived. Push still works, so the failure is one-directional and easy to miss',
+  },
+
+  /* ---- V81.1: the two-phone overwrite ------------------------------------- */
+  {
+    name: 'M180 (V81.1) the open job is skipped before it is judged',
+    file: 'sync.js',
+    from: "    const isOpen = (id === state.activeId);",
+    to:   "    const isOpen = (id === state.activeId);\n    if (isOpen) { blocked = true; return; }",
+    why:  'the V81 bug Peter found on two real phones. Skipping the open job before anything is decided means it is never HELD \u2014 and an unheld job is one the push sends, unconditionally, over the other device\u2019s work. Deciding and applying are different things, and this collapses them back together',
+  },
+  {
+    name: 'M181 (V81.1) a held job carries no notice on the job screen',
+    file: 'render-core.js',
+    from: "      ${syncWaitingBanner()}\n",
+    to:   "",
+    why:  'the job sits there looking ordinary and then changes, or vanishes, the moment the engineer leaves it. Nothing is lost — which is exactly why it needs saying, because a silent correct outcome is indistinguishable from a fault',
+  },
+  {
+    name: 'M182 (V81.1) the waiting notice is never cleared',
+    file: 'sync.js',
+    from: "    state.sync.waiting = out.waiting || null;",
+    to:   "    if (out.waiting) state.sync.waiting = out.waiting;",
+    why:  'the notice sticks after the change has applied or the other device has undone it, so the job screen keeps promising something that already happened. Stale reassurance is worse than none — it trains the engineer to ignore the line',
+  },
+  {
+    name: 'M183 (V81.1) a deferred delete is applied under the engineer anyway',
+    file: 'sync.js',
+    from: "        if (defer('delete')) return;\n",
+    to:   "",
+    why:  'the job the engineer is standing in disappears mid-entry, taking the item being typed with it. The one case where applying immediately is most tempting and least safe',
   },
 
 ];
