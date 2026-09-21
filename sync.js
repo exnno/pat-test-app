@@ -373,13 +373,16 @@ function _syncValidDoc(doc, id) {
 // Called from saveSessions() on the logging hot path: a status check and a
 // timer reset, nothing more. Rapid logging keeps pushing the timer back, so a
 // push happens once the engineer pauses.
-// v81 decision 6A: a save deliberately does NOT schedule a pull. The change
-// being saved is this phone's own; there is nothing to fetch on its account.
-// Pulling on the logging hot path would also put a download between an
-// engineer's taps for no benefit.
+// ⚠ v81.1, decision 2A — this REVERSES V81's decision 6A, which had the save
+// trigger push without reading first. That left a window with no open job in
+// it at all: the other phone pushes, this phone edits, its five-second debounce
+// fires before anything has pulled, and it overwrites work it never saw. Every
+// run now reads before it writes, so a push can only ever follow a look. The
+// cost is one filtered request that returns nothing almost every time — small,
+// constant, and far cheaper than the failure it prevents.
 function syncNoteSave() {
   if (!syncActive()) return;
-  syncPushSoon(SYNC_DEBOUNCE_MS);
+  syncPushSoon(SYNC_DEBOUNCE_MS, { pull: true });
 }
 
 // opts.pull — read the cloud first, then send (sign-in, reopen, back online,
@@ -465,13 +468,27 @@ function _syncPull(c, uid, st, out) {
     // skips it for being held, and the job can never be sent again. Harness 17j.
     if (st.resend[id]) return;
 
-    // Decision 7A. Never the job on screen. Not held either: nobody needs to
-    // decide anything, they just need to finish what they are doing.
-    if (id === state.activeId) { blocked = true; return; }
+    // ⚠ v81.1, decision 1A. V81 skipped the open job HERE, before anything was
+    // decided — and the push half then sent it anyway, because a push is an
+    // unconditional overwrite. Two phones editing one job silently lost the
+    // other device's work (17q). The open job is now judged like any other: if
+    // it clashes it is HELD, which is what stops the push touching it. Only the
+    // APPLYING is deferred, at each of the three points below, because that is
+    // the part that would change what is under the engineer's thumb.
 
     const local = (state.sessions || []).find(s => s && String(s.id) === id);
     const tomb = (state.tombstones || []).some(t => t && t.kind === 'session' && String(t.id) === id);
     const name = (local && local.site) || (row.doc && row.doc.site) || '';
+    const isOpen = (id === state.activeId);
+
+    // Decision 3A: defer, and say so on the entry screen. Returns true when the
+    // caller must stop — the change waits for the engineer to leave the job.
+    const defer = (kind) => {
+      if (!isOpen) return false;
+      blocked = true;
+      out.waiting = { id, kind };
+      return true;
+    };
 
     if (row.deleted === true) {
       if (!local) {
@@ -482,6 +499,7 @@ function _syncPull(c, uid, st, out) {
         return;
       }
       if (st.sent[id] === syncHash(JSON.stringify(local))) {
+        if (defer('delete')) return;
         _syncApplyRemoteDelete(id);
         delete st.sent[id];
         st.gone[id] = true;
@@ -553,6 +571,7 @@ function _syncPull(c, uid, st, out) {
       return;
     }
 
+    if (defer('update')) return;
     _syncReplaceSession(id, local, doc);
     st.sent[id] = hash;
     out.applied++; changed = true;
@@ -583,6 +602,9 @@ function _syncPull(c, uid, st, out) {
   }
 
   return page(since).then(() => {
+    // Recomputed every run, never accumulated: if the job was closed, or the
+    // other device undid whatever it did, the notice must go by itself.
+    state.sync.waiting = out.waiting || null;
     st.lastPullAt = new Date().toISOString();
     if (!blocked) st.pulledAt = high;
     _syncSave(st);
@@ -680,7 +702,7 @@ function _syncRun(o) {
     const uid = session && session.user ? session.user.id : '';
     if (!uid) { const e = new Error('not signed in'); e.syncStage = 'auth'; throw e; }
     const st = _syncStateFor(uid);
-    const pulled = { applied: 0, added: 0, removed: 0, held: 0 };
+    const pulled = { applied: 0, added: 0, removed: 0, held: 0, waiting: null };
     const first = opts.pull ? _syncPull(c, uid, st, pulled) : Promise.resolve();
     return first
       .then(() => _syncPushHalf(c, uid, st, !!opts.force))

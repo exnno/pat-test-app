@@ -8,10 +8,20 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Cloud track — V81 built (pull, jobs only), records next
+### Factory reset (Peter, V81.1) — needs its own spec round
+A guarded "reset this device" for handing a phone to another engineer, selling
+it, or resetting between tests. NOT a quick win: "reset" means at least three
+different things (data only / + settings / + cloud sign-in), and the easy-to-miss
+leftovers are the IndexedDB photo store and the sync bookkeeping keys
+(SYNC_STATE_KEY, SYNC_PRUNED_KEY, SYNC_HELD_KEY) — a half-reset phone that is
+still signed in would pull its old jobs straight back. Most destructive button in
+the app, so the confirm needs to be genuinely hard to hit by accident.
+
+### Cloud track — V81.1 built (pull + the two-phone fix), records next
 V78 ledger → V79 sign-in → V80 push → **V81 pull** (fingerprint decides, held
 jobs for anything it will not guess at, remote deletes applied, cursor stops at
-the first unresolved row). **Next: the remaining record kinds** (clients, sites,
+the first unresolved row) → **V81.1** (the open job is judged not skipped; every
+run reads before it writes; the job screen says what is waiting). **Next: the remaining record kinds** (clients, sites,
 presets, settings, instruments) → photos (+ the cross-account download isolation
 check) → status UI. Every cloud release runs `supabase/isolation-test.sql`
 (all PASS) before promotion to `Release`.

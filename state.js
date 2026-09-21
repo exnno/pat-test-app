@@ -256,7 +256,10 @@ let state = {
   //   resolving: v81 — the id of the held job whose decision is being carried
   //              out, so that one row can show a spinner without disabling
   //              every other decision on the page
-  sync: { busy: false, message: '', resolving: null },
+  //   waiting:   v81.1 — {id, kind} when a pulled change is being held back
+  //              because that job is open on screen (decision 3A). Recomputed
+  //              by every pull, so it clears itself when it stops being true.
+  sync: { busy: false, message: '', resolving: null, waiting: null },
   // v43: cloud pages visibility. cloudPagesRevealed is a transient per-session flag
   // set by long-pressing the About title; it resets when you navigate away from About
   // but persists if you open one of the cloud pages and return. Never persisted.

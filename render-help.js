@@ -64,17 +64,17 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v81: rolled forward — V81 on top, V78 dropped. -->
+      <!-- v8: rolling 3-version changelog. v81.1: rolled forward — V81.1 on top, V79 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V81.1</strong> &middot; September 2026</p>
+        <p class="muted">A fix for the invite-only cloud test, and nothing else. When the same job was being worked on in two places at once, one phone could overwrite the other's work without asking. It now notices, changes nothing, and asks which copy to keep. The job you have open on screen also tells you when something is waiting for it, instead of quietly changing or disappearing the moment you leave. If you're not in the cloud test, the app is exactly as it was.</p>
         <p><strong>V81</strong> &middot; September 2026</p>
         <p class="muted">Nothing changes for you. Another piece of the cloud version, switched on only for a small invite-only test: for those test accounts, jobs now travel both ways, so two phones on the same account keep up with each other. If the same job has been changed in two places at once, nothing on the phone is overwritten &mdash; it holds the job and asks which copy to keep. For everyone else the app is exactly as it was: nothing is sent anywhere, no account is needed, and it works the same with or without a signal.</p>
         <p><strong>V80</strong> &middot; September 2026</p>
         <p class="muted">Nothing changes for you. This release is the next piece of the cloud version, which is switched on only for a small invite-only test: for those test accounts, jobs are now copied from the phone to the cloud in the background. For everyone else the app is exactly as it was &mdash; nothing is sent anywhere, no account is needed, and it works the same with or without a signal.</p>
-        <p><strong>V79</strong> &middot; September 2026</p>
-        <p class="muted">Housekeeping you won't see, plus the first piece of the cloud version, switched off for everyone. Backups no longer include a leftover sign-in field from an old experiment &mdash; a backup is a file you email around, and it should never carry anything that looks like a login. Restoring an older backup that has one simply ignores it. Nothing about your jobs, clients, settings or reports has changed, nothing is sent anywhere, and the app works exactly as before with or without a signal.</p>
-                      </div>
+      </div>
 
       <div class="info-card">
         <h3>Set up another device</h3>

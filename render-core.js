@@ -1244,6 +1244,36 @@ function assetFieldHTML() {
     `${paired ? ' inputmode="none"' : ''}>`;
 }
 
+// v81.1, decision 3A. A change arrived from the other device for the job that
+// is open right now, and was deliberately held back rather than applied under
+// the engineer's thumb. Without this line the job simply changes — or vanishes —
+// the moment they leave it, which is what Peter hit in testing: a job deleted on
+// the other phone sat there looking alive, then disappeared on the way out.
+// Says nothing at all unless something really is waiting for THIS job.
+function syncWaitingBanner() {
+  const w = (state.sync && state.sync.waiting) || null;
+  const id = state.activeId;
+  if (!id) return '';
+
+  // A clash needing an answer outranks a waiting change: one is a question,
+  // the other is just a delay.
+  if (typeof syncHeldList === 'function') {
+    const stuck = syncHeldList().some(h => String(h.id) === String(id));
+    if (stuck) {
+      return '<div class="sync-waiting-banner">This job was changed on your other device too. '
+           + 'Nothing here has changed \u2014 pick which copy to keep on the Sync page.</div>';
+    }
+  }
+
+  if (!w || String(w.id) !== String(id)) return '';
+  if (w.kind === 'delete') {
+    return '<div class="sync-waiting-banner">Deleted on your other device. '
+         + 'It will be removed when you leave this job.</div>';
+  }
+  return '<div class="sync-waiting-banner">Changes from your other device are waiting. '
+       + 'They will apply when you leave this job.</div>';
+}
+
 function renderEntry() {
   const sess = activeSession();
   if (!sess) { state.view = 'sessions'; return renderSessions(); }
@@ -1646,6 +1676,7 @@ function renderEntry() {
       </header>
 
       ${lockBanner}
+      ${syncWaitingBanner()}
       ${progressRow}
 
       <label class="label">Asset number</label>
