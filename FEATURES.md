@@ -8,6 +8,9 @@ Every capability and release entry, one `##` section each.
 
 ---
 
+## Update now (V81.4)
+Cloud test only. When changes from your other device are waiting for the job you are in, the waiting line now has an **Update now** button, so you no longer have to leave the job and come back. Declined at V81.3 on the reasoning that you usually open a job *to* that message rather than halfway through logging — and then reversed after using it, because opening a job to the message is exactly when you want to act on it. A tap is you choosing the change, so it does not break the rule that nothing moves under your thumb uninvited. It is a single exception, not a standing one: the next change to that job waits again. And it is offered for updates only — a job deleted on your other device still waits for you to leave, because applying it would pull the screen out from under you.
+
 ## Leaving a job applies what was waiting for it (V81.3)
 Cloud test only. A change from the other device that arrives while you are in a job is held back, deliberately, so nothing moves under your thumb — and it was meant to apply the moment you left. It did not: going back to the jobs list left it waiting, and it only came through once you had opened some *other* job. Two causes, both small. The app remembers your last job after you leave it, and sync had been treating "your last job" as "the job on screen", so as far as it was concerned you never left; now only that job's entry screen counts as on screen. And the throttle that stops screen changes hammering the server was swallowing the very read that mattered, because you usually leave within seconds of arriving; leaving the job a change is waiting for is now never throttled. Considered and declined: an "Update now" button on the waiting line — you are almost always opening the job to that message rather than halfway through logging, so leaving is enough.
 

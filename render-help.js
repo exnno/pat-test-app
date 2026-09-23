@@ -64,17 +64,17 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v81.3: rolled forward — V81.3 on top, V81 dropped. -->
+      <!-- v8: rolling 3-version changelog. v81.4: rolled forward — V81.4 on top, V81.1 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V81.4</strong> &middot; September 2026</p>
+        <p class="muted">For the invite-only cloud test only. When changes from your other device are waiting for the job you're in, there's now an Update now button, so you don't have to leave the job and come back.</p>
         <p><strong>V81.3</strong> &middot; September 2026</p>
         <p class="muted">For the invite-only cloud test only. When a change from your other device is waiting for the job you're in, it now applies as soon as you leave that job, instead of only after you'd opened a different one.</p>
         <p><strong>V81.2</strong> &middot; September 2026</p>
         <p class="muted">Speed and polish for the invite-only cloud test. Changes from your other device now appear on screen by themselves, instead of only after you tapped between jobs; the app checks for them whenever you move around it, and quietly in the background if you sit still. It also no longer mistakes your own work coming back from the cloud for someone else's change. Nothing here affects you if you're not in the cloud test.</p>
-        <p><strong>V81.1</strong> &middot; September 2026</p>
-        <p class="muted">A fix for the invite-only cloud test, and nothing else. When the same job was being worked on in two places at once, one phone could overwrite the other's work without asking. It now notices, changes nothing, and asks which copy to keep. The job you have open on screen also tells you when something is waiting for it, instead of quietly changing or disappearing the moment you leave. If you're not in the cloud test, the app is exactly as it was.</p>
-                      </div>
+                              </div>
 
       <div class="info-card">
         <h3>Set up another device</h3>

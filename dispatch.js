@@ -787,6 +787,8 @@ registerActions({
   // arg is the job id: which copy of a held job wins (decision 2A).
   'sync-keep-phone':  (arg) => { if (typeof syncHeldResolve === 'function') syncHeldResolve(arg, 'phone'); },
   'sync-keep-cloud':  (arg) => { if (typeof syncHeldResolve === 'function') syncHeldResolve(arg, 'cloud'); },
+  // v81.4: "Update now" on the entry screen's waiting line.
+  'sync-apply-waiting': () => { if (typeof syncApplyWaiting === 'function') syncApplyWaiting(); },
 
   // v43: calibration reminder (Update button on the Sessions-screen cal banner)
   'edit-cal-date': () => {

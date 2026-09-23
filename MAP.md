@@ -574,7 +574,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~830 ln) — cloud sync, PUSH AND PULL — v80–v81.3
+### sync.js (~850 ln) — cloud sync, PUSH AND PULL — v80–v81.4
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session
@@ -615,6 +615,9 @@ focused or a sheet is open. Push results still repaint only the Sync page.
 activeId alone is NOT on screen — it survives going back to the jobs list (the
 app remembers your last job). Leaving the job a change waits for is never
 throttled in `syncNoteNav` (17x, M193, M194).
+⚠ v81.4: `syncApplyWaiting()` ("Update now" on the entry screen's waiting line,
+action `sync-apply-waiting`) sets `_syncAllowOpen` for ONE run and clears it
+however the run ends (M195). Updates only — never deletes (M196).
 ⚠ v81.1: the job on screen (`state.activeId`) is JUDGED like any other — only
 its APPLYING is deferred (`defer()`), and `state.sync.waiting` tells
 **render-core.js** `syncWaitingBanner()` to say so. V81 skipped it before
@@ -623,8 +626,8 @@ Deciding and applying are different things; do not collapse them (17q, M180).
 ⚠ Held and push are mutually exclusive: nothing held is sent, and nothing in
 `resend` is re-held. Break either half and the job can never sync again
 (M173, M176).
-Not probed at boot (optional subsystem). Harness 16a–16n and 17a–17x,
-mutations M142–M194.
+Not probed at boot (optional subsystem). Harness 16a–16n and 17a–17z,
+mutations M142–M197.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

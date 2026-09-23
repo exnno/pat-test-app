@@ -93,6 +93,7 @@ let _syncAgainForce = false;
 let _syncAgainPull = false;     // v81: …and that trigger wanted a pull
 let _syncLastNavPull = 0;       // v81.2: throttles the navigation trigger
 let _syncLastRunAt = 0;         // v81.2: when a run last finished, for the backstop
+let _syncAllowOpen = null;      // v81.4: the one open job the engineer asked to update
 
 // ---- gates -------------------------------------------------------------------
 // Signed in, on a host with a cloud. Offline is checked separately, because
@@ -561,6 +562,12 @@ function _syncPull(c, uid, st, out) {
     // caller must stop — the change waits for the engineer to leave the job.
     const defer = (kind) => {
       if (!isOpen) return false;
+      // v81.4. The engineer tapped "Update now" for THIS job, so the change is
+      // theirs to have, not something landing under their thumb uninvited.
+      // Updates only: a delete applied to the job being viewed would pull the
+      // screen out from under them, so a delete still waits for them to leave
+      // even if the row turned into one between the tap and the read (M196).
+      if (kind === 'update' && _syncAllowOpen === id) return false;
       blocked = true;
       out.waiting = { id, kind };
       return true;
@@ -874,6 +881,22 @@ function _syncPushHalf(c, uid, st, force) {
       return { sent, deleted };
     });
   });
+}
+
+// ---- "Update now" (v81.4) -----------------------------------------------------------
+// The button on the entry screen's "changes waiting" line. Reverses V81.3's 2B
+// after real use: opening a job to that message, the instinct was to reach for a
+// button, not to back out and come in again.
+//
+// The allowance is ONE-OFF and cleared however the run ends. Left standing, it
+// would quietly apply every later change to that job while it is open — which is
+// the very thing decision 7A exists to prevent (M195).
+function syncApplyWaiting() {
+  const w = state.sync && state.sync.waiting;
+  if (!w || w.kind !== 'update' || !syncActive()) return Promise.resolve(false);
+  _syncAllowOpen = String(w.id);
+  const clear = (v) => { _syncAllowOpen = null; return v; };
+  return syncPush({ manual: true, pull: true }).then(clear, (e) => { clear(); throw e; });
 }
 
 // ---- answering a held job ----------------------------------------------------------

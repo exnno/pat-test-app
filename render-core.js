@@ -1270,8 +1270,13 @@ function syncWaitingBanner() {
     return '<div class="sync-waiting-banner">Deleted on your other device. '
          + 'It will be removed when you leave this job.</div>';
   }
+  // v81.4: the button. Updates only — see syncApplyWaiting(). Disabled while a
+  // run is in flight, so a double tap cannot queue a second allowance.
+  const busy = !!(state.sync && state.sync.busy);
   return '<div class="sync-waiting-banner">Changes from your other device are waiting. '
-       + 'They will apply when you leave this job.</div>';
+       + 'They will apply when you leave this job. '
+       + '<button class="link-btn" data-action="sync-apply-waiting"' + (busy ? ' disabled' : '')
+       + ' style="margin-left:4px;font-weight:600">' + (busy ? 'Updating\u2026' : 'Update now') + '</button></div>';
 }
 
 function renderEntry() {
