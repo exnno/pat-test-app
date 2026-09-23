@@ -514,8 +514,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V81.2';",
-    to:   "const APP_VERSION = 'V81.2';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V81.3';",
+    to:   "const APP_VERSION = 'V81.3';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -634,8 +634,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V81</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V81</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V80</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V81.1</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V81.1</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V81</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1333,8 +1333,8 @@ const MUTATIONS = [
   {
     name: 'M180 (V81.1) the open job is skipped before it is judged',
     file: 'sync.js',
-    from: "    const isOpen = (id === state.activeId);",
-    to:   "    const isOpen = (id === state.activeId);\n    if (isOpen) { blocked = true; return; }",
+    from: "    const isOpen = (id === state.activeId && state.view === 'entry');",
+    to:   "    const isOpen = (id === state.activeId && state.view === 'entry');\n    if (isOpen) { blocked = true; return; }",
     why:  'the V81 bug Peter found on two real phones. Skipping the open job before anything is decided means it is never HELD \u2014 and an unheld job is one the push sends, unconditionally, over the other device\u2019s work. Deciding and applying are different things, and this collapses them back together',
   },
   {
@@ -1405,7 +1405,7 @@ const MUTATIONS = [
   {
     name: 'M190 (V81.2) every screen change reads the cloud, unthrottled',
     file: 'sync.js',
-    from: "  if (now - _syncLastNavPull < SYNC_NAV_THROTTLE_MS) return;",
+    from: "  if (!released && now - _syncLastNavPull < SYNC_NAV_THROTTLE_MS) return;",
     to:   "",
     why:  'tapping between jobs becomes a request each, so the busiest engineer pays the most battery \u2014 the modem never gets back to idle. Everything still works, which is why only an assertion finds it',
   },
@@ -1422,6 +1422,22 @@ const MUTATIONS = [
     from: "    if (state.view !== viewBefore && typeof syncNoteNav === 'function') {",
     to:   "    if (typeof syncNoteNav === 'function') {",
     why:  'every quick-pick tap and every toggle becomes a candidate read. The throttle hides most of it, which is exactly why it would never be noticed \u2014 it just quietly costs battery on the logging hot path',
+  },
+
+  /* ---- V81.3: leaving the job releases it -------------------------------- */
+  {
+    name: 'M193 (V81.3) "open" means the current job, not the job on screen',
+    file: 'sync.js',
+    from: "    const isOpen = (id === state.activeId && state.view === 'entry');",
+    to:   "    const isOpen = (id === state.activeId);",
+    why:  'V81.2 as Peter found it. activeId survives going back to the jobs list, so a change stays deferred for a job nobody is looking at, and releases only when some OTHER job is opened. It looks exactly like sync being slow',
+  },
+  {
+    name: 'M194 (V81.3) leaving the waiting job is throttled like any other tap',
+    file: 'sync.js',
+    from: "  if (!released && now - _syncLastNavPull < SYNC_NAV_THROTTLE_MS) return;",
+    to:   "  if (now - _syncLastNavPull < SYNC_NAV_THROTTLE_MS) return;",
+    why:  'the engineer almost always leaves within 20s of arriving, and arriving was itself a read — so the throttle swallows the one read that would apply the change. Close-and-reopen appears to fix it, which is why it reads as flakiness rather than a bug',
   },
 
 ];
