@@ -814,6 +814,46 @@ module.exports = async function () {
     t.ok(back.sent[id], 'while the original account still has its own');
   });
 
+  /* ------------------------------------------------------------------ 17x */
+  // v81.3, decision 1A. Peter's report: a change waiting for the job he was in
+  // did not apply when he went back to the jobs list — only after he opened a
+  // DIFFERENT job. state.activeId survives leaving (the app remembers your last
+  // job), and "open" had been taken to mean "current" rather than "on screen".
+  await t.group('17x — leaving the job releases the change waiting for it', async () => {
+    const app = signedIn();
+    const local = sentJob(app, 'ZZRELEASE');
+    const id = String(local.id);
+    app.srv.cloud.push(cloudJob(id, 'ZZRELEASE', ['A', 'B', 'C'], T2));
+
+    app.fn('openSession')(id);
+    app.stopTimer();
+    t.eq(app.state().view, 'entry', 'precondition: standing in the job');
+    await app.fn('syncPull')();
+    await tick(5);
+    t.eq(jobById(app, id).items.length, 1, 'while on its entry screen, the change waits');
+
+    // Back to the jobs list. activeId is NOT cleared — that is the app's normal
+    // behaviour, and exactly what made this bug.
+    app.fn('setView')('sessions');
+    app.stopTimer();
+    t.eq(String(app.state().activeId), id, 'precondition: the app still remembers it as the current job');
+
+    await app.fn('syncPull')();
+    await tick(5);
+    t.eq(jobById(app, id).items.length, 3,
+      'and on the jobs list it applies \u2014 without having to open a different job first');
+    t.eq(app.state().sync.waiting, null, 'with nothing left waiting');
+
+    // Source-guarded, for the reason 17u gives: the throttle bypass is a guard
+    // whose presence is the contract, and timing-based checks of it were flaky.
+    const src = fs.readFileSync(path.join(APP_DIR, 'sync.js'), 'utf8');
+    const nav = src.slice(src.indexOf('function syncNoteNav('), src.indexOf('// \u2026and the backstop'));
+    t.includes(nav, "const released = !!w && !(state.view === 'entry' && String(state.activeId) === String(w.id));",
+      'leaving the waiting job is recognised as releasing it');
+    t.includes(nav, 'if (!released && now - _syncLastNavPull < SYNC_NAV_THROTTLE_MS) return;',
+      'and that one screen change is never throttled \u2014 it is the read that matters most');
+  });
+
   /* ------------------------------------------------------------------ 17p */
   await t.group('17p — every trigger reads before it writes (decision 2A)', async () => {
     const app = signedIn({ server: { rows: [cloudJob('ZZREOPEN', 'ZZREOPENSITE', ['A'])] } });

@@ -325,7 +325,10 @@ module.exports = async function () {
     const rh  = fs.readFileSync(path.join(APP_DIR, 'render-help.js'), 'utf8');
     const ver = (cfg.match(/const APP_VERSION = '([^']+)'/) || [])[1];
     t.includes(mut, `from: "const APP_VERSION = '${ver}';"`, `M66 anchored on APP_VERSION ${ver}`);
-    const entries = rh.match(/<p><strong>V\d+<\/strong> &middot; [A-Za-z]+ \d{4}<\/p>/g) || [];
+    // v81.3: dotted versions, as 09w was widened at v81.1. This pattern survived
+    // two hotfixes only because an undotted entry was still at the bottom of the
+    // changelog; the first release where every entry is dotted, it found none.
+    const entries = rh.match(/<p><strong>V\d+(?:\.\d+)?<\/strong> &middot; [A-Za-z]+ \d{4}<\/p>/g) || [];
     const oldest = entries[entries.length - 1] || '(none)';
     t.includes(mut, `from: '        ${oldest}'`, `M82 anchored on the oldest changelog entry (${oldest})`);
   });
