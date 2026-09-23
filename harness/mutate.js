@@ -396,8 +396,8 @@ const MUTATIONS = [
   {
     name: 'M50 (D4) the delegated click handler stops catching action throws',
     file: 'dispatch.js',
-    from: '  try {\n    fn(arg, el, e);\n  } catch (err) {',
-    to:   '  if (true) {\n    fn(arg, el, e);\n  } else if (err) {',
+    from: '  try {\n    fn(arg, el, e);\n    if (state.view !== viewBefore',
+    to:   '  if (true) {\n    fn(arg, el, e);\n    if (state.view !== viewBefore',
     why:  'a throwing view renderer leaves state pointing at one screen while the previous screen is still on display, so the next tap runs the wrong actions',
   },
   {
@@ -514,8 +514,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V81.1';",
-    to:   "const APP_VERSION = 'V81.1';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V81.2';",
+    to:   "const APP_VERSION = 'V81.2';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -634,8 +634,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V80</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V80</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V79</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V81</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V81</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V80</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1127,7 +1127,7 @@ const MUTATIONS = [
   {
     name: 'M151 (V80) clearing ignores whether the cloud has the latest version',
     file: 'sync.js',
-    from: "    const ok = mine && s && st.sent[String(s.id)] === syncHash(JSON.stringify(s));",
+    from: "    const ok = mine && s && st.sent[String(s.id)] === syncHash(_syncCanonical(s));",
     to:   '    const ok = true;',
     why:  'decision 5A: clearing an unsent edit while signed in destroys the only copy of it',
   },
@@ -1282,8 +1282,8 @@ const MUTATIONS = [
   {
     name: 'M173 (V81) the push sends a job that is waiting on a decision',
     file: 'sync.js',
-    from: "      if (heldIds.has(id)) continue;\n      const json = JSON.stringify(s);",
-    to:   "      const json = JSON.stringify(s);",
+    from: "      if (heldIds.has(id)) continue;\n      // \u26a0 v81.2:",
+    to:   "      // \u26a0 v81.2:",
     why:  'the real bug 17k found during this release. The question is answered on the server, in this phone\u2019s favour, before anyone is asked \u2014 so choosing "use the cloud copy" fetches back what the push has just overwritten it with',
   },
   {
@@ -1357,6 +1357,71 @@ const MUTATIONS = [
     from: "        if (defer('delete')) return;\n",
     to:   "",
     why:  'the job the engineer is standing in disappears mid-entry, taking the item being typed with it. The one case where applying immediately is most tempting and least safe',
+  },
+
+  /* ---- V81.2: it has to reach the screen, and jsonb reorders keys --------- */
+  {
+    name: 'M184 (V81.2) the fingerprint is taken from the wire JSON, not the canonical form',
+    file: 'sync.js',
+    from: "      const hash = syncHash(_syncCanonical(s));",
+    to:   "      const hash = syncHash(json);",
+    why:  'the exact mistake V81.2 made on its first pass. The row is SENT as JSON.stringify and that is correct, but fingerprinting the same string makes every push disagree with every pull, for every job, for ever \u2014 because jsonb hands the keys back in another order',
+  },
+  {
+    name: 'M185 (V81.2) canonical JSON sorts only the top level',
+    file: 'sync.js',
+    from: "  if (Array.isArray(v)) return '[' + v.map(_syncCanonical).join(',') + ']';",
+    to:   "  if (Array.isArray(v)) return JSON.stringify(v);",
+    why:  'items are objects inside an array, so the reordering that actually bites is nested. A top-level-only sort looks right in a unit test and fixes nothing in the field',
+  },
+  {
+    name: 'M186 (V81.2) the hash marker never matches, so every job re-sends every run',
+    file: 'sync.js',
+    from: "           pulledAt: null, lastPullAt: null, hashV: SYNC_HASH_V };",
+    to:   "           pulledAt: null, lastPullAt: null, hashV: 0 };",
+    why:  'the stored marker can then never equal the current one, so every load throws away every fingerprint and every job is uploaded again on every single run \u2014 all day, on mobile data. The upgrade is meant to cost one round, not every round',
+  },
+  {
+    name: 'M187 (V81.2) a pull changes things but never repaints the screen',
+    file: 'sync.js',
+    from: "    if (changed || waitingMoved) _syncRepaintApp();",
+    to:   "",
+    why:  'V81.1 as Peter found it. Everything works and almost nothing shows: a deleted job sits in the list, the waiting banner never appears, and the fix is to tap between jobs until a render happens. Correct state that never reaches the screen is indistinguishable from a broken app',
+  },
+  {
+    name: 'M188 (V81.2) a repaint tears down a focused field',
+    file: 'sync.js',
+    from: "  if (!_syncSafeToRepaint()) { _syncRepaintWanted = true; return; }",
+    to:   "",
+    why:  'MAP rules 2/3. On iOS the keyboard goes down mid-entry and the half-typed asset number with it, at the exact moment an engineer is busiest. The reason pull results were confined to the Sync page for two releases',
+  },
+  {
+    name: 'M189 (V81.2) an unsafe repaint is dropped rather than owed',
+    file: 'sync.js',
+    from: "  if (!_syncSafeToRepaint()) { _syncRepaintWanted = true; return; }",
+    to:   "  if (!_syncSafeToRepaint()) { return; }",
+    why:  'subtler than M188 and the same outcome as V81.1: type in a field while a pull lands and the update never appears at all, because nothing remembers that it was owed',
+  },
+  {
+    name: 'M190 (V81.2) every screen change reads the cloud, unthrottled',
+    file: 'sync.js',
+    from: "  if (now - _syncLastNavPull < SYNC_NAV_THROTTLE_MS) return;",
+    to:   "",
+    why:  'tapping between jobs becomes a request each, so the busiest engineer pays the most battery \u2014 the modem never gets back to idle. Everything still works, which is why only an assertion finds it',
+  },
+  {
+    name: 'M191 (V81.2) the idle backstop runs in the background',
+    file: 'sync.js',
+    from: "  try { if (document.visibilityState === 'hidden') return; } catch { /* no document */ }",
+    to:   "",
+    why:  'the app keeps waking the radio all day from a pocket, for a screen nobody is looking at. The single worst thing a background timer can do to a phone that has to last a full day of testing',
+  },
+  {
+    name: 'M192 (V81.2) a screen change is read as any tap at all',
+    file: 'dispatch.js',
+    from: "    if (state.view !== viewBefore && typeof syncNoteNav === 'function') {",
+    to:   "    if (typeof syncNoteNav === 'function') {",
+    why:  'every quick-pick tap and every toggle becomes a candidate read. The throttle hides most of it, which is exactly why it would never be noticed \u2014 it just quietly costs battery on the logging hot path',
   },
 
 ];
