@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — config.js (constants & factories)
- * v82 (September 2026)
+ * v83 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V82';
+const APP_VERSION = 'V83';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -87,6 +87,13 @@ const ACTIVE_INSTRUMENT_KEY = 'pat:activeinstrument';
 // Cap on saved instruments (decision 6A). Enough for a sole trader with a spare
 // and a loaner; keeps the list a list rather than a database.
 const INSTRUMENTS_MAX = 5;
+// v83 (decision 4A): INSTRUMENTS_MAX is the ADD BUTTON's limit and nothing
+// else's. Two phones on one account can hold more than five between them, and
+// once they sync each has the lot. Cutting the list at five when it loads would
+// drop the sixth on every reopen, and the next sync would bring it straight
+// back — a loop that never settles, and a delete nobody made. This ceiling is
+// only a guard against a garbage value in storage or a hand-edited backup.
+const INSTRUMENTS_STORED_MAX = 100;
 // ---------- Welcome-modal "seen" key (v63: DERIVED, not version-named) ----------
 //
 // ⚠ READ THIS BEFORE ROLLING A WELCOME MODAL. It is now a ONE-LINE edit, in this
@@ -360,7 +367,20 @@ const SYNC_HELD_KEY = 'pat:syncHeld';       // v81: JSON [{id,at,reason,name,loc
 // compares the list it last read with against this one), so the new kind is read
 // from the beginning of the account rather than from wherever the old kinds had
 // reached. Rows of the old kinds come round again and resolve as no work.
-const SYNC_RECORD_KINDS = ['client', 'site'];
+// v83: instruments, presets and one settings row (the tester in use, decision
+// 1B) join them. The order here is only the order the push visits them in.
+const SYNC_RECORD_KINDS = ['client', 'site', 'instrument', 'preset', 'settings'];
+// v83: the settings rows this version understands. Settings travel as separate
+// small rows rather than one big one (V84 carries on in the same shape), so a
+// row id this version does not know is somebody newer's and is left alone.
+// ⚠ These ids are part of the cursor's tag, exactly like the kinds above: a
+// later version that adds one reads the whole account again, so a row pushed
+// before this phone understood it is never stranded behind the cursor.
+const SYNC_INUSE_ID = 'settings_instrument';   // { id, instrumentId }
+const SYNC_SETTINGS_IDS = [SYNC_INUSE_ID];
+// v83: screens a sync repaint must wait to leave — each holds unsaved typing in
+// fields that need not be focused (see _syncSafeToRepaint in sync.js).
+const SYNC_NO_REPAINT_VIEWS = ['settingsInstrument', 'settingsItems', 'settingsUser'];
 // v82 (decision 6A): the "What's different?" sheet lists at most this many
 // items per section, then says how many more there are.
 const SYNC_DIFF_LIST_MAX = 20;

@@ -162,12 +162,23 @@ const _encodedSessionCache = new WeakMap();
 // session EXCEPT its items array contents (those are guarded by the array-
 // reference identity check + the active-session always-re-encode rule). Pure
 // string concatenation of primitives — no object allocation, no JSON.stringify.
+//
+// ⚠ v83: THE INSTRUMENT FIELDS ARE PART OF THE SIGNATURE. Until V83 they were
+// not, and deleteInstrument() writes `instrumentSnapshot` onto every job that
+// used the instrument — in place, on jobs that are mostly NOT the active one.
+// Those jobs kept their cached encoding, so the frozen copy was never written
+// to disk, and after the next reopen they silently fell back to the instrument
+// in use today: the exact v66 defect the snapshot exists to prevent. It had been
+// that way since v66 (found speccing V83, harness 19a). The snapshot is only
+// ever set once and dropped whole (saveSessionEdits), so its PRESENCE is enough
+// here; its contents never change underneath a cached encoding.
 function _sessionSig(s) {
   return [
     s.id, s.name, s.site, s.engineer, s.prefix, s.date,
     s.startNumber, s.locked ? 1 : 0,
     s.exportedAt || '', s.exportDirty ? 1 : 0,
-    (s.items ? s.items.length : 0)
+    (s.items ? s.items.length : 0),
+    s.instrumentId || '', s.instrumentSnapshot ? 1 : 0
   ].join('\u0001');
 }
 
@@ -931,7 +942,9 @@ function save() {
 // Nothing in the app READS this ledger yet — that is the sync layer's job. It is
 // built now because the alternative is reconstructing deletions that were never
 // recorded, which cannot be done after the fact.
-const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset'];
+// v83: 'instrument' added. Widening is a superset — every ledger an older
+// version wrote still normalises exactly as it did.
+const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'instrument'];
 
 // Whitelisting validator. Used on both read and write, so a hand-edited or
 // corrupted value collapses to a clean list rather than propagating.

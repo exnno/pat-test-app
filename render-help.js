@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA
- * v82 (September 2026)
+ * v83 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -64,16 +64,16 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v82: rolled forward — V82 on top, V81.2 dropped. -->
+      <!-- v8: rolling 3-version changelog. v83: rolled forward — V83 on top, V81.3 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V83</strong> &middot; September 2026</p>
+        <p class="muted">Fixes a bug where deleting a test instrument could leave older jobs showing your current tester on their certificates after the app was reopened. For the invite-only cloud test: your instruments and item presets now travel between your devices too, along with which tester is in use.</p>
         <p><strong>V82</strong> &middot; September 2026</p>
         <p class="muted">For the invite-only cloud test only. Your clients and sites now travel between your devices as well as your jobs. When the app can't decide which copy of something to keep, the Sync page now shows you what's actually different, and each button says exactly what it will do.</p>
         <p><strong>V81.4</strong> &middot; September 2026</p>
         <p class="muted">For the invite-only cloud test only. When changes from your other device are waiting for the job you're in, there's now an Update now button, so you don't have to leave the job and come back.</p>
-        <p><strong>V81.3</strong> &middot; September 2026</p>
-        <p class="muted">For the invite-only cloud test only. When a change from your other device is waiting for the job you're in, it now applies as soon as you leave that job, instead of only after you'd opened a different one.</p>
                               </div>
 
       <div class="info-card">
@@ -411,6 +411,9 @@ function renderCloudSync() {
       </div>`;
   } else {
     const sum = syncStatusSummary();
+    // v83 (decision 1B): which tester is in use now travels, so say which it is.
+    const inUseInst = (typeof activeInstrument === 'function') ? activeInstrument() : null;
+    const inUse = inUseInst ? instrumentDisplayName(inUseInst) : '';
     const busy = !!sy.busy;
     const dis = busy ? 'disabled' : '';
     const stamp = (v) => v
@@ -422,6 +425,8 @@ function renderCloudSync() {
         <h3>Jobs</h3>
         <p id="sync-counts"><strong>${sum.upToDate}</strong> of ${sum.total} job${sum.total === 1 ? '' : 's'} in the cloud and up to date${sum.waiting ? ` &middot; <strong>${sum.waiting}</strong> waiting to send` : ''}</p>
         ${sum.recTotal ? `<p id="sync-rec-counts" style="font-size:14px">Clients &amp; sites: <strong>${sum.recUpToDate}</strong> of ${sum.recTotal} up to date</p>` : ''}
+        ${sum.listTotal ? `<p id="sync-list-counts" style="font-size:14px">Instruments &amp; presets: <strong>${sum.listUpToDate}</strong> of ${sum.listTotal} up to date</p>` : ''}
+        ${inUse ? `<p class="muted" id="sync-inuse" style="font-size:13px">Tester in use: <strong>${escapeHTML(inUse)}</strong> &mdash; the same on each of your devices</p>` : ''}
         <p class="muted" id="sync-last" style="font-size:13px">Last sent: ${stamp(sum.lastPushAt)}</p>
         <p class="muted" id="sync-last-pull" style="font-size:13px">Last checked: ${stamp(sum.lastPullAt)}</p>
         ${msg}
@@ -436,7 +441,7 @@ function renderCloudSync() {
       ${renderSettingsSubHeader('Sync')}
       <div class="info-card">
         <h2>Sync (test)</h2>
-        <p class="muted" style="font-size:12px">Jobs, and your client and site lists, are copied both ways between this phone and the cloud: sent a few seconds after you stop logging, and checked for whenever you sign in, reopen the app or get signal back. The example job is never sent. Deleting a job, client or site deletes it on your other device too; clearing old jobs only removes them from this phone, and the cloud keeps them. Photos don't travel yet, so a job that arrives from another device will show its photos as missing. This phone is still the master copy &mdash; keep making backups as normal.</p>
+        <p class="muted" style="font-size:12px">Jobs, your clients and sites, your test instruments and item presets, and which tester is in use are copied both ways between this phone and the cloud: sent a few seconds after you stop logging, and checked for whenever you sign in, reopen the app or get signal back. Which preset is in use stays separate on each device. The example job is never sent. Deleting a job, client, site, instrument or preset deletes it on your other device too; jobs that used a deleted instrument keep their own copy of its details. Clearing old jobs only removes them from this phone, and the cloud keeps them. Photos don't travel yet, so a job that arrives from another device will show its photos as missing. This phone is still the master copy &mdash; keep making backups as normal.</p>
       </div>
       ${body}
     </div>
@@ -540,18 +545,68 @@ function renderSyncHeld(sy) {
       </div>`;
   };
 
+  // v83: instruments, presets and the tester in use. Same answers, worded for
+  // what each is. Changed-on-both cards list the fields that differ (h.diffs),
+  // because "changed" alone is no help deciding which calibration date is right.
+  const blank = (v) => (v == null || v === '') ? '<span class="muted">blank</span>' : `<strong>${escapeHTML(v)}</strong>`;
+  const listRow = (h) => {
+    const key = keyOf(h);
+    const dis = resolving === key ? 'disabled' : '';
+    const isInst = h.kind === 'instrument', isPreset = h.kind === 'preset', isUse = h.kind === 'settings';
+    const tag = isInst ? 'Instrument' : (isPreset ? 'Preset' : 'Tester in use');
+    const title = isUse ? '' : (h.name ? escapeHTML(h.name) : (isInst ? 'Unnamed instrument' : 'Unnamed preset'));
+    const lines = [];
+    let phone = 'Keep this phone\u2019s', cloud = 'Use the cloud\u2019s';
+    if (h.reason === 'deleted-elsewhere') {
+      if (h.inUse) {
+        lines.push('Deleted on your other device &mdash; and it\u2019s the tester this phone is using. Keep it, or delete it here too and this phone moves to your next instrument.');
+      } else if (h.onlyOne) {
+        lines.push('Deleted on your other device, but it\u2019s the only preset on this phone, and there must always be one.');
+      } else {
+        lines.push('Deleted on your other device, but changed on this phone first.');
+      }
+      if (isInst) lines.push('Jobs that used it keep their own copy of its details either way.');
+      phone = 'Keep it here'; cloud = h.onlyOne ? '' : 'Delete it here too';
+    } else if (h.reason === 'deleted-here') {
+      lines.push('You deleted this on this phone, but your other device still has it.');
+      phone = 'Keep it deleted'; cloud = 'Bring it back';
+    } else if (h.reason === 'unreadable') {
+      lines.push('The cloud copy can\u2019t be read. Nothing on this phone has been touched.');
+      phone = 'Replace the cloud copy with this phone\u2019s'; cloud = '';
+    } else if (isUse) {
+      lines.push(`You switched tester on this phone and on your other device. This phone: ${blank(h.localName)} &middot; other device: ${h.cloudName == null ? 'a tester not on this phone yet' : blank(h.cloudName)}`);
+      phone = h.localName ? 'Use ' + escapeHTML(h.localName) : phone;
+      cloud = h.cloudName ? 'Use ' + escapeHTML(h.cloudName) : cloud;
+    } else {
+      lines.push('Changed on this phone and on your other device.');
+      for (const f of (h.diffs || [])) {
+        lines.push(`${escapeHTML(f.label)} &mdash; this phone: ${blank(f.here)} &middot; cloud: ${blank(f.cloud)}`);
+      }
+    }
+    return `
+      <div class="info-card sync-held-row" data-held-id="${escapeHTML(key)}" style="margin-top:8px">
+        <p><span class="muted" style="font-size:12px">${tag}</span>${title ? `<br><strong>${title}</strong>` : ''}</p>
+        ${lines.map(l => `<p class="muted" style="font-size:13px">${l}</p>`).join('')}
+        ${btns(key, dis, phone, cloud)}
+      </div>`;
+  };
+
   const jobs = held.filter(h => !h.kind || h.kind === 'session');
-  const recs = held.filter(h => h.kind && h.kind !== 'session');
+  const recs = held.filter(h => h.kind === 'client' || h.kind === 'site');
+  const lists = held.filter(h => h.kind && h.kind !== 'session' && h.kind !== 'client' && h.kind !== 'site');
+  const groups = (jobs.length ? 1 : 0) + (recs.length ? 1 : 0) + (lists.length ? 1 : 0);
   const sub = (id, text) => `<h4 id="${id}" style="margin:14px 0 0;font-size:14px">${text}</h4>`;
   return `
     <div class="info-card" id="sync-held" style="margin-top:12px">
       <h3>Needs a decision</h3>
       <p class="muted" style="font-size:13px">Nothing has been changed on this phone. ${held.length === 1 ? 'This one' : 'These'} couldn\u2019t be settled automatically without the risk of losing work, so choose which copy to keep.</p>
     </div>
-    ${jobs.length && recs.length ? sub('sync-held-jobs', 'Jobs') : ''}
+    ${jobs.length && groups > 1 ? sub('sync-held-jobs', 'Jobs') : ''}
     ${jobs.map(jobRow).join('')}
     ${recs.length ? sub('sync-held-records', 'Clients &amp; sites') : ''}
-    ${recs.map(recRow).join('')}`;
+    ${recs.map(recRow).join('')}
+    ${lists.length ? sub('sync-held-lists', 'Instruments &amp; presets') : ''}
+    ${lists.map(listRow).join('')}`;
 }
 
 // v82 (decision 6A): the read-only comparison for one held job. Built from the

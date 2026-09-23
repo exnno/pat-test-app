@@ -1,6 +1,14 @@
 // ============== PATGo PWA — v66 — Test instruments ==============
 // (c) 2026 Peter Birchley. All rights reserved.
 //
+// v83: instruments sync (sync.js). Three changes here, all small:
+//   • deleteInstrument() records a ledger entry, so the delete can travel;
+//   • the freeze onto referencing jobs is ONE helper (freezeInstrumentOntoJobs),
+//     shared with sync.js's remote delete, so the two can never drift apart;
+//   • loading and restoring no longer cut the list at INSTRUMENTS_MAX. That cap
+//     is the Add button's, and two synced phones can legitimately hold more
+//     between them. See INSTRUMENTS_STORED_MAX (config.js) for why.
+//
 // WHAT THIS FILE OWNS
 // A list of PAT testers (up to INSTRUMENTS_MAX), one of them "in use", and the
 // rule that decides WHICH instrument a given job's certificate should name.
@@ -271,7 +279,7 @@ function loadInstruments() {
   if (typeof raw === 'string' && raw) {
     try {
       const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed)) list = parsed.map(makeInstrument).slice(0, INSTRUMENTS_MAX);
+      if (Array.isArray(parsed)) list = parsed.map(makeInstrument).slice(0, INSTRUMENTS_STORED_MAX);
     } catch (e) {
       list = [];
     }
@@ -324,7 +332,7 @@ function saveInstruments() {
 // therefore restores to a single instrument built from its own tester details.
 function restoreInstrumentsFromBackup(data) {
   if (data && Array.isArray(data.instruments)) {
-    state.instruments = data.instruments.map(makeInstrument).slice(0, INSTRUMENTS_MAX);
+    state.instruments = data.instruments.map(makeInstrument).slice(0, INSTRUMENTS_STORED_MAX);
     const wanted = typeof data.activeInstrumentId === 'string' ? data.activeInstrumentId : '';
     state.activeInstrumentId = state.instruments.some(i => i.id === wanted)
       ? wanted
@@ -352,6 +360,44 @@ function pruneBlankInstruments() {
     state.activeInstrumentId = kept.length ? kept[0].id : '';
   }
   syncActiveInstrumentMirror();
+}
+
+// ---------- v83: the frozen copy, shared with sync.js ----------
+
+// The five certificate fields and nothing else — no id, because the copy stands
+// in for an instrument that no longer exists (tier 2 of instrumentForSession).
+function instrumentSnapshotOf(inst) {
+  const i = inst || {};
+  return {
+    make: typeof i.make === 'string' ? i.make : '',
+    model: typeof i.model === 'string' ? i.model : '',
+    calDate: typeof i.calDate === 'string' ? i.calDate : '',
+    calCertNo: typeof i.calCertNo === 'string' ? i.calCertNo : '',
+    calDue: typeof i.calDue === 'string' ? i.calDue : ''
+  };
+}
+
+// Writes the frozen copy onto every job stamped with `id` that has none yet.
+// Returns how many jobs it wrote to. Used by deleteInstrument() here and by
+// sync.js when the delete arrives from the other phone, so the two paths are
+// one path.
+//
+// ⚠ Edits the job objects IN PLACE, deliberately, including the job on screen:
+// swapping the open job's object under the engineer's thumb is the thing sync.js
+// refuses to do (decision 7A), and a frozen copy changes nothing he can see.
+// That is only safe because _sessionSig() (storage.js) covers the instrument
+// fields from V83 — before that, this write never reached the disk for any job
+// but the open one.
+function freezeInstrumentOntoJobs(id, snap) {
+  if (!id || !snap) return 0;
+  let n = 0;
+  (state.sessions || []).forEach(s => {
+    if (s && s.instrumentId === id && !s.instrumentSnapshot) {
+      s.instrumentSnapshot = instrumentSnapshotOf(snap);
+      n++;
+    }
+  });
+  return n;
 }
 
 // ---------- CRUD ----------
@@ -442,18 +488,8 @@ function deleteInstrument(id) {
       // ⚠ Freeze a copy onto every job that used it BEFORE removing it, or those
       // certificates silently fall back to today's instrument — the exact defect
       // v66 exists to fix.
-      const snap = {
-        make: inst.make,
-        model: inst.model,
-        calDate: inst.calDate,
-        calCertNo: inst.calCertNo,
-        calDue: inst.calDue
-      };
-      (state.sessions || []).forEach(s => {
-        if (s && s.instrumentId === id && !s.instrumentSnapshot) {
-          s.instrumentSnapshot = { ...snap };
-        }
-      });
+      freezeInstrumentOntoJobs(id, instrumentSnapshotOf(inst));
+      recordTombstone('instrument', id);   // v83: before the removal (MAP rule 5)
       state.instruments = instrumentList().filter(i => i.id !== id);
       if (state.activeInstrumentId === id) {
         state.activeInstrumentId = state.instruments.length ? state.instruments[0].id : '';

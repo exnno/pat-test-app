@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — sync.js (cloud sync: push and pull)
- * v82 (September 2026)
+ * v83 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -19,6 +19,19 @@
  * tidy-up of decision 4A). Held entries now carry a `kind`; an entry written by
  * V81 has none and reads as a job. And the Sync page can now show what actually
  * differs between the two copies of a held job (syncJobDiff / syncHeldDiff).
+ *
+ * V83: INSTRUMENTS, PRESETS and THE TESTER IN USE, through the same `records`
+ * machinery. What is new, and why, is in the "v83" notes beside the code; the
+ * short version:
+ *   • a tester deleted on the other phone freezes its details onto this phone's
+ *     jobs, as a local delete does — but AFTER the jobs have been read, so jobs
+ *     that arrive already frozen are not mistaken for jobs edited here too;
+ *   • the tester this phone is using is never deleted from under it without
+ *     asking (decision 2A);
+ *   • which tester is in use travels as a settings row (decision 1B), applied
+ *     last, and a phone that has never sent one takes the account's;
+ *   • a new phone's untouched starter preset is set aside when the account's
+ *     presets arrive (decision 5A). Which PRESET is in use stays per phone (7A).
  *
  * ⚠ THIS FILE NOW WRITES APP DATA. Through V80 it only ever read state and
  * wrote its own keys. From V81 the pull adds, replaces and deletes jobs, which
@@ -154,8 +167,18 @@ function _syncEmpty(userId) {
            rec: _syncRecEmpty() };
 }
 
+// v83: two more fields.
+//   freeze — instruments deleted on the other phone whose details are still to be
+//            frozen onto this phone's jobs: {instrumentId: {make, model, …}}.
+//            This phone's OWN copy of the instrument, taken as it is removed —
+//            never the cloud document. Written by the records pull, emptied by
+//            _syncFreezePending() once the jobs have been read. See there.
+//   inUse  — the tester-in-use value both sides last agreed on (sent, or
+//            applied): an instrument id, '' for none, null for never. It is
+//            what tells a switch made HERE from one made for this phone when the
+//            agreed tester was deleted (decision 1B). This phone's own value.
 function _syncRecEmpty() {
-  return { sent: {}, gone: {}, resend: {}, pulledAt: null, kinds: '' };
+  return { sent: {}, gone: {}, resend: {}, pulledAt: null, kinds: '', freeze: {}, inUse: null };
 }
 
 function _syncLoad() {
@@ -194,6 +217,17 @@ function _syncLoad() {
     trueMap(rr.resend, r.resend);
     if (typeof rr.pulledAt === 'string' && !isNaN(Date.parse(rr.pulledAt))) r.pulledAt = rr.pulledAt;
     if (typeof rr.kinds === 'string') r.kinds = rr.kinds;
+    // v83. A frozen copy is only ever five short strings; anything else is
+    // garbage and is dropped rather than written onto a job.
+    if (rr.freeze && typeof rr.freeze === 'object' && !Array.isArray(rr.freeze)) {
+      for (const k of Object.keys(rr.freeze)) {
+        const f = rr.freeze[k];
+        if (!f || typeof f !== 'object' || Array.isArray(f)) continue;
+        const ok = ['make', 'model', 'calDate', 'calCertNo', 'calDue'].every(x => f[x] === undefined || typeof f[x] === 'string');
+        if (ok) r.freeze[k] = f;
+      }
+    }
+    if (typeof rr.inUse === 'string') r.inUse = rr.inUse;
   }
   if (raw.hashV !== SYNC_HASH_V) { out.sent = {}; out.rec.sent = {}; }
   else out.hashV = SYNC_HASH_V;
@@ -228,17 +262,23 @@ function syncStatusSummary() {
     if (st.sent[String(s.id)] === syncHash(_syncCanonical(s))) upToDate++;
   }
   // v82: clients and sites, counted together — the page shows one line for them.
-  let recTotal = 0, recUpToDate = 0;
+  // v83: instruments and presets get a second line. The tester-in-use row is
+  // counted in neither: it is not something on either list, and a count that
+  // includes an invisible row is a count nobody can check.
+  let recTotal = 0, recUpToDate = 0, listTotal = 0, listUpToDate = 0;
   for (const kind of SYNC_RECORD_KINDS) {
+    if (kind === 'settings') continue;
+    const cs = _syncRecordGroup(kind) === 'cs';
     for (const r of _syncRecordList(kind)) {
       if (!r || r.id == null || r.id === '') continue;
-      recTotal++;
-      if (st.rec.sent[String(r.id)] === _syncRecordHash(kind, r)) recUpToDate++;
+      const ok = st.rec.sent[String(r.id)] === _syncRecordHash(kind, r);
+      if (cs) { recTotal++; if (ok) recUpToDate++; }
+      else { listTotal++; if (ok) listUpToDate++; }
     }
   }
   return {
     total: jobs.length, upToDate, waiting: jobs.length - upToDate,
-    recTotal, recUpToDate,
+    recTotal, recUpToDate, listTotal, listUpToDate,
     lastPushAt: st.lastPushAt,
     // v81
     lastPullAt: st.lastPullAt,
@@ -354,6 +394,17 @@ function syncPrunedMerge(incoming) {
 // APPLIED is never the stored copy. Jobs still store counts only.
 // A parent of '' means "no client"; null means "a client this phone doesn't have".
 //
+// v83: instruments, presets and the tester in use. Same two name fields, plus:
+//   diffs  — for a record changed on both sides, the fields that differ, as
+//            short display text: [{label, here, cloud}]. The 7A loosening again,
+//            for the same reasons and no further: a few clipped strings,
+//            refreshed on every re-read, never what is applied. Without it an
+//            instrument whose calibration date changed on both phones would be
+//            a card saying "changed" and nothing else (Peter, V82 3A).
+//   inUse  — an instrument deleted elsewhere that this phone is USING (2A).
+//   onlyOne — a preset deleted elsewhere that is this phone's last (there must
+//            always be one), so the card offers only "Keep it".
+//
 // NOT held, because they need no decision and resolve themselves: a row for the
 // job on screen (decision 7A) and anything already in SYNC_PRUNED_KEY. Both are
 // simply skipped for the run, which holds the cursor, and retried on the next.
@@ -391,6 +442,16 @@ function _syncHeldNormalise(list) {
         entry.localParent = txt(e.localParent);
         entry.cloudParent = txt(e.cloudParent);
       }
+      if (Array.isArray(e.diffs)) {
+        const d = [];
+        for (const f of e.diffs.slice(0, 8)) {
+          if (!f || typeof f !== 'object' || typeof f.label !== 'string') continue;
+          d.push({ label: f.label.slice(0, 40), here: txt(f.here), cloud: txt(f.cloud) });
+        }
+        if (d.length) entry.diffs = d;
+      }
+      if (kind === 'instrument' && e.inUse === true) entry.inUse = true;
+      if (kind === 'preset' && e.onlyOne === true) entry.onlyOne = true;
     }
     out.push(entry);
   }
@@ -552,6 +613,9 @@ function syncPushSoon(ms, opts) {
 // the first paint. On a host with no cloud this registers nothing at all.
 function syncBoot() {
   if (typeof cloudAvailable !== 'function' || !cloudAvailable()) return;
+  // v83: copies owed by a run that never finished (app closed between reading
+  // the records and reading the jobs). Late is better than a wrong certificate.
+  try { _syncFreezePending(_syncLoad()); } catch (e) { console.error('Sync: pending instrument copies not written (non-fatal).', e); }
   try {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') return;
@@ -867,25 +931,42 @@ function _syncOutcome(r) {
   if (r.sent) bits.push((bits.length ? 'sent ' : 'Sent ') + plural(r.sent, 'job', 'jobs'));
   if (r.deleted) bits.push((bits.length ? 'sent ' : 'Sent ') + plural(r.deleted, 'deletion', 'deletions'));
 
+  // v83: the records counts come split by heading (cs / ip). A result without
+  // the split — V82's shape — is all clients and sites.
+  const ok = rr && !rr.error;
+  const cs = ok ? (rr.cs || { in: rr.added + rr.applied + rr.removed, out: rr.sent + rr.deleted, held: rr.held || 0 }) : null;
+  const ip = ok ? (rr.ip || { in: 0, out: 0, held: 0 }) : null;
   const rec = [];
-  if (rr && !rr.error) {
-    const inN = rr.added + rr.applied + rr.removed;
-    const outN = rr.sent + rr.deleted;
+  if (ok) {
+    const inN = cs.in;
+    const outN = cs.out;
     if (inN) rec.push(plural(inN, 'change', 'changes') + ' brought in');
     if (outN) rec.push(plural(outN, 'change', 'changes') + ' sent');
     if (rr.unassigned) rec.push(plural(rr.unassigned, 'site', 'sites') + ' moved to Unassigned because the client was deleted on your other device');
   }
+  const lists = [];
+  if (ok) {
+    if (ip.in) lists.push(plural(ip.in, 'change', 'changes') + ' brought in');
+    if (ip.out) lists.push(plural(ip.out, 'change', 'changes') + ' sent');
+  }
 
   let msg = bits.length ? bits.join(', ') + '.' : '';
   if (rec.length) msg += (msg ? ' ' : '') + 'Clients & sites: ' + rec.join(', ') + '.';
+  if (lists.length) msg += (msg ? ' ' : '') + 'Instruments & presets: ' + lists.join(', ') + '.';
+  if (ok && rr.inUseNow) msg += (msg ? ' ' : '') + 'The tester in use is now ' + rr.inUseNow + ', as chosen on your other device.';
   if (!msg) msg = 'Everything was already up to date.';
   if (rr && rr.error) {
-    msg += ' Clients & sites couldn\u2019t be checked this time \u2014 they\u2019re safe on this phone and will be tried again.';
+    msg += ' Clients, sites, instruments and presets couldn\u2019t be checked this time \u2014 they\u2019re safe on this phone and will be tried again.';
   }
 
   const hJobs = p.held || 0;
-  const hRec = (rr && !rr.error && rr.held) || 0;
-  if (hJobs && hRec) {
+  const hRec = ok ? (cs.held || 0) : 0;
+  const hList = ok ? (ip.held || 0) : 0;
+  if (hList && (hJobs || hRec)) {
+    msg += ' Several things need you to decide \u2014 see below.';
+  } else if (hList) {
+    msg += ' ' + plural(hList, 'instrument or preset needs', 'instruments or presets need') + ' you to decide \u2014 see below.';
+  } else if (hJobs && hRec) {
     msg += ' Some jobs and some clients or sites need you to decide \u2014 see below.';
   } else if (hJobs) {
     msg += ' ' + plural(hJobs, 'job needs', 'jobs need') + ' you to decide \u2014 see below.';
@@ -913,7 +994,13 @@ function _syncRun(o) {
     const recs = opts.pull ? _syncRecordsHalf(c, uid, st) : Promise.resolve(null);
     return recs.then((records) => {
       const first = opts.pull ? _syncPull(c, uid, st, pulled) : Promise.resolve();
+      // v83: instruments deleted on the other phone are frozen onto this phone's
+      // jobs HERE — after the jobs were read, before they are sent. See the v83
+      // note on records. Failed read or not, the copies are written: a job left
+      // pointing at an instrument that is gone prints today's tester.
+      const freeze = () => { _syncFreezePending(st); };
       return first
+        .then(freeze, (e) => { freeze(); throw e; })
         .then(() => _syncPushHalf(c, uid, st, !!opts.force))
         .then((r) => ({ sent: r.sent, deleted: r.deleted, pulled, records }));
     });
@@ -1038,21 +1125,91 @@ function _syncPushHalf(c, uid, st, force) {
 // the cloud row is hashed through the same projection, so an unknown field is
 // invisible to it rather than a difference that can never be settled.
 
+// ---- v83: instruments, presets and the tester in use ---------------------------------
+// Same machine again. What each adds, beyond "another list":
+//
+//   instrument — a delete from the other phone freezes the instrument's details
+//     onto this phone's jobs, exactly as deleteInstrument() does, through the SAME
+//     helper (freezeInstrumentOntoJobs, instruments.js). ⚠ The freeze waits until
+//     the JOBS have been read (_syncFreezePending, called from _syncRun). The
+//     phone that deleted the instrument froze its own copies of those jobs, and
+//     they arrive in this run already carrying the copy. Freezing here first
+//     would make every one of them look edited on this phone too, and any the
+//     other phone had also changed would be held as a clash nobody made.
+//     Decision 2A: the tester this phone is using is never deleted without
+//     asking. The one open in the editor is never replaced or deleted under it
+//     (its Save writes every field back).
+//   preset — which preset is in use is per phone (decision 7A), so presets
+//     travel and the choice does not. A delete never takes a phone's last one.
+//     Decision 5A: a new phone's untouched starter "Default" is set aside when
+//     the account's presets arrive.
+//   settings — ONE row, SYNC_INUSE_ID: which tester is in use (decision 1B). Not
+//     a list: _syncRecordList builds it fresh from state each time, and every
+//     path that would add to, replace in or delete from a list special-cases it.
+
+// Which heading a kind sits under on the Sync page: 'cs' clients & sites,
+// 'ip' instruments & presets (the tester in use with them).
+function _syncRecordGroup(kind) {
+  return (kind === 'client' || kind === 'site') ? 'cs' : 'ip';
+}
+
+// What the records cursor was read WITH. Kinds and settings ids both: adding
+// either reads the account from the beginning (see SYNC_SETTINGS_IDS).
+function _syncRecordKindsTag() {
+  return SYNC_RECORD_KINDS.join(',') + '|' + SYNC_SETTINGS_IDS.join(',');
+}
+
+function _syncInUseRecord() {
+  return { id: SYNC_INUSE_ID, instrumentId: String(state.activeInstrumentId || '') };
+}
+
+// The instrument new jobs are actually stamped with, as far as the rest of the
+// app is concerned — activeInstrument() already falls back from a stale id.
+function _syncInUseId() {
+  const a = (typeof activeInstrument === 'function') ? activeInstrument() : null;
+  return a ? String(a.id) : '';
+}
+
+function _syncInstrumentName(id) {
+  const i = (id && typeof findInstrument === 'function') ? findInstrument(String(id)) : null;
+  return i ? instrumentDisplayName(i) : null;
+}
+
 function _syncRecordList(kind) {
   if (kind === 'client') return state.clients || [];
   if (kind === 'site') return state.sites || [];
+  if (kind === 'instrument') return Array.isArray(state.instruments) ? state.instruments : [];
+  if (kind === 'preset') return Array.isArray(state.itemPresets) ? state.itemPresets : [];
+  if (kind === 'settings') return (typeof findInstrument === 'function') ? [_syncInUseRecord()] : [];
   return [];
 }
 
 function _syncRecordSetList(kind, list) {
   if (kind === 'client') state.clients = list;
   else if (kind === 'site') state.sites = list;
+  else if (kind === 'instrument') state.instruments = list;
+  else if (kind === 'preset') state.itemPresets = list;
+  // 'settings' is not a list — see the v83 note above.
 }
 
 function _syncRecordDoc(kind, rec) {
   const r = rec || {};
+  const t = (v) => typeof v === 'string' ? v.trim() : '';
   if (kind === 'client') return { id: String(r.id), name: String(r.name || '').trim() };
   if (kind === 'site') return { id: String(r.id), clientId: String(r.clientId || ''), name: String(r.name || '').trim() };
+  // v83. Exactly what makeInstrument() stores, so a stored instrument hashes the
+  // same as its own projection and a reload is never a change (the 18b rule).
+  if (kind === 'instrument') {
+    const d = (v) => (typeof normaliseInstrumentDate === 'function') ? normaliseInstrumentDate(v) : t(v);
+    return { id: String(r.id), make: t(r.make), model: t(r.model), calDate: d(r.calDate),
+             calCertNo: t(r.calCertNo), calDue: d(r.calDue) };
+  }
+  // Item order is the button order, so it is part of what a preset IS.
+  if (kind === 'preset') {
+    return { id: String(r.id), name: t(r.name),
+             items: Array.isArray(r.items) ? r.items.map(x => String(x == null ? '' : x)) : [] };
+  }
+  if (kind === 'settings') return { id: String(r.id), instrumentId: String(r.instrumentId || '') };
   return null;
 }
 
@@ -1064,6 +1221,9 @@ function _syncRecordHash(kind, rec) {
 // passthrough fields are carried over from the record being replaced.
 function _syncRecordFromDoc(kind, doc, old) {
   const d = _syncRecordDoc(kind, doc);
+  // v83: instruments and presets have no passthrough fields — the projection IS
+  // the stored shape.
+  if (kind !== 'client' && kind !== 'site') return d;
   d.userId = (old && typeof old.userId === 'string') ? old.userId : null;
   d.lastModified = (old && typeof old.lastModified === 'string') ? old.lastModified : null;
   return d;
@@ -1075,6 +1235,24 @@ function _syncRecordFromDoc(kind, doc, old) {
 function _syncValidRecord(kind, doc, id) {
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return false;
   if (doc.id == null || String(doc.id) !== String(id)) return false;
+  const str = (v) => v === undefined || v === null || typeof v === 'string';
+  // v83. An instrument with no make and no model would show as "Unnamed
+  // instrument" for ever — the editor refuses to save one, so the pull refuses
+  // to apply one. It also keeps the half-filled result of an Add button off the
+  // wire: the push skips anything that fails here.
+  if (kind === 'instrument') {
+    if (!['make', 'model', 'calDate', 'calCertNo', 'calDue'].every(k => str(doc[k]))) return false;
+    return !!(String(doc.make || '').trim() || String(doc.model || '').trim());
+  }
+  // A preset is a name and one to nine buttons (saveItemTypesSettings).
+  if (kind === 'preset') {
+    if (typeof doc.name !== 'string' || !doc.name.trim()) return false;
+    if (!Array.isArray(doc.items) || !doc.items.length || doc.items.length > 9) return false;
+    return doc.items.every(x => typeof x === 'string' && x.trim());
+  }
+  if (kind === 'settings') {
+    return SYNC_SETTINGS_IDS.indexOf(String(id)) !== -1 && typeof doc.instrumentId === 'string';
+  }
   if (typeof doc.name !== 'string' || !doc.name.trim()) return false;
   if (kind === 'site' && doc.clientId != null && typeof doc.clientId !== 'string') return false;
   return true;
@@ -1089,10 +1267,26 @@ function _syncClientNameOf(clientId) {
 }
 
 function _syncRecordHeldEntry(kind, id, reason, local, doc) {
+  // v83: instruments are named the way the app names them everywhere else, and
+  // the tester-in-use row by the testers it points at on each side (null: one
+  // this phone doesn't have).
+  if (kind === 'instrument' || kind === 'settings') {
+    const nm = (r) => {
+      if (!r || typeof r !== 'object') return null;
+      if (kind === 'settings') return typeof r.instrumentId === 'string' ? (_syncInstrumentName(r.instrumentId) || (r.instrumentId ? null : '')) : null;
+      return instrumentDisplayName(_syncRecordDoc('instrument', r));
+    };
+    const ln = nm(local);
+    const cn = (doc && typeof doc === 'object') ? nm(doc) : null;
+    const e = { id, kind, reason, name: kind === 'settings' ? 'Tester in use' : (ln || cn || ''), localName: ln, cloudName: cn };
+    if (reason === 'both-changed' && local && doc) e.diffs = _syncRecordDiffs(kind, local, doc);
+    return e;
+  }
   const e = { id, kind, reason,
     name: (local && local.name) || (doc && typeof doc.name === 'string' ? doc.name : '') || '',
     localName: local ? String(local.name || '') : null,
     cloudName: (doc && typeof doc.name === 'string') ? doc.name : null };
+  if (kind === 'preset' && reason === 'both-changed' && local && doc) e.diffs = _syncRecordDiffs(kind, local, doc);
   if (kind === 'site') {
     e.localParent = local ? _syncClientNameOf(local.clientId) : null;
     e.cloudParent = (doc && typeof doc.name === 'string') ? _syncClientNameOf(doc.clientId) : null;
@@ -1100,9 +1294,40 @@ function _syncRecordHeldEntry(kind, id, reason, local, doc) {
   return e;
 }
 
+// v83: what differs between the two copies of a held instrument or preset, as
+// display text for the card. Only the fields that differ; '' shows as blank.
+function _syncRecordDiffs(kind, local, doc) {
+  const L = _syncRecordDoc(kind, local), C = _syncRecordDoc(kind, doc);
+  const clip = (v) => { const x = String(v == null ? '' : v); return x.length > 80 ? x.slice(0, 79) + '\u2026' : x; };
+  const fields = kind === 'instrument'
+    ? [['make', 'Make'], ['model', 'Model'], ['calDate', 'Calibration date'],
+       ['calCertNo', 'Calibration certificate'], ['calDue', 'Calibration due']]
+    : [['name', 'Name'], ['items', 'Buttons']];
+  const out = [];
+  for (const [k, label] of fields) {
+    const a = Array.isArray(L[k]) ? L[k].join(', ') : L[k];
+    const b = Array.isArray(C[k]) ? C[k].join(', ') : C[k];
+    if (a !== b) out.push({ label, here: clip(a), cloud: clip(b) });
+  }
+  return out;
+}
+
+// v83: point this phone at another tester. Only ever at one it has, or at none
+// when it has none: an id this phone cannot resolve would stamp new jobs with
+// something every certificate falls straight through (tier 3).
+function _syncApplyInUse(instrumentId) {
+  const want = String(instrumentId || '');
+  if (typeof findInstrument !== 'function') return false;
+  if (want ? !findInstrument(want) : instrumentList().length) return false;
+  state.activeInstrumentId = want;
+  syncActiveInstrumentMirror();
+  return true;
+}
+
 // Replace, never edit in place — same habit as jobs, and it means nothing that
 // captured the old object can write stale fields back over the new one.
 function _syncReplaceRecord(kind, old, doc) {
+  if (kind === 'settings') return _syncApplyInUse(doc && doc.instrumentId);
   const list = _syncRecordList(kind);
   const i = list.indexOf(old);
   if (i === -1) return false;
@@ -1114,12 +1339,111 @@ function _syncReplaceRecord(kind, old, doc) {
 
 // Ledger first, then the removal (MAP rule 5), exactly as deleteClient() and
 // deleteSite() do. ⚠ Deliberately NO site cascade for a client — see 4A above.
-function _syncApplyRecordDelete(kind, id) {
+//
+// v83: `rs` (the records bookkeeping) is where an instrument's frozen copy waits
+// for the jobs to be read — see _syncFreezePending. A preset is never a phone's
+// last (deletePreset refuses too), and if it was the one in use the same
+// neighbour deletePreset() would pick takes over. Which TESTER is in use after
+// an instrument goes is settled by _syncSettleLists, once, at the end.
+function _syncApplyRecordDelete(kind, id, rs) {
   const list = _syncRecordList(kind);
-  if (!list.some(r => r && String(r.id) === id)) return false;
+  const old = list.find(r => r && String(r.id) === id);
+  if (!old || kind === 'settings') return false;
+  if (kind === 'preset' && list.length <= 1) return false;
+  if (kind === 'instrument' && rs && typeof instrumentSnapshotOf === 'function') {
+    rs.freeze[id] = instrumentSnapshotOf(old);
+  }
   recordTombstone(kind, id);
-  _syncRecordSetList(kind, list.filter(r => !(r && String(r.id) === id)));
+  const idx = list.indexOf(old);
+  const next = list.filter(r => r !== old);
+  _syncRecordSetList(kind, next);
+  if (kind === 'preset' && state.activePresetId === id) {
+    state.activePresetId = next[Math.max(0, idx - 1)].id;
+  }
   return true;
+}
+
+// v83: the frozen copies the records pull set aside, written onto this phone's
+// jobs now that the jobs have been read (see the v83 note above for why not
+// sooner). Also run at boot, for a run that died between the two. An instrument
+// that is back on the phone by now (a "Keep it" answer) needs no copy.
+// Returns how many jobs were written to.
+function _syncFreezePending(st) {
+  const f = st && st.rec && st.rec.freeze;
+  if (!f) return 0;
+  const ids = Object.keys(f);
+  if (!ids.length) return 0;
+  let n = 0;
+  for (const id of ids) {
+    const back = (typeof findInstrument === 'function') && findInstrument(id);
+    if (!back && typeof freezeInstrumentOntoJobs === 'function') n += freezeInstrumentOntoJobs(id, f[id]);
+    delete f[id];
+  }
+  _syncSave(st);
+  if (n) {
+    state.sessions = state.sessions.slice();
+    saveSessions();
+  }
+  return n;
+}
+
+// v83 decision 5A. A new phone's own starter preset, if that is all it has: the
+// built-in "Default", never edited, never sent. It holds nothing anyone made,
+// and without this every new phone would arrive with a spare "Default".
+function _syncIsUntouchedStarter(p) {
+  if (!p || p.name !== 'Default' || !Array.isArray(p.items)) return false;
+  if (typeof DEFAULT_ITEM_TYPES === 'undefined' || p.items.length !== DEFAULT_ITEM_TYPES.length) return false;
+  return p.items.every((x, i) => x === DEFAULT_ITEM_TYPES[i]);
+}
+
+function _syncStarterPreset(rs) {
+  const ps = state.itemPresets || [];
+  if (ps.length !== 1 || !ps[0] || !ps[0].id) return null;
+  const id = String(ps[0].id);
+  if (rs.sent[id] || rs.gone[id] || rs.resend[id]) return null;
+  return _syncIsUntouchedStarter(ps[0]) ? id : null;
+}
+
+// Only once the account's presets have actually arrived, and only if it is still
+// untouched. No ledger entry: it never reached the server, so there is nothing
+// for the other phone to be told.
+function _syncDropStarter(id) {
+  const ps = state.itemPresets || [];
+  const p = ps.find(x => x && String(x.id) === id);
+  if (!p || ps.length < 2 || !_syncIsUntouchedStarter(p)) return false;
+  state.itemPresets = ps.filter(x => x !== p);
+  if (state.activePresetId === id) state.activePresetId = state.itemPresets[0].id;
+  return true;
+}
+
+function _syncActivePresetSig() {
+  const p = (typeof activePreset === 'function' && (state.itemPresets || []).length) ? activePreset() : null;
+  return p ? String(p.id) + '\u0001' + JSON.stringify(p.items || []) : '';
+}
+
+// v83: after the lists changed, make "in use" point at something that exists —
+// the same fallbacks loadInstruments() and load() apply at startup — and refresh
+// what depends on it: the instrument mirror (MAP rule 7) and, only if the preset
+// in use actually changed, the quick-pick buttons (which rebuilds the Smart Quick
+// Pick row, so it is not done for nothing). Returns true if either moved.
+function _syncSettleLists(presetBefore) {
+  let moved = false;
+  if (typeof instrumentList === 'function') {
+    const list = instrumentList();
+    if (!list.some(i => i.id === state.activeInstrumentId)) {
+      const next = list.length ? list[0].id : '';
+      if ((state.activeInstrumentId || '') !== next) moved = true;
+      state.activeInstrumentId = next;
+    }
+    if (typeof syncActiveInstrumentMirror === 'function') syncActiveInstrumentMirror();
+  }
+  const ps = state.itemPresets || [];
+  if (ps.length && !ps.some(p => p.id === state.activePresetId)) { state.activePresetId = ps[0].id; moved = true; }
+  if (ps.length && typeof syncItemTypesFromActivePreset === 'function' && _syncActivePresetSig() !== presetBefore) {
+    syncItemTypesFromActivePreset();
+    moved = true;
+  }
+  return moved;
 }
 
 // Decision 4A. After a CLEAN pull only: a site whose client is not on this phone
@@ -1145,27 +1469,54 @@ function _syncPullRecords(c, uid, st, out) {
   // A new kind means a new version is reading for the first time: start from
   // the beginning, or every row of that kind already behind the cursor would
   // never be seen. See SYNC_RECORD_KINDS in config.js.
-  const kindsTag = SYNC_RECORD_KINDS.join(',');
+  const kindsTag = _syncRecordKindsTag();
   if (rs.kinds !== kindsTag) { rs.pulledAt = null; rs.kinds = kindsTag; }
   const since = rs.pulledAt || SYNC_PULL_EPOCH;
   let changed = false;
   let blocked = false;
   let high = since;
+  // v83
+  const late = [];                                   // settings rows: decided last
+  const starter = _syncStarterPreset(rs);            // 5A, judged before anything arrives
+  let presetsAdded = 0;
+  const presetBefore = _syncActivePresetSig();
+  const editing = String(state.instrumentEditorId || '');
 
   function decide(row) {
     const id = String(row && row.id != null ? row.id : '');
     const kind = String(row && row.kind || '');
     if (!id || SYNC_RECORD_KINDS.indexOf(kind) === -1) { blocked = true; return; }
 
+    // v83: the tester in use points AT an instrument, which may be further down
+    // this very read. So it is decided after every other row (decideInUse). A
+    // settings row this version does not know is a newer version's: nothing to
+    // apply or ask, and the cursor tag makes sure it is read again once known.
+    if (kind === 'settings') {
+      if (SYNC_SETTINGS_IDS.indexOf(id) !== -1) late.push(row);
+      return;
+    }
+
     // Answered in this phone's favour; the push half of this run replaces it.
     if (rs.resend[id]) return;
 
+    const grp = _syncRecordGroup(kind);
     const local = _syncRecordList(kind).find(r => r && String(r.id) === id) || null;
     const tomb = (state.tombstones || []).some(t => t && t.kind === kind && String(t.id) === id);
-    const hold = (reason, doc) => {
-      _syncHeldNote(_syncRecordHeldEntry(kind, id, reason, local, doc));
-      blocked = true; out.held++;
+    const hold = (reason, doc, extra) => {
+      _syncHeldNote(Object.assign(_syncRecordHeldEntry(kind, id, reason, local, doc), extra || {}));
+      blocked = true; out.held++; out[grp].held++;
     };
+    // v83: the instrument open in the editor. Its form was filled from this
+    // phone's copy and its Save writes EVERY field back, so a change applied
+    // underneath it would be quietly reverted by the Save tap — calibration date
+    // and all. Judged like anything else (a clash is still held); only applying
+    // waits, and the push leaves it alone, until the editor closes (rule 6).
+    const deferEditor = () => {
+      if (kind !== 'instrument' || id !== editing) return false;
+      blocked = true; out.skip[id] = true;
+      return true;
+    };
+    const inUse = (kind === 'instrument' && id === _syncInUseId()) ? { inUse: true } : null;
 
     if (row.deleted === true) {
       if (!local) {
@@ -1174,14 +1525,23 @@ function _syncPullRecords(c, uid, st, out) {
         return;
       }
       if (rs.sent[id] === _syncRecordHash(kind, local)) {
-        _syncApplyRecordDelete(kind, id);
+        // v83 decision 2A: the tester this phone is using is not deleted from
+        // under it on the strength of the other phone, clean copy or not.
+        if (inUse) { hold('deleted-elsewhere', null, inUse); return; }
+        // There must always be a preset. Asked, not skipped (rule 5).
+        if (kind === 'preset' && _syncRecordList('preset').length <= 1) {
+          hold('deleted-elsewhere', null, { onlyOne: true });
+          return;
+        }
+        if (deferEditor()) return;
+        _syncApplyRecordDelete(kind, id, rs);
         delete rs.sent[id];
         rs.gone[id] = true;
-        out.removed++; changed = true;
+        out.removed++; out[grp].in++; changed = true;
         _syncHeldClear(id, kind);
         return;
       }
-      hold('deleted-elsewhere', null);
+      hold('deleted-elsewhere', null, inUse);
       return;
     }
 
@@ -1197,7 +1557,8 @@ function _syncPullRecords(c, uid, st, out) {
       }
       _syncRecordSetList(kind, _syncRecordList(kind).concat([_syncRecordFromDoc(kind, row.doc, null)]));
       rs.sent[id] = hash;
-      out.added++; changed = true;
+      out.added++; out[grp].in++; changed = true;
+      if (kind === 'preset') presetsAdded++;
       _syncHeldClear(id, kind);
       return;
     }
@@ -1206,9 +1567,63 @@ function _syncPullRecords(c, uid, st, out) {
     if (hash === localHash) { rs.sent[id] = hash; _syncHeldClear(id, kind); return; }
     if (rs.sent[id] !== localHash) { hold('both-changed', row.doc); return; }
 
+    if (deferEditor()) return;
     _syncReplaceRecord(kind, local, row.doc);
     rs.sent[id] = hash;
-    out.applied++; changed = true;
+    out.applied++; out[grp].in++; changed = true;
+    _syncHeldClear(id, kind);
+  }
+
+  // v83 decision 1B: which tester is in use. A pointer, so the fingerprint alone
+  // cannot say who moved: `rs.inUse` is the value both sides last agreed on.
+  //   same on both sides                     → nothing to do
+  //   a question is open about the tester
+  //     this phone is using                  → wait (2A: it stays on it until
+  //                                            answered, whatever the other
+  //                                            phone moved to meanwhile)
+  //   the cloud is what both last agreed     → only this phone moved: ours goes up
+  //   the other side has none chosen         → ours goes up; nothing to take
+  //   it names a tester not on this phone    → wait for it to arrive
+  //   this phone switched since they agreed  → both switched: ask (8A)
+  //   otherwise                              → take it. That includes a phone
+  //                                            that has never agreed anything (a
+  //                                            new phone takes the account's),
+  //                                            and one whose agreed tester was
+  //                                            deleted, which moved by itself.
+  function decideInUse(row) {
+    const id = SYNC_INUSE_ID, kind = 'settings';
+    if (typeof findInstrument !== 'function') return;   // instruments.js absent
+    if (rs.resend[id]) return;
+    if (row.deleted === true) return;        // no version ever deletes it
+    const local = _syncInUseRecord();
+    const hold = (reason, doc) => {
+      _syncHeldNote(_syncRecordHeldEntry(kind, id, reason, local, doc));
+      blocked = true; out.held++; out.ip.held++;
+    };
+    const wait = () => { blocked = true; out.skip[id] = true; };
+    if (!_syncValidRecord(kind, row.doc, id)) { hold('unreadable', null); return; }
+    const hash = _syncRecordHash(kind, row.doc);
+    const want = String(row.doc.instrumentId);
+    const mine = local.instrumentId;
+    if (hash === _syncRecordHash(kind, local)) {
+      rs.sent[id] = hash; rs.inUse = want; _syncHeldClear(id, kind);
+      return;
+    }
+    if (mine && _syncHeldLoad().some(e => e.kind === 'instrument' && e.id === mine)) { wait(); return; }
+    // The cloud still holds what the two sides last agreed: the other device has
+    // not moved, so the difference is this phone's switch, and the push sends it.
+    // (Without this a switch made on ONE phone was asked about as if both had
+    // switched — harness 19k.)
+    if (hash === rs.sent[id]) return;
+    if (!want) return;
+    if (!findInstrument(want)) { wait(); return; }
+    const agreed = rs.inUse;
+    if (agreed !== null && mine !== agreed && findInstrument(agreed)) { hold('both-changed', row.doc); return; }
+    _syncApplyInUse(want);
+    rs.sent[id] = hash;
+    rs.inUse = want;
+    out.applied++; out.ip.in++; changed = true;
+    out.inUseNow = _syncInstrumentName(want);
     _syncHeldClear(id, kind);
   }
 
@@ -1235,6 +1650,12 @@ function _syncPullRecords(c, uid, st, out) {
   }
 
   return page(since).then(() => {
+    // v83, in this order: the starter preset goes once the account's presets
+    // are here (5A); "in use" is settled against the lists as they now stand;
+    // THEN the tester-in-use row, which may name an instrument just added.
+    if (starter && presetsAdded && _syncDropStarter(starter)) changed = true;
+    if (_syncSettleLists(presetBefore)) changed = true;
+    for (const row of late) decideInUse(row);
     if (!blocked) {
       const moved = _syncTidyOrphanSites();
       if (moved) { out.unassigned += moved; changed = true; }
@@ -1245,6 +1666,7 @@ function _syncPullRecords(c, uid, st, out) {
       // storage.js save() is saveSessions() + saveSettings(); only the second
       // holds clients and sites, and the first would re-arm the sync timer for
       // nothing. The push half of this same run sends anything tidied above.
+      // v83: instruments and presets are saveSettings() too.
       if (typeof saveSettings === 'function') saveSettings();
       _syncRepaintApp();
     }
@@ -1258,6 +1680,7 @@ function _syncPushRecords(c, uid, st, out) {
   // Held is the only state the push respects (rule 5): nothing held is sent.
   const held = new Set(_syncHeldLoad().filter(e => e.kind !== 'session').map(e => e.id));
 
+  const skip = out.skip || {};
   for (const kind of SYNC_RECORD_KINDS) {
     const live = new Set();
     for (const r of _syncRecordList(kind)) {
@@ -1265,7 +1688,13 @@ function _syncPushRecords(c, uid, st, out) {
       const id = String(r.id);
       live.add(id);
       if (held.has(id)) continue;
+      // v83: what the pull deferred this run (the instrument open in the editor,
+      // a tester-in-use row that waits) is not settled, so it is not sent either:
+      // sending would settle it on the server in this phone's favour.
+      if (skip[id]) continue;
       const doc = _syncRecordDoc(kind, r);
+      // v83: no tester chosen is not a choice to send over the other phone's.
+      if (kind === 'settings' && !doc.instrumentId) { delete rs.resend[id]; continue; }
       // Never send what the other phone would have to hold as unreadable.
       if (!_syncValidRecord(kind, doc, id)) continue;
       // ⚠ Wire and fingerprint are separate jobs (M184): send the JSON, hash the
@@ -1274,7 +1703,8 @@ function _syncPushRecords(c, uid, st, out) {
       const json = JSON.stringify(doc);
       const hash = syncHash(_syncCanonical(doc));
       if (!rs.resend[id] && rs.sent[id] === hash) continue;
-      work.push({ id, hash, gone: false, bytes: json.length,
+      work.push({ id, hash, gone: false, bytes: json.length, grp: _syncRecordGroup(kind),
+        inUse: kind === 'settings' ? doc.instrumentId : undefined,
         row: { id, user_id: uid, kind, doc: JSON.parse(json), deleted: false, last_modified: now } });
     }
     for (const t of (state.tombstones || [])) {
@@ -1284,7 +1714,7 @@ function _syncPushRecords(c, uid, st, out) {
       if (!rs.sent[id] && !rs.gone[id] && !rs.resend[id]) continue;   // server never had it
       if (rs.gone[id] && !rs.resend[id]) continue;                     // already sent
       const at = (typeof t.at === 'string' && !isNaN(Date.parse(t.at))) ? t.at : now;
-      work.push({ id, hash: null, gone: true, bytes: 64,
+      work.push({ id, hash: null, gone: true, bytes: 64, grp: _syncRecordGroup(kind),
         row: { id, user_id: uid, kind, doc: {}, deleted: true, last_modified: at } });
     }
   }
@@ -1310,6 +1740,8 @@ function _syncPushRecords(c, uid, st, out) {
           delete rs.resend[w.id];
           if (w.gone) { delete rs.sent[w.id]; rs.gone[w.id] = true; out.deleted++; }
           else { rs.sent[w.id] = w.hash; delete rs.gone[w.id]; out.sent++; }
+          if (w.inUse !== undefined) rs.inUse = w.inUse;   // v83: now agreed
+          if (out[w.grp]) out[w.grp].out++;
         }
         _syncSave(st);
       });
@@ -1323,7 +1755,10 @@ function _syncPushRecords(c, uid, st, out) {
 // the next run tries again. ⚠ The push is chained AFTER the pull, so a failed
 // pull means no push (rule 4).
 function _syncRecordsHalf(c, uid, st) {
-  const out = { applied: 0, added: 0, removed: 0, held: 0, unassigned: 0, sent: 0, deleted: 0, error: null };
+  // v83: `cs` / `ip` split the same counts by Sync-page heading; `skip` is what
+  // the pull deferred this run; `inUseNow` names a tester taken from the cloud.
+  const out = { applied: 0, added: 0, removed: 0, held: 0, unassigned: 0, sent: 0, deleted: 0, error: null,
+    cs: { in: 0, out: 0, held: 0 }, ip: { in: 0, out: 0, held: 0 }, skip: {}, inUseNow: null };
   return _syncPullRecords(c, uid, st, out)
     .then(() => _syncPushRecords(c, uid, st, out))
     .then(() => out, (e) => { out.error = e || new Error('records'); return out; });
@@ -1448,12 +1883,16 @@ function _syncHeldResolveRecord(kind, sid, choice, key) {
     if (msg) state.sync.message = msg;
     _syncRepaint();
   };
-  const what = kind === 'site' ? 'site' : 'client';
+  const what = { site: 'site', instrument: 'instrument', preset: 'preset', settings: 'setting' }[kind] || 'client';
 
   if (choice === 'phone') {
     const st = _syncStateFor(_syncCurrentUserId());
     st.rec.resend[sid] = true;
     delete st.rec.gone[sid];
+    // v83 decision 2A: keeping the tester this phone is USING, after the other
+    // phone deleted it, means it is still the one in use — for the account
+    // (1B), so the other phone gets it back as its tester in use as well.
+    if (kind === 'instrument' && sid === _syncInUseId()) st.rec.resend[SYNC_INUSE_ID] = true;
     _syncSave(st);
     _syncHeldClear(sid, kind);
     done('');
@@ -1475,19 +1914,34 @@ function _syncHeldResolveRecord(kind, sid, choice, key) {
           return true;
         }
         const local = _syncRecordList(kind).find(x => x && String(x.id) === sid) || null;
+        const presetBefore = _syncActivePresetSig();
         if (row.deleted === true) {
-          if (local) _syncApplyRecordDelete(kind, sid);
+          // v83: a phone's last preset stays — there must always be one.
+          if (local && !_syncApplyRecordDelete(kind, sid, rs)) {
+            done('That\u2019s the only preset on this phone, so it has been kept. Add another preset first if you want this one gone.');
+            return false;
+          }
           delete rs.sent[sid];
           rs.gone[sid] = true;
         } else if (_syncValidRecord(kind, row.doc, sid)) {
-          if (local) _syncReplaceRecord(kind, local, row.doc);
+          if (local) {
+            // v83: a tester in use this phone doesn't have (yet) is not taken.
+            if (!_syncReplaceRecord(kind, local, row.doc) && kind === 'settings') {
+              done('That tester isn\u2019t on this phone yet, so nothing has been changed. Check for updates, then try again.');
+              return false;
+            }
+          }
           else _syncRecordSetList(kind, _syncRecordList(kind).concat([_syncRecordFromDoc(kind, row.doc, null)]));
           rs.sent[sid] = _syncRecordHash(kind, row.doc);
+          if (kind === 'settings') rs.inUse = String(row.doc.instrumentId);
           delete rs.gone[sid];
         } else {
           done('That cloud copy still can\u2019t be read, so nothing has been changed. Choose this phone\u2019s copy to replace it.');
           return false;
         }
+        // v83: "in use" pointed at what now exists; an instrument delete's
+        // frozen copies wait in `rs` for the run below to read the jobs first.
+        _syncSettleLists(presetBefore);
         if (typeof saveSettings === 'function') saveSettings();
         _syncSave(st);
         _syncHeldClear(sid, kind);
@@ -1671,6 +2125,11 @@ function syncErrorMessage(err) {
 // iOS mid-entry, and repainting under an open sheet pulls it out from under the
 // thumb. Both checks, one place, used by every repaint this file does.
 function _syncSafeToRepaint() {
+  // v83: three settings screens hold unsaved typing in fields that are not
+  // focused — the instrument editor, the preset buttons, the user page (whose
+  // instrument list a pull can now change). Repainting them would throw that
+  // typing away (MAP rule 3), so the repaint is owed until the engineer leaves.
+  if (SYNC_NO_REPAINT_VIEWS.indexOf(state.view) !== -1) return false;
   try {
     const a = document.activeElement;
     if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) return false;

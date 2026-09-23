@@ -1,4 +1,4 @@
-# PATGo — Code Map (V82)
+# PATGo — Code Map (V83)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -279,9 +279,9 @@ plus TOMBSTONE_KINDS. Deleted records are kept OUT of state entirely (no
 and 14g fails if a flag ever appears. `recordTombstone()` does NOT save, and is
 always called BEFORE the removal (cross-cutting rule 5). Callers: clients.js ×4
 (deleteClient + its site cascade, deleteSite, resolveAssignMerge), session.js ×2
-(deleteSession, deletePreset). Prune deliberately does NOT record — decision C,
+(deleteSession, deletePreset), instruments.js ×1 (deleteInstrument, v83). Prune deliberately does NOT record — decision C,
 settled V80: clearing is local, the cloud keeps the job (sync.js remembers the
-id in SYNC_PRUNED_KEY instead). sync.js READS the ledger (session kind only).
+id in SYNC_PRUNED_KEY instead). sync.js READS the ledger (every synced kind).
 ⚠ v80: `saveSessions()` carries the ONE sync line (`syncNoteSave`, guarded and
 wrapped). Every session save passes through it — keep it cheap.
 ⚠⚠ v69: `_encodedSessionCache` reuses a session's encoding when the items ARRAY
@@ -290,6 +290,10 @@ item CONTENTS. Anything that edits strings INSIDE existing item objects must cal
 `_invalidateSessionEncoding(sess)` or the stale encoding is written back and the
 edit silently un-happens on reload. Only bites NON-ACTIVE sessions (the active
 one always re-encodes fresh), which is why it is easy to miss in a test.
+⚠ v83: `_sessionSig()` now includes `instrumentId` and the PRESENCE of
+`instrumentSnapshot`. Without it, deleteInstrument's in-place freeze never reached
+disk for non-active jobs (bug present v66–V82; 19a, M226). Any NEW session-level
+field written in place on non-active jobs must join the sig.
 ⚠ v69 (D5): `runApostropheRepair()` / `apostropheRepairUndoCount()` /
 `undoApostropheRepair()` — one-time rewrite of stored locations, item types and
 preset entries, latched on `REPAIR_DONE_KEY`, undo diff in `REPAIR_UNDO_KEY`.
@@ -307,7 +311,7 @@ Orphan sites (empty clientId) are legal.
 **Coupling:** `load()`/`save()` in storage.js call in. `splitSiteSnapshot` is
 csv.js's dependency. Delete/rename confirms route through feedback.js sheets.
 
-### instruments.js (~490 ln) — test instruments & calibration
+### instruments.js (~665 ln) — test instruments & calibration
 The instrument list, which is active, and **which instrument a given job's
 certificate names**. Owns the three-tier resolution (`instrumentForSession`:
 stamped id → frozen snapshot → active), calibration status, the mirror sync
@@ -316,7 +320,11 @@ helpers, CRUD, and its own settings/editor markup.
 a certificate names.
 **Coupling:** ⚠ Rule 7. `report.js`, `csv.js` and the UI must all resolve through
 `instrumentForSession()`. `deleteInstrument()` freezes `session.instrumentSnapshot`
-onto referencing sessions **before** removing (rule 5).
+onto referencing sessions **before** removing (rule 5), through
+`freezeInstrumentOntoJobs()` — v83: **sync.js** calls the same helper for a remote
+delete; never give either path its own copy. v83: `deleteInstrument()` records an
+`instrument` tombstone. `INSTRUMENTS_MAX` is the Add button's cap only; load and
+restore cap at `INSTRUMENTS_STORED_MAX` (config.js, decision 4A).
 `restoreInstrumentsFromBackup()` is shared by backup.js and setup.js and depends
 on the caller having restored the flat fields first.
 Renders its own screens here rather than in render-settings — deliberate, and the
@@ -545,7 +553,9 @@ cloud pages revealed by a long-press on the About title (v79: only on a host
 with a cloud). Account is real (logic in **cloud.js**); Sync is real from v80
 (logic in **sync.js**); Subscription is a placeholder. v82: `renderSyncHeld()`
 groups jobs and clients & sites, and `openSyncDiffSheet()` builds the read-only
-comparison sheet via feedback.js `_openSheet()`.
+comparison sheet via feedback.js `_openSheet()`. v83: a third group, instruments &
+presets (`listRow`, incl. the tester-in-use card and per-field `diffs`); the Sync
+page shows an instruments & presets count and the tester in use.
 **Touch to:** roll the About changelog, add or reword a glossary term, change the
 Contact page or the bug sheet's markup, or work on the cloud stubs.
 **Coupling:** reached only through `render()`'s dispatcher — NOT through the
@@ -576,7 +586,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~1715 ln) — cloud sync, PUSH AND PULL — v80–v82
+### sync.js (~2175 ln) — cloud sync, PUSH AND PULL — v80–v83
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session
@@ -646,8 +656,25 @@ the jobs push respects only kind 'session' holds. Page/dispatch key is
 `syncJobDiff()` (pure, display text) + `syncHeldDiff()` (fetch on tap, action
 `sync-held-diff`) → **render-help.js** `openSyncDiffSheet()`. The fetched doc is
 never stored.
-Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z and 18a–18r,
-mutations M142–M225.
+⚠ v83: INSTRUMENTS, PRESETS, TESTER IN USE through `records` (kinds
+`instrument`, `preset`, `settings`). Writes `state.instruments` /
+`state.activeInstrumentId` (then **instruments.js** `syncActiveInstrumentMirror`,
+rule 7) and `state.itemPresets` (then **session.js**
+`syncItemTypesFromActivePreset`, only if the preset in use changed). The
+settings kind is ONE virtual row, `SYNC_INUSE_ID` (config.js), built from state
+by `_syncRecordList` — every add/replace/delete path special-cases it; it is
+decided LAST in a pull (`decideInUse`), agreement tracked in `st.rec.inUse`.
+Cursor tag = kinds + `SYNC_SETTINGS_IDS` (`_syncRecordKindsTag`).
+⚠ A remote instrument delete queues the frozen copy in `st.rec.freeze`;
+`_syncFreezePending()` writes it from `_syncRun` AFTER the jobs pull (and at
+`syncBoot`). Freezing earlier makes jobs the other phone already froze look
+edited on both sides (19d, M231). The freeze itself is **instruments.js**
+`freezeInstrumentOntoJobs()` — ONE helper for local and remote delete (19w).
+⚠ `out.skip` = what the pull deferred (instrument open in the editor, a waiting
+tester-in-use row); the records push skips it (M237). `_syncSafeToRepaint()`
+also refuses `SYNC_NO_REPAINT_VIEWS` (config.js).
+Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r and
+19a–19w, mutations M142–M260.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

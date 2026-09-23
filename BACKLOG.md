@@ -17,34 +17,41 @@ leftovers are the IndexedDB photo store and the sync bookkeeping keys
 still signed in would pull its old jobs straight back. Most destructive button in
 the app, so the confirm needs to be genuinely hard to hit by accident.
 
-### Cloud track — V82: clients and sites sync; instruments next
-V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull (closed) → **V82** clients
-+ sites through `records`, and the held card shows what differs. Agreed split
-(V82 Q1A): **V83 instruments + presets** → **V84 settings + report templates** →
-photos (+ the cross-account download isolation check) → status UI. Every cloud
-release runs `supabase/isolation-test.sql` (all PASS) before promotion to
-`Release` — passed at V81.4.
+### Cloud track — V83: instruments, presets, tester in use; settings next
+V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull → V82 clients + sites →
+**V83** instruments + presets + tester in use (1B). Next: **V84 settings +
+report templates** → photos (+ the cross-account download isolation check) →
+status UI. Every cloud release runs `supabase/isolation-test.sql` (all PASS)
+before promotion to `Release` — passed at V82.
 
-### Cloud — V83 must carry these (found speccing V82)
-- ⚠ A pulled job keeps its `instrumentId`, but instruments do not sync yet. If
-  the other phone lacks that id and the job has no frozen snapshot,
-  `instrumentForSession()` falls to tier three and the certificate names that
-  phone's ACTIVE instrument. Phones restored from one backup share ids and are
-  fine. V83 closes it; until then, don't trust certificates printed from pulled
-  jobs on a phone with different instruments.
-- `deleteInstrument()` records NO tombstone and `TOMBSTONE_KINDS` lacks
-  'instrument' (and 'template'). Widening the normaliser is a superset — old
-  backups still restore.
-- A remote instrument delete must freeze `instrumentSnapshot` onto referencing
-  jobs BEFORE removing it, as the local delete does — and that edits jobs, which
-  then sync. Same shape as `_syncApplyRemoteDelete` duplicating deleteSession.
-- Adding kinds to `SYNC_RECORD_KINDS` resets the records cursor by design (18m).
+### Cloud — V84 must carry these
+- Settings travel as SEPARATE small rows (kind `settings`), the shape V83 began
+  with `settings_instrument`. Add each new id to `SYNC_SETTINGS_IDS` (config.js):
+  that is what resets the records cursor so rows pushed earlier are read (19s,
+  M251). A V83 phone ignores settings ids it does not know, without blocking.
+- Setup-bundle sections (setup.js) are a ready-made split to start from.
+  Per-device, must NOT sync: theme, haptics/sound, scanner pairing and speed,
+  sort, filters — and the PRESET in use (V83 7A).
 - Report templates `tpl_standard` / `tpl_summary` have the SAME id on every
-  install — the first sync treats them as one record. Probably right; decide in
-  V84.
-- Settings singleton: theme, scanner pairing, scan speed, sort and filters are
-  per-device and must not sync. Setup-bundle sections (setup.js) are a ready-made
-  split to start from.
+  install — the first sync treats them as one record. Probably right; decide.
+- Report settings carry a base64 logo and signature — size check against
+  SYNC_BATCH_BYTES. `TOMBSTONE_KINDS` still lacks `template`.
+- `_sessionSig()` lesson (V83): anything written IN PLACE onto non-active jobs
+  must be in the sig, or it never reaches disk.
+- Consider a records-specific row in isolation-test.sql now instrument
+  calibration data lives in `records` (spec section 7).
+
+### Cloud — V83 residuals (known, accepted)
+- A job whose instrument is not on this phone and has no frozen copy still
+  prints the tester in use (tier 3). V83 closes it by order — instruments read
+  before jobs — leaving only a held instrument or a phone still on V82 (6A).
+- Rare false question: a job the other phone edited AND froze, whose freeze
+  happened while it was open on screen here (deferred) or while the jobs read
+  failed, can come back as changed on both. It is asked, never lost.
+- A blank instrument that jobs reference (kept by pruneBlankInstruments) is
+  never sent — nameless records are unreadable by design.
+- Same tester / same "Default" preset made on two phones separately = two
+  entries to tidy by hand (3A; 5A only covers an untouched starter).
 
 ### Cloud — an older phone strips fields it doesn't know (V82 note)
 Records sync a projection (`_syncRecordDoc`). A later version that adds a client
