@@ -91,6 +91,8 @@ let _syncRunning = null;        // the in-flight push promise, if any
 let _syncAgain = false;         // a trigger arrived mid-run: run once more
 let _syncAgainForce = false;
 let _syncAgainPull = false;     // v81: …and that trigger wanted a pull
+let _syncLastNavPull = 0;       // v81.2: throttles the navigation trigger
+let _syncLastRunAt = 0;         // v81.2: when a run last finished, for the backstop
 
 // ---- gates -------------------------------------------------------------------
 // Signed in, on a host with a cloud. Offline is checked separately, because
@@ -135,7 +137,7 @@ function _syncEmpty(userId) {
   // choosing the phone's copy would have to fake a fingerprint mismatch, and a
   // fake value in the store is a value someone later reads as real.
   return { userId: userId || '', sent: {}, gone: {}, resend: {}, lastPushAt: null,
-           pulledAt: null, lastPullAt: null };
+           pulledAt: null, lastPullAt: null, hashV: SYNC_HASH_V };
 }
 
 function _syncLoad() {
@@ -158,6 +160,11 @@ function _syncLoad() {
   // "send it again". A phone upgrading from V80 lands here on its first run.
   if (typeof raw.pulledAt === 'string' && !isNaN(Date.parse(raw.pulledAt))) out.pulledAt = raw.pulledAt;
   if (typeof raw.lastPullAt === 'string' && !isNaN(Date.parse(raw.lastPullAt))) out.lastPullAt = raw.lastPullAt;
+  // v81.2: fingerprints written before canonical hashing mean nothing now, so
+  // they are dropped rather than left to mismatch for ever. Costs one re-send of
+  // every job, once. `gone` survives — a delete already sent is still sent.
+  if (raw.hashV !== SYNC_HASH_V) out.sent = {};
+  else out.hashV = SYNC_HASH_V;
   return out;
 }
 
@@ -186,7 +193,7 @@ function syncStatusSummary() {
   const jobs = _syncSessions();
   let upToDate = 0;
   for (const s of jobs) {
-    if (st.sent[String(s.id)] === syncHash(JSON.stringify(s))) upToDate++;
+    if (st.sent[String(s.id)] === syncHash(_syncCanonical(s))) upToDate++;
   }
   return {
     total: jobs.length, upToDate, waiting: jobs.length - upToDate,
@@ -209,7 +216,7 @@ function syncPruneFilter(targets) {
   const mine = !!uid && st.userId === uid;
   const clear = [], kept = [];
   for (const s of list) {
-    const ok = mine && s && st.sent[String(s.id)] === syncHash(JSON.stringify(s));
+    const ok = mine && s && st.sent[String(s.id)] === syncHash(_syncCanonical(s));
     (ok ? clear : kept).push(s);
   }
   return { clear, kept, active: true };
@@ -354,6 +361,30 @@ function syncHeldList() {
   return _syncHeldLoad().sort((a, b) => String(b.at).localeCompare(String(a.at)));
 }
 
+// ---- canonical JSON (v81.2, decision 3A) ---------------------------------------
+// ⚠ The `doc` column is jsonb, and jsonb does NOT store the JSON it was given —
+// Postgres re-sorts object keys and drops whitespace. So a job comes back with a
+// different key ORDER, JSON.stringify produces a different string, and the
+// fingerprint does not match: a phone sees its OWN pushed job as changed and
+// applies it back over itself. On the job open on screen that showed up as
+// "changes from your other device are waiting" when nothing had come from the
+// other device at all (Peter, V81.1 testing). Worse, if the local copy happened
+// to be dirty at that moment it read as a real clash and asked a question nobody
+// needed to answer.
+//
+// Hashing therefore goes through here, both ends, so the hash depends on CONTENT
+// and never on key order. Not JSON.stringify with a replacer: the sort has to be
+// recursive, and nested objects are where the reordering actually bites.
+//
+// ⚠ The harness missed this because the fake server handed back the object it was
+// given. It now reorders keys on the way out (17s).
+function _syncCanonical(v) {
+  if (v === null || typeof v !== 'object') return JSON.stringify(v);
+  if (Array.isArray(v)) return '[' + v.map(_syncCanonical).join(',') + ']';
+  const keys = Object.keys(v).filter(k => v[k] !== undefined && typeof v[k] !== 'function').sort();
+  return '{' + keys.map(k => JSON.stringify(k) + ':' + _syncCanonical(v[k])).join(',') + '}';
+}
+
 // ---- the validator (decision 8A) -----------------------------------------------
 // Relaxed on purpose, and deliberately NOT a schema check. Jobs gain fields
 // release by release, and a phone on an older version must be able to read a row
@@ -385,6 +416,30 @@ function syncNoteSave() {
   syncPushSoon(SYNC_DEBOUNCE_MS, { pull: true });
 }
 
+// v81.2, decision 2D. A screen change is a moment the engineer might be
+// expecting the other phone's work, so it is the primary trigger — throttled,
+// because tapping between jobs is not a reason to hammer the server. Called
+// from dispatch.js only when state.view actually CHANGED, not on every tap.
+function syncNoteNav() {
+  if (!syncActive()) return;
+  const now = Date.now();
+  if (now - _syncLastNavPull < SYNC_NAV_THROTTLE_MS) return;
+  _syncLastNavPull = now;
+  syncPushSoon(0, { pull: true });
+}
+
+// …and the backstop, for standing still. Fires only if nothing has run in
+// SYNC_IDLE_MS, so an engineer who is navigating or logging never triggers it
+// and the radio is left alone. Also the last resort for a repaint that was
+// owed while a field was focused.
+function _syncIdleCheck() {
+  _syncFlushRepaint();
+  if (!syncActive() || _syncOffline()) return;
+  try { if (document.visibilityState === 'hidden') return; } catch { /* no document */ }
+  if (Date.now() - _syncLastRunAt < SYNC_IDLE_MS) return;
+  syncPushSoon(0, { pull: true });
+}
+
 // opts.pull — read the cloud first, then send (sign-in, reopen, back online,
 // boot, and the Sync page buttons). Without it this is the V80 push alone.
 function syncPushSoon(ms, opts) {
@@ -408,6 +463,13 @@ function syncBoot() {
     window.addEventListener('online', () => syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true }));
   } catch { /* ditto */ }
   if (syncActive() && !_syncOffline()) syncPushSoon(SYNC_BOOT_DELAY_MS, { pull: true });
+  // v81.2: a repaint owed while a field was focused takes the moment it blurs.
+  try {
+    document.addEventListener('focusout', () => setTimeout(_syncFlushRepaint, 0));
+  } catch { /* the idle check below still flushes it */ }
+  try {
+    setInterval(_syncIdleCheck, SYNC_IDLE_CHECK_MS);
+  } catch { /* no timers: navigation and saving still trigger reads */ }
 }
 
 // ---- applying what comes back ----------------------------------------------------
@@ -498,7 +560,7 @@ function _syncPull(c, uid, st, out) {
         _syncHeldClear(id);
         return;
       }
-      if (st.sent[id] === syncHash(JSON.stringify(local))) {
+      if (st.sent[id] === syncHash(_syncCanonical(local))) {
         if (defer('delete')) return;
         _syncApplyRemoteDelete(id);
         delete st.sent[id];
@@ -525,7 +587,7 @@ function _syncPull(c, uid, st, out) {
     }
 
     const doc = row.doc;
-    const hash = syncHash(JSON.stringify(doc));
+    const hash = syncHash(_syncCanonical(doc));
 
     if (!local) {
       if (tomb) {
@@ -547,7 +609,7 @@ function _syncPull(c, uid, st, out) {
       return;
     }
 
-    const localHash = syncHash(JSON.stringify(local));
+    const localHash = syncHash(_syncCanonical(local));
 
     // Identical. Usually this phone's own push coming back to it.
     if (hash === localHash) { st.sent[id] = hash; _syncHeldClear(id); return; }
@@ -604,7 +666,9 @@ function _syncPull(c, uid, st, out) {
   return page(since).then(() => {
     // Recomputed every run, never accumulated: if the job was closed, or the
     // other device undid whatever it did, the notice must go by itself.
+    const waitingBefore = JSON.stringify(state.sync.waiting || null);
     state.sync.waiting = out.waiting || null;
+    const waitingMoved = JSON.stringify(state.sync.waiting || null) !== waitingBefore;
     st.lastPullAt = new Date().toISOString();
     if (!blocked) st.pulledAt = high;
     _syncSave(st);
@@ -615,6 +679,10 @@ function _syncPull(c, uid, st, out) {
       state.sessions = state.sessions.slice();
       saveSessions();
     }
+    // v81.2: the screen, not just the Sync page. Done here rather than at the
+    // end of the whole run because the push half never changes local data —
+    // waiting until then would only delay what is already true.
+    if (changed || waitingMoved) _syncRepaintApp();
   });
 }
 
@@ -653,6 +721,7 @@ function syncPush(opts) {
     .then((ok) => {
       state.sync.busy = false;
       _syncRunning = null;
+      _syncLastRunAt = Date.now();
       _syncRepaint();
       if (_syncAgain) {
         const force = _syncAgainForce;
@@ -728,8 +797,12 @@ function _syncPushHalf(c, uid, st, force) {
       const id = String(s.id);
       live.add(id);
       if (heldIds.has(id)) continue;
+      // ⚠ v81.2: the row is sent as JSON.stringify (that is the wire format), but
+      // the FINGERPRINT is canonical — the two are different jobs and must not
+      // share a variable. Hashing `json` here is what V81.2 first shipped by
+      // mistake: every pull then disagreed with every push, for every job.
       const json = JSON.stringify(s);
-      const hash = syncHash(json);
+      const hash = syncHash(_syncCanonical(s));
       // v81: `resend` is set when a held job was resolved in the phone's
       // favour — the cloud copy is to be overwritten even though nothing local
       // changed since the last push.
@@ -855,7 +928,7 @@ function syncHeldResolve(id, choice) {
         } else if (_syncValidDoc(row.doc, sid)) {
           if (local) _syncReplaceSession(sid, local, row.doc);
           else state.sessions.unshift(row.doc);
-          st.sent[sid] = syncHash(JSON.stringify(row.doc));
+          st.sent[sid] = syncHash(_syncCanonical(row.doc));
         } else {
           done('That cloud copy still can\u2019t be read, so nothing has been changed. Choose this phone\u2019s copy to replace it.');
           return false;
@@ -888,12 +961,49 @@ function syncErrorMessage(err) {
 }
 
 // ---- UI plumbing -----------------------------------------------------------------
-function _syncRepaint() {
-  if (state.view !== 'cloudSync') return;
+// ⚠ MAP rules 2/3. Repainting over a focused field tears the keyboard down on
+// iOS mid-entry, and repainting under an open sheet pulls it out from under the
+// thumb. Both checks, one place, used by every repaint this file does.
+function _syncSafeToRepaint() {
   try {
     const a = document.activeElement;
-    if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) return;
-    if (document.querySelector('body > .bulk-sheet, body > .fail-sheet, body > .modal-backdrop')) return;
-  } catch { /* no DOM to inspect — fall through */ }
+    if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) return false;
+    if (document.querySelector('body > .bulk-sheet, body > .fail-sheet, body > .modal-backdrop')) return false;
+  } catch { /* no DOM to inspect — nothing unsafe to be over */ }
+  return true;
+}
+
+// Push results: the Sync page only, because nothing else shows them.
+function _syncRepaint() {
+  if (state.view !== 'cloudSync') return;
+  if (!_syncSafeToRepaint()) return;
+  render();
+}
+
+// v81.2, decision 1A. Pull results: whatever is on screen, because a pull adds
+// jobs, removes them and raises banners on screens that are not the Sync page.
+//
+// ⚠ Until V81.2 this did not exist, and the ONLY repaint was the Sync page one
+// above. Everything worked and almost nothing showed: a deleted job sat in the
+// list, the waiting banner never appeared, and Peter had to tap between jobs to
+// force a render the app should have done. Correct state that never reaches the
+// screen is indistinguishable from a broken app.
+//
+// If it is not safe right now, remember and take the next safe moment rather
+// than dropping it — that is what _syncFlushRepaint() is for.
+let _syncRepaintWanted = false;
+
+function _syncRepaintApp() {
+  if (!_syncSafeToRepaint()) { _syncRepaintWanted = true; return; }
+  _syncRepaintWanted = false;
+  render();
+}
+
+// The next safe moment: a field blurred, a sheet closed, or the idle check came
+// round. Cheap and does nothing unless a repaint is actually owed.
+function _syncFlushRepaint() {
+  if (!_syncRepaintWanted) return;
+  if (!_syncSafeToRepaint()) return;
+  _syncRepaintWanted = false;
   render();
 }

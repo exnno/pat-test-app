@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V81.1';
+const APP_VERSION = 'V81.2';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -360,7 +360,19 @@ const SYNC_BOOT_DELAY_MS = 3000;    // after the first paint, not during it
 const SYNC_RESUME_DELAY_MS = 1000;  // app reopened / signal back
 const SYNC_BATCH_ROWS = 25;         // rows per upload request…
 const SYNC_BATCH_BYTES = 400000;    // …or roughly this much JSON, whichever first
+// v81.2: bumped when the way a job is fingerprinted changes, so old
+// fingerprints are dropped rather than silently mismatching for ever.
+const SYNC_HASH_V = 2;
 const SYNC_PULL_PAGE = 200;         // v81: rows per pull request, then page again
+// v81.2 (decision 2D). Reading is driven by what the engineer DOES — every
+// screen change is a moment they might be expecting the other phone's work —
+// with a slow backstop for standing still. The interval matters far more than
+// the payload: an empty pull is ~2 KB, but each request wakes the cellular
+// modem and holds it in a high-power state for several seconds afterwards.
+// Poll every 30s and the radio never idles at all; at two minutes it does.
+const SYNC_NAV_THROTTLE_MS = 20000;   // at most one read per 20s of tapping about
+const SYNC_IDLE_MS = 120000;          // …and one anyway if nothing has run in 2 min
+const SYNC_IDLE_CHECK_MS = 20000;     // how often that is checked (no network unless due)
 // v81: the cursor before a phone has ever pulled. A phone upgrading from V80
 // has no cursor, so its first pull reads the whole account — every job it
 // pushed comes back, matches its own fingerprint, and resolves as no work.

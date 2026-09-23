@@ -64,17 +64,17 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v81.1: rolled forward — V81.1 on top, V79 dropped. -->
+      <!-- v8: rolling 3-version changelog. v81.2: rolled forward — V81.2 on top, V80 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V81.2</strong> &middot; September 2026</p>
+        <p class="muted">Speed and polish for the invite-only cloud test. Changes from your other device now appear on screen by themselves, instead of only after you tapped between jobs; the app checks for them whenever you move around it, and quietly in the background if you sit still. It also no longer mistakes your own work coming back from the cloud for someone else's change. Nothing here affects you if you're not in the cloud test.</p>
         <p><strong>V81.1</strong> &middot; September 2026</p>
         <p class="muted">A fix for the invite-only cloud test, and nothing else. When the same job was being worked on in two places at once, one phone could overwrite the other's work without asking. It now notices, changes nothing, and asks which copy to keep. The job you have open on screen also tells you when something is waiting for it, instead of quietly changing or disappearing the moment you leave. If you're not in the cloud test, the app is exactly as it was.</p>
         <p><strong>V81</strong> &middot; September 2026</p>
         <p class="muted">Nothing changes for you. Another piece of the cloud version, switched on only for a small invite-only test: for those test accounts, jobs now travel both ways, so two phones on the same account keep up with each other. If the same job has been changed in two places at once, nothing on the phone is overwritten &mdash; it holds the job and asks which copy to keep. For everyone else the app is exactly as it was: nothing is sent anywhere, no account is needed, and it works the same with or without a signal.</p>
-        <p><strong>V80</strong> &middot; September 2026</p>
-        <p class="muted">Nothing changes for you. This release is the next piece of the cloud version, which is switched on only for a small invite-only test: for those test accounts, jobs are now copied from the phone to the cloud in the background. For everyone else the app is exactly as it was &mdash; nothing is sent anywhere, no account is needed, and it works the same with or without a signal.</p>
-      </div>
+              </div>
 
       <div class="info-card">
         <h3>Set up another device</h3>

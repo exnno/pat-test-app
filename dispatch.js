@@ -80,8 +80,15 @@ function handleDelegatedClick(e) {
   // against entry-screen markup. Recovering to the Sessions list is the same
   // move v16.1 makes: a known-good screen that always renders, so state and
   // screen agree again.
+  // v81.2 (decision 2D): reading the cloud is driven by what the engineer does.
+  // Captured BEFORE the action so only a real screen change counts — tapping a
+  // quick-pick button or a toggle is not navigation, and should not read.
+  const viewBefore = state.view;
   try {
     fn(arg, el, e);
+    if (state.view !== viewBefore && typeof syncNoteNav === 'function') {
+      try { syncNoteNav(); } catch (e3) { console.error('syncNoteNav failed (non-fatal).', e3); }
+    }
   } catch (err) {
     console.error('Action "' + name + '" threw; recovering to the Sessions list.', err);
     try {
