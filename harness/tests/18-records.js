@@ -342,7 +342,8 @@ module.exports = async function () {
     await tick(5);
     t.ok(app.srv.rows('sessions').some(r => r.doc && String(r.doc.site).indexOf('ZZ JOB J') !== -1), 'the job is still sent');
     t.eq(app.srv.rows('records').length, 0, 'records are not pushed when their read failed');
-    t.includes(app.run('state.sync.message'), 'Clients & sites couldn', 'and the page says so plainly');
+    // v83: the sentence now names every list the records table carries.
+    t.includes(app.run('state.sync.message'), 'Clients, sites, instruments and presets couldn', 'and the page says so plainly');
   });
 
   /* ------------------------------------------------------------------ 18k */
@@ -392,9 +393,11 @@ module.exports = async function () {
     await tick(5);
     t.includes(app.srv.gets('records')[0].url, 'updated_at=gt.1970', 'a list that grew resets the cursor');
 
+    // v83: the tag is kinds AND settings ids (_syncRecordKindsTag), so the
+    // "same list" case reads the current tag rather than a hard-coded V82 one.
     const app2 = signedIn();
     app2.storage.setItem('pat:syncState', JSON.stringify({ userId: UID_A, hashV: 2, sent: {}, gone: {}, resend: {},
-      rec: { sent: {}, gone: {}, resend: {}, pulledAt: T2, kinds: 'client,site' } }));
+      rec: { sent: {}, gone: {}, resend: {}, pulledAt: T2, kinds: app2.fn('_syncRecordKindsTag')() } }));
     await app2.fn('syncPull')();
     await tick(5);
     t.includes(decodeURIComponent(app2.srv.gets('records')[0].url), 'updated_at=gt.' + T2, 'the same list carries on from its cursor');
