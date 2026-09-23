@@ -854,6 +854,70 @@ module.exports = async function () {
       'and that one screen change is never throttled \u2014 it is the read that matters most');
   });
 
+  /* ------------------------------------------------------------------ 17y */
+  // v81.4. Peter, after using V81.3: opening a job to "changes waiting", the
+  // instinct was to reach for a button rather than back out and come in again.
+  // A tap is the engineer choosing the update, so it does not break 7A.
+  await t.group('17y — "Update now" applies the waiting change to the open job, once', async () => {
+    const app = signedIn();
+    const local = sentJob(app, 'ZZUPDATENOW');
+    const id = String(local.id);
+    app.srv.cloud.push(cloudJob(id, 'ZZUPDATENOW', ['A', 'B', 'C'], T2));
+    app.fn('openSession')(id);
+    app.stopTimer();
+    await app.fn('syncPull')();
+    await tick(5);
+    t.eq(jobById(app, id).items.length, 1, 'precondition: the change is waiting');
+
+    const html = app.fn('renderEntry')();
+    t.includes(html, 'data-action="sync-apply-waiting"', 'the waiting line offers the button');
+
+    // Through the real dispatch table, as a tap would.
+    const table = app.run('ACTIONS');
+    t.ok(typeof table['sync-apply-waiting'] === 'function', 'and it is wired into dispatch');
+    await app.fn('syncApplyWaiting')();
+    await tick(5);
+
+    t.eq(app.state().view, 'entry', 'still standing in the job \u2014 nobody was moved');
+    t.eq(jobById(app, id).items.length, 3, 'and the change is applied');
+    t.eq(app.state().sync.waiting, null, 'so nothing is waiting any more');
+    t.eq(app.run('_syncAllowOpen'), null,
+      'and the allowance is gone \u2014 left standing, it would apply every later change under the thumb');
+
+    // One-off: the NEXT change to the same open job waits again.
+    app.srv.cloud.find(r => String(r.id) === id).updated_at = T2;
+    const again = cloudJob(id, 'ZZUPDATENOW', ['A', 'B', 'C', 'D'], '2026-09-04T10:00:00.000Z');
+    const i = app.srv.cloud.findIndex(r => String(r.id) === id);
+    app.srv.cloud[i] = again;
+    await app.fn('syncPull')();
+    await tick(5);
+    t.eq(jobById(app, id).items.length, 3, 'a later change to the open job waits again, as it always did');
+  });
+
+  /* ------------------------------------------------------------------ 17z */
+  await t.group('17z — there is no "Update now" for a delete', async () => {
+    const app = signedIn();
+    const local = sentJob(app, 'ZZNOBUTTON');
+    const id = String(local.id);
+    app.fn('openSession')(id);
+    app.stopTimer();
+    app.srv.cloud.push({ id, doc: {}, deleted: true, last_modified: T2, updated_at: T2 });
+    await app.fn('syncPull')();
+    await tick(5);
+
+    const html = app.fn('renderEntry')();
+    t.includes(html, 'Deleted on your other device', 'precondition: a delete is waiting');
+    t.excludes(html, 'sync-apply-waiting',
+      'with no button \u2014 applying it would pull the screen out from under the engineer');
+
+    // Even forced, the allowance does not reach deletes.
+    app.run('_syncAllowOpen = ' + JSON.stringify(id));
+    await app.fn('syncPull')();
+    await tick(5);
+    app.run('_syncAllowOpen = null');
+    t.ok(jobById(app, id), 'and a delete still waits for them to leave, whatever the allowance says');
+  });
+
   /* ------------------------------------------------------------------ 17p */
   await t.group('17p — every trigger reads before it writes (decision 2A)', async () => {
     const app = signedIn({ server: { rows: [cloudJob('ZZREOPEN', 'ZZREOPENSITE', ['A'])] } });
