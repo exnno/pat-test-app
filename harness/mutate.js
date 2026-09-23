@@ -514,8 +514,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V81.3';",
-    to:   "const APP_VERSION = 'V81.3';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V81.4';",
+    to:   "const APP_VERSION = 'V81.4';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -634,8 +634,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V81.1</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V81.1</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V81</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V81.2</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V81.2</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V81.1</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1438,6 +1438,29 @@ const MUTATIONS = [
     from: "  if (!released && now - _syncLastNavPull < SYNC_NAV_THROTTLE_MS) return;",
     to:   "  if (now - _syncLastNavPull < SYNC_NAV_THROTTLE_MS) return;",
     why:  'the engineer almost always leaves within 20s of arriving, and arriving was itself a read — so the throttle swallows the one read that would apply the change. Close-and-reopen appears to fix it, which is why it reads as flakiness rather than a bug',
+  },
+
+  /* ---- V81.4: Update now ------------------------------------------------- */
+  {
+    name: 'M195 (V81.4) the Update now allowance is never cleared',
+    file: 'sync.js',
+    from: "  const clear = (v) => { _syncAllowOpen = null; return v; };",
+    to:   "  const clear = (v) => v;",
+    why:  'one tap becomes a standing permission: every later change to that job lands while it is open, keyboard up and all. Decision 7A undone by a button meant to be a single exception',
+  },
+  {
+    name: 'M196 (V81.4) the allowance applies deletes too',
+    file: 'sync.js',
+    from: "      if (kind === 'update' && _syncAllowOpen === id) return false;",
+    to:   "      if (_syncAllowOpen === id) return false;",
+    why:  'if the row turned into a delete between the tap and the read, the job the engineer is standing in vanishes from under them mid-screen. Narrow window, total outcome',
+  },
+  {
+    name: 'M197 (V81.4) the waiting line has no button',
+    file: 'render-core.js',
+    from: "       + '<button class=\"link-btn\" data-action=\"sync-apply-waiting\"' + (busy ? ' disabled' : '')",
+    to:   "       + '<span' + (busy ? '' : '')",
+    why:  'the release shipped and did nothing visible. Everything underneath works; nobody can reach it',
   },
 
 ];
