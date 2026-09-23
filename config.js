@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — config.js (constants & factories)
- * v80 (September 2026)
+ * v82 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V81.4';
+const APP_VERSION = 'V82';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -354,7 +354,16 @@ const REQUIRE_ACCOUNT = false;
 // engineer's, and on another phone it would be meaningless.
 const SYNC_STATE_KEY = 'pat:syncState';     // v80: JSON {userId,sent,gone,lastPushAt}; v81 adds pulledAt,lastPullAt
 const SYNC_PRUNED_KEY = 'pat:syncPruned';   // v80: JSON [{id,at}]
-const SYNC_HELD_KEY = 'pat:syncHeld';       // v81: JSON [{id,at,reason,name,localItems,cloudItems}]
+const SYNC_HELD_KEY = 'pat:syncHeld';       // v81: JSON [{id,at,reason,name,localItems,cloudItems}]; v82 adds kind + names
+// v82: the record kinds that sync, through the `records` table (spec section 3).
+// ⚠ Adding a kind here RESETS the records pull cursor on the next run (sync.js
+// compares the list it last read with against this one), so the new kind is read
+// from the beginning of the account rather than from wherever the old kinds had
+// reached. Rows of the old kinds come round again and resolve as no work.
+const SYNC_RECORD_KINDS = ['client', 'site'];
+// v82 (decision 6A): the "What's different?" sheet lists at most this many
+// items per section, then says how many more there are.
+const SYNC_DIFF_LIST_MAX = 20;
 const SYNC_DEBOUNCE_MS = 5000;      // quiet time after the last save before a push
 const SYNC_BOOT_DELAY_MS = 3000;    // after the first paint, not during it
 const SYNC_RESUME_DELAY_MS = 1000;  // app reopened / signal back

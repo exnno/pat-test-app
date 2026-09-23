@@ -259,7 +259,7 @@ let state = {
   //   waiting:   v81.1 — {id, kind} when a pulled change is being held back
   //              because that job is open on screen (decision 3A). Recomputed
   //              by every pull, so it clears itself when it stops being true.
-  sync: { busy: false, message: '', resolving: null, waiting: null },
+  sync: { busy: false, message: '', resolving: null, waiting: null, diffing: null },   // v82: diffing = held job being compared
   // v43: cloud pages visibility. cloudPagesRevealed is a transient per-session flag
   // set by long-pressing the About title; it resets when you navigate away from About
   // but persists if you open one of the cloud pages and return. Never persisted.

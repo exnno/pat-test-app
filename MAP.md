@@ -1,4 +1,4 @@
-# PATGo — Code Map (V80)
+# PATGo — Code Map (V82)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -538,12 +538,14 @@ Instrument settings live in **instruments.js**. The stats footer reads
 for **render-help.js**, and those pages still call `renderSettingsSubHeader()`
 from here. The About changelog is no longer in this file.
 
-### render-help.js (~412 ln) — help, about & cloud pages — NEW v73
+### render-help.js (~633 ln) — help, about & cloud pages — NEW v73
 About (+ the rolling 3-version changelog), Glossary (page + the
 `GLOSSARY_GROUPS` data array), Contact, `renderBugSheet()` markup, and the three
 cloud pages revealed by a long-press on the About title (v79: only on a host
 with a cloud). Account is real (logic in **cloud.js**); Sync is real from v80
-(logic in **sync.js**); Subscription is a placeholder.
+(logic in **sync.js**); Subscription is a placeholder. v82: `renderSyncHeld()`
+groups jobs and clients & sites, and `openSyncDiffSheet()` builds the read-only
+comparison sheet via feedback.js `_openSheet()`.
 **Touch to:** roll the About changelog, add or reword a glossary term, change the
 Contact page or the bug sheet's markup, or work on the cloud stubs.
 **Coupling:** reached only through `render()`'s dispatcher — NOT through the
@@ -574,7 +576,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~850 ln) — cloud sync, PUSH AND PULL — v80–v81.4
+### sync.js (~1715 ln) — cloud sync, PUSH AND PULL — v80–v82
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session
@@ -626,8 +628,26 @@ Deciding and applying are different things; do not collapse them (17q, M180).
 ⚠ Held and push are mutually exclusive: nothing held is sent, and nothing in
 `resend` is re-held. Break either half and the job can never sync again
 (M173, M176).
-Not probed at boot (optional subsystem). Harness 16a–16n and 17a–17z,
-mutations M142–M197.
+⚠ v82: CLIENTS AND SITES through the `records` table (`SYNC_RECORD_KINDS`,
+**config.js**). Own bookkeeping in `st.rec` (sent/gone/resend keyed by id, one
+cursor, `kinds` — a changed kind list resets the cursor). `_syncRecordsHalf`
+runs FIRST in a reading run only, and is fail-soft on its own: a records error
+never stops jobs, and a failed records pull means no records push. Writes
+`state.clients`/`state.sites` and saves via **storage.js** `saveSettings()`
+directly (not save(), which would re-arm the trigger). ⚠ Hash the PROJECTION
+(`_syncRecordDoc`), never the stored object — loadClients adds null fields on
+reload (M198). Remote client delete does NOT cascade; `_syncTidyOrphanSites()`
+moves dangling sites to Unassigned after a CLEAN pull only (4A). No trigger
+change: every client/site write goes through save() → saveSessions() →
+syncNoteSave, and 18r fails if anything else calls saveSettings().
+⚠ v82: held entries carry `kind` (absent = job, V81). Clear/note are kind-aware;
+the jobs push respects only kind 'session' holds. Page/dispatch key is
+`syncHeldKey()`: bare id for a job, `client/<id>` / `site/<id>` for a record.
+`syncJobDiff()` (pure, display text) + `syncHeldDiff()` (fetch on tap, action
+`sync-held-diff`) → **render-help.js** `openSyncDiffSheet()`. The fetched doc is
+never stored.
+Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z and 18a–18r,
+mutations M142–M225.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

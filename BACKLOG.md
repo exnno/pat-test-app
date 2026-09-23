@@ -17,18 +17,41 @@ leftovers are the IndexedDB photo store and the sync bookkeeping keys
 still signed in would pull its old jobs straight back. Most destructive button in
 the app, so the confirm needs to be genuinely hard to hit by accident.
 
-### Cloud track — V81.4: pull chapter CLOSED, records next
-V78 ledger → V79 sign-in → V80 push → **V81 pull** (fingerprint decides, held
-jobs for anything it will not guess at, remote deletes applied, cursor stops at
-the first unresolved row) → **V81.1** (the open job is judged not skipped; every
-run reads before it writes; the job screen says what is waiting) → **V81.2**
-(pull results repaint the current screen; reading follows navigation with an
-idle backstop; fingerprints are canonical because jsonb re-sorts keys) →
-**V81.3** (leaving a job releases what was waiting for it) → **V81.4** (Update
-now). Two-phone test list 6–17 passed on real hardware. **Next: the remaining record kinds** (clients, sites,
-presets, settings, instruments) → photos (+ the cross-account download isolation
-check) → status UI. Every cloud release runs `supabase/isolation-test.sql`
-(all PASS) before promotion to `Release`.
+### Cloud track — V82: clients and sites sync; instruments next
+V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull (closed) → **V82** clients
++ sites through `records`, and the held card shows what differs. Agreed split
+(V82 Q1A): **V83 instruments + presets** → **V84 settings + report templates** →
+photos (+ the cross-account download isolation check) → status UI. Every cloud
+release runs `supabase/isolation-test.sql` (all PASS) before promotion to
+`Release` — passed at V81.4.
+
+### Cloud — V83 must carry these (found speccing V82)
+- ⚠ A pulled job keeps its `instrumentId`, but instruments do not sync yet. If
+  the other phone lacks that id and the job has no frozen snapshot,
+  `instrumentForSession()` falls to tier three and the certificate names that
+  phone's ACTIVE instrument. Phones restored from one backup share ids and are
+  fine. V83 closes it; until then, don't trust certificates printed from pulled
+  jobs on a phone with different instruments.
+- `deleteInstrument()` records NO tombstone and `TOMBSTONE_KINDS` lacks
+  'instrument' (and 'template'). Widening the normaliser is a superset — old
+  backups still restore.
+- A remote instrument delete must freeze `instrumentSnapshot` onto referencing
+  jobs BEFORE removing it, as the local delete does — and that edits jobs, which
+  then sync. Same shape as `_syncApplyRemoteDelete` duplicating deleteSession.
+- Adding kinds to `SYNC_RECORD_KINDS` resets the records cursor by design (18m).
+- Report templates `tpl_standard` / `tpl_summary` have the SAME id on every
+  install — the first sync treats them as one record. Probably right; decide in
+  V84.
+- Settings singleton: theme, scanner pairing, scan speed, sort and filters are
+  per-device and must not sync. Setup-bundle sections (setup.js) are a ready-made
+  split to start from.
+
+### Cloud — an older phone strips fields it doesn't know (V82 note)
+Records sync a projection (`_syncRecordDoc`). A later version that adds a client
+field must add it there AND in loadClients/loadSites; until every phone has
+that version, an older phone that EDITS the record sends it back without the
+field. Receiving is harmless. Worth remembering before adding anything to a
+client (address, contact).
 
 ### Cloud — photos do not sync yet (V81 note)
 A job pulled onto a second device shows its photos as missing — same as a backup

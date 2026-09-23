@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — sync.js (cloud sync: push and pull)
- * v81 (September 2026)
+ * v82 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -11,6 +11,14 @@
  * still do not sync — a job pulled onto a second phone will show photos it does
  * not have, which is the same as restoring a backup onto a new phone and fails
  * soft the same way.
+ *
+ * V82: CLIENTS AND SITES as well, through the `records` table, on exactly the
+ * rules jobs follow — fingerprints decide, anything not applied is held, a push
+ * only ever follows a pull. See "records" below for the three places they
+ * differ (no open-record deferral, no item-count guard, and the Unassigned
+ * tidy-up of decision 4A). Held entries now carry a `kind`; an entry written by
+ * V81 has none and reads as a job. And the Sync page can now show what actually
+ * differs between the two copies of a held job (syncJobDiff / syncHeldDiff).
  *
  * ⚠ THIS FILE NOW WRITES APP DATA. Through V80 it only ever read state and
  * wrote its own keys. From V81 the pull adds, replaces and deletes jobs, which
@@ -138,7 +146,16 @@ function _syncEmpty(userId) {
   // choosing the phone's copy would have to fake a fingerprint mismatch, and a
   // fake value in the store is a value someone later reads as real.
   return { userId: userId || '', sent: {}, gone: {}, resend: {}, lastPushAt: null,
-           pulledAt: null, lastPullAt: null, hashV: SYNC_HASH_V };
+           pulledAt: null, lastPullAt: null, hashV: SYNC_HASH_V,
+           // v82: the same bookkeeping for clients and sites, kept apart from the
+           // jobs' so the two can never be confused. Keyed by record id alone,
+           // which is how the server keys them (primary key user_id + id).
+           // `kinds` is the SYNC_RECORD_KINDS list the cursor was read with.
+           rec: _syncRecEmpty() };
+}
+
+function _syncRecEmpty() {
+  return { sent: {}, gone: {}, resend: {}, pulledAt: null, kinds: '' };
 }
 
 function _syncLoad() {
@@ -164,7 +181,21 @@ function _syncLoad() {
   // v81.2: fingerprints written before canonical hashing mean nothing now, so
   // they are dropped rather than left to mismatch for ever. Costs one re-send of
   // every job, once. `gone` survives — a delete already sent is still sent.
-  if (raw.hashV !== SYNC_HASH_V) out.sent = {};
+  // v82: records bookkeeping. Absent (every phone upgrading from V81) or
+  // malformed collapses to empty, which means "read everything and send
+  // everything" — the safe direction, exactly as for jobs.
+  const rr = raw.rec;
+  if (rr && typeof rr === 'object' && !Array.isArray(rr)) {
+    const r = out.rec;
+    const strMap = (m, dst) => { if (m && typeof m === 'object' && !Array.isArray(m)) for (const k of Object.keys(m)) if (typeof m[k] === 'string') dst[k] = m[k]; };
+    const trueMap = (m, dst) => { if (m && typeof m === 'object' && !Array.isArray(m)) for (const k of Object.keys(m)) if (m[k] === true) dst[k] = true; };
+    strMap(rr.sent, r.sent);
+    trueMap(rr.gone, r.gone);
+    trueMap(rr.resend, r.resend);
+    if (typeof rr.pulledAt === 'string' && !isNaN(Date.parse(rr.pulledAt))) r.pulledAt = rr.pulledAt;
+    if (typeof rr.kinds === 'string') r.kinds = rr.kinds;
+  }
+  if (raw.hashV !== SYNC_HASH_V) { out.sent = {}; out.rec.sent = {}; }
   else out.hashV = SYNC_HASH_V;
   return out;
 }
@@ -196,8 +227,18 @@ function syncStatusSummary() {
   for (const s of jobs) {
     if (st.sent[String(s.id)] === syncHash(_syncCanonical(s))) upToDate++;
   }
+  // v82: clients and sites, counted together — the page shows one line for them.
+  let recTotal = 0, recUpToDate = 0;
+  for (const kind of SYNC_RECORD_KINDS) {
+    for (const r of _syncRecordList(kind)) {
+      if (!r || r.id == null || r.id === '') continue;
+      recTotal++;
+      if (st.rec.sent[String(r.id)] === _syncRecordHash(kind, r)) recUpToDate++;
+    }
+  }
   return {
     total: jobs.length, upToDate, waiting: jobs.length - upToDate,
+    recTotal, recUpToDate,
     lastPushAt: st.lastPushAt,
     // v81
     lastPullAt: st.lastPullAt,
@@ -303,6 +344,16 @@ function syncPrunedMerge(incoming) {
 //   deleted-here     this phone deleted it, the cloud has it live again
 //   unreadable       the cloud row did not survive the validator (decision 8A)
 //
+// v82: entries carry a `kind` — 'session', 'client' or 'site'. An entry with no
+// kind was written by V81 and is a job. Uniqueness is kind + id. A client or site
+// entry also carries the NAMES on each side (localName / cloudName, and for a
+// site the client it sits under, localParent / cloudParent) so the card can show
+// the difference without a tap (decision 7A). That is a deliberate, narrow
+// loosening of the rule above: a name is all a client IS, it is refreshed every
+// time the row is re-read, and answering still re-reads the cloud — so what is
+// APPLIED is never the stored copy. Jobs still store counts only.
+// A parent of '' means "no client"; null means "a client this phone doesn't have".
+//
 // NOT held, because they need no decision and resolve themselves: a row for the
 // job on screen (decision 7A) and anything already in SYNC_PRUNED_KEY. Both are
 // simply skipped for the run, which holds the cursor, and retried on the next.
@@ -310,21 +361,38 @@ function _syncHeldNormalise(list) {
   const out = [];
   const seen = new Set();
   const reasons = ['both-changed', 'fewer-items', 'deleted-elsewhere', 'deleted-here', 'unreadable'];
+  const kinds = ['session'].concat(SYNC_RECORD_KINDS);
   if (!Array.isArray(list)) return out;
+  const num = (v) => (typeof v === 'number' && isFinite(v) && v >= 0) ? Math.floor(v) : null;
+  const txt = (v) => (typeof v === 'string') ? v.slice(0, 200) : null;
   for (const e of list) {
     if (!e || typeof e !== 'object') continue;
     const id = (typeof e.id === 'string' || typeof e.id === 'number') ? String(e.id) : '';
-    if (!id || seen.has(id)) continue;
+    const kind = (e.kind === undefined) ? 'session' : e.kind;   // V81 entries: jobs
+    if (!id || kinds.indexOf(kind) === -1) continue;
     if (reasons.indexOf(e.reason) === -1) continue;
+    // A client has no items, so the item-count guard can never hold one.
+    if (kind !== 'session' && e.reason === 'fewer-items') continue;
+    const key = kind + '\u0000' + id;
+    if (seen.has(key)) continue;
     const at = (typeof e.at === 'string' && !isNaN(Date.parse(e.at))) ? e.at : new Date(0).toISOString();
-    const num = (v) => (typeof v === 'number' && isFinite(v) && v >= 0) ? Math.floor(v) : null;
-    seen.add(id);
-    out.push({
-      id, at, reason: e.reason,
+    seen.add(key);
+    const entry = {
+      id, kind, at, reason: e.reason,
       name: typeof e.name === 'string' ? e.name : '',
-      localItems: num(e.localItems),
-      cloudItems: num(e.cloudItems),
-    });
+    };
+    if (kind === 'session') {
+      entry.localItems = num(e.localItems);
+      entry.cloudItems = num(e.cloudItems);
+    } else {
+      entry.localName = txt(e.localName);
+      entry.cloudName = txt(e.cloudName);
+      if (kind === 'site') {
+        entry.localParent = txt(e.localParent);
+        entry.cloudParent = txt(e.cloudParent);
+      }
+    }
+    out.push(entry);
   }
   return out;
 }
@@ -344,17 +412,39 @@ function _syncHeldSave(list) {
 
 // Record (or refresh) one held job. Refreshing matters: the same row is re-read
 // on every run while it is held, and the counts may have moved on either side.
+// v82: kind-aware. An entry without a kind is a job, so every V81 call site
+// (which passes none) keeps meaning exactly what it meant.
 function _syncHeldNote(entry) {
-  const list = _syncHeldLoad().filter(e => e.id !== String(entry.id));
-  list.push(Object.assign({ at: new Date().toISOString() }, entry, { id: String(entry.id) }));
+  const kind = entry.kind || 'session';
+  const id = String(entry.id);
+  const list = _syncHeldLoad().filter(e => !(e.id === id && e.kind === kind));
+  list.push(Object.assign({ at: new Date().toISOString() }, entry, { id, kind }));
   _syncHeldSave(list);
 }
 
-function _syncHeldClear(id) {
+function _syncHeldClear(id, kind) {
   const sid = String(id);
+  const k = kind || 'session';
   const list = _syncHeldLoad();
-  const out = list.filter(e => e.id !== sid);
+  const out = list.filter(e => !(e.id === sid && e.kind === k));
   if (out.length !== list.length) _syncHeldSave(out);
+}
+
+// v82: one string that names a held entry on the page and in dispatch. A job
+// keeps its bare id — exactly what V81 put in data-arg — and a client or site
+// is "kind/id". No job id can start with "client/" or "site/": they are
+// newId() values or older base-36 uids, neither of which contains a slash.
+function syncHeldKey(e) {
+  return (!e || !e.kind || e.kind === 'session') ? String(e && e.id) : e.kind + '/' + String(e.id);
+}
+
+function _syncParseHeldKey(key) {
+  const s = String(key == null ? '' : key);
+  const slash = s.indexOf('/');
+  if (slash > 0 && SYNC_RECORD_KINDS.indexOf(s.slice(0, slash)) !== -1) {
+    return { kind: s.slice(0, slash), id: s.slice(slash + 1) };
+  }
+  return { kind: 'session', id: s };
 }
 
 // For the Sync page. Newest question first.
@@ -765,8 +855,10 @@ function syncPull(opts) {
 
 // One plain line for the Sync page. Held jobs are named last and never as a
 // number alone — "1 needs a decision" with nothing else said reads as an error.
+// v82: clients and sites get their own short sentence, after the jobs one.
 function _syncOutcome(r) {
   const p = r.pulled || { applied: 0, added: 0, removed: 0, held: 0 };
+  const rr = r.records || null;
   const bits = [];
   const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
   const got = p.added + p.applied;
@@ -774,9 +866,31 @@ function _syncOutcome(r) {
   if (p.removed) bits.push('removed ' + plural(p.removed, 'job deleted on your other device', 'jobs deleted on your other device'));
   if (r.sent) bits.push((bits.length ? 'sent ' : 'Sent ') + plural(r.sent, 'job', 'jobs'));
   if (r.deleted) bits.push((bits.length ? 'sent ' : 'Sent ') + plural(r.deleted, 'deletion', 'deletions'));
-  let msg = bits.length ? bits.join(', ') + '.' : 'Everything was already up to date.';
-  if (p.held) {
-    msg += ' ' + plural(p.held, 'job needs', 'jobs need') + ' you to decide \u2014 see below.';
+
+  const rec = [];
+  if (rr && !rr.error) {
+    const inN = rr.added + rr.applied + rr.removed;
+    const outN = rr.sent + rr.deleted;
+    if (inN) rec.push(plural(inN, 'change', 'changes') + ' brought in');
+    if (outN) rec.push(plural(outN, 'change', 'changes') + ' sent');
+    if (rr.unassigned) rec.push(plural(rr.unassigned, 'site', 'sites') + ' moved to Unassigned because the client was deleted on your other device');
+  }
+
+  let msg = bits.length ? bits.join(', ') + '.' : '';
+  if (rec.length) msg += (msg ? ' ' : '') + 'Clients & sites: ' + rec.join(', ') + '.';
+  if (!msg) msg = 'Everything was already up to date.';
+  if (rr && rr.error) {
+    msg += ' Clients & sites couldn\u2019t be checked this time \u2014 they\u2019re safe on this phone and will be tried again.';
+  }
+
+  const hJobs = p.held || 0;
+  const hRec = (rr && !rr.error && rr.held) || 0;
+  if (hJobs && hRec) {
+    msg += ' Some jobs and some clients or sites need you to decide \u2014 see below.';
+  } else if (hJobs) {
+    msg += ' ' + plural(hJobs, 'job needs', 'jobs need') + ' you to decide \u2014 see below.';
+  } else if (hRec) {
+    msg += ' ' + plural(hRec, 'client or site needs', 'clients or sites need') + ' you to decide \u2014 see below.';
   }
   return msg;
 }
@@ -793,10 +907,16 @@ function _syncRun(o) {
     if (!uid) { const e = new Error('not signed in'); e.syncStage = 'auth'; throw e; }
     const st = _syncStateFor(uid);
     const pulled = { applied: 0, added: 0, removed: 0, held: 0, waiting: null };
-    const first = opts.pull ? _syncPull(c, uid, st, pulled) : Promise.resolve();
-    return first
-      .then(() => _syncPushHalf(c, uid, st, !!opts.force))
-      .then((r) => ({ sent: r.sent, deleted: r.deleted, pulled }));
+    // v82: clients and sites go FIRST, so a job that arrives in this run finds
+    // its client already here. Only on a run that reads (rule 4) — so never on
+    // "Re-send all jobs", which is jobs only. Fail-soft: see _syncRecordsHalf.
+    const recs = opts.pull ? _syncRecordsHalf(c, uid, st) : Promise.resolve(null);
+    return recs.then((records) => {
+      const first = opts.pull ? _syncPull(c, uid, st, pulled) : Promise.resolve();
+      return first
+        .then(() => _syncPushHalf(c, uid, st, !!opts.force))
+        .then((r) => ({ sent: r.sent, deleted: r.deleted, pulled, records }));
+    });
   }));
 }
 
@@ -812,7 +932,8 @@ function _syncPushHalf(c, uid, st, force) {
     // overwritten it with. Nothing held moves in either direction until the
     // engineer says which copy wins; resolving clears the hold first, so the
     // answer is still sent immediately.
-    const heldIds = new Set(_syncHeldLoad().map(e => e.id));
+    // v82: jobs only — a held client says nothing about any job.
+    const heldIds = new Set(_syncHeldLoad().filter(e => e.kind === 'session').map(e => e.id));
 
     for (const s of _syncSessions()) {
       const id = String(s.id);
@@ -883,6 +1004,331 @@ function _syncPushHalf(c, uid, st, force) {
   });
 }
 
+// ---- records: clients and sites (V82) ------------------------------------------------
+// The same machine as jobs, pointed at the `records` table. Every rule in the
+// header holds here too: the fingerprint decides, nothing is applied on a guess,
+// anything not applied is HELD, the cursor stops at the first unresolved row,
+// and a push only ever follows a pull (records are only touched on a run that
+// reads — "Re-send all jobs" is jobs only and never sends them).
+//
+// Where records DIFFER from jobs, and why:
+//   • No open-record deferral. A client is never "under the engineer's thumb" the
+//     way the job on its entry screen is. Every dialog that edits one looks it up
+//     by id at the moment it saves, and an applied row REPLACES the object, so a
+//     rename sheet open across a pull simply saves over the new copy — the
+//     engineer's later tap wins, which is what they meant.
+//   • No item-count guard. There are no items.
+//   • Decision 4A. A client deleted on the other phone does NOT cascade to its
+//     sites here. The phone that deleted it tombstoned every child site IT had,
+//     and those arrive as their own deletes. A site it never had — made on this
+//     phone — falls to Unassigned in the tidy-up at the end of a clean pull. It
+//     is never deleted on the strength of something the other phone never saw.
+//
+// ⚠ WHAT SYNCS IS A PROJECTION, not the stored object. loadClients() adds
+// `userId: null` and `lastModified: null` to every record on reload, and a record
+// made mid-session has neither key — so hashing the stored object would change
+// a record's fingerprint across a close and reopen with nothing edited, and a
+// phone would see its own work as a clash. The projection is the fields that
+// MEAN something (id, name, and a site's clientId), names trimmed the way
+// loadClients() trims them.
+// ⚠ A LATER VERSION THAT ADDS A FIELD must add it here AND in loadClients /
+// loadSites. Until every phone is on that version, an older phone that edits
+// the record will send it back without the new field — its projection cannot
+// carry what it does not know about. Fields it merely RECEIVES are harmless:
+// the cloud row is hashed through the same projection, so an unknown field is
+// invisible to it rather than a difference that can never be settled.
+
+function _syncRecordList(kind) {
+  if (kind === 'client') return state.clients || [];
+  if (kind === 'site') return state.sites || [];
+  return [];
+}
+
+function _syncRecordSetList(kind, list) {
+  if (kind === 'client') state.clients = list;
+  else if (kind === 'site') state.sites = list;
+}
+
+function _syncRecordDoc(kind, rec) {
+  const r = rec || {};
+  if (kind === 'client') return { id: String(r.id), name: String(r.name || '').trim() };
+  if (kind === 'site') return { id: String(r.id), clientId: String(r.clientId || ''), name: String(r.name || '').trim() };
+  return null;
+}
+
+function _syncRecordHash(kind, rec) {
+  return syncHash(_syncCanonical(_syncRecordDoc(kind, rec)));
+}
+
+// The local shape, as loadClients()/loadSites() would build it. The two
+// passthrough fields are carried over from the record being replaced.
+function _syncRecordFromDoc(kind, doc, old) {
+  const d = _syncRecordDoc(kind, doc);
+  d.userId = (old && typeof old.userId === 'string') ? old.userId : null;
+  d.lastModified = (old && typeof old.lastModified === 'string') ? old.lastModified : null;
+  return d;
+}
+
+// Decision 8A for records: what the app cannot survive without. loadClients()
+// drops a nameless record on the next reload, so a nameless row applied now
+// would vanish later and read as a delete. It is held instead.
+function _syncValidRecord(kind, doc, id) {
+  if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return false;
+  if (doc.id == null || String(doc.id) !== String(id)) return false;
+  if (typeof doc.name !== 'string' || !doc.name.trim()) return false;
+  if (kind === 'site' && doc.clientId != null && typeof doc.clientId !== 'string') return false;
+  return true;
+}
+
+// '' — no client; null — a client id this phone doesn't have.
+function _syncClientNameOf(clientId) {
+  const id = String(clientId || '');
+  if (!id) return '';
+  const c = (state.clients || []).find(x => x && String(x.id) === id);
+  return c ? c.name : null;
+}
+
+function _syncRecordHeldEntry(kind, id, reason, local, doc) {
+  const e = { id, kind, reason,
+    name: (local && local.name) || (doc && typeof doc.name === 'string' ? doc.name : '') || '',
+    localName: local ? String(local.name || '') : null,
+    cloudName: (doc && typeof doc.name === 'string') ? doc.name : null };
+  if (kind === 'site') {
+    e.localParent = local ? _syncClientNameOf(local.clientId) : null;
+    e.cloudParent = (doc && typeof doc.name === 'string') ? _syncClientNameOf(doc.clientId) : null;
+  }
+  return e;
+}
+
+// Replace, never edit in place — same habit as jobs, and it means nothing that
+// captured the old object can write stale fields back over the new one.
+function _syncReplaceRecord(kind, old, doc) {
+  const list = _syncRecordList(kind);
+  const i = list.indexOf(old);
+  if (i === -1) return false;
+  const next = list.slice();
+  next[i] = _syncRecordFromDoc(kind, doc, old);
+  _syncRecordSetList(kind, next);
+  return true;
+}
+
+// Ledger first, then the removal (MAP rule 5), exactly as deleteClient() and
+// deleteSite() do. ⚠ Deliberately NO site cascade for a client — see 4A above.
+function _syncApplyRecordDelete(kind, id) {
+  const list = _syncRecordList(kind);
+  if (!list.some(r => r && String(r.id) === id)) return false;
+  recordTombstone(kind, id);
+  _syncRecordSetList(kind, list.filter(r => !(r && String(r.id) === id)));
+  return true;
+}
+
+// Decision 4A. After a CLEAN pull only: a site whose client is not on this phone
+// goes to Unassigned rather than sitting invisible (the Clients page shows a
+// site under its client or under Unassigned, and a dangling one under neither).
+// Skipped on a held run, because the missing client may be the very thing
+// waiting on a decision, and a held site is left exactly as it is.
+function _syncTidyOrphanSites() {
+  const clientIds = new Set((state.clients || []).map(c => c && String(c.id)));
+  const heldSites = new Set(_syncHeldLoad().filter(e => e.kind === 'site').map(e => e.id));
+  let moved = 0;
+  const next = (state.sites || []).map((s) => {
+    if (!s || !s.clientId || clientIds.has(String(s.clientId)) || heldSites.has(String(s.id))) return s;
+    moved++;
+    return Object.assign({}, s, { clientId: '' });
+  });
+  if (moved) state.sites = next;
+  return moved;
+}
+
+function _syncPullRecords(c, uid, st, out) {
+  const rs = st.rec;
+  // A new kind means a new version is reading for the first time: start from
+  // the beginning, or every row of that kind already behind the cursor would
+  // never be seen. See SYNC_RECORD_KINDS in config.js.
+  const kindsTag = SYNC_RECORD_KINDS.join(',');
+  if (rs.kinds !== kindsTag) { rs.pulledAt = null; rs.kinds = kindsTag; }
+  const since = rs.pulledAt || SYNC_PULL_EPOCH;
+  let changed = false;
+  let blocked = false;
+  let high = since;
+
+  function decide(row) {
+    const id = String(row && row.id != null ? row.id : '');
+    const kind = String(row && row.kind || '');
+    if (!id || SYNC_RECORD_KINDS.indexOf(kind) === -1) { blocked = true; return; }
+
+    // Answered in this phone's favour; the push half of this run replaces it.
+    if (rs.resend[id]) return;
+
+    const local = _syncRecordList(kind).find(r => r && String(r.id) === id) || null;
+    const tomb = (state.tombstones || []).some(t => t && t.kind === kind && String(t.id) === id);
+    const hold = (reason, doc) => {
+      _syncHeldNote(_syncRecordHeldEntry(kind, id, reason, local, doc));
+      blocked = true; out.held++;
+    };
+
+    if (row.deleted === true) {
+      if (!local) {
+        if (tomb || rs.sent[id]) { delete rs.sent[id]; rs.gone[id] = true; }
+        _syncHeldClear(id, kind);
+        return;
+      }
+      if (rs.sent[id] === _syncRecordHash(kind, local)) {
+        _syncApplyRecordDelete(kind, id);
+        delete rs.sent[id];
+        rs.gone[id] = true;
+        out.removed++; changed = true;
+        _syncHeldClear(id, kind);
+        return;
+      }
+      hold('deleted-elsewhere', null);
+      return;
+    }
+
+    if (!_syncValidRecord(kind, row.doc, id)) { hold('unreadable', null); return; }
+
+    const hash = _syncRecordHash(kind, row.doc);
+
+    if (!local) {
+      if (tomb) {
+        if (!rs.gone[id]) return;          // our delete goes up in this run
+        hold('deleted-here', row.doc);
+        return;
+      }
+      _syncRecordSetList(kind, _syncRecordList(kind).concat([_syncRecordFromDoc(kind, row.doc, null)]));
+      rs.sent[id] = hash;
+      out.added++; changed = true;
+      _syncHeldClear(id, kind);
+      return;
+    }
+
+    const localHash = _syncRecordHash(kind, local);
+    if (hash === localHash) { rs.sent[id] = hash; _syncHeldClear(id, kind); return; }
+    if (rs.sent[id] !== localHash) { hold('both-changed', row.doc); return; }
+
+    _syncReplaceRecord(kind, local, row.doc);
+    rs.sent[id] = hash;
+    out.applied++; changed = true;
+    _syncHeldClear(id, kind);
+  }
+
+  // One request for every kind, one cursor, paged exactly as jobs are.
+  function page(from) {
+    return c.from('records')
+      .select('id,kind,doc,deleted,last_modified,updated_at')
+      .in('kind', SYNC_RECORD_KINDS)
+      .gt('updated_at', from)
+      .order('updated_at', { ascending: true })
+      .limit(SYNC_PULL_PAGE)
+      .then((r) => {
+        if (r && r.error) throw r.error;
+        const rows = (r && r.data) || [];
+        for (const row of rows) {
+          decide(row);
+          const u = row && row.updated_at;
+          if (typeof u === 'string' && u > high) high = u;
+        }
+        if (rows.length < SYNC_PULL_PAGE) return;
+        if (high === from) { blocked = true; return; }
+        return page(high);
+      });
+  }
+
+  return page(since).then(() => {
+    if (!blocked) {
+      const moved = _syncTidyOrphanSites();
+      if (moved) { out.unassigned += moved; changed = true; }
+      rs.pulledAt = high;
+    }
+    _syncSave(st);
+    if (changed) {
+      // storage.js save() is saveSessions() + saveSettings(); only the second
+      // holds clients and sites, and the first would re-arm the sync timer for
+      // nothing. The push half of this same run sends anything tidied above.
+      if (typeof saveSettings === 'function') saveSettings();
+      _syncRepaintApp();
+    }
+  });
+}
+
+function _syncPushRecords(c, uid, st, out) {
+  const rs = st.rec;
+  const now = new Date().toISOString();
+  const work = [];
+  // Held is the only state the push respects (rule 5): nothing held is sent.
+  const held = new Set(_syncHeldLoad().filter(e => e.kind !== 'session').map(e => e.id));
+
+  for (const kind of SYNC_RECORD_KINDS) {
+    const live = new Set();
+    for (const r of _syncRecordList(kind)) {
+      if (!r || r.id == null || r.id === '') continue;
+      const id = String(r.id);
+      live.add(id);
+      if (held.has(id)) continue;
+      const doc = _syncRecordDoc(kind, r);
+      // Never send what the other phone would have to hold as unreadable.
+      if (!_syncValidRecord(kind, doc, id)) continue;
+      // ⚠ Wire and fingerprint are separate jobs (M184): send the JSON, hash the
+      // canonical form. Captured together, at build time, for the reason the
+      // header gives for jobs.
+      const json = JSON.stringify(doc);
+      const hash = syncHash(_syncCanonical(doc));
+      if (!rs.resend[id] && rs.sent[id] === hash) continue;
+      work.push({ id, hash, gone: false, bytes: json.length,
+        row: { id, user_id: uid, kind, doc: JSON.parse(json), deleted: false, last_modified: now } });
+    }
+    for (const t of (state.tombstones || [])) {
+      if (!t || t.kind !== kind) continue;
+      const id = String(t.id);
+      if (held.has(id) || live.has(id)) continue;
+      if (!rs.sent[id] && !rs.gone[id] && !rs.resend[id]) continue;   // server never had it
+      if (rs.gone[id] && !rs.resend[id]) continue;                     // already sent
+      const at = (typeof t.at === 'string' && !isNaN(Date.parse(t.at))) ? t.at : now;
+      work.push({ id, hash: null, gone: true, bytes: 64,
+        row: { id, user_id: uid, kind, doc: {}, deleted: true, last_modified: at } });
+    }
+  }
+
+  // Records are small, but a first sign-in sends every one of them at once.
+  const batches = [];
+  let cur = [], size = 0;
+  for (const w of work) {
+    if (cur.length && (cur.length >= SYNC_BATCH_ROWS || size + w.bytes > SYNC_BATCH_BYTES)) {
+      batches.push(cur); cur = []; size = 0;
+    }
+    cur.push(w); size += w.bytes;
+  }
+  if (cur.length) batches.push(cur);
+
+  let chain = Promise.resolve();
+  for (const batch of batches) {
+    chain = chain
+      .then(() => c.from('records').upsert(batch.map(w => w.row), { onConflict: 'user_id,id' }))
+      .then((r) => {
+        if (r && r.error) throw r.error;
+        for (const w of batch) {
+          delete rs.resend[w.id];
+          if (w.gone) { delete rs.sent[w.id]; rs.gone[w.id] = true; out.deleted++; }
+          else { rs.sent[w.id] = w.hash; delete rs.gone[w.id]; out.sent++; }
+        }
+        _syncSave(st);
+      });
+  }
+  return chain;
+}
+
+// Pull then push, as one unit, and FAIL-SOFT on its own: a problem with the
+// records table must never stop jobs syncing — jobs are the engineer's work,
+// clients are a convenience list. The error is reported on the Sync page and
+// the next run tries again. ⚠ The push is chained AFTER the pull, so a failed
+// pull means no push (rule 4).
+function _syncRecordsHalf(c, uid, st) {
+  const out = { applied: 0, added: 0, removed: 0, held: 0, unassigned: 0, sent: 0, deleted: 0, error: null };
+  return _syncPullRecords(c, uid, st, out)
+    .then(() => _syncPushRecords(c, uid, st, out))
+    .then(() => out, (e) => { out.error = e || new Error('records'); return out; });
+}
+
 // ---- "Update now" (v81.4) -----------------------------------------------------------
 // The button on the entry screen's "changes waiting" line. Reverses V81.3's 2B
 // after real use: opening a job to that message, the instinct was to reach for a
@@ -913,12 +1359,18 @@ function syncApplyWaiting() {
 //
 // Either way the run that follows advances the cursor: whichever copy won, the
 // two sides now agree, and the row resolves as no work next time round.
+//
+// v82: `id` is a held KEY (syncHeldKey) — a job's bare id, as V81 sent, or
+// "client/<id>" / "site/<id>" for a record, which _syncHeldResolveRecord
+// answers on the same two terms.
 function syncHeldResolve(id, choice) {
-  const sid = String(id);
+  const parsed = _syncParseHeldKey(id);
+  const sid = parsed.id;
   if (!syncActive()) return Promise.resolve(false);
-  const entry = _syncHeldLoad().find(e => e.id === sid);
+  const entry = _syncHeldLoad().find(e => e.id === sid && e.kind === parsed.kind);
   if (!entry) return Promise.resolve(false);
   if (choice !== 'phone' && choice !== 'cloud') return Promise.resolve(false);
+  if (parsed.kind !== 'session') return _syncHeldResolveRecord(parsed.kind, sid, choice, String(id));
 
   state.sync.resolving = sid;
   state.sync.message = '';
@@ -977,6 +1429,223 @@ function syncHeldResolve(id, choice) {
         done('');
         return syncPush({ manual: true, pull: true }).then(() => true);
       }))
+    .catch((e) => {
+      done(syncErrorMessage(e));
+      return false;
+    });
+}
+
+// v82: the same two answers for a client or site.
+//   'phone' — nothing local changes; the record (or its delete) is re-sent.
+//   'cloud' — the row is re-read NOW and applied as it stands. The names on the
+//             card were for reading; they are never what gets applied.
+function _syncHeldResolveRecord(kind, sid, choice, key) {
+  state.sync.resolving = key;
+  state.sync.message = '';
+  _syncRepaint();
+  const done = (msg) => {
+    state.sync.resolving = null;
+    if (msg) state.sync.message = msg;
+    _syncRepaint();
+  };
+  const what = kind === 'site' ? 'site' : 'client';
+
+  if (choice === 'phone') {
+    const st = _syncStateFor(_syncCurrentUserId());
+    st.rec.resend[sid] = true;
+    delete st.rec.gone[sid];
+    _syncSave(st);
+    _syncHeldClear(sid, kind);
+    done('');
+    return syncPush({ manual: true, pull: true }).then(() => true);
+  }
+
+  return cloudClient()
+    .then((c) => c.from('records').select('id,kind,doc,deleted,last_modified,updated_at')
+      .eq('id', sid).limit(1)
+      .then((r) => {
+        if (r && r.error) throw r.error;
+        const row = (r && r.data && r.data[0]) || null;
+        const st = _syncStateFor(_syncCurrentUserId());
+        const rs = st.rec;
+        if (!row || String(row.kind || '') !== kind) {
+          _syncHeldClear(sid, kind);
+          _syncSave(st);
+          done('That ' + what + ' is no longer in the cloud, so this phone\u2019s copy has been kept.');
+          return true;
+        }
+        const local = _syncRecordList(kind).find(x => x && String(x.id) === sid) || null;
+        if (row.deleted === true) {
+          if (local) _syncApplyRecordDelete(kind, sid);
+          delete rs.sent[sid];
+          rs.gone[sid] = true;
+        } else if (_syncValidRecord(kind, row.doc, sid)) {
+          if (local) _syncReplaceRecord(kind, local, row.doc);
+          else _syncRecordSetList(kind, _syncRecordList(kind).concat([_syncRecordFromDoc(kind, row.doc, null)]));
+          rs.sent[sid] = _syncRecordHash(kind, row.doc);
+          delete rs.gone[sid];
+        } else {
+          done('That cloud copy still can\u2019t be read, so nothing has been changed. Choose this phone\u2019s copy to replace it.');
+          return false;
+        }
+        if (typeof saveSettings === 'function') saveSettings();
+        _syncSave(st);
+        _syncHeldClear(sid, kind);
+        done('');
+        return syncPush({ manual: true, pull: true }).then(() => true);
+      }))
+    .catch((e) => {
+      done(syncErrorMessage(e));
+      return false;
+    });
+}
+
+// ---- "What's different?" (v82, decisions 5A and 6A) ------------------------------------
+// A plain comparison of the two copies of a held job, for READING. It changes
+// nothing, stores nothing, and is thrown away when the sheet closes: the cloud
+// copy is fetched on the tap, compared, shown, and dropped — the held list
+// still keeps counts only (rule 7).
+//
+// Items are matched by their own id. An item with no id (older data) is matched
+// by position instead, which is the best available and is labelled no
+// differently — those jobs predate the question this answers.
+//
+// Everything returned is display text, so the sheet only has to escape it.
+// null for a value means "different, but not something a line can show"
+// (readings, a frozen instrument copy), and the sheet says just that.
+function syncJobDiff(local, cloud) {
+  const L = local || {}, C = cloud || {};
+  const blankish = (v) => v === undefined || v === null || v === '';
+  const same = (a, b) => (blankish(a) && blankish(b)) || _syncCanonical(a) === _syncCanonical(b);
+  const clip = (t) => { const x = String(t).replace(/\s+/g, ' ').trim(); return x.length > 60 ? x.slice(0, 59) + '\u2026' : x; };
+  const when = (v) => { const d = new Date(v); return isNaN(d.getTime()) ? clip(v) : d.toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
+  const fmt = (v, key) => {
+    if (blankish(v)) return '(blank)';
+    if (typeof v === 'boolean') return v ? 'Yes' : 'No';
+    if (typeof v === 'number') return String(v);
+    if (typeof v !== 'string') return null;
+    if (key === 'result') return clip(v.charAt(0).toUpperCase() + v.slice(1));
+    if (key === 'ts') return when(v);
+    return clip(v);
+  };
+
+  // ---- the job's own details
+  const JOB = { name: 'Job name', site: 'Site', engineer: 'Engineer', date: 'Date',
+    prefix: 'Asset prefix', startNumber: 'Start number', startPad: 'Number padding',
+    locked: 'Locked', instrumentId: 'Instrument', instrumentSnapshot: 'Instrument details',
+    clientId: 'Client in your list', siteId: 'Site in your list' };
+  const SKIP = { id: 1, items: 1, exportedAt: 1, exportDirty: 1 };
+  const jobVal = (key, v) => {
+    if (key === 'instrumentId') {
+      if (blankish(v)) return '(none)';
+      const inst = (typeof findInstrument === 'function') ? findInstrument(v) : null;
+      return inst && typeof instrumentDisplayName === 'function' ? clip(instrumentDisplayName(inst)) : 'an instrument not on this phone';
+    }
+    if (key === 'clientId') { const n = _syncClientNameOf(v); return n === '' ? '(none)' : (n === null ? 'a client not on this phone' : clip(n)); }
+    if (key === 'siteId') {
+      if (blankish(v)) return '(none)';
+      const st = (state.sites || []).find(x => x && String(x.id) === String(v));
+      return st ? clip(st.name) : 'a site not on this phone';
+    }
+    return fmt(v, key);
+  };
+  const details = [];
+  let otherJob = false;
+  const jobKeys = Array.from(new Set(Object.keys(L).concat(Object.keys(C))));
+  for (const key of Object.keys(JOB)) {
+    if (!same(L[key], C[key])) details.push({ label: JOB[key], here: jobVal(key, L[key]), cloud: jobVal(key, C[key]) });
+  }
+  for (const key of jobKeys) {
+    if (JOB[key] || SKIP[key]) continue;
+    if (!same(L[key], C[key])) otherJob = true;
+  }
+  const exp = (s) => s.exportedAt ? ('Exported' + (s.exportDirty ? ', changed since' : '')) : 'Not exported';
+  if (exp(L) !== exp(C)) details.push({ label: 'Export', here: exp(L), cloud: exp(C) });
+  if (otherJob) details.push({ label: 'Other job details', here: null, cloud: null });
+
+  // ---- items
+  const ITEM = { assetNo: 'Asset ID', itemType: 'Item', location: 'Location', result: 'Result',
+    notes: 'Notes', readings: 'Readings', ts: 'Time logged' };
+  const label = (it) => {
+    const bits = [it.assetNo, it.itemType, it.location].map(x => (x == null ? '' : String(x).trim())).filter(Boolean);
+    return bits.length ? clip(bits.join(' \u00b7 ')) : 'An item with no asset number';
+  };
+  const keyed = (items) => {
+    const m = new Map();
+    (Array.isArray(items) ? items : []).forEach((it, i) => {
+      if (!it || typeof it !== 'object') return;
+      let k = (it.id != null && it.id !== '') ? 'i:' + String(it.id) : 'n:' + i;
+      while (m.has(k)) k += '+';
+      m.set(k, it);
+    });
+    return m;
+  };
+  const LI = keyed(L.items), CI = keyed(C.items);
+  const onlyHere = [], onlyCloud = [], changed = [];
+  let unchanged = 0;
+  for (const [k, it] of LI) {
+    if (!CI.has(k)) { onlyHere.push(label(it)); continue; }
+    const other = CI.get(k);
+    const fields = [];
+    let otherItem = false;
+    for (const f of Object.keys(ITEM)) {
+      if (!same(it[f], other[f])) fields.push({ label: ITEM[f], here: fmt(it[f], f), cloud: fmt(other[f], f) });
+    }
+    for (const f of new Set(Object.keys(it).concat(Object.keys(other)))) {
+      if (f === 'id' || ITEM[f]) continue;
+      if (!same(it[f], other[f])) otherItem = true;
+    }
+    if (otherItem) fields.push({ label: 'Other details', here: null, cloud: null });
+    if (fields.length) changed.push({ label: label(it), fields });
+    else unchanged++;
+  }
+  for (const [k, it] of CI) if (!LI.has(k)) onlyCloud.push(label(it));
+
+  return {
+    details, onlyHere, onlyCloud, changed, unchanged,
+    hereCount: LI.size, cloudCount: CI.size,
+    none: !details.length && !onlyHere.length && !onlyCloud.length && !changed.length,
+  };
+}
+
+// The tap. Fetches the cloud copy of ONE held job, compares, opens the sheet.
+// Needs signal, as answering does. The fetched document goes into the diff and
+// nowhere else.
+function syncHeldDiff(id) {
+  const sid = String(id);
+  if (!syncActive()) return Promise.resolve(false);
+  const entry = _syncHeldLoad().find(e => e.kind === 'session' && e.id === sid);
+  if (!entry) return Promise.resolve(false);
+  if (_syncOffline()) {
+    state.sync.message = 'No signal right now. Comparing needs the cloud copy \u2014 try again when you\u2019re back online.';
+    _syncRepaint();
+    return Promise.resolve(false);
+  }
+  state.sync.diffing = sid;
+  state.sync.message = '';
+  _syncRepaint();
+  // ⚠ Clear the busy flag and repaint BEFORE opening the sheet: an open sheet
+  // blocks every repaint (_syncSafeToRepaint), so the button would otherwise
+  // say "Checking…" until something else happened to repaint the page.
+  const done = (msg) => {
+    state.sync.diffing = null;
+    if (msg) state.sync.message = msg;
+    _syncRepaint();
+  };
+  return cloudClient()
+    .then((c) => c.from('sessions').select('id,doc,deleted,updated_at').eq('id', sid).limit(1))
+    .then((r) => {
+      if (r && r.error) throw r.error;
+      const row = (r && r.data && r.data[0]) || null;
+      const local = (state.sessions || []).find(s => s && String(s.id) === sid) || null;
+      if (!row || row.deleted === true) { done('The cloud no longer has a copy of that job to compare with.'); return false; }
+      if (!local) { done('This phone no longer has that job to compare with.'); return false; }
+      if (!_syncValidDoc(row.doc, sid)) { done('The cloud copy of that job can\u2019t be read, so it can\u2019t be compared.'); return false; }
+      const diff = syncJobDiff(local, row.doc);
+      done('');
+      if (typeof openSyncDiffSheet === 'function') openSyncDiffSheet(entry, diff);
+      return true;
+    })
     .catch((e) => {
       done(syncErrorMessage(e));
       return false;
