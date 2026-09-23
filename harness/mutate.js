@@ -514,8 +514,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V81.4';",
-    to:   "const APP_VERSION = 'V81.4';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V82';",
+    to:   "const APP_VERSION = 'V82';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -634,8 +634,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V81.2</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V81.2</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V81.1</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V81.3</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V81.3</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V81.2</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1275,8 +1275,9 @@ const MUTATIONS = [
   {
     name: 'M172 (V81) the held list carries whatever it is given',
     file: 'sync.js',
-    from: "    out.push({\n      id, at, reason: e.reason,",
-    to:   "    out.push({\n      ...e, id, at, reason: e.reason,",
+    // v82: re-pointed — the normaliser now builds `entry` (with kind) before pushing it.
+    from: "    const entry = {\n      id, kind, at, reason: e.reason,",
+    to:   "    const entry = {\n      ...e, id, kind, at, reason: e.reason,",
     why:  'the whitelist is the only thing stopping a held row becoming a second store of the engineer\u2019s work. Drop it and any document a buggy or older build put there is carried straight back out, into the page and into the next write \u2014 in localStorage, against a decision that may sit for days',
   },
   {
@@ -1377,8 +1378,9 @@ const MUTATIONS = [
   {
     name: 'M186 (V81.2) the hash marker never matches, so every job re-sends every run',
     file: 'sync.js',
-    from: "           pulledAt: null, lastPullAt: null, hashV: SYNC_HASH_V };",
-    to:   "           pulledAt: null, lastPullAt: null, hashV: 0 };",
+    // v82: re-pointed — the object literal gained the `rec` block after hashV.
+    from: "           pulledAt: null, lastPullAt: null, hashV: SYNC_HASH_V,",
+    to:   "           pulledAt: null, lastPullAt: null, hashV: 0,",
     why:  'the stored marker can then never equal the current one, so every load throws away every fingerprint and every job is uploaded again on every single run \u2014 all day, on mobile data. The upgrade is meant to cost one round, not every round',
   },
   {
@@ -1462,6 +1464,203 @@ const MUTATIONS = [
     to:   "       + '<span' + (busy ? '' : '')",
     why:  'the release shipped and did nothing visible. Everything underneath works; nobody can reach it',
   },
+  /* ---- V82: clients and sites, and "What's different?" ------------------- */
+  {
+    name: 'M198 (V82) the record fingerprint hashes the stored object, not the projection',
+    file: 'sync.js',
+    from: "  if (kind === 'client') return { id: String(r.id), name: String(r.name || '').trim() };",
+    to:   "  if (kind === 'client') return Object.assign({}, r);",
+    why:  'loadClients() adds userId and lastModified on every reload, so a client nobody touched looks changed after a close and reopen: re-sent every time, and seen as a clash the moment the other phone renames it',
+  },
+  {
+    name: 'M199 (V82) a held client is pushed anyway',
+    file: 'sync.js',
+    from: "      if (held.has(id)) continue;\n      const doc = _syncRecordDoc(kind, r);",
+    to:   "      const doc = _syncRecordDoc(kind, r);",
+    why:  'rule 5: the push settles the question on the server, in this phone\u2019s favour, before anyone is asked',
+  },
+  {
+    name: 'M200 (V82) a client changed on both phones is applied on a guess',
+    file: 'sync.js',
+    from: "    if (rs.sent[id] !== localHash) { hold('both-changed', row.doc); return; }\n",
+    to:   "",
+    why:  'the rename made on this phone is silently replaced by the other phone\u2019s',
+  },
+  {
+    name: 'M201 (V82) the held card shows only this phone\u2019s name',
+    file: 'render-help.js',
+    from: "`Name &mdash; this phone: ${nm(h.localName)} &middot; cloud: ${nm(h.cloudName)}`",
+    to:   "`Name &mdash; this phone: ${nm(h.localName)}`",
+    why:  'decision 7A and Peter\u2019s point 3: saying it is different without saying HOW is the thing this release fixes',
+  },
+  {
+    name: 'M202 (V82) a remote client delete cascades to every site under it',
+    file: 'sync.js',
+    from: "  recordTombstone(kind, id);\n  _syncRecordSetList(kind, list.filter(r => !(r && String(r.id) === id)));",
+    to:   "  recordTombstone(kind, id);\n  if (kind === 'client') state.sites = (state.sites || []).filter(s => s.clientId !== id);\n  _syncRecordSetList(kind, list.filter(r => !(r && String(r.id) === id)));",
+    why:  'decision 4A: a site made on this phone is deleted on the strength of something the other phone never saw',
+  },
+  {
+    name: 'M203 (V82) an orphaned site is never moved to Unassigned',
+    file: 'sync.js',
+    from: "      const moved = _syncTidyOrphanSites();",
+    to:   "      const moved = 0;",
+    why:  'the Clients page lists a site under its client or under Unassigned; one pointing at a missing client appears under neither and is lost to the engineer',
+  },
+  {
+    name: 'M204 (V82) a remote record delete skips the ledger',
+    file: 'sync.js',
+    from: "  recordTombstone(kind, id);\n  _syncRecordSetList(kind, list.filter(r => !(r && String(r.id) === id)));",
+    to:   "  _syncRecordSetList(kind, list.filter(r => !(r && String(r.id) === id)));",
+    why:  'without a tombstone, a restore of an older backup brings the client back and nothing knows it was deleted',
+  },
+  {
+    name: 'M205 (V82) orphaned sites are tidied on a run that held something',
+    file: 'sync.js',
+    from: "    if (!blocked) {\n      const moved = _syncTidyOrphanSites();\n      if (moved) { out.unassigned += moved; changed = true; }\n      rs.pulledAt = high;\n    }",
+    to:   "    { const moved = _syncTidyOrphanSites(); if (moved) { out.unassigned += moved; changed = true; } }\n    if (!blocked) rs.pulledAt = high;",
+    why:  'the missing client may be the very record waiting on a decision; answering \"bring it back\" would then find its sites already moved away',
+  },
+  {
+    name: 'M206 (V82) a records failure fails the whole run',
+    file: 'sync.js',
+    from: "    .then(() => out, (e) => { out.error = e || new Error('records'); return out; });",
+    to:   "    .then(() => out);",
+    why:  'a problem with a convenience list stops the engineer\u2019s jobs syncing',
+  },
+  {
+    name: 'M207 (V82) records are pushed after their read failed',
+    file: 'sync.js',
+    from: "  return _syncPullRecords(c, uid, st, out)\n    .then(() => _syncPushRecords(c, uid, st, out))",
+    to:   "  return _syncPullRecords(c, uid, st, out).catch(() => {})\n    .then(() => _syncPushRecords(c, uid, st, out))",
+    why:  'rule 4: a push may only ever follow a pull. Without the look first, the push overwrites work it never saw',
+  },
+  {
+    name: 'M208 (V82) "Re-send all jobs" sends records without reading',
+    file: 'sync.js',
+    from: "const recs = opts.pull ? _syncRecordsHalf(c, uid, st) : Promise.resolve(null);",
+    to:   "const recs = _syncRecordsHalf(c, uid, st);",
+    why:  'the button is jobs only, and its run does not read first',
+  },
+  {
+    name: 'M209 (V82) clearing a held client clears a job with the same id',
+    file: 'sync.js',
+    from: "  const out = list.filter(e => !(e.id === sid && e.kind === k));",
+    to:   "  const out = list.filter(e => !(e.id === sid));",
+    why:  'a question about a job is dropped without being answered, and the push then sends over the cloud copy',
+  },
+  {
+    name: 'M210 (V82) a V81 held entry is read as a client',
+    file: 'sync.js',
+    from: "const kind = (e.kind === undefined) ? 'session' : e.kind;",
+    to:   "const kind = (e.kind === undefined) ? 'client' : e.kind;",
+    why:  'every job held on a phone upgrading from V81 changes meaning on the first read',
+  },
+  {
+    name: 'M211 (V82) a held client blocks the job with the same id',
+    file: 'sync.js',
+    from: "    const heldIds = new Set(_syncHeldLoad().filter(e => e.kind === 'session').map(e => e.id));",
+    to:   "    const heldIds = new Set(_syncHeldLoad().map(e => e.id));",
+    why:  'a job silently stops syncing because of a question about something else',
+  },
+  {
+    name: 'M212 (V82) a new record kind carries on from the old cursor',
+    file: 'sync.js',
+    from: "  if (rs.kinds !== kindsTag) { rs.pulledAt = null; rs.kinds = kindsTag; }",
+    to:   "  rs.kinds = kindsTag;",
+    why:  'V83 adds instruments; every instrument the other phone sent before this phone upgraded is behind the cursor and never read',
+  },
+  {
+    name: 'M213 (V82) the comparison matches items by position',
+    file: 'sync.js',
+    from: "let k = (it.id != null && it.id !== '') ? 'i:' + String(it.id) : 'n:' + i;",
+    to:   "let k = 'n:' + i;",
+    why:  'one item deleted near the top and every item below it reads as changed \u2014 the comparison would say the opposite of what happened',
+  },
+  {
+    name: 'M214 (V82) a blank field differs from a missing one',
+    file: 'sync.js',
+    from: "const same = (a, b) => (blankish(a) && blankish(b)) || _syncCanonical(a) === _syncCanonical(b);",
+    to:   "const same = (a, b) => _syncCanonical(a) === _syncCanonical(b);",
+    why:  'the sheet lists differences an engineer cannot see, which teaches him to stop reading it',
+  },
+  {
+    name: 'M215 (V82) "What\u2019s different?" never opens its sheet',
+    file: 'sync.js',
+    from: "      if (typeof openSyncDiffSheet === 'function') openSyncDiffSheet(entry, diff);",
+    to:   "",
+    why:  'the button fetches, compares, and shows nothing',
+  },
+  {
+    name: 'M216 (V82) the comparison button is never offered',
+    file: 'render-help.js',
+    from: "    const cmp = compare\n",
+    to:   "    const cmp = false\n",
+    why:  'everything underneath works; nobody can reach it',
+  },
+  {
+    name: 'M217 (V82) the comparison button is left saying Checking',
+    file: 'sync.js',
+    from: "    state.sync.diffing = null;\n    if (msg) state.sync.message = msg;",
+    to:   "    if (msg) state.sync.message = msg;",
+    why:  'the page looks stuck for ever after the first tap',
+  },
+  {
+    name: 'M218 (V82) the sheet stops saying what each answer would do',
+    file: 'render-help.js',
+    from: "  if (diff.onlyCloud.length) effects.push(",
+    to:   "  if (false) effects.push(",
+    why:  'the whole point: the engineer sees the difference AND what choosing loses',
+  },
+  {
+    name: 'M219 (V82) a deleted-here job goes back to the generic labels',
+    file: 'render-help.js',
+    from: "      phone = 'Keep it deleted'; cloud = 'Bring it back';\n    } else if (h.reason === 'fewer-items') {",
+    to:   "    } else if (h.reason === 'fewer-items') {",
+    why:  '\"Keep this phone\u2019s copy\" of a job this phone deleted is a riddle, not a choice',
+  },
+  {
+    name: 'M220 (V82) an unreadable record offers the cloud answer',
+    file: 'render-help.js',
+    from: "cloud = '';\n    } else {\n      lines.push(",
+    to:   "cloud = 'ZZ';\n    } else {\n      lines.push(",
+    why:  'there is nothing readable to apply; the button can only fail',
+  },
+  {
+    name: 'M221 (V82) the outcome line leaves clients and sites out',
+    file: 'sync.js',
+    from: "  if (rec.length) msg += (msg ? ' ' : '') + 'Clients & sites: ' + rec.join(', ') + '.';",
+    to:   "",
+    why:  'records sync silently; a quiet run and a busy one read the same',
+  },
+  {
+    name: 'M222 (V82) a client change is saved without passing the sync trigger',
+    file: 'clients.js',
+    from: "      recordTombstone('site', siteId);   // v78: before the filter",
+    to:   "      recordTombstone('site', siteId);   // v78: before the filter\n      saveSettings();",
+    why:  'the trigger lives in saveSessions(); a direct saveSettings() path writes clients the sync never hears about until something else saves',
+  },
+  {
+    name: 'M223 (V82) pulled records are applied in memory but never saved',
+    file: 'sync.js',
+    from: "      if (typeof saveSettings === 'function') saveSettings();\n      _syncRepaintApp();",
+    to:   "      _syncRepaintApp();",
+    why:  'the client appears, then vanishes on the next reopen \u2014 and its fingerprint says it was applied',
+  },
+  {
+    name: 'M224 (V82) the record fingerprint is taken from the wire JSON',
+    file: 'sync.js',
+    from: "      const hash = syncHash(_syncCanonical(doc));\n      if (!rs.resend[id] && rs.sent[id] === hash) continue;",
+    to:   "      const hash = syncHash(json);\n      if (!rs.resend[id] && rs.sent[id] === hash) continue;",
+    why:  'M184 again, for records: jsonb reorders keys, so every pull disagrees with every push and every client is sent on every run',
+  },
+  {
+    name: 'M225 (V82) "Keep it" on a held record is not re-sent',
+    file: 'sync.js',
+    from: "    st.rec.resend[sid] = true;\n",
+    to:   "",
+    why:  'the answer is forgotten: the next pull asks the same question again, for ever',
+  },
 
 ];
 
@@ -1517,8 +1716,11 @@ function main() {
 function runSuiteExpectingFailure(dir) {
   let out;
   try {
+    // v82: belt and braces with assert.js's group timeout. A suite that never
+    // ends is not a pass; it is killed here and scored as caught, because it
+    // never reported green.
     out = execFileSync(process.execPath, [path.join(dir, 'harness', 'run.js')], {
-      cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'],
+      cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 180000,
     });
   } catch (e) {
     // Non-zero exit is the normal "caught it" path.

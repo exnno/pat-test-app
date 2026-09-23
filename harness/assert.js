@@ -15,6 +15,7 @@ const groups = [];
 let current  = null;
 let passed   = 0;
 const failures = [];
+const GROUP_TIMEOUT_MS = 30000;
 
 /* ⚠ group() MUST be awaited when its body is async.
    A synchronous group() with an async body returns immediately: `current` is
@@ -40,9 +41,25 @@ function group(name, fn) {
   }
 
   if (result && typeof result.then === 'function') {
-    return result
-      .catch(e => { failures.push({ group: name, test: '(group threw)', message: e.stack || e.message }); })
-      .then(() => { current = prev; });
+    // v82: a group that awaits something that never settles used to hang the
+    // WHOLE run — no report, no exit. Found through M132 (V79), whose break
+    // leaves a library-load promise pending for ever, so 15f awaited it for
+    // ever and the mutation runner sat waiting on a suite that never ended.
+    // Present since V79 and not a V82 defect; V81.4 hangs identically. A hung
+    // group now FAILS, named, and the run carries on. GROUP_TIMEOUT_MS is far
+    // above any real group (the whole suite runs in ~6s).
+    let timer = null;
+    const hung = new Promise((resolve) => {
+      timer = setTimeout(() => {
+        failures.push({ group: name, test: '(group timed out)',
+          message: `did not finish within ${GROUP_TIMEOUT_MS / 1000}s — something it awaits never settles` });
+        resolve();
+      }, GROUP_TIMEOUT_MS);
+    });
+    const body = result
+      .catch(e => { failures.push({ group: name, test: '(group threw)', message: e.stack || e.message }); });
+    return Promise.race([body, hung])
+      .then(() => { clearTimeout(timer); current = prev; });
   }
   current = prev;
 }
