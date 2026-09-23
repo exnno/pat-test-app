@@ -423,7 +423,15 @@ function syncNoteSave() {
 function syncNoteNav() {
   if (!syncActive()) return;
   const now = Date.now();
-  if (now - _syncLastNavPull < SYNC_NAV_THROTTLE_MS) return;
+  // v81.3 (decision 1A). Leaving the job a change is waiting for is the exact
+  // moment it becomes applicable, so that one screen change is never throttled.
+  // Without this the engineer usually left within 20s of arriving — the arrival
+  // itself was a navigation read — and the throttle swallowed the one read that
+  // mattered. Close-and-reopen appeared to fix it only because reopening is a
+  // different trigger that the throttle never covered.
+  const w = state.sync && state.sync.waiting;
+  const released = !!w && !(state.view === 'entry' && String(state.activeId) === String(w.id));
+  if (!released && now - _syncLastNavPull < SYNC_NAV_THROTTLE_MS) return;
   _syncLastNavPull = now;
   syncPushSoon(0, { pull: true });
 }
@@ -541,7 +549,13 @@ function _syncPull(c, uid, st, out) {
     const local = (state.sessions || []).find(s => s && String(s.id) === id);
     const tomb = (state.tombstones || []).some(t => t && t.kind === 'session' && String(t.id) === id);
     const name = (local && local.site) || (row.doc && row.doc.site) || '';
-    const isOpen = (id === state.activeId);
+    // ⚠ v81.3 (decision 1A). "Open" means ON SCREEN — that job's entry screen —
+    // not merely the current job. state.activeId deliberately survives going
+    // back to the jobs list (the app remembers your last job), so V81.1/V81.2
+    // kept deferring a change the engineer had already walked away from, and it
+    // only released when a DIFFERENT job was opened. The protection exists for
+    // the keyboard and the half-typed asset number, which only exist here.
+    const isOpen = (id === state.activeId && state.view === 'entry');
 
     // Decision 3A: defer, and say so on the entry screen. Returns true when the
     // caller must stop — the change waits for the engineer to leave the job.

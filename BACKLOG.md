@@ -17,11 +17,15 @@ leftovers are the IndexedDB photo store and the sync bookkeeping keys
 still signed in would pull its old jobs straight back. Most destructive button in
 the app, so the confirm needs to be genuinely hard to hit by accident.
 
-### Cloud track — V81.1 built (pull + the two-phone fix), records next
+### Cloud track — V81.3 built (pull complete and field-tested), records next
 V78 ledger → V79 sign-in → V80 push → **V81 pull** (fingerprint decides, held
 jobs for anything it will not guess at, remote deletes applied, cursor stops at
 the first unresolved row) → **V81.1** (the open job is judged not skipped; every
-run reads before it writes; the job screen says what is waiting). **Next: the remaining record kinds** (clients, sites,
+run reads before it writes; the job screen says what is waiting) → **V81.2**
+(pull results repaint the current screen; reading follows navigation with an
+idle backstop; fingerprints are canonical because jsonb re-sorts keys) →
+**V81.3** (leaving a job releases what was waiting for it). Two-phone test list
+13–17 passed on real hardware at V81.3. **Next: the remaining record kinds** (clients, sites,
 presets, settings, instruments) → photos (+ the cross-account download isolation
 check) → status UI. Every cloud release runs `supabase/isolation-test.sql`
 (all PASS) before promotion to `Release`.
