@@ -83,8 +83,10 @@ const MUTATIONS = [
   {
     name: 'M08 deleting an instrument stops snapshotting it onto jobs',
     file: 'instruments.js',
-    from: '        if (s && s.instrumentId === id && !s.instrumentSnapshot) {',
-    to:   '        if (false) {',
+    // v83: re-pointed — the freeze now lives in freezeInstrumentOntoJobs(),
+    // shared by the local and the remote delete.
+    from: '    if (s && s.instrumentId === id && !s.instrumentSnapshot) {',
+    to:   '    if (false) {',
     why:  'without the snapshot those certificates silently fall back to today\u2019s instrument',
   },
   {
@@ -514,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V82';",
-    to:   "const APP_VERSION = 'V82';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V83';",
+    to:   "const APP_VERSION = 'V83';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -634,8 +636,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V81.3</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V81.3</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V81.2</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V81.4</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V81.4</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V81.3</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1475,8 +1477,9 @@ const MUTATIONS = [
   {
     name: 'M199 (V82) a held client is pushed anyway',
     file: 'sync.js',
-    from: "      if (held.has(id)) continue;\n      const doc = _syncRecordDoc(kind, r);",
-    to:   "      const doc = _syncRecordDoc(kind, r);",
+    // v83: re-pointed past the new deferral check.
+    from: "      if (held.has(id)) continue;\n      // v83: what the pull",
+    to:   "      // v83: what the pull",
     why:  'rule 5: the push settles the question on the server, in this phone\u2019s favour, before anyone is asked',
   },
   {
@@ -1496,8 +1499,9 @@ const MUTATIONS = [
   {
     name: 'M202 (V82) a remote client delete cascades to every site under it',
     file: 'sync.js',
-    from: "  recordTombstone(kind, id);\n  _syncRecordSetList(kind, list.filter(r => !(r && String(r.id) === id)));",
-    to:   "  recordTombstone(kind, id);\n  if (kind === 'client') state.sites = (state.sites || []).filter(s => s.clientId !== id);\n  _syncRecordSetList(kind, list.filter(r => !(r && String(r.id) === id)));",
+    // v83: re-pointed — _syncApplyRecordDelete was rewritten for the new kinds.
+    from: "  recordTombstone(kind, id);\n  const idx = list.indexOf(old);",
+    to:   "  recordTombstone(kind, id);\n  if (kind === 'client') state.sites = (state.sites || []).filter(s => s.clientId !== id);\n  const idx = list.indexOf(old);",
     why:  'decision 4A: a site made on this phone is deleted on the strength of something the other phone never saw',
   },
   {
@@ -1510,8 +1514,9 @@ const MUTATIONS = [
   {
     name: 'M204 (V82) a remote record delete skips the ledger',
     file: 'sync.js',
-    from: "  recordTombstone(kind, id);\n  _syncRecordSetList(kind, list.filter(r => !(r && String(r.id) === id)));",
-    to:   "  _syncRecordSetList(kind, list.filter(r => !(r && String(r.id) === id)));",
+    // v83: re-pointed, as M202.
+    from: "  recordTombstone(kind, id);\n  const idx = list.indexOf(old);",
+    to:   "  const idx = list.indexOf(old);",
     why:  'without a tombstone, a restore of an older backup brings the client back and nothing knows it was deleted',
   },
   {
@@ -1660,6 +1665,253 @@ const MUTATIONS = [
     from: "    st.rec.resend[sid] = true;\n",
     to:   "",
     why:  'the answer is forgotten: the next pull asks the same question again, for ever',
+  },
+
+  // ---------------------------------------------------------------- V83
+  {
+    name: 'M226 (V83) the encoding cache ignores the instrument fields again',
+    file: 'storage.js',
+    from: "    s.instrumentId || '', s.instrumentSnapshot ? 1 : 0\n",
+    to:   "    ''\n",
+    why:  'the v66 bug: a deleted instrument\u2019s frozen copy never reaches the disk for any job but the open one, and after a reopen the certificate names today\u2019s tester',
+  },
+  {
+    name: 'M227 (V83) deleting an instrument records no ledger entry',
+    file: 'instruments.js',
+    from: "      recordTombstone('instrument', id);   // v83",
+    to:   "      // (ledger entry removed)",
+    why:  'the delete never reaches the other phone, which keeps the instrument for ever',
+  },
+  {
+    name: 'M228 (V83) the ledger does not accept instrument entries',
+    file: 'storage.js',
+    from: "const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'instrument'];",
+    to:   "const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset'];",
+    why:  'recordTombstone silently drops the entry, so an instrument delete is never sent',
+  },
+  {
+    name: 'M229 (V83) loading instruments cuts the list at the Add limit again',
+    file: 'instruments.js',
+    from: "if (Array.isArray(parsed)) list = parsed.map(makeInstrument).slice(0, INSTRUMENTS_STORED_MAX);",
+    to:   "if (Array.isArray(parsed)) list = parsed.map(makeInstrument).slice(0, INSTRUMENTS_MAX);",
+    why:  '4A: the sixth synced instrument vanishes on every reopen and the next sync brings it back — a loop, and a delete nobody made',
+  },
+  {
+    name: 'M230 (V83) restoring instruments cuts the list at the Add limit again',
+    file: 'instruments.js',
+    from: "state.instruments = data.instruments.map(makeInstrument).slice(0, INSTRUMENTS_STORED_MAX);",
+    to:   "state.instruments = data.instruments.map(makeInstrument).slice(0, INSTRUMENTS_MAX);",
+    why:  'a backup of a synced phone restores short',
+  },
+  {
+    name: 'M231 (V83) a remote instrument delete freezes jobs BEFORE they are read',
+    file: 'sync.js',
+    from: "    rs.freeze[id] = instrumentSnapshotOf(old);",
+    to:   "    freezeInstrumentOntoJobs(id, instrumentSnapshotOf(old));",
+    why:  'jobs the other phone already froze arrive looking edited on both phones and are held as clashes nobody made',
+  },
+  {
+    name: 'M232 (V83) the owed copies are never written during a run',
+    file: 'sync.js',
+    from: "      const freeze = () => { _syncFreezePending(st); };",
+    to:   "      const freeze = () => {};",
+    why:  'a job only this phone had keeps pointing at a deleted instrument and prints today\u2019s tester',
+  },
+  {
+    name: 'M233 (V83) copies owed by a dead run are not written at boot',
+    file: 'sync.js',
+    from: "  try { _syncFreezePending(_syncLoad()); }",
+    to:   "  try { }",
+    why:  'an app closed mid-sync leaves jobs without their instrument until some later run happens to finish',
+  },
+  {
+    name: 'M234 (V83) the tester in use is deleted without asking',
+    file: 'sync.js',
+    from: "        if (inUse) { hold('deleted-elsewhere', null, inUse); return; }",
+    to:   "        if (false) { hold('deleted-elsewhere', null, inUse); return; }",
+    why:  'decision 2A: the phone quietly moves to a tester the engineer is not holding, and new certificates name it',
+  },
+  {
+    name: 'M235 (V83) keeping the tester in use does not keep it in use for the account',
+    file: 'sync.js',
+    from: "    if (kind === 'instrument' && sid === _syncInUseId()) st.rec.resend[SYNC_INUSE_ID] = true;",
+    to:   "",
+    why:  'the other phone gets the instrument back but stays on whatever it moved to (1B)',
+  },
+  {
+    name: 'M236 (V83) the instrument open in the editor is changed under it',
+    file: 'sync.js',
+    from: "      if (kind !== 'instrument' || id !== editing) return false;",
+    to:   "      return false;",
+    why:  'the Save tap writes the old form values back, quietly reverting the other phone\u2019s calibration date',
+  },
+  {
+    name: 'M237 (V83) what the pull deferred is pushed anyway',
+    file: 'sync.js',
+    from: "      if (skip[id]) continue;",
+    to:   "      if (false) continue;",
+    why:  'a deferred change is settled on the server in this phone\u2019s favour before it was ever applied',
+  },
+  {
+    name: 'M238 (V83) the tester in use is decided in read order, not last',
+    file: 'sync.js',
+    from: "      if (SYNC_SETTINGS_IDS.indexOf(id) !== -1) late.push(row);\n      return;",
+    to:   "      if (SYNC_SETTINGS_IDS.indexOf(id) !== -1) decideInUse(row);\n      return;",
+    why:  'a choice read before the instrument it names waits a whole extra run, and a new phone starts on the wrong tester',
+  },
+  {
+    name: 'M239 (V83) a phone that has never agreed is treated as having switched',
+    file: 'sync.js',
+    from: "    if (agreed !== null && mine !== agreed && findInstrument(agreed)) { hold('both-changed', row.doc); return; }",
+    to:   "    if (agreed === null || (mine !== agreed && findInstrument(agreed))) { hold('both-changed', row.doc); return; }",
+    why:  'every new phone is asked a question instead of taking the account\u2019s tester',
+  },
+  {
+    name: 'M240 (V83) a switch made on ONE phone is asked about as if both switched',
+    file: 'sync.js',
+    from: "    if (hash === rs.sent[id]) return;\n    if (!want) return;",
+    to:   "    if (!want) return;",
+    why:  'the bug 19k found during V83: the cloud had not moved, so there was nothing to ask',
+  },
+  {
+    name: 'M241 (V83) a move made FOR this phone counts as a switch made here',
+    file: 'sync.js',
+    from: "    if (agreed !== null && mine !== agreed && findInstrument(agreed)) { hold('both-changed', row.doc); return; }",
+    to:   "    if (agreed !== null && mine !== agreed) { hold('both-changed', row.doc); return; }",
+    why:  'when the agreed tester was deleted the phone moved by itself; asking about that is a question nobody made',
+  },
+  {
+    name: 'M242 (V83) the tester in use follows the other phone while its delete is being asked',
+    file: 'sync.js',
+    from: "    if (mine && _syncHeldLoad().some(e => e.kind === 'instrument' && e.id === mine)) { wait(); return; }\n",
+    to:   "",
+    why:  'the 2A question is answered behind the engineer\u2019s back before he has read it',
+  },
+  {
+    name: 'M243 (V83) "in use" is not settled after instruments arrive',
+    file: 'sync.js',
+    from: "    if (!list.some(i => i.id === state.activeInstrumentId)) {",
+    to:   "    if (false) {",
+    why:  'a phone that had no tester stamps new jobs with a blank id, which prints whatever is active at print time',
+  },
+  {
+    name: 'M244 (V83) the quick-pick buttons do not follow an edited preset in use',
+    file: 'sync.js',
+    from: "  if (ps.length && typeof syncItemTypesFromActivePreset === 'function' && _syncActivePresetSig() !== presetBefore) {",
+    to:   "  if (false) {",
+    why:  'the preset changes on disk but the entry screen shows the old buttons until a restart',
+  },
+  {
+    name: 'M245 (V83) a phone\u2019s last preset is not held when deleted elsewhere',
+    file: 'sync.js',
+    from: "        if (kind === 'preset' && _syncRecordList('preset').length <= 1) {",
+    to:   "        if (false) {",
+    why:  'the delete is neither applied nor asked about, and the phone counts it as done',
+  },
+  {
+    name: 'M246 (V83) the starter preset is never set aside',
+    file: 'sync.js',
+    from: "    if (starter && presetsAdded && _syncDropStarter(starter)) changed = true;\n",
+    to:   "",
+    why:  '5A: every new phone arrives with a spare "Default"',
+  },
+  {
+    name: 'M247 (V83) an edited starter preset is set aside too',
+    file: 'sync.js',
+    from: "  if (!p || p.name !== 'Default' || !Array.isArray(p.items)) return false;",
+    to:   "  if (!p) return false; return true;",
+    why:  'the engineer\u2019s own buttons are thrown away on first sign-in',
+  },
+  {
+    name: 'M248 (V83) the preset in use is overwritten by the pull',
+    file: 'sync.js',
+    from: "  if (ps.length && !ps.some(p => p.id === state.activePresetId)) { state.activePresetId = ps[0].id; moved = true; }",
+    to:   "  if (ps.length) { state.activePresetId = ps[0].id; moved = true; }",
+    why:  '7A: which preset is in use is per phone; a pull must never change it while it still exists',
+  },
+  {
+    name: 'M249 (V83) a held instrument keeps no differing fields',
+    file: 'sync.js',
+    from: "        if (d.length) entry.diffs = d;",
+    to:   "",
+    why:  'the card says "changed" and nothing about which calibration date is right',
+  },
+  {
+    name: 'M250 (V83) an unknown settings row stops the cursor',
+    file: 'sync.js',
+    from: "      if (SYNC_SETTINGS_IDS.indexOf(id) !== -1) late.push(row);\n      return;",
+    to:   "      if (SYNC_SETTINGS_IDS.indexOf(id) !== -1) late.push(row); else blocked = true;\n      return;",
+    why:  'once V84 pushes a new settings row, a V83 phone re-reads the whole account every run for ever',
+  },
+  {
+    name: 'M251 (V83) the cursor tag leaves out the settings ids',
+    file: 'sync.js',
+    from: "  return SYNC_RECORD_KINDS.join(',') + '|' + SYNC_SETTINGS_IDS.join(',');",
+    to:   "  return SYNC_RECORD_KINDS.join(',');",
+    why:  'a later version that adds a settings row never reads the ones pushed before it understood them',
+  },
+  {
+    name: 'M252 (V83) "no tester" is sent as a choice',
+    file: 'sync.js',
+    from: "      if (kind === 'settings' && !doc.instrumentId) { delete rs.resend[id]; continue; }\n",
+    to:   "",
+    why:  'a new phone with no instruments tells the account it uses none',
+  },
+  {
+    name: 'M253 (V83) a sent tester in use is not recorded as agreed',
+    file: 'sync.js',
+    from: "          if (w.inUse !== undefined) rs.inUse = w.inUse;   // v83: now agreed\n",
+    to:   "",
+    why:  'the next switch on the other phone reads as both phones switching, or none',
+  },
+  {
+    name: 'M254 (V83) the pull repaints a settings form with unsaved typing',
+    file: 'sync.js',
+    from: "  if (SYNC_NO_REPAINT_VIEWS.indexOf(state.view) !== -1) return false;\n",
+    to:   "",
+    why:  'MAP rule 3: half-typed calibration details vanish when something arrives',
+  },
+  {
+    name: 'M255 (V83) the outcome line leaves out instruments and presets',
+    file: 'sync.js',
+    from: "  if (lists.length) msg += (msg ? ' ' : '') + 'Instruments & presets: ' + lists.join(', ') + '.';",
+    to:   "",
+    why:  'changes happen and the page says everything was already up to date',
+  },
+  {
+    name: 'M256 (V83) a nameless instrument is sent',
+    file: 'sync.js',
+    from: "    return !!(String(doc.make || '').trim() || String(doc.model || '').trim());",
+    to:   "    return true;",
+    why:  'the blank record an Add button makes goes up, and the other phone holds it as "Unnamed instrument" for ever',
+  },
+  {
+    name: 'M257 (V83) the last-preset card offers to delete it',
+    file: 'render-help.js',
+    from: "      phone = 'Keep it here'; cloud = h.onlyOne ? '' : 'Delete it here too';",
+    to:   "      phone = 'Keep it here'; cloud = 'Delete it here too';",
+    why:  'a button that can only fail, on a question with one answer',
+  },
+  {
+    name: 'M258 (V83) the tester-in-use card does not name the testers',
+    file: 'render-help.js',
+    from: "      phone = h.localName ? 'Use ' + escapeHTML(h.localName) : phone;\n",
+    to:   "",
+    why:  'the engineer cannot tell which button keeps the tester in his hand',
+  },
+  {
+    name: 'M259 (V83) the Sync page drops the instruments and presets count',
+    file: 'render-help.js',
+    from: 'id="sync-list-counts"',
+    to:   'id="sync-list-countz"',
+    why:  'the page shows nothing about the new lists syncing',
+  },
+  {
+    name: 'M260 (V83) an owed copy is written for an instrument that is back',
+    file: 'sync.js',
+    from: "    if (!back && typeof freezeInstrumentOntoJobs === 'function') n += freezeInstrumentOntoJobs(id, f[id]);",
+    to:   "    if (typeof freezeInstrumentOntoJobs === 'function') n += freezeInstrumentOntoJobs(id, f[id]);",
+    why:  'after "Keep it", jobs are frozen to a copy that stops following the live instrument\u2019s recalibration',
   },
 
 ];
