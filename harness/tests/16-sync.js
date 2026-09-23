@@ -274,7 +274,7 @@ module.exports = async function () {
     const app = signedIn({ uid: UID_B, localStorage: { 'pat:syncState': other } });
     const a = job(app, 'ZZACCOUNTB');
     // Pretend account A had sent this exact job.
-    const h = app.fn('syncHash')(JSON.stringify(app.state().sessions.find(s => s.id === a.id)));
+    const h = app.fn('syncHash')(app.fn('_syncCanonical')(app.state().sessions.find(s => s.id === a.id)));
     app.storage.setItem('pat:syncState', JSON.stringify({ userId: UID_A, sent: { [String(a.id)]: h }, gone: {}, lastPushAt: null }));
     t.eq(app.fn('syncStatusSummary')().waiting, 1, 'account B does not count what A sent');
     app.online();

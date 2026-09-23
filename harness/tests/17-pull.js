@@ -49,6 +49,16 @@ function storedSession(id = UID_A, email = 'peter@example.com') {
    `id=eq.` filters, the ordering and the limit from the URL the library built.
    Filtering here rather than returning the whole array is what makes 17b able
    to tell a cursor that moved from one that did not. */
+// Recursively rebuild an object with its keys in a DIFFERENT order, the way
+// jsonb does. Content-identical, byte-different under JSON.stringify.
+function reorderKeys(v) {
+  if (v === null || typeof v !== 'object') return v;
+  if (Array.isArray(v)) return v.map(reorderKeys);
+  const out = {};
+  for (const k of Object.keys(v).reverse()) out[k] = reorderKeys(v[k]);
+  return out;
+}
+
 function fakeServer(o = {}) {
   const calls = [];
   const cloud = (o.rows || []).slice();
@@ -71,7 +81,13 @@ function fakeServer(o = {}) {
         rows.sort((a, b) => String(a.updated_at).localeCompare(String(b.updated_at)));
         const lim = parseInt(q.get('limit') || '0', 10);
         if (lim > 0) rows = rows.slice(0, lim);
-        return new Response(JSON.stringify(rows), {
+        // ⚠ v81.2. The `doc` column is jsonb, and jsonb does NOT give back the
+        // JSON it was handed — Postgres re-sorts object keys. Until this line
+        // existed the fake server returned the very object it was given, so a
+        // whole class of bug was invisible here and shipped: every phone saw
+        // its own pushed job as changed. Reversing the keys is the cheapest
+        // way to guarantee the order differs from what any caller built.
+        return new Response(JSON.stringify(rows.map(reorderKeys)), {
           status: 200, headers: { 'content-type': 'application/json' },
         });
       }
@@ -161,7 +177,10 @@ function sentJob(app, site) {
   app.run('state.activeId = null');
   const st = syncState(app) || { userId: UID_A, sent: {}, gone: {}, resend: {}, lastPushAt: null, pulledAt: null, lastPullAt: null };
   st.userId = UID_A;
-  st.sent[String(sess.id)] = app.fn('syncHash')(JSON.stringify(sess));
+  // v81.2: without this the loader drops `sent` as pre-canonical, and every
+  // "clean local copy" fixture would silently become a dirty one.
+  st.hashV = 2;
+  st.sent[String(sess.id)] = app.fn('syncHash')(app.fn('_syncCanonical')(sess));
   app.storage.setItem('pat:syncState', JSON.stringify(st));
   return sess;
 }
@@ -190,7 +209,7 @@ module.exports = async function () {
     t.eq(got && got.site, 'ZZOTHERSITE', 'and its own site, not this phone\u2019s');
 
     const st = syncState(app);
-    t.eq(st.sent['ZZREMOTE1'], app.fn('syncHash')(JSON.stringify(got)),
+    t.eq(st.sent['ZZREMOTE1'], app.fn('syncHash')(app.fn('_syncCanonical')(got)),
       'the fingerprint is set to what was applied \u2014 this is what stops it being pushed straight back');
     t.eq(app.srv.rows().filter(r => String(r.id) === 'ZZREMOTE1').length, 0,
       'and the push half of the same run sent it nowhere');
@@ -331,7 +350,7 @@ module.exports = async function () {
     // Re-mark clean at TWO items, so decision 1A alone would apply the cloud row.
     const sess = jobById(app, local.id);
     const st = syncState(app);
-    st.sent[String(local.id)] = app.fn('syncHash')(JSON.stringify(sess));
+    st.sent[String(local.id)] = app.fn('syncHash')(app.fn('_syncCanonical')(sess));
     app.storage.setItem('pat:syncState', JSON.stringify(st));
 
     app.srv.cloud.push(cloudJob(String(local.id), 'ZZSHRINK', ['ONLY-1'], T2));
@@ -448,7 +467,7 @@ module.exports = async function () {
     t.eq(now.items.length, 2, 'the cloud copy is in place');
     t.excludes(JSON.stringify(now.items), 'ZZDISCARD', 'and the local edit is gone, as chosen');
     t.eq(held(app).length, 0, 'the question is answered');
-    t.eq(syncState(app).sent[id], app.fn('syncHash')(JSON.stringify(now)),
+    t.eq(syncState(app).sent[id], app.fn('syncHash')(app.fn('_syncCanonical')(now)),
       'and fingerprinted, so it is not pushed back as if it were new work');
   });
 
@@ -499,7 +518,11 @@ module.exports = async function () {
     t.ok(jobById(app, 'ZZBEFOREPUSH'), 'picking up the other device\u2019s job on the way');
 
     const src = fs.readFileSync(path.join(APP_DIR, 'sync.js'), 'utf8');
-    const fn = src.slice(src.indexOf('function syncNoteSave('), src.indexOf('function syncPushSoon('));
+    // ⚠ Slice to syncNoteNav, NOT to syncPushSoon. v81.2 inserted syncNoteNav
+    // and _syncIdleCheck between the two, and both of them contain the same
+    // '{ pull: true }' — so the wider slice passed even with the save trigger's
+    // own read removed. M171 surviving is what exposed it.
+    const fn = src.slice(src.indexOf('function syncNoteSave('), src.indexOf('function syncNoteNav('));
     t.includes(fn.replace(/\/\/[^\n]*/g, ''), '{ pull: true }',
       'and the save trigger itself asks for the read \u2014 source-guarded on the CALL, because a debounce that never fires headlessly proves nothing');
   });
@@ -615,6 +638,180 @@ module.exports = async function () {
     t.eq(jobById(app2, id2).items.length, 1, 'the open job is untouched');
     t.includes(app2.fn('renderEntry')(), 'other device',
       'and says a change is waiting for it');
+  });
+
+  /* ------------------------------------------------------------------ 17s */
+  // v81.2, decision 3A. The `doc` column is jsonb: Postgres re-sorts object
+  // keys, so a job comes back byte-different from the one that was sent. Under
+  // plain JSON.stringify that reads as a change, and a phone re-applies its own
+  // work over itself — which on the open job showed up as "changes from your
+  // other device are waiting" when nothing had come from the other device.
+  await t.group('17s — a job coming back with its keys reordered is not a change', async () => {
+    const app = signedIn();
+    const local = sentJob(app, 'ZZJSONB');
+    const id = String(local.id);
+
+    // Byte-different, content-identical: exactly what the server gives back.
+    const same = reorderKeys(JSON.parse(JSON.stringify(jobById(app, id))));
+    t.notEq(JSON.stringify(same), JSON.stringify(jobById(app, id)),
+      'precondition: the reordered copy really is byte-different');
+    app.srv.cloud.push({ id, doc: same, deleted: false, last_modified: T2, updated_at: T2 });
+
+    const before = app.srv.posts().length;
+    await app.fn('syncPull')();
+    await tick(5);
+
+    t.eq(held(app).length, 0, 'it raises no question \u2014 nothing has actually changed');
+    t.eq(app.state().sync.waiting, null, 'and claims nothing is waiting for any job');
+    t.eq(app.srv.posts().length, before, 'and sends nothing back');
+    t.eq(syncState(app).pulledAt, T2, 'the row is resolved, so the cursor moves past it');
+
+    // The canonical form is what makes that true, and it must be recursive:
+    // nested items are where the reordering actually bites.
+    const canon = app.fn('_syncCanonical');
+    t.eq(canon({ b: 1, a: { d: 2, c: [{ f: 3, e: 4 }] } }),
+         canon({ a: { c: [{ e: 4, f: 3 }], d: 2 }, b: 1 }),
+         'key order does not reach the hash, at any depth');
+    t.notEq(canon({ a: 1 }), canon({ a: 2 }), 'but a real difference still does');
+  });
+
+  /* ------------------------------------------------------------------ 17t */
+  // v81.2, decision 1A. Peter's V81.1 report: everything worked and almost
+  // nothing showed until he tapped between jobs. The only repaint sync did was
+  // the Sync page.
+  await t.group('17t — a pull repaints the screen you are on, but never over a field or a sheet', async () => {
+    const app = signedIn({ server: { rows: [cloudJob('ZZSHOWME', 'ZZSHOWSITE', ['A'])] } });
+    app.run("state.view = 'sessions'");
+    const before = app.run('typeof __renders === "number" ? __renders : 0');
+    app.run('__renders = ' + before + '; _origRender = render; render = function () { __renders++; return _origRender.apply(null, arguments); };');
+
+    await app.fn('syncPull')();
+    await tick(5);
+    t.ok(app.run('__renders') > before,
+      'the jobs list repaints itself \u2014 correct state that never reaches the screen is indistinguishable from a broken app');
+
+    // Now the unsafe case: a focused field must never be torn down (MAP 2/3).
+    app.run('__renders = 0');
+    app.run('document.activeElement = { tagName: "INPUT" };');
+    app.srv.cloud.push(cloudJob('ZZWHILETYPING', 'ZZTYPE', ['B'], T2));
+    await app.fn('syncPull')();
+    await tick(5);
+    t.eq(app.run('__renders'), 0, 'no repaint while a field is focused');
+    t.ok(jobById(app, 'ZZWHILETYPING'), 'though the job itself still arrived');
+
+    // …and it is owed, not dropped: the next safe moment takes it.
+    app.run('document.activeElement = null;');
+    app.run('_syncFlushRepaint()');
+    t.ok(app.run('__renders') > 0, 'the owed repaint happens once the field blurs');
+    app.run('render = _origRender;');
+  });
+
+  /* ------------------------------------------------------------------ 17u */
+  // v81.2, decision 2D. Reading is driven by what the engineer does, with a slow
+  // backstop for standing still. The interval is the whole point: each request
+  // wakes the cellular modem and holds it awake for seconds afterwards, so a
+  // short timer never lets the radio idle. Navigation is free by comparison —
+  // it only happens when they are already using the phone.
+  await t.group('17u — reading follows what the engineer does, throttled (decision 2D)', async () => {
+    const app = signedIn({ server: { rows: [cloudJob('ZZNAV', 'ZZNAVSITE', ['A'])] } });
+
+    // ⚠ SOURCE-GUARDED, deliberately. Three behavioural formulations of this
+    // were tried and all three were flaky — waiting for a request to arrive
+    // depends on machine load, a zero-delay timer handle can be cleared by its
+    // own callback before the next line reads it, and comparing Date.now()
+    // against itself tests the clock's resolution. The throttle is a two-line
+    // guard whose PRESENCE is the whole contract, and M190 turns this red if it
+    // goes. A flaky assertion is worse than an honest source guard: it trains
+    // whoever runs the suite to re-run it until it goes green.
+    t.ok(app.run('syncActive()'), 'precondition: sync is active on this fixture');
+    t.eq(typeof app.run('syncNoteNav'), 'function', 'the navigation trigger exists');
+
+    const navSrc = fs.readFileSync(path.join(APP_DIR, 'sync.js'), 'utf8');
+    const nav = navSrc.slice(navSrc.indexOf('function syncNoteNav('), navSrc.indexOf('// \u2026and the backstop'));
+    t.includes(nav, 'now - _syncLastNavPull < SYNC_NAV_THROTTLE_MS',
+      'and it reads at most once per throttle window \u2014 tapping between jobs is not a reason to wake the radio each time');
+    t.includes(nav, '_syncLastNavPull = now', 'stamping the window as it goes');
+    t.includes(nav, '{ pull: true }', 'and what it schedules is a read');
+
+    // Only a genuine view CHANGE counts, not any old tap. Source-guarded: the
+    // before/after comparison is the whole mechanism.
+    const d = fs.readFileSync(path.join(APP_DIR, 'dispatch.js'), 'utf8');
+    t.includes(d, 'const viewBefore = state.view;',
+      'the view is captured before the action runs');
+    t.includes(d, 'if (state.view !== viewBefore && typeof syncNoteNav === \'function\')',
+      'and the read only fires when it actually changed \u2014 a quick-pick tap is not navigation');
+
+    // The backstop exists, is slow, and is skipped when the app is hidden.
+    const src = fs.readFileSync(path.join(APP_DIR, 'sync.js'), 'utf8');
+    const idle = src.slice(src.indexOf('function _syncIdleCheck('), src.indexOf('// opts.pull'));
+    t.includes(idle, 'visibilityState', 'the backstop does nothing while the app is in the background');
+    t.includes(idle, 'SYNC_IDLE_MS', 'and only when nothing has run for a while');
+    const cfg = fs.readFileSync(path.join(APP_DIR, 'config.js'), 'utf8');
+    const ms = parseInt((cfg.match(/SYNC_IDLE_MS = (\d+)/) || [])[1], 10);
+    t.ok(ms >= 60000,
+      `the backstop is at least a minute (${ms}ms) \u2014 a shorter one never lets the radio idle, which is the actual battery cost`);
+  });
+
+  /* ------------------------------------------------------------------ 17v */
+  // v81.2, decision 3A. Fingerprints written before canonical hashing describe
+  // a different calculation, so they can never match again. Dropping them costs
+  // one re-send of everything; keeping them would leave every job looking
+  // permanently unsent, or permanently in conflict with itself.
+  await t.group('17v — fingerprints from before the hashing changed are dropped, not trusted', async () => {
+    const app = signedIn();
+    const local = sentJob(app, 'ZZUPGRADE');
+    const id = String(local.id);
+
+    // Rewrite the stored state the way V81 left it: real fingerprints, no
+    // hashV marker at all.
+    const st = syncState(app);
+    delete st.hashV;
+    st.sent[id] = 'pre-canonical-hash';
+    st.gone['ZZALREADYDELETED'] = true;
+    app.storage.setItem('pat:syncState', JSON.stringify(st));
+
+    await app.fn('syncPull')();
+    await tick(5);
+
+    const after = syncState(app);
+    t.eq(after.hashV, 2, 'the state is marked as canonical once it has been upgraded');
+    t.notEq(after.sent[id], 'pre-canonical-hash', 'the old fingerprint is gone');
+    t.eq(after.gone['ZZALREADYDELETED'], true,
+      'but a delete already sent stays sent \u2014 re-sending work is cheap, re-deleting is not');
+
+    const pushed = app.srv.rows().filter(r => String(r.id) === id);
+    t.eq(pushed.length, 1, 'the job is re-sent exactly once');
+    t.eq(syncState(app).sent[id], app.fn('syncHash')(app.fn('_syncCanonical')(jobById(app, id))),
+      'and fingerprinted canonically from then on');
+
+    // Second run: nothing to do. The upgrade costs one round, not every round.
+    const before = app.srv.rows().length;
+    await app.fn('syncPull')();
+    await tick(5);
+    t.eq(app.srv.rows().length, before, 'and the run after that sends nothing');
+  });
+
+  /* ------------------------------------------------------------------ 17w */
+  await t.group('17w — one phone, two accounts: state is never read across them', async () => {
+    const app = signedIn();
+    const local = sentJob(app, 'ZZACCOUNTA');
+    const id = String(local.id);
+    t.ok(syncState(app).sent[id], 'precondition: account A has fingerprinted its job');
+
+    // The same phone, a different account. Asked of _syncStateFor directly
+    // rather than by driving a whole run: the vendored client caches its own
+    // session, so swapping the stored one mid-test would be racing the library
+    // rather than testing this rule.
+    const other = '22222222-2222-2222-2222-222222222222';
+    const st = app.run('_syncStateFor(' + JSON.stringify(other) + ')');
+    t.eq(st.userId, other, 'the state handed back belongs to the account asking for it');
+    t.notOk(st.sent[id],
+      'and carries none of the other account\u2019s fingerprints \u2014 believing them would mean this account\u2019s cloud silently never receives those jobs');
+    t.eq(Object.keys(st.gone).length, 0, 'nor its deletions');
+
+    // …and the first account's own state is still intact underneath.
+    const back = app.run('_syncStateFor(' + JSON.stringify(UID_A) + ')');
+    t.ok(back.sent[id], 'while the original account still has its own');
   });
 
   /* ------------------------------------------------------------------ 17p */
