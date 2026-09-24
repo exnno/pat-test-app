@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V83';",
-    to:   "const APP_VERSION = 'V83';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V83.1';",
+    to:   "const APP_VERSION = 'V83.1';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -636,8 +636,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V81.4</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V81.4</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V81.3</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V82</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V82</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V81.4</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1912,6 +1912,79 @@ const MUTATIONS = [
     from: "    if (!back && typeof freezeInstrumentOntoJobs === 'function') n += freezeInstrumentOntoJobs(id, f[id]);",
     to:   "    if (typeof freezeInstrumentOntoJobs === 'function') n += freezeInstrumentOntoJobs(id, f[id]);",
     why:  'after "Keep it", jobs are frozen to a copy that stops following the live instrument\u2019s recalibration',
+  },
+
+  /* ---- V83.1: paging --------------------------------------------------- */
+  {
+    name: 'M261 (V83.1) the jobs pager asks for rows AFTER the mark again',
+    file: 'sync.js',
+    from: "    return c.from('sessions')\n      .select('id,doc,deleted,last_modified,updated_at')\n      .gte('updated_at', from)",
+    to:   "    return c.from('sessions')\n      .select('id,doc,deleted,last_modified,updated_at')\n      .gt('updated_at', from)",
+    why:  'a page that ends part-way through an upload batch steps over the rest of it for good — the V81–V83 bug',
+  },
+  {
+    name: 'M262 (V83.1) the records pager asks for rows AFTER the mark again',
+    file: 'sync.js',
+    from: "      .in('kind', SYNC_RECORD_KINDS)\n      .gte('updated_at', from)",
+    to:   "      .in('kind', SYNC_RECORD_KINDS)\n      .gt('updated_at', from)",
+    why:  'the same step-over, for clients, sites, instruments and presets',
+  },
+  {
+    name: 'M263 (V83.1) the jobs pager decides a re-read edge row twice',
+    file: 'sync.js',
+    // First occurrence is the jobs pager (it comes first in the file).
+    from: "          if (!seen.has(key)) { seen.add(key); decide(row); }",
+    to:   "          decide(row);",
+    why:  'a held job on the page edge is counted twice: "2 jobs need you to decide" for one question',
+  },
+  {
+    name: 'M264 (V83.1) the records pager decides a re-read edge row twice',
+    file: 'sync.js',
+    from: "      .in('kind', SYNC_RECORD_KINDS)\n      .gte('updated_at', from)\n      .order('updated_at', { ascending: true })\n      .limit(SYNC_PULL_PAGE)\n      .then((r) => {\n        if (r && r.error) throw r.error;\n        const rows = (r && r.data) || [];\n        for (const row of rows) {\n          const u = row && row.updated_at;\n          const key = String(row && row.id) + '|' + String(u);\n          if (!seen.has(key)) { seen.add(key); decide(row); }",
+    to:   "      .in('kind', SYNC_RECORD_KINDS)\n      .gte('updated_at', from)\n      .order('updated_at', { ascending: true })\n      .limit(SYNC_PULL_PAGE)\n      .then((r) => {\n        if (r && r.error) throw r.error;\n        const rows = (r && r.data) || [];\n        for (const row of rows) {\n          const u = row && row.updated_at;\n          const key = String(row && row.id) + '|' + String(u);\n          decide(row);",
+    why:  'a held client on the page edge is counted twice, and a settings row is queued twice for decideInUse',
+  },
+  {
+    name: 'M265 (V83.1) the jobs guard lets the cursor move past a page it could not finish',
+    file: 'sync.js',
+    from: "        if (high === from) { blocked = true; return; }\n        return page(high);\n      });\n  }\n\n  return page(since).then(() => {\n    // Recomputed every run",
+    to:   "        if (high === from) { return; }\n        return page(high);\n      });\n  }\n\n  return page(since).then(() => {\n    // Recomputed every run",
+    why:  'more rows on one timestamp than a page holds: the rest are stepped over instead of the run stopping',
+  },
+  {
+    name: 'M266 (V83.1) the records guard lets the cursor move past a page it could not finish',
+    file: 'sync.js',
+    from: "        if (high === from) { blocked = true; return; }\n        return page(high);\n      });\n  }\n\n  return page(since).then(() => {\n    // v83, in this order",
+    to:   "        if (high === from) { return; }\n        return page(high);\n      });\n  }\n\n  return page(since).then(() => {\n    // v83, in this order",
+    why:  'the same, for records',
+  },
+  {
+    name: 'M267 (V83.1) a job the cloud still has as this phone sent it is held when edited since',
+    file: 'sync.js',
+    from: "    if (hash === st.sent[id]) { _syncHeldClear(id); return; }\n",
+    to:   "",
+    why:  'push, keep logging, next run reads the push back: a question with only one side to it, and the job stops syncing until answered',
+  },
+  {
+    name: 'M268 (V83.1) a record the cloud still has as this phone sent it is held when edited since',
+    file: 'sync.js',
+    from: "    if (hash === rs.sent[id]) { _syncHeldClear(id, kind); return; }\n",
+    to:   "",
+    why:  'the same, for a client renamed twice between runs',
+  },
+  {
+    name: 'M269 (V83.1) an old cursor is trusted — no one-off re-read',
+    file: 'sync.js',
+    from: "  if (raw.pagerV !== SYNC_PAGER_V) { out.pulledAt = null; out.rec.pulledAt = null; }\n",
+    to:   "",
+    why:  'a phone that already stepped over rows under V81–V83 never gets them',
+  },
+  {
+    name: 'M270 (V83.1) the pager version is never saved, so every run reads from the start',
+    file: 'sync.js',
+    from: "hashV: SYNC_HASH_V, pagerV: SYNC_PAGER_V,",
+    to:   "hashV: SYNC_HASH_V,",
+    why:  'the one-off re-read happens on every run: the whole account downloaded each time the engineer pauses',
   },
 
 ];
