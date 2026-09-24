@@ -74,6 +74,8 @@ function fakeServer(o = {}) {
         let rows = cloud.slice();
         const gt = q.get('updated_at');
         if (gt && gt.startsWith('gt.')) rows = rows.filter(r => r.updated_at > gt.slice(3));
+        // v83.1: the pagers ask "at or after" (gte) — honoured, or every read returns everything.
+        else if (gt && gt.startsWith('gte.')) rows = rows.filter(r => r.updated_at >= gt.slice(4));
         const eq = q.get('id');
         if (eq && eq.startsWith('eq.')) rows = rows.filter(r => String(r.id) === eq.slice(3));
         const kin = q.get('kind');

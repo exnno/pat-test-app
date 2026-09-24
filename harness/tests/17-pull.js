@@ -76,6 +76,8 @@ function fakeServer(o = {}) {
         let rows = cloud.slice();
         const gt = q.get('updated_at');
         if (gt && gt.startsWith('gt.')) rows = rows.filter(r => r.updated_at > gt.slice(3));
+        // v83.1: the pagers ask "at or after" (gte) — honoured, or every read returns everything.
+        else if (gt && gt.startsWith('gte.')) rows = rows.filter(r => r.updated_at >= gt.slice(4));
         const eq = q.get('id');
         if (eq && eq.startsWith('eq.')) rows = rows.filter(r => String(r.id) === eq.slice(3));
         rows.sort((a, b) => String(a.updated_at).localeCompare(String(b.updated_at)));
@@ -229,8 +231,10 @@ module.exports = async function () {
     await second();
     await tick(5);
     const url = app.srv.gets().slice(-1)[0].url;
-    t.includes(url, encodeURIComponent('gt.' + T1).replace(/%2E/g, '.'),
-      'the next pull asks only for rows newer than the mark');
+    // v83.1: "at or after" the mark, so a batch split by a page edge is read
+    // again in full (20a). Rows already applied resolve as no work.
+    t.includes(url, encodeURIComponent('gte.' + T1).replace(/%2E/g, '.'),
+      'the next pull starts from the mark');
 
     // Now a row that cannot be resolved: both sides changed.
     const local = sentJob(app, 'ZZBOTH');

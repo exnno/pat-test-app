@@ -70,6 +70,8 @@ function fakeServer(o = {}) {
         let rows = cloud.slice();
         const gt = q.get('updated_at');
         if (gt && gt.startsWith('gt.')) rows = rows.filter(r => r.updated_at > gt.slice(3));
+        // v83.1: the pagers ask "at or after" (gte) — honoured, or every read returns everything.
+        else if (gt && gt.startsWith('gte.')) rows = rows.filter(r => r.updated_at >= gt.slice(4));
         const eq = q.get('id');
         if (eq && eq.startsWith('eq.')) rows = rows.filter(r => String(r.id) === eq.slice(3));
         const kin = q.get('kind');
@@ -387,20 +389,23 @@ module.exports = async function () {
   /* ------------------------------------------------------------------ 18m */
   await t.group('18m — a new record kind reads from the beginning, not from the old cursor', async () => {
     const app = signedIn();
-    app.storage.setItem('pat:syncState', JSON.stringify({ userId: UID_A, hashV: 2, sent: {}, gone: {}, resend: {},
+    // v83.1: pagerV is current in both fixtures, so it is the KINDS tag that
+    // resets here, not the one-off pager re-read (that is 20c's subject).
+    const pagerV = app.run('SYNC_PAGER_V');
+    app.storage.setItem('pat:syncState', JSON.stringify({ userId: UID_A, hashV: 2, pagerV, sent: {}, gone: {}, resend: {},
       rec: { sent: {}, gone: {}, resend: {}, pulledAt: T2, kinds: 'client' } }));
     await app.fn('syncPull')();
     await tick(5);
-    t.includes(app.srv.gets('records')[0].url, 'updated_at=gt.1970', 'a list that grew resets the cursor');
+    t.includes(app.srv.gets('records')[0].url, 'updated_at=gte.1970', 'a list that grew resets the cursor');
 
     // v83: the tag is kinds AND settings ids (_syncRecordKindsTag), so the
     // "same list" case reads the current tag rather than a hard-coded V82 one.
     const app2 = signedIn();
-    app2.storage.setItem('pat:syncState', JSON.stringify({ userId: UID_A, hashV: 2, sent: {}, gone: {}, resend: {},
+    app2.storage.setItem('pat:syncState', JSON.stringify({ userId: UID_A, hashV: 2, pagerV, sent: {}, gone: {}, resend: {},
       rec: { sent: {}, gone: {}, resend: {}, pulledAt: T2, kinds: app2.fn('_syncRecordKindsTag')() } }));
     await app2.fn('syncPull')();
     await tick(5);
-    t.includes(decodeURIComponent(app2.srv.gets('records')[0].url), 'updated_at=gt.' + T2, 'the same list carries on from its cursor');
+    t.includes(decodeURIComponent(app2.srv.gets('records')[0].url), 'updated_at=gte.' + T2, 'the same list carries on from its cursor');
   });
 
   /* ------------------------------------------------------------------ 18n */
