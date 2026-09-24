@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — config.js (constants & factories)
- * v83 (September 2026)
+ * v83.1 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V83';
+const APP_VERSION = 'V83.1';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -393,6 +393,9 @@ const SYNC_BATCH_BYTES = 400000;    // …or roughly this much JSON, whichever f
 // fingerprints are dropped rather than silently mismatching for ever.
 const SYNC_HASH_V = 2;
 const SYNC_PULL_PAGE = 200;         // v81: rows per pull request, then page again
+// v83.1: the pager's version. A cursor saved under an older one is cleared once
+// (sync.js _syncLoad), because V81–V83 could step over rows at a page edge.
+const SYNC_PAGER_V = 2;
 // v81.2 (decision 2D). Reading is driven by what the engineer DOES — every
 // screen change is a moment they might be expecting the other phone's work —
 // with a slow backstop for standing still. The interval matters far more than

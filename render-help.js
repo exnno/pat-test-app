@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA
- * v83 (September 2026)
+ * v83.1 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -64,16 +64,16 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v83: rolled forward — V83 on top, V81.3 dropped. -->
+      <!-- v8: rolling 3-version changelog. v83.1: rolled forward — V83.1 on top, V81.4 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V83.1</strong> &middot; September 2026</p>
+        <p class="muted">For the invite-only cloud test only. Fixes a sync bug that could leave a few jobs or clients behind when a device had a lot to catch up on, and stops a job you'd only changed on this phone being wrongly flagged as changed on both. Each device reads everything once more on its first sync to catch anything it missed.</p>
         <p><strong>V83</strong> &middot; September 2026</p>
         <p class="muted">Fixes a bug where deleting a test instrument could leave older jobs showing your current tester on their certificates after the app was reopened. For the invite-only cloud test: your instruments and item presets now travel between your devices too, along with which tester is in use.</p>
         <p><strong>V82</strong> &middot; September 2026</p>
         <p class="muted">For the invite-only cloud test only. Your clients and sites now travel between your devices as well as your jobs. When the app can't decide which copy of something to keep, the Sync page now shows you what's actually different, and each button says exactly what it will do.</p>
-        <p><strong>V81.4</strong> &middot; September 2026</p>
-        <p class="muted">For the invite-only cloud test only. When changes from your other device are waiting for the job you're in, there's now an Update now button, so you don't have to leave the job and come back.</p>
                               </div>
 
       <div class="info-card">

@@ -17,9 +17,9 @@ leftovers are the IndexedDB photo store and the sync bookkeeping keys
 still signed in would pull its old jobs straight back. Most destructive button in
 the app, so the confirm needs to be genuinely hard to hit by accident.
 
-### Cloud track — V83: instruments, presets, tester in use; settings next
+### Cloud track — V83.1: instruments, presets, tester in use; settings next
 V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull → V82 clients + sites →
-**V83** instruments + presets + tester in use (1B). Next: **V84 settings +
+**V83** instruments + presets + tester in use (1B) → **V83.1** pager fix. Next: **V84 settings +
 report templates** → photos (+ the cross-account download isolation check) →
 status UI. Every cloud release runs `supabase/isolation-test.sql` (all PASS)
 before promotion to `Release` — passed at V82.
@@ -40,6 +40,13 @@ before promotion to `Release` — passed at V82.
   must be in the sig, or it never reaches disk.
 - Consider a records-specific row in isolation-test.sql now instrument
   calibration data lives in `records` (spec section 7).
+- README is stale on cloud: the Stack table's Cloud row still says "sign-in v79,
+  job push v80" and Related points at spec v1.2. Bring it up to date (V83.1 review).
+- Every new synced record kind or settings id answers, in the spec round: what
+  does an older phone do when it RECEIVES this, and what happens if an older
+  phone EDITS it and sends it back? (See "older phone strips fields" below.)
+- New tests that read from the cloud must include more than one page (V83.1:
+  no test had, which is how the step-over survived V81–V83).
 
 ### Cloud — V83 residuals (known, accepted)
 - A job whose instrument is not on this phone and has no frozen copy still
@@ -52,6 +59,14 @@ before promotion to `Release` — passed at V82.
   never sent — nameless records are unreadable by design.
 - Same tester / same "Default" preset made on two phones separately = two
   entries to tidy by hand (3A; 5A only covers an untouched starter).
+- (V83.1) Commit-order window: `updated_at` is when a write STARTED, not when it
+  committed. A write that starts first but commits after a later one could be
+  stepped over by a phone reading in between. Needs two of one account's
+  devices writing within milliseconds of each other while a third reads.
+  Accepted; revisit (read a few seconds behind the mark) only if ever seen.
+- (V83.1) A read stops without moving if more rows share one timestamp than a
+  page holds (200). Impossible while upload batches are 25 rows; the compound
+  (updated_at, id) cursor is the fix if batches ever grow.
 
 ### Cloud — an older phone strips fields it doesn't know (V82 note)
 Records sync a projection (`_syncRecordDoc`). A later version that adds a client

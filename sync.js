@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — sync.js (cloud sync: push and pull)
- * v83 (September 2026)
+ * v83.1 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -32,6 +32,14 @@
  *     last, and a phone that has never sent one takes the account's;
  *   • a new phone's untouched starter preset is set aside when the account's
  *     presets arrive (decision 5A). Which PRESET is in use stays per phone (7A).
+ *
+ * V83.1: THE PULL NO LONGER STEPS OVER ROWS. Both pagers now re-read the last
+ * page's timestamp ("at or after", not "after") — see the v83.1 note at the
+ * jobs pager. That makes re-reading a row this phone already knows routine,
+ * so a cloud row that still equals what this phone last sent is now no work,
+ * even if the phone has edited since (it used to be held as changed on both
+ * sides). And every phone reads its jobs and records once from the start
+ * (SYNC_PAGER_V), to pick up anything an earlier version stepped over.
  *
  * ⚠ THIS FILE NOW WRITES APP DATA. Through V80 it only ever read state and
  * wrote its own keys. From V81 the pull adds, replaces and deletes jobs, which
@@ -159,7 +167,7 @@ function _syncEmpty(userId) {
   // choosing the phone's copy would have to fake a fingerprint mismatch, and a
   // fake value in the store is a value someone later reads as real.
   return { userId: userId || '', sent: {}, gone: {}, resend: {}, lastPushAt: null,
-           pulledAt: null, lastPullAt: null, hashV: SYNC_HASH_V,
+           pulledAt: null, lastPullAt: null, hashV: SYNC_HASH_V, pagerV: SYNC_PAGER_V,
            // v82: the same bookkeeping for clients and sites, kept apart from the
            // jobs' so the two can never be confused. Keyed by record id alone,
            // which is how the server keys them (primary key user_id + id).
@@ -231,6 +239,12 @@ function _syncLoad() {
   }
   if (raw.hashV !== SYNC_HASH_V) { out.sent = {}; out.rec.sent = {}; }
   else out.hashV = SYNC_HASH_V;
+  // v83.1 (decision 3A). Cursors written by a pager that could step over rows
+  // are not trusted: both are cleared once, so the next run reads jobs and
+  // records from the start. Unlike hashV nothing else is dropped — rows this
+  // phone already has resolve as no work. Saved with the new pagerV by the
+  // first run, so it happens once per phone (per account).
+  if (raw.pagerV !== SYNC_PAGER_V) { out.pulledAt = null; out.rec.pulledAt = null; }
   return out;
 }
 
@@ -789,6 +803,15 @@ function _syncPull(c, uid, st, out) {
     // Identical. Usually this phone's own push coming back to it.
     if (hash === localHash) { st.sent[id] = hash; _syncHeldClear(id); return; }
 
+    // ⚠ v83.1. The cloud row is exactly what this phone last sent: the other
+    // phone has not touched it, so there is nothing here to take — only this
+    // phone moved, and the push half of this run sends it. Before V83.1 this
+    // fell through to "both changed" whenever the phone had been edited since
+    // its own push (push, keep logging, next run reads the push back), and the
+    // job was held for a question with only one side to it. The v83.1 pager
+    // re-reads the boundary rows every run, which would make that routine.
+    if (hash === st.sent[id]) { _syncHeldClear(id); return; }
+
     // Decision 1A. The local copy no longer matches what was last sent, so this
     // phone has changes of its own. Both sides moved; neither wins by default.
     if (st.sent[id] !== localHash) {
@@ -815,21 +838,32 @@ function _syncPull(c, uid, st, out) {
     _syncHeldClear(id);
   }
 
-  // Keyset paging on updated_at. If a whole page shares one timestamp the
-  // cursor cannot advance past it, so the run stops and leaves the mark where
-  // it was rather than stepping over rows it has not read.
+  // Keyset paging on updated_at.
+  // ⚠ v83.1 (decision 2A). Postgres stamps updated_at with the time the
+  // TRANSACTION started, so every row in one upload batch (up to
+  // SYNC_BATCH_ROWS) carries the same timestamp. V81–V83 asked the next page
+  // for rows AFTER the last one read: when a page ended part-way through a
+  // batch, the rest of that batch was stepped over and the cursor moved past
+  // it for good (harness 20a). Each page now starts AT the last timestamp, so
+  // the boundary batch is read again in full; rows already seen in this run
+  // are skipped (`seen`), and rows from earlier runs resolve as no work. The
+  // guard below is now real: a full page all on one timestamp cannot move, so
+  // the run stops and leaves the mark where it was. Needs more rows in one
+  // transaction than SYNC_PULL_PAGE — impossible while batches are smaller.
+  const seen = new Set();
   function page(from) {
     return c.from('sessions')
       .select('id,doc,deleted,last_modified,updated_at')
-      .gt('updated_at', from)
+      .gte('updated_at', from)
       .order('updated_at', { ascending: true })
       .limit(SYNC_PULL_PAGE)
       .then((r) => {
         if (r && r.error) throw r.error;
         const rows = (r && r.data) || [];
         for (const row of rows) {
-          decide(row);
           const u = row && row.updated_at;
+          const key = String(row && row.id) + '|' + String(u);
+          if (!seen.has(key)) { seen.add(key); decide(row); }
           if (typeof u === 'string' && u > high) high = u;
         }
         if (rows.length < SYNC_PULL_PAGE) return;
@@ -1565,6 +1599,9 @@ function _syncPullRecords(c, uid, st, out) {
 
     const localHash = _syncRecordHash(kind, local);
     if (hash === localHash) { rs.sent[id] = hash; _syncHeldClear(id, kind); return; }
+    // v83.1: the cloud is what this phone last sent — only this phone moved,
+    // and the push sends it. See the same line for jobs.
+    if (hash === rs.sent[id]) { _syncHeldClear(id, kind); return; }
     if (rs.sent[id] !== localHash) { hold('both-changed', row.doc); return; }
 
     if (deferEditor()) return;
@@ -1627,20 +1664,23 @@ function _syncPullRecords(c, uid, st, out) {
     _syncHeldClear(id, kind);
   }
 
-  // One request for every kind, one cursor, paged exactly as jobs are.
+  // One request for every kind, one cursor, paged exactly as jobs are —
+  // including the v83.1 re-read of the boundary timestamp. See the jobs pager.
+  const seen = new Set();
   function page(from) {
     return c.from('records')
       .select('id,kind,doc,deleted,last_modified,updated_at')
       .in('kind', SYNC_RECORD_KINDS)
-      .gt('updated_at', from)
+      .gte('updated_at', from)
       .order('updated_at', { ascending: true })
       .limit(SYNC_PULL_PAGE)
       .then((r) => {
         if (r && r.error) throw r.error;
         const rows = (r && r.data) || [];
         for (const row of rows) {
-          decide(row);
           const u = row && row.updated_at;
+          const key = String(row && row.id) + '|' + String(u);
+          if (!seen.has(key)) { seen.add(key); decide(row); }
           if (typeof u === 'string' && u > high) high = u;
         }
         if (rows.length < SYNC_PULL_PAGE) return;
