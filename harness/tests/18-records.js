@@ -345,7 +345,7 @@ module.exports = async function () {
     t.ok(app.srv.rows('sessions').some(r => r.doc && String(r.doc.site).indexOf('ZZ JOB J') !== -1), 'the job is still sent');
     t.eq(app.srv.rows('records').length, 0, 'records are not pushed when their read failed');
     // v83: the sentence now names every list the records table carries.
-    t.includes(app.run('state.sync.message'), 'Clients, sites, instruments and presets couldn', 'and the page says so plainly');
+    t.includes(app.run('state.sync.message'), 'Clients, sites, instruments, presets and report settings couldn', 'and the page says so plainly');
   });
 
   /* ------------------------------------------------------------------ 18k */
