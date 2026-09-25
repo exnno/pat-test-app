@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V84';",
-    to:   "const APP_VERSION = 'V84';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V85';",
+    to:   "const APP_VERSION = 'V85';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -636,8 +636,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V83</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V83</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V82</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V83.1</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V83.1</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V83</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -2170,6 +2170,78 @@ const MUTATIONS = [
     from: "|| (!sent && grp === 'rp' && _syncNothingMade(kind, id, r))",
     to:   "",
     why:  "a fresh phone shows report settings 'not up to date' for ever",
+  },
+
+  // ---- V85: Settings → Cloud and its access code (harness group 22) --------
+  {
+    name: "M296 (V85) the unlock is never remembered",
+    file: "cloud.js",
+    from: "try { return localStorage.getItem(CLOUD_UNLOCK_KEY) === '1'; } catch { return false; }",
+    to:   "return false;",
+    why:  "the code has to be typed on every visit — exactly the chore this release removes",
+  },
+  {
+    name: "M297 (V85) any code opens the Cloud group",
+    file: "cloud.js",
+    from: "if (typed !== CLOUD_ACCESS_CODE) {",
+    to:   "if (!typed) {",
+    why:  "the curtain is gone: a free user typing anything lands on a sign-in page they cannot use",
+  },
+  {
+    name: "M298 (V85) the Cloud group shows on a copy with no cloud",
+    file: "render-settings.js",
+    from: "${SETTINGS_CATEGORIES.filter(settingsCategoryVisible).map(cat =>",
+    to:   "${SETTINGS_CATEGORIES.map(cat =>",
+    why:  "every copy of the app (localhost, a future host) grows a Cloud row that leads nowhere",
+  },
+  {
+    name: "M299 (V85) settings search walks around the curtain",
+    file: "render-settings.js",
+    from: "      if (!settingsPageSearchable(cat)) return;   // v85\n",
+    to:   "",
+    why:  "typing 'sync' in settings search opens the cloud pages without the code",
+  },
+  {
+    name: "M300 (V85) the Cloud group opens without the code",
+    file: "render-settings.js",
+    from: "if (cat.id === 'catCloud' && !(typeof cloudPagesUnlocked",
+    to:   "if (false && cat.id === 'catCloud' && !(typeof cloudPagesUnlocked",
+    why:  "the code box never appears — 1A not delivered",
+  },
+  {
+    name: "M301 (V85) a cloud page paints while locked",
+    file: "render-core.js",
+    from: "    if (typeof cloudPagesUnlocked === 'function' && cloudPagesUnlocked()) {\n      html = v === 'cloudAccount'",
+    to:   "    if (true) {\n      html = v === 'cloudAccount'",
+    why:  "a stale view (or a future link) shows the sign-in page to a phone that never entered the code",
+  },
+  {
+    name: "M302 (V85) a signed-in phone is not remembered at boot",
+    file: "cloud.js",
+    from: "  _cloudRememberUnlock();   // v85 2A: a signed-in phone never asks for the code\n",
+    to:   "",
+    why:  "your test phones, already signed in, get the code box the first time they sign out",
+  },
+  {
+    name: "M303 (V85) signing in does not remember the unlock",
+    file: "cloud.js",
+    from: "      _cloudRememberUnlock();   // v85 2A\n",
+    to:   "",
+    why:  "a phone let in by signing in is locked out again after signing out (2A)",
+  },
+  {
+    name: "M304 (V85) a stale code message greets the next visit",
+    file: "dispatch.js",
+    from: "state.settingsCategory = arg; state.cloudCodeMessage = ''; setView('settingsCategory');",
+    to:   "state.settingsCategory = arg; setView('settingsCategory');",
+    why:  "'That code isn't right.' shows before anything has been typed",
+  },
+  {
+    name: "M305 (V85) the unlock travels in a backup",
+    file: "backup.js",
+    from: "    theme: state.theme,\n    hapticsEnabled: state.hapticsEnabled,",
+    to:   "    theme: state.theme,\n    cloudUnlocked: localStorage.getItem(CLOUD_UNLOCK_KEY),\n    hapticsEnabled: state.hapticsEnabled,",
+    why:  "restoring a backup onto a new phone would open the curtain there too",
   },
 ];
 
