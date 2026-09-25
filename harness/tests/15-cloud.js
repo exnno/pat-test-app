@@ -37,6 +37,10 @@ const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 function boot(opts = {}) {
   const app = bootApp(opts);
   app.state = () => app.refresh('state').state;
+  // V85: the cloud pages paint only once the phone is past the access code.
+  // This file tests the pages themselves, so every boot here is unlocked; the
+  // code box is group 22's subject. (Seeded after boot: the check is live.)
+  app.sandbox.localStorage.setItem('pat:cloudUnlocked', '1');
   return app;
 }
 
@@ -216,6 +220,10 @@ module.exports = async function () {
     t.eq(otp && otp.body.create_user, false, 'create_user is false — nobody can sign up from the app');
     t.eq(st.cloud.status, 'code-sent', 'page moved to the code step');
     t.ok(!!app.doc.getElementById('cloud-code'), 'code field painted');
+    // V85 2A: forget the unlock the boot helper seeded, so the check after
+    // sign-out can only pass if the SIGN-IN itself remembered it. (The code
+    // field's value is read before the page next repaints.)
+    app.storage.removeItem('pat:cloudUnlocked');
 
     app.doc.getElementById('cloud-code').value = '123 456';
     t.ok(await app.fn('cloudVerifyCode')(), 'verify resolved true');
@@ -234,6 +242,7 @@ module.exports = async function () {
     t.eq(st.cloud.status, 'signed-out', 'signed out');
     t.eq(app.storage.getItem('patgo:cloudAuth:test'), null, 'session removed from storage');
     t.excludes(app.doc.getElementById('app').innerHTML, 'id="cloud-test-strip"', 'strip gone');
+    t.eq(app.storage.getItem('pat:cloudUnlocked'), '1', 'the sign-in remembered the Cloud unlock; signing out kept it (V85 2A)');
   });
 
   /* ------------------------------------------------------------------ 15g */

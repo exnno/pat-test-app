@@ -453,6 +453,9 @@ module.exports = function run() {
     // lost dispatcher branch. Only driving render() per view and looking for a
     // string that ONLY that function emits can see it.
     const a = populated();
+    // V85: the three cloud views paint the access-code box until unlocked
+    // (group 22). This group is about the dispatcher branch, so unlock first.
+    a.sandbox.localStorage.setItem('pat:cloudUnlocked', '1');
     for (const { name, view, marker } of MOVED_TO_RENDER_HELP) {
       if (!view) continue;
       t.doesNotThrow(() => { a.fn('setView')(view); a.fn('render')(); },

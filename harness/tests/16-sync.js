@@ -43,6 +43,8 @@ function storedSession(id = UID_A, email = 'peter@example.com') {
 
 function boot(opts = {}) {
   const app = bootApp(opts);
+  // V85: past the Cloud access code, as in 15-cloud.js (group 22 tests the code).
+  app.sandbox.localStorage.setItem('pat:cloudUnlocked', '1');
   app.fn('load')();
   app.state = () => app.refresh('state').state;
   app.stopTimer = () => app.run('if (_syncTimer) { clearTimeout(_syncTimer); _syncTimer = null; }');
