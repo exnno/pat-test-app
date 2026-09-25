@@ -44,6 +44,12 @@ begin
   delete from public.sessions where id like 'iso-test-%';
   insert into public.sessions (id, user_id, doc, last_modified)
   values ('iso-test-A', a, '{"owner":"A"}', now());
+  -- V84: and one records row. Since V83 records hold instrument calibration
+  -- data, since V84 report settings (company, logo, signature) — same policy
+  -- shape as sessions, checked in its own right.
+  delete from public.records where id like 'iso-test-%';
+  insert into public.records (id, user_id, kind, doc, last_modified)
+  values ('iso-test-A', a, 'instrument', '{"owner":"A"}', now());
 
   -- Become B.
   perform set_config('request.jwt.claims',
@@ -88,6 +94,30 @@ begin
                   || case when n = 0 then 'PASS|0 rows affected' else 'FAIL|' || n || ' row(s) changed' end];
   exception when others then
     res := res || array['3|B cannot change A''s sessions|PASS|rejected: ' || sqlerrm];
+  end;
+
+  -- 6. (V84) The same three checks on records.
+  begin
+    select count(*) into n from public.records where id = 'iso-test-A';
+    res := res || array['6a|B cannot see A''s records|'
+                  || case when n = 0 then 'PASS|' else 'FAIL|B saw ' || n || ' row(s)' end];
+  exception when others then
+    res := res || array['6a|B cannot see A''s records|FAIL|error instead of 0 rows: ' || sqlerrm];
+  end;
+  begin
+    insert into public.records (id, user_id, kind, doc, last_modified)
+    values ('iso-test-forged', a, 'settings', '{"owner":"forged"}', now());
+    res := res || array['6b|B cannot write a record as A|FAIL|insert was accepted'];
+  exception when others then
+    res := res || array['6b|B cannot write a record as A|PASS|rejected: ' || sqlerrm];
+  end;
+  begin
+    update public.records set doc = '{"owner":"hacked"}' where id = 'iso-test-A';
+    get diagnostics n = row_count;
+    res := res || array['6c|B cannot change A''s records|'
+                  || case when n = 0 then 'PASS|0 rows affected' else 'FAIL|' || n || ' row(s) changed' end];
+  exception when others then
+    res := res || array['6c|B cannot change A''s records|PASS|rejected: ' || sqlerrm];
   end;
 
   -- 4. Storage: B cannot put a file in A's photo folder, and B cannot list
@@ -140,7 +170,12 @@ begin
   res := res || array['3b|A''s session content untouched|'
                 || case when msg = 'A' then 'PASS|' else 'FAIL|content now ' || coalesce(msg,'(gone)') end];
 
+  select doc->>'owner' into msg from public.records where id = 'iso-test-A';
+  res := res || array['6d|A''s record content untouched|'
+                || case when msg = 'A' then 'PASS|' else 'FAIL|content now ' || coalesce(msg,'(gone)') end];
+
   delete from public.sessions where id like 'iso-test-%';
+  delete from public.records where id like 'iso-test-%';
   -- (No storage cleanup: Supabase blocks SQL deletes on storage tables, and on
   -- a PASS the 4a insert never happened, so there is nothing to clean.)
 
