@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V83.1';",
-    to:   "const APP_VERSION = 'V83.1';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V84';",
+    to:   "const APP_VERSION = 'V84';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -636,8 +636,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V82</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V82</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V81.4</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V83</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V83</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V82</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1066,8 +1066,11 @@ const MUTATIONS = [
   {
     name: 'M142 (V80) saveSessions stops telling sync about saves',
     file: 'storage.js',
-    from: "  if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error('Sync trigger failed (non-fatal).', e); } }\n",
-    to:   '',
+    // v84: the same guarded line now also sits in saveReportSettings and
+    // saveReportTemplates, which come first in the file — anchored on the
+    // comment above the saveSessions copy so it breaks THIS one.
+    from: "  // guarded and wrapped so a broken sync.js can never make a save fail.\n  if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error('Sync trigger failed (non-fatal).', e); } }\n",
+    to:   "  // guarded and wrapped so a broken sync.js can never make a save fail.\n",
     why:  'the hot-path trigger: without it, jobs only go on reopen and nobody notices the gap',
   },
   {
@@ -1264,7 +1267,11 @@ const MUTATIONS = [
     name: 'M170 (V81) an applied job is edited in place instead of replaced',
     file: 'sync.js',
     from: "  _invalidateSessionEncoding(oldSess);\n  state.sessions[i] = doc;",
-    to:   "  oldSess.items = doc.items;",
+    // v84: re-shaped. The V81 form swapped the items ARRAY, which the cache's
+    // own reference check notices, so it re-encoded and the mutation survived
+    // (found on the first full run since V83). This edits item CONTENTS in
+    // place — same array, same count, same sig — which is the v69 defect.
+    to:   "  doc.items.forEach((it, k) => { if (oldSess.items[k]) Object.assign(oldSess.items[k], it); });",
     why:  'the exact v69 defect, restored. Same array length, same session fields, so _sessionSig() sees no change and the STALE encoding is written back: the pulled change is on screen until the next reload and gone after it',
   },
   {
@@ -1485,7 +1492,8 @@ const MUTATIONS = [
   {
     name: 'M200 (V82) a client changed on both phones is applied on a guess',
     file: 'sync.js',
-    from: "    if (rs.sent[id] !== localHash) { hold('both-changed', row.doc); return; }\n",
+    // v84: the line gained the starter-template takeIt; first match is decide()'s.
+    from: "    if (!takeIt && rs.sent[id] !== localHash) { hold('both-changed', row.doc); return; }\n",
     to:   "",
     why:  'the rename made on this phone is silently replaced by the other phone\u2019s',
   },
@@ -1648,7 +1656,8 @@ const MUTATIONS = [
   {
     name: 'M223 (V82) pulled records are applied in memory but never saved',
     file: 'sync.js',
-    from: "      if (typeof saveSettings === 'function') saveSettings();\n      _syncRepaintApp();",
+    // v84: the pull now saves through _syncSaveLists().
+    from: "      _syncSaveLists();\n      _syncRepaintApp();",
     to:   "      _syncRepaintApp();",
     why:  'the client appears, then vanishes on the next reopen \u2014 and its fingerprint says it was applied',
   },
@@ -1685,8 +1694,8 @@ const MUTATIONS = [
   {
     name: 'M228 (V83) the ledger does not accept instrument entries',
     file: 'storage.js',
-    from: "const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'instrument'];",
-    to:   "const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset'];",
+    from: "const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'instrument', 'template'];",
+    to:   "const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'template'];",
     why:  'recordTombstone silently drops the entry, so an instrument delete is never sent',
   },
   {
@@ -1853,7 +1862,7 @@ const MUTATIONS = [
   {
     name: 'M252 (V83) "no tester" is sent as a choice',
     file: 'sync.js',
-    from: "      if (kind === 'settings' && !doc.instrumentId) { delete rs.resend[id]; continue; }\n",
+    from: "      if (kind === 'settings' && id === SYNC_INUSE_ID && !doc.instrumentId) { delete rs.resend[id]; continue; }\n",
     to:   "",
     why:  'a new phone with no instruments tells the account it uses none',
   },
@@ -1987,6 +1996,181 @@ const MUTATIONS = [
     why:  'the one-off re-read happens on every run: the whole account downloaded each time the engineer pauses',
   },
 
+  {
+    name: "M271 (V84) applying a template rewinds the certificate counter again",
+    file: "settings-actions.js",
+    from: "      state.reportSettings.certNextNumber = keep.certNextNumber;\n",
+    to:   "",
+    why:  "the pre-existing bug 21a fixes: the next certificates reuse numbers already issued",
+  },
+  {
+    name: "M272 (V84) stamping no longer skips numbers already on a job",
+    file: "report.js",
+    from: "used.has(no) && guard <= used.size",
+    to:   "false && guard <= used.size",
+    why:  "two phones counting independently hand out the same certificate number, and nothing notices",
+  },
+  {
+    name: "M273 (V84) a hand-typed counter is not marked as deliberate",
+    file: "settings-actions.js",
+    from: "if (rs.certNextNumber !== was) rs.certSetAt = new Date().toISOString();",
+    to:   "",
+    why:  "resetting the counter for a new prefix is undone by the other phone's higher number",
+  },
+  {
+    name: "M274 (V84) every capture counts as a deliberate set",
+    file: "settings-actions.js",
+    from: "if (rs.certNextNumber !== was) rs.certSetAt",
+    to:   "if (true) rs.certSetAt",
+    why:  "every toggle on Report settings would stamp a set time, so a stale counter shown on screen beats the other phone's real one",
+  },
+  {
+    name: "M275 (V84) nothing-made records are pushed while unsent",
+    file: "sync.js",
+    from: "if (!rs.sent[id] && !rs.resend[id] && _syncNothingMade(kind, id, r)) continue;",
+    to:   "",
+    why:  "a fresh phone pushes defaults over the account (or makes the branded phone's first sync a question)",
+  },
+  {
+    name: "M276 (V84) an untouched phone does not take the account's report settings",
+    file: "sync.js",
+    from: "const takeIt = fresh && _syncIsDefaultReport(local.settings);",
+    to:   "const takeIt = false;",
+    why:  "every new phone is asked about report settings it never touched",
+  },
+  {
+    name: "M277 (V84) taking the cloud's report settings takes its counter too",
+    file: "sync.js",
+    from: "  next.certNextNumber = keep.certNextNumber;\n  next.certSetAt = keep.certSetAt;\n",
+    to:   "",
+    why:  "the counter travels on its own rules; riding with the report row rewinds it",
+  },
+  {
+    name: "M278 (V84) held report diffs carry the image itself",
+    file: "sync.js",
+    from: "if (k === 'logo' || k === 'signature') return v ? (other ? 'An image' : 'Image') : '';",
+    to:   "",
+    why:  "rule 7: a held entry must never become a store of the cloud document",
+  },
+  {
+    name: "M279 (V84) a default cloud copy does not give way to this phone's",
+    file: "sync.js",
+    from: "    if (fresh && _syncIsDefaultReport(row.doc.settings)) { _syncHeldClear(id, kind); return; }\n",
+    to:   "",
+    why:  "a phone that signed in first with nothing set would force a question on the branded one",
+  },
+  {
+    name: "M280 (V84) the counter ignores deliberate sets",
+    file: "sync.js",
+    from: "(cloud.setAt !== mine.setAt) ? cloud.setAt > mine.setAt : cloud.next > mine.next",
+    to:   "cloud.next > mine.next",
+    why:  "a reset to 1 is undone by any higher number anywhere",
+  },
+  {
+    name: "M281 (V84) a counter this phone wins is not re-sent",
+    file: "sync.js",
+    from: "    if (!cloudWins) { delete rs.sent[id]; return; }",
+    to:   "    if (!cloudWins) { return; }",
+    why:  "a slower phone's lower number stays in the cloud for good",
+  },
+  {
+    name: "M282 (V84) unsaved Report settings are pushed",
+    file: "sync.js",
+    from: "      if (reportOpen && (id === SYNC_REPORT_ID || id === SYNC_CERT_ID)) continue;\n",
+    to:   "",
+    why:  "toggles flipped but never saved reach the other phone",
+  },
+  {
+    name: "M283 (V84) report settings are replaced under the open page",
+    file: "sync.js",
+    from: "    if (reportOpen) { blocked = true; out.skip[id] = true; return; }\n    _syncApplyReport(row.doc);",
+    to:   "    _syncApplyReport(row.doc);",
+    why:  "its Save then writes every field back over the change",
+  },
+  {
+    name: "M284 (V84) deleting a template leaves no ledger entry",
+    file: "settings-actions.js",
+    from: "  recordTombstone('template', templateId);\n",
+    to:   "",
+    why:  "the delete never travels and the template comes back",
+  },
+  {
+    name: "M285 (V84) an untouched starter template is asked about",
+    file: "sync.js",
+    from: "const takeIt = fresh && _syncIsStarterTemplate(local);",
+    to:   "const takeIt = false;",
+    why:  "every new phone gets questions about templates it never touched",
+  },
+  {
+    name: "M286 (V84) a starter deleted here before it was ever sent never travels",
+    file: "sync.js",
+    from: "if (kind === 'template' && !rs.sent[id] && !rs.resend[id]) rs.sent[id] = hash;",
+    to:   "",
+    why:  "the push thinks the server never had it, so the other phone keeps it for ever",
+  },
+  {
+    name: "M287 (V84) a template's counter is part of what it is",
+    file: "sync.js",
+    from: "  delete n.certNextNumber;\n  delete n.certSetAt;\n",
+    to:   "",
+    why:  "templates saved at different counter values look edited on both sides",
+  },
+  {
+    name: "M288 (V84) the certificate counter reports as a change",
+    file: "sync.js",
+    from: "grp: id === SYNC_CERT_ID ? null : _syncRecordGroup(kind, id),",
+    to:   "grp: _syncRecordGroup(kind, id),",
+    why:  "every report produced says 'a change sent' — noise that trains people to ignore the page",
+  },
+  {
+    name: "M289 (V84) report cards fall under Instruments & presets",
+    file: "render-help.js",
+    from: "    ${reps.length ? sub('sync-held-reports', 'Report settings &amp; templates') : ''}\n",
+    to:   "",
+    why:  "the card appears without a heading that says what it is",
+  },
+  {
+    name: "M290 (V84) the resolve writes the tester-in-use bookkeeping for any settings row",
+    file: "sync.js",
+    from: "if (kind === 'settings' && sid === SYNC_INUSE_ID) rs.inUse",
+    to:   "if (kind === 'settings') rs.inUse",
+    why:  "answering a report settings question sets the agreed tester to 'undefined' and the next switch is asked about",
+  },
+  {
+    name: "M291 (V84) saving report settings never reaches the sync trigger",
+    file: "storage.js",
+    from: "  _writeReportSettings();\n  // v84: report settings sync, and most edits",
+    to:   "  // v84: report settings sync, and most edits",
+    why:  "a branding change sits unsent until some unrelated save or screen change",
+  },
+  {
+    name: "M292 (V84) the pull re-arms itself",
+    file: "sync.js",
+    from: "function _syncSaveLists() {\n  if (typeof saveSettings === 'function') saveSettings();",
+    to:   "function _syncSaveLists() {\n  if (typeof saveSettings === 'function') saveSettings();\n  if (typeof saveReportSettings === 'function') saveReportSettings();",
+    why:  "every pull that changed anything schedules another, for nothing",
+  },
+  {
+    name: "M293 (V84) the deliberate-set time is dropped on load",
+    file: "storage.js",
+    from: "  out.certSetAt       = (typeof stored.certSetAt === 'string' && !isNaN(Date.parse(stored.certSetAt)))\n    ? stored.certSetAt : '';",
+    to:   "  out.certSetAt       = '';",
+    why:  "a reset survives only until the next reopen",
+  },
+  {
+    name: "M294 (V84) templates are not in the synced kinds",
+    file: "config.js",
+    from: "'preset', 'settings', 'template'];",
+    to:   "'preset', 'settings'];",
+    why:  "templates never read or sent",
+  },
+  {
+    name: "M295 (V84) the page does not count report settings as up to date when there is nothing to send",
+    file: "sync.js",
+    from: "|| (!sent && grp === 'rp' && _syncNothingMade(kind, id, r))",
+    to:   "",
+    why:  "a fresh phone shows report settings 'not up to date' for ever",
+  },
 ];
 
 function main() {
