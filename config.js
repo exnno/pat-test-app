@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — config.js (constants & factories)
- * v83.1 (September 2026)
+ * v84 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V83.1';
+const APP_VERSION = 'V84';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -369,7 +369,8 @@ const SYNC_HELD_KEY = 'pat:syncHeld';       // v81: JSON [{id,at,reason,name,loc
 // reached. Rows of the old kinds come round again and resolve as no work.
 // v83: instruments, presets and one settings row (the tester in use, decision
 // 1B) join them. The order here is only the order the push visits them in.
-const SYNC_RECORD_KINDS = ['client', 'site', 'instrument', 'preset', 'settings'];
+// v84: report templates join them (kind 'template'), one row per template.
+const SYNC_RECORD_KINDS = ['client', 'site', 'instrument', 'preset', 'settings', 'template'];
 // v83: the settings rows this version understands. Settings travel as separate
 // small rows rather than one big one (V84 carries on in the same shape), so a
 // row id this version does not know is somebody newer's and is left alone.
@@ -377,10 +378,17 @@ const SYNC_RECORD_KINDS = ['client', 'site', 'instrument', 'preset', 'settings']
 // later version that adds one reads the whole account again, so a row pushed
 // before this phone understood it is never stranded behind the cursor.
 const SYNC_INUSE_ID = 'settings_instrument';   // { id, instrumentId }
-const SYNC_SETTINGS_IDS = [SYNC_INUSE_ID];
+// v84: report settings (4A: one row, everything but the counter) and the
+// certificate counter on its own (2A: highest wins, never asked). The counter
+// is split out because every report produced moves it — inside the report row
+// it would turn every report on one phone into a question on the other.
+const SYNC_REPORT_ID = 'settings_report';        // { id, settings }
+const SYNC_CERT_ID = 'settings_certcounter';     // { id, next, setAt }
+const SYNC_SETTINGS_IDS = [SYNC_INUSE_ID, SYNC_REPORT_ID, SYNC_CERT_ID];
 // v83: screens a sync repaint must wait to leave — each holds unsaved typing in
 // fields that need not be focused (see _syncSafeToRepaint in sync.js).
-const SYNC_NO_REPAINT_VIEWS = ['settingsInstrument', 'settingsItems', 'settingsUser'];
+// v84: + Report settings, whose toggles change state before Save is tapped.
+const SYNC_NO_REPAINT_VIEWS = ['settingsInstrument', 'settingsItems', 'settingsUser', 'settingsReport'];
 // v82 (decision 6A): the "What's different?" sheet lists at most this many
 // items per section, then says how many more there are.
 const SYNC_DIFF_LIST_MAX = 20;

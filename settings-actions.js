@@ -69,7 +69,12 @@ function captureReportTextInputs() {
   }
   if (certNext) {
     const nx = parseInt(certNext.value, 10);
+    const was = rs.certNextNumber;
     rs.certNextNumber = (Number.isFinite(nx) && nx >= 1) ? nx : rs.certNextNumber;
+    // v84: a number typed in by hand is deliberate — it beats "highest wins"
+    // on your other devices (Q2A). Only a real change stamps it: this runs
+    // before every toggle re-render too, and those must not count as a set.
+    if (rs.certNextNumber !== was) rs.certSetAt = new Date().toISOString();
   }
   if (months) {
     const m = parseInt(months.value, 10);
@@ -372,7 +377,14 @@ function applyReportTemplate(templateId) {
     confirmLabel: 'Apply',
     danger: false,
     onConfirm: () => {
+      // v84 (Q3A): a template never carries the certificate counter. Before
+      // V84 applying one rewound the counter to wherever it stood when the
+      // template was saved ("Standard": to 1), so the next certificates reused
+      // numbers already issued. The live counter and its set-time stay put.
+      const keep = normaliseReportSettings(state.reportSettings);
       state.reportSettings = normaliseReportSettings(tpl.settings);
+      state.reportSettings.certNextNumber = keep.certNextNumber;
+      state.reportSettings.certSetAt = keep.certSetAt;
       saveReportSettings();
       render();
       showToast(`Applied "${tpl.name}"`);
@@ -392,7 +404,7 @@ function saveCurrentAsTemplate(name) {
     existing.settings = snapshot;
   } else {
     state.reportTemplates.push({
-      id: 'tpl_' + Math.random().toString(36).slice(2, 9),
+      id: 'tpl_' + newId(),     // v84: synced, so a real id (was Math.random)
       name: nm,
       settings: snapshot
     });
@@ -417,8 +429,11 @@ function renameReportTemplate(templateId, name) {
 function deleteReportTemplate(templateId) {
   const tpl = (state.reportTemplates || []).find(t => t.id === templateId);
   if (!tpl) return;
+  // v84: ledger first (MAP rule 5), so the delete travels to your other devices.
+  recordTombstone('template', templateId);
   state.reportTemplates = state.reportTemplates.filter(t => t.id !== templateId);
   saveReportTemplates();
+  save();                  // v84: the ledger is written by save() (rule 1), which also reaches the sync trigger
   render();
   showToast('Template deleted');
 }

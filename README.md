@@ -43,7 +43,7 @@ in the shipped app — the files in the repo root are the files the browser load
 | Offline | Service worker (`sw.js`) precaching every asset |
 | PDF | jsPDF 3.0.3 + jsPDF-AutoTable 5.0.2, vendored and self-hosted (MIT) |
 | PDF preview | PDF.js 3.11.174 legacy UMD, vendored, lazy-loaded (Apache-2.0) |
-| Cloud | supabase-js 2.116.0 UMD, vendored, lazy-loaded (MIT) — sign-in v79, job push v80; test host only |
+| Cloud | supabase-js 2.116.0 UMD, vendored, lazy-loaded (MIT) — invite-only, test host only. Syncs both ways: jobs, clients, sites, instruments, presets, the tester in use, report settings, report templates and the certificate counter (V79–V84). Photos and general settings not yet |
 | Hosting | `main` → GitHub Pages (test); `Release` → Cloudflare (the product) |
 | Tests | `harness/` — Node, no dependencies |
 
@@ -204,6 +204,8 @@ than writing a new one.
 - **PATGo Scan** (`exnno/patgoscan`) — a separate barcode-first app for one
   client's audit workflow. Explicitly no merge-back; anything shared is
   hand-rebuilt from a spec.
-- **PATGo cloud** — the same codebase with a sync layer added (spec:
-  `PATGo_Sync_Spec_v1_2.md`). V79 sign-in; V80 pushes jobs one way (phone → cloud); pull and the other
-  record kinds follow release by release.
+- **PATGo cloud** — the same codebase with a sync layer added (`sync.js`,
+  `cloud.js`, `supabase/`; the architecture spec is kept outside the repo).
+  V79 sign-in, V80 push, V81 pull, then one group of records per release —
+  V84 reached report settings and templates. Signed out, or on any host not
+  listed in `CLOUD_HOSTS`, the app is exactly the offline app it always was.

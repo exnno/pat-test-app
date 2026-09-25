@@ -1,4 +1,4 @@
-# PATGo — Code Map (V83)
+# PATGo — Code Map (V84)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -279,7 +279,8 @@ plus TOMBSTONE_KINDS. Deleted records are kept OUT of state entirely (no
 and 14g fails if a flag ever appears. `recordTombstone()` does NOT save, and is
 always called BEFORE the removal (cross-cutting rule 5). Callers: clients.js ×4
 (deleteClient + its site cascade, deleteSite, resolveAssignMerge), session.js ×2
-(deleteSession, deletePreset), instruments.js ×1 (deleteInstrument, v83). Prune deliberately does NOT record — decision C,
+(deleteSession, deletePreset), instruments.js ×1 (deleteInstrument, v83),
+settings-actions.js ×1 (deleteReportTemplate, v84). Prune deliberately does NOT record — decision C,
 settled V80: clearing is local, the cloud keeps the job (sync.js remembers the
 id in SYNC_PRUNED_KEY instead). sync.js READS the ledger (every synced kind).
 ⚠ v80: `saveSessions()` carries the ONE sync line (`syncNoteSave`, guarded and
@@ -303,6 +304,10 @@ Called from boot.js after `load()`, before the first `render()`.
 `saveInstruments()` runs **before** writing them (a prune re-syncs the mirror).
 Unlisted fields pass through the codec untouched, which is why additive fields
 need no map entry. Rules 9 and 10 live here.
+⚠ v84: `saveReportSettings()` / `saveReportTemplates()` arm the sync trigger;
+`saveSettings()` writes report settings through the plain `_writeReportSettings()`
+so it never does (sync.js calls it after a pull). `reportSettings.certSetAt` =
+when the counter was last typed by hand ('' never).
 
 ### clients.js (~427 ln) — clients & sites
 CRUD, lookups, the site snapshot compose/split used by CSV, assign/move flows.
@@ -432,7 +437,8 @@ async and never let it touch the database.**
 `pageCount`. Running it earlier gives a photo report footers reading "Page 1 of 2"
 on a 4-page document.
 **Coupling:** rule 7 for instrument fields. Reading columns mirror the CSV
-emit-only-if-used rule. Every `addImage` is try/caught — a bad image never blocks
+emit-only-if-used rule. v84: `stampCertNumber` skips any number already on a
+job in `state.sessions` (jobs synced from the other phone included). Every `addImage` is try/caught — a bad image never blocks
 a report.
 
 ### pdfpreview.js (~135 ln) — multi-page preview rasteriser
@@ -479,6 +485,10 @@ Per-page saves, Report Settings (text, logo, filename tokens), signature capture
 editable list settings (item types, fail reasons, descriptions) and the
 appearance/feedback toggles. Job notes, certificate-number override and report
 templates live here too — saved from the same screens, same shape.
+⚠ v84: `applyReportTemplate` keeps the live `certNextNumber`/`certSetAt` (3A);
+`captureReportTextInputs` stamps `certSetAt` only when the counter box really
+changed; `deleteReportTemplate` records a `template` tombstone and saves via
+save() (18r: nothing outside storage/sync calls saveSettings()).
 **Touch to:** change what a Settings screen SAVES. To change how one is drawn,
 go to render-settings.js; to change a default, config.js.
 **Coupling:** `saveReportSettingsForm()` reads the DOM, so any re-render must
@@ -586,7 +596,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~2175 ln) — cloud sync, PUSH AND PULL — v80–v83
+### sync.js (~2400 ln) — cloud sync, PUSH AND PULL — v80–v84
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session
@@ -673,8 +683,18 @@ edited on both sides (19d, M231). The freeze itself is **instruments.js**
 ⚠ `out.skip` = what the pull deferred (instrument open in the editor, a waiting
 tester-in-use row); the records push skips it (M237). `_syncSafeToRepaint()`
 also refuses `SYNC_NO_REPAINT_VIEWS` (config.js).
-Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r and
-19a–19w, mutations M142–M260.
+⚠ v84: REPORT SETTINGS, CERT COUNTER, TEMPLATES. Two more settings rows —
+`SYNC_REPORT_ID` (report settings minus the counter, `decideReport`) and
+`SYNC_CERT_ID` (the counter, `decideCert`: later `certSetAt` wins, else higher;
+never held) — and kind `template` (`state.reportTemplates`). All hashed through
+`_syncReportProjection` (normalised, counter stripped). 5A `_syncNothingMade`:
+defaults / untouched starters / counter at 1 are never pushed while unsent.
+While `state.view === 'settingsReport'` the two report rows are neither applied
+nor pushed. Held cards: group 'rp' (`_syncRecordGroup(kind, id)`). Pull saves
+through `_syncSaveLists()` — never `saveReportSettings()`/`saveReportTemplates()`,
+which arm the trigger (21q, M292).
+Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
+19a–19w, 20a–20f2 and 21a–21q, mutations M142–M295.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

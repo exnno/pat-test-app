@@ -737,6 +737,11 @@ function normaliseReportSettings(stored) {
   out.certPrefix      = typeof stored.certPrefix === 'string' ? stored.certPrefix : '';
   const cnn = parseInt(stored.certNextNumber, 10);
   out.certNextNumber  = (Number.isFinite(cnn) && cnn >= 1) ? cnn : 1;
+  // v84: when the counter was last typed in by hand ('' = never). A deliberate
+  // set beats "highest wins" when the counter syncs (Q2A) — so resetting to 1
+  // for a new prefix is not undone by your other phone's higher number.
+  out.certSetAt       = (typeof stored.certSetAt === 'string' && !isNaN(Date.parse(stored.certSetAt)))
+    ? stored.certSetAt : '';
   const cpd = parseInt(stored.certPadding, 10);
   out.certPadding     = (Number.isFinite(cpd) && cpd >= 0 && cpd <= 10) ? cpd : 4;
   out.reportTitle     = (typeof stored.reportTitle === 'string' && stored.reportTitle.trim())
@@ -754,8 +759,16 @@ function normaliseReportSettings(stored) {
 }
 
 // v30: persist report settings as one JSON blob.
-function saveReportSettings() {
+function _writeReportSettings() {
   localStorage.setItem(REPORT_SETTINGS_KEY, JSON.stringify(state.reportSettings || makeDefaultReportSettings()));
+}
+
+function saveReportSettings() {
+  _writeReportSettings();
+  // v84: report settings sync, and most edits save them here rather than via
+  // save(), so they reach the sync trigger here too — same guarded line as
+  // saveSessions().
+  if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error('Sync trigger failed (non-fatal).', e); } }
 }
 
 // v36: report templates. Each template is { id, name, settings } where settings
@@ -780,6 +793,8 @@ function loadReportTemplates() {
 
 function saveReportTemplates() {
   localStorage.setItem(REPORT_TEMPLATES_KEY, JSON.stringify(state.reportTemplates || []));
+  // v84: as saveReportSettings() — templates sync.
+  if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error('Sync trigger failed (non-fatal).', e); } }
 }
 
 // v11: Ensure state.csvColumns contains every column defined in
@@ -905,7 +920,10 @@ function saveSettings() {
   // capped here as well as on read, which is what actually stops it growing.
   localStorage.setItem(PAT_STATS_KEY, JSON.stringify(normaliseArchivedStats(state.archivedStats)));
   // v30: PDF report settings (single blob incl. logo).
-  saveReportSettings();
+  // v84: the plain write — saveReportSettings() also arms the sync trigger, and
+  // saveSettings() must not (sync.js calls it after a pull; save() arms the
+  // trigger through saveSessions() already).
+  _writeReportSettings();
   // lastBackupAt + backupSnoozedUntil are written via their own helpers
   // (markBackupExported, snoozeBackupReminder) rather than here, because they
   // shouldn't update on every state change.
@@ -944,7 +962,7 @@ function save() {
 // recorded, which cannot be done after the fact.
 // v83: 'instrument' added. Widening is a superset — every ledger an older
 // version wrote still normalises exactly as it did.
-const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'instrument'];
+const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'instrument', 'template'];   // v84: + template
 
 // Whitelisting validator. Used on both read and write, so a hand-edited or
 // corrupted value collapses to a clean list rather than propagating.

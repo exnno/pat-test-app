@@ -789,8 +789,17 @@ function stampCertNumber(session) {
   const pad = Number.isFinite(parseInt(rs.certPadding, 10)) ? parseInt(rs.certPadding, 10) : 4;
   const year = (session.date && String(session.date).slice(0, 4)) || String(new Date().getFullYear());
   const prefix = String(rs.certPrefix || '').replace(/\{year\}/gi, year);
-  session.certNo = prefix + String(n).padStart(pad, '0');
-  rs.certNextNumber = n + 1;
+  // v84 (Q2A): never a number a job on this phone already has — including jobs
+  // pulled from your other device, which may have issued it while this phone's
+  // counter was behind. Bounded: at most one step per job holding a number.
+  const used = new Set((state.sessions || []).map(s => s && s.certNo).filter(Boolean));
+  let n2 = n, no = prefix + String(n2).padStart(pad, '0');
+  for (let guard = 0; used.has(no) && guard <= used.size; guard++) {
+    n2++;
+    no = prefix + String(n2).padStart(pad, '0');
+  }
+  session.certNo = no;
+  rs.certNextNumber = n2 + 1;
   save();                  // persists the session (with certNo)
   saveReportSettings();    // persists the advanced counter
 }

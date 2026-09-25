@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — sync.js (cloud sync: push and pull)
- * v83.1 (September 2026)
+ * v84 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -32,6 +32,10 @@
  *     last, and a phone that has never sent one takes the account's;
  *   • a new phone's untouched starter preset is set aside when the account's
  *     presets arrive (decision 5A). Which PRESET is in use stays per phone (7A).
+ *
+ * V84: REPORT SETTINGS, THE CERTIFICATE COUNTER AND REPORT TEMPLATES through
+ * records (two more settings ids, kind 'template'). See the v84 note above
+ * _syncRecordGroup: the counter never asks, "nothing made" is never pushed.
  *
  * V83.1: THE PULL NO LONGER STEPS OVER ROWS. Both pagers now re-read the last
  * page's timestamp ("at or after", not "after") — see the v83.1 note at the
@@ -279,20 +283,25 @@ function syncStatusSummary() {
   // v83: instruments and presets get a second line. The tester-in-use row is
   // counted in neither: it is not something on either list, and a count that
   // includes an invisible row is a count nobody can check.
-  let recTotal = 0, recUpToDate = 0, listTotal = 0, listUpToDate = 0;
+  // v84: report settings (the one visible row) and templates get a third line.
+  // Something nobody made and never sent (5A) has nothing to send: up to date.
+  let recTotal = 0, recUpToDate = 0, listTotal = 0, listUpToDate = 0, rpTotal = 0, rpUpToDate = 0;
   for (const kind of SYNC_RECORD_KINDS) {
-    if (kind === 'settings') continue;
-    const cs = _syncRecordGroup(kind) === 'cs';
     for (const r of _syncRecordList(kind)) {
       if (!r || r.id == null || r.id === '') continue;
-      const ok = st.rec.sent[String(r.id)] === _syncRecordHash(kind, r);
-      if (cs) { recTotal++; if (ok) recUpToDate++; }
+      const id = String(r.id);
+      if (kind === 'settings' && id !== SYNC_REPORT_ID) continue;
+      const grp = _syncRecordGroup(kind, id);
+      const sent = st.rec.sent[id];
+      const ok = sent === _syncRecordHash(kind, r) || (!sent && grp === 'rp' && _syncNothingMade(kind, id, r));
+      if (grp === 'cs') { recTotal++; if (ok) recUpToDate++; }
+      else if (grp === 'rp') { rpTotal++; if (ok) rpUpToDate++; }
       else { listTotal++; if (ok) listUpToDate++; }
     }
   }
   return {
     total: jobs.length, upToDate, waiting: jobs.length - upToDate,
-    recTotal, recUpToDate, listTotal, listUpToDate,
+    recTotal, recUpToDate, listTotal, listUpToDate, rpTotal, rpUpToDate,
     lastPushAt: st.lastPushAt,
     // v81
     lastPullAt: st.lastPullAt,
@@ -970,6 +979,7 @@ function _syncOutcome(r) {
   const ok = rr && !rr.error;
   const cs = ok ? (rr.cs || { in: rr.added + rr.applied + rr.removed, out: rr.sent + rr.deleted, held: rr.held || 0 }) : null;
   const ip = ok ? (rr.ip || { in: 0, out: 0, held: 0 }) : null;
+  const rp = ok ? (rr.rp || { in: 0, out: 0, held: 0 }) : null;   // v84
   const rec = [];
   if (ok) {
     const inN = cs.in;
@@ -984,20 +994,30 @@ function _syncOutcome(r) {
     if (ip.out) lists.push(plural(ip.out, 'change', 'changes') + ' sent');
   }
 
+  const reps = [];
+  if (ok) {
+    if (rp.in) reps.push(plural(rp.in, 'change', 'changes') + ' brought in');
+    if (rp.out) reps.push(plural(rp.out, 'change', 'changes') + ' sent');
+  }
+
   let msg = bits.length ? bits.join(', ') + '.' : '';
   if (rec.length) msg += (msg ? ' ' : '') + 'Clients & sites: ' + rec.join(', ') + '.';
   if (lists.length) msg += (msg ? ' ' : '') + 'Instruments & presets: ' + lists.join(', ') + '.';
+  if (reps.length) msg += (msg ? ' ' : '') + 'Report settings & templates: ' + reps.join(', ') + '.';
   if (ok && rr.inUseNow) msg += (msg ? ' ' : '') + 'The tester in use is now ' + rr.inUseNow + ', as chosen on your other device.';
   if (!msg) msg = 'Everything was already up to date.';
   if (rr && rr.error) {
-    msg += ' Clients, sites, instruments and presets couldn\u2019t be checked this time \u2014 they\u2019re safe on this phone and will be tried again.';
+    msg += ' Clients, sites, instruments, presets and report settings couldn\u2019t be checked this time \u2014 they\u2019re safe on this phone and will be tried again.';
   }
 
   const hJobs = p.held || 0;
   const hRec = ok ? (cs.held || 0) : 0;
   const hList = ok ? (ip.held || 0) : 0;
-  if (hList && (hJobs || hRec)) {
+  const hRp = ok ? (rp.held || 0) : 0;   // v84
+  if ((hList || hRp) && (hJobs || hRec || (hList && hRp))) {
     msg += ' Several things need you to decide \u2014 see below.';
+  } else if (hRp) {
+    msg += ' ' + plural(hRp, 'report setting or template needs', 'report settings or templates need') + ' you to decide \u2014 see below.';
   } else if (hList) {
     msg += ' ' + plural(hList, 'instrument or preset needs', 'instruments or presets need') + ' you to decide \u2014 see below.';
   } else if (hJobs && hRec) {
@@ -1181,10 +1201,83 @@ function _syncPushHalf(c, uid, st, force) {
 //     a list: _syncRecordList builds it fresh from state each time, and every
 //     path that would add to, replace in or delete from a list special-cases it.
 
+// ---- v84: report settings, the certificate counter, report templates -----------------
+//   settings/SYNC_REPORT_ID — the live report settings as ONE row (4A), everything
+//     except the certificate counter. Held when changed on both sides, like any
+//     record; the card lists what differs and never stores an image (rule 7).
+//     While Report settings is open nothing is applied or sent: its toggles
+//     change state before Save, and its Save writes every field back.
+//   settings/SYNC_CERT_ID — the counter alone (2A). Never asked about: a later
+//     hand-typed set (certSetAt) wins, else the higher number. It can therefore
+//     only go backwards when someone deliberately types a lower one.
+//     stampCertNumber (report.js) also skips any number a job here already has.
+//   template — one row per template, a full report identity minus the counter
+//     (3A). The two starters share their ids on every install, so they are one
+//     record (5A).
+//   5A for both: "nothing made" (untouched starter, default settings, a counter
+//     at 1 never set) is never pushed while unsent, a phone holding only that
+//     takes the account's copy without asking, and a cloud copy that is only
+//     that gives way to this phone's own.
+
 // Which heading a kind sits under on the Sync page: 'cs' clients & sites,
-// 'ip' instruments & presets (the tester in use with them).
-function _syncRecordGroup(kind) {
-  return (kind === 'client' || kind === 'site') ? 'cs' : 'ip';
+// 'ip' instruments & presets (the tester in use with them), v84 'rp' report
+// settings & templates (the two report settings rows with them).
+function _syncRecordGroup(kind, id) {
+  if (kind === 'client' || kind === 'site') return 'cs';
+  if (kind === 'template') return 'rp';
+  if (kind === 'settings' && (String(id) === SYNC_REPORT_ID || String(id) === SYNC_CERT_ID)) return 'rp';
+  return 'ip';
+}
+
+// v84: what a report settings object syncs as — normalised (so the two ends
+// compare like with like and a reload is never a change) and without the
+// counter, which travels on its own row.
+function _syncReportProjection(settings) {
+  const n = (typeof normaliseReportSettings === 'function')
+    ? normaliseReportSettings(settings)
+    : Object.assign({}, (settings && typeof settings === 'object') ? settings : {});
+  delete n.certNextNumber;
+  delete n.certSetAt;
+  return n;
+}
+
+function _syncReportRecord() {
+  return { id: SYNC_REPORT_ID, settings: state.reportSettings };
+}
+
+function _syncCertRecord() {
+  const rs = state.reportSettings || {};
+  return { id: SYNC_CERT_ID, next: rs.certNextNumber, setAt: rs.certSetAt };
+}
+
+function _syncCertDoc(r) {
+  const x = r || {};
+  const n = parseInt(x.next, 10);
+  return { id: SYNC_CERT_ID, next: (Number.isFinite(n) && n >= 1) ? n : 1,
+    setAt: (typeof x.setAt === 'string' && !isNaN(Date.parse(x.setAt))) ? x.setAt : '' };
+}
+
+// v84 5A: the two built-in templates, exactly as a fresh install makes them.
+function _syncIsStarterTemplate(rec) {
+  if (!rec || typeof makeStarterReportTemplates !== 'function') return false;
+  const id = String(rec.id);
+  const s = makeStarterReportTemplates().find(x => x.id === id);
+  return !!s && _syncRecordHash('template', s) === _syncRecordHash('template', rec);
+}
+
+function _syncIsDefaultReport(settings) {
+  if (typeof makeDefaultReportSettings !== 'function') return false;
+  return syncHash(_syncCanonical(_syncReportProjection(settings)))
+    === syncHash(_syncCanonical(_syncReportProjection(makeDefaultReportSettings())));
+}
+
+// v84 5A: holds nothing anyone made. Only ever asked of an UNSENT record.
+function _syncNothingMade(kind, id, rec) {
+  if (kind === 'template') return _syncIsStarterTemplate(rec);
+  if (kind !== 'settings') return false;
+  if (String(id) === SYNC_REPORT_ID) return _syncIsDefaultReport(rec && rec.settings);
+  if (String(id) === SYNC_CERT_ID) { const d = _syncCertDoc(rec); return d.next === 1 && !d.setAt; }
+  return false;
 }
 
 // What the records cursor was read WITH. Kinds and settings ids both: adding
@@ -1214,7 +1307,13 @@ function _syncRecordList(kind) {
   if (kind === 'site') return state.sites || [];
   if (kind === 'instrument') return Array.isArray(state.instruments) ? state.instruments : [];
   if (kind === 'preset') return Array.isArray(state.itemPresets) ? state.itemPresets : [];
-  if (kind === 'settings') return (typeof findInstrument === 'function') ? [_syncInUseRecord()] : [];
+  if (kind === 'settings') {
+    const out = (typeof findInstrument === 'function') ? [_syncInUseRecord()] : [];
+    // v84: the report settings row and the certificate counter.
+    if (state.reportSettings && typeof state.reportSettings === 'object') out.push(_syncReportRecord(), _syncCertRecord());
+    return out;
+  }
+  if (kind === 'template') return Array.isArray(state.reportTemplates) ? state.reportTemplates : [];
   return [];
 }
 
@@ -1223,6 +1322,7 @@ function _syncRecordSetList(kind, list) {
   else if (kind === 'site') state.sites = list;
   else if (kind === 'instrument') state.instruments = list;
   else if (kind === 'preset') state.itemPresets = list;
+  else if (kind === 'template') state.reportTemplates = list;
   // 'settings' is not a list — see the v83 note above.
 }
 
@@ -1243,7 +1343,13 @@ function _syncRecordDoc(kind, rec) {
     return { id: String(r.id), name: t(r.name),
              items: Array.isArray(r.items) ? r.items.map(x => String(x == null ? '' : x)) : [] };
   }
-  if (kind === 'settings') return { id: String(r.id), instrumentId: String(r.instrumentId || '') };
+  if (kind === 'settings') {
+    const sid = String(r.id);
+    if (sid === SYNC_REPORT_ID) return { id: sid, settings: _syncReportProjection(r.settings) };
+    if (sid === SYNC_CERT_ID) return _syncCertDoc(r);
+    return { id: sid, instrumentId: String(r.instrumentId || '') };
+  }
+  if (kind === 'template') return { id: String(r.id), name: t(r.name), settings: _syncReportProjection(r.settings) };
   return null;
 }
 
@@ -1255,6 +1361,9 @@ function _syncRecordHash(kind, rec) {
 // passthrough fields are carried over from the record being replaced.
 function _syncRecordFromDoc(kind, doc, old) {
   const d = _syncRecordDoc(kind, doc);
+  // v84: a template is stored as loadReportTemplates() makes it (normalised,
+  // so the counter fields come back as defaults — never applied, 3A).
+  if (kind === 'template') return { id: d.id, name: d.name, settings: normaliseReportSettings(d.settings) };
   // v83: instruments and presets have no passthrough fields — the projection IS
   // the stored shape.
   if (kind !== 'client' && kind !== 'site') return d;
@@ -1284,8 +1393,19 @@ function _syncValidRecord(kind, doc, id) {
     if (!Array.isArray(doc.items) || !doc.items.length || doc.items.length > 9) return false;
     return doc.items.every(x => typeof x === 'string' && x.trim());
   }
+  const obj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
   if (kind === 'settings') {
-    return SYNC_SETTINGS_IDS.indexOf(String(id)) !== -1 && typeof doc.instrumentId === 'string';
+    const sid = String(id);
+    if (SYNC_SETTINGS_IDS.indexOf(sid) === -1) return false;
+    if (sid === SYNC_REPORT_ID) return obj(doc.settings);
+    if (sid === SYNC_CERT_ID) return Number.isInteger(doc.next) && doc.next >= 1 && str(doc.setAt);
+    return typeof doc.instrumentId === 'string';
+  }
+  // v84: a template is a name and a settings object; the normaliser makes any
+  // settings object safe, exactly as loadReportTemplates() does on reload.
+  if (kind === 'template') {
+    if (typeof doc.name !== 'string' || !doc.name.trim()) return false;
+    return obj(doc.settings);
   }
   if (typeof doc.name !== 'string' || !doc.name.trim()) return false;
   if (kind === 'site' && doc.clientId != null && typeof doc.clientId !== 'string') return false;
@@ -1304,6 +1424,12 @@ function _syncRecordHeldEntry(kind, id, reason, local, doc) {
   // v83: instruments are named the way the app names them everywhere else, and
   // the tester-in-use row by the testers it points at on each side (null: one
   // this phone doesn't have).
+  // v84: the report settings row. No names — the card lists what differs.
+  if (kind === 'settings' && String(id) === SYNC_REPORT_ID) {
+    const e = { id, kind, reason, name: 'Report settings', localName: null, cloudName: null };
+    if (reason === 'both-changed' && local && doc) e.diffs = _syncRecordDiffs(kind, local, doc);
+    return e;
+  }
   if (kind === 'instrument' || kind === 'settings') {
     const nm = (r) => {
       if (!r || typeof r !== 'object') return null;
@@ -1320,7 +1446,7 @@ function _syncRecordHeldEntry(kind, id, reason, local, doc) {
     name: (local && local.name) || (doc && typeof doc.name === 'string' ? doc.name : '') || '',
     localName: local ? String(local.name || '') : null,
     cloudName: (doc && typeof doc.name === 'string') ? doc.name : null };
-  if (kind === 'preset' && reason === 'both-changed' && local && doc) e.diffs = _syncRecordDiffs(kind, local, doc);
+  if ((kind === 'preset' || kind === 'template') && reason === 'both-changed' && local && doc) e.diffs = _syncRecordDiffs(kind, local, doc);
   if (kind === 'site') {
     e.localParent = local ? _syncClientNameOf(local.clientId) : null;
     e.cloudParent = (doc && typeof doc.name === 'string') ? _syncClientNameOf(doc.clientId) : null;
@@ -1333,6 +1459,13 @@ function _syncRecordHeldEntry(kind, id, reason, local, doc) {
 function _syncRecordDiffs(kind, local, doc) {
   const L = _syncRecordDoc(kind, local), C = _syncRecordDoc(kind, doc);
   const clip = (v) => { const x = String(v == null ? '' : v); return x.length > 80 ? x.slice(0, 79) + '\u2026' : x; };
+  // v84: report settings and templates. Images are described, never copied —
+  // a held entry must not become a store of the cloud document (rule 7).
+  if (kind === 'template' || kind === 'settings') {
+    const out = [];
+    if (kind === 'template' && L.name !== C.name) out.push({ label: 'Name', here: clip(L.name), cloud: clip(C.name) });
+    return out.concat(_syncReportDiffs(L.settings || {}, C.settings || {}, clip));
+  }
   const fields = kind === 'instrument'
     ? [['make', 'Make'], ['model', 'Model'], ['calDate', 'Calibration date'],
        ['calCertNo', 'Calibration certificate'], ['calDue', 'Calibration due']]
@@ -1344,6 +1477,75 @@ function _syncRecordDiffs(kind, local, doc) {
     if (a !== b) out.push({ label, here: clip(a), cloud: clip(b) });
   }
   return out;
+}
+
+// v84: the report fields that differ, most telling first, in plain words.
+function _syncReportDiffs(a, b, clip) {
+  const labels = [
+    ['enabled', 'Reports switched on'], ['companyName', 'Company name'], ['companyAddress', 'Company address'],
+    ['logo', 'Logo'], ['signature', 'Signature'], ['reportTitle', 'Report title'],
+    ['certEnabled', 'Certificate numbers'], ['certPrefix', 'Certificate prefix'], ['certPadding', 'Certificate number digits'],
+    ['declaration', 'Declaration'], ['declarationText', 'Declaration wording'], ['signaturePosition', 'Signature position'],
+    ['headerColor', 'Header colour'], ['accentColor', 'Accent colour'],
+    ['retestEnabled', 'Retest date'], ['retestMonths', 'Retest period (months)'],
+    ['showEngineer', 'Show engineer'], ['showInstrument', 'Show instrument'], ['showCalibration', 'Show calibration'],
+    ['showFails', 'Show fails'], ['showReadings', 'Show readings'], ['showDuration', 'Show testing time'],
+    ['showPhotos', 'Show photos'], ['showAppCredit', 'App credit'], ['showFooterLogo', 'Footer logo'],
+    ['reportFilenamePattern', 'File name'],
+  ];
+  const known = new Set(labels.map(x => x[0]));
+  const same = (x, y) => syncHash(_syncCanonical(x === undefined ? null : x)) === syncHash(_syncCanonical(y === undefined ? null : y));
+  const show = (k, v, other) => {
+    if (k === 'logo' || k === 'signature') return v ? (other ? 'An image' : 'Image') : '';
+    if (typeof v === 'boolean') return v ? 'On' : 'Off';
+    return clip(v);
+  };
+  const out = [];
+  for (const [k, label] of labels) {
+    if (same(a[k], b[k])) continue;
+    const here = show(k, a[k], false);
+    let cloud = show(k, b[k], false);
+    if ((k === 'logo' || k === 'signature') && a[k] && b[k]) cloud = 'A different image';
+    out.push({ label, here, cloud });
+  }
+  // A field a newer version added: said to differ, not shown.
+  const extra = Object.keys(Object.assign({}, a, b)).some(k => !known.has(k) && !same(a[k], b[k]));
+  if (extra) out.push({ label: 'Other settings', here: 'Different', cloud: 'Different' });
+  return out;
+}
+
+// v84: take the cloud's report settings, keeping this phone's counter — that
+// row travels separately and is settled on its own rules (2A).
+function _syncApplyReport(doc) {
+  if (typeof normaliseReportSettings !== 'function') return false;
+  const keep = normaliseReportSettings(state.reportSettings);
+  const next = normaliseReportSettings(doc && doc.settings);
+  next.certNextNumber = keep.certNextNumber;
+  next.certSetAt = keep.certSetAt;
+  state.reportSettings = next;
+  return true;
+}
+
+// v84: take the cloud's counter. Replaced, not edited in place.
+function _syncApplyCert(doc) {
+  const d = _syncCertDoc(doc);
+  state.reportSettings = Object.assign({}, state.reportSettings, { certNextNumber: d.next, certSetAt: d.setAt });
+  return true;
+}
+
+// v84: everything a records change can touch. saveSettings() holds the lists,
+// the ledger and the in-use pointers; report settings and templates have
+// their own keys.
+// ⚠ Never through saveReportSettings()/saveReportTemplates(): those arm the
+// sync trigger (V84), and a pull must not re-arm itself — the push half of this
+// same run sends anything that needs sending. saveSettings() writes report
+// settings with the plain writer (_writeReportSettings); templates are written
+// here directly.
+function _syncSaveLists() {
+  if (typeof saveSettings === 'function') saveSettings();
+  if (typeof REPORT_TEMPLATES_KEY !== 'undefined') {
+    localStorage.setItem(REPORT_TEMPLATES_KEY, JSON.stringify(state.reportTemplates || []));
+  }
 }
 
 // v83: point this phone at another tester. Only ever at one it has, or at none
@@ -1361,7 +1563,12 @@ function _syncApplyInUse(instrumentId) {
 // Replace, never edit in place — same habit as jobs, and it means nothing that
 // captured the old object can write stale fields back over the new one.
 function _syncReplaceRecord(kind, old, doc) {
-  if (kind === 'settings') return _syncApplyInUse(doc && doc.instrumentId);
+  if (kind === 'settings') {
+    const sid = String((doc && doc.id != null) ? doc.id : (old && old.id));
+    if (sid === SYNC_REPORT_ID) return _syncApplyReport(doc);
+    if (sid === SYNC_CERT_ID) return _syncApplyCert(doc);
+    return _syncApplyInUse(doc && doc.instrumentId);
+  }
   const list = _syncRecordList(kind);
   const i = list.indexOf(old);
   if (i === -1) return false;
@@ -1515,6 +1722,8 @@ function _syncPullRecords(c, uid, st, out) {
   let presetsAdded = 0;
   const presetBefore = _syncActivePresetSig();
   const editing = String(state.instrumentEditorId || '');
+  // v84: Report settings open — its toggles are already in state, unsaved.
+  const reportOpen = state.view === 'settingsReport';
 
   function decide(row) {
     const id = String(row && row.id != null ? row.id : '');
@@ -1533,7 +1742,7 @@ function _syncPullRecords(c, uid, st, out) {
     // Answered in this phone's favour; the push half of this run replaces it.
     if (rs.resend[id]) return;
 
-    const grp = _syncRecordGroup(kind);
+    const grp = _syncRecordGroup(kind, id);
     const local = _syncRecordList(kind).find(r => r && String(r.id) === id) || null;
     const tomb = (state.tombstones || []).some(t => t && t.kind === kind && String(t.id) === id);
     const hold = (reason, doc, extra) => {
@@ -1558,7 +1767,9 @@ function _syncPullRecords(c, uid, st, out) {
         _syncHeldClear(id, kind);
         return;
       }
-      if (rs.sent[id] === _syncRecordHash(kind, local)) {
+      // v84 5A: an untouched starter template this phone never sent goes quietly.
+      if (rs.sent[id] === _syncRecordHash(kind, local)
+          || (kind === 'template' && !rs.sent[id] && _syncIsStarterTemplate(local))) {
         // v83 decision 2A: the tester this phone is using is not deleted from
         // under it on the strength of the other phone, clean copy or not.
         if (inUse) { hold('deleted-elsewhere', null, inUse); return; }
@@ -1585,7 +1796,14 @@ function _syncPullRecords(c, uid, st, out) {
 
     if (!local) {
       if (tomb) {
-        if (!rs.gone[id]) return;          // our delete goes up in this run
+        if (!rs.gone[id]) {
+          // Our delete goes up in this run. v84: a starter template shares its
+          // id across installs, so the cloud can hold one this phone deleted
+          // without ever sending — marked, or the push would think the server
+          // never had it and the delete would never travel.
+          if (kind === 'template' && !rs.sent[id] && !rs.resend[id]) rs.sent[id] = hash;
+          return;
+        }
         hold('deleted-here', row.doc);
         return;
       }
@@ -1602,7 +1820,13 @@ function _syncPullRecords(c, uid, st, out) {
     // v83.1: the cloud is what this phone last sent — only this phone moved,
     // and the push sends it. See the same line for jobs.
     if (hash === rs.sent[id]) { _syncHeldClear(id, kind); return; }
-    if (rs.sent[id] !== localHash) { hold('both-changed', row.doc); return; }
+    // v84 5A, for the shared-id starter templates: a cloud copy nobody changed
+    // gives way to this phone's (ours goes up); an untouched copy here takes
+    // the cloud's without asking.
+    const fresh = kind === 'template' && !rs.sent[id];
+    if (fresh && _syncIsStarterTemplate(row.doc)) { _syncHeldClear(id, kind); return; }
+    const takeIt = fresh && _syncIsStarterTemplate(local);
+    if (!takeIt && rs.sent[id] !== localHash) { hold('both-changed', row.doc); return; }
 
     if (deferEditor()) return;
     _syncReplaceRecord(kind, local, row.doc);
@@ -1664,6 +1888,55 @@ function _syncPullRecords(c, uid, st, out) {
     _syncHeldClear(id, kind);
   }
 
+  // v84 4A/5A: the report settings row. The records rules, plus 5A: a phone
+  // holding only the defaults takes the account's without asking, and a cloud
+  // copy that is only the defaults gives way. Applying (never judging) waits
+  // while Report settings is open.
+  function decideReport(row) {
+    const id = SYNC_REPORT_ID, kind = 'settings';
+    if (typeof normaliseReportSettings !== 'function' || !state.reportSettings) return;
+    if (rs.resend[id]) return;
+    if (row.deleted === true) return;        // no version ever deletes it
+    const local = _syncReportRecord();
+    const hold = (reason, doc) => {
+      _syncHeldNote(_syncRecordHeldEntry(kind, id, reason, local, doc));
+      blocked = true; out.held++; out.rp.held++;
+    };
+    if (!_syncValidRecord(kind, row.doc, id)) { hold('unreadable', null); return; }
+    const hash = _syncRecordHash(kind, row.doc);
+    const localHash = _syncRecordHash(kind, local);
+    if (hash === localHash) { rs.sent[id] = hash; _syncHeldClear(id, kind); return; }
+    if (hash === rs.sent[id]) { _syncHeldClear(id, kind); return; }
+    const fresh = !rs.sent[id];
+    if (fresh && _syncIsDefaultReport(row.doc.settings)) { _syncHeldClear(id, kind); return; }
+    const takeIt = fresh && _syncIsDefaultReport(local.settings);
+    if (!takeIt && rs.sent[id] !== localHash) { hold('both-changed', row.doc); return; }
+    if (reportOpen) { blocked = true; out.skip[id] = true; return; }
+    _syncApplyReport(row.doc);
+    rs.sent[id] = hash;
+    out.applied++; out.rp.in++; changed = true;
+    _syncHeldClear(id, kind);
+  }
+
+  // v84 2A: the certificate counter. Never held, never asked, never counted as
+  // a change on the Sync page. A later hand-typed set wins; otherwise the higher
+  // number. Losing means ours goes up in this run's push.
+  function decideCert(row) {
+    const id = SYNC_CERT_ID, kind = 'settings';
+    if (!state.reportSettings || row.deleted === true) return;
+    if (!_syncValidRecord(kind, row.doc, id)) { delete rs.sent[id]; return; }
+    const cloud = _syncCertDoc(row.doc);
+    const mine = _syncCertDoc(_syncCertRecord());
+    const hash = _syncRecordHash(kind, cloud);
+    if (hash === _syncRecordHash(kind, mine)) { rs.sent[id] = hash; return; }
+    const cloudWins = (cloud.setAt !== mine.setAt) ? cloud.setAt > mine.setAt : cloud.next > mine.next;
+    if (!cloudWins) { delete rs.sent[id]; return; }
+    if (reportOpen) { blocked = true; out.skip[id] = true; return; }
+    _syncApplyCert(cloud);
+    rs.sent[id] = hash;
+    changed = true;
+  }
+
   // One request for every kind, one cursor, paged exactly as jobs are —
   // including the v83.1 re-read of the boundary timestamp. See the jobs pager.
   const seen = new Set();
@@ -1695,7 +1968,12 @@ function _syncPullRecords(c, uid, st, out) {
     // THEN the tester-in-use row, which may name an instrument just added.
     if (starter && presetsAdded && _syncDropStarter(starter)) changed = true;
     if (_syncSettleLists(presetBefore)) changed = true;
-    for (const row of late) decideInUse(row);
+    for (const row of late) {
+      const sid = String(row.id);
+      if (sid === SYNC_REPORT_ID) decideReport(row);
+      else if (sid === SYNC_CERT_ID) decideCert(row);
+      else decideInUse(row);
+    }
     if (!blocked) {
       const moved = _syncTidyOrphanSites();
       if (moved) { out.unassigned += moved; changed = true; }
@@ -1707,7 +1985,8 @@ function _syncPullRecords(c, uid, st, out) {
       // holds clients and sites, and the first would re-arm the sync timer for
       // nothing. The push half of this same run sends anything tidied above.
       // v83: instruments and presets are saveSettings() too.
-      if (typeof saveSettings === 'function') saveSettings();
+      // v84: report settings and templates are their own keys.
+      _syncSaveLists();
       _syncRepaintApp();
     }
   });
@@ -1721,6 +2000,7 @@ function _syncPushRecords(c, uid, st, out) {
   const held = new Set(_syncHeldLoad().filter(e => e.kind !== 'session').map(e => e.id));
 
   const skip = out.skip || {};
+  const reportOpen = state.view === 'settingsReport';   // v84: unsaved toggles
   for (const kind of SYNC_RECORD_KINDS) {
     const live = new Set();
     for (const r of _syncRecordList(kind)) {
@@ -1732,9 +2012,12 @@ function _syncPushRecords(c, uid, st, out) {
       // a tester-in-use row that waits) is not settled, so it is not sent either:
       // sending would settle it on the server in this phone's favour.
       if (skip[id]) continue;
+      if (reportOpen && (id === SYNC_REPORT_ID || id === SYNC_CERT_ID)) continue;
       const doc = _syncRecordDoc(kind, r);
       // v83: no tester chosen is not a choice to send over the other phone's.
-      if (kind === 'settings' && !doc.instrumentId) { delete rs.resend[id]; continue; }
+      if (kind === 'settings' && id === SYNC_INUSE_ID && !doc.instrumentId) { delete rs.resend[id]; continue; }
+      // v84 5A: nothing anyone made, and never sent — nothing to send.
+      if (!rs.sent[id] && !rs.resend[id] && _syncNothingMade(kind, id, r)) continue;
       // Never send what the other phone would have to hold as unreadable.
       if (!_syncValidRecord(kind, doc, id)) continue;
       // ⚠ Wire and fingerprint are separate jobs (M184): send the JSON, hash the
@@ -1743,8 +2026,9 @@ function _syncPushRecords(c, uid, st, out) {
       const json = JSON.stringify(doc);
       const hash = syncHash(_syncCanonical(doc));
       if (!rs.resend[id] && rs.sent[id] === hash) continue;
-      work.push({ id, hash, gone: false, bytes: json.length, grp: _syncRecordGroup(kind),
-        inUse: kind === 'settings' ? doc.instrumentId : undefined,
+      // v84: the counter moves with every report — sent, but not reported as a change.
+      work.push({ id, hash, gone: false, bytes: json.length, grp: id === SYNC_CERT_ID ? null : _syncRecordGroup(kind, id),
+        inUse: (kind === 'settings' && id === SYNC_INUSE_ID) ? doc.instrumentId : undefined,
         row: { id, user_id: uid, kind, doc: JSON.parse(json), deleted: false, last_modified: now } });
     }
     for (const t of (state.tombstones || [])) {
@@ -1754,7 +2038,7 @@ function _syncPushRecords(c, uid, st, out) {
       if (!rs.sent[id] && !rs.gone[id] && !rs.resend[id]) continue;   // server never had it
       if (rs.gone[id] && !rs.resend[id]) continue;                     // already sent
       const at = (typeof t.at === 'string' && !isNaN(Date.parse(t.at))) ? t.at : now;
-      work.push({ id, hash: null, gone: true, bytes: 64, grp: _syncRecordGroup(kind),
+      work.push({ id, hash: null, gone: true, bytes: 64, grp: _syncRecordGroup(kind, id),
         row: { id, user_id: uid, kind, doc: {}, deleted: true, last_modified: at } });
     }
   }
@@ -1798,7 +2082,8 @@ function _syncRecordsHalf(c, uid, st) {
   // v83: `cs` / `ip` split the same counts by Sync-page heading; `skip` is what
   // the pull deferred this run; `inUseNow` names a tester taken from the cloud.
   const out = { applied: 0, added: 0, removed: 0, held: 0, unassigned: 0, sent: 0, deleted: 0, error: null,
-    cs: { in: 0, out: 0, held: 0 }, ip: { in: 0, out: 0, held: 0 }, skip: {}, inUseNow: null };
+    cs: { in: 0, out: 0, held: 0 }, ip: { in: 0, out: 0, held: 0 }, rp: { in: 0, out: 0, held: 0 },
+    skip: {}, inUseNow: null };
   return _syncPullRecords(c, uid, st, out)
     .then(() => _syncPushRecords(c, uid, st, out))
     .then(() => out, (e) => { out.error = e || new Error('records'); return out; });
@@ -1923,7 +2208,7 @@ function _syncHeldResolveRecord(kind, sid, choice, key) {
     if (msg) state.sync.message = msg;
     _syncRepaint();
   };
-  const what = { site: 'site', instrument: 'instrument', preset: 'preset', settings: 'setting' }[kind] || 'client';
+  const what = { site: 'site', instrument: 'instrument', preset: 'preset', settings: 'setting', template: 'template' }[kind] || 'client';
 
   if (choice === 'phone') {
     const st = _syncStateFor(_syncCurrentUserId());
@@ -1973,7 +2258,7 @@ function _syncHeldResolveRecord(kind, sid, choice, key) {
           }
           else _syncRecordSetList(kind, _syncRecordList(kind).concat([_syncRecordFromDoc(kind, row.doc, null)]));
           rs.sent[sid] = _syncRecordHash(kind, row.doc);
-          if (kind === 'settings') rs.inUse = String(row.doc.instrumentId);
+          if (kind === 'settings' && sid === SYNC_INUSE_ID) rs.inUse = String(row.doc.instrumentId);
           delete rs.gone[sid];
         } else {
           done('That cloud copy still can\u2019t be read, so nothing has been changed. Choose this phone\u2019s copy to replace it.');
@@ -1982,7 +2267,7 @@ function _syncHeldResolveRecord(kind, sid, choice, key) {
         // v83: "in use" pointed at what now exists; an instrument delete's
         // frozen copies wait in `rs` for the run below to read the jobs first.
         _syncSettleLists(presetBefore);
-        if (typeof saveSettings === 'function') saveSettings();
+        _syncSaveLists();
         _syncSave(st);
         _syncHeldClear(sid, kind);
         done('');

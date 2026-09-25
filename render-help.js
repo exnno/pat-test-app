@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA
- * v83.1 (September 2026)
+ * v84 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -64,16 +64,16 @@ function renderSettingsAbout() {
 
       ${cloudPagesMenu}
 
-      <!-- v8: rolling 3-version changelog. v83.1: rolled forward — V83.1 on top, V81.4 dropped. -->
+      <!-- v8: rolling 3-version changelog. v84: rolled forward — V84 on top, V82 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V84</strong> &middot; September 2026</p>
+        <p class="muted">Fixes a bug where applying a saved report template could wind your certificate numbers back, so new certificates reused numbers already issued. Certificate numbers also now skip any number a job already has. For the invite-only cloud test: your report settings, report templates and certificate numbering now travel between your devices.</p>
         <p><strong>V83.1</strong> &middot; September 2026</p>
         <p class="muted">For the invite-only cloud test only. Fixes a sync bug that could leave a few jobs or clients behind when a device had a lot to catch up on, and stops a job you'd only changed on this phone being wrongly flagged as changed on both. Each device reads everything once more on its first sync to catch anything it missed.</p>
         <p><strong>V83</strong> &middot; September 2026</p>
         <p class="muted">Fixes a bug where deleting a test instrument could leave older jobs showing your current tester on their certificates after the app was reopened. For the invite-only cloud test: your instruments and item presets now travel between your devices too, along with which tester is in use.</p>
-        <p><strong>V82</strong> &middot; September 2026</p>
-        <p class="muted">For the invite-only cloud test only. Your clients and sites now travel between your devices as well as your jobs. When the app can't decide which copy of something to keep, the Sync page now shows you what's actually different, and each button says exactly what it will do.</p>
                               </div>
 
       <div class="info-card">
@@ -426,6 +426,7 @@ function renderCloudSync() {
         <p id="sync-counts"><strong>${sum.upToDate}</strong> of ${sum.total} job${sum.total === 1 ? '' : 's'} in the cloud and up to date${sum.waiting ? ` &middot; <strong>${sum.waiting}</strong> waiting to send` : ''}</p>
         ${sum.recTotal ? `<p id="sync-rec-counts" style="font-size:14px">Clients &amp; sites: <strong>${sum.recUpToDate}</strong> of ${sum.recTotal} up to date</p>` : ''}
         ${sum.listTotal ? `<p id="sync-list-counts" style="font-size:14px">Instruments &amp; presets: <strong>${sum.listUpToDate}</strong> of ${sum.listTotal} up to date</p>` : ''}
+        ${sum.rpTotal ? `<p id="sync-rp-counts" style="font-size:14px">Report settings &amp; templates: <strong>${sum.rpUpToDate}</strong> of ${sum.rpTotal} up to date</p>` : ''}
         ${inUse ? `<p class="muted" id="sync-inuse" style="font-size:13px">Tester in use: <strong>${escapeHTML(inUse)}</strong> &mdash; the same on each of your devices</p>` : ''}
         <p class="muted" id="sync-last" style="font-size:13px">Last sent: ${stamp(sum.lastPushAt)}</p>
         <p class="muted" id="sync-last-pull" style="font-size:13px">Last checked: ${stamp(sum.lastPullAt)}</p>
@@ -552,9 +553,12 @@ function renderSyncHeld(sy) {
   const listRow = (h) => {
     const key = keyOf(h);
     const dis = resolving === key ? 'disabled' : '';
-    const isInst = h.kind === 'instrument', isPreset = h.kind === 'preset', isUse = h.kind === 'settings';
-    const tag = isInst ? 'Instrument' : (isPreset ? 'Preset' : 'Tester in use');
-    const title = isUse ? '' : (h.name ? escapeHTML(h.name) : (isInst ? 'Unnamed instrument' : 'Unnamed preset'));
+    // v84: report templates and the report settings row share these cards.
+    const isTpl = h.kind === 'template';
+    const isReport = h.kind === 'settings' && h.id === SYNC_REPORT_ID;
+    const isInst = h.kind === 'instrument', isPreset = h.kind === 'preset', isUse = h.kind === 'settings' && !isReport;
+    const tag = isInst ? 'Instrument' : (isPreset ? 'Preset' : (isTpl ? 'Report template' : (isReport ? 'Report settings' : 'Tester in use')));
+    const title = (isUse || isReport) ? '' : (h.name ? escapeHTML(h.name) : (isInst ? 'Unnamed instrument' : (isTpl ? 'Unnamed template' : 'Unnamed preset')));
     const lines = [];
     let phone = 'Keep this phone\u2019s', cloud = 'Use the cloud\u2019s';
     if (h.reason === 'deleted-elsewhere') {
@@ -593,8 +597,11 @@ function renderSyncHeld(sy) {
 
   const jobs = held.filter(h => !h.kind || h.kind === 'session');
   const recs = held.filter(h => h.kind === 'client' || h.kind === 'site');
-  const lists = held.filter(h => h.kind && h.kind !== 'session' && h.kind !== 'client' && h.kind !== 'site');
-  const groups = (jobs.length ? 1 : 0) + (recs.length ? 1 : 0) + (lists.length ? 1 : 0);
+  // v84: report settings and templates get their own heading.
+  const isRp = (h) => h.kind === 'template' || (h.kind === 'settings' && h.id === SYNC_REPORT_ID);
+  const reps = held.filter(isRp);
+  const lists = held.filter(h => h.kind && h.kind !== 'session' && h.kind !== 'client' && h.kind !== 'site' && !isRp(h));
+  const groups = (jobs.length ? 1 : 0) + (recs.length ? 1 : 0) + (lists.length ? 1 : 0) + (reps.length ? 1 : 0);
   const sub = (id, text) => `<h4 id="${id}" style="margin:14px 0 0;font-size:14px">${text}</h4>`;
   return `
     <div class="info-card" id="sync-held" style="margin-top:12px">
@@ -606,7 +613,9 @@ function renderSyncHeld(sy) {
     ${recs.length ? sub('sync-held-records', 'Clients &amp; sites') : ''}
     ${recs.map(recRow).join('')}
     ${lists.length ? sub('sync-held-lists', 'Instruments &amp; presets') : ''}
-    ${lists.map(listRow).join('')}`;
+    ${lists.map(listRow).join('')}
+    ${reps.length ? sub('sync-held-reports', 'Report settings &amp; templates') : ''}
+    ${reps.map(listRow).join('')}`;
 }
 
 // v82 (decision 6A): the read-only comparison for one held job. Built from the

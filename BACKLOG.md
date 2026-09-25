@@ -17,36 +17,56 @@ leftovers are the IndexedDB photo store and the sync bookkeeping keys
 still signed in would pull its old jobs straight back. Most destructive button in
 the app, so the confirm needs to be genuinely hard to hit by accident.
 
-### Cloud track — V83.1: instruments, presets, tester in use; settings next
+### Cloud track — V84: report settings, templates, certificate counter; general settings next
 V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull → V82 clients + sites →
-**V83** instruments + presets + tester in use (1B) → **V83.1** pager fix. Next: **V84 settings +
-report templates** → photos (+ the cross-account download isolation check) →
-status UI. Every cloud release runs `supabase/isolation-test.sql` (all PASS)
-before promotion to `Release` — passed at V82.
+V83 instruments + presets + tester in use → V83.1 pager fix → **V84** report
+settings + templates + certificate counter. Next: **V85 general settings** →
+photos (+ the cross-account download isolation check) → status UI. Every cloud
+release runs `supabase/isolation-test.sql` (all PASS) before promotion to
+`Release` — passed at V82; V84 adds checks 6a–6d (records).
 
-### Cloud — V84 must carry these
-- Settings travel as SEPARATE small rows (kind `settings`), the shape V83 began
-  with `settings_instrument`. Add each new id to `SYNC_SETTINGS_IDS` (config.js):
-  that is what resets the records cursor so rows pushed earlier are read (19s,
-  M251). A V83 phone ignores settings ids it does not know, without blocking.
-- Setup-bundle sections (setup.js) are a ready-made split to start from.
-  Per-device, must NOT sync: theme, haptics/sound, scanner pairing and speed,
-  sort, filters — and the PRESET in use (V83 7A).
-- Report templates `tpl_standard` / `tpl_summary` have the SAME id on every
-  install — the first sync treats them as one record. Probably right; decide.
-- Report settings carry a base64 logo and signature — size check against
-  SYNC_BATCH_BYTES. `TOMBSTONE_KINDS` still lacks `template`.
+### Cloud — V85 must carry these (general settings; V84 1A split them off)
+- What V85 syncs: engineer name, fail reasons + fail-reason tags, descriptions,
+  CSV columns, and the workflow switches that change what gets recorded
+  (timestamps, readings, Multi Pick config, Smart Quick Pick). Decide per
+  item in the spec round — some may be per device.
+- ⚠ Descriptions GROW BY THEMSELVES: `addDescriptionIfNew()` (session.js)
+  appends on every new description logged. Synced as one row with the normal
+  rules, two phones logging offline would raise a question almost every time.
+  Likely answer: a union when both changed (a removal colliding with an add
+  comes back — accept), not a hold.
+- Settings travel as SEPARATE small rows (kind `settings`). Add each new id to
+  `SYNC_SETTINGS_IDS` (config.js): that resets the records cursor so rows pushed
+  earlier are read (19s, M251). V83/V84 phones ignore ids they do not know.
+- Per-device, must NOT sync: theme, haptics/sound, scanner pairing and speed,
+  sort, filters, backup reminder timers — and the PRESET in use (V83 7A).
+- 5A pattern (V84 `_syncNothingMade`): defaults never pushed while unsent; a
+  phone holding only defaults adopts; a cloud copy that is only defaults gives way.
 - `_sessionSig()` lesson (V83): anything written IN PLACE onto non-active jobs
   must be in the sig, or it never reaches disk.
-- Consider a records-specific row in isolation-test.sql now instrument
-  calibration data lives in `records` (spec section 7).
-- README is stale on cloud: the Stack table's Cloud row still says "sign-in v79,
-  job push v80" and Related points at spec v1.2. Bring it up to date (V83.1 review).
-- Every new synced record kind or settings id answers, in the spec round: what
-  does an older phone do when it RECEIVES this, and what happens if an older
-  phone EDITS it and sends it back? (See "older phone strips fields" below.)
-- New tests that read from the cloud must include more than one page (V83.1:
-  no test had, which is how the step-over survived V81–V83).
+- Older phone question for every new id: what does it do RECEIVING it, and
+  EDITING it and sending it back?
+- Every pull test set includes more than one page, stamped one per batch
+  (rule 14; 21n is the V84 example).
+- Pulls save through `_syncSaveLists()` — never a save that arms the trigger
+  (V84 21q, M292). If V85 adds a save path that does, route it the same way.
+
+### Cloud — V84 residuals (known, accepted)
+- Two phones BOTH offline stamping a certificate at the same moment can issue
+  the same number: the stamp only skips numbers on jobs the phone already has.
+  The counter row is written by a plain upsert (no SQL change), so a slower
+  phone can briefly put a lower number in the cloud; the next run of the
+  further-on phone puts it back (21i). A server-side "max" would need SQL.
+- Setup import and backup restore replace the template list wholesale without
+  tombstones, so a template dropped that way comes back from the cloud on the
+  next read. Delete it in the app to make it stick.
+- An untouched starter template deleted on a phone that has never sent it,
+  while the cloud does not have it either, stays on the other phones.
+- A phone still on V83 applying a template still rewinds its own counter (the
+  fix is V84). Once it updates, the higher cloud number wins, so no harm lasts.
+- Report settings the cloud has from a NEWER version keep their extra fields
+  here (`normaliseReportSettings` carries unknown keys through) — so an older
+  V84 phone editing them does not strip anything. Opposite of clients (below).
 
 ### Cloud — V83 residuals (known, accepted)
 - A job whose instrument is not on this phone and has no frozen copy still
