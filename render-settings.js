@@ -92,6 +92,26 @@ function settingsPageSubtitle(pageId) {
       return `${n} terms explained`;
     }
     case 'settingsContact': return 'Get in touch';
+    // v85: the Cloud group's rows. Only ever painted once unlocked, so cloud.js
+    // is present — still guarded, it is an optional subsystem (MAP rule 6).
+    case 'cloudAccount': {
+      const c = state.cloud || {};
+      if (c.status === 'signed-in') return c.email ? `Signed in as ${c.email}` : 'Signed in';
+      if (c.status === 'code-sent') return 'Waiting for the code from your email';
+      return 'Not signed in';
+    }
+    case 'cloudSync': {
+      if (!state.cloud || state.cloud.status !== 'signed-in') return 'Sign in first';
+      if (typeof syncStatusSummary !== 'function') return '';
+      try {
+        const su = syncStatusSummary();
+        if (su.held > 0) return `${su.held} waiting for an answer`;
+        const toSend = su.waiting + (su.recTotal - su.recUpToDate)
+          + (su.listTotal - su.listUpToDate) + (su.rpTotal - su.rpUpToDate);
+        return toSend > 0 ? `${toSend} to send` : 'Up to date';
+      } catch { return ''; }
+    }
+    case 'cloudSubscription': return 'Not built yet';
     default: return '';
   }
 }
@@ -113,6 +133,20 @@ function settingsPageRowHTML(pageId, context) {
     </button>`;
 }
 
+// v85: the Cloud group (catCloud) exists only on a copy of the app with a cloud,
+// and its pages are searchable only once this phone is unlocked (decision 1A).
+// Every other group and page is unaffected. Both read cloud.js through typeof
+// guards: without cloud.js the group simply is not there.
+function settingsCategoryVisible(cat) {
+  if (!cat || cat.id !== 'catCloud') return true;
+  return typeof cloudAvailable === 'function' && cloudAvailable();
+}
+
+function settingsPageSearchable(cat) {
+  if (!cat || cat.id !== 'catCloud') return true;
+  return typeof cloudPagesUnlocked === 'function' && cloudPagesUnlocked();
+}
+
 // v32: the hub body (search results OR category list). Separated so the live
 // search filter can re-render just this region, preserving focus on the search
 // input (a full render() would blur it on every keystroke — the same reason
@@ -122,6 +156,7 @@ function renderSettingsHubBodyHTML() {
   if (query) {
     const results = [];
     SETTINGS_CATEGORIES.forEach(cat => {
+      if (!settingsPageSearchable(cat)) return;   // v85
       cat.pages.forEach(pageId => {
         const meta = SETTINGS_PAGE_META[pageId];
         if (!meta) return;
@@ -133,7 +168,7 @@ function renderSettingsHubBodyHTML() {
       ? `<div class="settings-list">${results.map(r => settingsPageRowHTML(r.pageId, r.cat.title)).join('')}</div>`
       : `<p class="muted settings-empty-search">No settings match "${escapeHTML(state.settingsSearchQuery.trim())}".</p>`;
   }
-  return `<div class="settings-list">${SETTINGS_CATEGORIES.map(cat => `
+  return `<div class="settings-list">${SETTINGS_CATEGORIES.filter(settingsCategoryVisible).map(cat => `
       <button class="settings-row" data-action="settings-category" data-arg="${cat.id}">
         <span class="settings-row-icon">${cat.icon}</span>
         <div class="settings-row-text">
@@ -188,9 +223,15 @@ function renderStatsFooterHTML() {
 // hub. A muted blurb under the header explains the group (helper text).
 function renderSettingsCategory() {
   const cat = SETTINGS_CATEGORIES.find(c => c.id === state.settingsCategory);
-  if (!cat) { // defensive: unknown category → bounce to hub
+  // v85: the Cloud group is also bounced on a copy with no cloud.
+  if (!cat || !settingsCategoryVisible(cat)) { // defensive: unknown category → bounce to hub
     state.view = 'settings';
     return renderSettingsHub();
+  }
+  // v85 (1A): until this phone is unlocked, the Cloud group shows the
+  // access-code box (render-help.js) in place of its three rows.
+  if (cat.id === 'catCloud' && !(typeof cloudPagesUnlocked === 'function' && cloudPagesUnlocked())) {
+    return renderCloudLocked();
   }
   return `
     <div class="screen">

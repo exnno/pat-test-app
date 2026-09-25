@@ -1,4 +1,4 @@
-# PATGo — Code Map (V84)
+# PATGo — Code Map (V85)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -225,6 +225,9 @@ Settings hub, sub-lists, search aliases and back-nav), `SETUP_SECTIONS`, the
 bug-report option lists, `PATGO_FOOTER_LOGO`, `CSA_RESISTANCE`/`CALC_LENGTHS`.
 **Touch to:** change a default list, add a Settings page, retag a fail reason,
 edit the calculator tables.
+⚠ v85: `catCloud` (last, below Help) holds the three cloud pages. Its visibility
+and searchability are filtered in **render-settings.js**
+(`settingsCategoryVisible` / `settingsPageSearchable`), its lock in **cloud.js**.
 **Coupling:** ⚠ must load immediately after config.js and BEFORE state.js — see
 the load-order note above. Contains NO functions, deliberately, which is why its
 boot probe is a constant. Nothing here touches storage or the DOM.
@@ -523,6 +526,9 @@ The **calibration banner is ONE banner** covering the worst instrument with
 "+N more", never stacked.
 ⚠ v72: `renderEntry()` calls `renderFailPhotoStripInner()` and
 `renderPhotoStripSheet()`, which now live in **render-review.js**.
+⚠ v85: the dispatcher paints the three cloud views only when
+`cloudPagesUnlocked()` (cloud.js); otherwise `renderCloudLocked()`. The V43 About
+long-press is gone — `setupLongPress` (utils.js) now has no caller.
 
 ### render-review.js (~690 ln) — review & manage screens — NEW v72
 Overview (+ `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
@@ -555,12 +561,17 @@ Instrument settings live in **instruments.js**. The stats footer reads
 ⚠ v73: About, Glossary, Contact, the bug-sheet markup and the cloud stubs left
 for **render-help.js**, and those pages still call `renderSettingsSubHeader()`
 from here. The About changelog is no longer in this file.
+⚠ v85: the hub hides the Cloud group where there is no cloud; search skips its
+pages and the group paints `renderCloudLocked()` (render-help.js) until
+`cloudPagesUnlocked()` (cloud.js). Row subtitles for the three cloud pages read
+`state.cloud` and `syncStatusSummary()` (sync.js), typeof-guarded.
 
 ### render-help.js (~633 ln) — help, about & cloud pages — NEW v73
 About (+ the rolling 3-version changelog), Glossary (page + the
 `GLOSSARY_GROUPS` data array), Contact, `renderBugSheet()` markup, and the three
-cloud pages revealed by a long-press on the About title (v79: only on a host
-with a cloud). Account is real (logic in **cloud.js**); Sync is real from v80
+cloud pages, reached from Settings → Cloud (v85; the About long-press is gone)
+plus `renderCloudLocked()`, the access-code box shown until the phone is
+unlocked. Account is real (logic in **cloud.js**); Sync is real from v80
 (logic in **sync.js**); Subscription is a placeholder. v82: `renderSyncHeld()`
 groups jobs and clients & sites, and `openSyncDiffSheet()` builds the read-only
 comparison sheet via feedback.js `_openSheet()`. v83: a third group, instruments &
@@ -579,7 +590,9 @@ Boot probe: `renderSettingsAbout` in `requiredFns`.
 
 ### cloud.js (~315 ln) — cloud sign-in — NEW v79
 Email-code sign-in (Supabase), session state in `state.cloud`, the TEST strip
-and version tag, lazy load of `supabase.umd.js`. Sign-in ONLY — nothing syncs.
+and version tag, lazy load of `supabase.umd.js`. v85: the Cloud access code —
+`cloudPagesUnlocked()`, `cloudUnlock()`, `CLOUD_UNLOCK_KEY` (config.js; per
+device, never backed up), remembered on code entry and on any sign-in. Sign-in ONLY — nothing syncs.
 **Touch to:** change sign-in, the Account page's behaviour, cloud errors, or add
 the next cloud step (sync lives in `sync.js`, not here).
 ⚠ v80: `cloudUserId()` (sync reads it) and a guarded `syncPushSoon(0)` after a

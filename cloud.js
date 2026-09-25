@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — cloud.js (cloud sign-in)
- * v80 (September 2026)
+ * v85 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -111,6 +111,7 @@ function cloudBoot() {
   if (!stored) { state.cloud.status = 'signed-out'; return; }
   state.cloud.status = 'signed-in';
   state.cloud.email = stored.email;
+  _cloudRememberUnlock();   // v85 2A: a signed-in phone never asks for the code
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
   cloudClient()
     .then((c) => c.auth.getSession())
@@ -235,6 +236,7 @@ function cloudVerifyCode() {
       const user = res && res.data && res.data.user;
       _cloudSet({ busy: false, status: 'signed-in', email: (user && user.email) || email,
         message: '', plan: null, trialEndsAt: null, checkedAt: null });
+      _cloudRememberUnlock();   // v85 2A
       return true;
     })
     .catch((e) => { _cloudSet({ busy: false, message: cloudErrorMessage(e, 'verify') }); return false; })
@@ -312,6 +314,39 @@ function cloudSignOut() {
     .then((c) => c.auth.signOut({ scope: 'local' }))
     .catch(() => {})
     .then(() => { finish(); return true; });
+}
+
+// ---- v85: the access code in front of the Cloud group (decisions 1A/2A) -------
+// A curtain, not a lock — see CLOUD_UNLOCK_KEY in config.js for why that is
+// acceptable. Open when: this copy has a cloud AND (signed in now, OR the code
+// was entered / an account signed in on this phone before). Signing out does NOT
+// close it again (2A). With no cloud it is always closed, so the group is never
+// shown (render-settings.js settingsCategoryVisible).
+function cloudPagesUnlocked() {
+  if (!cloudAvailable()) return false;
+  if (state.cloud && state.cloud.status === 'signed-in') return true;
+  try { return localStorage.getItem(CLOUD_UNLOCK_KEY) === '1'; } catch { return false; }
+}
+
+function _cloudRememberUnlock() {
+  try { localStorage.setItem(CLOUD_UNLOCK_KEY, '1'); } catch { /* private mode: asks again next time */ }
+}
+
+// The Unlock button on the code box. Runs from a tap, so render() is safe here
+// (the same shape as cloudSendCode's validation messages). Digits only, so a
+// phone keyboard's stray space or a pasted "1111 " still counts.
+function cloudUnlock() {
+  if (!cloudAvailable()) return false;
+  const typed = _cloudInputValue('cloud-access-code').replace(/\D/g, '');
+  if (typed !== CLOUD_ACCESS_CODE) {
+    state.cloudCodeMessage = typed ? "That code isn't right." : 'Enter the access code.';
+    render();
+    return false;
+  }
+  _cloudRememberUnlock();
+  state.cloudCodeMessage = '';
+  render();
+  return true;
 }
 
 // ---- render helpers (render-core / render-help / render-settings) ------------

@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA
- * v84 (September 2026)
+ * v85 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -13,7 +13,8 @@
 //
 // What lives here: the About page (and its rolling changelog), the Glossary
 // (page + GLOSSARY_GROUPS data), the Contact page, the bug-report sheet markup,
-// and the three cloud-prep stub pages behind the long-press on the About title.
+// and the three cloud pages (v85: reached from Settings → Cloud, behind an
+// access code — renderCloudLocked below; the V43 About long-press is gone).
 //
 // WHY THIS SEAM. These are the read-only reference and help screens: they show
 // text, they own no settings, and none of them writes anything. That is what
@@ -38,42 +39,27 @@
 // purely for readability.
 
 function renderSettingsAbout() {
-  // v43: cloud pages reveal via long-press on the title. This section only shows
-  // if cloudPagesRevealed is true (a transient per-session flag set by long-press).
-  // v79 (decision 1A): and only on a host that HAS a cloud — on any other host
-  // the long-press reveals nothing at all.
-  const cloudOn = state.cloud && state.cloud.status !== 'off';
-  const cloudPagesMenu = (state.cloudPagesRevealed && cloudOn) ? `
-    <div class="info-card cloud-pages-menu">
-      <h3>Cloud (test)</h3>
-      <p class="muted" style="font-size:11px">Sign-in only for now. Nothing from your jobs is sent anywhere.</p>
-      <button class="backup-action-btn" id="cloud-account-btn" data-action="open-cloud-page" data-arg="account" style="margin-top:8px">👤 Account</button>
-      <button class="backup-action-btn" id="cloud-sync-btn" data-action="open-cloud-page" data-arg="sync" style="margin-top:6px">☁ Sync</button>
-      <button class="backup-action-btn" id="cloud-subscription-btn" data-action="open-cloud-page" data-arg="subscription" style="margin-top:6px">💳 Subscription</button>
-    </div>
-  ` : '';
-
+  // v85 (decision 3A): the Cloud card and the long-press on the title that
+  // revealed it are gone — the cloud pages live in Settings → Cloud now.
   return `
     <div class="screen">
       ${renderSettingsSubHeader('About')}
       <div class="info-card">
-        <h2 id="about-title" style="cursor:pointer;-webkit-user-select:none;user-select:none">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}</h2>
+        <h2 id="about-title">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}</h2>
         <p>A fast, offline-first portable appliance testing app for working PAT engineers. Built around speed of data entry — pass/fail decisions in two taps, no fighting the interface.</p>
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      ${cloudPagesMenu}
-
-      <!-- v8: rolling 3-version changelog. v84: rolled forward — V84 on top, V82 dropped. -->
+      <!-- v8: rolling 3-version changelog. v85: rolled forward — V85 on top, V83 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V85</strong> &middot; September 2026</p>
+        <p class="muted">For the invite-only cloud test: the cloud pages have moved to their own place in Settings, called Cloud, below Help. It asks for an access code once on each phone, then stays open.</p>
         <p><strong>V84</strong> &middot; September 2026</p>
         <p class="muted">Fixes a bug where applying a saved report template could wind your certificate numbers back, so new certificates reused numbers already issued. Certificate numbers also now skip any number a job already has. For the invite-only cloud test: your report settings, report templates and certificate numbering now travel between your devices.</p>
         <p><strong>V83.1</strong> &middot; September 2026</p>
         <p class="muted">For the invite-only cloud test only. Fixes a sync bug that could leave a few jobs or clients behind when a device had a lot to catch up on, and stops a job you'd only changed on this phone being wrongly flagged as changed on both. Each device reads everything once more on its first sync to catch anything it missed.</p>
-        <p><strong>V83</strong> &middot; September 2026</p>
-        <p class="muted">Fixes a bug where deleting a test instrument could leave older jobs showing your current tester on their certificates after the app was reopened. For the invite-only cloud test: your instruments and item presets now travel between your devices too, along with which tester is in use.</p>
                               </div>
 
       <div class="info-card">
@@ -316,8 +302,8 @@ function renderBugSheet() {
   `;
 }
 
-// v43: cloud pages, revealed via long-press on the About title (never in the
-// main Settings nav). v79: the Account page is REAL — email-code sign-in via
+// v43: cloud pages. v85: they live in Settings → Cloud (catCloud, data.js),
+// behind an access code (renderCloudLocked above). v79: the Account page is REAL — email-code sign-in via
 // cloud.js. v80: so is Sync (push only, sync.js). Subscription is still an
 // honest placeholder.
 //
@@ -378,8 +364,37 @@ function renderCloudAccount() {
       ${renderSettingsSubHeader('Account')}
       <div class="info-card">
         <h2>Cloud account (test)</h2>
-        <p class="muted" style="font-size:12px">While you're signed in, your jobs are copied to the cloud test (see Sync). Clients, sites and settings stay on this phone for now, and the app works exactly the same signed in or not, signal or not.</p>
+        <p class="muted" style="font-size:12px">While you're signed in, your jobs, clients and sites, testers, presets and report settings are copied to the cloud test (see Sync). Your other settings stay on this phone for now, and the app works exactly the same signed in or not, signal or not.</p>
       </div>
+      ${body}
+    </div>
+  `;
+}
+
+// v85 (decisions 1A/2A): what Settings → Cloud shows until this phone has been
+// unlocked (cloud.js cloudPagesUnlocked). A screen, not a sheet, and the only
+// render() on it comes from the Unlock tap — MAP rule 3 is not in play.
+// ⚠ Also painted for a cloud page reached while locked (render-core.js), so it
+// must never assume it was opened from the Cloud group.
+function renderCloudLocked() {
+  const hasCloud = typeof cloudAvailable === 'function' && cloudAvailable();
+  const msg = state.cloudCodeMessage
+    ? `<p class="muted cloud-msg" id="cloud-access-msg" role="status">${escapeHTML(state.cloudCodeMessage)}</p>` : '';
+  const body = hasCloud ? `
+      <div class="info-card" id="cloud-locked">
+        <h3>Invite-only test</h3>
+        <p class="muted" style="font-size:13px">The cloud is being tested with a few engineers before it opens to everyone. Enter your access code to continue. You'll only be asked once on this phone.</p>
+        <label class="label" for="cloud-access-code">Access code</label>
+        <input class="input cloud-code-input" id="cloud-access-code" type="text" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="Code">
+        ${msg}
+        <button class="btn-primary" id="cloud-unlock" data-action="cloud-unlock" style="margin-top:10px">Unlock</button>
+      </div>` : `
+      <div class="info-card" id="cloud-locked">
+        <p class="muted">Cloud isn't available on this copy of the app.</p>
+      </div>`;
+  return `
+    <div class="screen" id="cloud-locked-page">
+      ${renderSettingsSubHeader('Cloud')}
       ${body}
     </div>
   `;

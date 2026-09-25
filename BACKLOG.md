@@ -13,20 +13,32 @@ A guarded "reset this device" for handing a phone to another engineer, selling
 it, or resetting between tests. NOT a quick win: "reset" means at least three
 different things (data only / + settings / + cloud sign-in), and the easy-to-miss
 leftovers are the IndexedDB photo store and the sync bookkeeping keys
-(SYNC_STATE_KEY, SYNC_PRUNED_KEY, SYNC_HELD_KEY) — a half-reset phone that is
+(SYNC_STATE_KEY, SYNC_PRUNED_KEY, SYNC_HELD_KEY; V85 adds CLOUD_UNLOCK_KEY, the
+Cloud access-code flag) — a half-reset phone that is
 still signed in would pull its old jobs straight back. Most destructive button in
 the app, so the confirm needs to be genuinely hard to hit by accident.
 
-### Cloud track — V84: report settings, templates, certificate counter; general settings next
+### Cloud track — V85: Settings → Cloud behind an access code; general settings next
 V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull → V82 clients + sites →
-V83 instruments + presets + tester in use → V83.1 pager fix → **V84** report
-settings + templates + certificate counter. Next: **V85 general settings** →
-photos (+ the cross-account download isolation check) → status UI. Every cloud
-release runs `supabase/isolation-test.sql` (all PASS) before promotion to
-`Release` — passed at V82; V84 adds checks 6a–6d (records).
+V83 instruments + presets + tester in use → V83.1 pager fix → V84 report
+settings + templates + certificate counter → **V85** the cloud pages moved to
+Settings → Cloud (code 1111, remembered per phone). Next: **V86 general
+settings** → photos (+ the cross-account download isolation check) → status UI.
+Every cloud release runs `supabase/isolation-test.sql` (all PASS) before
+promotion to `Release` — all PASS at V84 incl. 6a–6d. V85 changed no SQL.
 
-### Cloud — V85 must carry these (general settings; V84 1A split them off)
-- What V85 syncs: engineer name, fail reasons + fail-reason tags, descriptions,
+### Cloud — V85 residuals (known, accepted)
+- The access code is readable in public source (config.js). A curtain for free
+  users on the shared test address, not protection — that stays
+  `shouldCreateUser: false` + RLS. Remove the code at commercial launch.
+- Free users on the GitHub Pages address now SEE a "Cloud" row (1A); it asks
+  for a code they don't have. Accepted by Peter at V85.
+- `setupLongPress` (utils.js) has no caller since the About long-press went.
+  Dead code — remove in a structural release, not a feature one (13x source-
+  guards that it exists; update that test with the removal).
+
+### Cloud — V86 must carry these (general settings; V84 1A split them off; V85 was the Cloud menu)
+- What V86 syncs: engineer name, fail reasons + fail-reason tags, descriptions,
   CSV columns, and the workflow switches that change what gets recorded
   (timestamps, readings, Multi Pick config, Smart Quick Pick). Decide per
   item in the spec round — some may be per device.
@@ -49,7 +61,7 @@ release runs `supabase/isolation-test.sql` (all PASS) before promotion to
 - Every pull test set includes more than one page, stamped one per batch
   (rule 14; 21n is the V84 example).
 - Pulls save through `_syncSaveLists()` — never a save that arms the trigger
-  (V84 21q, M292). If V85 adds a save path that does, route it the same way.
+  (V84 21q, M292). If V86 adds a save path that does, route it the same way.
 
 ### Cloud — V84 residuals (known, accepted)
 - Two phones BOTH offline stamping a certificate at the same moment can issue

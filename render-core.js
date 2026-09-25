@@ -103,15 +103,6 @@ function render() {
     }
   }
 
-  // v43: the cloud-pages secret menu (revealed by long-pressing the About title)
-  // must close as soon as you leave the About page. We keep it open only while on
-  // About itself or on one of the three cloud pages (so tapping in and back out
-  // doesn't lose it), and clear it on any other view.
-  if (state.cloudPagesRevealed &&
-      v !== 'settingsAbout' && v !== 'cloudAccount' &&
-      v !== 'cloudSync' && v !== 'cloudSubscription') {
-    state.cloudPagesRevealed = false;
-  }
 
   // v56: the retest action sheet is bound to the reminders view only — clear its
   // transient target on any other view so it can't resurface elsewhere.
@@ -156,10 +147,18 @@ function render() {
   else if (v === 'settingsAbout') html = renderSettingsAbout();
   else if (v === 'settingsGlossary') html = renderSettingsGlossary();   // v58
   else if (v === 'settingsContact') html = renderSettingsContact();
-  // v43: cloud prep pages (not wired into nav yet, revealed via long-press on About)
-  else if (v === 'cloudAccount') html = renderCloudAccount();
-  else if (v === 'cloudSync') html = renderCloudSync();
-  else if (v === 'cloudSubscription') html = renderCloudSubscription();
+  // v85: the cloud pages live in Settings → Cloud. While this phone is not
+  // unlocked they are never painted — any route in (a stale view) gets the
+  // Cloud group's access-code box instead. Without cloud.js that is every time.
+  else if (v === 'cloudAccount' || v === 'cloudSync' || v === 'cloudSubscription') {
+    if (typeof cloudPagesUnlocked === 'function' && cloudPagesUnlocked()) {
+      html = v === 'cloudAccount' ? renderCloudAccount()
+           : v === 'cloudSync'    ? renderCloudSync()
+           : renderCloudSubscription();
+    } else {
+      html = renderCloudLocked();
+    }
+  }
 
   // Update banner sits above the screen
   const banner = state.updateAvailable ? `
@@ -490,16 +489,6 @@ function render() {
   _lastRenderedView = state.view;
   bindFocusFields();
   if (state.signaturePadOpen) initSignaturePad();   // v34
-  // v43: set up long-press on About title for cloud pages reveal
-  if (state.view === 'settingsAbout') {
-    const aboutTitle = document.getElementById('about-title');
-    if (aboutTitle) {
-      setupLongPress(aboutTitle, 2000, () => {
-        state.cloudPagesRevealed = true;
-        render();
-      });
-    }
-  }
   // v67: paired mode puts the cursor in the asset box so a scan lands with no
   // tap. Last in the render tail on purpose — it must run after the scroll
   // restore above, or focusing would fight it. The function itself bails on

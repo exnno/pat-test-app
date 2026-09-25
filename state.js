@@ -260,10 +260,10 @@ let state = {
   //              because that job is open on screen (decision 3A). Recomputed
   //              by every pull, so it clears itself when it stops being true.
   sync: { busy: false, message: '', resolving: null, waiting: null, diffing: null },   // v82: diffing = held job being compared
-  // v43: cloud pages visibility. cloudPagesRevealed is a transient per-session flag
-  // set by long-pressing the About title; it resets when you navigate away from About
-  // but persists if you open one of the cloud pages and return. Never persisted.
-  cloudPagesRevealed: false,
+  // v85: the one line under the Cloud access-code box ("That code isn't right.").
+  // Replaces V43's cloudPagesRevealed and the About long-press (decision 3A):
+  // whether the Cloud group is open is cloud.js cloudPagesUnlocked(), per phone.
+  cloudCodeMessage: '',
   // v36: saved report templates (array of {id, name, settings}). Loaded from
   // REPORT_TEMPLATES_KEY; seeded with starters on first run. Applying one copies
   // its settings snapshot over the live reportSettings.

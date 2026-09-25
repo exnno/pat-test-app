@@ -107,7 +107,14 @@ const SETTINGS_CATEGORIES = [
   { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Back up, restore and share your setup',
     pages: ['settingsBackup', 'settingsSetup'] },
   { id: 'catHelp',    icon: 'ℹ️', title: 'Help', blurb: 'About this app, what the terms mean, and how to get in touch',
-    pages: ['settingsAbout', 'settingsGlossary', 'settingsContact'] }
+    pages: ['settingsAbout', 'settingsGlossary', 'settingsContact'] },
+  // v85: the cloud pages' home (decision 1A), last so it sits below Help. ⚠ NOT
+  // shown on a copy of the app with no cloud, and its pages stay out of settings
+  // search until this phone is unlocked — both filtered in render-settings.js
+  // (settingsCategoryVisible / settingsPageSearchable). Until then the category
+  // screen shows the access-code box instead of this list (render-help.js).
+  { id: 'catCloud',   icon: '☁️', title: 'Cloud', blurb: 'Invite-only test: your account, sync and subscription',
+    pages: ['cloudAccount', 'cloudSync', 'cloudSubscription'] }
 ];
 
 // Per-page metadata for the category sub-lists and for search. icon/title shown
@@ -131,7 +138,11 @@ const SETTINGS_PAGE_META = {
   settingsSetup:       { icon: '🔁', title: 'Export / Import Setup', aliases: 'setup share configuration new device employee copy presets transfer' },
   settingsAbout:       { icon: 'ℹ️', title: 'About',                 aliases: 'about version changelog whats new' },
   settingsGlossary:    { icon: '📖', title: 'Glossary',              aliases: 'glossary terms jargon what does mean definitions help explain quick pick smart multi pick preset asset session client site overview readings class earth insulation leakage polarity fail reason tag retest certificate template csv backup setup calibration pruning' },
-  settingsContact:     { icon: '✉️', title: 'Contact',              aliases: 'contact support email help feedback website' }
+  settingsContact:     { icon: '✉️', title: 'Contact',              aliases: 'contact support email help feedback website' },
+  // v85: the Cloud group (searchable only once unlocked — see catCloud above).
+  cloudAccount:        { icon: '👤', title: 'Account',               aliases: 'cloud account sign in sign out email login' },
+  cloudSync:           { icon: '🔄', title: 'Sync',                  aliases: 'cloud sync upload send devices phones check for updates' },
+  cloudSubscription:   { icon: '💳', title: 'Subscription',          aliases: 'cloud subscription plan trial billing' }
 };
 
 

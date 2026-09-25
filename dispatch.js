@@ -483,7 +483,9 @@ registerActions({
   // Settings hub + sub-page nav. data-page carries the target view.
   'settings-page': (arg) => setView(arg),
   // v32: open a category sub-list from the hub.
-  'settings-category': (arg) => { state.settingsCategory = arg; setView('settingsCategory'); },
+  // v85: opening any group clears a stale "That code isn't right." from the
+  // Cloud access-code box, so it never greets a later visit.
+  'settings-category': (arg) => { state.settingsCategory = arg; state.cloudCodeMessage = ''; setView('settingsCategory'); },
   // v32: back from a setting page returns to its category (if opened from one),
   // back from a category returns to the hub. setView is also used directly when
   // jumping to a page from a flat search result (settingsCategory stays null →
@@ -759,13 +761,9 @@ registerActions({
   'tour-skip': () => closeTour(),
   'open-tour': () => openTour(),
 
-  // v43: cloud prep pages (long-press on About title reveals these)
-  'open-cloud-page': (arg) => {
-    if (arg === 'account') state.view = 'cloudAccount';
-    else if (arg === 'sync') state.view = 'cloudSync';
-    else if (arg === 'subscription') state.view = 'cloudSubscription';
-    render();
-  },
+  // v85: the cloud pages are ordinary Settings rows now (Settings → Cloud), so
+  // the V43 'open-cloud-page' action is gone. The access-code box's one button:
+  'cloud-unlock':     () => { if (typeof cloudUnlock === 'function') cloudUnlock(); },
   // v79: real sign-in (cloud.js). The V43 mock actions are gone — its "Sync now"
   // stamped lastBackupAt, which silently quietened the backup reminder without
   // any backup being made. Every handler here is typeof-guarded: cloud.js is an

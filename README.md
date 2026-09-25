@@ -43,7 +43,7 @@ in the shipped app — the files in the repo root are the files the browser load
 | Offline | Service worker (`sw.js`) precaching every asset |
 | PDF | jsPDF 3.0.3 + jsPDF-AutoTable 5.0.2, vendored and self-hosted (MIT) |
 | PDF preview | PDF.js 3.11.174 legacy UMD, vendored, lazy-loaded (Apache-2.0) |
-| Cloud | supabase-js 2.116.0 UMD, vendored, lazy-loaded (MIT) — invite-only, test host only. Syncs both ways: jobs, clients, sites, instruments, presets, the tester in use, report settings, report templates and the certificate counter (V79–V84). Photos and general settings not yet |
+| Cloud | supabase-js 2.116.0 UMD, vendored, lazy-loaded (MIT) — invite-only, test host only. Syncs both ways: jobs, clients, sites, instruments, presets, the tester in use, report settings, report templates and the certificate counter (V79–V84). Reached from Settings → Cloud behind an access code (V85). Photos and general settings not yet |
 | Hosting | `main` → GitHub Pages (test); `Release` → Cloudflare (the product) |
 | Tests | `harness/` — Node, no dependencies |
 

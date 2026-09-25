@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — config.js (constants & factories)
- * v84 (September 2026)
+ * v85 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V84';
+const APP_VERSION = 'V85';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -345,6 +345,19 @@ const CLOUD = CLOUD_PROJECTS[CLOUD_ENV] || { url: '', publishableKey: '' };
 const CLOUD_AUTH_STORAGE_KEY = 'patgo:cloudAuth:' + CLOUD_ENV;
 // Flip to true at commercial launch (spec decision 5). Nothing reads it yet.
 const REQUIRE_ACCOUNT = false;
+
+// v85 (decisions 1A/2A): the Cloud group in Settings sits behind an access code.
+// ⚠ A CURTAIN, NOT A LOCK. The code is readable in this public file. It exists so
+// free users on the shared test address are not walked into a sign-in page they
+// cannot use. What actually protects the cloud is unchanged: nobody can create an
+// account from the app (cloud.js shouldCreateUser: false) and the database rules
+// (supabase/*.sql, isolation-test.sql). Remove the code at commercial launch.
+// CLOUD_UNLOCK_KEY: '1' once the code has been entered on this phone, or once it
+// has been signed in (cloud.js). Per device and for good (2A) — signing out does
+// not clear it. NEVER in a backup or setup export: restoring onto a new phone must
+// not open the curtain. Factory reset (own spec, BACKLOG) must clear it.
+const CLOUD_UNLOCK_KEY = 'pat:cloudUnlocked';
+const CLOUD_ACCESS_CODE = '1111';
 
 // ---- v80/v81: sync (push and pull — see sync.js) ----------------------------
 // SYNC_STATE_KEY: which account the phone last sent to, a fingerprint of every
