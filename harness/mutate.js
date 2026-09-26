@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V85';",
-    to:   "const APP_VERSION = 'V85';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V86';",
+    to:   "const APP_VERSION = 'V86';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -636,8 +636,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V83.1</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V83.1</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V83</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V84</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V84</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V83.1</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -2118,8 +2118,9 @@ const MUTATIONS = [
   {
     name: "M288 (V84) the certificate counter reports as a change",
     file: "sync.js",
-    from: "grp: id === SYNC_CERT_ID ? null : _syncRecordGroup(kind, id),",
-    to:   "grp: _syncRecordGroup(kind, id),",
+    // v86: re-anchored — the line now also exempts Smart Quick Pick's history.
+    from: "grp: (id === SYNC_CERT_ID || id === SYNC_SQP_ID) ? null : _syncRecordGroup(kind, id),",
+    to:   "grp: (id === SYNC_SQP_ID) ? null : _syncRecordGroup(kind, id),",
     why:  "every report produced says 'a change sent' — noise that trains people to ignore the page",
   },
   {
@@ -2167,8 +2168,9 @@ const MUTATIONS = [
   {
     name: "M295 (V84) the page does not count report settings as up to date when there is nothing to send",
     file: "sync.js",
-    from: "|| (!sent && grp === 'rp' && _syncNothingMade(kind, id, r))",
-    to:   "",
+    // v86: re-anchored — the same clause now covers general settings too.
+    from: "|| (!sent && (grp === 'rp' || grp === 'gs') && _syncNothingMade(kind, id, r))",
+    to:   "|| (!sent && grp === 'gs' && _syncNothingMade(kind, id, r))",
     why:  "a fresh phone shows report settings 'not up to date' for ever",
   },
 
@@ -2242,6 +2244,148 @@ const MUTATIONS = [
     from: "    theme: state.theme,\n    hapticsEnabled: state.hapticsEnabled,",
     to:   "    theme: state.theme,\n    cloudUnlocked: localStorage.getItem(CLOUD_UNLOCK_KEY),\n    hapticsEnabled: state.hapticsEnabled,",
     why:  "restoring a backup onto a new phone would open the curtain there too",
+  },
+
+  // ---- V86: general settings sync (harness group 23) --------------------------
+  {
+    name: "M306 (V86) a general row is applied under its open settings page",
+    file: "sync.js",
+    from: "    if (_syncGeneralOpen(id)) { blocked = true; out.skip[id] = true; return; }\n    _syncApplyGeneral(id, row.doc);",
+    to:   "    _syncApplyGeneral(id, row.doc);",
+    why:  "a Save on the open Fail reasons page silently puts back the list the other phone just changed",
+  },
+  {
+    name: "M307 (V86) unsaved edits on an open settings page are sent",
+    file: "sync.js",
+    from: "      if (kind === 'settings' && _syncGeneralOpen(id)) continue;\n",
+    to:   "",
+    why:  "half-typed fail reasons or CSV headers reach the other phone before Save is tapped",
+  },
+  {
+    name: "M308 (V86) both-changed general settings are never asked",
+    file: "sync.js",
+    from: "    const takeIt = fresh && _syncGeneralNothingMade(id, local);\n    if (!takeIt && rs.sent[id] !== localHash) { hold('both-changed', row.doc); return; }",
+    to:   "    const takeIt = fresh && _syncGeneralNothingMade(id, local);",
+    why:  "one phone's fail reasons silently replace the other's (4A, 5A)",
+  },
+  {
+    name: "M309 (V86) out-of-the-box settings are sent",
+    file: "sync.js",
+    from: "  if (_syncIsGeneral(id)) return _syncGeneralNothingMade(id, rec);   // v86\n",
+    to:   "",
+    why:  "a new phone pushes default fail reasons and columns over the account's own",
+  },
+  {
+    name: "M310 (V86) an untouched phone asks instead of taking the account's",
+    file: "sync.js",
+    from: "    const takeIt = fresh && _syncGeneralNothingMade(id, local);",
+    to:   "    const takeIt = false;",
+    why:  "every new phone greets the engineer with a question per settings group",
+  },
+  {
+    name: "M311 (V86) the descriptions merge forgets what was agreed",
+    file: "sync.js",
+    from: "  const B = new Set(Array.isArray(base) ? base : []);",
+    to:   "  const B = new Set();",
+    why:  "a deleted typo comes back from the other phone for ever (3B not delivered)",
+  },
+  {
+    name: "M312 (V86) the agreed descriptions are not remembered after a send",
+    file: "sync.js",
+    from: "          if (w.descBase !== undefined) rs.descBase = w.descBase;   // v86: likewise\n",
+    to:   "",
+    why:  "the next merge has no base, becomes a union, and deletions stop travelling",
+  },
+  {
+    name: "M313 (V86) a one-sided descriptions change is merged, not taken",
+    file: "sync.js",
+    from: "    if (rs.sent[id] === _syncGeneralHash(id, local) || (fresh && _syncGeneralNothingMade(id, local))) next = cloud.list;",
+    to:   "    if (fresh && _syncGeneralNothingMade(id, local)) next = cloud.list;",
+    why:  "two phones re-send the same list in each other's order, every run, for ever",
+  },
+  {
+    name: "M314 (V86) Smart Quick Pick history merge takes the last copy, not the higher count",
+    file: "sync.js",
+    from: "        if (typeof n === 'number' && n > (bucket[type] || 0)) bucket[type] = n;",
+    to:   "        if (typeof n === 'number') bucket[type] = n;",
+    why:  "learning from this phone is overwritten by the other's on every sync",
+  },
+  {
+    name: "M315 (V86) a Smart Quick Pick clear on the other phone is ignored",
+    file: "sync.js",
+    from: "    if (cloud.resetAt !== local.resetAt) {",
+    to:   "    if (false) {",
+    why:  "clearing the history on one phone is undone by the other",
+  },
+  {
+    name: "M316 (V86) clearing Smart Quick Pick history is not stamped",
+    file: "sqp.js",
+    from: "  markSqpReset();            // v86 2B: a deliberate clear travels, and beats counts\n",
+    to:   "",
+    why:  "the other phone's counts put back everything the clear removed",
+  },
+  {
+    name: "M317 (V86) the readings switch does not reach the sync trigger",
+    file: "dispatch.js",
+    from: "    // v86: the switch syncs (settings_work) — arm the trigger, as save() would.\n    if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error(e); } }\n",
+    to:   "",
+    why:  "switching readings on waits for some unrelated save before it travels",
+  },
+  {
+    name: "M318 (V86) a reading-tag change does not reach the sync trigger",
+    file: "dispatch.js",
+    from: "    // v86: tags travel with the fail reasons (settings_fails).\n    if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error(e); } }",
+    to:   "",
+    why:  "a tag change sits unsent until something else is saved",
+  },
+  {
+    name: "M319 (V86) reading tags set here are not in the synced row",
+    file: "sync.js",
+    from: "      tags[String(reason).trim()] = (typeof readingTagForReason === 'function') ? readingTagForReason(reason) : _syncFailTagDefault(reason);",
+    to:   "      tags[String(reason).trim()] = _syncFailTagDefault(reason);",
+    why:  "every custom reason arrives on the other phone as a visual fail",
+  },
+  {
+    name: "M320 (V86) the held card does not say which settings differ",
+    file: "sync.js",
+    from: "    if (reason === 'both-changed' && local && doc) e.diffs = _syncGeneralDiffs(id, local, doc);\n",
+    to:   "",
+    why:  "a card that says 'changed' with nothing to choose by",
+  },
+  {
+    name: "M321 (V86) general settings questions lose their heading",
+    file: "render-help.js",
+    from: "    ${gens.length ? sub('sync-held-general', 'General settings') : ''}\n",
+    to:   "",
+    why:  "settings questions sit unlabelled under report templates",
+  },
+  {
+    name: "M322 (V86) the Sync page does not count general settings",
+    file: "sync.js",
+    from: "      else if (grp === 'gs') { gsTotal++; if (ok) gsUpToDate++; }\n",
+    to:   "",
+    why:  "the page never says whether settings are up to date",
+  },
+  {
+    name: "M323 (V86) Smart Quick Pick history is reported as a settings change",
+    file: "sync.js",
+    from: "        grp: (id === SYNC_CERT_ID || id === SYNC_SQP_ID) ? null : _syncRecordGroup(kind, id),",
+    to:   "        grp: (id === SYNC_CERT_ID) ? null : _syncRecordGroup(kind, id),",
+    why:  "'General settings: 1 change sent' after every job logged",
+  },
+  {
+    name: "M324 (V86) a per-phone setting is taken from the cloud",
+    file: "sync.js",
+    from: "  if (sid === SYNC_WORK_ID) {\n    const sqpBefore = !!state.sqpEnabled;",
+    to:   "  if (sid === SYNC_WORK_ID) {\n    if (d && doc && doc.theme) state.theme = doc.theme;\n    const sqpBefore = !!state.sqpEnabled;",
+    why:  "the other phone's dark mode switches this phone's theme (1A: per phone)",
+  },
+  {
+    name: "M325 (V86) the agreed descriptions are lost on reload",
+    file: "sync.js",
+    from: "    if (Array.isArray(rr.descBase)) r.descBase = rr.descBase.filter(x => typeof x === 'string');   // v86\n",
+    to:   "",
+    why:  "after any reload the merge is a union again and deletions come back",
   },
 ];
 
