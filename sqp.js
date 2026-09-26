@@ -241,6 +241,15 @@ function sqpRowForLocation(types, location) {
 // Force the frozen row to rebuild on the next render. Called when the confirmed
 // location changes and whenever the feature is toggled / history is rebuilt or
 // cleared (so a stale frozen row can't outlive the data it was built from).
+// v86 (2B): stamp a deliberate clear/rebuild. Sync merges the learned history
+// between phones by taking the higher count, which on its own would put back
+// everything a clear removed; a later reset stamp wins instead (the certificate
+// counter's rule). Seeding an empty history when the feature is switched on is
+// NOT a reset and does not call this.
+function markSqpReset() {
+  try { localStorage.setItem(SQP_RESET_KEY, new Date().toISOString()); } catch { /* private mode */ }
+}
+
 function invalidateSqpRow() {
   state.sqpRowCache = null;
   state.sqpRowKey = null;
@@ -250,6 +259,7 @@ function invalidateSqpRow() {
 // feature, or logging new items, will repopulate it. Confirmed by the caller.
 function clearSqpHistory() {
   state.sqpHistory = {};
+  markSqpReset();            // v86 2B: a deliberate clear travels, and beats counts
   bumpSqpHistoryVersion();   // v23 (E6)
   invalidateSqpRow();   // v20: drop the frozen row built from the old history
   save();
@@ -261,6 +271,7 @@ function clearSqpHistory() {
 // whatever was there. Confirmed by the caller.
 function rebuildSqpHistory() {
   state.sqpHistory = buildSqpHistory();
+  markSqpReset();            // v86 2B
   bumpSqpHistoryVersion();   // v23 (E6)
   invalidateSqpRow();   // v20: rebuild the frozen row from the new history
   save();

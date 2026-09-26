@@ -1,4 +1,4 @@
-# PATGo — Code Map (V85)
+# PATGo — Code Map (V86)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -342,7 +342,8 @@ editor screen is intentionally absent from `SETTINGS_CATEGORIES`.
 Location→item-type learning, scoring, ordering, history persistence.
 **Touch to:** change how the quick-pick row adapts to location.
 **Coupling:** tuning constants in config.js. Toasts via feedback.js; confirms in
-dispatch.js.
+dispatch.js. ⚠ v86: `clearSqpHistory`/`rebuildSqpHistory` stamp `SQP_RESET_KEY`
+(`markSqpReset`) — sync.js lets a later reset beat the merged counts.
 
 ### multipick.js (~135 ln) — Multi Pick
 Slot config, the batch-log fire path, settings save.
@@ -609,7 +610,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~2400 ln) — cloud sync, PUSH AND PULL — v80–v84
+### sync.js (~2800 ln) — cloud sync, PUSH AND PULL — v80–v86
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session
@@ -706,8 +707,21 @@ While `state.view === 'settingsReport'` the two report rows are neither applied
 nor pushed. Held cards: group 'rp' (`_syncRecordGroup(kind, id)`). Pull saves
 through `_syncSaveLists()` — never `saveReportSettings()`/`saveReportTemplates()`,
 which arm the trigger (21q, M292).
+⚠ v86: GENERAL SETTINGS. Six more settings rows (`SYNC_GENERAL_IDS`, config.js),
+each a projection (`_syncGeneralNormalise`) built fresh from state
+(`_syncGeneralRecord`). WORK / FAILS / CSV / MULTIPICK: `decideGeneral` (records
+rules + 5A, held with `_syncGeneralDiffs`). DESC: `decideDesc`, three-way merge
+against `st.rec.descBase` (the list both last agreed — set only on equality or
+after a send), never held. SQP: `decideSqp`, highest count wins, a later
+`SQP_RESET_KEY` beats it, never held, never counted. ⚠ Both merged rows TAKE the
+cloud's copy when only the cloud moved — merging then re-sends this phone's
+order for ever (23f, M313). Open screens hold rows back (`SYNC_GENERAL_VIEWS`).
+Sync page group 'gs'. Couples to: storage.js (`readingTagForReason`,
+`ensureAllCsvColumns`, `saveSettings`), sqp.js (`normaliseSqpHistory`,
+`bumpSqpHistoryVersion`, `invalidateSqpRow`, `buildSqpHistory`), multipick.js
+(`normaliseMultiPickConfig`), data.js defaults.
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
-19a–19w, 20a–20f2 and 21a–21q, mutations M142–M295.
+19a–19w, 20a–20f2, 21a–21q and 23a–23l, mutations M142–M295, M306–M325.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

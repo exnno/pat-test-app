@@ -9,7 +9,7 @@ here rather than restating it. Delete an item when it ships.
 ## Next release
 
 ### Factory reset (Peter, V81.1) — needs its own spec round
-A guarded "reset this device" for handing a phone to another engineer, selling
+A guarded "reset this device" (V86: must also clear SQP_RESET_KEY) for handing a phone to another engineer, selling
 it, or resetting between tests. NOT a quick win: "reset" means at least three
 different things (data only / + settings / + cloud sign-in), and the easy-to-miss
 leftovers are the IndexedDB photo store and the sync bookkeeping keys
@@ -18,12 +18,14 @@ Cloud access-code flag) — a half-reset phone that is
 still signed in would pull its old jobs straight back. Most destructive button in
 the app, so the confirm needs to be genuinely hard to hit by accident.
 
-### Cloud track — V85: Settings → Cloud behind an access code; general settings next
+### Cloud track — V86: general settings; photos next
 V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull → V82 clients + sites →
 V83 instruments + presets + tester in use → V83.1 pager fix → V84 report
-settings + templates + certificate counter → **V85** the cloud pages moved to
-Settings → Cloud (code 1111, remembered per phone). Next: **V86 general
-settings** → photos (+ the cross-account download isolation check) → status UI.
+settings + templates + certificate counter → V85 the cloud pages moved to
+Settings → Cloud (code 1111, remembered per phone) → **V86** general settings
+(engineer + switches, fail reasons, descriptions, CSV, Multi Pick, Smart Quick
+Pick history). Next: **photos** (+ the cross-account download isolation check)
+→ status UI → factory reset.
 Every cloud release runs `supabase/isolation-test.sql` (all PASS) before
 promotion to `Release` — all PASS at V84 incl. 6a–6d. V85 changed no SQL.
 
@@ -37,31 +39,24 @@ promotion to `Release` — all PASS at V84 incl. 6a–6d. V85 changed no SQL.
   Dead code — remove in a structural release, not a feature one (13x source-
   guards that it exists; update that test with the removal).
 
-### Cloud — V86 must carry these (general settings; V84 1A split them off; V85 was the Cloud menu)
-- What V86 syncs: engineer name, fail reasons + fail-reason tags, descriptions,
-  CSV columns, and the workflow switches that change what gets recorded
-  (timestamps, readings, Multi Pick config, Smart Quick Pick). Decide per
-  item in the spec round — some may be per device.
-- ⚠ Descriptions GROW BY THEMSELVES: `addDescriptionIfNew()` (session.js)
-  appends on every new description logged. Synced as one row with the normal
-  rules, two phones logging offline would raise a question almost every time.
-  Likely answer: a union when both changed (a removal colliding with an add
-  comes back — accept), not a hold.
-- Settings travel as SEPARATE small rows (kind `settings`). Add each new id to
-  `SYNC_SETTINGS_IDS` (config.js): that resets the records cursor so rows pushed
-  earlier are read (19s, M251). V83/V84 phones ignore ids they do not know.
-- Per-device, must NOT sync: theme, haptics/sound, scanner pairing and speed,
-  sort, filters, backup reminder timers — and the PRESET in use (V83 7A).
-- 5A pattern (V84 `_syncNothingMade`): defaults never pushed while unsent; a
-  phone holding only defaults adopts; a cloud copy that is only defaults gives way.
-- `_sessionSig()` lesson (V83): anything written IN PLACE onto non-active jobs
-  must be in the sig, or it never reaches disk.
-- Older phone question for every new id: what does it do RECEIVING it, and
-  EDITING it and sending it back?
-- Every pull test set includes more than one page, stamped one per batch
-  (rule 14; 21n is the V84 example).
-- Pulls save through `_syncSaveLists()` — never a save that arms the trigger
-  (V84 21q, M292). If V86 adds a save path that does, route it the same way.
+### Cloud — V86 residuals (known, accepted)
+- Two phones that both change the descriptions list's ORDER (not its contents)
+  before syncing: this phone's order wins the merge. Contents are never lost.
+- A description edited in Settings (same text, different spelling) is a removal
+  plus an addition to the merge, like any other.
+- Smart Quick Pick history merges by the higher count, so counts converge on the
+  busier phone rather than adding up. It is a ranking hint, not a tally.
+- A clear or rebuild on a phone that is signed OUT is still stamped, so it wins
+  on the next sign-in. Restoring a backup is not a reset.
+- Setup import and backup restore replace fail reasons, descriptions, CSV and
+  Multi Pick wholesale; with the other phone unchanged that simply goes up.
+- A V85 phone ignores the six new rows (unknown settings ids) — it neither
+  receives nor sends them until it updates.
+
+### Cloud — photos must carry these (next)
+- The cross-account download isolation check (spec section 7, check 4).
+- Blob upload after the session row; lazy pull on open; tombstone deletes the
+  Storage object. Measure the localStorage + IndexedDB footprint first.
 
 ### Cloud — V84 residuals (known, accepted)
 - Two phones BOTH offline stamping a certificate at the same moment can issue

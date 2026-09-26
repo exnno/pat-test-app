@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — config.js (constants & factories)
- * v85 (September 2026)
+ * v86 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V85';
+const APP_VERSION = 'V86';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -397,11 +397,49 @@ const SYNC_INUSE_ID = 'settings_instrument';   // { id, instrumentId }
 // it would turn every report on one phone into a question on the other.
 const SYNC_REPORT_ID = 'settings_report';        // { id, settings }
 const SYNC_CERT_ID = 'settings_certcounter';     // { id, next, setAt }
-const SYNC_SETTINGS_IDS = [SYNC_INUSE_ID, SYNC_REPORT_ID, SYNC_CERT_ID];
+// v86: general settings (decision 1A), one small row per group so a change to
+// one group on one phone never collides with a change to another on the other.
+//   WORK  — engineer name + the switches that change what gets recorded (item
+//           times, test readings, Smart Quick Pick on/off, retest reminders).
+//   FAILS — fail reasons and their reading tags (4A: asked when both changed).
+//   DESC  — descriptions (3B): MERGED, never asked. A deletion travels because
+//           the merge knows what both phones last agreed on (st.rec.descBase).
+//   CSV / MULTIPICK — as the Settings pages of the same names.
+//   SQP   — Smart Quick Pick's learned history (2B): merged, highest count per
+//           location and item wins; never asked; a deliberate clear or rebuild
+//           (SQP_RESET_KEY) beats both.
+// Everything else stays on each phone: theme, haptics, sound, scanner, sort,
+// filters, backup reminders, clear-old-jobs age, the preset in use (V83 7A).
+const SYNC_WORK_ID = 'settings_work';              // { id, engineer, timestamps, readings, sqp, retest }
+const SYNC_FAILS_ID = 'settings_fails';            // { id, reasons, tags }
+const SYNC_DESC_ID = 'settings_descriptions';      // { id, list }
+const SYNC_CSV_ID = 'settings_csv';                // { id, columns }
+const SYNC_MULTIPICK_ID = 'settings_multipick';    // { id, enabled, slots }
+const SYNC_SQP_ID = 'settings_sqp';                // { id, history, resetAt }
+const SYNC_GENERAL_IDS = [SYNC_WORK_ID, SYNC_FAILS_ID, SYNC_DESC_ID, SYNC_CSV_ID, SYNC_MULTIPICK_ID, SYNC_SQP_ID];
+// Which open screens hold back which row: neither applied under it nor sent from
+// it until the screen is left (the V84 Report-settings rule). Each of these
+// either holds unsaved typing or writes every field back on Save.
+const SYNC_GENERAL_VIEWS = {
+  settings_work: ['settingsUser', 'settingsDisplay', 'settingsReadings', 'settingsItems', 'settingsRetest'],
+  settings_fails: ['settingsFails'],
+  settings_descriptions: ['settingsDescriptions'],
+  settings_csv: ['settingsCsv'],
+  settings_multipick: ['settingsMultiPick'],
+};
+const SYNC_SETTINGS_IDS = [SYNC_INUSE_ID, SYNC_REPORT_ID, SYNC_CERT_ID].concat(SYNC_GENERAL_IDS);
+// v86 (2B): when Smart Quick Pick's history was last cleared or rebuilt on this
+// phone (ISO string, or absent). A deliberate reset beats "highest count wins",
+// the counter's rule 15 shape. Per device; NOT in backups (a restore is not a
+// reset). Factory reset must clear it.
+const SQP_RESET_KEY = 'pat:sqpResetAt';
 // v83: screens a sync repaint must wait to leave — each holds unsaved typing in
 // fields that need not be focused (see _syncSafeToRepaint in sync.js).
 // v84: + Report settings, whose toggles change state before Save is tapped.
-const SYNC_NO_REPAINT_VIEWS = ['settingsInstrument', 'settingsItems', 'settingsUser', 'settingsReport'];
+// v86: + the general-settings pages (SYNC_GENERAL_VIEWS).
+const SYNC_NO_REPAINT_VIEWS = ['settingsInstrument', 'settingsItems', 'settingsUser', 'settingsReport',
+  'settingsFails', 'settingsDescriptions', 'settingsCsv', 'settingsMultiPick', 'settingsDisplay',
+  'settingsReadings', 'settingsRetest'];
 // v82 (decision 6A): the "What's different?" sheet lists at most this many
 // items per section, then says how many more there are.
 const SYNC_DIFF_LIST_MAX = 20;

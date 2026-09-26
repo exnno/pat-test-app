@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA
- * v85 (September 2026)
+ * v86 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -50,16 +50,16 @@ function renderSettingsAbout() {
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v85: rolled forward — V85 on top, V83 dropped. -->
+      <!-- v8: rolling 3-version changelog. v86: rolled forward — V86 on top, V83.1 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V86</strong> &middot; September 2026</p>
+        <p class="muted">For the invite-only cloud test: your engineer name, fail reasons, descriptions, CSV columns, Multi Pick setup, Smart Quick Pick's learning and the switches that change what gets recorded (item times, test readings, Smart Quick Pick, retest reminders) now travel between your devices. Theme, sound, haptics and the barcode scanner stay set per phone.</p>
         <p><strong>V85</strong> &middot; September 2026</p>
         <p class="muted">For the invite-only cloud test: the cloud pages have moved to their own place in Settings, called Cloud, below Help. It asks for an access code once on each phone, then stays open.</p>
         <p><strong>V84</strong> &middot; September 2026</p>
         <p class="muted">Fixes a bug where applying a saved report template could wind your certificate numbers back, so new certificates reused numbers already issued. Certificate numbers also now skip any number a job already has. For the invite-only cloud test: your report settings, report templates and certificate numbering now travel between your devices.</p>
-        <p><strong>V83.1</strong> &middot; September 2026</p>
-        <p class="muted">For the invite-only cloud test only. Fixes a sync bug that could leave a few jobs or clients behind when a device had a lot to catch up on, and stops a job you'd only changed on this phone being wrongly flagged as changed on both. Each device reads everything once more on its first sync to catch anything it missed.</p>
                               </div>
 
       <div class="info-card">
@@ -364,7 +364,7 @@ function renderCloudAccount() {
       ${renderSettingsSubHeader('Account')}
       <div class="info-card">
         <h2>Cloud account (test)</h2>
-        <p class="muted" style="font-size:12px">While you're signed in, your jobs, clients and sites, testers, presets and report settings are copied to the cloud test (see Sync). Your other settings stay on this phone for now, and the app works exactly the same signed in or not, signal or not.</p>
+        <p class="muted" style="font-size:12px">While you're signed in, your jobs, clients and sites, testers, presets, report settings and most other settings are copied to the cloud test (see Sync). Theme, sound, haptics and the barcode scanner stay set on each phone, and the app works exactly the same signed in or not, signal or not.</p>
       </div>
       ${body}
     </div>
@@ -442,6 +442,7 @@ function renderCloudSync() {
         ${sum.recTotal ? `<p id="sync-rec-counts" style="font-size:14px">Clients &amp; sites: <strong>${sum.recUpToDate}</strong> of ${sum.recTotal} up to date</p>` : ''}
         ${sum.listTotal ? `<p id="sync-list-counts" style="font-size:14px">Instruments &amp; presets: <strong>${sum.listUpToDate}</strong> of ${sum.listTotal} up to date</p>` : ''}
         ${sum.rpTotal ? `<p id="sync-rp-counts" style="font-size:14px">Report settings &amp; templates: <strong>${sum.rpUpToDate}</strong> of ${sum.rpTotal} up to date</p>` : ''}
+        ${sum.gsTotal ? `<p id="sync-gs-counts" style="font-size:14px">General settings: <strong>${sum.gsUpToDate}</strong> of ${sum.gsTotal} up to date</p>` : ''}
         ${inUse ? `<p class="muted" id="sync-inuse" style="font-size:13px">Tester in use: <strong>${escapeHTML(inUse)}</strong> &mdash; the same on each of your devices</p>` : ''}
         <p class="muted" id="sync-last" style="font-size:13px">Last sent: ${stamp(sum.lastPushAt)}</p>
         <p class="muted" id="sync-last-pull" style="font-size:13px">Last checked: ${stamp(sum.lastPullAt)}</p>
@@ -571,9 +572,11 @@ function renderSyncHeld(sy) {
     // v84: report templates and the report settings row share these cards.
     const isTpl = h.kind === 'template';
     const isReport = h.kind === 'settings' && h.id === SYNC_REPORT_ID;
-    const isInst = h.kind === 'instrument', isPreset = h.kind === 'preset', isUse = h.kind === 'settings' && !isReport;
-    const tag = isInst ? 'Instrument' : (isPreset ? 'Preset' : (isTpl ? 'Report template' : (isReport ? 'Report settings' : 'Tester in use')));
-    const title = (isUse || isReport) ? '' : (h.name ? escapeHTML(h.name) : (isInst ? 'Unnamed instrument' : (isTpl ? 'Unnamed template' : 'Unnamed preset')));
+    // v86: a general-settings row is tagged by its group name, with no title.
+    const isGen = h.kind === 'settings' && typeof syncGeneralName === 'function' && SYNC_GENERAL_IDS.indexOf(h.id) !== -1;
+    const isInst = h.kind === 'instrument', isPreset = h.kind === 'preset', isUse = h.kind === 'settings' && !isReport && !isGen;
+    const tag = isGen ? escapeHTML(syncGeneralName(h.id)) : (isInst ? 'Instrument' : (isPreset ? 'Preset' : (isTpl ? 'Report template' : (isReport ? 'Report settings' : 'Tester in use'))));
+    const title = (isUse || isReport || isGen) ? '' : (h.name ? escapeHTML(h.name) : (isInst ? 'Unnamed instrument' : (isTpl ? 'Unnamed template' : 'Unnamed preset')));
     const lines = [];
     let phone = 'Keep this phone\u2019s', cloud = 'Use the cloud\u2019s';
     if (h.reason === 'deleted-elsewhere') {
@@ -615,8 +618,11 @@ function renderSyncHeld(sy) {
   // v84: report settings and templates get their own heading.
   const isRp = (h) => h.kind === 'template' || (h.kind === 'settings' && h.id === SYNC_REPORT_ID);
   const reps = held.filter(isRp);
-  const lists = held.filter(h => h.kind && h.kind !== 'session' && h.kind !== 'client' && h.kind !== 'site' && !isRp(h));
-  const groups = (jobs.length ? 1 : 0) + (recs.length ? 1 : 0) + (lists.length ? 1 : 0) + (reps.length ? 1 : 0);
+  // v86: general settings under their own heading too.
+  const isGs = (h) => h.kind === 'settings' && SYNC_GENERAL_IDS.indexOf(h.id) !== -1;
+  const gens = held.filter(isGs);
+  const lists = held.filter(h => h.kind && h.kind !== 'session' && h.kind !== 'client' && h.kind !== 'site' && !isRp(h) && !isGs(h));
+  const groups = (jobs.length ? 1 : 0) + (recs.length ? 1 : 0) + (lists.length ? 1 : 0) + (reps.length ? 1 : 0) + (gens.length ? 1 : 0);
   const sub = (id, text) => `<h4 id="${id}" style="margin:14px 0 0;font-size:14px">${text}</h4>`;
   return `
     <div class="info-card" id="sync-held" style="margin-top:12px">
@@ -630,7 +636,9 @@ function renderSyncHeld(sy) {
     ${lists.length ? sub('sync-held-lists', 'Instruments &amp; presets') : ''}
     ${lists.map(listRow).join('')}
     ${reps.length ? sub('sync-held-reports', 'Report settings &amp; templates') : ''}
-    ${reps.map(listRow).join('')}`;
+    ${reps.map(listRow).join('')}
+    ${gens.length ? sub('sync-held-general', 'General settings') : ''}
+    ${gens.map(listRow).join('')}`;
 }
 
 // v82 (decision 6A): the read-only comparison for one held job. Built from the

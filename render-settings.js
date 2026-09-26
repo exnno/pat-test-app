@@ -107,7 +107,8 @@ function settingsPageSubtitle(pageId) {
         const su = syncStatusSummary();
         if (su.held > 0) return `${su.held} waiting for an answer`;
         const toSend = su.waiting + (su.recTotal - su.recUpToDate)
-          + (su.listTotal - su.listUpToDate) + (su.rpTotal - su.rpUpToDate);
+          + (su.listTotal - su.listUpToDate) + (su.rpTotal - su.rpUpToDate)
+          + ((su.gsTotal || 0) - (su.gsUpToDate || 0));   // v86
         return toSend > 0 ? `${toSend} to send` : 'Up to date';
       } catch { return ''; }
     }

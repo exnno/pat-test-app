@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — sync.js (cloud sync: push and pull)
- * v84 (September 2026)
+ * v86 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -190,7 +190,10 @@ function _syncEmpty(userId) {
 //            what tells a switch made HERE from one made for this phone when the
 //            agreed tester was deleted (decision 1B). This phone's own value.
 function _syncRecEmpty() {
-  return { sent: {}, gone: {}, resend: {}, pulledAt: null, kinds: '', freeze: {}, inUse: null };
+  // v86: descBase — the descriptions both phones last agreed on (lower-cased),
+  // or null. Like inUse, a value both sides AGREED, so it is set only when the
+  // cloud is seen to equal this phone, or after this phone's copy is sent.
+  return { sent: {}, gone: {}, resend: {}, pulledAt: null, kinds: '', freeze: {}, inUse: null, descBase: null };
 }
 
 function _syncLoad() {
@@ -240,6 +243,7 @@ function _syncLoad() {
       }
     }
     if (typeof rr.inUse === 'string') r.inUse = rr.inUse;
+    if (Array.isArray(rr.descBase)) r.descBase = rr.descBase.filter(x => typeof x === 'string');   // v86
   }
   if (raw.hashV !== SYNC_HASH_V) { out.sent = {}; out.rec.sent = {}; }
   else out.hashV = SYNC_HASH_V;
@@ -285,23 +289,26 @@ function syncStatusSummary() {
   // includes an invisible row is a count nobody can check.
   // v84: report settings (the one visible row) and templates get a third line.
   // Something nobody made and never sent (5A) has nothing to send: up to date.
-  let recTotal = 0, recUpToDate = 0, listTotal = 0, listUpToDate = 0, rpTotal = 0, rpUpToDate = 0;
+  let recTotal = 0, recUpToDate = 0, listTotal = 0, listUpToDate = 0, rpTotal = 0, rpUpToDate = 0, gsTotal = 0, gsUpToDate = 0;
   for (const kind of SYNC_RECORD_KINDS) {
     for (const r of _syncRecordList(kind)) {
       if (!r || r.id == null || r.id === '') continue;
       const id = String(r.id);
-      if (kind === 'settings' && id !== SYNC_REPORT_ID) continue;
+      // v86: the general rows count too — all but Smart Quick Pick's history,
+      // which moves with every item logged (the certificate counter's rule).
+      if (kind === 'settings' && id !== SYNC_REPORT_ID && !(_syncIsGeneral(id) && id !== SYNC_SQP_ID)) continue;
       const grp = _syncRecordGroup(kind, id);
       const sent = st.rec.sent[id];
-      const ok = sent === _syncRecordHash(kind, r) || (!sent && grp === 'rp' && _syncNothingMade(kind, id, r));
+      const ok = sent === _syncRecordHash(kind, r) || (!sent && (grp === 'rp' || grp === 'gs') && _syncNothingMade(kind, id, r));
       if (grp === 'cs') { recTotal++; if (ok) recUpToDate++; }
       else if (grp === 'rp') { rpTotal++; if (ok) rpUpToDate++; }
+      else if (grp === 'gs') { gsTotal++; if (ok) gsUpToDate++; }
       else { listTotal++; if (ok) listUpToDate++; }
     }
   }
   return {
     total: jobs.length, upToDate, waiting: jobs.length - upToDate,
-    recTotal, recUpToDate, listTotal, listUpToDate, rpTotal, rpUpToDate,
+    recTotal, recUpToDate, listTotal, listUpToDate, rpTotal, rpUpToDate, gsTotal, gsUpToDate,
     lastPushAt: st.lastPushAt,
     // v81
     lastPullAt: st.lastPullAt,
@@ -1000,22 +1007,35 @@ function _syncOutcome(r) {
     if (rp.out) reps.push(plural(rp.out, 'change', 'changes') + ' sent');
   }
 
+  const gs = ok ? (rr.gs || { in: 0, out: 0, held: 0 }) : null;   // v86
+  const gens = [];
+  if (ok) {
+    if (gs.in) gens.push(plural(gs.in, 'change', 'changes') + ' brought in');
+    if (gs.out) gens.push(plural(gs.out, 'change', 'changes') + ' sent');
+  }
+
   let msg = bits.length ? bits.join(', ') + '.' : '';
   if (rec.length) msg += (msg ? ' ' : '') + 'Clients & sites: ' + rec.join(', ') + '.';
   if (lists.length) msg += (msg ? ' ' : '') + 'Instruments & presets: ' + lists.join(', ') + '.';
   if (reps.length) msg += (msg ? ' ' : '') + 'Report settings & templates: ' + reps.join(', ') + '.';
+  if (gens.length) msg += (msg ? ' ' : '') + 'General settings: ' + gens.join(', ') + '.';
   if (ok && rr.inUseNow) msg += (msg ? ' ' : '') + 'The tester in use is now ' + rr.inUseNow + ', as chosen on your other device.';
   if (!msg) msg = 'Everything was already up to date.';
   if (rr && rr.error) {
-    msg += ' Clients, sites, instruments, presets and report settings couldn\u2019t be checked this time \u2014 they\u2019re safe on this phone and will be tried again.';
+    msg += ' Clients, sites, instruments, presets, report settings and general settings couldn\u2019t be checked this time \u2014 they\u2019re safe on this phone and will be tried again.';
   }
 
   const hJobs = p.held || 0;
   const hRec = ok ? (cs.held || 0) : 0;
   const hList = ok ? (ip.held || 0) : 0;
   const hRp = ok ? (rp.held || 0) : 0;   // v84
-  if ((hList || hRp) && (hJobs || hRec || (hList && hRp))) {
+  const hGs = ok ? (gs.held || 0) : 0;   // v86
+  const kindsHeld = [hJobs, hRec, hList, hRp, hGs].filter(n => n > 0).length;
+  // (Jobs plus clients-or-sites alone keeps its own V82 wording, below.)
+  if (kindsHeld > 1 && !(kindsHeld === 2 && hJobs && hRec)) {
     msg += ' Several things need you to decide \u2014 see below.';
+  } else if (hGs) {
+    msg += ' ' + plural(hGs, 'setting needs', 'settings need') + ' you to decide \u2014 see below.';
   } else if (hRp) {
     msg += ' ' + plural(hRp, 'report setting or template needs', 'report settings or templates need') + ' you to decide \u2014 see below.';
   } else if (hList) {
@@ -1226,6 +1246,7 @@ function _syncRecordGroup(kind, id) {
   if (kind === 'client' || kind === 'site') return 'cs';
   if (kind === 'template') return 'rp';
   if (kind === 'settings' && (String(id) === SYNC_REPORT_ID || String(id) === SYNC_CERT_ID)) return 'rp';
+  if (kind === 'settings' && _syncIsGeneral(id)) return 'gs';   // v86: general settings
   return 'ip';
 }
 
@@ -1277,8 +1298,288 @@ function _syncNothingMade(kind, id, rec) {
   if (kind !== 'settings') return false;
   if (String(id) === SYNC_REPORT_ID) return _syncIsDefaultReport(rec && rec.settings);
   if (String(id) === SYNC_CERT_ID) { const d = _syncCertDoc(rec); return d.next === 1 && !d.setAt; }
+  if (_syncIsGeneral(id)) return _syncGeneralNothingMade(id, rec);   // v86
   return false;
 }
+
+// ---- v86: general settings (spec 8.4.4) -----------------------------------------------
+// Six settings rows, all built fresh from state (like the tester-in-use row):
+//   WORK, FAILS, CSV, MULTIPICK — the records rules: taken when only the other
+//     phone changed, ASKED when both did (4A, 5A), the card naming what differs.
+//   DESC — merged, never asked (3B). Three-way: anything both phones last agreed
+//     on (rs.descBase) that one side has since removed is removed; anything
+//     either side added is kept. So a deleted typo stays deleted, and typing it
+//     again later brings it back — it is simply new to both. No base (a new
+//     phone, or first meeting): a plain union.
+//   SQP — merged, never asked (2B): the higher count per location and item
+//     type, unless one side cleared or rebuilt later (SQP_RESET_KEY) — then
+//     that side's history wins outright. Not counted on the Sync page: it moves
+//     with every item logged, like the certificate counter.
+//   5A for all six: out-of-the-box settings are never sent while unsent, a phone
+//   holding only those takes the account's without asking, and a cloud copy that
+//   is only those gives way.
+// Every row is a PROJECTION (_syncGeneralNormalise), used for this phone's copy
+// and the cloud's alike, so a reload is never a change (the 18b rule).
+
+function _syncIsGeneral(id) { return SYNC_GENERAL_IDS.indexOf(String(id)) !== -1; }
+
+// True while a screen that owns this row is open (SYNC_GENERAL_VIEWS).
+function _syncGeneralOpen(id) {
+  const v = SYNC_GENERAL_VIEWS[String(id)];
+  return !!v && v.indexOf(state.view) !== -1;
+}
+
+function _syncSqpResetAt() {
+  try {
+    const v = localStorage.getItem(SQP_RESET_KEY) || '';
+    return (v && !isNaN(Date.parse(v))) ? v : '';
+  } catch { return ''; }
+}
+
+function _syncFailTagDefault(reason) {
+  const d = (typeof DEFAULT_FAIL_REASON_TAGS !== 'undefined' && DEFAULT_FAIL_REASON_TAGS) ? DEFAULT_FAIL_REASON_TAGS[reason] : null;
+  return (typeof d === 'string') ? d : 'visual';
+}
+
+// One shape for both ends. Anything malformed collapses to a safe value, as the
+// app's own loaders do on reload.
+function _syncGeneralNormalise(id, raw) {
+  const r = (raw && typeof raw === 'object') ? raw : {};
+  const sid = String(id);
+  const str = (v) => typeof v === 'string' ? v.trim() : '';
+  const strList = (v) => Array.isArray(v) ? v.map(x => str(x == null ? '' : String(x))).filter(Boolean) : [];
+  if (sid === SYNC_WORK_ID) {
+    return { id: sid, engineer: str(r.engineer), timestamps: r.timestamps === true, readings: r.readings === true,
+             sqp: r.sqp === true, retest: r.retest === true };
+  }
+  if (sid === SYNC_FAILS_ID) {
+    const reasons = strList(r.reasons);
+    const tags = {};
+    const src = (r.tags && typeof r.tags === 'object' && !Array.isArray(r.tags)) ? r.tags : {};
+    const ok = (typeof READING_FAIL_TAGS !== 'undefined') ? READING_FAIL_TAGS : [];
+    for (const reason of reasons) {
+      const t = src[reason];
+      tags[reason] = (typeof t === 'string' && ok.indexOf(t) !== -1) ? t : _syncFailTagDefault(reason);
+    }
+    return { id: sid, reasons, tags };
+  }
+  if (sid === SYNC_DESC_ID) {
+    const seen = new Set(), list = [];
+    for (const d of strList(r.list)) {
+      const k = d.toLowerCase();
+      if (!seen.has(k)) { seen.add(k); list.push(d); }
+    }
+    return { id: sid, list };
+  }
+  if (sid === SYNC_CSV_ID) {
+    const columns = (Array.isArray(r.columns) ? r.columns : [])
+      .filter(c => c && typeof c === 'object' && typeof c.id === 'string' && c.id)
+      .map(c => ({ id: c.id, header: typeof c.header === 'string' ? c.header : '', visible: c.visible !== false }));
+    return { id: sid, columns };
+  }
+  if (sid === SYNC_MULTIPICK_ID) {
+    const m = (typeof normaliseMultiPickConfig === 'function') ? normaliseMultiPickConfig(r) : { enabled: false, slots: [] };
+    return { id: sid, enabled: !!m.enabled, slots: (m.slots || []).map(s => ({ name: String(s.name || ''), items: (s.items || []).map(String) })) };
+  }
+  if (sid === SYNC_SQP_ID) {
+    const history = (typeof normaliseSqpHistory === 'function') ? normaliseSqpHistory(r.history) : {};
+    const resetAt = (typeof r.resetAt === 'string' && !isNaN(Date.parse(r.resetAt))) ? r.resetAt : '';
+    return { id: sid, history, resetAt };
+  }
+  return null;
+}
+
+// This phone's copy of a row, from state.
+function _syncGeneralRecord(id) {
+  const sid = String(id);
+  if (sid === SYNC_WORK_ID) {
+    return _syncGeneralNormalise(sid, { engineer: state.engineer, timestamps: !!state.timestampsEnabled,
+      readings: !!state.readingsEnabled, sqp: !!state.sqpEnabled, retest: !!state.retestRemindersEnabled });
+  }
+  if (sid === SYNC_FAILS_ID) {
+    const reasons = Array.isArray(state.failReasons) ? state.failReasons : [];
+    const tags = {};
+    for (const reason of reasons) {
+      tags[String(reason).trim()] = (typeof readingTagForReason === 'function') ? readingTagForReason(reason) : _syncFailTagDefault(reason);
+    }
+    return _syncGeneralNormalise(sid, { reasons, tags });
+  }
+  if (sid === SYNC_DESC_ID) return _syncGeneralNormalise(sid, { list: state.descriptions });
+  if (sid === SYNC_CSV_ID) return _syncGeneralNormalise(sid, { columns: state.csvColumns });
+  if (sid === SYNC_MULTIPICK_ID) return _syncGeneralNormalise(sid, state.multiPick);
+  if (sid === SYNC_SQP_ID) return _syncGeneralNormalise(sid, { history: state.sqpHistory, resetAt: _syncSqpResetAt() });
+  return null;
+}
+
+// The out-of-the-box value of each row (5A).
+function _syncGeneralDefault(id) {
+  const sid = String(id);
+  if (sid === SYNC_WORK_ID) return _syncGeneralNormalise(sid, {});
+  if (sid === SYNC_FAILS_ID) {
+    const reasons = (typeof DEFAULT_FAIL_REASONS !== 'undefined') ? DEFAULT_FAIL_REASONS : [];
+    return _syncGeneralNormalise(sid, { reasons, tags: {} });
+  }
+  if (sid === SYNC_DESC_ID) return _syncGeneralNormalise(sid, { list: (typeof DEFAULT_DESCRIPTIONS !== 'undefined') ? DEFAULT_DESCRIPTIONS : [] });
+  if (sid === SYNC_CSV_ID) return _syncGeneralNormalise(sid, { columns: (typeof DEFAULT_CSV_COLUMNS !== 'undefined') ? DEFAULT_CSV_COLUMNS : [] });
+  if (sid === SYNC_MULTIPICK_ID) return _syncGeneralNormalise(sid, {});
+  if (sid === SYNC_SQP_ID) return _syncGeneralNormalise(sid, {});
+  return null;
+}
+
+function _syncGeneralHash(id, rec) {
+  return syncHash(_syncCanonical(_syncGeneralNormalise(id, rec)));
+}
+
+// 5A. Descriptions: an empty list counts too (a phone that never had any).
+function _syncGeneralNothingMade(id, rec) {
+  const sid = String(id);
+  const h = _syncGeneralHash(sid, rec);
+  if (h === _syncGeneralHash(sid, _syncGeneralDefault(sid))) return true;
+  if (sid === SYNC_DESC_ID) return _syncGeneralNormalise(sid, rec).list.length === 0;
+  return false;
+}
+
+// 8A for the six rows: what the app cannot load without trouble is held (or,
+// for the two merged rows, overwritten by this phone's own copy).
+function _syncGeneralValid(id, doc) {
+  const sid = String(id);
+  const bool = (v) => v === undefined || typeof v === 'boolean';
+  const arr = (v) => Array.isArray(v);
+  const obj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+  if (sid === SYNC_WORK_ID) {
+    return (doc.engineer === undefined || typeof doc.engineer === 'string')
+      && ['timestamps', 'readings', 'sqp', 'retest'].every(k => bool(doc[k]));
+  }
+  // There must always be at least one fail reason (saveFailsSettings refuses none).
+  if (sid === SYNC_FAILS_ID) return arr(doc.reasons) && doc.reasons.some(x => typeof x === 'string' && x.trim()) && (doc.tags === undefined || obj(doc.tags));
+  if (sid === SYNC_DESC_ID) return arr(doc.list) && doc.list.every(x => typeof x === 'string');
+  if (sid === SYNC_CSV_ID) return arr(doc.columns) && doc.columns.length > 0 && doc.columns.every(c => obj(c) && typeof c.id === 'string');
+  if (sid === SYNC_MULTIPICK_ID) return (doc.slots === undefined || arr(doc.slots)) && bool(doc.enabled);
+  if (sid === SYNC_SQP_ID) return (doc.history === undefined || obj(doc.history)) && (doc.resetAt === undefined || typeof doc.resetAt === 'string');
+  return false;
+}
+
+// Take the cloud's copy of a row. Replaced, never edited in place.
+function _syncApplyGeneral(id, doc) {
+  const sid = String(id);
+  const d = _syncGeneralNormalise(sid, doc);
+  if (!d) return false;
+  if (sid === SYNC_WORK_ID) {
+    const sqpBefore = !!state.sqpEnabled;
+    state.engineer = d.engineer;
+    state.timestampsEnabled = d.timestamps;
+    state.readingsEnabled = d.readings;
+    state.retestRemindersEnabled = d.retest;
+    state.sqpEnabled = d.sqp;
+    // setSqp()'s side effects, without its save()/render(): switching on with no
+    // history seeds it from the jobs; the frozen row is rebuilt for the new mode.
+    if (d.sqp !== sqpBefore && typeof invalidateSqpRow === 'function') {
+      if (d.sqp && (!state.sqpHistory || !Object.keys(state.sqpHistory).length) && typeof buildSqpHistory === 'function') {
+        state.sqpHistory = buildSqpHistory();
+      }
+      if (typeof bumpSqpHistoryVersion === 'function') bumpSqpHistoryVersion();
+      invalidateSqpRow();
+    }
+    return true;
+  }
+  if (sid === SYNC_FAILS_ID) {
+    state.failReasons = d.reasons.slice();
+    state.failReasonTags = Object.assign({}, state.failReasonTags || {}, d.tags);
+    return true;
+  }
+  if (sid === SYNC_DESC_ID) { state.descriptions = d.list.slice(); return true; }
+  if (sid === SYNC_CSV_ID) {
+    state.csvColumns = d.columns.map(c => Object.assign({}, c));
+    if (typeof ensureAllCsvColumns === 'function') ensureAllCsvColumns();   // a column this version has and the sender didn't
+    return true;
+  }
+  if (sid === SYNC_MULTIPICK_ID) { state.multiPick = { enabled: d.enabled, slots: d.slots.map(s => ({ name: s.name, items: s.items.slice() })) }; return true; }
+  if (sid === SYNC_SQP_ID) {
+    state.sqpHistory = d.history;
+    try { if (d.resetAt) localStorage.setItem(SQP_RESET_KEY, d.resetAt); } catch { /* ignore */ }
+    // ⚠ The version bump only: the frozen Quick Pick row is NOT invalidated, so
+    // a sync never reshuffles the buttons under the engineer's thumb mid-job. The
+    // new history is used from the next location change.
+    if (typeof bumpSqpHistoryVersion === 'function') bumpSqpHistoryVersion();
+    return true;
+  }
+  return false;
+}
+
+// 3B: the three-way merge. `base` is the lower-cased list both phones last
+// agreed on, or null (never agreed: a union). Order: this phone's first, then
+// anything new from the cloud in the cloud's order. This phone's spelling wins
+// where both have the same description in different case.
+function _syncMergeDescriptions(base, local, cloud) {
+  const B = new Set(Array.isArray(base) ? base : []);
+  const key = (s) => String(s).toLowerCase();
+  const L = new Set(local.map(key)), C = new Set(cloud.map(key));
+  const out = [], seen = new Set();
+  for (const s of local) {
+    const k = key(s);
+    if (seen.has(k) || (B.has(k) && !C.has(k))) continue;   // removed on the other phone
+    seen.add(k); out.push(s);
+  }
+  for (const s of cloud) {
+    const k = key(s);
+    if (seen.has(k) || (B.has(k) && !L.has(k))) continue;   // removed on this phone
+    seen.add(k); out.push(s);
+  }
+  return out;
+}
+
+// 2B: the higher count per location and item type.
+function _syncMergeSqp(a, b) {
+  const out = {};
+  for (const src of [a || {}, b || {}]) {
+    for (const loc of Object.keys(src)) {
+      const bucket = out[loc] || (out[loc] = {});
+      const t = src[loc] || {};
+      for (const type of Object.keys(t)) {
+        const n = t[type];
+        if (typeof n === 'number' && n > (bucket[type] || 0)) bucket[type] = n;
+      }
+    }
+  }
+  return out;
+}
+
+// The card's "what differs", in plain words. Lists are shown as short joined text.
+function _syncGeneralDiffs(id, local, doc) {
+  const sid = String(id);
+  const L = _syncGeneralNormalise(sid, local), C = _syncGeneralNormalise(sid, doc);
+  const clip = (v) => { const x = String(v == null ? '' : v); return x.length > 80 ? x.slice(0, 79) + '\u2026' : x; };
+  const onOff = (v) => v ? 'On' : 'Off';
+  const out = [];
+  const add = (label, a, b) => { if (a !== b) out.push({ label, here: clip(a), cloud: clip(b) }); };
+  if (sid === SYNC_WORK_ID) {
+    add('Engineer name', L.engineer, C.engineer);
+    add('Item times', onOff(L.timestamps), onOff(C.timestamps));
+    add('Test readings', onOff(L.readings), onOff(C.readings));
+    add('Smart Quick Pick', onOff(L.sqp), onOff(C.sqp));
+    add('Retest reminders', onOff(L.retest), onOff(C.retest));
+  } else if (sid === SYNC_FAILS_ID) {
+    add('Fail reasons', L.reasons.join(', '), C.reasons.join(', '));
+    const tagText = (x) => x.reasons.map(r => r + ': ' + x.tags[r]).join(', ');
+    if (L.reasons.join('\n') === C.reasons.join('\n')) add('Reading tags', tagText(L), tagText(C));
+  } else if (sid === SYNC_CSV_ID) {
+    const vis = (x) => x.columns.filter(c => c.visible).map(c => c.header || c.id).join(', ');
+    add('Columns shown', vis(L), vis(C));
+    if (!out.length) out.push({ label: 'Column order or names', here: 'Different', cloud: 'Different' });
+  } else if (sid === SYNC_MULTIPICK_ID) {
+    add('Multi Pick', onOff(L.enabled), onOff(C.enabled));
+    const slots = (x) => x.slots.map(s => s.name + ' (' + s.items.join(', ') + ')').join('; ');
+    add('Multi Picks', slots(L), slots(C));
+  }
+  return out;
+}
+
+const _SYNC_GENERAL_NAMES = {
+  settings_work: 'Engineer name & recording switches', settings_fails: 'Fail reasons',
+  settings_descriptions: 'Descriptions', settings_csv: 'CSV columns',
+  settings_multipick: 'Multi Pick', settings_sqp: 'Smart Quick Pick history',
+};
+function syncGeneralName(id) { return _SYNC_GENERAL_NAMES[String(id)] || 'Setting'; }
 
 // What the records cursor was read WITH. Kinds and settings ids both: adding
 // either reads the account from the beginning (see SYNC_SETTINGS_IDS).
@@ -1311,6 +1612,8 @@ function _syncRecordList(kind) {
     const out = (typeof findInstrument === 'function') ? [_syncInUseRecord()] : [];
     // v84: the report settings row and the certificate counter.
     if (state.reportSettings && typeof state.reportSettings === 'object') out.push(_syncReportRecord(), _syncCertRecord());
+    // v86: the six general-settings rows.
+    for (const gid of SYNC_GENERAL_IDS) { const g = _syncGeneralRecord(gid); if (g) out.push(g); }
     return out;
   }
   if (kind === 'template') return Array.isArray(state.reportTemplates) ? state.reportTemplates : [];
@@ -1347,6 +1650,7 @@ function _syncRecordDoc(kind, rec) {
     const sid = String(r.id);
     if (sid === SYNC_REPORT_ID) return { id: sid, settings: _syncReportProjection(r.settings) };
     if (sid === SYNC_CERT_ID) return _syncCertDoc(r);
+    if (_syncIsGeneral(sid)) return _syncGeneralNormalise(sid, r);   // v86
     return { id: sid, instrumentId: String(r.instrumentId || '') };
   }
   if (kind === 'template') return { id: String(r.id), name: t(r.name), settings: _syncReportProjection(r.settings) };
@@ -1399,6 +1703,7 @@ function _syncValidRecord(kind, doc, id) {
     if (SYNC_SETTINGS_IDS.indexOf(sid) === -1) return false;
     if (sid === SYNC_REPORT_ID) return obj(doc.settings);
     if (sid === SYNC_CERT_ID) return Number.isInteger(doc.next) && doc.next >= 1 && str(doc.setAt);
+    if (_syncIsGeneral(sid)) return _syncGeneralValid(sid, doc);   // v86
     return typeof doc.instrumentId === 'string';
   }
   // v84: a template is a name and a settings object; the normaliser makes any
@@ -1425,6 +1730,12 @@ function _syncRecordHeldEntry(kind, id, reason, local, doc) {
   // the tester-in-use row by the testers it points at on each side (null: one
   // this phone doesn't have).
   // v84: the report settings row. No names — the card lists what differs.
+  // v86: general settings — named by group, the card lists what differs.
+  if (kind === 'settings' && _syncIsGeneral(id)) {
+    const e = { id, kind, reason, name: syncGeneralName(id), localName: null, cloudName: null };
+    if (reason === 'both-changed' && local && doc) e.diffs = _syncGeneralDiffs(id, local, doc);
+    return e;
+  }
   if (kind === 'settings' && String(id) === SYNC_REPORT_ID) {
     const e = { id, kind, reason, name: 'Report settings', localName: null, cloudName: null };
     if (reason === 'both-changed' && local && doc) e.diffs = _syncRecordDiffs(kind, local, doc);
@@ -1567,6 +1878,7 @@ function _syncReplaceRecord(kind, old, doc) {
     const sid = String((doc && doc.id != null) ? doc.id : (old && old.id));
     if (sid === SYNC_REPORT_ID) return _syncApplyReport(doc);
     if (sid === SYNC_CERT_ID) return _syncApplyCert(doc);
+    if (_syncIsGeneral(sid)) return _syncApplyGeneral(sid, doc);   // v86
     return _syncApplyInUse(doc && doc.instrumentId);
   }
   const list = _syncRecordList(kind);
@@ -1937,6 +2249,91 @@ function _syncPullRecords(c, uid, st, out) {
     changed = true;
   }
 
+  // v86: engineer name & switches, fail reasons, CSV columns, Multi Pick. The
+  // records rules plus 5A (decideReport's shape); applying waits while a screen
+  // that owns the row is open (SYNC_GENERAL_VIEWS), and so does judging a clash
+  // alone. A clash is still judged and held while the screen is open.
+  function decideGeneral(row, id) {
+    const kind = 'settings';
+    if (rs.resend[id]) return;
+    if (row.deleted === true) return;        // no version ever deletes it
+    const local = _syncGeneralRecord(id);
+    const hold = (reason, doc) => {
+      _syncHeldNote(_syncRecordHeldEntry(kind, id, reason, local, doc));
+      blocked = true; out.held++; out.gs.held++;
+    };
+    if (!_syncValidRecord(kind, row.doc, id)) { hold('unreadable', null); return; }
+    const hash = _syncGeneralHash(id, row.doc);
+    const localHash = _syncGeneralHash(id, local);
+    if (hash === localHash) { rs.sent[id] = hash; _syncHeldClear(id, kind); return; }
+    if (hash === rs.sent[id]) { _syncHeldClear(id, kind); return; }
+    const fresh = !rs.sent[id];
+    if (fresh && _syncGeneralNothingMade(id, row.doc)) { _syncHeldClear(id, kind); return; }
+    const takeIt = fresh && _syncGeneralNothingMade(id, local);
+    if (!takeIt && rs.sent[id] !== localHash) { hold('both-changed', row.doc); return; }
+    if (_syncGeneralOpen(id)) { blocked = true; out.skip[id] = true; return; }
+    _syncApplyGeneral(id, row.doc);
+    rs.sent[id] = hash;
+    out.applied++; out.gs.in++; changed = true;
+    _syncHeldClear(id, kind);
+  }
+
+  // v86 3B: descriptions. Never held — merged against what both last agreed on.
+  function decideDesc(row) {
+    const id = SYNC_DESC_ID;
+    if (rs.resend[id] || row.deleted === true) return;
+    if (!_syncValidRecord('settings', row.doc, id)) { delete rs.sent[id]; return; }   // ours replaces it
+    const cloud = _syncGeneralNormalise(id, row.doc);
+    const local = _syncGeneralRecord(id);
+    const hash = _syncGeneralHash(id, cloud);
+    const keys = (d) => d.list.map(x => x.toLowerCase());
+    if (hash === _syncGeneralHash(id, local)) { rs.sent[id] = hash; rs.descBase = keys(local); return; }
+    if (hash === rs.sent[id]) return;                          // only this phone moved: ours goes up
+    if (_syncGeneralOpen(id)) { blocked = true; out.skip[id] = true; return; }
+    const fresh = !rs.sent[id];
+    if (fresh && _syncGeneralNothingMade(id, cloud)) return;   // 5A: the cloud's is only defaults
+    // Only the other phone moved (this phone's copy is what it last sent), or
+    // this phone holds nothing it made (5A): take the cloud's as it stands.
+    // ⚠ Merging here instead would put this phone's ORDER back over the other
+    // phone's, which would then do the same — two phones re-sending the same
+    // list in turn for ever. A merge happens only when both really moved.
+    let next;
+    if (rs.sent[id] === _syncGeneralHash(id, local) || (fresh && _syncGeneralNothingMade(id, local))) next = cloud.list;
+    else next = _syncMergeDescriptions(rs.descBase, local.list, cloud.list);
+    const merged = _syncGeneralNormalise(id, { list: next });
+    if (_syncGeneralHash(id, merged) !== _syncGeneralHash(id, local)) {
+      _syncApplyGeneral(id, merged);
+      out.gs.in++; changed = true;
+    }
+    if (_syncGeneralHash(id, merged) === hash) { rs.sent[id] = hash; rs.descBase = keys(merged); }
+    else delete rs.sent[id];                                   // the merge goes up this run
+  }
+
+  // v86 2B: Smart Quick Pick's learned history. Never held, never counted.
+  function decideSqp(row) {
+    const id = SYNC_SQP_ID;
+    if (rs.resend[id] || row.deleted === true) return;
+    if (!_syncValidRecord('settings', row.doc, id)) { delete rs.sent[id]; return; }
+    const cloud = _syncGeneralNormalise(id, row.doc);
+    const local = _syncGeneralRecord(id);
+    const hash = _syncGeneralHash(id, cloud);
+    if (hash === _syncGeneralHash(id, local)) { rs.sent[id] = hash; return; }
+    if (hash === rs.sent[id]) return;
+    if (!rs.sent[id] && _syncGeneralNothingMade(id, cloud)) return;
+    // A deliberate clear or rebuild beats counts, whichever side made it later.
+    if (cloud.resetAt !== local.resetAt) {
+      if (cloud.resetAt > local.resetAt) { _syncApplyGeneral(id, cloud); rs.sent[id] = hash; changed = true; }
+      else delete rs.sent[id];
+      return;
+    }
+    // Only the other phone moved: take its copy as it stands (see decideDesc).
+    if (rs.sent[id] === _syncGeneralHash(id, local)) { _syncApplyGeneral(id, cloud); rs.sent[id] = hash; changed = true; return; }
+    const merged = _syncGeneralNormalise(id, { history: _syncMergeSqp(local.history, cloud.history), resetAt: local.resetAt });
+    if (_syncGeneralHash(id, merged) !== _syncGeneralHash(id, local)) { _syncApplyGeneral(id, merged); changed = true; }
+    if (_syncGeneralHash(id, merged) === hash) rs.sent[id] = hash;
+    else delete rs.sent[id];
+  }
+
   // One request for every kind, one cursor, paged exactly as jobs are —
   // including the v83.1 re-read of the boundary timestamp. See the jobs pager.
   const seen = new Set();
@@ -1972,6 +2369,9 @@ function _syncPullRecords(c, uid, st, out) {
       const sid = String(row.id);
       if (sid === SYNC_REPORT_ID) decideReport(row);
       else if (sid === SYNC_CERT_ID) decideCert(row);
+      else if (sid === SYNC_DESC_ID) decideDesc(row);     // v86
+      else if (sid === SYNC_SQP_ID) decideSqp(row);       // v86
+      else if (_syncIsGeneral(sid)) decideGeneral(row, sid);
       else decideInUse(row);
     }
     if (!blocked) {
@@ -2013,6 +2413,8 @@ function _syncPushRecords(c, uid, st, out) {
       // sending would settle it on the server in this phone's favour.
       if (skip[id]) continue;
       if (reportOpen && (id === SYNC_REPORT_ID || id === SYNC_CERT_ID)) continue;
+      // v86: a general-settings row whose screen is open waits until it closes.
+      if (kind === 'settings' && _syncGeneralOpen(id)) continue;
       const doc = _syncRecordDoc(kind, r);
       // v83: no tester chosen is not a choice to send over the other phone's.
       if (kind === 'settings' && id === SYNC_INUSE_ID && !doc.instrumentId) { delete rs.resend[id]; continue; }
@@ -2027,8 +2429,11 @@ function _syncPushRecords(c, uid, st, out) {
       const hash = syncHash(_syncCanonical(doc));
       if (!rs.resend[id] && rs.sent[id] === hash) continue;
       // v84: the counter moves with every report — sent, but not reported as a change.
-      work.push({ id, hash, gone: false, bytes: json.length, grp: id === SYNC_CERT_ID ? null : _syncRecordGroup(kind, id),
+      // v86: so is Smart Quick Pick's history, with every item logged.
+      work.push({ id, hash, gone: false, bytes: json.length,
+        grp: (id === SYNC_CERT_ID || id === SYNC_SQP_ID) ? null : _syncRecordGroup(kind, id),
         inUse: (kind === 'settings' && id === SYNC_INUSE_ID) ? doc.instrumentId : undefined,
+        descBase: (kind === 'settings' && id === SYNC_DESC_ID) ? doc.list.map(x => x.toLowerCase()) : undefined,
         row: { id, user_id: uid, kind, doc: JSON.parse(json), deleted: false, last_modified: now } });
     }
     for (const t of (state.tombstones || [])) {
@@ -2065,6 +2470,7 @@ function _syncPushRecords(c, uid, st, out) {
           if (w.gone) { delete rs.sent[w.id]; rs.gone[w.id] = true; out.deleted++; }
           else { rs.sent[w.id] = w.hash; delete rs.gone[w.id]; out.sent++; }
           if (w.inUse !== undefined) rs.inUse = w.inUse;   // v83: now agreed
+          if (w.descBase !== undefined) rs.descBase = w.descBase;   // v86: likewise
           if (out[w.grp]) out[w.grp].out++;
         }
         _syncSave(st);
@@ -2083,6 +2489,7 @@ function _syncRecordsHalf(c, uid, st) {
   // the pull deferred this run; `inUseNow` names a tester taken from the cloud.
   const out = { applied: 0, added: 0, removed: 0, held: 0, unassigned: 0, sent: 0, deleted: 0, error: null,
     cs: { in: 0, out: 0, held: 0 }, ip: { in: 0, out: 0, held: 0 }, rp: { in: 0, out: 0, held: 0 },
+    gs: { in: 0, out: 0, held: 0 },   // v86: general settings
     skip: {}, inUseNow: null };
   return _syncPullRecords(c, uid, st, out)
     .then(() => _syncPushRecords(c, uid, st, out))

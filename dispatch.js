@@ -1090,6 +1090,8 @@ registerChangeActions({
   'readings-toggle': (checked) => {
     state.readingsEnabled = !!checked;
     localStorage.setItem(READINGS_KEY, state.readingsEnabled ? '1' : '0');
+    // v86: the switch syncs (settings_work) — arm the trigger, as save() would.
+    if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error(e); } }
     render();
   },
 
@@ -1139,6 +1141,8 @@ registerChangeActions({
     if (!state.failReasonTags || typeof state.failReasonTags !== 'object') state.failReasonTags = {};
     state.failReasonTags[reason] = value;
     saveFailReasonTags();
+    // v86: tags travel with the fail reasons (settings_fails).
+    if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error(e); } }
   },
 
   // v30: Report Settings toggles. The master switch and logo persist instantly
