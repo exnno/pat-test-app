@@ -468,7 +468,17 @@ function makeNavigator(opts = {}) {
       async getRegistration() { return null; },
       addEventListener() {},
     },
-    storage: { async estimate() { return { usage: 1024 * 1024, quota: 1024 * 1024 * 500 }; } },
+    // V87 (S12): persisted()/persist() — the real API's shape. opts.persisted is
+    // the starting answer; opts.persistGrants is what persist() decides.
+    // opts.noPersist removes both, as on a browser without the API. Every call
+    // is recorded so a test can prove the app ASKED (or didn't) — a stub that
+    // only returned values couldn't tell "asked and refused" from "never asked".
+    storage: Object.assign(
+      { async estimate() { return { usage: 1024 * 1024, quota: 1024 * 1024 * 500 }; } },
+      opts.noPersist ? {} : {
+        async persisted() { calls.persisted = (calls.persisted || 0) + 1; return !!(opts.persisted || calls.granted); },
+        async persist() { calls.persist = (calls.persist || 0) + 1; if (opts.persistGrants) calls.granted = true; return !!(opts.persisted || opts.persistGrants); },
+      }),
   };
 }
 
