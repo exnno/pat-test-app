@@ -34,6 +34,15 @@ let state = {
   // Declined / reset) is open in the reminders view; null = no sheet. Not
   // persisted — purely view state, like other *Open flags.
   retestActionSessionId: null,
+  // V87 (4A): set when a write to storage fails (storage.js _noteSaveFailure).
+  // { full: true|false, at } or null. While set and not dismissed, render()
+  // paints the "not saved" sheet. Cleared by the next successful saveSessions().
+  saveFailure: null,
+  saveFailureDismissed: false,
+  // V87 (S12): whether the browser has agreed to keep this app's data when the
+  // phone runs short of space. 'unknown' until checked at boot, then
+  // 'protected' | 'not' | 'unsupported'. Never stored — asked fresh each launch.
+  storageProtection: 'unknown',
   cursor: 0,
   form: { assetNo: '', location: '', itemType: '', notes: '', showNotes: false },
   newForm: { name: '', site: '', engineer: '', prefix: '', startNo: '1', show: false, clientId: '', siteId: '' },

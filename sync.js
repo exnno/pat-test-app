@@ -2704,7 +2704,7 @@ function syncJobDiff(local, cloud) {
   const blankish = (v) => v === undefined || v === null || v === '';
   const same = (a, b) => (blankish(a) && blankish(b)) || _syncCanonical(a) === _syncCanonical(b);
   const clip = (t) => { const x = String(t).replace(/\s+/g, ' ').trim(); return x.length > 60 ? x.slice(0, 59) + '\u2026' : x; };
-  const when = (v) => { const d = new Date(v); return isNaN(d.getTime()) ? clip(v) : d.toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
+  const when = (v) => { const d = new Date(v); return isNaN(d.getTime()) ? clip(v) : d.toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }); };
   const fmt = (v, key) => {
     if (blankish(v)) return '(blank)';
     if (typeof v === 'boolean') return v ? 'Yes' : 'No';

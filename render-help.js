@@ -50,16 +50,16 @@ function renderSettingsAbout() {
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v86: rolled forward — V86 on top, V83.1 dropped. -->
+      <!-- v8: rolling 3-version changelog. v87: rolled forward — V87 on top, V84 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V87</strong> &middot; September 2026</p>
+        <p class="muted">Retests are now due for a whole month: a job tested on 30 September is due the following September, and your chase list picks it up on the 1st of the month before. The certificate shows the month. Report and export file names use spaces and UK dates (28-09-2026), and the report now carries its own title. If the phone's storage fills up, the app now tells you straight away instead of losing an item. The Backup page shows whether your data is protected, and a banner warns when storage gets full.</p>
         <p><strong>V86</strong> &middot; September 2026</p>
         <p class="muted">For the invite-only cloud test: your engineer name, fail reasons, descriptions, CSV columns, Multi Pick setup, Smart Quick Pick's learning and the switches that change what gets recorded (item times, test readings, Smart Quick Pick, retest reminders) now travel between your devices. Theme, sound, haptics and the barcode scanner stay set per phone.</p>
         <p><strong>V85</strong> &middot; September 2026</p>
         <p class="muted">For the invite-only cloud test: the cloud pages have moved to their own place in Settings, called Cloud, below Help. It asks for an access code once on each phone, then stays open.</p>
-        <p><strong>V84</strong> &middot; September 2026</p>
-        <p class="muted">Fixes a bug where applying a saved report template could wind your certificate numbers back, so new certificates reused numbers already issued. Certificate numbers also now skip any number a job already has. For the invite-only cloud test: your report settings, report templates and certificate numbering now travel between your devices.</p>
                               </div>
 
       <div class="info-card">
@@ -324,7 +324,7 @@ function renderCloudAccount() {
       </div>`;
   } else if (c.status === 'signed-in') {
     const plan = c.plan
-      ? `<p class="muted" id="cloud-plan">Plan: <strong>${escapeHTML(c.plan)}</strong>${c.trialEndsAt ? ` &middot; trial ends ${escapeHTML(new Date(c.trialEndsAt).toLocaleDateString())}` : ''}</p>`
+      ? `<p class="muted" id="cloud-plan">Plan: <strong>${escapeHTML(c.plan)}</strong>${c.trialEndsAt ? ` &middot; trial ends ${escapeHTML(new Date(c.trialEndsAt).toLocaleDateString('en-GB'))}` : ''}</p>`
       : '';
     body = `
       <div class="info-card">
@@ -432,7 +432,7 @@ function renderCloudSync() {
     const busy = !!sy.busy;
     const dis = busy ? 'disabled' : '';
     const stamp = (v) => v
-      ? escapeHTML(new Date(v).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))
+      ? escapeHTML(new Date(v).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))
       : 'never';
     const msg = sy.message ? `<p class="muted cloud-msg" id="sync-msg" role="status">${escapeHTML(sy.message)}</p>` : '';
     body = `

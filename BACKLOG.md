@@ -9,7 +9,7 @@ here rather than restating it. Delete an item when it ships.
 ## Next release
 
 ### Factory reset (Peter, V81.1) — needs its own spec round
-A guarded "reset this device" (V86: must also clear SQP_RESET_KEY) for handing a phone to another engineer, selling
+A guarded "reset this device" (V86: must also clear SQP_RESET_KEY; V87: STORAGE_BANNER_KEY) for handing a phone to another engineer, selling
 it, or resetting between tests. NOT a quick win: "reset" means at least three
 different things (data only / + settings / + cloud sign-in), and the easy-to-miss
 leftovers are the IndexedDB photo store and the sync bookkeeping keys
@@ -18,7 +18,23 @@ Cloud access-code flag) — a half-reset phone that is
 still signed in would pull its old jobs straight back. Most destructive button in
 the app, so the confirm needs to be genuinely hard to hit by accident.
 
-### Cloud track — V86: general settings; photos next
+### V87 residuals (known, accepted)
+- Android description list (field report): fixed on the likeliest cause — the
+  keyboard hid without a blur — NOT reproduced on hardware. If it recurs, get
+  the phone model/Android version and what was on screen.
+- Date pickers (`<input type="date">`) display in the phone's own format; the
+  app cannot change that. Stored and printed dates are UK.
+- Refused writes: sessions/settings/SQP/descriptions savers are guarded; the
+  other ~40 direct writes are covered only when they happen inside a TAP (the
+  dispatcher's catch). Writes from timers or async paths (sync pull saves,
+  photo callbacks, reminder stamps) still throw to the console — the next tap's
+  save shows the sheet. Guard any new hot-path saver explicitly.
+- Storage % counts UTF-16 (2 bytes/char) against ~5 MB — conservative on
+  browsers that count characters. Unchanged from v11.
+- Protection status is asked fresh each launch, never stored.
+- Day-first file names don't sort by date in a folder (Peter's choice, V87).
+
+### Cloud track — V86: general settings; V87 was a field release; photos next (V88)
 V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull → V82 clients + sites →
 V83 instruments + presets + tester in use → V83.1 pager fix → V84 report
 settings + templates + certificate counter → V85 the cloud pages moved to

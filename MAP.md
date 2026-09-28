@@ -1,4 +1,4 @@
-# PATGo — Code Map (V86)
+# PATGo — Code Map (V87)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -268,6 +268,12 @@ every phone while passing every test — because test files are ASCII source.
 `APOSTROPHES` in utils.js lists all three accepted (U+0027, U+2019, U+02BC).
 Any test touching apostrophes MUST assert against U+2019, not a bare `'`.
 Harness 06e2 loops all three; mutations M40/M41. Fixed v68.1.
+⚠ V87: `fileSafe()` + `fileDateUK()` build EVERY file name the app writes
+(report.js, csv.js `csvFilename`, backup.js, photos.js, setup.js) — spaces, not
+underscores; DD-MM-YYYY. `retestMonthLabel()` / `monthIndexAfter()` /
+`formatMonthIndex()` are the ONE retest-by-month arithmetic (session.js,
+report.js, render-review.js). UK-only app: any locale date format names 'en-GB'
+(harness 24b sweeps every first-party file).
 
 ### storage.js (~755 ln) — persistence boundary
 The key-shortening codec (`SESSION_KEY_MAP`, `ITEM_KEY_MAP`), `load`/`save` and
@@ -307,6 +313,15 @@ Called from boot.js after `load()`, before the first `render()`.
 `saveInstruments()` runs **before** writing them (a prune re-syncs the mirror).
 Unlisted fields pass through the codec untouched, which is why additive fields
 need no map entry. Rules 9 and 10 live here.
+⚠ V87 (4A): a refused write is CAUGHT, not thrown. `saveSessions()`,
+`saveSettings()` (guard around `_saveSettingsWrites()`), `saveSqpHistory()`,
+`saveDescriptions()` → `_noteSaveFailure()` sets `state.saveFailure`; render-core's
+`renderSaveFailSheet()` shows it. Only a successful `saveSessions()` clears it
+(`_noteSaveOk`). The ~40 other direct writes are caught by dispatch.js's action
+catch via `_isQuotaError()`. A new saver on the logging hot path must be guarded
+the same way (24e found saveSqpHistory). Also here: `checkStorageProtection()`
+(S12, paints #storage-protect IN PLACE, never render) and
+`storageBannerDue()`/`dismissStorageBanner()` (S13, STORAGE_BANNER_KEY).
 ⚠ v84: `saveReportSettings()` / `saveReportTemplates()` arm the sync trigger;
 `saveSettings()` writes report settings through the plain `_writeReportSettings()`
 so it never does (sync.js calls it after a pull). `reportSettings.certSetAt` =
@@ -442,7 +457,9 @@ async and never let it touch the database.**
 on a 4-page document.
 **Coupling:** rule 7 for instrument fields. Reading columns mirror the CSV
 emit-only-if-used rule. v84: `stampCertNumber` skips any number already on a
-job in `state.sessions` (jobs synced from the other phone included). Every `addImage` is try/caught — a bad image never blocks
+job in `state.sessions` (jobs synced from the other phone included). V87: `reportDocProperties()` (pure) builds the PDF's
+title/author, set right after `new JsPDF` inside the sync build; file names go
+through utils `fileSafe`/`fileDateUK`; the retest line is a MONTH. Every `addImage` is try/caught — a bad image never blocks
 a report.
 
 ### pdfpreview.js (~135 ln) — multi-page preview rasteriser
@@ -453,6 +470,9 @@ sequential for iOS memory.
 
 ### session.js (~2160 ln) — sessions and items
 Session/item lifecycle, form and cursor, validation, suggestions,
+⚠ V87: retest reminders are by MONTH — `retestStatus(sess, now)` buckets
+('upcoming' = due next month, 'duesoon' = due this month, 'overdue' from the 1st
+of the month after; names kept from v56 for the CSS/filter). No stored due date.
 sorting/filtering, presets, selection + bulk edit, export state and pruning,
 retest reminders, lifetime stats, asset history, testing duration, readings
 sheet lifecycle, photo staging/commit.
@@ -803,9 +823,13 @@ fires scroll, not resize, when it shifts the view to reveal a focused field, and
 binding only resize leaves the sheet correctly sized in the wrong place. No
 `visualViewport` → returns before binding, nothing is ever written, v74 CSS
 stands. See cross-cutting rule 13 for the contract with styles.css.
+**⚠ V87: `initSuggestionDismissGuards()` (once-at-boot)** closes the three lists
+on a pointerdown OUTSIDE their wrap (capture, never preventDefault) and when the
+visual viewport grows back past KB_MIN_INSET_PX (Android hides the keyboard
+without a blur). A new dropdown joins `SUGGEST_WRAPS` or it won't close.
 **Coupling:** called from `render()` and `refreshEntryAfterLog()`.
-`initSheetDragGuard()`, `initSuggestionClickSwallow()` and `initKeyboardInset()`
-are bound once from boot.js. `applyKeyboardInset()` is consumed entirely by
+`initSheetDragGuard()`, `initSuggestionClickSwallow()`, `initKeyboardInset()`
+and `initSuggestionDismissGuards()` are bound once from boot.js. `applyKeyboardInset()` is consumed entirely by
 styles.css — no JS reads its output. `sheetDragMoved` is read by dispatch.js's preset picker. Both hold callbacks read
 and write `state` and call `render()`. Everything else
 is delegated in dispatch.js — these stay direct because focus/blur/pointer timing

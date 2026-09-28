@@ -294,6 +294,9 @@ initSuggestionClickSwallow();
 // a guard would only hide which line noticed. The function itself returns
 // immediately when there is no visualViewport, so old iOS costs nothing.
 initKeyboardInset();
+// V87: close suggestion lists when the keyboard hides without a blur (Android) or
+// on a tap outside them. Same once-at-boot lifecycle; events.js is not optional.
+initSuggestionDismissGuards();
 // v67.1: bind the HID barcode scanner's keydown listener. Same once-at-boot,
 // document-capture lifecycle as the three above.
 //
@@ -405,6 +408,20 @@ try {
   }
 } catch (e) {
   console.error('Photo index failed to load (non-fatal).', e);
+}
+// V87 (S12, 2C): ask the browser to keep this app's data when the phone runs short
+// of space. Chrome and Safari decide silently from how much the app is used — no
+// prompt. Only ASKED once the phone holds a real job (the example job doesn't
+// count), so a first-time visitor on desktop Firefox isn't shown a permission
+// prompt before they've done anything; before that it is only CHECKED, for the
+// Backup page's status line. Async and fail-soft: nothing waits on it.
+try {
+  if (typeof checkStorageProtection === 'function') {
+    const hasRealJob = state.sessions.some(s => !(s && s[DEMO_SESSION_FLAG]));
+    checkStorageProtection(hasRealJob).catch(() => {});
+  }
+} catch (e) {
+  console.error('Storage protection check failed (non-fatal).', e);
 }
 }   // end if (_bootLoadOK)  — v61.2
 }   // end else (boot integrity OK)

@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V86';
+const APP_VERSION = 'V87';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V77';
+const WELCOME_VERSION = 'V87';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -513,6 +513,11 @@ const REPORT_DECLARATION_DEFAULT =
 // filename (PAT_Report_<site>_<date>) so upgrading users see no change unless
 // they opt in by editing it. Tokens are substituted then the whole string is
 // sanitised to a safe filename by reportFilename() in report.js.
+// ⚠ V87: deliberately NOT changed, although the output now uses spaces and a
+// day-first date. This string is part of the synced report row, and the V84
+// "nothing made" rule compares against the defaults — changing it would make
+// every untouched phone look customised to a V86 phone. fileSafe() turns its
+// underscores into spaces instead.
 const REPORT_FILENAME_DEFAULT = 'PAT_Report_{site}_{date}';
 
 // The insertable tokens offered as tappable chips on the Report Settings page.
@@ -1029,6 +1034,17 @@ const PRUNE_AGE_DEFAULT = 12;
 const CAL_DUE_SOON_DAYS = 30;
 
 const BACKUP_REMINDER_DAYS = 7;
+
+// V87 (S13, 3A): storage headroom. The app's main storage (localStorage) holds
+// roughly 5 MB and the browser will not report how much is left, so the app adds
+// it up itself (getStorageStats, storage.js). At WARN the Backup page's bar turns
+// amber with a note; at BANNER a banner on the Jobs screen says so, once a day
+// until dismissed. Photos live in separate storage and don't count toward this.
+const STORAGE_WARN_PCT = 60;
+const STORAGE_BANNER_PCT = 80;
+// ISO day (yyyy-mm-dd) the Jobs-screen storage banner was last dismissed. Per
+// device, a nag timer — NOT in backups or setup exports. Factory reset must clear it.
+const STORAGE_BANNER_KEY = 'pat:storageBannerDay';
 const BACKUP_SNOOZE_HOURS = 24;
 
 // v56: Retest reminders — the commercial "chase the customer to rebook" tool.
@@ -1042,14 +1058,11 @@ const BACKUP_SNOOZE_HOURS = 24;
 //      engineer flagged THAT job as worth chasing. Defaults off per session. This is
 //      what makes the list trustworthy: lost jobs, one-offs and subcontract work are
 //      simply never flagged (or flagged then resolved). See session.js retest helpers.
-// Urgency windows (days from today to the computed due date):
-//   • Overdue   — due date is in the past.
-//   • Due soon  — within RETEST_DUE_SOON_DAYS (the active "ring them now" band).
-//   • Upcoming  — within RETEST_UPCOMING_DAYS (shown, but quiet — lead time to plan).
-// Longer windows than calibration's 30 days because winning repeat work needs notice.
+// Urgency (V87 — by MONTH, see session.js retestStatus): a retest is due for a
+// whole calendar month. "Due next month" from the 1st of the month before, "Due
+// this month" during it, "Overdue" from the 1st of the month after. The v56 day
+// windows (RETEST_DUE_SOON_DAYS 60 / RETEST_UPCOMING_DAYS 90) were deleted in V87.
 const RETEST_REMINDERS_KEY = 'pat:retestReminders';   // '1' = feature on; absent/anything else = off
-const RETEST_DUE_SOON_DAYS = 60;
-const RETEST_UPCOMING_DAYS = 90;
 
 // v71: the file used to end with the built-in default lists (item types, fail
 // reasons, descriptions, CSV columns) and the resistance-calculator tables.

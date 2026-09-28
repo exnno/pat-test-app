@@ -90,6 +90,16 @@ function handleDelegatedClick(e) {
       try { syncNoteNav(); } catch (e3) { console.error('syncNoteNav failed (non-fatal).', e3); }
     }
   } catch (err) {
+    // V87 (4A): storage refused a write that isn't behind one of the guarded
+    // savers (there are ~40 direct writes across the app). Before V87 this fell
+    // through to the recovery below: the engineer was dropped on the Jobs list
+    // with "Something went wrong" while the unsaved item sat in memory — and was
+    // lost on reopen. The screen is fine here; only the disk is not. So: keep the
+    // screen, and show the "not saved" sheet instead.
+    if (typeof _isQuotaError === 'function' && _isQuotaError(err) && typeof _noteSaveFailure === 'function') {
+      _noteSaveFailure(err);
+      return;
+    }
     console.error('Action "' + name + '" threw; recovering to the Sessions list.', err);
     try {
       state.multiPickSheetOpen = false;
@@ -714,6 +724,16 @@ registerActions({
 
   // Backup & Restore + prune + about
   'backup-export': () => downloadBackup(),
+  // V87 (4A): the "not saved" sheet. Backing up leaves the sheet up (the item is
+  // still not in storage); Clear goes to the Backup page, where clearing lives.
+  'save-fail-backup': () => downloadBackup(),
+  'save-fail-clear': () => { state.saveFailureDismissed = true; setView('settingsBackup'); },
+  'save-fail-close': () => { state.saveFailureDismissed = true; render(); },
+  // V87 (S13): the Jobs-screen storage banner.
+  'storage-banner-open': () => setView('settingsBackup'),
+  'storage-banner-dismiss': () => { dismissStorageBanner(); render(); },
+  // V87 (S12): a tap is a user gesture, which some browsers weigh when deciding.
+  'storage-protect': () => { checkStorageProtection(true).catch(() => {}); },
   // v69 (D5): put the pre-repair spellings back. Confirmed first — it rewrites
   // saved data, same as the repair did, and the user is choosing to reintroduce
   // strings the app considers wrong. render() runs inside undoApostropheRepair's

@@ -708,6 +708,24 @@ function renderSettingsDisplay() {
   `;
 }
 
+// V87 (S12, 2C): the protection status line. Also painted IN PLACE by
+// checkStorageProtection() (storage.js) into #storage-protect when the browser
+// answers, so it must stay a pure function of state.storageProtection.
+function storageProtectionHTML() {
+  const v = state.storageProtection;
+  if (v === 'protected') {
+    return `<p class="muted"><strong style="color:var(--pass)">✓ Protected.</strong> This phone won't clear PATGo's data to free up space. Keep exporting backups &mdash; protection doesn't cover a lost or broken phone.</p>`;
+  }
+  if (v === 'not') {
+    return `<p class="muted"><strong>Not protected.</strong> If this phone runs short of space, it may clear PATGo's data. Using the app from its home-screen icon helps the phone decide to keep it. Until then, export backups regularly.</p>
+        <button class="backup-action-btn" id="storage-protect-btn" data-action="storage-protect">Protect my data</button>`;
+  }
+  if (v === 'unsupported') {
+    return `<p class="muted">This browser doesn't say whether it keeps PATGo's data when space runs short. Export backups regularly.</p>`;
+  }
+  return `<p class="muted">Checking&hellip;</p>`;
+}
+
 function renderSettingsBackup() {
   const stats = getStorageStats();
   // v62: photos live in IndexedDB, NOT in the ~5MB localStorage budget the bar
@@ -716,7 +734,11 @@ function renderSettingsBackup() {
   // directions — it would show 400% for a normal photo user, and it would imply
   // deleting photos frees the space the sessions blob is running out of.
   const photoStats = (typeof photoStatsSync === 'function') ? photoStatsSync() : { count: 0, bytes: 0 };
-  const barClass = stats.pct >= 90 ? 'danger' : (stats.pct >= 70 ? 'warn' : '');
+  // V87 (S13, 3A): amber from STORAGE_WARN_PCT (was 70), red from
+  // STORAGE_BANNER_PCT (was 90) — the same point the Jobs-screen banner appears.
+  const barClass = stats.pct >= STORAGE_BANNER_PCT ? 'danger' : (stats.pct >= STORAGE_WARN_PCT ? 'warn' : '');
+  const fullNote = stats.pct >= STORAGE_WARN_PCT ? `
+          <p class="storage-full-note" style="margin-top:10px;font-size:13px;color:var(--warn-soft-text)"><strong>Getting full (${stats.pct}%).</strong> Export a backup, then clear old sessions below to make room. When it's full, new items can't be saved.</p>` : '';
   // v14: prune suggestion — sessions exported AND older than the threshold.
   const prunable = prunableSessions();
   const ageMonths = state.pruneAgeMonths || PRUNE_AGE_DEFAULT;
@@ -759,6 +781,11 @@ function renderSettingsBackup() {
       ${renderPhotoBackupSection()}
 
       <div class="settings-section">
+        <h2 class="h2">Keep this app's data</h2>
+        <div id="storage-protect">${storageProtectionHTML()}</div>
+      </div>
+
+      <div class="settings-section">
         <h2 class="h2">Storage usage</h2>
         <div class="storage-card">
           <div class="storage-stat"><span class="storage-stat-label">Sessions</span><span class="storage-stat-value">${stats.sessions}</span></div>
@@ -768,6 +795,7 @@ function renderSettingsBackup() {
           ${photoStats.count ? `
           <div class="storage-stat"><span class="storage-stat-label">Photos</span><span class="storage-stat-value">${photoStats.count} · ${escapeHTML(formatBytes(photoStats.bytes))}</span></div>` : ''}
           <div class="storage-bar-wrap"><div class="storage-bar ${barClass}" style="width:${stats.pct}%"></div></div>
+          ${fullNote}
           <p class="muted" style="margin-top:10px;font-size:12px">Browsers cap local data at around 5 MB. Export a backup and clear old sessions before you get close to the limit.</p>
           ${pruneBlock}
         </div>
@@ -933,7 +961,8 @@ function renderSettingsRetest() {
       <div class="settings-section">
         <h2 class="h2">How it works</h2>
         <p class="muted">Open any session, tap <strong>Session settings</strong>, and switch on <strong>Remind me to chase this for retest</strong>. Only the jobs you flag appear on your chase list — so subcontract work and one-offs never clutter it.</p>
-        <p class="muted" style="margin-top:8px">Each flagged job's due date is its test date plus a retest interval. The interval is taken from your Report Settings default (currently <strong>${defMonths} month${defMonths === 1 ? '' : 's'}</strong>) at the moment you flag it, and you can change it per job. When a job is due, a banner appears on your Sessions screen and the job shows a 🔔 chip.</p>
+        <p class="muted" style="margin-top:8px">A retest is due for a whole month: a job tested on 30 September with a 12-month interval is due <strong>September</strong> the following year. The interval is taken from your Report Settings default (currently <strong>${defMonths} month${defMonths === 1 ? '' : 's'}</strong>) at the moment you flag it, and you can change it per job.</p>
+        <p class="muted" style="margin-top:8px">The job joins your chase list on the <strong>1st of the month before</strong> it's due, so you have a full month to ring the customer. A banner appears on your Sessions screen and the job shows a 🔔 chip: <em>due next month</em>, <em>due this month</em>, then <em>overdue</em> from the 1st of the month after.</p>
         <p class="muted" style="margin-top:8px">When you've contacted the customer, mark the job <strong>Rebooked</strong> or <strong>Declined</strong> to clear it from the list.</p>
       </div>
       <div class="settings-section">
@@ -1269,7 +1298,7 @@ function renderSettingsReport() {
             `<button type="button" class="filename-token-chip" data-action="report-filename-token" data-arg="${escapeHTML(t)}">${escapeHTML(t.replace(/[{}]/g, ''))}</button>`
           ).join('')}
         </div>
-        <p class="muted" style="font-size:12px;margin-top:6px">Anything that isn't a letter or number becomes an underscore in the saved file. Leave it as <code>${escapeHTML(REPORT_FILENAME_DEFAULT)}</code> to keep the original naming.</p>
+        <p class="muted" style="font-size:12px;margin-top:6px">Underscores become spaces, characters a file name can't hold are left out, and the date is written day first &mdash; for example <code>PAT Report Office 28-09-2026.pdf</code>.</p>
       </div>
 
       <div class="settings-section">
@@ -1320,7 +1349,7 @@ function renderSettingsReport() {
 
       <div class="settings-section">
         <h2 class="h2">Recommended retest</h2>
-        <p class="muted">Optional. When on, the report shows a recommended retest date (test date plus the months below). This is a guidance figure for your client — the IET Code of Practice sets no fixed interval and recommends a risk-based assessment.</p>
+        <p class="muted">Optional. When on, the report shows the month the retest is due (the month of the test plus the months below &mdash; for example <strong>September 2027</strong>). This is a guidance figure for your client — the IET Code of Practice sets no fixed interval and recommends a risk-based assessment.</p>
         ${toggle('report-retest-enabled', 'Show recommended retest', rs.retestEnabled)}
         <label class="label" style="margin-top:12px">Retest period (months)</label>
         <input class="input" id="report-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(retestMonthsVal)}" placeholder="e.g. 12"${rs.retestEnabled ? '' : ' disabled style="opacity:.5"'}>

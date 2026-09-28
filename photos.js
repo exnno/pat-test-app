@@ -593,7 +593,7 @@ function downloadPhotoBundle() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `PATGo_photos_${todayISO()}.json`;
+        a.download = `PATGo photos ${fileDateUK(todayISO())}.json`;   // V87: UK date, no underscores
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
         showToast(`Exported ${bundle.count} photo${bundle.count === 1 ? '' : 's'}`);

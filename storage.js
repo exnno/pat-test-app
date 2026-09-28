@@ -843,15 +843,62 @@ function computeHistoryFromItems() {
 function saveSessions() {
   // v14: sessions stored compressed via the key-shortening codec.
   // v23: serialiseSessions reuses cached encodings for unchanged sessions.
-  localStorage.setItem(STORAGE_KEY, serialiseSessions(state.sessions));
-  localStorage.setItem(ACTIVE_KEY, state.activeId || '');
+  // V87 (4A): a failed write used to throw out of the logging action with nothing
+  // catching it — the item stayed on screen, never reached storage, and vanished
+  // on reopen, silently. Now the failure is caught and the user is told at once
+  // (_noteSaveFailure). The sync trigger below still runs: when signed in, the
+  // push sends what is in memory, which is the one copy that has the item.
+  try {
+    localStorage.setItem(STORAGE_KEY, serialiseSessions(state.sessions));
+    localStorage.setItem(ACTIVE_KEY, state.activeId || '');
+    _noteSaveOk();
+  } catch (e) {
+    _noteSaveFailure(e);
+  }
   // v80: the ONE line sync adds to saving. A status check and a timer reset;
   // guarded and wrapped so a broken sync.js can never make a save fail.
   if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error('Sync trigger failed (non-fatal).', e); } }
 }
 
-// COLD: all settings/config keys. Called when a setting changes (and by save()).
+// V87 (4A): the guard around every settings write. The writes themselves are in
+// _saveSettingsWrites(); a failure there is reported exactly like a sessions
+// failure. Settings success does NOT clear the warning — only a sessions save can
+// say the jobs are safe again (they are the big blob that fills storage first).
 function saveSettings() {
+  try { _saveSettingsWrites(); }
+  catch (e) { _noteSaveFailure(e); }
+}
+
+// V87 (4A): what happens when storage refuses a write.
+//   • Quota errors are told apart (QuotaExceededError; Firefox's old name and
+//     the legacy codes 22 / 1014) so the sheet can say "storage full"; anything
+//     else still means "not saved" and is reported, never swallowed silently.
+//   • The repaint is deferred a tick and coalesced: this runs INSIDE a save that
+//     a render may already be about to follow. ⚠ It can repaint while a sheet
+//     with inputs is open — deliberately. The no-render rule protects the
+//     keyboard; losing an item without knowing is worse than losing the keyboard.
+let _saveFailPaintQueued = false;
+function _isQuotaError(e) {
+  return !!e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    || e.code === 22 || e.code === 1014);
+}
+function _noteSaveFailure(e) {
+  try { console.error('Save failed — data NOT written to storage.', e); } catch (e2) {}
+  state.saveFailure = { full: _isQuotaError(e), at: Date.now() };
+  state.saveFailureDismissed = false;
+  if (_saveFailPaintQueued) return;
+  _saveFailPaintQueued = true;
+  setTimeout(() => {
+    _saveFailPaintQueued = false;
+    if (typeof render === 'function') { try { render(); } catch (e3) {} }
+  }, 0);
+}
+function _noteSaveOk() {
+  if (state.saveFailure) { state.saveFailure = null; state.saveFailureDismissed = false; }
+}
+
+// COLD: all settings/config keys. Called when a setting changes (and by save()).
+function _saveSettingsWrites() {
   // v9: legacy ITEMS_KEY no longer written; ITEM_PRESETS_KEY + ACTIVE_PRESET_KEY are
   // the source of truth. Backup/restore still uses the same logic.
   localStorage.setItem(ITEM_PRESETS_KEY, JSON.stringify(state.itemPresets));
@@ -1175,11 +1222,16 @@ function undoApostropheRepair() {
 // (and rewrite all 23 cold keys) just to persist one of them, they call the
 // matching targeted writer. This keeps the hot path to: sessions (always) + at
 // most the one or two cold keys that genuinely changed.
+// V87 (4A): both sit on the item-logging hot path right after saveSessions()
+// (saveItem), so they are guarded the same way — found by harness 24e, where a
+// full phone let saveSessions() report cleanly and then threw here instead.
 function saveSqpHistory() {
-  localStorage.setItem(SQP_HISTORY_KEY, JSON.stringify(state.sqpHistory || {}));
+  try { localStorage.setItem(SQP_HISTORY_KEY, JSON.stringify(state.sqpHistory || {})); }
+  catch (e) { _noteSaveFailure(e); }
 }
 function saveDescriptions() {
-  localStorage.setItem(DESCRIPTIONS_KEY, JSON.stringify(state.descriptions));
+  try { localStorage.setItem(DESCRIPTIONS_KEY, JSON.stringify(state.descriptions)); }
+  catch (e) { _noteSaveFailure(e); }
 }
 
 // v53: Test Readings — fail-reason tag store. Tags are kept in their OWN map
@@ -1221,6 +1273,43 @@ function readingTagForReason(reason) {
 
 
 // ---------- Storage usage (v7) ----------
+// V87 (S12): ask whether the browser will keep this app's data under storage
+// pressure, and optionally ask it to. `ask` false = only check (no prompt on any
+// browser). Resolves to the new state.storageProtection value. Updates the
+// Backup page's status line IN PLACE — never render(): this resolves at an
+// arbitrary moment, possibly while the prune-age box on that page has focus.
+async function checkStorageProtection(ask) {
+  const st = (typeof navigator !== 'undefined' && navigator) ? navigator.storage : null;
+  if (!st || typeof st.persisted !== 'function') {
+    state.storageProtection = 'unsupported';
+  } else {
+    let ok = false;
+    try { ok = !!(await st.persisted()); } catch (e) { ok = false; }
+    if (!ok && ask && typeof st.persist === 'function') {
+      try { ok = !!(await st.persist()); } catch (e) { ok = false; }
+    }
+    state.storageProtection = ok ? 'protected' : 'not';
+  }
+  try {
+    const el = (typeof document !== 'undefined') ? document.getElementById('storage-protect') : null;
+    if (el && typeof storageProtectionHTML === 'function') el.innerHTML = storageProtectionHTML();
+  } catch (e) {}
+  return state.storageProtection;
+}
+
+// V87 (S13): the Jobs-screen banner shows at STORAGE_BANNER_PCT, at most once a
+// day (dismissing hides it until tomorrow). Reads the same figure as the Backup page.
+function storageBannerDue() {
+  const stats = getStorageStats();
+  if (stats.pct < STORAGE_BANNER_PCT) return false;
+  let day = null;
+  try { day = localStorage.getItem(STORAGE_BANNER_KEY); } catch (e) {}
+  return day !== todayISO();
+}
+function dismissStorageBanner() {
+  try { localStorage.setItem(STORAGE_BANNER_KEY, todayISO()); } catch (e) {}
+}
+
 function getStorageStats() {
   let bytes = 0;
   try {

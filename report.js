@@ -124,18 +124,9 @@ function runAutoTable(doc, opts) {
   throw new Error('autoTable unavailable');
 }
 
-// Add `months` calendar months to an ISO yyyy-mm-dd date; return formatted DD/MM/YYYY.
-function addMonthsFormatted(iso, months) {
-  if (!iso || !Number.isFinite(months)) return '';
-  const parts = String(iso).split('-');
-  if (parts.length !== 3) return '';
-  const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-  if (isNaN(d.getTime())) return '';
-  d.setMonth(d.getMonth() + months);
-  const dd = String(d.getDate()).padStart(2, '0');
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  return `${dd}/${mm}/${d.getFullYear()}`;
-}
+// V87: addMonthsFormatted() is gone. It printed a day (DD/MM/YYYY) and its
+// setMonth() rolled over at month end (31 Aug + 6 months → 03/03). The retest is
+// now a MONTH: retestMonthLabel() in utils.js ("September 2027").
 
 // Build the jsPDF document for a session. Returns the doc, or throws if the
 // libraries failed to load (caller surfaces a friendly message).
@@ -416,6 +407,12 @@ function buildReportDoc(session, photoData) {
   const orientation = (totalColCount > 6) ? 'landscape' : 'portrait';
 
   const doc = new JsPDF({ unit: 'pt', format: 'a4', orientation, compress: true });
+  // V87 (5B): the PDF's own title. Without it, viewers and the print screen fall
+  // back to the file name or "Untitled". Plain hyphens, not dashes: PDF metadata
+  // is not reliably Unicode in every reader. Set here, inside the synchronous
+  // build (buildReportDoc must stay sync), from the job itself — so it is right
+  // even if the file is renamed in the preview.
+  try { doc.setProperties(reportDocProperties(session, rs)); } catch (e) {}
   const pageW = doc.internal.pageSize.getWidth();
   const margin = 40;
   let y = margin;
@@ -494,7 +491,7 @@ function buildReportDoc(session, photoData) {
     if (reportInstrument.calDue) detailPairs.push(['Calibration due', formatDate(reportInstrument.calDue)]);
   }
   if (rs.retestEnabled && rs.retestMonths) {
-    const rd = addMonthsFormatted(session.date, rs.retestMonths);
+    const rd = retestMonthLabel(session.date, rs.retestMonths);   // V87: "September 2027"
     if (rd) detailPairs.push(['Recommended retest', rd]);
   }
   // v61: testing time. Gated TWO ways, and both matter:
@@ -719,11 +716,37 @@ function buildReportDoc(session, photoData) {
   return doc;
 }
 
+// V87 (5B): the metadata stored inside the PDF. Title reads
+// "PAT Test Certificate - Client, Site - 28/09/2026"; author is the company (or
+// the engineer when no company is set). Pure — no state writes — so the harness
+// can check it without a PDF engine.
+function reportDocProperties(session, rs) {
+  rs = rs || {};
+  let client = '', site = '';
+  try {
+    const parts = (typeof splitSiteSnapshot === 'function') ? splitSiteSnapshot(session.site || '') : null;
+    client = (parts && parts.client) || '';
+    site = (parts && parts.site) || '';
+  } catch (e) {}
+  if (!site) site = session.site || session.name || '';
+  const where = [client, site].filter(Boolean).join(', ');
+  const when = formatDate(session.date || '');
+  const title = ['PAT Test Certificate', where, when].filter(Boolean).join(' - ');
+  const engineer = session.engineer != null ? session.engineer : (state.engineer || '');
+  return {
+    title,
+    subject: 'Portable appliance test certificate',
+    author: String(rs.companyName || engineer || ''),
+    creator: 'PATGo',
+  };
+}
+
 // v31: build the report filename from the user's pattern (reportFilenamePattern
 // in report settings), substituting {site} {client} {date} {engineer} from the
-// session, then sanitising the whole thing to a safe filename. The default
-// pattern is PAT_Report_{site}_{date}, which reproduces the exact pre-v31 name.
-// An empty result (e.g. a pattern of only blank tokens) falls back to "PAT_Report".
+// session, then sanitising the whole thing to a safe filename.
+// V87: the stored default is still PAT_Report_{site}_{date} (see config.js), but
+// it now produces "PAT Report Site Name 28-09-2026.pdf" — underscores become
+// spaces and {date} is day-first. An empty result falls back to "PAT Report".
 function reportFilename(session, patternOverride) {
   const rs = state.reportSettings || {};
   const pattern = (typeof patternOverride === 'string' && patternOverride.trim())
@@ -744,13 +767,15 @@ function reportFilename(session, patternOverride) {
   const values = {
     '{site}': session.site || session.name || '',
     '{client}': client,
-    '{date}': session.date || todayISO(),
+    '{date}': fileDateUK(session.date || todayISO()),   // V87: 28-09-2026
     '{engineer}': (session.engineer != null ? session.engineer : (state.engineer || ''))
   };
   let name = pattern.replace(/\{site\}|\{client\}|\{date\}|\{engineer\}/g, m => values[m] || '');
-  // Sanitise: collapse anything non-filename-safe to underscores, trim edges.
-  name = name.replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '');
-  if (!name) name = 'PAT_Report';
+  // V87: spaces, not underscores (fileSafe, utils.js). Only characters a file
+  // name can't hold are removed; an underscore — including every one in the old
+  // default pattern — becomes a space.
+  name = fileSafe(name);
+  if (!name) name = 'PAT Report';
   return `${name}.pdf`;
 }
 
@@ -1000,8 +1025,8 @@ function openReportPreview(doc, session) {
   function currentFilename() {
     const inp = document.getElementById('report-filename-input');
     let n = inp ? inp.value : baseName;
-    n = String(n).replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '');
-    if (!n) n = 'PAT_Report';
+    n = fileSafe(n);   // V87: same rule as reportFilename()
+    if (!n) n = 'PAT Report';
     return `${n}.pdf`;
   }
 

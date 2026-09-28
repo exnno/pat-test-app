@@ -115,6 +115,60 @@ function formatDate(iso) {
   return `${parts[2]}/${parts[1]}/${parts[0]}`;
 }
 
+// V87: UK-only app, so every date the user SEES is day-first. Two forms:
+//   formatDate(iso)  → 28/09/2026  (on screen, CSV cells, certificates)
+//   fileDateUK(iso)  → 28-09-2026  (file names — '/' is not allowed in a file name)
+// ⚠ Day-first file names do not sort by date in a folder listing. Peter chose UK
+// format for every file anyway (V87 spec, "this is a UK only app") — don't "fix"
+// this back to year-first without asking.
+function fileDateUK(iso) {
+  const parts = String(iso || '').split('-');
+  if (parts.length !== 3) return '';
+  return `${parts[2]}-${parts[1]}-${parts[0]}`;
+}
+
+// V87: file names keep spaces and hyphens (Peter: underscores meant renaming
+// every file afterwards). Only characters a phone or PC refuses in a file name are
+// removed; an underscore — typed or from an old pattern such as the pre-V87
+// default "PAT_Report_{site}_{date}" — becomes a space, so old settings produce
+// new-style names with no migration and no change to the synced report row.
+function fileSafe(text) {
+  return String(text == null ? '' : text)
+    .replace(/[\/\\:*?"<>|\u0000-\u001f]+/g, ' ')
+    .replace(/_+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replace(/^\.+/, '');
+}
+
+// V87: retest by MONTH. A retest is due for a whole calendar month: a job tested
+// on 30/09/2026 with a 12-month interval is due "September 2027". Only the year
+// and month are counted, so there is no day-of-month arithmetic to overflow
+// (31 August + 6 months used to print 03/03 — the pre-V87 setMonth() rollover).
+const UK_MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December'];
+
+// Month index (year*12 + month0) of an ISO date plus `months`; null if unusable.
+function monthIndexAfter(iso, months) {
+  const parts = String(iso || '').split('-');
+  const m = Number(months);
+  if (parts.length !== 3 || !Number.isFinite(m)) return null;
+  const y = Number(parts[0]), mo = Number(parts[1]) - 1;
+  if (!Number.isFinite(y) || !Number.isFinite(mo) || mo < 0 || mo > 11) return null;
+  return y * 12 + mo + Math.round(m);
+}
+
+function formatMonthIndex(idx) {
+  if (!Number.isFinite(idx)) return '';
+  return `${UK_MONTH_NAMES[((idx % 12) + 12) % 12]} ${Math.floor(idx / 12)}`;
+}
+
+// "September 2027" for a test date + interval; '' if unusable.
+function retestMonthLabel(iso, months) {
+  const idx = monthIndexAfter(iso, months);
+  return idx === null ? '' : formatMonthIndex(idx);
+}
+
 // v17: format an item timestamp (full ISO) as HH:MM in the device's local
 // time, for the Overview row. Returns '' for missing/invalid input so callers
 // can omit the line entirely.
