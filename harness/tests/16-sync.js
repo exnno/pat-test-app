@@ -324,6 +324,9 @@ module.exports = async function () {
     t.includes(toasts.join('|'), 'reached the cloud yet', 'and the toast says why');
 
     app.online();
+    // V88: the photo mirror loads on a timer tick after boot; until it has, the
+    // prune guard clears nothing (decision 6A). Let it load, as a phone would.
+    await tick(5);
     await app.fn('syncPush')({});
     const tombsBefore = (app.state().tombstones || []).length;
     app.fn('pruneOldSessions')();
