@@ -698,7 +698,7 @@ function pruneOldSessions() {
   }
   if (targets.length === 0) {
     showToast(keptForCloud
-      ? `${keptForCloud} old job${keptForCloud === 1 ? ' hasn\u2019t' : 's haven\u2019t'} reached the cloud yet \u2014 push first`
+      ? `${keptForCloud} old job${keptForCloud === 1 ? ' hasn\u2019t' : 's haven\u2019t'} fully reached the cloud yet (the job or its photos) \u2014 push first`
       : 'Nothing to clear');
     return;
   }
@@ -710,7 +710,7 @@ function pruneOldSessions() {
       `(${itemTotal} item${itemTotal === 1 ? '' : 's'} in total)? ` +
       `These have all been exported to CSV and are older than ${state.pruneAgeMonths} month${state.pruneAgeMonths === 1 ? '' : 's'}. ` +
       (keptForCloud
-        ? `${keptForCloud} more ${keptForCloud === 1 ? 'is' : 'are'} kept for now because the latest changes haven\u2019t reached the cloud yet. `
+        ? `${keptForCloud} more ${keptForCloud === 1 ? 'is' : 'are'} kept for now because the latest changes or photos haven\u2019t reached the cloud yet. `
         : '') +
       (cloudKeepsThem
         ? `This removes them from this phone. Your cloud copy keeps them.`
@@ -1636,7 +1636,10 @@ function deletePhotoFromStrip(photoId) {
   const itemId = state.photoStripItemId;
   openConfirmSheet({
     title: 'Delete photo?',
-    message: "This removes the photo from this device permanently. It can't be recovered.",
+    // v88: signed in, the cloud copy goes too (decision 4A).
+    message: ((typeof syncActive === 'function' && syncActive())
+      ? "This deletes the photo from this device and from your cloud copy. It can't be recovered."
+      : "This removes the photo from this device permanently. It can't be recovered."),
     confirmLabel: 'Delete',
     onConfirm: () => {
       photoDelete(photoId).then(() => {

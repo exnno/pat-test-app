@@ -9,7 +9,8 @@ here rather than restating it. Delete an item when it ships.
 ## Next release
 
 ### Factory reset (Peter, V81.1) — needs its own spec round
-A guarded "reset this device" (V86: must also clear SQP_RESET_KEY; V87: STORAGE_BANNER_KEY) for handing a phone to another engineer, selling
+A guarded "reset this device" (V86: must also clear SQP_RESET_KEY; V87: STORAGE_BANNER_KEY; V88: the
+`ph` part of SYNC_STATE_KEY goes with it) for handing a phone to another engineer, selling
 it, or resetting between tests. NOT a quick win: "reset" means at least three
 different things (data only / + settings / + cloud sign-in), and the easy-to-miss
 leftovers are the IndexedDB photo store and the sync bookkeeping keys
@@ -17,6 +18,20 @@ leftovers are the IndexedDB photo store and the sync bookkeeping keys
 Cloud access-code flag) — a half-reset phone that is
 still signed in would pull its old jobs straight back. Most destructive button in
 the app, so the confirm needs to be genuinely hard to hit by accident.
+
+### V88 residuals (known, accepted)
+- A phone deletes only the cloud photos IT uploaded. A job deleted while the
+  uploading phone is lost or never syncs again leaves those photos in the cloud
+  — Stage 5's review-and-delete path is the tidy-up (Peter, 5A).
+- Uploads happen only while the app is open (web apps can't upload closed), on
+  any signal: an iPhone won't say whether it's on Wi-Fi.
+- A V87 phone on the same account neither uploads photos nor deletes them.
+  Test phones only; both go to V88.
+- A photo whose job is held for a decision waits until the question is answered.
+- Photo mirror unreadable (IndexedDB broken): while signed in, nothing can be
+  cleared as old. Sign out to clear, or fix the store.
+- Photo deletes write the ledger directly (`saveTombstones`); a refused write is
+  logged and the entry rides the next save().
 
 ### V87 residuals (known, accepted)
 - Android description list (field report): fixed on the likeliest cause — the
@@ -34,14 +49,15 @@ the app, so the confirm needs to be genuinely hard to hit by accident.
 - Protection status is asked fresh each launch, never stored.
 - Day-first file names don't sort by date in a folder (Peter's choice, V87).
 
-### Cloud track — V86: general settings; V87 was a field release; photos next (V88)
+### Cloud track — V88: photos up; V89: photos down, on request only
 V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull → V82 clients + sites →
 V83 instruments + presets + tester in use → V83.1 pager fix → V84 report
 settings + templates + certificate counter → V85 the cloud pages moved to
 Settings → Cloud (code 1111, remembered per phone) → **V86** general settings
 (engineer + switches, fail reasons, descriptions, CSV, Multi Pick, Smart Quick
-Pick history). Next: **photos** (+ the cross-account download isolation check)
-→ status UI → factory reset.
+Pick history) → V87 field release → **V88** photos UP (one way, isolation 4c/4d +
+7a–7d). Next: **V89** photos DOWN — only when asked (R17, decision 10A); a tiny
+row per photo tells the phone they exist. Then roadmap Stage 3 onward.
 Every cloud release runs `supabase/isolation-test.sql` (all PASS) before
 promotion to `Release` — all PASS at V84 incl. 6a–6d. V85 changed no SQL.
 
@@ -69,10 +85,14 @@ promotion to `Release` — all PASS at V84 incl. 6a–6d. V85 changed no SQL.
 - A V85 phone ignores the six new rows (unknown settings ids) — it neither
   receives nor sends them until it updates.
 
-### Cloud — photos must carry these (next)
-- The cross-account download isolation check (spec section 7, check 4).
-- Blob upload after the session row; lazy pull on open; tombstone deletes the
-  Storage object. Measure the localStorage + IndexedDB footprint first.
+### Cloud — V89 photos down must carry these (next)
+- Nothing downloads automatically (R17 / 10A): pull photo ROWS only (no image),
+  show "N photos in the cloud" on the job / strip, fetch on a tap.
+- Read the photos table by cursor (rule 10, rule 14 multi-page); a deleted row
+  removes the local photo; a row for an item not in the job is ignored.
+- What a report does with a photo not downloaded (spec round question).
+- Photos cleared locally (5A) come back only on request, never on open.
+- Footprint measured at V88: 13 photos = 3.22 MB (~250 KB each).
 
 ### Cloud — V84 residuals (known, accepted)
 - Two phones BOTH offline stamping a certificate at the same moment can issue
@@ -118,10 +138,10 @@ that version, an older phone that EDITS the record sends it back without the
 field. Receiving is harmless. Worth remembering before adding anything to a
 client (address, contact).
 
-### Cloud — photos do not sync yet (V81 note)
+### Cloud — photos do not come down yet (V81 note; V88: they go up)
 A job pulled onto a second device shows its photos as missing — same as a backup
-restored onto a new phone, and it fails soft the same way. Fix lands with the
-photo-sync release; until then it is a known gap to explain, not a bug.
+restored onto a new phone, and it fails soft the same way. V89 brings them down,
+on request only.
 
 ### Cloud — permanent delete of cleared jobs (Peter, V80 spec)
 Clearing old jobs leaves them in the cloud archive (5A). Peter wants a way to

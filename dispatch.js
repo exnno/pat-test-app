@@ -218,6 +218,34 @@ registerActions({
   'photo-import':       () => { const inp = document.getElementById('photo-import-file'); if (inp) inp.click(); },
   'photo-wipe':         () => {
     const n = photoStatsSync().count;
+    // v88 (decision 5A). Signed in, this frees space on the phone and nothing
+    // else: only photos already in the cloud go, and the cloud keeps them.
+    if (typeof syncActive === 'function' && syncActive()
+        && typeof syncPhotosUploadedIds === 'function' && typeof photosClearUploaded === 'function') {
+      const safe = syncPhotosUploadedIds();
+      const up = Object.keys(state.photoMeta || {}).filter((id) => safe.has(id)).length;
+      const notYet = Math.max(0, n - up);
+      if (!up) {
+        showToast('None of your photos have reached the cloud yet, so nothing was cleared');
+        return;
+      }
+      openConfirmSheet({
+        title: 'Clear photos from this phone?',
+        message:
+          `This removes the ${up} photo${up === 1 ? '' : 's'} already in your cloud copy from this phone, to free up space. ` +
+          `The cloud keeps them. ` +
+          (notYet ? `${notYet} photo${notYet === 1 ? ' hasn\u2019t' : 's haven\u2019t'} reached the cloud yet and ${notYet === 1 ? 'is' : 'are'} kept. ` : '') +
+          `Your jobs, items and results are not affected.`,
+        confirmLabel: 'Clear',
+        onConfirm: () => {
+          photosClearUploaded((id) => safe.has(id)).then((r) => {
+            render();
+            showToast(`Cleared ${r.removed} photo${r.removed === 1 ? '' : 's'} from this phone`);
+          });
+        }
+      });
+      return;
+    }
     openConfirmSheet({
       title: 'Delete all photos?',
       message:

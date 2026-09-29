@@ -1009,7 +1009,8 @@ function save() {
 // recorded, which cannot be done after the fact.
 // v83: 'instrument' added. Widening is a superset — every ledger an older
 // version wrote still normalises exactly as it did.
-const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'instrument', 'template'];   // v84: + template
+// v88: 'photo' — a photo the engineer deleted, so the cloud copy goes too.
+const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'instrument', 'template', 'photo'];   // v84: + template; v88: + photo
 
 // Whitelisting validator. Used on both read and write, so a hand-edited or
 // corrupted value collapses to a clean list rather than propagating.
@@ -1059,6 +1060,20 @@ function purgeTombstones(list) {
     const ms = Date.parse(t.at);
     return isNaN(ms) ? true : ms >= cutoff;
   });
+}
+
+// v88: the ledger alone. photos.js deletes inside a promise that no save()
+// follows, so it writes the ledger itself once its delete has succeeded.
+// A refused write is logged: the entry stays in memory and the next save()
+// writes it with everything else.
+function saveTombstones() {
+  try {
+    localStorage.setItem(TOMBSTONES_KEY, JSON.stringify(normaliseTombstones(state.tombstones)));
+    return true;
+  } catch (e) {
+    console.error('Deletion ledger could not be saved (non-fatal).', e);
+    return false;
+  }
 }
 
 function recordTombstone(kind, id) {

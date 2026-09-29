@@ -50,16 +50,16 @@ function renderSettingsAbout() {
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v87: rolled forward — V87 on top, V84 dropped. -->
+      <!-- v8: rolling 3-version changelog. v88: rolled forward — V88 on top, V85 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V88</strong> &middot; September 2026</p>
+        <p class="muted">For the invite-only cloud test: your fail photos are now copied up to the cloud, a few at a time while the app is open, and the Sync page shows how many are there. Deleting a photo, an item or a job deletes its cloud photos too. While you're signed in, old jobs can only be cleared once their photos are safe in the cloud, and Delete all photos clears only the ones already there, to free up space. Photos don't come down to your other devices yet.</p>
         <p><strong>V87</strong> &middot; September 2026</p>
         <p class="muted">Retests are now due for a whole month: a job tested on 30 September is due the following September, and your chase list picks it up on the 1st of the month before. The certificate shows the month. Report and export file names use spaces and UK dates (28-09-2026), and the report now carries its own title. If the phone's storage fills up, the app now tells you straight away instead of losing an item. The Backup page shows whether your data is protected, and a banner warns when storage gets full.</p>
         <p><strong>V86</strong> &middot; September 2026</p>
         <p class="muted">For the invite-only cloud test: your engineer name, fail reasons, descriptions, CSV columns, Multi Pick setup, Smart Quick Pick's learning and the switches that change what gets recorded (item times, test readings, Smart Quick Pick, retest reminders) now travel between your devices. Theme, sound, haptics and the barcode scanner stay set per phone.</p>
-        <p><strong>V85</strong> &middot; September 2026</p>
-        <p class="muted">For the invite-only cloud test: the cloud pages have moved to their own place in Settings, called Cloud, below Help. It asks for an access code once on each phone, then stays open.</p>
                               </div>
 
       <div class="info-card">
@@ -443,6 +443,7 @@ function renderCloudSync() {
         ${sum.listTotal ? `<p id="sync-list-counts" style="font-size:14px">Instruments &amp; presets: <strong>${sum.listUpToDate}</strong> of ${sum.listTotal} up to date</p>` : ''}
         ${sum.rpTotal ? `<p id="sync-rp-counts" style="font-size:14px">Report settings &amp; templates: <strong>${sum.rpUpToDate}</strong> of ${sum.rpTotal} up to date</p>` : ''}
         ${sum.gsTotal ? `<p id="sync-gs-counts" style="font-size:14px">General settings: <strong>${sum.gsUpToDate}</strong> of ${sum.gsTotal} up to date</p>` : ''}
+        ${sum.phReady && sum.phTotal ? `<p id="sync-ph-counts" style="font-size:14px">Photos: <strong>${sum.phUp}</strong> of ${sum.phTotal} in the cloud${sum.phTotal > sum.phUp ? ` &middot; <strong>${sum.phTotal - sum.phUp}</strong> waiting to send` : ''}</p>` : ''}
         ${inUse ? `<p class="muted" id="sync-inuse" style="font-size:13px">Tester in use: <strong>${escapeHTML(inUse)}</strong> &mdash; the same on each of your devices</p>` : ''}
         <p class="muted" id="sync-last" style="font-size:13px">Last sent: ${stamp(sum.lastPushAt)}</p>
         <p class="muted" id="sync-last-pull" style="font-size:13px">Last checked: ${stamp(sum.lastPullAt)}</p>
@@ -458,7 +459,7 @@ function renderCloudSync() {
       ${renderSettingsSubHeader('Sync')}
       <div class="info-card">
         <h2>Sync (test)</h2>
-        <p class="muted" style="font-size:12px">Jobs, your clients and sites, your test instruments and item presets, and which tester is in use are copied both ways between this phone and the cloud: sent a few seconds after you stop logging, and checked for whenever you sign in, reopen the app or get signal back. Which preset is in use stays separate on each device. The example job is never sent. Deleting a job, client, site, instrument or preset deletes it on your other device too; jobs that used a deleted instrument keep their own copy of its details. Clearing old jobs only removes them from this phone, and the cloud keeps them. Photos don't travel yet, so a job that arrives from another device will show its photos as missing. This phone is still the master copy &mdash; keep making backups as normal.</p>
+        <p class="muted" style="font-size:12px">Jobs, your clients and sites, your test instruments and item presets, and which tester is in use are copied both ways between this phone and the cloud: sent a few seconds after you stop logging, and checked for whenever you sign in, reopen the app or get signal back. Which preset is in use stays separate on each device. The example job is never sent. Deleting a job, client, site, instrument or preset deletes it on your other device too; jobs that used a deleted instrument keep their own copy of its details. Clearing old jobs only removes them from this phone, and the cloud keeps them. Photos are copied up to the cloud while the app is open, after their job; deleting a photo, an item or a job deletes its cloud photos too. Photos don't come down to your other devices yet, so a job that arrives from another device will show its photos as missing. This phone is still the master copy &mdash; keep making backups as normal.</p>
       </div>
       ${body}
     </div>

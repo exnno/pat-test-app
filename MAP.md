@@ -1,4 +1,4 @@
-# PATGo — Code Map (V87)
+# PATGo — Code Map (V88)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -191,6 +191,9 @@ property-bound handler could only be tested by hand-calling it — the V67
 if not re-pointed: **M66** (`APP_VERSION` in config.js) and **M82** (the oldest
 About changelog entry). Re-point both as part of the release, and treat a non-zero
 abort count as a failed run — an aborted mutation is not a caught one.
+⚠ v88: the fake IndexedDB now completes a transaction AFTER its requests and
+filters index lookups by key. Before V88 every photo READ in the harness came
+back empty — no test had ever read a photo back. Do not revert either.
 See `harness/README.md`.
 
 ---
@@ -275,7 +278,7 @@ underscores; DD-MM-YYYY. `retestMonthLabel()` / `monthIndexAfter()` /
 report.js, render-review.js). UK-only app: any locale date format names 'en-GB'
 (harness 24b sweeps every first-party file).
 
-### storage.js (~755 ln) — persistence boundary
+### storage.js (~770 ln) — persistence boundary
 The key-shortening codec (`SESSION_KEY_MAP`, `ITEM_KEY_MAP`), `load`/`save` and
 the per-area save paths, the shared boundary validators
 (`normaliseReportSettings`, `normaliseArchivedStats`), storage stats.
@@ -402,6 +405,13 @@ everything fails soft; nothing here may break the fail flow. `sessionId` is
 denormalised onto each record so deleting a job sweeps in one indexed lookup.
 Photos are **not** in the JSON backup (separate file) — backup.js carries only an
 informational count.
+⚠ v88: `state.photoMeta` (photo id → job, item, size, time) is the mirror
+**sync.js** reads to upload; `photoMetaReady` gates it (and the prune guard).
+Every add/delete must keep BOTH mirrors in step. Engineer deletes (one photo, an
+item, fail→pass) call `_photoNoteGone` → ledger kind 'photo' (storage.js
+`saveTombstones`) + sync.js `syncNotePhotosGone`. `photosDeleteForSessions`,
+`photosDeleteAll`, `photosClearUploaded` NEVER note (V80 C, 5A) — harness 25h/25l,
+M363/M368. The wipe action (dispatch.js) branches on `syncActive()`.
 
 ### csv.js (~665 ln) — CSV build + import
 Cell resolution per column, export/share/copy, import parsing and conflict flow.
@@ -630,7 +640,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~2800 ln) — cloud sync, PUSH AND PULL — v80–v86
+### sync.js (~3050 ln) — cloud sync, PUSH AND PULL — v80–v88
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session
@@ -740,8 +750,17 @@ Sync page group 'gs'. Couples to: storage.js (`readingTagForReason`,
 `ensureAllCsvColumns`, `saveSettings`), sqp.js (`normaliseSqpHistory`,
 `bumpSqpHistoryVersion`, `invalidateSqpRow`, `buildSqpHistory`), multipick.js
 (`normaliseMultiPickConfig`), data.js defaults.
+⚠ v88: PHOTOS UP, one way (`_syncPhotosHalf`, end of file). Runs LAST in a
+reading run, after the jobs push; fail-soft on its own. File to Storage
+(`{uid}/{photoId}.jpg`) THEN the `photos` row; `st.ph.sent[id] = {s, i}` only
+after both (M355/M356). Candidates via `_syncPhotoJobs()` (reads photos.js
+`state.photoMeta`): job syncs and is in `st.sent`, item still in it. Deletes:
+ledger 'photo' entries + photos of jobs in `st.gone` — row marked deleted, file
+removed, forgotten only after both. Prune guard (`syncPruneFilter`) also needs
+every photo up (`_syncPhotosPendingByJob`). Never reads the photos table (V89).
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
-19a–19w, 20a–20f2, 21a–21q and 23a–23l, mutations M142–M295, M306–M325.
+19a–19w, 20a–20f2, 21a–21q, 23a–23l and 25a–25n, mutations M142–M295, M306–M325,
+M355–M376.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

@@ -72,6 +72,11 @@ let state = {
   // failure the v59 stats counter avoided by recomputing its live half.
   photoIndex: {},
   photoBytes: 0,
+  // v88: the same mirror keyed by photo id ({s: sessionId, i: itemId, b, w, h,
+  // at}) for the cloud upload, and whether it is known to match the store. Same
+  // rules: derived, never saved, never in a backup. See photoIndexLoad().
+  photoMeta: {},
+  photoMetaReady: false,
 
   // Photos taken DURING the fail flow, before the item exists. The item has no
   // id until saveItem() pushes it, so these are held here as

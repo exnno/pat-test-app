@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V87';
+const APP_VERSION = 'V88';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -451,6 +451,11 @@ const SYNC_BATCH_BYTES = 400000;    // …or roughly this much JSON, whichever f
 // v81.2: bumped when the way a job is fingerprinted changes, so old
 // fingerprints are dropped rather than silently mismatching for ever.
 const SYNC_HASH_V = 2;
+// v88: photos go up a few per run, oldest first, while the app is open (a web
+// app cannot upload once closed). The rest wait for the next run; the idle
+// backstop and every save/navigation bring one round. Deletes go in batches.
+const SYNC_PHOTOS_PER_RUN = 25;
+const SYNC_PHOTO_DELETE_BATCH = 50;
 const SYNC_PULL_PAGE = 200;         // v81: rows per pull request, then page again
 // v83.1: the pager's version. A cursor saved under an older one is cleared once
 // (sync.js _syncLoad), because V81–V83 could step over rows at a page edge.
