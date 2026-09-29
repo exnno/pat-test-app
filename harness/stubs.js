@@ -405,8 +405,13 @@ function makeIndexedDB() {
       getAll()    { const r = makeRequest(); fire(r, 'onsuccess', [...data.values()]); return r; },
       getAllKeys(){ const r = makeRequest(); fire(r, 'onsuccess', [...data.keys()]); return r; },
       count()     { const r = makeRequest(); fire(r, 'onsuccess', data.size); return r; },
+      // V88: an index lookup filters by the index's field, as a real one does.
+      // Before V88 every index getAll returned the whole store, so a per-item
+      // or per-job photo delete swept every photo — invisible while no test
+      // held photos for more than one item.
       createIndex() { return { getAll: () => { const r = makeRequest(); fire(r, 'onsuccess', [...data.values()]); return r; } }; },
-      index()       { return { getAll: () => { const r = makeRequest(); fire(r, 'onsuccess', [...data.values()]); return r; } }; },
+      index(field)  { return { getAll: (key) => { const r = makeRequest();
+        fire(r, 'onsuccess', [...data.values()].filter(v => key === undefined || (v && v[field] === key))); return r; } }; },
     };
   }
 
@@ -417,7 +422,11 @@ function makeIndexedDB() {
       transaction(names) {
         const tx = { oncomplete: null, onerror: null, onabort: null, abort() {} };
         tx.objectStore = (n) => makeObjectStore(n);
-        setTimeout(() => { if (typeof tx.oncomplete === 'function') tx.oncomplete({ target: tx }); }, 0);
+        // V88: complete AFTER the transaction's requests have answered, as a
+        // real one does. Before V88 oncomplete fired first, so every READ
+        // through the app's _photoTx() resolved with no result — the photo
+        // index always loaded empty and a per-item lookup found nothing.
+        setTimeout(() => setTimeout(() => { if (typeof tx.oncomplete === 'function') tx.oncomplete({ target: tx }); }, 0), 0);
         return tx;
       },
       close() {},

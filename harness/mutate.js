@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V87';",
-    to:   "const APP_VERSION = 'V87';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V88';",
+    to:   "const APP_VERSION = 'V88';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -637,8 +637,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V85</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V85</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V84</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V86</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V86</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V85</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1133,7 +1133,8 @@ const MUTATIONS = [
   {
     name: 'M151 (V80) clearing ignores whether the cloud has the latest version',
     file: 'sync.js',
-    from: "    const ok = mine && s && st.sent[String(s.id)] === syncHash(_syncCanonical(s));",
+    // V88: re-anchored — the check now also asks about the job's photos (6A).
+    from: "    const ok = mine && !!pending && s && st.sent[String(s.id)] === syncHash(_syncCanonical(s))\n      && !pending.has(String(s.id));",
     to:   '    const ok = true;',
     why:  'decision 5A: clearing an unsent edit while signed in destroys the only copy of it',
   },
@@ -1695,8 +1696,9 @@ const MUTATIONS = [
   {
     name: 'M228 (V83) the ledger does not accept instrument entries',
     file: 'storage.js',
-    from: "const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'instrument', 'template'];",
-    to:   "const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'template'];",
+    // V88: re-anchored — 'photo' joined the list.
+    from: "const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'instrument', 'template', 'photo'];",
+    to:   "const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'template', 'photo'];",
     why:  'recordTombstone silently drops the entry, so an instrument delete is never sent',
   },
   {
@@ -2591,6 +2593,160 @@ const MUTATIONS = [
     from: "    closeSuggestionLists(inside);\n  }, true);",
     to:   "    closeSuggestionLists(inside);\n    if (e && e.preventDefault) e.preventDefault();\n  }, true);",
     why:  "the tap that closes the list must still do its job (Pass stays one tap)",
+  },
+  {
+    name: "M355 (V88) the row goes up before its file",
+    file: "sync.js",
+    from: "          return c.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true })\n            .then((r) => {\n              if (r && r.error) throw r.error;\n              return c.from('photos').upsert({",
+    to:   "          return c.from('photos').upsert({ id: cand.id, user_id: uid, session_id: cand.job, item_id: m.i, storage_path: path, deleted: false, last_modified: new Date().toISOString() }, { onConflict: 'user_id,id' }).then(() => c.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true }))\n            .then((r) => {\n              if (r && r.error) throw r.error;\n              return c.from('photos').upsert({",
+    why:  "2A: a row must mean the file is there — the other phone (V89) trusts it",
+  },
+  {
+    name: "M356 (V88) a photo is remembered as sent when only its file went",
+    file: "sync.js",
+    from: "              if (r && r.error) throw r.error;\n              return c.from('photos').upsert({",
+    to:   "              if (r && r.error) throw r.error;\n              st.ph.sent[cand.id] = { s: cand.job, i: m.i }; _syncSave(st);\n              return c.from('photos').upsert({",
+    why:  "a refused row would never be retried: a file in the cloud nobody can find",
+  },
+  {
+    name: "M357 (V88) photos go before the jobs push",
+    file: "sync.js",
+    from: "        .then(() => _syncPushHalf(c, uid, st, !!opts.force))\n        .then((r) => {\n          const base = { sent: r.sent, deleted: r.deleted, pulled, records };",
+    to:   "        .then(() => opts.pull ? _syncPhotosHalf(c, uid, st) : null)\n        .then(() => _syncPushHalf(c, uid, st, !!opts.force))\n        .then((r) => {\n          const base = { sent: r.sent, deleted: r.deleted, pulled, records }; if (opts.pull) return base;",
+    why:  "photos run AFTER the jobs push in the same run: before it, a new job's photos always wait a whole extra run",
+  },
+  {
+    name: "M358 (V88) photos of a job not in the cloud go anyway",
+    file: "sync.js",
+    from: "        if (!st.sent[job] || st.gone[job]) continue;   // job not in the cloud (yet)",
+    to:   "        if (st.gone[job]) continue;",
+    why:  "photo rows pointing at jobs the cloud doesn't have",
+  },
+  {
+    name: "M359 (V88) a photo whose item is gone is uploaded",
+    file: "sync.js",
+    from: "    const job = itemJob.get(m.i);\n    if (!job) continue;                         // item gone, or not a syncing job",
+    to:   "    const job = itemJob.get(m.i) || m.s;\n    if (!job) continue;",
+    why:  "orphans cost storage, and would block clearing old jobs for ever (6A)",
+  },
+  {
+    name: "M360 (V88) no per-run cap",
+    file: "sync.js",
+    from: "      const take = cands.slice(0, SYNC_PHOTOS_PER_RUN);",
+    to:   "      const take = cands.slice();",
+    why:  "the first run after V88 would hold the sync for the whole backlog",
+  },
+  {
+    name: "M361 (V88) a photo delete marks the row but leaves the file",
+    file: "sync.js",
+    from: "        .then(() => c.storage.from('photos').remove(chunk.map(id => _syncPhotoPath(uid, id))))",
+    to:   "        .then(() => ({}))",
+    why:  "the file is the client's data and the storage bill — delete means delete",
+  },
+  {
+    name: "M362 (V88) a photo is forgotten before its delete succeeds",
+    file: "sync.js",
+    from: "          .eq('user_id', uid).in('id', chunk))\n        .then((r) => { if (r && r.error) throw r.error; })",
+    to:   "          .eq('user_id', uid).in('id', chunk))\n        .then((r) => { if (r && r.error) throw r.error; for (const id of chunk) delete st.ph.sent[id]; _syncSave(st); })",
+    why:  "a refused delete would never be retried: the photo stays in the cloud for ever",
+  },
+  {
+    name: "M363 (V88) clearing old jobs deletes their cloud photos",
+    file: "photos.js",
+    from: "          records.forEach((r) => { _photoIndexRemove(r.itemId, r.bytes); _photoMetaDrop(r.id); });\n          return total + records.length;",
+    to:   "          records.forEach((r) => { _photoIndexRemove(r.itemId, r.bytes); _photoMetaDrop(r.id); });\n          _photoNoteGone(records.map((r) => r.id), []);\n          return total + records.length;",
+    why:  "V80 decision C: clearing is local, the cloud keeps the archive",
+  },
+  {
+    name: "M364 (V88) deleting one photo isn't noted",
+    file: "photos.js",
+    from: "      _photoMetaDrop(record.id);\n      _photoNoteGone([record.id], []);",
+    to:   "      _photoMetaDrop(record.id);",
+    why:  "4A: the engineer deleted it; the cloud would keep it",
+  },
+  {
+    name: "M365 (V88) an item with no photos left here takes nothing from the cloud",
+    file: "photos.js",
+    from: "    if (!records.length) { _photoNoteGone([], [itemId]); return 0; }",
+    to:   "    if (!records.length) return 0;",
+    why:  "photos cleared from the phone (5A) would outlive their deleted item in the cloud",
+  },
+  {
+    name: "M366 (V88) clearing old jobs ignores their photos",
+    file: "sync.js",
+    from: "      && !pending.has(String(s.id));",
+    to:   "      ;",
+    why:  "6A: clearing would take the only copy of a photo with it",
+  },
+  {
+    name: "M367 (V88) clearing proceeds before the photo mirror is loaded",
+    file: "sync.js",
+    from: "    const ok = mine && !!pending && s &&",
+    to:   "    const ok = mine && s &&",
+    why:  "an unread store looks like no photos at all",
+  },
+  {
+    name: "M368 (V88) Delete all photos, signed in, wipes everything",
+    file: "dispatch.js",
+    from: "          photosClearUploaded((id) => safe.has(id)).then((r) => {",
+    to:   "          photosDeleteAll().then((n) => ({ removed: n })).then((r) => {",
+    why:  "5A: photos not yet uploaded exist nowhere else",
+  },
+  {
+    name: "M369 (V88) an old ledger entry deletes a photo that is back on the phone",
+    file: "sync.js",
+    from: "      if (meta[id]) continue;                    // on this phone again (restored): live",
+    to:   "",
+    why:  "a restored or re-imported photo would be deleted from the cloud",
+  },
+  {
+    name: "M370 (V88) the ledger drops photo deletes",
+    file: "storage.js",
+    from: "'instrument', 'template', 'photo'];",
+    to:   "'instrument', 'template'];",
+    why:  "a photo deleted while signed out would never leave the cloud",
+  },
+  {
+    name: "M371 (V88) a new photo never reaches the mirror",
+    file: "photos.js",
+    from: "    _photoIndexAdd(itemId, record.bytes);\n    _photoMetaPut(record);",
+    to:   "    _photoIndexAdd(itemId, record.bytes);",
+    why:  "the upload finds photos only through the mirror",
+  },
+  {
+    name: "M372 (V88) a deleted job keeps its cloud photos",
+    file: "sync.js",
+    from: "      if (st.gone[st.ph.sent[id].s]) { seen.add(id); del.push(id); }",
+    to:   "",
+    why:  "4A: deleting a job deletes its photos, on this phone and the other",
+  },
+  {
+    name: "M373 (V88) the Sync page counts every photo as up",
+    file: "sync.js",
+    from: "  if (phJobs) for (const id of phJobs.keys()) { phTotal++; if (st.ph.sent[id]) phUp++; }",
+    to:   "  if (phJobs) for (const id of phJobs.keys()) { phTotal++; phUp++; }",
+    why:  "9A: the count is how Peter knows his evidence is safe",
+  },
+  {
+    name: "M374 (V88) a photo failure fails the whole run",
+    file: "sync.js",
+    from: "            (e) => {\n              console.error('Sync: photos not sent this time (non-fatal).', e);\n              return Object.assign(base, { photos: { error: true } });\n            });",
+    to:   "            (e) => { throw e; });",
+    why:  "photos are fail-soft: jobs must still be reported as sent",
+  },
+  {
+    name: "M375 (V88) the strip delete forgets to say the cloud copy goes",
+    file: "session.js",
+    from: "      ? \"This deletes the photo from this device and from your cloud copy. It can't be recovered.\"",
+    to:   "      ? \"This removes the photo from this device permanently. It can't be recovered.\"",
+    why:  "4A: a delete that reaches the cloud has to say so before the tap",
+  },
+  {
+    name: "M376 (V88) photos upload on the non-reading run",
+    file: "sync.js",
+    from: "          if (!opts.pull) return base;\n          return _syncPhotosHalf(",
+    to:   "          return _syncPhotosHalf(",
+    why:  "rule 4 shape: nothing goes up on a run that didn't read first",
   },
 ];
 
