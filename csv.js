@@ -93,13 +93,20 @@ function defaultHeaderFor(id) {
   const d = DEFAULT_CSV_COLUMNS.find(x => x.id === id);
   return d ? d.header : '';
 }
+// V87: one name builder for all three CSV paths (was three copies of the same
+// underscore template). "PAT Office Block 28-09-2026.csv" — spaces, UK date.
+function csvFilename(session) {
+  const site = fileSafe(session.site || session.name || '') || 'session';
+  const when = fileDateUK(session.date);
+  return `PAT ${site}${when ? ' ' + when : ''}.csv`;
+}
+
 function downloadCSV(session) {
   const BOM = '\uFEFF';
   const blob = new Blob([BOM + buildCSV(session)], { type: 'text/csv;charset=utf-8' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
-  const safe = (session.site || session.name || 'session').replace(/[^a-z0-9]+/gi, '_');
-  a.href = url; a.download = `PAT_${safe}_${session.date}.csv`;
+  a.href = url; a.download = csvFilename(session);
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
 }
@@ -133,8 +140,7 @@ const SHARE_ICON_SVG =
 async function shareOrDownloadCSV(session) {
   const BOM = '\uFEFF';
   const csvText = BOM + buildCSV(session);
-  const safe = (session.site || session.name || 'session').replace(/[^a-z0-9]+/gi, '_');
-  const filename = `PAT_${safe}_${session.date}.csv`;
+  const filename = csvFilename(session);
 
   // Feature detection — File constructor is also required for navigator.share({files})
   if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && typeof File === 'function') {
@@ -236,8 +242,7 @@ async function bulkExportUnexported() {
   if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && typeof File === 'function') {
     try {
       const files = targets.map(s => {
-        const safe = (s.site || s.name || 'session').replace(/[^a-z0-9]+/gi, '_');
-        return new File([BOM + buildCSV(s)], `PAT_${safe}_${s.date}.csv`, { type: 'text/csv' });
+        return new File([BOM + buildCSV(s)], csvFilename(s), { type: 'text/csv' });
       });
       if (navigator.canShare({ files })) {
         // v26: share ONLY the CSV files (no `title`/`text` — see single-export

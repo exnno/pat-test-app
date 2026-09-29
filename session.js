@@ -465,8 +465,8 @@ function unexportedSessions() {
 //                   has acted: status 'booked' (rebooked — job won) or 'declined'
 //                   (lost the job / customer gone). Either resolves the reminder
 //                   off the active chase list. `at` is an ISO timestamp.
-// The due date itself is COMPUTED, never stored (single source of truth):
-//   dueISO = session.date + retestMonths.
+// The due MONTH is COMPUTED, never stored (single source of truth):
+//   due month = month of session.date + retestMonths (V87 — was a day, see below).
 // All fields are additive — they ride through backup/restore wholesale and need
 // no backupVersion bump. normaliseSessionRetest() (below) is the restore guard.
 
@@ -479,57 +479,66 @@ function defaultRetestMonths() {
   return (Number.isFinite(m) && m >= 1 && m <= 120) ? m : 12;
 }
 
-// Add `months` calendar months to an ISO yyyy-mm-dd date; return a Date at local
-// midnight, or null if the input is unusable. Mirrors report.js addMonthsFormatted
-// but returns a Date object for day-math (that one returns a DD/MM/YYYY string).
-function retestDueDate(sess) {
+// V87: RETEST BY MONTH (Peter, V87 spec 6/9A/11A). A retest is due for a whole
+// calendar month — tested 30/09/2026 on a 12-month cycle means due September 2027.
+// The chase starts on the 1st of the month BEFORE (1 August 2027): being reminded
+// on 30 August about something due in September was no use. Only year+month are
+// counted (monthIndexAfter, utils.js), so the pre-V87 day-of-month rollover is gone.
+// Pre-V87 this was day counts (60 "due soon" / 90 "upcoming") from test date +
+// months; those constants are deleted, not left unused.
+
+// The due month as a month index (year*12 + month0), or null when not tracked.
+function retestDueMonthIndex(sess) {
   if (!sess || !sess.retestTrack) return null;
-  const iso = sess.date;
-  const months = Number(sess.retestMonths);
-  if (!iso || !Number.isFinite(months)) return null;
-  const parts = String(iso).split('-');
-  if (parts.length !== 3) return null;
-  const d = new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
-  if (isNaN(d.getTime())) return null;
-  d.setMonth(d.getMonth() + months);
-  d.setHours(0, 0, 0, 0);
-  return d;
+  return monthIndexAfter(sess.date, Number(sess.retestMonths));
 }
 
-// Whole days from today (local midnight) to a session's retest due date.
-// Negative = overdue. null when the session isn't a tracked reminder.
-function retestDaysUntil(sess) {
-  const due = retestDueDate(sess);
-  if (!due) return null;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  return Math.round((due - today) / (1000 * 3600 * 24));
+// Today's month index. `now` is injectable for tests.
+function currentMonthIndex(now) {
+  const d = now instanceof Date ? now : new Date();
+  return d.getFullYear() * 12 + d.getMonth();
+}
+
+// "September 2027" for a tracked session; '' otherwise.
+function retestDueLabel(sess) {
+  const idx = retestDueMonthIndex(sess);
+  return idx === null ? '' : formatMonthIndex(idx);
 }
 
 // Urgency bucket for a tracked session, used by the banner, the filter and the
-// reminders view. Returns one of:
+// reminders view. The bucket NAMES are kept from v56 so the CSS classes, the
+// filter and the banner need no renaming; what changed is what they mean:
 //   'resolved' — engineer has booked or declined; off the active chase list.
-//   'overdue'  — due date has passed.
-//   'duesoon'  — due within RETEST_DUE_SOON_DAYS (the "ring them now" band).
-//   'upcoming' — due within RETEST_UPCOMING_DAYS (shown, but quiet — lead time).
-//   'later'    — tracked, but further out than the upcoming window.
+//   'upcoming' — due NEXT month (from the 1st of the month before).  "Due next month"
+//   'duesoon'  — due THIS month.                                       "Due this month"
+//   'overdue'  — the due month has ended (from the 1st of the month after).
+//   'later'    — tracked, but the chase hasn't started yet.
 //   null       — not a tracked reminder at all.
-function retestStatus(sess) {
+function retestStatus(sess, now) {
   if (!sess || !sess.retestTrack) return null;
   if (sess.retestContact && (sess.retestContact.status === 'booked' || sess.retestContact.status === 'declined')) {
     return 'resolved';
   }
-  const days = retestDaysUntil(sess);
-  if (days === null) return null;
-  if (days < 0) return 'overdue';
-  if (days <= RETEST_DUE_SOON_DAYS) return 'duesoon';
-  if (days <= RETEST_UPCOMING_DAYS) return 'upcoming';
+  const due = retestDueMonthIndex(sess);
+  if (due === null) return null;
+  const cur = currentMonthIndex(now);
+  if (cur > due) return 'overdue';
+  if (cur === due) return 'duesoon';
+  if (cur === due - 1) return 'upcoming';
   return 'later';
 }
 
+// Short chip wording for a bucket (Jobs list chip and reminders view).
+function retestChipLabel(status) {
+  if (status === 'overdue')  return 'Retest overdue';
+  if (status === 'duesoon')  return 'Retest due this month';
+  if (status === 'upcoming') return 'Retest due next month';
+  return '';
+}
+
 // Does a session belong on the ACTIVE chase list (banner count, reminders view,
-// "Retest due" filter)? Active = tracked, unresolved, and within the upcoming
-// window or overdue. 'later' and 'resolved' don't surface — they exist but stay
+// "Retest due" filter)? Active = tracked, unresolved, and due next month, due
+// this month, or overdue (V87). 'later' and 'resolved' don't surface — they exist but stay
 // quiet so the list is only ever the work worth doing now.
 function isRetestActive(sess) {
   const st = retestStatus(sess);
@@ -547,8 +556,7 @@ function activeRetestReminders() {
     .sort((a, b) => {
       const ra = rank[retestStatus(a)], rb = rank[retestStatus(b)];
       if (ra !== rb) return ra - rb;
-      const da = retestDaysUntil(a), db = retestDaysUntil(b);
-      return da - db;   // earlier due (smaller / more negative) first
+      return retestDueMonthIndex(a) - retestDueMonthIndex(b);   // earlier due month first
     });
 }
 
@@ -690,7 +698,7 @@ function pruneOldSessions() {
   }
   if (targets.length === 0) {
     showToast(keptForCloud
-      ? `${keptForCloud} old job${keptForCloud === 1 ? ' hasn\u2019t' : 's haven\u2019t'} reached the cloud yet \u2014 push first`
+      ? `${keptForCloud} old job${keptForCloud === 1 ? ' hasn\u2019t' : 's haven\u2019t'} fully reached the cloud yet (the job or its photos) \u2014 push first`
       : 'Nothing to clear');
     return;
   }
@@ -702,7 +710,7 @@ function pruneOldSessions() {
       `(${itemTotal} item${itemTotal === 1 ? '' : 's'} in total)? ` +
       `These have all been exported to CSV and are older than ${state.pruneAgeMonths} month${state.pruneAgeMonths === 1 ? '' : 's'}. ` +
       (keptForCloud
-        ? `${keptForCloud} more ${keptForCloud === 1 ? 'is' : 'are'} kept for now because the latest changes haven\u2019t reached the cloud yet. `
+        ? `${keptForCloud} more ${keptForCloud === 1 ? 'is' : 'are'} kept for now because the latest changes or photos haven\u2019t reached the cloud yet. `
         : '') +
       (cloudKeepsThem
         ? `This removes them from this phone. Your cloud copy keeps them.`
@@ -1628,7 +1636,10 @@ function deletePhotoFromStrip(photoId) {
   const itemId = state.photoStripItemId;
   openConfirmSheet({
     title: 'Delete photo?',
-    message: "This removes the photo from this device permanently. It can't be recovered.",
+    // v88: signed in, the cloud copy goes too (decision 4A).
+    message: ((typeof syncActive === 'function' && syncActive())
+      ? "This deletes the photo from this device and from your cloud copy. It can't be recovered."
+      : "This removes the photo from this device permanently. It can't be recovered."),
     confirmLabel: 'Delete',
     onConfirm: () => {
       photoDelete(photoId).then(() => {

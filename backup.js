@@ -130,7 +130,7 @@ function downloadBackup() {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = `PAT_backup_${todayISO()}.json`;
+  a.download = `PAT backup ${fileDateUK(todayISO())}.json`;   // V87: UK date, no underscores
   document.body.appendChild(a); a.click(); document.body.removeChild(a);
   URL.revokeObjectURL(url);
   // v11: stamp the successful export so the 7-day reminder timer resets.
@@ -202,7 +202,7 @@ function restoreBackupFromFile(file) {
       message:
         `This file contains ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'} ` +
         `and ${itemCount} item${itemCount === 1 ? '' : 's'} in total` +
-        (data.exportedAt ? `, exported ${new Date(data.exportedAt).toLocaleString()}` : '') +
+        (data.exportedAt ? `, exported ${new Date(data.exportedAt).toLocaleString('en-GB')}` : '') +
         `. This will REPLACE all current data on this device and cannot be undone.`,
       confirmLabel: 'Replace & restore',
       onConfirm: () => {

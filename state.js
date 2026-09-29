@@ -34,6 +34,15 @@ let state = {
   // Declined / reset) is open in the reminders view; null = no sheet. Not
   // persisted — purely view state, like other *Open flags.
   retestActionSessionId: null,
+  // V87 (4A): set when a write to storage fails (storage.js _noteSaveFailure).
+  // { full: true|false, at } or null. While set and not dismissed, render()
+  // paints the "not saved" sheet. Cleared by the next successful saveSessions().
+  saveFailure: null,
+  saveFailureDismissed: false,
+  // V87 (S12): whether the browser has agreed to keep this app's data when the
+  // phone runs short of space. 'unknown' until checked at boot, then
+  // 'protected' | 'not' | 'unsupported'. Never stored — asked fresh each launch.
+  storageProtection: 'unknown',
   cursor: 0,
   form: { assetNo: '', location: '', itemType: '', notes: '', showNotes: false },
   newForm: { name: '', site: '', engineer: '', prefix: '', startNo: '1', show: false, clientId: '', siteId: '' },
@@ -63,6 +72,11 @@ let state = {
   // failure the v59 stats counter avoided by recomputing its live half.
   photoIndex: {},
   photoBytes: 0,
+  // v88: the same mirror keyed by photo id ({s: sessionId, i: itemId, b, w, h,
+  // at}) for the cloud upload, and whether it is known to match the store. Same
+  // rules: derived, never saved, never in a backup. See photoIndexLoad().
+  photoMeta: {},
+  photoMetaReady: false,
 
   // Photos taken DURING the fail flow, before the item exists. The item has no
   // id until saveItem() pushes it, so these are held here as
@@ -248,14 +262,22 @@ let state = {
     plan: null, trialEndsAt: null, checkedAt: null, message: '',
   },
   // v80: sync (sync.js). TRANSIENT, like `cloud` — the durable part (what was
-  // sent, and when) lives in SYNC_STATE_KEY, owned by sync.js.
-  //   busy:    a push is in flight (Sync page buttons disable)
-  //   message: one plain-language line for the Sync page (errors included)
-  sync: { busy: false, message: '' },
-  // v43: cloud pages visibility. cloudPagesRevealed is a transient per-session flag
-  // set by long-pressing the About title; it resets when you navigate away from About
-  // but persists if you open one of the cloud pages and return. Never persisted.
-  cloudPagesRevealed: false,
+  // sent, what was read, and when) lives in SYNC_STATE_KEY, owned by sync.js.
+  // The jobs awaiting a decision are durable too, in SYNC_HELD_KEY — they must
+  // survive a reload, or closing the app would silently drop the question.
+  //   busy:      a run is in flight (Sync page buttons disable)
+  //   message:   one plain-language line for the Sync page (errors included)
+  //   resolving: v81 — the id of the held job whose decision is being carried
+  //              out, so that one row can show a spinner without disabling
+  //              every other decision on the page
+  //   waiting:   v81.1 — {id, kind} when a pulled change is being held back
+  //              because that job is open on screen (decision 3A). Recomputed
+  //              by every pull, so it clears itself when it stops being true.
+  sync: { busy: false, message: '', resolving: null, waiting: null, diffing: null },   // v82: diffing = held job being compared
+  // v85: the one line under the Cloud access-code box ("That code isn't right.").
+  // Replaces V43's cloudPagesRevealed and the About long-press (decision 3A):
+  // whether the Cloud group is open is cloud.js cloudPagesUnlocked(), per phone.
+  cloudCodeMessage: '',
   // v36: saved report templates (array of {id, name, settings}). Loaded from
   // REPORT_TEMPLATES_KEY; seeded with starters on first run. Applying one copies
   // its settings snapshot over the live reportSettings.

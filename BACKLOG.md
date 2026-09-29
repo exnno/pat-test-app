@@ -8,25 +8,153 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Cloud track — V80 built (push, jobs only), V81 next
-V78 ledger → V79 sign-in → V80 push (sessions, one way, fingerprint change
-detection; decision C settled: clearing is local, cloud keeps the job) → **V81
-pull, spec round first**: second device, the item-count conflict guard, skip ids
-in SYNC_PRUNED_KEY, `_invalidateSessionEncoding` on any in-place apply, set the
-fingerprint on pull so a pulled job isn't pushed straight back. Then remaining
-record kinds (clients, sites, presets, settings, instruments) → photos (+ the
-cross-account download isolation check) → status UI. Every cloud release runs
-`supabase/isolation-test.sql` (all PASS) before promotion to `Release`.
+### Factory reset (Peter, V81.1) — needs its own spec round
+A guarded "reset this device" (V86: must also clear SQP_RESET_KEY; V87: STORAGE_BANNER_KEY; V88: the
+`ph` part of SYNC_STATE_KEY goes with it) for handing a phone to another engineer, selling
+it, or resetting between tests. NOT a quick win: "reset" means at least three
+different things (data only / + settings / + cloud sign-in), and the easy-to-miss
+leftovers are the IndexedDB photo store and the sync bookkeeping keys
+(SYNC_STATE_KEY, SYNC_PRUNED_KEY, SYNC_HELD_KEY; V85 adds CLOUD_UNLOCK_KEY, the
+Cloud access-code flag) — a half-reset phone that is
+still signed in would pull its old jobs straight back. Most destructive button in
+the app, so the confirm needs to be genuinely hard to hit by accident.
+
+### V88 residuals (known, accepted)
+- A phone deletes only the cloud photos IT uploaded. A job deleted while the
+  uploading phone is lost or never syncs again leaves those photos in the cloud
+  — Stage 5's review-and-delete path is the tidy-up (Peter, 5A).
+- Uploads happen only while the app is open (web apps can't upload closed), on
+  any signal: an iPhone won't say whether it's on Wi-Fi.
+- A V87 phone on the same account neither uploads photos nor deletes them.
+  Test phones only; both go to V88.
+- A photo whose job is held for a decision waits until the question is answered.
+- Photo mirror unreadable (IndexedDB broken): while signed in, nothing can be
+  cleared as old. Sign out to clear, or fix the store.
+- Photo deletes write the ledger directly (`saveTombstones`); a refused write is
+  logged and the entry rides the next save().
+
+### V87 residuals (known, accepted)
+- Android description list (field report): fixed on the likeliest cause — the
+  keyboard hid without a blur — NOT reproduced on hardware. If it recurs, get
+  the phone model/Android version and what was on screen.
+- Date pickers (`<input type="date">`) display in the phone's own format; the
+  app cannot change that. Stored and printed dates are UK.
+- Refused writes: sessions/settings/SQP/descriptions savers are guarded; the
+  other ~40 direct writes are covered only when they happen inside a TAP (the
+  dispatcher's catch). Writes from timers or async paths (sync pull saves,
+  photo callbacks, reminder stamps) still throw to the console — the next tap's
+  save shows the sheet. Guard any new hot-path saver explicitly.
+- Storage % counts UTF-16 (2 bytes/char) against ~5 MB — conservative on
+  browsers that count characters. Unchanged from v11.
+- Protection status is asked fresh each launch, never stored.
+- Day-first file names don't sort by date in a folder (Peter's choice, V87).
+
+### Cloud track — V88: photos up; V89: photos down, on request only
+V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull → V82 clients + sites →
+V83 instruments + presets + tester in use → V83.1 pager fix → V84 report
+settings + templates + certificate counter → V85 the cloud pages moved to
+Settings → Cloud (code 1111, remembered per phone) → **V86** general settings
+(engineer + switches, fail reasons, descriptions, CSV, Multi Pick, Smart Quick
+Pick history) → V87 field release → **V88** photos UP (one way, isolation 4c/4d +
+7a–7d). Next: **V89** photos DOWN — only when asked (R17, decision 10A); a tiny
+row per photo tells the phone they exist. Then roadmap Stage 3 onward.
+Every cloud release runs `supabase/isolation-test.sql` (all PASS) before
+promotion to `Release` — all PASS at V84 incl. 6a–6d. V85 changed no SQL.
+
+### Cloud — V85 residuals (known, accepted)
+- The access code is readable in public source (config.js). A curtain for free
+  users on the shared test address, not protection — that stays
+  `shouldCreateUser: false` + RLS. Remove the code at commercial launch.
+- Free users on the GitHub Pages address now SEE a "Cloud" row (1A); it asks
+  for a code they don't have. Accepted by Peter at V85.
+- `setupLongPress` (utils.js) has no caller since the About long-press went.
+  Dead code — remove in a structural release, not a feature one (13x source-
+  guards that it exists; update that test with the removal).
+
+### Cloud — V86 residuals (known, accepted)
+- Two phones that both change the descriptions list's ORDER (not its contents)
+  before syncing: this phone's order wins the merge. Contents are never lost.
+- A description edited in Settings (same text, different spelling) is a removal
+  plus an addition to the merge, like any other.
+- Smart Quick Pick history merges by the higher count, so counts converge on the
+  busier phone rather than adding up. It is a ranking hint, not a tally.
+- A clear or rebuild on a phone that is signed OUT is still stamped, so it wins
+  on the next sign-in. Restoring a backup is not a reset.
+- Setup import and backup restore replace fail reasons, descriptions, CSV and
+  Multi Pick wholesale; with the other phone unchanged that simply goes up.
+- A V85 phone ignores the six new rows (unknown settings ids) — it neither
+  receives nor sends them until it updates.
+
+### Cloud — V89 photos down must carry these (next)
+- Nothing downloads automatically (R17 / 10A): pull photo ROWS only (no image),
+  show "N photos in the cloud" on the job / strip, fetch on a tap.
+- Read the photos table by cursor (rule 10, rule 14 multi-page); a deleted row
+  removes the local photo; a row for an item not in the job is ignored.
+- What a report does with a photo not downloaded (spec round question).
+- Photos cleared locally (5A) come back only on request, never on open.
+- Footprint measured at V88: 13 photos = 3.22 MB (~250 KB each).
+
+### Cloud — V84 residuals (known, accepted)
+- Two phones BOTH offline stamping a certificate at the same moment can issue
+  the same number: the stamp only skips numbers on jobs the phone already has.
+  The counter row is written by a plain upsert (no SQL change), so a slower
+  phone can briefly put a lower number in the cloud; the next run of the
+  further-on phone puts it back (21i). A server-side "max" would need SQL.
+- Setup import and backup restore replace the template list wholesale without
+  tombstones, so a template dropped that way comes back from the cloud on the
+  next read. Delete it in the app to make it stick.
+- An untouched starter template deleted on a phone that has never sent it,
+  while the cloud does not have it either, stays on the other phones.
+- A phone still on V83 applying a template still rewinds its own counter (the
+  fix is V84). Once it updates, the higher cloud number wins, so no harm lasts.
+- Report settings the cloud has from a NEWER version keep their extra fields
+  here (`normaliseReportSettings` carries unknown keys through) — so an older
+  V84 phone editing them does not strip anything. Opposite of clients (below).
+
+### Cloud — V83 residuals (known, accepted)
+- A job whose instrument is not on this phone and has no frozen copy still
+  prints the tester in use (tier 3). V83 closes it by order — instruments read
+  before jobs — leaving only a held instrument or a phone still on V82 (6A).
+- Rare false question: a job the other phone edited AND froze, whose freeze
+  happened while it was open on screen here (deferred) or while the jobs read
+  failed, can come back as changed on both. It is asked, never lost.
+- A blank instrument that jobs reference (kept by pruneBlankInstruments) is
+  never sent — nameless records are unreadable by design.
+- Same tester / same "Default" preset made on two phones separately = two
+  entries to tidy by hand (3A; 5A only covers an untouched starter).
+- (V83.1) Commit-order window: `updated_at` is when a write STARTED, not when it
+  committed. A write that starts first but commits after a later one could be
+  stepped over by a phone reading in between. Needs two of one account's
+  devices writing within milliseconds of each other while a third reads.
+  Accepted; revisit (read a few seconds behind the mark) only if ever seen.
+- (V83.1) A read stops without moving if more rows share one timestamp than a
+  page holds (200). Impossible while upload batches are 25 rows; the compound
+  (updated_at, id) cursor is the fix if batches ever grow.
+
+### Cloud — an older phone strips fields it doesn't know (V82 note)
+Records sync a projection (`_syncRecordDoc`). A later version that adds a client
+field must add it there AND in loadClients/loadSites; until every phone has
+that version, an older phone that EDITS the record sends it back without the
+field. Receiving is harmless. Worth remembering before adding anything to a
+client (address, contact).
+
+### Cloud — photos do not come down yet (V81 note; V88: they go up)
+A job pulled onto a second device shows its photos as missing — same as a backup
+restored onto a new phone, and it fails soft the same way. V89 brings them down,
+on request only.
 
 ### Cloud — permanent delete of cleared jobs (Peter, V80 spec)
 Clearing old jobs leaves them in the cloud archive (5A). Peter wants a way to
-delete them from the cloud too, at some point. Needs a view of what the cloud
-holds first, so after pull. Would send an emptied deleted row, as a job delete does.
+delete them from the cloud too, at some point. Pull now exists, so the blocker
+is gone — what is still missing is a view of what the cloud holds. Would send an
+emptied deleted row, as a job delete does, and must also drop the id from
+SYNC_PRUNED_KEY or the row is skipped for ever.
 
-### Cloud — sync timestamps are "noticed", not "edited" (V80 note)
+### Cloud — sync timestamps are "noticed", not "edited" (V80 note, closed V81)
 `last_modified` on the server is the push time, because sessions have no edit
-timestamp. Harmless for push; V81's last-write-wins compares these. Revisit if a
-conflict ever resolves the wrong way.
+timestamp. V81 does NOT compare them: the fingerprint decides instead, so the
+stamp is display only. Keep the note — anything added later that reaches for a
+timestamp comparison is reaching for a value that does not mean what it says.
 
 ### Harness — three mutation anchors were stale through V78
 M66/M82 (rolling anchors) and M110 (the V77 data-loss mutation, broken by

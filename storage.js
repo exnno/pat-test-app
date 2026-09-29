@@ -162,12 +162,23 @@ const _encodedSessionCache = new WeakMap();
 // session EXCEPT its items array contents (those are guarded by the array-
 // reference identity check + the active-session always-re-encode rule). Pure
 // string concatenation of primitives — no object allocation, no JSON.stringify.
+//
+// ⚠ v83: THE INSTRUMENT FIELDS ARE PART OF THE SIGNATURE. Until V83 they were
+// not, and deleteInstrument() writes `instrumentSnapshot` onto every job that
+// used the instrument — in place, on jobs that are mostly NOT the active one.
+// Those jobs kept their cached encoding, so the frozen copy was never written
+// to disk, and after the next reopen they silently fell back to the instrument
+// in use today: the exact v66 defect the snapshot exists to prevent. It had been
+// that way since v66 (found speccing V83, harness 19a). The snapshot is only
+// ever set once and dropped whole (saveSessionEdits), so its PRESENCE is enough
+// here; its contents never change underneath a cached encoding.
 function _sessionSig(s) {
   return [
     s.id, s.name, s.site, s.engineer, s.prefix, s.date,
     s.startNumber, s.locked ? 1 : 0,
     s.exportedAt || '', s.exportDirty ? 1 : 0,
-    (s.items ? s.items.length : 0)
+    (s.items ? s.items.length : 0),
+    s.instrumentId || '', s.instrumentSnapshot ? 1 : 0
   ].join('\u0001');
 }
 
@@ -726,6 +737,11 @@ function normaliseReportSettings(stored) {
   out.certPrefix      = typeof stored.certPrefix === 'string' ? stored.certPrefix : '';
   const cnn = parseInt(stored.certNextNumber, 10);
   out.certNextNumber  = (Number.isFinite(cnn) && cnn >= 1) ? cnn : 1;
+  // v84: when the counter was last typed in by hand ('' = never). A deliberate
+  // set beats "highest wins" when the counter syncs (Q2A) — so resetting to 1
+  // for a new prefix is not undone by your other phone's higher number.
+  out.certSetAt       = (typeof stored.certSetAt === 'string' && !isNaN(Date.parse(stored.certSetAt)))
+    ? stored.certSetAt : '';
   const cpd = parseInt(stored.certPadding, 10);
   out.certPadding     = (Number.isFinite(cpd) && cpd >= 0 && cpd <= 10) ? cpd : 4;
   out.reportTitle     = (typeof stored.reportTitle === 'string' && stored.reportTitle.trim())
@@ -743,8 +759,16 @@ function normaliseReportSettings(stored) {
 }
 
 // v30: persist report settings as one JSON blob.
-function saveReportSettings() {
+function _writeReportSettings() {
   localStorage.setItem(REPORT_SETTINGS_KEY, JSON.stringify(state.reportSettings || makeDefaultReportSettings()));
+}
+
+function saveReportSettings() {
+  _writeReportSettings();
+  // v84: report settings sync, and most edits save them here rather than via
+  // save(), so they reach the sync trigger here too — same guarded line as
+  // saveSessions().
+  if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error('Sync trigger failed (non-fatal).', e); } }
 }
 
 // v36: report templates. Each template is { id, name, settings } where settings
@@ -769,6 +793,8 @@ function loadReportTemplates() {
 
 function saveReportTemplates() {
   localStorage.setItem(REPORT_TEMPLATES_KEY, JSON.stringify(state.reportTemplates || []));
+  // v84: as saveReportSettings() — templates sync.
+  if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error('Sync trigger failed (non-fatal).', e); } }
 }
 
 // v11: Ensure state.csvColumns contains every column defined in
@@ -817,15 +843,62 @@ function computeHistoryFromItems() {
 function saveSessions() {
   // v14: sessions stored compressed via the key-shortening codec.
   // v23: serialiseSessions reuses cached encodings for unchanged sessions.
-  localStorage.setItem(STORAGE_KEY, serialiseSessions(state.sessions));
-  localStorage.setItem(ACTIVE_KEY, state.activeId || '');
+  // V87 (4A): a failed write used to throw out of the logging action with nothing
+  // catching it — the item stayed on screen, never reached storage, and vanished
+  // on reopen, silently. Now the failure is caught and the user is told at once
+  // (_noteSaveFailure). The sync trigger below still runs: when signed in, the
+  // push sends what is in memory, which is the one copy that has the item.
+  try {
+    localStorage.setItem(STORAGE_KEY, serialiseSessions(state.sessions));
+    localStorage.setItem(ACTIVE_KEY, state.activeId || '');
+    _noteSaveOk();
+  } catch (e) {
+    _noteSaveFailure(e);
+  }
   // v80: the ONE line sync adds to saving. A status check and a timer reset;
   // guarded and wrapped so a broken sync.js can never make a save fail.
   if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error('Sync trigger failed (non-fatal).', e); } }
 }
 
-// COLD: all settings/config keys. Called when a setting changes (and by save()).
+// V87 (4A): the guard around every settings write. The writes themselves are in
+// _saveSettingsWrites(); a failure there is reported exactly like a sessions
+// failure. Settings success does NOT clear the warning — only a sessions save can
+// say the jobs are safe again (they are the big blob that fills storage first).
 function saveSettings() {
+  try { _saveSettingsWrites(); }
+  catch (e) { _noteSaveFailure(e); }
+}
+
+// V87 (4A): what happens when storage refuses a write.
+//   • Quota errors are told apart (QuotaExceededError; Firefox's old name and
+//     the legacy codes 22 / 1014) so the sheet can say "storage full"; anything
+//     else still means "not saved" and is reported, never swallowed silently.
+//   • The repaint is deferred a tick and coalesced: this runs INSIDE a save that
+//     a render may already be about to follow. ⚠ It can repaint while a sheet
+//     with inputs is open — deliberately. The no-render rule protects the
+//     keyboard; losing an item without knowing is worse than losing the keyboard.
+let _saveFailPaintQueued = false;
+function _isQuotaError(e) {
+  return !!e && (e.name === 'QuotaExceededError' || e.name === 'NS_ERROR_DOM_QUOTA_REACHED'
+    || e.code === 22 || e.code === 1014);
+}
+function _noteSaveFailure(e) {
+  try { console.error('Save failed — data NOT written to storage.', e); } catch (e2) {}
+  state.saveFailure = { full: _isQuotaError(e), at: Date.now() };
+  state.saveFailureDismissed = false;
+  if (_saveFailPaintQueued) return;
+  _saveFailPaintQueued = true;
+  setTimeout(() => {
+    _saveFailPaintQueued = false;
+    if (typeof render === 'function') { try { render(); } catch (e3) {} }
+  }, 0);
+}
+function _noteSaveOk() {
+  if (state.saveFailure) { state.saveFailure = null; state.saveFailureDismissed = false; }
+}
+
+// COLD: all settings/config keys. Called when a setting changes (and by save()).
+function _saveSettingsWrites() {
   // v9: legacy ITEMS_KEY no longer written; ITEM_PRESETS_KEY + ACTIVE_PRESET_KEY are
   // the source of truth. Backup/restore still uses the same logic.
   localStorage.setItem(ITEM_PRESETS_KEY, JSON.stringify(state.itemPresets));
@@ -894,7 +967,10 @@ function saveSettings() {
   // capped here as well as on read, which is what actually stops it growing.
   localStorage.setItem(PAT_STATS_KEY, JSON.stringify(normaliseArchivedStats(state.archivedStats)));
   // v30: PDF report settings (single blob incl. logo).
-  saveReportSettings();
+  // v84: the plain write — saveReportSettings() also arms the sync trigger, and
+  // saveSettings() must not (sync.js calls it after a pull; save() arms the
+  // trigger through saveSessions() already).
+  _writeReportSettings();
   // lastBackupAt + backupSnoozedUntil are written via their own helpers
   // (markBackupExported, snoozeBackupReminder) rather than here, because they
   // shouldn't update on every state change.
@@ -931,7 +1007,10 @@ function save() {
 // Nothing in the app READS this ledger yet — that is the sync layer's job. It is
 // built now because the alternative is reconstructing deletions that were never
 // recorded, which cannot be done after the fact.
-const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset'];
+// v83: 'instrument' added. Widening is a superset — every ledger an older
+// version wrote still normalises exactly as it did.
+// v88: 'photo' — a photo the engineer deleted, so the cloud copy goes too.
+const TOMBSTONE_KINDS = ['session', 'client', 'site', 'preset', 'instrument', 'template', 'photo'];   // v84: + template; v88: + photo
 
 // Whitelisting validator. Used on both read and write, so a hand-edited or
 // corrupted value collapses to a clean list rather than propagating.
@@ -981,6 +1060,20 @@ function purgeTombstones(list) {
     const ms = Date.parse(t.at);
     return isNaN(ms) ? true : ms >= cutoff;
   });
+}
+
+// v88: the ledger alone. photos.js deletes inside a promise that no save()
+// follows, so it writes the ledger itself once its delete has succeeded.
+// A refused write is logged: the entry stays in memory and the next save()
+// writes it with everything else.
+function saveTombstones() {
+  try {
+    localStorage.setItem(TOMBSTONES_KEY, JSON.stringify(normaliseTombstones(state.tombstones)));
+    return true;
+  } catch (e) {
+    console.error('Deletion ledger could not be saved (non-fatal).', e);
+    return false;
+  }
 }
 
 function recordTombstone(kind, id) {
@@ -1144,11 +1237,16 @@ function undoApostropheRepair() {
 // (and rewrite all 23 cold keys) just to persist one of them, they call the
 // matching targeted writer. This keeps the hot path to: sessions (always) + at
 // most the one or two cold keys that genuinely changed.
+// V87 (4A): both sit on the item-logging hot path right after saveSessions()
+// (saveItem), so they are guarded the same way — found by harness 24e, where a
+// full phone let saveSessions() report cleanly and then threw here instead.
 function saveSqpHistory() {
-  localStorage.setItem(SQP_HISTORY_KEY, JSON.stringify(state.sqpHistory || {}));
+  try { localStorage.setItem(SQP_HISTORY_KEY, JSON.stringify(state.sqpHistory || {})); }
+  catch (e) { _noteSaveFailure(e); }
 }
 function saveDescriptions() {
-  localStorage.setItem(DESCRIPTIONS_KEY, JSON.stringify(state.descriptions));
+  try { localStorage.setItem(DESCRIPTIONS_KEY, JSON.stringify(state.descriptions)); }
+  catch (e) { _noteSaveFailure(e); }
 }
 
 // v53: Test Readings — fail-reason tag store. Tags are kept in their OWN map
@@ -1190,6 +1288,43 @@ function readingTagForReason(reason) {
 
 
 // ---------- Storage usage (v7) ----------
+// V87 (S12): ask whether the browser will keep this app's data under storage
+// pressure, and optionally ask it to. `ask` false = only check (no prompt on any
+// browser). Resolves to the new state.storageProtection value. Updates the
+// Backup page's status line IN PLACE — never render(): this resolves at an
+// arbitrary moment, possibly while the prune-age box on that page has focus.
+async function checkStorageProtection(ask) {
+  const st = (typeof navigator !== 'undefined' && navigator) ? navigator.storage : null;
+  if (!st || typeof st.persisted !== 'function') {
+    state.storageProtection = 'unsupported';
+  } else {
+    let ok = false;
+    try { ok = !!(await st.persisted()); } catch (e) { ok = false; }
+    if (!ok && ask && typeof st.persist === 'function') {
+      try { ok = !!(await st.persist()); } catch (e) { ok = false; }
+    }
+    state.storageProtection = ok ? 'protected' : 'not';
+  }
+  try {
+    const el = (typeof document !== 'undefined') ? document.getElementById('storage-protect') : null;
+    if (el && typeof storageProtectionHTML === 'function') el.innerHTML = storageProtectionHTML();
+  } catch (e) {}
+  return state.storageProtection;
+}
+
+// V87 (S13): the Jobs-screen banner shows at STORAGE_BANNER_PCT, at most once a
+// day (dismissing hides it until tomorrow). Reads the same figure as the Backup page.
+function storageBannerDue() {
+  const stats = getStorageStats();
+  if (stats.pct < STORAGE_BANNER_PCT) return false;
+  let day = null;
+  try { day = localStorage.getItem(STORAGE_BANNER_KEY); } catch (e) {}
+  return day !== todayISO();
+}
+function dismissStorageBanner() {
+  try { localStorage.setItem(STORAGE_BANNER_KEY, todayISO()); } catch (e) {}
+}
+
 function getStorageStats() {
   let bytes = 0;
   try {

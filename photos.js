@@ -6,7 +6,7 @@
  * See LICENSE.txt for full terms.
  */
 
-// ============== PATGo PWA — v62 — Photo evidence store ==============
+// ============== PATGo PWA — v62 — Photo evidence store (v88: cloud upload hooks) ==============
 //
 // The app's FIRST use of any persistence mechanism other than localStorage.
 // Everything that touches IndexedDB lives in this file and nowhere else, so the
@@ -162,21 +162,55 @@ function _photoTx(mode, fn) {
 // Rebuild state.photoIndex from the store. Called ONCE from boot.js after
 // load(), then re-renders so the counts appear. Until it resolves, counts read
 // as 0 and the UI simply shows no chips — never a wrong number.
+//
+// v88: and state.photoMeta — { [photoId]: {s, i, b, w, h, at} } — the same
+// mirror keyed by PHOTO, so sync.js can see which photos exist, and which job
+// and item each belongs to, without awaiting the database. `photoMetaReady` is
+// true only once the mirror is known to match the store: a phone with no photo
+// store at all is ready (it has nothing to upload); a read that FAILED is not,
+// so the prune guard keeps jobs rather than assume they have no photos.
 function photoIndexLoad() {
-  if (!photosSupported()) return Promise.resolve(false);
-  return _photoTx('readonly', (store) => store.getAll()).then(({ result }) => {
+  if (!photosSupported()) { state.photoMetaReady = true; return Promise.resolve(false); }
+  return _photoTx('readonly', (store) => store.getAll()).then(({ ok, result }) => {
+    if (!ok) return false;
     const records = result || [];
     const index = {};
+    const meta = {};
     let bytes = 0;
     records.forEach((r) => {
       if (!r || !r.itemId) return;
       index[r.itemId] = (index[r.itemId] || 0) + 1;
       bytes += (typeof r.bytes === 'number' && r.bytes > 0) ? r.bytes : 0;
+      if (r.id) meta[r.id] = _photoMetaOf(r);
     });
     state.photoIndex = index;
     state.photoBytes = bytes;
+    state.photoMeta = meta;
+    state.photoMetaReady = true;
     return true;
   }).catch(() => false);
+}
+
+// v88: the bits of a record sync needs — never the image.
+function _photoMetaOf(r) {
+  return {
+    s: String(r.sessionId || ''),
+    i: String(r.itemId || ''),
+    b: (typeof r.bytes === 'number' && r.bytes > 0) ? r.bytes : 0,
+    w: r.w || 0,
+    h: r.h || 0,
+    at: (typeof r.at === 'string') ? r.at : ''
+  };
+}
+
+function _photoMetaPut(r) {
+  if (!r || !r.id) return;
+  if (!state.photoMeta) state.photoMeta = {};
+  state.photoMeta[r.id] = _photoMetaOf(r);
+}
+
+function _photoMetaDrop(id) {
+  if (state.photoMeta) delete state.photoMeta[id];
 }
 
 // Synchronous count for an item — the ONLY thing render() may call.
@@ -283,6 +317,10 @@ function photoAdd(sessionId, itemId, processed) {
   return _photoTx('readwrite', (store) => store.put(record)).then(({ ok }) => {
     if (!ok) return null;
     _photoIndexAdd(itemId, record.bytes);
+    _photoMetaPut(record);
+    // v88: a photo added to an item that was saved earlier (from the strip)
+    // arms nothing else, so it arms the upload itself. Signed out: a no-op.
+    if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error('Photo sync note failed (non-fatal).', e); } }
     return record.id;
   });
 }
@@ -314,6 +352,14 @@ function photosForSession(sessionId) {
       return list;
     })
     .catch(() => []);
+}
+
+// v88: one photo's image, for the upload. Null on any failure or if it's gone.
+function photoBlob(photoId) {
+  if (!photoId) return Promise.resolve(null);
+  return _photoTx('readonly', (store) => store.get(photoId))
+    .then(({ result }) => (result && result.blob) ? result.blob : null)
+    .catch(() => null);
 }
 
 // v64: re-encode one stored photo down to print size for the PDF appendix.
@@ -367,6 +413,29 @@ function photoPrintDataUrl(blob, maxPx, quality) {
 
 // ---------- deletes ----------
 
+// v88 (decision 4A). The deletes the ENGINEER makes — one photo, an item, a
+// fail changed to a pass — go to the cloud as well. Recorded in the deletion
+// ledger (kind 'photo') so a delete made while signed out, or with no signal,
+// still reaches the cloud later. `itemIds` also covers photos this phone
+// uploaded and has since cleared locally (decision 5A): sync.js knows their ids.
+//
+// ⚠ NOT called from photosDeleteForSessions (a deleted job's cloud photos go
+// with the job's own tombstone; clearing old jobs never touches the cloud,
+// V80 decision C) nor from photosDeleteAll / photosClearUploaded (phone only).
+//
+// Unlike the v78 rule, this saves the ledger itself: it runs after the
+// database delete has SUCCEEDED, inside a promise no save() follows.
+function _photoNoteGone(ids, itemIds) {
+  try {
+    if (typeof recordTombstone === 'function') (ids || []).forEach((id) => recordTombstone('photo', id));
+    if (typeof syncNotePhotosGone === 'function') syncNotePhotosGone(itemIds || []);
+    if (typeof saveTombstones === 'function') saveTombstones();
+    if (typeof syncNoteSave === 'function') syncNoteSave();
+  } catch (e) {
+    console.error('Photo delete note failed (non-fatal).', e);
+  }
+}
+
 // Delete one photo by id. Resolves true if it went.
 function photoDelete(photoId) {
   if (!photoId) return Promise.resolve(false);
@@ -375,6 +444,8 @@ function photoDelete(photoId) {
     return _photoTx('readwrite', (store) => store.delete(photoId)).then(({ ok }) => {
       if (!ok) return false;
       _photoIndexRemove(record.itemId, record.bytes);
+      _photoMetaDrop(record.id);
+      _photoNoteGone([record.id], []);
       return true;
     });
   });
@@ -382,15 +453,18 @@ function photoDelete(photoId) {
 
 // Delete every photo attached to one item. Used by the item-delete path and by
 // the v62 decision 14B confirm (a fail edited to a pass gives up its photos).
+// v88: noted as gone even when this phone holds none of them — it may have
+// uploaded them and cleared them locally since.
 function photosDeleteForItem(itemId) {
   if (!itemId) return Promise.resolve(0);
   return photosForItem(itemId).then((records) => {
-    if (!records.length) return 0;
+    if (!records.length) { _photoNoteGone([], [itemId]); return 0; }
     return _photoTx('readwrite', (store) => {
       records.forEach((r) => { try { store.delete(r.id); } catch {} });
     }).then(({ ok }) => {
       if (!ok) return 0;
-      records.forEach((r) => _photoIndexRemove(r.itemId, r.bytes));
+      records.forEach((r) => { _photoIndexRemove(r.itemId, r.bytes); _photoMetaDrop(r.id); });
+      _photoNoteGone(records.map((r) => r.id), [itemId]);
       return records.length;
     });
   });
@@ -428,7 +502,7 @@ function photosDeleteForSessions(sessionIds) {
           records.forEach((r) => { try { store.delete(r.id); } catch {} });
         }).then(({ ok }) => {
           if (!ok) return total;
-          records.forEach((r) => _photoIndexRemove(r.itemId, r.bytes));
+          records.forEach((r) => { _photoIndexRemove(r.itemId, r.bytes); _photoMetaDrop(r.id); });
           return total + records.length;
         });
       });
@@ -443,7 +517,29 @@ function photosDeleteAll() {
     if (!ok) return 0;
     state.photoIndex = {};
     state.photoBytes = 0;
+    state.photoMeta = {};
     return before;
+  });
+}
+
+// v88 (decision 5A). "Delete all photos" while signed in: frees space on THIS
+// phone only, and only takes photos already safe in the cloud — `isUploaded(id)`
+// is sync.js's answer. Nothing is noted as gone, so the cloud keeps them. Photos
+// not yet uploaded stay. Resolves { removed, kept }.
+function photosClearUploaded(isUploaded) {
+  if (typeof isUploaded !== 'function') return Promise.resolve({ removed: 0, kept: photoStatsSync().count });
+  return _photoTx('readonly', (store) => store.getAll()).then(({ ok, result }) => {
+    if (!ok) return { removed: 0, kept: photoStatsSync().count };
+    const all = (result || []).filter((r) => r && r.id);
+    const going = all.filter((r) => { try { return !!isUploaded(r.id); } catch { return false; } });
+    if (!going.length) return { removed: 0, kept: all.length };
+    return _photoTx('readwrite', (store) => {
+      going.forEach((r) => { try { store.delete(r.id); } catch {} });
+    }).then(({ ok: done }) => {
+      if (!done) return { removed: 0, kept: all.length };
+      going.forEach((r) => { _photoIndexRemove(r.itemId, r.bytes); _photoMetaDrop(r.id); });
+      return { removed: going.length, kept: all.length - going.length };
+    });
   });
 }
 
@@ -593,7 +689,7 @@ function downloadPhotoBundle() {
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `PATGo_photos_${todayISO()}.json`;
+        a.download = `PATGo photos ${fileDateUK(todayISO())}.json`;   // V87: UK date, no underscores
         document.body.appendChild(a); a.click(); document.body.removeChild(a);
         URL.revokeObjectURL(url);
         showToast(`Exported ${bundle.count} photo${bundle.count === 1 ? '' : 's'}`);
@@ -676,6 +772,8 @@ function importPhotosFromFile(file) {
           // we go: a put() over an existing id REPLACES rather than adds, so
           // counting the writes would over-report on any re-import.
           return photoIndexLoad().then(() => {
+            // v88: imported photos of jobs in the cloud are uploads now.
+            if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch {} }
             render();
             showToast(`Imported ${n} photo${n === 1 ? '' : 's'}`);
           });

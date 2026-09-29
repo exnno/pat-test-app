@@ -396,7 +396,7 @@ function renderEditSession() {
       `;
     } else {
       const months = Number(sess.retestMonths) || defaultRetestMonths();
-      const dueStr = addMonthsFormatted(sess.date, months);
+      const dueStr = retestMonthLabel(sess.date, months);   // V87: "September 2027"
       const contact = sess.retestContact;
       let contactLine = '';
       if (contact && contact.status === 'booked') {
@@ -408,7 +408,7 @@ function renderEditSession() {
         <div class="lock-toggle-row">
           <div class="lock-toggle-text">
             <div class="lock-toggle-title">🔔 Retest reminder on</div>
-            <div class="lock-toggle-sub">Due ${dueStr ? '<strong>' + escapeHTML(dueStr) + '</strong>' : '—'} (this test date + the interval below). This job is on your chase list.</div>
+            <div class="lock-toggle-sub">Due ${dueStr ? '<strong>' + escapeHTML(dueStr) + '</strong>' : '—'} (the month of this test + the interval below — a retest is due for the whole month). This job is on your chase list.</div>
             ${contactLine}
           </div>
           <label class="toggle-switch">
@@ -510,20 +510,10 @@ function renderRetestReminders() {
   } else {
     list = due.map(s => {
       const st = retestStatus(s);
-      const days = retestDaysUntil(s);
-      const months = Number(s.retestMonths) || defaultRetestMonths();
-      const dueStr = addMonthsFormatted(s.date, months);
-      let chipCls, chipLabel;
-      if (st === 'overdue') {
-        chipCls = 'retest-chip-overdue';
-        chipLabel = `Overdue by ${Math.abs(days)} day${Math.abs(days) === 1 ? '' : 's'}`;
-      } else if (st === 'duesoon') {
-        chipCls = 'retest-chip-soon';
-        chipLabel = `Due in ${days} day${days === 1 ? '' : 's'}`;
-      } else {
-        chipCls = 'retest-chip-upcoming';
-        chipLabel = `Due in ${days} day${days === 1 ? '' : 's'}`;
-      }
+      const dueStr = retestDueLabel(s);   // V87: the due MONTH, e.g. "September 2027"
+      const chipCls = st === 'overdue' ? 'retest-chip-overdue'
+        : (st === 'duesoon' ? 'retest-chip-soon' : 'retest-chip-upcoming');
+      const chipLabel = retestChipLabel(st);
       const client = clientNameForSession(s);
       const titleLine = escapeHTML(s.site || s.name || 'Untitled session');
       const clientLine = (client && client !== (s.site || s.name)) ? `<div class="retest-row-client">${escapeHTML(client)}</div>` : '';

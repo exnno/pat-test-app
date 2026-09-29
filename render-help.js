@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA
- * v73 (August 2026)
+ * v86 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -13,7 +13,8 @@
 //
 // What lives here: the About page (and its rolling changelog), the Glossary
 // (page + GLOSSARY_GROUPS data), the Contact page, the bug-report sheet markup,
-// and the three cloud-prep stub pages behind the long-press on the About title.
+// and the three cloud pages (v85: reached from Settings → Cloud, behind an
+// access code — renderCloudLocked below; the V43 About long-press is gone).
 //
 // WHY THIS SEAM. These are the read-only reference and help screens: they show
 // text, they own no settings, and none of them writes anything. That is what
@@ -38,43 +39,28 @@
 // purely for readability.
 
 function renderSettingsAbout() {
-  // v43: cloud pages reveal via long-press on the title. This section only shows
-  // if cloudPagesRevealed is true (a transient per-session flag set by long-press).
-  // v79 (decision 1A): and only on a host that HAS a cloud — on any other host
-  // the long-press reveals nothing at all.
-  const cloudOn = state.cloud && state.cloud.status !== 'off';
-  const cloudPagesMenu = (state.cloudPagesRevealed && cloudOn) ? `
-    <div class="info-card cloud-pages-menu">
-      <h3>Cloud (test)</h3>
-      <p class="muted" style="font-size:11px">Sign-in only for now. Nothing from your jobs is sent anywhere.</p>
-      <button class="backup-action-btn" id="cloud-account-btn" data-action="open-cloud-page" data-arg="account" style="margin-top:8px">👤 Account</button>
-      <button class="backup-action-btn" id="cloud-sync-btn" data-action="open-cloud-page" data-arg="sync" style="margin-top:6px">☁ Sync</button>
-      <button class="backup-action-btn" id="cloud-subscription-btn" data-action="open-cloud-page" data-arg="subscription" style="margin-top:6px">💳 Subscription</button>
-    </div>
-  ` : '';
-
+  // v85 (decision 3A): the Cloud card and the long-press on the title that
+  // revealed it are gone — the cloud pages live in Settings → Cloud now.
   return `
     <div class="screen">
       ${renderSettingsSubHeader('About')}
       <div class="info-card">
-        <h2 id="about-title" style="cursor:pointer;-webkit-user-select:none;user-select:none">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}</h2>
+        <h2 id="about-title">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}</h2>
         <p>A fast, offline-first portable appliance testing app for working PAT engineers. Built around speed of data entry — pass/fail decisions in two taps, no fighting the interface.</p>
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      ${cloudPagesMenu}
-
-      <!-- v8: rolling 3-version changelog. v80: rolled forward — V80 on top, V77 dropped. -->
+      <!-- v8: rolling 3-version changelog. v88: rolled forward — V88 on top, V85 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
-        <p><strong>V80</strong> &middot; September 2026</p>
-        <p class="muted">Nothing changes for you. This release is the next piece of the cloud version, which is switched on only for a small invite-only test: for those test accounts, jobs are now copied from the phone to the cloud in the background. For everyone else the app is exactly as it was &mdash; nothing is sent anywhere, no account is needed, and it works the same with or without a signal.</p>
-        <p><strong>V79</strong> &middot; September 2026</p>
-        <p class="muted">Housekeeping you won't see, plus the first piece of the cloud version, switched off for everyone. Backups no longer include a leftover sign-in field from an old experiment &mdash; a backup is a file you email around, and it should never carry anything that looks like a login. Restoring an older backup that has one simply ignores it. Nothing about your jobs, clients, settings or reports has changed, nothing is sent anywhere, and the app works exactly as before with or without a signal.</p>
-        <p><strong>V78</strong> &middot; September 2026</p>
-        <p class="muted">Groundwork, with nothing to see on screen. Until now, deleting a job, a client or a site simply removed it &mdash; which is all a single phone needs to know. Once your records can live on more than one device, that isn't enough: the other device still holds the thing you deleted, and would put it back. The app now keeps a quiet record of what you've deleted and when, so a deletion made here stays deleted everywhere. New records are also given stronger identifiers, so two devices writing at the same moment can't produce two records claiming to be the same one. Everything already saved keeps the identifier it has. No screen, setting or job has changed, and the app still makes no network calls.</p>
-              </div>
+        <p><strong>V88</strong> &middot; September 2026</p>
+        <p class="muted">For the invite-only cloud test: your fail photos are now copied up to the cloud, a few at a time while the app is open, and the Sync page shows how many are there. Deleting a photo, an item or a job deletes its cloud photos too. While you're signed in, old jobs can only be cleared once their photos are safe in the cloud, and Delete all photos clears only the ones already there, to free up space. Photos don't come down to your other devices yet.</p>
+        <p><strong>V87</strong> &middot; September 2026</p>
+        <p class="muted">Retests are now due for a whole month: a job tested on 30 September is due the following September, and your chase list picks it up on the 1st of the month before. The certificate shows the month. Report and export file names use spaces and UK dates (28-09-2026), and the report now carries its own title. If the phone's storage fills up, the app now tells you straight away instead of losing an item. The Backup page shows whether your data is protected, and a banner warns when storage gets full.</p>
+        <p><strong>V86</strong> &middot; September 2026</p>
+        <p class="muted">For the invite-only cloud test: your engineer name, fail reasons, descriptions, CSV columns, Multi Pick setup, Smart Quick Pick's learning and the switches that change what gets recorded (item times, test readings, Smart Quick Pick, retest reminders) now travel between your devices. Theme, sound, haptics and the barcode scanner stay set per phone.</p>
+                              </div>
 
       <div class="info-card">
         <h3>Set up another device</h3>
@@ -316,8 +302,8 @@ function renderBugSheet() {
   `;
 }
 
-// v43: cloud pages, revealed via long-press on the About title (never in the
-// main Settings nav). v79: the Account page is REAL — email-code sign-in via
+// v43: cloud pages. v85: they live in Settings → Cloud (catCloud, data.js),
+// behind an access code (renderCloudLocked above). v79: the Account page is REAL — email-code sign-in via
 // cloud.js. v80: so is Sync (push only, sync.js). Subscription is still an
 // honest placeholder.
 //
@@ -338,7 +324,7 @@ function renderCloudAccount() {
       </div>`;
   } else if (c.status === 'signed-in') {
     const plan = c.plan
-      ? `<p class="muted" id="cloud-plan">Plan: <strong>${escapeHTML(c.plan)}</strong>${c.trialEndsAt ? ` &middot; trial ends ${escapeHTML(new Date(c.trialEndsAt).toLocaleDateString())}` : ''}</p>`
+      ? `<p class="muted" id="cloud-plan">Plan: <strong>${escapeHTML(c.plan)}</strong>${c.trialEndsAt ? ` &middot; trial ends ${escapeHTML(new Date(c.trialEndsAt).toLocaleDateString('en-GB'))}` : ''}</p>`
       : '';
     body = `
       <div class="info-card">
@@ -378,8 +364,37 @@ function renderCloudAccount() {
       ${renderSettingsSubHeader('Account')}
       <div class="info-card">
         <h2>Cloud account (test)</h2>
-        <p class="muted" style="font-size:12px">While you're signed in, your jobs are copied to the cloud test (see Sync). Clients, sites and settings stay on this phone for now, and the app works exactly the same signed in or not, signal or not.</p>
+        <p class="muted" style="font-size:12px">While you're signed in, your jobs, clients and sites, testers, presets, report settings and most other settings are copied to the cloud test (see Sync). Theme, sound, haptics and the barcode scanner stay set on each phone, and the app works exactly the same signed in or not, signal or not.</p>
       </div>
+      ${body}
+    </div>
+  `;
+}
+
+// v85 (decisions 1A/2A): what Settings → Cloud shows until this phone has been
+// unlocked (cloud.js cloudPagesUnlocked). A screen, not a sheet, and the only
+// render() on it comes from the Unlock tap — MAP rule 3 is not in play.
+// ⚠ Also painted for a cloud page reached while locked (render-core.js), so it
+// must never assume it was opened from the Cloud group.
+function renderCloudLocked() {
+  const hasCloud = typeof cloudAvailable === 'function' && cloudAvailable();
+  const msg = state.cloudCodeMessage
+    ? `<p class="muted cloud-msg" id="cloud-access-msg" role="status">${escapeHTML(state.cloudCodeMessage)}</p>` : '';
+  const body = hasCloud ? `
+      <div class="info-card" id="cloud-locked">
+        <h3>Invite-only test</h3>
+        <p class="muted" style="font-size:13px">The cloud is being tested with a few engineers before it opens to everyone. Enter your access code to continue. You'll only be asked once on this phone.</p>
+        <label class="label" for="cloud-access-code">Access code</label>
+        <input class="input cloud-code-input" id="cloud-access-code" type="text" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="Code">
+        ${msg}
+        <button class="btn-primary" id="cloud-unlock" data-action="cloud-unlock" style="margin-top:10px">Unlock</button>
+      </div>` : `
+      <div class="info-card" id="cloud-locked">
+        <p class="muted">Cloud isn't available on this copy of the app.</p>
+      </div>`;
+  return `
+    <div class="screen" id="cloud-locked-page">
+      ${renderSettingsSubHeader('Cloud')}
       ${body}
     </div>
   `;
@@ -411,32 +426,285 @@ function renderCloudSync() {
       </div>`;
   } else {
     const sum = syncStatusSummary();
+    // v83 (decision 1B): which tester is in use now travels, so say which it is.
+    const inUseInst = (typeof activeInstrument === 'function') ? activeInstrument() : null;
+    const inUse = inUseInst ? instrumentDisplayName(inUseInst) : '';
     const busy = !!sy.busy;
     const dis = busy ? 'disabled' : '';
-    const last = sum.lastPushAt
-      ? escapeHTML(new Date(sum.lastPushAt).toLocaleString([], { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))
+    const stamp = (v) => v
+      ? escapeHTML(new Date(v).toLocaleString('en-GB', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }))
       : 'never';
     const msg = sy.message ? `<p class="muted cloud-msg" id="sync-msg" role="status">${escapeHTML(sy.message)}</p>` : '';
     body = `
       <div class="info-card">
         <h3>Jobs</h3>
         <p id="sync-counts"><strong>${sum.upToDate}</strong> of ${sum.total} job${sum.total === 1 ? '' : 's'} in the cloud and up to date${sum.waiting ? ` &middot; <strong>${sum.waiting}</strong> waiting to send` : ''}</p>
-        <p class="muted" id="sync-last" style="font-size:13px">Last sent: ${last}</p>
+        ${sum.recTotal ? `<p id="sync-rec-counts" style="font-size:14px">Clients &amp; sites: <strong>${sum.recUpToDate}</strong> of ${sum.recTotal} up to date</p>` : ''}
+        ${sum.listTotal ? `<p id="sync-list-counts" style="font-size:14px">Instruments &amp; presets: <strong>${sum.listUpToDate}</strong> of ${sum.listTotal} up to date</p>` : ''}
+        ${sum.rpTotal ? `<p id="sync-rp-counts" style="font-size:14px">Report settings &amp; templates: <strong>${sum.rpUpToDate}</strong> of ${sum.rpTotal} up to date</p>` : ''}
+        ${sum.gsTotal ? `<p id="sync-gs-counts" style="font-size:14px">General settings: <strong>${sum.gsUpToDate}</strong> of ${sum.gsTotal} up to date</p>` : ''}
+        ${sum.phReady && sum.phTotal ? `<p id="sync-ph-counts" style="font-size:14px">Photos: <strong>${sum.phUp}</strong> of ${sum.phTotal} in the cloud${sum.phTotal > sum.phUp ? ` &middot; <strong>${sum.phTotal - sum.phUp}</strong> waiting to send` : ''}</p>` : ''}
+        ${inUse ? `<p class="muted" id="sync-inuse" style="font-size:13px">Tester in use: <strong>${escapeHTML(inUse)}</strong> &mdash; the same on each of your devices</p>` : ''}
+        <p class="muted" id="sync-last" style="font-size:13px">Last sent: ${stamp(sum.lastPushAt)}</p>
+        <p class="muted" id="sync-last-pull" style="font-size:13px">Last checked: ${stamp(sum.lastPullAt)}</p>
         ${msg}
-        <button class="btn-primary" id="sync-push" data-action="sync-push" ${dis} style="margin-top:10px">${busy ? 'Sending…' : 'Push now'}</button>
+        <button class="btn-primary" id="sync-push" data-action="sync-push" ${dis} style="margin-top:10px">${busy ? 'Working…' : 'Push now'}</button>
+        <button class="backup-action-btn" id="sync-pull" data-action="sync-pull" ${dis} style="margin-top:8px">↓ Check for updates</button>
         <button class="link-btn" id="sync-resend-all" data-action="sync-resend-all" ${dis} style="margin-top:8px">Re-send all jobs</button>
-      </div>`;
+      </div>
+      ${renderSyncHeld(sy)}`;
   }
   return `
     <div class="screen" id="cloud-sync-page">
       ${renderSettingsSubHeader('Sync')}
       <div class="info-card">
         <h2>Sync (test)</h2>
-        <p class="muted" style="font-size:12px">Jobs are copied one way, from this phone to the cloud, a few seconds after you stop logging, whenever you reopen the app, and when signal comes back. The example job is never sent. Deleting a job deletes the cloud copy too; clearing old jobs only removes them from this phone, and the cloud keeps them. This phone is still the master copy &mdash; keep making backups as normal.</p>
+        <p class="muted" style="font-size:12px">Jobs, your clients and sites, your test instruments and item presets, and which tester is in use are copied both ways between this phone and the cloud: sent a few seconds after you stop logging, and checked for whenever you sign in, reopen the app or get signal back. Which preset is in use stays separate on each device. The example job is never sent. Deleting a job, client, site, instrument or preset deletes it on your other device too; jobs that used a deleted instrument keep their own copy of its details. Clearing old jobs only removes them from this phone, and the cloud keeps them. Photos are copied up to the cloud while the app is open, after their job; deleting a photo, an item or a job deletes its cloud photos too. Photos don't come down to your other devices yet, so a job that arrives from another device will show its photos as missing. This phone is still the master copy &mdash; keep making backups as normal.</p>
       </div>
       ${body}
     </div>
   `;
+}
+
+// v81 decision 2A. The jobs the app would not decide on its own. This card is
+// the whole reason a held job is safe: nothing was overwritten, and the question
+// is asked in terms an engineer can actually answer. Plain language throughout;
+// "fingerprint", "conflict" and "cursor" are our words, not his.
+//
+// v82 (Peter, after V81: "make it clear what's different rather than just
+// saying it's different"). Three changes:
+//   • every button says what it DOES for that situation — "Keep it deleted",
+//     "Bring it back" — rather than the same two labels for five questions;
+//   • a job that exists on both sides gets "What's different?", which fetches
+//     the cloud copy and opens a read-only comparison (decision 6A);
+//   • clients and sites are asked about here too, grouped under their own
+//     heading, with both names right on the card (decision 7A).
+function renderSyncHeld(sy) {
+  if (typeof syncHeldList !== 'function') return '';
+  const held = syncHeldList();
+  if (!held.length) return '';
+  const resolving = (sy && sy.resolving) || null;
+  const diffing = (sy && sy.diffing) || null;
+  const n = (v, one, many) => `${v} ${v === 1 ? one : many}`;
+  const keyOf = (h) => (typeof syncHeldKey === 'function') ? syncHeldKey(h) : String(h.id);
+  const btns = (key, dis, phone, cloud) => `
+        <button class="backup-action-btn" data-action="sync-keep-phone" data-arg="${escapeHTML(key)}" ${dis} style="margin-top:8px">📱 ${phone}</button>
+        ${cloud ? `<button class="link-btn" data-action="sync-keep-cloud" data-arg="${escapeHTML(key)}" ${dis} style="margin-top:8px">☁ ${cloud}</button>` : ''}`;
+
+  const jobRow = (h) => {
+    const key = keyOf(h);
+    const name = h.name ? escapeHTML(h.name) : 'Untitled job';
+    const dis = resolving === key ? 'disabled' : '';
+    const here = h.localItems == null ? '' : n(h.localItems, 'item', 'items');
+    const there = h.cloudItems == null ? '' : n(h.cloudItems, 'item', 'items');
+    let what, phone = 'Keep this phone\u2019s copy', cloud = 'Use the cloud copy', compare = false;
+    if (h.reason === 'deleted-elsewhere') {
+      what = `Deleted on your other device, but this phone has changes that were never sent${here ? ` (${here} here)` : ''}.`;
+      phone = 'Keep this job'; cloud = 'Delete it here too';
+    } else if (h.reason === 'deleted-here') {
+      what = `You deleted this job on this phone, and it\u2019s back in the cloud${there ? ` with ${there}` : ''}.`;
+      phone = 'Keep it deleted'; cloud = 'Bring it back';
+    } else if (h.reason === 'fewer-items') {
+      what = `The cloud copy has fewer items than this phone (${h.cloudItems} against ${h.localItems}). Using it would remove items from this phone.`;
+      compare = true;
+    } else if (h.reason === 'unreadable') {
+      what = `The cloud copy of this job can\u2019t be read. Nothing on this phone has been touched.`;
+      phone = 'Replace the cloud copy with this phone\u2019s'; cloud = '';
+    } else {
+      what = `Changed on this phone and on your other device since it was last sent. This phone: ${here} &middot; cloud: ${there}.`;
+      compare = true;
+    }
+    const busyDiff = diffing === String(h.id);
+    const cmp = compare
+      ? `<button class="backup-action-btn" data-action="sync-held-diff" data-arg="${escapeHTML(String(h.id))}" ${busyDiff || dis ? 'disabled' : ''} style="margin-top:8px">${busyDiff ? 'Checking\u2026' : '🔍 What\u2019s different?'}</button>`
+      : '';
+    return `
+      <div class="info-card sync-held-row" data-held-id="${escapeHTML(key)}" style="margin-top:8px">
+        <p><strong>${name}</strong></p>
+        <p class="muted" style="font-size:13px">${what}</p>
+        ${cmp}${btns(key, dis, phone, cloud)}
+      </div>`;
+  };
+
+  // '' is Unassigned; null is a client this phone doesn't have.
+  const parent = (p) => p === '' ? 'Unassigned' : (p == null ? 'a client not on this phone' : escapeHTML(p));
+  const recRow = (h) => {
+    const key = keyOf(h);
+    const isSite = h.kind === 'site';
+    const tag = isSite ? 'Site' : 'Client';
+    const title = h.name ? escapeHTML(h.name) : (isSite ? 'Unnamed site' : 'Unnamed client');
+    const dis = resolving === key ? 'disabled' : '';
+    const nm = (v) => `<strong>${escapeHTML(v || '')}</strong>`;
+    const under = (p) => isSite ? ` under ${parent(p)}` : '';
+    let lines = [], phone = 'Keep this phone\u2019s', cloud = 'Use the cloud\u2019s';
+    if (h.reason === 'deleted-elsewhere') {
+      lines.push(`Deleted on your other device, but changed on this phone first. This phone has it as ${nm(h.localName)}${under(h.localParent)}.`);
+      phone = 'Keep it'; cloud = 'Delete it here too';
+    } else if (h.reason === 'deleted-here') {
+      lines.push(`You deleted this on this phone, but your other device still has it as ${nm(h.cloudName)}${under(h.cloudParent)}.`);
+      phone = 'Keep it deleted'; cloud = 'Bring it back';
+    } else if (h.reason === 'unreadable') {
+      lines.push(`The cloud copy can\u2019t be read. Nothing on this phone has been touched.`);
+      phone = 'Replace the cloud copy with this phone\u2019s'; cloud = '';
+    } else {
+      lines.push('Changed on this phone and on your other device.');
+      if ((h.localName || '') !== (h.cloudName || '')) {
+        lines.push(`Name &mdash; this phone: ${nm(h.localName)} &middot; cloud: ${nm(h.cloudName)}`);
+      }
+      if (isSite && h.localParent !== h.cloudParent) {
+        lines.push(`Client &mdash; this phone: <strong>${parent(h.localParent)}</strong> &middot; cloud: <strong>${parent(h.cloudParent)}</strong>`);
+      }
+    }
+    return `
+      <div class="info-card sync-held-row" data-held-id="${escapeHTML(key)}" style="margin-top:8px">
+        <p><span class="muted" style="font-size:12px">${tag}</span><br><strong>${title}</strong></p>
+        ${lines.map(l => `<p class="muted" style="font-size:13px">${l}</p>`).join('')}
+        ${btns(key, dis, phone, cloud)}
+      </div>`;
+  };
+
+  // v83: instruments, presets and the tester in use. Same answers, worded for
+  // what each is. Changed-on-both cards list the fields that differ (h.diffs),
+  // because "changed" alone is no help deciding which calibration date is right.
+  const blank = (v) => (v == null || v === '') ? '<span class="muted">blank</span>' : `<strong>${escapeHTML(v)}</strong>`;
+  const listRow = (h) => {
+    const key = keyOf(h);
+    const dis = resolving === key ? 'disabled' : '';
+    // v84: report templates and the report settings row share these cards.
+    const isTpl = h.kind === 'template';
+    const isReport = h.kind === 'settings' && h.id === SYNC_REPORT_ID;
+    // v86: a general-settings row is tagged by its group name, with no title.
+    const isGen = h.kind === 'settings' && typeof syncGeneralName === 'function' && SYNC_GENERAL_IDS.indexOf(h.id) !== -1;
+    const isInst = h.kind === 'instrument', isPreset = h.kind === 'preset', isUse = h.kind === 'settings' && !isReport && !isGen;
+    const tag = isGen ? escapeHTML(syncGeneralName(h.id)) : (isInst ? 'Instrument' : (isPreset ? 'Preset' : (isTpl ? 'Report template' : (isReport ? 'Report settings' : 'Tester in use'))));
+    const title = (isUse || isReport || isGen) ? '' : (h.name ? escapeHTML(h.name) : (isInst ? 'Unnamed instrument' : (isTpl ? 'Unnamed template' : 'Unnamed preset')));
+    const lines = [];
+    let phone = 'Keep this phone\u2019s', cloud = 'Use the cloud\u2019s';
+    if (h.reason === 'deleted-elsewhere') {
+      if (h.inUse) {
+        lines.push('Deleted on your other device &mdash; and it\u2019s the tester this phone is using. Keep it, or delete it here too and this phone moves to your next instrument.');
+      } else if (h.onlyOne) {
+        lines.push('Deleted on your other device, but it\u2019s the only preset on this phone, and there must always be one.');
+      } else {
+        lines.push('Deleted on your other device, but changed on this phone first.');
+      }
+      if (isInst) lines.push('Jobs that used it keep their own copy of its details either way.');
+      phone = 'Keep it here'; cloud = h.onlyOne ? '' : 'Delete it here too';
+    } else if (h.reason === 'deleted-here') {
+      lines.push('You deleted this on this phone, but your other device still has it.');
+      phone = 'Keep it deleted'; cloud = 'Bring it back';
+    } else if (h.reason === 'unreadable') {
+      lines.push('The cloud copy can\u2019t be read. Nothing on this phone has been touched.');
+      phone = 'Replace the cloud copy with this phone\u2019s'; cloud = '';
+    } else if (isUse) {
+      lines.push(`You switched tester on this phone and on your other device. This phone: ${blank(h.localName)} &middot; other device: ${h.cloudName == null ? 'a tester not on this phone yet' : blank(h.cloudName)}`);
+      phone = h.localName ? 'Use ' + escapeHTML(h.localName) : phone;
+      cloud = h.cloudName ? 'Use ' + escapeHTML(h.cloudName) : cloud;
+    } else {
+      lines.push('Changed on this phone and on your other device.');
+      for (const f of (h.diffs || [])) {
+        lines.push(`${escapeHTML(f.label)} &mdash; this phone: ${blank(f.here)} &middot; cloud: ${blank(f.cloud)}`);
+      }
+    }
+    return `
+      <div class="info-card sync-held-row" data-held-id="${escapeHTML(key)}" style="margin-top:8px">
+        <p><span class="muted" style="font-size:12px">${tag}</span>${title ? `<br><strong>${title}</strong>` : ''}</p>
+        ${lines.map(l => `<p class="muted" style="font-size:13px">${l}</p>`).join('')}
+        ${btns(key, dis, phone, cloud)}
+      </div>`;
+  };
+
+  const jobs = held.filter(h => !h.kind || h.kind === 'session');
+  const recs = held.filter(h => h.kind === 'client' || h.kind === 'site');
+  // v84: report settings and templates get their own heading.
+  const isRp = (h) => h.kind === 'template' || (h.kind === 'settings' && h.id === SYNC_REPORT_ID);
+  const reps = held.filter(isRp);
+  // v86: general settings under their own heading too.
+  const isGs = (h) => h.kind === 'settings' && SYNC_GENERAL_IDS.indexOf(h.id) !== -1;
+  const gens = held.filter(isGs);
+  const lists = held.filter(h => h.kind && h.kind !== 'session' && h.kind !== 'client' && h.kind !== 'site' && !isRp(h) && !isGs(h));
+  const groups = (jobs.length ? 1 : 0) + (recs.length ? 1 : 0) + (lists.length ? 1 : 0) + (reps.length ? 1 : 0) + (gens.length ? 1 : 0);
+  const sub = (id, text) => `<h4 id="${id}" style="margin:14px 0 0;font-size:14px">${text}</h4>`;
+  return `
+    <div class="info-card" id="sync-held" style="margin-top:12px">
+      <h3>Needs a decision</h3>
+      <p class="muted" style="font-size:13px">Nothing has been changed on this phone. ${held.length === 1 ? 'This one' : 'These'} couldn\u2019t be settled automatically without the risk of losing work, so choose which copy to keep.</p>
+    </div>
+    ${jobs.length && groups > 1 ? sub('sync-held-jobs', 'Jobs') : ''}
+    ${jobs.map(jobRow).join('')}
+    ${recs.length ? sub('sync-held-records', 'Clients &amp; sites') : ''}
+    ${recs.map(recRow).join('')}
+    ${lists.length ? sub('sync-held-lists', 'Instruments &amp; presets') : ''}
+    ${lists.map(listRow).join('')}
+    ${reps.length ? sub('sync-held-reports', 'Report settings &amp; templates') : ''}
+    ${reps.map(listRow).join('')}
+    ${gens.length ? sub('sync-held-general', 'General settings') : ''}
+    ${gens.map(listRow).join('')}`;
+}
+
+// v82 (decision 6A): the read-only comparison for one held job. Built from the
+// display text syncJobDiff() returns; nothing here reads the cloud or state.
+// A read-only sheet — no inputs — so the page may render under it (MAP rule 3),
+// though _syncSafeToRepaint() holds sync's own repaints until it closes.
+function openSyncDiffSheet(entry, diff) {
+  if (typeof _openSheet !== 'function' || !diff) return;
+  const max = (typeof SYNC_DIFF_LIST_MAX === 'number') ? SYNC_DIFF_LIST_MAX : 20;
+  const n = (v, one, many) => `${v} ${v === 1 ? one : many}`;
+  const val = (v) => v == null ? '' : `<strong>${escapeHTML(v)}</strong>`;
+  const pair = (f) => (f.here == null && f.cloud == null)
+    ? `${escapeHTML(f.label)} is different`
+    : `${escapeHTML(f.label)} &mdash; this phone: ${val(f.here)} &middot; cloud: ${val(f.cloud)}`;
+  const row = (inner) => `<div style="padding:6px 0;border-top:1px solid var(--border);font-size:13px;line-height:1.45">${inner}</div>`;
+  const more = (total) => total > max ? `<p class="muted" style="font-size:12px;margin:6px 0 0">and ${total - max} more</p>` : '';
+  const section = (id, title, list, render) => list.length ? `
+      <h4 id="${id}" style="margin:14px 0 4px;font-size:14px">${title}</h4>
+      ${list.slice(0, max).map(x => row(render(x))).join('')}${more(list.length)}` : '';
+
+  const summary = [];
+  if (diff.onlyHere.length) summary.push(`${n(diff.onlyHere.length, 'item', 'items')} only on this phone`);
+  if (diff.onlyCloud.length) summary.push(`${n(diff.onlyCloud.length, 'item', 'items')} only in the cloud`);
+  if (diff.changed.length) summary.push(`${n(diff.changed.length, 'item', 'items')} changed`);
+  if (diff.unchanged) summary.push(`${n(diff.unchanged, 'item', 'items')} the same`);
+
+  // What each answer would actually do, in the terms of THIS comparison.
+  const effects = [];
+  if (diff.onlyHere.length) effects.push(`Using the cloud copy would remove the ${n(diff.onlyHere.length, 'item', 'items')} only on this phone.`);
+  if (diff.onlyCloud.length) effects.push(`Keeping this phone\u2019s copy would remove the ${n(diff.onlyCloud.length, 'item', 'items')} only in the cloud.`);
+  if (diff.changed.length || diff.details.length) effects.push('Anything changed takes the version from whichever copy you keep.');
+
+  const name = entry && entry.name ? escapeHTML(entry.name) : 'Untitled job';
+  const body = diff.none
+    ? `<p class="muted" id="sync-diff-none" style="font-size:13px">No differences found: the two copies hold the same details and items. Either answer leaves you with the same job.</p>`
+    : `
+      <p class="muted" id="sync-diff-summary" style="font-size:13px;margin:0 0 6px">${summary.join(' &middot; ')}</p>
+      ${effects.map(e => `<p class="muted" style="font-size:13px;margin:0 0 6px">${e}</p>`).join('')}
+      ${section('sync-diff-details', 'Job details', diff.details, pair)}
+      ${section('sync-diff-here', 'Only on this phone', diff.onlyHere, (l) => escapeHTML(l))}
+      ${section('sync-diff-cloud', 'Only in the cloud', diff.onlyCloud, (l) => escapeHTML(l))}
+      ${section('sync-diff-changed', 'Changed', diff.changed, (c) =>
+        `<strong>${escapeHTML(c.label)}</strong>${c.fields.map(f => `<br>${pair(f)}`).join('')}`)}`;
+
+  const { sheet, backdrop, cleanup } = _openSheet('What\u2019s different');
+  sheet.id = 'sync-diff-sheet';
+  sheet.innerHTML = `
+    <div class="bulk-sheet-handle"></div>
+    <div class="bulk-sheet-header">
+      <span class="fail-close-spacer"></span>
+      <h3 class="bulk-sheet-title">What\u2019s different</h3>
+      <button class="fail-close-btn" id="sync-diff-x" aria-label="Close">&times;</button>
+    </div>
+    <div class="sheet-scroll" style="margin:0 0 12px">
+      <p style="margin:0 0 6px"><strong>${name}</strong> &middot; this phone ${n(diff.hereCount, 'item', 'items')}, cloud ${n(diff.cloudCount, 'item', 'items')}</p>
+      ${body}
+    </div>
+    <button class="btn-primary sheet-pin" id="sync-diff-close">Close</button>
+  `;
+  document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+  const x = document.getElementById('sync-diff-x');
+  const ok = document.getElementById('sync-diff-close');
+  if (x) x.addEventListener('click', cleanup);
+  if (ok) ok.addEventListener('click', cleanup);
 }
 
 function renderCloudSubscription() {

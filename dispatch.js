@@ -80,9 +80,26 @@ function handleDelegatedClick(e) {
   // against entry-screen markup. Recovering to the Sessions list is the same
   // move v16.1 makes: a known-good screen that always renders, so state and
   // screen agree again.
+  // v81.2 (decision 2D): reading the cloud is driven by what the engineer does.
+  // Captured BEFORE the action so only a real screen change counts — tapping a
+  // quick-pick button or a toggle is not navigation, and should not read.
+  const viewBefore = state.view;
   try {
     fn(arg, el, e);
+    if (state.view !== viewBefore && typeof syncNoteNav === 'function') {
+      try { syncNoteNav(); } catch (e3) { console.error('syncNoteNav failed (non-fatal).', e3); }
+    }
   } catch (err) {
+    // V87 (4A): storage refused a write that isn't behind one of the guarded
+    // savers (there are ~40 direct writes across the app). Before V87 this fell
+    // through to the recovery below: the engineer was dropped on the Jobs list
+    // with "Something went wrong" while the unsaved item sat in memory — and was
+    // lost on reopen. The screen is fine here; only the disk is not. So: keep the
+    // screen, and show the "not saved" sheet instead.
+    if (typeof _isQuotaError === 'function' && _isQuotaError(err) && typeof _noteSaveFailure === 'function') {
+      _noteSaveFailure(err);
+      return;
+    }
     console.error('Action "' + name + '" threw; recovering to the Sessions list.', err);
     try {
       state.multiPickSheetOpen = false;
@@ -201,6 +218,34 @@ registerActions({
   'photo-import':       () => { const inp = document.getElementById('photo-import-file'); if (inp) inp.click(); },
   'photo-wipe':         () => {
     const n = photoStatsSync().count;
+    // v88 (decision 5A). Signed in, this frees space on the phone and nothing
+    // else: only photos already in the cloud go, and the cloud keeps them.
+    if (typeof syncActive === 'function' && syncActive()
+        && typeof syncPhotosUploadedIds === 'function' && typeof photosClearUploaded === 'function') {
+      const safe = syncPhotosUploadedIds();
+      const up = Object.keys(state.photoMeta || {}).filter((id) => safe.has(id)).length;
+      const notYet = Math.max(0, n - up);
+      if (!up) {
+        showToast('None of your photos have reached the cloud yet, so nothing was cleared');
+        return;
+      }
+      openConfirmSheet({
+        title: 'Clear photos from this phone?',
+        message:
+          `This removes the ${up} photo${up === 1 ? '' : 's'} already in your cloud copy from this phone, to free up space. ` +
+          `The cloud keeps them. ` +
+          (notYet ? `${notYet} photo${notYet === 1 ? ' hasn\u2019t' : 's haven\u2019t'} reached the cloud yet and ${notYet === 1 ? 'is' : 'are'} kept. ` : '') +
+          `Your jobs, items and results are not affected.`,
+        confirmLabel: 'Clear',
+        onConfirm: () => {
+          photosClearUploaded((id) => safe.has(id)).then((r) => {
+            render();
+            showToast(`Cleared ${r.removed} photo${r.removed === 1 ? '' : 's'} from this phone`);
+          });
+        }
+      });
+      return;
+    }
     openConfirmSheet({
       title: 'Delete all photos?',
       message:
@@ -476,7 +521,9 @@ registerActions({
   // Settings hub + sub-page nav. data-page carries the target view.
   'settings-page': (arg) => setView(arg),
   // v32: open a category sub-list from the hub.
-  'settings-category': (arg) => { state.settingsCategory = arg; setView('settingsCategory'); },
+  // v85: opening any group clears a stale "That code isn't right." from the
+  // Cloud access-code box, so it never greets a later visit.
+  'settings-category': (arg) => { state.settingsCategory = arg; state.cloudCodeMessage = ''; setView('settingsCategory'); },
   // v32: back from a setting page returns to its category (if opened from one),
   // back from a category returns to the hub. setView is also used directly when
   // jumping to a page from a flat search result (settingsCategory stays null →
@@ -705,6 +752,16 @@ registerActions({
 
   // Backup & Restore + prune + about
   'backup-export': () => downloadBackup(),
+  // V87 (4A): the "not saved" sheet. Backing up leaves the sheet up (the item is
+  // still not in storage); Clear goes to the Backup page, where clearing lives.
+  'save-fail-backup': () => downloadBackup(),
+  'save-fail-clear': () => { state.saveFailureDismissed = true; setView('settingsBackup'); },
+  'save-fail-close': () => { state.saveFailureDismissed = true; render(); },
+  // V87 (S13): the Jobs-screen storage banner.
+  'storage-banner-open': () => setView('settingsBackup'),
+  'storage-banner-dismiss': () => { dismissStorageBanner(); render(); },
+  // V87 (S12): a tap is a user gesture, which some browsers weigh when deciding.
+  'storage-protect': () => { checkStorageProtection(true).catch(() => {}); },
   // v69 (D5): put the pre-repair spellings back. Confirmed first — it rewrites
   // saved data, same as the repair did, and the user is choosing to reintroduce
   // strings the app considers wrong. render() runs inside undoApostropheRepair's
@@ -752,13 +809,9 @@ registerActions({
   'tour-skip': () => closeTour(),
   'open-tour': () => openTour(),
 
-  // v43: cloud prep pages (long-press on About title reveals these)
-  'open-cloud-page': (arg) => {
-    if (arg === 'account') state.view = 'cloudAccount';
-    else if (arg === 'sync') state.view = 'cloudSync';
-    else if (arg === 'subscription') state.view = 'cloudSubscription';
-    render();
-  },
+  // v85: the cloud pages are ordinary Settings rows now (Settings → Cloud), so
+  // the V43 'open-cloud-page' action is gone. The access-code box's one button:
+  'cloud-unlock':     () => { if (typeof cloudUnlock === 'function') cloudUnlock(); },
   // v79: real sign-in (cloud.js). The V43 mock actions are gone — its "Sync now"
   // stamped lastBackupAt, which silently quietened the backup reminder without
   // any backup being made. Every handler here is typeof-guarded: cloud.js is an
@@ -771,8 +824,19 @@ registerActions({
   'cloud-sign-out':   () => { if (typeof cloudSignOut === 'function') cloudSignOut(); },
   // v80: sync (sync.js), same guarding. "Re-send all" ignores the fingerprints
   // and sends every job again — the fix for a cloud copy that looks wrong.
-  'sync-push':        () => { if (typeof syncPush === 'function') syncPush({ manual: true }); },
+  'sync-push':        () => { if (typeof syncPush === 'function') syncPush({ manual: true, pull: true }); },
   'sync-resend-all':  () => { if (typeof syncPush === 'function') syncPush({ manual: true, force: true }); },
+  // v81: pull. "Check for updates" is the same run as Push now — the button
+  // exists because "send" and "check" are different questions to the engineer,
+  // not because they are different operations underneath.
+  'sync-pull':        () => { if (typeof syncPull === 'function') syncPull({ manual: true }); },
+  // arg is the job id: which copy of a held job wins (decision 2A).
+  'sync-keep-phone':  (arg) => { if (typeof syncHeldResolve === 'function') syncHeldResolve(arg, 'phone'); },
+  'sync-keep-cloud':  (arg) => { if (typeof syncHeldResolve === 'function') syncHeldResolve(arg, 'cloud'); },
+  // v82 (decision 6A): fetch the cloud copy of a held job and show what differs.
+  'sync-held-diff':   (arg) => { if (typeof syncHeldDiff === 'function') syncHeldDiff(arg); },
+  // v81.4: "Update now" on the entry screen's waiting line.
+  'sync-apply-waiting': () => { if (typeof syncApplyWaiting === 'function') syncApplyWaiting(); },
 
   // v43: calibration reminder (Update button on the Sessions-screen cal banner)
   'edit-cal-date': () => {
@@ -1074,6 +1138,8 @@ registerChangeActions({
   'readings-toggle': (checked) => {
     state.readingsEnabled = !!checked;
     localStorage.setItem(READINGS_KEY, state.readingsEnabled ? '1' : '0');
+    // v86: the switch syncs (settings_work) — arm the trigger, as save() would.
+    if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error(e); } }
     render();
   },
 
@@ -1123,6 +1189,8 @@ registerChangeActions({
     if (!state.failReasonTags || typeof state.failReasonTags !== 'object') state.failReasonTags = {};
     state.failReasonTags[reason] = value;
     saveFailReasonTags();
+    // v86: tags travel with the fail reasons (settings_fails).
+    if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error(e); } }
   },
 
   // v30: Report Settings toggles. The master switch and logo persist instantly

@@ -453,6 +453,9 @@ module.exports = function run() {
     // lost dispatcher branch. Only driving render() per view and looking for a
     // string that ONLY that function emits can see it.
     const a = populated();
+    // V85: the three cloud views paint the access-code box until unlocked
+    // (group 22). This group is about the dispatcher branch, so unlock first.
+    a.sandbox.localStorage.setItem('pat:cloudUnlocked', '1');
     for (const { name, view, marker } of MOVED_TO_RENDER_HELP) {
       if (!view) continue;
       t.doesNotThrow(() => { a.fn('setView')(view); a.fn('render')(); },
@@ -534,7 +537,11 @@ module.exports = function run() {
     const ver = (cfg.match(/const APP_VERSION = '([^']+)'/) || [])[1];
     t.ok(!!ver, 'APP_VERSION is readable from config.js');
     t.includes(rh, `<strong>${ver}</strong>`, 'the current release is the top changelog entry');
-    t.eq((rh.match(/<p><strong>V\d+<\/strong> &middot;/g) || []).length, 3,
+    // v81.1: widened to match a hotfix version. The original pattern predates
+    // the first dotted release, so it silently counted V81.1 as not an entry —
+    // an assertion that fails on correct code is as bad as one that passes on
+    // broken code. Same shape as 01d's APP_VERSION check.
+    t.eq((rh.match(/<p><strong>V\d+(?:\.\d+)?<\/strong> &middot;/g) || []).length, 3,
       'the changelog is exactly three entries — rolled, not appended to');
   });
 };

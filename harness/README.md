@@ -146,6 +146,13 @@ bug; leaving it red trains everyone to ignore the suite.
   `"10 failed"` scored as a pass; and a mutation that failed to apply also
   scored as a pass. Both are fixed permanently in `mutate.js` — the anchor is
   checked before every run, and the summary is matched as a whole phrase.
+- **A hung group used to hang everything (fixed V82).** An async group that
+  awaits a promise that never settles gave no report and no exit, and the
+  mutation runner waited on it for ever (M132, present since V79). `assert.js`
+  now fails any group still running after 30s, by name, and `mutate.js` kills a
+  suite after 180s and scores it caught. The full run is ~225 × 6s ≈ 25 min —
+  in a tool with a per-command time limit, run it in slices with the name or
+  file filter.
 
 ---
 

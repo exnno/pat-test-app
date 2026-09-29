@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — config.js (constants & factories)
- * v80 (September 2026)
+ * v86 (September 2026)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V80';
+const APP_VERSION = 'V88';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -87,6 +87,13 @@ const ACTIVE_INSTRUMENT_KEY = 'pat:activeinstrument';
 // Cap on saved instruments (decision 6A). Enough for a sole trader with a spare
 // and a loaner; keeps the list a list rather than a database.
 const INSTRUMENTS_MAX = 5;
+// v83 (decision 4A): INSTRUMENTS_MAX is the ADD BUTTON's limit and nothing
+// else's. Two phones on one account can hold more than five between them, and
+// once they sync each has the lot. Cutting the list at five when it loads would
+// drop the sixth on every reopen, and the next sync would bring it straight
+// back — a loop that never settles, and a delete nobody made. This ceiling is
+// only a guard against a garbage value in storage or a hand-edited backup.
+const INSTRUMENTS_STORED_MAX = 100;
 // ---------- Welcome-modal "seen" key (v63: DERIVED, not version-named) ----------
 //
 // ⚠ READ THIS BEFORE ROLLING A WELCOME MODAL. It is now a ONE-LINE edit, in this
@@ -124,7 +131,7 @@ const INSTRUMENTS_MAX = 5;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V77';
+const WELCOME_VERSION = 'V87';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -339,20 +346,133 @@ const CLOUD_AUTH_STORAGE_KEY = 'patgo:cloudAuth:' + CLOUD_ENV;
 // Flip to true at commercial launch (spec decision 5). Nothing reads it yet.
 const REQUIRE_ACCOUNT = false;
 
-// ---- v80: sync (push only — see sync.js) ------------------------------------
+// v85 (decisions 1A/2A): the Cloud group in Settings sits behind an access code.
+// ⚠ A CURTAIN, NOT A LOCK. The code is readable in this public file. It exists so
+// free users on the shared test address are not walked into a sign-in page they
+// cannot use. What actually protects the cloud is unchanged: nobody can create an
+// account from the app (cloud.js shouldCreateUser: false) and the database rules
+// (supabase/*.sql, isolation-test.sql). Remove the code at commercial launch.
+// CLOUD_UNLOCK_KEY: '1' once the code has been entered on this phone, or once it
+// has been signed in (cloud.js). Per device and for good (2A) — signing out does
+// not clear it. NEVER in a backup or setup export: restoring onto a new phone must
+// not open the curtain. Factory reset (own spec, BACKLOG) must clear it.
+const CLOUD_UNLOCK_KEY = 'pat:cloudUnlocked';
+const CLOUD_ACCESS_CODE = '1111';
+
+// ---- v80/v81: sync (push and pull — see sync.js) ----------------------------
 // SYNC_STATE_KEY: which account the phone last sent to, a fingerprint of every
-// job as it was last sent, the jobs whose deletion was sent, and when. Local
-// bookkeeping — NEVER in a backup: a restore onto another phone must send
-// everything afresh, not believe it already has.
+// job as it was last sent, the jobs whose deletion was sent, when it last sent,
+// and (v81) how far the pull has read. Local bookkeeping — NEVER in a backup: a
+// restore onto another phone must send everything afresh, and read the cloud
+// from the beginning, rather than believe it already has.
 // SYNC_PRUNED_KEY: ids of jobs cleared from this phone that the cloud still
-// keeps, so the pull (V81) does not bring them back. This one IS in backups.
-const SYNC_STATE_KEY = 'pat:syncState';     // v80: JSON {userId,sent,gone,lastPushAt}
+// keeps, so the pull does not bring them back. This one IS in backups.
+// SYNC_HELD_KEY (v81): the jobs the pull would not apply on its own and is
+// waiting on a decision for. Ids and counts only — never the cloud document,
+// which is re-read from the server if the cloud copy is the one chosen. Not in
+// backups: it describes a disagreement with a server, not anything of the
+// engineer's, and on another phone it would be meaningless.
+const SYNC_STATE_KEY = 'pat:syncState';     // v80: JSON {userId,sent,gone,lastPushAt}; v81 adds pulledAt,lastPullAt
 const SYNC_PRUNED_KEY = 'pat:syncPruned';   // v80: JSON [{id,at}]
+const SYNC_HELD_KEY = 'pat:syncHeld';       // v81: JSON [{id,at,reason,name,localItems,cloudItems}]; v82 adds kind + names
+// v82: the record kinds that sync, through the `records` table (spec section 3).
+// ⚠ Adding a kind here RESETS the records pull cursor on the next run (sync.js
+// compares the list it last read with against this one), so the new kind is read
+// from the beginning of the account rather than from wherever the old kinds had
+// reached. Rows of the old kinds come round again and resolve as no work.
+// v83: instruments, presets and one settings row (the tester in use, decision
+// 1B) join them. The order here is only the order the push visits them in.
+// v84: report templates join them (kind 'template'), one row per template.
+const SYNC_RECORD_KINDS = ['client', 'site', 'instrument', 'preset', 'settings', 'template'];
+// v83: the settings rows this version understands. Settings travel as separate
+// small rows rather than one big one (V84 carries on in the same shape), so a
+// row id this version does not know is somebody newer's and is left alone.
+// ⚠ These ids are part of the cursor's tag, exactly like the kinds above: a
+// later version that adds one reads the whole account again, so a row pushed
+// before this phone understood it is never stranded behind the cursor.
+const SYNC_INUSE_ID = 'settings_instrument';   // { id, instrumentId }
+// v84: report settings (4A: one row, everything but the counter) and the
+// certificate counter on its own (2A: highest wins, never asked). The counter
+// is split out because every report produced moves it — inside the report row
+// it would turn every report on one phone into a question on the other.
+const SYNC_REPORT_ID = 'settings_report';        // { id, settings }
+const SYNC_CERT_ID = 'settings_certcounter';     // { id, next, setAt }
+// v86: general settings (decision 1A), one small row per group so a change to
+// one group on one phone never collides with a change to another on the other.
+//   WORK  — engineer name + the switches that change what gets recorded (item
+//           times, test readings, Smart Quick Pick on/off, retest reminders).
+//   FAILS — fail reasons and their reading tags (4A: asked when both changed).
+//   DESC  — descriptions (3B): MERGED, never asked. A deletion travels because
+//           the merge knows what both phones last agreed on (st.rec.descBase).
+//   CSV / MULTIPICK — as the Settings pages of the same names.
+//   SQP   — Smart Quick Pick's learned history (2B): merged, highest count per
+//           location and item wins; never asked; a deliberate clear or rebuild
+//           (SQP_RESET_KEY) beats both.
+// Everything else stays on each phone: theme, haptics, sound, scanner, sort,
+// filters, backup reminders, clear-old-jobs age, the preset in use (V83 7A).
+const SYNC_WORK_ID = 'settings_work';              // { id, engineer, timestamps, readings, sqp, retest }
+const SYNC_FAILS_ID = 'settings_fails';            // { id, reasons, tags }
+const SYNC_DESC_ID = 'settings_descriptions';      // { id, list }
+const SYNC_CSV_ID = 'settings_csv';                // { id, columns }
+const SYNC_MULTIPICK_ID = 'settings_multipick';    // { id, enabled, slots }
+const SYNC_SQP_ID = 'settings_sqp';                // { id, history, resetAt }
+const SYNC_GENERAL_IDS = [SYNC_WORK_ID, SYNC_FAILS_ID, SYNC_DESC_ID, SYNC_CSV_ID, SYNC_MULTIPICK_ID, SYNC_SQP_ID];
+// Which open screens hold back which row: neither applied under it nor sent from
+// it until the screen is left (the V84 Report-settings rule). Each of these
+// either holds unsaved typing or writes every field back on Save.
+const SYNC_GENERAL_VIEWS = {
+  settings_work: ['settingsUser', 'settingsDisplay', 'settingsReadings', 'settingsItems', 'settingsRetest'],
+  settings_fails: ['settingsFails'],
+  settings_descriptions: ['settingsDescriptions'],
+  settings_csv: ['settingsCsv'],
+  settings_multipick: ['settingsMultiPick'],
+};
+const SYNC_SETTINGS_IDS = [SYNC_INUSE_ID, SYNC_REPORT_ID, SYNC_CERT_ID].concat(SYNC_GENERAL_IDS);
+// v86 (2B): when Smart Quick Pick's history was last cleared or rebuilt on this
+// phone (ISO string, or absent). A deliberate reset beats "highest count wins",
+// the counter's rule 15 shape. Per device; NOT in backups (a restore is not a
+// reset). Factory reset must clear it.
+const SQP_RESET_KEY = 'pat:sqpResetAt';
+// v83: screens a sync repaint must wait to leave — each holds unsaved typing in
+// fields that need not be focused (see _syncSafeToRepaint in sync.js).
+// v84: + Report settings, whose toggles change state before Save is tapped.
+// v86: + the general-settings pages (SYNC_GENERAL_VIEWS).
+const SYNC_NO_REPAINT_VIEWS = ['settingsInstrument', 'settingsItems', 'settingsUser', 'settingsReport',
+  'settingsFails', 'settingsDescriptions', 'settingsCsv', 'settingsMultiPick', 'settingsDisplay',
+  'settingsReadings', 'settingsRetest'];
+// v82 (decision 6A): the "What's different?" sheet lists at most this many
+// items per section, then says how many more there are.
+const SYNC_DIFF_LIST_MAX = 20;
 const SYNC_DEBOUNCE_MS = 5000;      // quiet time after the last save before a push
 const SYNC_BOOT_DELAY_MS = 3000;    // after the first paint, not during it
 const SYNC_RESUME_DELAY_MS = 1000;  // app reopened / signal back
 const SYNC_BATCH_ROWS = 25;         // rows per upload request…
 const SYNC_BATCH_BYTES = 400000;    // …or roughly this much JSON, whichever first
+// v81.2: bumped when the way a job is fingerprinted changes, so old
+// fingerprints are dropped rather than silently mismatching for ever.
+const SYNC_HASH_V = 2;
+// v88: photos go up a few per run, oldest first, while the app is open (a web
+// app cannot upload once closed). The rest wait for the next run; the idle
+// backstop and every save/navigation bring one round. Deletes go in batches.
+const SYNC_PHOTOS_PER_RUN = 25;
+const SYNC_PHOTO_DELETE_BATCH = 50;
+const SYNC_PULL_PAGE = 200;         // v81: rows per pull request, then page again
+// v83.1: the pager's version. A cursor saved under an older one is cleared once
+// (sync.js _syncLoad), because V81–V83 could step over rows at a page edge.
+const SYNC_PAGER_V = 2;
+// v81.2 (decision 2D). Reading is driven by what the engineer DOES — every
+// screen change is a moment they might be expecting the other phone's work —
+// with a slow backstop for standing still. The interval matters far more than
+// the payload: an empty pull is ~2 KB, but each request wakes the cellular
+// modem and holds it in a high-power state for several seconds afterwards.
+// Poll every 30s and the radio never idles at all; at two minutes it does.
+const SYNC_NAV_THROTTLE_MS = 20000;   // at most one read per 20s of tapping about
+const SYNC_IDLE_MS = 120000;          // …and one anyway if nothing has run in 2 min
+const SYNC_IDLE_CHECK_MS = 20000;     // how often that is checked (no network unless due)
+// v81: the cursor before a phone has ever pulled. A phone upgrading from V80
+// has no cursor, so its first pull reads the whole account — every job it
+// pushed comes back, matches its own fingerprint, and resolves as no work.
+const SYNC_PULL_EPOCH = '1970-01-01T00:00:00.000Z';
 // v33: First-run wizard "seen" flag. Set once the wizard is completed OR skipped,
 // so it never reappears. Distinct from the welcome modal key: a genuinely-new
 // install gets the WIZARD (gated by this key + an empty-install test); an
@@ -398,6 +518,11 @@ const REPORT_DECLARATION_DEFAULT =
 // filename (PAT_Report_<site>_<date>) so upgrading users see no change unless
 // they opt in by editing it. Tokens are substituted then the whole string is
 // sanitised to a safe filename by reportFilename() in report.js.
+// ⚠ V87: deliberately NOT changed, although the output now uses spaces and a
+// day-first date. This string is part of the synced report row, and the V84
+// "nothing made" rule compares against the defaults — changing it would make
+// every untouched phone look customised to a V86 phone. fileSafe() turns its
+// underscores into spaces instead.
 const REPORT_FILENAME_DEFAULT = 'PAT_Report_{site}_{date}';
 
 // The insertable tokens offered as tappable chips on the Report Settings page.
@@ -914,6 +1039,17 @@ const PRUNE_AGE_DEFAULT = 12;
 const CAL_DUE_SOON_DAYS = 30;
 
 const BACKUP_REMINDER_DAYS = 7;
+
+// V87 (S13, 3A): storage headroom. The app's main storage (localStorage) holds
+// roughly 5 MB and the browser will not report how much is left, so the app adds
+// it up itself (getStorageStats, storage.js). At WARN the Backup page's bar turns
+// amber with a note; at BANNER a banner on the Jobs screen says so, once a day
+// until dismissed. Photos live in separate storage and don't count toward this.
+const STORAGE_WARN_PCT = 60;
+const STORAGE_BANNER_PCT = 80;
+// ISO day (yyyy-mm-dd) the Jobs-screen storage banner was last dismissed. Per
+// device, a nag timer — NOT in backups or setup exports. Factory reset must clear it.
+const STORAGE_BANNER_KEY = 'pat:storageBannerDay';
 const BACKUP_SNOOZE_HOURS = 24;
 
 // v56: Retest reminders — the commercial "chase the customer to rebook" tool.
@@ -927,14 +1063,11 @@ const BACKUP_SNOOZE_HOURS = 24;
 //      engineer flagged THAT job as worth chasing. Defaults off per session. This is
 //      what makes the list trustworthy: lost jobs, one-offs and subcontract work are
 //      simply never flagged (or flagged then resolved). See session.js retest helpers.
-// Urgency windows (days from today to the computed due date):
-//   • Overdue   — due date is in the past.
-//   • Due soon  — within RETEST_DUE_SOON_DAYS (the active "ring them now" band).
-//   • Upcoming  — within RETEST_UPCOMING_DAYS (shown, but quiet — lead time to plan).
-// Longer windows than calibration's 30 days because winning repeat work needs notice.
+// Urgency (V87 — by MONTH, see session.js retestStatus): a retest is due for a
+// whole calendar month. "Due next month" from the 1st of the month before, "Due
+// this month" during it, "Overdue" from the 1st of the month after. The v56 day
+// windows (RETEST_DUE_SOON_DAYS 60 / RETEST_UPCOMING_DAYS 90) were deleted in V87.
 const RETEST_REMINDERS_KEY = 'pat:retestReminders';   // '1' = feature on; absent/anything else = off
-const RETEST_DUE_SOON_DAYS = 60;
-const RETEST_UPCOMING_DAYS = 90;
 
 // v71: the file used to end with the built-in default lists (item types, fail
 // reasons, descriptions, CSV columns) and the resistance-calculator tables.

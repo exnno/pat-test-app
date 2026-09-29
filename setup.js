@@ -84,10 +84,11 @@ function buildSetupBundle(label, include) {
   };
 }
 
-// Filename for a setup file: PAT_setup_<label>_<date>.json, label sanitised.
+// Filename for a setup file: "PAT setup <label> 28-09-2026.json" (V87), label sanitised.
 function setupFilename(label) {
-  const safe = String(label || 'setup').replace(/[^a-z0-9]+/gi, '_').replace(/^_+|_+$/g, '') || 'setup';
-  return `PAT_setup_${safe}_${todayISO()}.json`;
+  // V87: spaces and a UK date, like every other file the app writes.
+  const safe = fileSafe(label) || 'setup';
+  return `PAT setup ${safe} ${fileDateUK(todayISO())}.json`;
 }
 
 // Count what a bundle contains, for the export confirm / import summary.

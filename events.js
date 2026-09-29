@@ -624,6 +624,54 @@ function applyKeyboardInset() {
   root.style.setProperty('--sheet-min-release', '0px');
 }
 
+// V87: SUGGESTION LISTS THAT WOULDN'T CLOSE (a user's report, Android, the item
+// description list: "sometimes blocks and doesn't clear"). Not reproduced here —
+// no Android device — but the code shows how it can happen. The lists close ONLY
+// on the field's blur. On Android, hiding the keyboard (back gesture, the
+// keyboard's own hide key) does NOT blur the field, so the list stays open over
+// Pass / Fail, and a tap there picks a description instead of passing the item.
+// Two guards, safe on iPhone too:
+//   1. the keyboard goes away (visual viewport grows back past KB_MIN_INSET_PX)
+//      → close every open list;
+//   2. a pointerdown OUTSIDE the field that owns an open list → close it. The tap
+//      itself is left alone (no preventDefault), so it still does its job. The
+//      list is position:absolute, so removing it shifts nothing under the finger.
+// A pointerdown INSIDE a wrap is ignored — that is the suggestion's own commit
+// (makeSuggestionCommit) or a tap back into the field.
+const SUGGEST_WRAPS = [
+  { cls: 'custom-type-wrap',    open: () => state.showSuggestions,         close: () => { state.showSuggestions = false; renderSuggestionsOnly(); } },
+  { cls: 'location-input-wrap', open: () => state.showLocationSuggestions, close: () => { state.showLocationSuggestions = false; renderLocationSuggestionsOnly(); } },
+  { cls: 'nf-input-wrap',       open: () => state.showNfSuggestions,       close: () => { state.showNfSuggestions = false; renderNfSuggestionsOnly('client'); renderNfSuggestionsOnly('site'); } },
+];
+
+function closeSuggestionLists(keepCls) {
+  SUGGEST_WRAPS.forEach(w => {
+    if (w.cls === keepCls) return;
+    try { if (w.open()) w.close(); } catch (e) {}
+  });
+}
+
+function initSuggestionDismissGuards() {
+  document.addEventListener('pointerdown', (e) => {
+    const t = e && e.target;
+    let inside = null;
+    if (t && typeof t.closest === 'function') {
+      for (const w of SUGGEST_WRAPS) { if (t.closest('.' + w.cls)) { inside = w.cls; break; } }
+    }
+    closeSuggestionLists(inside);
+  }, true);   // capture: sees the tap before anything below can stop it
+
+  const vv = window.visualViewport;
+  if (!vv) return;
+  let keyboardUp = false;
+  vv.addEventListener('resize', () => {
+    const inset = Math.max(0, Math.round(window.innerHeight - (vv.height + (vv.offsetTop || 0))));
+    const up = inset >= KB_MIN_INSET_PX;
+    if (keyboardUp && !up) closeSuggestionLists(null);
+    keyboardUp = up;
+  });
+}
+
 // Bound once at boot, same lifecycle as initDelegation / initSheetDragGuard /
 // initSuggestionClickSwallow. `scroll` is not optional alongside `resize`: iOS
 // fires scroll on the visual viewport (not resize) when it shifts the view to

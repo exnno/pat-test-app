@@ -1058,6 +1058,21 @@ body.has-update-banner .screen { padding-top: 64px; }
 /* v8: Lock-session banner — sits inline at the top of the entry screen when
    the active session is locked. Uses neutral colours rather than fail-red to
    make clear it's a guard, not an error. */
+/* v81.1: a change from the other device is waiting for the job on screen, or
+   that job needs a decision. Informational, not a control — deliberately quieter
+   than .lock-banner, which is about something the engineer must act on here. */
+.sync-waiting-banner {
+  padding: 9px 12px;
+  margin: 0 0 12px;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent-border);
+  border-left: 3px solid var(--accent);
+  border-radius: 8px;
+  color: var(--accent-text);
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 .lock-banner {
   display: flex;
   align-items: center;

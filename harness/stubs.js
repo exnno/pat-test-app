@@ -405,8 +405,13 @@ function makeIndexedDB() {
       getAll()    { const r = makeRequest(); fire(r, 'onsuccess', [...data.values()]); return r; },
       getAllKeys(){ const r = makeRequest(); fire(r, 'onsuccess', [...data.keys()]); return r; },
       count()     { const r = makeRequest(); fire(r, 'onsuccess', data.size); return r; },
+      // V88: an index lookup filters by the index's field, as a real one does.
+      // Before V88 every index getAll returned the whole store, so a per-item
+      // or per-job photo delete swept every photo — invisible while no test
+      // held photos for more than one item.
       createIndex() { return { getAll: () => { const r = makeRequest(); fire(r, 'onsuccess', [...data.values()]); return r; } }; },
-      index()       { return { getAll: () => { const r = makeRequest(); fire(r, 'onsuccess', [...data.values()]); return r; } }; },
+      index(field)  { return { getAll: (key) => { const r = makeRequest();
+        fire(r, 'onsuccess', [...data.values()].filter(v => key === undefined || (v && v[field] === key))); return r; } }; },
     };
   }
 
@@ -417,7 +422,11 @@ function makeIndexedDB() {
       transaction(names) {
         const tx = { oncomplete: null, onerror: null, onabort: null, abort() {} };
         tx.objectStore = (n) => makeObjectStore(n);
-        setTimeout(() => { if (typeof tx.oncomplete === 'function') tx.oncomplete({ target: tx }); }, 0);
+        // V88: complete AFTER the transaction's requests have answered, as a
+        // real one does. Before V88 oncomplete fired first, so every READ
+        // through the app's _photoTx() resolved with no result — the photo
+        // index always loaded empty and a per-item lookup found nothing.
+        setTimeout(() => setTimeout(() => { if (typeof tx.oncomplete === 'function') tx.oncomplete({ target: tx }); }, 0), 0);
         return tx;
       },
       close() {},
@@ -468,7 +477,17 @@ function makeNavigator(opts = {}) {
       async getRegistration() { return null; },
       addEventListener() {},
     },
-    storage: { async estimate() { return { usage: 1024 * 1024, quota: 1024 * 1024 * 500 }; } },
+    // V87 (S12): persisted()/persist() — the real API's shape. opts.persisted is
+    // the starting answer; opts.persistGrants is what persist() decides.
+    // opts.noPersist removes both, as on a browser without the API. Every call
+    // is recorded so a test can prove the app ASKED (or didn't) — a stub that
+    // only returned values couldn't tell "asked and refused" from "never asked".
+    storage: Object.assign(
+      { async estimate() { return { usage: 1024 * 1024, quota: 1024 * 1024 * 500 }; } },
+      opts.noPersist ? {} : {
+        async persisted() { calls.persisted = (calls.persisted || 0) + 1; return !!(opts.persisted || calls.granted); },
+        async persist() { calls.persist = (calls.persist || 0) + 1; if (opts.persistGrants) calls.granted = true; return !!(opts.persisted || opts.persistGrants); },
+      }),
   };
 }
 

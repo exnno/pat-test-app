@@ -43,6 +43,8 @@ function storedSession(id = UID_A, email = 'peter@example.com') {
 
 function boot(opts = {}) {
   const app = bootApp(opts);
+  // V85: past the Cloud access code, as in 15-cloud.js (group 22 tests the code).
+  app.sandbox.localStorage.setItem('pat:cloudUnlocked', '1');
   app.fn('load')();
   app.state = () => app.refresh('state').state;
   app.stopTimer = () => app.run('if (_syncTimer) { clearTimeout(_syncTimer); _syncTimer = null; }');
@@ -76,6 +78,12 @@ function fakeServer(o = {}) {
     const headers = new Headers(init.headers || {});
     calls.push({ url: u, method: init.method || 'GET', body, prefer: headers.get('prefer') || '' });
     if (u.includes('/rest/v1/sessions')) {
+      // v81: this group is the PUSH test. The pull now runs on the same
+      // triggers, so a GET means "check for updates" — answered with an empty
+      // account, which is what a push-only test is entitled to assume.
+      if ((init.method || 'GET') === 'GET') {
+        return new Response('[]', { status: 200, headers: { 'content-type': 'application/json' } });
+      }
       if (o.sessions) return o.sessions(body, calls);
       return new Response(null, { status: 201 });
     }
@@ -85,9 +93,13 @@ function fakeServer(o = {}) {
     }
     return new Response(JSON.stringify({ message: 'unexpected ' + u }), { status: 404 });
   };
-  const posts = () => calls.filter(c => c.url.includes('/rest/v1/sessions'));
+  // v81: POST only. Before the pull existed every sessions call was an upload,
+  // and counting them all was the same thing as counting sends; it is not any
+  // more, and an assertion whose meaning quietly changed is worse than a red one.
+  const posts = () => calls.filter(c => c.url.includes('/rest/v1/sessions') && c.method === 'POST');
+  const gets  = () => calls.filter(c => c.url.includes('/rest/v1/sessions') && c.method === 'GET');
   const rows = () => posts().flatMap(c => Array.isArray(c.body) ? c.body : []);
-  return { calls, fetchImpl, posts, rows };
+  return { calls, fetchImpl, posts, gets, rows };
 }
 
 function job(app, site) {
@@ -264,7 +276,7 @@ module.exports = async function () {
     const app = signedIn({ uid: UID_B, localStorage: { 'pat:syncState': other } });
     const a = job(app, 'ZZACCOUNTB');
     // Pretend account A had sent this exact job.
-    const h = app.fn('syncHash')(JSON.stringify(app.state().sessions.find(s => s.id === a.id)));
+    const h = app.fn('syncHash')(app.fn('_syncCanonical')(app.state().sessions.find(s => s.id === a.id)));
     app.storage.setItem('pat:syncState', JSON.stringify({ userId: UID_A, sent: { [String(a.id)]: h }, gone: {}, lastPushAt: null }));
     t.eq(app.fn('syncStatusSummary')().waiting, 1, 'account B does not count what A sent');
     app.online();
@@ -312,6 +324,9 @@ module.exports = async function () {
     t.includes(toasts.join('|'), 'reached the cloud yet', 'and the toast says why');
 
     app.online();
+    // V88: the photo mirror loads on a timer tick after boot; until it has, the
+    // prune guard clears nothing (decision 6A). Let it load, as a phone would.
+    await tick(5);
     await app.fn('syncPush')({});
     const tombsBefore = (app.state().tombstones || []).length;
     app.fn('pruneOldSessions')();

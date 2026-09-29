@@ -103,15 +103,6 @@ function render() {
     }
   }
 
-  // v43: the cloud-pages secret menu (revealed by long-pressing the About title)
-  // must close as soon as you leave the About page. We keep it open only while on
-  // About itself or on one of the three cloud pages (so tapping in and back out
-  // doesn't lose it), and clear it on any other view.
-  if (state.cloudPagesRevealed &&
-      v !== 'settingsAbout' && v !== 'cloudAccount' &&
-      v !== 'cloudSync' && v !== 'cloudSubscription') {
-    state.cloudPagesRevealed = false;
-  }
 
   // v56: the retest action sheet is bound to the reminders view only — clear its
   // transient target on any other view so it can't resurface elsewhere.
@@ -156,10 +147,18 @@ function render() {
   else if (v === 'settingsAbout') html = renderSettingsAbout();
   else if (v === 'settingsGlossary') html = renderSettingsGlossary();   // v58
   else if (v === 'settingsContact') html = renderSettingsContact();
-  // v43: cloud prep pages (not wired into nav yet, revealed via long-press on About)
-  else if (v === 'cloudAccount') html = renderCloudAccount();
-  else if (v === 'cloudSync') html = renderCloudSync();
-  else if (v === 'cloudSubscription') html = renderCloudSubscription();
+  // v85: the cloud pages live in Settings → Cloud. While this phone is not
+  // unlocked they are never painted — any route in (a stale view) gets the
+  // Cloud group's access-code box instead. Without cloud.js that is every time.
+  else if (v === 'cloudAccount' || v === 'cloudSync' || v === 'cloudSubscription') {
+    if (typeof cloudPagesUnlocked === 'function' && cloudPagesUnlocked()) {
+      html = v === 'cloudAccount' ? renderCloudAccount()
+           : v === 'cloudSync'    ? renderCloudSync()
+           : renderCloudSubscription();
+    } else {
+      html = renderCloudLocked();
+    }
+  }
 
   // Update banner sits above the screen
   const banner = state.updateAvailable ? `
@@ -227,10 +226,11 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>New: log a run of identical items in one go.</strong> Got ten of the same thing in a room? Log the first, then <strong>press and hold Copy last result</strong> and pick how many more to add &mdash; +2, +3, +5, +10, or type a number. It shows you exactly what it's about to copy first.</li>
-        <li><strong>Holding the quick-pick buttons no longer highlights the text.</strong> Holding them to switch presets used to select the button labels at the same time, which looked like something had gone wrong. It doesn't now.</li>
-        <li><strong>Back goes where you came from.</strong> If you open <em>Edit presets</em> from the press-and-hold panel, Back now returns you straight to the test screen instead of dropping you in Settings.</li>
-        <li><strong>Nothing else has changed.</strong> Every screen, setting and job is exactly where you left it.</li>
+        <li><strong>Retests go by the month.</strong> A retest is due for the whole month &mdash; a job tested on 30 September on a 12-month cycle is due next September. If you use retest reminders, the job joins your chase list on the <strong>1st of the month before</strong>, so you have a full month to ring the customer. Certificates show the month, e.g. <em>Recommended retest: September 2027</em>.</li>
+        <li><strong>Tidier file names.</strong> Reports and exports are saved with spaces and a UK date, like <em>PAT Report Office 28-09-2026.pdf</em> &mdash; no more underscores to tidy up. The report also has its own title when you print or open it.</li>
+        <li><strong>Full storage can't lose an item any more.</strong> If the phone runs out of room for PATGo, you're told straight away, with a button to back up what's on screen.</li>
+        <li><strong>Storage health on the Backup page.</strong> It shows whether the phone has agreed to keep PATGo's data, and a banner on the Jobs screen warns you when storage is getting full.</li>
+        <li><strong>Description suggestions close properly.</strong> The suggestions list now closes when you hide the keyboard or tap elsewhere, so it can't sit over the Pass and Fail buttons.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -447,7 +447,11 @@ function render() {
   // v79: the TEST strip (decision 3A) sits above everything, and only exists
   // while signed in to the test cloud. typeof-guarded — cloud.js is optional.
   const cloudStrip = (typeof cloudTestStripHTML === 'function') ? cloudTestStripHTML() : '';
-  const finalHTML = cloudStrip + banner + html + migrationModal + welcomeModal + wizardModal + signaturePadModal + reopenWarnModal;
+  // V87 (4A): a save just failed. Painted LAST and above everything (z 400), on
+  // every screen, because the thing on screen is not on disk. Not dismissible by
+  // the backdrop — only by a button — so a stray tap can't hide it.
+  const saveFailModal = renderSaveFailSheet();
+  const finalHTML = cloudStrip + banner + html + migrationModal + welcomeModal + wizardModal + signaturePadModal + reopenWarnModal + saveFailModal;
   app.innerHTML = finalHTML;
   // v24 (E4): record whether THIS render put any modal/sheet into the DOM, so the
   // next render knows whether the orphan-sweep above could find anything. Cheap
@@ -490,16 +494,6 @@ function render() {
   _lastRenderedView = state.view;
   bindFocusFields();
   if (state.signaturePadOpen) initSignaturePad();   // v34
-  // v43: set up long-press on About title for cloud pages reveal
-  if (state.view === 'settingsAbout') {
-    const aboutTitle = document.getElementById('about-title');
-    if (aboutTitle) {
-      setupLongPress(aboutTitle, 2000, () => {
-        state.cloudPagesRevealed = true;
-        render();
-      });
-    }
-  }
   // v67: paired mode puts the cursor in the asset box so a scan lands with no
   // tap. Last in the render tail on purpose — it must run after the scroll
   // restore above, or focusing would fight it. The function itself bails on
@@ -740,7 +734,7 @@ function renderRetestBanner() {
   let label;
   if (overdue > 0) {
     label = `🔔 ${overdue} retest${overdue === 1 ? '' : 's'} overdue` +
-      (due.length > overdue ? ` · ${due.length - overdue} due soon` : '');
+      (due.length > overdue ? ` · ${due.length - overdue} due` : '');
   } else {
     label = `🔔 ${due.length} client${due.length === 1 ? '' : 's'} due for retest`;
   }
@@ -838,6 +832,9 @@ function renderSessions() {
   // a tracked job is due. Sits below the calibration warning.
   const retestBanner = renderRetestBanner();
 
+  // V87 (S13): storage getting full — at STORAGE_BANNER_PCT, once a day.
+  const storageBanner = renderStorageBanner();
+
   return `
     <div class="screen">
       <header class="header">
@@ -845,6 +842,7 @@ function renderSessions() {
         ${state.reportSettings.enabled ? '<button class="icon-btn" id="reports-btn" data-action="open-reports" aria-label="Reports">📄</button>' : ''}
         <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">⚙</button>
       </header>
+      ${storageBanner}
       ${calWarning}
       ${retestBanner}
       ${backupBanner}
@@ -942,6 +940,58 @@ function renderAssetHistorySheet() {
 // whether the user has ever backed up:
 //   • Never → "You haven't backed up yet. Export a copy to keep your data safe."
 //   • Stale → "It's been N days since your last backup."
+// V87 (S13, 3A): the phone's storage for this app is 80%+ full. Top of the Jobs
+// screen, above calibration, because running out loses work. "Back up" opens the
+// Backup page, where the storage meter and "clear old sessions" live; × hides it
+// until tomorrow (storageBannerDue / dismissStorageBanner, storage.js).
+// V87 (4A): the "not saved" sheet. `full` decides the wording only; either way
+// the last change is on screen but not in storage. The backup is built from what
+// is in memory (buildBackup, backup.js), so "Back up now" DOES include it.
+function renderSaveFailSheet() {
+  const f = state.saveFailure;
+  if (!f || state.saveFailureDismissed) return '';
+  const title = f.full ? 'Storage full \u2014 not saved' : 'Couldn\u2019t save';
+  const why = f.full
+    ? 'This phone has run out of room for PATGo\u2019s data.'
+    : 'Something stopped PATGo writing to this phone\u2019s storage.';
+  return `
+    <div class="modal-backdrop" style="z-index:400"></div>
+    <div class="bulk-sheet save-fail-sheet" style="z-index:401" role="alertdialog" aria-label="${escapeHTML(title)}">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+        <span class="fail-close-spacer"></span>
+      </div>
+      <div class="sheet-scroll">
+        <p style="margin:0 0 10px">${escapeHTML(why)} <strong>Your last change is on screen but is NOT saved</strong> &mdash; if you close the app now, it will be lost.</p>
+        <p class="muted" style="margin:0 0 14px">Back up now: the backup includes what's on screen. Then clear old jobs to make room, and carry on.</p>
+      </div>
+      <button class="btn-primary" style="width:100%" data-action="save-fail-backup">Back up now</button>
+      <div class="btn-row" style="margin-top:10px">
+        <button class="btn-secondary" data-action="save-fail-clear">Clear old jobs</button>
+        <button class="btn-secondary" data-action="save-fail-close">Close</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderStorageBanner() {
+  if (typeof storageBannerDue !== 'function' || !storageBannerDue()) return '';
+  const pct = getStorageStats().pct;
+  return `
+    <div class="backup-banner storage-banner" role="status">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text">This phone's storage for PATGo is ${pct}% full. Back up, then clear old jobs to make room.</div>
+        <div class="backup-banner-actions">
+          <button class="backup-banner-action primary" id="storage-banner-open" data-action="storage-banner-open">Back up &amp; clear</button>
+        </div>
+      </div>
+      <button class="backup-banner-dismiss" id="storage-banner-dismiss" data-action="storage-banner-dismiss" aria-label="Dismiss until tomorrow">×</button>
+    </div>
+  `;
+}
+
 function renderBackupReminderBanner() {
   let msg;
   if (!state.lastBackupAt) {
@@ -1089,18 +1139,10 @@ function renderSessionsListAreaHTML() {
       const rStatus = state.retestRemindersEnabled ? retestStatus(s) : null;
       let retestChip = '';
       if (rStatus === 'overdue' || rStatus === 'duesoon' || rStatus === 'upcoming') {
-        const days = retestDaysUntil(s);
-        let rCls, rLabel;
-        if (rStatus === 'overdue') {
-          rCls = 'retest-chip-overdue';
-          rLabel = `🔔 Retest overdue (${Math.abs(days)}d)`;
-        } else if (rStatus === 'duesoon') {
-          rCls = 'retest-chip-soon';
-          rLabel = `🔔 Retest due in ${days}d`;
-        } else {
-          rCls = 'retest-chip-upcoming';
-          rLabel = `🔔 Retest in ${days}d`;
-        }
+        // V87: month wording, not day counts — a retest is due for a whole month.
+        const rCls = rStatus === 'overdue' ? 'retest-chip-overdue'
+          : (rStatus === 'duesoon' ? 'retest-chip-soon' : 'retest-chip-upcoming');
+        const rLabel = `🔔 ${retestChipLabel(rStatus)}`;
         retestChip = `<div class="session-export-row"><span class="retest-chip ${rCls}">${escapeHTML(rLabel)}</span></div>`;
       }
       const openAttr = matchedItemIndex !== -1
@@ -1242,6 +1284,41 @@ function assetFieldHTML() {
     ` value="${escapeHTML(state.form.assetNo)}"` +
     `${state.scannerEnabled ? ' placeholder="Scan or type"' : ''}` +
     `${paired ? ' inputmode="none"' : ''}>`;
+}
+
+// v81.1, decision 3A. A change arrived from the other device for the job that
+// is open right now, and was deliberately held back rather than applied under
+// the engineer's thumb. Without this line the job simply changes — or vanishes —
+// the moment they leave it, which is what Peter hit in testing: a job deleted on
+// the other phone sat there looking alive, then disappeared on the way out.
+// Says nothing at all unless something really is waiting for THIS job.
+function syncWaitingBanner() {
+  const w = (state.sync && state.sync.waiting) || null;
+  const id = state.activeId;
+  if (!id) return '';
+
+  // A clash needing an answer outranks a waiting change: one is a question,
+  // the other is just a delay.
+  if (typeof syncHeldList === 'function') {
+    const stuck = syncHeldList().some(h => String(h.id) === String(id));
+    if (stuck) {
+      return '<div class="sync-waiting-banner">This job was changed on your other device too. '
+           + 'Nothing here has changed \u2014 pick which copy to keep on the Sync page.</div>';
+    }
+  }
+
+  if (!w || String(w.id) !== String(id)) return '';
+  if (w.kind === 'delete') {
+    return '<div class="sync-waiting-banner">Deleted on your other device. '
+         + 'It will be removed when you leave this job.</div>';
+  }
+  // v81.4: the button. Updates only — see syncApplyWaiting(). Disabled while a
+  // run is in flight, so a double tap cannot queue a second allowance.
+  const busy = !!(state.sync && state.sync.busy);
+  return '<div class="sync-waiting-banner">Changes from your other device are waiting. '
+       + 'They will apply when you leave this job. '
+       + '<button class="link-btn" data-action="sync-apply-waiting"' + (busy ? ' disabled' : '')
+       + ' style="margin-left:4px;font-weight:600">' + (busy ? 'Updating\u2026' : 'Update now') + '</button></div>';
 }
 
 function renderEntry() {
@@ -1646,6 +1723,7 @@ function renderEntry() {
       </header>
 
       ${lockBanner}
+      ${syncWaitingBanner()}
       ${progressRow}
 
       <label class="label">Asset number</label>
