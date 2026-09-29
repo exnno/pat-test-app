@@ -59,6 +59,10 @@ create table if not exists public.photos (
   primary key (user_id, id)
 );
 
+-- V88: when each photo was taken, so another phone can show a job's photos in
+-- order (V89). Safe to re-run; on an existing project paste just this line.
+alter table public.photos add column if not exists taken_at timestamptz;
+
 -- [v1.2] updated_at must move on EVERY update, not just insert. The sync pull
 -- asks for "rows changed since X" by updated_at; a default alone only stamps
 -- the first write, so later edits would never be pulled by another device.
