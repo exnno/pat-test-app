@@ -3157,6 +3157,13 @@ const MUTATIONS = [
     to:   "select('id,doc,' + _SYNC_BROWSE_JOB_COLS).eq('user_id', uid).in('id', chunk))\n        .then",
     why:  "R17: names only until Bring back (28g)",
   },
+  {
+    name: "M435 (V91.1) the new cache is filled from the browser cache",
+    file: "sw.js",
+    from: "      cache.addAll(ASSETS.map(url => new Request(url, { cache: 'reload' }))))",
+    to:   "      cache.addAll(ASSETS))",
+    why:  "a phone updating soon after a release installs the new key with the old files and stays on the old version (28j)",
+  },
 ];
 
 function main() {
