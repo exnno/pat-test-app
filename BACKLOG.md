@@ -18,6 +18,24 @@ leftovers are the IndexedDB photo store and the sync bookkeeping keys
 Cloud access-code flag) — a half-reset phone that is
 still signed in would pull its old jobs straight back. Most destructive button in
 the app, so the confirm needs to be genuinely hard to hit by accident.
+V91 adds: TIDY_OFFER_KEY (the offer's timer) and PHOTO_AGE_KEY (a setting — the
+settings level decides); `conf`/`confV` live inside SYNC_STATE_KEY.
+
+### V91 residuals (known, accepted)
+- A job is safe one sync AFTER the one that sent it (the read-back). Right after
+  logging, the 🛡 waits for the next trigger (reopen, a save, the backstop).
+- The read-back is today's pull downloading each pushed job again — the waste
+  Stage 5's fingerprint column removes. When it lands, `st.conf` must be filled
+  from that column, or nothing is ever safe again.
+- No signal: removal trusts the last read-back (3A). A job deleted everywhere on
+  another phone since then is removed here too — which is what that phone asked.
+- A job brought back whose instrument was deleted since prints the tester in
+  use (same as any job pulled from another phone — V83 tier 3).
+- Bring back lists cleared jobs by name only; no item count (it would mean
+  downloading the job).
+- A cleared job's `st.conf` entry is dropped on the next pull; its photos stay
+  known (`ph.sent`), so the photo manager still shows them as in the cloud.
+- Signed-out users see the V91 welcome sheet, which says nothing changed for them.
 
 ### V90 residuals (known, accepted)
 - "Look in the cloud" reads rows and job names only while the manager is open;
@@ -83,7 +101,7 @@ the app, so the confirm needs to be genuinely hard to hit by accident.
 - Protection status is asked fresh each launch, never stored.
 - Day-first file names don't sort by date in a folder (Peter's choice, V87).
 
-### Cloud track — V90: the photo manager; next Stage 4 safe in the cloud
+### Cloud track — V91: safe in the cloud; next Stage 5 jobs on request
 V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull → V82 clients + sites →
 V83 instruments + presets + tester in use → V83.1 pager fix → V84 report
 settings + templates + certificate counter → V85 the cloud pages moved to
@@ -93,9 +111,11 @@ Pick history) → V87 field release → **V88** photos UP (one way, isolation 4c
 7a–7d) → **V89** photos DOWN, only when asked (rows, previews, ☁ tiles,
 certificate prompt, deletes from any phone; isolation 4e/4f) → **V90** the
 photo manager (Settings → Backup → Manage photos: phone + cloud, Look in the
-cloud, remove from phone, download, delete everywhere, orphans; no SQL). Next
-(roadmap v4.3, 6A): Stage 4 safe-in-the-cloud, Stage 5 jobs on request, then
-field batch A.
+cloud, remove from phone, download, delete everywhere, orphans; no SQL) →
+**V91** safe in the cloud (read-back fingerprint, 🛡, Jobs on this phone, remove
+/ bring back, tidy-up offer, two-step delete everywhere; no SQL). Next (roadmap
+v4.4): Stage 5 jobs on request + fresh-phone rule + lighter pull, then field
+batch A.
 Every cloud release runs `supabase/isolation-test.sql` (all PASS) before
 promotion to `Release` — all PASS at V84 incl. 6a–6d. V85 changed no SQL.
 

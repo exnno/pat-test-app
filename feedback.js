@@ -105,6 +105,45 @@ function openConfirmSheet(opts) {
   });
 }
 
+// V91: a sheet of two or more choices plus Cancel — the confirm sheet's shape
+// with a button per choice, stacked full width. opts: { title, message,
+// choices: [{ label, style: 'primary'|'secondary'|'danger', onPick }],
+// cancelLabel='Cancel' }. A pick closes the sheet first, then runs its onPick.
+function openChoiceSheet(opts) {
+  opts = opts || {};
+  const title = opts.title || 'Choose';
+  const message = opts.message || '';
+  const choices = Array.isArray(opts.choices) ? opts.choices : [];
+  const cls = (st) => st === 'danger' ? 'btn-danger' : (st === 'primary' ? 'btn-primary' : 'btn-secondary');
+  const { sheet, backdrop, cleanup } = _openSheet(title);
+  sheet.innerHTML = `
+    <div class="bulk-sheet-handle"></div>
+    <div class="bulk-sheet-header">
+      <span class="fail-close-spacer"></span>
+      <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+      <button class="fail-close-btn" id="choice-sheet-cancel" aria-label="Cancel">&times;</button>
+    </div>
+    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
+    <div class="sheet-pin" style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+      ${choices.map((c, i) => `<button class="${cls(c.style)}" id="choice-sheet-${i}" style="width:100%">${escapeHTML(c.label || '')}</button>`).join('')}
+      <button class="btn-secondary" id="choice-sheet-no" style="width:100%">${escapeHTML(opts.cancelLabel || 'Cancel')}</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+  const x = document.getElementById('choice-sheet-cancel');
+  const no = document.getElementById('choice-sheet-no');
+  if (x) x.addEventListener('click', cleanup);
+  if (no) no.addEventListener('click', cleanup);
+  choices.forEach((c, i) => {
+    const b = document.getElementById('choice-sheet-' + i);
+    if (b) b.addEventListener('click', () => {
+      cleanup();
+      if (typeof c.onPick === 'function') c.onPick();
+    });
+  });
+}
+
 // A single-line name/text input dialog. opts: { title, blurb, value='',
 // placeholder='', confirmLabel='Save', maxlength=60, onConfirm(value) }.
 // onConfirm receives the trimmed value and is only called on the confirm tap

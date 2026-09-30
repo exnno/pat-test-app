@@ -918,3 +918,155 @@ function renderPhotoManager() {
     ${_pmPreviewSheet(m, pm)}
   `;
 }
+
+// ============== V91 (roadmap Stage 4) — Jobs on this phone ==============
+// Settings → Backup → Jobs on this phone (5A). Logic in settings-actions.js
+// (jobMgr*, tidy*). Signed in only — signed out it is never linked; a stray
+// visit shows a line saying so. 🛡 = on this phone AND safe in the cloud;
+// ☁ stays "only in the cloud" (Peter, V91 4A — Stage 5 relies on it).
+
+// The tidy-up block (8A/9A) — the offer's two actions, also shown at the top of
+// this screen. '' when there is nothing to tidy.
+function renderTidyBlock(m, cls) {
+  if (!m || !m.active || (!m.jobs.length && !m.photos.length)) return '';
+  const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const lines = [];
+  if (m.jobs.length) {
+    lines.push(`
+        <div class="tidy-row">
+          <span class="tidy-text">${pl(m.jobs.length, 'job')} older than ${pl(m.jobAge, 'month')} (${pl(m.jobItems, 'item')})</span>
+          <button class="backup-action-btn tidy-btn" data-action="tidy-jobs">Remove from phone</button>
+        </div>`);
+  }
+  if (m.photos.length) {
+    lines.push(`
+        <div class="tidy-row">
+          <span class="tidy-text">${pl(m.photos.length, 'photo')} older than ${pl(m.photoAge, 'month')} (${escapeHTML(formatBytes(m.photoBytes))})</span>
+          <button class="backup-action-btn tidy-btn" data-action="tidy-photos">Remove from phone</button>
+        </div>`);
+  }
+  return `
+      <div class="tidy-block ${cls || ''}">
+        <p class="tidy-lead">Safe in the cloud and can come off this phone:</p>
+        ${lines.join('')}
+      </div>`;
+}
+
+function renderJobManager() {
+  const jm = state.jobMgr || {};
+  const m = jobMgrModel();
+  const header = `
+    <header class="header-row">
+      <button class="icon-btn" data-action="jm-back" aria-label="Back">\u2039</button>
+      <div class="site-name">Jobs on this phone</div>
+      ${m.active && m.counts.all ? `<button class="pm-select-btn" data-action="jm-select-toggle" ${jm.busy ? 'disabled' : ''}>${jm.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
+    </header>`;
+  if (!m.active) {
+    return `
+    <div class="screen jm-screen">
+      ${header}
+      <p class="muted pm-note">Sign in to the cloud to see which jobs are safe there.</p>
+    </div>`;
+  }
+
+  const summary = `
+    <div class="settings-section pm-totals">
+      <div class="pm-total-row"><span>\ud83d\udee1 Safe in the cloud</span><strong>${m.counts.safe} of ${m.counts.all}</strong></div>
+      <p class="muted pm-note">A job can come off this phone once the cloud copy matches it and all its photos are uploaded. It stays in the cloud and on your other phones, and you can bring it back.</p>
+    </div>`;
+
+  const tidy = renderTidyBlock(tidyModel(false), 'jm-tidy');
+
+  const opt = (v, label) => `<option value="${v}"${m.filter === v ? ' selected' : ''}>${label}</option>`;
+  const controls = m.counts.all ? `
+    <div class="list-controls">
+      <label class="control-field">
+        <span class="control-label">Show</span>
+        <select class="sort-select" data-change-action="jm-filter">
+          ${opt('all', 'All')}${opt('safe', 'Safe in the cloud')}${opt('notyet', 'Not safe yet')}
+        </select>
+      </label>
+    </div>` : '';
+
+  const busy = jm.busy ? `<p class="pm-busy" id="jm-busy" role="status">${escapeHTML(jm.busy)}</p>` : '';
+
+  let body;
+  if (!m.counts.all) {
+    body = `<p class="muted pm-note">No jobs on this phone.</p>`;
+  } else if (!m.rows.length) {
+    body = `<p class="muted pm-note">No jobs match this filter.</p>`;
+  } else {
+    body = m.rows.map((x) => {
+      const sel = !!(jm.selected || {})[x.id];
+      const meta = [x.client, formatDate(x.date), `${x.items} item${x.items === 1 ? '' : 's'}`, x.photos ? `\ud83d\udcf7 ${x.photos}` : ''].filter(Boolean).join(' \u00b7 ');
+      const status = x.r.safe
+        ? `<span class="jm-status is-safe">\ud83d\udee1 ${escapeHTML(syncSafetyText(x.r))}</span>`
+        : `<span class="jm-status">${escapeHTML(syncSafetyText(x.r))}</span>`;
+      const tick = jm.selecting
+        ? `<span class="jm-tick${sel ? ' is-on' : ''}${x.removable ? '' : ' is-off'}" aria-hidden="true">${sel ? '\u2713' : ''}</span>`
+        : '';
+      return `
+        <div class="jm-row${sel ? ' is-selected' : ''}${jm.selecting && !x.removable ? ' is-dim' : ''}" data-action="jm-tap" data-arg="${escapeHTML(x.id)}">
+          ${tick}
+          <div class="jm-text">
+            <div class="pm-group-title">${x.locked ? '<span class="session-lock" title="Locked">\ud83d\udd12</span>' : ''}${escapeHTML(x.title)}</div>
+            <div class="pm-group-sub">${escapeHTML(meta)}</div>
+            <div class="jm-status-row">${status}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // 10A: cleared from this phone — names on a tap, never automatic.
+  const cl = jm.cleared;
+  let cleared;
+  if (cl && cl.loading) {
+    cleared = `<p class="muted pm-note">Looking in the cloud\u2026</p>`;
+  } else if (cl && cl.ok) {
+    const rows = (cl.jobs || []).map((j) => {
+      const c = (j.clientId && typeof clientById === 'function') ? clientById(j.clientId) : null;
+      const meta = [c ? c.name : '', formatDate(j.date)].filter(Boolean).join(' \u00b7 ');
+      return `
+        <div class="jm-row jm-cleared-row">
+          <div class="jm-text">
+            <div class="pm-group-title">${j.locked ? '<span class="session-lock" title="Locked">\ud83d\udd12</span>' : ''}${escapeHTML(j.site || j.name || 'Untitled job')}</div>
+            <div class="pm-group-sub">\u2601 ${escapeHTML(meta || 'In the cloud')}</div>
+          </div>
+          <button class="backup-action-btn jm-back-btn" data-action="jm-bring-back" data-arg="${escapeHTML(j.id)}" ${jm.busy ? 'disabled' : ''}>Bring back</button>
+        </div>`;
+    }).join('');
+    const when = escapeHTML(new Date(cl.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
+    cleared = (rows || `<p class="muted pm-note">No jobs cleared from this phone are waiting in the cloud.</p>`) +
+      (cl.gone ? `<p class="muted pm-note">${cl.gone} cleared job${cl.gone === 1 ? ' was' : 's were'} deleted from the cloud since.</p>` : '') +
+      `<p class="muted pm-note">Checked at ${when} \u00b7 <button class="pm-look-link" data-action="jm-cleared-look">Look again</button></p>`;
+  } else {
+    cleared = `<p class="muted pm-note">Jobs you removed from this phone stay in the cloud. <button class="pm-look-link" data-action="jm-cleared-look">Show them</button></p>`;
+  }
+  if (cl && cl.error) cleared += `<p class="pm-note pm-error">${escapeHTML(cl.error)}</p>`;
+
+  let bar = '';
+  if (jm.selecting) {
+    const n = Object.keys(jm.selected || {}).filter((id) => m.byId.has(id)).length;
+    bar = `
+      <div class="selection-bar pm-bar">
+        <span class="selection-bar-count">${n} selected</span>
+        <button class="selection-bar-action pm-bar-btn" data-action="jm-remove" ${n && !jm.busy ? '' : 'disabled'}>Remove from phone</button>
+      </div>`;
+  }
+
+  return `
+    <div class="screen jm-screen">
+      ${header}
+      ${summary}
+      ${tidy}
+      ${controls}
+      ${busy}
+      ${body}
+      <div class="settings-section jm-cleared">
+        <h2 class="h2">Cleared from this phone</h2>
+        ${cleared}
+      </div>
+    </div>
+    ${bar}
+  `;
+}

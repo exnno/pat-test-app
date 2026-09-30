@@ -139,6 +139,8 @@ function render() {
   // V90 (R18): the photo manager, reached from the Backup page. Falls back to
   // the Backup page if its markup is missing (never a blank screen).
   else if (v === 'photoManager') html = (typeof renderPhotoManager === 'function') ? renderPhotoManager() : renderSettingsBackup();
+  // V91 (Stage 4, 5A): Jobs on this phone — same fallback.
+  else if (v === 'jobManager') html = (typeof renderJobManager === 'function') ? renderJobManager() : renderSettingsBackup();
   else if (v === 'settingsSetup') html = renderSettingsSetup();   // v33
   else if (v === 'settingsCsv') html = renderSettingsCsv();   // v11
   else if (v === 'settingsClients') html = renderSettingsClients();   // v19
@@ -229,10 +231,11 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Manage photos.</strong> Settings &rarr; Backup &rarr; <strong>Manage photos</strong> shows every photo, grouped by job, with how much space they take. Tap one to see it larger, or tap <strong>Select</strong> to pick several &mdash; or a whole job &mdash; and delete them.</li>
-        <li><strong>Sort by space.</strong> Sort jobs by <em>Most space</em> to find the ones filling your phone.</li>
-        <li><strong>Locked jobs are safe.</strong> Photos on a locked job are never deleted from here &mdash; unlock the job first.</li>
-        <li><strong>Remember:</strong> photos aren't in your backup. Export them from the Backup page before deleting anything you might need.</li>
+        <li><strong>For the invite-only cloud test.</strong> If you're not signed in to the cloud, nothing has changed for you in this update.</li>
+        <li><strong>&#128737; Safe in the cloud.</strong> A shield on a job means the cloud has checked it holds the same copy, with every photo. Only those jobs can come off this phone.</li>
+        <li><strong>Jobs on this phone.</strong> Settings &rarr; Backup &rarr; <strong>Jobs on this phone</strong> shows which jobs are safe and why the rest aren't yet. Pick some and remove them from this phone &mdash; the cloud and your other phones keep them, and <strong>Show them</strong> brings any back.</li>
+        <li><strong>Tidy up.</strong> Once a month the app may offer to take old jobs and old photos off this phone. You choose the ages on the Backup page.</li>
+        <li><strong>Deleting a job</strong> now asks whether to remove it from this phone or delete it everywhere &mdash; and everywhere asks twice.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -466,7 +469,8 @@ function render() {
     finalHTML.indexOf('bulk-sheet') !== -1;
   // Toggle body class for selection bar spacing
   if ((state.view === 'overview' && state.selectionMode)
-      || (state.view === 'photoManager' && state.photoMgr && state.photoMgr.selecting)) {
+      || (state.view === 'photoManager' && state.photoMgr && state.photoMgr.selecting)
+      || (state.view === 'jobManager' && state.jobMgr && state.jobMgr.selecting)) {
     document.body.classList.add('has-selection-bar');
   } else {
     document.body.classList.remove('has-selection-bar');
@@ -837,6 +841,8 @@ function renderSessions() {
 
   // V87 (S13): storage getting full — at STORAGE_BANNER_PCT, once a day.
   const storageBanner = renderStorageBanner();
+  // V91 (Stage 4, 8A): the tidy-up offer — signed in, once a month at most.
+  const tidyBanner = renderTidyBanner();
 
   return `
     <div class="screen">
@@ -846,6 +852,7 @@ function renderSessions() {
         <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">⚙</button>
       </header>
       ${storageBanner}
+      ${tidyBanner}
       ${calWarning}
       ${retestBanner}
       ${backupBanner}
@@ -995,6 +1002,31 @@ function renderStorageBanner() {
   `;
 }
 
+// V91 (Stage 4, 8A/9A — O4): one offer, jobs and photos together. Shown on the
+// Jobs screen when signed in, something is safe in the cloud and old enough, and
+// it hasn't been answered in TIDY_OFFER_DAYS. Review opens Jobs on this phone;
+// × waits another month. Either answer stamps TIDY_OFFER_KEY.
+function renderTidyBanner() {
+  let m = null;
+  try { m = (typeof tidyOfferDue === 'function') ? tidyOfferDue() : null; } catch (e) { m = null; }
+  if (!m) return '';
+  const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const parts = [];
+  if (m.jobs.length) parts.push(`${pl(m.jobs.length, 'old job')}`);
+  if (m.photos.length) parts.push(`${pl(m.photos.length, 'old photo')} (${formatBytes(m.photoBytes)})`);
+  return `
+    <div class="backup-banner tidy-banner" role="status">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text">Tidy up this phone? ${escapeHTML(parts.join(' and '))} ${m.jobs.length + m.photos.length === 1 ? 'is' : 'are'} safe in the cloud and can come off this phone.</div>
+        <div class="backup-banner-actions">
+          <button class="backup-banner-action primary" id="tidy-review-btn" data-action="tidy-review">Review</button>
+        </div>
+      </div>
+      <button class="backup-banner-dismiss" id="tidy-dismiss-btn" data-action="tidy-dismiss" aria-label="Not now">×</button>
+    </div>
+  `;
+}
+
 function renderBackupReminderBanner() {
   let msg;
   if (!state.lastBackupAt) {
@@ -1119,6 +1151,11 @@ function renderSessionsListAreaHTML() {
     list = `<p class="muted">No sessions match the current filters.</p>
       <button type="button" class="btn-tertiary" id="clear-filters-btn" data-action="clear-session-filters">Show all sessions</button>`;
   } else {
+    // V91 (Stage 4, 4A): 🛡 on jobs safe in the cloud, signed in only. Display
+    // check (fingerprints reused while storage.js reuses the saved encoding).
+    // ☁ is kept for "only in the cloud" (Peter, V91 round).
+    let safety = null;
+    try { safety = (typeof syncJobsSafety === 'function') ? syncJobsSafety(false) : null; } catch (e) { safety = null; }
     list = filtered.map(({ session: s, matchedItemIndex, itemMatchCount }) => {
       const passes = s.items.filter(i => i.result === 'pass').length;
       const fails = s.items.filter(i => i.result === 'fail').length;
@@ -1130,6 +1167,8 @@ function renderSessionsListAreaHTML() {
         : '';
       // v8: subtle 🔒 prefix on locked sessions so they're easy to spot in the list.
       const lockMark = s.locked ? '<span class="session-lock" title="Locked">🔒</span>' : '';
+      const safeR = safety ? safety.map.get(String(s.id)) : null;
+      const safeMark = (safeR && safeR.safe) ? '<span class="session-safe" title="Safe in the cloud" aria-label="Safe in the cloud">🛡</span>' : '';
       // v14: export-status badge in the meta row. 'exported' → ✓ Exported;
       // 'modified' → ✓✎ Modified since export; 'none' → no badge.
       const xStatus = exportStatus(s);
@@ -1160,7 +1199,7 @@ function renderSessionsListAreaHTML() {
       return `
         <div class="session-card${s.locked ? ' locked' : ''}">
           <div class="session-info" ${openAttr}>
-            <div class="session-title">${lockMark}${escapeHTML(s.site || s.name)}</div>
+            <div class="session-title">${lockMark}${safeMark}${escapeHTML(s.site || s.name)}</div>
             <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span>${photoMeta}</div>
             ${exportBadge ? `<div class="session-export-row">${exportBadge}</div>` : ''}
             ${retestChip}

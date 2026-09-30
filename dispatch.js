@@ -229,6 +229,19 @@ registerActions({
   'pm-remove':          (arg) => photoMgrRemove(arg),
   'pm-download':        (arg) => photoMgrDownload(arg),
   'pm-delete':          (arg) => photoMgrDelete(arg),
+  // V91 (Stage 4): Jobs on this phone and the tidy-up offer (settings-actions.js).
+  'jm-open':            () => jobMgrOpen(),
+  'jm-back':            () => setView('settingsBackup'),
+  'jm-select-toggle':   () => jobMgrToggleSelecting(),
+  'jm-tap':             (arg) => jobMgrTap(arg),
+  'jm-remove':          () => jobMgrRemoveSelected(),
+  'jm-cleared-look':    () => jobMgrClearedLook(),
+  'jm-bring-back':      (arg) => jobMgrBringBack(arg),
+  'tidy-jobs':          () => tidyJobsRemove(),
+  'tidy-photos':        () => tidyPhotosRemove(),
+  'tidy-review':        () => tidyOfferReview(),
+  'tidy-dismiss':       () => tidyOfferDismiss(),
+  'photo-age-save':     () => savePhotoAge(),
   'photo-import':       () => { const inp = document.getElementById('photo-import-file'); if (inp) inp.click(); },
   'photo-wipe':         () => {
     const n = photoStatsSync().count;
@@ -295,14 +308,7 @@ registerActions({
   },
   'delete-session': (arg, el, e) => {
     e.stopPropagation();
-    const s = state.sessions.find(x => x.id === arg);
-    if (!s) return;
-    openConfirmSheet({
-      title: 'Delete session?',
-      message: `Delete "${s.site || s.name}"? This cannot be undone.`,
-      confirmLabel: 'Delete',
-      onConfirm: () => deleteSession(arg)
-    });
+    deleteSessionAsk(arg);   // V91 (6A): signed in, remove from phone or delete everywhere (two steps)
   },
   'clear-session-filters': () => {
     state.sessionFilter = 'all';
@@ -1053,6 +1059,7 @@ registerChangeActions({
   'status-filter': (v) => { state.sessionFilter = v; save(); refreshSessionsListAreaOnly(); },
   'lock-filter': (v) => { state.lockFilter = v; save(); refreshSessionsListAreaOnly(); },
   'pm-filter': (v) => photoMgrSetFilter(v),   // V90
+  'jm-filter': (v) => jobMgrSetFilter(v),     // V91
   'pm-sort': (v) => photoMgrSetSort(v),
 
   // Import / backup file pickers (the change fires when a file is chosen)

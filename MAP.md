@@ -1,4 +1,4 @@
-# PATGo — Code Map (V90)
+# PATGo — Code Map (V91)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -372,9 +372,10 @@ unconditionally since v77 — see the session.js entry.
 **⚠ Not the same feature as "Log again ×N"** (session.js): Multi Pick fires a
 fixed MIXED list of types as passes; ×N repeats ONE item, whatever its result.
 
-### feedback.js (~405 ln) — toast, dialogs, haptic / flash / sound
+### feedback.js (~460 ln) — toast, dialogs, haptic / flash / sound
 `showToast`, the shared `.bulk-sheet` dialog builders (`openConfirmSheet`,
-`openNameSheet`, `openInfoSheet`), feedback channels.
+`openNameSheet`, `openInfoSheet`, v91 `openChoiceSheet` — two or more choices +
+Cancel), feedback channels.
 **Touch to:** change feedback channels, toasts, or the shared dialogs.
 **Coupling:** rule 11 — every destructive confirm in the app routes here. No
 state, no re-render. Loads before everything that toasts.
@@ -491,7 +492,7 @@ sequential for iOS memory.
 **Touch to:** change preview rasterising, the lazy load, or the PDF.js version.
 **Coupling:** throws on parse failure so report.js falls back to its iframe view.
 
-### session.js (~2390 ln) — sessions and items
+### session.js (~2490 ln) — sessions and items
 Session/item lifecycle, form and cursor, validation, suggestions,
 ⚠ V87: retest reminders are by MONTH — `retestStatus(sess, now)` buckets
 ('upcoming' = due next month, 'duesoon' = due this month, 'overdue' from the 1st
@@ -520,13 +521,20 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   box, and CARRIES the source item's notes because a fail's reason lives there.
   Mutations M110–M114.
 - `state.sessions` is reassigned in exactly four places: load, restore, prune,
-  delete. Any new removal path needs the same hooks.
+  delete. Any new removal path needs the same hooks. v91: `removeJobsFromPhone`
+  (take jobs off this phone, the cloud keeps them — stats archive, photo sweep,
+  `syncNotePruned`, then filter) is the signed-in clear; callers re-check safety
+  first. `unarchiveSessionStats` is its reverse (sync.js `syncBringBack`).
+- v91: `deleteSessionAsk` (the 🗑 on a card, via dispatch `delete-session`) —
+  signed in: **feedback.js** `openChoiceSheet` → remove from this phone
+  (**settings-actions.js** `jobsRemoveAsk`) or `deleteEverywhereAsk` (second
+  confirm) → `deleteSession`. `pruneOldSessions` signed in → `jobMgrOpen`.
 - `captureWizardStep()` is the last legacy writer of the instrument flat mirror
   and calls `adoptMirrorIntoInstruments()` (rule 7).
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
 (scroll reset) live in `render()` via `_lastRenderedView`, not in `setView`.
 
-### settings-actions.js (~1140 ln) — the write half of the Settings screens + the photo manager (v90) — NEW v70
+### settings-actions.js (~1465 ln) — the write half of the Settings screens + the photo manager (v90) + jobs on this phone (v91) — NEW v70
 Per-page saves, Report Settings (text, logo, filename tokens), signature capture
 (draw and upload), CSV column ordering, Export/Import Setup UI handlers, the
 editable list settings (item types, fail reasons, descriptions) and the
@@ -550,6 +558,16 @@ Actions reuse existing paths only: `photosRemoveQuiet(ids, true)`,
 `syncPhotoKnowForDelete`. 8A: nothing on a locked job is deleted. Markup is
 `renderPhotoManager()` in **render-review.js**; actions `pm-*` in **dispatch.js**;
 **session.js** `setView()` calls `photoMgrLeave()` on any other view.
+⚠ v91: JOBS ON THIS PHONE and the tidy-up offer (`jobMgr*`, `_jm*`, `tidy*`,
+`jobsRemoveAsk`, `savePhotoAge`). `jobMgrModel()`/`tidyModel()` are synchronous
+(render() calls them) over **sync.js** `syncJobsSafety`. EVERY removal goes
+through `jobsRemoveAsk`: sync first when online → `syncPruneFilter` (fresh) →
+confirm → `syncWhenIdle` → re-check → **session.js** `removeJobsFromPhone`.
+Old photos → `photosRemoveQuiet`. Offer timer TIDY_OFFER_KEY (`tidyOfferDue`/
+`tidyOfferAnswered`). Markup `renderJobManager()`/`renderTidyBlock()` in
+**render-review.js**; banner `renderTidyBanner()` in **render-core.js**; Backup
+page block in **render-settings.js**; actions `jm-*`, `tidy-*`,
+`photo-age-save` in **dispatch.js**; `setView()` calls `jobMgrLeave()`.
 
 ### onboarding.js (~195 ln) — first-run wizard — NEW v70
 The wizard state machine (step capture, paging, fresh/import fork, theme pick,
@@ -582,7 +600,7 @@ The **calibration banner is ONE banner** covering the worst instrument with
 `cloudPagesUnlocked()` (cloud.js); otherwise `renderCloudLocked()`. The V43 About
 long-press is gone — `setupLongPress` (utils.js) now has no caller.
 
-### render-review.js (~905 ln) — review & manage screens — NEW v72
+### render-review.js (~1070 ln) — review & manage screens — NEW v72
 Overview (+ `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
 `refreshOverviewBody`, `refreshOverviewSelection`), Edit Session, Retest
 Reminders, the Reports hub, and the shared photo-evidence markup
@@ -602,6 +620,8 @@ look one line says what it found (`totals.awayN/awayJobs/orphanN` from the model
 v90: `renderPhotoManager()` (view `photoManager`, reached from the Backup page;
 render-core falls back to the Backup page if it is missing). Previews are
 painted into `#pm-t-<id>` in place by settings-actions.js, not by render.
+v91: `renderJobManager()` (view `jobManager`, same Backup-page fallback) and
+`renderTidyBlock()` (also used by render-settings.js's Backup page).
 Boot probe: `renderOverview` in `requiredFns`.
 
 ### render-settings.js (~1377 ln) — settings screens that own a setting
@@ -666,7 +686,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~3550 ln) — cloud sync, PUSH AND PULL — v80–v90
+### sync.js (~3760 ln) — cloud sync, PUSH AND PULL — v80–v91
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session
@@ -801,9 +821,21 @@ via `syncPhotoThumb` (strip open).
 `syncPhotoKnowForDelete` adds found photos to `st.ph.sent` so the normal delete
 step takes them — it waits for `_syncRunning` (a run saves its own `st` and would
 overwrite it). `syncPhotoThumb(id, hint)` accepts a found row's `{t}`.
+⚠ v91: SAFE IN THE CLOUD. `st.conf[jobId]` = hash of the cloud copy as the
+pull last READ it (set in `_syncPull` for every valid live row; deleted/
+unreadable clear it; trimmed to jobs on the phone). `SYNC_CONF_V` (config.js):
+a state without it clears the jobs cursor once. `syncJobsSafety(fresh)` —
+held / unsent / photos / checking / safe; `fresh=false` reuses a hash while
+**storage.js** `_encodedSessionCache` reuses the encoding (reads that const and
+`_sessionSig` — keep their reuse test and this one identical). `syncPruneFilter`
+is now safety-based (always fresh). `syncWhenIdle(fn)`. `_syncSafetyRepaint`
+after every run repaints `sessions`/`jobManager` when the safe set moved.
+`syncClearedLook` (names of SYNC_PRUNED jobs, `doc->>` only, writes nothing) and
+`syncBringBack` (reads the rows, adds like a pull-add, sets conf, `ph.need`,
+leaves the cleared list, **session.js** `unarchiveSessionStats`).
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
-19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q and 27a–27m, mutations
-M142–M295, M306–M325, M355–M395, M396–M418.
+19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q, 27a–27m and 28a–28i,
+mutations M142–M295, M306–M325, M355–M395, M396–M418, M419–M434.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

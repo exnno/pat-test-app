@@ -606,6 +606,11 @@ function loadV11Settings() {
   state.pruneAgeMonths = (Number.isFinite(storedPruneAge) && storedPruneAge >= 1 && storedPruneAge <= 120)
     ? storedPruneAge
     : PRUNE_AGE_DEFAULT;
+  // V91 (9A): photo age for the tidy-up offer — same rules as the prune age.
+  const storedPhotoAge = parseInt(localStorage.getItem(PHOTO_AGE_KEY) || '', 10);
+  state.photoAgeMonths = (Number.isFinite(storedPhotoAge) && storedPhotoAge >= 1 && storedPhotoAge <= 120)
+    ? storedPhotoAge
+    : PHOTO_AGE_DEFAULT;
 
   // v30: PDF Reports settings. Loaded defensively — any corrupt/garbage key
   // collapses to defaults so a bad value can never wedge boot. We merge stored
@@ -929,6 +934,7 @@ function _saveSettingsWrites() {
   localStorage.setItem(CAL_DUE_KEY, state.calDue);
   // v14: prune-age setting.
   localStorage.setItem(PRUNE_AGE_KEY, String(state.pruneAgeMonths));
+  localStorage.setItem(PHOTO_AGE_KEY, String(state.photoAgeMonths || PHOTO_AGE_DEFAULT));   // V91
   // v16: Multi Pick config (single JSON object).
   localStorage.setItem(MULTIPICK_KEY, JSON.stringify(state.multiPick));
   // v17: Sound feedback + Item timestamps settings.

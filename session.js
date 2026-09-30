@@ -676,6 +676,14 @@ function savePruneAge() {
 // after the last edit — but we still guard by skipping state.activeId to be
 // safe). Deletion is permanent; we strongly word the confirm.
 function pruneOldSessions() {
+  // V91 (Stage 4, 7A): signed in, clearing old jobs is "safe in the cloud and
+  // older than N months" — exported or not — and lives on the Jobs on this
+  // phone screen, which syncs first and re-checks at the moment of clearing.
+  // Signed out: everything below, unchanged.
+  if (typeof syncActive === 'function' && syncActive() && typeof jobMgrOpen === 'function') {
+    jobMgrOpen({ tidy: true });
+    return;
+  }
   const candidates = prunableSessions().filter(s => s.id !== state.activeId);
   // v80 (decision 5A): while signed in to the cloud, clearing is local
   // housekeeping and the cloud keeps the job — so only a job whose LATEST
@@ -734,6 +742,80 @@ function pruneOldSessions() {
       render();
       showToast(`Cleared ${targets.length} session${targets.length === 1 ? '' : 's'}`);
     }
+  });
+}
+
+// V91 (Stage 4): take jobs off THIS phone. The cloud and the other phones keep
+// them (the job is recorded as cleared, so the pull does not bring it back).
+// The CALLER has already re-checked that every id is safe in the cloud
+// (syncPruneFilter, fresh) — this does no checking of its own beyond never
+// touching the job on screen or the example job. Same order as the V80 clear:
+// tallies and photos before the job goes (MAP rule 5), then the cleared note.
+// Returns how many went.
+function removeJobsFromPhone(ids) {
+  const want = new Set((ids || []).map(String));
+  const going = state.sessions.filter(s => s && want.has(String(s.id))
+    && !(state.view === 'entry' && s.id === state.activeId) && !s[DEMO_SESSION_FLAG]);
+  if (!going.length) return 0;
+  const gone = new Set(going.map(s => s.id));
+  archiveSessionStats(going);
+  photosDeleteForSessions(Array.from(gone));
+  if (typeof syncNotePruned === 'function') {
+    try { syncNotePruned(Array.from(gone)); } catch (e) { console.error('Cleared-jobs note failed (non-fatal).', e); }
+  }
+  state.sessions = state.sessions.filter(s => !gone.has(s.id));
+  if (gone.has(state.activeId)) state.activeId = null;
+  save();
+  return going.length;
+}
+
+// V91 (Stage 4, 6A): the 🗑 on a job card. Signed out (or the example job) —
+// unchanged: one confirm, delete. Signed in — a choice: remove from this phone
+// (only when the job is safe in the cloud; otherwise the sheet says why not) or
+// delete everywhere, which asks a SECOND time with a hard final button (Peter,
+// V91 round: two steps to really make it safe).
+function deleteSessionAsk(id) {
+  const s = state.sessions.find(x => x.id === id);
+  if (!s) return;
+  const title = s.site || s.name || 'this job';
+  const signedIn = typeof syncActive === 'function' && syncActive() && !s[DEMO_SESSION_FLAG];
+  if (!signedIn) {
+    openConfirmSheet({
+      title: 'Delete session?',
+      message: `Delete "${title}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      onConfirm: () => deleteSession(id)
+    });
+    return;
+  }
+  const r = (typeof syncJobsSafety === 'function') ? (syncJobsSafety(true) || { map: new Map() }).map.get(String(id)) : null;
+  const canRemove = !!(r && r.safe);
+  const why = r && !r.safe && typeof syncSafetyText === 'function' ? syncSafetyText(r) : '';
+  const choices = [];
+  if (canRemove) choices.push({ label: 'Remove from this phone', style: 'primary', onPick: () => jobsRemoveAsk([String(id)]) });
+  choices.push({ label: 'Delete everywhere\u2026', style: 'danger', onPick: () => deleteEverywhereAsk(id) });
+  openChoiceSheet({
+    title: `\u201c${title}\u201d`,
+    message: canRemove
+      ? 'Remove from this phone: it stays in the cloud and on your other phones, with its photos, and you can bring it back here. Delete everywhere: it goes from this phone, your other phones and the cloud.'
+      : `This job can\u2019t come off just this phone yet (${why.toLowerCase()}). Delete everywhere removes it from this phone, your other phones and the cloud.`,
+    choices,
+  });
+}
+
+function deleteEverywhereAsk(id) {
+  const s = state.sessions.find(x => x.id === id);
+  if (!s) return;
+  const title = s.site || s.name || 'this job';
+  const items = (s.items || []).length;
+  const pc = (typeof photoCountsForSession === 'function') ? photoCountsForSession(s) : { total: 0 };
+  openConfirmSheet({
+    title: 'Delete everywhere \u2014 are you sure?',
+    message: `\u201c${title}\u201d (${items} item${items === 1 ? '' : 's'}` +
+      (pc.total ? `, ${pc.total} photo${pc.total === 1 ? '' : 's'}` : '') +
+      ') will be deleted from this phone, every other phone and the cloud. It can\u2019t be brought back or undone.',
+    confirmLabel: 'Yes, delete everywhere',
+    onConfirm: () => deleteSession(id)
   });
 }
 
@@ -1019,6 +1101,23 @@ function archiveSessionStats(sessions) {
   bucket.types = bucket.types || {};
   Object.keys(add.types).forEach(t => {
     bucket.types[t] = (bucket.types[t] || 0) + add.types[t];
+  });
+  state.archivedStats = bucket;
+}
+
+// V91 (Stage 4, 10A): the reverse, for a job brought BACK onto this phone after
+// it was cleared (syncBringBack). Its tallies joined the archive when it left;
+// now it counts live again, so they come out — never below zero (a phone
+// restored from a backup may not have archived it).
+function unarchiveSessionStats(sessions) {
+  const sub = tallySessions(sessions);
+  const bucket = state.archivedStats || makeEmptyArchivedStats();
+  bucket.items = Math.max(0, (bucket.items || 0) - sub.items);
+  bucket.fails = Math.max(0, (bucket.fails || 0) - sub.fails);
+  bucket.types = bucket.types || {};
+  Object.keys(sub.types).forEach(t => {
+    const n = (bucket.types[t] || 0) - sub.types[t];
+    if (n > 0) bucket.types[t] = n; else delete bucket.types[t];
   });
   state.archivedStats = bucket;
 }
@@ -2094,6 +2193,7 @@ function setView(v) {
   closePhotoStripState();             // v62
   // V90: leaving the photo manager drops its selection, preview and cloud look.
   if (v !== 'photoManager' && typeof photoMgrLeave === 'function') photoMgrLeave();
+  if (v !== 'jobManager' && typeof jobMgrLeave === 'function') jobMgrLeave();   // V91
   // v61: the asset-history sheet lives on the Sessions screen; leaving that
   // screen must not leave it armed to reappear on the way back.
   state.assetHistorySheetOpen = false;

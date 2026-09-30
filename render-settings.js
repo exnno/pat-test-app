@@ -754,7 +754,14 @@ function renderSettingsBackup() {
         <button class="backup-action-btn" id="repair-undo-btn" data-action="repair-undo">Undo the correction</button>
       </div>
   ` : '';
-  const pruneBlock = prunable.length > 0 ? `
+  // V91 (Stage 4, 7A): signed in, old jobs are cleared when they're safe in the
+  // cloud (exported or not), from Jobs on this phone — plus old photos (9A).
+  const cloudOn = (typeof syncActive === 'function' && syncActive() && typeof renderJobManager === 'function');
+  const tidyM = cloudOn && typeof tidyModel === 'function' ? tidyModel(false) : null;
+  const pruneBlock = cloudOn ? `
+          ${renderTidyBlock(tidyM, 'backup-tidy') || `<p class="muted" style="margin-top:10px;font-size:12px">Nothing older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} is ready to come off this phone right now.</p>`}
+          <button class="backup-action-btn" id="jobs-manage-btn" data-action="jm-open" style="margin-top:10px">🛡 Jobs on this phone</button>
+  ` : prunable.length > 0 ? `
           <div class="prune-suggestion">
             <p class="prune-suggestion-text">${prunable.length} exported session${prunable.length === 1 ? '' : 's'} older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} can be cleared to free space.</p>
             <button class="backup-action-btn" id="prune-review-btn" data-action="prune-review">Review &amp; clear…</button>
@@ -803,12 +810,21 @@ function renderSettingsBackup() {
 
       <div class="settings-section">
         <h2 class="h2">Clear-old-sessions age</h2>
-        <p class="muted">When a session has been exported and is older than this, it'll be offered for clearing above. Nothing is ever deleted without your confirmation.</p>
+        <p class="muted">${cloudOn
+          ? 'When a job is safe in the cloud and older than this, it\'ll be offered for removing from this phone. The cloud keeps it. Nothing is ever removed without your confirmation.'
+          : 'When a session has been exported and is older than this, it\'ll be offered for clearing above. Nothing is ever deleted without your confirmation.'}</p>
         <label class="label">Age in months</label>
         <input class="input" id="prune-age-input" type="number" inputmode="numeric" min="1" max="120" value="${ageMonths}">
         <div class="btn-row">
           <button class="btn-primary" id="prune-age-save" data-action="prune-age-save">Save</button>
         </div>
+        ${cloudOn ? `
+        <label class="label" style="margin-top:14px">Photos older than (months)</label>
+        <p class="muted" style="font-size:12px;margin:0 0 6px">Photos in the cloud older than this are offered for removing from this phone. A tap brings any of them back.</p>
+        <input class="input" id="photo-age-input" type="number" inputmode="numeric" min="1" max="120" value="${state.photoAgeMonths || PHOTO_AGE_DEFAULT}">
+        <div class="btn-row">
+          <button class="btn-primary" id="photo-age-save" data-action="photo-age-save">Save</button>
+        </div>` : ''}
       </div>
     </div>
   `;

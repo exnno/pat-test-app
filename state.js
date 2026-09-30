@@ -118,6 +118,17 @@ let state = {
     preview: null,        // { id, url, loading }
     thumbGen: 0,          // bumped to stop an older preview round
   },
+  // V91 (Stage 4, 5A): Jobs on this phone (Settings → Backup). Transient — never
+  // saved; reset when the view is left (setView → jobMgrLeave). `cleared` is the
+  // last look at the jobs cleared from this phone (10A): names only, in memory,
+  // re-read on tap (rule 25).
+  jobMgr: {
+    filter: 'all',        // 'all' | 'safe' | 'notyet'
+    selecting: false,
+    selected: {},         // job id → true
+    busy: '',             // progress text while an action runs
+    cleared: null,        // { at, loading, error, ok, jobs: [], gone }
+  },
   showFailsOnly: false,
   searchQuery: '',
   // v7
@@ -518,6 +529,9 @@ let state = {
   // older than this are offered for pruning in the storage indicator. Loaded
   // from PRUNE_AGE_KEY; editable on the Backup & Restore page.
   pruneAgeMonths: PRUNE_AGE_DEFAULT,
+  // V91 (9A): photos older than this many months, known in the cloud, are
+  // offered for removal from this phone. PHOTO_AGE_KEY; per device.
+  photoAgeMonths: PHOTO_AGE_DEFAULT,
 
   // v14: reopen warning. When the user opens a session that has already been
   // exported (clean or modified-since), and it's not locked/view-only, we

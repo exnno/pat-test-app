@@ -193,7 +193,11 @@ function _syncEmpty(userId) {
            // Entries may also carry b (bytes), t (1 = a preview exists, 1A) and
            // a (taken at). `pulledAt` is the photo rows' own cursor; `need` lists
            // jobs that arrived after that cursor passed their rows.
-           ph: { sent: {}, pulledAt: null, need: [] } };
+           ph: { sent: {}, pulledAt: null, need: [] },
+           // V91 (Stage 4, 1A): {jobId: fingerprint of the cloud copy as the pull
+           // last READ it}. Not what was sent — what was SEEN. A job is safe in
+           // the cloud when this equals the phone's copy (syncJobsSafety).
+           conf: {}, confV: SYNC_CONF_V };
 }
 
 // v83: two more fields.
@@ -284,7 +288,12 @@ function _syncLoad() {
   if (rp && typeof rp === 'object' && Array.isArray(rp.need)) {
     out.ph.need = rp.need.filter(x => typeof x === 'string' && x).slice(0, 2000);
   }
-  if (raw.hashV !== SYNC_HASH_V) { out.sent = {}; out.rec.sent = {}; }
+  // V91: a fingerprint, so hashV drops it with the rest (a read under the old
+  // hashing can't vouch for anything).
+  if (raw.conf && typeof raw.conf === 'object' && !Array.isArray(raw.conf)) {
+    for (const k of Object.keys(raw.conf)) if (typeof raw.conf[k] === 'string') out.conf[k] = raw.conf[k];
+  }
+  if (raw.hashV !== SYNC_HASH_V) { out.sent = {}; out.rec.sent = {}; out.conf = {}; }
   else out.hashV = SYNC_HASH_V;
   // v83.1 (decision 3A). Cursors written by a pager that could step over rows
   // are not trusted: both are cleared once, so the next run reads jobs and
@@ -292,6 +301,12 @@ function _syncLoad() {
   // phone already has resolve as no work. Saved with the new pagerV by the
   // first run, so it happens once per phone (per account).
   if (raw.pagerV !== SYNC_PAGER_V) { out.pulledAt = null; out.rec.pulledAt = null; }
+  // V91 (decision 2A). A state saved before V91 has never recorded what the pull
+  // read, and its jobs cursor is already past the rows that would tell it. The
+  // jobs cursor (only) is cleared once, so the next run reads every job back and
+  // records it; rows this phone already has resolve as no work. Saved with the
+  // new confV by that run, so it happens once per phone (per account).
+  if (raw.confV !== SYNC_CONF_V) { out.pulledAt = null; out.conf = {}; }
   return out;
 }
 
@@ -380,27 +395,129 @@ function syncStatusSummary() {
   };
 }
 
-// V80 decision 5A. Clearing old jobs is local housekeeping and the cloud keeps
-// them — but only a job whose LATEST version is in the cloud may be cleared
-// while signed in, or the clear would take the only copy of an edit with it.
+// ---- V91 (roadmap Stage 4): safe in the cloud ---------------------------------
+//
+// A job is SAFE IN THE CLOUD when the cloud's copy has been SEEN to match the
+// phone's (1A: st.conf, recorded by the pull's read-back of this phone's own
+// push) and every photo of it on this phone is known in the cloud. That, and
+// only that, lets it come off this phone (R6).
+//
+// Why not "the push succeeded": the fingerprint of what was SENT (st.sent) says
+// what this phone tried to put there. The read-back says what is there. Today
+// every pull already downloads back each job this phone pushed (the waste
+// Stage 5's lighter pull removes), so the proof costs nothing extra; when the
+// fingerprint column lands, conf is filled from that column instead.
+//
+// Reasons, in the order they are judged (the first one that applies is the one
+// the engineer is told):
+//   held            waiting for an answer on the Sync page
+//   unsent          changes on this phone not sent yet
+//   photos-unknown  the photo list hasn't been read yet (nothing is assumed)
+//   photos          n photos still to upload
+//   checking        sent, but the cloud copy not read back yet (next sync)
+//   safe
+// The example job never syncs and is left out altogether.
+//
+// fresh = false (display: job cards, counts, the offer) reuses a job's
+// fingerprint while storage.js reuses its saved encoding — the same proof that
+// nothing in it changed. fresh = true (every REMOVAL) hashes every job again.
+// Returns null when not signed in: there is nothing to be safe in.
+const _syncJobHashMemo = new WeakMap();
+
+function _syncJobHash(s, fresh) {
+  const cache = (typeof _encodedSessionCache !== 'undefined') ? _encodedSessionCache : null;
+  if (!fresh && cache && s.id !== state.activeId) {
+    const enc = cache.get(s);
+    const m = _syncJobHashMemo.get(s);
+    // ⚠ storage.js's own reuse test, plus identity of its cache entry: any
+    // invalidation (_invalidateSessionEncoding) or re-encode makes a new entry.
+    if (enc && m && m.enc === enc && enc.itemsRef === s.items && enc.sig === _sessionSig(s)) return m.hash;
+    const hash = syncHash(_syncCanonical(s));
+    if (enc && enc.itemsRef === s.items && enc.sig === _sessionSig(s)) _syncJobHashMemo.set(s, { enc, hash });
+    return hash;
+  }
+  return syncHash(_syncCanonical(s));
+}
+
+function syncJobsSafety(fresh) {
+  if (!syncActive()) return null;
+  const uid = _syncCurrentUserId();
+  const st = _syncStateFor(uid);
+  const pending = (uid && st.userId === uid) ? _syncPhotosPendingByJob(st) : null;
+  const held = new Set(_syncHeldLoad().filter(e => e.kind === 'session').map(e => e.id));
+  const map = new Map();
+  let safe = 0;
+  for (const s of _syncSessions()) {
+    const id = String(s.id);
+    const h = _syncJobHash(s, !!fresh);
+    let r;
+    if (held.has(id)) r = { safe: false, why: 'held' };
+    else if (st.sent[id] !== h) r = { safe: false, why: 'unsent' };
+    else if (!pending) r = { safe: false, why: 'photos-unknown' };
+    else if (pending.get(id)) r = { safe: false, why: 'photos', n: pending.get(id) };
+    else if (st.conf[id] !== h) r = { safe: false, why: 'checking' };
+    else { r = { safe: true, why: 'safe' }; safe++; }
+    map.set(id, r);
+  }
+  return { map, safe, total: map.size };
+}
+
+// One plain line for a reason. Never shown signed out.
+function syncSafetyText(r) {
+  if (!r) return '';
+  switch (r.why) {
+    case 'safe':           return 'Safe in the cloud';
+    case 'held':           return 'Waiting for your answer on the Sync page';
+    case 'unsent':         return 'Latest changes not sent yet';
+    case 'photos-unknown': return 'Checking its photos\u2026';
+    case 'photos':         return `${r.n} photo${r.n === 1 ? '' : 's'} still to upload`;
+    case 'checking':       return 'Sent \u2014 confirmed on the next sync';
+    default:               return '';
+  }
+}
+
+// V80 decision 5A, V91 (Stage 4): clearing jobs while signed in is local
+// housekeeping and the cloud keeps them — so only a job SAFE IN THE CLOUD may
+// go. Always fresh (every job hashed again): this is the check AT the moment of
+// clearing. `kept` carries each refused job's reason.
 // Signed out: unchanged pre-V80 behaviour, every target is clearable.
 function syncPruneFilter(targets) {
   const list = Array.isArray(targets) ? targets : [];
   if (!syncActive()) return { clear: list.slice(), kept: [], active: false };
-  const uid = _syncCurrentUserId();
-  const st = _syncLoad();
-  const mine = !!uid && st.userId === uid;
-  // v88 (decision 6A): and every photo of it uploaded, or clearing would take
-  // the only copy of a photo with it. Photo mirror not loaded (or unreadable):
-  // nothing is known, so nothing is cleared.
-  const pending = mine ? _syncPhotosPendingByJob(st) : null;
+  const safety = syncJobsSafety(true);
   const clear = [], kept = [];
   for (const s of list) {
-    const ok = mine && !!pending && s && st.sent[String(s.id)] === syncHash(_syncCanonical(s))
-      && !pending.has(String(s.id));
-    (ok ? clear : kept).push(s);
+    const r = (s && safety) ? safety.map.get(String(s.id)) : null;
+    if (r && r.safe) clear.push(s);
+    else kept.push({ s, why: r ? r.why : 'unsent', r });
   }
   return { clear, kept, active: true };
+}
+
+// V91: a job turns safe on a run that changed nothing on screen — the read-back
+// only records a fingerprint, and the last photo can go up after the jobs half.
+// So after every run the set of safe jobs is compared with the last one seen,
+// and the screens that show it (Jobs list, Jobs on this phone) repaint when it
+// moved. Display check only (memoised fingerprints); never on another screen.
+let _syncLastSafeSig = null;
+function _syncSafetyRepaint() {
+  try {
+    const safety = syncJobsSafety(false);
+    const sig = safety ? Array.from(safety.map.entries()).map(([id, r]) => id + ':' + r.why).sort().join('|') : '';
+    if (sig === _syncLastSafeSig) return;
+    _syncLastSafeSig = sig;
+    if (state.view === 'sessions' || state.view === 'jobManager') _syncRepaintApp();
+  } catch (e) { /* display only */ }
+}
+
+// Run fn once no sync run is going, in one synchronous step (a run holds its
+// own copy of the sync state and the job list; see syncPhotoKnowForDelete).
+function syncWhenIdle(fn) {
+  const go = () => {
+    if (_syncRunning) return _syncRunning.then(go, go);
+    return fn();
+  };
+  return Promise.resolve().then(go);
 }
 
 // ---- cleared-jobs list (SYNC_PRUNED_KEY) ---------------------------------------
@@ -829,6 +946,7 @@ function _syncPull(c, uid, st, out) {
     };
 
     if (row.deleted === true) {
+      delete st.conf[id];   // V91: nothing in the cloud to vouch for it
       if (!local) {
         // Already gone here. Record that the cloud knows, so the push does not
         // send our own tombstone for it a second time.
@@ -856,6 +974,7 @@ function _syncPull(c, uid, st, out) {
     // Decision 8A: anything unreadable is held, not dropped. A dropped row is a
     // row the cursor moves past and nobody ever sees again.
     if (!_syncValidDoc(row.doc, id)) {
+      delete st.conf[id];   // V91: an unreadable cloud copy vouches for nothing
       _syncHeldNote({ id, reason: 'unreadable', name,
         localItems: (local && Array.isArray(local.items)) ? local.items.length : null, cloudItems: null });
       blocked = true; out.held++;
@@ -864,6 +983,12 @@ function _syncPull(c, uid, st, out) {
 
     const doc = row.doc;
     const hash = syncHash(_syncCanonical(doc));
+    // V91 (Stage 4, 1A). What the cloud was SEEN to hold, whatever is decided
+    // below. This is the read-back that makes a job "safe in the cloud": after a
+    // push, the next pull reads the row again (the push never moves the cursor),
+    // and if it hashes the same as the phone's copy, the cloud provably has it.
+    // Held rows record it too — the phone's copy then differs, so not safe.
+    st.conf[id] = hash;
 
     if (!local) {
       if (tomb) {
@@ -969,6 +1094,11 @@ function _syncPull(c, uid, st, out) {
     const waitingMoved = JSON.stringify(state.sync.waiting || null) !== waitingBefore;
     st.lastPullAt = new Date().toISOString();
     if (!blocked) st.pulledAt = high;
+    st.confV = SYNC_CONF_V;
+    // V91: only jobs on this phone need vouching for. A cleared job's entry
+    // would never be read again (the pull skips it) — dropped, not kept stale.
+    const onPhone = new Set((state.sessions || []).map(s => String(s && s.id)));
+    for (const k of Object.keys(st.conf)) if (!onPhone.has(k)) delete st.conf[k];
     _syncSave(st);
     if (changed) {
       // A new array reference busts activeSession()'s memo (session.js), which
@@ -1021,6 +1151,7 @@ function syncPush(opts) {
       _syncRunning = null;
       _syncLastRunAt = Date.now();
       _syncRepaint();
+      _syncSafetyRepaint();
       if (_syncAgain) {
         const force = _syncAgainForce;
         const pull = _syncAgainPull;
@@ -3545,4 +3676,128 @@ function syncPhotoKnowForDelete(list) {
     return n;
   };
   return Promise.resolve(go());
+}
+
+// ---- V91 (Stage 4, 10A): cleared from this phone, and bringing one back ------
+//
+// Jobs cleared from this phone (SYNC_PRUNED_KEY) stay in the cloud and on the
+// other phones, but the pull never brings them back — that is what clearing
+// meant. V91 makes clearing easier, so it also makes it undoable.
+//
+// syncClearedLook(): the NAMES of the cleared jobs, on a tap — five fields picked
+// out of each job row (doc->>…), never the job itself (R17), exactly as V90's
+// look does. Memory only (rule 25): nothing is written. Resolves
+// { ok, offline, error, jobs: [{id, site, name, date, clientId, locked, at}],
+//   gone } — gone = cleared jobs the cloud no longer holds (deleted elsewhere).
+function syncClearedLook() {
+  const res = { ok: false, offline: false, error: '', jobs: [], gone: 0 };
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+  const list = _syncPrunedLoad().filter(e => !local.has(e.id));
+  const at = new Map(list.map(e => [e.id, e.at]));
+  const want = list.map(e => e.id);
+  if (!want.length) { res.ok = true; return Promise.resolve(res); }
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  const seen = new Set();
+  return cloudClient().then((c) => {
+    let chain = Promise.resolve();
+    for (let k = 0; k < want.length; k += batch) {
+      const chunk = want.slice(k, k + batch);
+      chain = chain.then(() => c.from('sessions').select(_SYNC_BROWSE_JOB_COLS).eq('user_id', uid).in('id', chunk))
+        .then((r) => {
+          if (r && r.error) throw r.error;
+          for (const j of ((r && r.data) || [])) {
+            const id = String(j && j.id != null ? j.id : '');
+            if (!id || !at.has(id)) continue;
+            seen.add(id);
+            if (j.deleted === true) continue;
+            const str = (v) => (typeof v === 'string') ? v : '';
+            res.jobs.push({ id, site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
+              locked: j.locked === true || j.locked === 'true', at: at.get(id) || '' });
+          }
+        });
+    }
+    return chain;
+  }).then(() => {
+    res.gone = want.length - res.jobs.length;
+    res.jobs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+    res.ok = true;
+    return res;
+  }).catch((e) => {
+    res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn\u2019t reach the cloud.';
+    res.jobs = []; res.gone = 0;
+    return res;
+  });
+}
+
+// Bring cleared jobs back onto this phone: each job's row is read (the one
+// download a return needs), checked like any pulled job, and added exactly as
+// the pull adds a job from the other phone — plus:
+//   • it leaves the cleared list, so the pull treats it as an ordinary job;
+//   • st.conf records the read (it is safe in the cloud the moment it lands);
+//   • st.ph.need, so its photo rows come with it (rule 24);
+//   • its tallies leave the archived stats they joined when it was cleared
+//     (unarchiveSessionStats), or the lifetime counter would count it twice.
+// ⚠ The write waits for any run and happens in one synchronous step
+// (syncWhenIdle): a run holds the job list and the sync state. A job already
+// back on the phone by then is only taken off the cleared list.
+// Resolves { ok, offline, error, got, missing }.
+function syncBringBack(ids) {
+  const want = Array.from(new Set((ids || []).map(String).filter(Boolean)));
+  const res = { ok: false, offline: false, error: '', got: 0, missing: 0 };
+  if (!want.length) { res.ok = true; return Promise.resolve(res); }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  const rows = [];
+  return cloudClient().then((c) => {
+    let chain = Promise.resolve();
+    for (let k = 0; k < want.length; k += batch) {
+      const chunk = want.slice(k, k + batch);
+      chain = chain.then(() => c.from('sessions').select('id,doc,deleted').eq('user_id', uid).in('id', chunk))
+        .then((r) => { if (r && r.error) throw r.error; for (const row of ((r && r.data) || [])) rows.push(row); });
+    }
+    return chain;
+  }).then(() => syncWhenIdle(() => {
+    const st = _syncLoad();
+    if (st.userId !== uid) { res.error = 'Signed in as someone else now.'; return res; }
+    const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+    const back = new Set();
+    const added = [];
+    for (const row of rows) {
+      const id = String(row && row.id != null ? row.id : '');
+      if (!id || want.indexOf(id) === -1 || back.has(id)) continue;
+      if (local.has(id)) { back.add(id); continue; }
+      if (row.deleted === true || !_syncValidDoc(row.doc, id)) continue;
+      const doc = row.doc;
+      const hash = syncHash(_syncCanonical(doc));
+      state.sessions.unshift(doc);
+      st.sent[id] = hash;
+      st.conf[id] = hash;
+      delete st.gone[id];
+      st.ph.need.push(id);
+      _syncHeldClear(id);
+      added.push(doc);
+      back.add(id);
+    }
+    res.missing = want.length - back.size;
+    if (back.size) _syncPrunedSave(_syncPrunedLoad().filter(e => !back.has(e.id)));
+    if (added.length) {
+      if (typeof unarchiveSessionStats === 'function') { try { unarchiveSessionStats(added); } catch (e) { console.error('Stats not adjusted (non-fatal).', e); } }
+      _syncSave(st);
+      // A new array reference busts activeSession()'s memo, as in the pull.
+      state.sessions = state.sessions.slice();
+      saveSessions();
+      if (typeof saveSettings === 'function') { try { saveSettings(); } catch (e) { console.error(e); } }
+    }
+    res.got = added.length;
+    res.ok = true;
+    return res;
+  })).catch((e) => {
+    res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn\u2019t reach the cloud.';
+    return res;
+  });
 }

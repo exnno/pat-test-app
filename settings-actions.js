@@ -1147,3 +1147,319 @@ function photoMgrDelete(arg) {
     },
   });
 }
+
+// ============== V91 (roadmap Stage 4) — safe in the cloud ==============
+//
+// Settings → Backup → Jobs on this phone (5A), the tidy-up offer (8A, 9A — O4)
+// and every path that takes jobs off this phone. Signed in only: signed out
+// there is no cloud to keep anything, and the V14 clear-old-sessions is
+// unchanged.
+//
+// ⚠ One rule for every removal: sync first when there is signal, then check
+// (3A), then check AGAIN at the moment of removing (syncPruneFilter, fresh).
+// A job comes off this phone only if it is safe in the cloud (sync.js
+// syncJobsSafety). What is removed is recorded as cleared (the pull leaves it in
+// the cloud) and can be brought back (10A, syncBringBack).
+//
+// The screen has no text inputs, so it may render() freely.
+
+function _jmReset() {
+  const old = state.jobMgr || {};
+  state.jobMgr = { filter: 'all', selecting: false, selected: {}, busy: '', cleared: null,
+    gen: (old.gen || 0) + 1 };
+}
+
+function jobMgrOpen() {
+  _jmReset();
+  setView('jobManager');
+}
+
+// Called by setView() on every navigation away: a fresh object, so anything
+// still running for the old screen sees it has gone (state.jobMgr !== jm).
+function jobMgrLeave() {
+  if (!state.jobMgr) return;
+  _jmReset();
+}
+
+const _jmPlural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+function _jmCutoff(months) {
+  const d = new Date();
+  d.setMonth(d.getMonth() - (months || 12));
+  return d.toISOString().slice(0, 10);
+}
+
+// What the tidy-up offer would take off this phone (8A, 9A). Not signed in →
+// { active: false }. Old jobs: older than the clear-old age, safe in the cloud.
+// Old photos: taken more than the photo age ago, known in the cloud, of jobs
+// on this phone that are NOT already in the old-jobs list (those go with their
+// job). fresh as syncJobsSafety.
+function tidyModel(fresh) {
+  const out = { active: false, jobs: [], jobItems: 0, photos: [], photoBytes: 0,
+    jobAge: state.pruneAgeMonths || PRUNE_AGE_DEFAULT, photoAge: state.photoAgeMonths || PHOTO_AGE_DEFAULT };
+  const safety = (typeof syncJobsSafety === 'function') ? syncJobsSafety(fresh) : null;
+  if (!safety) return out;
+  out.active = true;
+  const jobCut = _jmCutoff(out.jobAge);
+  const onScreen = (state.view === 'entry') ? state.activeId : null;
+  const going = new Set();
+  for (const s of (state.sessions || [])) {
+    if (!s || s.id === onScreen) continue;
+    const r = safety.map.get(String(s.id));
+    if (!r || !r.safe || !s.date || !(s.date < jobCut)) continue;
+    out.jobs.push(s);
+    out.jobItems += (s.items || []).length;
+    going.add(String(s.id));
+  }
+  const vis = typeof _photoCloudVisible === 'function' && _photoCloudVisible();
+  if (vis && state.photoMetaReady) {
+    const photoCut = _jmCutoff(out.photoAge);
+    const known = state.photoCloud || {};
+    const jobDate = new Map();
+    for (const s of (state.sessions || [])) if (s && s.id != null) jobDate.set(String(s.id), s.date || '');
+    const meta = state.photoMeta || {};
+    for (const id of Object.keys(meta)) {
+      const m = meta[id] || {};
+      const job = String(m.s || '');
+      if (!known[id] || !jobDate.has(job) || going.has(job) || job === String(onScreen)) continue;
+      const when = String(m.at || jobDate.get(job) || '');
+      if (!when || !(when < photoCut)) continue;
+      out.photos.push(id);
+      out.photoBytes += (m.b || 0);
+    }
+  }
+  return out;
+}
+
+// ---- the offer (8A): Jobs screen, at most once every TIDY_OFFER_DAYS ----
+function tidyOfferDue() {
+  if (typeof syncActive !== 'function' || !syncActive()) return null;
+  let day = null;
+  try { day = localStorage.getItem(TIDY_OFFER_KEY); } catch (e) {}
+  if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    const next = new Date(day + 'T00:00:00Z');
+    next.setUTCDate(next.getUTCDate() + TIDY_OFFER_DAYS);
+    if (todayISO() < next.toISOString().slice(0, 10)) return null;
+  }
+  const m = tidyModel(false);
+  return (m.active && (m.jobs.length || m.photos.length)) ? m : null;
+}
+
+function tidyOfferAnswered() {
+  try { localStorage.setItem(TIDY_OFFER_KEY, todayISO()); } catch (e) {}
+}
+
+// ---- the removal flow (every path) ----
+// ids: job ids chosen. Syncs first when there's signal (3A), then asks, then
+// re-checks at the moment of removing. Works from any screen.
+function jobsRemoveAsk(ids, onDone) {
+  const want = new Set((ids || []).map(String));
+  if (!want.size || typeof syncPruneFilter !== 'function') return;
+  const jm = (state.view === 'jobManager') ? state.jobMgr : null;
+  const here = () => !jm || (state.jobMgr === jm && state.view === 'jobManager');
+  const busy = (text) => { if (jm && here()) { jm.busy = text; render(); } };
+  const pick = () => syncPruneFilter((state.sessions || []).filter(s => s && want.has(String(s.id))));
+  const online = typeof syncActive === 'function' && syncActive() && !(typeof _syncOffline === 'function' && _syncOffline());
+  if (online) { if (jm) busy('Checking with the cloud\u2026'); else showToast('Checking with the cloud\u2026'); }
+  const first = (online && typeof syncPull === 'function') ? syncPull({ manual: false }).catch(() => false) : Promise.resolve(false);
+  return first.then(() => {
+    if (!here()) return;
+    busy('');
+    const g = pick();
+    if (!g.clear.length) {
+      const one = g.kept.length === 1 ? g.kept[0] : null;
+      showToast(one && typeof syncSafetyText === 'function'
+        ? `Can\u2019t take it off this phone yet \u2014 ${syncSafetyText(one.r || { why: one.why }).toLowerCase()}`
+        : 'None of those can come off this phone yet \u2014 they\u2019re not all safe in the cloud');
+      return;
+    }
+    const items = g.clear.reduce((n, s) => n + ((s.items || []).length), 0);
+    const kept = g.kept.length;
+    openConfirmSheet({
+      title: `Remove ${_jmPlural(g.clear.length, 'job')} from this phone?`,
+      message: `${g.clear.length === 1 ? 'It stays' : 'They stay'} in the cloud and on your other phones, with ${g.clear.length === 1 ? 'its' : 'their'} photos (${_jmPlural(items, 'item')}). ` +
+        `You can bring ${g.clear.length === 1 ? 'it' : 'them'} back here from Settings \u2192 Backup \u2192 Jobs on this phone.` +
+        (kept ? ` ${_jmPlural(kept, 'job')} not safe in the cloud yet ${kept === 1 ? 'stays' : 'stay'} on this phone.` : '') +
+        (online ? '' : ' No signal right now: checked against the last sync.'),
+      confirmLabel: 'Remove',
+      danger: false,
+      onConfirm: () => {
+        syncWhenIdle(() => {
+          // ⚠ The check AT the moment of removing — the cloud may have moved
+          // while the sheet was open (a run finished, another phone deleted it).
+          const g2 = pick();
+          const n = removeJobsFromPhone(g2.clear.map(s => s.id));
+          if (jm && here()) {
+            g2.clear.forEach(s => { delete jm.selected[String(s.id)]; });
+            if (!Object.keys(jm.selected).length) jm.selecting = false;
+            jm.cleared = null;   // the cleared list has changed; look again
+          }
+          render();
+          showToast(n ? `Removed ${_jmPlural(n, 'job')} from this phone`
+            : 'Nothing removed \u2014 they changed while you were deciding');
+          if (typeof onDone === 'function') onDone(n);
+        });
+      },
+    });
+  });
+}
+
+// ---- the tidy-up actions (the offer, the Backup page, the manager's top) ----
+function tidyJobsRemove() {
+  const m = tidyModel(true);
+  tidyOfferAnswered();
+  if (!m.jobs.length) { showToast('No old jobs are ready to come off this phone'); render(); return; }
+  jobsRemoveAsk(m.jobs.map(s => s.id));
+}
+
+function tidyPhotosRemove() {
+  const m = tidyModel(false);
+  tidyOfferAnswered();
+  if (!m.photos.length) { showToast('No old photos are ready to come off this phone'); render(); return; }
+  openConfirmSheet({
+    title: `Remove ${_jmPlural(m.photos.length, 'photo')} from this phone?`,
+    message: `Photos taken more than ${_jmPlural(m.photoAge, 'month')} ago. This frees about ${formatBytes(m.photoBytes)} on this phone. ` +
+      'Your cloud copy keeps them, and a tap brings any of them back. Your jobs and results are not affected.',
+    confirmLabel: 'Remove',
+    danger: false,
+    onConfirm: () => {
+      // Only what is known in the cloud NOW.
+      const now = (typeof syncPhotosUploadedIds === 'function') ? syncPhotosUploadedIds() : new Set();
+      const ids = m.photos.filter(id => now.has(id));
+      photosRemoveQuiet(ids, false).then((n) => {
+        if (n < 0) { showToast('Couldn\u2019t remove the photos. Try again.'); return; }
+        showToast(`Removed ${_jmPlural(n, 'photo')} from this phone`);
+        render();
+      });
+    },
+  });
+}
+
+function tidyOfferDismiss() {
+  tidyOfferAnswered();
+  render();
+}
+
+function tidyOfferReview() {
+  tidyOfferAnswered();
+  jobMgrOpen();
+}
+
+// ---- Jobs on this phone: the list ----
+// Synchronous — render() calls it. Every job that syncs (the example job
+// never does), newest first, each with its safety and whether it can come off.
+function jobMgrModel() {
+  if (!state.jobMgr) _jmReset();
+  const jm = state.jobMgr;
+  const safety = (typeof syncJobsSafety === 'function') ? syncJobsSafety(false) : null;
+  const out = { active: !!safety, rows: [], counts: { all: 0, safe: 0, notyet: 0 }, filter: jm.filter, byId: new Map() };
+  if (!safety) return out;
+  const onScreen = (state.view === 'entry') ? state.activeId : null;
+  const all = [];
+  for (const s of (state.sessions || [])) {
+    if (!s || !safety.map.has(String(s.id))) continue;
+    const r = safety.map.get(String(s.id));
+    const pc = (typeof photoCountsForSession === 'function') ? photoCountsForSession(s) : { total: 0, cloud: 0 };
+    const row = {
+      id: String(s.id), s, r,
+      title: s.site || s.name || 'Untitled job',
+      client: (typeof clientNameForSession === 'function') ? clientNameForSession(s) : '',
+      date: s.date || '', items: (s.items || []).length, photos: pc.total, locked: !!s.locked,
+      removable: !!r.safe && s.id !== onScreen,
+    };
+    all.push(row);
+    out.byId.set(row.id, row);
+    out.counts.all++;
+    if (r.safe) out.counts.safe++; else out.counts.notyet++;
+  }
+  all.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  out.rows = all.filter(x => jm.filter === 'safe' ? x.r.safe : (jm.filter === 'notyet' ? !x.r.safe : true));
+  return out;
+}
+
+function jobMgrSetFilter(v) {
+  const jm = state.jobMgr;
+  jm.filter = (v === 'safe' || v === 'notyet') ? v : 'all';
+  render();
+}
+
+function jobMgrToggleSelecting() {
+  const jm = state.jobMgr;
+  if (jm.busy) return;
+  jm.selecting = !jm.selecting;
+  if (!jm.selecting) jm.selected = {};
+  render();
+}
+
+function jobMgrTap(id) {
+  const jm = state.jobMgr;
+  if (!id || jm.busy || !jm.selecting) return;
+  const row = jobMgrModel().byId.get(String(id));
+  if (!row || !row.removable) {
+    if (row && typeof syncSafetyText === 'function') showToast(row.r.safe ? 'That job is open' : syncSafetyText(row.r));
+    return;
+  }
+  if (jm.selected[row.id]) delete jm.selected[row.id]; else jm.selected[row.id] = true;
+  render();
+}
+
+function jobMgrRemoveSelected() {
+  const jm = state.jobMgr;
+  if (jm.busy) return;
+  const ids = Object.keys(jm.selected || {});
+  if (!ids.length) return;
+  jobsRemoveAsk(ids);
+}
+
+// ---- 10A: cleared from this phone ----
+function jobMgrClearedLook() {
+  const jm = state.jobMgr;
+  if (typeof syncClearedLook !== 'function') return;
+  if (jm.cleared && jm.cleared.loading) return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    showToast('No signal \u2014 try again when you\u2019re connected');
+    return;
+  }
+  jm.cleared = { loading: true, ok: false, jobs: [], gone: 0, error: '' };
+  render();
+  syncClearedLook().then((res) => {
+    if (state.jobMgr !== jm) return;
+    jm.cleared = res.ok
+      ? { ok: true, loading: false, error: '', at: new Date().toISOString(), jobs: res.jobs, gone: res.gone }
+      : { ok: false, loading: false, jobs: [], gone: 0,
+          error: res.offline ? 'No signal \u2014 try again when you\u2019re connected.' : (res.error || 'Couldn\u2019t reach the cloud. Try again.') };
+    if (state.view === 'jobManager') render();
+  });
+}
+
+function jobMgrBringBack(id) {
+  const jm = state.jobMgr;
+  if (!id || jm.busy || typeof syncBringBack !== 'function') return;
+  jm.busy = 'Bringing it back\u2026';
+  render();
+  syncBringBack([String(id)]).then((res) => {
+    if (state.jobMgr !== jm) { if (res.got) showToast('Brought back onto this phone'); return; }
+    jm.busy = '';
+    if (res.got) {
+      if (jm.cleared && Array.isArray(jm.cleared.jobs)) jm.cleared.jobs = jm.cleared.jobs.filter(j => j.id !== String(id));
+      showToast('Brought back onto this phone \u2014 its photos follow on the next sync');
+    } else if (res.offline) showToast('No signal \u2014 try again when you\u2019re connected');
+    else if (res.error) showToast(res.error);
+    else showToast('That job isn\u2019t in the cloud any more');
+    if (state.view === 'jobManager') render();
+  });
+}
+
+// V91 (9A): the photo age, from the Backup page (signed in).
+function savePhotoAge() {
+  const el = document.getElementById('photo-age-input');
+  if (!el) return;
+  const n = parseInt(el.value, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 120) {
+    showToast('Enter a whole number of months (1\u2013120)');
+    return;
+  }
+  state.photoAgeMonths = n;
+  save();
+  render();
+}

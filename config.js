@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V90';
+const APP_VERSION = 'V91';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V90';
+const WELCOME_VERSION = 'V91';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -482,6 +482,13 @@ const SYNC_PULL_PAGE = 200;         // v81: rows per pull request, then page aga
 // v83.1: the pager's version. A cursor saved under an older one is cleared once
 // (sync.js _syncLoad), because V81–V83 could step over rows at a page edge.
 const SYNC_PAGER_V = 2;
+// V91 (Stage 4, 1A/2A): "safe in the cloud". st.conf[jobId] = the fingerprint of
+// the job's cloud copy as the pull last READ it. A job is safe when that equals
+// the phone's copy and every photo is known in the cloud. SYNC_CONF_V marks the
+// bookkeeping version: a stored state without it has never recorded a read, so
+// its jobs cursor is cleared ONCE (2A) and every job is read back — rows this
+// phone already has resolve as no work (the V83.1 re-read, jobs only).
+const SYNC_CONF_V = 1;
 // v81.2 (decision 2D). Reading is driven by what the engineer DOES — every
 // screen change is a moment they might be expecting the other phone's work —
 // with a slow backstop for standing still. The interval matters far more than
@@ -1072,6 +1079,18 @@ const STORAGE_BANNER_PCT = 80;
 // ISO day (yyyy-mm-dd) the Jobs-screen storage banner was last dismissed. Per
 // device, a nag timer — NOT in backups or setup exports. Factory reset must clear it.
 const STORAGE_BANNER_KEY = 'pat:storageBannerDay';
+
+// V91 (Stage 4, O4 — 8A/9A): the tidy-up offer. Signed in only.
+// PHOTO_AGE_KEY — photos taken more than this many months ago, known to be in
+//   the cloud, are offered for removal from THIS phone (they come back with a
+//   tap). Per device, like PRUNE_AGE_KEY; 1–120, default 3.
+// TIDY_OFFER_KEY — ISO day the Jobs-screen offer was last shown-and-answered.
+//   It comes back TIDY_OFFER_DAYS later. Per device, a nag timer — NOT in
+//   backups or setup exports. Factory reset must clear it.
+const PHOTO_AGE_KEY = 'pat:photoAgeMonths';
+const PHOTO_AGE_DEFAULT = 3;
+const TIDY_OFFER_KEY = 'pat:tidyOfferDay';
+const TIDY_OFFER_DAYS = 30;
 const BACKUP_SNOOZE_HOURS = 24;
 
 // v56: Retest reminders — the commercial "chase the customer to rebook" tool.

@@ -4012,3 +4012,52 @@ body.has-selection-bar .screen.pm-screen { padding-bottom: 140px; }
   cursor: pointer;
 }
 .pm-found { color: var(--text); font-weight: 600; }
+
+/* ============== V91 (Stage 4) — safe in the cloud ============== */
+/* 🛡 on a job card: on this phone AND safe in the cloud. ☁ stays "only in the cloud". */
+.session-safe {
+  display: inline-block;
+  margin-right: 4px;
+  font-size: 13px;
+  opacity: 0.85;
+}
+/* The tidy-up block (Jobs on this phone, Backup page) */
+.tidy-block {
+  margin: 12px 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--card-bg);
+}
+.tidy-lead { margin: 0 0 8px; font-size: 13px; font-weight: 600; color: var(--text); }
+.tidy-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; }
+.tidy-row + .tidy-row { border-top: 1px solid var(--row-separator); }
+.tidy-text { flex: 1; min-width: 0; font-size: 13px; color: var(--text); overflow-wrap: anywhere; }
+.tidy-btn { width: auto; flex: 0 0 auto; margin: 0; padding: 8px 12px; font-size: 13px; }
+/* Jobs on this phone */
+.jm-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 2px;
+  border-bottom: 1px solid var(--row-separator);
+}
+.jm-row.is-dim { opacity: 0.55; }
+.jm-row.is-selected { background: var(--accent-soft); }
+.jm-text { flex: 1; min-width: 0; }
+.jm-status-row { margin-top: 4px; }
+.jm-status { font-size: 12px; color: var(--text-muted); }
+.jm-status.is-safe { color: var(--pass); font-weight: 600; }
+.jm-tick {
+  flex: 0 0 auto;
+  width: 24px; height: 24px;
+  border-radius: 50%;
+  border: 2px solid var(--border-strong);
+  display: inline-flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 14px; font-weight: 700;
+}
+.jm-tick.is-on { background: var(--accent); border-color: var(--accent); }
+.jm-tick.is-off { border-style: dashed; }
+.jm-back-btn { width: auto; flex: 0 0 auto; margin: 0; padding: 8px 12px; font-size: 13px; }
+.jm-cleared { margin-top: 22px; }
+body.has-selection-bar .screen.jm-screen { padding-bottom: 120px; }
