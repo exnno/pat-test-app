@@ -10,7 +10,7 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v91.1';
+const CACHE_VERSION = 'pat-v91-1';
 const ASSETS = [
   './',
   './index.html',
@@ -62,7 +62,14 @@ const ASSETS = [
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then(cache => cache.addAll(ASSETS))
+    // V91.1: every file is fetched with cache: 'reload' — straight from the
+    // server, never from the browser's own HTTP cache. ⚠ GitHub Pages lets
+    // files be cached for ~10 minutes, so a phone that picked up a new sw.js
+    // soon after a release could fill the NEW cache with the OLD files and stay
+    // on the old version however often the key was bumped (found at V91: phone
+    // on V90, incognito on V91).
+    caches.open(CACHE_VERSION).then(cache =>
+      cache.addAll(ASSETS.map(url => new Request(url, { cache: 'reload' }))))
     // v61.2: the temporary install-time skipWaiting() used to recover from the
     // v61 deadlock has been REMOVED, deliberately. It has to go: with it in
     // place, every future update activates immediately, and the controllerchange
