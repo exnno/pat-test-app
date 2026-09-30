@@ -9,6 +9,8 @@
 -- email addresses on the next two lines → Run. Every row of the result must
 -- say PASS. Any FAIL: do not promote, and bring the output to the next chat.
 --
+-- V89: CHECKS 4e/4f NEED ONE PREVIEW FROM ACCOUNT A — any photo uploaded by a
+-- V89 phone has one (or wait for a V89 phone holding older photos to add them).
 -- V88: CHECK 4c NEEDS ONE REAL PHOTO FROM ACCOUNT A. Before running, sign in
 -- as A on a phone running V88, add a photo to a failed item, and wait until
 -- Settings → Cloud → Sync shows it in the cloud. Without one, 4c and 4d say
@@ -29,6 +31,7 @@ declare
   a uuid; b uuid;
   n int; ok boolean; msg text; plan_after text;
   real_a text;   -- V88: one real photo file of A's, if there is one
+  thumb_a text;  -- V89: one real preview file of A's, if there is one
   res text[] := '{}';
   rls_off text;
 begin
@@ -66,6 +69,12 @@ begin
   select name into real_a from storage.objects
   where bucket_id = 'photos' and (storage.foldername(name))[1] = a::text
     and name <> a::text || '/iso-test.jpg'
+    and name not like '%\_t.jpg'
+  order by created_at desc limit 1;
+  -- V89: and a real PREVIEW of A's ({id}_t.jpg), for check 4e.
+  select name into thumb_a from storage.objects
+  where bucket_id = 'photos' and (storage.foldername(name))[1] = a::text
+    and name like '%\_t.jpg'
   order by created_at desc limit 1;
 
   -- Become B.
@@ -181,6 +190,20 @@ begin
     end;
   end if;
 
+  -- 4e. (V89) B cannot read one of A's photo PREVIEWS either. Same folder, same
+  -- policy — checked because V89 is the first release to write them.
+  if thumb_a is null then
+    res := res || array['4e|B cannot read A''s real preview file|INCONCLUSIVE|A has no preview in the cloud yet — see the note at the top'];
+  else
+    begin
+      select count(*) into n from storage.objects where bucket_id = 'photos' and name = thumb_a;
+      res := res || array['4e|B cannot read A''s real preview file|'
+                    || case when n = 0 then 'PASS|' || thumb_a else 'FAIL|B can see ' || thumb_a end];
+    exception when others then
+      res := res || array['4e|B cannot read A''s real preview file|FAIL|error instead of 0 rows: ' || sqlerrm];
+    end;
+  end if;
+
   -- 7. (V88) The same checks on photo rows.
   begin
     select count(*) into n from public.photos where id = 'iso-test-A';
@@ -232,6 +255,23 @@ begin
                     || case when n = 1 then 'PASS|' else 'FAIL|A saw ' || n end];
     exception when others then
       res := res || array['4d|control: A can read A''s own photo file|FAIL|' || sqlerrm];
+    end;
+    execute 'reset role';
+    perform set_config('request.jwt.claims', '', true);
+  end if;
+  -- 4f. (V89) Control for 4e: A CAN see the same preview.
+  if thumb_a is null then
+    res := res || array['4f|control: A can read A''s own preview file|INCONCLUSIVE|A has no preview yet'];
+  else
+    perform set_config('request.jwt.claims',
+      json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      select count(*) into n from storage.objects where bucket_id = 'photos' and name = thumb_a;
+      res := res || array['4f|control: A can read A''s own preview file|'
+                    || case when n = 1 then 'PASS|' else 'FAIL|A saw ' || n end];
+    exception when others then
+      res := res || array['4f|control: A can read A''s own preview file|FAIL|' || sqlerrm];
     end;
     execute 'reset role';
     perform set_config('request.jwt.claims', '', true);

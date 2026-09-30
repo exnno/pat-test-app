@@ -63,6 +63,11 @@ create table if not exists public.photos (
 -- order (V89). Safe to re-run; on an existing project paste just this line.
 alter table public.photos add column if not exists taken_at timestamptz;
 
+-- V89: a small preview ({user_id}/{photo_id}_t.jpg, same folder, same policy)
+-- exists for this photo. Set only after the preview file is up, so another
+-- phone can trust it. Safe to re-run; on an existing project paste just this line.
+alter table public.photos add column if not exists thumb boolean not null default false;
+
 -- [v1.2] updated_at must move on EVERY update, not just insert. The sync pull
 -- asks for "rows changed since X" by updated_at; a default alone only stamps
 -- the first write, so later edits would never be pulled by another device.
