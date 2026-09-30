@@ -554,6 +554,16 @@ module.exports = async function () {
     t.eq(app.storage.getItem('pat:photoAgeMonths'), '6', '…per phone');
   });
 
+  /* ------------------------------------------------------------------ 28j */
+  // V91.1. Source guard — a service worker's install can't run headlessly here.
+  await t.group('28j — the service worker fills a new cache from the server, never the browser cache (V91.1)', () => {
+    const sw = fs.readFileSync(path.join(APP_DIR, 'sw.js'), 'utf8');
+    const install = sw.slice(sw.indexOf("addEventListener('install'"), sw.indexOf("addEventListener('activate'"));
+    t.ok(install.length > 0, 'the install handler is found');
+    t.includes(install, "new Request(url, { cache: 'reload' })", 'every file is fetched with cache: reload');
+    t.excludes(install, 'cache.addAll(ASSETS)', 'never the plain list (which may come from the HTTP cache)');
+  });
+
   /* ------------------------------------------------------------------ 28i */
   await t.group('28i — signed out nothing changes: no shield, no offer, no Jobs on this phone, the old clear', async () => {
     const app = await signedOut();
