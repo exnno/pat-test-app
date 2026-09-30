@@ -19,6 +19,23 @@ Cloud access-code flag) — a half-reset phone that is
 still signed in would pull its old jobs straight back. Most destructive button in
 the app, so the confirm needs to be genuinely hard to hit by accident.
 
+### V90 residuals (known, accepted)
+- "Look in the cloud" reads rows and job names only while the manager is open;
+  nothing is kept, so every look reads again (3A). Accounts over 20,000 photos
+  see the first 20,000 (said on screen).
+- Before a phone's first sync on an account the manager shows phone photos only
+  (same rule as V89's badges).
+- Photos of a job not on this phone can be seen and deleted, not downloaded (4A)
+  — they come with their job in Stage 5.
+- A photo found by the look and deleted is removed on the next sync, not at
+  once. Offline, it waits like any other delete.
+- Local previews are made one at a time on the phone (canvas); a big page on an
+  old phone fills in over a few seconds. A photo that won't decode stays a 📷.
+- No "remove photos older than X" offer — goes with Stage 4's clear-old-jobs
+  offer (O4, Peter 10A).
+- Harness: 25a waited one tick for the photo store and failed twice under a full
+  run while building V90; it now waits up to a second (harness defect, not app).
+
 ### V89 residuals (known, accepted)
 - A phone keeps photo records only for jobs it holds. A job brought back by a
   path other than the pull or "Use the cloud's copy" (none today; Stage 5's
@@ -66,7 +83,7 @@ the app, so the confirm needs to be genuinely hard to hit by accident.
 - Protection status is asked fresh each launch, never stored.
 - Day-first file names don't sort by date in a folder (Peter's choice, V87).
 
-### Cloud track — V89: photos down, on request only; next the photo manager
+### Cloud track — V90: the photo manager; next Stage 4 safe in the cloud
 V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull → V82 clients + sites →
 V83 instruments + presets + tester in use → V83.1 pager fix → V84 report
 settings + templates + certificate counter → V85 the cloud pages moved to
@@ -74,10 +91,10 @@ Settings → Cloud (code 1111, remembered per phone) → **V86** general setting
 (engineer + switches, fail reasons, descriptions, CSV, Multi Pick, Smart Quick
 Pick history) → V87 field release → **V88** photos UP (one way, isolation 4c/4d +
 7a–7d) → **V89** photos DOWN, only when asked (rows, previews, ☁ tiles,
-certificate prompt, deletes from any phone; isolation 4e/4f). Next (roadmap
-v4.2, 6A): **V90** the photo manager (Peter: iMessage-style review of what's on
-the phone and in the cloud — preview, remove from phone, download, delete
-everywhere), then Stage 4 safe-in-the-cloud and Stage 5 jobs on request, then
+certificate prompt, deletes from any phone; isolation 4e/4f) → **V90** the
+photo manager (Settings → Backup → Manage photos: phone + cloud, Look in the
+cloud, remove from phone, download, delete everywhere, orphans; no SQL). Next
+(roadmap v4.3, 6A): Stage 4 safe-in-the-cloud, Stage 5 jobs on request, then
 field batch A.
 Every cloud release runs `supabase/isolation-test.sql` (all PASS) before
 promotion to `Release` — all PASS at V84 incl. 6a–6d. V85 changed no SQL.

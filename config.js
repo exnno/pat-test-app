@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V89';
+const APP_VERSION = 'V90';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V87';
+const WELCOME_VERSION = 'V90';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -469,6 +469,15 @@ const SYNC_THUMBS_PER_RUN = 50;
 // Photo rows for jobs that arrived after the photo cursor passed them (a job
 // brought in later): fetched by job id, this many ids per request.
 const SYNC_PHOTO_NEED_BATCH = 50;
+// V90 (R18): the photo manager (Settings → Backup → Manage photos).
+// PHOTO_MGR_PAGE tiles are shown at a time; "Show more" at the bottom
+// adds another page — a grid of hundreds never builds, reads or fetches at once.
+// "Look in the cloud" (3A) reads the photos table — rows only, never images —
+// SYNC_BROWSE_PAGE rows per request, up to SYNC_BROWSE_MAX, then the names of
+// the jobs not on this phone, SYNC_PHOTO_NEED_BATCH ids per request.
+const PHOTO_MGR_PAGE = 48;
+const SYNC_BROWSE_PAGE = 1000;
+const SYNC_BROWSE_MAX = 20000;
 const SYNC_PULL_PAGE = 200;         // v81: rows per pull request, then page again
 // v83.1: the pager's version. A cursor saved under an older one is cleared once
 // (sync.js _syncLoad), because V81–V83 could step over rows at a page edge.

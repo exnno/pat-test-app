@@ -648,3 +648,492 @@ function setTimestamps(enabled) {
   state.timestampsEnabled = !!enabled;
   save();
 }
+
+// ============== V90 (R18) — the photo manager ==============
+// Settings → Backup → Manage photos. See what's on this phone and what's in the
+// cloud, and decide what stays where — iMessage "review attachments" style.
+// Markup: renderPhotoManager() in render-review.js. State: state.photoMgr
+// (state.js), all transient. Actions: pm-* in dispatch.js.
+//
+// It READS only what the phone already knows (state.photoMeta — this phone's
+// photos; state.photoCloud — photos known in the cloud, V89) until the engineer
+// taps "Look in the cloud" (3A), which reads rows only (sync.js syncPhotoBrowse)
+// and keeps them in memory. Every action goes through a path that already
+// existed:
+//   remove from phone = photosRemoveQuiet (known-in-cloud only, notes nothing)
+//   download          = syncPhotoDownload (cloud-only photos of jobs HERE — 4A)
+//   delete            = photoDelete / photoDeleteCloudOnly (the V89 ledger path);
+//                       a photo found by the look is made known first
+//                       (syncPhotoKnowForDelete), then the same ledger path.
+// ⚠ 8A: nothing on a LOCKED job is deleted here, signed in or out. Removing it
+// from the phone is fine — the cloud keeps it.
+//
+// The screen has no text inputs (two selects only), so it may render() freely;
+// previews arriving are painted in place, not by a render.
+
+function _pmVisible() {
+  return typeof _photoCloudVisible === 'function' && _photoCloudVisible();
+}
+
+function _pmReset(keepView) {
+  const old = state.photoMgr || {};
+  state.photoMgr = {
+    filter: keepView ? (old.filter || 'all') : 'all',
+    sort: keepView ? (old.sort || 'newest') : 'newest',
+    selecting: false,
+    selected: {},
+    shown: 0,
+    busy: '',
+    cloud: null,
+    preview: null,
+    thumbGen: (old.thumbGen || 0) + 1,   // stops a preview round still going
+  };
+}
+
+function photoMgrOpen() {
+  _pmReset(false);
+  setView('photoManager');
+  photoMgrLoadThumbs();
+}
+
+// Called by setView() on every navigation away. Cheap when there is nothing to do.
+function photoMgrLeave() {
+  const pm = state.photoMgr;
+  if (!pm) return;
+  if (pm.preview && pm.preview.own && typeof photoReleaseObjectUrls === 'function') photoReleaseObjectUrls();
+  // A fresh object: anything still running for the old screen sees it has gone
+  // (state.photoMgr !== pm) and stops. The cloud look is not kept (3A: re-read).
+  _pmReset(false);
+}
+
+function _pmJobInfo(e, sessById, pm) {
+  const sess = sessById.get(e.s);
+  if (sess) {
+    return {
+      onPhone: true, locked: !!sess.locked, orphan: false,
+      title: sess.site || sess.name || 'Untitled job',
+      client: (typeof clientNameForSession === 'function') ? clientNameForSession(sess) : '',
+      date: sess.date || '',
+    };
+  }
+  const cl = pm.cloud;
+  const j = (cl && cl.ok && cl.jobs) ? cl.jobs[e.s] : null;
+  // No job (5A) only when the look ASKED about it and the cloud had none, or a
+  // deleted one. A job never asked about (a capped look) is just unnamed.
+  const asked = !!(cl && cl.ok && Array.isArray(cl.asked) && cl.asked.indexOf(e.s) !== -1);
+  if (asked && (!j || j.deleted)) {
+    return { onPhone: false, locked: false, orphan: true, title: 'Photos with no job', client: '', date: '' };
+  }
+  if (j) {
+    const c = (j.clientId && typeof clientById === 'function') ? clientById(j.clientId) : null;
+    return { onPhone: false, locked: !!j.locked, orphan: false,
+      title: j.site || j.name || 'Untitled job', client: c ? c.name : '', date: j.date || '' };
+  }
+  return { onPhone: false, locked: false, orphan: false, title: 'A job not on this phone', client: '', date: '' };
+}
+
+// Everything the manager knows, as one list, plus the groups on screen.
+// Synchronous — render() calls it (MAP rule 2).
+function photoMgrModel() {
+  if (!state.photoMgr) _pmReset(false);
+  const pm = state.photoMgr;
+  const vis = _pmVisible();
+  const meta = state.photoMeta || {};
+  const known = vis ? (state.photoCloud || {}) : {};
+  const gone = new Set();
+  for (const t of (state.tombstones || [])) if (t && t.kind === 'photo') gone.add(String(t.id));
+  const sessById = new Map();
+  for (const s of (state.sessions || [])) if (s && s.id != null) sessById.set(String(s.id), s);
+
+  const all = [];
+  for (const id of Object.keys(meta)) {
+    const m = meta[id] || {};
+    all.push({ id, s: String(m.s || ''), i: String(m.i || ''), b: m.b || 0, a: m.at || '',
+      local: true, cloud: !!known[id], src: 'phone', t: !!(known[id] && known[id].t) });
+  }
+  if (vis) {
+    for (const id of Object.keys(known)) {
+      if (meta[id] || gone.has(id)) continue;
+      const e = known[id];
+      if (!e || !e.s || !e.i) continue;
+      all.push({ id, s: e.s, i: e.i, b: e.b || 0, a: e.a || '', local: false, cloud: true, src: 'known', t: !!e.t });
+    }
+    const cl = pm.cloud;
+    if (cl && cl.ok && Array.isArray(cl.rows)) {
+      for (const r of cl.rows) {
+        if (meta[r.id] || known[r.id] || gone.has(r.id)) continue;
+        // A job on this phone learns its own rows through the pull (rule 24).
+        if (sessById.has(r.s)) continue;
+        all.push({ id: r.id, s: r.s, i: r.i, b: r.b || 0, a: r.a || '', local: false, cloud: true, src: 'browse', t: !!r.t });
+      }
+    }
+  }
+  const byId = new Map();
+  for (const e of all) { Object.assign(e, _pmJobInfo(e, sessById, pm)); byId.set(e.id, e); }
+
+  // Totals (6A). The cloud line says what it covers: before a look, only what
+  // this phone knows; after, everything the account holds.
+  const totals = { phoneN: 0, phoneB: 0, cloudN: 0, cloudB: 0, cloudAll: false };
+  for (const e of all) if (e.local) { totals.phoneN++; totals.phoneB += e.b || 0; }
+  if (vis) {
+    const cl = pm.cloud;
+    if (cl && cl.ok && Array.isArray(cl.rows)) {
+      totals.cloudAll = !cl.capped;
+      for (const r of cl.rows) if (!gone.has(r.id)) { totals.cloudN++; totals.cloudB += r.b || 0; }
+    } else {
+      for (const id of Object.keys(known)) if (!gone.has(id)) { totals.cloudN++; totals.cloudB += (known[id] && known[id].b) || 0; }
+    }
+  }
+
+  const f = vis ? (pm.filter || 'all') : 'all';
+  const keep = (e) => f === 'all' || (f === 'phone' && e.local) || (f === 'cloud' && !e.local)
+    || (f === 'notup' && e.local && !e.cloud);
+
+  const groups = new Map();
+  for (const e of all) {
+    if (!keep(e)) continue;
+    const key = e.orphan ? '~orphan' : e.s;
+    let g = groups.get(key);
+    if (!g) {
+      g = { key, title: e.title, client: e.client, date: e.date, onPhone: e.onPhone, locked: e.locked,
+            orphan: e.orphan, photos: [], bytes: 0, last: '' };
+      groups.set(key, g);
+    }
+    g.photos.push(e);
+    g.bytes += e.b || 0;
+    if (String(e.a) > g.last) g.last = String(e.a);
+  }
+  const list = Array.from(groups.values());
+  list.forEach((g) => g.photos.sort((a, b) => String(a.a).localeCompare(String(b.a)) || a.id.localeCompare(b.id)));
+  const when = (g) => g.date || String(g.last).slice(0, 10);
+  const sort = pm.sort || 'newest';
+  list.sort((a, b) => {
+    if (a.orphan !== b.orphan) return a.orphan ? 1 : -1;          // no job: always last
+    if (sort === 'space' && a.bytes !== b.bytes) return b.bytes - a.bytes;
+    const d = when(a).localeCompare(when(b));
+    if (d) return sort === 'oldest' ? d : -d;
+    return String(a.title).localeCompare(String(b.title)) || a.key.localeCompare(b.key);
+  });
+
+  // One page at a time (11A): a grid of hundreds never builds at once.
+  const page = (typeof PHOTO_MGR_PAGE === 'number') ? PHOTO_MGR_PAGE : 48;
+  const limit = pm.shown > 0 ? pm.shown : page;
+  let total = 0;
+  for (const g of list) total += g.photos.length;
+  let left = limit;
+  const shownGroups = [];
+  for (const g of list) {
+    if (left <= 0) break;
+    const take = g.photos.slice(0, left);
+    left -= take.length;
+    shownGroups.push(Object.assign({}, g, { shown: take }));
+  }
+  return { vis, filter: f, groups: shownGroups, allGroups: list, total,
+    more: Math.max(0, total - limit), byId, totals };
+}
+
+function _pmSelected(ids) {
+  const model = photoMgrModel();
+  const want = Array.isArray(ids) ? ids : Object.keys(state.photoMgr.selected || {});
+  return want.map((id) => model.byId.get(String(id))).filter(Boolean);
+}
+
+function _pmPaint(thumbs) {
+  render();
+  if (thumbs) photoMgrLoadThumbs();
+}
+
+// ---- previews (11A) ----
+// Tiles show small previews: a cloud photo's comes down (about 10 KB, only for
+// tiles on screen); this phone's own is made here from the photo (a full
+// 1280px picture per tile would fill a phone's memory). Kept for the session
+// (photos.js), so scrolling back or reopening costs nothing. One at a time.
+function _pmWithin(p, ms) {
+  let timer = null;
+  return Promise.race([p, new Promise((res) => { timer = setTimeout(() => res(null), ms); })])
+    .then((v) => { if (timer) clearTimeout(timer); return v; });
+}
+
+function _pmThumbFor(e) {
+  if (e.local) {
+    if (typeof photoThumbBlob !== 'function') return Promise.resolve(null);
+    return photoBlob(e.id).then((b) => b ? _pmWithin(photoThumbBlob(b), 8000) : null);
+  }
+  if (!e.t || typeof syncPhotoThumb !== 'function') return Promise.resolve(null);
+  return syncPhotoThumb(e.id, e.src === 'browse' ? { t: 1 } : undefined);
+}
+
+function _pmPaintThumb(id, url) {
+  try {
+    const el = document.getElementById('pm-t-' + id);
+    if (el && url) el.innerHTML = `<img src="${escapeHTML(url)}" alt="" loading="lazy">`;
+  } catch { /* the next render shows it */ }
+}
+
+function photoMgrLoadThumbs() {
+  const pm = state.photoMgr;
+  if (!pm || state.view !== 'photoManager') return Promise.resolve();
+  const gen = pm.thumbGen = (pm.thumbGen || 0) + 1;
+  const model = photoMgrModel();
+  const want = [];
+  for (const g of model.groups) for (const e of g.shown) if (!photoThumbCached(e.id)) want.push(e);
+  return want.reduce((chain, e) => chain.then(() => {
+    // A newer round (or leaving the screen) stops this one starting more…
+    if (state.photoMgr !== pm || pm.thumbGen !== gen || state.view !== 'photoManager') return null;
+    return _pmThumbFor(e).then((blob) => {
+      // …but a preview already on its way is kept: it was paid for.
+      if (!blob) return;
+      const url = photoThumbRemember(e.id, blob);
+      if (state.view === 'photoManager') _pmPaintThumb(e.id, url);
+      if (pm.preview && pm.preview.id === e.id && !pm.preview.url) { pm.preview.url = url; pm.preview.loading = false; render(); }
+    }, () => null);
+  }), Promise.resolve()).catch(() => { /* a missing preview stays a placeholder */ });
+}
+
+// ---- controls ----
+function photoMgrSetFilter(v) {
+  const ok = ['all', 'phone', 'cloud', 'notup'];
+  state.photoMgr.filter = ok.indexOf(v) === -1 ? 'all' : v;
+  state.photoMgr.shown = 0;
+  _pmPaint(true);
+}
+
+function photoMgrSetSort(v) {
+  const ok = ['newest', 'oldest', 'space'];
+  state.photoMgr.sort = ok.indexOf(v) === -1 ? 'newest' : v;
+  state.photoMgr.shown = 0;
+  _pmPaint(true);
+}
+
+function photoMgrShowMore() {
+  const page = (typeof PHOTO_MGR_PAGE === 'number') ? PHOTO_MGR_PAGE : 48;
+  const pm = state.photoMgr;
+  pm.shown = (pm.shown > 0 ? pm.shown : page) + page;
+  _pmPaint(true);
+}
+
+// 7A: Select → tap tiles; a job heading's tick takes the whole job.
+function photoMgrToggleSelecting() {
+  const pm = state.photoMgr;
+  if (pm.busy) return;
+  pm.selecting = !pm.selecting;
+  if (!pm.selecting) pm.selected = {};
+  _pmPaint(false);
+}
+
+function photoMgrTile(id) {
+  const pm = state.photoMgr;
+  if (!id || pm.busy) return;
+  if (!pm.selecting) { photoMgrPreview(id); return; }
+  if (pm.selected[id]) delete pm.selected[id]; else pm.selected[id] = true;
+  _pmPaint(false);
+}
+
+function photoMgrSelectJob(key) {
+  const pm = state.photoMgr;
+  if (!pm.selecting || pm.busy) return;
+  const g = photoMgrModel().allGroups.find((x) => x.key === key);
+  if (!g) return;
+  const all = g.photos.every((e) => pm.selected[e.id]);
+  g.photos.forEach((e) => { if (all) delete pm.selected[e.id]; else pm.selected[e.id] = true; });
+  _pmPaint(false);
+}
+
+function _pmForget(ids) {
+  const pm = state.photoMgr;
+  (ids || []).forEach((id) => { delete pm.selected[id]; });
+  if (pm.preview && (ids || []).indexOf(pm.preview.id) !== -1) photoMgrPreviewClose(true);
+}
+
+// ---- 3A: Look in the cloud ----
+function photoMgrLook() {
+  const pm = state.photoMgr;
+  if (!_pmVisible() || typeof syncPhotoBrowse !== 'function') return;
+  if (pm.cloud && pm.cloud.loading) return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    showToast('No signal \u2014 try again when you\u2019re connected');
+    return;
+  }
+  const prev = pm.cloud;
+  pm.cloud = Object.assign({}, prev || {}, { loading: true, error: '' });
+  _pmPaint(false);
+  syncPhotoBrowse().then((res) => {
+    if (state.photoMgr !== pm) return;             // left the screen meanwhile
+    if (res.ok) {
+      pm.cloud = { ok: true, loading: false, error: '', at: new Date().toISOString(),
+        rows: res.rows, jobs: res.jobs, asked: res.asked, capped: !!res.capped };
+    } else {
+      pm.cloud = Object.assign({}, prev && prev.ok ? prev : { ok: false, rows: [], jobs: {}, asked: [] }, {
+        loading: false,
+        error: res.offline ? 'No signal \u2014 try again when you\u2019re connected.' : (res.error || 'Couldn\u2019t reach the cloud. Try again.'),
+      });
+    }
+    pm.shown = 0;
+    if (state.view === 'photoManager') _pmPaint(true);
+  });
+}
+
+// ---- the preview (tap a tile outside Select) ----
+function photoMgrPreview(id) {
+  const pm = state.photoMgr;
+  const e = photoMgrModel().byId.get(String(id));
+  if (!e) return;
+  pm.preview = { id: e.id, url: photoThumbCached(e.id) || '', loading: true, own: false };
+  _pmPaint(false);
+  if (e.local) {
+    photoBlob(e.id).then((blob) => {
+      if (state.photoMgr !== pm || !pm.preview || pm.preview.id !== e.id) return;
+      const url = blob ? photoObjectUrl(blob) : '';
+      if (url) { pm.preview.url = url; pm.preview.own = true; }
+      pm.preview.loading = false;
+      render();
+    });
+    return;
+  }
+  if (pm.preview.url || !e.t) { pm.preview.loading = false; render(); return; }
+  _pmThumbFor(e).then((blob) => {
+    if (state.photoMgr !== pm || !pm.preview || pm.preview.id !== e.id) return;
+    if (blob) pm.preview.url = photoThumbRemember(e.id, blob);
+    pm.preview.loading = false;
+    render();
+  });
+}
+
+function photoMgrPreviewClose(quiet) {
+  const pm = state.photoMgr;
+  if (pm.preview && pm.preview.own && typeof photoReleaseObjectUrls === 'function') photoReleaseObjectUrls();
+  pm.preview = null;
+  if (!quiet) _pmPaint(false);
+}
+
+function _pmIdsOrSelected(arg) {
+  return arg ? [String(arg)] : Object.keys(state.photoMgr.selected || {});
+}
+
+const _pmPlural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+// ---- remove from phone (known in the cloud only) ----
+function photoMgrRemove(arg) {
+  const pm = state.photoMgr;
+  if (pm.busy || typeof syncPhotosUploadedIds !== 'function') return;
+  const sel = _pmSelected(_pmIdsOrSelected(arg));
+  const up = syncPhotosUploadedIds();
+  const go = sel.filter((e) => e.local && up.has(e.id));
+  const kept = sel.filter((e) => e.local && !up.has(e.id)).length;
+  if (!go.length) {
+    showToast(kept
+      ? 'Those photos haven\u2019t reached the cloud yet, so they stay on this phone'
+      : 'Those photos aren\u2019t on this phone');
+    return;
+  }
+  const bytes = go.reduce((n, e) => n + (e.b || 0), 0);
+  openConfirmSheet({
+    title: `Remove ${_pmPlural(go.length, 'photo')} from this phone?`,
+    message: `This frees about ${formatBytes(bytes)} on this phone. Your cloud copy keeps them, and you can download them again at any time. ` +
+      (kept ? `${_pmPlural(kept, 'photo')} not in the cloud yet ${kept === 1 ? 'is' : 'are'} kept. ` : '') +
+      'Your jobs and results are not affected.',
+    confirmLabel: 'Remove',
+    danger: false,
+    onConfirm: () => {
+      // Ask again at the moment of removing: only what is known in the cloud NOW.
+      const now = syncPhotosUploadedIds();
+      const ids = go.map((e) => e.id).filter((id) => now.has(id));
+      pm.busy = 'Removing\u2026';
+      _pmPaint(false);
+      photosRemoveQuiet(ids, true).then((n) => {
+        pm.busy = '';
+        if (n < 0) { showToast('Couldn\u2019t remove the photos. Try again.'); _pmPaint(false); return; }
+        _pmForget(ids);
+        showToast(`Removed ${_pmPlural(n, 'photo')} from this phone`);
+        _pmPaint(true);
+      });
+    },
+  });
+}
+
+// ---- download (cloud-only photos of jobs on this phone — 4A) ----
+function _pmPaintBusy() {
+  try {
+    const el = document.getElementById('pm-busy');
+    if (el) el.textContent = state.photoMgr.busy || '';
+  } catch { /* shown on the next render */ }
+}
+
+function photoMgrDownload(arg) {
+  const pm = state.photoMgr;
+  if (pm.busy || typeof syncPhotoDownload !== 'function') return;
+  const sel = _pmSelected(_pmIdsOrSelected(arg));
+  const go = sel.filter((e) => !e.local && e.src === 'known' && e.onPhone);
+  const away = sel.filter((e) => !e.local && !(e.src === 'known' && e.onPhone)).length;
+  if (!go.length) {
+    showToast(away
+      ? 'Those photos\u2019 jobs aren\u2019t on this phone. You can see and delete them here, but not download them yet'
+      : 'Those photos are already on this phone');
+    return;
+  }
+  const ids = go.map((e) => e.id);
+  pm.busy = `Downloading 0 of ${ids.length}\u2026`;
+  _pmPaint(false);
+  syncPhotoDownload(ids, (done, total) => { pm.busy = `Downloading ${done} of ${total}\u2026`; _pmPaintBusy(); }).then((res) => {
+    pm.busy = '';
+    if (res.offline) showToast('No signal \u2014 the photos are safe in the cloud. Try again when you\u2019re connected.');
+    else if (res.notReady) showToast('Photos are still loading \u2014 try again in a moment');
+    else if (res.failed) showToast(`Downloaded ${res.got}. Couldn\u2019t download ${res.failed} \u2014 try again later.`);
+    else showToast(`Downloaded ${_pmPlural(res.got, 'photo')}` + (away ? ` \u00b7 ${away} left: their jobs aren\u2019t on this phone` : ''));
+    const here = ids.filter((id) => state.photoMeta && state.photoMeta[id]);
+    here.forEach((id) => { delete pm.selected[id]; });
+    if (state.photoMgr === pm && state.view === 'photoManager') _pmPaint(true);
+  });
+}
+
+// ---- delete (everywhere when signed in — 9A; never on a locked job — 8A) ----
+function photoMgrDelete(arg) {
+  const pm = state.photoMgr;
+  if (pm.busy) return;
+  const vis = _pmVisible();
+  const sel = _pmSelected(_pmIdsOrSelected(arg));
+  const locked = sel.filter((e) => e.locked).length;
+  const go = sel.filter((e) => !e.locked && (e.local || vis));
+  if (!go.length) {
+    showToast(locked
+      ? 'Those photos are on a locked job. Unlock the job first to delete them.'
+      : 'Nothing to delete');
+    return;
+  }
+  const n = go.length;
+  const bytes = go.reduce((t, e) => t + (e.b || 0), 0);
+  const lockedNote = locked
+    ? ` ${_pmPlural(locked, 'photo')} on locked jobs ${locked === 1 ? 'is' : 'are'} left alone \u2014 unlock the job first to delete ${locked === 1 ? 'it' : 'them'}.`
+    : '';
+  openConfirmSheet({
+    title: vis ? `Delete ${_pmPlural(n, 'photo')} everywhere?` : `Delete ${_pmPlural(n, 'photo')}?`,
+    message: vis
+      ? `This deletes ${_pmPlural(n, 'photo')} (${formatBytes(bytes)}) from this phone and from your cloud copy, so they go from every phone too. It can\u2019t be undone.${lockedNote}`
+      : `This permanently deletes ${_pmPlural(n, 'photo')} (${formatBytes(bytes)}) from this phone. If you haven\u2019t exported them, they can\u2019t be recovered.${lockedNote}`,
+    confirmLabel: `Delete ${_pmPlural(n, 'photo')}`,
+    onConfirm: () => {
+      const locals = go.filter((e) => e.local);
+      const knownOnly = go.filter((e) => !e.local && e.src === 'known');
+      const found = go.filter((e) => e.src === 'browse');
+      pm.busy = 'Deleting\u2026';
+      _pmPaint(false);
+      let gone = 0;
+      locals.reduce((chain, e) => chain.then(() => photoDelete(e.id).then((ok) => { if (ok) gone++; })), Promise.resolve())
+        .then(() => {
+          knownOnly.forEach((e) => { if (photoDeleteCloudOnly(e.id)) gone++; });
+          // A photo the look found becomes known FIRST, then takes the same path.
+          return (found.length && typeof syncPhotoKnowForDelete === 'function')
+            ? syncPhotoKnowForDelete(found).then(() => { found.forEach((e) => { if (photoDeleteCloudOnly(e.id)) gone++; }); })
+            : null;
+        })
+        .catch((err) => { console.error('Photo manager delete (non-fatal).', err); })
+        .then(() => {
+          pm.busy = '';
+          locals.forEach((e) => { if (typeof photoThumbForget === 'function') photoThumbForget(e.id); });
+          _pmForget(go.map((e) => e.id));
+          showToast(gone === n ? `Deleted ${_pmPlural(n, 'photo')}` : `Deleted ${gone} of ${n} photos \u2014 try the rest again`);
+          if (state.photoMgr === pm && state.view === 'photoManager') _pmPaint(true);
+        });
+    },
+  });
+}

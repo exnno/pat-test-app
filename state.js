@@ -104,6 +104,20 @@ let state = {
   photoStripItemId: '',
   photoStripPhotos: [],
   photoStripLoading: false,
+  // V90 (R18): the photo manager. All transient — never saved; reset when the
+  // view is left (setView → photoMgrLeave). `cloud` is the last "Look in the
+  // cloud" read (3A): rows and job names, held in memory only, re-read on tap.
+  photoMgr: {
+    filter: 'all',        // 'all' | 'phone' | 'cloud' | 'notup'
+    sort: 'newest',       // 'newest' | 'oldest' | 'space'
+    selecting: false,
+    selected: {},         // photo id → true
+    shown: 0,             // tiles shown (0 = one page)
+    busy: '',             // progress text while an action runs
+    cloud: null,          // { at, loading, error, rows: [], jobs: {}, capped }
+    preview: null,        // { id, url, loading }
+    thumbGen: 0,          // bumped to stop an older preview round
+  },
   showFailsOnly: false,
   searchQuery: '',
   // v7

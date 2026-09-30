@@ -2092,6 +2092,8 @@ function setView(v) {
   closeReadingsSheetState();          // v53
   discardPendingPhotos();             // v62
   closePhotoStripState();             // v62
+  // V90: leaving the photo manager drops its selection, preview and cloud look.
+  if (v !== 'photoManager' && typeof photoMgrLeave === 'function') photoMgrLeave();
   // v61: the asset-history sheet lives on the Sessions screen; leaving that
   // screen must not leave it armed to reappear on the way back.
   state.assetHistorySheetOpen = false;

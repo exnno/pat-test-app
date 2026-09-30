@@ -136,6 +136,9 @@ function render() {
   else if (v === 'settingsDescriptions') html = renderSettingsDescriptions();
   else if (v === 'settingsDisplay') html = renderSettingsDisplay();
   else if (v === 'settingsBackup') html = renderSettingsBackup();
+  // V90 (R18): the photo manager, reached from the Backup page. Falls back to
+  // the Backup page if its markup is missing (never a blank screen).
+  else if (v === 'photoManager') html = (typeof renderPhotoManager === 'function') ? renderPhotoManager() : renderSettingsBackup();
   else if (v === 'settingsSetup') html = renderSettingsSetup();   // v33
   else if (v === 'settingsCsv') html = renderSettingsCsv();   // v11
   else if (v === 'settingsClients') html = renderSettingsClients();   // v19
@@ -226,11 +229,10 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Retests go by the month.</strong> A retest is due for the whole month &mdash; a job tested on 30 September on a 12-month cycle is due next September. If you use retest reminders, the job joins your chase list on the <strong>1st of the month before</strong>, so you have a full month to ring the customer. Certificates show the month, e.g. <em>Recommended retest: September 2027</em>.</li>
-        <li><strong>Tidier file names.</strong> Reports and exports are saved with spaces and a UK date, like <em>PAT Report Office 28-09-2026.pdf</em> &mdash; no more underscores to tidy up. The report also has its own title when you print or open it.</li>
-        <li><strong>Full storage can't lose an item any more.</strong> If the phone runs out of room for PATGo, you're told straight away, with a button to back up what's on screen.</li>
-        <li><strong>Storage health on the Backup page.</strong> It shows whether the phone has agreed to keep PATGo's data, and a banner on the Jobs screen warns you when storage is getting full.</li>
-        <li><strong>Description suggestions close properly.</strong> The suggestions list now closes when you hide the keyboard or tap elsewhere, so it can't sit over the Pass and Fail buttons.</li>
+        <li><strong>Manage photos.</strong> Settings &rarr; Backup &rarr; <strong>Manage photos</strong> shows every photo, grouped by job, with how much space they take. Tap one to see it larger, or tap <strong>Select</strong> to pick several &mdash; or a whole job &mdash; and delete them.</li>
+        <li><strong>Sort by space.</strong> Sort jobs by <em>Most space</em> to find the ones filling your phone.</li>
+        <li><strong>Locked jobs are safe.</strong> Photos on a locked job are never deleted from here &mdash; unlock the job first.</li>
+        <li><strong>Remember:</strong> photos aren't in your backup. Export them from the Backup page before deleting anything you might need.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -463,7 +465,8 @@ function render() {
     finalHTML.indexOf('fail-sheet') !== -1 ||
     finalHTML.indexOf('bulk-sheet') !== -1;
   // Toggle body class for selection bar spacing
-  if (state.view === 'overview' && state.selectionMode) {
+  if ((state.view === 'overview' && state.selectionMode)
+      || (state.view === 'photoManager' && state.photoMgr && state.photoMgr.selecting)) {
     document.body.classList.add('has-selection-bar');
   } else {
     document.body.classList.remove('has-selection-bar');

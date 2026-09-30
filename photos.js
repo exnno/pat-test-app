@@ -669,7 +669,11 @@ function photoAddFromCloud(e, blob) {
 // A photo deleted on the other phone: this phone's copy goes, and NOTHING is
 // noted — the delete is already in the cloud (it is how we heard of it).
 // Resolves the number removed, or -1 if the store refused (the caller retries).
-function photosRemoveQuiet(ids) {
+// V90: also the photo manager's "Remove from phone" (a selection of photos KNOWN
+// to be in the cloud — the caller checks). Same meaning: this phone's copy goes,
+// nothing is noted, the cloud keeps it. `keepPreview` keeps its preview for the
+// session, since the photo is still there to see.
+function photosRemoveQuiet(ids, keepPreview) {
   const want = (ids || []).map(String).filter((id) => state.photoMeta && state.photoMeta[id]);
   if (!want.length) return Promise.resolve(0);
   return _photoTx('readwrite', (store) => {
@@ -680,7 +684,7 @@ function photosRemoveQuiet(ids) {
       const m = state.photoMeta[id];
       if (m) _photoIndexRemove(m.i, m.b);
       _photoMetaDrop(id);
-      photoThumbForget(id);
+      if (!keepPreview) photoThumbForget(id);
     });
     return want.length;
   }).catch(() => -1);

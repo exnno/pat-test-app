@@ -3375,9 +3375,12 @@ function _syncThumbBackfill(c, uid, st, out) {
 
 // A preview, for the strip. Null when there isn't one, or no signal, or signed
 // out: the tile then shows a plain cloud.
-function syncPhotoThumb(photoId) {
+// V90: `hint` is a row the photo manager read with "Look in the cloud" — a photo
+// of a job not on this phone, so not known here (rule 24). Its own `t` says
+// whether a preview exists; nothing about it is remembered.
+function syncPhotoThumb(photoId, hint) {
   const id = String(photoId || '');
-  const e = (state.photoCloud || {})[id];
+  const e = (state.photoCloud || {})[id] || ((hint && hint.t) ? hint : null);
   if (!id || !e || !e.t || !syncActive() || _syncOffline()) return Promise.resolve(null);
   const uid = _syncCurrentUserId();
   if (!uid || state.photoCloudUser !== uid) return Promise.resolve(null);
@@ -3424,4 +3427,122 @@ function syncPhotoDownload(ids, onStep) {
     if (res.got) { try { syncNoteSave(); } catch { /* next trigger */ } }
     return res;
   }, () => { res.failed = list.length - res.got; return res; });
+}
+
+// ---- V90: the photo manager's cloud read (R18) -------------------------------
+//
+// "Look in the cloud" (3A). The first read of what the cloud holds for jobs NOT
+// on this phone: the photos table, ROWS only — never an image (R17) — and, for
+// the jobs those rows belong to, five fields picked out of the job row
+// (doc->>…), never the job itself. Roughly 200 bytes a photo.
+//
+// ⚠ Nothing read here is remembered. It is not added to st.ph.sent (rule 24:
+// knowing is scoped to what the phone holds) and never saved — the manager keeps
+// it in memory until it closes, and the next look reads again. The one exception
+// is a photo the engineer chooses to delete: see syncPhotoKnowForDelete.
+//
+// Keyset paging by id (gt + order + limit): stable while rows are added, and no
+// offsets. Resolves { ok, offline, error, rows: [{id,s,i,b,t,a}], jobs, asked, capped }.
+const _SYNC_BROWSE_COLS = 'id,session_id,item_id,bytes,thumb,taken_at';
+const _SYNC_BROWSE_JOB_COLS = 'id,deleted,site:doc->>site,name:doc->>name,date:doc->>date,clientId:doc->>clientId,locked:doc->>locked';
+
+function syncPhotoBrowse() {
+  const res = { ok: false, offline: false, error: '', rows: [], jobs: {}, asked: [], capped: false };
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  const size = (typeof SYNC_BROWSE_PAGE === 'number') ? SYNC_BROWSE_PAGE : 1000;
+  const max = (typeof SYNC_BROWSE_MAX === 'number') ? SYNC_BROWSE_MAX : 20000;
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  return cloudClient().then((c) => {
+    function page(after) {
+      let q = c.from('photos').select(_SYNC_BROWSE_COLS).eq('user_id', uid).eq('deleted', false);
+      if (after) q = q.gt('id', after);
+      return q.order('id', { ascending: true }).limit(size).then((r) => {
+        if (r && r.error) throw r.error;
+        const got = (r && r.data) || [];
+        for (const row of got) {
+          const id = String(row && row.id != null ? row.id : '');
+          const s = String(row && row.session_id != null ? row.session_id : '');
+          const i = String(row && row.item_id != null ? row.item_id : '');
+          if (!id || !s || !i) continue;
+          const e = { id, s, i, b: 0, t: row.thumb === true, a: '' };
+          const b = Number(row.bytes);
+          if (b > 0 && isFinite(b)) e.b = Math.round(b);
+          if (typeof row.taken_at === 'string' && !isNaN(Date.parse(row.taken_at))) e.a = row.taken_at;
+          res.rows.push(e);
+        }
+        if (got.length < size) return;
+        if (res.rows.length >= max) { res.capped = true; return; }
+        const last = got[got.length - 1];
+        return page(String(last && last.id != null ? last.id : ''));
+      });
+    }
+    return page('').then(() => {
+      // The names of the jobs NOT on this phone (the manager names the rest from
+      // the phone). A job missing from the answer, or deleted, leaves its photos
+      // with no job (5A) — the manager says so; nothing is decided here.
+      const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+      const want = Array.from(new Set(res.rows.map(e => e.s))).filter(id => !local.has(id));
+      res.asked = want;   // a job asked about and not answered has no job (5A)
+      let chain = Promise.resolve();
+      for (let k = 0; k < want.length; k += batch) {
+        const chunk = want.slice(k, k + batch);
+        chain = chain.then(() => c.from('sessions').select(_SYNC_BROWSE_JOB_COLS).eq('user_id', uid).in('id', chunk))
+          .then((r) => {
+            if (r && r.error) throw r.error;
+            for (const j of ((r && r.data) || [])) {
+              const id = String(j && j.id != null ? j.id : '');
+              if (!id) continue;
+              const str = (v) => (typeof v === 'string') ? v : '';
+              res.jobs[id] = {
+                deleted: j.deleted === true,
+                site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
+                locked: j.locked === true || j.locked === 'true',
+              };
+            }
+          });
+      }
+      return chain;
+    }).then(() => { res.ok = true; return res; });
+  }).catch((e) => {
+    res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn\u2019t reach the cloud.';
+    res.rows = []; res.jobs = {}; res.asked = [];
+    return res;
+  });
+}
+
+// V90: a photo the manager found with "Look in the cloud" and the engineer
+// chose to delete everywhere. It becomes KNOWN first, then goes through the one
+// delete path V89 built (a 'photo' ledger entry; the next run marks the row,
+// removes both files, then forgets it) — so it retries like any other delete and
+// survives the app closing or losing signal.
+//
+// ⚠ Written only while no run is going: a run holds its own copy of the sync
+// state and saves it, which would overwrite this. Waits, then writes in one
+// synchronous step (nothing can start a run in between). Resolves the number
+// added. `list` = [{id, s, i, b?, t?, a?}].
+function syncPhotoKnowForDelete(list) {
+  const uid = _syncCurrentUserId();
+  const want = (list || []).filter(e => e && e.id && e.s && e.i);
+  if (!uid || !want.length) return Promise.resolve(0);
+  const go = () => {
+    if (_syncRunning) return _syncRunning.then(go, go);
+    const st = _syncLoad();
+    if (st.userId !== uid) return 0;
+    let n = 0;
+    for (const e of want) {
+      const id = String(e.id);
+      if (st.ph.sent[id]) continue;
+      const o = { s: String(e.s), i: String(e.i) };
+      if (typeof e.b === 'number' && e.b > 0 && isFinite(e.b)) o.b = Math.round(e.b);
+      if (e.t) o.t = 1;
+      if (typeof e.a === 'string' && e.a && !isNaN(Date.parse(e.a))) o.a = e.a;
+      st.ph.sent[id] = o;
+      n++;
+    }
+    if (n) _syncSave(st);
+    return n;
+  };
+  return Promise.resolve(go());
 }

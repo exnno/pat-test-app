@@ -1,4 +1,4 @@
-# PATGo — Code Map (V89)
+# PATGo — Code Map (V90)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -408,6 +408,8 @@ informational count.
 ⚠ v88: `state.photoMeta` (photo id → job, item, size, time) is the mirror
 **sync.js** reads to upload; `photoMetaReady` gates it (and the prune guard).
 Every add/delete must keep BOTH mirrors in step.
+⚠ v90: `photosRemoveQuiet(ids, keepPreview)` is also the manager's "Remove from
+phone" (known-in-cloud only, caller checks); notes nothing either way.
 ⚠ v89: cloud-only lookups (`photoCloudOnlyForItem`, `photoCountForItemAll`,
 `photoCountsForSession`, `photoCloudOnlyForSession`) read **sync.js**'s
 `state.photoCloud`, memoised on `photoMetaV`/`photoCloudV`/ledger — every meta
@@ -524,7 +526,7 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
 (scroll reset) live in `render()` via `_lastRenderedView`, not in `setView`.
 
-### settings-actions.js (~620 ln) — the write half of the Settings screens — NEW v70
+### settings-actions.js (~1140 ln) — the write half of the Settings screens + the photo manager (v90) — NEW v70
 Per-page saves, Report Settings (text, logo, filename tokens), signature capture
 (draw and upload), CSV column ordering, Export/Import Setup UI handlers, the
 editable list settings (item types, fail reasons, descriptions) and the
@@ -540,6 +542,14 @@ go to render-settings.js; to change a default, config.js.
 call `captureReportTextInputs()` first or unsaved text is lost (dispatch.js
 depends on this). `setTheme` delegates to `applyTheme` (session.js). Extracted
 from session.js in v70, byte identical.
+⚠ v90: also the PHOTO MANAGER's logic (`photoMgr*`, `_pm*`): `photoMgrModel()`
+(synchronous — render() calls it) merges **photos.js** `state.photoMeta`,
+**sync.js** `state.photoCloud` and the in-memory look (`state.photoMgr.cloud`).
+Actions reuse existing paths only: `photosRemoveQuiet(ids, true)`,
+`syncPhotoDownload`, `photoDelete`/`photoDeleteCloudOnly`,
+`syncPhotoKnowForDelete`. 8A: nothing on a locked job is deleted. Markup is
+`renderPhotoManager()` in **render-review.js**; actions `pm-*` in **dispatch.js**;
+**session.js** `setView()` calls `photoMgrLeave()` on any other view.
 
 ### onboarding.js (~195 ln) — first-run wizard — NEW v70
 The wizard state machine (step capture, paging, fresh/import fork, theme pick,
@@ -572,7 +582,7 @@ The **calibration banner is ONE banner** covering the worst instrument with
 `cloudPagesUnlocked()` (cloud.js); otherwise `renderCloudLocked()`. The V43 About
 long-press is gone — `setupLongPress` (utils.js) now has no caller.
 
-### render-review.js (~715 ln) — review & manage screens — NEW v72
+### render-review.js (~905 ln) — review & manage screens — NEW v72
 Overview (+ `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
 `refreshOverviewBody`, `refreshOverviewSelection`), Edit Session, Retest
 Reminders, the Reports hub, and the shared photo-evidence markup
@@ -587,6 +597,9 @@ cover them instead. `dispatch.js` calls `refreshOverviewBody()` /
 helpers. Declares NO top-level bindings, so its load position is free.
 `renderRetestReminders()` bounces to the sessions list when the retest feature
 is off — any test of it must turn the flag on first.
+v90: `renderPhotoManager()` (view `photoManager`, reached from the Backup page;
+render-core falls back to the Backup page if it is missing). Previews are
+painted into `#pm-t-<id>` in place by settings-actions.js, not by render.
 Boot probe: `renderOverview` in `requiredFns`.
 
 ### render-settings.js (~1377 ln) — settings screens that own a setting
@@ -651,7 +664,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~3430 ln) — cloud sync, PUSH AND PULL — v80–v89
+### sync.js (~3550 ln) — cloud sync, PUSH AND PULL — v80–v90
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session
@@ -780,9 +793,15 @@ anything known (5A), file AND `{uid}/{id}_t.jpg`. Previews: `_syncThumbUpload`
 `state.photoCloud` at `st.ph.sent` (`_syncPhotoCloudPoint`). Images come down
 ONLY via `syncPhotoDownload` (session.js strip, report.js prompt); previews only
 via `syncPhotoThumb` (strip open).
+⚠ v90: the photo manager's two entry points (callers: **settings-actions.js**).
+`syncPhotoBrowse` = "Look in the cloud": photos rows (keyset by id) + five
+`doc->>` fields of jobs NOT on this phone; returns data, writes NOTHING (rule 24).
+`syncPhotoKnowForDelete` adds found photos to `st.ph.sent` so the normal delete
+step takes them — it waits for `_syncRunning` (a run saves its own `st` and would
+overwrite it). `syncPhotoThumb(id, hint)` accepts a found row's `{t}`.
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
-19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n and 26a–26q, mutations M142–M295,
-M306–M325, M355–M395.
+19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q and 27a–27l, mutations
+M142–M295, M306–M325, M355–M395, M396–M416.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

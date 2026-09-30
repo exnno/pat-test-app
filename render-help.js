@@ -50,17 +50,17 @@ function renderSettingsAbout() {
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v89: rolled forward — V89 on top, V86 dropped. -->
+      <!-- v8: rolling 3-version changelog. V90: rolled forward — V90 on top, V87 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V90</strong> &middot; September 2026</p>
+        <p class="muted">New: Manage photos, on the Backup page. See every photo grouped by job with how much space they take, pick the ones you want, and delete them. For the invite-only cloud test it also shows what's in the cloud: remove photos from the phone to free space (the cloud keeps them), download them back, look in the cloud for photos of jobs that aren't on this phone, and delete photos everywhere. Photos on locked jobs are never deleted from here. Signed in, the Backup page button is now called Clear photos from this phone, because that's what it does.</p>
         <p><strong>V89</strong> &middot; September 2026</p>
         <p class="muted">The jobs list now shows how many photos each job has. For the invite-only cloud test: photos now reach your other devices, without filling them up. Each device learns which photos are in the cloud and shows them with a &#9729; and a small preview, and a photo comes down only when you tap it (or Download all). If a job's certificate includes photos that are only in the cloud, the app asks whether to download them first. Deleting a photo on either device deletes it everywhere. Photos you clear from a phone now show as in the cloud, so you can bring them back.</p>
         <p><strong>V88</strong> &middot; September 2026</p>
         <p class="muted">For the invite-only cloud test: your fail photos are now copied up to the cloud, a few at a time while the app is open, and the Sync page shows how many are there. Deleting a photo, an item or a job deletes its cloud photos too. While you're signed in, old jobs can only be cleared once their photos are safe in the cloud, and Delete all photos clears only the ones already there, to free up space. Photos don't come down to your other devices yet.</p>
-        <p><strong>V87</strong> &middot; September 2026</p>
-        <p class="muted">Retests are now due for a whole month: a job tested on 30 September is due the following September, and your chase list picks it up on the 1st of the month before. The certificate shows the month. Report and export file names use spaces and UK dates (28-09-2026), and the report now carries its own title. If the phone's storage fills up, the app now tells you straight away instead of losing an item. The Backup page shows whether your data is protected, and a banner warns when storage gets full.</p>
-                              </div>
+        </div>
 
       <div class="info-card">
         <h3>Set up another device</h3>

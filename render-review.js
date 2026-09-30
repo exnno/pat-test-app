@@ -712,3 +712,195 @@ function renderPhotoStripSheet() {
     </div>
   `;
 }
+
+// ============== V90 (R18) — the photo manager screen ==============
+// Settings → Backup → Manage photos. Markup only; the logic is in
+// settings-actions.js (photoMgrModel and the photoMgr* actions). Read-only apart
+// from two selects, so it may render freely (MAP rule 3). Previews are painted
+// into #pm-t-<id> in place as they arrive; a render simply shows the cached one.
+function _pmWhenUK(iso) {
+  const d = new Date(iso);
+  if (!iso || isNaN(d.getTime())) return '';
+  try {
+    return d.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch { return ''; }
+}
+
+function _pmItemLabel(e) {
+  const sess = (state.sessions || []).find((s) => s && String(s.id) === e.s);
+  const it = sess && Array.isArray(sess.items) ? sess.items.find((x) => x && String(x.id) === e.i) : null;
+  if (!it) return 'Photo';
+  const bits = [it.assetNo, it.itemType, it.location].map((x) => String(x || '').trim()).filter(Boolean);
+  return bits.length ? bits.join(' \u00b7 ') : 'Photo';
+}
+
+function _pmTile(e, pm, vis) {
+  const sel = !!pm.selected[e.id];
+  const url = photoThumbCached(e.id);
+  const inner = url
+    ? `<img src="${escapeHTML(url)}" alt="" loading="lazy">`
+    : `<span class="pm-thumb-blank" aria-hidden="true">${e.local ? '\ud83d\udcf7' : '\u2601'}</span>`;
+  const badge = !vis ? '' : (!e.local ? '\u2601 Cloud only' : (!e.cloud ? 'Not uploaded' : ''));
+  const label = `${e.local ? 'Photo on this phone' : 'Photo in the cloud'}${sel ? ', selected' : ''}`;
+  return `<button class="pm-tile${sel ? ' is-selected' : ''}${e.local ? '' : ' is-cloud'}" data-action="pm-tile" data-arg="${escapeHTML(e.id)}" aria-label="${label}">
+      <span class="pm-thumb" id="pm-t-${escapeHTML(e.id)}">${inner}</span>
+      ${badge ? `<span class="pm-badge">${badge}</span>` : ''}
+      ${pm.selecting ? `<span class="pm-tick" aria-hidden="true">${sel ? '\u2713' : ''}</span>` : ''}
+    </button>`;
+}
+
+function _pmPreviewSheet(m, pm) {
+  const p = pm.preview;
+  if (!p) return '';
+  const e = m.byId.get(p.id);
+  if (!e) return '';
+  const vis = m.vis;
+  const img = p.url
+    ? `<img src="${escapeHTML(p.url)}" alt="Photo">`
+    : `<span class="pm-thumb-blank">${p.loading ? 'Loading\u2026' : '\u2601 No preview yet'}</span>`;
+  const where = !vis ? 'On this phone'
+    : (!e.local ? 'Only in the cloud' : (e.cloud ? 'On this phone and in the cloud' : 'On this phone \u00b7 not uploaded yet'));
+  const job = [e.client, e.title, formatDate(e.date)].filter(Boolean).join(' \u00b7 ');
+  const taken = _pmWhenUK(e.a);
+  const lines = [
+    job,
+    [taken ? `Taken ${taken}` : '', e.b ? formatBytes(e.b) : ''].filter(Boolean).join(' \u00b7 '),
+    where + (e.local ? '' : (e.onPhone ? '' : ' \u00b7 its job isn\u2019t on this phone')),
+  ].filter(Boolean);
+  const btns = [];
+  if (vis && !e.local && e.src === 'known' && e.onPhone) btns.push(`<button class="btn-primary" data-action="pm-download" data-arg="${escapeHTML(e.id)}">\u2601 Download</button>`);
+  if (vis && e.local && e.cloud) btns.push(`<button class="btn-secondary" data-action="pm-remove" data-arg="${escapeHTML(e.id)}">Remove from phone</button>`);
+  if (e.locked) btns.push(`<p class="muted pm-note">\ud83d\udd12 This job is locked. Unlock it to delete its photos.</p>`);
+  else if (e.local || vis) btns.push(`<button class="btn-danger" data-action="pm-delete" data-arg="${escapeHTML(e.id)}">${vis ? 'Delete everywhere' : 'Delete'}</button>`);
+  return `
+    <div class="modal-backdrop" data-action="pm-preview-close"></div>
+    <div class="bulk-sheet" role="dialog" aria-label="Photo">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">${escapeHTML(e.onPhone ? _pmItemLabel(e) : 'Photo')}</h3>
+        <button class="fail-close-btn" data-action="pm-preview-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="sheet-scroll">
+        <div class="pm-preview-img">${img}</div>
+        ${lines.map((l) => `<p class="muted pm-preview-line">${escapeHTML(l)}</p>`).join('')}
+      </div>
+      <div class="sheet-pin pm-preview-actions">${btns.join('')}</div>
+    </div>
+  `;
+}
+
+function renderPhotoManager() {
+  const pm = state.photoMgr;
+  const m = photoMgrModel();
+  const vis = m.vis;
+  const t = m.totals;
+  const nSel = Object.keys(pm.selected || {}).filter((id) => m.byId.has(id)).length;
+  const anything = m.byId.size > 0;
+  const plural = (n) => `${n} photo${n === 1 ? '' : 's'}`;
+
+  const header = `
+    <header class="header-row">
+      <button class="icon-btn" data-action="pm-back" aria-label="Back">\u2039</button>
+      <div class="site-name">Manage photos</div>
+      ${anything ? `<button class="pm-select-btn" data-action="pm-select-toggle" ${pm.busy ? 'disabled' : ''}>${pm.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
+    </header>`;
+
+  // 3A: the cloud read is a tap, never automatic.
+  const cl = pm.cloud;
+  let look = '';
+  if (vis) {
+    if (cl && cl.loading) {
+      look = `<p class="muted pm-note">Looking in the cloud\u2026</p>`;
+    } else {
+      const checked = (cl && cl.ok && cl.at)
+        ? `Checked at ${escapeHTML(new Date(cl.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}.${cl.capped ? ' Very large account: the first 20,000 photos are shown.' : ''}`
+        : 'See photos of jobs that aren\u2019t on this phone, and any left with no job. Needs a signal.';
+      look = `
+        <button class="backup-action-btn" data-action="pm-look" style="margin-top:10px">\u2601 ${cl && cl.ok ? 'Look again' : 'Look in the cloud'}</button>
+        <p class="muted pm-note">${checked}</p>
+        ${cl && cl.error ? `<p class="pm-note pm-error">${escapeHTML(cl.error)}</p>` : ''}`;
+    }
+  }
+
+  const totals = `
+    <div class="settings-section pm-totals">
+      <div class="pm-total-row"><span>\ud83d\udcf1 On this phone</span><strong>${plural(t.phoneN)} \u00b7 ${escapeHTML(formatBytes(t.phoneB))}</strong></div>
+      ${vis ? `<div class="pm-total-row"><span>\u2601 In the cloud${t.cloudAll ? '' : ' <span class="muted">(jobs on this phone)</span>'}</span><strong>${plural(t.cloudN)} \u00b7 ${escapeHTML(formatBytes(t.cloudB))}</strong></div>` : ''}
+      ${look}
+    </div>`;
+
+  const opt = (v, cur, label) => `<option value="${v}"${cur === v ? ' selected' : ''}>${label}</option>`;
+  const controls = anything ? `
+    <div class="list-controls">
+      ${vis ? `<label class="control-field">
+        <span class="control-label">Show</span>
+        <select class="sort-select" data-change-action="pm-filter">
+          ${opt('all', m.filter, 'All')}${opt('phone', m.filter, 'On this phone')}${opt('cloud', m.filter, 'Cloud only')}${opt('notup', m.filter, 'Not uploaded yet')}
+        </select>
+      </label>` : ''}
+      <label class="control-field">
+        <span class="control-label">Sort jobs</span>
+        <select class="sort-select" data-change-action="pm-sort">
+          ${opt('newest', pm.sort, 'Newest')}${opt('oldest', pm.sort, 'Oldest')}${opt('space', pm.sort, 'Most space')}
+        </select>
+      </label>
+    </div>` : '';
+
+  const busy = pm.busy ? `<p class="pm-busy" id="pm-busy" role="status">${escapeHTML(pm.busy)}</p>` : '';
+
+  let body;
+  if (!m.total) {
+    body = !anything
+      ? emptyStateHTML('\ud83d\udcf7', 'No photos yet', 'Photos are added from the FAIL screen. They\u2019ll appear here, grouped by job.')
+      : `<p class="muted pm-note">No photos match this filter.</p>`;
+  } else {
+    body = m.groups.map((g) => {
+      const allSel = g.photos.every((e) => pm.selected[e.id]);
+      const sub = g.orphan
+        ? [`Their job was deleted, or never reached the cloud`, `${plural(g.photos.length)} \u00b7 ${formatBytes(g.bytes)}`]
+        : [g.client, formatDate(g.date), `${plural(g.photos.length)} \u00b7 ${formatBytes(g.bytes)}`, g.onPhone ? '' : 'not on this phone'];
+      return `
+        <section class="pm-group">
+          <div class="pm-group-head">
+            ${pm.selecting ? `<button class="pm-group-tick${allSel ? ' is-on' : ''}" data-action="pm-select-job" data-arg="${escapeHTML(g.key)}" aria-label="${allSel ? 'Deselect' : 'Select'} every photo in this job">${allSel ? '\u2713' : ''}</button>` : ''}
+            <div class="pm-group-text">
+              <div class="pm-group-title">${g.locked ? '<span class="session-lock" title="Locked">\ud83d\udd12</span>' : ''}${escapeHTML(g.title)}</div>
+              <div class="pm-group-sub">${escapeHTML(sub.filter(Boolean).join(' \u00b7 '))}</div>
+            </div>
+          </div>
+          <div class="pm-grid">${g.shown.map((e) => _pmTile(e, pm, vis)).join('')}</div>
+        </section>`;
+    }).join('');
+    if (m.more) body += `<button class="backup-action-btn pm-more" data-action="pm-more">Show more (${m.more} more)</button>`;
+  }
+
+  let bar = '';
+  if (pm.selecting) {
+    const sel = Object.keys(pm.selected || {}).map((id) => m.byId.get(id)).filter(Boolean);
+    const bytes = sel.reduce((n, e) => n + (e.b || 0), 0);
+    const canRemove = sel.some((e) => e.local && e.cloud);
+    const canDown = sel.some((e) => !e.local && e.src === 'known' && e.onPhone);
+    const canDel = sel.some((e) => !e.locked && (e.local || vis));
+    const off = (ok) => (ok && !pm.busy) ? '' : 'disabled';
+    bar = `
+      <div class="selection-bar pm-bar">
+        <span class="selection-bar-count">${nSel} selected${nSel ? ` \u00b7 ${escapeHTML(formatBytes(bytes))}` : ''}</span>
+        ${vis ? `<button class="selection-bar-action pm-bar-btn" data-action="pm-remove" ${off(canRemove)}>Remove from phone</button>
+        <button class="selection-bar-action pm-bar-btn" data-action="pm-download" ${off(canDown)}>Download</button>` : ''}
+        <button class="selection-bar-action pm-bar-btn is-danger" data-action="pm-delete" ${off(canDel)}>${vis ? 'Delete everywhere' : 'Delete'}</button>
+      </div>`;
+  }
+
+  return `
+    <div class="screen pm-screen">
+      ${header}
+      ${totals}
+      ${controls}
+      ${busy}
+      ${body}
+    </div>
+    ${bar}
+    ${_pmPreviewSheet(m, pm)}
+  `;
+}

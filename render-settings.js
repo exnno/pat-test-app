@@ -1447,13 +1447,23 @@ function renderPhotoBackupSection() {
        <p class="muted" style="margin-top:8px;font-size:12px">${stats.count} photo${stats.count === 1 ? '' : 's'} on this device · about ${escapeHTML(formatBytes(Math.round(stats.bytes * 1.37)))} as a file.</p>`
     : `<p class="muted" style="font-size:12px">No photos on this device yet. Photos are added from the FAIL screen.</p>`;
 
+  // V90 (Peter, V90 round): the label says what the button does. Signed in it
+  // only clears photos already in the cloud (V88 5A — the cloud keeps them);
+  // signed out it really deletes, so it keeps the word "Delete". Same condition
+  // as the photo-wipe action in dispatch.js.
+  const clears = (typeof syncActive === 'function' && syncActive());
   const wipeBlock = stats.count
-    ? `<button class="backup-action-btn danger" id="photo-wipe-btn" data-action="photo-wipe" style="margin-top:10px">🗑 Delete all photos</button>`
+    ? `<button class="backup-action-btn danger" id="photo-wipe-btn" data-action="photo-wipe" style="margin-top:10px">🗑 ${clears ? 'Clear photos from this phone' : 'Delete all photos'}</button>`
+    : '';
+  // V90 (R18): the photo manager. Signed out it shows this phone's photos.
+  const manageBlock = (typeof renderPhotoManager === 'function')
+    ? `<button class="backup-action-btn primary" id="photo-manage-btn" data-action="pm-open" style="margin-bottom:10px">🖼 Manage photos</button>`
     : '';
 
   return `
       <div class="settings-section">
         <h2 class="h2">Photos</h2>
+        ${manageBlock}
         <p class="muted"><strong>Photos are not included in your backup.</strong> They're far too large for it — putting them in would risk the backup itself failing to save. Export them separately and keep both files together.</p>
         ${exportBlock}
         <input type="file" id="photo-import-file" data-change-action="photo-import-file" accept="application/json,.json" style="display:none">
