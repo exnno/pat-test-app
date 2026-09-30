@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V91';",
-    to:   "const APP_VERSION = 'V91';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V92';",
+    to:   "const APP_VERSION = 'V92';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -637,8 +637,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V89</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V89</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V88</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V90</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V90</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V89</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1091,8 +1091,8 @@ const MUTATIONS = [
   {
     name: 'M145 (V80) a delete keeps the job\u2019s contents in the cloud',
     file: 'sync.js',
-    from: "row: { id, user_id: uid, doc: {}, deleted: true, last_modified: at } });",
-    to:   "row: { id, user_id: uid, doc: (state.sessions.find(x => String(x.id) === id) || { gone: id, site: 'ZZDELETEME' }), deleted: true, last_modified: at } });",
+    from: "row: { id, user_id: uid, doc: {}, fp: null, deleted: true, last_modified: at } });",
+    to:   "row: { id, user_id: uid, doc: (state.sessions.find(x => String(x.id) === id) || { gone: id, site: 'ZZDELETEME' }), fp: null, deleted: true, last_modified: at } });",
     why:  'decision 4A: delete means delete — the client data must not linger server-side',
   },
   {
@@ -1934,8 +1934,8 @@ const MUTATIONS = [
   {
     name: 'M261 (V83.1) the jobs pager asks for rows AFTER the mark again',
     file: 'sync.js',
-    from: "    return c.from('sessions')\n      .select('id,doc,deleted,last_modified,updated_at')\n      .gte('updated_at', from)",
-    to:   "    return c.from('sessions')\n      .select('id,doc,deleted,last_modified,updated_at')\n      .gt('updated_at', from)",
+    from: "    return c.from('sessions')\n      .select(_SYNC_JOB_LIST_COLS)\n      .gte('updated_at', from)",
+    to:   "    return c.from('sessions')\n      .select(_SYNC_JOB_LIST_COLS)\n      .gt('updated_at', from)",
     why:  'a page that ends part-way through an upload batch steps over the rest of it for good — the V81–V83 bug',
   },
   {
@@ -1963,8 +1963,8 @@ const MUTATIONS = [
   {
     name: 'M265 (V83.1) the jobs guard lets the cursor move past a page it could not finish',
     file: 'sync.js',
-    from: "        if (high === from) { blocked = true; return; }\n        return page(high);\n      });\n  }\n\n  return page(since).then(() => {\n    // Recomputed every run",
-    to:   "        if (high === from) { return; }\n        return page(high);\n      });\n  }\n\n  return page(since).then(() => {\n    // Recomputed every run",
+    from: "          if (high === from) { blocked = true; return; }\n          return page(high);\n        });\n      });\n  }\n\n  return page(since).then(() => {\n    // Recomputed every run",
+    to:   "          if (high === from) { return; }\n          return page(high);\n        });\n      });\n  }\n\n  return page(since).then(() => {\n    // Recomputed every run",
     why:  'more rows on one timestamp than a page holds: the rest are stepped over instead of the run stopping',
   },
   {
@@ -3163,6 +3163,83 @@ const MUTATIONS = [
     from: "      cache.addAll(ASSETS.map(url => new Request(url, { cache: 'reload' }))))",
     to:   "      cache.addAll(ASSETS))",
     why:  "a phone updating soon after a release installs the new key with the old files and stays on the old version (28j)",
+  },
+  {
+    name: "M436 (V92) the pull's list read downloads the contents again",
+    file: "sync.js",
+    from: "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at';",
+    to:   "const _SYNC_JOB_LIST_COLS = 'id,doc,fp,deleted,updated_at';",
+    why:  "R17: every push comes straight back down in full — the waste V92 exists to remove (29a, 29e)",
+  },
+  {
+    name: "M437 (V92) the push sends no fingerprint",
+    file: "sync.js",
+    from: "doc: JSON.parse(json), fp: hash, deleted: false,",
+    to:   "doc: JSON.parse(json), deleted: false,",
+    why:  "2A: the cloud row can't vouch for its contents, so no job is ever safe from the list and every change downloads in full (29a)",
+  },
+  {
+    name: "M438 (V92) a blank fingerprint is trusted instead of downloading",
+    file: "sync.js",
+    from: "    if (!fp) return true;                      // written by an older phone, or blanked",
+    to:   "    if (!fp) return false;                     // written by an older phone, or blanked",
+    why:  "a V91 phone's job or edit never reaches a V92 phone (29c)",
+  },
+  {
+    name: "M439 (V92) nothing is read back after the push",
+    file: "sync.js",
+    from: "      return _syncConfirmPushed(c, uid, st, work.filter(w => !w.gone).map(w => w.id));",
+    to:   "      return null;",
+    why:  "4A: 🛡 one sync late again (29a)",
+  },
+  {
+    name: "M440 (V92) the read-back trusts the push instead of the row",
+    file: "sync.js",
+    from: "          if (fp === st.sent[id]) { st.conf[id] = fp; n++; }",
+    to:   "          { st.conf[id] = st.sent[id]; n++; }",
+    why:  "rule 26: a row another phone rewrote between push and read-back shows 🛡 for a copy the cloud doesn't hold (29a)",
+  },
+  {
+    name: "M441 (V92) a changed fingerprint on a clean job is treated as identical",
+    file: "sync.js",
+    from: "    return fp !== syncHash(_syncCanonical(local));   // identical needs nothing",
+    to:   "    return false;",
+    why:  "another phone's edit never arrives (29b)",
+  },
+  {
+    name: "M442 (V92) removal skips reading the real contents",
+    file: "settings-actions.js",
+    from: "    if (!online || typeof syncVerifyJobs !== 'function') return true;",
+    to:   "    return true;",
+    why:  "3B: a job whose cloud contents differ from its fingerprint comes off the phone (29d)",
+  },
+  {
+    name: "M443 (V92) the removal check compares the fingerprint, not the contents",
+    file: "sync.js",
+    from: "            out.set(id, syncHash(_syncCanonical(row.doc)));",
+    to:   "            out.set(id, row.fp || (state.sessions.find(s => String(s.id) === id) ? syncHash(_syncCanonical(state.sessions.find(s => String(s.id) === id))) : null));",
+    why:  "3B is hollow: the check re-reads what the list already said (29d)",
+  },
+  {
+    name: "M444 (V92) a failed contents check removes anyway",
+    file: "settings-actions.js",
+    from: "    return syncVerifyJobs(safe).then((m) => { verified = m; return true; }, () => false);",
+    to:   "    return syncVerifyJobs(safe).then((m) => { verified = m; return true; }, () => true);",
+    why:  "3B: no signal mid-check is not a check (29d)",
+  },
+  {
+    name: "M445 (V92) the guard blanks only when fp is sent as null",
+    file: "supabase/schema.sql",
+    from: "  if new.doc is distinct from old.doc and new.fp is not distinct from old.fp then\n    new.fp := null;",
+    to:   "  if new.doc is distinct from old.doc and new.fp is null then\n    new.fp := null;",
+    why:  "an older phone's upsert keeps the OLD fingerprint on NEW contents — every V92 phone then skips its edit (29e; Postgres F2)",
+  },
+  {
+    name: "M446 (V92) a doc asked for and not returned is decided without it",
+    file: "sync.js",
+    from: "if (d.want.has(id)) { if (d.got.has(id)) decide(d.got.get(id)); else blocked = true; }",
+    to:   "if (d.want.has(id)) { if (d.got.has(id)) decide(d.got.get(id)); }",
+    why:  "the cursor moves past a row nobody read (rule 10) — 29f",
   },
 ];
 
