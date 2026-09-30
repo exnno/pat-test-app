@@ -3027,6 +3027,20 @@ const MUTATIONS = [
     to:   "",
     why:  "rule 24: a row for a job on this phone is left to the pull, whose entry can be downloaded (27m)",
   },
+  {
+    name: "M417 (V90.1) the result line never counts jobs not on this phone",
+    file: "settings-actions.js",
+    from: "    else { totals.awayN++; awayJobs.add(e.s); }\n",
+    to:   "",
+    why:  "the look must say what it found (27c)",
+  },
+  {
+    name: "M418 (V90.1) the result line counts this phone's own jobs",
+    file: "settings-actions.js",
+    from: "  for (const e of all) {\n    if (e.onPhone) continue;\n    if (e.orphan)",
+    to:   "  for (const e of all) {\n    if (e.orphan)",
+    why:  "a look that finds nothing new says Nothing extra (27m)",
+  },
 ];
 
 function main() {
