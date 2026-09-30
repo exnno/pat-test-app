@@ -773,8 +773,18 @@ function photoMgrModel() {
 
   // Totals (6A). The cloud line says what it covers: before a look, only what
   // this phone knows; after, everything the account holds.
-  const totals = { phoneN: 0, phoneB: 0, cloudN: 0, cloudB: 0, cloudAll: false };
+  const totals = { phoneN: 0, phoneB: 0, cloudN: 0, cloudB: 0, cloudAll: false,
+    awayN: 0, awayJobs: 0, orphanN: 0 };
   for (const e of all) if (e.local) { totals.phoneN++; totals.phoneB += e.b || 0; }
+  // V90.1: what lies beyond this phone's jobs — the look's result line says it,
+  // so a look that finds nothing new says so instead of looking like a sync.
+  const awayJobs = new Set();
+  for (const e of all) {
+    if (e.onPhone) continue;
+    if (e.orphan) totals.orphanN++;
+    else { totals.awayN++; awayJobs.add(e.s); }
+  }
+  totals.awayJobs = awayJobs.size;
   if (vis) {
     const cl = pm.cloud;
     if (cl && cl.ok && Array.isArray(cl.rows)) {

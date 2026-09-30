@@ -813,13 +813,27 @@ function renderPhotoManager() {
     if (cl && cl.loading) {
       look = `<p class="muted pm-note">Looking in the cloud\u2026</p>`;
     } else {
-      const checked = (cl && cl.ok && cl.at)
-        ? `Checked at ${escapeHTML(new Date(cl.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }))}.${cl.capped ? ' Very large account: the first 20,000 photos are shown.' : ''}`
-        : 'See photos of jobs that aren\u2019t on this phone, and any left with no job. Needs a signal.';
-      look = `
-        <button class="backup-action-btn" data-action="pm-look" style="margin-top:10px">\u2601 ${cl && cl.ok ? 'Look again' : 'Look in the cloud'}</button>
-        <p class="muted pm-note">${checked}</p>
-        ${cl && cl.error ? `<p class="pm-note pm-error">${escapeHTML(cl.error)}</p>` : ''}`;
+      // V90.1 (Peter): a small secondary link, not a big button — it is not a
+      // sync, and each look reads the whole photo list. After a look, one line
+      // says what it found beyond this phone's jobs.
+      if (cl && cl.ok && cl.at) {
+        const when = escapeHTML(new Date(cl.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
+        const parts = [];
+        if (t.awayN) parts.push(`${plural(t.awayN)} from ${t.awayJobs} job${t.awayJobs === 1 ? '' : 's'} not on this phone`);
+        if (t.orphanN) parts.push(`${plural(t.orphanN)} with no job`);
+        const found = parts.length
+          ? 'Found ' + parts.join(' \u00b7 ')
+          : 'Nothing extra \u2014 every cloud photo belongs to a job on this phone.';
+        look = `
+        <p class="pm-note pm-found" role="status">${found}</p>
+        <p class="muted pm-note">Checked at ${when}${cl.capped ? ' \u00b7 very large account: the first 20,000 photos are shown' : ''} \u00b7 <button class="pm-look-link" data-action="pm-look">Look again</button></p>
+`;
+      } else {
+        look = `
+        <p class="muted pm-note">Photos of jobs not on this phone? <button class="pm-look-link" data-action="pm-look">Look in the cloud</button></p>
+`;
+      }
+      look += `        ${cl && cl.error ? `<p class="pm-note pm-error">${escapeHTML(cl.error)}</p>` : ''}`;
     }
   }
 

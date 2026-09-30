@@ -3999,3 +3999,16 @@ body.has-selection-bar .screen.pm-screen { padding-bottom: 140px; }
 .pm-preview-img img { width: 100%; height: auto; display: block; }
 .pm-preview-line { margin: 8px 0 0; font-size: 13px; }
 .pm-preview-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 14px; }
+/* V90.1: Look in the cloud is a small link, not a button — it is not a sync. */
+.pm-look-link {
+  display: inline;
+  padding: 0;
+  border: none;
+  background: none;
+  color: var(--accent-text);
+  font: inherit;
+  font-weight: 600;
+  text-decoration: underline;
+  cursor: pointer;
+}
+.pm-found { color: var(--text); font-weight: 600; }

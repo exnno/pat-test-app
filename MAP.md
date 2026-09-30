@@ -597,6 +597,8 @@ cover them instead. `dispatch.js` calls `refreshOverviewBody()` /
 helpers. Declares NO top-level bindings, so its load position is free.
 `renderRetestReminders()` bounces to the sessions list when the retest feature
 is off — any test of it must turn the flag on first.
+v90.1: "Look in the cloud" is a small `.pm-look-link`, not a button; after a
+look one line says what it found (`totals.awayN/awayJobs/orphanN` from the model).
 v90: `renderPhotoManager()` (view `photoManager`, reached from the Backup page;
 render-core falls back to the Backup page if it is missing). Previews are
 painted into `#pm-t-<id>` in place by settings-actions.js, not by render.
@@ -800,8 +802,8 @@ via `syncPhotoThumb` (strip open).
 step takes them — it waits for `_syncRunning` (a run saves its own `st` and would
 overwrite it). `syncPhotoThumb(id, hint)` accepts a found row's `{t}`.
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
-19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q and 27a–27l, mutations
-M142–M295, M306–M325, M355–M395, M396–M416.
+19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q and 27a–27m, mutations
+M142–M295, M306–M325, M355–M395, M396–M418.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This
