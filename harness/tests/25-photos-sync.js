@@ -368,9 +368,12 @@ module.exports = async function () {
     t.ok(confirmSheet(app), 'clear confirmed');
     await tick(20); app.stopTimer();
     t.notOk(app.state().sessions.some(s => s.id === j2.id), 'job 2 cleared from the phone');
-    const before = app.srv.photoCalls().length;
+    // V89: every reading run now READS the photos table (rows down, 10A) —
+    // what must not happen is a write: no PATCH, no storage DELETE.
+    const writes = () => app.srv.photoCalls().filter(c => c.method !== 'GET').length;
+    const before = writes();
     await run(app);
-    t.eq(app.srv.photoCalls().length, before, 'clearing sends no photo delete');
+    t.eq(writes(), before, 'clearing sends no photo delete');
     t.ok(app.srv.files.has(UID + '/' + p2.ids[0] + '.jpg'), 'the cloud keeps its photo');
   });
 
@@ -485,7 +488,7 @@ module.exports = async function () {
     t.eq(sum.phTotal, 2, 'two photos counted');
     t.eq(sum.phUp, 0, 'none in the cloud');
     app.fn('setView')('cloudSync');
-    t.includes(app.doc.getElementById('app').innerHTML, 'Photos: <strong>0</strong> of 2 in the cloud', 'the page line');
+    t.includes(app.doc.getElementById('app').innerHTML, 'Photos: <strong>0</strong> of 2 on this phone in the cloud', 'the page line (V89 wording)');
     t.includes(app.doc.getElementById('app').innerHTML, '<strong>2</strong> waiting to send', '…with what waits');
     app.srv.fail.delete('upload');
     await run(app);
