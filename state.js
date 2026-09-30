@@ -77,6 +77,16 @@ let state = {
   // rules: derived, never saved, never in a backup. See photoIndexLoad().
   photoMeta: {},
   photoMetaReady: false,
+  // v89: a change counter for photoMeta (bumped on every put/drop) so the
+  // cloud-only lookup in photos.js can memoise without rescanning per item.
+  photoMetaV: 0,
+  // v89: the photos this phone KNOWS are in the cloud for the signed-in account
+  // — the same object as the sync state's ph.sent (sync.js keeps it pointed
+  // there on every save; photoCloudV moves with it). {photoId: {s, i, b?, t?, a?}}.
+  // photoCloudUser = the account it belongs to. Derived, never saved here.
+  photoCloud: {},
+  photoCloudV: 0,
+  photoCloudUser: '',
 
   // Photos taken DURING the fail flow, before the item exists. The item has no
   // id until saveItem() pushes it, so these are held here as

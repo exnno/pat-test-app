@@ -89,11 +89,16 @@ function renderOverviewBodyHTML(sess) {
           // the markup is empty, so the table is untouched for existing users.
           // In selection mode it renders as an inert span: tapping a row there
           // must toggle the selection, not open a sheet.
-          const photoN = (it.result === 'fail' && it.id) ? photoCountForItem(it.id) : 0;
+          // v89 (3A): photos only in the cloud count too, with a ☁ when any are
+          // not on this phone. Signed out, it is this phone's photos, as before.
+          const photoN = (it.result === 'fail' && it.id)
+            ? ((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id) : photoCountForItem(it.id)) : 0;
+          const photoCloudN = (photoN && typeof photoCloudOnlyCountForItem === 'function') ? photoCloudOnlyCountForItem(it.id) : 0;
+          const photoMark = photoCloudN ? ' ☁' : '';
           const photoChip = !photoN ? ''
             : (sel
-              ? `<span class="photo-chip is-static">📷 ${photoN}</span>`
-              : `<button class="photo-chip" data-action="photo-strip-open" data-arg="${escapeHTML(it.id)}" aria-label="View ${photoN} photo${photoN === 1 ? '' : 's'}">📷 ${photoN}</button>`);
+              ? `<span class="photo-chip is-static">📷 ${photoN}${photoMark}</span>`
+              : `<button class="photo-chip" data-action="photo-strip-open" data-arg="${escapeHTML(it.id)}" aria-label="View ${photoN} photo${photoN === 1 ? '' : 's'}${photoCloudN ? `, ${photoCloudN} in the cloud only` : ''}">📷 ${photoN}${photoMark}</button>`);
           return `
             <tr class="${rowClass}" ${rowAttr}>
               ${checkCol}
@@ -654,13 +659,25 @@ function renderPhotoStripSheet() {
   } else if (!count) {
     body = `<p class="muted photo-strip-loading">No photos on this item.</p>`;
   } else {
+    // v89 (2A): a photo only in the cloud is a tile with a ☁ — its preview once
+    // fetched, a plain cloud until then. Tapping it downloads it.
+    const tile = (p, i) => {
+      if (!p.cloud) return `<img src="${p.url}" alt="Photo ${i + 1}" loading="lazy">`;
+      const inner = p.url
+        ? `<img src="${p.url}" alt="Photo ${i + 1}, in the cloud" loading="lazy">`
+        : `<span class="photo-cloud-blank" aria-hidden="true">☁</span>`;
+      return `<button class="photo-cloud-tile${p.busy ? ' is-busy' : ''}" data-action="photo-download" data-arg="${escapeHTML(p.id)}" aria-label="Download photo ${i + 1}" ${p.busy ? 'disabled' : ''}>
+              ${inner}
+              <span class="photo-cloud-badge">${p.busy ? 'Downloading…' : '☁ Tap to download'}</span>
+            </button>`;
+    };
     body = `
       <div class="photo-strip-grid">
         ${photos.map((p, i) => `
-          <figure class="photo-strip-item">
-            <img src="${p.url}" alt="Photo ${i + 1}" loading="lazy">
+          <figure class="photo-strip-item${p.cloud ? ' is-cloud' : ''}">
+            ${tile(p, i)}
             <figcaption>
-              <span class="photo-strip-size">${escapeHTML(formatBytes(p.bytes || 0))}</span>
+              <span class="photo-strip-size">${escapeHTML(formatBytes(p.bytes || 0))}${p.cloud ? ' · cloud' : ''}</span>
               <button class="photo-strip-delete" data-action="photo-delete" data-arg="${escapeHTML(p.id)}" aria-label="Delete photo ${i + 1}">Delete</button>
             </figcaption>
           </figure>
@@ -668,6 +685,12 @@ function renderPhotoStripSheet() {
       </div>
     `;
   }
+  const cloudTiles = photos.filter((p) => p.cloud);
+  const cloudBytes = cloudTiles.reduce((n, p) => n + (p.bytes || 0), 0);
+  const anyBusy = cloudTiles.some((p) => p.busy);
+  const downloadAll = cloudTiles.length >= 2
+    ? `<button class="photo-add-btn wide photo-download-all" data-action="photo-download-all" ${anyBusy ? 'disabled' : ''}>☁ Download all (${cloudTiles.length} · ${escapeHTML(formatBytes(cloudBytes))})</button>`
+    : '';
 
   const addControl = (count >= cap)
     ? `<p class="muted photo-strip-note">${cap} photo maximum reached.</p>`
@@ -683,6 +706,7 @@ function renderPhotoStripSheet() {
         <button class="fail-close-btn" id="photo-strip-close" data-action="photo-strip-close" aria-label="Close">×</button>
       </div>
       ${body}
+      ${downloadAll}
       ${addControl}
       <input type="file" id="photo-strip-file" data-change-action="photo-strip-file" accept="image/*" style="display:none">
     </div>

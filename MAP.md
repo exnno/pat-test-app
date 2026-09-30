@@ -1,4 +1,4 @@
-# PATGo — Code Map (V88)
+# PATGo — Code Map (V89)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -395,7 +395,7 @@ construction, so `_scrubCustomerData()` redacts known customer strings at
 report-build time. ⚠ It FAILS CLOSED — an incomplete term list withholds the
 message rather than passing it through. Do not add a raw-text fallback.
 
-### photos.js (~625 ln) — photo evidence store
+### photos.js (~990 ln) — photo evidence store
 **The app's only IndexedDB code.** Record store, count index, image processing,
 object-URL tracking, the separate photo export/import bundle.
 **Touch to:** anything about photo storage, processing, or the photo export file.
@@ -407,7 +407,15 @@ Photos are **not** in the JSON backup (separate file) — backup.js carries only
 informational count.
 ⚠ v88: `state.photoMeta` (photo id → job, item, size, time) is the mirror
 **sync.js** reads to upload; `photoMetaReady` gates it (and the prune guard).
-Every add/delete must keep BOTH mirrors in step. Engineer deletes (one photo, an
+Every add/delete must keep BOTH mirrors in step.
+⚠ v89: cloud-only lookups (`photoCloudOnlyForItem`, `photoCountForItemAll`,
+`photoCountsForSession`, `photoCloudOnlyForSession`) read **sync.js**'s
+`state.photoCloud`, memoised on `photoMetaV`/`photoCloudV`/ledger — every meta
+change must go through `_photoMetaPut`/`_photoMetaDrop` or reassign the object.
+Shown only while signed in to `state.photoCloudUser`. Consumers: render-core.js
+(jobs list, entry button), render-review.js (chip, strip), session.js (strip,
+fail→pass, cap), report.js (4A prompt). `photoAddFromCloud` keeps the cloud id
+(never re-uploaded); `photosRemoveQuiet` notes nothing. Engineer deletes (one photo, an
 item, fail→pass) call `_photoNoteGone` → ledger kind 'photo' (storage.js
 `saveTombstones`) + sync.js `syncNotePhotosGone`. `photosDeleteForSessions`,
 `photosDeleteAll`, `photosClearUploaded` NEVER note (V80 C, 5A) — harness 25h/25l,
@@ -453,7 +461,7 @@ coachmarks — the fragile iOS path). Transient state, never persisted.
 **Coupling:** routed as a full-screen view early in `render()`. Entry points: the
 wizard finish step and About.
 
-### report.js (~700 ln) — PDF certificates
+### report.js (~1190 ln) — PDF certificates
 Lazy-loads the vendored jsPDF + AutoTable, builds the document, the preview
 modal, filename tokens, share/download.
 **Touch to:** change report layout/content, reading columns, orientation, or how
@@ -471,6 +479,9 @@ job in `state.sessions` (jobs synced from the other phone included). V87: `repor
 title/author, set right after `new JsPDF` inside the sync build; file names go
 through utils `fileSafe`/`fileDateUK`; the retest line is a MONTH. Every `addImage` is try/caught — a bad image never blocks
 a report.
+V89: `produceReport` asks about cloud-only photos (`_reportCloudPhotoChoice`,
+built on **feedback.js** `_openSheet`) BEFORE `stampCertNumber` — Cancel must
+cost no number (M388) — and downloads through **sync.js** `syncPhotoDownload`.
 
 ### pdfpreview.js (~135 ln) — multi-page preview rasteriser
 Lazy-loads vendored PDF.js, renders each page to a stacked canvas, DPR-capped,
@@ -478,7 +489,7 @@ sequential for iOS memory.
 **Touch to:** change preview rasterising, the lazy load, or the PDF.js version.
 **Coupling:** throws on parse failure so report.js falls back to its iframe view.
 
-### session.js (~2160 ln) — sessions and items
+### session.js (~2390 ln) — sessions and items
 Session/item lifecycle, form and cursor, validation, suggestions,
 ⚠ V87: retest reminders are by MONTH — `retestStatus(sess, now)` buckets
 ('upcoming' = due next month, 'duesoon' = due this month, 'overdue' from the 1st
@@ -540,7 +551,7 @@ instrument flat mirror and must keep calling `adoptMirrorIntoInstruments()`
 (rule 7). `onboardSetupImport()` delegates to setup.js; the final step can hand
 off to tour.js. Extracted from session.js in v70, byte identical.
 
-### render-core.js (~1620 ln) — dispatcher + the logging screens
+### render-core.js (~1780 ln) — dispatcher + the logging screens
 Owns `const app` and the `render()` dispatcher. Sessions list, entry screen,
 empty states, welcome modal AND its `dismissWelcome()` handler (moved here
 v70 — see rule 8), first-run wizard markup, signature pad, calibration banner,
@@ -561,7 +572,7 @@ The **calibration banner is ONE banner** covering the worst instrument with
 `cloudPagesUnlocked()` (cloud.js); otherwise `renderCloudLocked()`. The V43 About
 long-press is gone — `setupLongPress` (utils.js) now has no caller.
 
-### render-review.js (~690 ln) — review & manage screens — NEW v72
+### render-review.js (~715 ln) — review & manage screens — NEW v72
 Overview (+ `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
 `refreshOverviewBody`, `refreshOverviewSelection`), Edit Session, Retest
 Reminders, the Reports hub, and the shared photo-evidence markup
@@ -640,7 +651,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~3050 ln) — cloud sync, PUSH AND PULL — v80–v88
+### sync.js (~3430 ln) — cloud sync, PUSH AND PULL — v80–v89
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session
@@ -757,10 +768,21 @@ after both (M355/M356). Candidates via `_syncPhotoJobs()` (reads photos.js
 `state.photoMeta`): job syncs and is in `st.sent`, item still in it. Deletes:
 ledger 'photo' entries + photos of jobs in `st.gone` — row marked deleted, file
 removed, forgotten only after both. Prune guard (`syncPruneFilter`) also needs
-every photo up (`_syncPhotosPendingByJob`). Never reads the photos table (V89).
+every photo up (`_syncPhotosPendingByJob`).
+⚠ v89: PHOTOS DOWN, rows only (`_syncPhotoRowsPull`, first step of the photos
+half; own cursor `st.ph.pulledAt`, V83.1 pager shape). `st.ph.sent` now means
+KNOWN in the cloud (own uploads + rows for jobs on this phone), entries
+`{s, i, b?, t?, a?}`. Rows for jobs not here are skipped (R17); `st.ph.need`
+(pushed by `_syncPull`'s add branch and `syncHeldResolve`) fetches them by job.
+Deleted row → **photos.js** `photosRemoveQuiet` (no ledger). Deletes go to
+anything known (5A), file AND `{uid}/{id}_t.jpg`. Previews: `_syncThumbUpload`
+(photo → preview → row with `thumb`), `_syncThumbBackfill`. `_syncSave` points
+`state.photoCloud` at `st.ph.sent` (`_syncPhotoCloudPoint`). Images come down
+ONLY via `syncPhotoDownload` (session.js strip, report.js prompt); previews only
+via `syncPhotoThumb` (strip open).
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
-19a–19w, 20a–20f2, 21a–21q, 23a–23l and 25a–25n, mutations M142–M295, M306–M325,
-M355–M376.
+19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n and 26a–26q, mutations M142–M295,
+M306–M325, M355–M395.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

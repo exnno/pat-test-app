@@ -1119,6 +1119,12 @@ function renderSessionsListAreaHTML() {
     list = filtered.map(({ session: s, matchedItemIndex, itemMatchCount }) => {
       const passes = s.items.filter(i => i.result === 'pass').length;
       const fails = s.items.filter(i => i.result === 'fail').length;
+      // v89 (Peter, V89 round): photos after pass/fail, with how many are only in
+      // the cloud. Nothing at all for a job with no photos.
+      const pc = (typeof photoCountsForSession === 'function') ? photoCountsForSession(s) : { total: 0, cloud: 0 };
+      const photoMeta = pc.total
+        ? ` · <span class="photo-text">📷 ${pc.total}${pc.cloud ? ` (${pc.cloud} in cloud)` : ''}</span>`
+        : '';
       // v8: subtle 🔒 prefix on locked sessions so they're easy to spot in the list.
       const lockMark = s.locked ? '<span class="session-lock" title="Locked">🔒</span>' : '';
       // v14: export-status badge in the meta row. 'exported' → ✓ Exported;
@@ -1152,7 +1158,7 @@ function renderSessionsListAreaHTML() {
         <div class="session-card${s.locked ? ' locked' : ''}">
           <div class="session-info" ${openAttr}>
             <div class="session-title">${lockMark}${escapeHTML(s.site || s.name)}</div>
-            <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span></div>
+            <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span>${photoMeta}</div>
             ${exportBadge ? `<div class="session-export-row">${exportBadge}</div>` : ''}
             ${retestChip}
             ${itemBadge}
@@ -1389,13 +1395,16 @@ function renderEntry() {
   // without a photo still lets you add one — the strip's own Add button handles
   // it from there.
   const entryItem = isExisting ? sess.items[state.cursor] : null;
+  // v89 (3A): cloud-only photos count too; ☁ when any aren't on this phone.
   const entryPhotoCount = (entryItem && entryItem.result === 'fail' && entryItem.id)
-    ? photoCountForItem(entryItem.id) : 0;
+    ? ((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(entryItem.id) : photoCountForItem(entryItem.id)) : 0;
+  const entryPhotoCloud = (entryPhotoCount && typeof photoCloudOnlyCountForItem === 'function')
+    ? photoCloudOnlyCountForItem(entryItem.id) : 0;
   const showEntryPhotoRow = !!(entryItem && entryItem.result === 'fail' && entryItem.id
     && (typeof photosSupported !== 'function' || photosSupported()));
   const entryPhotoRow = showEntryPhotoRow ? `
       <button class="entry-photo-btn" id="entry-photo-btn" data-action="photo-strip-open" data-arg="${escapeHTML(entryItem.id)}">
-        📷 ${entryPhotoCount ? `Photos (${entryPhotoCount})` : 'Add a photo'}
+        📷 ${entryPhotoCount ? `Photos (${entryPhotoCount})${entryPhotoCloud ? ' ☁' : ''}` : 'Add a photo'}
       </button>
   ` : '';
 

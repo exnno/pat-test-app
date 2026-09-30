@@ -1345,14 +1345,17 @@ function passClicked() {
   // the realistic route here is correcting a mis-tap, and someone who mis-tapped
   // needs to know what else that undo takes with it.
   const existing = (sess && state.cursor < sess.items.length) ? sess.items[state.cursor] : null;
-  const losing = (existing && existing.result === 'fail') ? photoCountForItem(existing.id) : 0;
+  // v89: photos only in the cloud count too — they go the same way (4A/5A).
+  const losing = (existing && existing.result === 'fail')
+    ? ((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(existing.id) : photoCountForItem(existing.id)) : 0;
+  const cloudToo = (typeof syncActive === 'function' && syncActive());
   if (losing > 0) {
     openConfirmSheet({
       title: 'Change to PASS?',
       message:
         `This item is a FAIL with ${losing} photo${losing === 1 ? '' : 's'} attached. ` +
         `Changing it to PASS will delete ${losing === 1 ? 'that photo' : 'those photos'} ` +
-        `from this device. They can't be recovered.`,
+        `from this device${cloudToo ? ' and from your cloud copy' : ''}. They can't be recovered.`,
       confirmLabel: 'Change and delete',
       onConfirm: () => {
         // Delete first, THEN commit the result change. If the delete fails the
@@ -1557,15 +1560,76 @@ function openPhotoStrip(itemId) {
   photosForItem(itemId).then((records) => {
     // The sheet may have been closed, or another item opened, while we waited.
     if (!state.photoStripOpen || state.photoStripItemId !== itemId) return;
-    state.photoStripPhotos = records.map((r) => ({
-      id: r.id,
-      url: photoObjectUrl(r.blob),
-      bytes: r.bytes || 0,
-      at: r.at || ''
-    }));
+    state.photoStripPhotos = _photoStripEntries(itemId, records);
     state.photoStripLoading = false;
     render();
+    _photoStripFetchThumbs(itemId);
   });
+}
+
+// v89: the strip shows this phone's photos AND the item's photos that are only
+// in the cloud (2A), in the order they were taken. A cloud tile carries
+// `cloud: true`; its `url` is its preview once fetched (1A), '' until then.
+function _photoStripEntries(itemId, records) {
+  const local = (records || []).map((r) => ({
+    id: r.id, url: photoObjectUrl(r.blob), bytes: r.bytes || 0, at: r.at || ''
+  }));
+  const cloud = (typeof photoCloudOnlyForItem === 'function' ? photoCloudOnlyForItem(itemId) : []).map((e) => ({
+    id: e.id,
+    url: (typeof photoThumbCached === 'function') ? photoThumbCached(e.id) : '',
+    bytes: e.b || 0, at: e.a || '', cloud: true, thumb: !!e.t, busy: false
+  }));
+  return local.concat(cloud).sort((a, b) => String(a.at).localeCompare(String(b.at)) || String(a.id).localeCompare(String(b.id)));
+}
+
+// v89 (1A): previews come down when the strip is opened — that tap is the
+// request (R17). One at a time; kept for the session (photos.js), so reopening
+// costs nothing. Each arrival repaints: the strip is buttons only (MAP rule 3).
+function _photoStripFetchThumbs(itemId) {
+  if (typeof syncPhotoThumb !== 'function') return;
+  // syncPhotoThumb() itself refuses a photo with no preview — one guard, one place.
+  const want = (state.photoStripPhotos || []).filter((p) => p.cloud && !p.url).map((p) => p.id);
+  want.reduce((chain, id) => chain.then(() => syncPhotoThumb(id).then((blob) => {
+    if (!blob) return;
+    const url = photoThumbRemember(id, blob);
+    if (!state.photoStripOpen || state.photoStripItemId !== itemId) return;
+    const p = (state.photoStripPhotos || []).find((x) => x.id === id);
+    if (p && p.cloud && url) { p.url = url; render(); }
+  })), Promise.resolve()).catch(() => { /* a missing preview just stays a cloud */ });
+}
+
+// Re-read the strip from the store (what is on screen is what is persisted).
+function _photoStripReload(itemId) {
+  photoReleaseObjectUrls();
+  return photosForItem(itemId).then((records) => {
+    if (!state.photoStripOpen || state.photoStripItemId !== itemId) return;
+    state.photoStripPhotos = _photoStripEntries(itemId, records);
+    state.photoStripLoading = false;
+    render();
+    _photoStripFetchThumbs(itemId);
+  });
+}
+
+// v89 (2A): bring photos down onto this phone — one tile, or "Download all".
+function downloadStripPhotos(ids) {
+  const itemId = state.photoStripItemId;
+  const want = (ids || []).filter(Boolean);
+  if (!itemId || !want.length || typeof syncPhotoDownload !== 'function') return;
+  const busy = new Set(want);
+  if ((state.photoStripPhotos || []).some((p) => busy.has(p.id) && p.busy)) return;   // already going
+  (state.photoStripPhotos || []).forEach((p) => { if (busy.has(p.id)) p.busy = true; });
+  render();
+  syncPhotoDownload(want).then((res) => {
+    if (res.offline) showToast('No signal \u2014 the photo is safe in the cloud. Try again when you\u2019re connected.');
+    else if (res.notReady) showToast('Photos are still loading \u2014 try again in a moment');
+    else if (res.failed) showToast(`Couldn\u2019t download ${res.failed} photo${res.failed === 1 ? '' : 's'}. Try again later.`);
+    if (!state.photoStripOpen || state.photoStripItemId !== itemId) return null;
+    return _photoStripReload(itemId);
+  });
+}
+
+function downloadStripPhotosAll() {
+  downloadStripPhotos((state.photoStripPhotos || []).filter((p) => p.cloud).map((p) => p.id));
 }
 
 // Clear the strip's state and release its object URLs. Separate from
@@ -1597,7 +1661,7 @@ function closePhotoStrip() {
 function addPhotoToItemFromFile(file) {
   const itemId = state.photoStripItemId;
   if (!file || !itemId) return;
-  if (photoCountForItem(itemId) >= PHOTO_MAX_PER_ITEM) {
+  if (((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(itemId) : photoCountForItem(itemId)) >= PHOTO_MAX_PER_ITEM) {
     showToast(`Up to ${PHOTO_MAX_PER_ITEM} photos per item`);
     return;
   }
@@ -1616,15 +1680,7 @@ function addPhotoToItemFromFile(file) {
       if (!id) { showToast('Could not save that photo'); }
       // Reload the strip from the store rather than patching it in memory, so
       // what is on screen is always what is actually persisted.
-      photoReleaseObjectUrls();
-      state.photoStripPhotos = [];
-      return photosForItem(itemId).then((records) => {
-        state.photoStripPhotos = records.map((r) => ({
-          id: r.id, url: photoObjectUrl(r.blob), bytes: r.bytes || 0, at: r.at || ''
-        }));
-        state.photoStripLoading = false;
-        render();
-      });
+      return _photoStripReload(itemId);
     });
   });
 }
@@ -1634,6 +1690,22 @@ function addPhotoToItemFromFile(file) {
 function deletePhotoFromStrip(photoId) {
   if (!photoId) return;
   const itemId = state.photoStripItemId;
+  // v89 (5A): a photo only in the cloud is deleted from there.
+  const tile = (state.photoStripPhotos || []).find((p) => p.id === photoId);
+  if (tile && tile.cloud) {
+    openConfirmSheet({
+      title: 'Delete photo?',
+      message: "This photo is only in your cloud copy. Deleting it removes it from there. It can't be recovered.",
+      confirmLabel: 'Delete',
+      onConfirm: () => {
+        photoDeleteCloudOnly(photoId);
+        state.photoStripPhotos = state.photoStripPhotos.filter((p) => p.id !== photoId);
+        if (!state.photoStripPhotos.length) { closePhotoStrip(); return; }
+        render();
+      }
+    });
+    return;
+  }
   openConfirmSheet({
     title: 'Delete photo?',
     // v88: signed in, the cloud copy goes too (decision 4A).

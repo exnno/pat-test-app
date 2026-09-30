@@ -852,6 +852,25 @@ async function produceReport(sessionId) {
     }
   }
 
+  // v89 (4A): photos of this job that are only in the cloud. Asked BEFORE the
+  // certificate number is stamped, so Cancel costs nothing. Only when the
+  // report shows photos at all. Downloaded photos stay on the phone.
+  if (state.reportSettings.showPhotos === true && typeof photoCloudOnlyForSession === 'function') {
+    const cloud = photoCloudOnlyForSession(session);
+    if (cloud.length) {
+      const offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+      const choice = await _reportCloudPhotoChoice(cloud, offline);
+      if (choice === 'cancel') return;
+      if (choice === 'download' && typeof syncPhotoDownload === 'function') {
+        showToast(`Downloading photos\u2026 0 of ${cloud.length}`);
+        const res = await syncPhotoDownload(cloud.map((e) => e.id),
+          (done, total) => showToast(`Downloading photos\u2026 ${done} of ${total}`));
+        if (res.offline) showToast('No signal \u2014 the report shows the photos on this phone');
+        else if (res.failed) showToast(`${res.failed} photo${res.failed === 1 ? '' : 's'} couldn\u2019t be downloaded \u2014 the report shows the rest`);
+      }
+    }
+  }
+
   stampCertNumber(session);   // v36: assign-once cert number before building
 
   // v64: read and re-encode the job's photos BEFORE building. This is the only
@@ -880,6 +899,47 @@ async function produceReport(sessionId) {
     return;
   }
   openReportPreview(doc, session);
+}
+
+// v89 (4A): "N photos for this job are only in the cloud — download them for
+// the certificate?" Resolves 'download' | 'without' | 'cancel'. Built on the
+// feedback.js sheet like every other dialog; no inputs, no render(). Offline,
+// Download isn't offered — it would only fail. Dismissing is Cancel.
+function _reportCloudPhotoChoice(cloud, offline) {
+  return new Promise((resolve) => {
+    const n = cloud.length;
+    const bytes = cloud.reduce((t, e) => t + (e.b || 0), 0);
+    const size = bytes ? ` (about ${formatBytes(bytes)})` : '';
+    const title = 'Photos in the cloud';
+    const msg = offline
+      ? `${n} photo${n === 1 ? '' : 's'} for this job ${n === 1 ? 'is' : 'are'} only in the cloud, and there\u2019s no signal to download ${n === 1 ? 'it' : 'them'}. You can make the report without ${n === 1 ? 'it' : 'them'}, or cancel and try again when you\u2019re connected.`
+      : `${n} photo${n === 1 ? '' : 's'} for this job ${n === 1 ? 'is' : 'are'} only in the cloud${size}. Download ${n === 1 ? 'it' : 'them'} for the certificate? ${n === 1 ? 'It stays' : 'They stay'} on this phone afterwards.`;
+    const { sheet, backdrop, cleanup } = _openSheet(title);
+    let settled = false;
+    const finish = (v) => { if (settled) return; settled = true; cleanup(); resolve(v); };
+    backdrop.addEventListener('click', () => finish('cancel'));
+    sheet.innerHTML = `
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+        <button class="fail-close-btn" id="rcp-close" aria-label="Cancel">&times;</button>
+      </div>
+      <p class="sheet-scroll" style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(msg)}</p>
+      <div class="sheet-pin" style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+        ${offline ? '' : '<button class="btn-primary" id="rcp-download">Download and continue</button>'}
+        <button class="btn-secondary" id="rcp-without">Without ${n === 1 ? 'it' : 'them'}</button>
+        <button class="btn-secondary" id="rcp-cancel">Cancel</button>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+    document.body.appendChild(sheet);
+    const on = (id, v) => { const el = document.getElementById(id); if (el) el.addEventListener('click', () => finish(v)); };
+    on('rcp-download', 'download');
+    on('rcp-without', 'without');
+    on('rcp-cancel', 'cancel');
+    on('rcp-close', 'cancel');
+  });
 }
 
 // Preview modal (Q5=C): show the PDF with Share + Download + Close. Built

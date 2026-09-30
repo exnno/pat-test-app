@@ -214,6 +214,8 @@ registerActions({
   'photo-strip-close':  () => closePhotoStrip(),
   'photo-strip-add':    () => { const inp = document.getElementById('photo-strip-file'); if (inp) inp.click(); },
   'photo-delete':       (arg) => deletePhotoFromStrip(arg),
+  'photo-download':     (arg) => downloadStripPhotos([arg]),     // v89 (2A)
+  'photo-download-all': () => downloadStripPhotosAll(),
   'photo-export':       () => downloadPhotoBundle(),
   'photo-import':       () => { const inp = document.getElementById('photo-import-file'); if (inp) inp.click(); },
   'photo-wipe':         () => {

@@ -3614,6 +3614,43 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .photo-strip-loading,
 .photo-strip-note { margin: 12px 0; font-size: 13px; }
 
+/* v89: a photo only in the cloud. The whole tile is the download button; its
+   preview (when there is one) sits under a small label. Same 4:3 box as a
+   photo on the phone, so the grid doesn't jump when it arrives. */
+.photo-cloud-tile {
+  position: relative;
+  display: block;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  padding: 0;
+  border: 0;
+  background: var(--neutral-bg);
+  cursor: pointer;
+  color: var(--text-hint);
+}
+.photo-cloud-tile img { width: 100%; height: 100%; object-fit: cover; display: block; opacity: 0.75; }
+.photo-cloud-tile.is-busy { cursor: default; }
+.photo-cloud-blank {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  font-size: 34px;
+}
+.photo-cloud-badge {
+  position: absolute;
+  left: 6px;
+  bottom: 6px;
+  padding: 3px 7px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.62);
+  color: #fff;
+}
+.photo-download-all { margin-top: 12px; }
+
 /* v62.1: entry-screen route into an existing fail's photos. Styled like the
    Copy-last button it sits above — a secondary navigation control, not a
    result action, so it must not compete with PASS/FAIL. */

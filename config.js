@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V88';
+const APP_VERSION = 'V89';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -456,6 +456,19 @@ const SYNC_HASH_V = 2;
 // backstop and every save/navigation bring one round. Deletes go in batches.
 const SYNC_PHOTOS_PER_RUN = 25;
 const SYNC_PHOTO_DELETE_BATCH = 50;
+// V89 (10A, R17): photos come DOWN on request only. The phone learns which photos
+// are in the cloud from their small rows (read by cursor, like jobs); an image
+// comes down only on a tap (strip, "Download all", or the certificate prompt).
+// A preview (1A) is a small JPEG uploaded beside each photo at
+// {user_id}/{photo_id}_t.jpg — about 1/25th of the photo — so a cloud-only photo
+// can be SEEN without downloading it. Opening the strip is the request for its
+// previews. Previews made per run (backfill of photos already up): SYNC_THUMBS_PER_RUN.
+const SYNC_THUMB_PX = 240;
+const SYNC_THUMB_QUALITY = 0.6;
+const SYNC_THUMBS_PER_RUN = 50;
+// Photo rows for jobs that arrived after the photo cursor passed them (a job
+// brought in later): fetched by job id, this many ids per request.
+const SYNC_PHOTO_NEED_BATCH = 50;
 const SYNC_PULL_PAGE = 200;         // v81: rows per pull request, then page again
 // v83.1: the pager's version. A cursor saved under an older one is cleared once
 // (sync.js _syncLoad), because V81–V83 could step over rows at a page edge.

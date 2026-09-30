@@ -187,7 +187,13 @@ function _syncEmpty(userId) {
            // cloud; removed when this phone deletes the cloud copy. The job and
            // item are kept so a deleted job or item can take its cloud photos
            // with it even after they were cleared from this phone (5A).
-           ph: { sent: {} } };
+           // v89: `sent` now means KNOWN to be in the cloud — this phone's own
+           // uploads AND rows read from the photos table for jobs on this phone
+           // (decision 5A: any phone that can see a cloud photo can delete it).
+           // Entries may also carry b (bytes), t (1 = a preview exists, 1A) and
+           // a (taken at). `pulledAt` is the photo rows' own cursor; `need` lists
+           // jobs that arrived after that cursor passed their rows.
+           ph: { sent: {}, pulledAt: null, need: [] } };
 }
 
 // v83: two more fields.
@@ -263,8 +269,20 @@ function _syncLoad() {
   if (rp && typeof rp === 'object' && !Array.isArray(rp) && rp.sent && typeof rp.sent === 'object' && !Array.isArray(rp.sent)) {
     for (const k of Object.keys(rp.sent)) {
       const e = rp.sent[k];
-      if (e && typeof e === 'object' && typeof e.s === 'string' && typeof e.i === 'string') out.ph.sent[k] = { s: e.s, i: e.i };
+      if (!(e && typeof e === 'object' && typeof e.s === 'string' && typeof e.i === 'string')) continue;
+      // v89: the optional extras. Anything odd is dropped, never the entry.
+      const o = { s: e.s, i: e.i };
+      if (typeof e.b === 'number' && e.b > 0 && isFinite(e.b)) o.b = Math.round(e.b);
+      if (e.t === 1 || e.t === true) o.t = 1;
+      if (typeof e.a === 'string' && !isNaN(Date.parse(e.a))) o.a = e.a;
+      out.ph.sent[k] = o;
     }
+  }
+  // v89. A missing cursor means "read every photo row" — rows only, and only
+  // kept for jobs on this phone: the safe direction, and cheap.
+  if (rp && typeof rp === 'object' && typeof rp.pulledAt === 'string' && !isNaN(Date.parse(rp.pulledAt))) out.ph.pulledAt = rp.pulledAt;
+  if (rp && typeof rp === 'object' && Array.isArray(rp.need)) {
+    out.ph.need = rp.need.filter(x => typeof x === 'string' && x).slice(0, 2000);
   }
   if (raw.hashV !== SYNC_HASH_V) { out.sent = {}; out.rec.sent = {}; }
   else out.hashV = SYNC_HASH_V;
@@ -281,6 +299,20 @@ function _syncSave(st) {
   try { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(st)); } catch (e) {
     console.error('Sync state could not be saved (non-fatal).', e);
   }
+  _syncPhotoCloudPoint(st);
+}
+
+// v89: the UI's view of the photos known in the cloud (photos.js reads it
+// synchronously for badges and the strip). Pointed at the state just saved —
+// the same object, so it is never a stale copy — with a counter so photos.js
+// knows to rebuild its lookup.
+function _syncPhotoCloudPoint(st) {
+  try {
+    if (!st || !st.ph) return;
+    state.photoCloud = st.ph.sent;
+    state.photoCloudUser = st.userId || '';
+    state.photoCloudV = (state.photoCloudV || 0) + 1;
+  } catch { /* the badges simply show this phone's photos */ }
 }
 
 // The state for THIS account, or a fresh one if the stored state is someone else's.
@@ -331,12 +363,16 @@ function syncStatusSummary() {
   // still in it), and how many of those are in the cloud. null until the photo
   // mirror is loaded — the page then says nothing rather than a wrong number.
   const phJobs = _syncPhotoJobs();
-  let phTotal = 0, phUp = 0;
+  let phTotal = 0, phUp = 0, phCloudOnly = 0;
   if (phJobs) for (const id of phJobs.keys()) { phTotal++; if (st.ph.sent[id]) phUp++; }
+  // v89: photos of jobs on this phone that are only in the cloud.
+  if (phJobs && typeof photoCountsForSession === 'function') {
+    for (const s of jobs) phCloudOnly += photoCountsForSession(s).cloud;
+  }
   return {
     total: jobs.length, upToDate, waiting: jobs.length - upToDate,
     recTotal, recUpToDate, listTotal, listUpToDate, rpTotal, rpUpToDate, gsTotal, gsUpToDate,
-    phReady: !!phJobs, phTotal, phUp,
+    phReady: !!phJobs, phTotal, phUp, phCloudOnly,
     lastPushAt: st.lastPushAt,
     // v81
     lastPullAt: st.lastPullAt,
@@ -679,6 +715,8 @@ function syncBoot() {
   // v83: copies owed by a run that never finished (app closed between reading
   // the records and reading the jobs). Late is better than a wrong certificate.
   try { _syncFreezePending(_syncLoad()); } catch (e) { console.error('Sync: pending instrument copies not written (non-fatal).', e); }
+  // v89: badges and the strip can show cloud photos from the first paint.
+  try { _syncPhotoCloudPoint(_syncLoad()); } catch { /* next save does it */ }
   try {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') return;
@@ -842,6 +880,8 @@ function _syncPull(c, uid, st, out) {
       // A job from the other phone. Newest-first, like createSession().
       state.sessions.unshift(doc);
       st.sent[id] = hash;
+      // v89: its photo rows may be behind the photo cursor already.
+      st.ph.need.push(id);
       out.added++; changed = true;
       _syncHeldClear(id);
       return;
@@ -1060,6 +1100,7 @@ function _syncOutcome(r) {
     if (ph.up) pbits.push(plural(ph.up, 'photo', 'photos') + ' sent');
     if (ph.gone) pbits.push(plural(ph.gone, 'photo deletion', 'photo deletions') + ' sent');
     if (ph.more) pbits.push(ph.more + ' more to send next time');
+    if (ph.removed) pbits.push(plural(ph.removed, 'photo', 'photos') + ' removed here (deleted on your other device)');
     if (pbits.length) msg += (msg ? ' ' : '') + 'Photos: ' + pbits.join(', ') + '.';
   }
   if (!msg) msg = 'Everything was already up to date.';
@@ -2641,7 +2682,7 @@ function syncHeldResolve(id, choice) {
           st.gone[sid] = true;
         } else if (_syncValidDoc(row.doc, sid)) {
           if (local) _syncReplaceSession(sid, local, row.doc);
-          else state.sessions.unshift(row.doc);
+          else { state.sessions.unshift(row.doc); st.ph.need.push(sid); }   // v89: its photo rows
           st.sent[sid] = syncHash(_syncCanonical(row.doc));
         } else {
           done('That cloud copy still can\u2019t be read, so nothing has been changed. Choose this phone\u2019s copy to replace it.');
@@ -2987,9 +3028,33 @@ function _syncFlushRepaint() {
 // ⚠ Nothing here renders or writes app data. It reads state.photoMeta (the
 // in-memory mirror photos.js keeps) and state.tombstones, and writes only
 // st.ph — saved after every photo, so a run cut short loses nothing it did.
+//
+// V89 (photos DOWN, on request only — 10A, R17). What changed:
+//   • Rows come down, images don't. The photos table is read by its own cursor
+//     (st.ph.pulledAt; rules 10 and 14 — the jobs pager's shape). A live row for
+//     a job on this phone is remembered in st.ph.sent, which now means KNOWN to
+//     be in the cloud, whoever uploaded it. Rows for jobs not on this phone are
+//     not kept (R17); when such a job arrives later, st.ph.need fetches its rows.
+//   • A deleted row takes this phone's copy (photos.js photosRemoveQuiet — no
+//     ledger entry: the delete is already in the cloud).
+//   • ⚠ Rule 21 becomes "a phone deletes only what it KNOWS is in the cloud"
+//     (decision 5A: any phone that can see a cloud photo can delete it).
+//   • Previews (1A): {user_id}/{photo_id}_t.jpg, made on the phone. For a new
+//     photo: file, then preview, then the row with thumb = true — a row that
+//     says thumb means both files are there (2A extended). Photos already up
+//     get one later (backfill, a few per run) while their image is on a phone.
+//     A photo that never gets a preview is still a photo: nothing waits on it.
+//   • Images come down only through syncPhotoDownload() (a tap), previews only
+//     through syncPhotoThumb() (the strip being opened).
 
 function _syncPhotoPath(uid, id) {
   return uid + '/' + id + '.jpg';
+}
+
+// v89 (1A): the preview sits beside the photo, in the same folder, so the same
+// storage policy (and the same isolation check) covers it.
+function _syncThumbPath(uid, id) {
+  return uid + '/' + id + '_t.jpg';
 }
 
 // photoId → sessionId for every photo on this phone that is eligible to be in
@@ -3048,88 +3113,315 @@ function syncPhotosUploadedIds() {
   return st.userId === uid ? new Set(Object.keys(st.ph.sent)) : new Set();
 }
 
+// v89: read the photos table — ROWS only (R17). Remembers live rows for jobs on
+// this phone; a deleted row forgets the photo and removes this phone's copy.
+// Mutates st.ph and counts into `out`; the caller saves.
+const _SYNC_PHOTO_COLS = 'id,session_id,item_id,bytes,thumb,taken_at,deleted,updated_at';
+
+function _syncPhotoRowsPull(c, uid, st, out) {
+  const ph = st.ph;
+  const local = new Set(_syncSessions().map(s => String(s.id)));
+  const meta = state.photoMeta || {};
+  const drop = [];
+  let known = false;       // what this phone knows changed → the badges repaint
+  let blocked = false;
+
+  function decide(row) {
+    const id = String(row && row.id != null ? row.id : '');
+    if (!id) return;
+    if (row.deleted === true) {
+      if (ph.sent[id]) { delete ph.sent[id]; known = true; }
+      if (meta[id] && drop.indexOf(id) === -1) drop.push(id);
+      return;
+    }
+    const job = String(row.session_id != null ? row.session_id : '');
+    const item = String(row.item_id != null ? row.item_id : '');
+    if (!job || !item) return;
+    const had = ph.sent[id];
+    // R17: a job not on this phone keeps its rows in the cloud. (A photo this
+    // phone uploaded stays known even if its job was cleared here — V88 5A.)
+    if (!had && !local.has(job)) return;
+    const e = { s: job, i: item };
+    const b = Number(row.bytes);
+    if (b > 0 && isFinite(b)) e.b = Math.round(b);
+    if (row.thumb === true || (had && had.t)) e.t = 1;
+    if (typeof row.taken_at === 'string' && !isNaN(Date.parse(row.taken_at))) e.a = row.taken_at;
+    else if (had && had.a) e.a = had.a;
+    if (!had || had.s !== e.s || had.i !== e.i || had.b !== e.b || had.t !== e.t || had.a !== e.a) known = true;
+    ph.sent[id] = e;
+  }
+
+  // 1. Jobs that arrived after the cursor passed their rows. Skipped on a phone
+  //    that has never read the table: the full read below covers them.
+  const need = ph.pulledAt ? Array.from(new Set(ph.need)).filter(id => local.has(id)) : [];
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  let chain = Promise.resolve();
+  for (let i = 0; i < need.length; i += batch) {
+    const chunk = need.slice(i, i + batch);
+    chain = chain.then(() => c.from('photos').select(_SYNC_PHOTO_COLS).in('session_id', chunk).eq('deleted', false))
+      .then((r) => {
+        if (r && r.error) throw r.error;
+        for (const row of ((r && r.data) || [])) decide(row);
+      });
+  }
+
+  // 2. Everything changed since the cursor. The V83.1 pager: each page starts AT
+  //    the last stamp, rows already seen this run are skipped (rules 10, 14).
+  const since = ph.pulledAt || SYNC_PULL_EPOCH;
+  let high = since;
+  const seen = new Set();
+  function page(from) {
+    return c.from('photos')
+      .select(_SYNC_PHOTO_COLS)
+      .gte('updated_at', from)
+      .order('updated_at', { ascending: true })
+      .limit(SYNC_PULL_PAGE)
+      .then((r) => {
+        if (r && r.error) throw r.error;
+        const rows = (r && r.data) || [];
+        for (const row of rows) {
+          const u = row && row.updated_at;
+          const key = String(row && row.id) + '|' + String(u);
+          if (!seen.has(key)) { seen.add(key); decide(row); }
+          if (typeof u === 'string' && u > high) high = u;
+        }
+        if (rows.length < SYNC_PULL_PAGE) return;
+        if (high === from) { blocked = true; return; }
+        return page(high);
+      });
+  }
+
+  return chain.then(() => page(since)).then(() => {
+    ph.need = [];
+    if (!drop.length) return;
+    return photosRemoveQuiet(drop).then((n) => {
+      if (n < 0) { blocked = true; return; }     // store refused: read these again next run
+      out.removed += n;
+      if (n) known = true;
+      // The strip may be showing one of them. It is buttons only, so a repaint
+      // is allowed (MAP rule 3); the tile simply goes.
+      if (state.photoStripOpen && Array.isArray(state.photoStripPhotos)) {
+        const gone = new Set(drop);
+        state.photoStripPhotos = state.photoStripPhotos.filter((p) => !gone.has(p.id));
+      }
+    });
+  }).then(() => {
+    if (!blocked) ph.pulledAt = high;
+    _syncSave(st);
+    if (known) _syncRepaintApp();
+  });
+}
+
+// v89 (1A). Upload one preview. Resolves true only if it is in the cloud.
+function _syncThumbUpload(c, uid, id, blob) {
+  if (typeof photoThumbBlob !== 'function' || !blob) return Promise.resolve(false);
+  // A picture that never finishes decoding must not hold up the photo itself:
+  // after 10 seconds there is simply no preview (the photo's row says so).
+  let timer = null;
+  const made = Promise.race([
+    photoThumbBlob(blob),
+    new Promise((res) => { timer = setTimeout(() => res(null), 10000); }),
+  ]).then((v) => { if (timer) clearTimeout(timer); return v; });
+  return made.then((tb) => {
+    if (!tb) return false;
+    return c.storage.from('photos').upload(_syncThumbPath(uid, id), tb, { contentType: 'image/jpeg', upsert: true })
+      .then((r) => !(r && r.error), () => false);
+  }).catch(() => false);
+}
+
 function _syncPhotosHalf(c, uid, st) {
-  const out = { up: 0, gone: 0, more: 0 };
+  const out = { up: 0, gone: 0, more: 0, removed: 0, thumbs: 0 };
   return Promise.resolve().then(() => {
     // The mirror isn't loaded yet (boot) — nothing is known. Next run.
     if (!state.photoMetaReady) { out.skipped = true; return out; }
-    const meta = state.photoMeta || {};
-    const now = new Date().toISOString();
 
-    // 1. Deletes first: they are small, and they free space before uploads use it.
-    const del = [];
-    const seen = new Set();
-    for (const t of (state.tombstones || [])) {
-      if (!t || t.kind !== 'photo') continue;
-      const id = String(t.id);
-      if (seen.has(id)) continue;
-      if (meta[id]) continue;                    // on this phone again (restored): live
-      if (!st.ph.sent[id]) continue;             // the cloud never had it from here
-      seen.add(id); del.push(id);
-    }
-    for (const id of Object.keys(st.ph.sent)) {
-      if (seen.has(id)) continue;
-      if (st.gone[st.ph.sent[id].s]) { seen.add(id); del.push(id); }
-    }
-    let chain = Promise.resolve();
-    for (let i = 0; i < del.length; i += SYNC_PHOTO_DELETE_BATCH) {
-      const chunk = del.slice(i, i + SYNC_PHOTO_DELETE_BATCH);
-      chain = chain
-        .then(() => c.from('photos').update({ deleted: true, last_modified: now })
-          .eq('user_id', uid).in('id', chunk))
-        .then((r) => { if (r && r.error) throw r.error; })
-        .then(() => c.storage.from('photos').remove(chunk.map(id => _syncPhotoPath(uid, id))))
-        .then((r) => {
-          if (r && r.error) throw r.error;
-          for (const id of chunk) { delete st.ph.sent[id]; out.gone++; }
-          _syncSave(st);
-        });
-    }
+    // 0. v89: rows down first, so deletes made elsewhere are known before this
+    //    phone decides what to send.
+    return _syncPhotoRowsPull(c, uid, st, out).then(() => {
+      const meta = state.photoMeta || {};
+      const now = new Date().toISOString();
 
-    // 2. Uploads, oldest first, a few per run (SYNC_PHOTOS_PER_RUN).
-    return chain.then(() => {
-      const jobs = _syncPhotoJobs() || new Map();
-      const cands = [];
-      for (const [id, job] of jobs) {
-        if (st.ph.sent[id]) continue;
-        if (!st.sent[job] || st.gone[job]) continue;   // job not in the cloud (yet)
-        cands.push({ id, job, m: meta[id] });
+      // 1. Deletes: they are small, and they free space before uploads use it.
+      //    v89: anything KNOWN to be in the cloud (5A), not only this phone's own.
+      const del = [];
+      const seen = new Set();
+      for (const t of (state.tombstones || [])) {
+        if (!t || t.kind !== 'photo') continue;
+        const id = String(t.id);
+        if (seen.has(id)) continue;
+        if (meta[id]) continue;                    // on this phone again (restored): live
+        if (!st.ph.sent[id]) continue;             // not known to be in the cloud
+        seen.add(id); del.push(id);
       }
-      cands.sort((a, b) => String(a.m.at).localeCompare(String(b.m.at)) || a.id.localeCompare(b.id));
-      const take = cands.slice(0, SYNC_PHOTOS_PER_RUN);
-      out.more = cands.length - take.length;
-      let up = Promise.resolve();
-      for (const cand of take) {
-        up = up.then(() => photoBlob(cand.id)).then((blob) => {
-          // Deleted while the run was going, or unreadable: skip, don't fail.
-          if (!blob || !(state.photoMeta || {})[cand.id]) return null;
-          const path = _syncPhotoPath(uid, cand.id);
-          const m = cand.m;
-          const at = (m.at && !isNaN(Date.parse(m.at))) ? m.at : null;
-          return c.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true })
-            .then((r) => {
-              if (r && r.error) throw r.error;
-              return c.from('photos').upsert({
+      for (const id of Object.keys(st.ph.sent)) {
+        if (seen.has(id)) continue;
+        if (st.gone[st.ph.sent[id].s]) { seen.add(id); del.push(id); }
+      }
+      let chain = Promise.resolve();
+      for (let i = 0; i < del.length; i += SYNC_PHOTO_DELETE_BATCH) {
+        const chunk = del.slice(i, i + SYNC_PHOTO_DELETE_BATCH);
+        chain = chain
+          .then(() => c.from('photos').update({ deleted: true, last_modified: now })
+            .eq('user_id', uid).in('id', chunk))
+          .then((r) => { if (r && r.error) throw r.error; })
+          // v89: the preview goes with the photo. Removing one that was never
+          // made is not an error.
+          .then(() => c.storage.from('photos').remove(
+            chunk.map(id => _syncPhotoPath(uid, id)).concat(chunk.map(id => _syncThumbPath(uid, id)))))
+          .then((r) => {
+            if (r && r.error) throw r.error;
+            for (const id of chunk) { delete st.ph.sent[id]; out.gone++; }
+            _syncSave(st);
+          });
+      }
+
+      // 2. Uploads, oldest first, a few per run (SYNC_PHOTOS_PER_RUN).
+      return chain.then(() => {
+        const jobs = _syncPhotoJobs() || new Map();
+        const cands = [];
+        for (const [id, job] of jobs) {
+          if (st.ph.sent[id]) continue;
+          if (!st.sent[job] || st.gone[job]) continue;   // job not in the cloud (yet)
+          cands.push({ id, job, m: meta[id] });
+        }
+        cands.sort((a, b) => String(a.m.at).localeCompare(String(b.m.at)) || a.id.localeCompare(b.id));
+        const take = cands.slice(0, SYNC_PHOTOS_PER_RUN);
+        out.more = cands.length - take.length;
+        let up = Promise.resolve();
+        for (const cand of take) {
+          up = up.then(() => photoBlob(cand.id)).then((blob) => {
+            // Deleted while the run was going, or unreadable: skip, don't fail.
+            if (!blob || !(state.photoMeta || {})[cand.id]) return null;
+            const path = _syncPhotoPath(uid, cand.id);
+            const m = cand.m;
+            const at = (m.at && !isNaN(Date.parse(m.at))) ? m.at : null;
+            let thumb = false;
+            return c.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true })
+              .then((r) => {
+                if (r && r.error) throw r.error;
+                // v89 (1A): the preview after the photo, before the row.
+                return _syncThumbUpload(c, uid, cand.id, blob).then((ok) => { thumb = ok; });
+              })
+              .then(() => c.from('photos').upsert({
                 id: cand.id, user_id: uid, session_id: cand.job, item_id: m.i,
                 storage_path: path, bytes: m.b || (blob.size || 0),
-                w: m.w || null, h: m.h || null, taken_at: at,
+                w: m.w || null, h: m.h || null, taken_at: at, thumb,
                 deleted: false, last_modified: new Date().toISOString(),
-              }, { onConflict: 'user_id,id' });
-            })
-            .then((r) => {
-              if (r && r.error) throw r.error;
-              st.ph.sent[cand.id] = { s: cand.job, i: m.i };
-              out.up++;
-              _syncSave(st);
-            });
-        });
-      }
-      // More waiting (a backlog, or the first run after V88): take the next
-      // round shortly rather than waiting for the two-minute backstop.
-      return up.then(() => {
-        if (out.more > 0) { try { syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true }); } catch { /* next trigger will do */ } }
+              }, { onConflict: 'user_id,id' }))
+              .then((r) => {
+                if (r && r.error) throw r.error;
+                const e = { s: cand.job, i: m.i };
+                const b = m.b || blob.size || 0;
+                if (b > 0) e.b = b;
+                if (thumb) e.t = 1;
+                if (at) e.a = at;
+                st.ph.sent[cand.id] = e;
+                out.up++;
+                _syncSave(st);
+              });
+          });
+        }
+        return up;
+      }).then(() => _syncThumbBackfill(c, uid, st, out)).then(() => {
+        // More waiting (a backlog, or the first run after an update): take the
+        // next round shortly rather than waiting for the two-minute backstop.
+        if (out.more > 0 || out.thumbsMore > 0) { try { syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true }); } catch { /* next trigger will do */ } }
         return out;
       });
     });
   });
+}
+
+// v89 (1A): previews for photos already in the cloud without one, while the
+// image is on this phone (uploaded before V89, or downloaded here). Best effort:
+// a failure stops the round quietly and is tried next run — a preview is a
+// convenience, never a reason to report photos as not sent.
+const _syncThumbGaveUp = new Set();   // images that will not decode, this session
+
+function _syncThumbBackfill(c, uid, st, out) {
+  const meta = state.photoMeta || {};
+  const gone = new Set();
+  for (const t of (state.tombstones || [])) if (t && t.kind === 'photo') gone.add(String(t.id));
+  const cands = Object.keys(st.ph.sent).filter((id) =>
+    !st.ph.sent[id].t && meta[id] && !gone.has(id) && !_syncThumbGaveUp.has(id) && !st.gone[st.ph.sent[id].s]);
+  const cap = (typeof SYNC_THUMBS_PER_RUN === 'number') ? SYNC_THUMBS_PER_RUN : 50;
+  const take = cands.slice(0, cap);
+  out.thumbsMore = cands.length - take.length;
+  let stop = false;
+  let chain = Promise.resolve();
+  for (const id of take) {
+    chain = chain.then(() => {
+      if (stop) return null;
+      return photoBlob(id).then((blob) => {
+        if (!blob) return null;
+        return _syncThumbUpload(c, uid, id, blob).then((ok) => {
+          if (!ok) { _syncThumbGaveUp.add(id); return null; }
+          return c.from('photos').update({ thumb: true, last_modified: new Date().toISOString() })
+            .eq('user_id', uid).eq('id', id)
+            .then((r) => {
+              if (r && r.error) { stop = true; return; }
+              if (st.ph.sent[id]) { st.ph.sent[id].t = 1; out.thumbs++; _syncSave(st); }
+            });
+        });
+      }).catch(() => { stop = true; });
+    });
+  }
+  return chain.then(() => { if (stop) out.thumbsMore = 0; });
+}
+
+// ---- v89: on request (10A) ------------------------------------------------------------
+// The only two ways an image comes down. Both read state.photoCloud — the list
+// the pull keeps — and never the table itself.
+
+// A preview, for the strip. Null when there isn't one, or no signal, or signed
+// out: the tile then shows a plain cloud.
+function syncPhotoThumb(photoId) {
+  const id = String(photoId || '');
+  const e = (state.photoCloud || {})[id];
+  if (!id || !e || !e.t || !syncActive() || _syncOffline()) return Promise.resolve(null);
+  const uid = _syncCurrentUserId();
+  if (!uid || state.photoCloudUser !== uid) return Promise.resolve(null);
+  return cloudClient()
+    .then((c) => c.storage.from('photos').download(_syncThumbPath(uid, id)))
+    .then((r) => (r && !r.error && r.data) ? r.data : null)
+    .catch(() => null);
+}
+
+// Full photos onto this phone. One at a time (a phone, a canvas each, mobile
+// data). `onStep(done, total)` after each. Resolves {got, failed, offline,
+// notReady}; a failure never stops the rest.
+function syncPhotoDownload(ids, onStep) {
+  const list = Array.from(new Set((ids || []).map(String).filter(Boolean)));
+  const res = { got: 0, failed: 0, offline: false, notReady: false };
+  if (!list.length) return Promise.resolve(res);
+  if (!syncActive() || _syncOffline()) { res.offline = true; res.failed = list.length; return Promise.resolve(res); }
+  // Until the store has been read, "not on this phone" isn't known yet.
+  if (!state.photoMetaReady) { res.notReady = true; res.failed = list.length; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid || state.photoCloudUser !== uid) { res.offline = true; res.failed = list.length; return Promise.resolve(res); }
+  let done = 0;
+  const step = () => { done++; if (typeof onStep === 'function') { try { onStep(done, list.length); } catch { /* progress only */ } } };
+  return cloudClient().then((c) => {
+    let chain = Promise.resolve();
+    for (const id of list) {
+      chain = chain.then(() => {
+        const e = (state.photoCloud || {})[id];
+        if (state.photoMeta && state.photoMeta[id]) { step(); return null; }   // already here
+        if (!e) { res.failed++; step(); return null; }
+        return c.storage.from('photos').download(_syncPhotoPath(uid, id))
+          .then((r) => {
+            if (!r || r.error || !r.data) { res.failed++; return null; }
+            return photoAddFromCloud({ id, s: e.s, i: e.i, b: e.b, a: e.a }, r.data)
+              .then((ok) => { if (ok) res.got++; else res.failed++; });
+          }, () => { res.failed++; })
+          .then(step);
+      });
+    }
+    return chain;
+  }).then(() => {
+    // A photo downloaded without a preview in the cloud gets one on the next
+    // run (the backfill) — "made the first time one is downloaded" (1A).
+    if (res.got) { try { syncNoteSave(); } catch { /* next trigger */ } }
+    return res;
+  }, () => { res.failed = list.length - res.got; return res; });
 }

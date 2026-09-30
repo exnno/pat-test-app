@@ -10,7 +10,7 @@ here rather than restating it. Delete an item when it ships.
 
 ### Factory reset (Peter, V81.1) — needs its own spec round
 A guarded "reset this device" (V86: must also clear SQP_RESET_KEY; V87: STORAGE_BANNER_KEY; V88: the
-`ph` part of SYNC_STATE_KEY goes with it) for handing a phone to another engineer, selling
+`ph` part of SYNC_STATE_KEY goes with it; V89: the session's preview cache is memory only — nothing extra) for handing a phone to another engineer, selling
 it, or resetting between tests. NOT a quick win: "reset" means at least three
 different things (data only / + settings / + cloud sign-in), and the easy-to-miss
 leftovers are the IndexedDB photo store and the sync bookkeeping keys
@@ -19,10 +19,27 @@ Cloud access-code flag) — a half-reset phone that is
 still signed in would pull its old jobs straight back. Most destructive button in
 the app, so the confirm needs to be genuinely hard to hit by accident.
 
+### V89 residuals (known, accepted)
+- A phone keeps photo records only for jobs it holds. A job brought back by a
+  path other than the pull or "Use the cloud's copy" (none today; Stage 5's
+  archive will be one) must push its id onto `st.ph.need`, or its photos stay
+  unseen until the next full read.
+- Previews are made on the phone from the stored photo. Photos cleared from
+  every phone before V89 get one only after someone downloads them.
+- A photo the phone can't decode gets no preview; retried next session only.
+- A V88 phone on the account: uploads without previews, deletes only what it
+  uploaded, never removes a copy deleted elsewhere. Test phones only.
+- Download on mobile data is not limited (iPhone can't say whether it's on
+  Wi-Fi); the tile and the certificate prompt show the size first.
+- Turning Photos ON from the report preview's quick-adjust chip does not ask
+  about cloud photos; it prints what is on the phone (the prompt runs at
+  "Produce report").
+- The Sync page's photo line counts photos of jobs on this phone only.
+
 ### V88 residuals (known, accepted)
-- A phone deletes only the cloud photos IT uploaded. A job deleted while the
-  uploading phone is lost or never syncs again leaves those photos in the cloud
-  — Stage 5's review-and-delete path is the tidy-up (Peter, 5A).
+- ~~A phone deletes only the cloud photos IT uploaded~~ — V89 (5A): any phone
+  that knows a cloud photo can delete it. A job deleted while NO phone knows its
+  photos still leaves them — Stage 5's review-and-delete path is the tidy-up.
 - Uploads happen only while the app is open (web apps can't upload closed), on
   any signal: an iPhone won't say whether it's on Wi-Fi.
 - A V87 phone on the same account neither uploads photos nor deletes them.
@@ -49,15 +66,19 @@ the app, so the confirm needs to be genuinely hard to hit by accident.
 - Protection status is asked fresh each launch, never stored.
 - Day-first file names don't sort by date in a folder (Peter's choice, V87).
 
-### Cloud track — V88: photos up; V89: photos down, on request only
+### Cloud track — V89: photos down, on request only; next the photo manager
 V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull → V82 clients + sites →
 V83 instruments + presets + tester in use → V83.1 pager fix → V84 report
 settings + templates + certificate counter → V85 the cloud pages moved to
 Settings → Cloud (code 1111, remembered per phone) → **V86** general settings
 (engineer + switches, fail reasons, descriptions, CSV, Multi Pick, Smart Quick
 Pick history) → V87 field release → **V88** photos UP (one way, isolation 4c/4d +
-7a–7d). Next: **V89** photos DOWN — only when asked (R17, decision 10A); a tiny
-row per photo tells the phone they exist. Then roadmap Stage 3 onward.
+7a–7d) → **V89** photos DOWN, only when asked (rows, previews, ☁ tiles,
+certificate prompt, deletes from any phone; isolation 4e/4f). Next (roadmap
+v4.2, 6A): **V90** the photo manager (Peter: iMessage-style review of what's on
+the phone and in the cloud — preview, remove from phone, download, delete
+everywhere), then Stage 4 safe-in-the-cloud and Stage 5 jobs on request, then
+field batch A.
 Every cloud release runs `supabase/isolation-test.sql` (all PASS) before
 promotion to `Release` — all PASS at V84 incl. 6a–6d. V85 changed no SQL.
 
@@ -138,10 +159,9 @@ that version, an older phone that EDITS the record sends it back without the
 field. Receiving is harmless. Worth remembering before adding anything to a
 client (address, contact).
 
-### Cloud — photos do not come down yet (V81 note; V88: they go up)
-A job pulled onto a second device shows its photos as missing — same as a backup
-restored onto a new phone, and it fails soft the same way. V89 brings them down,
-on request only.
+### Cloud — photos on a second device (V81 note; V88 up; V89 down on request — CLOSED)
+A job pulled onto a second device now shows its photos as ☁ tiles with previews;
+each comes down on a tap. Offline, or signed out, it still fails soft.
 
 ### Cloud — permanent delete of cleared jobs (Peter, V80 spec)
 Clearing old jobs leaves them in the cloud archive (5A). Peter wants a way to
