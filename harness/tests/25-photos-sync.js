@@ -167,6 +167,9 @@ module.exports = async function () {
     const calls = [];
     const app = boot({ fetch: async (u) => { calls.push(String(u)); throw new Error('offline'); } });
     await tick(5);
+    // V90: under a full run the store read can take longer than one tick (seen
+    // twice while building V90) — wait for it rather than race it.
+    for (let k = 0; k < 100 && !app.state().photoMetaReady; k++) await tick(10);
     t.ok(app.state().photoMetaReady, 'the mirror is ready once the store has been read');
     withSession(app, { site: 'ZZPHOUT' });
     const { item, ids } = await failWithPhotos(app, 2);
