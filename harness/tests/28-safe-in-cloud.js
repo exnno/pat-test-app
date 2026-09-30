@@ -290,22 +290,23 @@ const clickChoice = (app, i) => { const b = app.doc.getElementById('choice-sheet
 
 module.exports = async function () {
   /* ------------------------------------------------------------------ 28a */
-  await t.group('28a — safe means the cloud copy was READ BACK and matches; a push alone is not (1A)', async () => {
+  await t.group('28a — safe means the cloud copy was READ BACK and matches (1A; V92 4A: in the same sync)', async () => {
     const app = await signedIn();
     const id = plainJob(app, 'ZZSAFE1');
     away(app);
     t.eq(why(app, id), 'unsent', 'a new job: its changes aren\u2019t sent');
+    // V92 (4A): the fingerprint is read back straight after the push, so the
+    // job is safe in the SAME sync. A push whose read-back never comes is still
+    // not safe — 16i (a server that answers every read with nothing) and 29a.
     await run(app);
-    t.eq(why(app, id), 'checking', 'pushed: not safe until the next sync reads it back');
-    await run(app);
-    t.eq(why(app, id), 'safe', 'read back, and it matches: safe');
+    t.eq(why(app, id), 'safe', 'pushed and its fingerprint read straight back: safe in the same sync (V92 4A)');
     t.ok(syncState(app).conf[id], 'the cloud copy\u2019s fingerprint is recorded as SEEN');
     edit(app, id);
     t.eq(why(app, id), 'unsent', 'edited on this phone: not safe any more');
     await run(app);
-    t.eq(why(app, id), 'checking', '…sent again, waiting for the read-back');
+    t.eq(why(app, id), 'safe', '…sent again and read back: safe again');
     await run(app);
-    t.eq(why(app, id), 'safe', '…and safe after it');
+    t.eq(why(app, id), 'safe', '…and it stays safe');
     t.eq(app.fn('syncSafetyText')({ why: 'checking' }), 'Sent \u2014 confirmed on the next sync', 'the reason in plain words');
     const out = await signedOut();
     plainJob(out, 'ZZSAFEOUT');
@@ -318,11 +319,10 @@ module.exports = async function () {
     const id = plainJob(app, 'ZZSHIELD');
     away(app);
     app.fn('render')();
+    t.excludes(app.html(), 'title="Safe in the cloud"', 'not sent yet: no 🛡');
     await run(app);
-    t.excludes(app.html(), 'title="Safe in the cloud"', 'pushed but not read back: no 🛡');
-    await run(app);
-    // Nothing on screen changed in that run (the pull found the job identical),
-    // so only the safety repaint can have drawn it.
+    // Nothing on screen changed in that run (a push changes no job), so only
+    // the safety repaint can have drawn it. V92 (4A): in the same sync.
     t.includes(app.html(), 'title="Safe in the cloud"', 'the 🛡 appears after the read-back, without another repaint');
     t.excludes(app.html().split('title="Safe in the cloud"')[0].slice(-200), '\u2601', '…and it is not the ☁ (which means only in the cloud)');
     // In place, same array — as storage.js's own cache test sees it.
@@ -379,12 +379,15 @@ module.exports = async function () {
     t.includes(app.toasts.join('|'), 'not sent yet', '…and the toast says why');
     tap(app, 'jm-tap', a);
     t.ok(app.state().jobMgr.selected[a], 'a safe job can');
-    const getsBefore = sessGets(app).length;
+    // V92: the removal also reads the job's contents (3B) — a jobs request too,
+    // so "synced first" is proved by the PULL's page request, not any request.
+    const pages = () => sessGets(app).filter(c => c.url.includes('updated_at=')).length;
+    const getsBefore = pages();
     const tombs = ledger(app).length;
     tap(app, 'jm-remove');
     await until(() => app.asked.some(x => x.startsWith('Remove 1 job from this phone?')));
     app.stopTimer();
-    t.ok(sessGets(app).length > getsBefore, 'it synced first (3A)');
+    t.ok(pages() > getsBefore, 'it synced first (3A)');
     const msg = app.asked.find(x => x.startsWith('Remove 1 job'));
     t.includes(msg, 'stays in the cloud and on your other phones', 'the confirm says the cloud keeps it');
     t.includes(msg, 'bring it back', '…and that it can come back');

@@ -278,7 +278,9 @@ module.exports = async function () {
     t.ok(client(app, 'client_ZZPOLD'), 'and the client');
     t.eq(syncState(app).pagerV, app.run('SYNC_PAGER_V'), 'the new pager version is saved');
     await run(app);
-    const url = (tbl) => decodeURIComponent(app.srv.gets(tbl).slice(-1)[0].url);
+    // V92: jobs also read docs by id and fingerprints after a push; the page
+    // request is the one carrying the cursor.
+    const url = (tbl) => decodeURIComponent(app.srv.gets(tbl).filter(c => c.url.includes('updated_at=')).slice(-1)[0].url);
     t.includes(url('sessions'), 'updated_at=gte.' + T1, 'after which jobs carry on from their cursor');
     t.includes(url('records'), 'updated_at=gte.' + T1, 'and so do records — it happens once, not every run');
   });
@@ -320,7 +322,7 @@ module.exports = async function () {
     const app = signedIn({ server: { sessions: rows } });
     await run(app);
     t.notOk(syncState(app).pulledAt, 'the cursor does not move past rows it may not have read');
-    t.ok(app.srv.gets('sessions').length <= 2, 'and the run ends rather than asking for the same page for ever');
+    t.ok(app.srv.gets('sessions').filter(c => c.url.includes('updated_at=')).length <= 2, 'and the run ends rather than asking for the same page for ever');
   });
 
   /* ------------------------------------------------------------------ 20f2 */

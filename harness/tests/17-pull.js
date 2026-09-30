@@ -230,7 +230,9 @@ module.exports = async function () {
     const second = app.fn('syncPull');
     await second();
     await tick(5);
-    const url = app.srv.gets().slice(-1)[0].url;
+    // V92: a run also reads docs by id and fingerprints after a push — the
+    // PAGE request is the one carrying the cursor.
+    const url = app.srv.gets().filter(c => c.url.includes('updated_at=')).slice(-1)[0].url;
     // v83.1: "at or after" the mark, so a batch split by a page edge is read
     // again in full (20a). Rows already applied resolve as no work.
     t.includes(url, encodeURIComponent('gte.' + T1).replace(/%2E/g, '.'),
