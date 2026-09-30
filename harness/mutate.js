@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V89';",
-    to:   "const APP_VERSION = 'V89';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V90';",
+    to:   "const APP_VERSION = 'V90';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -637,8 +637,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V87</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V87</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V86</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V88</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V88</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V87</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -2764,8 +2764,9 @@ const MUTATIONS = [
   {
     name: "M379 (V89) the quiet removal writes a ledger entry",
     file: "photos.js",
-    from: "      _photoMetaDrop(id);\n      photoThumbForget(id);\n    });\n    return want.length;",
-    to:   "      _photoMetaDrop(id);\n      photoThumbForget(id);\n    });\n    _photoNoteGone(want, []);\n    return want.length;",
+    // V90: re-anchored — the preview line gained a keepPreview guard.
+    from: "      _photoMetaDrop(id);\n      if (!keepPreview) photoThumbForget(id);\n    });\n    return want.length;",
+    to:   "      _photoMetaDrop(id);\n      if (!keepPreview) photoThumbForget(id);\n    });\n    _photoNoteGone(want, []);\n    return want.length;",
     why:  "a remote delete must not be sent back as this phone's own (26f)",
   },
   {
@@ -2879,6 +2880,152 @@ const MUTATIONS = [
     from: "          return c.from('photos').update({ thumb: true, last_modified: new Date().toISOString() })\n            .eq('user_id', uid).eq('id', id)\n            .then((r) => {",
     to:   "          return Promise.resolve(null)\n            .then((r) => {",
     why:  "another phone learns of a preview only from the row (26j)",
+  },  {
+    name: "M396 (V90) signed in, the Backup button still says Delete",
+    file: "render-settings.js",
+    from: "🗑 ${clears ? 'Clear photos from this phone' : 'Delete all photos'}",
+    to:   "🗑 ${clears ? 'Delete all photos' : 'Delete all photos'}",
+    why:  "Peter's V90 wording: signed in the button only clears (27b)",
+  },
+  {
+    name: "M397 (V90) opening the manager looks in the cloud by itself",
+    file: "settings-actions.js",
+    from: "  setView('photoManager');\n  photoMgrLoadThumbs();\n}",
+    to:   "  setView('photoManager');\n  photoMgrLoadThumbs();\n  photoMgrLook();\n}",
+    why:  "3A/R17: the cloud read is a tap, never automatic (27c)",
+  },
+  {
+    name: "M398 (V90) the look downloads whole jobs",
+    file: "sync.js",
+    from: "const _SYNC_BROWSE_JOB_COLS = 'id,deleted,site:doc->>site",
+    to:   "const _SYNC_BROWSE_JOB_COLS = 'id,deleted,doc,site:doc->>site",
+    why:  "R17: names are picked out of the job row, the job never comes down (27c)",
+  },
+  {
+    name: "M399 (V90) the look remembers what it read",
+    file: "sync.js",
+    from: "    }).then(() => { res.ok = true; return res; });",
+    to:   "    }).then(() => { res.ok = true; const st = _syncLoad(); for (const e of res.rows) st.ph.sent[e.id] = { s: e.s, i: e.i }; _syncSave(st); return res; });",
+    why:  "rule 24: knowing is scoped to what the phone holds; the look is memory only (27c)",
+  },
+  {
+    name: "M400 (V90) the look reads deleted rows too",
+    file: "sync.js",
+    from: "      let q = c.from('photos').select(_SYNC_BROWSE_COLS).eq('user_id', uid).eq('deleted', false);",
+    to:   "      let q = c.from('photos').select(_SYNC_BROWSE_COLS).eq('user_id', uid);",
+    why:  "a deleted photo would come back as a tile (27c)",
+  },
+  {
+    name: "M401 (V90) the look pages without moving on",
+    file: "sync.js",
+    from: "      if (after) q = q.gt('id', after);\n",
+    to:   "",
+    why:  "keyset paging: every row once, the next page after the last id (27d)",
+  },
+  {
+    name: "M402 (V90) a deleted job's photos are not orphans",
+    file: "settings-actions.js",
+    from: "  if (asked && (!j || j.deleted)) {",
+    to:   "  if (asked && !j) {",
+    why:  "5A: a deleted job leaves its photos with no job (27c)",
+  },
+  {
+    name: "M403 (V90) Remove from phone notes the photos as deleted",
+    file: "settings-actions.js",
+    from: "      photosRemoveQuiet(ids, true).then((n) => {",
+    to:   "      Promise.all(ids.map((id) => photoDelete(id))).then(() => ids.length).then((n) => {",
+    why:  "remove from phone must never touch the cloud copy (27f)",
+  },
+  {
+    name: "M404 (V90) Remove from phone forgets the preview",
+    file: "photos.js",
+    from: "      if (!keepPreview) photoThumbForget(id);",
+    to:   "      photoThumbForget(id);",
+    why:  "the photo is still there to see: no re-download of its preview (27f)",
+  },
+  {
+    name: "M405 (V90) a locked job's photos can be deleted",
+    file: "settings-actions.js",
+    from: "  const go = sel.filter((e) => !e.locked && (e.local || vis));",
+    to:   "  const go = sel.filter((e) => (e.local || vis));",
+    why:  "8A: never delete on a locked job (27g, 27j)",
+  },
+  {
+    name: "M406 (V90) a found photo is ledgered without being made known",
+    file: "settings-actions.js",
+    from: "            ? syncPhotoKnowForDelete(found).then(() => {",
+    to:   "            ? Promise.resolve().then(() => {",
+    why:  "the V89 delete path only deletes what it knows: the photo would never go (27g)",
+  },
+  {
+    name: "M407 (V90) making a photo known does not wait for a run",
+    file: "sync.js",
+    from: "    if (_syncRunning) return _syncRunning.then(go, go);\n",
+    to:   "",
+    why:  "a running sync saves its own copy of the state and would overwrite it (27h)",
+  },
+  {
+    name: "M408 (V90) Download tries photos whose job isn't here",
+    file: "settings-actions.js",
+    from: "  const go = sel.filter((e) => !e.local && e.src === 'known' && e.onPhone);",
+    to:   "  const go = sel.filter((e) => !e.local);",
+    why:  "4A: a photo with no job on this phone has nowhere to show (27i)",
+  },
+  {
+    name: "M409 (V90) the job heading ticks only the shown page",
+    file: "settings-actions.js",
+    from: "  g.photos.forEach((e) => { if (all) delete pm.selected[e.id]; else pm.selected[e.id] = true; });",
+    to:   "  g.photos.slice(0, PHOTO_MGR_PAGE).forEach((e) => { if (all) delete pm.selected[e.id]; else pm.selected[e.id] = true; });",
+    why:  "7A: the heading takes the whole job (27e)",
+  },
+  {
+    name: "M410 (V90) no paging",
+    file: "settings-actions.js",
+    from: "  const limit = pm.shown > 0 ? pm.shown : page;",
+    to:   "  const limit = pm.shown > 0 ? pm.shown : 100000;",
+    why:  "11A: a grid of hundreds never builds at once (27d)",
+  },
+  {
+    name: "M411 (V90) previews for every photo, not the page",
+    file: "settings-actions.js",
+    from: "  for (const g of model.groups) for (const e of g.shown) if (!photoThumbCached(e.id)) want.push(e);",
+    to:   "  for (const g of model.allGroups) for (const e of g.photos) if (!photoThumbCached(e.id)) want.push(e);",
+    why:  "11A/R17: only tiles on screen get previews (27e)",
+  },
+  {
+    name: "M412 (V90) leaving the manager keeps the look",
+    file: "session.js",
+    from: "  if (v !== 'photoManager' && typeof photoMgrLeave === 'function') photoMgrLeave();\n",
+    to:   "",
+    why:  "3A: re-read each time; nothing read lingers (27c)",
+  },
+  {
+    name: "M413 (V90) the confirm doesn't say everywhere",
+    file: "settings-actions.js",
+    from: "    title: vis ? `Delete ${_pmPlural(n, 'photo')} everywhere?` : `Delete ${_pmPlural(n, 'photo')}?`,",
+    to:   "    title: `Delete ${_pmPlural(n, 'photo')}?`,",
+    why:  "9A: the engineer is told it goes from every phone (27g)",
+  },
+  {
+    name: "M414 (V90) a filter value nobody offered is kept",
+    file: "settings-actions.js",
+    from: "  state.photoMgr.filter = ok.indexOf(v) === -1 ? 'all' : v;",
+    to:   "  state.photoMgr.filter = v;",
+    why:  "garbage collapses to a safe default (27b)",
+  },
+  {
+    name: "M415 (V90) a found photo's preview is refused",
+    file: "sync.js",
+    from: "  const e = (state.photoCloud || {})[id] || ((hint && hint.t) ? hint : null);",
+    to:   "  const e = (state.photoCloud || {})[id];",
+    why:  "a found photo is seen by its preview (27c)",
+  },
+  {
+    name: "M416 (V90) no job on this phone is treated as on it",
+    file: "settings-actions.js",
+    from: "        if (sessById.has(r.s)) continue;\n",
+    to:   "",
+    why:  "rule 24: a row for a job on this phone is left to the pull, whose entry can be downloaded (27m)",
   },
 ];
 
