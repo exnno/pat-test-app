@@ -307,39 +307,32 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 16i */
-  await t.group('16i — clearing old jobs: cloud keeps them; unsent ones stay (decision 5A)', async () => {
-    const toasts = [];
+  await t.group('16i — clearing old jobs: cloud keeps them; unsent ones stay (decision 5A; V91: safe = read back)', async () => {
     const app = signedIn();
-    app.sandbox.showToast = (m) => toasts.push(String(m));
-    // Record what the confirm sheet was asked to say; the real sheet still opens.
-    const asked = [];
-    const realConfirm = app.sandbox.openConfirmSheet;
-    app.sandbox.openConfirmSheet = (o) => { asked.push(String(o && o.message)); return realConfirm(o); };
     const a = job(app, 'ZZOLDJOB');
     app.run(`(() => { const s = state.sessions.find(x => x.id === ${JSON.stringify(a.id)});
       s.date = '2020-01-01'; s.exportedAt = '2020-01-02T00:00:00Z'; s.exportDirty = false;
       state.activeId = null; })()`);
-    app.fn('pruneOldSessions')();
-    t.ok(app.state().sessions.some(s => s.id === a.id), 'never-sent old job is NOT cleared while signed in');
-    t.includes(toasts.join('|'), 'reached the cloud yet', 'and the toast says why');
+    const sess = () => app.state().sessions.find(s => s.id === a.id);
+    let g = app.fn('syncPruneFilter')([sess()]);
+    t.eq(g.clear.length, 0, 'never-sent old job is NOT clearable while signed in');
+    t.eq(g.kept[0] && g.kept[0].why, 'unsent', '…and the reason says its changes aren\u2019t sent');
 
     app.online();
     // V88: the photo mirror loads on a timer tick after boot; until it has, the
     // prune guard clears nothing (decision 6A). Let it load, as a phone would.
     await tick(5);
     await app.fn('syncPush')({});
-    const tombsBefore = (app.state().tombstones || []).length;
-    app.fn('pruneOldSessions')();
-    t.includes(asked.join('|'), 'Your cloud copy keeps them', 'the confirm says the cloud keeps it');
-    t.ok(confirmSheet(app), 'confirm sheet shown');
     app.stopTimer();
-    t.notOk(app.state().sessions.some(s => s.id === a.id), 'the sent job is cleared from the phone');
-    t.eq((app.state().tombstones || []).length, tombsBefore, 'and it is NOT a deletion');
-    const pruned = JSON.parse(app.storage.getItem('pat:syncPruned') || '[]');
-    t.ok(pruned.some(e => e.id === String(a.id)), 'its id is remembered so the pull won\u2019t bring it back');
-    const posts = app.srv.posts().length;
-    await app.fn('syncPush')({});
-    t.eq(app.srv.posts().length, posts, 'clearing sends nothing to the server');
+    // ⚠ V91 (1A). This group's server answers every read with an empty account,
+    // so the push is never READ BACK. A push that succeeded is not proof the
+    // cloud holds the job — before V91 this was enough to clear it.
+    g = app.fn('syncPruneFilter')([sess()]);
+    t.eq(g.clear.length, 0, 'sent but never read back: still not clearable (V91)');
+    t.eq(g.kept[0] && g.kept[0].why, 'checking', '…and the reason says it is waiting for the check');
+    app.fn('pruneOldSessions')();
+    t.eq(app.state().view, 'jobManager', 'signed in, Review & clear opens Jobs on this phone (7A)');
+    t.ok(sess(), 'nothing was cleared by opening it');
 
     // Signed out: the pre-V80 behaviour, wording included.
     const out = boot();
