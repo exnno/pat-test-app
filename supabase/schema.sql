@@ -68,6 +68,30 @@ alter table public.photos add column if not exists taken_at timestamptz;
 -- phone can trust it. Safe to re-run; on an existing project paste just this line.
 alter table public.photos add column if not exists thumb boolean not null default false;
 
+-- V92: each job's fingerprint (the app's syncHash of the job's canonical JSON),
+-- sent by the phone in the SAME write as the doc. The pull reads id + fp first
+-- and downloads doc only where fp differs from the phone's copy (R17). On an
+-- existing project run supabase/v92-fingerprint.sql instead (it checks itself).
+alter table public.sessions add column if not exists fp text;
+
+-- A write that changes doc WITHOUT a new fp (a phone still on V91, a hand edit
+-- in the dashboard) blanks fp, so no phone ever trusts a fingerprint that no
+-- longer describes the doc. Blank means "download it" — the pre-V92 behaviour.
+-- (A PostgREST upsert sets only the columns it sends, so an older phone's
+-- update keeps the OLD fp unless this clears it.)
+create or replace function public.sessions_fp_guard()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if new.doc is distinct from old.doc and new.fp is not distinct from old.fp then
+    new.fp := null;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists sessions_fp_guard on public.sessions;
+create trigger sessions_fp_guard before update on public.sessions
+  for each row execute function public.sessions_fp_guard();
+
 -- [v1.2] updated_at must move on EVERY update, not just insert. The sync pull
 -- asks for "rows changed since X" by updated_at; a default alone only stamps
 -- the first write, so later edits would never be pulled by another device.
