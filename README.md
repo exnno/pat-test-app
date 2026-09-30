@@ -43,7 +43,7 @@ in the shipped app — the files in the repo root are the files the browser load
 | Offline | Service worker (`sw.js`) precaching every asset |
 | PDF | jsPDF 3.0.3 + jsPDF-AutoTable 5.0.2, vendored and self-hosted (MIT) |
 | PDF preview | PDF.js 3.11.174 legacy UMD, vendored, lazy-loaded (Apache-2.0) |
-| Cloud | supabase-js 2.116.0 UMD, vendored, lazy-loaded (MIT) — invite-only, test host only. Syncs both ways: jobs, clients, sites, instruments, presets, the tester in use, report settings, report templates, the certificate counter (V79–V84) and general settings (V86). Reached from Settings → Cloud behind an access code (V85). Photos not yet |
+| Cloud | supabase-js 2.116.0 UMD, vendored, lazy-loaded (MIT) — invite-only, test host only. Syncs both ways: jobs, clients, sites, instruments, presets, the tester in use, report settings, report templates, the certificate counter (V79–V84) and general settings (V86). Reached from Settings → Cloud behind an access code (V85). Photos go up (V88) and come down on request (V89); jobs come down only when they changed (V92, fingerprint column) |
 | Hosting | `main` → GitHub Pages (test); `Release` → Cloudflare (the product) |
 | Tests | `harness/` — Node, no dependencies |
 
@@ -66,7 +66,8 @@ manifest.webmanifest  PWA manifest
 icon-192.png  icon-512.png
 jspdf.*.min.js        vendored PDF engine — precached, not <script>-tagged
 supabase.umd.js       vendored cloud client — precached, not <script>-tagged
-supabase/             server SQL: schema.sql (run once), isolation-test.sql (every release)
+supabase/             server SQL: schema.sql (run once), isolation-test.sql (every release),
+                      v92-fingerprint.sql (V92 change for an existing project)
 harness/              the committed test harness — NOT shipped
 MAP.md  FEATURES.md  BACKLOG.md
 PAThandoff_vNN.md     the canonical state block for the current release

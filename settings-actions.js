@@ -1258,13 +1258,23 @@ function jobsRemoveAsk(ids, onDone) {
   const jm = (state.view === 'jobManager') ? state.jobMgr : null;
   const here = () => !jm || (state.jobMgr === jm && state.view === 'jobManager');
   const busy = (text) => { if (jm && here()) { jm.busy = text; render(); } };
-  const pick = () => syncPruneFilter((state.sessions || []).filter(s => s && want.has(String(s.id))));
+  // V92 (3B): `verified` = the cloud's real contents, hashed, read just before
+  // asking. With signal every removal needs it; with none the last sync stands.
+  let verified = null;
+  const pick = () => syncPruneFilter((state.sessions || []).filter(s => s && want.has(String(s.id))), verified || undefined);
   const online = typeof syncActive === 'function' && syncActive() && !(typeof _syncOffline === 'function' && _syncOffline());
   if (online) { if (jm) busy('Checking with the cloud\u2026'); else showToast('Checking with the cloud\u2026'); }
   const first = (online && typeof syncPull === 'function') ? syncPull({ manual: false }).catch(() => false) : Promise.resolve(false);
-  return first.then(() => {
+  const check = () => {
+    if (!online || typeof syncVerifyJobs !== 'function') return true;
+    const safe = pick().clear.map(s => s.id);
+    if (!safe.length) return true;
+    return syncVerifyJobs(safe).then((m) => { verified = m; return true; }, () => false);
+  };
+  return first.then(check).then((ok) => {
     if (!here()) return;
     busy('');
+    if (!ok) { showToast('Couldn\u2019t check with the cloud \u2014 try again when the signal is better'); return; }
     const g = pick();
     if (!g.clear.length) {
       const one = g.kept.length === 1 ? g.kept[0] : null;

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V91)
+# PATGo — Code Map (V92)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -562,7 +562,8 @@ Actions reuse existing paths only: `photosRemoveQuiet(ids, true)`,
 `jobsRemoveAsk`, `savePhotoAge`). `jobMgrModel()`/`tidyModel()` are synchronous
 (render() calls them) over **sync.js** `syncJobsSafety`. EVERY removal goes
 through `jobsRemoveAsk`: sync first when online → `syncPruneFilter` (fresh) →
-confirm → `syncWhenIdle` → re-check → **session.js** `removeJobsFromPhone`.
+v92 `syncVerifyJobs` (real contents; online only; a failed read stops) →
+confirm → `syncWhenIdle` → re-check with the same map → **session.js** `removeJobsFromPhone`.
 Old photos → `photosRemoveQuiet`. Offer timer TIDY_OFFER_KEY (`tidyOfferDue`/
 `tidyOfferAnswered`). Markup `renderJobManager()`/`renderTidyBlock()` in
 **render-review.js**; banner `renderTidyBanner()` in **render-core.js**; Backup
@@ -686,7 +687,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~3760 ln) — cloud sync, PUSH AND PULL — v80–v91
+### sync.js (~3900 ln) — cloud sync, PUSH AND PULL — v80–v92
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session
@@ -833,9 +834,18 @@ after every run repaints `sessions`/`jobManager` when the safe set moved.
 `syncClearedLook` (names of SYNC_PRUNED jobs, `doc->>` only, writes nothing) and
 `syncBringBack` (reads the rows, adds like a pull-add, sets conf, `ph.need`,
 leaves the cleared list, **session.js** `unarchiveSessionStats`).
+⚠ v92: THE LIGHTER PULL. `sessions.fp` (server column + `sessions_fp_guard`
+trigger in **supabase/schema.sql**) = `syncHash(_syncCanonical(doc))`, sent by the
+push in the same row. `_syncPull` pages read `_SYNC_JOB_LIST_COLS` (no doc);
+`needsDoc` picks rows the fp can't settle, fetched by id (`_SYNC_JOB_DOC_COLS`)
+before the page is decided; a light row reaches `decide` with no doc — every
+doc-reading branch must be a needsDoc "yes" (the `!doc` guards). A blank fp =
+download (V91 phones). `_syncConfirmPushed` reads id+fp after the push → conf
+(4A). `syncVerifyJobs(ids)` reads real docs for **settings-actions.js**
+`jobsRemoveAsk`; `syncPruneFilter(targets, verified)` (3B). Records untouched.
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
-19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q, 27a–27m and 28a–28i,
-mutations M142–M295, M306–M325, M355–M395, M396–M418, M419–M434.
+19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q, 27a–27m, 28a–28i and
+29a–29f, mutations M142–M295, M306–M325, M355–M395, M396–M418, M419–M434, M436–M446.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This
@@ -995,5 +1005,7 @@ another file having parsed. Don't "DRY" this.
 - `supabase.umd.js` — vendored supabase-js (MIT). NEVER read or grep it (218 KB,
   one minified line — it floods context). Exclude it: `grep --exclude=supabase.umd.js`.
 - `supabase/schema.sql`, `supabase/isolation-test.sql` — server side (v79). Pasted
-  into the Supabase SQL editor by hand; not loaded by the app.
+  into the Supabase SQL editor by hand; not loaded by the app. `schema.sql` is the
+  whole server for a NEW project; `supabase/v92-fingerprint.sql` is the paste-once
+  change for an existing one (checks itself, F1–F3). Harness 29e reads both.
 - `manifest.webmanifest` — icons, name, display mode.

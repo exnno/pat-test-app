@@ -21,12 +21,21 @@ the app, so the confirm needs to be genuinely hard to hit by accident.
 V91 adds: TIDY_OFFER_KEY (the offer's timer) and PHOTO_AGE_KEY (a setting — the
 settings level decides); `conf`/`confV` live inside SYNC_STATE_KEY.
 
+### V92 residuals (known, accepted)
+- A row with a BLANK fingerprint at the cursor's boundary (the newest batch,
+  re-read every run by the V83.1 pager) is downloaded again each run until any
+  newer row is written. Only rows written by a V91 phone are blank; the first
+  V92 push moves the boundary past them. Before V92 every boundary row came down
+  every run.
+- 🛡 from the list trusts the fingerprint the writing phone sent (2A, 3B). The
+  contents are compared only at removal. A jsonb round trip that altered a doc
+  would show as safe until someone tried to remove it — then it stays.
+- Existing rows keep a blank fingerprint until they next change (no backfill);
+  blank only means "download it if it's read".
+- The removal check downloads each job being removed (3B) — a large tidy-up of
+  many jobs is one download of each, once.
+
 ### V91 residuals (known, accepted)
-- A job is safe one sync AFTER the one that sent it (the read-back). Right after
-  logging, the 🛡 waits for the next trigger (reopen, a save, the backstop).
-- The read-back is today's pull downloading each pushed job again — the waste
-  Stage 5's fingerprint column removes. When it lands, `st.conf` must be filled
-  from that column, or nothing is ever safe again.
 - No signal: removal trusts the last read-back (3A). A job deleted everywhere on
   another phone since then is removed here too — which is what that phone asked.
 - A job brought back whose instrument was deleted since prints the tester in

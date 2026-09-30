@@ -481,17 +481,55 @@ function syncSafetyText(r) {
 // go. Always fresh (every job hashed again): this is the check AT the moment of
 // clearing. `kept` carries each refused job's reason.
 // Signed out: unchanged pre-V80 behaviour, every target is clearable.
-function syncPruneFilter(targets) {
+//
+// V92 (3B): `verified` (from syncVerifyJobs) is what the cloud's REAL contents
+// hash to, per job. Given, a safe job may go only if that equals its fresh hash
+// — the fingerprint says the cloud has it; the contents prove it, at the one
+// moment data leaves the phone. Not given (no signal), the last read stands.
+function syncPruneFilter(targets, verified) {
   const list = Array.isArray(targets) ? targets : [];
   if (!syncActive()) return { clear: list.slice(), kept: [], active: false };
   const safety = syncJobsSafety(true);
   const clear = [], kept = [];
   for (const s of list) {
-    const r = (s && safety) ? safety.map.get(String(s.id)) : null;
+    let r = (s && safety) ? safety.map.get(String(s.id)) : null;
+    if (r && r.safe && verified instanceof Map && verified.get(String(s.id)) !== syncHash(_syncCanonical(s))) {
+      r = { safe: false, why: 'checking' };
+    }
     if (r && r.safe) clear.push(s);
     else kept.push({ s, why: r ? r.why : 'unsent', r });
   }
   return { clear, kept, active: true };
+}
+
+// V92 (3B). Read the real contents of these jobs from the cloud and hash them
+// — the check made before a job comes off the phone, now that the pull no
+// longer downloads what it sent. Memory only: nothing is written (a run may be
+// going). Resolves a Map id → hash (null: deleted, missing or unreadable), or
+// null with no signal / signed out. Rejects if the cloud can't be read.
+function syncVerifyJobs(ids) {
+  const want = Array.from(new Set((ids || []).map(String).filter(Boolean)));
+  if (!syncActive() || _syncOffline()) return Promise.resolve(null);
+  const uid = _syncCurrentUserId();
+  if (!uid) return Promise.resolve(null);
+  const out = new Map(want.map(id => [id, null]));
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  return cloudClient().then((c) => {
+    let chain = Promise.resolve();
+    for (let k = 0; k < want.length; k += batch) {
+      const chunk = want.slice(k, k + batch);
+      chain = chain.then(() => c.from('sessions').select('id,doc,deleted').eq('user_id', uid).in('id', chunk))
+        .then((r) => {
+          if (r && r.error) throw r.error;
+          for (const row of ((r && r.data) || [])) {
+            const id = String(row && row.id != null ? row.id : '');
+            if (!out.has(id) || row.deleted === true || !_syncValidDoc(row.doc, id)) continue;
+            out.set(id, syncHash(_syncCanonical(row.doc)));
+          }
+        });
+    }
+    return chain;
+  }).then(() => out);
 }
 
 // V91: a job turns safe on a run that changed nothing on screen — the read-back
@@ -768,6 +806,18 @@ function _syncValidDoc(doc, id) {
   return true;
 }
 
+// ---- the fingerprint column (V92, Stage 5 12A) ----------------------------------
+// sessions.fp = syncHash(_syncCanonical(doc)), sent by the phone in the same
+// write as the doc (2A). The database blanks it when a doc changes without one
+// (a V91 phone) — supabase/schema.sql sessions_fp_guard — so a blank means
+// "unknown: download it", which is exactly the pre-V92 behaviour. A stale hash
+// version (SYNC_HASH_V) simply never matches and falls back the same way.
+const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at';
+const _SYNC_JOB_DOC_COLS = 'id,doc,fp,deleted,updated_at';
+function _syncFp(row) {
+  return (row && typeof row.fp === 'string' && row.fp) ? row.fp : null;
+}
+
 // ---- triggers ------------------------------------------------------------------
 // Called from saveSessions() on the logging hot path: a status check and a
 // timer reset, nothing more. Rapid logging keeps pushing the timer back, so a
@@ -971,9 +1021,16 @@ function _syncPull(c, uid, st, out) {
       return;
     }
 
+    // V92 (Stage 5, 12A). A row the fingerprint settles arrives WITHOUT its doc
+    // (see needsDoc below): its `fp` stands in for the hash. Every branch below
+    // that reads the doc is one needsDoc sends for it; the `!doc` guards are the
+    // belt to that — a light row that got here by mistake waits, never guesses.
+    const light = (row.doc === undefined);
+    if (light && !_syncFp(row)) { blocked = true; return; }
+
     // Decision 8A: anything unreadable is held, not dropped. A dropped row is a
     // row the cursor moves past and nobody ever sees again.
-    if (!_syncValidDoc(row.doc, id)) {
+    if (!light && !_syncValidDoc(row.doc, id)) {
       delete st.conf[id];   // V91: an unreadable cloud copy vouches for nothing
       _syncHeldNote({ id, reason: 'unreadable', name,
         localItems: (local && Array.isArray(local.items)) ? local.items.length : null, cloudItems: null });
@@ -981,13 +1038,16 @@ function _syncPull(c, uid, st, out) {
       return;
     }
 
-    const doc = row.doc;
-    const hash = syncHash(_syncCanonical(doc));
+    const doc = light ? null : row.doc;
+    const hash = light ? _syncFp(row) : syncHash(_syncCanonical(doc));
     // V91 (Stage 4, 1A). What the cloud was SEEN to hold, whatever is decided
-    // below. This is the read-back that makes a job "safe in the cloud": after a
-    // push, the next pull reads the row again (the push never moves the cursor),
-    // and if it hashes the same as the phone's copy, the cloud provably has it.
+    // below. After a push, the next pull reads the row again (the push never
+    // moves the cursor), and if it matches the phone's copy the cloud has it.
     // Held rows record it too — the phone's copy then differs, so not safe.
+    // V92 (2A, 3B): a light row's `fp` was written by the phone that wrote the
+    // doc, in the same row write, and a doc changed without it is blanked by the
+    // database (sessions_fp_guard) — so reading it is reading what the cloud
+    // holds. Removal still checks the real contents (syncVerifyJobs).
     st.conf[id] = hash;
 
     if (!local) {
@@ -995,6 +1055,7 @@ function _syncPull(c, uid, st, out) {
         // Deleted here. If that delete has not reached the cloud yet, the push
         // half of this very run carries it — nothing to decide.
         if (!st.gone[id]) return;
+        if (!doc) { blocked = true; return; }   // V92: needsDoc sends for it
         // It HAS reached the cloud, and the row is live again: the other phone
         // has it back. Deleting someone's work twice over is not a default.
         _syncHeldNote({ id, reason: 'deleted-here', name,
@@ -1002,6 +1063,7 @@ function _syncPull(c, uid, st, out) {
         blocked = true; out.held++;
         return;
       }
+      if (!doc) { blocked = true; return; }   // V92: needsDoc sends for it
       // A job from the other phone. Newest-first, like createSession().
       state.sessions.unshift(doc);
       st.sent[id] = hash;
@@ -1025,6 +1087,8 @@ function _syncPull(c, uid, st, out) {
     // job was held for a question with only one side to it. The v83.1 pager
     // re-reads the boundary rows every run, which would make that routine.
     if (hash === st.sent[id]) { _syncHeldClear(id); return; }
+
+    if (!doc) { blocked = true; return; }   // V92: needsDoc sends for it
 
     // Decision 1A. The local copy no longer matches what was last sent, so this
     // phone has changes of its own. Both sides moved; neither wins by default.
@@ -1064,25 +1128,78 @@ function _syncPull(c, uid, st, out) {
   // guard below is now real: a full page all on one timestamp cannot move, so
   // the run stops and leaves the mark where it was. Needs more rows in one
   // transaction than SYNC_PULL_PAGE — impossible while batches are smaller.
+  //
+  // V92 (Stage 5, 12A — R17). Each page is a LIST: id, fingerprint, deleted,
+  // updated_at — about 100 bytes a job. Before V92 every page carried every
+  // doc, so each push came straight back down in full on the next pull (a
+  // 300-item job after every pause in logging). needsDoc() says which rows the
+  // fingerprint cannot settle; only those docs are fetched, by id, before the
+  // page is decided. The rows are decided in list order either way.
+  function needsDoc(row) {
+    const id = String(row && row.id != null ? row.id : '');
+    if (!id || pruned.has(id) || st.resend[id] || row.deleted === true) return false;
+    const fp = _syncFp(row);
+    if (!fp) return true;                      // written by an older phone, or blanked
+    const local = (state.sessions || []).find(s => s && String(s.id) === id);
+    if (!local) {
+      const tomb = (state.tombstones || []).some(t => t && t.kind === 'session' && String(t.id) === id);
+      return !(tomb && !st.gone[id]);          // only "our delete is on its way" needs nothing
+    }
+    if (fp === st.sent[id]) return false;      // only this phone moved (v83.1)
+    return fp !== syncHash(_syncCanonical(local));   // identical needs nothing
+  }
+  function docsFor(rows) {
+    const want = [];
+    for (const row of rows) {
+      const id = String(row && row.id != null ? row.id : '');
+      if (needsDoc(row) && want.indexOf(id) === -1) want.push(id);
+    }
+    const got = new Map();
+    const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+    let chain = Promise.resolve();
+    for (let k = 0; k < want.length; k += batch) {
+      const chunk = want.slice(k, k + batch);
+      chain = chain.then(() => c.from('sessions').select(_SYNC_JOB_DOC_COLS).eq('user_id', uid).in('id', chunk))
+        .then((r) => {
+          if (r && r.error) throw r.error;
+          for (const d of ((r && r.data) || [])) {
+            const id = String(d && d.id != null ? d.id : '');
+            if (id && chunk.indexOf(id) !== -1) got.set(id, d);
+          }
+        });
+    }
+    return chain.then(() => ({ want: new Set(want), got }));
+  }
   const seen = new Set();
   function page(from) {
     return c.from('sessions')
-      .select('id,doc,deleted,last_modified,updated_at')
+      .select(_SYNC_JOB_LIST_COLS)
       .gte('updated_at', from)
       .order('updated_at', { ascending: true })
       .limit(SYNC_PULL_PAGE)
       .then((r) => {
         if (r && r.error) throw r.error;
         const rows = (r && r.data) || [];
-        for (const row of rows) {
-          const u = row && row.updated_at;
-          const key = String(row && row.id) + '|' + String(u);
-          if (!seen.has(key)) { seen.add(key); decide(row); }
-          if (typeof u === 'string' && u > high) high = u;
-        }
-        if (rows.length < SYNC_PULL_PAGE) return;
-        if (high === from) { blocked = true; return; }
-        return page(high);
+        const fresh = rows.filter((row) => !seen.has(String(row && row.id) + '|' + String(row && row.updated_at)));
+        return docsFor(fresh).then((d) => {
+          for (const row of rows) {
+            const u = row && row.updated_at;
+            const key = String(row && row.id) + '|' + String(u);
+            if (!seen.has(key)) {
+              seen.add(key);
+              const id = String(row && row.id != null ? row.id : '');
+              // The row as fetched may be NEWER than the listed one (or deleted
+              // since): it is what the cloud holds now, so it is what is decided.
+              // A doc asked for and not returned waits (blocked) for next time.
+              if (d.want.has(id)) { if (d.got.has(id)) decide(d.got.get(id)); else blocked = true; }
+              else decide({ id: row.id, fp: row.fp, deleted: row.deleted, updated_at: row.updated_at });
+            }
+            if (typeof u === 'string' && u > high) high = u;
+          }
+          if (rows.length < SYNC_PULL_PAGE) return;
+          if (high === from) { blocked = true; return; }
+          return page(high);
+        });
       });
   }
 
@@ -1341,7 +1458,7 @@ function _syncPushHalf(c, uid, st, force) {
       // changed since the last push.
       if (!force && !st.resend[id] && st.sent[id] === hash) continue;
       work.push({ id, hash, gone: false, bytes: json.length,
-        row: { id, user_id: uid, doc: JSON.parse(json), deleted: false, last_modified: now } });
+        row: { id, user_id: uid, doc: JSON.parse(json), fp: hash, deleted: false, last_modified: now } });
     }
 
     // Deletions (decision 4A): the cloud copy is emptied, and the row kept as a
@@ -1356,7 +1473,7 @@ function _syncPushHalf(c, uid, st, force) {
       if (st.gone[id] && !force && !st.resend[id]) continue;          // already sent
       const at = (typeof t.at === 'string' && !isNaN(Date.parse(t.at))) ? t.at : now;
       work.push({ id, hash: null, gone: true, bytes: 64,
-        row: { id, user_id: uid, doc: {}, deleted: true, last_modified: at } });
+        row: { id, user_id: uid, doc: {}, fp: null, deleted: true, last_modified: at } });
     }
 
     // Batches by size as well as count: one long job can be hundreds of KB.
@@ -1390,9 +1507,37 @@ function _syncPushHalf(c, uid, st, force) {
     return chain.then(() => {
       st.lastPushAt = now;
       _syncSave(st);
-      return { sent, deleted };
-    });
+      return _syncConfirmPushed(c, uid, st, work.filter(w => !w.gone).map(w => w.id));
+    }).then(() => ({ sent, deleted }));
   });
+}
+
+// V92 (4A). Straight after a push, read back the fingerprint of just the jobs
+// sent (id + fp, a few bytes each) so 🛡 comes in the same sync, not the next
+// one. Rule 26 holds: `conf` is set only from what was READ, and only where the
+// cloud row still carries exactly what this phone sent — another phone's write
+// in between, or a write that never landed, leaves the job "checking" for the
+// next pull to settle. Fail-soft: a failed read costs nothing but the wait.
+function _syncConfirmPushed(c, uid, st, ids) {
+  if (!ids.length) return Promise.resolve();
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  let n = 0;
+  let chain = Promise.resolve();
+  for (let k = 0; k < ids.length; k += batch) {
+    const chunk = ids.slice(k, k + batch);
+    chain = chain.then(() => c.from('sessions').select('id,fp,deleted').eq('user_id', uid).in('id', chunk))
+      .then((r) => {
+        if (r && r.error) throw r.error;
+        for (const row of ((r && r.data) || [])) {
+          const id = String(row && row.id != null ? row.id : '');
+          const fp = _syncFp(row);
+          if (!id || chunk.indexOf(id) === -1 || row.deleted === true || !fp) continue;
+          if (fp === st.sent[id]) { st.conf[id] = fp; n++; }
+        }
+      });
+  }
+  return chain.then(() => { if (n) _syncSave(st); },
+    (e) => { console.error('Sync: sent, confirmed on the next sync (non-fatal).', e); });
 }
 
 // ---- records: clients and sites (V82) ------------------------------------------------
