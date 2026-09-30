@@ -344,7 +344,8 @@ module.exports = async function () {
     tap(app, 'pm-open'); await tick(30);
     t.eq(app.srv.browseGets().length, 0, 'opening the manager reads nothing from the cloud');
     t.eq(app.srv.jobGets().length, 0, '…and no job names');
-    t.includes(app.html(), 'Look in the cloud', 'the Look in the cloud button');
+    t.includes(app.html(), 'class="pm-look-link" data-action="pm-look">Look in the cloud', 'Look in the cloud is a small link (V90.1)');
+    t.excludes(app.html(), 'Nothing extra', 'no result line before a look');
     const knownBefore = JSON.stringify(known(app));
     tap(app, 'pm-look'); await until(looked(app)); await tick(40);
     t.ok(app.srv.browseGets().length >= 1, 'the look read the photos table');
@@ -373,6 +374,8 @@ module.exports = async function () {
     t.ok(app.srv.downloads().some(c => c.url.includes('ZZAWAY1_t.jpg')), 'a found photo\u2019s preview comes down for its tile');
     t.notOk(app.srv.downloads().some(c => c.url.includes('ZZAWAY2')), 'none requested where there is no preview');
     t.includes(app.html(), 'Photos with no job', 'the orphan group is named');
+    t.includes(app.html(), 'Found 2 photos from 1 job not on this phone \u00b7 2 photos with no job', 'the result line says what the look found (V90.1)');
+    t.includes(app.html(), 'data-action="pm-look">Look again', '…with a Look again link');
     // Leaving drops the look; coming back reads nothing until asked.
     tap(app, 'pm-back'); await tick(5);
     t.eq(pm(app).cloud, null, 'leaving the screen drops what the look read');
@@ -620,6 +623,7 @@ module.exports = async function () {
     t.notOk(known(app).ZZHERE2, '(not known yet: no run has read it)');
     t.ok(pm(app).cloud.rows.some(r => r.id === 'ZZHERE2'), '(the look did read the row)');
     t.notOk(model(app).byId.has('ZZHERE2'), 'not shown as a found photo: the pull brings it, with a Download that works');
+    t.includes(app.html(), 'Nothing extra', 'a look that finds nothing beyond this phone says so (V90.1)');
     await run(app);
     const e = model(app).byId.get('ZZHERE2');
     t.ok(e && e.src === 'known' && e.onPhone, 'after the next run it is there, known, on its job');
