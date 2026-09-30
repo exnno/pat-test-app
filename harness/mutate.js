@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V90';",
-    to:   "const APP_VERSION = 'V90';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V91';",
+    to:   "const APP_VERSION = 'V91';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -637,8 +637,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V88</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V88</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V87</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V89</strong> &middot; September 2026</p>',
+    to:   '        <p><strong>V89</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V88</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1134,15 +1134,19 @@ const MUTATIONS = [
     name: 'M151 (V80) clearing ignores whether the cloud has the latest version',
     file: 'sync.js',
     // V88: re-anchored — the check now also asks about the job's photos (6A).
-    from: "    const ok = mine && !!pending && s && st.sent[String(s.id)] === syncHash(_syncCanonical(s))\n      && !pending.has(String(s.id));",
-    to:   '    const ok = true;',
+    // V91: re-anchored — the check is syncJobsSafety's "unsent" step.
+    from: "    else if (st.sent[id] !== h) r = { safe: false, why: 'unsent' };\n",
+    to:   '',
     why:  'decision 5A: clearing an unsent edit while signed in destroys the only copy of it',
   },
   {
     name: 'M152 (V80) cleared jobs are not remembered',
     file: 'session.js',
-    from: "        try { syncNotePruned(Array.from(ids)); } catch (e) { console.error('Cleared-jobs note failed (non-fatal).', e); }\n",
-    to:   '',
+    // V91: re-anchored. Signed in, clearing now goes through removeJobsFromPhone
+    // (pruneOldSessions opens Jobs on this phone); the V80 line it pointed at is
+    // only reached signed out, where nothing is ever recorded.
+    from: "    try { syncNotePruned(Array.from(gone)); }",
+    to:   "    try { syncNotePruned([]); }",
     why:  'the V81 pull would download every cleared job straight back onto the phone',
   },
   {
@@ -2674,15 +2678,15 @@ const MUTATIONS = [
   {
     name: "M366 (V88) clearing old jobs ignores their photos",
     file: "sync.js",
-    from: "      && !pending.has(String(s.id));",
-    to:   "      ;",
+    from: "    else if (pending.get(id)) r = { safe: false, why: 'photos', n: pending.get(id) };\n",   // V91 re-anchored
+    to:   "",
     why:  "6A: clearing would take the only copy of a photo with it",
   },
   {
     name: "M367 (V88) clearing proceeds before the photo mirror is loaded",
     file: "sync.js",
-    from: "    const ok = mine && !!pending && s &&",
-    to:   "    const ok = mine && s &&",
+    from: "    else if (!pending) r = { safe: false, why: 'photos-unknown' };\n    else if (pending.get(id))",   // V91 re-anchored
+    to:   "    else if (pending && pending.get(id))",
     why:  "an unread store looks like no photos at all",
   },
   {
@@ -3040,6 +3044,118 @@ const MUTATIONS = [
     from: "  for (const e of all) {\n    if (e.onPhone) continue;\n    if (e.orphan)",
     to:   "  for (const e of all) {\n    if (e.orphan)",
     why:  "a look that finds nothing new says Nothing extra (27m)",
+  },
+  {
+    name: "M419 (V91) the pull never records what it read",
+    file: "sync.js",
+    from: "    st.conf[id] = hash;\n\n    if (!local) {",
+    to:   "\n    if (!local) {",
+    why:  "1A: safe means READ BACK \u2014 without the record no job is ever safe (28a)",
+  },
+  {
+    name: "M420 (V91) a push alone counts as safe",
+    file: "sync.js",
+    from: "    else if (st.conf[id] !== h) r = { safe: false, why: 'checking' };\n",
+    to:   "",
+    why:  "a successful push is not proof the cloud holds it (28a, 16i)",
+  },
+  {
+    name: "M421 (V91) no one-off re-read on upgrade",
+    file: "sync.js",
+    from: "  if (raw.confV !== SYNC_CONF_V) { out.pulledAt = null; out.conf = {}; }\n",
+    to:   "",
+    why:  "2A: a V90 phone's cursor is past its rows; without the re-read nothing is ever safe (28c)",
+  },
+  {
+    name: "M422 (V91) no re-check at the moment of removing",
+    file: "settings-actions.js",
+    from: "const n = removeJobsFromPhone(g2.clear.map(s => s.id));",
+    to:   "const n = removeJobsFromPhone(g.clear.map(s => s.id));",
+    why:  "3A: a job that changed while the sheet was open must stay (28e)",
+  },
+  {
+    name: "M423 (V91) delete everywhere in one step",
+    file: "session.js",
+    from: "onPick: () => deleteEverywhereAsk(id) });",
+    to:   "onPick: () => deleteSession(id) });",
+    why:  "6A: Peter asked for two steps (28f)",
+  },
+  {
+    name: "M424 (V91) a job brought back stays on the cleared list",
+    file: "sync.js",
+    from: "    if (back.size) _syncPrunedSave(_syncPrunedLoad().filter(e => !back.has(e.id)));\n",
+    to:   "",
+    why:  "10A: the pull would skip it for ever (28g)",
+  },
+  {
+    name: "M425 (V91) bringing back doubles the lifetime count",
+    file: "sync.js",
+    from: "      if (typeof unarchiveSessionStats === 'function') {",
+    to:   "      if (false) {",
+    why:  "10A: the job's tallies were archived when it left (28g)",
+  },
+  {
+    name: "M426 (V91) the offer ignores its monthly timer",
+    file: "settings-actions.js",
+    from: "    if (todayISO() < next.toISOString().slice(0, 10)) return null;\n",
+    to:   "",
+    why:  "8A: at most once a month (28h)",
+  },
+  {
+    name: "M427 (V91) photos not in the cloud are offered",
+    file: "settings-actions.js",
+    from: "      if (!known[id] || !jobDate.has(job)",
+    to:   "      if (!jobDate.has(job)",
+    why:  "9A: only photos known in the cloud may come off (28h)",
+  },
+  {
+    name: "M428 (V91) the display memo ignores in-place changes",
+    file: "sync.js",
+    from: "    if (enc && m && m.enc === enc && enc.itemsRef === s.items && enc.sig === _sessionSig(s)) return m.hash;",
+    to:   "    if (enc && m && m.enc === enc && enc.itemsRef === s.items) return m.hash;",
+    why:  "4A: a stale \ud83d\udee1 on a changed job (28b)",
+  },
+  {
+    name: "M429 (V91) no repaint when a job turns safe",
+    file: "sync.js",
+    from: "      _syncRepaint();\n      _syncSafetyRepaint();",
+    to:   "      _syncRepaint();",
+    why:  "4A: the \ud83d\udee1 would wait for some unrelated repaint (28b)",
+  },
+  {
+    name: "M430 (V91) signed-in Review & clear keeps the V80 flow",
+    file: "session.js",
+    from: "  if (typeof syncActive === 'function' && syncActive() && typeof jobMgrOpen === 'function') {\n    jobMgrOpen({ tidy: true });",
+    to:   "  if (false) {\n    jobMgrOpen({ tidy: true });",
+    why:  "7A: signed in, clearing is safe-in-the-cloud from Jobs on this phone (16i)",
+  },
+  {
+    name: "M431 (V91) Remove from this phone offered for a job not safe",
+    file: "session.js",
+    from: "  const canRemove = !!(r && r.safe);",
+    to:   "  const canRemove = !!r;",
+    why:  "6A/11: only safe jobs come off (28f)",
+  },
+  {
+    name: "M432 (V91) removal not recorded as cleared",
+    file: "session.js",
+    from: "    try { syncNotePruned(Array.from(gone)); } catch (e) { console.error('Cleared-jobs note failed (non-fatal).', e); }\n  }\n  state.sessions = state.sessions.filter(s => !gone.has(s.id));\n  if (gone.has(state.activeId))",
+    to:   "    try { } catch (e) { }\n  }\n  state.sessions = state.sessions.filter(s => !gone.has(s.id));\n  if (gone.has(state.activeId))",
+    why:  "the pull would bring it straight back (28d)",
+  },
+  {
+    name: "M433 (V91) removal does not sync first",
+    file: "settings-actions.js",
+    from: "const first = (online && typeof syncPull === 'function')",
+    to:   "const first = (false && typeof syncPull === 'function')",
+    why:  "3A: check against the freshest cloud the phone can see (28d)",
+  },
+  {
+    name: "M434 (V91) the cleared look downloads the jobs",
+    file: "sync.js",
+    from: "select(_SYNC_BROWSE_JOB_COLS).eq('user_id', uid).in('id', chunk))\n        .then",
+    to:   "select('id,doc,' + _SYNC_BROWSE_JOB_COLS).eq('user_id', uid).in('id', chunk))\n        .then",
+    why:  "R17: names only until Bring back (28g)",
   },
 ];
 
