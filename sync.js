@@ -599,7 +599,11 @@ function syncNotePruned(ids) {
   for (const raw of (ids || [])) {
     const id = String(raw);
     if (!st.sent[id]) continue;                       // never sent: nothing to remember
-    if (list.some(e => e.id === id)) continue;
+    // V92.1: cleared again → the date moves on. The push weighs a tombstone
+    // against it (a delete older than the clearing is stale), so an old date
+    // left by a restore must not make an older delete look newer.
+    const had = list.find(e => e.id === id);
+    if (had) { if (had.at !== now) { had.at = now; changed = true; } continue; }
     list.push({ id, at: now });
     changed = true;
   }
@@ -1464,16 +1468,35 @@ function _syncPushHalf(c, uid, st, force) {
     // Deletions (decision 4A): the cloud copy is emptied, and the row kept as a
     // marker so other devices learn of the delete. Only for jobs this phone has
     // sent — a delete of something the server never had is not sent at all.
+    //
+    // ⚠ V92.1. A job that came BACK after being deleted here (the Sync page's
+    // "deleted here, live again" → use the cloud's copy; a restore) kept its
+    // tombstone, and "live" was the only thing stopping it. Since V91, Remove
+    // from phone takes a job off without a delete — the stale tombstone then
+    // fired and emptied a job shown 🛡 (found by Peter on real phones). A
+    // tombstone is a delete only while it is the NEWEST thing that happened to
+    // the job, so two rules, both forgetting the stale entry for good:
+    //   • the job is live on this phone → the delete was undone;
+    //   • the job was cleared from this phone AFTER the delete (its cleared-list
+    //     entry is newer) → it came back and left again, kept in the cloud.
+    const clearedAt = new Map(_syncPrunedLoad().map(e => [e.id, e.at]));
+    const stale = new Set();
     for (const t of (state.tombstones || [])) {
       if (!t || t.kind !== 'session') continue;
       const id = String(t.id);
+      if (live.has(id)) { stale.add(t); continue; }   // restored since: it's live
+      const cAt = clearedAt.get(id);
+      if (typeof cAt === 'string' && (typeof t.at !== 'string' || cAt >= t.at)) { stale.add(t); continue; }
       if (heldIds.has(id)) continue;                 // awaiting a decision
-      if (live.has(id)) continue;                    // restored since: it's live
       if (!st.sent[id] && !st.gone[id] && !st.resend[id]) continue;  // server never had it
       if (st.gone[id] && !force && !st.resend[id]) continue;          // already sent
       const at = (typeof t.at === 'string' && !isNaN(Date.parse(t.at))) ? t.at : now;
       work.push({ id, hash: null, gone: true, bytes: 64,
         row: { id, user_id: uid, doc: {}, fp: null, deleted: true, last_modified: at } });
+    }
+    if (stale.size) {
+      state.tombstones = state.tombstones.filter(t => !stale.has(t));
+      if (typeof saveTombstones === 'function') saveTombstones();
     }
 
     // Batches by size as well as count: one long job can be hundreds of KB.

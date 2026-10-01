@@ -21,6 +21,14 @@ the app, so the confirm needs to be genuinely hard to hit by accident.
 V91 adds: TIDY_OFFER_KEY (the offer's timer) and PHOTO_AGE_KEY (a setting — the
 settings level decides); `conf`/`confV` live inside SYNC_STATE_KEY.
 
+### V92.1 (fixed — data loss)
+- A job shown 🛡, removed from the phone, was emptied in the cloud by a stale
+  session tombstone (job once deleted here, then brought back). Fixed in the
+  push. Cloud copies emptied before V92.1 are not recoverable (Free tier, no
+  backups) unless a phone or a JSON backup still holds them.
+- Watch in V93: the archive and the fresh-phone rule make "not on this phone"
+  normal — check every path that reads absence as meaning something.
+
 ### V92 residuals (known, accepted)
 - A row with a BLANK fingerprint at the cursor's boundary (the newest batch,
   re-read every run by the V83.1 pager) is downloaded again each run until any

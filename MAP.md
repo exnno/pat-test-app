@@ -843,6 +843,10 @@ doc-reading branch must be a needsDoc "yes" (the `!doc` guards). A blank fp =
 download (V91 phones). `_syncConfirmPushed` reads id+fp after the push → conf
 (4A). `syncVerifyJobs(ids)` reads real docs for **settings-actions.js**
 `jobsRemoveAsk`; `syncPruneFilter(targets, verified)` (3B). Records untouched.
+⚠ v92.1: `_syncPushHalf` FORGETS a session tombstone (ledger + saveTombstones)
+when the job is live, or its SYNC_PRUNED entry is newer — a stale tombstone
+fired on Remove from phone and emptied the cloud copy. `syncNotePruned` moves
+an existing entry's date on. Harness 29g–29i, M447–M451.
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
 19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q, 27a–27m, 28a–28i and
 29a–29f, mutations M142–M295, M306–M325, M355–M395, M396–M418, M419–M434, M436–M446.
