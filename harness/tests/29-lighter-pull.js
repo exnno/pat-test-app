@@ -17,7 +17,11 @@
 
    ⚠ WHAT THIS FILE CANNOT PROVE. The trigger itself — supabase/v92-fingerprint.sql
    checks that in Postgres (F1–F3). That a real jsonb round trip hashes the same
-   (the two-phone test: a job must show 🛡 after ONE sync). */
+   (the two-phone test: a job must show 🛡 after ONE sync).
+
+   V92.1 (29g–29i): a tombstone is a delete only while it is the newest thing
+   that happened to the job — found by Peter: a job shown 🛡, removed from the
+   phone, was emptied in the cloud by its old tombstone. */
 
 'use strict';
 
@@ -414,6 +418,93 @@ module.exports = async function () {
     app.srv.hideDocs.clear();
     await run(app);
     t.ok(onPhone(app, 'ZZHIDE'), 'the next sync brings it');
+  });
+
+  /* ------------------------------------------------------------------ 29g */
+  await t.group('29g — V92.1: a job deleted here and brought back loses its old tombstone, so removing it later deletes nothing', async () => {
+    const app = await signedIn();
+    const id = plainJob(app, 'ZZBACK1', '2020-01-01');
+    away(app);
+    await run(app);
+    app.fn('deleteSession')(id);
+    await run(app);
+    t.eq(cloudRow(app, id).deleted, true, 'deleted here: the delete reached the cloud');
+    v92Write(app, id, { site: 'ZZBACK', date: '2020-01-01', items: [item('ZZB1')] });
+    await run(app);
+    const h = app.fn('_syncHeldLoad')().find(e => e.id === id);
+    t.eq(h && h.reason, 'deleted-here', 'another phone has it live again: asked');
+    await app.fn('syncHeldResolve')(id, 'cloud');
+    await tick(50); app.stopTimer();
+    t.ok(onPhone(app, id), 'use the cloud\u2019s copy: back on the phone');
+    t.eq(app.state().tombstones.filter(x => x.kind === 'session' && x.id === id).length, 0,
+      'the sync that followed forgot the old tombstone (the delete was undone)');
+    t.eq(app.storage.getItem('pat:tombstones') && JSON.parse(app.storage.getItem('pat:tombstones')).filter(x => x.id === id).length, 0,
+      '…and saved that, so a reopen doesn\u2019t bring it back');
+    edit(app, id);
+    await run(app);
+    t.eq(why(app, id), 'safe', 'logged on and synced: 🛡');
+    await app.fn('jobsRemoveAsk')([id]);
+    await until(() => app.asked.some(x => x.startsWith('Remove 1 job')));
+    confirmSheet(app);
+    await until(() => !onPhone(app, id));
+    await run(app); await run(app);
+    t.eq(cloudRow(app, id).deleted, false, 'removed from the phone: the cloud copy is still live (Peter\u2019s bug: it was emptied)');
+    t.ok(cloudRow(app, id).doc && cloudRow(app, id).doc.items.length >= 1, '…with its contents');
+  });
+
+  /* ------------------------------------------------------------------ 29h */
+  await t.group('29h — V92.1: a stale tombstone older than the job\u2019s clearing never fires, even if it outlived the job being live', async () => {
+    const app = await signedIn();
+    const id = plainJob(app, 'ZZSTALE1', '2020-01-01');
+    away(app);
+    await run(app);
+    t.eq(why(app, id), 'safe', 'safe');
+    // A tombstone from long before, still in the ledger (a phone upgraded from
+    // V92 with one already there), and no sync between its return and its removal.
+    app.run(`state.tombstones.push({ kind: 'session', id: ${J(id)}, at: '2020-01-02T00:00:00.000Z' }); saveTombstones();`);
+    app.run('navigator.onLine = false');
+    await app.fn('jobsRemoveAsk')([id]);
+    confirmSheet(app);
+    await until(() => !onPhone(app, id));
+    app.run('navigator.onLine = true');
+    t.notOk(onPhone(app, id), 'removed from the phone (no signal: nothing ran in between)');
+    await run(app); await run(app);
+    t.eq(cloudRow(app, id).deleted, false, 'the old tombstone is older than the clearing: no delete is sent');
+    t.eq(app.state().tombstones.filter(x => x.kind === 'session' && x.id === id).length, 0, '…and it is forgotten');
+
+    // The same, with an even older entry already on the cleared list (a restore
+    // merges the list): removing the job again must move its date on.
+    const b = plainJob(app, 'ZZSTALE2', '2020-01-01');
+    away(app);
+    await run(app);
+    app.run(`_syncPrunedSave(_syncPrunedLoad().concat([{ id: ${J(b)}, at: '2020-01-01T00:00:00.000Z' }]));
+      state.tombstones.push({ kind: 'session', id: ${J(b)}, at: '2020-01-02T00:00:00.000Z' }); saveTombstones();`);
+    app.run('navigator.onLine = false');
+    await app.fn('jobsRemoveAsk')([b]);
+    confirmSheet(app);
+    await until(() => !onPhone(app, b));
+    app.run('navigator.onLine = true');
+    await run(app);
+    t.eq(cloudRow(app, b).deleted, false, 'an old cleared date is moved on by the removal: still no delete');
+  });
+
+  /* ------------------------------------------------------------------ 29i */
+  await t.group('29i — V92.1: a real delete still goes, even for a job once on the cleared list', async () => {
+    const app = await signedIn();
+    const id = plainJob(app, 'ZZREALDEL', '2020-01-01');
+    away(app);
+    await run(app);
+    // On the cleared list from long ago (a restore merges the list) yet live here.
+    app.run(`_syncPrunedSave(_syncPrunedLoad().concat([{ id: ${J(id)}, at: '2020-01-01T00:00:00.000Z' }]))`);
+    app.fn('deleteSession')(id);
+    await run(app);
+    t.eq(cloudRow(app, id).deleted, true, 'deleted after it was cleared: the delete is sent');
+    const plain = plainJob(app, 'ZZREALDEL2', '2020-01-01');
+    away(app);
+    await run(app);
+    app.fn('deleteSession')(plain);
+    await run(app);
+    t.eq(cloudRow(app, plain).deleted, true, 'an ordinary delete everywhere still reaches the cloud');
   });
 
   /* ------------------------------------------------------------------ 29e */
