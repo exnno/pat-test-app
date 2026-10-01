@@ -92,6 +92,25 @@ drop trigger if exists sessions_fp_guard on public.sessions;
 create trigger sessions_fp_guard before update on public.sessions
   for each row execute function public.sessions_fp_guard();
 
+-- V93: item and fail counts for the cloud job cards, worked out BY THE
+-- DATABASE from doc (no phone writes them; any version keeps working).
+-- Existing projects: supabase/v93-archive.sql (the same, plus self-checks).
+create or replace function public.job_item_count(d jsonb)
+returns integer language sql immutable set search_path = '' as $$
+  select case when jsonb_typeof(d->'items') = 'array' then jsonb_array_length(d->'items') else 0 end
+$$;
+create or replace function public.job_fail_count(d jsonb)
+returns integer language sql immutable set search_path = '' as $$
+  select case when jsonb_typeof(d->'items') = 'array'
+              then (select count(*)::integer from jsonb_array_elements(d->'items') e
+                    where e->>'result' = 'fail')
+              else 0 end
+$$;
+alter table public.sessions add column if not exists n_items integer
+  generated always as (public.job_item_count(doc)) stored;
+alter table public.sessions add column if not exists n_fails integer
+  generated always as (public.job_fail_count(doc)) stored;
+
 -- [v1.2] updated_at must move on EVERY update, not just insert. The sync pull
 -- asks for "rows changed since X" by updated_at; a default alone only stamps
 -- the first write, so later edits would never be pulled by another device.
@@ -175,6 +194,19 @@ revoke all on public.profiles, public.sessions, public.records, public.photos fr
 revoke all on public.profiles from authenticated;
 grant  select on public.profiles to authenticated;
 grant  select, insert, update, delete on public.sessions, public.records, public.photos to authenticated;
+
+-- V93: photos per job for the cloud job cards. security_invoker: it reads the
+-- photos table with the READER's rights, so "own photos" decides what it can
+-- count. Isolation checks 8a–8c.
+create or replace view public.session_photo_counts
+  with (security_invoker = true) as
+  select user_id, session_id, count(*)::integer as n
+  from public.photos
+  where deleted = false
+  group by user_id, session_id;
+revoke all on public.session_photo_counts from anon;
+revoke all on public.session_photo_counts from authenticated;
+grant select on public.session_photo_counts to authenticated;
 
 -- --------------------------------------------------------------- storage
 insert into storage.buckets (id, name, public)

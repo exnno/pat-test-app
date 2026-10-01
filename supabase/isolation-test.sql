@@ -9,6 +9,7 @@
 -- email addresses on the next two lines → Run. Every row of the result must
 -- say PASS. Any FAIL: do not promote, and bring the output to the next chat.
 --
+-- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V89: CHECKS 4e/4f NEED ONE PREVIEW FROM ACCOUNT A — any photo uploaded by a
 -- V89 phone has one (or wait for a V89 phone holding older photos to add them).
 -- V88: CHECK 4c NEEDS ONE REAL PHOTO FROM ACCOUNT A. Before running, sign in
@@ -48,6 +49,16 @@ begin
     and not c.relrowsecurity;
   res := res || array['0|row-level security is on for all four tables|'
                 || case when rls_off is null then 'PASS|' else 'FAIL|off on: ' || rls_off end];
+
+  -- V93: the photo-count view must read with the READER's rights. A view
+  -- normally runs as its owner, who is not bound by "own photos".
+  select case when 'security_invoker=true' = any(coalesce(c.reloptions, '{}')) then 'yes' else 'no' end
+    into msg from pg_class c join pg_namespace s on s.oid = c.relnamespace
+  where s.nspname = 'public' and c.relname = 'session_photo_counts';
+  res := res || array['8c|the photo-count view runs with the reader''s rights|'
+                || case when msg = 'yes' then 'PASS|'
+                        when msg is null then 'FAIL|view missing — run supabase/v93-archive.sql'
+                        else 'FAIL|it runs as its owner and can count anyone''s photos' end];
 
   -- Seed one row belonging to A (as the admin role, which bypasses RLS).
   delete from public.sessions where id like 'iso-test-%';
@@ -226,6 +237,26 @@ begin
                   || case when n = 0 then 'PASS|0 rows affected' else 'FAIL|' || n || ' row(s) changed' end];
   exception when others then
     res := res || array['7c|B cannot change A''s photo rows|PASS|rejected: ' || sqlerrm];
+  end;
+
+  -- 8. (V93) The photo-count view. B sees no count for A's job (A's photo row
+  -- above belongs to job iso-test-A), and — the control — B's own photo IS
+  -- counted, so a view that counts nothing at all can't pass.
+  begin
+    select count(*) into n from public.session_photo_counts v where v.session_id = 'iso-test-A';
+    res := res || array['8a|B cannot count A''s photos|'
+                  || case when n = 0 then 'PASS|' else 'FAIL|B saw a count for A''s job' end];
+  exception when others then
+    res := res || array['8a|B cannot count A''s photos|FAIL|' || sqlerrm];
+  end;
+  begin
+    insert into public.photos (id, user_id, session_id, item_id, storage_path, last_modified)
+    values ('iso-test-B', b, 'iso-test-B', 'x', b::text || '/iso-test-B.jpg', now());
+    select coalesce(sum(v.n), 0) into n from public.session_photo_counts v where v.session_id = 'iso-test-B';
+    res := res || array['8b|control: B''s own photo is counted|'
+                  || case when n = 1 then 'PASS|' else 'FAIL|counted ' || n end];
+  exception when others then
+    res := res || array['8b|control: B''s own photo is counted|FAIL|' || sqlerrm];
   end;
 
   -- 5. B cannot change B's own plan (no update route on profiles at all).
