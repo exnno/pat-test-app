@@ -1,4 +1,4 @@
-# PATGo — Code Map (V92)
+# PATGo — Code Map (V93)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -534,7 +534,7 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
 (scroll reset) live in `render()` via `_lastRenderedView`, not in `setView`.
 
-### settings-actions.js (~1465 ln) — the write half of the Settings screens + the photo manager (v90) + jobs on this phone (v91) — NEW v70
+### settings-actions.js (~1620 ln) — the write half of the Settings screens + the photo manager (v90) + jobs on this phone (v91) + the Jobs screen's cloud tab (v93) — NEW v70
 Per-page saves, Report Settings (text, logo, filename tokens), signature capture
 (draw and upload), CSV column ordering, Export/Import Setup UI handlers, the
 editable list settings (item types, fail reasons, descriptions) and the
@@ -569,6 +569,18 @@ Old photos → `photosRemoveQuiet`. Offer timer TIDY_OFFER_KEY (`tidyOfferDue`/
 **render-review.js**; banner `renderTidyBanner()` in **render-core.js**; Backup
 page block in **render-settings.js**; actions `jm-*`, `tidy-*`,
 `photo-age-save` in **dispatch.js**; `setView()` calls `jobMgrLeave()`.
+v93: the Cleared section is a link (`jobMgrCloudLink`, `jm-cloud-link`) to the cloud tab.
+⚠ v93: THE "IN THE CLOUD" TAB (`cloudJobs*`, `_cloud*`, `jobsTabSet`,
+`cloudTabActive`). `state.jobsTab` / `state.cloudJobs` (state.js, transient).
+`cloudJobsLoad` → **sync.js** `syncCloudList` (memory only; kept for the session,
+re-read on ⟳, a different account, or `stale` — set by **session.js**
+`removeJobsFromPhone`). `cloudJobsModel()` is synchronous (render calls it):
+hides jobs on the phone, search, month groups. Tap → `_cloudBring` →
+`syncBringBack` → `requestOpenSession` (one job) or stays (several). The search
+box is an input: `cloudJobsSearch` → `refreshCloudListAreaOnly` (render-review.js),
+never render(). Markup `renderCloudJobsHTML`/`renderCloudListAreaHTML` in
+**render-review.js**, drawn by **render-core.js** `renderSessions`; actions
+`jobs-tab`, `cloud-*` (+ input `cloud-search`) in **dispatch.js**.
 
 ### onboarding.js (~195 ln) — first-run wizard — NEW v70
 The wizard state machine (step capture, paging, fresh/import fork, theme pick,
@@ -580,7 +592,7 @@ instrument flat mirror and must keep calling `adoptMirrorIntoInstruments()`
 (rule 7). `onboardSetupImport()` delegates to setup.js; the final step can hand
 off to tour.js. Extracted from session.js in v70, byte identical.
 
-### render-core.js (~1780 ln) — dispatcher + the logging screens
+### render-core.js (~1850 ln) — dispatcher + the logging screens
 Owns `const app` and the `render()` dispatcher. Sessions list, entry screen,
 empty states, welcome modal AND its `dismissWelcome()` handler (moved here
 v70 — see rule 8), first-run wizard markup, signature pad, calibration banner,
@@ -600,8 +612,11 @@ The **calibration banner is ONE banner** covering the worst instrument with
 ⚠ v85: the dispatcher paints the three cloud views only when
 `cloudPagesUnlocked()` (cloud.js); otherwise `renderCloudLocked()`. The V43 About
 long-press is gone — `setupLongPress` (utils.js) now has no caller.
+⚠ v93: `renderSessions()` draws the "On this phone | ☁ In the cloud" tabs when
+`syncActive()`; the cloud tab returns early with **render-review.js**
+`renderCloudJobsHTML()` (no banners, no new-session form there).
 
-### render-review.js (~1070 ln) — review & manage screens — NEW v72
+### render-review.js (~1130 ln) — review & manage screens — NEW v72
 Overview (+ `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
 `refreshOverviewBody`, `refreshOverviewSelection`), Edit Session, Retest
 Reminders, the Reports hub, and the shared photo-evidence markup
@@ -623,6 +638,9 @@ render-core falls back to the Backup page if it is missing). Previews are
 painted into `#pm-t-<id>` in place by settings-actions.js, not by render.
 v91: `renderJobManager()` (view `jobManager`, same Backup-page fallback) and
 `renderTidyBlock()` (also used by render-settings.js's Backup page).
+v93: `renderCloudJobsHTML()`, `renderCloudListAreaHTML()` and
+`refreshCloudListAreaOnly()` — the Jobs screen's cloud tab (called from
+render-core.js, model in settings-actions.js).
 Boot probe: `renderOverview` in `requiredFns`.
 
 ### render-settings.js (~1377 ln) — settings screens that own a setting
@@ -687,7 +705,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~3900 ln) — cloud sync, PUSH AND PULL — v80–v92
+### sync.js (~4150 ln) — cloud sync, PUSH AND PULL — v80–v93
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session
@@ -831,9 +849,9 @@ held / unsent / photos / checking / safe; `fresh=false` reuses a hash while
 `_sessionSig` — keep their reuse test and this one identical). `syncPruneFilter`
 is now safety-based (always fresh). `syncWhenIdle(fn)`. `_syncSafetyRepaint`
 after every run repaints `sessions`/`jobManager` when the safe set moved.
-`syncClearedLook` (names of SYNC_PRUNED jobs, `doc->>` only, writes nothing) and
-`syncBringBack` (reads the rows, adds like a pull-add, sets conf, `ph.need`,
-leaves the cleared list, **session.js** `unarchiveSessionStats`).
+`syncBringBack` (reads the rows, adds through `_syncTakeRows`/`_syncTakeJob`
+like a pull-add, sets conf, `ph.need`, leaves the cleared list, and — v93 —
+**session.js** `unarchiveSessionStats` ONLY for jobs that were cleared).
 ⚠ v92: THE LIGHTER PULL. `sessions.fp` (server column + `sessions_fp_guard`
 trigger in **supabase/schema.sql**) = `syncHash(_syncCanonical(doc))`, sent by the
 push in the same row. `_syncPull` pages read `_SYNC_JOB_LIST_COLS` (no doc);
@@ -847,9 +865,20 @@ download (V91 phones). `_syncConfirmPushed` reads id+fp after the push → conf
 when the job is live, or its SYNC_PRUNED entry is newer — a stale tombstone
 fired on Remove from phone and emptied the cloud copy. `syncNotePruned` moves
 an existing entry's date on. Harness 29g–29i, M447–M451.
+⚠ v93: THE WINDOW (R21/R22). A job with no local copy and no tombstone comes down
+only if `_syncJobBelongs(_syncPicks(row))`: dated within SYNC_WINDOW_DAYS
+(config.js), an unreadable date, or `_syncRetestDue` (**session.js**
+`retestStatus`). The list carries `_SYNC_JOB_PICKS` (date, retest fields as
+`doc->>`); `needsDoc` and `decide` both check it — a light row MUST keep the
+picks. Nothing is stored about jobs left behind (the cloud is the list).
+`_syncRetestLook` runs in `_syncRun` after the jobs pull, once per calendar
+month (`st.rtMonth`), fail-soft. `syncCloudList` (replaces `syncClearedLook`)
+reads `_SYNC_CLOUD_JOB_COLS` incl. server columns `n_items`/`n_fails` and the
+view `session_photo_counts` (**supabase/v93-archive.sql**). Harness 30a–30i,
+M452–M474.
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
 19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q, 27a–27m, 28a–28i and
-29a–29f, mutations M142–M295, M306–M325, M355–M395, M396–M418, M419–M434, M436–M446.
+29a–29i and 30a–30i, mutations M142–M295, M306–M325, M355–M395, M396–M418, M419–M434, M436–M451, M452–M474.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This
@@ -1010,6 +1039,9 @@ another file having parsed. Don't "DRY" this.
   one minified line — it floods context). Exclude it: `grep --exclude=supabase.umd.js`.
 - `supabase/schema.sql`, `supabase/isolation-test.sql` — server side (v79). Pasted
   into the Supabase SQL editor by hand; not loaded by the app. `schema.sql` is the
-  whole server for a NEW project; `supabase/v92-fingerprint.sql` is the paste-once
-  change for an existing one (checks itself, F1–F3). Harness 29e reads both.
+  whole server for a NEW project; `supabase/v92-fingerprint.sql` and
+  `supabase/v93-archive.sql` are the paste-once changes for an existing one (they
+  check themselves, F1–F3 and A1–A5). Harness 29e and 30i read them.
+  ⚠ v93: `session_photo_counts` is a VIEW — it must stay `security_invoker`
+  (isolation 8a–8c), or it counts every account's photos.
 - `manifest.webmanifest` — icons, name, display mode.

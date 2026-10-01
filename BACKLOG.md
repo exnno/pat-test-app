@@ -21,13 +21,27 @@ the app, so the confirm needs to be genuinely hard to hit by accident.
 V91 adds: TIDY_OFFER_KEY (the offer's timer) and PHOTO_AGE_KEY (a setting — the
 settings level decides); `conf`/`confV` live inside SYNC_STATE_KEY.
 
+### V93 residuals (known, accepted)
+- Search, asset history (V61) and the certificate-number skip see jobs on this
+  phone only. The synced counter is the real guard against reused numbers.
+  Stage 3's "asset ID already used" (S4) will need the cloud.
+- A fresh phone's lifetime stats count only what is on it.
+- A tracked job brought down by the retest look and removed again comes back the
+  next month while its chase is on (until booked or declined) — by design.
+- The cloud list is read whole on opening the tab (8A, ~200 bytes a job); at
+  SYNC_CLOUD_MAX (20,000) it stops and says so.
+- A job's date is editable; the window uses it as stored.
+- Storage view and permanent cloud delete: Stage 5 part 3 (maybe V94).
+
 ### V92.1 (fixed — data loss)
 - A job shown 🛡, removed from the phone, was emptied in the cloud by a stale
   session tombstone (job once deleted here, then brought back). Fixed in the
   push. Cloud copies emptied before V92.1 are not recoverable (Free tier, no
   backups) unless a phone or a JSON backup still holds them.
-- Watch in V93: the archive and the fresh-phone rule make "not on this phone"
-  normal — check every path that reads absence as meaning something.
+- V93 checked the paths that read absence: tombstones (the window skips jobs
+  deleted here; Bring back of one live elsewhere lets rule 32 forget it), photo
+  rows (rule 24 via `_syncTakeJob`), held entries (none for jobs left in the
+  cloud), `conf` (trimmed as before), stats (cleared only).
 
 ### V92 residuals (known, accepted)
 - A row with a BLANK fingerprint at the cursor's boundary (the newest batch,
@@ -118,7 +132,7 @@ settings level decides); `conf`/`confV` live inside SYNC_STATE_KEY.
 - Protection status is asked fresh each launch, never stored.
 - Day-first file names don't sort by date in a folder (Peter's choice, V87).
 
-### Cloud track — V91: safe in the cloud; next Stage 5 jobs on request
+### Cloud track — V93: fresh phone + the cloud tab; next field batch A
 V78 ledger → V79 sign-in → V80 push → V81–V81.4 pull → V82 clients + sites →
 V83 instruments + presets + tester in use → V83.1 pager fix → V84 report
 settings + templates + certificate counter → V85 the cloud pages moved to
@@ -130,9 +144,11 @@ certificate prompt, deletes from any phone; isolation 4e/4f) → **V90** the
 photo manager (Settings → Backup → Manage photos: phone + cloud, Look in the
 cloud, remove from phone, download, delete everywhere, orphans; no SQL) →
 **V91** safe in the cloud (read-back fingerprint, 🛡, Jobs on this phone, remove
-/ bring back, tidy-up offer, two-step delete everywhere; no SQL). Next (roadmap
-v4.4): Stage 5 jobs on request + fresh-phone rule + lighter pull, then field
-batch A.
+/ bring back, tidy-up offer, two-step delete everywhere; no SQL) → **V92** the
+lighter pull (`sessions.fp`) → **V93** the 30-day window, the monthly retest look
+and the Jobs screen's ☁ In the cloud tab (counts columns + photo-count view;
+isolation 8a–8c). Next (roadmap v4.6): Stage 5 part 3 (storage view / permanent
+delete) if wanted, then field batch A.
 Every cloud release runs `supabase/isolation-test.sql` (all PASS) before
 promotion to `Release` — all PASS at V84 incl. 6a–6d. V85 changed no SQL.
 

@@ -1017,32 +1017,9 @@ function renderJobManager() {
     }).join('');
   }
 
-  // 10A: cleared from this phone — names on a tap, never automatic.
-  const cl = jm.cleared;
-  let cleared;
-  if (cl && cl.loading) {
-    cleared = `<p class="muted pm-note">Looking in the cloud\u2026</p>`;
-  } else if (cl && cl.ok) {
-    const rows = (cl.jobs || []).map((j) => {
-      const c = (j.clientId && typeof clientById === 'function') ? clientById(j.clientId) : null;
-      const meta = [c ? c.name : '', formatDate(j.date)].filter(Boolean).join(' \u00b7 ');
-      return `
-        <div class="jm-row jm-cleared-row">
-          <div class="jm-text">
-            <div class="pm-group-title">${j.locked ? '<span class="session-lock" title="Locked">\ud83d\udd12</span>' : ''}${escapeHTML(j.site || j.name || 'Untitled job')}</div>
-            <div class="pm-group-sub">\u2601 ${escapeHTML(meta || 'In the cloud')}</div>
-          </div>
-          <button class="backup-action-btn jm-back-btn" data-action="jm-bring-back" data-arg="${escapeHTML(j.id)}" ${jm.busy ? 'disabled' : ''}>Bring back</button>
-        </div>`;
-    }).join('');
-    const when = escapeHTML(new Date(cl.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
-    cleared = (rows || `<p class="muted pm-note">No jobs cleared from this phone are waiting in the cloud.</p>`) +
-      (cl.gone ? `<p class="muted pm-note">${cl.gone} cleared job${cl.gone === 1 ? ' was' : 's were'} deleted from the cloud since.</p>` : '') +
-      `<p class="muted pm-note">Checked at ${when} \u00b7 <button class="pm-look-link" data-action="jm-cleared-look">Look again</button></p>`;
-  } else {
-    cleared = `<p class="muted pm-note">Jobs you removed from this phone stay in the cloud. <button class="pm-look-link" data-action="jm-cleared-look">Show them</button></p>`;
-  }
-  if (cl && cl.error) cleared += `<p class="pm-note pm-error">${escapeHTML(cl.error)}</p>`;
+  // V93 (7A): cleared jobs live with every other cloud job — on the Jobs
+  // screen's cloud tab. One path, not two.
+  const cleared = `<p class="muted pm-note">Jobs you remove from this phone stay in the cloud, with every older job. <button class="pm-look-link" data-action="jm-cloud-link">See them in \u2601 In the cloud</button> on the Jobs screen \u2014 tap one to bring it back.</p>`;
 
   let bar = '';
   if (jm.selecting) {
@@ -1069,4 +1046,87 @@ function renderJobManager() {
     </div>
     ${bar}
   `;
+}
+
+// ============== V93 (roadmap Stage 5 part 2) — the "In the cloud" tab ==============
+// Drawn by renderSessions() (render-core.js) when the cloud tab is chosen. Logic
+// and model in settings-actions.js (cloudJobsModel). Every job here is ☁ — only
+// in the cloud (R19). The search box sits OUTSIDE #cloud-list-area so typing
+// refreshes the list without rebuilding the input (MAP rule 3).
+function renderCloudJobsHTML() {
+  const cj = state.cloudJobs || {};
+  const busy = cj.busy ? `<p class="pm-busy" id="cloud-busy" role="status">${escapeHTML(cj.busy)}</p>` : '';
+  if (!cj.ok) {
+    let msg;
+    if (cj.loading) msg = `<p class="muted pm-note" role="status">Reading the cloud\u2026</p>`;
+    else if (cj.error) msg = `<p class="pm-note pm-error">${escapeHTML(cj.error)}</p><button class="btn-secondary cloud-retry" data-action="cloud-refresh">Try again</button>`;
+    else msg = `<p class="muted pm-note">Jobs that aren't on this phone stay in the cloud. <button class="pm-look-link" data-action="cloud-refresh">Show them</button></p>`;
+    return `<div class="cloud-tab">${msg}</div>`;
+  }
+  const m = cloudJobsModel();
+  const search = m.total ? `
+    <div class="sessions-search-row">
+      <input type="search" class="search-input" id="cloud-search" data-input-action="cloud-search" placeholder="Search client, site or certificate\u2026" value="${escapeHTML(cj.q || '')}" autocomplete="off">
+    </div>` : '';
+  const selectBtn = m.total ? `<button class="pm-select-btn cloud-select-btn" data-action="cloud-select-toggle" ${cj.busy ? 'disabled' : ''}>${cj.selecting ? 'Done' : 'Select'}</button>` : '';
+  let bar = '';
+  if (cj.selecting) {
+    const n = Object.keys(cj.selected || {}).filter((id) => m.byId.has(id)).length;
+    bar = `
+      <div class="selection-bar pm-bar">
+        <span class="selection-bar-count">${n} selected</span>
+        <button class="selection-bar-action pm-bar-btn" data-action="cloud-bring" ${n && !cj.busy ? '' : 'disabled'}>Bring onto this phone</button>
+      </div>`;
+  }
+  return `
+    <div class="cloud-tab">
+      <div class="cloud-head">${selectBtn}</div>
+      ${search}
+      ${busy}
+      <div id="cloud-list-area">${renderCloudListAreaHTML(m)}</div>
+    </div>
+    ${bar}`;
+}
+
+function renderCloudListAreaHTML(model) {
+  const cj = state.cloudJobs || {};
+  const m = model || cloudJobsModel();
+  const when = cj.at ? escapeHTML(new Date(cj.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) : '';
+  const q = String(cj.q || '').trim();
+  const count = q
+    ? `${m.shown} of ${m.total} job${m.total === 1 ? '' : 's'} match`
+    : `${m.total} job${m.total === 1 ? '' : 's'} only in the cloud`;
+  const head = `<p class="muted pm-note cloud-count">${count} \u00b7 checked ${when} \u00b7 <button class="pm-look-link" data-action="cloud-refresh" aria-label="Read the cloud list again">\u27f3 Refresh</button></p>` +
+    (cj.capped ? `<p class="muted pm-note">Showing the first ${SYNC_CLOUD_MAX.toLocaleString('en-GB')} jobs.</p>` : '');
+  if (!m.total) return head + `<p class="muted pm-note">Every job in the cloud is on this phone.</p>`;
+  if (!m.shown) return head + `<p class="muted pm-note">No cloud jobs match.</p>`;
+  const sel = cj.selected || {};
+  const groups = m.groups.map((g) => {
+    const rows = g.rows.map((j) => {
+      const on = !!sel[j.id];
+      const counts = [];
+      if (j.items !== null && j.items !== undefined) counts.push(`${j.items} item${j.items === 1 ? '' : 's'}`);
+      if (j.fails) counts.push(`<span class="fail-text">${j.fails} fail</span>`);
+      if (j.photos) counts.push(`<span class="photo-text">\ud83d\udcf7 ${j.photos}</span>`);
+      const meta = [j.client ? escapeHTML(j.client) : '', escapeHTML(formatDate(j.date))].concat(counts).filter(Boolean).join(' \u00b7 ');
+      const tick = cj.selecting ? `<span class="jm-tick${on ? ' is-on' : ''}" aria-hidden="true">${on ? '\u2713' : ''}</span>` : '';
+      return `
+        <div class="session-card cloud-card${on ? ' is-selected' : ''}${j.locked ? ' locked' : ''}">
+          <div class="session-info" data-action="cloud-tap" data-arg="${escapeHTML(j.id)}">
+            <div class="session-title">${tick}<span class="session-cloud" title="Only in the cloud" aria-label="Only in the cloud">\u2601</span>${j.locked ? '<span class="session-lock" title="Locked">\ud83d\udd12</span>' : ''}${escapeHTML(j.title)}</div>
+            <div class="session-meta">${meta}</div>
+            ${j.certNo ? `<div class="session-meta cloud-cert">Certificate ${escapeHTML(j.certNo)}</div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+    return `<h3 class="cloud-month">${escapeHTML(g.label)}</h3>${rows}`;
+  }).join('');
+  return head + groups;
+}
+
+// The cloud search's partial refresh — the input itself is left alone.
+function refreshCloudListAreaOnly() {
+  const wrap = document.getElementById('cloud-list-area');
+  if (!wrap) return;
+  wrap.innerHTML = renderCloudListAreaHTML();
 }

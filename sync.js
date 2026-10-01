@@ -197,7 +197,10 @@ function _syncEmpty(userId) {
            // V91 (Stage 4, 1A): {jobId: fingerprint of the cloud copy as the pull
            // last READ it}. Not what was sent — what was SEEN. A job is safe in
            // the cloud when this equals the phone's copy (syncJobsSafety).
-           conf: {}, confV: SYNC_CONF_V };
+           conf: {}, confV: SYNC_CONF_V,
+           // V93 (2A): the month (year*12 + month0) the retest look last ran
+           // in full for this account. null = never: it runs on the next sync.
+           rtMonth: null };
 }
 
 // v83: two more fields.
@@ -293,6 +296,7 @@ function _syncLoad() {
   if (raw.conf && typeof raw.conf === 'object' && !Array.isArray(raw.conf)) {
     for (const k of Object.keys(raw.conf)) if (typeof raw.conf[k] === 'string') out.conf[k] = raw.conf[k];
   }
+  if (Number.isInteger(raw.rtMonth)) out.rtMonth = raw.rtMonth;   // V93: garbage → look again
   if (raw.hashV !== SYNC_HASH_V) { out.sent = {}; out.rec.sent = {}; out.conf = {}; }
   else out.hashV = SYNC_HASH_V;
   // v83.1 (decision 3A). Cursors written by a pager that could step over rows
@@ -816,8 +820,66 @@ function _syncValidDoc(doc, id) {
 // (a V91 phone) — supabase/schema.sql sessions_fp_guard — so a blank means
 // "unknown: download it", which is exactly the pre-V92 behaviour. A stale hash
 // version (SYNC_HASH_V) simply never matches and falls back the same way.
-const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at';
+// V93 (1A, 2A): the list also carries the few fields that decide whether a job
+// this phone hasn't got comes down — its date and its retest reminder — picked
+// out of the doc by the database (~40 bytes), never the doc itself.
+const _SYNC_JOB_PICKS = 'date:doc->>date,rt:doc->>retestTrack,rm:doc->>retestMonths,rc:doc->retestContact->>status';
+const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,' + _SYNC_JOB_PICKS;
 const _SYNC_JOB_DOC_COLS = 'id,doc,fp,deleted,updated_at';
+
+// ---- V93: which jobs belong on this phone (1A, 2A — R21, R22) -------------------
+// The deciding fields of a row: from its doc when it has one (a fetched row),
+// else from the list's picks (text, as Postgres returns ->> values).
+function _syncPicks(row) {
+  const str = (v) => (typeof v === 'string') ? v : '';
+  const d = (row && row.doc && typeof row.doc === 'object' && !Array.isArray(row.doc)) ? row.doc : null;
+  if (d) {
+    const rc = (d.retestContact && typeof d.retestContact === 'object') ? str(d.retestContact.status) : '';
+    return { date: str(d.date), rt: d.retestTrack === true, rm: Number(d.retestMonths), rc };
+  }
+  const r = row || {};
+  return { date: str(r.date), rt: r.rt === true || r.rt === 'true', rm: Number(r.rm), rc: str(r.rc) };
+}
+
+// The first date (YYYY-MM-DD, this phone's calendar) inside the window.
+function _syncWindowStart(now) {
+  const d = (now instanceof Date) ? new Date(now.getTime()) : new Date();
+  d.setDate(d.getDate() - SYNC_WINDOW_DAYS);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// 2A: a tracked job whose chase has started (due next month, this month, or
+// overdue) and that nobody has booked or declined. retestStatus (session.js)
+// is the one rule, so the banner and the cloud never disagree (R15).
+function _syncRetestDue(p, now) {
+  if (!p || p.rt !== true || typeof retestStatus !== 'function') return false;
+  const st = retestStatus({ retestTrack: true, retestMonths: p.rm, date: p.date,
+    retestContact: p.rc ? { status: p.rc } : null }, now);
+  return st === 'upcoming' || st === 'duesoon' || st === 'overdue';
+}
+
+// 1A: dated within the window, or a retest being chased. A date that can't be
+// read comes down — when in doubt, the job is the engineer's to see.
+function _syncJobBelongs(p, now) {
+  if (!p) return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(p.date)) return true;
+  if (p.date >= _syncWindowStart(now)) return true;
+  return _syncRetestDue(p, now);
+}
+
+// A job arriving from the cloud by request (the "In the cloud" tab, the retest
+// look) is added exactly as the pull adds one — plus st.conf, because it was
+// just read: it is safe in the cloud the moment it lands. Caller saves.
+function _syncTakeJob(st, doc) {
+  const id = String(doc.id);
+  const hash = syncHash(_syncCanonical(doc));
+  state.sessions.unshift(doc);
+  st.sent[id] = hash;
+  st.conf[id] = hash;
+  delete st.gone[id];
+  st.ph.need.push(id);   // rule 24: its photo rows come with it
+  _syncHeldClear(id);
+}
 function _syncFp(row) {
   return (row && typeof row.fp === 'string' && row.fp) ? row.fp : null;
 }
@@ -1029,6 +1091,16 @@ function _syncPull(c, uid, st, out) {
     // (see needsDoc below): its `fp` stands in for the hash. Every branch below
     // that reads the doc is one needsDoc sends for it; the `!doc` guards are the
     // belt to that — a light row that got here by mistake waits, never guesses.
+    // V93 (1A — R21, R22). A job this phone has never held (or cleared, above)
+    // comes down only if it belongs here: dated in the last SYNC_WINDOW_DAYS,
+    // or a retest being chased. Anything else stays in the cloud: RESOLVED, not
+    // held — the cursor moves on, and the "In the cloud" tab is how it's reached.
+    // Checked before the fingerprint, so an old job from an older phone (blank
+    // fp) is never downloaded to be thrown away. ⚠ Nothing is recorded: the
+    // cloud itself is the list of what isn't here (3A). A job deleted HERE
+    // (tomb) is not this rule's business — the branches below decide it.
+    if (!local && !tomb && !_syncJobBelongs(_syncPicks(row))) return;
+
     const light = (row.doc === undefined);
     if (light && !_syncFp(row)) { blocked = true; return; }
 
@@ -1142,13 +1214,14 @@ function _syncPull(c, uid, st, out) {
   function needsDoc(row) {
     const id = String(row && row.id != null ? row.id : '');
     if (!id || pruned.has(id) || st.resend[id] || row.deleted === true) return false;
+    const local = (state.sessions || []).find(s => s && String(s.id) === id);
+    const tomb = !local && (state.tombstones || []).some(t => t && t.kind === 'session' && String(t.id) === id);
+    // V93 (1A): a job this phone hasn't got and doesn't belong here stays in
+    // the cloud — its doc is never fetched, fingerprint or not.
+    if (!local && !tomb && !_syncJobBelongs(_syncPicks(row))) return false;
     const fp = _syncFp(row);
     if (!fp) return true;                      // written by an older phone, or blanked
-    const local = (state.sessions || []).find(s => s && String(s.id) === id);
-    if (!local) {
-      const tomb = (state.tombstones || []).some(t => t && t.kind === 'session' && String(t.id) === id);
-      return !(tomb && !st.gone[id]);          // only "our delete is on its way" needs nothing
-    }
+    if (!local) return !(tomb && !st.gone[id]);   // only "our delete is on its way" needs nothing
     if (fp === st.sent[id]) return false;      // only this phone moved (v83.1)
     return fp !== syncHash(_syncCanonical(local));   // identical needs nothing
   }
@@ -1196,7 +1269,10 @@ function _syncPull(c, uid, st, out) {
               // since): it is what the cloud holds now, so it is what is decided.
               // A doc asked for and not returned waits (blocked) for next time.
               if (d.want.has(id)) { if (d.got.has(id)) decide(d.got.get(id)); else blocked = true; }
-              else decide({ id: row.id, fp: row.fp, deleted: row.deleted, updated_at: row.updated_at });
+              // V93: a light row keeps the list's picks (date, retest) — decide's
+              // window check reads them (harness 30a found them dropped here).
+              else decide({ id: row.id, fp: row.fp, deleted: row.deleted, updated_at: row.updated_at,
+                date: row.date, rt: row.rt, rm: row.rm, rc: row.rc });
             }
             if (typeof u === 'string' && u > high) high = u;
           }
@@ -1405,7 +1481,11 @@ function _syncRun(o) {
     // "Re-send all jobs", which is jobs only. Fail-soft: see _syncRecordsHalf.
     const recs = opts.pull ? _syncRecordsHalf(c, uid, st) : Promise.resolve(null);
     return recs.then((records) => {
-      const first = opts.pull ? _syncPull(c, uid, st, pulled) : Promise.resolve();
+      // V93 (2A): the retest look straight after the jobs pull, once a month —
+      // fail-soft (a failure never stops the run; the month isn't stamped).
+      const look = () => _syncRetestLook(c, uid, st, pulled)
+        .catch((e) => { console.error('Sync: retest look not done this time (non-fatal).', e); });
+      const first = opts.pull ? _syncPull(c, uid, st, pulled).then(look) : Promise.resolve();
       // v83: instruments deleted on the other phone are frozen onto this phone's
       // jobs HERE — after the jobs were read, before they are sent. See the v83
       // note on records. Failed read or not, the copies are written: a job left
@@ -3846,71 +3926,95 @@ function syncPhotoKnowForDelete(list) {
   return Promise.resolve(go());
 }
 
-// ---- V91 (Stage 4, 10A): cleared from this phone, and bringing one back ------
-//
-// Jobs cleared from this phone (SYNC_PRUNED_KEY) stay in the cloud and on the
-// other phones, but the pull never brings them back — that is what clearing
-// meant. V91 makes clearing easier, so it also makes it undoable.
-//
-// syncClearedLook(): the NAMES of the cleared jobs, on a tap — five fields picked
-// out of each job row (doc->>…), never the job itself (R17), exactly as V90's
-// look does. Memory only (rule 25): nothing is written. Resolves
-// { ok, offline, error, jobs: [{id, site, name, date, clientId, locked, at}],
-//   gone } — gone = cleared jobs the cloud no longer holds (deleted elsewhere).
-function syncClearedLook() {
-  const res = { ok: false, offline: false, error: '', jobs: [], gone: 0 };
+// ---- V93 (Stage 5 part 2): the "In the cloud" tab, and bringing jobs down ----
+// The Jobs screen's cloud tab (4A) lists every live job the account holds, as a
+// LIST: id plus a few fields picked out of each job row (doc->>…), and the item
+// and fail counts the database works out itself (n_items, n_fails —
+// supabase/v93-archive.sql, 6B). Never a doc (R17): about 200 bytes a job. Photo
+// counts come from the read-only view session_photo_counts (security_invoker —
+// the photos table's own rule decides what it counts; isolation 8a–8c). That
+// read is fail-soft: without it the cards just show no 📷.
+// Memory only (rule 25): nothing is written. The screen keeps the result for
+// the app session (8A) and hides jobs that are on this phone when it draws, so
+// a job brought down or arriving by the pull simply drops out of the list.
+// Keyset paged by id, SYNC_CLOUD_PAGE a request, at most SYNC_CLOUD_MAX (said
+// on screen — `capped`). Replaces V91's cleared look: cleared jobs are cloud
+// jobs like any other (3A, 7A).
+// Resolves { ok, offline, error, uid, capped, photos, jobs: [{id, site, name,
+//   date, clientId, locked, certNo, items, fails, photos}] }.
+const _SYNC_CLOUD_JOB_COLS = 'id,site:doc->>site,name:doc->>name,date:doc->>date,clientId:doc->>clientId,locked:doc->>locked,certNo:doc->>certNo,n_items,n_fails';
+function syncCloudList() {
+  const res = { ok: false, offline: false, error: '', uid: '', capped: false, photos: false, jobs: [] };
   if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
   const uid = _syncCurrentUserId();
   if (!uid) { res.offline = true; return Promise.resolve(res); }
-  const local = new Set((state.sessions || []).map(s => String(s && s.id)));
-  const list = _syncPrunedLoad().filter(e => !local.has(e.id));
-  const at = new Map(list.map(e => [e.id, e.at]));
-  const want = list.map(e => e.id);
-  if (!want.length) { res.ok = true; return Promise.resolve(res); }
-  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
-  const seen = new Set();
-  return cloudClient().then((c) => {
-    let chain = Promise.resolve();
-    for (let k = 0; k < want.length; k += batch) {
-      const chunk = want.slice(k, k + batch);
-      chain = chain.then(() => c.from('sessions').select(_SYNC_BROWSE_JOB_COLS).eq('user_id', uid).in('id', chunk))
-        .then((r) => {
-          if (r && r.error) throw r.error;
-          for (const j of ((r && r.data) || [])) {
-            const id = String(j && j.id != null ? j.id : '');
-            if (!id || !at.has(id)) continue;
-            seen.add(id);
-            if (j.deleted === true) continue;
-            const str = (v) => (typeof v === 'string') ? v : '';
-            res.jobs.push({ id, site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
-              locked: j.locked === true || j.locked === 'true', at: at.get(id) || '' });
-          }
-        });
-    }
-    return chain;
-  }).then(() => {
-    res.gone = want.length - res.jobs.length;
-    res.jobs.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
-    res.ok = true;
-    return res;
-  }).catch((e) => {
-    res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn\u2019t reach the cloud.';
-    res.jobs = []; res.gone = 0;
-    return res;
-  });
+  res.uid = uid;
+  const str = (v) => (typeof v === 'string') ? v : '';
+  const num = (v) => (typeof v === 'number' && isFinite(v) && v >= 0) ? Math.round(v) : null;
+  const counts = new Map();
+  let client = null;
+  function jobsPage(after) {
+    let q = client.from('sessions').select(_SYNC_CLOUD_JOB_COLS).eq('user_id', uid).eq('deleted', false);
+    if (after) q = q.gt('id', after);
+    return q.order('id', { ascending: true }).limit(SYNC_CLOUD_PAGE).then((r) => {
+      if (r && r.error) throw r.error;
+      const rows = (r && r.data) || [];
+      for (const j of rows) {
+        const id = String(j && j.id != null ? j.id : '');
+        if (!id) continue;
+        res.jobs.push({ id, site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
+          locked: j.locked === true || j.locked === 'true', certNo: str(j.certNo),
+          items: num(j.n_items), fails: num(j.n_fails), photos: 0 });
+      }
+      if (rows.length < SYNC_CLOUD_PAGE) return;
+      if (res.jobs.length >= SYNC_CLOUD_MAX) { res.capped = true; return; }
+      return jobsPage(String(rows[rows.length - 1].id));
+    });
+  }
+  function photoPage(after, n) {
+    let q = client.from('session_photo_counts').select('session_id,n').eq('user_id', uid);
+    if (after) q = q.gt('session_id', after);
+    return q.order('session_id', { ascending: true }).limit(SYNC_CLOUD_PAGE).then((r) => {
+      if (r && r.error) throw r.error;
+      const rows = (r && r.data) || [];
+      for (const x of rows) {
+        const sid = String(x && x.session_id != null ? x.session_id : '');
+        const c = num(x && x.n);
+        if (sid && c) counts.set(sid, c);
+      }
+      if (rows.length < SYNC_CLOUD_PAGE || n > SYNC_CLOUD_MAX / SYNC_CLOUD_PAGE) return;
+      return photoPage(String(rows[rows.length - 1].session_id), n + 1);
+    });
+  }
+  return cloudClient().then((c) => { client = c; return jobsPage(''); })
+    .then(() => photoPage('', 0).then(() => { res.photos = true; },
+      (e) => { console.error('Cloud list: photo counts not read (non-fatal).', e); }))
+    .then(() => {
+      for (const j of res.jobs) j.photos = counts.get(j.id) || 0;
+      res.jobs.sort((a, b) => (b.date || '').localeCompare(a.date || '') || a.id.localeCompare(b.id));
+      res.ok = true;
+      return res;
+    }).catch((e) => {
+      res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn\u2019t reach the cloud.';
+      res.jobs = [];
+      return res;
+    });
 }
 
-// Bring cleared jobs back onto this phone: each job's row is read (the one
-// download a return needs), checked like any pulled job, and added exactly as
-// the pull adds a job from the other phone — plus:
-//   • it leaves the cleared list, so the pull treats it as an ordinary job;
-//   • st.conf records the read (it is safe in the cloud the moment it lands);
-//   • st.ph.need, so its photo rows come with it (rule 24);
-//   • its tallies leave the archived stats they joined when it was cleared
-//     (unarchiveSessionStats), or the lifetime counter would count it twice.
+// Bring jobs from the cloud onto this phone: each job's row is read (the one
+// download a job on request needs), checked like any pulled job, and added
+// through _syncTakeJob — exactly as the pull adds one, plus st.conf (safe the
+// moment it lands) and st.ph.need (its photo rows come too, rule 24). Then:
+//   • it leaves the cleared list, if it was on it, so the pull treats it as an
+//     ordinary job from now on;
+//   • ⚠ V93: ONLY a job that was cleared has its tallies taken back out of the
+//     archived stats (unarchiveSessionStats). A job that never came down to
+//     this phone was never counted here — subtracting it would undercount.
 // ⚠ The write waits for any run and happens in one synchronous step
 // (syncWhenIdle): a run holds the job list and the sync state. A job already
-// back on the phone by then is only taken off the cleared list.
+// on the phone by then is only taken off the cleared list. A job deleted HERE
+// (a session tombstone) that is live in the cloud again comes back like any
+// other — the push then forgets the stale tombstone (rule 32).
 // Resolves { ok, offline, error, got, missing }.
 function syncBringBack(ids) {
   const want = Array.from(new Set((ids || []).map(String).filter(Boolean)));
@@ -3932,40 +4036,112 @@ function syncBringBack(ids) {
   }).then(() => syncWhenIdle(() => {
     const st = _syncLoad();
     if (st.userId !== uid) { res.error = 'Signed in as someone else now.'; return res; }
-    const local = new Set((state.sessions || []).map(s => String(s && s.id)));
-    const back = new Set();
-    const added = [];
-    for (const row of rows) {
-      const id = String(row && row.id != null ? row.id : '');
-      if (!id || want.indexOf(id) === -1 || back.has(id)) continue;
-      if (local.has(id)) { back.add(id); continue; }
-      if (row.deleted === true || !_syncValidDoc(row.doc, id)) continue;
-      const doc = row.doc;
-      const hash = syncHash(_syncCanonical(doc));
-      state.sessions.unshift(doc);
-      st.sent[id] = hash;
-      st.conf[id] = hash;
-      delete st.gone[id];
-      st.ph.need.push(id);
-      _syncHeldClear(id);
-      added.push(doc);
-      back.add(id);
-    }
-    res.missing = want.length - back.size;
-    if (back.size) _syncPrunedSave(_syncPrunedLoad().filter(e => !back.has(e.id)));
-    if (added.length) {
-      if (typeof unarchiveSessionStats === 'function') { try { unarchiveSessionStats(added); } catch (e) { console.error('Stats not adjusted (non-fatal).', e); } }
+    const out = _syncTakeRows(st, rows, want);
+    res.missing = want.length - out.back.size;
+    if (out.added.length) {
       _syncSave(st);
       // A new array reference busts activeSession()'s memo, as in the pull.
       state.sessions = state.sessions.slice();
       saveSessions();
       if (typeof saveSettings === 'function') { try { saveSettings(); } catch (e) { console.error(e); } }
     }
-    res.got = added.length;
+    res.got = out.added.length;
     res.ok = true;
     return res;
   })).catch((e) => {
     res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn\u2019t reach the cloud.';
     return res;
+  });
+}
+
+// The shared half of syncBringBack and the retest look: add each valid live row
+// asked for that isn't on the phone, take every one now here off the cleared
+// list, and un-archive the stats of those that WERE cleared (and only those).
+// Synchronous; the caller saves st and the job list.
+function _syncTakeRows(st, rows, want) {
+  const wanted = new Set((want || []).map(String));
+  const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+  const cleared = new Set(_syncPrunedLoad().map(e => e.id));
+  const back = new Set();
+  const added = [];
+  for (const row of (rows || [])) {
+    const id = String(row && row.id != null ? row.id : '');
+    if (!id || !wanted.has(id) || back.has(id)) continue;
+    if (local.has(id)) { back.add(id); continue; }
+    if (row.deleted === true || !_syncValidDoc(row.doc, id)) continue;
+    _syncTakeJob(st, row.doc);
+    added.push(row.doc);
+    back.add(id);
+  }
+  if (Array.from(back).some(id => cleared.has(id))) _syncPrunedSave(_syncPrunedLoad().filter(e => !back.has(e.id)));
+  const wasCleared = added.filter(d => cleared.has(String(d.id)));
+  if (wasCleared.length) {
+    if (typeof unarchiveSessionStats === 'function') { try { unarchiveSessionStats(wasCleared); } catch (e) { console.error('Stats not adjusted (non-fatal).', e); } }
+  }
+  return { back, added };
+}
+
+// ---- V93 (2A): the retest look ------------------------------------------------
+// The window (1A) keeps old jobs in the cloud — and retest reminders are FOR old
+// jobs (tested 11–12 months ago). The pull brings a chased one down when it
+// meets its row, but an untouched row is never met again. So once a calendar
+// month (the chase moves only at a month boundary, R15), in a reading run,
+// straight after the jobs pull: tracked jobs not on this phone are LISTED (a
+// filter on the server, the same picks as the pull — no docs), and those whose
+// chase has started and that nobody has booked or declined come down. That
+// includes jobs cleared from this phone (tidy-up or by hand): the reminder is
+// the point of tracking (Peter, V93 round). A job deleted here never does.
+// Fail-soft: an error is logged and the month is not stamped, so the next run
+// tries again. Adds through _syncTakeRows (shared with Bring back).
+const _SYNC_RETEST_COLS = 'id,' + _SYNC_JOB_PICKS;
+function _syncRetestLook(c, uid, st, out) {
+  if (typeof currentMonthIndex !== 'function') return Promise.resolve();
+  const now = new Date();
+  const month = currentMonthIndex(now);
+  if (st.rtMonth === month) return Promise.resolve();
+  const rows = [];
+  function page(after) {
+    let q = c.from('sessions').select(_SYNC_RETEST_COLS).eq('user_id', uid).eq('deleted', false).eq('doc->>retestTrack', 'true');
+    if (after) q = q.gt('id', after);
+    return q.order('id', { ascending: true }).limit(SYNC_CLOUD_PAGE).then((r) => {
+      if (r && r.error) throw r.error;
+      const got = (r && r.data) || [];
+      for (const x of got) rows.push(x);
+      if (got.length < SYNC_CLOUD_PAGE || rows.length >= SYNC_CLOUD_MAX) return;
+      return page(String(got[got.length - 1].id));
+    });
+  }
+  return page('').then(() => {
+    const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+    const deletedHere = new Set((state.tombstones || []).filter(t => t && t.kind === 'session').map(t => String(t.id)));
+    const want = [];
+    for (const r of rows) {
+      const id = String(r && r.id != null ? r.id : '');
+      if (!id || local.has(id) || deletedHere.has(id) || st.resend[id]) continue;
+      if (_syncRetestDue(_syncPicks(r), now)) want.push(id);
+    }
+    if (!want.length) return [];
+    const got = [];
+    const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+    let chain = Promise.resolve();
+    for (let k = 0; k < want.length; k += batch) {
+      const chunk = want.slice(k, k + batch);
+      chain = chain.then(() => c.from('sessions').select('id,doc,deleted').eq('user_id', uid).in('id', chunk))
+        .then((r) => { if (r && r.error) throw r.error; for (const row of ((r && r.data) || [])) got.push(row); });
+    }
+    return chain.then(() => ({ want, got }));
+  }).then((x) => {
+    if (x && x.want && x.want.length) {
+      const res = _syncTakeRows(st, x.got, x.want);
+      if (res.added.length) {
+        out.added += res.added.length;
+        state.sessions = state.sessions.slice();
+        saveSessions();
+        if (typeof saveSettings === 'function') { try { saveSettings(); } catch (e) { console.error(e); } }
+        _syncRepaintApp();
+      }
+    }
+    st.rtMonth = month;
+    _syncSave(st);
   });
 }

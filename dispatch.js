@@ -235,8 +235,13 @@ registerActions({
   'jm-select-toggle':   () => jobMgrToggleSelecting(),
   'jm-tap':             (arg) => jobMgrTap(arg),
   'jm-remove':          () => jobMgrRemoveSelected(),
-  'jm-cleared-look':    () => jobMgrClearedLook(),
-  'jm-bring-back':      (arg) => jobMgrBringBack(arg),
+  'jm-cloud-link':      () => jobMgrCloudLink(),              // V93 (7A)
+  // V93 (Stage 5 part 2): the Jobs screen's tabs and the cloud tab.
+  'jobs-tab':           (arg) => jobsTabSet(arg),
+  'cloud-refresh':      () => cloudJobsLoad(true),
+  'cloud-tap':          (arg) => cloudJobsTap(arg),
+  'cloud-select-toggle': () => cloudJobsToggleSelecting(),
+  'cloud-bring':        () => cloudJobsBringSelected(),
   'tidy-jobs':          () => tidyJobsRemove(),
   'tidy-photos':        () => tidyPhotosRemove(),
   'tidy-review':        () => tidyOfferReview(),
@@ -988,6 +993,8 @@ registerInputActions({
     state.sessionsSearchQuery = v;
     refreshSessionsListAreaOnly();
   },
+  // V93: the cloud tab's search — partial refresh so focus is preserved
+  'cloud-search': (v) => cloudJobsSearch(v),
 
   // v32: Settings hub search — partial refresh so the search box keeps focus
   'settings-search': (v) => {

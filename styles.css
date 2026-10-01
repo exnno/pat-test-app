@@ -73,6 +73,8 @@
      49. instruments: list
      50. log again x N
      51. cloud sign-in (v79)
+     52. V90: the photo manager (Settings → Backup → Manage photos)
+     53. V93: the Jobs screen's tabs and the "In the cloud" tab
 ============================================================================ */
 
 /* @@ tokens & theme */
@@ -4061,3 +4063,41 @@ body.has-selection-bar .screen.pm-screen { padding-bottom: 140px; }
 .jm-back-btn { width: auto; flex: 0 0 auto; margin: 0; padding: 8px 12px; font-size: 13px; }
 .jm-cleared { margin-top: 22px; }
 body.has-selection-bar .screen.jm-screen { padding-bottom: 120px; }
+
+/* @@ V93: the Jobs screen's tabs and the "In the cloud" tab */
+.jobs-tabs {
+  display: flex;
+  gap: 4px;
+  margin: 0 0 12px;
+  padding: 3px;
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+.jobs-tab {
+  flex: 1 1 0;
+  min-height: 40px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  font-weight: 600;
+}
+.jobs-tab.is-on { background: var(--accent-soft); color: var(--accent-text); }
+.cloud-head { display: flex; justify-content: flex-end; min-height: 4px; }
+.cloud-head:empty { display: none; }
+.cloud-month {
+  margin: 16px 2px 6px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+.cloud-card .session-title { display: flex; align-items: center; gap: 4px; }
+.cloud-card.is-selected { border-color: var(--accent); background: var(--accent-soft); }
+.session-cloud { display: inline-block; font-size: 13px; opacity: 0.85; }
+.cloud-cert { font-size: 12px; }
+.cloud-retry { margin-top: 8px; }
+body.has-selection-bar .cloud-tab { padding-bottom: 100px; }

@@ -119,16 +119,19 @@ let state = {
     thumbGen: 0,          // bumped to stop an older preview round
   },
   // V91 (Stage 4, 5A): Jobs on this phone (Settings → Backup). Transient — never
-  // saved; reset when the view is left (setView → jobMgrLeave). `cleared` is the
-  // last look at the jobs cleared from this phone (10A): names only, in memory,
-  // re-read on tap (rule 25).
+  // saved; reset when the view is left (setView → jobMgrLeave). V93 (7A): its
+  // Cleared section is a link to the Jobs screen's cloud tab.
   jobMgr: {
     filter: 'all',        // 'all' | 'safe' | 'notyet'
     selecting: false,
     selected: {},         // job id → true
     busy: '',             // progress text while an action runs
-    cleared: null,        // { at, loading, error, ok, jobs: [], gone }
   },
+  // V93 (4A, 8A): the Jobs screen's tabs, signed in only — 'phone' | 'cloud' —
+  // and the cloud tab's list (settings-actions.js). Transient, never saved: the
+  // list lives for the app session (rule 25), each app start reads it afresh.
+  jobsTab: 'phone',
+  cloudJobs: null,        // { loading, ok, error, at, uid, jobs, capped, photos, stale, q, selecting, selected, busy }
   showFailsOnly: false,
   searchQuery: '',
   // v7

@@ -232,10 +232,10 @@ function render() {
       </div>
       <ul class="welcome-list sheet-scroll">
         <li><strong>For the invite-only cloud test.</strong> If you're not signed in to the cloud, nothing has changed for you in this update.</li>
-        <li><strong>&#128737; Safe in the cloud.</strong> A shield on a job means the cloud has checked it holds the same copy, with every photo. Only those jobs can come off this phone.</li>
-        <li><strong>Jobs on this phone.</strong> Settings &rarr; Backup &rarr; <strong>Jobs on this phone</strong> shows which jobs are safe and why the rest aren't yet. Pick some and remove them from this phone &mdash; the cloud and your other phones keep them, and <strong>Show them</strong> brings any back.</li>
-        <li><strong>Tidy up.</strong> Once a month the app may offer to take old jobs and old photos off this phone. You choose the ages on the Backup page.</li>
-        <li><strong>Deleting a job</strong> now asks whether to remove it from this phone or delete it everywhere &mdash; and everywhere asks twice.</li>
+        <li><strong>Two tabs on the Jobs screen.</strong> <strong>On this phone</strong> is your jobs list as before. <strong>&#9729; In the cloud</strong> lists every job that isn't on this phone, with its items, fails and photos.</li>
+        <li><strong>A new phone brings recent work only.</strong> A new or reset phone brings down the last 30 days of jobs, plus any job whose retest reminder is due. Everything older stays in the cloud &mdash; nothing on a phone you already use is taken off.</li>
+        <li><strong>Tap a cloud job</strong> to bring it onto this phone and open it. Its photos download when you tap them. <strong>Select</strong> brings several at once.</li>
+        <li><strong>Jobs you remove from this phone</strong> are in the cloud tab too &mdash; that's where you bring them back now.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -844,13 +844,37 @@ function renderSessions() {
   // V91 (Stage 4, 8A): the tidy-up offer — signed in, once a month at most.
   const tidyBanner = renderTidyBanner();
 
-  return `
-    <div class="screen">
+  // V93 (4A — O9): signed in, the Jobs screen has two tabs. "In the cloud" is
+  // how old jobs are reached once a phone only brings down recent ones (R21):
+  // a paid product's everyday screen, so it lives where jobs live, not in
+  // Settings. Signed out there is no tab and nothing here changes.
+  const signedIn = typeof syncActive === 'function' && syncActive();
+  const cloudTab = signedIn && state.jobsTab === 'cloud' && typeof renderCloudJobsHTML === 'function';
+  const tabs = signedIn ? `
+      <div class="jobs-tabs" role="tablist">
+        <button class="jobs-tab${cloudTab ? '' : ' is-on'}" role="tab" aria-selected="${cloudTab ? 'false' : 'true'}" data-action="jobs-tab" data-arg="phone">On this phone</button>
+        <button class="jobs-tab${cloudTab ? ' is-on' : ''}" role="tab" aria-selected="${cloudTab ? 'true' : 'false'}" data-action="jobs-tab" data-arg="cloud">\u2601 In the cloud</button>
+      </div>` : '';
+  const header = `
       <header class="header">
         <h1 class="h1">PAT Sessions</h1>
         ${state.reportSettings.enabled ? '<button class="icon-btn" id="reports-btn" data-action="open-reports" aria-label="Reports">📄</button>' : ''}
         <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">⚙</button>
-      </header>
+      </header>`;
+  if (cloudTab) {
+    return `
+    <div class="screen">
+      ${header}
+      ${tabs}
+      ${renderCloudJobsHTML()}
+    </div>
+  `;
+  }
+
+  return `
+    <div class="screen">
+      ${header}
+      ${tabs}
       ${storageBanner}
       ${tidyBanner}
       ${calWarning}

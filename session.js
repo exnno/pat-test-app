@@ -765,6 +765,9 @@ function removeJobsFromPhone(ids) {
   }
   state.sessions = state.sessions.filter(s => !gone.has(s.id));
   if (gone.has(state.activeId)) state.activeId = null;
+  // V93: the cloud tab's list was read without these (they were here): read
+  // it again next time the tab opens, so they show there.
+  if (state.cloudJobs) state.cloudJobs.stale = true;
   save();
   return going.length;
 }

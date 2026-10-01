@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V92';
+const APP_VERSION = 'V93';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V91';
+const WELCOME_VERSION = 'V93';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -489,6 +489,16 @@ const SYNC_PAGER_V = 2;
 // its jobs cursor is cleared ONCE (2A) and every job is read back — rows this
 // phone already has resolve as no work (the V83.1 re-read, jobs only).
 const SYNC_CONF_V = 1;
+// V93 (Stage 5 part 2, R21/R22 — 1A). Which jobs come down to a phone that does
+// not hold them: a job dated within the last SYNC_WINDOW_DAYS days, or one whose
+// retest chase has started (2A). A FIXED rule, applied every time the pull meets
+// a job this phone hasn't got — not only on a fresh phone. Everything else stays
+// in the cloud and is one tap away on the Jobs screen's "In the cloud" tab.
+const SYNC_WINDOW_DAYS = 30;
+// V93 (8A): the cloud list read for the Jobs screen's "In the cloud" tab — rows
+// per request, and the most it will read (said on screen if reached).
+const SYNC_CLOUD_PAGE = 1000;
+const SYNC_CLOUD_MAX = 20000;
 // v81.2 (decision 2D). Reading is driven by what the engineer DOES — every
 // screen change is a moment they might be expecting the other phone's work —
 // with a slow backstop for standing still. The interval matters far more than

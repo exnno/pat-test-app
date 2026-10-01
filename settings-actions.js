@@ -1159,13 +1159,14 @@ function photoMgrDelete(arg) {
 // (3A), then check AGAIN at the moment of removing (syncPruneFilter, fresh).
 // A job comes off this phone only if it is safe in the cloud (sync.js
 // syncJobsSafety). What is removed is recorded as cleared (the pull leaves it in
-// the cloud) and can be brought back (10A, syncBringBack).
+// the cloud) and can be brought back from the Jobs screen's "In the cloud" tab
+// (V93 7A — the V91 Cleared section became a link there; one path).
 //
 // The screen has no text inputs, so it may render() freely.
 
 function _jmReset() {
   const old = state.jobMgr || {};
-  state.jobMgr = { filter: 'all', selecting: false, selected: {}, busy: '', cleared: null,
+  state.jobMgr = { filter: 'all', selecting: false, selected: {}, busy: '',
     gen: (old.gen || 0) + 1 };
 }
 
@@ -1288,7 +1289,7 @@ function jobsRemoveAsk(ids, onDone) {
     openConfirmSheet({
       title: `Remove ${_jmPlural(g.clear.length, 'job')} from this phone?`,
       message: `${g.clear.length === 1 ? 'It stays' : 'They stay'} in the cloud and on your other phones, with ${g.clear.length === 1 ? 'its' : 'their'} photos (${_jmPlural(items, 'item')}). ` +
-        `You can bring ${g.clear.length === 1 ? 'it' : 'them'} back here from Settings \u2192 Backup \u2192 Jobs on this phone.` +
+        `You can bring ${g.clear.length === 1 ? 'it' : 'them'} back from the Jobs screen \u2192 \u2601 In the cloud.` +
         (kept ? ` ${_jmPlural(kept, 'job')} not safe in the cloud yet ${kept === 1 ? 'stays' : 'stay'} on this phone.` : '') +
         (online ? '' : ' No signal right now: checked against the last sync.'),
       confirmLabel: 'Remove',
@@ -1302,7 +1303,6 @@ function jobsRemoveAsk(ids, onDone) {
           if (jm && here()) {
             g2.clear.forEach(s => { delete jm.selected[String(s.id)]; });
             if (!Object.keys(jm.selected).length) jm.selecting = false;
-            jm.cleared = null;   // the cleared list has changed; look again
           }
           render();
           showToast(n ? `Removed ${_jmPlural(n, 'job')} from this phone`
@@ -1421,43 +1421,11 @@ function jobMgrRemoveSelected() {
   jobsRemoveAsk(ids);
 }
 
-// ---- 10A: cleared from this phone ----
-function jobMgrClearedLook() {
-  const jm = state.jobMgr;
-  if (typeof syncClearedLook !== 'function') return;
-  if (jm.cleared && jm.cleared.loading) return;
-  if (typeof _syncOffline === 'function' && _syncOffline()) {
-    showToast('No signal \u2014 try again when you\u2019re connected');
-    return;
-  }
-  jm.cleared = { loading: true, ok: false, jobs: [], gone: 0, error: '' };
-  render();
-  syncClearedLook().then((res) => {
-    if (state.jobMgr !== jm) return;
-    jm.cleared = res.ok
-      ? { ok: true, loading: false, error: '', at: new Date().toISOString(), jobs: res.jobs, gone: res.gone }
-      : { ok: false, loading: false, jobs: [], gone: 0,
-          error: res.offline ? 'No signal \u2014 try again when you\u2019re connected.' : (res.error || 'Couldn\u2019t reach the cloud. Try again.') };
-    if (state.view === 'jobManager') render();
-  });
-}
-
-function jobMgrBringBack(id) {
-  const jm = state.jobMgr;
-  if (!id || jm.busy || typeof syncBringBack !== 'function') return;
-  jm.busy = 'Bringing it back\u2026';
-  render();
-  syncBringBack([String(id)]).then((res) => {
-    if (state.jobMgr !== jm) { if (res.got) showToast('Brought back onto this phone'); return; }
-    jm.busy = '';
-    if (res.got) {
-      if (jm.cleared && Array.isArray(jm.cleared.jobs)) jm.cleared.jobs = jm.cleared.jobs.filter(j => j.id !== String(id));
-      showToast('Brought back onto this phone \u2014 its photos follow on the next sync');
-    } else if (res.offline) showToast('No signal \u2014 try again when you\u2019re connected');
-    else if (res.error) showToast(res.error);
-    else showToast('That job isn\u2019t in the cloud any more');
-    if (state.view === 'jobManager') render();
-  });
+// V93 (7A): the Cleared section is now a way to the cloud tab — one path.
+function jobMgrCloudLink() {
+  state.jobsTab = 'cloud';
+  setView('sessions');
+  cloudJobsLoad(false);
 }
 
 // V91 (9A): the photo age, from the Backup page (signed in).
@@ -1472,4 +1440,180 @@ function savePhotoAge() {
   state.photoAgeMonths = n;
   save();
   render();
+}
+
+// ============== V93 (roadmap Stage 5 part 2) — the "In the cloud" tab ==============
+//
+// The Jobs screen gains two tabs when signed in (4A): On this phone | ☁ In the
+// cloud. The cloud tab lists every job the account holds that is NOT on this
+// phone — old jobs a fresh phone never brought down (1A), jobs cleared from it
+// (3A) — from one LIST read (8A, sync.js syncCloudList: names and counts, never
+// a job's contents). The list is kept in memory for the app session
+// (state.cloudJobs) with a ⟳ to read it again; it is re-read when this phone
+// removes jobs (stale) or a different account is signed in. Search and the
+// month groups are worked out on the phone.
+//
+// Tap a job → it comes down onto this phone and opens (5A, syncBringBack: one
+// download; a locked job stays locked). Select → Bring onto this phone for
+// several. Nothing here deletes anything (permanent delete is Stage 5 part 3).
+//
+// ⚠ The search box is an input: typing refreshes only #cloud-list-area (as the
+// Jobs search does), never render(), or iOS drops the keyboard (MAP rule 3).
+
+function _cloudReset() {
+  state.cloudJobs = { loading: false, ok: false, error: '', at: '', uid: '', jobs: [],
+    capped: false, photos: false, stale: false, q: (state.cloudJobs && state.cloudJobs.q) || '',
+    selecting: false, selected: {}, busy: '' };
+}
+
+function cloudTabActive() {
+  return state.jobsTab === 'cloud' && typeof syncActive === 'function' && syncActive();
+}
+
+// The tab switch. Opening the cloud tab reads the list unless this session
+// already has a good one for this account.
+function jobsTabSet(tab) {
+  const t = tab === 'cloud' ? 'cloud' : 'phone';
+  if (state.jobsTab === t) return;
+  state.jobsTab = t;
+  if (t === 'cloud') cloudJobsLoad(false);
+  else if (state.cloudJobs) { state.cloudJobs.selecting = false; state.cloudJobs.selected = {}; }
+  render();
+}
+
+function cloudJobsLoad(force) {
+  if (!state.cloudJobs) _cloudReset();
+  const cj = state.cloudJobs;
+  if (cj.loading) return;
+  const uid = (typeof _syncCurrentUserId === 'function') ? _syncCurrentUserId() : '';
+  if (!force && cj.ok && !cj.stale && cj.uid === uid) return;
+  if (typeof syncCloudList !== 'function') return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    cj.error = 'No signal \u2014 the cloud list needs a connection.';
+    if (state.view === 'sessions') render();
+    return;
+  }
+  cj.loading = true;
+  cj.error = '';
+  if (state.view === 'sessions') render();
+  syncCloudList().then((res) => {
+    if (state.cloudJobs !== cj) return;
+    cj.loading = false;
+    if (res.ok) {
+      Object.assign(cj, { ok: true, stale: false, error: '', at: new Date().toISOString(), uid: res.uid,
+        jobs: res.jobs, capped: res.capped, photos: res.photos });
+    } else {
+      cj.error = res.offline ? 'No signal \u2014 the cloud list needs a connection.' : (res.error || 'Couldn\u2019t reach the cloud. Try again.');
+    }
+    if (state.view === 'sessions') render();
+  });
+}
+
+// What the tab shows: the list minus jobs now on this phone, filtered by the
+// search, newest first, grouped by month. Pure — render-core/review draw it.
+function cloudJobsModel() {
+  const cj = state.cloudJobs || {};
+  const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+  const all = (cj.jobs || []).filter(j => !local.has(j.id));
+  const q = String(cj.q || '').trim().toLowerCase();
+  const clientName = (id) => {
+    const c = (id && typeof clientById === 'function') ? clientById(id) : null;
+    return c && c.name ? c.name : '';
+  };
+  const rows = [];
+  for (const j of all) {
+    const client = clientName(j.clientId);
+    const title = j.site || j.name || 'Untitled job';
+    if (q) {
+      const hay = [j.site, j.name, client, j.certNo, j.date, (typeof formatDate === 'function' ? formatDate(j.date) : '')]
+        .join(' ').toLowerCase();
+      if (hay.indexOf(q) === -1) continue;
+    }
+    rows.push(Object.assign({}, j, { client, title }));
+  }
+  const groups = [];
+  let last = null;
+  for (const r of rows) {
+    const key = /^\d{4}-\d{2}/.test(r.date) ? r.date.slice(0, 7) : '';
+    if (!last || last.key !== key) {
+      let label = 'No date';
+      if (key) {
+        const idx = parseInt(key.slice(0, 4), 10) * 12 + parseInt(key.slice(5, 7), 10) - 1;
+        label = (typeof formatMonthIndex === 'function') ? formatMonthIndex(idx) : key;
+      }
+      last = { key, label, rows: [] };
+      groups.push(last);
+    }
+    last.rows.push(r);
+  }
+  return { total: all.length, shown: rows.length, groups, byId: new Map(rows.map(r => [r.id, r])) };
+}
+
+function cloudJobsSearch(v) {
+  if (!state.cloudJobs) _cloudReset();
+  state.cloudJobs.q = String(v || '');
+  if (typeof refreshCloudListAreaOnly === 'function') refreshCloudListAreaOnly();
+}
+
+function cloudJobsToggleSelecting() {
+  const cj = state.cloudJobs;
+  if (!cj || cj.busy) return;
+  cj.selecting = !cj.selecting;
+  cj.selected = {};
+  render();
+}
+
+// A tap: in select mode, tick it; otherwise bring it down and open it (5A).
+function cloudJobsTap(id) {
+  const cj = state.cloudJobs;
+  if (!cj || !id || cj.busy) return;
+  const key = String(id);
+  if (cj.selecting) {
+    if (cj.selected[key]) delete cj.selected[key]; else cj.selected[key] = true;
+    render();
+    return;
+  }
+  _cloudBring([key], true);
+}
+
+function cloudJobsBringSelected() {
+  const cj = state.cloudJobs;
+  if (!cj || cj.busy) return;
+  const ids = Object.keys(cj.selected || {});
+  if (!ids.length) return;
+  _cloudBring(ids, false);
+}
+
+function _cloudBring(ids, open) {
+  const cj = state.cloudJobs;
+  if (typeof syncBringBack !== 'function') return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    showToast('No signal \u2014 try again when you\u2019re connected');
+    return;
+  }
+  cj.busy = ids.length === 1 ? 'Bringing it onto this phone\u2026' : `Bringing ${ids.length} jobs onto this phone\u2026`;
+  render();
+  syncBringBack(ids).then((res) => {
+    if (state.cloudJobs === cj) {
+      cj.busy = '';
+      if (res.got) { cj.selecting = false; cj.selected = {}; }
+    }
+    if (res.got && open && ids.length === 1 && state.sessions.some(s => String(s.id) === ids[0])) {
+      // On the phone tab underneath, so Back from the job lands on the phone
+      // list where it now is. requestOpenSession keeps V10's reopen warning.
+      state.jobsTab = 'phone';
+      showToast('On this phone now \u2014 its photos download when you tap them');
+      requestOpenSession(ids[0]);
+      return;
+    }
+    if (res.got) {
+      showToast(`${res.got} job${res.got === 1 ? '' : 's'} brought onto this phone` +
+        (res.missing ? ` \u00b7 ${res.missing} no longer in the cloud` : ''));
+    } else if (res.offline) showToast('No signal \u2014 try again when you\u2019re connected');
+    else if (res.error) showToast(res.error);
+    else showToast(ids.length === 1 ? 'That job isn\u2019t in the cloud any more' : 'Those jobs aren\u2019t in the cloud any more');
+    // Deleted elsewhere since the list was read: read it again.
+    if (res.missing && state.cloudJobs === cj) cloudJobsLoad(true);
+    if (state.view === 'sessions') render();
+  });
 }
