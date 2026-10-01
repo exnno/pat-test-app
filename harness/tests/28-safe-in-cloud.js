@@ -473,7 +473,7 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 28g */
-  await t.group('28g — cleared jobs: names on a tap, then Bring back — safe at once, photos follow, stats not doubled (10A)', async () => {
+  await t.group('28g — cleared jobs: listed in the cloud tab (V93), then Bring back — safe at once, photos follow, stats not doubled (10A)', async () => {
     const app = await signedIn();
     const g = plainJob(app, 'ZZBRINGBACK', '2020-01-01');
     withItem(app, { assetNo: 'ZZBB2', result: 'fail' });
@@ -485,18 +485,21 @@ module.exports = async function () {
     await until(() => !onPhone(app, g));
     app.stopTimer();
     t.eq(app.fn('computeAppStats')().items, itemsBefore, 'removed: the lifetime count is unchanged (archived)');
+    // V93 (7A): Jobs on this phone's Cleared section is a link to the Jobs
+    // screen's cloud tab — one path. The cleared job is listed there.
     app.fn('jobMgrOpen')();
-    t.includes(app.html(), 'data-action="jm-cleared-look"', 'Show them is a tap, never automatic');
+    t.includes(app.html(), 'data-action="jm-cloud-link"', 'Jobs on this phone points to the cloud tab (V93 7A)');
     const n = sessGets(app).length;
-    tap(app, 'jm-cleared-look');
-    await until(() => !!(app.state().jobMgr.cleared && app.state().jobMgr.cleared.ok));
-    const cl = app.state().jobMgr.cleared;
-    t.eq(cl.jobs.length, 1, 'the cleared job is listed');
-    t.includes(cl.jobs[0].site, 'ZZBRINGBACK', '…by its name');
+    tap(app, 'jm-cloud-link');
+    await until(() => !!(app.state().cloudJobs && app.state().cloudJobs.ok));
+    const cl = app.state().cloudJobs;
+    const listed = cl.jobs.filter(j => j.id === g);
+    t.eq(listed.length, 1, 'the cleared job is listed in the cloud tab');
+    t.includes(listed[0].site, 'ZZBRINGBACK', '…by its name');
     const look = sessGets(app).slice(n).map(c => decodeURIComponent(c.url));
-    t.ok(look.length && look.every(u => !/select=id,doc[,&]/.test(u)), 'the look never downloads the job itself (R17)');
-    t.includes(app.html(), 'data-action="jm-bring-back"', 'with Bring back');
-    tap(app, 'jm-bring-back', g);
+    t.ok(look.length && look.every(u => !/select=id,doc[,&]/.test(u)), 'the list never downloads the job itself (R17)');
+    t.includes(app.html(), 'data-action="cloud-tap"', 'with a tap to bring it back');
+    tap(app, 'cloud-tap', g);
     await until(() => onPhone(app, g));
     app.stopTimer();
     t.ok(onPhone(app, g), 'it is back on this phone');

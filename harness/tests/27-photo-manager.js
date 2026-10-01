@@ -143,7 +143,9 @@ function fakeServer() {
     removes: () => calls.filter(c => is(c, '/storage/v1/object/photos', 'DELETE')),
     patches: () => calls.filter(c => is(c, '/rest/v1/photos', 'PATCH')),
     browseGets: () => calls.filter(c => is(c, '/rest/v1/photos', 'GET') && c.url.includes('order=id')),
-    jobGets: () => calls.filter(c => is(c, '/rest/v1/sessions', 'GET') && c.url.includes('doc-%3E%3E')),
+    // V93: the pull's list and the retest look also pick fields out of docs
+    // (date, retest) — a "job names" read is one that picks the SITE.
+    jobGets: () => calls.filter(c => is(c, '/rest/v1/sessions', 'GET') && /site(%3A|:)doc-%3E%3E/.test(c.url)),
     // A job on ANOTHER phone, with its photos in the cloud.
     otherJob(id, doc, o = {}) {
       tables.sessions.push({ id, user_id: UID, doc: Object.assign({ id, items: [] }, doc || {}), deleted: !!o.deleted, updated_at: stamp() });
