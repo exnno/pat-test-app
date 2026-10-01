@@ -1105,7 +1105,7 @@ const MUTATIONS = [
   {
     name: 'M147 (V80) a job that is live AND in the ledger is sent as deleted',
     file: 'sync.js',
-    from: "      if (live.has(id)) continue;                    // restored since: it's live\n",
+    from: "      if (live.has(id)) { stale.add(t); continue; }   // restored since: it's live\n",
     to:   '',
     why:  'a restored job would be wiped from the cloud straight after being re-sent',
   },
@@ -3240,6 +3240,41 @@ const MUTATIONS = [
     from: "if (d.want.has(id)) { if (d.got.has(id)) decide(d.got.get(id)); else blocked = true; }",
     to:   "if (d.want.has(id)) { if (d.got.has(id)) decide(d.got.get(id)); }",
     why:  "the cursor moves past a row nobody read (rule 10) — 29f",
+  },
+  {
+    name: "M447 (V92.1) a live job keeps its old tombstone",
+    file: "sync.js",
+    from: "      if (live.has(id)) { stale.add(t); continue; }   // restored since: it's live",
+    to:   "      if (live.has(id)) continue;   // restored since: it's live",
+    why:  "the tombstone survives the job's return and waits to fire the moment it leaves the phone (29g)",
+  },
+  {
+    name: "M448 (V92.1) a tombstone older than the clearing still fires",
+    file: "sync.js",
+    from: "      if (typeof cAt === 'string' && (typeof t.at !== 'string' || cAt >= t.at)) { stale.add(t); continue; }",
+    to:   "",
+    why:  "Peter's bug: a job shown safe, removed from the phone, is emptied in the cloud (29h)",
+  },
+  {
+    name: "M449 (V92.1) any cleared-list entry cancels a delete",
+    file: "sync.js",
+    from: "(typeof t.at !== 'string' || cAt >= t.at)) { stale.add(t); continue; }",
+    to:   "true) { stale.add(t); continue; }",
+    why:  "a real delete everywhere of a job once cleared never reaches the cloud (29i)",
+  },
+  {
+    name: "M450 (V92.1) the forgotten tombstones are not saved",
+    file: "sync.js",
+    from: "      if (typeof saveTombstones === 'function') saveTombstones();\n    }\n",
+    to:   "    }\n",
+    why:  "the stale tombstone is back after a reopen (29g)",
+  },
+  {
+    name: "M451 (V92.1) clearing a job again keeps its old cleared date",
+    file: "sync.js",
+    from: "    if (had) { if (had.at !== now) { had.at = now; changed = true; } continue; }",
+    to:   "    if (had) continue;",
+    why:  "after a restore, an old tombstone looks newer than the clearing and empties the job (29h)",
   },
 ];
 
