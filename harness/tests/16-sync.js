@@ -321,7 +321,11 @@ module.exports = async function () {
     app.online();
     // V88: the photo mirror loads on a timer tick after boot; until it has, the
     // prune guard clears nothing (decision 6A). Let it load, as a phone would.
-    await tick(5);
+    // V94: wait for the mirror itself, not a fixed 5 ms — under a full run's
+    // load the fake IndexedDB read can take longer, and this read "photos-unknown"
+    // (a timing defect in the test, not the app: the group passes alone).
+    for (let i = 0; i < 100 && !app.state().photoMetaReady; i++) await tick(5);
+    t.ok(app.state().photoMetaReady, 'the photo mirror has loaded (precondition)');
     await app.fn('syncPush')({});
     app.stopTimer();
     // ⚠ V91 (1A). This group's server answers every read with an empty account,

@@ -444,6 +444,9 @@ module.exports = async function () {
     fresh.srv.tables.sessions.push({ id: jid, user_id: UID, deleted: false, last_modified: '2026-09-29T09:00:00.000Z',
       updated_at: fresh.srv.stamp(), doc: { id: jid, site: 'ZZLATE', date: '2026-09-28', items: [{ id: 'ZZK-ITEM', assetNo: 'K1', result: 'fail' }] } });
     fresh.srv.otherRow({ id: 'ZZK2', session_id: jid, item_id: 'ZZK-ITEM' });
+    // V94: wait for the photo mirror rather than trust signedIn()'s 5 ms — this
+    // assertion flaked under a loaded full run (noted at V93). Same fix as 16i.
+    for (let i = 0; i < 100 && !fresh.state().photoMetaReady; i++) await tick(5);
     await run(fresh);
     t.notOk(fresh.srv.rowGets().some(c => /session_id=in\./.test(c.url)), 'fresh phone: one full read, no by-job fetch');
     t.ok(!!known(fresh).ZZK2, 'and the photo is known');
