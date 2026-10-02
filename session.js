@@ -987,6 +987,7 @@ function createSession() {
 
 function openSession(id, opts) {
   state.activeId = id;
+  state.lastLog = null;   // V94: Undo belongs to the visit that logged it
   const s = activeSession();
   if (!s) return;
   // v10: when called from the sessions-list search with an item-level match, we
@@ -1403,6 +1404,7 @@ function saveItem(result, readings) {
     const appended = { id: newId(), ...item };
     sess.items.push(appended);
     savedItemId = appended.id;
+    noteLastLog(sess, [appended], cleanType);   // V94: Undo
     // v18: learn this (location, type) pairing on first log (pass OR fail — a
     // failed item still belongs to that location). No-op when SQP is off.
     recordSqpUsage(cleanLocation, cleanType);
@@ -1438,6 +1440,9 @@ function passClicked() {
   // v8: belt-and-braces — UI disables the buttons when locked, but block here too.
   const sess = activeSession();
   if (sess && sess.locked) return;
+  // V94 (12A): a Multi Pick tile is selected — PASS logs its sequence. Before
+  // validateBeforeSave(), which would ask for an item type the tile replaces.
+  if (state.form.qpTile && typeof qpTileFire === 'function') { qpTileFire(state.form.qpTile); return; }
   const err = validateBeforeSave();
   if (err) { showToast(err); return; }
 
@@ -1493,6 +1498,7 @@ function commitPassResult() {
 function failClicked() {
   const sess = activeSession();
   if (sess && sess.locked) return;
+  if (state.form.qpTile) return;   // V94: a multi-pick is passes only (FAIL is greyed)
   const err = validateBeforeSave();
   if (err) { showToast(err); return; }
   feedback('fail', 'fail-btn');   // v17: haptic + neutral flash + (opt-in) fail tone
@@ -2014,9 +2020,11 @@ function copyLastResult() {
     // the capture/exposure note in config.js. Copy-last is a genuine first log
     // of a new item, so it stamps exactly like any other.
     item.ts = new Date().toISOString();
-    sess.items.push({ id: newId(), ...item });
+    const pushed = { id: newId(), ...item };
+    sess.items.push(pushed);
     // v18: learn the copied (location, type) pairing as a fresh log.
     recordSqpUsage(item.location, item.itemType);
+    noteLastLog(sess, [pushed], item.itemType);   // V94: Undo
   }
   markSessionDirty(sess);   // v14
   state.cursor++;
@@ -2087,6 +2095,7 @@ function repeatLastResult(n) {
 
   const last = sess.items[sess.items.length - 1];
   const cleanType = normaliseItemType(last.itemType);
+  const added = [];   // V94: for Undo
 
   for (let i = 0; i < total; i++) {
     const item = {
@@ -2101,9 +2110,11 @@ function repeatLastResult(n) {
     // only (see config.js). Copy-last and saveItem both stamp unconditionally.
     item.ts = new Date().toISOString();
     sess.items.push(item);
+    added.push(item);
     // v18: each copy is a genuine fresh log of this (location, type) pairing.
     recordSqpUsage(cleanLocation, cleanType);
   }
+  noteLastLog(sess, added, `Log again: ${cleanType}`);   // V94: one Undo for the batch
 
   markSessionDirty(sess);             // v14: new entries invalidate a prior export
   state.repeatSheetOpen = false;
@@ -2121,6 +2132,139 @@ function repeatLastResult(n) {
   saveSessions(); saveSqpHistory();
   render();
   showToast(`Added ${total} more`);
+}
+
+// ============== V94 — Undo (8, 9B, 14A, 15A, 16B) ==============
+// ↶ Undo sits beside Copy last when switched on (per phone, off by default). It
+// removes the most recent LOGGING action — one new item, or a whole batch (Log
+// again ×N, Multi Pick, a Multi Pick tile) — one level only. Edits to existing
+// items are never undoable.
+//
+// WHAT IS RECORDED. state.lastLog = { sessionId, ids, sigs, sqp, label }: the ids
+// of the items that action appended, and a JSON snapshot of each. Memory only:
+// a reload, or opening any job, forgets it.
+//
+// ⚠ IT IS CHECKED AT THE MOMENT OF THE TAP, not trusted from when it was noted
+// (undoAvailable). Those items must still be the LAST ones in the open job, in
+// order, and unchanged — an edit, a delete, another log after them, or a lock
+// greys the button. A stale record must never remove items the engineer has
+// since worked on.
+//
+// WHAT IT REVERSES. The items (their photos first — MAP rule 5), and Smart Quick
+// Pick's learning, only if the log recorded any. Lifetime stats need nothing:
+// they are worked out from the jobs. A new description the item added stays in
+// the list. The frozen Quick Pick row is NOT rebuilt (no reshuffle under the
+// thumb). Certificate numbers are never touched by logging.
+function noteLastLog(sess, items, label) {
+  if (!sess || !Array.isArray(items) || !items.length) return;
+  state.lastLog = {
+    sessionId: sess.id,
+    ids: items.map(it => it.id),
+    sigs: items.map(it => JSON.stringify(it)),
+    sqp: !!state.sqpEnabled,          // recordSqpUsage() no-ops while it is off
+    label: String(label || '')
+  };
+}
+
+function undoAvailable() {
+  if (!state.undoEnabled) return false;
+  const L = state.lastLog;
+  const sess = activeSession();
+  if (!L || !sess || sess.id !== L.sessionId || sess.locked) return false;
+  const n = L.ids.length;
+  const items = sess.items || [];
+  if (!n || items.length < n) return false;
+  for (let i = 0; i < n; i++) {
+    const it = items[items.length - n + i];
+    if (!it || it.id !== L.ids[i] || JSON.stringify(it) !== L.sigs[i]) return false;
+  }
+  return true;
+}
+
+// 14A: ask first — the button sits beside Copy last, and a mis-tap there would
+// otherwise delete a real item.
+function undoAsk() {
+  if (!undoAvailable()) {
+    showToast('Nothing to undo');
+    if (typeof refreshEntryAfterLog === 'function') refreshEntryAfterLog();
+    return;
+  }
+  const L = state.lastLog;
+  const sess = activeSession();
+  const n = L.ids.length;
+  const first = sess.items.length - n + 1;
+  const going = sess.items.slice(-n);
+  let message;
+  if (n === 1) {
+    const it = going[0];
+    message = `Remove item ${first} — ${it.itemType || 'item'}, ${String(it.result || '').toUpperCase()}?`;
+  } else {
+    message = `Remove items ${first}–${first + n - 1}${L.label ? ` (${L.label})` : ''}?`;
+  }
+  const photos = going.reduce((t, it) => t + ((it.result === 'fail' && it.id)
+    ? ((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id)
+      : (typeof photoCountForItem === 'function') ? photoCountForItem(it.id) : 0)
+    : 0), 0);
+  if (photos) message += ` ${photos === 1 ? 'Its photo' : `Its ${photos} photos`} will be deleted too.`;
+  openConfirmSheet({
+    title: 'Undo?',
+    message,
+    confirmLabel: n === 1 ? 'Remove it' : `Remove ${n} items`,
+    onConfirm: undoLastLog
+  });
+}
+
+function undoLastLog() {
+  // Checked again: the job may have changed while the sheet was open (a sync).
+  if (!undoAvailable()) { showToast('Nothing to undo — the job has changed'); refreshEntryAfterLog(); return; }
+  const L = state.lastLog;
+  const sess = activeSession();
+  const n = L.ids.length;
+  const start = sess.items.length - n;
+  const going = sess.items.slice(start);
+  const onNew = state.cursor >= sess.items.length;
+  const autoBefore = nextAssetNo(sess);
+
+  // Photos BEFORE the splice (MAP rule 5) — the same path deleteItem() uses,
+  // which also sends the delete to the cloud for any already uploaded.
+  if (typeof photosDeleteForItem === 'function') {
+    going.forEach(it => { if (it.id) { try { photosDeleteForItem(it.id); } catch (e) {} } });
+  }
+  if (L.sqp && typeof unrecordSqpUsage === 'function') {
+    going.forEach(it => unrecordSqpUsage(it.location, it.itemType));
+  }
+  sess.items.splice(start, n);
+  markSessionDirty(sess);
+  state.lastLog = null;
+
+  if (onNew) {
+    // 9B: the form stays on the next new item as it is — except an untouched
+    // automatic asset number, which goes back with the items it followed.
+    state.cursor = sess.items.length;
+    if (state.form.assetNo === autoBefore) state.form.assetNo = nextAssetNo(sess);
+  } else if (state.cursor >= start) {
+    state.cursor = sess.items.length;
+    loadFormForCursor();
+  }
+  saveSessions();
+  if (L.sqp) saveSqpHistory();
+  refreshEntryAfterLog();
+  showToast(n === 1 ? 'Undone — item removed' : `Undone — ${n} items removed`);
+}
+
+// V94 (6): how many items in THIS job are at the location on the form — shown
+// in the item readout ("Item 21 (new) · 15 at this location"). Matched the way
+// an engineer reads it: case, outer spaces and doubled spaces don't count.
+// null when the location is blank (the readout then shows nothing).
+function locationKey(loc) {
+  return String(loc || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+function locationCountInJob(sess, location) {
+  const key = locationKey(location);
+  if (!sess || !key) return null;
+  let n = 0;
+  (sess.items || []).forEach(it => { if (locationKey(it.location) === key) n++; });
+  return n;
 }
 
 function deleteItem(idx) {

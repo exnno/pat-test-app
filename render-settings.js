@@ -569,11 +569,18 @@ function renderSettingsMultiPick() {
   for (let i = 0; i < MULTIPICK_MAX_SLOTS; i++) {
     const s = slots[i] || { name: '', items: [] };
     const seqValue = (s.items || []).join(', ');
+    // V94 (7): which Quick Pick tile, if any. A plain <select> (fine on iOS);
+    // choosing a slot here clears it from any other row (mp-qp → mpQpPicked).
+    const qpOpts = [['', 'Not on Quick Pick'], ['1', 'Slot 1 — bottom right'], ['2', 'Slot 2 — bottom middle'], ['3', 'Slot 3 — bottom left']]
+      .map(([v, label]) => `<option value="${v}"${String(s.qp || '') === v ? ' selected' : ''}>${label}</option>`).join('');
     slotRows.push(`
       <div class="mp-slot">
         <div class="mp-slot-head">Multi-pick ${i + 1}</div>
         <input class="input mp-slot-name" value="${escapeHTML(s.name || '')}" placeholder="Name (optional) — e.g. Desk PC setup">
         <input class="input mp-slot-seq" value="${escapeHTML(seqValue)}" placeholder="Lead, AC Adapter, Lead, PC, Lead, Monitor">
+        <label class="mp-slot-qp-label">Quick Pick tile
+          <select class="input mp-slot-qp" data-change-action="mp-qp">${qpOpts}</select>
+        </label>
       </div>
     `);
   }
@@ -584,7 +591,7 @@ function renderSettingsMultiPick() {
 
       <div class="settings-section">
         <h2 class="h2">Multi Pick button</h2>
-        <p class="muted">Multi Pick logs a fixed list of items as PASS, in order, with a single tap — handy on jobs with lots of identical setups, and easy to leave off when you don't need it.</p>
+        <p class="muted">Multi Pick logs a fixed list of items as PASS, in order, with a single tap — handy on jobs with lots of identical setups, and easy to leave off when you don't need it. This switch shows or hides the Multi Pick button at the bottom of the test screen; Quick Pick tiles (below) work either way.</p>
         <div class="toggle-row">
           <div class="toggle-row-text">
             <div class="toggle-row-title">Show on entry screen</div>
@@ -602,6 +609,7 @@ function renderSettingsMultiPick() {
         <p class="muted">For each one, type the item types you want logged, <strong>separated by commas</strong>, in the order they should be added. Add a name to label the button, or leave it blank to show the list itself. Leave a multi-pick's items blank to hide it. Up to ${MULTIPICK_MAX_SLOTS}.</p>
         <div class="mp-example">Example — items <strong>Lead, AC Adapter, Lead, PC, Lead, Monitor</strong> log six passes in that order, each on whatever location is in the entry screen's Location field.</div>
         ${slotRows.join('')}
+        <p class="muted">💡 <strong>Quick Pick tile</strong> (optional): puts that multi-pick on the bottom row of the Quick Pick buttons. Tap the tile, then <strong>PASS</strong> — the whole list is logged, the first item taking the asset number on screen. Each tile takes one button's place, so your preset shows one fewer item type per tile.</p>
       </div>
 
       <!-- v77: discoverability for the "Log again ×N" hold. Placed here, on the
@@ -685,6 +693,21 @@ function renderSettingsDisplay() {
           </div>
           <label class="toggle-switch">
             <input type="checkbox" id="sound-toggle" data-change-action="sound" ${state.soundEnabled ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Undo button</h2>
+        <p class="muted">Puts <strong>↶ Undo</strong> beside Copy last on the test screen. It takes back the last item you logged — or the whole batch from Log again or Multi Pick — after asking. Only the most recent, and only while those items are untouched. This phone only.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Show Undo</div>
+            <div class="toggle-row-sub">${state.undoEnabled ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="undo-toggle" data-change-action="undo" ${state.undoEnabled ? 'checked' : ''}>
             <span class="toggle-slider"></span>
           </label>
         </div>

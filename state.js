@@ -429,6 +429,12 @@ let state = {
   // short Web Audio tone plays on pass/fail/copy alongside the haptic call.
   soundEnabled: false,
 
+  // V94 (15A, 16B): the ↶ Undo button beside Copy last. Per phone, default OFF.
+  undoEnabled: false,
+  // V94: what the last logging action appended, for Undo (session.js
+  // noteLastLog). Memory only — never saved, never in a backup.
+  lastLog: null,
+
   // v17: Item timestamps. Default OFF. Gates both capture (stamping item.ts on
   // first save) and display (Overview HH:MM + CSV column output).
   timestampsEnabled: false,

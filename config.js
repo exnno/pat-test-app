@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V93';
+const APP_VERSION = 'V94';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V93';
+const WELCOME_VERSION = 'V94';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -1043,6 +1043,13 @@ const SOUNDFX_KEY = 'pat:soundfx';          // v17: '1' | '0', default '0'
 // so existing users see no change unless they enable it.
 const TIMESTAMPS_KEY = 'pat:timestamps';    // v17: '1' | '0', default '0'
 
+// V94 (15A, 16B): the ↶ Undo button beside Copy last. PER PHONE (a personal
+// habit — and keeping it out of the synced settings_work row means no row
+// changes shape). '1' | '0', default OFF: only an explicit '1' turns it on.
+// Not synced; in backups and setup exports like Sound. Factory reset (Stage 10)
+// must clear it.
+const UNDO_KEY = 'pat:undo';
+
 // v16: Multi Pick. A single GLOBAL set of up to 6 named, ordered item-type
 // sequences, plus a show/hide toggle for the entry-screen button. Stored as one
 // JSON object under MULTIPICK_KEY:
@@ -1054,6 +1061,13 @@ const TIMESTAMPS_KEY = 'pat:timestamps';    // v17: '1' | '0', default '0'
 // Slots with no items are dropped on save and never shown in the sheet.
 const MULTIPICK_KEY = 'pat:multipick';
 const MULTIPICK_MAX_SLOTS = 6;
+// V94 (7, 13A): a multi-pick may also sit in the Quick Pick grid as a tile —
+// `qp` on the slot (1 | 2 | 3; absent = not on the grid). Slot 1 is the bottom
+// row's RIGHT cell, 2 the middle, 3 the left. Stored on the multi-pick itself so
+// it syncs with it (13A); a slot without `qp` is byte-identical to V93's shape.
+// ⚠ Mixed versions: a V93 phone that SAVES Multi Pick settings sends the row
+// without `qp`, and every V94 phone takes that (one-sided change) — tiles gone.
+const QP_TILE_SLOTS = 3;
 
 // v15: Sessions-list filter persistence. Two independent filters that combine
 // (AND) and sit beside the Sort control. Both default to 'all'.

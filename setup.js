@@ -68,6 +68,7 @@ function buildSetupBundle(label, include) {
       hapticsEnabled: state.hapticsEnabled,
       soundEnabled: state.soundEnabled,
       timestampsEnabled: state.timestampsEnabled,
+      undoEnabled: state.undoEnabled,   // V94
       multiPick: state.multiPick,
       sqpEnabled: state.sqpEnabled
       // NOTE: deliberately NOT sqpHistory — learned history is device-specific.
@@ -263,6 +264,7 @@ function applySetupBundle(data) {
     }
     if (typeof pr.hapticsEnabled === 'boolean') state.hapticsEnabled = pr.hapticsEnabled;
     if (typeof pr.soundEnabled === 'boolean') state.soundEnabled = pr.soundEnabled;
+    if (typeof pr.undoEnabled === 'boolean') state.undoEnabled = pr.undoEnabled;   // V94
     if (typeof pr.timestampsEnabled === 'boolean') state.timestampsEnabled = pr.timestampsEnabled;
     state.multiPick = normaliseMultiPickConfig(pr.multiPick);
     if (typeof pr.sqpEnabled === 'boolean') state.sqpEnabled = pr.sqpEnabled;

@@ -231,11 +231,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>For the invite-only cloud test.</strong> If you're not signed in to the cloud, nothing has changed for you in this update.</li>
-        <li><strong>Two tabs on the Jobs screen.</strong> <strong>On this phone</strong> is your jobs list as before. <strong>&#9729; In the cloud</strong> lists every job that isn't on this phone, with its items, fails and photos.</li>
-        <li><strong>A new phone brings recent work only.</strong> A new or reset phone brings down the last 30 days of jobs, plus any job whose retest reminder is due. Everything older stays in the cloud &mdash; nothing on a phone you already use is taken off.</li>
-        <li><strong>Tap a cloud job</strong> to bring it onto this phone and open it. Its photos download when you tap them. <strong>Select</strong> brings several at once.</li>
-        <li><strong>Jobs you remove from this phone</strong> are in the cloud tab too &mdash; that's where you bring them back now.</li>
+        <li><strong>Location count.</strong> The item line on the test screen now says how many items you've logged at the location on the form &mdash; e.g. <strong>Item 21 (new) &middot; 15 at this location</strong>. It counts this job only.</li>
+        <li><strong>Multi Pick on the Quick Pick grid.</strong> In Settings &rarr; Multi Pick, give any multi-pick a <strong>Quick Pick slot</strong> (1 is bottom-right, 2 the middle, 3 the left). It appears as a &#xFF0B; tile: tap it, then <strong>PASS</strong>, exactly like an item &mdash; the whole list is logged. Optional: assign nothing and Quick Pick is just as before. The Multi Pick button works as it always has.</li>
+        <li><strong>Undo.</strong> Switch it on in Settings &rarr; Display Settings and <strong>&#8630; Undo</strong> sits beside Copy last. It takes back the last item you logged &mdash; or the whole batch from Log again or Multi Pick &mdash; after asking. Off unless you turn it on.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -1358,6 +1356,21 @@ function assetFieldHTML() {
     `${paired ? ' inputmode="none"' : ''}>`;
 }
 
+// V94 (6): " · 15 at this location" for the item readout — '' while the
+// location box is blank. Shared by renderEntry and the in-place refresh below.
+function locationCountText() {
+  const n = (typeof locationCountInJob === 'function')
+    ? locationCountInJob(activeSession(), state.form.location) : null;
+  return (n === null) ? '' : ` · ${n} at this location`;
+}
+
+// The location is confirmed (blur, a suggestion) without a render — repaint
+// just the count, so the keyboard and the rest of the form are untouched.
+function refreshLocationCountOnly() {
+  const el = (typeof document !== 'undefined') ? document.getElementById('loc-count') : null;
+  if (el) el.textContent = locationCountText();
+}
+
 // v81.1, decision 3A. A change arrived from the other device for the job that
 // is open right now, and was deliberately held back rather than applied under
 // the engineer's thumb. Without this line the job simply changes — or vanishes —
@@ -1418,8 +1431,19 @@ function renderEntry() {
   // v20: read the FROZEN row (cached per location). It only recomputes when the
   // confirmed location changes — logging a PASS no longer reshuffles buttons.
   const orderedTypes = sqpRowForLocation(state.itemTypes, state.form.location);
-  const quickButtons = orderedTypes.map(t => `
+  // V94 (7): Multi Pick tiles on the bottom row (slot 1 right, 2 middle, 3 left).
+  // Each takes one of the nine cells, so the preset fills the rest as usual and
+  // its LAST types (after Smart Quick Pick's ordering) are the ones that drop
+  // off. No tiles assigned → this is V93's grid exactly. The tiles are placed by
+  // CSS (.qp-tile-N), so the types flow around them however few there are.
+  // ⚠ sess.locked, not isLocked: that const is declared further down (TDZ).
+  const tiles = (typeof qpTiles === 'function') ? qpTiles() : [];
+  const shownTypes = tiles.length ? orderedTypes.slice(0, Math.max(0, 9 - tiles.length)) : orderedTypes;
+  const tileOff = (!!sess.locked || isExisting) ? ' disabled' : '';
+  const quickButtons = shownTypes.map(t => `
     <button class="quick-btn ${state.form.itemType === t ? 'active' : ''}" data-action="quick-pick" data-arg="${escapeHTML(t)}" data-type="${escapeHTML(t)}">${escapeHTML(t)}</button>
+  `).join('') + tiles.map(tl => `
+    <button class="quick-btn qp-tile qp-tile-${tl.qp} ${state.form.qpTile === tl.qp ? 'active' : ''}" data-action="qp-tile" data-arg="${tl.qp}"${tileOff}><span class="qp-tile-plus">＋</span>${escapeHTML(qpTileLabel(tl.slot))}</button>
   `).join('');
 
   const notesBlock = state.form.showNotes
@@ -1538,7 +1562,7 @@ function renderEntry() {
 
   const progressRow = `
     <div class="progress-row"${flashSearchJump ? ' data-search-jump="1"' : ''}>
-      <div class="progress">Item ${state.cursor + 1} ${isExisting ? `of ${sess.items.length}` : '(new)'}${resultBadge}</div>
+      <div class="progress">Item ${state.cursor + 1} ${isExisting ? `of ${sess.items.length}` : '(new)'}${resultBadge}<span class="loc-count" id="loc-count">${locationCountText()}</span></div>
       ${isExisting ? `<button class="del-icon-top" id="del-item-btn" data-action="delete-current-item" aria-label="Delete item" title="Delete item">🗑</button>` : ''}
     </div>
   `;
@@ -1555,7 +1579,24 @@ function renderEntry() {
   ` : '';
 
   const passFailDisabled = isLocked ? 'disabled' : '';
+  // V94 (12A): a selected Multi Pick tile greys FAIL — a multi-pick is passes only.
+  const failDisabled = (isLocked || state.form.qpTile) ? 'disabled' : '';
   const copyDisabled = (!hasLast || isLocked) ? 'disabled' : '';
+
+  // V94 (8, 16B): with Undo switched on, Copy last shares its row with ↶ Undo
+  // (about 70/30), and its label shortens so the item it copies still shows.
+  // Undo is ALWAYS drawn while switched on — greyed when there is nothing to
+  // undo — so nothing moves under the thumb. Off: the row is V93's exactly.
+  const copyLabel = state.undoEnabled ? '⎘ Copy last' : '⎘ Copy last result';
+  const copyBtnHTML = `<button class="copy-last-btn" id="copy-last-btn" data-action="copy-last" ${copyDisabled}>
+        ${copyLabel}${lastInfo}
+      </button>`;
+  const copyUndoRow = state.undoEnabled
+    ? `<div class="copy-undo-row">
+        ${copyBtnHTML}
+        <button class="undo-btn" id="undo-btn" data-action="undo-last" aria-label="Undo the last item logged" ${(typeof undoAvailable === 'function' && undoAvailable()) ? '' : 'disabled'}>↶ Undo</button>
+      </div>`
+    : copyBtnHTML;
 
   // v16: Multi Pick. Full-width button at the very bottom of the entry screen,
   // shown only when the feature is enabled in Settings. Disabled (like Pass/Fail)
@@ -1821,14 +1862,12 @@ function renderEntry() {
 
       <div class="pass-fail-row">
         <button class="pass-btn" id="pass-btn" data-action="log-pass" ${passFailDisabled}><span class="icon">✓</span>PASS</button>
-        <button class="fail-btn" id="fail-btn" data-action="log-fail" ${passFailDisabled}><span class="icon">✗</span>FAIL</button>
+        <button class="fail-btn" id="fail-btn" data-action="log-fail" ${failDisabled}><span class="icon">✗</span>FAIL</button>
       </div>
 
       ${entryPhotoRow}
 
-      <button class="copy-last-btn" id="copy-last-btn" data-action="copy-last" ${copyDisabled}>
-        ⎘ Copy last result${lastInfo}
-      </button>
+      ${copyUndoRow}
 
       <div class="nav-row">
         <button class="nav-btn" id="prev-btn" data-action="cursor-prev" ${state.cursor === 0 ? 'disabled' : ''}>‹ Prev</button>

@@ -630,6 +630,15 @@ function setHaptics(enabled) {
 // v17: opt-in sound feedback. Flipping it on plays a sample pass tone so the
 // user immediately hears what they've enabled (and it doubles as the first
 // user-gesture that unlocks the AudioContext on iOS). Flipping off is silent.
+// V94 (15A): the Undo button, per phone. Turning it off forgets any pending
+// undo. (Logging still notes itself while it is off — it costs nothing, and
+// undoAvailable() checks the record against the job at the tap anyway.)
+function setUndo(enabled) {
+  state.undoEnabled = !!enabled;
+  if (!state.undoEnabled) state.lastLog = null;
+  save();
+}
+
 function setSound(enabled) {
   state.soundEnabled = !!enabled;
   save();

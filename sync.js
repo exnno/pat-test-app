@@ -1857,7 +1857,15 @@ function _syncGeneralNormalise(id, raw) {
   }
   if (sid === SYNC_MULTIPICK_ID) {
     const m = (typeof normaliseMultiPickConfig === 'function') ? normaliseMultiPickConfig(r) : { enabled: false, slots: [] };
-    return { id: sid, enabled: !!m.enabled, slots: (m.slots || []).map(s => ({ name: String(s.name || ''), items: (s.items || []).map(String) })) };
+    // V94 (13A): `qp` (the Quick Pick tile) travels with its multi-pick — only
+    // when set, so a config with no tiles hashes exactly as on V93 and nobody's
+    // row looks changed by the upgrade. The normaliser above already dropped an
+    // invalid or clashing value.
+    return { id: sid, enabled: !!m.enabled, slots: (m.slots || []).map(s => {
+      const o = { name: String(s.name || ''), items: (s.items || []).map(String) };
+      if (s.qp) o.qp = s.qp;
+      return o;
+    }) };
   }
   if (sid === SYNC_SQP_ID) {
     const history = (typeof normaliseSqpHistory === 'function') ? normaliseSqpHistory(r.history) : {};
@@ -1971,7 +1979,7 @@ function _syncApplyGeneral(id, doc) {
     if (typeof ensureAllCsvColumns === 'function') ensureAllCsvColumns();   // a column this version has and the sender didn't
     return true;
   }
-  if (sid === SYNC_MULTIPICK_ID) { state.multiPick = { enabled: d.enabled, slots: d.slots.map(s => ({ name: s.name, items: s.items.slice() })) }; return true; }
+  if (sid === SYNC_MULTIPICK_ID) { state.multiPick = { enabled: d.enabled, slots: d.slots.map(s => (s.qp ? { name: s.name, items: s.items.slice(), qp: s.qp } : { name: s.name, items: s.items.slice() })) }; return true; }
   if (sid === SYNC_SQP_ID) {
     state.sqpHistory = d.history;
     try { if (d.resetAt) localStorage.setItem(SQP_RESET_KEY, d.resetAt); } catch { /* ignore */ }
@@ -2046,7 +2054,8 @@ function _syncGeneralDiffs(id, local, doc) {
     if (!out.length) out.push({ label: 'Column order or names', here: 'Different', cloud: 'Different' });
   } else if (sid === SYNC_MULTIPICK_ID) {
     add('Multi Pick', onOff(L.enabled), onOff(C.enabled));
-    const slots = (x) => x.slots.map(s => s.name + ' (' + s.items.join(', ') + ')').join('; ');
+    // V94: a tile-only difference must still show as a difference.
+    const slots = (x) => x.slots.map(s => s.name + ' (' + s.items.join(', ') + ')' + (s.qp ? ' [Quick Pick ' + s.qp + ']' : '')).join('; ');
     add('Multi Picks', slots(L), slots(C));
   }
   return out;

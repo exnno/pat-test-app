@@ -1,4 +1,4 @@
-# PATGo — Code Map (V93)
+# PATGo — Code Map (V94)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -362,10 +362,22 @@ Location→item-type learning, scoring, ordering, history persistence.
 **Coupling:** tuning constants in config.js. Toasts via feedback.js; confirms in
 dispatch.js. ⚠ v86: `clearSqpHistory`/`rebuildSqpHistory` stamp `SQP_RESET_KEY`
 (`markSqpReset`) — sync.js lets a later reset beat the merged counts.
+v94: `unrecordSqpUsage` is `recordSqpUsage`'s reverse — called only by Undo
+(session.js `undoLastLog`).
 
-### multipick.js (~135 ln) — Multi Pick
-Slot config, the batch-log fire path, settings save.
-**Touch to:** change the multi-pick sheet or its settings.
+### multipick.js (~290 ln) — Multi Pick + its Quick Pick tiles (v94)
+Slot config, the batch-log fire path, settings save. v94: a multi-pick's `qp`
+(1|2|3) puts it on the Quick Pick grid as a tile — `qpTiles`, `qpTileSelect`,
+`qpTileClear`, `qpTileFire` (PASS with a tile), `mpQpPicked` (settings clash).
+**Touch to:** change the multi-pick sheet, its settings, or the tiles.
+**Coupling (v94):** the tile is drawn by **render-core.js** `renderEntry` (types
+sliced to 9 − tiles; CSS places tiles on row 3); selected in `state.form.qpTile`,
+which `loadFormForCursor` does not rebuild (so it clears like the item type);
+cleared by **dispatch.js** `quick-pick` and **events.js** f-type input / type
+suggestion; **session.js** `passClicked` branches to `qpTileFire` BEFORE
+`validateBeforeSave`; `failClicked` refuses. `qp` must survive the
+normaliser here AND **sync.js** `_syncGeneralNormalise` / `_syncApplyGeneral` /
+`_syncGeneralDiffs` (13A). Every batch path calls `noteLastLog` (Undo).
 **Coupling:** computes asset numbers via `nextAssetNo()` and clears the scan
 carry-forward flags before `loadFormForCursor()` (rule 4). Stamps `ts`
 unconditionally since v77 — see the session.js entry.
@@ -529,6 +541,14 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   signed in: **feedback.js** `openChoiceSheet` → remove from this phone
   (**settings-actions.js** `jobsRemoveAsk`) or `deleteEverywhereAsk` (second
   confirm) → `deleteSession`. `pruneOldSessions` signed in → `jobMgrOpen`.
+- v94 Undo: every APPEND path (`saveItem`, `copyLastResult`,
+  `repeatLastResult`, **multipick.js** `multiPickFire` / `qpTileFire`) calls
+  `noteLastLog`; edit branches don't. `undoAvailable` re-checks at the tap (still
+  last, unchanged — JSON snapshot). `undoLastLog` sweeps photos BEFORE the splice
+  (rule 5) and calls **sqp.js** `unrecordSqpUsage`. `openSession` clears
+  `state.lastLog`. A new append path must call `noteLastLog` or Undo takes back
+  the item BEFORE it. v94 `locationCountInJob` feeds **render-core.js**
+  `locationCountText`.
 - `captureWizardStep()` is the last legacy writer of the instrument flat mirror
   and calls `adoptMirrorIntoInstruments()` (rule 7).
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
@@ -615,6 +635,11 @@ long-press is gone — `setupLongPress` (utils.js) now has no caller.
 ⚠ v93: `renderSessions()` draws the "On this phone | ☁ In the cloud" tabs when
 `syncActive()`; the cloud tab returns early with **render-review.js**
 `renderCloudJobsHTML()` (no banners, no new-session form there).
+⚠ v94: the entry screen's location count (`#loc-count`, `locationCountText`) is
+repainted in place by `refreshLocationCountOnly()` from **events.js** location
+blur / suggestion pick (no render). Multi Pick tiles + `failDisabled` + the
+Copy last / ↶ Undo row (`state.undoEnabled`) are built here — the tile block
+must read `sess.locked`, not `isLocked` (declared later: TDZ).
 
 ### render-review.js (~1130 ln) — review & manage screens — NEW v72
 Overview (+ `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
@@ -811,6 +836,8 @@ after a send), never held. SQP: `decideSqp`, highest count wins, a later
 `SQP_RESET_KEY` beats it, never held, never counted. ⚠ Both merged rows TAKE the
 cloud's copy when only the cloud moved — merging then re-sends this phone's
 order for ever (23f, M313). Open screens hold rows back (`SYNC_GENERAL_VIEWS`).
+⚠ v94: the MULTIPICK row carries a slot's `qp` (Quick Pick tile) ONLY when set —
+normalise, apply and diffs all three; a config with no tiles hashes as on V93.
 Sync page group 'gs'. Couples to: storage.js (`readingTagForReason`,
 `ensureAllCsvColumns`, `saveSettings`), sqp.js (`normaliseSqpHistory`,
 `bumpSqpHistoryVersion`, `invalidateSqpRow`, `buildSqpHistory`), multipick.js

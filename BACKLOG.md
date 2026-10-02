@@ -20,6 +20,28 @@ still signed in would pull its old jobs straight back. Most destructive button i
 the app, so the confirm needs to be genuinely hard to hit by accident.
 V91 adds: TIDY_OFFER_KEY (the offer's timer) and PHOTO_AGE_KEY (a setting — the
 settings level decides); `conf`/`confV` live inside SYNC_STATE_KEY.
+V94 adds: UNDO_KEY (`pat:undo`, the Undo switch — a setting, settings level).
+
+### Visual inspection tick (PN) — postponed at V94 (11D)
+Peter worried it would harm the entry screen. Placements offered at the V94 round:
+A a chip on the Asset number label line (recommended — no new space); B hold PASS
+for "Pass — visual only" (hidden, passes only); C mark items afterwards in Overview
+select mode (no entry-screen change; could add to A); D per item type in the preset
+(automatic, but edges towards S9). If revived: 4A (a "Visual only" certificate
+column only when used + a hidden CSV column, import reads it) and 5A (PASS skips the
+readings sheet) were the proposals. Stored as an item field only when ticked.
+
+### V94 residuals (known, accepted)
+- Undo of a fail whose staged photos are still being written (a tap within a
+  moment of saving) could leave that photo without its item. The confirm sheet
+  makes this a two-tap race; not seen in the harness.
+- A V93 phone that SAVES Multi Pick settings sends the row without tiles and every
+  V94 phone takes it (13A, accepted — test phones only).
+- Smart Quick Pick: an undo's decrement can be outvoted by the merge when both
+  phones moved (highest count wins) — harmless.
+- The location count can wrap the item readout onto two lines on a narrow phone
+  with the 🗑 showing (accepted at the spec round).
+- S4 (asset ID already used) is V95 and needs a cloud check (V93 window).
 
 ### V93 residuals (known, accepted)
 - Search, asset history (V61) and the certificate-number skip see jobs on this
@@ -31,7 +53,7 @@ settings level decides); `conf`/`confV` live inside SYNC_STATE_KEY.
 - The cloud list is read whole on opening the tab (8A, ~200 bytes a job); at
   SYNC_CLOUD_MAX (20,000) it stops and says so.
 - A job's date is editable; the window uses it as stored.
-- Storage view and permanent cloud delete: Stage 5 part 3 (maybe V94).
+- Storage view and permanent cloud delete: Stage 5 part 3 (optional, not chosen at V94).
 
 ### V92.1 (fixed — data loss)
 - A job shown 🛡, removed from the phone, was emptied in the cloud by a stale

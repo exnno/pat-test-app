@@ -132,7 +132,7 @@ function bindFocusFields() {
         // changed, so rebuild the FROZEN row (v20) and full-render to show it.
         // Otherwise the lightweight suggestions-only refresh is enough.
         if (state.sqpEnabled && locationChanged) { invalidateSqpRow(); render(); }
-        else renderLocationSuggestionsOnly();
+        else { renderLocationSuggestionsOnly(); refreshLocationCountOnly(); }   // V94 (6)
       }, 150);
     };
   }
@@ -142,6 +142,7 @@ function bindFocusFields() {
   if ($('f-type')) {
     $('f-type').oninput = e => {
       const val = e.target.value;
+      if (typeof qpTileClear === 'function') qpTileClear();   // V94: typing replaces a tile
       state.form.itemType = val;
       document.querySelectorAll('.quick-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.type === val);
@@ -466,6 +467,7 @@ function renderSuggestionsOnly(fromTyping) {
       // (the V57 fix); the click swallow kills the trailing ghost click that V57
       // missed (which was landing on Notes / PASS below the field).
       el.onpointerdown = makeSuggestionCommit((el) => {
+        if (typeof qpTileClear === 'function') qpTileClear();   // V94
         state.form.itemType = el.dataset.suggest;
         const inp = document.getElementById('f-type');
         if (inp) inp.value = el.dataset.suggest;
@@ -543,7 +545,7 @@ function renderLocationSuggestionsOnly(fromTyping) {
         // v18/v20: tapping a suggestion confirms the location, so rebuild the
         // frozen row (v20) and full-render when Smart Quick Pick is on.
         if (state.sqpEnabled) { invalidateSqpRow(); render(); }
-        else renderLocationSuggestionsOnly();
+        else { renderLocationSuggestionsOnly(); refreshLocationCountOnly(); }   // V94 (6)
       });
     });
   }, 'location-suggestions', fromTyping ? () => renderLocationSuggestionsOnly(false) : null);

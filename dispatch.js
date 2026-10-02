@@ -356,6 +356,7 @@ registerActions({
 
   // Quick-pick item-type buttons. data-arg carries the type.
   'quick-pick': (arg, el) => {
+    if (typeof qpTileClear === 'function') qpTileClear();   // V94: a type replaces a tile
     state.form.itemType = arg;
     const inp = document.getElementById('f-type');
     if (inp) inp.value = arg;
@@ -371,6 +372,9 @@ registerActions({
   'log-pass': () => passClicked(),
   'log-fail': () => failClicked(),
   'copy-last': () => copyLastResult(),
+  // V94: Multi Pick tile in the Quick Pick grid (12A) and Undo (8, 14A).
+  'qp-tile': (arg) => qpTileSelect(parseInt(arg, 10)),
+  'undo-last': () => undoAsk(),
   'cursor-prev': () => moveCursor(-1),
   'cursor-next': () => moveCursor(1),
   'skip-new': () => skipToNew(),
@@ -1151,6 +1155,9 @@ registerChangeActions({
   // Display settings toggles — each re-renders to refresh its On/Off sub-text
   'haptics': (checked) => { setHaptics(checked); render(); },
   'sound': (checked) => { setSound(checked); render(); },
+  'undo': (checked) => { setUndo(checked); render(); },   // V94
+  // V94: a Quick Pick slot chosen for one multi-pick leaves every other row.
+  'mp-qp': (value, el) => mpQpPicked(el),
   'timestamps': (checked) => { setTimestamps(checked); render(); },
 
   // Multi Pick enabled — live sub-text update (no full render, matches old)

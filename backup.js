@@ -54,6 +54,7 @@ function buildBackup() {
     // v17: feedback + timestamp settings.
     soundEnabled: state.soundEnabled,
     timestampsEnabled: state.timestampsEnabled,
+    undoEnabled: state.undoEnabled,   // V94: per phone; absent in older backups
     // v18: Smart Quick Pick flag + learned history (readable long-key form).
     sqpEnabled: state.sqpEnabled,
     sqpHistory: state.sqpHistory,
@@ -315,6 +316,10 @@ function restoreBackupFromFile(file) {
     // these keys leave the defaults (both off) intact.
     if (typeof data.soundEnabled === 'boolean') {
       state.soundEnabled = data.soundEnabled;
+    }
+    // V94: Undo button. Boolean only; an older backup leaves this phone's own.
+    if (typeof data.undoEnabled === 'boolean') {
+      state.undoEnabled = data.undoEnabled;
     }
     if (typeof data.timestampsEnabled === 'boolean') {
       state.timestampsEnabled = data.timestampsEnabled;

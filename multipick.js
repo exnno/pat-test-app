@@ -26,10 +26,40 @@ function normaliseMultiPickConfig(raw) {
       const items = (s && Array.isArray(s.items))
         ? s.items.map(x => String(x || '').trim()).filter(Boolean)
         : [];
-      if (items.length) out.slots.push({ name, items });
+      if (!items.length) return;
+      const slot = { name, items };
+      // V94: the Quick Pick tile number, kept only when valid and not already
+      // taken (first wins — the settings page clears a clash before it saves,
+      // this is the guard for a hand-edited backup or a synced row). Absent
+      // when unassigned, so an untouched config keeps V93's exact shape.
+      const qp = s ? Number(s.qp) : NaN;
+      if (Number.isInteger(qp) && qp >= 1 && qp <= QP_TILE_SLOTS
+          && !out.slots.some(o => o.qp === qp)) slot.qp = qp;
+      out.slots.push(slot);
     });
   }
   return out;
+}
+
+// V94 (7): the multi-picks assigned to the Quick Pick grid, as
+// [{ qp, slot }] sorted by qp. Empty when none — the grid is then exactly V93's.
+function qpTiles() {
+  const slots = (state.multiPick && state.multiPick.slots) || [];
+  return slots
+    .filter(s => s && s.items && s.items.length && Number.isInteger(s.qp)
+      && s.qp >= 1 && s.qp <= QP_TILE_SLOTS)
+    .map(s => ({ qp: s.qp, slot: s }))
+    .sort((a, b) => a.qp - b.qp);
+}
+
+function qpTileSlot(qp) {
+  const hit = qpTiles().find(t => t.qp === Number(qp));
+  return hit ? hit.slot : null;
+}
+
+// The tile's label: the multi-pick's name, else its list.
+function qpTileLabel(slot) {
+  return (slot && (slot.name || (slot.items || []).join(' · '))) || '';
 }
 
 function loadMultiPickConfig() {
@@ -69,10 +99,11 @@ function multiPickFire(idx) {
     return;
   }
 
+  const added = [];   // V94: for Undo
   slot.items.forEach(typeRaw => {
     const cleanType = normaliseItemType(typeRaw);
     const item = {
-      id: uid(),
+      id: newId(),   // V94: was uid() — V78 meant every new record to use newId()
       assetNo: nextAssetNo(sess),   // recomputed each push off the growing list
       location: cleanLocation,
       itemType: cleanType,
@@ -90,12 +121,14 @@ function multiPickFire(idx) {
     // gate, so no existing user sees anything new because of this.
     item.ts = new Date().toISOString();
     sess.items.push(item);
+    added.push(item);
     addDescriptionIfNew(cleanType);
     // v18: learn each (location, type) pairing in the batch.
     recordSqpUsage(cleanLocation, cleanType);
   });
 
   const n = slot.items.length;
+  noteLastLog(sess, added, slot.name || slot.items.join(', '));   // V94: one Undo for the batch
   markSessionDirty(sess);            // v14: new entries invalidate a prior export
   state.multiPickSheetOpen = false;
   state.cursor = sess.items.length;  // drop onto a fresh new item after the batch
@@ -117,6 +150,117 @@ function multiPickFire(idx) {
   showToast(`Added ${n} item${n === 1 ? '' : 's'}`);
 }
 
+// ============== V94 — Multi Pick tiles in Quick Pick (7, 12A) ==============
+// A multi-pick assigned a Quick Pick slot (`qp`) shows as a tile on the grid's
+// bottom row. It behaves EXACTLY like an item type (12A): a tap selects it
+// (highlighted), PASS logs the whole sequence. While one is selected FAIL is
+// greyed — a multi-pick is passes only. Tapping a type or typing in the custom
+// box swaps to that. state.form.qpTile holds the selected slot number; it is
+// not part of the form loadFormForCursor() builds, so logging, moving the
+// cursor or opening a job clears it the same way it clears the item type.
+//
+// ⚠ The selection changes the DOM IN PLACE (classes, the FAIL button), never a
+// render(): the quick-pick action works the same way, because a render here
+// would rebuild #app under a tap and drop the keyboard if a field is open.
+
+function qpTileSyncDom() {
+  if (typeof document === 'undefined') return;
+  document.querySelectorAll('.qp-tile').forEach(b =>
+    b.classList.toggle('active', Number(b.dataset.arg) === state.form.qpTile));
+  const fb = document.getElementById('fail-btn');
+  const sess = activeSession();
+  if (fb) fb.disabled = !!(sess && sess.locked) || !!state.form.qpTile;
+}
+
+function qpTileSelect(qp) {
+  const sess = activeSession();
+  if (!sess || sess.locked) return;
+  if (state.cursor < sess.items.length) return;   // a sequence can't replace one item
+  const n = Number(qp);
+  if (!qpTileSlot(n)) return;
+  state.form.qpTile = n;
+  state.form.itemType = '';
+  const inp = document.getElementById('f-type');
+  if (inp) inp.value = '';
+  document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+  state.showSuggestions = false;
+  if (typeof renderSuggestionsOnly === 'function') renderSuggestionsOnly();
+  qpTileSyncDom();
+}
+
+// Called when an item type is chosen another way (a type button, typing, a
+// suggestion): the tile gives way, and FAIL comes back.
+function qpTileClear() {
+  if (!state.form.qpTile) return;
+  state.form.qpTile = null;
+  qpTileSyncDom();
+}
+
+// PASS with a tile selected. Modelled on multiPickFire(), and differs from it
+// in the three ways that make it "exactly like an item":
+//   • the FIRST item takes the Asset box's number (a scanned label included),
+//     with the usual duplicate check; the rest number on from it;
+//   • a note typed on the form goes on the FIRST item (Multi Pick's sheet has
+//     no form to type into, so it leaves notes blank);
+//   • it lands like a single PASS — PASS feedback, the scan carry-forward
+//     honoured, the lightweight entry refresh.
+// Location is mandatory, as for every item. No readings sheet: a multi-pick
+// is a run of passes, exactly as the Multi Pick button logs them.
+function qpTileFire(qp) {
+  const sess = activeSession();
+  if (!sess || sess.locked) return;
+  if (state.cursor < sess.items.length) return;
+  const slot = qpTileSlot(qp);
+  if (!slot || !slot.items.length) { qpTileClear(); return; }
+  const err = validateBeforeSave({ skipItemType: true });
+  if (err) { showToast(err); return; }
+
+  const cleanLocation = normaliseLocation(state.form.location);
+  const firstAsset = state.form.assetNo.trim();
+  const notes = state.form.notes.trim();
+  const added = [];
+  slot.items.forEach((typeRaw, i) => {
+    const cleanType = normaliseItemType(typeRaw);
+    const item = {
+      id: newId(),
+      assetNo: (i === 0 && firstAsset) ? firstAsset : nextAssetNo(sess),
+      location: cleanLocation,
+      itemType: cleanType,
+      notes: i === 0 ? notes : '',
+      result: 'pass'
+    };
+    item.ts = new Date().toISOString();   // v61: every item stamped on first log
+    sess.items.push(item);
+    added.push(item);
+    addDescriptionIfNew(cleanType);
+    recordSqpUsage(cleanLocation, cleanType);
+  });
+
+  markSessionDirty(sess);
+  state.cursor = sess.items.length;
+  // Same rule as saveItem: a scanned number means the next box is left blank
+  // rather than offering arithmetic on someone else's label.
+  state.lastLogWasScanned = !!state.scanFilledAsset;
+  state.lastScanSessionId = state.lastLogWasScanned ? sess.id : '';
+  const label = qpTileLabel(slot);
+  noteLastLog(sess, added, label);
+  loadFormForCursor();                 // clears qpTile with the rest of the form
+  feedback('pass', 'pass-btn');
+  saveSessions(); saveSqpHistory(); saveDescriptions();
+  refreshEntryAfterLog();
+  const n = added.length;
+  showToast(`Added ${n} item${n === 1 ? '' : 's'} — ${label}`);
+}
+
+// Settings: picking a slot for one multi-pick takes it from any other, in the
+// page itself, so what is on screen is what saves.
+function mpQpPicked(el) {
+  if (!el || !el.value) return;
+  document.querySelectorAll('.mp-slot-qp').forEach(o => {
+    if (o !== el && o.value === el.value) o.value = '';
+  });
+}
+
 // v16: save the Multi Pick settings page. Reads the show/hide toggle and all 6
 // slot rows from the live DOM in one pass. Each row's sequence input is split on
 // commas; blanks dropped. Slots with no items are not stored. Matches the
@@ -133,9 +277,13 @@ function saveMultiPickSettings() {
     const items = seqEl
       ? String(seqEl.value || '').split(',').map(s => s.trim()).filter(Boolean)
       : [];
-    if (items.length) slots.push({ name, items });
+    // V94: the Quick Pick tile slot, if one is chosen.
+    const qpEl = row.querySelector('.mp-slot-qp');
+    const qp = qpEl ? parseInt(qpEl.value, 10) : NaN;
+    if (items.length) slots.push(Number.isInteger(qp) ? { name, items, qp } : { name, items });
   });
-  state.multiPick = { enabled, slots: slots.slice(0, MULTIPICK_MAX_SLOTS) };
+  // Through the normaliser, so a clash or a stray value can't be stored.
+  state.multiPick = normaliseMultiPickConfig({ enabled, slots: slots.slice(0, MULTIPICK_MAX_SLOTS) });
   save();
   setView('settings');
 }
