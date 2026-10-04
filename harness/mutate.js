@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V95';",
-    to:   "const APP_VERSION = 'V95';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V96';",
+    to:   "const APP_VERSION = 'V96';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -637,8 +637,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V93</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V93</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V92</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V94</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V94</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V92</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -2199,8 +2199,9 @@ const MUTATIONS = [
   {
     name: "M298 (V85) the Cloud group shows on a copy with no cloud",
     file: "render-settings.js",
-    from: "${SETTINGS_CATEGORIES.filter(settingsCategoryVisible).map(cat =>",
-    to:   "${SETTINGS_CATEGORIES.map(cat =>",
+    // V96: re-anchored — the hub draws settingsCategoriesInOrder(), which filters.
+    from: "  const shown = SETTINGS_CATEGORIES.filter(settingsCategoryVisible);",
+    to:   "  const shown = SETTINGS_CATEGORIES.slice();",
     why:  "every copy of the app (localhost, a future host) grows a Cloud row that leads nowhere",
   },
   {
@@ -2240,9 +2241,10 @@ const MUTATIONS = [
   },
   {
     name: "M304 (V85) a stale code message greets the next visit",
-    file: "dispatch.js",
-    from: "state.settingsCategory = arg; state.cloudCodeMessage = ''; setView('settingsCategory');",
-    to:   "state.settingsCategory = arg; setView('settingsCategory');",
+    // V96: re-anchored — opening a group is settingsOpenCategory (settings-actions.js).
+    file: "settings-actions.js",
+    from: "function settingsOpenCategory(id) {\n  state.cloudCodeMessage = '';",
+    to:   "function settingsOpenCategory(id) {",
     why:  "'That code isn't right.' shows before anything has been typed",
   },
   {
@@ -3125,8 +3127,9 @@ const MUTATIONS = [
   {
     name: "M430 (V91) signed-in Review & clear keeps the V80 flow",
     file: "session.js",
-    from: "  if (typeof syncActive === 'function' && syncActive() && typeof jobMgrOpen === 'function') {\n    jobMgrOpen({ tidy: true });",
-    to:   "  if (false) {\n    jobMgrOpen({ tidy: true });",
+    // V96: re-anchored (mgrNoteReturn now sits between the two lines).
+    from: "  if (typeof syncActive === 'function' && syncActive() && typeof jobMgrOpen === 'function') {\n    if (typeof mgrNoteReturn",
+    to:   "  if (false) {\n    if (typeof mgrNoteReturn",
     why:  "7A: signed in, clearing is safe-in-the-cloud from Jobs on this phone (16i)",
   },
   {
@@ -3696,6 +3699,62 @@ const MUTATIONS = [
     from: "    onDelete: () => descDeleteAsk(oldVal)\n",
     to:   "",
     why:  "Peter, V95 test: since the list became rows, deleting a description meant Edit as text (32m)",
+  },
+  {
+    name: "M512 (V96) Account & Sync drawn first while locked",
+    file: "render-settings.js",
+    from: "  if (unlocked) return shown;\n",
+    to:   "  return shown;\n",
+    why:  "4A: free users on the test host would meet an access-code box at the top of Settings (33a)",
+  },
+  {
+    name: "M513 (V96) the calculator goes back under Display",
+    file: "data.js",
+    from: "'settingsReadings', 'settingsScanner', 'settingsCalculator'] },",
+    to:   "'settingsReadings', 'settingsScanner'] },",
+    why:  "3A: the calculator is a testing tool; this also orphans the page from the hub (33b)",
+  },
+  {
+    name: "M514 (V96) a one-page group shows a one-row list",
+    file: "settings-actions.js",
+    from: "  if (pages.length === 1 && !(SETTINGS_PAGE_META[pages[0]] || {}).action) {",
+    to:   "  if (false) {",
+    why:  "a wasted tap on Engineer & Tester and Phone & Display (33d)",
+  },
+  {
+    name: "M515 (V96) Back from a manager always goes to the Backup page",
+    file: "settings-actions.js",
+    from: "  const v = state.mgrReturnView || 'settingsBackup';",
+    to:   "  const v = 'settingsBackup';",
+    why:  "opened from its Data row, Back would land on a page the user never visited (33f)",
+  },
+  {
+    name: "M516 (V96) Jobs on this phone row shown signed out",
+    file: "render-settings.js",
+    from: "    return typeof syncActive === 'function' && syncActive() && typeof renderJobManager === 'function';",
+    to:   "    return true;",
+    why:  "a signed-out phone would get a cloud screen it cannot use (33e)",
+  },
+  {
+    name: "M517 (V96) the hub footer says 'this phone only' while syncing",
+    file: "render-settings.js",
+    from: "  return syncing ? 'Saved on this phone and in your cloud account' : 'Saved on this phone only';",
+    to:   "  return 'Saved on this phone only';",
+    why:  "wrong for every signed-in customer (33g)",
+  },
+  {
+    name: "M518 (V96) the old Fail page name drops out of search",
+    file: "data.js",
+    from: "aliases: 'quick pick fail reasons failure tags' },",
+    to:   "aliases: 'reasons failure tags' },",
+    why:  "5A: anyone who learned the old name can no longer search for it (33c)",
+  },
+  {
+    name: "M519 (V96) a page row ignores its own open action",
+    file: "render-settings.js",
+    from: "data-action=\"${meta.action || 'settings-page'}\"",
+    to:   "data-action=\"settings-page\"",
+    why:  "the Manage photos row would setView without photoMgrOpen \u2014 no previews, no state reset (33e)",
   },
 ];
 
