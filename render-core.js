@@ -231,9 +231,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Location count.</strong> The item line on the test screen now says how many items you've logged at the location on the form &mdash; e.g. <strong>Item 21 (new) &middot; 15 at this location</strong>. It counts this job only.</li>
-        <li><strong>Multi Pick on the Quick Pick grid.</strong> In Settings &rarr; Multi Pick, give any multi-pick a <strong>Quick Pick slot</strong> (1 is bottom-right, 2 the middle, 3 the left). It appears as a &#xFF0B; tile: tap it, then <strong>PASS</strong>, exactly like an item &mdash; the whole list is logged. Optional: assign nothing and Quick Pick is just as before. The Multi Pick button works as it always has.</li>
-        <li><strong>Undo.</strong> Switch it on in Settings &rarr; Display Settings and <strong>&#8630; Undo</strong> sits beside Copy last. It takes back the last item you logged &mdash; or the whole batch from Log again or Multi Pick &mdash; after asking. Off unless you turn it on.</li>
+        <li><strong>Changing a FAIL to a PASS.</strong> If the item's notes still say why it failed, the app now asks before saving &mdash; <strong>Remove the fail reason</strong> is the big button, so a corrected mistake doesn't print as a PASS saying &ldquo;Damaged plug&rdquo;.</li>
+        <li><strong>Fix a description's spelling.</strong> Settings &rarr; Item Description List is now a list: tap a description to correct it, and choose whether to change items already logged in unlocked jobs (and matching Quick Pick buttons) too. Locked jobs never change. <strong>Edit as text</strong> is still there.</li>
+        <li><strong>Remedial actions on the report.</strong> Switch it on in Report settings &rarr; What to include (or on the preview). Every failed item is listed at the end of the report with its reason, plus an optional action line you can word yourself. With Photos on, each fail's photos print with it there. Off unless you turn it on.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

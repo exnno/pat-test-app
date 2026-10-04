@@ -727,6 +727,9 @@ registerActions({
   'settings-items-save': () => saveItemTypesSettings(),
   'settings-fails-save': () => saveFailReasonsSettings(),
   'settings-descriptions-save': () => saveDescriptionsSettings(),
+  'desc-edit': (arg) => descEditOpen(arg),                               // V95
+  'desc-text-mode': () => { state.descTextMode = true; render(); },      // V95
+  'desc-list-mode': () => { state.descTextMode = false; render(); },     // V95
   'settings-multipick-save': () => saveMultiPickSettings(),
   'settings-items-reset': () => resetItemsToDefaults(),
   'settings-fails-reset': () => resetFailReasonsToDefaults(),
@@ -1009,6 +1012,7 @@ registerInputActions({
   // Entry screen
   'f-asset': (v) => { state.form.assetNo = v; },
   'f-notes': (v) => { state.form.notes = v; },
+  'desc-filter': (v) => descFilter(v),   // V95: DOM-only, never renders (keyboard stays up)
 
   // Fail sheet — "other" reason free text
   'fail-other': (v) => { state.failOtherText = v; },
@@ -1256,6 +1260,10 @@ registerChangeActions({
   // v64: photographic evidence appendix. Opt-in — defaults off (decision Q6A),
   // for the same reason as showDuration: it changes a client-facing certificate.
   'report-show-photos':      (checked) => { captureReportTextInputs(); state.reportSettings.showPhotos = checked; render(); },
+  // V95 (S7): remedial actions section + its optional action line. Opt-in, off
+  // by default — the same posture as photos (a client-facing change).
+  'report-show-remedial':    (checked) => { captureReportTextInputs(); state.reportSettings.showRemedial = checked; render(); },
+  'report-remedial-action':  (checked) => { captureReportTextInputs(); state.reportSettings.remedialActionOn = checked; render(); },
   'report-retest-enabled':   (checked) => { captureReportTextInputs(); state.reportSettings.retestEnabled = checked; render(); },
   // v36: certificate-numbers master toggle. Capture cert text inputs first so an
   // unsaved prefix/counter survives the re-render that enables/disables the

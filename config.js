@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V94';
+const APP_VERSION = 'V95';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V94';
+const WELCOME_VERSION = 'V95';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -588,6 +588,10 @@ const REPORT_COLOR_THEMES = [
 // Factory (not a shared object) so callers always get an independent copy —
 // mirrors the DEFAULT_CSV_COLUMNS.map(...) deep-copy pattern used elsewhere
 // (that table is in data.js since v71).
+// V95: the remedial section's action line, editable in Report settings.
+const REPORT_REMEDIAL_ACTION_DEFAULT =
+  'Failed items have been withdrawn from use and labelled as failed. Repair or replace before further use.';
+
 function makeDefaultReportSettings() {
   return {
     enabled:          false,   // master switch — OFF for everyone (see note above)
@@ -638,6 +642,18 @@ function makeDefaultReportSettings() {
     // welcome modal tells them the switch exists. Read with `=== true`
     // (storage.js) so a pre-v64 settings blob backfills to OFF, not ON.
     showPhotos:       false,
+    // V95 (S7, 5B 6A): the remedial actions section at the END of the report —
+    // every fail with its reason; with photos on, it is also where a fail's
+    // photos print (6A: each fail once). OFF by default, `=== true` in
+    // storage.js, same posture as showDuration/showPhotos. The action line is
+    // its own switch (5B "optional like everything else"), on by default but
+    // only drawn while the section is. ⚠ Sync rule 36: _syncReportProjection
+    // drops these three while they hold their defaults, so an untouched V95
+    // phone's report row hashes exactly as on V94 (nothing re-sent, no holds,
+    // V84 5A "nothing made" still true).
+    showRemedial:     false,
+    remedialActionOn: true,
+    remedialActionText: REPORT_REMEDIAL_ACTION_DEFAULT,
     declaration:      true,    // print the declaration/signature line
     declarationText:  REPORT_DECLARATION_DEFAULT,
     // v34: optional signature image (base64 PNG data URL, downscaled <=400px on

@@ -1456,6 +1456,14 @@ function passClicked() {
   const losing = (existing && existing.result === 'fail')
     ? ((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(existing.id) : photoCountForItem(existing.id)) : 0;
   const cloudToo = (typeof syncActive === 'function' && syncActive());
+  // V95 (1A, 2B): a fail changed to PASS keeps its notes, and pickFailReason()
+  // wrote the fail reason INTO the notes — so a corrected mistake printed as a
+  // PASS saying "Damaged plug" and confused the customer (team leaders' report).
+  // Any fail with notes asks first; the big button is the safe one (remove).
+  // Read from the FORM box, not the stored item: an engineer who already
+  // cleared or rewrote the notes before tapping PASS is not asked again.
+  const failNotes = (existing && existing.result === 'fail') ? String(state.form.notes || '').trim() : '';
+  if (failNotes) { failToPassAsk(existing, failNotes, losing, cloudToo); return; }
   if (losing > 0) {
     openConfirmSheet({
       title: 'Change to PASS?',
@@ -1474,6 +1482,50 @@ function passClicked() {
     return;
   }
   commitPassResult();
+}
+
+// V95: the notes with every fail-reason segment taken out. pickFailReason()
+// joins with ' — ' ("note — Damaged plug", or the reason alone), so split on
+// that, drop any segment that IS one of the current reasons (case and spaces
+// ignored), and rejoin. Returns { text, found } — found = a segment was dropped.
+// A reason since renamed, or typed through "Other…", is not recognised; 2B
+// still asks about those notes, offering to clear them instead.
+function stripFailReasons(notes) {
+  const reasons = {};
+  (state.failReasons || []).forEach(r => { const k = String(r || '').trim().toLowerCase(); if (k) reasons[k] = true; });
+  const parts = String(notes || '').split(' — ');
+  const kept = parts.filter(p => !reasons[p.trim().toLowerCase()]);
+  return { text: kept.map(p => p.trim()).filter(Boolean).join(' — '), found: kept.length !== parts.length };
+}
+
+// V95 (1A): the fail → PASS sheet. One sheet, photos included, so a fail with
+// both notes and photos is asked once. Cancel changes nothing (the form keeps
+// the notes; the result stays FAIL). The choice is applied to state.form.notes,
+// which saveItem() reads — and to the DOM box, so the readings sheet path (which
+// returns to the form) shows what will be saved.
+function failToPassAsk(existing, notes, losing, cloudToo) {
+  const strip = stripFailReasons(notes);
+  const photoLine = losing > 0
+    ? ` It also has ${losing} photo${losing === 1 ? '' : 's'}, which will be deleted from this device` +
+      `${cloudToo ? ' and from your cloud copy' : ''}. They can't be recovered.`
+    : '';
+  const go = (newNotes) => {
+    state.form.notes = newNotes;
+    const box = document.getElementById('f-notes');
+    if (box) box.value = newNotes;
+    if (losing > 0) photosDeleteForItem(existing.id).then(() => commitPassResult());
+    else commitPassResult();
+  };
+  const choices = strip.found
+    ? [{ label: strip.text ? 'Remove the fail reason' : 'Remove the fail reason (clears the notes)', style: 'primary', onPick: () => go(strip.text) },
+       { label: 'Keep the notes as they are', style: 'secondary', onPick: () => go(notes) }]
+    : [{ label: 'Clear the notes', style: 'primary', onPick: () => go('') },
+       { label: 'Keep the notes as they are', style: 'secondary', onPick: () => go(notes) }];
+  openChoiceSheet({
+    title: 'Change to PASS?',
+    message: `This item's notes say "${notes}". The certificate will print them beside a PASS.` + photoLine,
+    choices
+  });
 }
 
 // The PASS commit itself, split out of passClicked so the v62 photo confirm can

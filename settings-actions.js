@@ -60,6 +60,9 @@ function captureReportTextInputs() {
   if (addr) rs.companyAddress = addr.value.replace(/\s+$/, '');
   if (title) rs.reportTitle = title.value.trim() || 'Portable Appliance Test Report';
   if (decl) rs.declarationText = decl.value.trim();
+  // V95 (5B): the remedial action wording; blank goes back to the default.
+  const remAct = document.getElementById('report-remedial-text');
+  if (remAct) rs.remedialActionText = remAct.value.trim() || REPORT_REMEDIAL_ACTION_DEFAULT;
   if (fnpat) rs.reportFilenamePattern = fnpat.value.trim() || REPORT_FILENAME_DEFAULT;
   // v36: certificate-number fields.
   if (certPrefix) rs.certPrefix = certPrefix.value;
@@ -562,8 +565,115 @@ function saveDescriptionsSettings() {
     seen.add(l);
     return true;
   });
+  state.descTextMode = false;   // V95
   save();
   setView('settings');
+}
+
+// ---------- V95 (3A, 4A): fix a description's spelling ----------
+// The list rename is a delete plus an add as far as sync is concerned — the V86
+// three-way merge carries both. Items are only ever changed in UNLOCKED jobs on
+// this phone (a locked job is a finished certificate); jobs only in the cloud
+// are not touched. Smart Quick Pick history keeps the old spelling on purpose:
+// renaming its keys would fight the highest-count merge between phones, and an
+// unused key simply stops being picked.
+
+function descFilter(v) {
+  const q = String(v || '').trim().toLowerCase();
+  document.querySelectorAll('.desc-row').forEach(el => {
+    el.style.display = (!q || (el.dataset.desc || '').includes(q)) ? '' : 'none';
+  });
+}
+
+// Every place the old spelling is used: { items, jobs, buttons, locked }.
+function descMatches(oldVal) {
+  const k = String(oldVal || '').trim().toLowerCase();
+  const out = { items: 0, jobs: 0, buttons: 0, locked: 0 };
+  if (!k) return out;
+  (state.sessions || []).forEach(s => {
+    if (!s || !Array.isArray(s.items)) return;
+    const n = s.items.filter(it => it && String(it.itemType || '').trim().toLowerCase() === k).length;
+    if (!n) return;
+    if (s.locked) { out.locked += n; return; }
+    out.items += n; out.jobs++;
+  });
+  (state.itemPresets || []).forEach(p => {
+    (p.items || []).forEach(t => { if (String(t || '').trim().toLowerCase() === k) out.buttons++; });
+  });
+  return out;
+}
+
+function descEditOpen(arg) {
+  const idx = parseInt(arg, 10);
+  const oldVal = state.descriptions[idx];
+  if (typeof oldVal !== 'string') return;
+  openNameSheet({
+    title: 'Fix description',
+    blurb: 'Correct the spelling. You can also change items already logged.',
+    value: oldVal,
+    maxlength: 100,
+    confirmLabel: 'Save',
+    onConfirm: (v) => descRenameAsk(oldVal, v)
+  });
+}
+
+function descRenameAsk(oldVal, newVal) {
+  const nv = String(newVal || '').trim();
+  if (!nv || nv === oldVal) return;
+  const m = descMatches(oldVal);
+  if (!m.items && !m.buttons) { descRenameApply(oldVal, nv, false); return; }
+  const bits = [];
+  if (m.items) bits.push(`${m.items} item${m.items === 1 ? '' : 's'} in ${m.jobs} unlocked job${m.jobs === 1 ? '' : 's'}`);
+  if (m.buttons) bits.push(`${m.buttons} Quick Pick button${m.buttons === 1 ? '' : 's'}`);
+  openChoiceSheet({
+    title: `Change to "${nv}"?`,
+    message: `"${oldVal}" is also used on ${bits.join(' and ')}.`
+      + (m.locked ? ` ${m.locked} item${m.locked === 1 ? '' : 's'} in locked jobs stay as they are.` : ''),
+    choices: [
+      { label: 'Change them too', style: 'primary', onPick: () => descRenameApply(oldVal, nv, true) },
+      { label: 'Only fix the list', style: 'secondary', onPick: () => descRenameApply(oldVal, nv, false) }
+    ]
+  });
+}
+
+function descRenameApply(oldVal, newVal, alsoUsed) {
+  const k = String(oldVal).trim().toLowerCase();
+  const nk = newVal.toLowerCase();
+  // The list: replace in place; if the new spelling is already there (a merge
+  // of two entries), the old one just goes.
+  const at = state.descriptions.findIndex(d => d.toLowerCase() === k);
+  const dupe = state.descriptions.findIndex(d => d.toLowerCase() === nk);
+  if (at !== -1) {
+    if (dupe !== -1 && dupe !== at) state.descriptions.splice(at, 1);
+    else state.descriptions[at] = newVal;
+  } else if (dupe === -1) state.descriptions.push(newVal);
+  let changed = 0;
+  if (alsoUsed) {
+    (state.sessions || []).forEach(s => {
+      if (!s || s.locked || !Array.isArray(s.items)) return;
+      let hit = false;
+      s.items.forEach(it => {
+        if (it && String(it.itemType || '').trim().toLowerCase() === k) { it.itemType = newVal; hit = true; changed++; }
+      });
+      if (hit) {
+        markSessionDirty(s);
+        // ⚠ In-place string edits: the encoding cache keys on item COUNT, so
+        // without this a non-open job writes its OLD encoding back and the fix
+        // silently un-happens on reload (sync spec section 6, the v69 trap).
+        if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(s);
+      }
+    });
+    (state.itemPresets || []).forEach(p => {
+      if (!Array.isArray(p.items)) return;
+      const seen = new Set();
+      p.items = p.items.map(t => String(t || '').trim().toLowerCase() === k ? newVal : t)
+        .filter(t => { const l = String(t).toLowerCase(); if (seen.has(l)) return false; seen.add(l); return true; });
+    });
+    syncItemTypesFromActivePreset();
+  }
+  save();
+  render();
+  showToast(changed ? `Fixed — ${changed} item${changed === 1 ? '' : 's'} changed` : 'Description fixed');
 }
 
 // v9: Reset-to-defaults helpers — overwrite the current list with the built-in

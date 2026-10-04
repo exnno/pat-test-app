@@ -4136,3 +4136,14 @@ body.has-selection-bar .cloud-tab { padding-bottom: 100px; }
   border-radius: 10px;
 }
 .undo-btn:disabled { background: var(--neutral-bg); color: var(--text-hint); border-color: var(--border); }
+
+/* ===== V95 ===== */
+/* (3A) Item Description List as tappable rows. */
+.desc-list { display: flex; flex-direction: column; gap: 6px; }
+.desc-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  width: 100%; padding: 12px 14px; text-align: left; font-size: 15px;
+  background: var(--card-bg); color: var(--text); border: 1px solid var(--border); border-radius: 10px;
+}
+.desc-row-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.desc-row-edit { color: var(--text-muted); flex: none; }

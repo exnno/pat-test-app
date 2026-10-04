@@ -723,6 +723,12 @@ function normaliseReportSettings(stored) {
   // settings blob, backup or setup bundle written before v64 has no such key, so
   // every existing certificate stays byte-identical until it is switched on.
   out.showPhotos      = stored.showPhotos === true;
+  // V95 (S7): remedial section OFF unless switched on; its action line ON
+  // unless switched off; wording falls back to the default when blank.
+  out.showRemedial    = stored.showRemedial === true;
+  out.remedialActionOn = stored.remedialActionOn !== false;
+  out.remedialActionText = (typeof stored.remedialActionText === 'string' && stored.remedialActionText.trim())
+    ? stored.remedialActionText : defaults.remedialActionText;
   out.declaration     = stored.declaration !== false;
   out.retestEnabled   = stored.retestEnabled === true;
   const rm = parseInt(stored.retestMonths, 10);

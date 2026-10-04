@@ -19,6 +19,7 @@ let state = {
   // syncItemTypesFromActivePreset() after preset edits or switches.
   itemTypes: DEFAULT_ITEM_TYPES.slice(),
   failReasons: DEFAULT_FAIL_REASONS.slice(),
+  descTextMode: false,      // V95: Item Description List shown as the old text box
   engineer: '',
   descriptions: [],
   sort: 'date_desc',

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V94)
+# PATGo — Code Map (V95)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -191,6 +191,9 @@ property-bound handler could only be tested by hand-calling it — the V67
 if not re-pointed: **M66** (`APP_VERSION` in config.js) and **M82** (the oldest
 About changelog entry). Re-point both as part of the release, and treat a non-zero
 abort count as a failed run — an aborted mutation is not a caught one.
+⚠ V95: pull fixtures date their jobs with `RECENT_DATE` (fixture.js). V93's
+30-day window makes a fixed date a time bomb — group 17 went red on 2 Oct with
+no code change. Fixed OLD dates stay only where a test means an old job.
 ⚠ v88: the fake IndexedDB now completes a transaction AFTER its requests and
 filters index lookups by key. Before V88 every photo READ in the harness came
 back empty — no test had ever read a photo back. Do not revert either.
@@ -497,6 +500,10 @@ a report.
 V89: `produceReport` asks about cloud-only photos (`_reportCloudPhotoChoice`,
 built on **feedback.js** `_openSheet`) BEFORE `stampCertNumber` — Cancel must
 cost no number (M388) — and downloads through **sync.js** `syncPhotoDownload`.
+V95: the END of the document is one of two sections — `_appendRemedialPages`
+when `_remedialWanted` (it carries the photos too), else `_appendPhotoPages`.
+Both draw through the shared `_photoGeom` / `_drawPhotoGroups` / omit-notice
+helpers; change photo block layout there, once.
 
 ### pdfpreview.js (~135 ln) — multi-page preview rasteriser
 Lazy-loads vendored PDF.js, renders each page to a stacked canvas, DPR-capped,
@@ -573,6 +580,9 @@ from session.js in v70, byte identical.
 ⚠ v90: also the PHOTO MANAGER's logic (`photoMgr*`, `_pm*`): `photoMgrModel()`
 (synchronous — render() calls it) merges **photos.js** `state.photoMeta`,
 **sync.js** `state.photoCloud` and the in-memory look (`state.photoMgr.cloud`).
+⚠ V95: `descRenameApply` edits items IN PLACE in jobs that are not open — it must
+call **storage.js** `_invalidateSessionEncoding` per touched job (sync spec §6
+trap, M503). Locked jobs are never touched.
 Actions reuse existing paths only: `photosRemoveQuiet(ids, true)`,
 `syncPhotoDownload`, `photoDelete`/`photoDeleteCloudOnly`,
 `syncPhotoKnowForDelete`. 8A: nothing on a locked job is deleted. Markup is

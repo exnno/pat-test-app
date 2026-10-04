@@ -21,6 +21,7 @@ the app, so the confirm needs to be genuinely hard to hit by accident.
 V91 adds: TIDY_OFFER_KEY (the offer's timer) and PHOTO_AGE_KEY (a setting — the
 settings level decides); `conf`/`confV` live inside SYNC_STATE_KEY.
 V94 adds: UNDO_KEY (`pat:undo`, the Undo switch — a setting, settings level).
+V95 adds nothing (`state.descTextMode` is memory only).
 
 ### Visual inspection tick (PN) — postponed at V94 (11D)
 Peter worried it would harm the entry screen. Placements offered at the V94 round:
@@ -30,6 +31,19 @@ select mode (no entry-screen change; could add to A); D per item type in the pre
 (automatic, but edges towards S9). If revived: 4A (a "Visual only" certificate
 column only when used + a hidden CSV column, import reads it) and 5A (PASS skips the
 readings sheet) were the proposals. Stored as an item field only when ticked.
+
+### V95 residuals (known, accepted)
+- The fail → PASS sheet recognises a fail reason only as it is NOW in the fail
+  reasons list; a reason since renamed, or typed through "Other…", is offered as
+  "Clear the notes" instead (2B asks either way).
+- A description fix changes jobs on this phone only. A job only in the cloud keeps
+  the old spelling until it is brought down and fixed again.
+- Smart Quick Pick history keeps the old spelling (renaming its keys would fight
+  the highest-count merge); the new spelling learns from scratch.
+- A V94 phone opening Report settings after a V95 phone switched remedial on shows
+  "Other settings: Different" on a held card (it has no label for the field).
+- Bulk "change to PASS" does not exist (1A, Peter: not needed); every fail → PASS
+  change is one item and one sheet.
 
 ### V94 residuals (known, accepted)
 - Undo of a fail whose staged photos are still being written (a tap within a
@@ -41,7 +55,7 @@ readings sheet) were the proposals. Stored as an item field only when ticked.
   phones moved (highest count wins) — harmless.
 - The location count can wrap the item readout onto two lines on a narrow phone
   with the 🗑 showing (accepted at the spec round).
-- S4 (asset ID already used) is V95 and needs a cloud check (V93 window).
+- ~~S4 is V95~~ — not built; see "S4" in the feature backlog (V95 round).
 
 ### V93 residuals (known, accepted)
 - Search, asset history (V61) and the certificate-number skip see jobs on this
@@ -609,6 +623,7 @@ survives those documents being archived.
 | Weekly/batch PDF export | Parked pending a direct tester ask — good idea, but wanted from testers before committing time |
 | Per-instrument "in service" toggle | Only if overdue calibration nags on a retired instrument prove annoying in practice |
 | ~~Sheet-scroller audit~~ | **SHIPPED V76.** The general sheet-markup guard, the part deliberately not built, is still open above |
+| S4 asset ID already used at this site | **Very low priority, considered not needed (Peter, V95 round).** Peter gives every item a new number, and the same-job duplicate check already blocks repeats within a job. If a customer who numbers each site from 1 asks: a phone-only check against same-site jobs in the last 30 days needs no SQL (V95 round option B); a cloud-wide check would need a generated `asset_nos` column |
 | Scan into other fields (location, item type) | Raised implicitly by V67. Currently a scan is refused when any other text field has focus (the deliberate V65 "known limit"). Only worth revisiting if Peter starts labelling locations |
 
 ### Discussed and NOT proceeding

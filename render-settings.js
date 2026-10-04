@@ -628,17 +628,42 @@ function renderSettingsMultiPick() {
 }
 
 function renderSettingsDescriptions() {
+  // V95 (3A): a tappable list — tap a description to fix its spelling, and the
+  // fix can carry into logged items (descRenameAsk). The old text box stays as
+  // "Edit as text" for adding, deleting and pasting in bulk.
+  if (state.descTextMode) {
+    return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Item Description List')}
+      <div class="settings-section">
+        <h2 class="h2">Edit as text</h2>
+        <p class="muted">One description per line. Add lines to seed autocomplete, or delete lines you don't want. To fix a spelling on items you've already logged, use the list instead.</p>
+        <textarea class="textarea" id="settings-descriptions" style="min-height:280px">${escapeHTML(state.descriptions.join('\n'))}</textarea>
+      </div>
+      <div class="btn-row" style="margin-top:24px">
+        <button class="btn-secondary" data-action="desc-list-mode">Back to list</button>
+        <button class="btn-primary" id="settings-descriptions-save" data-action="settings-descriptions-save">Save</button>
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn-secondary" id="settings-descriptions-reset" data-action="settings-descriptions-reset">↺ Reset to defaults</button>
+      </div>
+    </div>
+  `;
+  }
+  const rows = state.descriptions.map((d, i) =>
+    `<button class="desc-row" data-action="desc-edit" data-arg="${i}" data-desc="${escapeHTML(d.toLowerCase())}"><span class="desc-row-text">${escapeHTML(d)}</span><span class="desc-row-edit">✎</span></button>`
+  ).join('');
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Item Description List')}
       <div class="settings-section">
         <h2 class="h2">Saved descriptions</h2>
-        <p class="muted">Item types you've typed into the custom field. Edit to fix typos for future autocomplete (won't change items already saved). Add new lines to seed autocomplete with common items.</p>
-        <textarea class="textarea" id="settings-descriptions" style="min-height:280px">${escapeHTML(state.descriptions.join('\n'))}</textarea>
+        <p class="muted">Item types you've typed into the custom field. Tap one to fix its spelling — you can also fix it on items already logged in unlocked jobs.</p>
+        ${state.descriptions.length > 12 ? `<input class="input" id="desc-filter" data-input-action="desc-filter" placeholder="Find a description" autocomplete="off" style="margin-bottom:10px">` : ''}
+        <div class="desc-list">${rows || '<p class="muted">No saved descriptions yet.</p>'}</div>
       </div>
       <div class="btn-row" style="margin-top:24px">
-        <button class="btn-secondary" id="settings-descriptions-reset" data-action="settings-descriptions-reset">↺ Reset to defaults</button>
-        <button class="btn-primary" id="settings-descriptions-save" data-action="settings-descriptions-save">Save</button>
+        <button class="btn-secondary" data-action="desc-text-mode">Edit as text</button>
       </div>
     </div>
   `;
@@ -1379,6 +1404,12 @@ function renderSettingsReport() {
         ${toggle('report-show-duration', 'Testing time', rs.showDuration, rs.showDuration ? 'Prints how long the job took' : 'Kept off the certificate')}
         ${toggle('report-show-photos', 'Photos', rs.showPhotos, rs.showPhotos ? 'Photo pages added after the declaration' : 'Kept off the certificate')}
         ${rs.showPhotos ? `<p class="muted" style="margin-left:16px">Any photos you've taken are added at the end of the report, under the asset they belong to. The certificate itself doesn't change. Photos are made smaller for printing so the file stays small enough to send — on a very big job they're made smaller still, and past 150 photos the report says clearly that not all of them are shown.</p>` : ''}
+        ${toggle('report-show-remedial', 'Remedial actions', rs.showRemedial, rs.showRemedial ? 'Every fail listed at the end of the report' : 'Kept off the certificate')}
+        ${rs.showRemedial ? `<div style="margin-left:16px">
+          <p class="muted">A section at the end listing every failed item with its reason. Fails with a photo are shown with it when Photos is on (the photos then appear here, not on separate photo pages); the rest are listed together. Nothing is added to a job with no fails.</p>
+          ${toggle('report-remedial-action', 'Action line', rs.remedialActionOn !== false, rs.remedialActionOn !== false ? 'Printed under the heading' : 'Hidden')}
+          ${rs.remedialActionOn !== false ? `<textarea class="textarea" id="report-remedial-text" style="min-height:70px">${escapeHTML(rs.remedialActionText || '')}</textarea>` : ''}
+        </div>` : ''}
         ${toggle('report-declaration', 'Declaration line', rs.declaration)}
         ${toggle('report-show-appcredit', 'PATGo credit line', rs.showAppCredit, rs.showAppCredit ? 'Shown at the foot of the report' : 'Hidden')}
         <div style="margin-left:16px${rs.showAppCredit ? '' : ';opacity:.5'}">

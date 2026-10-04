@@ -255,7 +255,8 @@ function _photoAppendixWanted(data) {
 // Draw the appendix onto the END of the document, after the declaration. Returns
 // nothing; the caller runs the footer pass afterwards so these pages are numbered
 // and footed like every other page.
-function _appendPhotoPages(doc, session, data, margin, headerRgb) {
+// V95: the page geometry both end sections share (photo pages, remedial actions).
+function _photoGeom(doc, margin) {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const contentW = pageW - margin * 2;
@@ -265,24 +266,12 @@ function _appendPhotoPages(doc, session, data, margin, headerRgb) {
   const boxH = colW;                 // square slot; portrait and landscape shots both fit
   const bottomLimit = pageH - 46;    // clear of the footer band at pageH-20
 
-  doc.addPage();
-  let y = margin;
+  return { pageW, pageH, contentW, cols, gap, colW, boxH, bottomLimit };
+}
 
-  // ----- Appendix title -----
-  doc.setFontSize(14); doc.setFont(undefined, 'bold');
-  doc.setTextColor(headerRgb[0], headerRgb[1], headerRgb[2]);
-  doc.text(pdfSafe('Photographic evidence'), margin, y + 12);
-  doc.setTextColor(0);
-  y += 22;
-  doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
-  const introLines = doc.splitTextToSize(
-    pdfSafe('Photographs recorded during testing, listed against the asset each belongs to.'),
-    contentW
-  );
-  doc.text(introLines, margin, y + 8);
-  y += introLines.length * 11 + 8;
-  doc.setTextColor(0);
-
+// V95: the boxed "not every photo is printed" notice, drawn at y; returns new y.
+// Split out of _appendPhotoPages unchanged so the remedial section shows it too.
+function _drawPhotoOmitNotice(doc, data, margin, contentW, y) {
   // ----- The "not everything is here" notice (decision Q9A: make it clear) -----
   // Printed on the FIRST appendix page, boxed, not buried at the end of fifty
   // pages where nobody would reach it. It is repeated at the end as well.
@@ -305,8 +294,15 @@ function _appendPhotoPages(doc, session, data, margin, headerRgb) {
     doc.setTextColor(0); doc.setFont(undefined, 'normal'); doc.setDrawColor(0);
   }
 
+  return y;
+}
+
+// V95: one block per photo group (caption, the item's notes, a row of photos),
+// from y; returns new y. Split out of _appendPhotoPages unchanged.
+function _drawPhotoGroups(doc, groups, margin, G, y) {
+  const { contentW, cols, gap, colW, boxH, bottomLimit } = G;
   // ----- One block per item -----
-  data.groups.forEach((g) => {
+  groups.forEach((g) => {
     const it = g.item || {};
     const headBits = [];
     if (it.assetNo) headBits.push(String(it.assetNo));
@@ -357,6 +353,12 @@ function _appendPhotoPages(doc, session, data, margin, headerRgb) {
     y += 8;
   });
 
+  return y;
+}
+
+// V95: the repeated omission line at the end; from y.
+function _drawPhotoOmitTail(doc, data, margin, contentW, bottomLimit, y) {
+  const omitted = data.omitted || 0;
   // ----- Repeat the omission notice at the end -----
   if (omitted > 0) {
     if (y + 30 > bottomLimit) { doc.addPage(); y = margin; }
@@ -368,6 +370,99 @@ function _appendPhotoPages(doc, session, data, margin, headerRgb) {
     );
     doc.text(tail, margin, y + 10);
     doc.setTextColor(0); doc.setFont(undefined, 'normal');
+  }
+}
+
+function _appendPhotoPages(doc, session, data, margin, headerRgb) {
+  const G = _photoGeom(doc, margin);
+  const contentW = G.contentW;
+
+  doc.addPage();
+  let y = margin;
+
+  // ----- Appendix title -----
+  doc.setFontSize(14); doc.setFont(undefined, 'bold');
+  doc.setTextColor(headerRgb[0], headerRgb[1], headerRgb[2]);
+  doc.text(pdfSafe('Photographic evidence'), margin, y + 12);
+  doc.setTextColor(0);
+  y += 22;
+  doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+  const introLines = doc.splitTextToSize(
+    pdfSafe('Photographs recorded during testing, listed against the asset each belongs to.'),
+    contentW
+  );
+  doc.text(introLines, margin, y + 8);
+  y += introLines.length * 11 + 8;
+  doc.setTextColor(0);
+
+  y = _drawPhotoOmitNotice(doc, data, margin, contentW, y);
+  y = _drawPhotoGroups(doc, data.groups, margin, G, y);
+  _drawPhotoOmitTail(doc, data, margin, contentW, G.bottomLimit, y);
+}
+
+// ---------------------------------------------------------------------------
+// V95 (S7 — 5B, 6A, 6C): the remedial actions section, at the END of the report.
+//
+// Every failed item once. Order (6C): first a list of the fails that have no
+// printed photo, then each fail that does, with its photos — so with photos ON
+// this section REPLACES the photo pages (6A: photos only ever attach to a fail,
+// so both on would print every photographed fail twice). With photos OFF every
+// fail is in the list. `data` is the photo data when photos are on, else null.
+// A job with no fails gets no section, switch on or not.
+// ---------------------------------------------------------------------------
+function _remedialWanted(session) {
+  const rs = state.reportSettings || {};
+  return rs.showRemedial === true && !!session && Array.isArray(session.items)
+    && session.items.some(i => i && i.result === 'fail');
+}
+
+function _appendRemedialPages(doc, session, data, margin, headerRgb) {
+  const rs = state.reportSettings || {};
+  const G = _photoGeom(doc, margin);
+  const contentW = G.contentW;
+  const fails = session.items.filter(i => i && i.result === 'fail');
+  const groups = (data && Array.isArray(data.groups)) ? data.groups : [];
+  const pictured = {};
+  groups.forEach(g => { if (g.item && g.item.id) pictured[g.item.id] = true; });
+  // Photos of a non-fail item (a stray left by a failed delete) still print —
+  // dropping them would lose evidence the photo pages used to show.
+  const listed = fails.filter(it => !pictured[it.id]);
+
+  doc.addPage();
+  let y = margin;
+  doc.setFontSize(14); doc.setFont(undefined, 'bold');
+  doc.setTextColor(headerRgb[0], headerRgb[1], headerRgb[2]);
+  doc.text(pdfSafe('Remedial actions'), margin, y + 12);
+  doc.setTextColor(0);
+  y += 22;
+  doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+  const intro = `${fails.length} ${fails.length === 1 ? 'item' : 'items'} failed testing.`
+    + ((rs.remedialActionOn !== false && String(rs.remedialActionText || '').trim())
+      ? ' ' + String(rs.remedialActionText).trim() : '');
+  const introLines = doc.splitTextToSize(pdfSafe(intro), contentW);
+  doc.text(introLines, margin, y + 8);
+  y += introLines.length * 11 + 8;
+  doc.setTextColor(0);
+
+  if (data && groups.length) y = _drawPhotoOmitNotice(doc, data, margin, contentW, y);
+
+  if (listed.length) {
+    runAutoTable(doc, {
+      startY: y + 4,
+      head: [['Asset', 'Description', 'Location', 'Reason'].map(pdfSafe)],
+      body: listed.map(it => [it.assetNo || '', it.itemType || '', it.location || '', (it.notes || '').trim()].map(v => pdfSafe(v))),
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 9, cellPadding: 4 },
+      headStyles: { fillColor: headerRgb, textColor: contrastColor(headerRgb) }
+    });
+    y = (doc.lastAutoTable ? doc.lastAutoTable.finalY : y) + 16;
+    doc.setPage(doc.internal.getNumberOfPages());
+  }
+
+  if (groups.length) {
+    if (listed.length && y + 30 > G.bottomLimit) { doc.addPage(); y = margin; }
+    y = _drawPhotoGroups(doc, groups, margin, G, y);
+    _drawPhotoOmitTail(doc, data, margin, contentW, G.bottomLimit, y);
   }
 }
 
@@ -667,7 +762,12 @@ function buildReportDoc(session, photoData) {
   const _photos = (photoData !== undefined && photoData !== null)
     ? photoData
     : ((_reportPhotoCache.sessionId === session.id) ? _reportPhotoCache : null);
-  if (_photoAppendixWanted(_photos)) {
+  // V95 (6A): remedial on and the job has fails → one end section that also
+  // carries the photos (when they are on); otherwise the photo pages as before.
+  if (_remedialWanted(session)) {
+    try { _appendRemedialPages(doc, session, _photoAppendixWanted(_photos) ? _photos : null, margin, headerRgb); }
+    catch (e) { console.error('Remedial section failed (non-fatal).', e); }
+  } else if (_photoAppendixWanted(_photos)) {
     // Guarded: an appendix that throws must not cost the engineer the whole
     // certificate. Worst case the report prints without its photos.
     try { _appendPhotoPages(doc, session, _photos, margin, headerRgb); }
@@ -997,6 +1097,7 @@ function openReportPreview(doc, session) {
         ${chip('calibration', rs.showCalibration, 'Calibration')}
         ${chip('signature', rs.declaration, 'Declaration')}
         ${chip('photos', rs.showPhotos, 'Photos')}
+        ${chip('remedial', rs.showRemedial === true, 'Remedial actions')}
         ${hasSig ? chip('sigside', rs.signaturePosition === 'right', 'Signature right') : ''}
       </div>
     `;
@@ -1130,6 +1231,7 @@ function openReportPreview(doc, session) {
     else if (action === 'signature')   state.reportSettings.declaration = !state.reportSettings.declaration;
     else if (action === 'sigside')      state.reportSettings.signaturePosition = (state.reportSettings.signaturePosition === 'right') ? 'left' : 'right';
     else if (action === 'photos')       state.reportSettings.showPhotos = !state.reportSettings.showPhotos;
+    else if (action === 'remedial')     state.reportSettings.showRemedial = !(state.reportSettings.showRemedial === true);   // V95 (7A)
     saveReportSettings();
     if (action === 'photos' && state.reportSettings.showPhotos === true) {
       try { _setReportPhotoCache(await ensureReportPhotos(session)); }

@@ -1737,6 +1737,12 @@ function _syncReportProjection(settings) {
     : Object.assign({}, (settings && typeof settings === 'object') ? settings : {});
   delete n.certNextNumber;
   delete n.certSetAt;
+  // V95 rule 36: the S7 fields leave the projection while at their defaults, so
+  // a phone that never touched them hashes as it did on V94 (and a V94 row,
+  // which lacks them, equals an untouched V95 one).
+  if (n.showRemedial !== true) delete n.showRemedial;
+  if (n.remedialActionOn !== false) delete n.remedialActionOn;
+  if (typeof REPORT_REMEDIAL_ACTION_DEFAULT === 'string' && n.remedialActionText === REPORT_REMEDIAL_ACTION_DEFAULT) delete n.remedialActionText;
   return n;
 }
 
@@ -2289,9 +2295,15 @@ function _syncReportDiffs(a, b, clip) {
     ['showEngineer', 'Show engineer'], ['showInstrument', 'Show instrument'], ['showCalibration', 'Show calibration'],
     ['showFails', 'Show fails'], ['showReadings', 'Show readings'], ['showDuration', 'Show testing time'],
     ['showPhotos', 'Show photos'], ['showAppCredit', 'App credit'], ['showFooterLogo', 'Footer logo'],
+    ['showRemedial', 'Remedial actions'], ['remedialActionOn', 'Remedial action line'], ['remedialActionText', 'Remedial action wording'],
     ['reportFilenamePattern', 'File name'],
   ];
   const known = new Set(labels.map(x => x[0]));
+  // V95: the projection drops the S7 fields at their defaults (rule 36) — put
+  // the defaults back so a held card says "Off"/"On", not a blank.
+  const s7 = { showRemedial: false, remedialActionOn: true,
+    remedialActionText: (typeof REPORT_REMEDIAL_ACTION_DEFAULT === 'string') ? REPORT_REMEDIAL_ACTION_DEFAULT : '' };
+  a = Object.assign({}, s7, a || {}); b = Object.assign({}, s7, b || {});
   const same = (x, y) => syncHash(_syncCanonical(x === undefined ? null : x)) === syncHash(_syncCanonical(y === undefined ? null : y));
   const show = (k, v, other) => {
     if (k === 'logo' || k === 'signature') return v ? (other ? 'An image' : 'Image') : '';
