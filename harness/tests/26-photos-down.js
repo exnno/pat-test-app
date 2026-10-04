@@ -24,7 +24,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, withSession, withItem, confirmSheet } = require('../fixture');
+const { tick, withSession, withItem, confirmSheet, RECENT_DATE } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID = '11111111-1111-1111-1111-111111111111';
@@ -432,7 +432,7 @@ module.exports = async function () {
     t.notOk(known(app).ZZK1, 'its job is not here yet: the row is not kept');
     app.srv.tables.sessions.push({ id: jid, user_id: UID, deleted: false, last_modified: '2026-09-29T09:00:00.000Z',
       updated_at: app.srv.stamp(),
-      doc: { id: jid, site: 'ZZLATE', date: '2026-09-28', items: [{ id: 'ZZK-ITEM', assetNo: 'K1', result: 'fail' }] } });
+      doc: { id: jid, site: 'ZZLATE', date: RECENT_DATE, items: [{ id: 'ZZK-ITEM', assetNo: 'K1', result: 'fail' }] } });
     await run(app);
     t.ok(app.state().sessions.some(s => s.id === jid), 'the job arrived');
     t.ok(app.srv.rowGets().some(c => /session_id=in\./.test(c.url) && c.url.includes(jid)), 'its photo rows were fetched by job');
@@ -442,7 +442,7 @@ module.exports = async function () {
     // A phone that has never read the table reads it all, so no by-job fetch.
     const fresh = await signedIn();
     fresh.srv.tables.sessions.push({ id: jid, user_id: UID, deleted: false, last_modified: '2026-09-29T09:00:00.000Z',
-      updated_at: fresh.srv.stamp(), doc: { id: jid, site: 'ZZLATE', date: '2026-09-28', items: [{ id: 'ZZK-ITEM', assetNo: 'K1', result: 'fail' }] } });
+      updated_at: fresh.srv.stamp(), doc: { id: jid, site: 'ZZLATE', date: RECENT_DATE, items: [{ id: 'ZZK-ITEM', assetNo: 'K1', result: 'fail' }] } });
     fresh.srv.otherRow({ id: 'ZZK2', session_id: jid, item_id: 'ZZK-ITEM' });
     // V94: wait for the photo mirror rather than trust signedIn()'s 5 ms — this
     // assertion flaked under a loaded full run (noted at V93). Same fix as 16i.

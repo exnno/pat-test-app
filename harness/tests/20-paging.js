@@ -23,7 +23,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, withSession, withItem, CANARY } = require('../fixture');
+const { tick, withSession, withItem, CANARY, RECENT_DATE } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID_A = '11111111-1111-1111-1111-111111111111';
@@ -177,7 +177,7 @@ function batched(make) {
 function jobRow(id, items, at) {
   return {
     id,
-    doc: { id, site: 'ZZ PAGED', name: '', engineer: CANARY.engineer, prefix: '', date: '2026-09-10',
+    doc: { id, site: 'ZZ PAGED', name: '', engineer: CANARY.engineer, prefix: '', date: RECENT_DATE,
       startNumber: 1, locked: false,
       items: items.map((a, i) => ({ assetNo: a, location: 'ZZPAGED', itemType: 'Kettle', notes: '', result: 'pass', id: id + '-i' + i })) },
     deleted: false, last_modified: at, updated_at: at,

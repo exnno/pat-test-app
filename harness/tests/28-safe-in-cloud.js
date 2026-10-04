@@ -318,6 +318,12 @@ module.exports = async function () {
     const app = await signedIn();
     const id = plainJob(app, 'ZZSHIELD');
     away(app);
+    // V95: the same wait V94 gave 16i/26k. Safe needs the photo mirror read
+    // ("photos-unknown" until then); under a full run's load it could still be
+    // loading when the run's safety repaint fired — 28b failed about one run in
+    // three at V95 with no code involved. Meaning unchanged.
+    for (let i = 0; i < 100 && !app.state().photoMetaReady; i++) await tick(5);
+    t.ok(app.state().photoMetaReady, 'the photo mirror has loaded (precondition)');
     app.fn('render')();
     t.excludes(app.html(), 'title="Safe in the cloud"', 'not sent yet: no 🛡');
     await run(app);

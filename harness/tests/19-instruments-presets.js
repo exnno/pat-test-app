@@ -28,7 +28,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, freshApp, withInstrument, addInstrument, withSession, withItem, confirmSheet } = require('../fixture');
+const { tick, freshApp, withInstrument, addInstrument, withSession, withItem, confirmSheet, RECENT_DATE } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID_A = '11111111-1111-1111-1111-111111111111';
@@ -176,7 +176,7 @@ function markSent(app, o = {}) {
 function job(app, id, instrumentId, items = 1) {
   const its = [];
   for (let i = 0; i < items; i++) its.push({ id: id + '-it' + i, assetNo: 'ZZ-' + id + '-' + i, itemType: 'Kettle', location: 'Office', result: 'pass' });
-  app.run(`state.sessions.push(${JSON.stringify({ id, site: 'ZZ Site ' + id, name: '', date: '2026-09-01', items: its, instrumentId })}); saveSessions();`);
+  app.run(`state.sessions.push(${JSON.stringify({ id, site: 'ZZ Site ' + id, name: '', date: RECENT_DATE, items: its, instrumentId })}); saveSessions();`);
   app.stopTimer();
   return findS(app, id);
 }
@@ -249,7 +249,7 @@ module.exports = async function () {
   await t.group('19d — deleted on the other phone: frozen onto jobs AFTER the jobs are read', async () => {
     // Phone A deleted ZZDI and froze it onto J1 — and had also added an item to
     // J1 first. The cloud J1 therefore carries A's item AND the frozen copy.
-    const cloudJ1 = { id: 'ZZDJ1', site: 'ZZ Site ZZDJ1', name: '', date: '2026-09-01', instrumentId: 'ZZDI',
+    const cloudJ1 = { id: 'ZZDJ1', site: 'ZZ Site ZZDJ1', name: '', date: RECENT_DATE, instrumentId: 'ZZDI',
       instrumentSnapshot: { make: 'ZZ Retired', model: '', calDate: '2026-01-01', calCertNo: 'CERT-ZZDI', calDue: '2027-01-01' },
       items: [{ id: 'ZZDJ1-it0', assetNo: 'ZZ-ZZDJ1-0', itemType: 'Kettle', location: 'Office', result: 'pass' },
               { id: 'ZZDJ1-A', assetNo: 'ZZ-A-ADDED', itemType: 'Drill', location: 'Office', result: 'pass' }] };

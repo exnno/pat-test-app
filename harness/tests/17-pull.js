@@ -27,7 +27,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, CANARY, withSession, withItem } = require('../fixture');
+const { tick, CANARY, withSession, withItem, RECENT_DATE } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID_A = '11111111-1111-1111-1111-111111111111';
@@ -144,7 +144,7 @@ function cloudJob(id, site, items, stamp = T1) {
   return {
     id,
     doc: {
-      id, site, name: '', engineer: CANARY.engineer, prefix: '', date: '2026-09-01',
+      id, site, name: '', engineer: CANARY.engineer, prefix: '', date: RECENT_DATE,
       startNumber: 1, locked: false,
       items: items.map((a, i) => ({ assetNo: a, location: 'ZZPULLED', itemType: 'Kettle', notes: '', result: 'pass', id: id + '-i' + i })),
     },
