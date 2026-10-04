@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V96';",
-    to:   "const APP_VERSION = 'V96';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V97';",
+    to:   "const APP_VERSION = 'V97';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -637,8 +637,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V94</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V94</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V92</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V95</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V95</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V93</strong> &middot; October 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -3710,8 +3710,8 @@ const MUTATIONS = [
   {
     name: "M513 (V96) the calculator goes back under Display",
     file: "data.js",
-    from: "'settingsReadings', 'settingsScanner', 'settingsCalculator'] },",
-    to:   "'settingsReadings', 'settingsScanner'] },",
+    from: "'settingsScanner', 'settingsCalculator', 'settingsLogging'] },",   // V97 re-anchored
+    to:   "'settingsScanner', 'settingsLogging'] },",
     why:  "3A: the calculator is a testing tool; this also orphans the page from the hub (33b)",
   },
   {
@@ -3722,10 +3722,10 @@ const MUTATIONS = [
     why:  "a wasted tap on Engineer & Tester and Phone & Display (33d)",
   },
   {
-    name: "M515 (V96) Back from a manager always goes to the Backup page",
+    name: "M515 (V96) Back from a manager always goes to the storage page",
     file: "settings-actions.js",
-    from: "  const v = state.mgrReturnView || 'settingsBackup';",
-    to:   "  const v = 'settingsBackup';",
+    from: "  const v = state.mgrReturnView || 'settingsStorage';",   // V97 re-anchored
+    to:   "  const v = 'settingsStorage';",
     why:  "opened from its Data row, Back would land on a page the user never visited (33f)",
   },
   {
@@ -3755,6 +3755,68 @@ const MUTATIONS = [
     from: "data-action=\"${meta.action || 'settings-page'}\"",
     to:   "data-action=\"settings-page\"",
     why:  "the Manage photos row would setView without photoMgrOpen \u2014 no previews, no state reset (33e)",
+  },  {
+    name: "M520 (V97) the storage banner still opens Backup & Restore",
+    file: "dispatch.js",
+    from: "  'storage-banner-open': () => setView('settingsStorage'),",
+    to:   "  'storage-banner-open': () => setView('settingsBackup'),",
+    why:  "the banner says clear old jobs; Backup & Restore no longer has them (34e)",
+  },
+  {
+    name: "M521 (V97) the not-saved sheet's Clear old jobs opens Backup & Restore",
+    file: "dispatch.js",
+    from: "state.saveFailureDismissed = true; setView('settingsStorage'); },",
+    to:   "state.saveFailureDismissed = true; setView('settingsBackup'); },",
+    why:  "a full phone mid-job would land on a page with nothing to clear (34e)",
+  },
+  {
+    name: "M522 (V97) Logging Options drops out of Logging",
+    file: "data.js",
+    from: "'settingsCalculator', 'settingsLogging'] },",
+    to:   "'settingsCalculator'] },",
+    why:  "Undo and item times would be reachable only by search (34c, 33b)",
+  },
+  {
+    name: "M523 (V97) item times still held back by Phone & Display",
+    file: "config.js",
+    from: "  settings_work: ['settingsUser', 'settingsLogging',",
+    to:   "  settings_work: ['settingsUser', 'settingsDisplay',",
+    why:  "a pull could apply item times under the open Logging Options switch (34d)",
+  },
+  {
+    name: "M524 (V97) a pull repaints over Logging Options",
+    file: "config.js",
+    from: "  'settingsReadings', 'settingsRetest', 'settingsLogging', 'settingsStorage'];",
+    to:   "  'settingsReadings', 'settingsRetest', 'settingsStorage'];",
+    why:  "the no-repaint rule for a page that owns a synced row (34d)",
+  },
+  {
+    name: "M525 (V97) About says nothing is uploaded while signed in",
+    file: "render-help.js",
+    from: "  return syncing\n    ? 'Your data is saved",
+    to:   "  return false\n    ? 'Your data is saved",
+    why:  "4A: wrong for every signed-in customer (34f)",
+  },
+  {
+    name: "M526 (V97) a setup import lands on Backup & Restore",
+    file: "setup.js",
+    from: "        state.view = 'settingsSetup';",
+    to:   "        state.view = 'settingsBackup';",
+    why:  "the user was on the Setup page; the bug carried since v33 (34g)",
+  },
+  {
+    name: "M527 (V97) a manager's fallback Back is Backup & Restore",
+    file: "settings-actions.js",
+    from: "!== -1 ? state.view : 'settingsStorage';",
+    to:   "!== -1 ? state.view : 'settingsBackup';",
+    why:  "the managers' buttons live on Phone Storage now (34e)",
+  },
+  {
+    name: "M528 (V97) Backup & Restore keeps the photo space block",
+    file: "render-settings.js",
+    from: "      ${renderPhotoBackupSection()}\n\n      <p class=\"muted\" style=\"margin:4px",
+    to:   "      ${renderPhotoBackupSection()}\n      ${renderPhotoStorageSection()}\n\n      <p class=\"muted\" style=\"margin:4px",
+    why:  "1A: the split leaks back — space controls on the copies page (34a)",
   },
 ];
 
