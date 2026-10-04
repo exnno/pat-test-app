@@ -20,18 +20,19 @@ earth (0.1 + R) Ω with tolerance leeway, older kit up to 0.5 Ω; leakage 5 mA.
 Peter to confirm against the book (and whether the 4th-ed 0.3 MΩ heating figure
 survives). Readings off → no check. The switch lands in Logging → Test Readings.
 
-### Settings redo part 2 (Stage 7) — the crowded pages, own spec round
-Peter, V96 round: some pages (Data especially) have so much on them they should
-be split into new pages. V96 was structure only (1A). Candidates seen in V96:
-- Backup & Restore holds the storage meter, Protect my data, backup/restore,
-  reminders, clear old jobs / the tidy block, photo storage + Manage photos +
-  Clear photos, and the apostrophe-correction undo — split by job to be done.
-- Undo (a logging habit) still lives in Phone & Display; Smart Quick Pick on/off
-  sits inside Quick Pick Items.
-- About still says "Your data stays on your device. Nothing is uploaded, no
-  account needed" — wrong while signed in (the hub footer was fixed in V96).
-- Emoji icons and mixed casing ("Manage photos" / "Jobs on this phone" inside
-  pages) read as DIY — a look pass (scope C at V96) is its own release.
+### Settings redo part 3 (Stage 7, optional) — the look pass
+V97 did part 2 (Backup & Restore split, Phone Storage, Logging Options, About copy).
+Left: emoji icons and casing inside pages (e.g. "Clear photos from this phone",
+section headings), and whether Smart Quick Pick on/off should leave Quick Pick
+Items. Not chosen yet — Peter decides whether it is worth a release.
+Other crowded pages seen, not split: Report Settings (long), Quick Pick Items
+(presets + items + SQP).
+
+### V97 residuals (known, accepted)
+- Phone Storage's row subtitle reads getStorageStats() each time the Data list or
+  search draws it — same figure the Jobs banner reads; cheap at today's sizes.
+- 33f still opens the photo manager from Backup & Restore (no button there now; the
+  action still works and settingsBackup stays in the return list).
 
 ### Factory reset (Peter, V81.1) — needs its own spec round
 A guarded "reset this device" (V86: must also clear SQP_RESET_KEY; V87: STORAGE_BANNER_KEY; V88: the
@@ -48,6 +49,7 @@ settings level decides); `conf`/`confV` live inside SYNC_STATE_KEY.
 V94 adds: UNDO_KEY (`pat:undo`, the Undo switch — a setting, settings level).
 V95 adds nothing (`state.descTextMode` is memory only).
 V96 adds nothing (`state.mgrReturnView` is memory only).
+V97 adds nothing (no new keys).
 
 ### Visual inspection tick (PN) — postponed at V94 (11D)
 Peter worried it would harm the entry screen. Placements offered at the V94 round:

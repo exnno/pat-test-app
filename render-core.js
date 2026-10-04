@@ -136,11 +136,13 @@ function render() {
   else if (v === 'settingsDescriptions') html = renderSettingsDescriptions();
   else if (v === 'settingsDisplay') html = renderSettingsDisplay();
   else if (v === 'settingsBackup') html = renderSettingsBackup();
-  // V90 (R18): the photo manager, reached from the Backup page. Falls back to
-  // the Backup page if its markup is missing (never a blank screen).
-  else if (v === 'photoManager') html = (typeof renderPhotoManager === 'function') ? renderPhotoManager() : renderSettingsBackup();
+  else if (v === 'settingsStorage') html = renderSettingsStorage();   // V97 (1A)
+  else if (v === 'settingsLogging') html = renderSettingsLogging();   // V97 (3A)
+  // V90 (R18): the photo manager, reached from Phone Storage (V97). Falls back
+  // to Phone Storage if its markup is missing (never a blank screen).
+  else if (v === 'photoManager') html = (typeof renderPhotoManager === 'function') ? renderPhotoManager() : renderSettingsStorage();
   // V91 (Stage 4, 5A): Jobs on this phone — same fallback.
-  else if (v === 'jobManager') html = (typeof renderJobManager === 'function') ? renderJobManager() : renderSettingsBackup();
+  else if (v === 'jobManager') html = (typeof renderJobManager === 'function') ? renderJobManager() : renderSettingsStorage();
   else if (v === 'settingsSetup') html = renderSettingsSetup();   // v33
   else if (v === 'settingsCsv') html = renderSettingsCsv();   // v11
   else if (v === 'settingsClients') html = renderSettingsClients();   // v19
@@ -231,9 +233,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Settings, reorganised.</strong> Everything is now grouped by what you're doing: Engineer &amp; Tester, Logging, Clients &amp; Retests, Reports &amp; Exports, Phone &amp; Display, Data and Help. Nothing has been removed &mdash; only moved.</li>
-        <li><strong>Clearer names.</strong> Quick Pick Fail is now <strong>Fail Reasons</strong>, Item Description List is <strong>Descriptions</strong>, and User Settings is <strong>Engineer &amp; Tester</strong>. Searching Settings for the old names still finds them.</li>
-        <li><strong>Fewer taps.</strong> A group with only one page opens it straight away, and Manage Photos has its own row under Data. The Resistance Calculator now sits with the other testing tools under Logging.</li>
+        <li><strong>Backup &amp; Restore, split in two.</strong> Backup &amp; Restore now holds just your backup and photo files. Everything about space &mdash; the storage meter, clearing old jobs, clearing photos &mdash; has its own page: <strong>Settings &rarr; Data &rarr; Phone Storage</strong>.</li>
+        <li><strong>Logging Options.</strong> The Undo button and item times have moved from Phone &amp; Display to <strong>Settings &rarr; Logging &rarr; Logging Options</strong>. Phone &amp; Display now holds only what's set for this phone: theme, vibration and sound.</li>
+        <li><strong>Nothing has changed how it works</strong> &mdash; only where it lives. Searching Settings still finds everything.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

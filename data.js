@@ -107,15 +107,15 @@ const SETTINGS_CATEGORIES = [
   { id: 'catUser',    icon: '👤', title: 'Engineer & Tester', blurb: 'Your name and your test instruments',
     pages: ['settingsUser'] },
   { id: 'catTesting', icon: '⚡', title: 'Logging', blurb: 'Quick Pick, fail reasons, descriptions and the tools you use while testing',
-    pages: ['settingsItems', 'settingsFails', 'settingsDescriptions', 'settingsMultiPick', 'settingsReadings', 'settingsScanner', 'settingsCalculator'] },
+    pages: ['settingsItems', 'settingsFails', 'settingsDescriptions', 'settingsMultiPick', 'settingsReadings', 'settingsScanner', 'settingsCalculator', 'settingsLogging'] },
   { id: 'catClients', icon: '🏢', title: 'Clients & Retests', blurb: 'Your clients and sites, and reminders to rebook them',
     pages: ['settingsClients', 'settingsRetest'] },
   { id: 'catReports', icon: '📄', title: 'Reports & Exports', blurb: 'The PDF certificate and the CSV export',
     pages: ['settingsReport', 'settingsCsv'] },
-  { id: 'catApp',     icon: '🎨', title: 'Phone & Display', blurb: 'Theme, sound, vibration and other preferences on this phone',
+  { id: 'catApp',     icon: '🎨', title: 'Phone & Display', blurb: 'Theme, sound and vibration on this phone',
     pages: ['settingsDisplay'] },
-  { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Backups, photos, and moving your setup to another phone',
-    pages: ['settingsBackup', 'photoManager', 'jobManager', 'settingsSetup'] },
+  { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Backups, space on this phone, photos, and moving your setup to another phone',
+    pages: ['settingsBackup', 'settingsStorage', 'photoManager', 'jobManager', 'settingsSetup'] },
   { id: 'catHelp',    icon: 'ℹ️', title: 'Help', blurb: 'About this app, what the terms mean, and how to get in touch',
     pages: ['settingsAbout', 'settingsGlossary', 'settingsContact'] }
 ];
@@ -135,9 +135,14 @@ const SETTINGS_PAGE_META = {
   settingsCsv:         { icon: '📊', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
   settingsClients:     { icon: '🏢', title: 'Clients',               aliases: 'clients sites customers addresses' },
   settingsRetest:      { icon: '🔔', title: 'Retest Reminders',       aliases: 'retest reminders rebook chase due overdue recall renewal commercial repeat business follow up contact customer' },
-  settingsDisplay:     { icon: '🎨', title: 'Phone & Display',       aliases: 'display settings theme dark light haptics sound timestamps appearance undo' },
+  settingsDisplay:     { icon: '🎨', title: 'Phone & Display',       aliases: 'display settings theme dark light haptics vibration sound appearance' },
+  // V97 (3A): Undo and item times moved here from Phone & Display — item times
+  // sync with the engineer settings, so they never belonged under "this phone".
+  settingsLogging:     { icon: '⚙️', title: 'Logging Options',       aliases: 'undo take back last item timestamps item times record time logged display settings' },
   settingsCalculator:  { icon: '🧮', title: 'Resistance Calculator', aliases: 'earth continuity resistance limit ohms calculator csa' },
-  settingsBackup:      { icon: '💾', title: 'Backup & Restore',      aliases: 'backup restore export import data save json' },
+  settingsBackup:      { icon: '💾', title: 'Backup & Restore',      aliases: 'backup restore export import data save json photos file' },
+  // V97 (1A, 2A): split out of Backup & Restore — everything about space.
+  settingsStorage:     { icon: '📦', title: 'Phone Storage',         aliases: 'storage space full clear old jobs sessions prune protect keep data meter tidy free up delete photos age' },
   // V96 (3A): the photo manager and Jobs on this phone get their own rows in
   // Data. They are screens of their own already (V90, V91); `action` opens them
   // through their own open functions (which set their state up) instead of a

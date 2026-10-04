@@ -785,12 +785,12 @@ registerActions({
   // Backup & Restore + prune + about
   'backup-export': () => downloadBackup(),
   // V87 (4A): the "not saved" sheet. Backing up leaves the sheet up (the item is
-  // still not in storage); Clear goes to the Backup page, where clearing lives.
+  // still not in storage); Clear goes to Phone Storage (V97), where clearing lives.
   'save-fail-backup': () => downloadBackup(),
-  'save-fail-clear': () => { state.saveFailureDismissed = true; setView('settingsBackup'); },
+  'save-fail-clear': () => { state.saveFailureDismissed = true; setView('settingsStorage'); },
   'save-fail-close': () => { state.saveFailureDismissed = true; render(); },
   // V87 (S13): the Jobs-screen storage banner.
-  'storage-banner-open': () => setView('settingsBackup'),
+  'storage-banner-open': () => setView('settingsStorage'),   // V97
   'storage-banner-dismiss': () => { dismissStorageBanner(); render(); },
   // V87 (S12): a tap is a user gesture, which some browsers weigh when deciding.
   'storage-protect': () => { checkStorageProtection(true).catch(() => {}); },

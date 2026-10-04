@@ -38,6 +38,15 @@
 // body — so this file's load position is free. It sits after render-settings.js
 // purely for readability.
 
+// V97 (4A): About said "Nothing is uploaded, no account needed" even while
+// signed in and syncing. Same test as the hub footer (settingsWhereDataLives).
+function aboutWhereDataLives() {
+  const syncing = typeof syncActive === 'function' && syncActive();
+  return syncing
+    ? 'Your data is saved on this phone, with a copy in your cloud account so it reaches your other phones. No signal needed while you work &mdash; it catches up when you\'re back online.'
+    : 'Your data stays on this phone. Nothing is uploaded, no account needed, no signal required once installed.';
+}
+
 function renderSettingsAbout() {
   // v85 (decision 3A): the Cloud card and the long-press on the title that
   // revealed it are gone — the cloud pages live in Settings → Cloud now.
@@ -47,19 +56,19 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h2 id="about-title">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}</h2>
         <p>A fast, offline-first portable appliance testing app for working PAT engineers. Built around speed of data entry — pass/fail decisions in two taps, no fighting the interface.</p>
-        <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
+        <p>${aboutWhereDataLives()} The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V96: rolled forward — V96 on top, V93 dropped. -->
+      <!-- v8: rolling 3-version changelog. V97: rolled forward — V97 on top, V94 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V97</strong> &middot; October 2026</p>
+        <p class="muted">Backup &amp; Restore split in two: backups and photo files stay there, and a new Phone Storage page holds the storage meter, clearing old jobs and clearing photos. Undo and item times moved to a new Logging Options page under Logging. About now says where your data is when you're signed in.</p>
         <p><strong>V96</strong> &middot; October 2026</p>
         <p class="muted">Settings reorganised by what you're doing: Engineer &amp; Tester, Logging, Clients &amp; Retests, Reports &amp; Exports, Phone &amp; Display, Data and Help. Clearer names &mdash; Fail Reasons, Descriptions, Engineer &amp; Tester &mdash; and search still finds the old ones. One-page groups open straight away; Manage Photos has its own row under Data.</p>
         <p><strong>V95</strong> &middot; October 2026</p>
         <p class="muted">Changing a FAIL to a PASS now asks about the fail reason still in the notes, so a corrected mistake doesn't print as a PASS with a fail description. Settings &rarr; Item Description List: tap a description to fix its spelling, on items in unlocked jobs too. New optional Remedial actions section at the end of the report: every fail with its reason, an action line, and its photos.</p>
-        <p><strong>V94</strong> &middot; October 2026</p>
-        <p class="muted">The test screen's item line shows how many items you've logged at the current location in this job. Multi-picks can sit on the Quick Pick grid's bottom row as tiles &mdash; tap one, then PASS, and the whole list is logged; assign them in Settings &rarr; Multi Pick (optional). New Undo button beside Copy last, switched on in Display Settings: it takes back the last item or batch you logged, after asking.</p>
         </div>
 
       <div class="info-card">

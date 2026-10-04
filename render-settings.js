@@ -55,7 +55,6 @@ function settingsPageSubtitle(pageId) {
       const themeSummary = state.theme === 'system' ? 'System' : (state.theme === 'dark' ? 'Dark' : 'Light');
       const extras = [];
       if (state.soundEnabled) extras.push('Sound on');
-      if (state.timestampsEnabled) extras.push('Times on');
       return [themeSummary, state.hapticsEnabled ? 'Haptics on' : 'Haptics off', ...extras].join(' · ');
     }
     case 'settingsCsv': {
@@ -82,7 +81,16 @@ function settingsPageSubtitle(pageId) {
       const n = activeRetestCount();
       return n === 0 ? 'On · nothing due' : `On · ${n} due`;
     }
-    case 'settingsBackup':  return 'Back up and restore your data';
+    case 'settingsBackup':  return 'Back up and restore your jobs, settings and photos';
+    // V97 (1A): the storage page's row says how full this phone is.
+    case 'settingsStorage': {
+      try {
+        const st = getStorageStats();
+        return `${st.pct}% full`;
+      } catch (e) { return 'Space used on this phone'; }
+    }
+    case 'settingsLogging':
+      return `Undo ${state.undoEnabled ? 'on' : 'off'} · Item times ${state.timestampsEnabled ? 'on' : 'off'}`;
     case 'settingsSetup':   return 'Share your setup to another device';
     case 'settingsCalculator': return 'Earth continuity limit';
     case 'settingsAbout':   return `PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}`;
@@ -765,6 +773,19 @@ function renderSettingsDisplay() {
         </div>
       </div>
 
+    </div>
+  `;
+}
+
+// V97 (3A): Logging Options — Undo (a logging habit, per phone) and item times
+// (synced in settings_work), moved out of Phone & Display, which is now only
+// what is genuinely this phone's: theme, haptics, sound. The view is in
+// SYNC_GENERAL_VIEWS settings_work and SYNC_NO_REPAINT_VIEWS (config.js): a pull
+// must not apply or repaint item times while this page is open.
+function renderSettingsLogging() {
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Logging Options')}
       <div class="settings-section">
         <h2 class="h2">Undo button</h2>
         <p class="muted">Puts <strong>↶ Undo</strong> beside Copy last on the test screen. It takes back the last item you logged — or the whole batch from Log again or Multi Pick — after asking. Only the most recent, and only while those items are untouched. This phone only.</p>
@@ -816,22 +837,11 @@ function storageProtectionHTML() {
   return `<p class="muted">Checking&hellip;</p>`;
 }
 
+// V97 (1A): Backup & Restore holds COPIES only — the backup file, restore, the
+// photo files, and the v69 apostrophe undo. Everything about SPACE (protection,
+// the meter, clearing old jobs, the ages, clearing photos) is Phone Storage,
+// renderSettingsStorage below.
 function renderSettingsBackup() {
-  const stats = getStorageStats();
-  // v62: photos live in IndexedDB, NOT in the ~5MB localStorage budget the bar
-  // above measures, so they are reported as their own line and deliberately do
-  // NOT feed the percentage bar. Rolling them in would make the bar lie in both
-  // directions — it would show 400% for a normal photo user, and it would imply
-  // deleting photos frees the space the sessions blob is running out of.
-  const photoStats = (typeof photoStatsSync === 'function') ? photoStatsSync() : { count: 0, bytes: 0 };
-  // V87 (S13, 3A): amber from STORAGE_WARN_PCT (was 70), red from
-  // STORAGE_BANNER_PCT (was 90) — the same point the Jobs-screen banner appears.
-  const barClass = stats.pct >= STORAGE_BANNER_PCT ? 'danger' : (stats.pct >= STORAGE_WARN_PCT ? 'warn' : '');
-  const fullNote = stats.pct >= STORAGE_WARN_PCT ? `
-          <p class="storage-full-note" style="margin-top:10px;font-size:13px;color:var(--warn-soft-text)"><strong>Getting full (${stats.pct}%).</strong> Export a backup, then clear old sessions below to make room. When it's full, new items can't be saved.</p>` : '';
-  // v14: prune suggestion — sessions exported AND older than the threshold.
-  const prunable = prunableSessions();
-  const ageMonths = state.pruneAgeMonths || PRUNE_AGE_DEFAULT;
   // v69 (D5, Q4-A'): the apostrophe repair's undo. Shown only while a snapshot
   // exists, so the page is unchanged for anyone whose data needed no repair and
   // for everyone once they've moved on. Deliberately placed directly under
@@ -844,25 +854,12 @@ function renderSettingsBackup() {
         <button class="backup-action-btn" id="repair-undo-btn" data-action="repair-undo">Undo the correction</button>
       </div>
   ` : '';
-  // V91 (Stage 4, 7A): signed in, old jobs are cleared when they're safe in the
-  // cloud (exported or not), from Jobs on this phone — plus old photos (9A).
-  const cloudOn = (typeof syncActive === 'function' && syncActive() && typeof renderJobManager === 'function');
-  const tidyM = cloudOn && typeof tidyModel === 'function' ? tidyModel(false) : null;
-  const pruneBlock = cloudOn ? `
-          ${renderTidyBlock(tidyM, 'backup-tidy') || `<p class="muted" style="margin-top:10px;font-size:12px">Nothing older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} is ready to come off this phone right now.</p>`}
-          <button class="backup-action-btn" id="jobs-manage-btn" data-action="jm-open" style="margin-top:10px">🛡 Jobs on this phone</button>
-  ` : prunable.length > 0 ? `
-          <div class="prune-suggestion">
-            <p class="prune-suggestion-text">${prunable.length} exported session${prunable.length === 1 ? '' : 's'} older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} can be cleared to free space.</p>
-            <button class="backup-action-btn" id="prune-review-btn" data-action="prune-review">Review &amp; clear…</button>
-          </div>
-  ` : `<p class="muted" style="margin-top:10px;font-size:12px">No exported sessions older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} to clear right now.</p>`;
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Backup & Restore')}
       <div class="settings-section">
         <h2 class="h2">Backup</h2>
-        <p class="muted">Save a complete copy of all sessions and settings as a single JSON file. Keep it somewhere safe — it's the only safety net if the browser ever clears its data.</p>
+        <p class="muted">Save a complete copy of all jobs and settings as a single JSON file. Keep it somewhere safe — it's the only safety net if the browser ever clears its data.</p>
         <button class="backup-action-btn primary" id="backup-export-btn" data-action="backup-export">⬇ Export backup (.json)</button>
       </div>
 
@@ -877,15 +874,56 @@ function renderSettingsBackup() {
 
       ${renderPhotoBackupSection()}
 
+      <p class="muted" style="margin:4px 16px 16px;font-size:12px">Running out of space? See Settings → Data → Phone Storage.</p>
+    </div>
+  `;
+}
+
+// V97 (1A, 2A): Phone Storage — space on this phone. Split out of Backup &
+// Restore. The storage banner and the "not saved" sheet's Clear old jobs land
+// here (dispatch.js), and Manage Photos / Jobs on This Phone return here when
+// opened from it (settings-actions.js _MGR_RETURN_VIEWS).
+function renderSettingsStorage() {
+  const stats = getStorageStats();
+  // v62: photos live in IndexedDB, NOT in the ~5MB localStorage budget the bar
+  // above measures, so they are reported as their own line and deliberately do
+  // NOT feed the percentage bar. Rolling them in would make the bar lie in both
+  // directions — it would show 400% for a normal photo user, and it would imply
+  // deleting photos frees the space the sessions blob is running out of.
+  const photoStats = (typeof photoStatsSync === 'function') ? photoStatsSync() : { count: 0, bytes: 0 };
+  // V87 (S13, 3A): amber from STORAGE_WARN_PCT (was 70), red from
+  // STORAGE_BANNER_PCT (was 90) — the same point the Jobs-screen banner appears.
+  const barClass = stats.pct >= STORAGE_BANNER_PCT ? 'danger' : (stats.pct >= STORAGE_WARN_PCT ? 'warn' : '');
+  const fullNote = stats.pct >= STORAGE_WARN_PCT ? `
+          <p class="storage-full-note" style="margin-top:10px;font-size:13px;color:var(--warn-soft-text)"><strong>Getting full (${stats.pct}%).</strong> Export a backup, then clear old jobs below to make room. When it's full, new items can't be saved.</p>` : '';
+  // v14: prune suggestion — sessions exported AND older than the threshold.
+  const prunable = prunableSessions();
+  const ageMonths = state.pruneAgeMonths || PRUNE_AGE_DEFAULT;
+  // V91 (Stage 4, 7A): signed in, old jobs are cleared when they're safe in the
+  // cloud (exported or not), from Jobs on this phone — plus old photos (9A).
+  const cloudOn = (typeof syncActive === 'function' && syncActive() && typeof renderJobManager === 'function');
+  const tidyM = cloudOn && typeof tidyModel === 'function' ? tidyModel(false) : null;
+  const pruneBlock = cloudOn ? `
+          ${renderTidyBlock(tidyM, 'backup-tidy') || `<p class="muted" style="margin-top:10px;font-size:12px">Nothing older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} is ready to come off this phone right now.</p>`}
+          <button class="backup-action-btn" id="jobs-manage-btn" data-action="jm-open" style="margin-top:10px">🛡 Jobs on This Phone</button>
+  ` : prunable.length > 0 ? `
+          <div class="prune-suggestion">
+            <p class="prune-suggestion-text">${prunable.length} exported job${prunable.length === 1 ? '' : 's'} older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} can be cleared to free space.</p>
+            <button class="backup-action-btn" id="prune-review-btn" data-action="prune-review">Review &amp; clear…</button>
+          </div>
+  ` : `<p class="muted" style="margin-top:10px;font-size:12px">No exported jobs older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} to clear right now.</p>`;
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Phone Storage')}
       <div class="settings-section">
         <h2 class="h2">Keep this app's data</h2>
         <div id="storage-protect">${storageProtectionHTML()}</div>
       </div>
 
       <div class="settings-section">
-        <h2 class="h2">Storage usage</h2>
+        <h2 class="h2">Space used</h2>
         <div class="storage-card">
-          <div class="storage-stat"><span class="storage-stat-label">Sessions</span><span class="storage-stat-value">${stats.sessions}</span></div>
+          <div class="storage-stat"><span class="storage-stat-label">Jobs</span><span class="storage-stat-value">${stats.sessions}</span></div>
           <div class="storage-stat"><span class="storage-stat-label">Items recorded</span><span class="storage-stat-value">${stats.items.toLocaleString()}</span></div>
           <div class="storage-stat"><span class="storage-stat-label">Storage used</span><span class="storage-stat-value">${formatBytes(stats.bytes)}</span></div>
           <div class="storage-stat"><span class="storage-stat-label">Approx. limit</span><span class="storage-stat-value">~5 MB</span></div>
@@ -893,16 +931,16 @@ function renderSettingsBackup() {
           <div class="storage-stat"><span class="storage-stat-label">Photos</span><span class="storage-stat-value">${photoStats.count} · ${escapeHTML(formatBytes(photoStats.bytes))}</span></div>` : ''}
           <div class="storage-bar-wrap"><div class="storage-bar ${barClass}" style="width:${stats.pct}%"></div></div>
           ${fullNote}
-          <p class="muted" style="margin-top:10px;font-size:12px">Browsers cap local data at around 5 MB. Export a backup and clear old sessions before you get close to the limit.</p>
+          <p class="muted" style="margin-top:10px;font-size:12px">Browsers cap local data at around 5 MB. Export a backup and clear old jobs before you get close to the limit.</p>
           ${pruneBlock}
         </div>
       </div>
 
       <div class="settings-section">
-        <h2 class="h2">Clear-old-sessions age</h2>
+        <h2 class="h2">Clear old jobs after</h2>
         <p class="muted">${cloudOn
           ? 'When a job is safe in the cloud and older than this, it\'ll be offered for removing from this phone. The cloud keeps it. Nothing is ever removed without your confirmation.'
-          : 'When a session has been exported and is older than this, it\'ll be offered for clearing above. Nothing is ever deleted without your confirmation.'}</p>
+          : 'When a job has been exported and is older than this, it\'ll be offered for clearing above. Nothing is ever deleted without your confirmation.'}</p>
         <label class="label">Age in months</label>
         <input class="input" id="prune-age-input" type="number" inputmode="numeric" min="1" max="120" value="${ageMonths}">
         <div class="btn-row">
@@ -916,6 +954,8 @@ function renderSettingsBackup() {
           <button class="btn-primary" id="photo-age-save" data-action="photo-age-save">Save</button>
         </div>` : ''}
       </div>
+
+      ${renderPhotoStorageSection()}
     </div>
   `;
 }
@@ -1550,6 +1590,7 @@ function renderSettingsCalculator() {
 //
 // The section hides itself entirely when the device can't store photos, rather
 // than offering buttons that can't work.
+// V97 (1A): the photo FILES (export / import) — Backup & Restore.
 function renderPhotoBackupSection() {
   if (typeof photosSupported === 'function' && !photosSupported()) return '';
   const stats = (typeof photoStatsSync === 'function') ? photoStatsSync() : { count: 0, bytes: 0 };
@@ -1559,6 +1600,22 @@ function renderPhotoBackupSection() {
        <p class="muted" style="margin-top:8px;font-size:12px">${stats.count} photo${stats.count === 1 ? '' : 's'} on this device · about ${escapeHTML(formatBytes(Math.round(stats.bytes * 1.37)))} as a file.</p>`
     : `<p class="muted" style="font-size:12px">No photos on this device yet. Photos are added from the FAIL screen.</p>`;
 
+  return `
+      <div class="settings-section">
+        <h2 class="h2">Photos</h2>
+        <p class="muted"><strong>Photos are not included in your backup.</strong> They're far too large for it — putting them in would risk the backup itself failing to save. Export them separately and keep both files together.</p>
+        ${exportBlock}
+        <input type="file" id="photo-import-file" data-change-action="photo-import-file" accept="application/json,.json" style="display:none">
+        <button class="backup-action-btn" id="photo-import-btn" data-action="photo-import" style="margin-top:10px">⬆ Import photos (.json)</button>
+        <p class="muted" style="margin-top:8px;font-size:12px">Importing adds to what's already here — it never replaces your jobs. Restore your backup first, then import photos.</p>
+      </div>
+  `;
+}
+
+// V97 (1A): photos as SPACE — the manager and clearing them. Phone Storage.
+function renderPhotoStorageSection() {
+  if (typeof photosSupported === 'function' && !photosSupported()) return '';
+  const stats = (typeof photoStatsSync === 'function') ? photoStatsSync() : { count: 0, bytes: 0 };
   // V90 (Peter, V90 round): the label says what the button does. Signed in it
   // only clears photos already in the cloud (V88 5A — the cloud keeps them);
   // signed out it really deletes, so it keeps the word "Delete". Same condition
@@ -1569,18 +1626,14 @@ function renderPhotoBackupSection() {
     : '';
   // V90 (R18): the photo manager. Signed out it shows this phone's photos.
   const manageBlock = (typeof renderPhotoManager === 'function')
-    ? `<button class="backup-action-btn primary" id="photo-manage-btn" data-action="pm-open" style="margin-bottom:10px">🖼 Manage photos</button>`
+    ? `<button class="backup-action-btn primary" id="photo-manage-btn" data-action="pm-open">🖼 Manage Photos</button>`
     : '';
-
+  if (!manageBlock && !wipeBlock) return '';
   return `
       <div class="settings-section">
         <h2 class="h2">Photos</h2>
+        <p class="muted">${stats.count ? `${stats.count} photo${stats.count === 1 ? '' : 's'} on this phone · ${escapeHTML(formatBytes(stats.bytes))}.` : 'No photos on this phone.'} Photos are kept apart from the space above, so clearing them doesn't make room for jobs.</p>
         ${manageBlock}
-        <p class="muted"><strong>Photos are not included in your backup.</strong> They're far too large for it — putting them in would risk the backup itself failing to save. Export them separately and keep both files together.</p>
-        ${exportBlock}
-        <input type="file" id="photo-import-file" data-change-action="photo-import-file" accept="application/json,.json" style="display:none">
-        <button class="backup-action-btn" id="photo-import-btn" data-action="photo-import" style="margin-top:10px">⬆ Import photos (.json)</button>
-        <p class="muted" style="margin-top:8px;font-size:12px">Importing adds to what's already here — it never replaces your jobs. Restore your backup first, then import photos.</p>
         ${wipeBlock}
       </div>
   `;

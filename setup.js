@@ -174,7 +174,7 @@ function importSetupFromFile(file) {
         applySetupBundle(data);
         save();
         showToast(`Setup \u201c${name}\u201d imported`);
-        state.view = 'settingsBackup';
+        state.view = 'settingsSetup';   // V97: was the Backup page — Setup has been its own page since v33
         render();
       }
     });

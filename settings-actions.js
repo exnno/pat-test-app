@@ -852,13 +852,14 @@ function settingsOpenCategory(id) {
 // V96: Manage photos and Jobs on this phone are reached from the Backup page,
 // from their own rows in Data, from search, and (jobs) from the Jobs screen's
 // tidy offer. Back used to go to the Backup page from all of them. Now each
-// opener notes where it was, and Back goes there.
-const _MGR_RETURN_VIEWS = ['settingsBackup', 'settingsCategory', 'settings', 'sessions'];
+// opener notes where it was, and Back goes there. V97: their buttons moved to
+// Phone Storage, which is also the fallback.
+const _MGR_RETURN_VIEWS = ['settingsStorage', 'settingsBackup', 'settingsCategory', 'settings', 'sessions'];
 function mgrNoteReturn() {
-  state.mgrReturnView = _MGR_RETURN_VIEWS.indexOf(state.view) !== -1 ? state.view : 'settingsBackup';
+  state.mgrReturnView = _MGR_RETURN_VIEWS.indexOf(state.view) !== -1 ? state.view : 'settingsStorage';
 }
 function mgrGoBack() {
-  const v = state.mgrReturnView || 'settingsBackup';
+  const v = state.mgrReturnView || 'settingsStorage';
   state.mgrReturnView = null;
   setView(v);
 }

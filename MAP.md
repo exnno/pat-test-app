@@ -1,4 +1,4 @@
-# PATGo — Code Map (V96)
+# PATGo — Code Map (V97)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -609,8 +609,8 @@ v92 `syncVerifyJobs` (real contents; online only; a failed read stops) →
 confirm → `syncWhenIdle` → re-check with the same map → **session.js** `removeJobsFromPhone`.
 Old photos → `photosRemoveQuiet`. Offer timer TIDY_OFFER_KEY (`tidyOfferDue`/
 `tidyOfferAnswered`). Markup `renderJobManager()`/`renderTidyBlock()` in
-**render-review.js**; banner `renderTidyBanner()` in **render-core.js**; Backup
-page block in **render-settings.js**; actions `jm-*`, `tidy-*`,
+**render-review.js**; banner `renderTidyBanner()` in **render-core.js**; Phone
+Storage page block (V97, was Backup) in **render-settings.js**; actions `jm-*`, `tidy-*`,
 `photo-age-save` in **dispatch.js**; `setView()` calls `jobMgrLeave()`.
 v93: the Cleared section is a link (`jobMgrCloudLink`, `jm-cloud-link`) to the cloud tab.
 ⚠ v93: THE "IN THE CLOUD" TAB (`cloudJobs*`, `_cloud*`, `jobsTabSet`,
@@ -681,11 +681,11 @@ helpers. Declares NO top-level bindings, so its load position is free.
 is off — any test of it must turn the flag on first.
 v90.1: "Look in the cloud" is a small `.pm-look-link`, not a button; after a
 look one line says what it found (`totals.awayN/awayJobs/orphanN` from the model).
-v90: `renderPhotoManager()` (view `photoManager`, reached from the Backup page;
-render-core falls back to the Backup page if it is missing). Previews are
+v90: `renderPhotoManager()` (view `photoManager`, reached from Phone Storage (V97);
+render-core falls back to Phone Storage if it is missing). Previews are
 painted into `#pm-t-<id>` in place by settings-actions.js, not by render.
-v91: `renderJobManager()` (view `jobManager`, same Backup-page fallback) and
-`renderTidyBlock()` (also used by render-settings.js's Backup page).
+v91: `renderJobManager()` (view `jobManager`, same fallback) and
+`renderTidyBlock()` (also used by render-settings.js's Phone Storage page).
 v93: `renderCloudJobsHTML()`, `renderCloudListAreaHTML()` and
 `refreshCloudListAreaOnly()` — the Jobs screen's cloud tab (called from
 render-core.js, model in settings-actions.js).
@@ -694,8 +694,8 @@ Boot probe: `renderOverview` in `requiredFns`.
 ### render-settings.js (~1377 ln) — settings screens that own a setting
 The two-level Settings hub, its search, every `renderSettings*` sub-page with a
 write handler behind it, `renderSettingsSubHeader()`, the earth-resistance
-calculator, and `renderPhotoBackupSection()` (which paints inside the Backup
-page).
+calculator, `renderPhotoBackupSection()` (photo FILES, inside Backup & Restore)
+and `renderPhotoStorageSection()` (Manage Photos + clear, inside Phone Storage).
 **Touch to:** change any Settings page that changes a setting.
 **Coupling:** category structure and search aliases live in **data.js** (moved
 from config.js in v71), not here. Scanner test-log markup lives in **scanner.js**
@@ -714,6 +714,14 @@ the locked catCloud blurb (`settingsCategoryBlurb`) and the footer
 (`settingsWhereDataLives`, reads `syncActive()`) live here. Opening a group is
 `settingsOpenCategory` in **settings-actions.js**. Row subtitles for the three cloud pages read
 `state.cloud` and `syncStatusSummary()` (sync.js), typeof-guarded.
+⚠ V97: Backup & Restore (`settingsBackup`) = copies only; Phone Storage
+(`settingsStorage`, `renderSettingsStorage`) = space (protection slot
+`#storage-protect` painted in place by storage.js, meter, prune/tidy, ages,
+photo clear). Logging Options (`settingsLogging`) = Undo + item times; item times
+sync (settings_work), so the view is in `SYNC_GENERAL_VIEWS` and
+`SYNC_NO_REPAINT_VIEWS` (config.js). A new page that owns a synced setting must
+join both lists. Ways in: `storage-banner-open`, `save-fail-clear` (dispatch.js);
+manager Back `_MGR_RETURN_VIEWS` (settings-actions.js).
 
 ### render-help.js (~633 ln) — help, about & cloud pages — NEW v73
 About (+ the rolling 3-version changelog), Glossary (page + the

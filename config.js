@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V96';
+const APP_VERSION = 'V97';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V96';
+const WELCOME_VERSION = 'V97';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -421,7 +421,8 @@ const SYNC_GENERAL_IDS = [SYNC_WORK_ID, SYNC_FAILS_ID, SYNC_DESC_ID, SYNC_CSV_ID
 // it until the screen is left (the V84 Report-settings rule). Each of these
 // either holds unsaved typing or writes every field back on Save.
 const SYNC_GENERAL_VIEWS = {
-  settings_work: ['settingsUser', 'settingsDisplay', 'settingsReadings', 'settingsItems', 'settingsRetest'],
+  // V97 (3A): item times moved from settingsDisplay to settingsLogging.
+  settings_work: ['settingsUser', 'settingsLogging', 'settingsReadings', 'settingsItems', 'settingsRetest'],
   settings_fails: ['settingsFails'],
   settings_descriptions: ['settingsDescriptions'],
   settings_csv: ['settingsCsv'],
@@ -439,7 +440,7 @@ const SQP_RESET_KEY = 'pat:sqpResetAt';
 // v86: + the general-settings pages (SYNC_GENERAL_VIEWS).
 const SYNC_NO_REPAINT_VIEWS = ['settingsInstrument', 'settingsItems', 'settingsUser', 'settingsReport',
   'settingsFails', 'settingsDescriptions', 'settingsCsv', 'settingsMultiPick', 'settingsDisplay',
-  'settingsReadings', 'settingsRetest'];
+  'settingsReadings', 'settingsRetest', 'settingsLogging', 'settingsStorage'];   // V97
 // v82 (decision 6A): the "What's different?" sheet lists at most this many
 // items per section, then says how many more there are.
 const SYNC_DIFF_LIST_MAX = 20;
@@ -469,7 +470,7 @@ const SYNC_THUMBS_PER_RUN = 50;
 // Photo rows for jobs that arrived after the photo cursor passed them (a job
 // brought in later): fetched by job id, this many ids per request.
 const SYNC_PHOTO_NEED_BATCH = 50;
-// V90 (R18): the photo manager (Settings → Backup → Manage photos).
+// V90 (R18): the photo manager (Settings → Data → Manage Photos).
 // PHOTO_MGR_PAGE tiles are shown at a time; "Show more" at the bottom
 // adds another page — a grid of hundreds never builds, reads or fetches at once.
 // "Look in the cloud" (3A) reads the photos table — rows only, never images —
