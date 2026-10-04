@@ -274,4 +274,21 @@ module.exports = async function run() {
     t.includes(src, "chip('remedial', rs.showRemedial === true, 'Remedial actions')", 'a preview switch');
     t.includes(src, "action === 'remedial'", 'that flips the setting');
   });
+
+  t.group('32m — V95.1: the fix sheet deletes from the list, after a confirm; items keep it', () => {
+    const app = freshApp();
+    const st = app.state();
+    withSession(app, { site: 'ZZDEL' });
+    withItem(app, { assetNo: 'D1', itemType: 'Ketle', result: 'pass' });
+    st.descriptions = ['Ketle', 'Lead'];
+    st.view = 'settingsDescriptions';
+    app.fn('render')();
+    app.fn('descEditOpen')('0');
+    t.ok(byId(app, 'name-sheet-delete'), 'the fix sheet has a Delete button');
+    click(app, 'name-sheet-delete');
+    t.deepEq(st.descriptions, ['Ketle', 'Lead'], 'nothing is deleted before the confirm');
+    t.ok(click(app, 'confirm-sheet-yes'), 'it asks first');
+    t.deepEq(st.descriptions, ['Lead'], 'confirmed: off the list');
+    t.eq(app.fn('activeSession')().items[0].itemType, 'Ketle', 'the logged item keeps its description');
+  });
 };
