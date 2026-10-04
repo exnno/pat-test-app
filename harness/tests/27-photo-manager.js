@@ -268,9 +268,9 @@ module.exports = async function () {
   await t.group('27a — signed out: the Backup page offers Manage photos; the button still says Delete; phone photos only', async () => {
     const app = await signedOut();
     const { sess, ids } = await jobWithPhotos(app, 'ZZOUT', 2);
-    app.fn('setView')('settingsBackup');
+    app.fn('setView')('settingsStorage');   // V97: the photo buttons moved to Phone Storage
     const html = app.html();
-    t.includes(html, 'data-action="pm-open"', 'a Manage photos button on the Backup page');
+    t.includes(html, 'data-action="pm-open"', 'a Manage photos button on the Phone Storage page');
     t.includes(html, '🗑 Delete all photos', 'signed out the wipe button says Delete — it really deletes');
     t.excludes(html, 'Clear photos from this phone', '…not Clear');
     tap(app, 'pm-open');
@@ -289,7 +289,7 @@ module.exports = async function () {
     t.includes(out, 'data-change-action="pm-sort"', 'the sort is there');
     t.ok(ids.every(id => !!app.fn('photoThumbCached')(id)), 'previews were made on the phone for the tiles on screen');
     tap(app, 'pm-back'); await tick(5);
-    t.eq(app.state().view, 'settingsBackup', 'Back returns to the Backup page');
+    t.eq(app.state().view, 'settingsStorage', 'Back returns to Phone Storage');
   });
 
   /* ------------------------------------------------------------------ 27b */
@@ -302,7 +302,7 @@ module.exports = async function () {
     await run(app);
     const localNotUp = await addPhotos(app, b.sess, b.item, 1, 'late');
     app.run('navigator.onLine = false');   // no run: the late photo stays not uploaded
-    app.fn('setView')('settingsBackup');
+    app.fn('setView')('settingsStorage');   // V97
     t.includes(app.html(), '🗑 Clear photos from this phone', 'signed in the wipe button says Clear');
     tap(app, 'pm-open'); await tick(40);
     const m = model(app);

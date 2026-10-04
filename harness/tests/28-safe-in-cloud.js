@@ -369,10 +369,10 @@ module.exports = async function () {
     away(app);
     await run(app); await run(app);
     edit(app, b);
-    app.fn('setView')('settingsBackup');
+    app.fn('setView')('settingsStorage');   // V97: clearing moved to Phone Storage
     const bk = app.html();
-    t.includes(bk, 'data-action="jm-open"', 'the Backup page has Jobs on this phone');
-    t.excludes(bk, 'No exported sessions', 'signed in: not the CSV-export wording (7A)');
+    t.includes(bk, 'data-action="jm-open"', 'Phone Storage has Jobs on this phone');
+    t.excludes(bk, 'No exported jobs', 'signed in: not the CSV-export wording (7A; V97 says jobs)');
     t.includes(bk, 'data-action="tidy-jobs"', 'the old safe job is offered, exported or not');
     tap(app, 'jm-open');
     t.eq(app.state().view, 'jobManager', 'it opens');
@@ -556,10 +556,10 @@ module.exports = async function () {
     t.notOk(app.state().photoMeta[ids[0]], 'the old photo is off this phone');
     t.ok(known(app)[ids[0]], '…and still known in the cloud');
     t.ok(app.state().photoMeta[notUp[0]], 'the photo not in the cloud stays');
-    // The photo age (9A), from the Backup page.
-    app.fn('setView')('settingsBackup');
+    // The photo age (9A), from Phone Storage (V97).
+    app.fn('setView')('settingsStorage');
     const inp = app.doc.getElementById('photo-age-input');
-    t.ok(inp, 'signed in, the Backup page has the photo age');
+    t.ok(inp, 'signed in, Phone Storage has the photo age');
     inp.value = '6';
     tap(app, 'photo-age-save');
     t.eq(app.state().photoAgeMonths, 6, 'saved');
@@ -584,11 +584,11 @@ module.exports = async function () {
     app.fn('render')();
     t.excludes(app.html(), 'session-safe', 'no 🛡');
     t.excludes(app.html(), 'Tidy up', 'no offer');
-    app.fn('setView')('settingsBackup');
+    app.fn('setView')('settingsStorage');   // V97
     const html = app.html();
     t.excludes(html, 'data-action="jm-open"', 'no Jobs on this phone');
     t.excludes(html, 'photo-age-input', 'no photo age');
-    t.includes(html, 'When a session has been exported', 'the old clear-old wording');
+    t.includes(html, 'When a job has been exported', 'the old clear-old wording (V97: jobs)');
     app.fn('jobMgrOpen')();
     t.includes(app.html(), 'Sign in to the cloud', 'a stray visit says why there is nothing');
   });
