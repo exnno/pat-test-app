@@ -3690,6 +3690,13 @@ const MUTATIONS = [
     to:   "  if (false) {\n",
     why:  "the setting would do nothing (32l)",
   },
+  {
+    name: "M511 (V95.1) the description fix sheet has no Delete",
+    file: "settings-actions.js",
+    from: "    onDelete: () => descDeleteAsk(oldVal)\n",
+    to:   "",
+    why:  "Peter, V95 test: since the list became rows, deleting a description meant Edit as text (32m)",
+  },
 ];
 
 function main() {
