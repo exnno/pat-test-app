@@ -582,7 +582,8 @@ from session.js in v70, byte identical.
 **sync.js** `state.photoCloud` and the in-memory look (`state.photoMgr.cloud`).
 ⚠ V95: `descRenameApply` edits items IN PLACE in jobs that are not open — it must
 call **storage.js** `_invalidateSessionEncoding` per touched job (sync spec §6
-trap, M503). Locked jobs are never touched.
+trap, M503). Locked jobs are never touched. V95.1: `descDeleteAsk` (list only) via
+**feedback.js** `openNameSheet`'s optional `onDelete` — other name sheets unchanged.
 Actions reuse existing paths only: `photosRemoveQuiet(ids, true)`,
 `syncPhotoDownload`, `photoDelete`/`photoDeleteCloudOnly`,
 `syncPhotoKnowForDelete`. 8A: nothing on a locked job is deleted. Markup is

@@ -613,7 +613,28 @@ function descEditOpen(arg) {
     value: oldVal,
     maxlength: 100,
     confirmLabel: 'Save',
-    onConfirm: (v) => descRenameAsk(oldVal, v)
+    onConfirm: (v) => descRenameAsk(oldVal, v),
+    deleteLabel: 'Delete from the list',
+    onDelete: () => descDeleteAsk(oldVal)
+  });
+}
+
+// V95.1: delete from the list only — autocomplete stops offering it. Items
+// already logged keep their description (they're records, not list entries),
+// and Quick Pick buttons are a preset's own list. Sync: a removal is what the
+// V86 three-way merge already carries (in the agreed base, gone here).
+function descDeleteAsk(oldVal) {
+  openConfirmSheet({
+    title: `Delete "${oldVal}"?`,
+    message: 'It comes off the description list, so it is no longer suggested. Items already logged keep it.',
+    confirmLabel: 'Delete',
+    onConfirm: () => {
+      const k = String(oldVal).toLowerCase();
+      state.descriptions = state.descriptions.filter(d => d.toLowerCase() !== k);
+      save();
+      render();
+      showToast('Description deleted');
+    }
   });
 }
 

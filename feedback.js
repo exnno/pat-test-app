@@ -167,6 +167,7 @@ function openNameSheet(opts) {
     ${blurb ? `<p class="sheet-scroll" style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text-muted)">${escapeHTML(blurb)}</p>` : ''}
     <input class="input sheet-pin" id="name-sheet-input" value="${escapeHTML(value)}" placeholder="${escapeHTML(placeholder)}" autocapitalize="on" autocomplete="off" maxlength="${maxlength}">
     <button class="btn-primary sheet-pin" id="name-sheet-save" style="margin-top:12px">${escapeHTML(confirmLabel)}</button>
+    ${typeof opts.onDelete === 'function' ? `<button class="btn-secondary sheet-pin" id="name-sheet-delete" style="margin-top:10px;color:var(--fail)">${escapeHTML(opts.deleteLabel || 'Delete')}</button>` : ''}
   `;
   document.body.appendChild(backdrop);
   document.body.appendChild(sheet);
@@ -181,6 +182,10 @@ function openNameSheet(opts) {
     if (typeof opts.onConfirm === 'function') opts.onConfirm(v);
   }
   if (saveBtn) saveBtn.addEventListener('click', commit);
+  // V95.1: optional Delete under Save (the description list's fix sheet). The
+  // sheet closes first; the caller asks for confirmation itself.
+  const delBtn = document.getElementById('name-sheet-delete');
+  if (delBtn) delBtn.addEventListener('click', () => { cleanup(); opts.onDelete(); });
   if (inp) {
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
     // v75: the worst case of the five — this focuses AND selects on open, so a
