@@ -124,4 +124,16 @@ function tick(ms = 0) {
   return new Promise(res => setTimeout(res, ms));
 }
 
-module.exports = { CANARY, freshApp, withInstrument, addInstrument, withSession, withItem, populated, confirmSheet, tick };
+// V95: a job date that is always "recent". V93's window brings a job the phone
+// has never held down only if it is dated within 30 days of today, so a fixed
+// date in a pull fixture is a time bomb: group 17's '2026-09-01' went red on
+// 2 Oct 2026 with no code change. Pull fixtures that mean "a normal recent job"
+// use this; tests that mean "an OLD job" keep their fixed old dates on purpose.
+function recentDate(daysAgo) {
+  const d = new Date(); d.setDate(d.getDate() - (daysAgo || 0));
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+const RECENT_DATE = recentDate(1);
+
+module.exports = { RECENT_DATE, recentDate, CANARY, freshApp, withInstrument, addInstrument, withSession, withItem, populated, confirmSheet, tick };

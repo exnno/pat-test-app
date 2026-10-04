@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V94';",
-    to:   "const APP_VERSION = 'V94';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V95';",
+    to:   "const APP_VERSION = 'V95';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -637,8 +637,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V92</strong> &middot; September 2026</p>',
-    to:   '        <p><strong>V92</strong> &middot; September 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V91</strong> &middot; September 2026</p>',
+    from: '        <p><strong>V93</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V93</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V92</strong> &middot; September 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -3605,6 +3605,90 @@ const MUTATIONS = [
     from: "  if (bucket[type] <= 0) delete bucket[type];\n",
     to:   "",
     why:  "a zero count would sit in the synced history for ever (31g)",
+  },
+  {
+    name: "M499 (V95) the fail reason is matched case-sensitively",
+    file: "session.js",
+    from: "  const kept = parts.filter(p => !reasons[p.trim().toLowerCase()]);\n",
+    to:   "  const kept = parts.filter(p => !reasons[p.trim()]);\n",
+    why:  "a reason typed or stored in another case would stay on a PASS (32a)",
+  },
+  {
+    name: "M500 (V95) a fail with notes changes to PASS without asking",
+    file: "session.js",
+    from: "  if (failNotes) { failToPassAsk(existing, failNotes, losing, cloudToo); return; }\n",
+    to:   "",
+    why:  "the customer-facing bug the release exists for: a PASS printed with a fail description (32b)",
+  },
+  {
+    name: "M501 (V95) the choice is never written to the form",
+    file: "session.js",
+    from: "    state.form.notes = newNotes;\n",
+    to:   "",
+    why:  "the sheet asks and then saves the old notes anyway (32b, 32d)",
+  },
+  {
+    name: "M502 (V95) the notes sheet forgets the photos",
+    file: "session.js",
+    from: "    if (losing > 0) photosDeleteForItem(existing.id).then(() => commitPassResult());\n    else commitPassResult();\n",
+    to:   "    commitPassResult();\n",
+    why:  "a PASS carrying a fail's photos \u2014 the V62 rule that photos only belong to a fail (32f)",
+  },
+  {
+    name: "M503 (V95) a spelling fix edits jobs in place without dropping their encoding",
+    file: "settings-actions.js",
+    from: "        if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(s);\n",
+    to:   "",
+    why:  "the v69 encoding-cache trap: the fix shows, then silently un-happens on reopen for every job not open (32g)",
+  },
+  {
+    name: "M504 (V95) a spelling fix reaches into locked jobs",
+    file: "settings-actions.js",
+    from: "      if (!s || s.locked || !Array.isArray(s.items)) return;\n      let hit = false;\n",
+    to:   "      if (!s || !Array.isArray(s.items)) return;\n      let hit = false;\n",
+    why:  "a locked job is an issued certificate and must never change (32g)",
+  },
+  {
+    name: "M505 (V95) a spelling fix leaves the Quick Pick buttons",
+    file: "settings-actions.js",
+    from: "      p.items = p.items.map(t => String(t || '').trim().toLowerCase() === k ? newVal : t)\n",
+    to:   "      p.items = p.items.map(t => t)\n",
+    why:  "4A: the typo would come straight back from the Quick Pick grid (32g)",
+  },
+  {
+    name: "M506 (V95) the remedial switch is always in the synced report row",
+    file: "sync.js",
+    from: "  if (n.showRemedial !== true) delete n.showRemedial;\n",
+    to:   "",
+    why:  "rule 36: every phone's untouched report row would look edited after the upgrade (32j)",
+  },
+  {
+    name: "M507 (V95) the remedial switch defaults on",
+    file: "storage.js",
+    from: "  out.showRemedial    = stored.showRemedial === true;\n",
+    to:   "  out.showRemedial    = stored.showRemedial !== false;\n",
+    why:  "a client-facing certificate would change for everyone without asking (32j)",
+  },
+  {
+    name: "M508 (V95) a photographed fail is listed AND shown",
+    file: "report.js",
+    from: "  const listed = fails.filter(it => !pictured[it.id]);\n",
+    to:   "  const listed = fails.slice();\n",
+    why:  "6A: each fail once (32k)",
+  },
+  {
+    name: "M509 (V95) the action line ignores its switch",
+    file: "report.js",
+    from: "    + ((rs.remedialActionOn !== false && String(rs.remedialActionText || '').trim())\n",
+    to:   "    + ((String(rs.remedialActionText || '').trim())\n",
+    why:  "5B: the line is optional like everything else (32k)",
+  },
+  {
+    name: "M510 (V95) the report never draws the remedial section",
+    file: "report.js",
+    from: "  if (_remedialWanted(session)) {\n",
+    to:   "  if (false) {\n",
+    why:  "the setting would do nothing (32l)",
   },
 ];
 
