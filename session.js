@@ -681,6 +681,7 @@ function pruneOldSessions() {
   // phone screen, which syncs first and re-checks at the moment of clearing.
   // Signed out: everything below, unchanged.
   if (typeof syncActive === 'function' && syncActive() && typeof jobMgrOpen === 'function') {
+    if (typeof mgrNoteReturn === 'function') mgrNoteReturn();   // V96: Back returns here
     jobMgrOpen({ tidy: true });
     return;
   }

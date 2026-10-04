@@ -50,16 +50,16 @@ function renderSettingsAbout() {
         <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V95: rolled forward — V95 on top, V92 dropped. -->
+      <!-- v8: rolling 3-version changelog. V96: rolled forward — V96 on top, V93 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V96</strong> &middot; October 2026</p>
+        <p class="muted">Settings reorganised by what you're doing: Engineer &amp; Tester, Logging, Clients &amp; Retests, Reports &amp; Exports, Phone &amp; Display, Data and Help. Clearer names &mdash; Fail Reasons, Descriptions, Engineer &amp; Tester &mdash; and search still finds the old ones. One-page groups open straight away; Manage Photos has its own row under Data.</p>
         <p><strong>V95</strong> &middot; October 2026</p>
         <p class="muted">Changing a FAIL to a PASS now asks about the fail reason still in the notes, so a corrected mistake doesn't print as a PASS with a fail description. Settings &rarr; Item Description List: tap a description to fix its spelling, on items in unlocked jobs too. New optional Remedial actions section at the end of the report: every fail with its reason, an action line, and its photos.</p>
         <p><strong>V94</strong> &middot; October 2026</p>
         <p class="muted">The test screen's item line shows how many items you've logged at the current location in this job. Multi-picks can sit on the Quick Pick grid's bottom row as tiles &mdash; tap one, then PASS, and the whole list is logged; assign them in Settings &rarr; Multi Pick (optional). New Undo button beside Copy last, switched on in Display Settings: it takes back the last item or batch you logged, after asking.</p>
-        <p><strong>V93</strong> &middot; October 2026</p>
-        <p class="muted">For the invite-only cloud test: the Jobs screen now has two tabs &mdash; On this phone and &#9729; In the cloud. A new or reset phone brings down only the last 30 days of jobs, plus any job whose retest reminder is due; everything older stays in the cloud. The In the cloud tab lists those jobs with their items, fails and photos &mdash; search them, and tap one to bring it onto this phone and open it. Jobs you remove from this phone are there too. Nothing changes if you're not signed in.</p>
         </div>
 
       <div class="info-card">
@@ -143,7 +143,7 @@ const GLOSSARY_GROUPS = [
       ['Locked session', 'A finished session. It is read-only so you cannot change it by accident. Unlock it if you genuinely need to edit it.'],
       ['Retest reminder', 'An optional feature, off by default. Flags a session for a retest a set number of months out, and lists the ones coming due so you can chase the repeat work.'],
       ['Calibration', 'Your tester\'s calibration due date. Set it and the app warns you when it is close or overdue. From V66 the warning covers every instrument you have saved, and names the one that is due.'],
-      ['Test instrument', 'The PAT tester itself. You can save up to five under Settings → User Settings, each with its own calibration details, and mark one as In use. Every job you start is recorded against the instrument in use at that moment, so its certificate keeps naming that tester even after you recalibrate or switch to another one. Change it for a single job under Session settings.']
+      ['Test instrument', 'The PAT tester itself. You can save up to five under Settings → Engineer & Tester, each with its own calibration details, and mark one as In use. Every job you start is recorded against the instrument in use at that moment, so its certificate keeps naming that tester even after you recalibrate or switch to another one. Change it for a single job under Session settings.']
     ]
   },
   {
@@ -394,7 +394,7 @@ function renderCloudLocked() {
       </div>`;
   return `
     <div class="screen" id="cloud-locked-page">
-      ${renderSettingsSubHeader('Cloud')}
+      ${renderSettingsSubHeader('Account & Sync')}
       ${body}
     </div>
   `;

@@ -802,7 +802,7 @@ function renderPhotoManager() {
   const header = `
     <header class="header-row">
       <button class="icon-btn" data-action="pm-back" aria-label="Back">\u2039</button>
-      <div class="site-name">Manage photos</div>
+      <div class="site-name">Manage Photos</div>
       ${anything ? `<button class="pm-select-btn" data-action="pm-select-toggle" ${pm.busy ? 'disabled' : ''}>${pm.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
     </header>`;
 
@@ -958,7 +958,7 @@ function renderJobManager() {
   const header = `
     <header class="header-row">
       <button class="icon-btn" data-action="jm-back" aria-label="Back">\u2039</button>
-      <div class="site-name">Jobs on this phone</div>
+      <div class="site-name">Jobs on This Phone</div>
       ${m.active && m.counts.all ? `<button class="pm-select-btn" data-action="jm-select-toggle" ${jm.busy ? 'disabled' : ''}>${jm.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
     </header>`;
   if (!m.active) {

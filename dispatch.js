@@ -218,8 +218,8 @@ registerActions({
   'photo-download-all': () => downloadStripPhotosAll(),
   'photo-export':       () => downloadPhotoBundle(),
   // V90 (R18): the photo manager (logic in settings-actions.js).
-  'pm-open':            () => photoMgrOpen(),
-  'pm-back':            () => setView('settingsBackup'),
+  'pm-open':            () => { mgrNoteReturn(); photoMgrOpen(); },   // V96: Back returns where you came from
+  'pm-back':            () => mgrGoBack(),
   'pm-select-toggle':   () => photoMgrToggleSelecting(),
   'pm-tile':            (arg) => photoMgrTile(arg),
   'pm-select-job':      (arg) => photoMgrSelectJob(arg),
@@ -230,8 +230,8 @@ registerActions({
   'pm-download':        (arg) => photoMgrDownload(arg),
   'pm-delete':          (arg) => photoMgrDelete(arg),
   // V91 (Stage 4): Jobs on this phone and the tidy-up offer (settings-actions.js).
-  'jm-open':            () => jobMgrOpen(),
-  'jm-back':            () => setView('settingsBackup'),
+  'jm-open':            () => { mgrNoteReturn(); jobMgrOpen(); },
+  'jm-back':            () => mgrGoBack(),
   'jm-select-toggle':   () => jobMgrToggleSelecting(),
   'jm-tap':             (arg) => jobMgrTap(arg),
   'jm-remove':          () => jobMgrRemoveSelected(),
@@ -552,7 +552,7 @@ registerActions({
   // v32: open a category sub-list from the hub.
   // v85: opening any group clears a stale "That code isn't right." from the
   // Cloud access-code box, so it never greets a later visit.
-  'settings-category': (arg) => { state.settingsCategory = arg; state.cloudCodeMessage = ''; setView('settingsCategory'); },
+  'settings-category': (arg) => settingsOpenCategory(arg),   // V96: one-page groups open the page
   // v32: back from a setting page returns to its category (if opened from one),
   // back from a category returns to the hub. setView is also used directly when
   // jumping to a page from a flat search result (settingsCategory stays null →

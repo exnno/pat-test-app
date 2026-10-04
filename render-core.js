@@ -231,9 +231,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Changing a FAIL to a PASS.</strong> If the item's notes still say why it failed, the app now asks before saving &mdash; <strong>Remove the fail reason</strong> is the big button, so a corrected mistake doesn't print as a PASS saying &ldquo;Damaged plug&rdquo;.</li>
-        <li><strong>Fix a description's spelling.</strong> Settings &rarr; Item Description List is now a list: tap a description to correct it, and choose whether to change items already logged in unlocked jobs (and matching Quick Pick buttons) too. Locked jobs never change. <strong>Edit as text</strong> is still there.</li>
-        <li><strong>Remedial actions on the report.</strong> Switch it on in Report settings &rarr; What to include (or on the preview). Every failed item is listed at the end of the report with its reason, plus an optional action line you can word yourself. With Photos on, each fail's photos print with it there. Off unless you turn it on.</li>
+        <li><strong>Settings, reorganised.</strong> Everything is now grouped by what you're doing: Engineer &amp; Tester, Logging, Clients &amp; Retests, Reports &amp; Exports, Phone &amp; Display, Data and Help. Nothing has been removed &mdash; only moved.</li>
+        <li><strong>Clearer names.</strong> Quick Pick Fail is now <strong>Fail Reasons</strong>, Item Description List is <strong>Descriptions</strong>, and User Settings is <strong>Engineer &amp; Tester</strong>. Searching Settings for the old names still finds them.</li>
+        <li><strong>Fewer taps.</strong> A group with only one page opens it straight away, and Manage Photos has its own row under Data. The Resistance Calculator now sits with the other testing tools under Logging.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

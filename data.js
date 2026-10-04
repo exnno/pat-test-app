@@ -92,49 +92,59 @@ const BUG_REPORT_REPRO_DEFAULT = 'unsure';
 // the structure — the hub, the category sub-list, search (which flattens this),
 // and back-navigation all read it. `pages` are view ids handled in render().
 // `aliases` are extra search keywords so plain-language terms find a page.
-// Grouping rationale: split by "whose data is this" — User (the engineer) vs the
-// job (clients/reports/CSV) vs the app vs data-movement vs help. Clients sits in
-// Reports & Output because it feeds the report header and CSV, not identity.
+// V96 (Stage 7, the settings redo — 3A): grouped by what the engineer is doing,
+// not by whose data it is. ⚠ View ids and category ids did NOT change (5A only
+// renamed what is shown), so deep links, SYNC_GENERAL_VIEWS,
+// SYNC_NO_REPAINT_VIEWS and every setView() call still resolve. catCloud is
+// FIRST here, but it is drawn first only once this phone is unlocked; a locked
+// phone draws it last (4A — render-settings.js settingsCategoriesInOrder), so
+// free users on the test host never see an access-code box at the top.
+// A group with ONE visible page opens that page straight from the hub
+// (settings-actions.js settingsOpenCategory) — no one-row list in between.
 const SETTINGS_CATEGORIES = [
-  { id: 'catUser',    icon: '👤', title: 'User & Calibration', blurb: 'Your engineer details and calibration',
+  { id: 'catCloud',   icon: '☁️', title: 'Account & Sync', blurb: 'Your account, syncing between phones, and your subscription',
+    pages: ['cloudAccount', 'cloudSync', 'cloudSubscription'] },
+  { id: 'catUser',    icon: '👤', title: 'Engineer & Tester', blurb: 'Your name and your test instruments',
     pages: ['settingsUser'] },
-  { id: 'catTesting', icon: '⚡', title: 'Testing Setup', blurb: 'How Quick Pick, Multi Pick and descriptions behave',
-    pages: ['settingsItems', 'settingsFails', 'settingsReadings', 'settingsMultiPick', 'settingsDescriptions', 'settingsScanner'] },
-  { id: 'catReports', icon: '📄', title: 'Reports & Output', blurb: 'PDF reports, CSV export and your clients',
-    pages: ['settingsReport', 'settingsCsv', 'settingsClients', 'settingsRetest'] },
-  { id: 'catApp',     icon: '🎨', title: 'App & Display', blurb: 'Appearance and the resistance calculator',
-    pages: ['settingsDisplay', 'settingsCalculator'] },
-  { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Back up, restore and share your setup',
-    pages: ['settingsBackup', 'settingsSetup'] },
+  { id: 'catTesting', icon: '⚡', title: 'Logging', blurb: 'Quick Pick, fail reasons, descriptions and the tools you use while testing',
+    pages: ['settingsItems', 'settingsFails', 'settingsDescriptions', 'settingsMultiPick', 'settingsReadings', 'settingsScanner', 'settingsCalculator'] },
+  { id: 'catClients', icon: '🏢', title: 'Clients & Retests', blurb: 'Your clients and sites, and reminders to rebook them',
+    pages: ['settingsClients', 'settingsRetest'] },
+  { id: 'catReports', icon: '📄', title: 'Reports & Exports', blurb: 'The PDF certificate and the CSV export',
+    pages: ['settingsReport', 'settingsCsv'] },
+  { id: 'catApp',     icon: '🎨', title: 'Phone & Display', blurb: 'Theme, sound, vibration and other preferences on this phone',
+    pages: ['settingsDisplay'] },
+  { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Backups, photos, and moving your setup to another phone',
+    pages: ['settingsBackup', 'photoManager', 'jobManager', 'settingsSetup'] },
   { id: 'catHelp',    icon: 'ℹ️', title: 'Help', blurb: 'About this app, what the terms mean, and how to get in touch',
-    pages: ['settingsAbout', 'settingsGlossary', 'settingsContact'] },
-  // v85: the cloud pages' home (decision 1A), last so it sits below Help. ⚠ NOT
-  // shown on a copy of the app with no cloud, and its pages stay out of settings
-  // search until this phone is unlocked — both filtered in render-settings.js
-  // (settingsCategoryVisible / settingsPageSearchable). Until then the category
-  // screen shows the access-code box instead of this list (render-help.js).
-  { id: 'catCloud',   icon: '☁️', title: 'Cloud', blurb: 'Invite-only test: your account, sync and subscription',
-    pages: ['cloudAccount', 'cloudSync', 'cloudSubscription'] }
+    pages: ['settingsAbout', 'settingsGlossary', 'settingsContact'] }
 ];
 
 // Per-page metadata for the category sub-lists and for search. icon/title shown
 // on the row; `aliases` widen search matching. Subtitles are computed live in
 // renderSettingsCategory (counts/status), so they're not stored here.
 const SETTINGS_PAGE_META = {
-  settingsUser:        { icon: '👤', title: 'User Settings',         aliases: 'engineer name calibration cal due instrument tester testers multiple megger seaward kewtech' },
+  settingsUser:        { icon: '👤', title: 'Engineer & Tester',     aliases: 'user settings engineer name calibration cal due instrument tester testers multiple megger seaward kewtech' },
   settingsItems:       { icon: '⚡', title: 'Quick Pick Items',      aliases: 'item types presets quick pick buttons' },
-  settingsFails:       { icon: '⚠️', title: 'Quick Pick Fail',       aliases: 'fail reasons failure quick pick' },
+  settingsFails:       { icon: '⚠️', title: 'Fail Reasons',          aliases: 'quick pick fail reasons failure tags' },
   settingsReadings:    { icon: '🔬', title: 'Test Readings',          aliases: 'test readings ohms megohms leakage insulation earth continuity class measurements' },
   settingsMultiPick:   { icon: '🧰', title: 'Multi Pick',            aliases: 'multi pick bulk multiple slots quick pick tile' },
-  settingsDescriptions:{ icon: '📝', title: 'Item Description List', aliases: 'descriptions notes labels spelling typo fix rename' },
+  settingsDescriptions:{ icon: '📝', title: 'Descriptions',          aliases: 'item description list descriptions notes labels spelling typo fix rename' },
   settingsScanner:     { icon: '🏷️', title: 'Barcode Scanner',      aliases: 'barcode scanner scan wedge hid bluetooth label qr code reader asset number' },
   settingsReport:      { icon: '📄', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration signature sign colour color theme header accent cert number template preset notes remedial actions fails failed summary' },
   settingsCsv:         { icon: '📊', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
   settingsClients:     { icon: '🏢', title: 'Clients',               aliases: 'clients sites customers addresses' },
   settingsRetest:      { icon: '🔔', title: 'Retest Reminders',       aliases: 'retest reminders rebook chase due overdue recall renewal commercial repeat business follow up contact customer' },
-  settingsDisplay:     { icon: '🎨', title: 'Display Settings',      aliases: 'theme dark light haptics sound timestamps appearance undo' },
+  settingsDisplay:     { icon: '🎨', title: 'Phone & Display',       aliases: 'display settings theme dark light haptics sound timestamps appearance undo' },
   settingsCalculator:  { icon: '🧮', title: 'Resistance Calculator', aliases: 'earth continuity resistance limit ohms calculator csa' },
   settingsBackup:      { icon: '💾', title: 'Backup & Restore',      aliases: 'backup restore export import data save json' },
+  // V96 (3A): the photo manager and Jobs on this phone get their own rows in
+  // Data. They are screens of their own already (V90, V91); `action` opens them
+  // through their own open functions (which set their state up) instead of a
+  // bare setView. `whenVisible` is checked in render-settings.js
+  // settingsPageVisible: Jobs on this phone exists only while syncing.
+  photoManager:        { icon: '🖼', title: 'Manage Photos',          aliases: 'photos pictures images storage space delete remove download cloud', action: 'pm-open' },
+  jobManager:          { icon: '🛡', title: 'Jobs on This Phone',     aliases: 'jobs sessions remove clear safe cloud storage space tidy', action: 'jm-open' },
   settingsSetup:       { icon: '🔁', title: 'Export / Import Setup', aliases: 'setup share configuration new device employee copy presets transfer' },
   settingsAbout:       { icon: 'ℹ️', title: 'About',                 aliases: 'about version changelog whats new' },
   settingsGlossary:    { icon: '📖', title: 'Glossary',              aliases: 'glossary terms jargon what does mean definitions help explain quick pick smart multi pick preset asset session client site overview readings class earth insulation leakage polarity fail reason tag retest certificate template csv backup setup calibration pruning' },

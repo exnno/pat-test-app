@@ -1,4 +1,4 @@
-# PATGo — Code Map (V95)
+# PATGo — Code Map (V96)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -231,9 +231,17 @@ Settings hub, sub-lists, search aliases and back-nav), `SETUP_SECTIONS`, the
 bug-report option lists, `PATGO_FOOTER_LOGO`, `CSA_RESISTANCE`/`CALC_LENGTHS`.
 **Touch to:** change a default list, add a Settings page, retag a fail reason,
 edit the calculator tables.
-⚠ v85: `catCloud` (last, below Help) holds the three cloud pages. Its visibility
+⚠ v85: `catCloud` holds the three cloud pages. Its visibility
 and searchability are filtered in **render-settings.js**
 (`settingsCategoryVisible` / `settingsPageSearchable`), its lock in **cloud.js**.
+⚠ V96: groups and titles redone; view ids and category ids UNCHANGED (deep links,
+SYNC_GENERAL_VIEWS, SYNC_NO_REPAINT_VIEWS untouched). Hub order is NOT the array
+order: `settingsCategoriesInOrder` (render-settings.js) puts catCloud last while
+locked. A page meta may carry `action` (row opens through that ACTIONS entry —
+photoManager `pm-open`, jobManager `jm-open`); its visibility is
+`settingsPageVisible` (render-settings.js). 33b: every SETTINGS_PAGE_META key must
+sit in exactly one group. A renamed page also needs its `renderSettingsSubHeader`
+title changed and the old name kept in `aliases`.
 **Coupling:** ⚠ must load immediately after config.js and BEFORE state.js — see
 the load-order note above. Contains NO functions, deliberately, which is why its
 boot probe is a constant. Nothing here touches storage or the DOM.
@@ -577,6 +585,10 @@ go to render-settings.js; to change a default, config.js.
 call `captureReportTextInputs()` first or unsaved text is lost (dispatch.js
 depends on this). `setTheme` delegates to `applyTheme` (session.js). Extracted
 from session.js in v70, byte identical.
+⚠ V96: `settingsOpenCategory` (a one-page group opens its page, settingsCategory
+null so Back → hub) and `mgrNoteReturn`/`mgrGoBack` (Back from Manage photos /
+Jobs on this phone returns to the view that opened it; dispatch `pm-open`/`jm-open`
+note it, as does session.js's tidy offer before `jobMgrOpen`).
 ⚠ v90: also the PHOTO MANAGER's logic (`photoMgr*`, `_pm*`): `photoMgrModel()`
 (synchronous — render() calls it) merges **photos.js** `state.photoMeta`,
 **sync.js** `state.photoCloud` and the in-memory look (`state.photoMgr.cloud`).
@@ -695,7 +707,12 @@ for **render-help.js**, and those pages still call `renderSettingsSubHeader()`
 from here. The About changelog is no longer in this file.
 ⚠ v85: the hub hides the Cloud group where there is no cloud; search skips its
 pages and the group paints `renderCloudLocked()` (render-help.js) until
-`cloudPagesUnlocked()` (cloud.js). Row subtitles for the three cloud pages read
+`cloudPagesUnlocked()` (cloud.js).
+⚠ V96: hub order (`settingsCategoriesInOrder`), per-page visibility
+(`settingsPageVisible`, `settingsCategoryPages` — used by the list AND search),
+the locked catCloud blurb (`settingsCategoryBlurb`) and the footer
+(`settingsWhereDataLives`, reads `syncActive()`) live here. Opening a group is
+`settingsOpenCategory` in **settings-actions.js**. Row subtitles for the three cloud pages read
 `state.cloud` and `syncStatusSummary()` (sync.js), typeof-guarded.
 
 ### render-help.js (~633 ln) — help, about & cloud pages — NEW v73

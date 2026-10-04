@@ -124,7 +124,7 @@ function settingsPageRowHTML(pageId, context) {
   const sub = settingsPageSubtitle(pageId);
   const ctx = context ? `<span class="settings-row-context">${escapeHTML(context)}</span>` : '';
   return `
-    <button class="settings-row" data-action="settings-page" data-arg="${pageId}" data-page="${pageId}">
+    <button class="settings-row" data-action="${meta.action || 'settings-page'}" data-arg="${pageId}" data-page="${pageId}">
       <span class="settings-row-icon">${meta.icon}</span>
       <div class="settings-row-text">
         <div class="settings-row-title">${escapeHTML(meta.title)}${ctx}</div>
@@ -148,6 +148,41 @@ function settingsPageSearchable(cat) {
   return typeof cloudPagesUnlocked === 'function' && cloudPagesUnlocked();
 }
 
+// V96 (4A): the hub's order. Account & Sync is first in SETTINGS_CATEGORIES and
+// is drawn first only once this phone is unlocked; locked, it goes to the end so
+// a free user on the test host meets their own settings first, not a code box.
+function settingsCategoriesInOrder() {
+  const shown = SETTINGS_CATEGORIES.filter(settingsCategoryVisible);
+  const unlocked = typeof cloudPagesUnlocked === 'function' && cloudPagesUnlocked();
+  if (unlocked) return shown;
+  return shown.filter(c => c.id !== 'catCloud').concat(shown.filter(c => c.id === 'catCloud'));
+}
+
+// V96 (3A): a page row that only makes sense in some states. Jobs on this phone
+// is a cloud screen (V91 5A) — the Backup page shows its button only while
+// syncing, and so does the row. Manage photos is there whenever photos.js is.
+function settingsPageVisible(pageId) {
+  if (pageId === 'jobManager') {
+    return typeof syncActive === 'function' && syncActive() && typeof renderJobManager === 'function';
+  }
+  if (pageId === 'photoManager') return typeof renderPhotoManager === 'function';
+  return !!SETTINGS_PAGE_META[pageId];
+}
+
+// V96: while locked, the Account & Sync row keeps saying what it is today —
+// an invite-only test — so nobody expects to sign up from it.
+function settingsCategoryBlurb(cat) {
+  if (cat.id === 'catCloud' && !(typeof cloudPagesUnlocked === 'function' && cloudPagesUnlocked())) {
+    return 'Invite-only test: your account, sync and subscription';
+  }
+  return cat.blurb;
+}
+
+// The pages of a group that are drawn right now, in order.
+function settingsCategoryPages(cat) {
+  return cat ? cat.pages.filter(settingsPageVisible) : [];
+}
+
 // v32: the hub body (search results OR category list). Separated so the live
 // search filter can re-render just this region, preserving focus on the search
 // input (a full render() would blur it on every keystroke — the same reason
@@ -158,7 +193,7 @@ function renderSettingsHubBodyHTML() {
     const results = [];
     SETTINGS_CATEGORIES.forEach(cat => {
       if (!settingsPageSearchable(cat)) return;   // v85
-      cat.pages.forEach(pageId => {
+      settingsCategoryPages(cat).forEach(pageId => {   // V96
         const meta = SETTINGS_PAGE_META[pageId];
         if (!meta) return;
         const hay = `${meta.title} ${meta.aliases || ''}`.toLowerCase();
@@ -169,12 +204,12 @@ function renderSettingsHubBodyHTML() {
       ? `<div class="settings-list">${results.map(r => settingsPageRowHTML(r.pageId, r.cat.title)).join('')}</div>`
       : `<p class="muted settings-empty-search">No settings match "${escapeHTML(state.settingsSearchQuery.trim())}".</p>`;
   }
-  return `<div class="settings-list">${SETTINGS_CATEGORIES.filter(settingsCategoryVisible).map(cat => `
+  return `<div class="settings-list">${settingsCategoriesInOrder().map(cat => `
       <button class="settings-row" data-action="settings-category" data-arg="${cat.id}">
         <span class="settings-row-icon">${cat.icon}</span>
         <div class="settings-row-text">
           <div class="settings-row-title">${escapeHTML(cat.title)}</div>
-          <div class="settings-row-sub">${escapeHTML(cat.blurb)}</div>
+          <div class="settings-row-sub">${escapeHTML(settingsCategoryBlurb(cat))}</div>
         </div>
         <span class="settings-row-chevron">›</span>
       </button>`).join('')}</div>`;
@@ -199,10 +234,17 @@ function renderSettingsHub() {
       </header>
       ${searchBox}
       <div id="settings-hub-body">${renderSettingsHubBodyHTML()}</div>
-      <p class="settings-footer">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''} · © 2026 Peter Birchley<br>Data stored on this device only</p>
+      <p class="settings-footer">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''} · © 2026 Peter Birchley<br>${settingsWhereDataLives()}</p>
       ${renderStatsFooterHTML()}
     </div>
   `;
+}
+
+// V96: the footer said "Data stored on this device only" even while signed in
+// and syncing — wrong, and the first thing a paying customer would notice.
+function settingsWhereDataLives() {
+  const syncing = typeof syncActive === 'function' && syncActive();
+  return syncing ? 'Saved on this phone and in your cloud account' : 'Saved on this phone only';
 }
 
 // v59: the lifetime stats line, under the existing footer in the same muted
@@ -243,7 +285,7 @@ function renderSettingsCategory() {
       </header>
       <p class="settings-category-blurb">${escapeHTML(cat.blurb)}</p>
       <div class="settings-list">
-        ${cat.pages.map(pageId => settingsPageRowHTML(pageId)).join('')}
+        ${settingsCategoryPages(cat).map(pageId => settingsPageRowHTML(pageId)).join('')}
       </div>
     </div>
   `;
@@ -271,7 +313,7 @@ function renderSettingsUser() {
   // global chip would be meaningless.
   return `
     <div class="screen">
-      ${renderSettingsSubHeader('User Settings')}
+      ${renderSettingsSubHeader('Engineer & Tester')}
       <div class="settings-section">
         <h2 class="h2">Engineer name</h2>
         <p class="muted">Used as the default for new sessions and shown on exported CSVs.</p>
@@ -421,7 +463,7 @@ function renderSettingsFails() {
   }
   return `
     <div class="screen">
-      ${renderSettingsSubHeader('Quick Pick Fail')}
+      ${renderSettingsSubHeader('Fail Reasons')}
       <div class="settings-section">
         <h2 class="h2">Fail reasons</h2>
         <p class="muted">One per line. Up to 6. Shown when you tap FAIL.</p>
@@ -463,7 +505,7 @@ function renderSettingsReadings() {
       <div class="settings-section">
         <h2 class="h2">A few things to know</h2>
         <p class="muted">The equipment class decides which boxes appear — Class II has no earth continuity, Class III is insulation only. You can tag each fail reason (on the Quick Pick Fail page) so the right box shows when something fails. Readings are optional even when this is on — an empty box just records no value.</p>
-        <p class="muted">To include readings in your CSV export, turn the reading columns on under Settings → Reports & Output → CSV Columns. Readings will appear on the PDF certificate in a future update.</p>
+        <p class="muted">To include readings in your CSV export, turn the reading columns on under Settings → Reports &amp; Exports → CSV Columns. Readings will appear on the PDF certificate in a future update.</p>
       </div>` : ''}
     </div>
   `;
@@ -634,7 +676,7 @@ function renderSettingsDescriptions() {
   if (state.descTextMode) {
     return `
     <div class="screen">
-      ${renderSettingsSubHeader('Item Description List')}
+      ${renderSettingsSubHeader('Descriptions')}
       <div class="settings-section">
         <h2 class="h2">Edit as text</h2>
         <p class="muted">One description per line. Add lines to seed autocomplete, or delete lines you don't want. To fix a spelling on items you've already logged, use the list instead.</p>
@@ -655,7 +697,7 @@ function renderSettingsDescriptions() {
   ).join('');
   return `
     <div class="screen">
-      ${renderSettingsSubHeader('Item Description List')}
+      ${renderSettingsSubHeader('Descriptions')}
       <div class="settings-section">
         <h2 class="h2">Saved descriptions</h2>
         <p class="muted">Item types you've typed into the custom field. Tap one to fix its spelling — you can also fix it on items already logged in unlocked jobs.</p>
@@ -677,7 +719,7 @@ function renderSettingsDisplay() {
   ];
   return `
     <div class="screen">
-      ${renderSettingsSubHeader('Display Settings')}
+      ${renderSettingsSubHeader('Phone & Display')}
       <div class="settings-section">
         <h2 class="h2">Theme</h2>
         <p class="muted">Choose how the app looks.</p>

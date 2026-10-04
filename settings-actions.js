@@ -720,7 +720,7 @@ function resetItemsToDefaults() {
 function resetFailReasonsToDefaults() {
   openConfirmSheet({
     title: 'Reset fail reasons?',
-    message: 'Reset Quick Pick Fail to the built-in default reasons? This replaces the current list.',
+    message: 'Reset Fail Reasons to the built-in default reasons? This replaces the current list.',
     confirmLabel: 'Reset',
     onConfirm: () => {
       state.failReasons = DEFAULT_FAIL_REASONS.slice();
@@ -734,7 +734,7 @@ function resetFailReasonsToDefaults() {
 function resetDescriptionsToDefaults() {
   openConfirmSheet({
     title: 'Reset descriptions?',
-    message: 'Reset the Item Description List to the built-in defaults? This replaces the current list. Items already saved in past sessions are unaffected.',
+    message: 'Reset Descriptions to the built-in defaults? This replaces the current list. Items already saved in past sessions are unaffected.',
     confirmLabel: 'Reset',
     onConfirm: () => {
       state.descriptions = DEFAULT_DESCRIPTIONS.slice();
@@ -828,6 +828,39 @@ function _pmReset(keepView) {
     preview: null,
     thumbGen: (old.thumbGen || 0) + 1,   // stops a preview round still going
   };
+}
+
+// V96 (Stage 7): opening a Settings group. A group with one visible page opens
+// that page straight away (Engineer & Tester, Phone & Display): a list with one
+// row is a wasted tap. settingsCategory is left null, so Back from the page
+// returns to the hub — the place the user actually was. Account & Sync always
+// shows its list (or the access-code box while locked), even if it shrinks.
+function settingsOpenCategory(id) {
+  state.cloudCodeMessage = '';
+  const cat = SETTINGS_CATEGORIES.find(c => c.id === id);
+  const pages = (cat && cat.id !== 'catCloud' && typeof settingsCategoryPages === 'function')
+    ? settingsCategoryPages(cat) : [];
+  if (pages.length === 1 && !(SETTINGS_PAGE_META[pages[0]] || {}).action) {
+    state.settingsCategory = null;
+    setView(pages[0]);
+    return;
+  }
+  state.settingsCategory = id;
+  setView('settingsCategory');
+}
+
+// V96: Manage photos and Jobs on this phone are reached from the Backup page,
+// from their own rows in Data, from search, and (jobs) from the Jobs screen's
+// tidy offer. Back used to go to the Backup page from all of them. Now each
+// opener notes where it was, and Back goes there.
+const _MGR_RETURN_VIEWS = ['settingsBackup', 'settingsCategory', 'settings', 'sessions'];
+function mgrNoteReturn() {
+  state.mgrReturnView = _MGR_RETURN_VIEWS.indexOf(state.view) !== -1 ? state.view : 'settingsBackup';
+}
+function mgrGoBack() {
+  const v = state.mgrReturnView || 'settingsBackup';
+  state.mgrReturnView = null;
+  setView(v);
 }
 
 function photoMgrOpen() {
