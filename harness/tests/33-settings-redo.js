@@ -138,8 +138,9 @@ module.exports = function () {
     tap(app, 'back-to-settings');
     t.eq(app.state().view, 'settings', 'Back goes to the hub, where the user was');
 
+    // V100 (7A): Phone & Display gained Reminders, so it is a list now.
     tap(app, 'settings-category', 'catApp');
-    t.eq(app.state().view, 'settingsDisplay', 'Phone & Display opens the page straight away');
+    t.eq(app.state().view, 'settingsCategory', 'Phone & Display (two pages since V100) shows its list');
     tap(app, 'back-to-settings');
     t.eq(app.state().view, 'settings', '… and Back to the hub');
 
