@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V98';",
-    to:   "const APP_VERSION = 'V98';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V99';",
+    to:   "const APP_VERSION = 'V99';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -637,8 +637,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V96</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V96</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V95</strong> &middot; October 2026</p>',
+    from: '        <p><strong>V97</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V97</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V96</strong> &middot; October 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -3619,7 +3619,8 @@ const MUTATIONS = [
   {
     name: "M500 (V95) a fail with notes changes to PASS without asking",
     file: "session.js",
-    from: "  if (failNotes) { failToPassAsk(existing, failNotes, losing, cloudToo); return; }\n",
+    // V99: re-anchored — the line now also asks about a map pin (M545 covers that half).
+    from: "  if (failNotes || failPin) { failToPassAsk(existing, failNotes, losing, cloudToo, failPin); return; }\n",
     to:   "",
     why:  "the customer-facing bug the release exists for: a PASS printed with a fail description (32b)",
   },
@@ -3914,6 +3915,118 @@ const MUTATIONS = [
     from: "<span class=\"client-site-name\">${siteNotesOf(s) ? '<span class=\"site-notes-mark\" title=\"Has site notes\">📝</span> ' : ''}${escapeHTML(s.name)}</span>\n            <div class=\"client-site-actions\">\n              <button class=\"link-btn\" data-action=\"site-assign\" data-arg=\"${escapeHTML(s.id)}\">Move</button>",
     to:   "<span class=\"client-site-name\">${escapeHTML(s.name)}${siteNotesOf(s) ? ' <span class=\"site-notes-mark\" title=\"Has site notes\">📝</span>' : ''}</span>\n            <div class=\"client-site-actions\">\n              <button class=\"link-btn\" data-action=\"site-assign\" data-arg=\"${escapeHTML(s.id)}\">Move</button>",
     why:  "a long site name ends in an ellipsis and swallows the marker — the V98 bug Peter found on a real phone (35i)",
+  },
+  {
+    name: "M543 (V99) a map pin is written onto the item object in place",
+    file: "session.js",
+    from: "  const copy = { ...t.item };\n  if (clean) copy.pin = clean; else delete copy.pin;\n  t.sess.items[t.idx] = copy;",
+    to:   "  const copy = t.item;\n  if (clean) copy.pin = clean; else delete copy.pin;\n  t.sess.items[t.idx] = copy;",
+    why:  "editing the item in place is the v69 encoding-cache trap — on a job that is not open the change silently un-happens on reload (36c)",
+  },
+  {
+    name: "M544 (V99) fail → PASS forgets to drop the pin",
+    file: "session.js",
+    from: "    if (state.form.dropPin) delete merged.pin;\n",
+    to:   "",
+    why:  "the big button promises the pin goes; a PASS carrying a fail's location is the V95 wording bug again (36g)",
+  },
+  {
+    name: "M545 (V99) a fail with a pin but no notes is not asked about",
+    file: "session.js",
+    from: "if (failNotes || failPin) { failToPassAsk(",
+    to:   "if (failNotes) { failToPassAsk(",
+    why:  "7A: the pin is part of what the fail says — changing to PASS must never keep it silently (36g)",
+  },
+  {
+    name: "M546 (V99) the offer ignores the switch",
+    file: "session.js",
+    from: "  if (!state.mapPinEnabled || !itemId) return false;\n  const app =",
+    to:   "  if (!itemId) return false;\n  const app =",
+    why:  "8A: off means no way of adding — an offer after every fail on a phone that never asked for pins (36e)",
+  },
+  {
+    name: "M547 (V99) the offer sits at the bottom, under the next PASS tap",
+    file: "styles.css",
+    from: "  top: calc(env(safe-area-inset-top, 0px) + 12px);\n  transform: translateX(-50%);\n  z-index: 250;",
+    to:   "  bottom: calc(28px + env(safe-area-inset-bottom));\n  transform: translateX(-50%);\n  z-index: 250;",
+    why:  "5A's risk: a tap meant for the next item opens the pin sheet instead of logging (36e)",
+  },
+  {
+    name: "M548 (V99) the hidden Map pin column goes into the synced CSV row",
+    file: "sync.js",
+    from: "      .filter(c => !(_SYNC_CSV_LATE_COLUMNS[c.id] === c.header && !c.visible));",
+    to:   "      .filter(c => !!c);",
+    why:  "rule 36: every phone's CSV settings would look edited on upgrade — re-sent by each, held between customised phones (36i)",
+  },
+  {
+    name: "M549 (V99) Open what3words does not note the item first",
+    file: "session.js",
+    from: "    localStorage.setItem(MAP_PIN_OPEN_KEY, JSON.stringify({",
+    to:   "    void (JSON.stringify({",
+    why:  "the iOS reload trap: the app comes back on the Jobs list and the engineer has to find the item again (36h)",
+  },
+  {
+    name: "M550 (V99) a stale reload note still reopens the sheet",
+    file: "session.js",
+    from: "  const fresh = typeof o.at === 'number' && Date.now() - o.at >= 0 && Date.now() - o.at <= MAP_PIN_OPEN_MAX_MS;",
+    to:   "  const fresh = typeof o.at === 'number';",
+    why:  "a note left from yesterday would hijack the next open of the app into an old job (36h)",
+  },
+  {
+    name: "M551 (V99) the 📍 button follows the switch only",
+    file: "render-core.js",
+    from: "    && (entryPin || (state.mapPinEnabled && entryItem.result === 'fail')));",
+    to:   "    && state.mapPinEnabled && entryItem.result === 'fail');",
+    why:  "9A: a pin saved earlier (or on another phone) could not be seen or removed with the switch off (36f)",
+  },
+  {
+    name: "M552 (V99) the CSV column only fills while the switch is on",
+    file: "csv.js",
+    from: "    case 'mapPin': { const p = (typeof mapPinOf === 'function') ? mapPinOf(item) : '';",
+    to:   "    case 'mapPin': { const p = (state.mapPinEnabled && typeof mapPinOf === 'function') ? mapPinOf(item) : '';",
+    why:  "9A: the same job would export differently on two phones (36f)",
+  },
+  {
+    name: "M553 (V99) pins print on the plain photo pages too",
+    file: "report.js",
+    from: "  y = _drawPhotoGroups(doc, data.groups, margin, G, y);",
+    to:   "  y = _drawPhotoGroups(doc, data.groups, margin, G, y, true);",
+    why:  "6A: pins print with the fail under Remedial actions only (36k)",
+  },
+  {
+    name: "M554 (V99) four words pass as an address",
+    file: "utils.js",
+    from: "  let m = t.match(new RegExp('\\\\/\\\\/\\\\/' + W + '(?!\\\\p{L}|\\\\.\\\\p{L})', 'u'));",
+    to:   "  let m = t.match(new RegExp('\\\\/\\\\/\\\\/' + W, 'u'));",
+    why:  "a wrong address that looks right is worse than none — it sends someone to the wrong 3 m square (36a)",
+  },
+  {
+    name: "M555 (V99) leaving the screen keeps the pin sheet and its reload note",
+    file: "session.js",
+    from: "  if (state.mapPinSheet) { state.mapPinSheet = null; _mapPinForgetOpen(); }\n",
+    to:   "",
+    why:  "a sheet for a job no longer on screen, and a note that reopens it on the next launch (36h)",
+  },
+  {
+    name: "M556 (V99) copy last over an item keeps its old pin",
+    file: "session.js",
+    from: "    delete sess.items[state.cursor].pin;\n",
+    to:   "",
+    why:  "copy last replaces the item's result and clears its notes — leaving the pin pins a different item's location on it (36l)",
+  },
+  {
+    name: "M557 (V99) CSV import drops the Map pin column",
+    file: "csv.js",
+    from: "    if (pinWords) imported.pin = pinWords;\n",
+    to:   "",
+    why:  "an exported job imported elsewhere loses its pins (36j)",
+  },
+  {
+    name: "M558 (V99) the fail sheet grows a map pin button",
+    file: "render-core.js",
+    from: "      ${failSheetInner}\n      ${failPhotoRow}\n    </div>",
+    to:   "      ${failSheetInner}\n      ${failPhotoRow}\n      <button data-action=\"map-pin-w3w\">📍</button>\n    </div>",
+    why:  "4A: leaving for what3words from inside the fail sheet loses the fail, its reason and staged photos if iOS reloads (36d)",
   },
 ];
 
