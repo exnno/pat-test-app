@@ -8,14 +8,26 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Stage 8 part 2 — fail location (V99), then part 3 — in-app reminders (V100)
-Split at the V98 round (1A). Fail location: what3words paste and/or phone GPS
-(O7); ⚠ the fail sheet is not saved anywhere — switching apps on iOS may reload
-the PWA and lose it, so the design must not leave the app mid-fail (GPS stays in
-the app; a what3words box could live on the logged item instead). Reminders:
-nothing records WHEN a job was locked today — a `lockedAt` field on the job (in
+### Stage 8 part 3 — in-app reminders (V100)
+Nothing records WHEN a job was locked today — a `lockedAt` field on the job (in
 the synced doc, so Stage 14's server can see it) is the first decision; the
-"not exported" count on the Jobs screen exists (v14) and is per job.
+"not exported" count on the Jobs screen exists (v14) and is per job. Reminder
+timing per phone (roadmap Stage 8).
+
+### V99 residuals (known, accepted)
+- How iOS asks for permission is not involved (no GPS), but how a home-screen app
+  returns from Safari/what3words is: if iOS keeps the app alive, the sheet is
+  simply still open; if it reloads, `mapPinResume` reopens it. Only a real phone
+  proves both.
+- The Paste button relies on iOS's own "Paste" bubble; if the phone refuses,
+  the app says "Long-press the box and choose Paste".
+- 5A risk accepted: the offer covers the job title for ~4 s (nothing to tap there).
+- A pin kept on a PASS (fail → PASS, Keep) shows on the Overview and in the CSV
+  but never prints (Remedial actions lists fails only).
+- A V98 phone that EDITS a pinned item keeps the pin (whole-item spread). A V98
+  phone receiving a CSV row with Map pin shown keeps the column (unknown ids are
+  kept) and exports it blank — harmless.
+- The hidden Map pin column's POSITION does not sync while hidden.
 
 ### V98 residuals (known, accepted)
 - The sticky Overview bar sits under the "new version" banner when that shows

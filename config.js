@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V98';
+const APP_VERSION = 'V99';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V98';
+const WELCOME_VERSION = 'V99';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -1073,6 +1073,27 @@ const TIMESTAMPS_KEY = 'pat:timestamps';    // v17: '1' | '0', default '0'
 // Not synced; in backups and setup exports like Sound. Factory reset (Stage 10)
 // must clear it.
 const UNDO_KEY = 'pat:undo';
+
+// V99 (Stage 8 part 2): MAP PIN — a fail's what3words address (1A: pasted, never
+// worked out by the app; that needs what3words' paid service with a key in
+// public source). Stored on the ITEM as `pin` = 'word.word.word' (no slashes,
+// lower case), ABSENT when none (3A, sync rule 36). Never in notes.
+// MAP_PIN_KEY: the switch, PER PHONE (8A), '1' | '0', default OFF — only an
+// explicit '1' turns it on. It hides only the ways of ADDING a pin (the 📍
+// button and the offer after a fail); pins already on items always show,
+// export and print (9A). In backups and setup exports like Undo. Factory reset
+// (Stage 10) must clear it at the settings level.
+const MAP_PIN_KEY = 'pat:mapPin';
+// MAP_PIN_OPEN_KEY: { s: sessionId, i: itemId, at: ms } written the moment the
+// engineer taps "Open what3words" — iOS may reload a home-screen app while it is
+// in the background, and boot (mapPinResume) reopens the pin sheet on that item.
+// Cleared whenever the sheet closes. Older than MAP_PIN_OPEN_MAX_MS = ignored.
+// Per phone, never in backups. Factory reset must clear it (data level).
+const MAP_PIN_OPEN_KEY = 'pat:mapPinOpen';
+const MAP_PIN_OPEN_MAX_MS = 2 * 60 * 60 * 1000;
+// The offer after a fail is logged (5A): how long the "📍 Add map pin" pill stays.
+const MAP_PIN_OFFER_MS = 4000;
+const W3W_HOME_URL = 'https://what3words.com/';
 
 // v16: Multi Pick. A single GLOBAL set of up to 6 named, ordered item-type
 // sequences, plus a show/hide toggle for the entry-screen button. Stored as one

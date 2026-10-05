@@ -90,7 +90,7 @@ function settingsPageSubtitle(pageId) {
       } catch (e) { return 'Space used on this phone'; }
     }
     case 'settingsLogging':
-      return `Undo ${state.undoEnabled ? 'on' : 'off'} · Item times ${state.timestampsEnabled ? 'on' : 'off'}`;
+      return `Undo ${state.undoEnabled ? 'on' : 'off'} · Map pins ${state.mapPinEnabled ? 'on' : 'off'} · Item times ${state.timestampsEnabled ? 'on' : 'off'}`;
     case 'settingsSetup':   return 'Share your setup to another device';
     case 'settingsCalculator': return 'Earth continuity limit';
     case 'settingsAbout':   return `PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}`;
@@ -796,6 +796,21 @@ function renderSettingsLogging() {
           </div>
           <label class="toggle-switch">
             <input type="checkbox" id="undo-toggle" data-change-action="undo" ${state.undoEnabled ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Map pins for fails</h2>
+        <p class="muted">Puts <strong>📍 Add map pin</strong> on a failed item, and offers it for a few seconds after you log a fail. Open what3words, copy the three words for where the item is, come back and paste them. Pins show on the Overview, print with each fail under Remedial actions on the report, and can go in a Map pin column (Settings &rarr; CSV Columns). Turning this off only hides the button &mdash; pins already added still show and print. This phone only.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Map pins</div>
+            <div class="toggle-row-sub">${state.mapPinEnabled ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="map-pin-toggle" data-change-action="map-pin-enabled" ${state.mapPinEnabled ? 'checked' : ''}>
             <span class="toggle-slider"></span>
           </label>
         </div>

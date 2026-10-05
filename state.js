@@ -437,6 +437,12 @@ let state = {
 
   // V94 (15A, 16B): the ↶ Undo button beside Copy last. Per phone, default OFF.
   undoEnabled: false,
+  // V99: map pins. mapPinEnabled = the per-phone switch (8A), default OFF.
+  // mapPinSheet = { sessionId, itemId, text } while the pin sheet is open, else
+  // null. Holds the typing (the sheet has an input, so it is never rendered under
+  // the keyboard: MAP rule 3). Cleared by setView.
+  mapPinEnabled: false,
+  mapPinSheet: null,
   // V94: what the last logging action appended, for Undo (session.js
   // noteLastLog). Memory only — never saved, never in a backup.
   lastLog: null,

@@ -1392,6 +1392,9 @@ function saveItem(result, readings) {
     // must not leave a stale one behind — spread first, then reconcile the key.
     const merged = { ...sess.items[state.cursor], ...item };
     if (state.readingsEnabled && !item.readings) delete merged.readings;
+    // V99 (7A): the fail → PASS sheet's "remove" button takes the map pin too.
+    // Read off the form here, before loadFormForCursor() below rebuilds it.
+    if (state.form.dropPin) delete merged.pin;
     sess.items[state.cursor] = merged;
     savedItemId = merged.id || '';
   } else {
@@ -1435,6 +1438,12 @@ function saveItem(result, readings) {
   // item that has already been saved.
   commitPendingPhotos(sess.id, savedItemId, result, stagedPhotos);
   refreshEntryAfterLog();
+  // V99 (5A): offer a map pin for a fail that has none — after the repaint
+  // above, which would otherwise wipe it. Switch off → mapPinOfferShow says no.
+  if (result === 'fail' && savedItemId) {
+    const saved = sess.items.find(it => it && it.id === savedItemId);
+    if (saved && !mapPinOf(saved)) mapPinOfferShow(savedItemId);
+  }
 }
 
 function passClicked() {
@@ -1464,7 +1473,10 @@ function passClicked() {
   // Read from the FORM box, not the stored item: an engineer who already
   // cleared or rewrote the notes before tapping PASS is not asked again.
   const failNotes = (existing && existing.result === 'fail') ? String(state.form.notes || '').trim() : '';
-  if (failNotes) { failToPassAsk(existing, failNotes, losing, cloudToo); return; }
+  // V99 (7A): a map pin is part of what the fail says, so a fail with a pin is
+  // asked about too, even with no notes.
+  const failPin = (existing && existing.result === 'fail') ? mapPinOf(existing) : '';
+  if (failNotes || failPin) { failToPassAsk(existing, failNotes, losing, cloudToo, failPin); return; }
   if (losing > 0) {
     openConfirmSheet({
       title: 'Change to PASS?',
@@ -1504,27 +1516,37 @@ function stripFailReasons(notes) {
 // the notes; the result stays FAIL). The choice is applied to state.form.notes,
 // which saveItem() reads — and to the DOM box, so the readings sheet path (which
 // returns to the form) shows what will be saved.
-function failToPassAsk(existing, notes, losing, cloudToo) {
+// V99 (7A): `pin` — the item's map pin, if any. The big (remove) button takes
+// it as well as the fail wording; "Keep" keeps both. A pin with no notes gets
+// its own pair of buttons.
+function failToPassAsk(existing, notes, losing, cloudToo, pin) {
   const strip = stripFailReasons(notes);
   const photoLine = losing > 0
     ? ` It also has ${losing} photo${losing === 1 ? '' : 's'}, which will be deleted from this device` +
       `${cloudToo ? ' and from your cloud copy' : ''}. They can't be recovered.`
     : '';
-  const go = (newNotes) => {
+  const go = (newNotes, dropPin) => {
     state.form.notes = newNotes;
+    state.form.dropPin = !!(pin && dropPin);
     const box = document.getElementById('f-notes');
     if (box) box.value = newNotes;
     if (losing > 0) photosDeleteForItem(existing.id).then(() => commitPassResult());
     else commitPassResult();
   };
-  const choices = strip.found
-    ? [{ label: strip.text ? 'Remove the fail reason' : 'Remove the fail reason (clears the notes)', style: 'primary', onPick: () => go(strip.text) },
-       { label: 'Keep the notes as they are', style: 'secondary', onPick: () => go(notes) }]
-    : [{ label: 'Clear the notes', style: 'primary', onPick: () => go('') },
-       { label: 'Keep the notes as they are', style: 'secondary', onPick: () => go(notes) }];
+  const pinTail = pin ? ' and the map pin' : '';
+  const choices = !notes
+    ? [{ label: 'Remove the map pin', style: 'primary', onPick: () => go('', true) },
+       { label: 'Keep the map pin', style: 'secondary', onPick: () => go('', false) }]
+    : strip.found
+    ? [{ label: (strip.text ? 'Remove the fail reason' : 'Remove the fail reason (clears the notes)') + pinTail, style: 'primary', onPick: () => go(strip.text, true) },
+       { label: pin ? 'Keep the notes and the pin' : 'Keep the notes as they are', style: 'secondary', onPick: () => go(notes, false) }]
+    : [{ label: 'Clear the notes' + pinTail, style: 'primary', onPick: () => go('', true) },
+       { label: pin ? 'Keep the notes and the pin' : 'Keep the notes as they are', style: 'secondary', onPick: () => go(notes, false) }];
+  const pinLine = pin ? ` It has a map pin (///${pin}).` : '';
   openChoiceSheet({
     title: 'Change to PASS?',
-    message: `This item's notes say "${notes}". The certificate will print them beside a PASS.` + photoLine,
+    message: (notes ? `This item's notes say "${notes}". The certificate will print them beside a PASS.` : 'This item is a FAIL.')
+      + pinLine + photoLine,
     choices
   });
 }
@@ -1888,6 +1910,181 @@ function deletePhotoFromStrip(photoId) {
   });
 }
 
+// ---------- V99: map pin (Stage 8 part 2, spec 1A–9A) ----------
+// A fail's what3words address, pasted (1A), stored on the ITEM as `pin`
+// ('word.word.word', absent when none — 3A). Added only to a SAVED item (4A):
+// the fail sheet holds its reason and staged photos in memory until the fail is
+// saved, so switching to what3words from inside it could lose the whole fail if
+// iOS reloads the app. From a saved item the worst a reload can lose is the
+// paste — and MAP_PIN_OPEN_KEY + mapPinResume() reopen the sheet even then.
+// The switch (state.mapPinEnabled, per phone — 8A) gates only the WAYS OF
+// ADDING one; a pin on an item always shows, exports and prints (9A).
+
+// The item's pin, normalised ('' for none). Anything malformed — a hand-edited
+// backup, a row from a later version — reads as no pin rather than as junk.
+function mapPinOf(item) {
+  if (!item || typeof item.pin !== 'string' || !item.pin) return '';
+  return (typeof normaliseW3w === 'function') ? normaliseW3w(item.pin) : '';
+}
+
+function _mapPinTarget(sessionId, itemId) {
+  const sess = state.sessions.find(s => s && s.id === sessionId);
+  if (!sess || !Array.isArray(sess.items) || !itemId) return null;
+  const idx = sess.items.findIndex(it => it && it.id === itemId);
+  if (idx === -1) return null;
+  return { sess, idx, item: sess.items[idx] };
+}
+
+// Set or clear an item's pin. The item OBJECT is replaced (never edited in place)
+// and the job's cached encoding dropped — the v69 trap (sync spec section 6): the
+// encoding signature covers the item COUNT, not item contents. Returns null when
+// the item is gone, false when nothing changed, true when it did.
+function setItemMapPin(sessionId, itemId, words) {
+  const t = _mapPinTarget(sessionId, itemId);
+  if (!t) return null;
+  const clean = (typeof normaliseW3w === 'function') ? normaliseW3w(words) : '';
+  if (clean === mapPinOf(t.item) && (clean || !('pin' in t.item))) return false;
+  const copy = { ...t.item };
+  if (clean) copy.pin = clean; else delete copy.pin;
+  t.sess.items[t.idx] = copy;
+  if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(t.sess);
+  markSessionDirty(t.sess);
+  return true;
+}
+
+function _mapPinForgetOpen() {
+  try { localStorage.removeItem(MAP_PIN_OPEN_KEY); } catch (e) { /* ignore */ }
+}
+
+function openMapPinSheet(sessionId, itemId) {
+  const t = _mapPinTarget(sessionId, itemId);
+  if (!t) return;
+  mapPinOfferHide();
+  const pin = mapPinOf(t.item);
+  state.mapPinSheet = { sessionId, itemId, text: pin ? '///' + pin : '' };
+  render();
+}
+
+function closeMapPinSheet() {
+  state.mapPinSheet = null;
+  _mapPinForgetOpen();
+  render();
+}
+
+// The sheet's message line, written in place (the sheet has an input — MAP
+// rule 3: no render() while it is open).
+function _mapPinSheetMessage(text) {
+  const el = (typeof document !== 'undefined') ? document.getElementById('map-pin-error') : null;
+  if (el) el.textContent = text || '';
+}
+
+// Save: three words → set; an empty box → remove; anything else → say so and
+// keep the sheet open with the typing intact.
+function saveMapPinSheet() {
+  const sh = state.mapPinSheet;
+  if (!sh) return;
+  const raw = String(sh.text || '').trim();
+  const words = normaliseW3w(raw);
+  if (raw && !words) {
+    _mapPinSheetMessage('That isn\u2019t three words. Copy them from what3words \u2014 e.g. ///filled.count.soap');
+    return;
+  }
+  const changed = setItemMapPin(sh.sessionId, sh.itemId, words);
+  state.mapPinSheet = null;
+  _mapPinForgetOpen();
+  if (changed === null) { render(); showToast('That item is no longer in this job'); return; }
+  if (changed) saveSessions();
+  render();
+  if (changed) showToast(words ? 'Map pin saved' : 'Map pin removed');
+}
+
+function removeMapPinFromSheet() {
+  const sh = state.mapPinSheet;
+  if (!sh) return;
+  sh.text = '';
+  saveMapPinSheet();
+}
+
+// "Open what3words": remember which item's sheet is open FIRST (iOS may reload
+// the app while it is in the background — MAP_PIN_OPEN_KEY), then leave. The
+// sheet stays open: if the app is not reloaded the engineer comes back to it.
+function mapPinOpenW3w() {
+  const sh = state.mapPinSheet;
+  if (!sh) return;
+  try {
+    localStorage.setItem(MAP_PIN_OPEN_KEY, JSON.stringify({
+      s: sh.sessionId, i: sh.itemId, at: Date.now(), t: String(sh.text || '').slice(0, 200)
+    }));
+  } catch (e) { /* a full phone: the sheet still works, it just can't come back after a reload */ }
+  try { window.open(W3W_HOME_URL, '_blank', 'noopener'); } catch (e) { /* nothing to open with */ }
+}
+
+// The Paste button. iOS shows its own "Paste" bubble first; refusing it, or a
+// browser with no clipboard read, falls back to a plain instruction. The box
+// is written in place (no render — the sheet has an input).
+function mapPinPaste() {
+  const sh = state.mapPinSheet;
+  if (!sh) return;
+  const fallback = () => showToast('Long-press the box and choose Paste');
+  let p = null;
+  try { p = (navigator.clipboard && navigator.clipboard.readText) ? navigator.clipboard.readText() : null; } catch (e) { p = null; }
+  if (!p || typeof p.then !== 'function') { fallback(); return; }
+  p.then((text) => {
+    if (state.mapPinSheet !== sh) return;   // closed meanwhile
+    const words = normaliseW3w(text);
+    const shown = words ? '///' + words : String(text || '').trim().slice(0, 200);
+    sh.text = shown;
+    const box = document.getElementById('map-pin-input');
+    if (box) box.value = shown;
+    _mapPinSheetMessage(words || !shown ? '' : 'That isn\u2019t three words. Copy them from what3words \u2014 e.g. ///filled.count.soap');
+  }).catch(fallback);
+}
+
+// Boot, BEFORE the first loadFormForCursor()/render(): the app was reloaded
+// while the engineer was in what3words. Reopen the job's entry screen on that
+// item with the sheet open. A locked job too (a pin can be added to one, like
+// notes) — load() will have dropped it as the resume target. Stale or broken
+// → forgotten. Returns true when it reopened.
+function mapPinResume() {
+  let o = null;
+  try { o = JSON.parse(localStorage.getItem(MAP_PIN_OPEN_KEY) || 'null'); } catch (e) { o = null; }
+  if (!o) { _mapPinForgetOpen(); return false; }
+  const fresh = typeof o.at === 'number' && Date.now() - o.at >= 0 && Date.now() - o.at <= MAP_PIN_OPEN_MAX_MS;
+  const t = (fresh && typeof o.s === 'string' && typeof o.i === 'string') ? _mapPinTarget(o.s, o.i) : null;
+  if (!t) { _mapPinForgetOpen(); return false; }
+  state.activeId = t.sess.id;
+  state.view = 'entry';
+  state.cursor = t.idx;
+  state.mapPinSheet = { sessionId: t.sess.id, itemId: t.item.id, text: typeof o.t === 'string' ? o.t : '' };
+  return true;
+}
+
+// 5A: straight after a fail is logged, "📍 Add map pin" for a few seconds — at
+// the TOP of the screen, away from PASS / FAIL, so a tap meant for the next
+// item cannot land on it. A DOM node inside #app (so the delegated click
+// reaches it), added after the entry repaint; the next repaint removes it, as
+// does the timer. Switch off → never shown.
+let _mapPinOfferTimer = null;
+function mapPinOfferHide() {
+  if (_mapPinOfferTimer) { clearTimeout(_mapPinOfferTimer); _mapPinOfferTimer = null; }
+  try { document.querySelectorAll('.map-pin-offer').forEach(el => el.remove()); } catch (e) { /* no DOM */ }
+}
+function mapPinOfferShow(itemId) {
+  if (!state.mapPinEnabled || !itemId) return false;
+  const app = (typeof document !== 'undefined') ? document.getElementById('app') : null;
+  if (!app) return false;
+  mapPinOfferHide();
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'map-pin-offer';
+  el.setAttribute('data-action', 'map-pin-offer');
+  el.setAttribute('data-arg', itemId);
+  el.textContent = '\uD83D\uDCCD Add map pin';
+  app.appendChild(el);
+  _mapPinOfferTimer = setTimeout(mapPinOfferHide, MAP_PIN_OFFER_MS);
+  return true;
+}
+
 // ---------- v53: Test Readings sheet ----------
 // The readings sheet is the confirm-with-numbers step shown after PASS (pass
 // mode) or after a fail reason is picked (fail mode), only when the feature is
@@ -2067,7 +2264,9 @@ function copyLastResult() {
   };
   if (state.cursor < sess.items.length) {
     // v17: overwrite keeps the existing item's original ts (item has no ts key).
+    // V99: the overwrite clears the notes, so it clears the map pin too.
     sess.items[state.cursor] = { ...sess.items[state.cursor], ...item };
+    delete sess.items[state.cursor].pin;
   } else {
     // v17: stamp on first save (append). v61: unconditional — see saveItem and
     // the capture/exposure note in config.js. Copy-last is a genuine first log
@@ -2410,6 +2609,8 @@ function setView(v) {
   // dialog can't leak across pages. The expanded-client accordion can persist
   // harmlessly.
   state.siteNotesSheet = null;   // V98: the Overview's site-notes sheet
+  // V99: leaving the screen closes the map pin sheet and forgets the reload note.
+  if (state.mapPinSheet) { state.mapPinSheet = null; _mapPinForgetOpen(); }
   state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
   state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
   // v39: close the New Session form on any view change too. Previously its open

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V98)
+# PATGo — Code Map (V99)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -574,6 +574,13 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   `locationCountText`.
 - `captureWizardStep()` is the last legacy writer of the instrument flat mirror
   and calls `adoptMirrorIntoInstruments()` (rule 7).
+- V99 map pins (item field `pin`): `mapPinOf` is the one reader (**render-core**,
+  **render-review**, **csv.js**, **report.js** call it); `setItemMapPin` the one
+  writer (replaces the item object + `_invalidateSessionEncoding`). Never from the
+  fail sheet. `failToPassAsk` drops it via `state.form.dropPin` (read in
+  `saveItem` before `loadFormForCursor`); `copyLastResult` overwrite clears it.
+  `mapPinResume` is called by **boot.js** before the first render;
+  `mapPinOfferShow` appends into #app AFTER `refreshEntryAfterLog`.
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
 (scroll reset) live in `render()` via `_lastRenderedView`, not in `setView`.
 
@@ -1066,7 +1073,8 @@ this through `handleDelegatedClick`, never through `render()` directly.
 Service-worker registration and update banner, `bootIntegrityOK()`, the boot tail,
 the crash fallback screens, the v69 one-time data repair call.
 **Touch to:** change the startup sequence, the SW update banner or the integrity
-guard.
+guard. V99: `mapPinResume()` (session.js) runs before the first
+`loadFormForCursor()`/`render()` — it may set the active job, view and cursor.
 **Coupling:** the integrity guard verifies the critical cross-file functions
 loaded before any storage write and skips `load()`/`render()`/`save()` if not —
 this is the guard against the duplicate-`const` data-loss class (rule 1).

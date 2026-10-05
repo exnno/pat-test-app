@@ -211,6 +211,15 @@ registerActions({
   'fail-photo-pick':    () => { const inp = document.getElementById('fail-photo-file'); if (inp) inp.click(); },
   'fail-photo-remove':  (arg) => removePendingPhoto(parseInt(arg, 10)),
   'photo-strip-open':   (arg) => openPhotoStrip(arg),
+  // V99: map pins (session.js). The 📍 button and the offer both name an item of
+  // the job on screen; everything else works on the open sheet's own ids.
+  'map-pin-open':   (arg) => { const s = activeSession(); if (s) openMapPinSheet(s.id, arg); },
+  'map-pin-offer':  (arg) => { const s = activeSession(); if (s) openMapPinSheet(s.id, arg); },
+  'map-pin-cancel': () => closeMapPinSheet(),
+  'map-pin-save':   () => saveMapPinSheet(),
+  'map-pin-remove': () => removeMapPinFromSheet(),
+  'map-pin-w3w':    () => mapPinOpenW3w(),
+  'map-pin-paste':  () => mapPinPaste(),
   'photo-strip-close':  () => closePhotoStrip(),
   'photo-strip-add':    () => { const inp = document.getElementById('photo-strip-file'); if (inp) inp.click(); },
   'photo-delete':       (arg) => deletePhotoFromStrip(arg),
@@ -1083,7 +1092,13 @@ registerInputActions({
   'client-name': (v) => { state.clientsPage.clientDialog.name = v; },
   'site-name': (v) => { state.clientsPage.siteDialog.name = v; },
   'site-dialog-notes': (v) => { state.clientsPage.siteDialog.notes = v; },   // V98
-  'site-notes-text': (v) => { if (state.siteNotesSheet) state.siteNotesSheet.text = v; }   // V98
+  'site-notes-text': (v) => { if (state.siteNotesSheet) state.siteNotesSheet.text = v; },   // V98
+  // V99: the map pin box. Typing clears a "that isn't three words" message.
+  'map-pin-text': (v) => {
+    if (state.mapPinSheet) state.mapPinSheet.text = v;
+    const m = document.getElementById('map-pin-error');
+    if (m && m.textContent) m.textContent = '';
+  }
 });
 
 // ===========================================================================
@@ -1186,6 +1201,7 @@ registerChangeActions({
   'haptics': (checked) => { setHaptics(checked); render(); },
   'sound': (checked) => { setSound(checked); render(); },
   'undo': (checked) => { setUndo(checked); render(); },   // V94
+  'map-pin-enabled': (checked) => { setMapPinEnabled(checked); render(); },   // V99
   // V94: a Quick Pick slot chosen for one multi-pick leaves every other row.
   'mp-qp': (value, el) => mpQpPicked(el),
   'timestamps': (checked) => { setTimestamps(checked); render(); },

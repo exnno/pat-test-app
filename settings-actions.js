@@ -770,6 +770,14 @@ function setUndo(enabled) {
   save();
 }
 
+// V99 (8A): map pins, per phone. Off hides only the ways of adding one — the 📍
+// button on a fail and the offer after logging one (9A).
+function setMapPinEnabled(enabled) {
+  state.mapPinEnabled = !!enabled;
+  if (!state.mapPinEnabled && typeof mapPinOfferHide === 'function') mapPinOfferHide();
+  save();
+}
+
 function setSound(enabled) {
   state.soundEnabled = !!enabled;
   save();

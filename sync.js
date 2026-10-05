@@ -1825,6 +1825,9 @@ function _syncFailTagDefault(reason) {
   return (typeof d === 'string') ? d : 'visual';
 }
 
+// V99: CSV columns added since V98 → their default header (see the CSV branch below).
+const _SYNC_CSV_LATE_COLUMNS = { mapPin: 'Map pin' };
+
 // One shape for both ends. Anything malformed collapses to a safe value, as the
 // app's own loaders do on reload.
 function _syncGeneralNormalise(id, raw) {
@@ -1858,7 +1861,14 @@ function _syncGeneralNormalise(id, raw) {
   if (sid === SYNC_CSV_ID) {
     const columns = (Array.isArray(r.columns) ? r.columns : [])
       .filter(c => c && typeof c === 'object' && typeof c.id === 'string' && c.id)
-      .map(c => ({ id: c.id, header: typeof c.header === 'string' ? c.header : '', visible: c.visible !== false }));
+      .map(c => ({ id: c.id, header: typeof c.header === 'string' ? c.header : '', visible: c.visible !== false }))
+      // V99 (rule 36, by projection as V95 did for the report row): a column
+      // added after V98 is left out while it is still as ensureAllCsvColumns()
+      // appended it — hidden, default header. Every upgraded phone then hashes
+      // this row exactly as on V98: nothing re-sent, nothing held. Its position
+      // while hidden does not travel (a hidden column is never exported), and
+      // the receiving phone's ensureAllCsvColumns() puts it back at the end.
+      .filter(c => !(_SYNC_CSV_LATE_COLUMNS[c.id] === c.header && !c.visible));
     return { id: sid, columns };
   }
   if (sid === SYNC_MULTIPICK_ID) {

@@ -299,7 +299,10 @@ function _drawPhotoOmitNotice(doc, data, margin, contentW, y) {
 
 // V95: one block per photo group (caption, the item's notes, a row of photos),
 // from y; returns new y. Split out of _appendPhotoPages unchanged.
-function _drawPhotoGroups(doc, groups, margin, G, y) {
+// V99 (6A): `withPins` — the remedial section passes true, so a fail's map pin
+// prints under its caption as a tap-to-open what3words link. The photo pages
+// (remedial off) pass nothing: pins print in the remedial section only.
+function _drawPhotoGroups(doc, groups, margin, G, y, withPins) {
   const { contentW, cols, gap, colW, boxH, bottomLimit } = G;
   // ----- One block per item -----
   groups.forEach((g) => {
@@ -317,8 +320,9 @@ function _drawPhotoGroups(doc, groups, margin, G, y) {
     // Rows of up to `cols` photos (the per-item cap is 3 and cols is 3, so this
     // is one row today — written as a loop so raising PHOTO_MAX_PER_ITEM later
     // doesn't silently drop photos off the side of the page).
+    const pin = (withPins && typeof mapPinOf === 'function') ? mapPinOf(it) : '';
     const rowCount = Math.max(1, Math.ceil(g.photos.length / cols));
-    const blockH = 14 + (noteLines.length * 11) + 6 + (rowCount * (boxH + 10)) + 8;
+    const blockH = 14 + (noteLines.length * 11) + (pin ? 12 : 0) + 6 + (rowCount * (boxH + 10)) + 8;
 
     if (y + blockH > bottomLimit) { doc.addPage(); y = margin; }
 
@@ -331,6 +335,7 @@ function _drawPhotoGroups(doc, groups, margin, G, y) {
       y += noteLines.length * 11;
       doc.setTextColor(0); doc.setFont(undefined, 'normal');
     }
+    if (pin) { _drawMapPinLine(doc, pin, margin, y + 9); y += 12; }
     y += 6;
 
     for (let r = 0; r < rowCount; r++) {
@@ -371,6 +376,21 @@ function _drawPhotoOmitTail(doc, data, margin, contentW, bottomLimit, y) {
     doc.text(tail, margin, y + 10);
     doc.setTextColor(0); doc.setFont(undefined, 'normal');
   }
+}
+
+// V99: one map pin as "Map pin: ///word.word.word", the address a link to its
+// what3words page (opens the app or the site). Baseline at y.
+function _drawMapPinLine(doc, pin, margin, y) {
+  const label = 'Map pin: ';
+  const addr = '///' + pin;
+  doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+  doc.text(pdfSafe(label), margin, y);
+  const lw = (typeof doc.getTextWidth === 'function') ? doc.getTextWidth(label) : 40;
+  doc.setTextColor(30, 64, 175);
+  const url = (typeof w3wUrl === 'function') ? w3wUrl(pin) : '';
+  if (url && typeof doc.textWithLink === 'function') doc.textWithLink(pdfSafe(addr), margin + lw, y, { url });
+  else doc.text(pdfSafe(addr), margin + lw, y);
+  doc.setTextColor(0);
 }
 
 function _appendPhotoPages(doc, session, data, margin, headerRgb) {
@@ -447,13 +467,27 @@ function _appendRemedialPages(doc, session, data, margin, headerRgb) {
   if (data && groups.length) y = _drawPhotoOmitNotice(doc, data, margin, contentW, y);
 
   if (listed.length) {
+    // V99 (6A): a Map pin column only when a listed fail has one; each address
+    // is a link to its what3words page.
+    const pinOf = (it) => (typeof mapPinOf === 'function') ? mapPinOf(it) : '';
+    const anyPin = listed.some(it => pinOf(it));
+    const head = ['Asset', 'Description', 'Location', 'Reason'].concat(anyPin ? ['Map pin'] : []);
     runAutoTable(doc, {
       startY: y + 4,
-      head: [['Asset', 'Description', 'Location', 'Reason'].map(pdfSafe)],
-      body: listed.map(it => [it.assetNo || '', it.itemType || '', it.location || '', (it.notes || '').trim()].map(v => pdfSafe(v))),
+      head: [head.map(pdfSafe)],
+      body: listed.map(it => [it.assetNo || '', it.itemType || '', it.location || '', (it.notes || '').trim()]
+        .concat(anyPin ? [pinOf(it) ? '///' + pinOf(it) : ''] : []).map(v => pdfSafe(v))),
       margin: { left: margin, right: margin },
       styles: { fontSize: 9, cellPadding: 4 },
-      headStyles: { fillColor: headerRgb, textColor: contrastColor(headerRgb) }
+      headStyles: { fillColor: headerRgb, textColor: contrastColor(headerRgb) },
+      ...(anyPin ? { didDrawCell: (d) => {
+        if (!d || d.section !== 'body' || d.column.index !== 4 || !d.cell) return;
+        const it = listed[d.row.index];
+        const url = it && (typeof w3wUrl === 'function') ? w3wUrl(pinOf(it)) : '';
+        if (url && typeof doc.link === 'function') {
+          try { doc.link(d.cell.x, d.cell.y, d.cell.width, d.cell.height, { url }); } catch (e) { /* a link never blocks the report */ }
+        }
+      } } : {})
     });
     y = (doc.lastAutoTable ? doc.lastAutoTable.finalY : y) + 16;
     doc.setPage(doc.internal.getNumberOfPages());
@@ -461,7 +495,7 @@ function _appendRemedialPages(doc, session, data, margin, headerRgb) {
 
   if (groups.length) {
     if (listed.length && y + 30 > G.bottomLimit) { doc.addPage(); y = margin; }
-    y = _drawPhotoGroups(doc, groups, margin, G, y);
+    y = _drawPhotoGroups(doc, groups, margin, G, y, true);
     _drawPhotoOmitTail(doc, data, margin, contentW, G.bottomLimit, y);
   }
 }

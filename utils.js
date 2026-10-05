@@ -431,3 +431,30 @@ function focusInSheet(el) {
     try { el.focus(); } catch (e2) {}
   }
 }
+
+// V99: a map pin's what3words address, from whatever the engineer pasted. Takes,
+// in this order: the first "///word.word.word" anywhere in the text (what the
+// what3words app's Share/Copy gives — often with a link and a sentence round
+// it); else the words in a what3words.com/… or w3w.co/… link; else the whole text
+// if it IS three words. Returns 'word.word.word' lower-cased, or '' when none
+// is found. Letters only (\p{L}), so "what3words.com" can never be taken for an
+// address, and a stray "https://" (two slashes) never starts one. A full stop
+// straight after the words ends a sentence; a fourth word makes it no address.
+function normaliseW3w(text) {
+  const t = String(text == null ? '' : text).replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+  if (!t || t.length > 2000) return '';
+  const W = '(\\p{L}+\\.\\p{L}+\\.\\p{L}+)';
+  let m = t.match(new RegExp('\\/\\/\\/' + W + '(?!\\p{L}|\\.\\p{L})', 'u'));
+  if (!m) m = t.match(new RegExp('(?:what3words\\.com|w3w\\.co)\\/' + W + '(?!\\p{L}|\\.\\p{L})', 'iu'));
+  if (!m) m = t.match(new RegExp('^' + W + '$', 'u'));
+  if (!m) return '';
+  const words = m[1].toLowerCase();
+  return words.length <= 80 ? words : '';
+}
+
+// V99: the what3words page for a pin ('' for no pin). Opens the what3words app
+// where it is installed, the website otherwise.
+function w3wUrl(words) {
+  const w = normaliseW3w(words);
+  return w ? 'https://what3words.com/' + w : '';
+}

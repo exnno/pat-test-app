@@ -99,13 +99,17 @@ function renderOverviewBodyHTML(sess) {
             : (sel
               ? `<span class="photo-chip is-static">📷 ${photoN}${photoMark}</span>`
               : `<button class="photo-chip" data-action="photo-strip-open" data-arg="${escapeHTML(it.id)}" aria-label="View ${photoN} photo${photoN === 1 ? '' : 's'}${photoCloudN ? `, ${photoCloudN} in the cloud only` : ''}">📷 ${photoN}${photoMark}</button>`);
+          // V99 (6A, 9A): 📍 on any item with a map pin, switch on or off. Static —
+          // tapping the row opens the item, where the pin is.
+          const itPin = (typeof mapPinOf === 'function') ? mapPinOf(it) : '';
+          const pinChip = itPin ? `<span class="pin-chip" title="${escapeHTML('///' + itPin)}" aria-label="Map pin ${escapeHTML(itPin)}">📍</span>` : '';
           return `
             <tr class="${rowClass}" ${rowAttr}>
               ${checkCol}
               <td class="td">${escapeHTML(it.assetNo)}</td>
               <td class="td">${escapeHTML(it.location)}</td>
               <td class="td">${escapeHTML(it.itemType)}${timeLine}</td>
-              <td class="td td-result ${it.result || ''}">${capitalise(it.result || '')}${photoChip}</td>
+              <td class="td td-result ${it.result || ''}">${capitalise(it.result || '')}${photoChip}${pinChip}</td>
               ${actionCol}
             </tr>
           `;

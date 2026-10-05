@@ -55,6 +55,7 @@ function buildBackup() {
     soundEnabled: state.soundEnabled,
     timestampsEnabled: state.timestampsEnabled,
     undoEnabled: state.undoEnabled,   // V94: per phone; absent in older backups
+    mapPinEnabled: state.mapPinEnabled,   // V99: per phone; absent in older backups
     // v18: Smart Quick Pick flag + learned history (readable long-key form).
     sqpEnabled: state.sqpEnabled,
     sqpHistory: state.sqpHistory,
@@ -320,6 +321,10 @@ function restoreBackupFromFile(file) {
     // V94: Undo button. Boolean only; an older backup leaves this phone's own.
     if (typeof data.undoEnabled === 'boolean') {
       state.undoEnabled = data.undoEnabled;
+    }
+    // V99: map pins switch. Boolean only; an older backup leaves this phone's own.
+    if (typeof data.mapPinEnabled === 'boolean') {
+      state.mapPinEnabled = data.mapPinEnabled;
     }
     if (typeof data.timestampsEnabled === 'boolean') {
       state.timestampsEnabled = data.timestampsEnabled;

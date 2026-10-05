@@ -233,9 +233,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Site notes.</strong> Keep door codes, difficult locations and reminders on the site itself. They show when you start a job there and at the top of the job's Overview, every year. Add them from the job's Overview, or under <strong>Settings &rarr; Clients</strong> &mdash; tap <strong>Edit</strong> beside a site.</li>
-        <li><strong>Only for you.</strong> Site notes never print on a report or go into a CSV. Job notes still print, as before.</li>
-        <li><strong>The Overview's top bar stays put.</strong> Back, the report and the CSV buttons stay at the top while you scroll a long job.</li>
+        <li><strong>Map pins for fails.</strong> Mark exactly where a failed item is with its what3words address, so whoever fixes it can find it. Switch it on under <strong>Settings &rarr; Logging &rarr; Logging Options</strong>. It's off until you do.</li>
+        <li><strong>How it works.</strong> After you log a fail, tap <strong>📍 Add map pin</strong> at the top of the screen (or go back to the fail and tap 📍). Open what3words, copy the three words, come back and paste.</li>
+        <li><strong>Where pins show.</strong> A 📍 on the Overview, with the fail under Remedial actions on the report, and in a new Map pin column you can switch on under CSV Columns.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -1518,11 +1518,25 @@ function renderEntry() {
     ? photoCloudOnlyCountForItem(entryItem.id) : 0;
   const showEntryPhotoRow = !!(entryItem && entryItem.result === 'fail' && entryItem.id
     && (typeof photosSupported !== 'function' || photosSupported()));
-  const entryPhotoRow = showEntryPhotoRow ? `
+  const entryPhotoBtn = showEntryPhotoRow ? `
       <button class="entry-photo-btn" id="entry-photo-btn" data-action="photo-strip-open" data-arg="${escapeHTML(entryItem.id)}">
         📷 ${entryPhotoCount ? `Photos (${entryPhotoCount})${entryPhotoCloud ? ' ☁' : ''}` : 'Add a photo'}
       </button>
   ` : '';
+  // V99 (4A, 9A): the map pin button, on a SAVED item only — never the fail
+  // sheet (the iOS reload trap). Shown on a fail while the switch is on, and on
+  // any item that already has a pin whatever the switch says (9A: a pin is part
+  // of the job's record — it can always be seen, and so removed). Shares the
+  // photo button's row, half width each, so it takes no new space.
+  const entryPin = entryItem ? mapPinOf(entryItem) : '';
+  const showEntryPin = !!(entryItem && entryItem.id
+    && (entryPin || (state.mapPinEnabled && entryItem.result === 'fail')));
+  const entryPinBtn = showEntryPin ? `
+      <button class="entry-photo-btn entry-pin-btn${entryPin ? ' has-pin' : ''}" id="entry-pin-btn" data-action="map-pin-open" data-arg="${escapeHTML(entryItem.id)}">📍 ${entryPin ? '///' + escapeHTML(entryPin) : 'Add map pin'}</button>
+  ` : '';
+  const entryPhotoRow = (entryPhotoBtn && entryPinBtn)
+    ? `<div class="entry-aux-row">${entryPhotoBtn}${entryPinBtn}</div>`
+    : (entryPhotoBtn || entryPinBtn);
 
   let failSheetInner = '';
   if (state.failModalStage === 'reasons') {
@@ -1909,7 +1923,41 @@ function renderEntry() {
       ${repeatSheet}
       ${readingsSheet}
       ${renderPhotoStripSheet()}
+      ${renderMapPinSheet()}
     </div>
   `;
+}
+
+// V99: the map pin sheet (entry screen). Has an input → never re-rendered while
+// open except from state (MAP rule 3): the typing lives in state.mapPinSheet.text.
+// Item named from the open sheet's own ids, so a pull that replaced the job
+// object meanwhile still finds it.
+function renderMapPinSheet() {
+  const sh = state.mapPinSheet;
+  if (!sh) return '';
+  const sess = state.sessions.find(s => s && s.id === sh.sessionId);
+  const it = (sess && Array.isArray(sess.items)) ? sess.items.find(x => x && x.id === sh.itemId) : null;
+  const had = it ? mapPinOf(it) : '';
+  const label = it ? [it.assetNo, it.itemType].filter(Boolean).join(' \u00b7 ') : '';
+  return `
+      <div class="modal-backdrop" id="map-pin-backdrop" data-action="map-pin-cancel" style="z-index:300"></div>
+      <div class="bulk-sheet map-pin-sheet" style="z-index:301" role="dialog" aria-label="Map pin">
+        <div class="bulk-sheet-handle"></div>
+        <div class="bulk-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="bulk-sheet-title">📍 Map pin</h3>
+          <button class="fail-close-btn" id="map-pin-cancel" data-action="map-pin-cancel" aria-label="Cancel">×</button>
+        </div>
+        <p class="muted" style="margin:0 0 10px">${label ? escapeHTML(label) + '. ' : ''}Open what3words, copy the three words for where this item is, then come back and paste them here.</p>
+        <button class="btn-secondary map-pin-w3w" id="map-pin-w3w" data-action="map-pin-w3w">Open what3words ↗</button>
+        <div class="map-pin-input-row">
+          <input class="input map-pin-input" id="map-pin-input" data-input-action="map-pin-text" value="${escapeHTML(sh.text || '')}" placeholder="///filled.count.soap" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="200">
+          <button class="btn-secondary map-pin-paste" id="map-pin-paste" data-action="map-pin-paste">Paste</button>
+        </div>
+        <div class="map-pin-error" id="map-pin-error" role="alert"></div>
+        <p class="muted map-pin-where">Shows on the Overview, prints with this fail under Remedial actions, and goes in the Map pin CSV column.</p>
+        <button class="btn-primary" id="map-pin-save" data-action="map-pin-save" style="margin-top:12px">Save</button>
+        ${had ? '<button class="link-btn danger map-pin-remove" id="map-pin-remove" data-action="map-pin-remove">Remove map pin</button>' : ''}
+      </div>`;
 }
 

@@ -546,6 +546,8 @@ function loadV11Settings() {
   state.soundEnabled = localStorage.getItem(SOUNDFX_KEY) === '1';
   // V94: Undo button — same rule, default OFF (16B).
   state.undoEnabled = localStorage.getItem(UNDO_KEY) === '1';
+  // V99: map pins — same rule, default OFF.
+  state.mapPinEnabled = localStorage.getItem(MAP_PIN_KEY) === '1';
   state.timestampsEnabled = localStorage.getItem(TIMESTAMPS_KEY) === '1';
 
   // v18: Smart Quick Pick. Flag defaults OFF; history is validated defensively
@@ -948,6 +950,7 @@ function _saveSettingsWrites() {
   // v17: Sound feedback + Item timestamps settings.
   localStorage.setItem(SOUNDFX_KEY, state.soundEnabled ? '1' : '0');
   localStorage.setItem(UNDO_KEY, state.undoEnabled ? '1' : '0');   // V94
+  localStorage.setItem(MAP_PIN_KEY, state.mapPinEnabled ? '1' : '0');   // V99
   localStorage.setItem(TIMESTAMPS_KEY, state.timestampsEnabled ? '1' : '0');
   // v18: Smart Quick Pick flag + learned history.
   localStorage.setItem(SQP_ENABLED_KEY, state.sqpEnabled ? '1' : '0');

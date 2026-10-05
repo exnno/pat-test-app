@@ -138,7 +138,7 @@ const SETTINGS_PAGE_META = {
   settingsDisplay:     { icon: '🎨', title: 'Phone & Display',       aliases: 'display settings theme dark light haptics vibration sound appearance' },
   // V97 (3A): Undo and item times moved here from Phone & Display — item times
   // sync with the engineer settings, so they never belonged under "this phone".
-  settingsLogging:     { icon: '⚙️', title: 'Logging Options',       aliases: 'undo take back last item timestamps item times record time logged display settings' },
+  settingsLogging:     { icon: '⚙️', title: 'Logging Options',       aliases: 'undo take back last item timestamps item times record time logged display settings map pin pins what3words w3w fail location where gps' },
   settingsCalculator:  { icon: '🧮', title: 'Resistance Calculator', aliases: 'earth continuity resistance limit ohms calculator csa' },
   settingsBackup:      { icon: '💾', title: 'Backup & Restore',      aliases: 'backup restore export import data save json photos file' },
   // V97 (1A, 2A): split out of Backup & Restore — everything about space.
@@ -383,7 +383,13 @@ const DEFAULT_CSV_COLUMNS = [
   { id: 'readingLeakage',    header: 'Leakage (mA)',    visible: false },
   // v55: polarity (Class I only). 'Yes' when an item recorded a polarity tick,
   // blank otherwise — same emit-only-real-data rule as the columns above.
-  { id: 'readingPolarity',   header: 'Polarity',        visible: false }
+  { id: 'readingPolarity',   header: 'Polarity',        visible: false },
+  // V99 (6A): a fail's map pin, as "///word.word.word". Default HIDDEN. Emits
+  // whenever an item HAS a pin, whatever the Map pins switch says (9A). ⚠ While
+  // hidden with this header it is left out of the synced settings_csv row
+  // (sync.js _syncGeneralNormalise — rule 36), so ensureAllCsvColumns() adding
+  // it on upgrade never makes a phone's CSV settings look edited.
+  { id: 'mapPin',            header: 'Map pin',         visible: false }
 ];
 
 // v8: Resistance calculator — IET Code of Practice Table V1.1 nominal values.

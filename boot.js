@@ -355,6 +355,17 @@ try {
   console.error('Sync failed to start (non-fatal).', e);
 }
 
+// V99: the app was reloaded while the engineer was in what3words adding a map
+// pin — reopen that job on that item with the pin sheet open. BEFORE the first
+// loadFormForCursor()/render() below, which build the form for state.cursor.
+// typeof-guarded and wrapped: a stale note must never stop the app starting.
+try {
+  if (typeof mapPinResume === 'function') mapPinResume();
+} catch (e) {
+  console.error('Map pin resume failed (non-fatal).', e);
+  try { localStorage.removeItem(MAP_PIN_OPEN_KEY); } catch (e2) { /* ignore */ }
+}
+
 // v16.1: boot-level safety net. A throw inside render() (e.g. a screen-specific
 // bug like the v16 entry-screen TDZ error) used to leave #app permanently
 // blank — and because the service worker serves the cached build, a plain

@@ -65,6 +65,8 @@ function csvCellValue(colId, session, item) {
     case 'readingInsulation': return (state.readingsEnabled && item.readings && item.readings.insulation) ? item.readings.insulation : '';
     case 'readingLeakage':    return (state.readingsEnabled && item.readings && item.readings.leakage)    ? item.readings.leakage    : '';
     case 'readingPolarity':   return (state.readingsEnabled && item.readings && item.readings.polarity === true) ? 'Yes' : '';
+    // V99 (6A, 9A): the pin whenever there is one (not gated on the switch).
+    case 'mapPin': { const p = (typeof mapPinOf === 'function') ? mapPinOf(item) : ''; return p ? '///' + p : ''; }
     default:            return '';
   }
 }
@@ -421,6 +423,7 @@ function parseImportCSV(text) {
   const iDate   = idxOf('date');
   const iResult = idxOf('result');
   const iNotes  = idxOf('notes');
+  const iPin    = idxOf('mapPin');   // V99: optional Map pin column
 
   const missing = [];
   if (iAsset  === null) missing.push('Asset ID');
@@ -535,14 +538,19 @@ function parseImportCSV(text) {
       skipped.push({ row: rowNum, reason: `invalid Result "${resultRawDisplay}" (expected Passed or Failed)` });
       continue;
     }
-    items.push({
+    const imported = {
       id: uid(),
       assetNo,
       location,
       itemType: desc,
       notes,
       result: normResult
-    });
+    };
+    // V99: a Map pin cell that holds three words comes back as the item's pin
+    // (absent otherwise — 3A); anything else in the cell is ignored.
+    const pinWords = (iPin !== null && typeof normaliseW3w === 'function') ? normaliseW3w(r[iPin]) : '';
+    if (pinWords) imported.pin = pinWords;
+    items.push(imported);
   }
   if (items.length === 0) {
     return {

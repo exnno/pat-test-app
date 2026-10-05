@@ -59,16 +59,16 @@ function renderSettingsAbout() {
         <p>${aboutWhereDataLives()} The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V98: rolled forward — V98 on top, V95 dropped. -->
+      <!-- v8: rolling 3-version changelog. V99: rolled forward — V99 on top, V96 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V99</strong> &middot; October 2026</p>
+        <p class="muted">Map pins for fails: mark where a failed item is with its what3words address. Switch it on under Settings &rarr; Logging &rarr; Logging Options, then tap 📍 on a fail (or the offer straight after logging one), open what3words and paste the three words. Pins show on the Overview, print with the fail under Remedial actions, and can go in a Map pin CSV column.</p>
         <p><strong>V98</strong> &middot; October 2026</p>
         <p class="muted">Site notes: keep door codes, difficult locations and reminders on a site. They show when you start a job there and at the top of the job's Overview, and are never printed on a report or CSV. Edit them from the Overview or Settings &rarr; Clients. The Overview's top bar now stays in place while you scroll.</p>
         <p><strong>V97</strong> &middot; October 2026</p>
         <p class="muted">Backup &amp; Restore split in two: backups and photo files stay there, and a new Phone Storage page holds the storage meter, clearing old jobs and clearing photos. Undo and item times moved to a new Logging Options page under Logging. About now says where your data is when you're signed in.</p>
-        <p><strong>V96</strong> &middot; October 2026</p>
-        <p class="muted">Settings reorganised by what you're doing: Engineer &amp; Tester, Logging, Clients &amp; Retests, Reports &amp; Exports, Phone &amp; Display, Data and Help. Clearer names &mdash; Fail Reasons, Descriptions, Engineer &amp; Tester &mdash; and search still finds the old ones. One-page groups open straight away; Manage Photos has its own row under Data.</p>
 
         </div>
 
