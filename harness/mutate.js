@@ -4028,6 +4028,27 @@ const MUTATIONS = [
     to:   "      ${failSheetInner}\n      ${failPhotoRow}\n      <button data-action=\"map-pin-w3w\">📍</button>\n    </div>",
     why:  "4A: leaving for what3words from inside the fail sheet loses the fail, its reason and staged photos if iOS reloads (36d)",
   },
+  {
+    name: "M559 (V99.1) Open what3words goes back to the website in a browser panel",
+    file: "session.js",
+    from: "  try { window.location.href = W3W_APP_URL; } catch (e) { /* nothing to open with */ }",
+    to:   "  try { window.open(W3W_HOME_URL, '_blank', 'noopener'); } catch (e) { /* nothing to open with */ }",
+    why:  "the V99 bug Peter found on a real phone: coming back leaves a blank browser panel to close first (36h, 36m)",
+  },
+  {
+    name: "M560 (V99.1) the website is offered even after the app opened",
+    file: "session.js",
+    from: "    if (left || state.mapPinSheet !== sh) return;",
+    to:   "    if (state.mapPinSheet !== sh) return;",
+    why:  "everyone with the app would find a 'Didn't open?' message waiting when they come back (36m)",
+  },
+  {
+    name: "M561 (V99.1) the website opens by itself when the app doesn't",
+    file: "session.js",
+    from: "    sh.noApp = true;\n",
+    to:   "    sh.noApp = true;\n    mapPinOpenW3wWeb();\n",
+    why:  "a browser panel appearing unasked is the blank-panel annoyance again, for anyone whose iOS is slow to switch (36m)",
+  },
 ];
 
 function main() {
