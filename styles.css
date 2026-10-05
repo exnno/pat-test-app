@@ -4247,3 +4247,74 @@ body.has-selection-bar .cloud-tab { padding-bottom: 100px; }
 .site-notes-add { display: inline-block; margin: 0 0 8px; }
 .site-notes-input { width: 100%; min-height: 150px; }
 .site-notes-mark { font-size: 12px; }
+
+/* ===== V100: reminder banners — the backup banner's shape, a calmer tint ===== */
+.reminder-banner { background: var(--accent-soft); border-color: var(--accent-border); }
+.reminder-banner .backup-banner-text { color: var(--accent-text); }
+
+/* ===== V100: the 100 moment (welcome + About replay) =====
+   ⚠ MAP rule 12: transitions only, started from script (render-help.js
+   partyAfterRender). Resting state = finished picture: the 100 shows, the
+   sparks are invisible. */
+.party-hero { text-align: center; margin: 2px 0 6px; flex-shrink: 0; }
+.party-logo-wrap { position: relative; display: inline-block; width: 64px; height: 64px; }
+.party-sparks { position: absolute; left: 50%; top: 50%; width: 0; height: 0; pointer-events: none; }
+.party-spark {
+  position: absolute; left: -5px; top: -5px; width: 10px; height: 10px; border-radius: 50%;
+  opacity: 0; transform: translate(0, 0) scale(1);
+  transition: transform 750ms cubic-bezier(.12,.75,.3,1), opacity 380ms ease;
+}
+.party-spark-0 { background: #f59e0b; }
+.party-spark-1 { background: var(--pass); }
+.party-spark-2 { background: var(--accent); }
+.party-100 {
+  font-size: 44px; font-weight: 900; line-height: 1; margin-top: 6px; letter-spacing: -1px;
+  color: var(--accent); transition: transform 420ms cubic-bezier(.2,1.5,.4,1);
+}
+.party-title { font-size: 15px; font-weight: 700; color: var(--text); margin-top: 4px; }
+.party-line { margin: 4px 0 0; font-size: 14px; color: var(--text-muted); }
+.party-thanks { text-align: center; margin: 10px 0 14px; }
+
+/* About's title takes seven quick taps: no text selection, no double-tap zoom. */
+.about-title-tap { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; touch-action: manipulation; cursor: default; }
+
+/* ===== V100: "PATGo tests itself" ===== */
+.egg-unit { font-size: 13px; color: var(--text-muted); margin: 0 0 10px; }
+.egg-test { position: relative; }
+.egg-row {
+  display: flex; justify-content: space-between; align-items: center; gap: 12px;
+  padding: 10px 2px; border-bottom: 1px solid var(--row-separator); font-size: 15px;
+  transition: opacity 250ms ease;
+}
+.egg-row.is-waiting { opacity: 0.45; }
+.egg-label { color: var(--text); }
+.egg-val { font-variant-numeric: tabular-nums; font-weight: 700; }
+.egg-v-wait, .egg-v-test, .egg-v-done { display: none; }
+.egg-row.is-waiting .egg-v-wait { display: inline; color: var(--text-hint); }
+.egg-row.is-testing .egg-v-test { display: inline; color: var(--text-muted); font-weight: 600; }
+.egg-row.is-done .egg-v-done { display: inline; color: var(--pass); }
+.egg-sticker {
+  position: absolute; right: 6px; bottom: -6px; padding: 6px 14px; border: 3px solid var(--pass);
+  border-radius: 8px; color: var(--pass); background: var(--card-bg); font-size: 26px; font-weight: 900;
+  letter-spacing: 2px; pointer-events: none;
+  opacity: 0; transform: scale(2.4) rotate(-28deg);
+  transition: transform 260ms cubic-bezier(.2,1.6,.4,1), opacity 140ms ease;
+}
+.egg-sticker.is-on { opacity: 1; transform: scale(1) rotate(-12deg); }
+.egg-cert { display: none; opacity: 0; transform: translateY(8px); transition: opacity 420ms ease, transform 420ms ease;
+  text-align: center; border: 2px solid var(--accent-border); border-radius: 12px; padding: 16px 14px; background: var(--accent-soft); }
+.egg-sheet.is-flipped .egg-test { display: none; }
+.egg-sheet.is-flipped .egg-cert { display: block; }
+.egg-cert.is-shown { opacity: 1; transform: none; }
+.egg-cert-kicker { font-size: 12px; font-weight: 800; letter-spacing: 1.5px; text-transform: uppercase; color: var(--accent-text); margin-bottom: 8px; }
+.egg-cert-text { margin: 2px 0; font-size: 14px; color: var(--text); }
+.egg-cert-big { font-size: 40px; font-weight: 900; color: var(--accent); line-height: 1.1; font-variant-numeric: tabular-nums; }
+.egg-cert-rows { margin: 12px 0 10px; text-align: left; }
+.egg-cert-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--accent-border); font-size: 14px; color: var(--text-muted); }
+.egg-cert-row strong { color: var(--text); text-align: right; }
+.egg-cert-result { font-size: 14px; color: var(--text); margin-top: 6px; }
+.egg-cert-pass { display: inline-block; margin-right: 6px; padding: 2px 8px; border: 2px solid var(--pass); border-radius: 6px; color: var(--pass); font-weight: 900; letter-spacing: 1px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .party-spark, .party-100, .egg-row, .egg-sticker, .egg-cert { transition: none; }
+}

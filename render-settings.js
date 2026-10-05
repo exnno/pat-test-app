@@ -91,6 +91,7 @@ function settingsPageSubtitle(pageId) {
     }
     case 'settingsLogging':
       return `Undo ${state.undoEnabled ? 'on' : 'off'} · Map pins ${state.mapPinEnabled ? 'on' : 'off'} · Item times ${state.timestampsEnabled ? 'on' : 'off'}`;
+    case 'settingsReminders': return reminderSettingsSummary();   // V100
     case 'settingsSetup':   return 'Share your setup to another device';
     case 'settingsCalculator': return 'Earth continuity limit';
     case 'settingsAbout':   return `PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}`;
@@ -727,7 +728,7 @@ function renderSettingsDisplay() {
   ];
   return `
     <div class="screen">
-      ${renderSettingsSubHeader('Phone & Display')}
+      ${renderSettingsSubHeader('Theme & Sound')}
       <div class="settings-section">
         <h2 class="h2">Theme</h2>
         <p class="muted">Choose how the app looks.</p>
@@ -1134,6 +1135,55 @@ function renderSettingsRetest() {
     </div>
   `;
 }
+// ---------- V100: Reminders (Phone & Display — 7A) ----------
+// Three per-phone choices, each a plain <select> that saves on change. Words
+// shared by the page and the row summary live in REMINDER_LABELS so the two
+// can't disagree.
+const REMINDER_LABELS = {
+  exportAfter: { off: 'Off', '1h': '1 hour after locking', '4h': '4 hours after locking', morning: 'The next morning (8am)' },
+  unlockedAt: { off: 'Off', '16': 'From 4pm', '17': 'From 5pm', '18': 'From 6pm', '19': 'From 7pm', '20': 'From 8pm' },
+  backupDays: { off: 'Off', '3': 'Every 3 days', '7': 'Every 7 days', '14': 'Every 14 days', '30': 'Every 30 days' },
+};
+function reminderSettingsSummary() {
+  const r = normaliseReminders(state.reminders);
+  const on = [];
+  if (r.exportAfter !== 'off') on.push('Not exported');
+  if (r.unlockedAt !== 'off') on.push('Unlocked jobs');
+  const backup = r.backupDays === 'off' ? 'Backups off' : `Backups every ${r.backupDays} days`;
+  return (on.length ? on.join(' · ') + ' · ' : '') + backup;
+}
+function _reminderSelect(id, field, action, list) {
+  const r = normaliseReminders(state.reminders);
+  const opts = list.map(v => `<option value="${v}"${r[field] === v ? ' selected' : ''}>${escapeHTML(REMINDER_LABELS[field][v])}</option>`).join('');
+  return `<select class="input" id="${id}" data-change-action="${action}">${opts}</select>`;
+}
+function renderSettingsReminders() {
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Reminders')}
+      <div class="settings-section">
+        <h2 class="h2">Locked but not exported</h2>
+        <p class="muted">A reminder on the Jobs screen when a job you've locked still has no certificate and no CSV export. Making the certificate (Download or Share from the preview) or exporting the CSV clears it. Jobs locked before this version don't count.</p>
+        ${_reminderSelect('remind-export', 'exportAfter', 'remind-export', REMINDER_EXPORT_CHOICES)}
+      </div>
+      <div class="settings-section">
+        <h2 class="h2">Jobs still unlocked</h2>
+        <p class="muted">From this time each day, a reminder on the Jobs screen if any job on this phone is still unlocked &mdash; a nudge to finish and lock the day's work.</p>
+        ${_reminderSelect('remind-unlocked', 'unlockedAt', 'remind-unlocked', REMINDER_UNLOCKED_CHOICES)}
+      </div>
+      <div class="settings-section">
+        <h2 class="h2">Backup reminder</h2>
+        <p class="muted">How often the Jobs screen reminds you to export a backup file.</p>
+        ${_reminderSelect('remind-backup', 'backupDays', 'remind-backup', REMINDER_BACKUP_CHOICES)}
+      </div>
+      <div class="settings-section">
+        <p class="muted" style="margin:0 0 10px">Reminders show inside the app when you open it &mdash; they aren't notifications on your phone. Each one's &times; hides it for the rest of the day. These settings are for this phone only.</p>
+        <button class="btn-secondary" style="width:100%" data-action="settings-page" data-arg="settingsRetest">🔔 Retest reminders</button>
+      </div>
+    </div>
+  `;
+}
+
 // Lists clients; tapping a client expands it to show its sites with add /
 // rename / delete. Add / rename use a bottom-sheet (the same .bulk-sheet
 // pattern used elsewhere) so the flow matches the rest of the app and works

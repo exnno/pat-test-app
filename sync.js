@@ -3246,7 +3246,8 @@ function syncJobDiff(local, cloud) {
     prefix: 'Asset prefix', startNumber: 'Start number', startPad: 'Number padding',
     locked: 'Locked', instrumentId: 'Instrument', instrumentSnapshot: 'Instrument details',
     clientId: 'Client in your list', siteId: 'Site in your list' };
-  const SKIP = { id: 1, items: 1, exportedAt: 1, exportDirty: 1 };
+  // V100: the lock time is shown by Locked; the certificate time by Export.
+  const SKIP = { id: 1, items: 1, exportedAt: 1, exportDirty: 1, lockedAt: 1, reportAt: 1 };
   const jobVal = (key, v) => {
     if (key === 'instrumentId') {
       if (blankish(v)) return '(none)';
@@ -3271,7 +3272,8 @@ function syncJobDiff(local, cloud) {
     if (JOB[key] || SKIP[key]) continue;
     if (!same(L[key], C[key])) otherJob = true;
   }
-  const exp = (s) => s.exportedAt ? ('Exported' + (s.exportDirty ? ', changed since' : '')) : 'Not exported';
+  const exp = (s) => (s.exportedAt ? ('Exported' + (s.exportDirty ? ', changed since' : '')) : 'Not exported')
+    + (s.reportAt ? ' \u00b7 certificate made' : '');   // V100
   if (exp(L) !== exp(C)) details.push({ label: 'Export', here: exp(L), cloud: exp(C) });
   if (otherJob) details.push({ label: 'Other job details', here: null, cloud: null });
 

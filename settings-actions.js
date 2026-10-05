@@ -778,6 +778,18 @@ function setMapPinEnabled(enabled) {
   save();
 }
 
+// V100 (7A, 8A): one of the three reminder timings, per phone. field =
+// 'exportAfter' | 'unlockedAt' | 'backupDays'; anything not on that field's list
+// falls back through normaliseReminders. Switching the not-exported reminder
+// off also leaves its Jobs-list filter.
+function setReminder(field, value) {
+  const r = normaliseReminders(state.reminders);
+  if (Object.prototype.hasOwnProperty.call(r, field)) r[field] = String(value);
+  state.reminders = normaliseReminders(r);
+  if (state.reminders.exportAfter === 'off' && state.sessionFilter === 'remindexport') state.sessionFilter = 'all';
+  save();
+}
+
 function setSound(enabled) {
   state.soundEnabled = !!enabled;
   save();

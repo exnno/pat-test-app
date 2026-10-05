@@ -1,4 +1,4 @@
-# PATGo — Code Map (V99)
+# PATGo — Code Map (V100)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -476,8 +476,10 @@ when empty) and is MERGED on restore (`syncPrunedMerge`), never replaced. The
 sync fingerprints (SYNC_STATE_KEY) are NEVER in a backup. Harness 16j.
 **Coupling:** restores through the SAME validators as `load()`
 (`normaliseReportSettings`, `normaliseArchivedStats`, `normaliseItemReadings`,
-`normaliseSessionRetest`, `restoreInstrumentsFromBackup`) — never write a second
-validator. ⚠ Instruments restore **after** the flat fields. Boolean flags restore
+`normaliseSessionRetest`, `restoreInstrumentsFromBackup`, V100
+`normaliseReminders` — session.js) — never write a second validator. V100: the
+backup interval comes from `backupReminderDays()` ('off' silences even
+"never backed up"); `BACKUP_REMINDER_DAYS` is only the default. ⚠ Instruments restore **after** the flat fields. Boolean flags restore
 only when the backup actually holds a boolean (absence ≠ off).
 
 ### setup.js (~260 ln) — export/import Setup bundle
@@ -520,6 +522,9 @@ V95: the END of the document is one of two sections — `_appendRemedialPages`
 when `_remedialWanted` (it carries the photos too), else `_appendPhotoPages`.
 Both draw through the shared `_photoGeom` / `_drawPhotoGroups` / omit-notice
 helpers; change photo block layout there, once.
+V100: the preview's Download and (successful) Share call **session.js**
+`noteReportMade(session.id)` — a certificate that leaves the phone stamps the
+job's `reportAt`; `shareOrDownloadReport` returns false on a cancelled share.
 
 ### pdfpreview.js (~135 ln) — multi-page preview rasteriser
 Lazy-loads vendored PDF.js, renders each page to a stacked canvas, DPR-capped,
@@ -584,6 +589,18 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   V99.1: `mapPinOpenW3w` opens the APP (`W3W_APP_URL`, location.href — never
   window.open, which leaves a blank panel); `_mapPinWatchLeave` offers the
   website (`mapPinOpenW3wWeb`) only if the page never hid or lost focus.
+- V100 reminders (block after `unexportedSessions`): `normaliseReminders` (the one
+  normaliser — storage, backup, setup, settings-actions), `backupReminderDays`
+  (**backup.js** `shouldShowBackupReminder`), `isExportReminderJob` /
+  `exportReminderDue` / `unlockedReminderDue` (**render-core.js**
+  `renderReminderBanners`), `reviewReminder` / `quietReminder` (dispatch).
+  `lockedAt` is written ONLY by `saveSessionEdits` (on the change to locked) and
+  removed by it and `unlockActiveSession` — a new lock/unlock path must do the
+  same. `noteReportMade` (called by **report.js** preview Download/Share) stamps
+  `reportAt` by id. Both fields are in `_sessionSig` (**storage.js**). Read
+  `lockedAt` only through `lockedAtMs` (ignores it on an unlocked job). The
+  `remindexport` list filter is transient (storage load drops it).
+  `setView` clears `state.partyOpen` / `state.egg` (**render-help.js**).
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
 (scroll reset) live in `render()` via `_lastRenderedView`, not in `setView`.
 
@@ -676,6 +693,11 @@ long-press is gone — `setupLongPress` (utils.js) now has no caller.
 ⚠ v93: `renderSessions()` draws the "On this phone | ☁ In the cloud" tabs when
 `syncActive()`; the cloud tab returns early with **render-review.js**
 `renderCloudJobsHTML()` (no banners, no new-session form there).
+⚠ V100: `renderReminderBanners()` (Jobs screen, reads **session.js** reminder
+logic at render — nothing scheduled); the Status filter offers `remindexport`
+while the not-exported reminder is on. The welcome's top is **render-help.js**
+`v100HeroHTML()`; `render()`'s finalHTML carries `renderPartyModal()` and
+`renderEggSheet()` (render-help.js) and its tail calls `partyAfterRender()`.
 ⚠ v94: the entry screen's location count (`#loc-count`, `locationCountText`) is
 repainted in place by `refreshLocationCountOnly()` from **events.js** location
 blur / suggestion pick (no render). Multi Pick tiles + `failDisabled` + the
@@ -727,6 +749,10 @@ Instrument settings live in **instruments.js**. The stats footer reads
 ⚠ v73: About, Glossary, Contact, the bug-sheet markup and the cloud stubs left
 for **render-help.js**, and those pages still call `renderSettingsSubHeader()`
 from here. The About changelog is no longer in this file.
+V100: `renderSettingsReminders()` (view `settingsReminders`, Phone & Display) and
+`reminderSettingsSummary()`; labels in `REMINDER_LABELS`, values validated by
+**session.js** `normaliseReminders`, written by **settings-actions.js**
+`setReminder`.
 ⚠ v85: the hub hides the Cloud group where there is no cloud; search skips its
 pages and the group paints `renderCloudLocked()` (render-help.js) until
 `cloudPagesUnlocked()` (cloud.js).
@@ -764,7 +790,14 @@ cover them instead. Calls `renderSettingsSubHeader()` back across the seam into
 render-settings.js. `renderBugSheet()` is markup only — its logic and state are
 in **bugreport.js**, and it returns `''` unless `state.bugSheetOpen`. Declares
 ONE top-level binding, `GLOSSARY_GROUPS`, read only inside a function body, so
-its load position is free.
+its load position is free (09u — V100's egg constants live in **config.js**, its
+tap count and timer in `state`).
+V100: the 100 moment (`v100HeroHTML` — also called by **render-core.js**'s welcome;
+`renderPartyModal`, `partyOpen`, `partyAfterRender` — called at the end of
+`render()`) and "PATGo tests itself" (`aboutTitleTapped`, `eggOpen`/`eggClose`,
+`renderEggSheet`, painted in place by `_eggPaint`). Write nothing (11A). Both
+overlays are added to `render()`'s finalHTML in **render-core.js**. Animation is
+CSS transitions started from script (rule 12).
 Boot probe: `renderSettingsAbout` in `requiredFns`.
 
 ### cloud.js (~315 ln) — cloud sign-in — NEW v79

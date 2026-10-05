@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V99';
+const APP_VERSION = 'V100';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V99';
+const WELCOME_VERSION = 'V100';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -1103,6 +1103,52 @@ const W3W_APP_URL = 'w3w://show?currentlocation';
 // No sign of leaving the app this long after the tap → what3words is not on
 // this phone (or iOS's "Open in what3words?" was cancelled): offer the website.
 const W3W_APP_WAIT_MS = 2500;
+
+// V100 (Stage 8 part 3): IN-APP REMINDERS — banners on the Jobs screen, never
+// notifications (Stage 14 adds those, server-side). All three timings are PER
+// PHONE (8A) in one JSON object under REMINDERS_KEY, every value a string:
+//   exportAfter — 'off' | '1h' | '4h' | 'morning': how long after a job is
+//                 LOCKED before "not exported" shows (3A: off by default).
+//   unlockedAt  — 'off' | '16'…'20': the hour of the day after which "jobs still
+//                 unlocked" shows (4A: off by default).
+//   backupDays  — 'off' | '3' | '7' | '14' | '30': the backup reminder (5A). '7'
+//                 is what the app always did, so nothing changes until changed.
+// In backups and setup exports like Undo (normaliseReminders on the way in).
+// Factory reset (Stage 10) must clear it at the settings level.
+const REMINDERS_KEY = 'pat:reminders';
+const REMINDER_EXPORT_CHOICES = ['off', '1h', '4h', 'morning'];
+const REMINDER_UNLOCKED_CHOICES = ['off', '16', '17', '18', '19', '20'];
+const REMINDER_BACKUP_CHOICES = ['off', '3', '7', '14', '30'];
+// 'morning' = this hour on the calendar day after the lock, phone's own clock.
+const REMINDER_MORNING_HOUR = 8;
+// REMINDER_QUIET_KEY: { exp: 'yyyy-mm-dd', unl: 'yyyy-mm-dd' } — the LOCAL day a
+// banner's × was tapped; it stays away for the rest of that day (6A). A nag timer:
+// per phone, NOT in backups or setup exports. Factory reset must clear it.
+const REMINDER_QUIET_KEY = 'pat:reminderQuiet';
+// The job's own lock time is `lockedAt` (ISO), written by saveSessionEdits when a
+// job becomes locked and removed when it is unlocked — ABSENT otherwise (sync rule
+// 36), so no job's fingerprint moves on upgrade (1A: jobs locked before V100 have
+// none and never remind). `reportAt` (ISO) is stamped when a certificate PDF is
+// downloaded or shared from the preview (2B: a certificate made after locking
+// counts as exported). Both in the job document, which Stage 14's server reads.
+
+// V100: the 100th version. The welcome opens with a one-off "100" moment, About
+// can replay it, and seven taps on About's title run "PATGo tests itself" (9A,
+// 10A). Both write NOTHING, anywhere (11A), and skip the animation when iPhone's
+// Reduce Motion is on. Taps more than this far apart start the count again.
+const EGG_TAPS = 7;
+const EGG_TAP_GAP_MS = 1500;
+// The self-test's readings, in order, and its steps: 0…3 that reading is being
+// taken; 4 all done; EGG_STICKER_STEP the PASS sticker; EGG_FINAL the certificate.
+const EGG_ROWS = [
+  ['Visual inspection', 'No damage'],
+  ['Earth continuity', '0.01 \u03a9'],
+  ['Insulation resistance', '>299 M\u03a9'],
+  ['Polarity', 'Correct'],
+];
+const EGG_STICKER_STEP = EGG_ROWS.length + 1;
+const EGG_FINAL = EGG_ROWS.length + 2;
+const PARTY_SPARKS = 14;
 
 // v16: Multi Pick. A single GLOBAL set of up to 6 named, ordered item-type
 // sequences, plus a show/hide toggle for the entry-screen button. Stored as one

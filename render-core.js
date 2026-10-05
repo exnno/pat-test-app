@@ -138,6 +138,7 @@ function render() {
   else if (v === 'settingsBackup') html = renderSettingsBackup();
   else if (v === 'settingsStorage') html = renderSettingsStorage();   // V97 (1A)
   else if (v === 'settingsLogging') html = renderSettingsLogging();   // V97 (3A)
+  else if (v === 'settingsReminders') html = renderSettingsReminders();   // V100 (7A)
   // V90 (R18): the photo manager, reached from Phone Storage (V97). Falls back
   // to Phone Storage if its markup is missing (never a blank screen).
   else if (v === 'photoManager') html = (typeof renderPhotoManager === 'function') ? renderPhotoManager() : renderSettingsStorage();
@@ -226,16 +227,17 @@ function render() {
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
     <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="${welcomeTitle}">
       <div class="bulk-sheet-handle"></div>
-      <div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>
+      ${typeof v100HeroHTML === 'function' ? v100HeroHTML() : '<div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>'}
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
         <h3 class="bulk-sheet-title">${welcomeTitle}</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Map pins for fails.</strong> Mark exactly where a failed item is with its what3words address, so whoever fixes it can find it. Switch it on under <strong>Settings &rarr; Logging &rarr; Logging Options</strong>. It's off until you do.</li>
-        <li><strong>How it works.</strong> After you log a fail, tap <strong>📍 Add map pin</strong> at the top of the screen (or go back to the fail and tap 📍). Open what3words, copy the three words, come back and paste.</li>
-        <li><strong>Where pins show.</strong> A 📍 on the Overview, with the fail under Remedial actions on the report, and in a new Map pin column you can switch on under CSV Columns.</li>
+        <li><strong>Reminders.</strong> A new page under <strong>Settings &rarr; Phone &amp; Display &rarr; Reminders</strong>: a nudge when a job you've locked still has no certificate or CSV export (1 hour, 4 hours or the next morning after locking), and a time each day to remind you about jobs still unlocked. Both are off until you choose a time.</li>
+        <li><strong>The certificate counts.</strong> Downloading or sharing a certificate from the preview now counts as finishing a locked job, just like a CSV export.</li>
+        <li><strong>Backup reminder.</strong> Choose how often it appears &mdash; every 3, 7, 14 or 30 days, or off. It stays at 7 days until you change it.</li>
+        <li><strong>One more thing.</strong> It's version 100. Something new is hiding on the About page.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -456,7 +458,10 @@ function render() {
   // every screen, because the thing on screen is not on disk. Not dismissible by
   // the backdrop — only by a button — so a stray tap can't hide it.
   const saveFailModal = renderSaveFailSheet();
-  const finalHTML = cloudStrip + banner + html + migrationModal + welcomeModal + wizardModal + signaturePadModal + reopenWarnModal + saveFailModal;
+  // V100 (9A, 10A): the replayed 100 moment and "PATGo tests itself" (render-help.js).
+  const partyModal = (typeof renderPartyModal === 'function') ? renderPartyModal() : '';
+  const eggModal = (typeof renderEggSheet === 'function') ? renderEggSheet() : '';
+  const finalHTML = cloudStrip + banner + html + migrationModal + welcomeModal + wizardModal + signaturePadModal + reopenWarnModal + partyModal + eggModal + saveFailModal;
   app.innerHTML = finalHTML;
   // v24 (E4): record whether THIS render put any modal/sheet into the DOM, so the
   // next render knows whether the orphan-sweep above could find anything. Cheap
@@ -501,6 +506,9 @@ function render() {
   _lastRenderedView = state.view;
   bindFocusFields();
   if (state.signaturePadOpen) initSignaturePad();   // v34
+  // V100: fire the 100 moment's sparks once (render-help.js). Cosmetic — never
+  // allowed to break a render.
+  if (typeof partyAfterRender === 'function') { try { partyAfterRender(); } catch (e) {} }
   // v67: paired mode puts the cursor in the asset box so a scan lands with no
   // tap. Last in the render tail on purpose — it must run after the scroll
   // restore above, or focusing would fight it. The function itself bails on
@@ -867,6 +875,8 @@ function renderSessions() {
   const storageBanner = renderStorageBanner();
   // V91 (Stage 4, 8A): the tidy-up offer — signed in, once a month at most.
   const tidyBanner = renderTidyBanner();
+  // V100 (Stage 8 part 3): the two in-app reminders — not exported, unlocked.
+  const reminderBanners = renderReminderBanners();
 
   // V93 (4A — O9): signed in, the Jobs screen has two tabs. "In the cloud" is
   // how old jobs are reached once a phone only brings down recent ones (R21):
@@ -903,6 +913,7 @@ function renderSessions() {
       ${tidyBanner}
       ${calWarning}
       ${retestBanner}
+      ${reminderBanners}
       ${backupBanner}
       ${newForm}
       ${searchRow}
@@ -1075,6 +1086,36 @@ function renderTidyBanner() {
   `;
 }
 
+// V100 (6A): the reminder banners, in the backup banner's shape. Worked out from
+// the clock at render (session.js) — nothing is scheduled. Hidden while the New
+// Job form is open, like the backup banner.
+function renderReminderBanners() {
+  if (state.newForm && state.newForm.show) return '';
+  let exp = [], unl = [];
+  try { exp = (typeof exportReminderDue === 'function') ? exportReminderDue() : []; } catch (e) { exp = []; }
+  try { unl = (typeof unlockedReminderDue === 'function') ? unlockedReminderDue() : []; } catch (e) { unl = []; }
+  const one = (cls, text, review, dismiss) => `
+    <div class="backup-banner reminder-banner ${cls}" role="status">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text">${escapeHTML(text)}</div>
+        <div class="backup-banner-actions">
+          <button class="backup-banner-action primary" data-action="${review}">Review</button>
+        </div>
+      </div>
+      <button class="backup-banner-dismiss" data-action="${dismiss}" aria-label="Hide until tomorrow">×</button>
+    </div>`;
+  let out = '';
+  if (exp.length) {
+    const n = exp.length;
+    out += one('reminder-export', `⏰ ${n} locked job${n === 1 ? ' has' : 's have'} no certificate or CSV export yet.`, 'remind-export-review', 'remind-export-dismiss');
+  }
+  if (unl.length) {
+    const n = unl.length;
+    out += one('reminder-unlocked', `⏰ ${n} job${n === 1 ? ' is' : 's are'} still unlocked. Finished? Lock ${n === 1 ? 'it' : 'them'} in Session settings.`, 'remind-unlocked-review', 'remind-unlocked-dismiss');
+  }
+  return out;
+}
+
 function renderBackupReminderBanner() {
   let msg;
   if (!state.lastBackupAt) {
@@ -1174,6 +1215,7 @@ function renderSessionsListAreaHTML() {
           <option value="exported"${state.sessionFilter === 'exported' ? ' selected' : ''}>Exported</option>
           <option value="modified"${state.sessionFilter === 'modified' ? ' selected' : ''}>Modified since</option>
           ${state.retestRemindersEnabled ? `<option value="retestdue"${state.sessionFilter === 'retestdue' ? ' selected' : ''}>Retest due</option>` : ''}
+          ${(state.sessionFilter === 'remindexport' || (state.reminders && state.reminders.exportAfter && state.reminders.exportAfter !== 'off')) ? `<option value="remindexport"${state.sessionFilter === 'remindexport' ? ' selected' : ''}>Locked, not exported</option>` : ''}
         </select>
       </label>
       <label class="control-field">

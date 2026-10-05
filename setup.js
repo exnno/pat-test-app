@@ -70,6 +70,7 @@ function buildSetupBundle(label, include) {
       timestampsEnabled: state.timestampsEnabled,
       undoEnabled: state.undoEnabled,   // V94
       mapPinEnabled: state.mapPinEnabled,   // V99
+      reminders: normaliseReminders(state.reminders),   // V100
       multiPick: state.multiPick,
       sqpEnabled: state.sqpEnabled
       // NOTE: deliberately NOT sqpHistory — learned history is device-specific.
@@ -267,6 +268,7 @@ function applySetupBundle(data) {
     if (typeof pr.soundEnabled === 'boolean') state.soundEnabled = pr.soundEnabled;
     if (typeof pr.undoEnabled === 'boolean') state.undoEnabled = pr.undoEnabled;   // V94
     if (typeof pr.mapPinEnabled === 'boolean') state.mapPinEnabled = pr.mapPinEnabled;   // V99
+    if (pr.reminders && typeof pr.reminders === 'object' && !Array.isArray(pr.reminders)) state.reminders = normaliseReminders(pr.reminders);   // V100
     if (typeof pr.timestampsEnabled === 'boolean') state.timestampsEnabled = pr.timestampsEnabled;
     state.multiPick = normaliseMultiPickConfig(pr.multiPick);
     if (typeof pr.sqpEnabled === 'boolean') state.sqpEnabled = pr.sqpEnabled;

@@ -317,6 +317,9 @@ function sessionMatchesControlFilters(s) {
     // the feature is on (the option isn't offered otherwise).
     if (state.sessionFilter === 'retestdue') {
       if (!isRetestActive(s)) return false;
+    } else if (state.sessionFilter === 'remindexport') {
+      // V100: the not-exported reminder's jobs (Review on its banner).
+      if (!isExportReminderJob(s)) return false;
     } else {
       const st = exportStatus(s);
       if (state.sessionFilter === 'unexported' && st !== 'none') return false;
@@ -451,6 +454,136 @@ function unexportedSessionCount() {
 // in a sensible sequence. Drives the tappable bulk-export nudge.
 function unexportedSessions() {
   return sortedSessions().filter(s => exportStatus(s) !== 'exported');
+}
+
+// ===== V100: in-app reminders (roadmap Stage 8 part 3) =====
+// Three per-phone timings (state.reminders, REMINDERS_KEY — config.js) and two
+// job fields: `lockedAt` (when the job was locked) and `reportAt` (when its
+// certificate was last downloaded or shared). Reminders are BANNERS on the Jobs
+// screen, worked out at render time from the clock — nothing is scheduled and
+// nothing is stored except the × day (REMINDER_QUIET_KEY). A phone that is never
+// opened is never reminded; that is what Stage 14's notifications are for.
+
+// Every value in, a clean object out. Anything unknown falls back per field, so
+// a garbage backup can never wedge a banner on or off.
+function normaliseReminders(raw) {
+  const r = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+  const pick = (v, list, dflt) => { const x = String(v == null ? '' : v); return list.includes(x) ? x : dflt; };
+  return {
+    exportAfter: pick(r.exportAfter, REMINDER_EXPORT_CHOICES, 'off'),
+    unlockedAt: pick(r.unlockedAt, REMINDER_UNLOCKED_CHOICES, 'off'),
+    backupDays: pick(r.backupDays, REMINDER_BACKUP_CHOICES, String(BACKUP_REMINDER_DAYS)),
+  };
+}
+
+// The backup interval in days, or 0 when switched off.
+function backupReminderDays() {
+  const v = normaliseReminders(state.reminders).backupDays;
+  return v === 'off' ? 0 : parseInt(v, 10);
+}
+
+// The phone's own calendar day, yyyy-mm-dd. NOT todayISO(), which is the UTC day
+// and would end "quiet until tomorrow" at 1 a.m. all summer.
+function reminderLocalDay(ms) {
+  const d = new Date(ms == null ? Date.now() : ms);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function _reminderQuiet() {
+  let q = null;
+  try { q = JSON.parse(localStorage.getItem(REMINDER_QUIET_KEY)); } catch (e) { q = null; }
+  return (q && typeof q === 'object' && !Array.isArray(q)) ? q : {};
+}
+// × on a banner: gone for the rest of the phone's day (6A). which = 'exp' | 'unl'.
+function quietReminder(which) {
+  const q = _reminderQuiet();
+  q[which] = reminderLocalDay();
+  try { localStorage.setItem(REMINDER_QUIET_KEY, JSON.stringify(q)); } catch (e) {}
+}
+
+// A job's lock time in ms — only while it IS locked. A V99 phone unlocking a job
+// leaves the field behind (it edits the job in place), so `locked` decides.
+function lockedAtMs(sess) {
+  if (!sess || !sess.locked || typeof sess.lockedAt !== 'string') return null;
+  const ms = Date.parse(sess.lockedAt);
+  return Number.isFinite(ms) ? ms : null;
+}
+function reportAtMs(sess) {
+  if (!sess || typeof sess.reportAt !== 'string') return null;
+  const ms = Date.parse(sess.reportAt);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+// 2B: the job's paperwork is done — a CSV export it hasn't changed since, OR a
+// certificate made at or after the lock. A certificate made BEFORE locking
+// doesn't count: the job could have changed between the two.
+function jobPaperworkDone(sess) {
+  if (exportStatus(sess) === 'exported') return true;
+  const lk = lockedAtMs(sess), rp = reportAtMs(sess);
+  return lk != null && rp != null && rp >= lk;
+}
+
+// When "not exported" becomes due for a job locked at lockedMs.
+function exportReminderDueAt(lockedMs, mode) {
+  if (mode === '1h') return lockedMs + 60 * 60 * 1000;
+  if (mode === '4h') return lockedMs + 4 * 60 * 60 * 1000;
+  if (mode === 'morning') {
+    const d = new Date(lockedMs);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, REMINDER_MORNING_HOUR, 0, 0, 0).getTime();
+  }
+  return null;
+}
+
+// Is this job one the not-exported reminder is about? (Also the Jobs list's
+// "Locked, not exported" filter.) Example job never; no lock time (1A) never.
+function isExportReminderJob(sess, now) {
+  if (!sess || sess[DEMO_SESSION_FLAG]) return false;
+  const mode = normaliseReminders(state.reminders).exportAfter;
+  if (mode === 'off') return false;
+  const lk = lockedAtMs(sess);
+  if (lk == null || jobPaperworkDone(sess)) return false;
+  const due = exportReminderDueAt(lk, mode);
+  return due != null && (now == null ? Date.now() : now) >= due;
+}
+function exportReminderJobs(now) {
+  return (state.sessions || []).filter(s => isExportReminderJob(s, now));
+}
+// The banner: the jobs, unless × was tapped today.
+function exportReminderDue(now) {
+  if (_reminderQuiet().exp === reminderLocalDay(now)) return [];
+  return exportReminderJobs(now);
+}
+
+// 4A: after the chosen hour, every unlocked job on this phone (not the example).
+function unlockedReminderDue(now) {
+  const at = normaliseReminders(state.reminders).unlockedAt;
+  if (at === 'off') return [];
+  const t = (now == null ? Date.now() : now);
+  if (new Date(t).getHours() < parseInt(at, 10)) return [];
+  if (_reminderQuiet().unl === reminderLocalDay(t)) return [];
+  return (state.sessions || []).filter(s => s && !s.locked && !s[DEMO_SESSION_FLAG]);
+}
+
+// "Review" on a banner: the Jobs list, filtered to what the banner counted.
+// The filter is not one of the saved choices, so a reload returns to All.
+function reviewReminder(which) {
+  state.sessionsSearchQuery = '';
+  if (which === 'exp') { state.sessionFilter = 'remindexport'; state.lockFilter = 'all'; }
+  else { state.sessionFilter = 'all'; state.lockFilter = 'unlocked'; }
+}
+
+// 2B: a certificate left the phone (downloaded or shared from the preview).
+// Looked up by id at that moment — a sync may have replaced the object while
+// the preview was open (sync rule 8). Written in place on a job that is often
+// not the open one, so the encoding is dropped explicitly (section 6 trap; the
+// signature covers reportAt as well). save() only — the preview is open.
+function noteReportMade(sessionId) {
+  const sess = (state.sessions || []).find(s => s && s.id === sessionId);
+  if (!sess) return;
+  sess.reportAt = new Date().toISOString();
+  if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(sess);
+  try { save(); } catch (e) {}
 }
 
 // ===== v56: Retest reminders (commercial chase list) =====
@@ -2651,6 +2784,10 @@ function setView(v) {
   state.siteNotesSheet = null;   // V98: the Overview's site-notes sheet
   // V99: leaving the screen closes the map pin sheet and forgets the reload note.
   if (state.mapPinSheet) { state.mapPinSheet = null; _mapPinForgetOpen(); }
+  // V100: the replayed 100 moment and "PATGo tests itself" belong to About.
+  state.partyOpen = false;
+  if (state.egg && state.egg.timer) clearTimeout(state.egg.timer);
+  state.egg = null;
   state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
   state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
   // v39: close the New Session form on any view change too. Previously its open
@@ -2916,7 +3053,13 @@ function saveSessionEdits() {
   sess.engineer = String(engineer).trim();
   sess.prefix = String(prefix).trim();
   sess.date = date || sess.date;
+  // V100 (1A): the lock TIME. Stamped only on the change to locked; removed on
+  // unlock, so it is absent unless the job is locked (sync rule 36). Re-saving a
+  // job that was already locked keeps its time.
+  const wasLocked = !!sess.locked;
   sess.locked = !!locked;   // v8
+  if (sess.locked && !wasLocked) sess.lockedAt = new Date().toISOString();
+  else if (!sess.locked) delete sess.lockedAt;
   // v66: the per-session instrument stamp (decision 2A).
   // ⚠ The snapshot describes the PREVIOUS stamp and nothing else, so it is
   // dropped whenever the stamp actually changes — unconditionally. An earlier
@@ -2941,5 +3084,6 @@ function unlockActiveSession() {
   const sess = activeSession();
   if (!sess) return;
   sess.locked = false;
+  delete sess.lockedAt;   // V100
   save(); render();
 }

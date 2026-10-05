@@ -8,11 +8,27 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Stage 8 part 3 — in-app reminders (V100)
-Nothing records WHEN a job was locked today — a `lockedAt` field on the job (in
-the synced doc, so Stage 14's server can see it) is the first decision; the
-"not exported" count on the Jobs screen exists (v14) and is per job. Reminder
-timing per phone (roadmap Stage 8).
+### Next after V100
+Stage 9 (split / duplicate jobs) per the roadmap, unless Peter picks S10 (needs
+his CoP figures) or Stage 7 part 3 (the look pass).
+
+### V100 residuals (known, accepted)
+- Reminders are worked out when the Jobs screen is drawn. A phone left open on
+  the Jobs screen past the time shows the banner at the next repaint, not on the
+  minute. Notifications while closed are Stage 14.
+- The existing "N jobs not yet exported" line and the ✓ badges still mean CSV
+  only; only the new reminder counts a certificate (2B scope). Peter works by
+  PDF — a candidate follow-up: let the line/badges count certificates too.
+- A V99 phone that RE-locks a job doesn't stamp a new lock time (it keeps an old
+  one left from an earlier lock, or none). Test phones only, upgraded together.
+- A certificate made BEFORE locking doesn't count (a job could change in between)
+  — make it again after locking, or export the CSV.
+- "Locked, not exported" is a transient filter: a reload returns to All.
+- The 100 moment's sparks and the egg's steps are CSS transitions started from
+  script (MAP rule 12); only a real iPhone proves they play. If they don't, the
+  finished picture still shows.
+- Factory reset (Stage 10) must clear REMINDER_QUIET_KEY (data level) and
+  REMINDERS_KEY (settings level).
 
 ### V99 residuals (known, accepted)
 - How iOS asks for permission is not involved (no GPS), but how a home-screen app

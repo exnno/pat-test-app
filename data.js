@@ -112,8 +112,8 @@ const SETTINGS_CATEGORIES = [
     pages: ['settingsClients', 'settingsRetest'] },
   { id: 'catReports', icon: '📄', title: 'Reports & Exports', blurb: 'The PDF certificate and the CSV export',
     pages: ['settingsReport', 'settingsCsv'] },
-  { id: 'catApp',     icon: '🎨', title: 'Phone & Display', blurb: 'Theme, sound and vibration on this phone',
-    pages: ['settingsDisplay'] },
+  { id: 'catApp',     icon: '🎨', title: 'Phone & Display', blurb: 'Theme, sound, vibration and reminders on this phone',
+    pages: ['settingsDisplay', 'settingsReminders'] },   // V100 (7A): + Reminders
   { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Backups, space on this phone, photos, and moving your setup to another phone',
     pages: ['settingsBackup', 'settingsStorage', 'photoManager', 'jobManager', 'settingsSetup'] },
   { id: 'catHelp',    icon: 'ℹ️', title: 'Help', blurb: 'About this app, what the terms mean, and how to get in touch',
@@ -135,7 +135,11 @@ const SETTINGS_PAGE_META = {
   settingsCsv:         { icon: '📊', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
   settingsClients:     { icon: '🏢', title: 'Clients',               aliases: 'clients sites customers addresses' },
   settingsRetest:      { icon: '🔔', title: 'Retest Reminders',       aliases: 'retest reminders rebook chase due overdue recall renewal commercial repeat business follow up contact customer' },
-  settingsDisplay:     { icon: '🎨', title: 'Phone & Display',       aliases: 'display settings theme dark light haptics vibration sound appearance' },
+  // V100: the row is "Theme & Sound" now that the group holds two pages (a row
+  // named the same as its group read oddly); the old name stays in search.
+  settingsDisplay:     { icon: '🎨', title: 'Theme & Sound',         aliases: 'phone and display settings theme dark light haptics vibration sound appearance' },
+  // V100 (7A): the three in-app reminders — all per phone.
+  settingsReminders:   { icon: '⏰', title: 'Reminders',             aliases: 'reminders reminder nag alert prompt not exported export locked lock unlocked end of day backup back up certificate notification remind me' },
   // V97 (3A): Undo and item times moved here from Phone & Display — item times
   // sync with the engineer settings, so they never belonged under "this phone".
   settingsLogging:     { icon: '⚙️', title: 'Logging Options',       aliases: 'undo take back last item timestamps item times record time logged display settings map pin pins what3words w3w fail location where gps' },

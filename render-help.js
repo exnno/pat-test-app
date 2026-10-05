@@ -54,21 +54,23 @@ function renderSettingsAbout() {
     <div class="screen">
       ${renderSettingsSubHeader('About')}
       <div class="info-card">
-        <h2 id="about-title">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}</h2>
+        <h2 id="about-title" class="about-title-tap" data-action="about-title-tap">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}</h2>
         <p>A fast, offline-first portable appliance testing app for working PAT engineers. Built around speed of data entry — pass/fail decisions in two taps, no fighting the interface.</p>
         <p>${aboutWhereDataLives()} The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
+        <!-- V100 (9A): replay the 100 moment from the V100 welcome. -->
+        <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">✨ Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V99: rolled forward — V99 on top, V96 dropped. -->
+      <!-- v8: rolling 3-version changelog. V100: rolled forward — V100 on top, V97 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V100</strong> &middot; October 2026</p>
+        <p class="muted">Reminders, on a new page under Settings &rarr; Phone &amp; Display: a nudge when a locked job still has no certificate or CSV export, a time each day to remind you about jobs still unlocked, and a choice of how often the backup reminder appears. Making the certificate now counts as finishing a job. And it's version 100 &mdash; thank you for testing with PATGo.</p>
         <p><strong>V99</strong> &middot; October 2026</p>
         <p class="muted">Map pins for fails: mark where a failed item is with its what3words address. Switch it on under Settings &rarr; Logging &rarr; Logging Options, then tap 📍 on a fail (or the offer straight after logging one), open what3words and paste the three words. Pins show on the Overview, print with the fail under Remedial actions, and can go in a Map pin CSV column.</p>
         <p><strong>V98</strong> &middot; October 2026</p>
         <p class="muted">Site notes: keep door codes, difficult locations and reminders on a site. They show when you start a job there and at the top of the job's Overview, and are never printed on a report or CSV. Edit them from the Overview or Settings &rarr; Clients. The Overview's top bar now stays in place while you scroll.</p>
-        <p><strong>V97</strong> &middot; October 2026</p>
-        <p class="muted">Backup &amp; Restore split in two: backups and photo files stay there, and a new Phone Storage page holds the storage meter, clearing old jobs and clearing photos. Undo and item times moved to a new Logging Options page under Logging. About now says where your data is when you're signed in.</p>
 
         </div>
 
@@ -735,3 +737,224 @@ function renderCloudSubscription() {
   `;
 }
 
+
+// ===== V100: the 100 moment (9A) and "PATGo tests itself" (10A) =====
+// The 100th version. Neither piece writes ANYTHING — no storage, no sync, no
+// backup (11A) — and both skip their animation when iPhone's Reduce Motion is on.
+// Neither sheet has an input, so render() may run while one is open (MAP rule 3).
+//
+// ⚠ iOS (MAP rule 12): no @keyframes. Everything moves by CSS TRANSITIONS on
+// elements already in the DOM, started from script after a forced reflow and the
+// next frame (_partyNextFrame — two RAFs, with a setTimeout fallback). If the
+// script never runs, the resting state is the finished picture: the "100" is
+// visible, the sparks stay invisible, the test sheet shows its current step.
+
+function _partyReducedMotion() {
+  try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  catch (e) { return false; }
+}
+function _partyNum(n) {
+  try { return Number(n).toLocaleString('en-GB'); } catch (e) { return String(n); }
+}
+function _partyNextFrame(fn) {
+  let done = false;
+  const run = () => { if (done) return; done = true; try { fn(); } catch (e) {} };
+  try { if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(run)); } catch (e) {}
+  setTimeout(run, 80);
+}
+
+// --- the 100 moment: the top of the V100 welcome, and About's replay (9A) ---
+function v100HeroHTML() {
+  let stats = null;
+  try { stats = (typeof computeAppStats === 'function') ? computeAppStats() : null; } catch (e) { stats = null; }
+  const line = stats
+    ? `You've tested <strong>${_partyNum(stats.items)}</strong> item${stats.items === 1 ? '' : 's'} with PATGo.`
+    : 'Here\u2019s to your first hundred items.';
+  // Sparks only until they have been fired once for this showing — a repaint
+  // mid-way (a sync, a toast) then can't fire them a second time.
+  const sparks = state.partySparked ? '' : `<div class="party-sparks" id="party-sparks" aria-hidden="true">${
+    Array.from({ length: PARTY_SPARKS }, (_, i) => `<span class="party-spark party-spark-${i % 3}"></span>`).join('')}</div>`;
+  return `
+      <div class="party-hero">
+        <div class="party-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64">${sparks}</div>
+        <div class="party-100" id="party-100" aria-hidden="true">100</div>
+        <div class="party-title">One hundred versions of PATGo</div>
+        <p class="party-line">${line}</p>
+      </div>`;
+}
+
+function renderPartyModal() {
+  if (!state.partyOpen) return '';
+  return `
+    <div class="modal-backdrop" data-action="party-close" style="z-index:300"></div>
+    <div class="bulk-sheet party-sheet" style="z-index:301" role="dialog" aria-label="PATGo V100">
+      <div class="bulk-sheet-handle"></div>
+      ${v100HeroHTML()}
+      <p class="muted party-thanks sheet-scroll">Thank you for testing with PATGo.</p>
+      <button class="btn-primary sheet-pin" data-action="party-close">Close</button>
+    </div>
+  `;
+}
+function partyOpen() {
+  state.partyOpen = true;
+  state.partySparked = false;
+  render();
+}
+
+// Called at the end of every render() (render-core.js). Fires the sparks once.
+function partyAfterRender() {
+  const box = document.getElementById('party-sparks');
+  if (!box) return;
+  state.partySparked = true;
+  if (_partyReducedMotion()) return;
+  const hundred = document.getElementById('party-100');
+  const sparks = Array.from(box.children || []);
+  if (hundred) { hundred.style.transition = 'none'; hundred.style.transform = 'scale(0.4)'; void hundred.offsetWidth; }
+  _partyNextFrame(() => {
+    if (hundred) { hundred.style.transition = ''; hundred.style.transform = ''; }
+    sparks.forEach((el, i) => {
+      const ang = (i / sparks.length) * Math.PI * 2 + (i % 2 ? 0.22 : 0);
+      const r = 58 + (i % 3) * 20;
+      el.style.opacity = '1';
+      el.style.transform = `translate(${Math.round(Math.cos(ang) * r)}px, ${Math.round(Math.sin(ang) * r)}px) scale(0.5)`;
+    });
+    setTimeout(() => sparks.forEach(el => { el.style.opacity = '0'; }), 480);
+  });
+}
+
+// --- "PATGo tests itself" (10A): seven taps on About's title ---
+// Steps: 0…3 = that reading is being tested (the ones before it are done);
+// 4 = all four done; 5 = the PASS sticker; 6 = the certificate. Each step is
+// painted IN PLACE (class changes, so the CSS transitions run); render() draws
+// whatever step state.egg holds, so a repaint mid-test simply continues.
+// The rows and step numbers are in config.js (EGG_ROWS…) — 09u: this file
+// declares no top-level binding but GLOSSARY_GROUPS. The tap count and the timer
+// live in state (eggTaps; egg.timer), memory only.
+
+function aboutTitleTapped() {
+  const now = Date.now();
+  const tp = state.eggTaps || (state.eggTaps = { n: 0, at: 0 });
+  if (now - tp.at > EGG_TAP_GAP_MS) tp.n = 0;
+  tp.n++;
+  tp.at = now;
+  if (tp.n >= EGG_TAPS) { tp.n = 0; eggOpen(); return; }
+  const left = EGG_TAPS - tp.n;
+  if (left <= 3 && typeof showToast === 'function') showToast(`${left} more\u2026`);
+}
+
+function _eggStopTimer() {
+  if (state.egg && state.egg.timer) { clearTimeout(state.egg.timer); state.egg.timer = null; }
+}
+function eggOpen() {
+  _eggStopTimer();
+  state.egg = { step: _partyReducedMotion() ? EGG_FINAL : 0, timer: null };
+  render();
+  if (state.egg && state.egg.step < EGG_FINAL) _eggSchedule();
+}
+function eggClose() {
+  _eggStopTimer();
+  state.egg = null;
+  render();
+}
+function _eggDelay(step) {
+  if (step < EGG_ROWS.length) return 700;     // a reading being taken
+  if (step === EGG_ROWS.length) return 350;   // all done → the sticker
+  return 1500;                                // admire the sticker → the certificate
+}
+function _eggSchedule() {
+  const st = state.egg;
+  if (!st) return;
+  st.timer = setTimeout(() => {
+    st.timer = null;
+    if (state.egg !== st) return;             // closed, or started again
+    st.step = Math.min(EGG_FINAL, st.step + 1);
+    _eggPaint();
+    if (st.step < EGG_FINAL) _eggSchedule();
+  }, _eggDelay(st.step));
+}
+function _eggRowClass(i, step) {
+  return 'egg-row ' + (i < step ? 'is-done' : (i === step ? 'is-testing' : 'is-waiting'));
+}
+function _eggPaint() {
+  const st = state.egg;
+  if (!st) return;
+  const root = document.getElementById('egg-sheet');
+  if (!root) return;
+  EGG_ROWS.forEach((r, i) => {
+    const el = document.getElementById('egg-row-' + i);
+    if (el) el.className = _eggRowClass(i, st.step);
+  });
+  const sticker = document.getElementById('egg-sticker');
+  if (sticker && st.step >= EGG_STICKER_STEP) sticker.classList.add('is-on');
+  if (st.step >= EGG_FINAL) {
+    root.classList.add('is-flipped');
+    const cert = document.getElementById('egg-cert');
+    if (cert) _partyNextFrame(() => cert.classList.add('is-shown'));
+  }
+}
+
+// The certificate's numbers — read from what the app already counts, never stored.
+function _eggCertData() {
+  let stats = null;
+  try { stats = (typeof computeAppStats === 'function') ? computeAppStats() : null; } catch (e) { stats = null; }
+  const jobs = (state.sessions || []).filter(s => s && !s[DEMO_SESSION_FLAG]);
+  const dates = jobs.map(s => s.date).filter(d => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  return {
+    name: String(state.engineer || '').trim(),
+    items: stats ? stats.items : 0,
+    fails: stats ? stats.fails : 0,
+    failRate: stats ? stats.failRate : '0.0',
+    topType: stats ? stats.topType : '',
+    jobs: jobs.length,
+    oldest: dates.length ? dates[0] : '',
+  };
+}
+
+function renderEggSheet() {
+  const st = state.egg;
+  if (!st) return '';
+  const step = st.step;
+  const d = _eggCertData();
+  const rows = EGG_ROWS.map((r, i) => `
+        <div class="${_eggRowClass(i, step)}" id="egg-row-${i}">
+          <span class="egg-label">${escapeHTML(r[0])}</span>
+          <span class="egg-val"><span class="egg-v-wait">&mdash;</span><span class="egg-v-test">testing&hellip;</span><span class="egg-v-done">${escapeHTML(r[1])} &check;</span></span>
+        </div>`).join('');
+  const certRows = [
+    ['Fails found', `${_partyNum(d.fails)} (${d.failRate}%)`],
+    d.topType ? ['Most tested', d.topType] : null,
+    ['Jobs on this phone', _partyNum(d.jobs)],
+    d.oldest ? ['Oldest job here', formatDate(d.oldest)] : null,
+  ].filter(Boolean).map(([k, v]) => `<div class="egg-cert-row"><span>${escapeHTML(k)}</span><strong>${escapeHTML(v)}</strong></div>`).join('');
+  const flipped = step >= EGG_FINAL;
+  return `
+    <div class="modal-backdrop" data-action="egg-close" style="z-index:300"></div>
+    <div class="bulk-sheet egg-sheet${flipped ? ' is-flipped' : ''}" id="egg-sheet" style="z-index:301" role="dialog" aria-label="PATGo tests itself">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">PATGo ${escapeHTML(APP_VERSION)} self-test</h3>
+        <button class="fail-close-btn" data-action="egg-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="sheet-scroll egg-body">
+        <div class="egg-test">
+          <div class="egg-unit">Appliance: <strong>PATGo ${escapeHTML(APP_VERSION)}</strong> &middot; Location: your pocket</div>
+          ${rows}
+          <div class="egg-sticker${step >= EGG_STICKER_STEP ? ' is-on' : ''}" id="egg-sticker">PASS</div>
+        </div>
+        <div class="egg-cert${flipped ? ' is-shown' : ''}" id="egg-cert">
+          <div class="egg-cert-kicker">Certificate of testing</div>
+          <p class="egg-cert-text">This certifies that <strong>${escapeHTML(d.name || 'you')}</strong> ${d.name ? 'has' : 'have'} tested</p>
+          <div class="egg-cert-big">${_partyNum(d.items)}</div>
+          <p class="egg-cert-text">item${d.items === 1 ? '' : 's'} with PATGo.</p>
+          <div class="egg-cert-rows">${certRows}</div>
+          <div class="egg-cert-result"><span class="egg-cert-pass">PASS</span> Retest due: never</div>
+        </div>
+      </div>
+      <div class="btn-row sheet-pin" style="margin-top:12px">
+        <button class="btn-secondary" data-action="egg-again">Test again</button>
+        <button class="btn-primary" data-action="egg-close">Close</button>
+      </div>
+    </div>
+  `;
+}

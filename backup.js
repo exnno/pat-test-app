@@ -56,6 +56,7 @@ function buildBackup() {
     timestampsEnabled: state.timestampsEnabled,
     undoEnabled: state.undoEnabled,   // V94: per phone; absent in older backups
     mapPinEnabled: state.mapPinEnabled,   // V99: per phone; absent in older backups
+    reminders: normaliseReminders(state.reminders),   // V100: per phone; absent in older backups
     // v18: Smart Quick Pick flag + learned history (readable long-key form).
     sqpEnabled: state.sqpEnabled,
     sqpHistory: state.sqpHistory,
@@ -174,11 +175,16 @@ function shouldShowBackupReminder() {
     const snoozeMs = Date.parse(state.backupSnoozedUntil);
     if (!isNaN(snoozeMs) && snoozeMs > now) return false;
   }
+  if (!backupReminderDays()) return false;   // V100 (5A): switched off
   if (!state.lastBackupAt) return true; // never backed up
   const lastMs = Date.parse(state.lastBackupAt);
   if (isNaN(lastMs)) return true;
   const ageDays = (now - lastMs) / (1000 * 3600 * 24);
-  return ageDays >= BACKUP_REMINDER_DAYS;
+  // V100 (5A): the interval is a per-phone choice; 'off' never reminds. A phone
+  // that never chose gets 7 — BACKUP_REMINDER_DAYS, what it always did.
+  const days = backupReminderDays();
+  if (!days) return false;
+  return ageDays >= days;
 }
 
 function restoreBackupFromFile(file) {
@@ -325,6 +331,11 @@ function restoreBackupFromFile(file) {
     // V99: map pins switch. Boolean only; an older backup leaves this phone's own.
     if (typeof data.mapPinEnabled === 'boolean') {
       state.mapPinEnabled = data.mapPinEnabled;
+    }
+    // V100: reminder timings. An object only; anything odd in it falls back per
+    // field. An older backup has none and leaves this phone's own.
+    if (data.reminders && typeof data.reminders === 'object' && !Array.isArray(data.reminders)) {
+      state.reminders = normaliseReminders(data.reminders);
     }
     if (typeof data.timestampsEnabled === 'boolean') {
       state.timestampsEnabled = data.timestampsEnabled;

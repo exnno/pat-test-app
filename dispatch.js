@@ -802,6 +802,18 @@ registerActions({
   // V87 (S13): the Jobs-screen storage banner.
   'storage-banner-open': () => setView('settingsStorage'),   // V97
   'storage-banner-dismiss': () => { dismissStorageBanner(); render(); },
+  // V100 (6A): the reminder banners. Review filters the Jobs list to what the
+  // banner counted; × hides it for the rest of the day.
+  'remind-export-review': () => { reviewReminder('exp'); save(); render(); },
+  'remind-export-dismiss': () => { quietReminder('exp'); render(); },
+  'remind-unlocked-review': () => { reviewReminder('unl'); save(); render(); },
+  'remind-unlocked-dismiss': () => { quietReminder('unl'); render(); },
+  // V100 (9A, 10A): the 100 moment again, and "PATGo tests itself".
+  'about-title-tap': () => aboutTitleTapped(),
+  'party-open': () => partyOpen(),
+  'party-close': () => { state.partyOpen = false; render(); },
+  'egg-close': () => eggClose(),
+  'egg-again': () => eggOpen(),
   // V87 (S12): a tap is a user gesture, which some browsers weigh when deciding.
   'storage-protect': () => { checkStorageProtection(true).catch(() => {}); },
   // v69 (D5): put the pre-repair spellings back. Confirmed first — it rewrites
@@ -1203,6 +1215,10 @@ registerChangeActions({
   'sound': (checked) => { setSound(checked); render(); },
   'undo': (checked) => { setUndo(checked); render(); },   // V94
   'map-pin-enabled': (checked) => { setMapPinEnabled(checked); render(); },   // V99
+  // V100: the Reminders page (Phone & Display).
+  'remind-export': (v) => { setReminder('exportAfter', v); render(); },
+  'remind-unlocked': (v) => { setReminder('unlockedAt', v); render(); },
+  'remind-backup': (v) => { setReminder('backupDays', v); render(); },
   // V94: a Quick Pick slot chosen for one multi-pick leaves every other row.
   'mp-qp': (value, el) => mpQpPicked(el),
   'timestamps': (checked) => { setTimestamps(checked); render(); },

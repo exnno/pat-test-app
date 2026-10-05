@@ -177,6 +177,9 @@ function _sessionSig(s) {
     s.id, s.name, s.site, s.engineer, s.prefix, s.date,
     s.startNumber, s.locked ? 1 : 0,
     s.exportedAt || '', s.exportDirty ? 1 : 0,
+    // V100: written in place — lockedAt by saveSessionEdits, reportAt when a
+    // certificate is made (often for a job that is not the open one).
+    s.lockedAt || '', s.reportAt || '',
     (s.items ? s.items.length : 0),
     s.instrumentId || '', s.instrumentSnapshot ? 1 : 0
   ].join('\u0001');
@@ -548,6 +551,9 @@ function loadV11Settings() {
   state.undoEnabled = localStorage.getItem(UNDO_KEY) === '1';
   // V99: map pins — same rule, default OFF.
   state.mapPinEnabled = localStorage.getItem(MAP_PIN_KEY) === '1';
+  // V100: reminder timings (per phone). Garbage of any kind → the defaults.
+  { let rem = null; try { rem = JSON.parse(localStorage.getItem(REMINDERS_KEY)); } catch (e) { rem = null; }
+    state.reminders = normaliseReminders(rem); }
   state.timestampsEnabled = localStorage.getItem(TIMESTAMPS_KEY) === '1';
 
   // v18: Smart Quick Pick. Flag defaults OFF; history is validated defensively
@@ -951,6 +957,7 @@ function _saveSettingsWrites() {
   localStorage.setItem(SOUNDFX_KEY, state.soundEnabled ? '1' : '0');
   localStorage.setItem(UNDO_KEY, state.undoEnabled ? '1' : '0');   // V94
   localStorage.setItem(MAP_PIN_KEY, state.mapPinEnabled ? '1' : '0');   // V99
+  localStorage.setItem(REMINDERS_KEY, JSON.stringify(normaliseReminders(state.reminders)));   // V100
   localStorage.setItem(TIMESTAMPS_KEY, state.timestampsEnabled ? '1' : '0');
   // v18: Smart Quick Pick flag + learned history.
   localStorage.setItem(SQP_ENABLED_KEY, state.sqpEnabled ? '1' : '0');

@@ -1277,11 +1277,16 @@ function openReportPreview(doc, session) {
   // Wire all the sheet's controls (called on open and after each rebuild).
   function wireSheet() {
     document.getElementById('report-preview-close').addEventListener('click', cleanup);
+    // V100 (2B): a certificate that leaves the phone is "made" — it stamps the
+    // job's reportAt, which clears the not-exported reminder for a locked job.
+    // Opening the preview alone does not; a cancelled share does not.
+    const made = () => { if (typeof noteReportMade === 'function') noteReportMade(session.id); };
     document.getElementById('report-preview-download').addEventListener('click', () => {
       triggerDownload(blob, currentFilename());
+      made();
     });
     document.getElementById('report-preview-share').addEventListener('click', async () => {
-      await shareOrDownloadReport(blob, currentFilename());
+      if (await shareOrDownloadReport(blob, currentFilename())) made();
     });
     sheet.querySelectorAll('[data-qa]').forEach(btn => {
       btn.addEventListener('click', () => { onQuickAdjust(btn.getAttribute('data-qa')).catch(() => {}); });
@@ -1318,11 +1323,12 @@ async function shareOrDownloadReport(blob, filename) {
       const file = new File([blob], filename, { type: 'application/pdf' });
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file] });
-        return;
+        return true;
       }
     } catch (err) {
-      if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return;
+      if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return false;   // V100: not shared
     }
   }
   triggerDownload(blob, filename);
+  return true;
 }

@@ -443,6 +443,17 @@ let state = {
   // the keyboard: MAP rule 3). Cleared by setView.
   mapPinEnabled: false,
   mapPinSheet: null,
+  // V100: reminder timings, per phone (REMINDERS_KEY, config.js). Defaults: the
+  // two new reminders off (3A, 4A), backups every 7 days as before (5A).
+  reminders: { exportAfter: 'off', unlockedAt: 'off', backupDays: '7' },
+  // V100: the "100" moment replayed from About (party) and "PATGo tests itself"
+  // (egg = { step } while its sheet is open, else null). Memory only, never saved
+  // (11A). Both cleared by setView. Neither sheet has an input, so either may
+  // render (MAP rule 3).
+  partyOpen: false,
+  partySparked: false,
+  egg: null,
+  eggTaps: { n: 0, at: 0 },
   // V94: what the last logging action appended, for Undo (session.js
   // noteLastLog). Memory only — never saved, never in a backup.
   lastLog: null,
