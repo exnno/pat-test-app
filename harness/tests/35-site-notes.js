@@ -269,13 +269,18 @@ module.exports = async function () {
     type(app, 'site-dialog-notes', 'ZZEDITED');
     tap(app, 'site-dialog-confirm');
     t.eq(storedSites(app).find(s => s.id === site.id).notes, 'ZZEDITED', 'saved');
-
     tap(app, 'site-add', site.clientId);
     type(app, 'site-name', 'ZZADDED');
     type(app, 'site-dialog-notes', 'ZZADDNOTES');
     tap(app, 'site-dialog-confirm');
     const added = app.state().sites.find(s => s.name === 'ZZADDED');
     t.eq(added && added.notes, 'ZZADDNOTES', 'Add site keeps notes typed with it');
+    // (Add site leaves the client expanded, so its site rows are drawn.)
+    // V98.1: the name truncates with an ellipsis, so the marker must come first.
+    const html = app.html();
+    const at = html.indexOf('<span class="client-site-name"><span class="site-notes-mark"');
+    t.ok(at !== -1, 'the 📝 is the first thing in the site name (an ellipsis can\u2019t hide it)');
+
 
     // Merge: an Unassigned same-named site with notes, moved onto the client.
     const orphan = app.fn('ensureOrphanSite')('ZZADDED');
