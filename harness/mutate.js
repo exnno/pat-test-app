@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V99';",
-    to:   "const APP_VERSION = 'V99';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V100';",
+    to:   "const APP_VERSION = 'V100';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -637,8 +637,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V97</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V97</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V96</strong> &middot; October 2026</p>',
+    from: '        <p><strong>V98</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V98</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V97</strong> &middot; October 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -4048,6 +4048,133 @@ const MUTATIONS = [
     from: "    sh.noApp = true;\n",
     to:   "    sh.noApp = true;\n    mapPinOpenW3wWeb();\n",
     why:  "a browser panel appearing unasked is the blank-panel annoyance again, for anyone whose iOS is slow to switch (36m)",
+  },
+  // ---- V100: in-app reminders + the 100th version (group 37) ----
+  {
+    name: "M562 (V100) locking never stamps the lock time",
+    file: "session.js",
+    from: "  if (sess.locked && !wasLocked) sess.lockedAt = new Date().toISOString();\n",
+    to:   "",
+    why:  "every not-exported reminder silently never fires — the engineer believes it is on (37a)",
+  },
+  {
+    name: "M563 (V100) the entry-screen unlock leaves the lock time behind",
+    file: "session.js",
+    from: "  delete sess.lockedAt;   // V100\n",
+    to:   "",
+    why:  "an absent-unless-locked field that isn't absent: a stale time travels in the job doc for Stage 14's server to misread (37a)",
+  },
+  {
+    name: "M564 (V100) the encoding signature misses the new fields",
+    file: "storage.js",
+    from: "    s.lockedAt || '', s.reportAt || '',",
+    to:   "",
+    why:  "a certificate stamped on a job that isn't open is written from the stale cached encoding and silently un-happens on reload (section 6 trap; 37a)",
+  },
+  {
+    name: "M565 (V100) the backup reminder defaults to off",
+    file: "session.js",
+    from: "    backupDays: pick(r.backupDays, REMINDER_BACKUP_CHOICES, String(BACKUP_REMINDER_DAYS)),",
+    to:   "    backupDays: pick(r.backupDays, REMINDER_BACKUP_CHOICES, 'off'),",
+    why:  "every upgraded phone quietly stops being reminded to back up — 5A promised nothing changes until changed (37b)",
+  },
+  {
+    name: "M566 (V100) a certificate made before locking counts",
+    file: "session.js",
+    from: "  return lk != null && rp != null && rp >= lk;",
+    to:   "  return lk != null && rp != null;",
+    why:  "a job changed after its certificate was made is treated as finished — the reminder exists for exactly that case (37c)",
+  },
+  {
+    name: "M567 (V100) a lock time on an unlocked job is believed",
+    file: "session.js",
+    from: "  if (!sess || !sess.locked || typeof sess.lockedAt !== 'string') return null;",
+    to:   "  if (!sess || typeof sess.lockedAt !== 'string') return null;",
+    why:  "a V99 phone's unlock leaves the time behind, and an open job nags as if locked (37c)",
+  },
+  {
+    name: "M568 (V100) 'next morning' is this morning",
+    file: "session.js",
+    from: "d.getDate() + 1, REMINDER_MORNING_HOUR",
+    to:   "d.getDate(), REMINDER_MORNING_HOUR",
+    why:  "a job locked in the afternoon reminds at once (37c)",
+  },
+  {
+    name: "M569 (V100) × is ignored",
+    file: "session.js",
+    from: "  if (_reminderQuiet().exp === reminderLocalDay(now)) return [];\n",
+    to:   "",
+    why:  "the banner comes straight back on the next render — a nag with no off (37d)",
+  },
+  {
+    name: "M570 (V100) the Review filter matches everything",
+    file: "session.js",
+    from: "      if (!isExportReminderJob(s)) return false;\n",
+    to:   "",
+    why:  "Review shows every job, and the one that needs exporting is lost in the list (37d)",
+  },
+  {
+    name: "M571 (V100) backups off still reminds a phone that never backed up",
+    file: "backup.js",
+    from: "  if (!backupReminderDays()) return false;   // V100 (5A): switched off\n",
+    to:   "",
+    why:  "Off doesn't mean off for the case most likely to have chosen it (37f)",
+  },
+  {
+    name: "M572 (V100) a cancelled share still counts as a certificate made",
+    file: "report.js",
+    from: "      if (await shareOrDownloadReport(blob, currentFilename())) made();",
+    to:   "      await shareOrDownloadReport(blob, currentFilename()); made();",
+    why:  "backing out of the share sheet clears the reminder for a job nobody received (37g)",
+  },
+  {
+    name: "M573 (V100) Reminders is missing from Phone & Display",
+    file: "data.js",
+    from: "    pages: ['settingsDisplay', 'settingsReminders'] },",
+    to:   "    pages: ['settingsDisplay'] },",
+    why:  "the page exists and is searchable, but browsing never finds it (37h)",
+  },
+  {
+    name: "M574 (V100) a reminder choice is never saved",
+    file: "settings-actions.js",
+    from: "  if (state.reminders.exportAfter === 'off' && state.sessionFilter === 'remindexport') state.sessionFilter = 'all';\n  save();\n}",
+    to:   "  if (state.reminders.exportAfter === 'off' && state.sessionFilter === 'remindexport') state.sessionFilter = 'all';\n}",
+    why:  "the choice shows until the app is closed, then is gone (37b, 37h)",
+  },
+  {
+    name: "M575 (V100) the sparks fire on every repaint",
+    file: "render-help.js",
+    from: "  if (!box) return;\n  state.partySparked = true;\n",
+    to:   "  if (!box) return;\n",
+    why:  "any sync or toast repaint while the welcome is open sets the fireworks off again (37i)",
+  },
+  {
+    name: "M576 (V100) six taps open the egg",
+    file: "config.js",
+    from: "const EGG_TAPS = 7;",
+    to:   "const EGG_TAPS = 6;",
+    why:  "the count the toast promises and the count that works disagree (37j)",
+  },
+  {
+    name: "M577 (V100) the egg saves",
+    file: "render-help.js",
+    from: "  state.egg = { step: _partyReducedMotion() ? EGG_FINAL : 0, timer: null };\n  render();",
+    to:   "  state.egg = { step: _partyReducedMotion() ? EGG_FINAL : 0, timer: null };\n  save();\n  render();",
+    why:  "11A: the egg writes NOTHING (37j)",
+  },
+  {
+    name: "M578 (V100) leaving About leaves the egg open",
+    file: "session.js",
+    from: "  if (state.egg && state.egg.timer) clearTimeout(state.egg.timer);\n  state.egg = null;\n",
+    to:   "",
+    why:  "the self-test sheet follows the engineer onto the Jobs screen (37j)",
+  },
+  {
+    name: "M579 (V100) Reduce Motion is ignored",
+    file: "render-help.js",
+    from: "  try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }",
+    to:   "  try { return false; }",
+    why:  "someone who asked their phone for no motion gets the whole show (37j)",
   },
 ];
 
