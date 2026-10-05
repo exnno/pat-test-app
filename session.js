@@ -2409,6 +2409,7 @@ function setView(v) {
   // v19: clear the Clients page add/rename sheets on any view change so an open
   // dialog can't leak across pages. The expanded-client accordion can persist
   // harmlessly.
+  state.siteNotesSheet = null;   // V98: the Overview's site-notes sheet
   state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
   state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
   // v39: close the New Session form on any view change too. Previously its open
@@ -2655,10 +2656,22 @@ function saveSessionEdits() {
     return;
   }
   sess.name = String(name).trim() || sess.name;
-  sess.site = String(site).trim();
   // v19: clientId/siteId refs are convenience-only and never drive display, CSV,
-  // or search (the `site` text snapshot does). We intentionally leave them as set
-  // at creation — editing the site text here won't and needn't update them.
+  // or search (the `site` text snapshot does).
+  // V98: the site link now decides whose SITE NOTES a job shows, so a changed
+  // site text re-links the job to the saved site it now names ('' when it names
+  // none — siteForSession() then falls back to the text). Nothing is created, and
+  // an unchanged text leaves the link alone (a site renamed in Clients & Sites
+  // keeps its old jobs). The text changes in the same step, so _sessionSig()
+  // sees the edit; the explicit invalidate covers siteId, which it doesn't list.
+  const newSite = String(site).trim();
+  if (newSite !== String(sess.site || '').trim()) {
+    const parts = splitSiteSnapshot(newSite);
+    const linked = siteForNames(parts.client, parts.site);
+    sess.siteId = linked ? linked.id : '';
+    if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(sess);
+  }
+  sess.site = newSite;
   sess.engineer = String(engineer).trim();
   sess.prefix = String(prefix).trim();
   sess.date = date || sess.date;

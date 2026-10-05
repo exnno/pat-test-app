@@ -40,6 +40,7 @@ function bindFocusFields() {
   if ($('nf-client')) {
     $('nf-client').oninput = e => {
       state.newForm.clientId = e.target.value;
+      if (typeof refreshNfSiteNotesOnly === 'function') refreshNfSiteNotesOnly();   // V98
       state.nfActiveField = 'client';
       state.nfSuggestions = computeNfClientSuggestions(e.target.value);
       state.showNfSuggestions = state.nfSuggestions.length > 0;
@@ -64,6 +65,7 @@ function bindFocusFields() {
   if ($('nf-site')) {
     $('nf-site').oninput = e => {
       state.newForm.site = e.target.value;
+      if (typeof refreshNfSiteNotesOnly === 'function') refreshNfSiteNotesOnly();   // V98
       state.nfActiveField = 'site';
       state.nfSuggestions = computeNfSiteSuggestions(e.target.value);
       state.showNfSuggestions = state.nfSuggestions.length > 0;
@@ -513,6 +515,8 @@ function renderNfSuggestionsOnly(field, fromTyping) {
         state.showNfSuggestions = false;
         state.nfSuggestions = [];
         renderNfSuggestionsOnly(field);
+        // V98: a picked client or site may bring site notes onto the form.
+        if (typeof refreshNfSiteNotesOnly === 'function') refreshNfSiteNotesOnly();
       });
     });
   }, `nf-${field}-suggestions`, fromTyping ? () => renderNfSuggestionsOnly(field, false) : null);

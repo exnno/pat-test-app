@@ -136,7 +136,7 @@ function renderOverview() {
   if (state.selectionMode) {
     const n = state.selectedIndices.length;
     header = `
-      <header class="header-row">
+      <header class="header-row header-sticky">
         <button class="icon-btn" id="cancel-selection-btn" data-action="cancel-selection" aria-label="Cancel selection">✕</button>
         <div class="site-name">${n} selected</div>
         <span style="width:40px"></span>
@@ -144,7 +144,7 @@ function renderOverview() {
     `;
   } else {
     header = `
-      <header class="header-row">
+      <header class="header-row header-sticky">
         <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">‹</button>
         <div class="site-name">Overview</div>
         <div class="header-actions">
@@ -295,10 +295,40 @@ function renderOverview() {
     </div>
   `;
 
+  // V98 (2A, 3A): the site's notes, at the top of the job — door codes and the
+  // like, read on arrival. They belong to the SITE (never copied into the job,
+  // never printed — 4A), so they show and can be edited on a locked job too.
+  // Hidden while selecting items, like the job details.
+  const notesSite = state.selectionMode ? null : siteForSession(sess);
+  const notesText = siteNotesOf(notesSite);
+  const siteNotes = !notesSite ? '' : (notesText ? `
+      <button type="button" class="site-notes-card" id="site-notes-card" data-action="site-notes-open">
+        <span class="site-notes-head">📝 Site notes &middot; ${escapeHTML(notesSite.name)}</span>
+        <span class="site-notes-text">${escapeHTML(notesText)}</span>
+        <span class="site-notes-more">Tap to read all or edit</span>
+      </button>` : `
+      <button type="button" class="link-btn site-notes-add" id="site-notes-add" data-action="site-notes-open">+ Add site notes</button>`);
+  const sn = state.siteNotesSheet;
+  const snSite = sn ? siteById(sn.siteId) : null;
+  const siteNotesSheet = sn ? `
+      <div class="modal-backdrop" id="site-notes-backdrop" data-action="site-notes-cancel" style="z-index:300"></div>
+      <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Site notes">
+        <div class="bulk-sheet-handle"></div>
+        <div class="bulk-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="bulk-sheet-title">Site notes</h3>
+          <button class="fail-close-btn" id="site-notes-cancel" data-action="site-notes-cancel" aria-label="Cancel">×</button>
+        </div>
+        <p class="muted" style="margin:0 0 10px">${escapeHTML(snSite ? snSite.name : 'This site')} &middot; shown in every job here. Only for you &mdash; never printed on a report.</p>
+        <textarea class="textarea site-notes-input" id="site-notes-input" data-input-action="site-notes-text" maxlength="${SITE_NOTES_MAX}" rows="8" placeholder="e.g. Door code 1234. Keys from reception. Server room on the 2nd floor &mdash; ask for Dave.">${escapeHTML(sn.text || '')}</textarea>
+        <button class="btn-primary" id="site-notes-save" data-action="site-notes-save" style="margin-top:12px">Save</button>
+      </div>` : '';
+
   return `
     <div class="screen">
       ${header}
       ${stats}
+      ${siteNotes}
       ${actionRow}
       ${jobDetails}
       ${state.selectionMode ? '' : filterRow}
@@ -310,6 +340,7 @@ function renderOverview() {
       ${renderPhotoStripSheet()}
       ${bulkTypeDialog}
       ${bulkNotesDialog}
+      ${siteNotesSheet}
     </div>
   `;
 }

@@ -2126,7 +2126,18 @@ function _syncRecordDoc(kind, rec) {
   const r = rec || {};
   const t = (v) => typeof v === 'string' ? v.trim() : '';
   if (kind === 'client') return { id: String(r.id), name: String(r.name || '').trim() };
-  if (kind === 'site') return { id: String(r.id), clientId: String(r.clientId || ''), name: String(r.name || '').trim() };
+  // V98: a site's notes travel with it, but ONLY when it has some (rule 36): a
+  // site without notes projects — and hashes — exactly as on V97, so the upgrade
+  // makes no site look edited and nothing is re-sent. One normaliser both ends.
+  // ⚠ Mixed versions (5A): a V97 phone that edits a site sends it back without
+  // notes, and V98 phones take it (only the cloud moved). Accepted: test phones
+  // only, upgraded together. A V97 phone that merely receives notes is unaffected.
+  if (kind === 'site') {
+    const d = { id: String(r.id), clientId: String(r.clientId || ''), name: String(r.name || '').trim() };
+    const n = normaliseSiteNotes(r.notes);
+    if (n) d.notes = n;
+    return d;
+  }
   // v83. Exactly what makeInstrument() stores, so a stored instrument hashes the
   // same as its own projection and a reload is never a change (the 18b rule).
   if (kind === 'instrument') {
@@ -2254,6 +2265,12 @@ function _syncRecordHeldEntry(kind, id, reason, local, doc) {
   if (kind === 'site') {
     e.localParent = local ? _syncClientNameOf(local.clientId) : null;
     e.cloudParent = (doc && typeof doc.name === 'string') ? _syncClientNameOf(doc.clientId) : null;
+    // V98: notes that differ are NAMED, never copied — they hold door codes, and
+    // a held entry never stores the cloud document (rule 7).
+    if (reason === 'both-changed' && local && doc) {
+      const ln = normaliseSiteNotes(local.notes), cn = normaliseSiteNotes(doc.notes);
+      if (ln !== cn) e.diffs = [{ label: 'Notes', here: ln ? 'Written' : 'None', cloud: cn ? (ln ? 'Different' : 'Written') : 'None' }];
+    }
   }
   return e;
 }

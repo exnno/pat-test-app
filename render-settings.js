@@ -1142,10 +1142,10 @@ function renderSettingsClients() {
       <div class="client-sites">
         ${sites.length ? sites.map(s => `
           <div class="client-site-row">
-            <span class="client-site-name">${escapeHTML(s.name)}</span>
+            <span class="client-site-name">${escapeHTML(s.name)}${siteNotesOf(s) ? ' <span class="site-notes-mark" title="Has site notes">📝</span>' : ''}</span>
             <div class="client-site-actions">
               <button class="link-btn" data-action="site-assign" data-arg="${escapeHTML(s.id)}">Move</button>
-              <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Rename</button>
+              <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Edit</button>
               <button class="link-btn danger" data-action="site-delete" data-arg="${escapeHTML(s.id)}" data-site-delete="${escapeHTML(s.id)}">Delete</button>
             </div>
           </div>
@@ -1186,10 +1186,10 @@ function renderSettingsClients() {
       <div class="client-sites">
         ${orphans.map(s => `
           <div class="client-site-row">
-            <span class="client-site-name">${escapeHTML(s.name)}</span>
+            <span class="client-site-name">${escapeHTML(s.name)}${siteNotesOf(s) ? ' <span class="site-notes-mark" title="Has site notes">📝</span>' : ''}</span>
             <div class="client-site-actions">
               <button class="link-btn" data-action="site-assign" data-arg="${escapeHTML(s.id)}">Assign to client…</button>
-              <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Rename</button>
+              <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Edit</button>
               <button class="link-btn danger" data-action="site-delete" data-arg="${escapeHTML(s.id)}" data-site-delete="${escapeHTML(s.id)}">Delete</button>
             </div>
           </div>
@@ -1220,7 +1220,7 @@ function renderSettingsClients() {
       </div>
     `;
   } else if (sd.mode) {
-    const title = sd.mode === 'add' ? 'Add site' : 'Rename site';
+    const title = sd.mode === 'add' ? 'Add site' : 'Edit site';   // V98: name + notes
     const parent = sd.mode === 'add' ? clientById(sd.clientId) : (siteById(sd.editingId) ? clientById(siteById(sd.editingId).clientId) : null);
     const parentLine = parent ? `<p class="muted" style="margin:0 0 12px">Client: ${escapeHTML(parent.name)}</p>` : '';
     dialog = `
@@ -1235,6 +1235,8 @@ function renderSettingsClients() {
         ${parentLine}
         <label class="label">Site name</label>
         <input class="input" id="site-dialog-input" data-input-action="site-name" value="${escapeHTML(sd.name)}" placeholder="e.g. Unit 4, Head Office" autofocus>
+        <label class="label" style="margin-top:12px">Site notes <span class="hint">(optional &mdash; only for you, never printed)</span></label>
+        <textarea class="textarea" id="site-dialog-notes" data-input-action="site-dialog-notes" maxlength="${SITE_NOTES_MAX}" rows="4" placeholder="Door codes, difficult locations, reminders">${escapeHTML(sd.notes || '')}</textarea>
         <button class="btn-primary" id="site-dialog-confirm" data-action="site-dialog-confirm" style="margin-top:14px">${sd.mode === 'add' ? 'Add' : 'Save'}</button>
       </div>
     `;

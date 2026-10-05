@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V97';
+const APP_VERSION = 'V98';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V97';
+const WELCOME_VERSION = 'V98';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -830,6 +830,13 @@ const SETUP_BUNDLE_VERSION = 1;
 // deleting a client/site never alters any saved session, CSV, or import.
 const CLIENTS_KEY = 'pat:clients';          // v19: JSON [{id,name}]
 const SITES_KEY = 'pat:sites';              // v19: JSON [{id,clientId,name}]
+
+// V98 (Stage 8): site notes — door codes, difficult locations, reminders. A
+// site MAY carry `notes` (plain text, at most SITE_NOTES_MAX characters). The key
+// is ABSENT when there are none, so a site without notes keeps its V97 shape in
+// storage, in backups and in the synced row (sync rule 36). Private to the
+// engineer: never on a certificate or a CSV (4A).
+const SITE_NOTES_MAX = 1000;
 
 // v78: sync prep. THE DELETION LEDGER — a record of what the engineer has
 // deleted, kept after the record itself is gone.

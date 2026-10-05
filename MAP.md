@@ -1,4 +1,4 @@
-# PATGo — Code Map (V97)
+# PATGo — Code Map (V98)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -341,12 +341,20 @@ the same way (24e found saveSqpHistory). Also here: `checkStorageProtection()`
 so it never does (sync.js calls it after a pull). `reportSettings.certSetAt` =
 when the counter was last typed by hand ('' never).
 
-### clients.js (~427 ln) — clients & sites
+### clients.js (~517 ln) — clients & sites
 CRUD, lookups, the site snapshot compose/split used by CSV, assign/move flows.
 Orphan sites (empty clientId) are legal.
 **Touch to:** change how clients/sites are stored or managed.
 **Coupling:** `load()`/`save()` in storage.js call in. `splitSiteSnapshot` is
 csv.js's dependency. Delete/rename confirms route through feedback.js sheets.
+V98: site notes — `normaliseSiteNotes`/`withSiteNotes` are the ONE normaliser
+(load, the site sheet, the Overview sheet, backup.js restore, sync.js
+`_syncRecordDoc`). ⚠ The `notes` key is ABSENT when empty — never `notes: ''`
+(sync rule 36; harness 35a/35b). `siteForSession` (link, then the site text) and
+`siteForNames` (read-only, as startSession resolves) are read by render-review.js
+(Overview card), render-core.js (New Job form), dispatch.js and session.js
+(`saveSessionEdits` re-links `siteId`). report.js and csv.js must never read notes
+(35k).
 
 ### instruments.js (~665 ln) — test instruments & calibration
 The instrument list, which is active, and **which instrument a given job's
@@ -689,6 +697,10 @@ v91: `renderJobManager()` (view `jobManager`, same fallback) and
 v93: `renderCloudJobsHTML()`, `renderCloudListAreaHTML()` and
 `refreshCloudListAreaOnly()` — the Jobs screen's cloud tab (called from
 render-core.js, model in settings-actions.js).
+V98: the Overview's title bar is `.header-row.header-sticky` (styles.css; both the
+normal and selection headers). The site-notes card and its sheet
+(`state.siteNotesSheet`, cleared by setView) are drawn here; the sheet holds an
+input, so it is never re-rendered while typing (rule 3) — its text lives in state.
 Boot probe: `renderOverview` in `requiredFns`.
 
 ### render-settings.js (~1377 ln) — settings screens that own a setting

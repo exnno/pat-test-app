@@ -388,11 +388,11 @@ function restoreBackupFromFile(file) {
       : [];
     state.sites = Array.isArray(data.sites)
       ? data.sites
-          .map(s => ({
+          .map(s => withSiteNotes({   // V98: notes ride along (additive — no backupVersion bump)
             id: String(s && s.id || ''),
             clientId: String(s && s.clientId || ''),
             name: String(s && s.name || '').trim()
-          }))
+          }, s && s.notes))
           .filter(s => s.id && s.name)   // v26: clientId no longer required (orphan sites)
       : [];
     // v78: restore the deletion ledger, purged on the way in on the same rule as

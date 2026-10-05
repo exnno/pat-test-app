@@ -233,9 +233,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Backup &amp; Restore, split in two.</strong> Backup &amp; Restore now holds just your backup and photo files. Everything about space &mdash; the storage meter, clearing old jobs, clearing photos &mdash; has its own page: <strong>Settings &rarr; Data &rarr; Phone Storage</strong>.</li>
-        <li><strong>Logging Options.</strong> The Undo button and item times have moved from Phone &amp; Display to <strong>Settings &rarr; Logging &rarr; Logging Options</strong>. Phone &amp; Display now holds only what's set for this phone: theme, vibration and sound.</li>
-        <li><strong>Nothing has changed how it works</strong> &mdash; only where it lives. Searching Settings still finds everything.</li>
+        <li><strong>Site notes.</strong> Keep door codes, difficult locations and reminders on the site itself. They show when you start a job there and at the top of the job's Overview, every year. Add them from the job's Overview, or under <strong>Settings &rarr; Clients</strong> &mdash; tap <strong>Edit</strong> beside a site.</li>
+        <li><strong>Only for you.</strong> Site notes never print on a report or go into a CSV. Job notes still print, as before.</li>
+        <li><strong>The Overview's top bar stays put.</strong> Back, the report and the CSV buttons stay at the top while you scroll a long job.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -675,6 +675,29 @@ function nfSuggestionsHTML(field) {
   </div>`;
 }
 
+// V98 (2A): the picked site's notes on the New Job form — read on arrival, before
+// the job starts. Resolved read-only, as starting the job will resolve it
+// (siteForNames). The form holds inputs, so this is repainted IN PLACE by
+// refreshNfSiteNotesOnly() (events.js, as the client or site changes) — never by
+// render() (MAP rule 3).
+function nfSiteNotesHTML() {
+  const site = (typeof siteForNames === 'function')
+    ? siteForNames(state.newForm.clientId, state.newForm.site) : null;
+  const text = siteNotesOf(site);
+  if (!text) return '';
+  return `<div class="site-notes-card site-notes-card-static">
+      <span class="site-notes-head">📝 Site notes &middot; ${escapeHTML(site.name)}</span>
+      <span class="site-notes-text site-notes-text-full">${escapeHTML(text)}</span>
+    </div>`;
+}
+
+function refreshNfSiteNotesOnly() {
+  const box = document.getElementById('nf-site-notes');
+  if (!box) return;
+  const html = nfSiteNotesHTML();
+  if (box.innerHTML !== html) box.innerHTML = html;
+}
+
 // v32: shared empty-state block — a centred icon, a bold line, a muted line, and
 // an optional primary action button. Used on the Sessions list, Overview,
 // Clients and Reports screens so "nothing here yet" always looks intentional and
@@ -770,6 +793,7 @@ function renderSessions() {
         <input class="input" id="nf-site" value="${escapeHTML(state.newForm.site)}" placeholder="e.g. Unit 4, Head Office" autocomplete="off">
         ${nfSuggestionsHTML('site')}
       </div>
+      <div id="nf-site-notes">${nfSiteNotesHTML()}</div>
       <p class="muted nf-hint">Enter a client, a site, or both — at least one. Type new ones to save them for next time, or pick from your saved list. Manage them under Settings → Clients.</p>
       ${nfError}
       <label class="label">Engineer</label>

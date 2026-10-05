@@ -56,6 +56,10 @@ let state = {
   suggestions: [],
   showSuggestions: false,
   failModalOpen: false,
+  // V98: the Overview's site-notes sheet — { siteId, text } while open, else null.
+  // Holds the typing (the sheet has an input, so it is never rendered under the
+  // keyboard: MAP rule 3). Cleared by setView.
+  siteNotesSheet: null,
   failModalStage: 'reasons',
   failOtherText: '',
 
@@ -419,7 +423,7 @@ let state = {
   clientsPage: {
     expandedClientId: null,
     clientDialog: { mode: null, name: '', editingId: null },   // 'add' | 'rename'
-    siteDialog: { mode: null, name: '', editingId: null, clientId: null },
+    siteDialog: { mode: null, name: '', editingId: null, clientId: null },   // V98: may also carry notes
     // v26 (Q3=B): assign/move a site to a client. siteId is the site being
     // moved; name holds the typed/selected target client name. When a same-name
     // clash is detected on confirm, `clash` holds { targetClientId } and the

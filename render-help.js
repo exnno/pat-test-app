@@ -59,16 +59,17 @@ function renderSettingsAbout() {
         <p>${aboutWhereDataLives()} The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V97: rolled forward — V97 on top, V94 dropped. -->
+      <!-- v8: rolling 3-version changelog. V98: rolled forward — V98 on top, V95 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V98</strong> &middot; October 2026</p>
+        <p class="muted">Site notes: keep door codes, difficult locations and reminders on a site. They show when you start a job there and at the top of the job's Overview, and are never printed on a report or CSV. Edit them from the Overview or Settings &rarr; Clients. The Overview's top bar now stays in place while you scroll.</p>
         <p><strong>V97</strong> &middot; October 2026</p>
         <p class="muted">Backup &amp; Restore split in two: backups and photo files stay there, and a new Phone Storage page holds the storage meter, clearing old jobs and clearing photos. Undo and item times moved to a new Logging Options page under Logging. About now says where your data is when you're signed in.</p>
         <p><strong>V96</strong> &middot; October 2026</p>
         <p class="muted">Settings reorganised by what you're doing: Engineer &amp; Tester, Logging, Clients &amp; Retests, Reports &amp; Exports, Phone &amp; Display, Data and Help. Clearer names &mdash; Fail Reasons, Descriptions, Engineer &amp; Tester &mdash; and search still finds the old ones. One-page groups open straight away; Manage Photos has its own row under Data.</p>
-        <p><strong>V95</strong> &middot; October 2026</p>
-        <p class="muted">Changing a FAIL to a PASS now asks about the fail reason still in the notes, so a corrected mistake doesn't print as a PASS with a fail description. Settings &rarr; Item Description List: tap a description to fix its spelling, on items in unlocked jobs too. New optional Remedial actions section at the end of the report: every fail with its reason, an action line, and its photos.</p>
+
         </div>
 
       <div class="info-card">
@@ -562,6 +563,12 @@ function renderSyncHeld(sy) {
       }
       if (isSite && h.localParent !== h.cloudParent) {
         lines.push(`Client &mdash; this phone: <strong>${parent(h.localParent)}</strong> &middot; cloud: <strong>${parent(h.cloudParent)}</strong>`);
+      }
+      // V98: a site's notes — described (Written / Different / None), never shown.
+      if (isSite) {
+        for (const f of (h.diffs || [])) {
+          lines.push(`${escapeHTML(f.label)} &mdash; this phone: <strong>${escapeHTML(f.here || '')}</strong> &middot; cloud: <strong>${escapeHTML(f.cloud || '')}</strong>`);
+        }
       }
     }
     return `

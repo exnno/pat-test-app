@@ -8,6 +8,23 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Stage 8 part 2 — fail location (V99), then part 3 — in-app reminders (V100)
+Split at the V98 round (1A). Fail location: what3words paste and/or phone GPS
+(O7); ⚠ the fail sheet is not saved anywhere — switching apps on iOS may reload
+the PWA and lose it, so the design must not leave the app mid-fail (GPS stays in
+the app; a what3words box could live on the logged item instead). Reminders:
+nothing records WHEN a job was locked today — a `lockedAt` field on the job (in
+the synced doc, so Stage 14's server can see it) is the first decision; the
+"not exported" count on the Jobs screen exists (v14) and is per job.
+
+### V98 residuals (known, accepted)
+- The sticky Overview bar sits under the "new version" banner when that shows
+  (rare, cosmetic).
+- Jobs whose site text was edited BEFORE V98 keep their old site link, so they
+  show the old site's notes until the site text is edited again.
+- 5A: a V97 phone that edits a site sends it back without its notes and V98
+  phones take that. Test phones only — upgrade both together.
+
 ### S10 readings check — PARKED at the V96 round (Peter: limits from his own copy of the CoP)
 Spec drafted at the V96 round, not answered: 1 leakage 5 mA all classes (5th ed.)
 vs 3.5 mA; 2 earth with the cord unknown — warn above 0.5 Ω (A) / 0.3 Ω (B) / no

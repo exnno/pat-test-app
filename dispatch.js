@@ -946,14 +946,14 @@ registerActions({
   },
   'client-delete': (arg) => deleteClient(arg),
   'site-add': (arg) => {
-    state.clientsPage.siteDialog = { mode: 'add', name: '', editingId: null, clientId: arg };
+    state.clientsPage.siteDialog = { mode: 'add', name: '', editingId: null, clientId: arg, notes: '' };
     state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
     render();
   },
   'site-rename': (arg) => {
     const s = siteById(arg);
     if (!s) return;
-    state.clientsPage.siteDialog = { mode: 'rename', name: s.name, editingId: s.id, clientId: s.clientId };
+    state.clientsPage.siteDialog = { mode: 'rename', name: s.name, editingId: s.id, clientId: s.clientId, notes: siteNotesOf(s) };   // V98: Edit = name + notes
     state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
     render();
   },
@@ -977,7 +977,31 @@ registerActions({
     if (state.clientsPage.siteDialog.mode === 'add') addSiteFromDialog();
     else renameSiteFromDialog();
   },
-  'site-dialog-cancel': () => { state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null }; render(); }
+  'site-dialog-cancel': () => { state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null }; render(); },
+
+  // V98: the Overview's site-notes sheet. Saved by site id at the moment of
+  // saving (a pull may have replaced the list while it was open — V82's rule for
+  // every records dialog). The text is the sheet's state, kept by the
+  // site-notes-text input action — the same single source the Clients site
+  // sheet uses for its name.
+  'site-notes-open': () => {
+    const site = siteForSession(activeSession());
+    if (!site) return;
+    state.siteNotesSheet = { siteId: site.id, text: siteNotesOf(site) };
+    render();
+  },
+  'site-notes-cancel': () => { state.siteNotesSheet = null; render(); },
+  'site-notes-save': () => {
+    const sh = state.siteNotesSheet;
+    if (!sh) return;
+    const text = sh.text;
+    state.siteNotesSheet = null;
+    if (!siteById(sh.siteId)) { render(); showToast('That site is no longer in your list'); return; }
+    const changed = setSiteNotes(sh.siteId, text);
+    if (changed) save();
+    render();
+    if (changed) showToast('Site notes saved');
+  }
 });
 
 // ===========================================================================
@@ -1057,7 +1081,9 @@ registerInputActions({
   // Settings dialogs
   'preset-name': (v) => { state.presetDialog.name = v; },
   'client-name': (v) => { state.clientsPage.clientDialog.name = v; },
-  'site-name': (v) => { state.clientsPage.siteDialog.name = v; }
+  'site-name': (v) => { state.clientsPage.siteDialog.name = v; },
+  'site-dialog-notes': (v) => { state.clientsPage.siteDialog.notes = v; },   // V98
+  'site-notes-text': (v) => { if (state.siteNotesSheet) state.siteNotesSheet.text = v; }   // V98
 });
 
 // ===========================================================================

@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA
- * v22 (June 2026)
+ * v22 (June 2026) · V98 site notes
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -44,15 +44,74 @@ function loadSites() {
   // we keep them (clientId coerced to '') and surface them in an Unassigned
   // group on the Clients page, where they can be assigned to a client later.
   return raw
-    .map(s => ({
+    .map(s => withSiteNotes({
       id: String(s && s.id || ''),
       clientId: String(s && s.clientId || ''),
       name: String(s && s.name || '').trim(),
       // v43: cloud prep. Passthrough fields for future sync.
       userId: (s && typeof s.userId === 'string') ? s.userId : null,
       lastModified: (s && typeof s.lastModified === 'string') ? s.lastModified : null
-    }))
+    }, s && s.notes))
     .filter(s => s.id && s.name);   // clientId no longer required
+}
+
+// ---------- V98: site notes ----------
+// Door codes, difficult locations, reminders — kept on the SITE, shown in every
+// job at that site, never copied into a job (O6) and never printed (4A).
+// One normaliser for every way in: typing, load(), restore, the sync projection.
+// ⚠ The key is ABSENT when the notes are empty (withSiteNotes deletes it), so a
+// site without notes stays byte-for-byte its V97 self everywhere — the synced
+// row's fingerprint included (sync rule 36). Never store `notes: ''`.
+function normaliseSiteNotes(v) {
+  if (typeof v !== 'string') return '';
+  return v.replace(/\r\n?/g, '\n').trim().slice(0, SITE_NOTES_MAX).trim();
+}
+
+// Sets (or removes) the notes on a site object and returns it.
+function withSiteNotes(site, raw) {
+  if (!site) return site;
+  const n = normaliseSiteNotes(raw);
+  if (n) site.notes = n; else delete site.notes;
+  return site;
+}
+
+function siteNotesOf(site) {
+  return (site && typeof site.notes === 'string') ? site.notes : '';
+}
+
+// The saved site a job belongs to, or null. The job's site link first (set when
+// the job was started, and re-set when Session settings changes the site — V98);
+// then, for jobs without one (older jobs, CSV imports, a stale link), the site
+// part of the job's own site text. Never creates anything.
+function siteForSession(sess) {
+  if (!sess) return null;
+  const linked = sess.siteId ? siteById(sess.siteId) : null;
+  if (linked) return linked;
+  const parts = splitSiteSnapshot(sess.site);
+  return siteForNames(parts.client, parts.site);
+}
+
+// The saved site for a typed client + site pair, resolved exactly as starting
+// a job resolves it (startSession) — but read-only. Client only → no site.
+function siteForNames(clientName, siteName) {
+  const c = String(clientName || '').trim();
+  const s = String(siteName || '').trim();
+  if (!s) return null;
+  if (c) {
+    const client = findClientByName(c);
+    return client ? findSiteByName(client.id, s) : null;
+  }
+  return findOrphanSiteByName(s);
+}
+
+// Write a site's notes from the Overview sheet. Returns true if they changed.
+// Saving is the caller's (one save, then render).
+function setSiteNotes(siteId, text) {
+  const site = siteById(siteId);
+  if (!site) return false;
+  const before = siteNotesOf(site);
+  withSiteNotes(site, text);
+  return siteNotesOf(site) !== before;
 }
 
 // First-V19 seed. Each distinct existing session `site` string becomes a client
@@ -304,7 +363,8 @@ function addSiteFromDialog() {
     showToast('That client already has a site with that name');
     return;
   }
-  ensureSite(clientId, trimmed);
+  const added = ensureSite(clientId, trimmed);
+  withSiteNotes(added, state.clientsPage.siteDialog.notes);   // V98
   state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
   state.clientsPage.expandedClientId = clientId;
   save();
@@ -322,6 +382,9 @@ function renameSiteFromDialog() {
     return;
   }
   site.name = trimmed;
+  // V98: the sheet edits the notes too. Absent (an older caller) = unchanged.
+  const notes = state.clientsPage.siteDialog.notes;
+  if (typeof notes === 'string') withSiteNotes(site, notes);
   state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
   save();
   render();
@@ -403,6 +466,15 @@ function resolveAssignMerge() {
   // Drop the moving site; the target's existing same-named site stands.
   // v78: a merge IS a delete of the moving site as far as any other device is
   // concerned, so it earns a tombstone like any other removal.
+  // V98: the moving site's notes are not thrown away with it. They join the
+  // standing site's (kept as they are when identical), before the filter.
+  const keep = findSiteByName(targetId, site.name);
+  const mine = siteNotesOf(site);
+  if (keep && mine) {
+    const theirs = siteNotesOf(keep);
+    if (!theirs) withSiteNotes(keep, mine);
+    else if (theirs !== mine) withSiteNotes(keep, theirs + '\n\n' + mine);
+  }
   recordTombstone('site', site.id);
   state.sites = state.sites.filter(s => s.id !== site.id);
   finishSiteAssign(targetId);
