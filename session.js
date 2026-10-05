@@ -2016,6 +2016,46 @@ function mapPinOpenW3w() {
       s: sh.sessionId, i: sh.itemId, at: Date.now(), t: String(sh.text || '').slice(0, 200)
     }));
   } catch (e) { /* a full phone: the sheet still works, it just can't come back after a reload */ }
+  // V99.1: the APP, by its own link — no browser panel in between. The page is
+  // not replaced: an app link either opens the app or does nothing.
+  _mapPinWatchLeave(sh);
+  try { window.location.href = W3W_APP_URL; } catch (e) { /* nothing to open with */ }
+}
+
+// V99.1: did the tap leave PATGo? Leaving = the page hid, or the window lost
+// focus (iOS's own "Open in what3words?" question takes focus too). If neither
+// has happened W3W_APP_WAIT_MS later, what3words is not on this phone: the sheet
+// offers the website instead (state, so a repaint keeps it; written in place
+// because the sheet has an input — MAP rule 3).
+let _mapPinLeaveTimer = null;
+function _mapPinWatchLeave(sh) {
+  if (_mapPinLeaveTimer) { clearTimeout(_mapPinLeaveTimer); _mapPinLeaveTimer = null; }
+  let left = false;
+  const onLeave = () => { if (document.visibilityState === 'hidden') left = true; };
+  const onHide = () => { left = true; };
+  try {
+    document.addEventListener('visibilitychange', onLeave);
+    window.addEventListener('blur', onHide);
+    window.addEventListener('pagehide', onHide);
+  } catch (e) { /* no events: the timer alone decides */ }
+  _mapPinLeaveTimer = setTimeout(() => {
+    _mapPinLeaveTimer = null;
+    try {
+      document.removeEventListener('visibilitychange', onLeave);
+      window.removeEventListener('blur', onHide);
+      window.removeEventListener('pagehide', onHide);
+    } catch (e) { /* ignore */ }
+    if (left || state.mapPinSheet !== sh) return;
+    sh.noApp = true;
+    const el = (typeof document !== 'undefined') ? document.getElementById('map-pin-noapp') : null;
+    if (el) el.innerHTML = mapPinNoAppHTML();
+  }, W3W_APP_WAIT_MS);
+}
+
+// V99.1: the website, only when the app didn't open. Still window.open (the
+// panel's Done button brings you back) — said so on the button's line.
+function mapPinOpenW3wWeb() {
+  if (!state.mapPinSheet) return;
   try { window.open(W3W_HOME_URL, '_blank', 'noopener'); } catch (e) { /* nothing to open with */ }
 }
 

@@ -581,6 +581,9 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   `saveItem` before `loadFormForCursor`); `copyLastResult` overwrite clears it.
   `mapPinResume` is called by **boot.js** before the first render;
   `mapPinOfferShow` appends into #app AFTER `refreshEntryAfterLog`.
+  V99.1: `mapPinOpenW3w` opens the APP (`W3W_APP_URL`, location.href — never
+  window.open, which leaves a blank panel); `_mapPinWatchLeave` offers the
+  website (`mapPinOpenW3wWeb`) only if the page never hid or lost focus.
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
 (scroll reset) live in `render()` via `_lastRenderedView`, not in `setView`.
 

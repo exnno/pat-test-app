@@ -1928,6 +1928,12 @@ function renderEntry() {
   `;
 }
 
+// V99.1: shown in the pin sheet when the what3words app didn't open.
+function mapPinNoAppHTML() {
+  return `<p class="muted map-pin-noapp-text">Didn\u2019t open? The what3words app may not be on this phone. Get it from the App Store, or use the website &mdash; it opens in a panel: tap <strong>Done</strong> to come back.</p>
+        <button class="link-btn map-pin-web" id="map-pin-web" data-action="map-pin-w3w-web">Use the what3words website</button>`;
+}
+
 // V99: the map pin sheet (entry screen). Has an input → never re-rendered while
 // open except from state (MAP rule 3): the typing lives in state.mapPinSheet.text.
 // Item named from the open sheet's own ids, so a pull that replaced the job
@@ -1949,7 +1955,8 @@ function renderMapPinSheet() {
           <button class="fail-close-btn" id="map-pin-cancel" data-action="map-pin-cancel" aria-label="Cancel">×</button>
         </div>
         <p class="muted" style="margin:0 0 10px">${label ? escapeHTML(label) + '. ' : ''}Open what3words, copy the three words for where this item is, then come back and paste them here.</p>
-        <button class="btn-secondary map-pin-w3w" id="map-pin-w3w" data-action="map-pin-w3w">Open what3words ↗</button>
+        <button class="btn-secondary map-pin-w3w" id="map-pin-w3w" data-action="map-pin-w3w">Open the what3words app</button>
+        <div id="map-pin-noapp">${sh.noApp ? mapPinNoAppHTML() : ''}</div>
         <div class="map-pin-input-row">
           <input class="input map-pin-input" id="map-pin-input" data-input-action="map-pin-text" value="${escapeHTML(sh.text || '')}" placeholder="///filled.count.soap" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="200">
           <button class="btn-secondary map-pin-paste" id="map-pin-paste" data-action="map-pin-paste">Paste</button>

@@ -19,6 +19,10 @@ timing per phone (roadmap Stage 8).
   returns from Safari/what3words is: if iOS keeps the app alive, the sheet is
   simply still open; if it reloads, `mapPinResume` reopens it. Only a real phone
   proves both.
+- V99.1: the what3words app is opened by its own link. Unproven on a phone:
+  whether iOS asks "Open in what3words?" first (harmless — it counts as
+  leaving), and what a phone WITHOUT the app shows (expected: nothing, then the
+  website offer after 2.5 s).
 - The Paste button relies on iOS's own "Paste" bubble; if the phone refuses,
   the app says "Long-press the box and choose Paste".
 - 5A risk accepted: the offer covers the job title for ~4 s (nothing to tap there).

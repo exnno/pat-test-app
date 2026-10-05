@@ -219,6 +219,7 @@ registerActions({
   'map-pin-save':   () => saveMapPinSheet(),
   'map-pin-remove': () => removeMapPinFromSheet(),
   'map-pin-w3w':    () => mapPinOpenW3w(),
+  'map-pin-w3w-web': () => mapPinOpenW3wWeb(),   // V99.1: only offered when the app didn't open
   'map-pin-paste':  () => mapPinPaste(),
   'photo-strip-close':  () => closePhotoStrip(),
   'photo-strip-add':    () => { const inp = document.getElementById('photo-strip-file'); if (inp) inp.click(); },

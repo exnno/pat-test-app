@@ -1094,6 +1094,15 @@ const MAP_PIN_OPEN_MAX_MS = 2 * 60 * 60 * 1000;
 // The offer after a fail is logged (5A): how long the "📍 Add map pin" pill stays.
 const MAP_PIN_OFFER_MS = 4000;
 const W3W_HOME_URL = 'https://what3words.com/';
+// V99.1: open the what3words APP straight away — its own documented link
+// (developer.what3words.com, "Mobile linking to the what3words app"), at the
+// phone's current position. V99 opened the website with window.open: from a
+// home-screen app iOS shows that in a browser panel, the site hands over to the
+// app, and coming back left a BLANK panel to close first (Peter, 5 Oct).
+const W3W_APP_URL = 'w3w://show?currentlocation';
+// No sign of leaving the app this long after the tap → what3words is not on
+// this phone (or iOS's "Open in what3words?" was cancelled): offer the website.
+const W3W_APP_WAIT_MS = 2500;
 
 // v16: Multi Pick. A single GLOBAL set of up to 6 named, ordered item-type
 // sequences, plus a show/hide toggle for the entry-screen button. Stored as one
