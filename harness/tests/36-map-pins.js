@@ -248,7 +248,8 @@ module.exports = async function () {
     const sid = app.fn('activeSession')().id;
     tap(app, 'map-pin-open', it.id);
     tap(app, 'map-pin-w3w');
-    t.eq(opened, 'https://what3words.com/', 'what3words opens');
+    t.eq(app.sandbox.location.href, 'w3w://show?currentlocation', 'the what3words APP opens, by its own link (V99.1)');
+    t.eq(opened, null, 'no browser panel (V99.1: the blank-panel bug)');
     const note = JSON.parse(app.storage.getItem('pat:mapPinOpen') || 'null');
     t.ok(note && note.s === sid && note.i === it.id, 'the item is noted BEFORE leaving');
 
@@ -366,6 +367,39 @@ module.exports = async function () {
     d = fake();
     app.fn('_appendPhotoPages')(d, sess, { groups: [{ item: sess.items[2], photos: [photo] }], total: 1, printed: 1, omitted: 0 }, 40, [0, 0, 0]);
     t.ok(!d.texts.some(x => x.includes('index.home.raft')), 'the plain photo pages (remedial off) do not print pins');
+  });
+
+  /* ------------------------------------------------------------------ 36m */
+  await t.group('36m — V99.1: the app by its own link; the website only if the app never opened', async () => {
+    const mk = () => {
+      const { app, it } = failJob();
+      app.__opened = [];
+      app.sandbox.open = (u) => { app.__opened.push(u); return null; };
+      tap(app, 'map-pin-open', it.id);
+      return app;
+    };
+    const stay = mk();     // the app is not installed: PATGo never loses focus
+    const gone = mk();     // the app opened: PATGo hid
+    const asked = mk();    // iOS asked "Open in what3words?" — focus left
+    const vcBefore = (gone.doc._listeners.visibilitychange || []).length;
+    tap(stay, 'map-pin-w3w');
+    tap(gone, 'map-pin-w3w');
+    tap(asked, 'map-pin-w3w');
+    gone.doc.visibilityState = 'hidden';
+    (gone.doc._listeners.visibilitychange || []).forEach(fn => fn({ type: 'visibilitychange' }));
+    asked.sandbox.window.dispatchEvent({ type: 'blur' });
+    t.ok(!stay.state().mapPinSheet.noApp, 'nothing is offered straight away');
+    await tick(2700);
+    t.ok(stay.state().mapPinSheet && stay.state().mapPinSheet.noApp, 'still here after the wait → the website is offered');
+    stay.fn('render')();
+    t.includes(stay.html(), 'id="map-pin-web"', 'as a button in the sheet');
+    t.includes(stay.html(), 'tap <strong>Done</strong> to come back', 'saying how to get back from the panel');
+    t.eq(stay.__opened.length, 0, 'the website never opens by itself');
+    tap(stay, 'map-pin-w3w-web');
+    t.eq(stay.__opened[0], 'https://what3words.com/', 'only when asked');
+    t.ok(!gone.state().mapPinSheet.noApp, 'the app opened (PATGo hid) → no website offer');
+    t.ok(!asked.state().mapPinSheet.noApp, 'iOS asked first (focus left) → no website offer');
+    t.eq((gone.doc._listeners.visibilitychange || []).length, vcBefore, 'the watchers are removed afterwards');
   });
 
   /* ------------------------------------------------------------------ 36l */
