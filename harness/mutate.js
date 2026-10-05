@@ -3908,6 +3908,13 @@ const MUTATIONS = [
     to:   "    }, ''))\n    .filter(s => s.id && s.name);   // clientId no longer required",
     why:  "notes survive only until the app is next opened (35a)",
   },
+  {
+    name: "M542 (V98.1) the notes marker goes after the site name",
+    file: "render-settings.js",
+    from: "<span class=\"client-site-name\">${siteNotesOf(s) ? '<span class=\"site-notes-mark\" title=\"Has site notes\">📝</span> ' : ''}${escapeHTML(s.name)}</span>\n            <div class=\"client-site-actions\">\n              <button class=\"link-btn\" data-action=\"site-assign\" data-arg=\"${escapeHTML(s.id)}\">Move</button>",
+    to:   "<span class=\"client-site-name\">${escapeHTML(s.name)}${siteNotesOf(s) ? ' <span class=\"site-notes-mark\" title=\"Has site notes\">📝</span>' : ''}</span>\n            <div class=\"client-site-actions\">\n              <button class=\"link-btn\" data-action=\"site-assign\" data-arg=\"${escapeHTML(s.id)}\">Move</button>",
+    why:  "a long site name ends in an ellipsis and swallows the marker — the V98 bug Peter found on a real phone (35i)",
+  },
 ];
 
 function main() {
