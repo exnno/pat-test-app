@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V97';",
-    to:   "const APP_VERSION = 'V97';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V98';",
+    to:   "const APP_VERSION = 'V98';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -637,8 +637,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V95</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V95</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V93</strong> &middot; October 2026</p>',
+    from: '        <p><strong>V96</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V96</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V95</strong> &middot; October 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -3817,6 +3817,96 @@ const MUTATIONS = [
     from: "      ${renderPhotoBackupSection()}\n\n      <p class=\"muted\" style=\"margin:4px",
     to:   "      ${renderPhotoBackupSection()}\n      ${renderPhotoStorageSection()}\n\n      <p class=\"muted\" style=\"margin:4px",
     why:  "1A: the split leaks back — space controls on the copies page (34a)",
+  },  {
+    name: "M529 (V98) the site row always carries notes",
+    file: "sync.js",
+    from: "    const n = normaliseSiteNotes(r.notes);\n    if (n) d.notes = n;\n    return d;",
+    to:   "    const n = normaliseSiteNotes(r.notes);\n    d.notes = n;\n    return d;",
+    why:  "rule 36: every site would look edited on upgrade and be re-sent; a V97 phone sees a stray field (35b)",
+  },
+  {
+    name: "M530 (V98) an empty note is stored as notes: ''",
+    file: "clients.js",
+    from: "  if (n) site.notes = n; else delete site.notes;",
+    to:   "  site.notes = n;",
+    why:  "a site without notes no longer has its V97 shape in storage and backups (35a)",
+  },
+  {
+    name: "M531 (V98) a held site stores the notes text",
+    file: "sync.js",
+    from: "here: ln ? 'Written' : 'None'",
+    to:   "here: ln || 'None'",
+    why:  "door codes copied into the held list, which must never store record contents beyond names (rule 7, 35c)",
+  },
+  {
+    name: "M532 (V98) restore drops site notes",
+    file: "backup.js",
+    from: "          }, s && s.notes))\n          .filter(s => s.id && s.name)   // v26",
+    to:   "          }, ''))\n          .filter(s => s.id && s.name)   // v26",
+    why:  "a restore would silently lose every site's notes (35d)",
+  },
+  {
+    name: "M533 (V98) Session settings leaves the old site link",
+    file: "session.js",
+    from: "    sess.siteId = linked ? linked.id : '';\n",
+    to:   "",
+    why:  "a job moved to another site keeps showing the old site's door codes (35f)",
+  },
+  {
+    name: "M534 (V98) a locked job hides its site notes",
+    file: "render-review.js",
+    from: "  const notesSite = state.selectionMode ? null : siteForSession(sess);",
+    to:   "  const notesSite = (state.selectionMode || sess.locked) ? null : siteForSession(sess);",
+    why:  "the notes belong to the site, not the job: a locked job is still where you are standing (35e)",
+  },
+  {
+    name: "M535 (V98) the Overview title bar is not sticky",
+    file: "render-review.js",
+    from: "      <header class=\"header-row header-sticky\">\n        <button class=\"icon-btn\" id=\"back-btn\"",
+    to:   "      <header class=\"header-row\">\n        <button class=\"icon-btn\" id=\"back-btn\"",
+    why:  "6B: Back, report and CSV scroll away on a long job (35j)",
+  },
+  {
+    name: "M536 (V98) the notes sheet saves nothing to storage",
+    file: "dispatch.js",
+    from: "    if (changed) save();\n    render();\n    if (changed) showToast('Site notes saved');",
+    to:   "    render();\n    if (changed) showToast('Site notes saved');",
+    why:  "says saved, gone on reopen (35e)",
+  },
+  {
+    name: "M537 (V98) a site merge throws its notes away",
+    file: "clients.js",
+    from: "  if (keep && mine) {",
+    to:   "  if (false) {",
+    why:  "merging an Unassigned site into the client loses its door codes (35i)",
+  },
+  {
+    name: "M538 (V98) jobs without a site link find no notes",
+    file: "clients.js",
+    from: "  const parts = splitSiteSnapshot(sess.site);\n  return siteForNames(parts.client, parts.site);",
+    to:   "  return null;",
+    why:  "older jobs and CSV imports would never show their site's notes (35g)",
+  },
+  {
+    name: "M539 (V98) Edit site ignores the notes box",
+    file: "clients.js",
+    from: "  if (typeof notes === 'string') withSiteNotes(site, notes);\n",
+    to:   "",
+    why:  "3A: the Clients sheet would show notes it can't save (35i)",
+  },
+  {
+    name: "M540 (V98) typing a site leaves the old notes on the New Job form",
+    file: "events.js",
+    from: "      state.newForm.site = e.target.value;\n      if (typeof refreshNfSiteNotesOnly === 'function') refreshNfSiteNotesOnly();   // V98\n",
+    to:   "      state.newForm.site = e.target.value;\n",
+    why:  "the form shows the previous site's codes until a render (35h)",
+  },
+  {
+    name: "M541 (V98) a reload drops site notes",
+    file: "clients.js",
+    from: "    }, s && s.notes))\n    .filter(s => s.id && s.name);   // clientId no longer required",
+    to:   "    }, ''))\n    .filter(s => s.id && s.name);   // clientId no longer required",
+    why:  "notes survive only until the app is next opened (35a)",
   },
 ];
 
