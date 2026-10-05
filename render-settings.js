@@ -1138,11 +1138,13 @@ function renderSettingsClients() {
     const siteCount = sites.length;
     const sub = siteCount === 0 ? 'No sites' : `${siteCount} site${siteCount === 1 ? '' : 's'}`;
 
+    // V98.1: the 📝 goes BEFORE the name — .client-site-name ends in an ellipsis,
+    // so a marker after a long name was cut off (found by Peter on a real phone).
     const sitesBlock = expanded ? `
       <div class="client-sites">
         ${sites.length ? sites.map(s => `
           <div class="client-site-row">
-            <span class="client-site-name">${escapeHTML(s.name)}${siteNotesOf(s) ? ' <span class="site-notes-mark" title="Has site notes">📝</span>' : ''}</span>
+            <span class="client-site-name">${siteNotesOf(s) ? '<span class="site-notes-mark" title="Has site notes">📝</span> ' : ''}${escapeHTML(s.name)}</span>
             <div class="client-site-actions">
               <button class="link-btn" data-action="site-assign" data-arg="${escapeHTML(s.id)}">Move</button>
               <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Edit</button>
@@ -1186,7 +1188,7 @@ function renderSettingsClients() {
       <div class="client-sites">
         ${orphans.map(s => `
           <div class="client-site-row">
-            <span class="client-site-name">${escapeHTML(s.name)}${siteNotesOf(s) ? ' <span class="site-notes-mark" title="Has site notes">📝</span>' : ''}</span>
+            <span class="client-site-name">${siteNotesOf(s) ? '<span class="site-notes-mark" title="Has site notes">📝</span> ' : ''}${escapeHTML(s.name)}</span>
             <div class="client-site-actions">
               <button class="link-btn" data-action="site-assign" data-arg="${escapeHTML(s.id)}">Assign to client…</button>
               <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Edit</button>
