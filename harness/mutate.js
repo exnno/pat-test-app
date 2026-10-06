@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V100';",
-    to:   "const APP_VERSION = 'V100';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V101';",
+    to:   "const APP_VERSION = 'V101';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -637,8 +637,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V98</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V98</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V97</strong> &middot; October 2026</p>',
+    from: '        <p><strong>V99</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V99</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V98</strong> &middot; October 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -1258,7 +1258,8 @@ const MUTATIONS = [
   {
     name: 'M168 (V81) the item-count guard is dropped',
     file: 'sync.js',
-    from: "    if (doc.items.length < local.items.length) {",
+    // V101: the guard line gained "&& !ready" (moved-out items, 8A) — re-anchored.
+    from: "    if (doc.items.length < local.items.length && !ready) {",
     to:   "    if (false) {",
     why:  'a truncated or half-written cloud row replaces a longer local one without a word. Decision 3A is deliberately stricter than the fingerprint rule needs, precisely so that a bug on the other side of the wire cannot shorten a job here',
   },
@@ -4176,7 +4177,141 @@ const MUTATIONS = [
     to:   "  try { return false; }",
     why:  "someone who asked their phone for no motion gets the whole show (37j)",
   },
+  {
+    name: "M580 (V101) a locked job can be split",
+    file: "session.js",
+    from: "  if (sess.locked) return 'This job is locked. Unlock it in Session settings first, then move the items.';",
+    to:   "",
+    why:  "a locked job is finished paperwork — splitting it changes what its certificate covers (38a, 4A)",
+  },
+  {
+    name: "M581 (V101) every item can be moved out",
+    file: "session.js",
+    from: "  if (n >= (sess.items || []).length) {",
+    to:   "  if (false) {",
+    why:  "moving everything is a client change, and leaves an empty job behind (38a, 5A)",
+  },
+  {
+    name: "M582 (V101) the moved items are copied, not moved",
+    file: "session.js",
+    from: "  sess.items = keep;\n  sess.movedOut = out;",
+    to:   "  sess.movedOut = out;",
+    why:  "the same item ids in two jobs share — and delete — each other's photos (38c)",
+  },
+  {
+    name: "M583 (V101) the new job reuses the original's id",
+    file: "session.js",
+    from: "  const job = {\n    id: newId(),",
+    to:   "  const job = {\n    id: sess.id,",
+    why:  "two jobs under one id overwrite each other on the phone and in the cloud (38c)",
+  },
+  {
+    name: "M584 (V101) the original does not record what moved out",
+    file: "session.js",
+    from: "  for (const id of goingIds) { delete out[id]; out[id] = job.id; }",
+    to:   "",
+    why:  "without movedOut every other phone asks the fewer-items question, and 'keep this phone's' duplicates the items (38c, 38g)",
+  },
+  {
+    name: "M585 (V101) the move does not re-check at the moment of moving",
+    file: "session.js",
+    from: "    (moving.length !== m.ids.length ? 'This job changed while you were choosing. Check the items and try again.' : '');",
+    to:   "    '';",
+    why:  "a sync can replace the job while the sheet is open; what moves must be what was reviewed (38d)",
+  },
+  {
+    name: "M586 (V101) Undo survives the move",
+    file: "session.js",
+    from: "  state.lastLog = null;   // Undo belongs to items that are still where they were logged",
+    to:   "",
+    why:  "Undo would offer to remove items that are no longer in this job (38c)",
+  },
+  {
+    name: "M587 (V101) the confirm forgets the certificate warning",
+    file: "render-review.js",
+    from: "    const cert = (sess.certNo || sess.reportAt) ? `",
+    to:   "    const cert = false ? `",
+    why:  "a certificate already made lists items that are now in another job (38b, 6A)",
+  },
+  {
+    name: "M588 (V101) Continue repaints the sheet on a missing client and site",
+    file: "session.js",
+    from: "    try { const el = document.getElementById('move-job-error'); if (el) el.textContent = m.error; } catch (e) { /* no DOM */ }\n    return;",
+    to:   "    render();\n    return;",
+    why:  "a repaint while the sheet holds typing drops the keyboard (MAP rule 3) (38b)",
+  },
+  {
+    name: "M589 (V101) photos are never re-labelled on the phone",
+    file: "photos.js",
+    from: "    if (job && job !== m.s) fix.set(id, job);",
+    to:   "",
+    why:  "deleting the original sweeps photos by job — the moved items' photos would go with it (38e)",
+  },
+  {
+    name: "M590 (V101) the mirror is re-labelled but the store is not",
+    file: "photos.js",
+    from: "        if (r && r.sessionId !== job) { r.sessionId = job; store.put(r); }",
+    to:   "",
+    why:  "the store is what photosDeleteForSessions sweeps, and the mirror is rebuilt from it at boot (38e)",
+  },
+  {
+    name: "M591 (V101) the sync state is not told about a move",
+    file: "sync.js",
+    from: "    if (d && e.s !== d) { e.s = d; st.ph.mv[id] = d; n++; }",
+    to:   "",
+    why:  "a deleted original would take the moved photos in the cloud; their rows would never be re-pointed (38f, 38g)",
+  },
+  {
+    name: "M592 (V101) queued moves are never sent",
+    file: "sync.js",
+    from: "  for (const [job, ids] of byJob) {\n    for (let i = 0; i < ids.length; i += SYNC_PHOTO_DELETE_BATCH) {",
+    to:   "  for (const [job, ids] of []) {\n    for (let i = 0; i < ids.length; i += SYNC_PHOTO_DELETE_BATCH) {",
+    why:  "the cloud rows keep naming the old job: other phones, the cloud tab's counts and later deletes all go by it (38f)",
+  },
+  {
+    name: "M593 (V101) a photo row read back undoes a move still queued",
+    file: "sync.js",
+    from: "    const job = String(ph.mv[id] || (row.session_id != null ? row.session_id : ''));",
+    to:   "    const job = String(row.session_id != null ? row.session_id : '');",
+    why:  "until the update lands the row names the old job; trusting it puts the photo back under the original (38f)",
+  },
+  {
+    name: "M594 (V101) a moved-out job is never taken without asking",
+    file: "sync.js",
+    from: "    const ready = moves.covered && moves.dests.every(d => _syncMoveDestReady(d, pruned, destRows));",
+    to:   "    const ready = false;",
+    why:  "8A: every split would put a fewer-items question on the other phone (38g)",
+  },
+  {
+    name: "M595 (V101) the job the items went to is not brought down",
+    file: "sync.js",
+    from: "        _syncTakeJob(st, destRows.get(d).doc);\n        out.added++;",
+    to:   "",
+    why:  "the other phone would drop the items and hold them on no job (38g)",
+  },
+  {
+    name: "M596 (V101) the job the items went to need not exist",
+    file: "sync.js",
+    from: "  return !!(row && row.deleted !== true && _syncValidDoc(row.doc, d));",
+    to:   "  return true;",
+    why:  "a split that never reached the cloud would delete items from the other phone with nowhere to go (38h)",
+  },
+  {
+    name: "M597 (V101) a sync repaints under the Move sheet",
+    file: "sync.js",
+    from: "  if (state.moveJob) return false;   // V101: the Move sheet holds a selection and typing",
+    to:   "",
+    why:  "the repaint tears down the sheet's fields mid-typing (38j)",
+  },
+  {
+    name: "M598 (V101) the encoding signature ignores movedOut",
+    file: "storage.js",
+    from: "    (s.movedOut && typeof s.movedOut === 'object') ? Object.keys(s.movedOut).length : 0,",
+    to:   "    0,",
+    why:  "a movedOut written without an items change would be re-encoded from a stale cache and silently un-happen (38j, section 6 trap)",
+  },
 ];
+
 
 function main() {
   const filter = process.argv[2];
