@@ -511,6 +511,14 @@ registerActions({
   },
   'bulk-notes-apply': () => applyBulkNotes(),
 
+  // V101 (Stage 9, split): Move to a new job (session.js).
+  'move-job-open': () => openMoveJob(),
+  'move-job-close': () => closeMoveJob(),
+  'move-job-continue': () => moveJobContinue(),
+  'move-job-back': () => moveJobBack(),
+  'move-job-go': () => moveItemsToNewJob(),
+  'move-open-new': (arg) => openMovedJob(arg),
+
   // Overview body rows
   'jump-to-item': (arg) => jumpTo(parseInt(arg, 10)),
   'delete-item': (arg) => openConfirmSheet({
@@ -1085,6 +1093,7 @@ registerInputActions({
   'bulk-location': (v) => { state.bulkLocationValue = v; },
   'bulk-type': (v) => { state.bulkEdit.typeValue = v; },
   'bulk-notes': (v) => { state.bulkEdit.notesValue = v; },
+  'move-job-field': (v, el) => setMoveJobField(el && el.dataset ? el.dataset.arg : '', v),   // V101
 
   // Edit-session form
   'ef-site': (v) => { state.editForm.site = v; },
@@ -1122,6 +1131,7 @@ registerInputActions({
 // render-core.js (bindSessionsListAreaEvents / bindOverviewBodyEvents).
 // ===========================================================================
 registerChangeActions({
+  'move-job-field': (v, el) => setMoveJobField(el && el.dataset ? el.dataset.arg : '', v),   // V101 (the tester picker)
   // Sessions list area — sort / status / lock filters (were in render-core.js).
   // Each persists and refreshes just the list area.
   'sessions-sort': (v) => { state.sort = v; save(); refreshSessionsListAreaOnly(); },

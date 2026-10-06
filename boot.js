@@ -415,6 +415,9 @@ try {
       // Only repaint if something was actually found. A user with no photos —
       // which is everyone on the day this ships — gets no second render at all.
       if (loaded && state.photoIndex && Object.keys(state.photoIndex).length) render();
+      // V101: re-label any photo whose item has moved to another job — heals a
+      // store write that failed after a move (photos.js photosSettleJobs).
+      if (loaded && typeof photosSettleJobs === 'function') photosSettleJobs();
     }).catch(() => {});
   }
 } catch (e) {

@@ -8,9 +8,38 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V100
-Stage 9 (split / duplicate jobs) per the roadmap, unless Peter picks S10 (needs
-his CoP figures) or Stage 7 part 3 (the look pass).
+### Next after V101
+V102 = Stage 9 part 2, duplicate a job (locked at the V101 round: 9C a full copy
+WITH items — every job, item and photo gets a NEW id, never shared; 12A photos on
+the phone are copied, cloud-only ones download first or the duplicate goes
+without them; 13A a locked job can be duplicated, the copy starts unlocked with no
+certificate number; always on, like Move). Spec round for the rest (where it
+lives, what is copied, the confirm).
+
+### Move items to an EXISTING job (Peter, V101 round 2B — parked)
+Move selected items into another unlocked job on this phone (fixes "logged on the
+wrong job"). Needs: a job picker; asset-number clashes in the target
+(`findDuplicateAssetIndex`); the target's certificate warning; `movedOut` already
+names any job id, so the sync side carries over unchanged.
+
+### V101 residuals (known, accepted)
+- A phone on V100 or older treats a moved-out job as before: the "fewer items"
+  question. Answering "keep this phone's copy" puts the moved items back into the
+  original, so they exist in two jobs and share photos by item id. Test phones
+  only, upgraded together.
+- A phone that applied a moved-out job while the job the items went to was
+  CLEARED from it (on the cleared list) leaves those items in the cloud only —
+  reached from the ☁ tab, as any cleared job.
+- Photo rows of moved items on ANOTHER phone's IndexedDB are re-labelled when that
+  phone applies the moved-out job (photosSettleJobs after a changed pull) — or at
+  its next start-up. A phone still holding the original whole (held question)
+  keeps them under the original until answered.
+- `movedOut` keeps entries until the item comes back into the job; bounded at
+  MOVED_OUT_MAX (5000) per job, oldest first.
+- Lifetime stats are unchanged by a move; asset history (V61) shows each item under
+  the job that now holds it.
+- Stage 14 / Teams: a job made by a move has no `lockedAt` or `reportAt` (it was
+  never locked or certified); the original keeps its own.
 
 ### V100 residuals (known, accepted)
 - Reminders are worked out when the Jobs screen is drawn. A phone left open on

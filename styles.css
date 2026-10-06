@@ -3708,6 +3708,37 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .map-pin-remove { display: block; margin: 12px auto 0; }
 .pin-chip { margin-left: 4px; font-size: 13px; }
 
+/* @@ move to a new job (V101, Stage 9) */
+.bulk-menu-move { margin-top: 12px; border-top: 1px solid var(--border); }
+.move-job-scroll { margin-bottom: 8px; }
+.move-job-list { list-style: none; margin: 0 0 12px; padding: 0; border: 1px solid var(--border); border-radius: 10px; }
+.move-job-item { padding: 8px 10px; font-size: 14px; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+.move-job-item:first-child { border-top: none; }
+.move-job-more { margin-top: 12px; }
+.move-job-more summary { padding: 8px 0; font-weight: 600; cursor: pointer; }
+.move-job-note { margin: 6px 0; font-size: 14px; }
+.move-job-error { min-height: 1em; margin: 4px 0 8px; font-size: 14px; font-weight: 600; color: var(--fail); }
+.move-job-msg, .move-job-why { margin: 0 0 12px; font-size: 16px; line-height: 1.4; }
+.move-job-warn { margin: 0 0 12px; padding: 10px 12px; font-size: 14px; line-height: 1.4; border-radius: 10px; background: var(--card-bg); border: 1px solid var(--fail); }
+.move-job-back { display: block; width: 100%; margin-top: 10px; }
+.move-offer {
+  position: fixed;
+  left: 50%;
+  top: calc(env(safe-area-inset-top, 0px) + 12px);
+  transform: translateX(-50%);
+  z-index: 250;
+  max-width: 88%;
+  padding: 10px 18px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #fff;
+  background: var(--accent);
+  border: none;
+  border-radius: 999px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+}
+.move-offer:active { background: var(--accent-hover); }
+
 /* @@ scanner */
 /* ---------------------------------------------------------------------------
    v65: HID barcode scanner.

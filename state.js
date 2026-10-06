@@ -60,6 +60,10 @@ let state = {
   // Holds the typing (the sheet has an input, so it is never rendered under the
   // keyboard: MAP rule 3). Cleared by setView.
   siteNotesSheet: null,
+  // V101: the Move to a new job sheet — null, or { step: 'form'|'confirm'|'blocked',
+  // ids (selected item ids, captured on open), from (job id), client, site, name,
+  // date, engineer, instrumentId, prefix, error, why }.
+  moveJob: null,
   failModalStage: 'reasons',
   failOtherText: '',
 

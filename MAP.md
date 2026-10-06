@@ -1,4 +1,4 @@
-# PATGo — Code Map (V100)
+# PATGo — Code Map (V101)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -440,6 +440,10 @@ informational count.
 ⚠ v88: `state.photoMeta` (photo id → job, item, size, time) is the mirror
 **sync.js** reads to upload; `photoMetaReady` gates it (and the prune guard).
 Every add/delete must keep BOTH mirrors in step.
+⚠ V101: a photo's job (`sessionId` / meta `s`) is the job HOLDING its item —
+`photoItemJobs` + `photosSettleJobs` re-label after a move (session.js), after a
+pull that changed jobs (sync.js) and at boot (boot.js). A path that moves items
+between jobs must end in `photosSettleJobs`, or deleting the old job sweeps them.
 ⚠ v90: `photosRemoveQuiet(ids, keepPreview)` is also the manager's "Remove from
 phone" (known-in-cloud only, caller checks); notes nothing either way.
 ⚠ v89: cloud-only lookups (`photoCloudOnlyForItem`, `photoCountForItemAll`,
@@ -601,6 +605,16 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   `lockedAt` only through `lockedAtMs` (ignores it on an unlocked job). The
   `remindexport` list filter is transient (storage load drops it).
   `setView` clears `state.partyOpen` / `state.egg` (**render-help.js**).
+- V101 move to a new job (block before "Edit-session flow"): `openMoveJob` captures
+  the selection as item IDS in `state.moveJob` (cleared by `exitSelectionMode`, so
+  by `setView`); `moveJobBlockReason` (locked, all items) is checked on open AND at
+  the moment of moving with the ids looked up again; `moveItemsToNewJob` is the only
+  writer of `movedOut` on a job (rule 36 — absent until used, bounded by
+  `MOVED_OUT_MAX`), then calls **photos.js** `photosSettleJobs` and **sync.js**
+  `syncNoteMoved`. Items MOVE (ids unchanged): photos are found and deleted by item
+  id alone — a copy with the same ids would share them. Markup:
+  **render-review.js** `renderMoveJobSheet`. `moveOfferShow` appends into #app
+  after the render, like `mapPinOfferShow`.
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
 (scroll reset) live in `render()` via `_lastRenderedView`, not in `setView`.
 
@@ -734,6 +748,10 @@ normal and selection headers). The site-notes card and its sheet
 (`state.siteNotesSheet`, cleared by setView) are drawn here; the sheet holds an
 input, so it is never re-rendered while typing (rule 3) — its text lives in state.
 Boot probe: `renderOverview` in `requiredFns`.
+V101: `renderMoveJobSheet(sess)` (Move to a new job — form / confirm / blocked),
+drawn from `renderOverview`; logic in session.js. The form holds inputs: never
+re-rendered while typing, its fields write `state.moveJob` on input; sync.js
+`_syncSafeToRepaint` refuses while `state.moveJob` is set.
 
 ### render-settings.js (~1377 ln) — settings screens that own a setting
 The two-level Settings hub, its search, every `renderSettings*` sub-page with a
@@ -821,7 +839,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~4150 ln) — cloud sync, PUSH AND PULL — v80–v93
+### sync.js (~4300 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session
@@ -829,6 +847,14 @@ tombstones) send an emptied row both directions. Prune guard
 (`syncPruneFilter`) + cleared-ids list (SYNC_PRUNED_KEY). v81: pull cursor
 (`st.pulledAt`), held jobs awaiting a decision (SYNC_HELD_KEY), re-send set
 (`st.resend`), `syncHeldResolve`. Sync page logic.
+⚠ V101 (split): `_syncMovedOut` / `_syncMoveDestReady` / `_syncFetchMoveDests`
+relax the fewer-items guard ONLY when every missing item is in the cloud doc's
+`movedOut` and each job they went to is here, cleared, or fetched live in the same
+page — then it comes down first (`_syncTakeJob`, window ignored). `st.ph.mv`
+{photoId: jobId} queues cloud rows to re-point (`_syncPhotoMoves`, after the rows
+pull, before deletes); the rows pull keeps an `mv` job over the row's. Written by
+`syncNoteMoved` (session.js, via `syncWhenIdle`) and the pull's moved-out path
+(`_syncNoteMovedInState`).
 **Touch to:** change what syncs, when, or how; add record kinds or photos.
 **Coupling:** asks **cloud.js** who is signed in (`cloudAvailable`,
 `cloudUserId`, `cloudClient`). Triggers: **storage.js** `saveSessions()` (one

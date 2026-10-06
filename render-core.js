@@ -227,17 +227,16 @@ function render() {
     <div class="modal-backdrop" data-action="welcome-dismiss" style="z-index:300"></div>
     <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="${welcomeTitle}">
       <div class="bulk-sheet-handle"></div>
-      ${typeof v100HeroHTML === 'function' ? v100HeroHTML() : '<div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>'}
+      <div class="welcome-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
         <h3 class="bulk-sheet-title">${welcomeTitle}</h3>
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Reminders.</strong> A new page under <strong>Settings &rarr; Phone &amp; Display &rarr; Reminders</strong>: a nudge when a job you've locked still has no certificate or CSV export (1 hour, 4 hours or the next morning after locking), and a time each day to remind you about jobs still unlocked. Both are off until you choose a time.</li>
-        <li><strong>The certificate counts.</strong> Downloading or sharing a certificate from the preview now counts as finishing a locked job, just like a CSV export.</li>
-        <li><strong>Backup reminder.</strong> Choose how often it appears &mdash; every 3, 7, 14 or 30 days, or off. It stays at 7 days until you change it.</li>
-        <li><strong>One more thing.</strong> It's version 100. Something new is hiding on the About page.</li>
+        <li><strong>Move items to a new job.</strong> Logged two clients in one job? On the Overview, tap <strong>Select items</strong>, pick the ones that belong elsewhere, then <strong>Edit selected &rarr; Move to a new job</strong>. Enter the new job's client and site, check the list, and confirm.</li>
+        <li><strong>Everything goes with them.</strong> Photos, map pins, readings and notes move with their items, and asset numbers stay the same. The new job starts with the same date, engineer and tester &mdash; change them under More details if you need to.</li>
+        <li><strong>Safe by design.</strong> A locked job can't be split, and at least one item always stays behind. If a certificate was already made for the job, you're reminded to make it again.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

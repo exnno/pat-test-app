@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V100';
+const APP_VERSION = 'V101';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V100';
+const WELCOME_VERSION = 'V101';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -1093,6 +1093,12 @@ const MAP_PIN_OPEN_KEY = 'pat:mapPinOpen';
 const MAP_PIN_OPEN_MAX_MS = 2 * 60 * 60 * 1000;
 // The offer after a fail is logged (5A): how long the "📍 Add map pin" pill stays.
 const MAP_PIN_OFFER_MS = 4000;
+// V101 (Stage 9, split): the "Moved 12 items to … · Open" pill after a move (11A).
+const MOVE_OFFER_MS = 6000;
+// V101 (8A): a job remembers which items moved out of it, and to which job
+// (`movedOut`, {itemId: jobId}), so another phone can take the smaller job without
+// the "fewer items" question. Bounded; the oldest entries go first.
+const MOVED_OUT_MAX = 5000;
 const W3W_HOME_URL = 'https://what3words.com/';
 // V99.1: open the what3words APP straight away — its own documented link
 // (developer.what3words.com, "Mobile linking to the what3words app"), at the

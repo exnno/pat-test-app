@@ -2824,6 +2824,7 @@ function exitSelectionMode() {
   state.bulkEdit.typeValue = '';
   state.bulkEdit.notesValue = '';
   state.bulkEdit.notesMode = 'replace';
+  state.moveJob = null;   // V101
 }
 
 function toggleSelected(idx) {
@@ -3006,6 +3007,253 @@ function applyBulkDelete() {
       showToast(`Deleted ${n} item${n === 1 ? '' : 's'}`);
     }
   });
+}
+
+// ---------- V101: move selected items to a new job (roadmap Stage 9, split) ----------
+// Locked: 1A Overview → Select items → Edit selected → "Move to a new job…",
+// with a review of what is moving and an "Are you sure?" step; 2A a NEW job only
+// (an existing job is BACKLOG); 3A the sheet asks client + site, everything else
+// copied and editable under More details; 4A not on a locked job; 5A at least one
+// item stays; 6A the original keeps its certificate number, the confirm warns when
+// a certificate was already made; 7 photos and map pins move with their items;
+// 8A the original records what moved out, and where (`movedOut`); 10 always on
+// (Peter — an exception to R30); 11A stay on the original, "· Open" offer.
+//
+// ⚠ ITEMS MOVE, THEY ARE NOT COPIED. Item ids are unchanged, so each id is still
+// in exactly ONE job: photos are found and deleted by item id alone (photos.js
+// photosDeleteForItem), so a copy with the same ids would share — and delete —
+// the original's photos. That is V102's problem (duplicate mints new ids).
+//
+// ⚠ PHOTOS ARE RE-LABELLED. A photo also carries its job (IndexedDB `sessionId`,
+// sync's st.ph.sent[id].s, the cloud row's session_id), and deleting or clearing a
+// job sweeps photos BY THAT LABEL. Left alone, deleting the original would take
+// the moved items' photos with it. photosSettleJobs() re-labels this phone's
+// copies (a photo belongs to the one job holding its item); syncNoteMoved() tells
+// the sync state, which re-points the cloud rows at the next sync.
+//
+// The selection is captured as item IDS when the sheet opens: on the Overview the
+// pull may replace the job object underneath (it defers only the entry screen),
+// and indices would then point at different items.
+
+function moveJobBlockReason(sess, ids) {
+  if (!sess) return 'This job is no longer on this phone.';
+  if (sess.locked) return 'This job is locked. Unlock it in Session settings first, then move the items.';
+  const n = (ids || []).length;
+  if (!n) return 'Select the items to move first.';
+  if (n >= (sess.items || []).length) {
+    return 'At least one item must stay in this job. To change the client or site of the whole job, use Session settings.';
+  }
+  return '';
+}
+
+function openMoveJob() {
+  const sess = activeSession();
+  if (!sess) return;
+  const ids = state.selectedIndices
+    .map(i => sess.items[i] && sess.items[i].id)
+    .filter(id => id != null)
+    .map(String);
+  state.bulkEdit.menuOpen = false;
+  const why = moveJobBlockReason(sess, ids);
+  state.moveJob = why
+    ? { step: 'blocked', why, ids: [], from: sess.id }
+    : {
+        step: 'form', ids, from: sess.id,
+        client: '', site: '',
+        name: sess.name || '',
+        date: sess.date || todayISO(),
+        engineer: sess.engineer || '',
+        instrumentId: sess.instrumentId || '',
+        prefix: sess.prefix || '',
+        error: ''
+      };
+  render();
+}
+
+function closeMoveJob() {
+  state.moveJob = null;
+  render();
+}
+
+// Field edits arrive here from data-input-action (no render — MAP rule 3).
+function setMoveJobField(field, value) {
+  const m = state.moveJob;
+  if (!m || m.step !== 'form') return;
+  if (['client', 'site', 'name', 'date', 'engineer', 'instrumentId', 'prefix'].indexOf(field) === -1) return;
+  m[field] = String(value == null ? '' : value);
+}
+
+// The items still selected for the move, looked up by id in the job as it is NOW.
+function _moveJobItems(sess, ids) {
+  const want = new Set((ids || []).map(String));
+  return (sess && Array.isArray(sess.items)) ? sess.items.filter(it => it && want.has(String(it.id))) : [];
+}
+
+function moveJobSummary(sess, ids) {
+  const items = _moveJobItems(sess, ids);
+  let fails = 0, photos = 0, pins = 0;
+  for (const it of items) {
+    if (it.result === 'fail') fails++;
+    photos += (typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id)
+      : ((typeof photoCountForItem === 'function') ? photoCountForItem(it.id) : 0);
+    if (mapPinOf(it)) pins++;
+  }
+  return { n: items.length, fails, photos, pins, items };
+}
+
+function moveJobContinue() {
+  const m = state.moveJob;
+  if (!m || m.step !== 'form') return;
+  const client = String(m.client || '').trim();
+  const site = String(m.site || '').trim();
+  if (!client && !site) {
+    // No render: the sheet holds typing (MAP rule 3). Say it in place.
+    m.error = 'Enter a client or a site for the new job.';
+    try { const el = document.getElementById('move-job-error'); if (el) el.textContent = m.error; } catch (e) { /* no DOM */ }
+    return;
+  }
+  m.error = '';
+  m.step = 'confirm';
+  render();
+}
+
+function moveJobBack() {
+  const m = state.moveJob;
+  if (!m || m.step !== 'confirm') return;
+  m.step = 'form';
+  render();
+}
+
+// The title a job shows on the Jobs list — for the confirm and the offer.
+function moveJobTitle(clientName, siteName) {
+  return composeSiteSnapshot(String(clientName || '').trim(), String(siteName || '').trim());
+}
+
+function moveItemsToNewJob() {
+  const m = state.moveJob;
+  if (!m || m.step !== 'confirm') return;
+  const sess = activeSession();
+  if (!sess || String(sess.id) !== String(m.from)) { closeMoveJob(); return; }
+  const moving = _moveJobItems(sess, m.ids);
+  // ⚠ Re-checked at the moment of moving: a sync may have changed the job since
+  // the sheet opened. Anything other than exactly what was reviewed → stop.
+  const why = moveJobBlockReason(sess, m.ids) ||
+    (moving.length !== m.ids.length ? 'This job changed while you were choosing. Check the items and try again.' : '');
+  if (why) { state.moveJob = { step: 'blocked', why, ids: [], from: sess.id }; render(); return; }
+
+  const clientName = String(m.client || '').trim();
+  const siteName = String(m.site || '').trim();
+  if (!clientName && !siteName) { m.step = 'form'; m.error = 'Enter a client or a site for the new job.'; render(); return; }
+  // Same resolution as createSession(): list entries made for anything new.
+  let clientRec = null, siteRec = null;
+  if (clientName && siteName) {
+    clientRec = ensureClient(clientName);
+    if (clientRec) siteRec = ensureSite(clientRec.id, siteName);
+  } else if (clientName) {
+    clientRec = ensureClient(clientName);
+  } else {
+    siteRec = ensureOrphanSite(siteName);
+  }
+
+  const now = new Date().toISOString();
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(m.date || '')) ? m.date : (sess.date || todayISO());
+  const job = {
+    id: newId(),
+    name: String(m.name || '').trim() || `Session ${state.sessions.length + 1}`,
+    site: moveJobTitle(clientName, siteName),
+    clientId: clientRec ? clientRec.id : '',
+    siteId: siteRec ? siteRec.id : '',
+    engineer: String(m.engineer || '').trim(),
+    prefix: String(m.prefix || '').trim(),
+    date,
+    startNumber: sess.startNumber || 1,
+    instrumentId: String(m.instrumentId || ''),
+    items: moving,
+    locked: false,
+    notes: '',          // 3A: job notes belong to the job they were written for
+    certNo: '',         // 6A: its own number, the first time its certificate is made
+    userId: null,
+    lastModified: now,
+    syncedAt: null
+  };
+  if (sess.startPad) job.startPad = sess.startPad;
+  // A frozen tester copy only means something for the tester it froze.
+  if (sess.instrumentSnapshot && job.instrumentId === String(sess.instrumentId || '')) {
+    job.instrumentSnapshot = JSON.parse(JSON.stringify(sess.instrumentSnapshot));
+  }
+  // Retest tracking and interval carry; the contact status starts fresh.
+  if (sess.retestTrack) { job.retestTrack = true; job.retestMonths = sess.retestMonths; job.retestContact = null; }
+  normaliseSessionRetest(job);
+
+  // The original: fewer items, and a note of where they went (8A). An id that has
+  // since come back into this job is no longer "moved out".
+  const goingIds = new Set(moving.map(it => String(it.id)));
+  const keep = sess.items.filter(it => !(it && goingIds.has(String(it.id))));
+  const out = {};
+  const prev = (sess.movedOut && typeof sess.movedOut === 'object' && !Array.isArray(sess.movedOut)) ? sess.movedOut : {};
+  const stays = new Set(keep.map(it => String(it && it.id)));
+  for (const k of Object.keys(prev)) if (!stays.has(k) && typeof prev[k] === 'string') out[k] = prev[k];
+  for (const id of goingIds) { delete out[id]; out[id] = job.id; }
+  const keys = Object.keys(out);
+  if (keys.length > MOVED_OUT_MAX) for (const k of keys.slice(0, keys.length - MOVED_OUT_MAX)) delete out[k];
+  sess.items = keep;
+  sess.movedOut = out;
+  markSessionDirty(sess);
+  sess.lastModified = now;
+  _invalidateSessionEncoding(sess);
+
+  state.sessions.unshift(job);
+  state.sessions = state.sessions.slice();
+  state.lastLog = null;   // Undo belongs to items that are still where they were logged
+  if (state.cursor > sess.items.length) state.cursor = sess.items.length;
+  exitSelectionMode();
+  state.moveJob = null;
+
+  // Photos: this phone's copies now, the cloud at the next sync (7).
+  const moved = {};
+  for (const id of goingIds) moved[id] = job.id;
+  if (typeof photosSettleJobs === 'function') { try { photosSettleJobs(); } catch (e) { console.error('photosSettleJobs failed', e); } }
+  if (typeof syncNoteMoved === 'function') {
+    try { Promise.resolve(syncNoteMoved(moved)).catch((e) => console.error('syncNoteMoved failed', e)); }
+    catch (e) { console.error('syncNoteMoved failed', e); }
+  }
+
+  save();
+  loadFormForCursor();
+  render();
+  moveOfferShow(job.id, moving.length, job.site);
+}
+
+// 11A: the original stays on screen; a short offer opens the new job.
+let _moveOfferTimer = null;
+function moveOfferHide() {
+  if (_moveOfferTimer) { clearTimeout(_moveOfferTimer); _moveOfferTimer = null; }
+  try { document.querySelectorAll('.move-offer').forEach(el => el.remove()); } catch (e) { /* no DOM */ }
+}
+function moveOfferShow(jobId, n, title) {
+  const app = (typeof document !== 'undefined') ? document.getElementById('app') : null;
+  if (!app || !jobId) return false;
+  moveOfferHide();
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'move-offer';
+  el.setAttribute('data-action', 'move-open-new');
+  el.setAttribute('data-arg', jobId);
+  el.textContent = `Moved ${n} item${n === 1 ? '' : 's'} to ${title || 'a new job'} \u00b7 Open`;
+  app.appendChild(el);
+  _moveOfferTimer = setTimeout(moveOfferHide, MOVE_OFFER_MS);
+  return true;
+}
+function openMovedJob(id) {
+  moveOfferHide();
+  const s = (state.sessions || []).find(x => x && String(x.id) === String(id));
+  if (!s) return;
+  state.activeId = s.id;
+  state.lastLog = null;
+  state.cursor = s.items.length;
+  loadFormForCursor();
+  save();
+  setView('overview');
 }
 
 // Edit-session flow

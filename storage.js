@@ -180,6 +180,8 @@ function _sessionSig(s) {
     // V100: written in place — lockedAt by saveSessionEdits, reportAt when a
     // certificate is made (often for a job that is not the open one).
     s.lockedAt || '', s.reportAt || '',
+    // V101: what moved out of the job (and where) — written with the items.
+    (s.movedOut && typeof s.movedOut === 'object') ? Object.keys(s.movedOut).length : 0,
     (s.items ? s.items.length : 0),
     s.instrumentId || '', s.instrumentSnapshot ? 1 : 0
   ].join('\u0001');

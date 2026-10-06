@@ -690,6 +690,57 @@ function photosRemoveQuiet(ids, keepPreview) {
   }).catch(() => -1);
 }
 
+// V101 (Stage 9, split). A photo belongs to the ONE job holding its item. Items
+// can now move between jobs (session.js moveItemsToNewJob, or a moved-out job
+// arriving from the other phone), but every record here also carries its job —
+// `sessionId`, which photosDeleteForSessions() sweeps by. Left stale, deleting or
+// clearing the job the items LEFT would delete the photos of the job they moved
+// to. itemId → jobId for items in exactly one job; an id held by two jobs is
+// ambiguous and maps to null (never guessed).
+function photoItemJobs(sessions) {
+  const out = new Map();
+  for (const s of (sessions || [])) {
+    if (!s || !Array.isArray(s.items)) continue;
+    const sid = String(s.id);
+    for (const it of s.items) {
+      if (!it || it.id == null) continue;
+      const k = String(it.id);
+      if (!out.has(k)) out.set(k, sid);
+      else if (out.get(k) !== sid) out.set(k, null);
+    }
+  }
+  return out;
+}
+
+// Re-label this phone's photos whose item now lives in a different job. The
+// mirror first (synchronous — sync.js and the prune guard read it), then the
+// store. Called after a move, after a pull that changed jobs (sync.js), and at
+// boot once the mirror is read — so a store write that failed heals itself.
+// Resolves the number re-labelled in the store (-1 if the store refused).
+function photosSettleJobs() {
+  const meta = state.photoMeta;
+  if (!meta || !state.photoMetaReady) return Promise.resolve(0);
+  const holders = photoItemJobs(state.sessions);
+  const fix = new Map();
+  for (const id of Object.keys(meta)) {
+    const m = meta[id];
+    const job = holders.get(String(m.i));
+    if (job && job !== m.s) fix.set(id, job);
+  }
+  if (!fix.size) return Promise.resolve(0);
+  for (const [id, job] of fix) meta[id].s = job;
+  state.photoMetaV = (state.photoMetaV || 0) + 1;
+  return _photoTx('readwrite', (store) => {
+    for (const [id, job] of fix) {
+      const req = store.get(id);
+      req.onsuccess = () => {
+        const r = req.result;
+        if (r && r.sessionId !== job) { r.sessionId = job; store.put(r); }
+      };
+    }
+  }).then(({ ok }) => (ok ? fix.size : -1)).catch(() => -1);
+}
+
 // The engineer deletes a photo that is only in the cloud (5A: any phone that can
 // see it). The ledger carries it; sync.js deletes the row and file.
 function photoDeleteCloudOnly(photoId) {

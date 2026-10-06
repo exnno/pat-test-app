@@ -193,7 +193,10 @@ function _syncEmpty(userId) {
            // Entries may also carry b (bytes), t (1 = a preview exists, 1A) and
            // a (taken at). `pulledAt` is the photo rows' own cursor; `need` lists
            // jobs that arrived after that cursor passed their rows.
-           ph: { sent: {}, pulledAt: null, need: [] },
+           // V101 (Stage 9): `mv` = {photoId: jobId} — known photos whose item
+           // moved to another job; their cloud rows' session_id still to be
+           // re-pointed (_syncPhotoMoves). Cleared once the update lands.
+           ph: { sent: {}, pulledAt: null, need: [], mv: {} },
            // V91 (Stage 4, 1A): {jobId: fingerprint of the cloud copy as the pull
            // last READ it}. Not what was sent — what was SEEN. A job is safe in
            // the cloud when this equals the phone's copy (syncJobsSafety).
@@ -290,6 +293,15 @@ function _syncLoad() {
   if (rp && typeof rp === 'object' && typeof rp.pulledAt === 'string' && !isNaN(Date.parse(rp.pulledAt))) out.ph.pulledAt = rp.pulledAt;
   if (rp && typeof rp === 'object' && Array.isArray(rp.need)) {
     out.ph.need = rp.need.filter(x => typeof x === 'string' && x).slice(0, 2000);
+  }
+  // V101: moves still to reach the cloud. Not a fingerprint — hashV keeps it.
+  // Malformed entries dropped: the cost is a cloud row left pointing at the old
+  // job, which syncNoteMoved / the pull's moved-out path would queue again.
+  if (rp && typeof rp === 'object' && rp.mv && typeof rp.mv === 'object' && !Array.isArray(rp.mv)) {
+    let n = 0;
+    for (const k of Object.keys(rp.mv)) {
+      if (typeof rp.mv[k] === 'string' && rp.mv[k] && n < MOVED_OUT_MAX) { out.ph.mv[k] = rp.mv[k]; n++; }
+    }
   }
   // V91: a fingerprint, so hashV drops it with the rest (a read under the old
   // hashing can't vouch for anything).
@@ -1000,6 +1012,98 @@ function _syncApplyRemoteDelete(id) {
   return true;
 }
 
+// ---- V101 (Stage 9, split): items moved to another job ---------------------------
+// A job a phone split carries `movedOut` = {itemId: jobId}. Pure: which of THIS
+// phone's items the cloud copy lacks, whether every one is listed as moved, and
+// to which jobs.
+function _syncMovedOut(local, doc) {
+  const res = { missing: [], dests: [], to: {}, covered: false };
+  if (!local || !doc || !Array.isArray(local.items) || !Array.isArray(doc.items)) return res;
+  const have = new Set(doc.items.map(it => String(it && it.id)));
+  const mo = (doc.movedOut && typeof doc.movedOut === 'object' && !Array.isArray(doc.movedOut)) ? doc.movedOut : {};
+  for (const it of local.items) {
+    const k = String(it && it.id);
+    if (!have.has(k)) res.missing.push(k);
+  }
+  if (!res.missing.length) return res;
+  for (const k of res.missing) {
+    const d = mo[k];
+    if (typeof d !== 'string' || !d || d === String(doc.id)) return res;   // not (validly) moved
+    res.to[k] = d;
+    if (res.dests.indexOf(d) === -1) res.dests.push(d);
+  }
+  res.covered = true;
+  return res;
+}
+function _syncHasJob(id) {
+  return (state.sessions || []).some(s => s && String(s.id) === String(id));
+}
+// A job items moved to is safe to rely on when it is on this phone, cleared from
+// it (the cloud keeps it — V80 C), or was just read live from the cloud. Deleted
+// here, or not in the cloud (yet), is not: the items would be on no job here.
+function _syncMoveDestReady(d, pruned, destRows) {
+  if (_syncHasJob(d) || pruned.has(d)) return true;
+  if ((state.tombstones || []).some(t => t && t.kind === 'session' && String(t.id) === d)) return false;
+  const row = destRows.get(d);
+  return !!(row && row.deleted !== true && _syncValidDoc(row.doc, d));
+}
+// The jobs fetched docs moved items to, when not on this phone: one read by id.
+function _syncFetchMoveDests(c, uid, got, pruned) {
+  const want = [];
+  for (const row of got.values()) {
+    if (!row || row.deleted === true || !_syncValidDoc(row.doc, row.id)) continue;
+    const local = (state.sessions || []).find(s => s && String(s.id) === String(row.id));
+    if (!local) continue;
+    const m = _syncMovedOut(local, row.doc);
+    if (!m.covered) continue;
+    for (const d of m.dests) if (!_syncHasJob(d) && !pruned.has(d) && want.indexOf(d) === -1) want.push(d);
+  }
+  const dest = new Map();
+  if (!want.length) return Promise.resolve(dest);
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  let chain = Promise.resolve();
+  for (let k = 0; k < want.length; k += batch) {
+    const chunk = want.slice(k, k + batch);
+    chain = chain.then(() => c.from('sessions').select(_SYNC_JOB_DOC_COLS).eq('user_id', uid).in('id', chunk))
+      .then((r) => {
+        if (r && r.error) throw r.error;
+        for (const d of ((r && r.data) || [])) {
+          const id = String(d && d.id != null ? d.id : '');
+          if (id && chunk.indexOf(id) !== -1) dest.set(id, d);
+        }
+      });
+  }
+  return chain.then(() => dest);
+}
+// Known cloud photos of moved items now belong to the job they moved to — so a
+// deleted original never takes them (photos half: st.gone[e.s]) — and their
+// rows are queued to be re-pointed. `to` = {itemId: jobId}. Mutates st.
+function _syncNoteMovedInState(st, to) {
+  let n = 0;
+  for (const id of Object.keys(st.ph.sent)) {
+    const e = st.ph.sent[id];
+    const d = to[e.i];
+    if (d && e.s !== d) { e.s = d; st.ph.mv[id] = d; n++; }
+  }
+  return n;
+}
+// session.js moveItemsToNewJob → here, with {itemId: newJobId}. The stored sync
+// state is written whoever is signed in (or nobody): its known photos belong to
+// whichever account they were read for, and a stale job label there is what a
+// later delete would sweep by. Waits for a run (V90: a run holds its own st).
+function syncNoteMoved(to) {
+  if (!to || typeof to !== 'object') return Promise.resolve(0);
+  return syncWhenIdle(() => {
+    let raw = null;
+    try { raw = localStorage.getItem(SYNC_STATE_KEY); } catch { raw = null; }
+    if (!raw) return 0;                     // never synced: nothing known in the cloud
+    const st = _syncLoad();
+    const n = _syncNoteMovedInState(st, to);
+    if (n) { _syncSave(st); try { syncPushSoon(SYNC_RESUME_DELAY_MS); } catch { /* next trigger */ } }
+    return n;
+  });
+}
+
 // ---- the pull ----------------------------------------------------------------------
 // Reads rows changed since the cursor and decides each one. Mutates `st` (the
 // caller saves it) and counts its work into `out`. Resolves to nothing: the
@@ -1011,6 +1115,9 @@ function _syncPull(c, uid, st, out) {
   let changed = false;   // a local job was added, replaced or removed
   let blocked = false;   // something was left undecided → the cursor stays put
   let high = since;
+  // V101 (8A): the jobs items moved TO, fetched for this page by docsFor (id →
+  // row with doc), so a moved-out job never leaves its items on no job here.
+  let destRows = new Map();
 
   function decide(row) {
     const id = String(row && row.id != null ? row.id : '');
@@ -1178,7 +1285,15 @@ function _syncPull(c, uid, st, out) {
     // Decision 3A. The local copy is clean, so by 1A the cloud row would apply —
     // but it has fewer items than the phone holds. Applying it would be the one
     // failure this app cannot have, whatever the cause, so it is asked about.
-    if (doc.items.length < local.items.length) {
+    //
+    // V101 (8A). Unless the items it lacks were MOVED: the other phone split
+    // them into another job and recorded where (`movedOut`). Taken without the
+    // question only when every missing item is listed as moved AND each job they
+    // went to is here already, cleared here (so in the cloud), or fetched in this
+    // very page — it comes down first. Anything short of that asks, as before.
+    const moves = _syncMovedOut(local, doc);
+    const ready = moves.covered && moves.dests.every(d => _syncMoveDestReady(d, pruned, destRows));
+    if (doc.items.length < local.items.length && !ready) {
       _syncHeldNote({ id, reason: 'fewer-items', name,
         localItems: local.items.length, cloudItems: doc.items.length });
       blocked = true; out.held++;
@@ -1186,6 +1301,14 @@ function _syncPull(c, uid, st, out) {
     }
 
     if (defer('update')) return;
+    if (ready) {
+      for (const d of moves.dests) {
+        if (_syncHasJob(d) || pruned.has(d)) continue;
+        _syncTakeJob(st, destRows.get(d).doc);
+        out.added++;
+      }
+      _syncNoteMovedInState(st, moves.to);
+    }
     _syncReplaceSession(id, local, doc);
     st.sent[id] = hash;
     out.applied++; changed = true;
@@ -1245,7 +1368,8 @@ function _syncPull(c, uid, st, out) {
           }
         });
     }
-    return chain.then(() => ({ want: new Set(want), got }));
+    return chain.then(() => _syncFetchMoveDests(c, uid, got, pruned))
+      .then((dest) => ({ want: new Set(want), got, dest }));
   }
   const seen = new Set();
   function page(from) {
@@ -1259,6 +1383,7 @@ function _syncPull(c, uid, st, out) {
         const rows = (r && r.data) || [];
         const fresh = rows.filter((row) => !seen.has(String(row && row.id) + '|' + String(row && row.updated_at)));
         return docsFor(fresh).then((d) => {
+          destRows = d.dest;   // V101
           for (const row of rows) {
             const u = row && row.updated_at;
             const key = String(row && row.id) + '|' + String(u);
@@ -1303,6 +1428,9 @@ function _syncPull(c, uid, st, out) {
       // cached encodings, so this costs one allocation, not a re-encode.
       state.sessions = state.sessions.slice();
       saveSessions();
+      // V101: an applied moved-out job (or anything else that moved an item to
+      // another job) re-labels this phone's photo copies to match.
+      if (typeof photosSettleJobs === 'function') { try { photosSettleJobs(); } catch (e) { /* next boot heals */ } }
     }
     // v81.2: the screen, not just the Sync page. Done here rather than at the
     // end of the whole run because the push half never changes local data —
@@ -3247,7 +3375,8 @@ function syncJobDiff(local, cloud) {
     locked: 'Locked', instrumentId: 'Instrument', instrumentSnapshot: 'Instrument details',
     clientId: 'Client in your list', siteId: 'Site in your list' };
   // V100: the lock time is shown by Locked; the certificate time by Export.
-  const SKIP = { id: 1, items: 1, exportedAt: 1, exportDirty: 1, lockedAt: 1, reportAt: 1 };
+  // V101: movedOut is bookkeeping — the items' own differences say what moved.
+  const SKIP = { id: 1, items: 1, exportedAt: 1, exportDirty: 1, lockedAt: 1, reportAt: 1, movedOut: 1 };
   const jobVal = (key, v) => {
     if (key === 'instrumentId') {
       if (blankish(v)) return '(none)';
@@ -3390,6 +3519,7 @@ function _syncSafeToRepaint() {
   // instrument list a pull can now change). Repainting them would throw that
   // typing away (MAP rule 3), so the repaint is owed until the engineer leaves.
   if (SYNC_NO_REPAINT_VIEWS.indexOf(state.view) !== -1) return false;
+  if (state.moveJob) return false;   // V101: the Move sheet holds a selection and typing
   try {
     const a = document.activeElement;
     if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) return false;
@@ -3560,10 +3690,13 @@ function _syncPhotoRowsPull(c, uid, st, out) {
     if (!id) return;
     if (row.deleted === true) {
       if (ph.sent[id]) { delete ph.sent[id]; known = true; }
+      delete ph.mv[id];   // V101: nothing left to re-point
       if (meta[id] && drop.indexOf(id) === -1) drop.push(id);
       return;
     }
-    const job = String(row.session_id != null ? row.session_id : '');
+    // V101: a move this phone has still to send wins over the row, which is the
+    // OLD job until the update lands — reading it back must not undo the move.
+    const job = String(ph.mv[id] || (row.session_id != null ? row.session_id : ''));
     const item = String(row.item_id != null ? row.item_id : '');
     if (!job || !item) return;
     const had = ph.sent[id];
@@ -3658,6 +3791,39 @@ function _syncThumbUpload(c, uid, id, blob) {
   }).catch(() => false);
 }
 
+// V101 (Stage 9, split): re-point the cloud rows of known photos whose item moved
+// to another job (st.ph.mv, written by syncNoteMoved and the pull's moved-out
+// path). Rows only — the file is named by the photo's own id ({uid}/{id}.jpg), so
+// nothing is copied or uploaded. One update per destination job. Runs BEFORE the
+// deletes, though st.ph.sent already names the new job, so the order is belt and
+// braces. An entry clears only when its update landed and still says the same
+// job; a failure throws to the photos half, which is fail-soft (tried next run).
+function _syncPhotoMoves(c, uid, st, out) {
+  const byJob = new Map();
+  for (const id of Object.keys(st.ph.mv)) {
+    if (!st.ph.sent[id]) { delete st.ph.mv[id]; continue; }   // no longer known in the cloud
+    const job = st.ph.mv[id];
+    if (!byJob.has(job)) byJob.set(job, []);
+    byJob.get(job).push(id);
+  }
+  out.moved = 0;
+  let chain = Promise.resolve();
+  for (const [job, ids] of byJob) {
+    for (let i = 0; i < ids.length; i += SYNC_PHOTO_DELETE_BATCH) {
+      const chunk = ids.slice(i, i + SYNC_PHOTO_DELETE_BATCH);
+      chain = chain
+        .then(() => c.from('photos').update({ session_id: job, last_modified: new Date().toISOString() })
+          .eq('user_id', uid).in('id', chunk))
+        .then((r) => {
+          if (r && r.error) throw r.error;
+          for (const id of chunk) if (st.ph.mv[id] === job) { delete st.ph.mv[id]; out.moved++; }
+          _syncSave(st);
+        });
+    }
+  }
+  return chain;
+}
+
 function _syncPhotosHalf(c, uid, st) {
   const out = { up: 0, gone: 0, more: 0, removed: 0, thumbs: 0 };
   return Promise.resolve().then(() => {
@@ -3666,7 +3832,7 @@ function _syncPhotosHalf(c, uid, st) {
 
     // 0. v89: rows down first, so deletes made elsewhere are known before this
     //    phone decides what to send.
-    return _syncPhotoRowsPull(c, uid, st, out).then(() => {
+    return _syncPhotoRowsPull(c, uid, st, out).then(() => _syncPhotoMoves(c, uid, st, out)).then(() => {
       const meta = state.photoMeta || {};
       const now = new Date().toISOString();
 
@@ -3699,7 +3865,7 @@ function _syncPhotosHalf(c, uid, st) {
             chunk.map(id => _syncPhotoPath(uid, id)).concat(chunk.map(id => _syncThumbPath(uid, id)))))
           .then((r) => {
             if (r && r.error) throw r.error;
-            for (const id of chunk) { delete st.ph.sent[id]; out.gone++; }
+            for (const id of chunk) { delete st.ph.sent[id]; delete st.ph.mv[id]; out.gone++; }
             _syncSave(st);
           });
       }

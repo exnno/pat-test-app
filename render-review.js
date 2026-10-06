@@ -207,6 +207,7 @@ function renderOverview() {
         <button class="bulk-menu-btn" data-action="bulk-edit-mode" data-arg="type" data-bulk-edit="type">Change type</button>
         <button class="bulk-menu-btn" data-action="bulk-edit-mode" data-arg="notes" data-bulk-edit="notes">Change notes</button>
         <button class="bulk-menu-btn danger" data-action="bulk-edit-mode" data-arg="delete" data-bulk-edit="delete">Delete selected</button>
+        <button class="bulk-menu-btn bulk-menu-move" id="bulk-move-btn" data-action="move-job-open">Move to a new job\u2026</button>
       </div>
     </div>
   ` : '';
@@ -345,8 +346,97 @@ function renderOverview() {
       ${bulkTypeDialog}
       ${bulkNotesDialog}
       ${siteNotesSheet}
+      ${renderMoveJobSheet(sess)}
     </div>
   `;
+}
+
+// V101 (Stage 9, split): Move to a new job. Three steps in one sheet slot —
+// 'form' (what is moving, then client + site, More details), 'confirm' (the
+// "Are you sure?" — buttons only, so a repaint is allowed) and 'blocked' (why
+// not). The form's fields write state on input (data-input-action) and the sheet
+// never renders itself while open (MAP rule 3). Logic: session.js.
+function renderMoveJobSheet(sess) {
+  const m = state.moveJob;
+  if (!m || !sess || String(m.from) !== String(sess.id)) return '';
+  const head = (title) => `
+      <div class="modal-backdrop" id="move-job-backdrop" data-action="move-job-close"></div>
+      <div class="bulk-sheet move-job-sheet" role="dialog" aria-label="${escapeHTML(title)}">
+        <div class="bulk-sheet-handle"></div>
+        <div class="bulk-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+          <button class="fail-close-btn" id="move-job-close" data-action="move-job-close" aria-label="Cancel">\u00d7</button>
+        </div>`;
+  if (m.step === 'blocked') {
+    return head('Can\u2019t move these items') + `
+        <p class="move-job-why">${escapeHTML(m.why || '')}</p>
+        <button class="btn-primary" id="move-job-ok" data-action="move-job-close">OK</button>
+      </div>`;
+  }
+  const sum = moveJobSummary(sess, m.ids);
+  const n = sum.n;
+  const plural = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+  if (m.step === 'confirm') {
+    const from = sess.site || sess.name || 'this job';
+    const to = moveJobTitle(m.client, m.site);
+    const bits = [plural(n, 'item')];
+    if (sum.fails) bits.push(plural(sum.fails, 'fail'));
+    if (sum.photos) bits.push(plural(sum.photos, 'photo'));
+    const cert = (sess.certNo || sess.reportAt) ? `
+        <p class="move-job-warn">\u26a0 A certificate has already been made for this job${sess.certNo ? ' (No. ' + escapeHTML(sess.certNo) + ')' : ''}. It lists these items \u2014 make it again after moving. This job keeps its certificate number; the new job gets its own.</p>` : '';
+    const goes = (sum.photos || sum.pins) ? `
+        <p class="muted move-job-note">Their ${[sum.photos ? 'photos' : '', sum.pins ? 'map pins' : ''].filter(Boolean).join(' and ')} go with them.</p>` : '';
+    return head('Are you sure?') + `
+        <p class="move-job-msg">Move ${escapeHTML(bits.join(' \u00b7 '))} from <strong>${escapeHTML(from)}</strong> to a new job for <strong>${escapeHTML(to)}</strong>?</p>${cert}${goes}
+        <button class="btn-primary" id="move-job-go" data-action="move-job-go">Move ${plural(n, 'item')}</button>
+        <button class="btn-secondary move-job-back" id="move-job-back" data-action="move-job-back">Back</button>
+      </div>`;
+  }
+  // 'form'
+  const rows = sum.items.map((it) => {
+    const res = it.result === 'fail' ? '<span class="fail-text">FAIL</span>' : (it.result === 'pass' ? '<span class="pass-text">PASS</span>' : '');
+    const ph = (typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id) : 0;
+    const bits = [it.assetNo, it.itemType, it.location].filter(x => x != null && String(x).trim() !== '').map(x => escapeHTML(String(x)));
+    return `<li class="move-job-item"><span>${bits.join(' \u00b7 ') || '(no details)'}</span> ${res}${ph ? ' \ud83d\udcf7' + ph : ''}${mapPinOf(it) ? ' \ud83d\udccd' : ''}</li>`;
+  }).join('');
+  const clientOpts = Array.from(new Set((state.clients || []).map(c => c && c.name).filter(Boolean)))
+    .map(x => `<option value="${escapeHTML(x)}"></option>`).join('');
+  const siteOpts = Array.from(new Set((state.sites || []).map(x => x && x.name).filter(Boolean)))
+    .map(x => `<option value="${escapeHTML(x)}"></option>`).join('');
+  const insts = (typeof instrumentList === 'function') ? instrumentList() : [];
+  const tester = insts.length ? `
+            <label class="label" for="move-job-tester">Tester</label>
+            <select class="input" id="move-job-tester" data-change-action="move-job-field" data-arg="instrumentId">
+              <option value=""${m.instrumentId ? '' : ' selected'}>The tester in use</option>
+              ${insts.map(i => `<option value="${escapeHTML(String(i.id))}"${String(i.id) === String(m.instrumentId) ? ' selected' : ''}>${escapeHTML(instrumentDisplayName(i))}</option>`).join('')}
+            </select>` : '';
+  const field = (id, key, label, extra) => `
+            <label class="label" for="${id}">${label}</label>
+            <input class="input" id="${id}" data-input-action="move-job-field" data-arg="${key}" value="${escapeHTML(m[key] || '')}" ${extra || ''}>`;
+  return head(`Move ${plural(n, 'item')} to a new job`) + `
+        <div class="sheet-scroll move-job-scroll">
+          <p class="muted move-job-note">Moving:</p>
+          <ul class="move-job-list">${rows}</ul>
+          <label class="label" for="move-job-client">New job\u2019s client</label>
+          <input class="input" id="move-job-client" data-input-action="move-job-field" data-arg="client" value="${escapeHTML(m.client || '')}" list="move-job-clients" autocomplete="off" placeholder="Client">
+          <datalist id="move-job-clients">${clientOpts}</datalist>
+          <label class="label" for="move-job-site">New job\u2019s site</label>
+          <input class="input" id="move-job-site" data-input-action="move-job-field" data-arg="site" value="${escapeHTML(m.site || '')}" list="move-job-sites" autocomplete="off" placeholder="Site">
+          <datalist id="move-job-sites">${siteOpts}</datalist>
+          <details class="move-job-more">
+            <summary>More details</summary>
+            ${field('move-job-name', 'name', 'Job name', 'autocomplete="off"')}
+            ${field('move-job-date', 'date', 'Date', 'type="date"')}
+            ${field('move-job-engineer', 'engineer', 'Engineer', 'autocomplete="off"')}
+            ${tester}
+            ${field('move-job-prefix', 'prefix', 'Asset prefix', 'autocomplete="off" autocapitalize="characters"')}
+            <p class="muted move-job-note">Copied from this job. Job notes, the certificate number and the lock stay here.</p>
+          </details>
+        </div>
+        <p class="move-job-error" id="move-job-error" role="alert">${escapeHTML(m.error || '')}</p>
+        <button class="btn-primary sheet-pin" id="move-job-continue" data-action="move-job-continue">Continue</button>
+      </div>`;
 }
 
 function refreshOverviewBody() {
