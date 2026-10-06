@@ -275,18 +275,24 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 37i */
-  t.group('37i — the 100 moment: welcome, replay, sparks once (9A)', () => {
-    t.eq(boot().val('WELCOME_VERSION'), 'V100', 'the welcome rolls');
-    const app = boot({ localStorage: { 'pat:onboarded': '1', 'pat:v99welcome': '1' } });
+  // V101: the welcome rolled on and no longer opens with the 100 moment — it
+  // lives on as About's replay, which is what stays tested here (sparks once,
+  // through the replay sheet instead of the welcome).
+  t.group('37i — the 100 moment: replay, sparks once (9A); the welcome moved on (V101)', () => {
+    t.ok(boot().val('WELCOME_VERSION') !== 'V100', 'the welcome has rolled past V100');
+    const app = boot({ localStorage: { 'pat:onboarded': '1' } });
     app.state().onboardedV33Seen = true;
     app.state().welcomeSeen = false;
     app.fn('render')();
-    t.includes(app.html(), 'One hundred versions of PATGo', 'the welcome opens with the 100 moment');
-    t.includes(app.html(), 'Reminders.', 'and says what is new');
+    t.excludes(app.html(), 'One hundred versions of PATGo', 'the newer welcome no longer opens with the 100 moment');
+    app.state().welcomeSeen = true;
+    app.fn('setView')('settingsAbout');
+    tap(app, 'party-open');
+    t.includes(app.html(), 'One hundred versions of PATGo', 'the replay shows the 100 moment');
     t.ok(app.state().partySparked, 'its sparks are fired once');
     app.fn('render')();
     t.excludes(app.html(), 'id="party-sparks"', 'a repaint does not bring them back');
-    app.state().welcomeSeen = true;
+    tap(app, 'party-close');
     app.fn('setView')('settingsAbout');
     t.includes(app.html(), 'data-action="party-open"', 'About has the replay button');
     tap(app, 'party-open');
@@ -318,7 +324,7 @@ module.exports = async function () {
     t.eq(app.state().egg, null, 'a slow tap starts the count again');
     for (let i = 0; i < 6; i++) tap(app, 'about-title-tap');
     t.ok(app.state().egg && app.state().egg.step === 0, 'seven quick taps open it');
-    t.includes(app.html(), 'PATGo V100 self-test', 'the self-test sheet');
+    t.includes(app.html(), 'PATGo ' + app.val('APP_VERSION') + ' self-test', 'the self-test sheet');
     t.includes(app.html(), 'class="egg-row is-testing" id="egg-row-0"', 'the first reading is being taken');
     await tick(800);
     t.eq(app.state().egg.step, 1, 'and the test moves on by itself');
