@@ -59,7 +59,7 @@ is no toolchain to rot between releases.
 
 ```
 index.html            script tags, in a load order that matters
-config.js … boot.js   31 first-party modules (see below)
+config.js … boot.js   32 first-party modules (see below)
 styles.css            one stylesheet, ordered by release, banner-indexed
 sw.js                 service worker + the precache ASSETS list
 manifest.webmanifest  PWA manifest
@@ -71,15 +71,14 @@ supabase/             server SQL: schema.sql (run once), isolation-test.sql (eve
                       v93-archive.sql (V93 change for an existing project)
 harness/              the committed test harness — NOT shipped
 MAP.md  FEATURES.md  BACKLOG.md
-PAThandoff_vNN.md     the canonical state block for the current release
 ```
 
-### Load order — 31 files, and it is not arbitrary
+### Load order — 32 files, and it is not arbitrary
 
 ```
 config → data → state → utils → storage → clients → instruments → sqp
-→ multipick → feedback → bugreport → photos → csv → backup → session
-→ settings-actions → setup → tour → onboarding → report → pdfpreview
+→ multipick → feedback → bugreport → photos → csv → backup → snapshots
+→ session → settings-actions → setup → tour → onboarding → report → pdfpreview
 → render-core → render-review → render-settings → render-help
 → cloud → sync → scanner → events → dispatch → boot
 ```
@@ -88,7 +87,7 @@ config → data → state → utils → storage → clients → instruments → 
 readability choice: `state.js` seeds itself from `data.js` constants in a
 top-level initialiser that runs at load. `boot.js` must be last — it runs on load.
 
-`sw.js` ASSETS lists **34** `.js` entries: these 31 plus the two jsPDF files and
+`sw.js` ASSETS lists **35** `.js` entries: these 32 plus the two jsPDF files and
 `supabase.umd.js`, which are precached but injected on demand rather than
 script-tagged.
 

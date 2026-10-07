@@ -1,4 +1,4 @@
-# PATGo — Code Map (V104)
+# PATGo — Code Map (V105)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -65,8 +65,8 @@ is discoverable from the file you happen to be editing.
 
 9. **Feature-flag polarity.** Default-ON flags read `!== false`; default-OFF flags
    read `=== true`. Copying the wrong neighbour silently switches a feature on for
-   every existing user. `SCANNER_KEY` and `READINGS_CHECK_KEY` (V104) are the only
-   default-ON flags read as `!== '0'` — a third needs adding to 07d's list. ⚠ `SCANNER_PAIRED_KEY` (v67) sits on the NEXT LINE in
+   every existing user. `SCANNER_KEY`, `READINGS_CHECK_KEY` (V104) and `SNAPSHOTS_KEY`
+   (V105) are the only default-ON flags read as `!== '0'` — a fourth needs adding to 07d's list. ⚠ `SCANNER_PAIRED_KEY` (v67) sits on the NEXT LINE in
    storage.js and is ordinary opt-in `=== '1'`. Harness-asserted both ways.
 
 10. **`backupVersion` is 5.** Additive fields ride through encode/decode wholesale
@@ -138,11 +138,11 @@ is discoverable from the file you happen to be editing.
 
 ---
 
-## Load order (index.html) — 31 first-party files
+## Load order (index.html) — 32 first-party files
 
 `config` → `data` → `state` → `utils` → `storage` → `clients` → `instruments` → `sqp`
 → `multipick` → `feedback` → `bugreport` → `photos` → `csv` → `backup`
-→ `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
+→ `snapshots` → `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
 → `pdfpreview` → `render-core` → `render-review` → `render-settings` → `render-help`
 → `cloud` → `sync` → `scanner` → `events` → `dispatch` → `boot`
 
@@ -151,7 +151,7 @@ choice. `state.js` seeds `itemTypes`/`failReasons` from `DEFAULT_ITEM_TYPES` /
 `DEFAULT_FAIL_REASONS` in its top-level initialiser, which runs at load, so
 `data.js` must precede it. Harness 09h/09i, mutation M61.
 
-`sw.js` ASSETS lists **34** `.js` entries: these 31 plus 3 lazy-loaded vendored
+`sw.js` ASSETS lists **35** `.js` entries: these 32 plus 3 lazy-loaded vendored
 files (precached, not `<script>` tags): the jsPDF pair (report.js injects them)
 and `supabase.umd.js` (cloud.js injects it, v79).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
@@ -169,7 +169,7 @@ DATA-ONLY file needs a CONSTANT probe instead — top-level `const` never attach
 to `window`, so the `requiredFns` loop cannot see it whatever name you use.
 Harness 09e/09f/09k/09l and mutations M54/M55/M64/M65 hold all of this.
 ⚠ EXCEPT an optional subsystem (rule 6): `photos.js`, `scanner.js`,
-`bugreport.js`, `cloud.js`, `sync.js` are deliberately NOT probed — a probe would make a
+`bugreport.js`, `cloud.js`, `sync.js`, `snapshots.js` (V105) are deliberately NOT probed — a probe would make a
 missing optional file block boot, which is the opposite of the rule.
 
 ---
@@ -197,6 +197,16 @@ no code change. Fixed OLD dates stay only where a test means an old job.
 ⚠ v88: the fake IndexedDB now completes a transaction AFTER its requests and
 filters index lookups by key. Before V88 every photo READ in the harness came
 back empty — no test had ever read a photo back. Do not revert either.
+⚠ V105: the fake IndexedDB keeps ONE namespace of store names across every
+database (so `snapshots` must never share a store name with `photos`), and a
+database opens asynchronously at boot — a test that seeds the snapshot store
+must `await snapshotsLoad()` first or the upgrade replaces what it seeded (42).
+⚠ V105: every restore applies AFTER the safety copy is kept (an async step), so
+a restore test awaits a tick after confirming (03f/03f2/03i, 41f).
+⚠ V105: a test restores a FILE with `await restoreFile(app, file)` (fixture.js),
+which waits for the read to finish (a new sheet on screen, max 2 s). Never a fixed
+`tick(5)`: the stub awaits a real Blob read, and under load 5 ms flaked 03f and let
+03h pass vacuously.
 See `harness/README.md`.
 
 ---
@@ -474,9 +484,15 @@ Cell resolution per column, export/share/copy, import parsing and conflict flow.
 instrument columns via `instrumentForSession()` (rule 7, source-guarded in the
 harness). Import learns new clients/sites into clients.js.
 
-### backup.js (~340 ln) — backup / restore
+### backup.js (~530 ln) — backup / restore
 `buildBackup`, restore, the export reminder/snooze logic.
 **Touch to:** change the JSON backup shape or restore path.
+⚠ V105: the restore is ONE routine, `applyBackupData(data, opts)`, used by a
+backup file AND a snapshot (snapshots.js) — never write a second.
+`opts.markExported` is true for a file, false for a snapshot (a copy on the same
+phone is not a backup). Both go through `restoreWithSafetyCopy()`, which keeps a
+"before restore" snapshot first and ASKS if that copy is refused (harness 42f,
+M688/M689). The apply therefore runs a moment after the confirm, not inside it.
 **⚠ Keep old-backup compatibility; bump `backupVersion` only for a genuine
 incompatible change (rule 10).**
 ⚠ v79: NO sign-in data in a backup, ever; restore ignores a V43 `authUser`
@@ -493,6 +509,28 @@ sync fingerprints (SYNC_STATE_KEY) are NEVER in a backup. Harness 16j.
 backup interval comes from `backupReminderDays()` ('off' silences even
 "never backed up"); `BACKUP_REMINDER_DAYS` is only the default. ⚠ Instruments restore **after** the flat fields. Boolean flags restore
 only when the backup actually holds a boolean (absence ≠ off).
+
+### snapshots.js (~390 ln) — daily snapshots (V105, S14) — OPTIONAL SUBSYSTEM
+Once a day (first open, or the app coming back to the front) keeps exactly what a
+backup file holds in its own IndexedDB database `patgo-snapshots` (store
+`snapshots`), only when the work changed since the newest copy; keeps 7 plus one
+"before restore" safety copy. Restore / Save as file from the Backup page.
+**Touch to:** change when or how many copies are kept, the Backup page's
+snapshot section (`snapshotsSectionHTML`), or the safety copy.
+**Coupling:** restores through backup.js `applyBackupData` (never its own
+apply). Started from boot.js INSIDE the good-load block, after the first render
+(`snapshotsBoot`), so a failed load is never kept. The Backup page
+(render-settings.js) includes the section only if this file loaded; dispatch.js
+wires `snapshot-restore`, `snapshot-save`, `snapshots-toggle`, all typeof-guarded.
+Switch `SNAPSHOTS_KEY` default ON (rule 9) — backed up, NOT synced;
+`SNAPSHOT_FAIL_KEY` is a per-device note, never backed up.
+⚠ WRITE FIRST, THEN PRUNE: the oldest copy is deleted only after the new one
+has committed (42e, M679). ⚠ The signature leaves out `exportedAt` and
+`lastBackupAt` or "nothing changed" never matches (M682). ⚠ Photos are never in
+a snapshot (4A). ⚠ `_snapCache` holds the records WITH json so Save as file runs
+synchronously inside the tap. ⚠ The safety copy is taken even with the daily
+switch OFF — it exists only when a restore is about to replace everything.
+⚠ Factory reset (V106) must delete this database and `SNAPSHOT_FAIL_KEY`.
 
 ### setup.js (~260 ln) — export/import Setup bundle
 Config-only shareable bundle: presets & lists / report settings / CSV columns /
@@ -816,6 +854,8 @@ Instrument settings live in **instruments.js**. The stats footer reads
 ⚠ v73: About, Glossary, Contact, the bug-sheet markup and the cloud stubs left
 for **render-help.js**, and those pages still call `renderSettingsSubHeader()`
 from here. The About changelog is no longer in this file.
+V105: the Backup page's "Daily snapshots" section is a shell here; its inside is
+`snapshotsSectionHTML()` (snapshots.js), painted in place into `#snapshots-block`.
 V100: `renderSettingsReminders()` (view `settingsReminders`, Phone & Display) and
 `reminderSettingsSummary()`; labels in `REMINDER_LABELS`, values validated by
 **session.js** `normaliseReminders`, written by **settings-actions.js**
@@ -1193,6 +1233,8 @@ the crash fallback screens, the v69 one-time data repair call.
 **Touch to:** change the startup sequence, the SW update banner or the integrity
 guard. V99: `mapPinResume()` (session.js) runs before the first
 `loadFormForCursor()`/`render()` — it may set the active job, view and cursor.
+V105: `snapshotsBoot()` runs after the first render, inside the good-load block,
+typeof-guarded and NOT probed (snapshots.js is optional — rule 6).
 **Coupling:** the integrity guard verifies the critical cross-file functions
 loaded before any storage write and skips `load()`/`render()`/`save()` if not —
 this is the guard against the duplicate-`const` data-loss class (rule 1).

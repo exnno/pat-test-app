@@ -823,6 +823,10 @@ registerActions({
 
   // Backup & Restore + prune + about
   'backup-export': () => downloadBackup(),
+  // V105 (S14, 5B): a snapshot's two buttons. Both typeof-guarded — snapshots.js
+  // is optional (MAP rule 6).
+  'snapshot-restore': (arg) => { if (typeof snapshotRestoreAsk === 'function') snapshotRestoreAsk(arg); },
+  'snapshot-save': (arg) => { if (typeof snapshotSaveFile === 'function') snapshotSaveFile(arg); },
   // V87 (4A): the "not saved" sheet. Backing up leaves the sheet up (the item is
   // still not in storage); Clear goes to Phone Storage (V97), where clearing lives.
   'save-fail-backup': () => downloadBackup(),
@@ -1281,6 +1285,13 @@ registerChangeActions({
 
   // V104 (S10): the readings check switch (default ON) and the earth ceiling.
   // Same instant-persist pattern as readings-toggle; both sync (settings_work).
+  // V105 (S14, 7A): the daily-snapshots switch. Not synced — it is about this
+  // phone's storage. render() is safe: the Backup page holds no text box.
+  'snapshots-toggle': (checked) => {
+    if (typeof setSnapshotsEnabled === 'function') setSnapshotsEnabled(checked);
+    else { state.snapshotsEnabled = !!checked; localStorage.setItem(SNAPSHOTS_KEY, state.snapshotsEnabled ? '1' : '0'); }
+    render();
+  },
   'readings-check-toggle': (checked) => {
     state.readingsCheckEnabled = !!checked;
     localStorage.setItem(READINGS_CHECK_KEY, state.readingsCheckEnabled ? '1' : '0');

@@ -234,9 +234,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Readings check.</strong> If you record test readings, a PASS reading outside the usual limit now gets an amber note under its box &mdash; insulation below 1.0 M&Omega; (Class I) or 2.0 M&Omega; (Class II), or leakage over 5 mA.</li>
-        <li><strong>Asked once, never decided for you.</strong> Saving a pass with a reading outside the limit asks first: <strong>Change to FAIL</strong> (your readings come with it) or <strong>Save as PASS anyway</strong>. Readings typed as &ldquo;&lt;5&rdquo; or &ldquo;&ge;19.99&rdquo; are only flagged when they're definitely outside.</li>
-        <li><strong>Earth is your call.</strong> The earth limit depends on the lead, so you set the highest you'd pass without checking (0.15 &Omega; to start). Switch the check off or change the earth limit in Settings &rarr; Logging &rarr; Test Readings.</li>
+        <li><strong>Daily snapshots.</strong> Once a day PATGo now quietly keeps a copy of your jobs and settings on this phone &mdash; the last 7 days you changed something. Nothing for you to do.</li>
+        <li><strong>Undo a mistake.</strong> If something goes wrong, Settings &rarr; Backup &amp; Restore lists them by day: <strong>Restore</strong> puts that day back, or <strong>Save as file</strong> turns one into a normal backup file.</li>
+        <li><strong>Restores can be undone.</strong> Before any restore, PATGo keeps a copy of what's on the phone first. Snapshots live inside the app, so keep exporting backups for a lost or broken phone. Photos aren't included.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

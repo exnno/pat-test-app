@@ -518,6 +518,15 @@ let state = {
   readingsSheetStage: 'entry',
   readingsCarry: null,
 
+  // V105 (S14): daily snapshots. snapshotsEnabled is persisted (SNAPSHOTS_KEY)
+  // and backed up, not synced. snapList (metadata only, newest first; null until
+  // the database has answered), snapBytes and snapUnavailable are published by
+  // snapshots.js for the Backup page — transient, never saved.
+  snapshotsEnabled: true,
+  snapList: null,
+  snapBytes: 0,
+  snapUnavailable: false,
+
   // v65: HID barcode scanner. ONE persisted flag; everything else here is
   // transient and deliberately so.
   //   scannerEnabled     — the only thing saved. DEFAULT ON (see SCANNER_KEY in

@@ -8,10 +8,25 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V104
-Stage 10 (snapshots, then factory reset), then permanent cloud
+### Next after V105
+Stage 10 part 2 — factory reset (spec round below), then permanent cloud
 delete + storage used (Stage 5 part 3), then a housekeeping release (favicon set,
-remove dead `setupLongPress`, the sheet-markup guard). Full order: roadmap v4.16.
+remove dead `setupLongPress`, the sheet-markup guard). Full order: roadmap v4.18.
+
+### V105 residuals (known, accepted)
+- Restoring (a file or a snapshot) while signed in goes through sync exactly as
+  restoring a backup file always has — V105 changes nothing there and did not
+  re-test it. By the fingerprint rules (sync.js header) a restored job that
+  differs from what this phone last sent reads as this phone's own change; jobs
+  made after the copy and already in the cloud are not removed from it. Snapshots
+  are aimed at phones that never sign in; worth a deliberate look before Stage 10
+  part 2, since reset has the same question.
+- A snapshot is taken on the first open of the (UTC) day — `todayISO()`, as the
+  storage banner — so between midnight and 1am in summer it counts as yesterday.
+- Snapshots live inside the app: deleting PATGo from the home screen, or the phone
+  clearing its storage, takes them too. They don't stop the backup reminder.
+- The safety copy is taken even with Daily snapshots switched off (Claude's call,
+  flagged at the build) — say if the switch should cover it too.
 
 ### V104 residuals (known, accepted)
 - A V103 phone doesn't carry the readings check settings in the settings_work
@@ -155,6 +170,9 @@ V94 adds: UNDO_KEY (`pat:undo`, the Undo switch — a setting, settings level).
 V95 adds nothing (`state.descTextMode` is memory only).
 V96 adds nothing (`state.mgrReturnView` is memory only).
 V97 adds nothing (no new keys).
+V105 adds: the IndexedDB database `patgo-snapshots` (delete it — it holds
+copies of every job) and SNAPSHOT_FAIL_KEY (a note); SNAPSHOTS_KEY (the switch —
+a setting, settings level). Reset should keep no safety copy of what it wipes.
 
 ### Visual inspection tick (PN) — postponed at V94 (11D)
 Peter worried it would harm the entry screen. Placements offered at the V94 round:

@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V104';
+const APP_VERSION = 'V105';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V104';
+const WELCOME_VERSION = 'V105';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -1220,6 +1220,15 @@ const STORAGE_BANNER_PCT = 80;
 // ISO day (yyyy-mm-dd) the Jobs-screen storage banner was last dismissed. Per
 // device, a nag timer — NOT in backups or setup exports. Factory reset must clear it.
 const STORAGE_BANNER_KEY = 'pat:storageBannerDay';
+
+// V105 (S14, 7A): daily snapshots (snapshots.js). ⚠ DEFAULTS ON — only an
+// explicit '0' turns them off, the same absent-means-on reading as SCANNER_KEY
+// (MAP rule 9). Backed up; NOT synced (it is about this phone's storage).
+const SNAPSHOTS_KEY = 'pat:snapshots';
+// ISO day the last daily snapshot was refused (usually a full phone); removed
+// on the next success. Per device, a status note only — NOT in backups or setup
+// exports. Factory reset must clear it.
+const SNAPSHOT_FAIL_KEY = 'pat:snapshotFailDay';
 
 // V91 (Stage 4, O4 — 8A/9A): the tidy-up offer. Signed in only.
 // PHOTO_AGE_KEY — photos taken more than this many months ago, known to be in

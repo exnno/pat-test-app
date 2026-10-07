@@ -900,6 +900,16 @@ function renderSettingsBackup() {
         <button class="backup-action-btn" id="repair-undo-btn" data-action="repair-undo">Undo the correction</button>
       </div>
   ` : '';
+  // V105 (S14): Daily snapshots. The inner part is snapshotsSectionHTML()
+  // (snapshots.js), painted IN PLACE into #snapshots-block when the database
+  // answers. Left out entirely if snapshots.js is missing (MAP rule 6).
+  const snapshotsBlock = (typeof snapshotsSectionHTML === 'function') ? `
+      <div class="settings-section">
+        <h2 class="h2">Daily snapshots</h2>
+        <p class="muted">Once a day, PATGo quietly keeps a copy of your jobs and settings on this phone &mdash; the last ${typeof SNAPSHOT_KEEP === 'number' ? SNAPSHOT_KEEP : 7} days you changed something. You don't need to do anything. They're for undoing a mistake, not for a lost phone: they live inside the app, so keep exporting backups too. Photos aren't included.</p>
+        <div id="snapshots-block">${snapshotsSectionHTML()}</div>
+      </div>
+  ` : '';
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Backup & Restore')}
@@ -917,6 +927,8 @@ function renderSettingsBackup() {
         <input type="file" id="backup-import-file" data-change-action="backup-import-file" accept="application/json,.json" style="display:none">
         <button class="backup-action-btn danger" id="backup-import-btn" data-action="backup-import">⬆ Import backup (.json)</button>
       </div>
+
+      ${snapshotsBlock}
 
       ${renderPhotoBackupSection()}
 

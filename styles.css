@@ -1371,6 +1371,32 @@ body.has-update-banner .screen { padding-top: 64px; }
   color: var(--fail);
 }
 
+/* V105 (S14): Daily snapshots on the Backup page */
+.snapshot-list { margin-top: 12px; }
+.snapshot-row {
+  background: var(--card-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  margin-bottom: 8px;
+}
+.snapshot-row-title { font-size: 15px; font-weight: 600; color: var(--text); }
+.snapshot-row-sub { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.snapshot-row-btns { display: flex; gap: 8px; margin-top: 10px; }
+.snapshot-btn {
+  flex: 1;
+  padding: 10px 12px;
+  font-size: 14px;
+  font-weight: 600;
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+}
+.snapshot-btn:active { background: var(--row-active); }
+.snapshot-total { margin-top: 4px; font-size: 12px; }
+.snapshot-fail-note { margin: 10px 0 0; font-size: 13px; color: var(--warn-soft-text); }
+
 /* Storage usage card */
 .storage-card {
   background: var(--card-bg);

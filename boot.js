@@ -437,6 +437,15 @@ try {
 } catch (e) {
   console.error('Storage protection check failed (non-fatal).', e);
 }
+// V105 (S14, 2A): the day's snapshot. Inside the good-load block on purpose —
+// a load that failed must never be kept as a snapshot. After the first render,
+// async and fail-soft like the photo index: nothing waits on it, and a missing
+// snapshots.js or a refused database changes nothing else (MAP rule 6).
+try {
+  if (typeof snapshotsBoot === 'function') snapshotsBoot();
+} catch (e) {
+  console.error('Daily snapshot failed to start (non-fatal).', e);
+}
 }   // end if (_bootLoadOK)  — v61.2
 }   // end else (boot integrity OK)
 // registerServiceWorker() runs REGARDLESS of everything above, and MUST stay

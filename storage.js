@@ -572,6 +572,8 @@ function loadV11Settings() {
   // V104 (S10): the check DEFAULTS ON — only an explicit '0' is off.
   state.readingsCheckEnabled = localStorage.getItem(READINGS_CHECK_KEY) !== '0';
   state.readingsEarthLimit = normaliseEarthLimit(localStorage.getItem(READINGS_EARTH_LIMIT_KEY));
+  // V105 (S14, 7A): daily snapshots DEFAULT ON — only an explicit '0' is off.
+  state.snapshotsEnabled = localStorage.getItem(SNAPSHOTS_KEY) !== '0';
   state.failReasonTags = loadFailReasonTags();
 
   // v65: HID barcode scanner. ⚠ Note the comparison — this flag DEFAULTS ON, so
@@ -975,6 +977,8 @@ function _saveSettingsWrites() {
   // V104 (S10): written explicitly so OFF persists (absent reads as on).
   localStorage.setItem(READINGS_CHECK_KEY, state.readingsCheckEnabled ? '1' : '0');
   localStorage.setItem(READINGS_EARTH_LIMIT_KEY, String(normaliseEarthLimit(state.readingsEarthLimit)));
+  // V105 (S14): written explicitly so OFF persists (absent reads as on).
+  localStorage.setItem(SNAPSHOTS_KEY, state.snapshotsEnabled === false ? '0' : '1');
   localStorage.setItem(FAIL_REASON_TAGS_KEY, JSON.stringify(state.failReasonTags || {}));
   // v65: barcode scanner on/off. Written explicitly as '1'/'0' (rather than
   // relying on the absent-means-on default) so that switching it OFF actually

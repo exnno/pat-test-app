@@ -8,6 +8,8 @@
 
 // ============== PATGo PWA — v22 — Backup / Restore ==============
 // Backup build/restore, export-state markers... NOTE only buildBackup/restore here.
+// V105: the restore is applyBackupData(), shared by a file and a snapshot
+// (snapshots.js); restoreWithSafetyCopy() keeps a copy before either.
 
 // ---------- Backup / Restore (v7) ----------
 // Full app state -> downloadable .json file. Restore replaces all current data.
@@ -70,6 +72,9 @@ function buildBackup() {
     // backupVersion bump; an older backup restores with the defaults.
     readingsCheckEnabled: state.readingsCheckEnabled,
     readingsEarthLimit: state.readingsEarthLimit,
+    // V105 (S14): the daily-snapshots switch. Additive — no backupVersion bump;
+    // an older backup restores with this phone's own setting.
+    snapshotsEnabled: state.snapshotsEnabled !== false,
     // v65: barcode scanner on/off. Additive and missing-field-tolerant, so NO
     // backupVersion bump — a pre-v65 backup simply has no key and restores with
     // the default (ON), which is also what a fresh install gets.
@@ -215,9 +220,23 @@ function restoreBackupFromFile(file) {
         `This file contains ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'} ` +
         `and ${itemCount} item${itemCount === 1 ? '' : 's'} in total` +
         (data.exportedAt ? `, exported ${new Date(data.exportedAt).toLocaleString('en-GB')}` : '') +
-        `. This will REPLACE all current data on this device and cannot be undone.`,
+        `. This will REPLACE all current data on this device. A copy of what's here now is kept first, so you can undo it from Daily snapshots on the Backup page.`,
       confirmLabel: 'Replace & restore',
-      onConfirm: () => {
+      onConfirm: () => restoreWithSafetyCopy(() => applyBackupData(data, { markExported: true })),
+    });
+  };
+  reader.onerror = () => openInfoSheet({ title: 'Couldn\u2019t read that file', message: 'The file couldn\u2019t be opened. Please try again.' });
+  reader.readAsText(file);
+}
+
+// V105: the restore itself, lifted out of restoreBackupFromFile so a snapshot
+// (snapshots.js) restores through EXACTLY the same validators and steps as a
+// file. The body below is the pre-V105 apply block, moved unchanged apart from
+// the two marked V105 lines. `data` must already have passed the sessions-array
+// check. opts.markExported: true for a file, false for a snapshot.
+function applyBackupData(data, opts) {
+    opts = opts || {};
+    const itemCount = data.sessions.reduce((n, s) => n + (Array.isArray(s.items) ? s.items.length : 0), 0);
     // Apply
     state.sessions = data.sessions;
     // v53: Test Readings — validate each item's readings object defensively on
@@ -370,6 +389,11 @@ function restoreBackupFromFile(file) {
     if (typeof data.readingsEarthLimit === 'number') {
       state.readingsEarthLimit = normaliseEarthLimit(data.readingsEarthLimit);
     }
+    // V105 (S14): the daily-snapshots switch. Boolean only; an older backup
+    // leaves this phone's own.
+    if (typeof data.snapshotsEnabled === 'boolean') {
+      state.snapshotsEnabled = data.snapshotsEnabled;
+    }
 
     // v65: barcode scanner flag. Restored only when the backup actually carries
     // a boolean — an older backup leaves the loaded default (ON) alone, which
@@ -470,7 +494,9 @@ function restoreBackupFromFile(file) {
     save();
     // v11: stamp the restore as a fresh backup checkpoint so we don't nag the
     // user the moment they restore from a known-good file.
-    markBackupExported();
+    // V105: a FILE only. A snapshot lives on this phone, so restoring one says
+    // nothing about whether a copy exists anywhere else.
+    if (opts.markExported !== false) markBackupExported();
     render();
     showToast(`Restored ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'} (${itemCount} item${itemCount === 1 ? '' : 's'})`);
     // v62: if this backup was taken on a device that had photos, say so — the
@@ -489,9 +515,25 @@ function restoreBackupFromFile(file) {
           `Your jobs and items have all restored normally.`
       });
     }
-      }
+}
+
+// V105 (6A): before ANY restore replaces what is on this phone, keep a copy of
+// it (snapshots.js, the "Before your last restore" row), so a wrong restore can
+// be undone. If that copy is refused — usually a full phone — ask rather than
+// either restoring unprotected without saying so or blocking a restore the
+// engineer has already confirmed. With no snapshots file, no database, or no
+// real job to protect, the restore simply goes ahead as it always did.
+function restoreWithSafetyCopy(apply) {
+  if (typeof snapshotBeforeRestore !== 'function') { apply(); return; }
+  let p;
+  try { p = snapshotBeforeRestore(); } catch (e) { p = Promise.reject(e); }
+  Promise.resolve(p).then(() => apply(), (err) => {
+    console.error('Safety copy before restore not saved.', err);
+    openConfirmSheet({
+      title: 'Couldn\u2019t keep a safety copy',
+      message: 'Before restoring, PATGo keeps a copy of what\u2019s on this phone now, so the restore can be undone. That copy couldn\u2019t be saved \u2014 the phone may be short of space. Restore anyway?',
+      confirmLabel: 'Restore anyway',
+      onConfirm: apply,
     });
-  };
-  reader.onerror = () => openInfoSheet({ title: 'Couldn\u2019t read that file', message: 'The file couldn\u2019t be opened. Please try again.' });
-  reader.readAsText(file);
+  });
 }
