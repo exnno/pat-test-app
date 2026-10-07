@@ -447,7 +447,10 @@ function makeIndexedDB() {
       }, 0);
       return req;
     },
-    deleteDatabase() { const r = makeRequest(); stores.clear(); fire(r, 'onsuccess', undefined); return r; },
+    // V106: records WHICH database was deleted (the stores themselves still share
+    // one namespace, so a delete still empties all of them — see the note above).
+    _deleted: [],
+    deleteDatabase(name) { this._deleted.push(String(name)); const r = makeRequest(); stores.clear(); fire(r, 'onsuccess', undefined); return r; },
   };
 }
 
@@ -572,7 +575,9 @@ function makeEnvironment(opts = {}) {
       pathname: '/pat-test-app/',
       search: '',
       hash: '',
-      reload() {},
+      // V106: counted, so a test can see a reset ask for the reload.
+      _reloads: 0,
+      reload() { win.location._reloads++; },
       assign() {},
       replace() {},
     },
