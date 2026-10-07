@@ -8,7 +8,7 @@
 
 const t = require('../assert');
 const { bootApp } = require('../load');
-const { CANARY, freshApp, withInstrument, withSession, withItem, populated, confirmSheet, tick } = require('../fixture');
+const { CANARY, freshApp, withInstrument, withSession, withItem, populated, confirmSheet, tick, restoreFile } = require('../fixture');
 
 module.exports = async function run() {
 
@@ -93,10 +93,10 @@ module.exports = async function run() {
     app.fn('save')();
 
     const file = new app.sandbox.File([before], 'patgo-backup.json', { type: 'application/json' });
-    app.fn('restoreBackupFromFile')(file);
-    await tick(5);
+    await restoreFile(app, file);
 
     t.ok(confirmSheet(app, 'yes'), 'restore raised the confirm sheet and it was wired');
+    await tick(30);   // V105: a restore applies once the safety copy (6A) has been kept
 
     const after = app.state();
     t.eq(after.sessions.length, beforeSessions, 'session count restored');
@@ -130,9 +130,9 @@ module.exports = async function run() {
       }],
     };
     const file = new app.sandbox.File([JSON.stringify(payload)], 'b.json', { type: 'application/json' });
-    app.fn('restoreBackupFromFile')(file);
-    await tick(5);
+    await restoreFile(app, file);
     t.ok(confirmSheet(app, 'yes'), 'the confirm sheet was raised');
+    await tick(30);   // V105: a restore applies once the safety copy (6A) has been kept
 
     const items = app.state().sessions[0].items;
     const byId = id => items.find(i => i.id === id);
@@ -150,8 +150,7 @@ module.exports = async function run() {
     const st = app.state();
     st.sessions = [];
     const file = new app.sandbox.File([payload], 'b.json', { type: 'application/json' });
-    app.fn('restoreBackupFromFile')(file);
-    await tick(5);
+    await restoreFile(app, file);
     confirmSheet(app, 'no');
     t.eq(app.state().sessions.length, 0, 'dismissing the sheet applies nothing');
   });
@@ -161,8 +160,7 @@ module.exports = async function run() {
     const n = app.state().sessions.length;
     for (const junk of ['this is not json', '{"hello":"world"}', '[]']) {
       const file = new app.sandbox.File([junk], 'x.json', { type: 'application/json' });
-      app.fn('restoreBackupFromFile')(file);
-      await tick(5);
+      await restoreFile(app, file);
       // No confirm sheet should be raised at all for an unrecognised file.
       const raised = !!app.doc.getElementById('confirm-sheet-yes');
       if (raised) confirmSheet(app, 'no');
@@ -188,9 +186,9 @@ module.exports = async function run() {
       engineer: 'Pete',
     };
     const file = new app.sandbox.File([JSON.stringify(legacy)], 'old.json', { type: 'application/json' });
-    app.fn('restoreBackupFromFile')(file);
-    await tick(5);
+    await restoreFile(app, file);
     t.ok(confirmSheet(app, 'yes'), 'legacy backup raised the confirm sheet');
+    await tick(30);   // V105: a restore applies once the safety copy (6A) has been kept
 
     const after = app.state();
     t.eq(after.sessions.length, 1, 'legacy session restored');

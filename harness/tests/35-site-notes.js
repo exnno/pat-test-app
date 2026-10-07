@@ -21,7 +21,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR } = require('../load');
-const { freshApp, withSession, withItem, confirmSheet, tick, CANARY } = require('../fixture');
+const { freshApp, withSession, withItem, confirmSheet, tick, CANARY, restoreFile } = require('../fixture');
 
 const NOTE = 'ZZDOORCODE 4471\nKeys from reception';
 
@@ -141,8 +141,7 @@ module.exports = async function () {
     st.sessions = []; st.clients = []; st.sites = [];
     app.fn('save')();
     const file = new app.sandbox.File([before], 'patgo-backup.json', { type: 'application/json' });
-    app.fn('restoreBackupFromFile')(file);
-    await tick(5);
+    await restoreFile(app, file);
     confirmSheet(app, 'yes');
     await tick(5);
     t.eq(app.state().sites[0] && app.state().sites[0].notes, NOTE, 'restored with their notes');

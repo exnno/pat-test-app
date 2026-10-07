@@ -22,7 +22,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR } = require('../load');
-const { freshApp, withSession, confirmSheet, tick } = require('../fixture');
+const { freshApp, withSession, confirmSheet, tick, restoreFile } = require('../fixture');
 
 function fire(app, type, el) {
   app.doc.getElementById('app').dispatchEvent({
@@ -325,18 +325,18 @@ module.exports = async function run() {
     t.includes(backup, '"readingsCheckEnabled":false', 'the backup carries the switch (long key)');
     t.includes(backup, '"readingsEarthLimit":0.25', '…and the limit');
     st.readingsCheckEnabled = true; st.readingsEarthLimit = 0.15;
-    app.fn('restoreBackupFromFile')(new app.sandbox.File([backup], 'b.json', { type: 'application/json' }));
-    await tick(5);
+    await restoreFile(app, new app.sandbox.File([backup], 'b.json', { type: 'application/json' }));
     t.ok(confirmSheet(app, 'yes'), 'restore confirmed');
+    await tick(30);   // V105: a restore applies once the safety copy (6A) has been kept
     t.eq(app.state().readingsCheckEnabled, false, 'switch restored');
     t.eq(app.state().readingsEarthLimit, 0.25, 'limit restored');
 
     // An older backup (no keys) leaves the defaults; a garbage limit can't land.
     const app2 = freshApp();
     const old = { appVersion: 'V103', backupVersion: 5, exportedAt: '2026-10-01T00:00:00.000Z', sessions: [], readingsEarthLimit: 7 };
-    app2.fn('restoreBackupFromFile')(new app2.sandbox.File([JSON.stringify(old)], 'o.json', { type: 'application/json' }));
-    await tick(5);
+    await restoreFile(app2, new app2.sandbox.File([JSON.stringify(old)], 'o.json', { type: 'application/json' }));
     t.ok(confirmSheet(app2, 'yes'), 'old backup restore confirmed');
+    await tick(30);   // V105: a restore applies once the safety copy (6A) has been kept
     t.eq(app2.state().readingsCheckEnabled, true, 'an older backup leaves the check on');
     t.eq(app2.state().readingsEarthLimit, 0.15, 'an out-of-range limit restores as the default');
   });
@@ -373,12 +373,9 @@ module.exports = async function run() {
     for (const a of ['readings-pass-anyway', 'readings-change-to-fail', 'readings-confirm-back', 'readings-check-toggle', 'readings-earth-limit']) {
       t.includes(dsrc, `'${a}':`, `dispatch wires ${a}`);
     }
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V104', 'APP_VERSION V104');
-    t.eq(app.run('WELCOME_VERSION'), 'V104', 'welcome rolled');
+    // V105: the V104 version and welcome-copy pins retired (they roll every
+    // release, same as 39/40) — group 42 pins V105's.
     const rs = fs.readFileSync(path.join(APP_DIR, 'render-settings.js'), 'utf8');
     t.excludes(rs, 'in a future update', 'the Test Readings page no longer says readings come to the certificate later');
-    const core = fs.readFileSync(path.join(APP_DIR, 'render-core.js'), 'utf8');
-    t.includes(core, '<strong>Readings check.</strong>', 'the welcome copy is this release\u2019s');
   });
 };

@@ -26,7 +26,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, CANARY, withSession, withItem, confirmSheet } = require('../fixture');
+const { tick, CANARY, withSession, withItem, confirmSheet, restoreFile } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID_A = '11111111-1111-1111-1111-111111111111';
@@ -129,7 +129,12 @@ module.exports = async function () {
       'a backup from a phone that never synced carries no syncPruned key — byte-identical to before');
 
     // The reopen/back-online triggers exist on a cloud host and not elsewhere.
-    const vis = (a) => ((a.doc._listeners || {}).visibilitychange || []).length;
+    // V105: snapshots.js hooks the same event (today's snapshot on reopen) on
+    // every host; it is counted separately so this still pins sync's own.
+    const snapHook = (a) => a.run('_snapOnVisible');
+    const vis = (a) => ((a.doc._listeners || {}).visibilitychange || []).filter(fn => fn !== snapHook(a)).length;
+    t.eq(((app.doc._listeners || {}).visibilitychange || []).filter(fn => fn === snapHook(app)).length, 1,
+      'snapshots registered its reopen hook once (V105)');
     t.eq(vis(app), 1, 'test host: syncBoot registered the app-reopen trigger');
     const off = boot({ hostname: 'localhost' });
     t.eq(vis(off), 0, 'no-cloud host: syncBoot registered nothing');
@@ -367,8 +372,7 @@ module.exports = async function () {
     const bk2 = JSON.parse(JSON.stringify(bk));
     bk2.syncPruned = [{ id: 'ZZPRUNEDELSEWHERE', at: '2026-09-02T00:00:00Z' }, { id: 7 }, 'junk', null];
     const file = new app.sandbox.File([JSON.stringify(bk2)], 'b.json', { type: 'application/json' });
-    app.fn('restoreBackupFromFile')(file);
-    await tick(5);
+    await restoreFile(app, file);
     t.ok(confirmSheet(app), 'restore confirm shown');
     await tick(5);
     app.stopTimer();

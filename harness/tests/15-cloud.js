@@ -30,7 +30,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, CANARY } = require('../fixture');
+const { tick, CANARY, restoreFile } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 
@@ -180,8 +180,7 @@ module.exports = async function () {
     const old = JSON.parse(JSON.stringify(fresh.fn('buildBackup')()));
     old.authUser = { userId: 'ZZMOCKUSER', authToken: 'ZZMOCKTOKEN', loginTime: '2026-01-01T00:00:00Z' };
     const file = new fresh.sandbox.File([JSON.stringify(old)], 'old.json', { type: 'application/json' });
-    fresh.fn('restoreBackupFromFile')(file);
-    await tick(5);
+    await restoreFile(fresh, file);
     const yes = fresh.doc.getElementById('confirm-sheet-yes');
     t.ok(!!yes, 'restore raised its confirm sheet');
     if (yes) yes.click();
