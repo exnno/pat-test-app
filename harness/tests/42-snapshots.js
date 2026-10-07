@@ -322,7 +322,8 @@ module.exports = async function run() {
     t.ok(a > -1 && b > a && c > b, 'index.html: backup → snapshots → session');
     const sw = fs.readFileSync(path.join(APP_DIR, 'sw.js'), 'utf8');
     t.includes(sw, "'./snapshots.js',", 'precached');
-    t.includes(sw, "const CACHE_VERSION = 'pat-v105';", 'cache key pat-v105');
+    // V106: the four release pins (cache key, APP_VERSION, WELCOME_VERSION, welcome
+    // copy) retired — 43j pins the current release.
     const boot = fs.readFileSync(path.join(APP_DIR, 'boot.js'), 'utf8');
     const probe = boot.slice(boot.indexOf('const requiredFns = ['), boot.indexOf('];', boot.indexOf('const requiredFns = [')));
     t.excludes(probe, 'snapshot', 'NOT probed — optional subsystem (MAP rule 6)');
@@ -333,11 +334,6 @@ module.exports = async function run() {
     for (const k of ['snapshot-restore', 'snapshot-save', 'snapshots-toggle']) t.includes(disp, `'${k}':`, `dispatch wires ${k}`);
     const sync = fs.readFileSync(path.join(APP_DIR, 'sync.js'), 'utf8');
     t.excludes(sync, 'snapshotsEnabled', 'the switch is not synced (about this phone)');
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V105', 'APP_VERSION V105');
-    t.eq(app.run('WELCOME_VERSION'), 'V105', 'welcome rolled');
-    const core = fs.readFileSync(path.join(APP_DIR, 'render-core.js'), 'utf8');
-    t.includes(core, '<strong>Daily snapshots.</strong>', 'the welcome copy is this release\u2019s');
     // Rule 6 the other way: with snapshots.js gone the app boots and restores as before.
     const bare = freshApp({ skip: ['snapshots.js'] });
     t.eq(bare.run('typeof snapshotsBoot'), 'undefined', 'boots without snapshots.js');
