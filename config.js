@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V105';
+const APP_VERSION = 'V106';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V105';
+const WELCOME_VERSION = 'V106';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -1229,6 +1229,13 @@ const SNAPSHOTS_KEY = 'pat:snapshots';
 // on the next success. Per device, a status note only — NOT in backups or setup
 // exports. Factory reset must clear it.
 const SNAPSHOT_FAIL_KEY = 'pat:snapshotFailDay';
+
+// V106 (Stage 10 part 2): Reset this phone (reset.js). Present only between the
+// confirm tap and the next boot finishing the job: JSON {level, cert, at}. Read
+// by reset.js resetRunPending() BEFORE load(), then removed. Never backed up,
+// never synced. Every other key's fate on a reset is in reset.js RESET_KEY_PLAN
+// — a new storage key added here must be classified there too (harness 43a).
+const RESET_PENDING_KEY = 'pat:resetPending';
 
 // V91 (Stage 4, O4 — 8A/9A): the tidy-up offer. Signed in only.
 // PHOTO_AGE_KEY — photos taken more than this many months ago, known to be in

@@ -93,6 +93,7 @@ function settingsPageSubtitle(pageId) {
       return `Undo ${state.undoEnabled ? 'on' : 'off'} · Map pins ${state.mapPinEnabled ? 'on' : 'off'} · Item times ${state.timestampsEnabled ? 'on' : 'off'}`;
     case 'settingsReminders': return reminderSettingsSummary();   // V100
     case 'settingsSetup':   return 'Share your setup to another device';
+    case 'settingsReset':   return 'Clear this phone, or start again as new';   // V106
     case 'settingsCalculator': return 'Earth continuity limit';
     case 'settingsAbout':   return `PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}`;
     case 'settingsGlossary': {
@@ -175,6 +176,8 @@ function settingsPageVisible(pageId) {
     return typeof syncActive === 'function' && syncActive() && typeof renderJobManager === 'function';
   }
   if (pageId === 'photoManager') return typeof renderPhotoManager === 'function';
+  // V106: Reset This Phone lives in reset.js, an optional subsystem (MAP rule 6).
+  if (pageId === 'settingsReset') return typeof renderSettingsReset === 'function';
   return !!SETTINGS_PAGE_META[pageId];
 }
 

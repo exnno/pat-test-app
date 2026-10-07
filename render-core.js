@@ -145,6 +145,9 @@ function render() {
   // V91 (Stage 4, 5A): Jobs on this phone — same fallback.
   else if (v === 'jobManager') html = (typeof renderJobManager === 'function') ? renderJobManager() : renderSettingsStorage();
   else if (v === 'settingsSetup') html = renderSettingsSetup();   // v33
+  // V106 (Stage 10 part 2): Reset This Phone — reset.js is optional, so a stale
+  // view without it falls back to Backup & Restore, never a blank screen.
+  else if (v === 'settingsReset') html = (typeof renderSettingsReset === 'function') ? renderSettingsReset() : renderSettingsBackup();
   else if (v === 'settingsCsv') html = renderSettingsCsv();   // v11
   else if (v === 'settingsClients') html = renderSettingsClients();   // v19
   else if (v === 'settingsRetest') html = renderSettingsRetest();   // v56
@@ -234,9 +237,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Daily snapshots.</strong> Once a day PATGo now quietly keeps a copy of your jobs and settings on this phone &mdash; the last 7 days you changed something. Nothing for you to do.</li>
-        <li><strong>Undo a mistake.</strong> If something goes wrong, Settings &rarr; Backup &amp; Restore lists them by day: <strong>Restore</strong> puts that day back, or <strong>Save as file</strong> turns one into a normal backup file.</li>
-        <li><strong>Restores can be undone.</strong> Before any restore, PATGo keeps a copy of what's on the phone first. Snapshots live inside the app, so keep exporting backups for a lost or broken phone. Photos aren't included.</li>
+        <li><strong>Reset this phone.</strong> New in Settings &rarr; Data &rarr; <strong>Reset This Phone</strong>, for handing a phone on or starting again.</li>
+        <li><strong>Three choices.</strong> Clear just your work (jobs, clients and sites, photos), your work and your settings, or everything including your sign-in.</li>
+        <li><strong>No surprises.</strong> Before anything happens it lists exactly what will be deleted and what will be kept, and you type RESET to confirm. Nothing is ever deleted from your cloud account.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

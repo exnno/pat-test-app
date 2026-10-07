@@ -8,10 +8,30 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V105
-Stage 10 part 2 — factory reset (spec round below), then permanent cloud
-delete + storage used (Stage 5 part 3), then a housekeeping release (favicon set,
-remove dead `setupLongPress`, the sheet-markup guard). Full order: roadmap v4.18.
+### Next after V106
+Stage 5 part 3 — permanent cloud delete + storage used (own spec round), then a
+housekeeping release (favicon set, remove dead `setupLongPress`, the
+sheet-markup guard). Full order: roadmap v4.19.
+
+### V106 residuals (known, accepted)
+- Reset is local only. A signed-in phone after "Clear my work" is a fresh phone
+  to sync: the last 30 days (and retests being chased) come back with clients and
+  sites; older jobs stay in the cloud until opened. Removing work from the CLOUD
+  is Stage 5 part 3.
+- Settings that sync (presets, instruments, report setup, templates, tester in
+  use) come back after "Clear work and settings" while signed in — said on the
+  confirm. Per-phone settings (theme, sound, switches) do not.
+- Claude's calls at the build: certificate numbering kept at the settings level
+  includes prefix and padding, not only the counter; the cloud access code goes
+  only at "Everything"; the RESET box is not focused on open (the keyboard would
+  cover the overview).
+- Reset deletes the two IndexedDB databases it knows (photos, snapshots) by
+  name. A future database must be added to reset.js by hand — MAP rule 17.
+- deleteDatabase at boot can be "blocked" by a connection still open elsewhere
+  (another tab). The live page has already emptied both stores, so only empty
+  databases can linger; they go once the other tab closes.
+- Not tested on a real iPhone: the reload after the reset, and typing RESET with
+  iOS auto-capitals (any case is accepted either way).
 
 ### V105 residuals (known, accepted)
 - Restoring (a file or a snapshot) while signed in goes through sync exactly as
@@ -19,8 +39,8 @@ remove dead `setupLongPress`, the sheet-markup guard). Full order: roadmap v4.18
   re-test it. By the fingerprint rules (sync.js header) a restored job that
   differs from what this phone last sent reads as this phone's own change; jobs
   made after the copy and already in the cloud are not removed from it. Snapshots
-  are aimed at phones that never sign in; worth a deliberate look before Stage 10
-  part 2, since reset has the same question.
+  are aimed at phones that never sign in. V106's reset sidesteps the question by
+  wiping the sync bookkeeping (a reset phone is a fresh phone); restores do not.
 - A snapshot is taken on the first open of the (UTC) day — `todayISO()`, as the
   storage banner — so between midnight and 1am in summer it counts as yesterday.
 - Snapshots live inside the app: deleting PATGo from the home screen, or the phone
@@ -98,8 +118,6 @@ remove dead `setupLongPress`, the sheet-markup guard). Full order: roadmap v4.18
 - The 100 moment's sparks and the egg's steps are CSS transitions started from
   script (MAP rule 12); only a real iPhone proves they play. If they don't, the
   finished picture still shows.
-- Factory reset (Stage 10) must clear REMINDER_QUIET_KEY (data level) and
-  REMINDERS_KEY (settings level).
 
 ### V99 residuals (known, accepted)
 - How iOS asks for permission is not involved (no GPS), but how a home-screen app
@@ -153,26 +171,6 @@ Other crowded pages seen, not split: Report Settings (long), Quick Pick Items
   search draws it — same figure the Jobs banner reads; cheap at today's sizes.
 - 33f still opens the photo manager from Backup & Restore (no button there now; the
   action still works and settingsBackup stays in the return list).
-
-### Factory reset (Peter, V81.1) — needs its own spec round
-A guarded "reset this device" (V86: must also clear SQP_RESET_KEY; V87: STORAGE_BANNER_KEY; V88: the
-`ph` part of SYNC_STATE_KEY goes with it; V89: the session's preview cache is memory only — nothing extra) for handing a phone to another engineer, selling
-it, or resetting between tests. NOT a quick win: "reset" means at least three
-different things (data only / + settings / + cloud sign-in), and the easy-to-miss
-leftovers are the IndexedDB photo store and the sync bookkeeping keys
-(SYNC_STATE_KEY, SYNC_PRUNED_KEY, SYNC_HELD_KEY; V85 adds CLOUD_UNLOCK_KEY, the
-Cloud access-code flag) — a half-reset phone that is
-still signed in would pull its old jobs straight back. Most destructive button in
-the app, so the confirm needs to be genuinely hard to hit by accident.
-V91 adds: TIDY_OFFER_KEY (the offer's timer) and PHOTO_AGE_KEY (a setting — the
-settings level decides); `conf`/`confV` live inside SYNC_STATE_KEY.
-V94 adds: UNDO_KEY (`pat:undo`, the Undo switch — a setting, settings level).
-V95 adds nothing (`state.descTextMode` is memory only).
-V96 adds nothing (`state.mgrReturnView` is memory only).
-V97 adds nothing (no new keys).
-V105 adds: the IndexedDB database `patgo-snapshots` (delete it — it holds
-copies of every job) and SNAPSHOT_FAIL_KEY (a note); SNAPSHOTS_KEY (the switch —
-a setting, settings level). Reset should keep no safety copy of what it wipes.
 
 ### Visual inspection tick (PN) — postponed at V94 (11D)
 Peter worried it would harm the entry screen. Placements offered at the V94 round:

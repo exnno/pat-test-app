@@ -1397,6 +1397,40 @@ body.has-update-banner .screen { padding-top: 64px; }
 .snapshot-total { margin-top: 4px; font-size: 12px; }
 .snapshot-fail-note { margin: 10px 0 0; font-size: 13px; color: var(--warn-soft-text); }
 
+/* V106 (Stage 10 part 2): Reset This Phone */
+.reset-level {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 14px 16px;
+  margin-top: 10px;
+  background: var(--card-bg);
+  color: var(--text);
+  border: 1px solid var(--fail-soft-border);
+  border-radius: 10px;
+}
+.reset-level:active { background: var(--fail-soft-bg); }
+.reset-level-title { display: block; font-size: 15px; font-weight: 700; color: var(--fail); }
+.reset-level-blurb { display: block; font-size: 13px; color: var(--text-muted); margin-top: 3px; line-height: 1.4; }
+.reset-overview { font-size: 14px; line-height: 1.45; color: var(--text); }
+.reset-h { margin: 12px 0 4px; font-size: 14px; font-weight: 700; }
+.reset-h-gone { color: var(--fail); }
+.reset-h-kept { color: var(--pass); }
+.reset-list { margin: 0 0 6px; padding-left: 20px; }
+.reset-list li { margin: 3px 0; }
+.reset-note { margin: 8px 0 0; font-size: 13px; color: var(--text-muted); }
+.reset-final { margin: 10px 0 12px; font-size: 13px; font-weight: 600; color: var(--fail-soft-text); }
+.reset-warn {
+  margin: 4px 0 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  background: var(--warn-soft-bg);
+  color: var(--warn-soft-text);
+  border: 1px solid var(--warn-soft-border);
+  border-radius: 8px;
+}
+.reset-busy { padding: 40px 16px; text-align: center; color: var(--text-muted); }
+
 /* Storage usage card */
 .storage-card {
   background: var(--card-bg);

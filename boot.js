@@ -233,6 +233,15 @@ if (!_bootIntegrity) {
   }
   // Deliberately stop here — do NOT call load()/render()/save() with a partial build.
 } else {
+// V106 (Stage 10 part 2): finish a "Reset this phone" the last page started.
+// BEFORE load(), so load() reads the clean phone and nothing in memory can write
+// the old data back. After the integrity check, so a half-loaded build never
+// deletes anything. Optional (MAP rule 6): no reset.js, no wipe — the safe way.
+try {
+  if (typeof resetRunPending === 'function') resetRunPending();
+} catch (e) {
+  console.error('Reset could not finish at start-up (non-fatal).', e);
+}
 // v61.2: load() is now INSIDE a try/catch. It never was, which is why a throw in
 // here produced a blank screen with no message rather than the recovery prompt
 // the app has had since v16.1 for render() failures.

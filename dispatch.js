@@ -823,6 +823,8 @@ registerActions({
 
   // Backup & Restore + prune + about
   'backup-export': () => downloadBackup(),
+  // V106: a level on Reset This Phone opens its confirm (reset.js, optional).
+  'reset-open': (arg) => { if (typeof resetOpen === 'function') resetOpen(arg); },
   // V105 (S14, 5B): a snapshot's two buttons. Both typeof-guarded — snapshots.js
   // is optional (MAP rule 6).
   'snapshot-restore': (arg) => { if (typeof snapshotRestoreAsk === 'function') snapshotRestoreAsk(arg); },

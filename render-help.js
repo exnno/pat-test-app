@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">✨ Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V105: rolled forward — V105 on top, V102 dropped. -->
+      <!-- v8: rolling 3-version changelog. V106: rolled forward — V106 on top, V103 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V106</strong> &middot; October 2026</p>
+        <p class="muted">Reset this phone: Settings &rarr; Data &rarr; Reset This Phone. Clear just your work, your work and settings, or everything including your sign-in. You see exactly what is deleted and what is kept, and type RESET to confirm. Nothing is deleted from your cloud account, and no copy is kept on the phone &mdash; save a backup file first if you might want anything back.</p>
         <p><strong>V105</strong> &middot; October 2026</p>
         <p class="muted">Daily snapshots: once a day PATGo keeps a copy of your jobs and settings on this phone, the last 7 days you changed something. Restore one, or save it as a backup file, from Settings &rarr; Backup &amp; Restore. Any restore now keeps a copy of what was there first, so it can be undone.</p>
         <p><strong>V104</strong> &middot; October 2026</p>
         <p class="muted">Readings check: with test readings on, a PASS reading outside the usual limit gets a note under its box, and saving asks once &mdash; change to FAIL or save as PASS anyway. Insulation 1.0 M&Omega; (Class I) / 2.0 M&Omega; (Class II), leakage 5 mA, and your own earth limit. Settings &rarr; Logging &rarr; Test Readings.</p>
-        <p><strong>V103</strong> &middot; October 2026</p>
-        <p class="muted">Move items into another job: on the Overview, Select items, then Edit selected &rarr; Move to another job, and pick the job they belong in. If an asset number is already there, you choose for each item &mdash; leave it, keep the one there, use this one instead, or give it a new number. Moving every item merges two jobs.</p>
 
 
         </div>

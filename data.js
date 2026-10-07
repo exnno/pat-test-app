@@ -114,8 +114,8 @@ const SETTINGS_CATEGORIES = [
     pages: ['settingsReport', 'settingsCsv'] },
   { id: 'catApp',     icon: '🎨', title: 'Phone & Display', blurb: 'Theme, sound, vibration and reminders on this phone',
     pages: ['settingsDisplay', 'settingsReminders'] },   // V100 (7A): + Reminders
-  { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Backups, space on this phone, photos, and moving your setup to another phone',
-    pages: ['settingsBackup', 'settingsStorage', 'photoManager', 'jobManager', 'settingsSetup'] },
+  { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Backups, space on this phone, photos, moving your setup, and resetting this phone',
+    pages: ['settingsBackup', 'settingsStorage', 'photoManager', 'jobManager', 'settingsSetup', 'settingsReset'] },   // V106: + Reset (last)
   { id: 'catHelp',    icon: 'ℹ️', title: 'Help', blurb: 'About this app, what the terms mean, and how to get in touch',
     pages: ['settingsAbout', 'settingsGlossary', 'settingsContact'] }
 ];
@@ -147,6 +147,8 @@ const SETTINGS_PAGE_META = {
   settingsBackup:      { icon: '💾', title: 'Backup & Restore',      aliases: 'backup restore export import data save json photos file snapshot snapshots daily undo' },   // V105: snapshots
   // V97 (1A, 2A): split out of Backup & Restore — everything about space.
   settingsStorage:     { icon: '📦', title: 'Phone Storage',         aliases: 'storage space full clear old jobs sessions prune protect keep data meter tidy free up delete photos age' },
+  // V106 (Stage 10 part 2, 9A): the last row in Data. Hidden without reset.js.
+  settingsReset:       { icon: '🧹', title: 'Reset This Phone',      aliases: 'reset factory wipe erase clear delete everything all data start again fresh new install hand on give sell sign out' },
   // V96 (3A): the photo manager and Jobs on this phone get their own rows in
   // Data. They are screens of their own already (V90, V91); `action` opens them
   // through their own open functions (which set their state up) instead of a

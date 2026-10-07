@@ -1,4 +1,4 @@
-# PATGo — Code Map (V105)
+# PATGo — Code Map (V106)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -48,7 +48,7 @@ is discoverable from the file you happen to be editing.
    dependents are orphaned.
 
 6. **Optional subsystems fail soft.** `photos.js`, `scanner.js`, `bugreport.js`,
-   `cloud.js`, `sync.js` are `typeof`-guarded and try/catch-wrapped at their boot call sites. A missing
+   `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106) are `typeof`-guarded and try/catch-wrapped at their boot call sites. A missing
    or broken one must never stop the app starting or break the fail flow.
 
 7. **Instrument fields on `state` are a MIRROR, not the truth.** Never read
@@ -136,13 +136,21 @@ is discoverable from the file you happen to be editing.
     global rule doing this; adding a fourth hold site means adding those
     properties too. Harness 13m.
 
+17. **Every storage key is classified for Reset this phone (V106).** A new
+    `*_KEY` in config.js needs a row in reset.js `RESET_KEY_PLAN` (work /
+    settings / account) or harness 43a goes red. The reset is PREFIX-SCOPED
+    (`pat:`, and `patgo:` at the everything level): the test host shares its
+    origin with PATGo Scan (`scan:` keys) — never a blanket clear of storage.
+    A new IndexedDB database needs adding to `_resetDeleteDatabases` and
+    `_resetClearStores` by hand (nothing enforces that one).
+
 ---
 
-## Load order (index.html) — 32 first-party files
+## Load order (index.html) — 33 first-party files
 
 `config` → `data` → `state` → `utils` → `storage` → `clients` → `instruments` → `sqp`
 → `multipick` → `feedback` → `bugreport` → `photos` → `csv` → `backup`
-→ `snapshots` → `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
+→ `snapshots` → `reset` → `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
 → `pdfpreview` → `render-core` → `render-review` → `render-settings` → `render-help`
 → `cloud` → `sync` → `scanner` → `events` → `dispatch` → `boot`
 
@@ -151,7 +159,7 @@ choice. `state.js` seeds `itemTypes`/`failReasons` from `DEFAULT_ITEM_TYPES` /
 `DEFAULT_FAIL_REASONS` in its top-level initialiser, which runs at load, so
 `data.js` must precede it. Harness 09h/09i, mutation M61.
 
-`sw.js` ASSETS lists **35** `.js` entries: these 32 plus 3 lazy-loaded vendored
+`sw.js` ASSETS lists **36** `.js` entries: these 33 plus 3 lazy-loaded vendored
 files (precached, not `<script>` tags): the jsPDF pair (report.js injects them)
 and `supabase.umd.js` (cloud.js injects it, v79).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
@@ -169,7 +177,7 @@ DATA-ONLY file needs a CONSTANT probe instead — top-level `const` never attach
 to `window`, so the `requiredFns` loop cannot see it whatever name you use.
 Harness 09e/09f/09k/09l and mutations M54/M55/M64/M65 hold all of this.
 ⚠ EXCEPT an optional subsystem (rule 6): `photos.js`, `scanner.js`,
-`bugreport.js`, `cloud.js`, `sync.js`, `snapshots.js` (V105) are deliberately NOT probed — a probe would make a
+`bugreport.js`, `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106) are deliberately NOT probed — a probe would make a
 missing optional file block boot, which is the opposite of the rule.
 
 ---
@@ -201,6 +209,10 @@ back empty — no test had ever read a photo back. Do not revert either.
 database (so `snapshots` must never share a store name with `photos`), and a
 database opens asynchronously at boot — a test that seeds the snapshot store
 must `await snapshotsLoad()` first or the upgrade replaces what it seeded (42).
+⚠ V106: the fake IndexedDB records deleted database NAMES (`indexedDB._deleted`)
+and the fake `location.reload()` counts calls (`location._reloads`). Its
+`clear()` lands at once where a real one lands on completion — a test asking
+"was the clear FINISHED before X" must defer it itself (43e, M724).
 ⚠ V105: every restore applies AFTER the safety copy is kept (an async step), so
 a restore test awaits a tick after confirming (03f/03f2/03i, 41f).
 ⚠ V105: a test restores a FILE with `await restoreFile(app, file)` (fixture.js),
@@ -530,7 +542,32 @@ has committed (42e, M679). ⚠ The signature leaves out `exportedAt` and
 a snapshot (4A). ⚠ `_snapCache` holds the records WITH json so Save as file runs
 synchronously inside the tap. ⚠ The safety copy is taken even with the daily
 switch OFF — it exists only when a restore is about to replace everything.
-⚠ Factory reset (V106) must delete this database and `SNAPSHOT_FAIL_KEY`.
+⚠ Reset this phone (V106, reset.js) clears this store live and deletes the
+database at boot; the reset reaches `_snapTx`/`_snapCache` directly.
+
+### reset.js (~450 ln) — Reset this phone (V106, Stage 10 pt 2) — OPTIONAL SUBSYSTEM
+Three levels: work / + settings / + everything (sign-in). The page
+(`renderSettingsReset`, last row in Data), the confirm sheet (`resetOpen`,
+typed RESET, deleted/kept overview from `resetOverview`), the wipe
+(`_resetWipeLocal`, table `RESET_KEY_PLAN` — rule 17) and the boot pass
+(`resetRunPending`).
+**Touch to:** change what a level deletes, the confirm's wording, or the page.
+**Coupling:** TWO PASSES — the live page neutralises `save`/`saveSessions`/
+`saveSettings`/`render`, writes `RESET_PENDING_KEY` (config.js), wipes, clears
+the photo store (`photosDeleteAll`) and snapshot store (`_snapTx`), WAITS for
+both, then reloads; boot.js calls `resetRunPending()` after the integrity check
+and BEFORE `load()`, wipes again (anything a late sync wrote back) and deletes
+both databases. Settings level writes the certificate numbering back
+(`certEnabled/certNextNumber/certPrefix/certPadding`, 8B) as a bare object that
+`normaliseReportSettings` fills. Everything level calls cloud.js `cloudSignOut`
+first. Overview reads sync.js `syncJobsSafety` (4A warning) and photos.js
+`photoStatsSync`. Route: render-core.js (falls back to Backup); row visibility:
+render-settings.js `settingsPageVisible`; tap: dispatch.js `reset-open`.
+⚠ Local only: sync bookkeeping and the tombstone ledger go at EVERY level, so the
+phone is a fresh phone to sync (R21 brings 30 days back) and no delete can be
+sent. ⚠ `SQP_RESET_KEY` is removed, never re-stamped — a new stamp would clear
+Smart Quick Pick on the other phone. ⚠ The input is not focused on open — the
+keyboard would cover the overview.
 
 ### setup.js (~260 ln) — export/import Setup bundle
 Config-only shareable bundle: presets & lists / report settings / CSV columns /
@@ -1235,6 +1272,8 @@ guard. V99: `mapPinResume()` (session.js) runs before the first
 `loadFormForCursor()`/`render()` — it may set the active job, view and cursor.
 V105: `snapshotsBoot()` runs after the first render, inside the good-load block,
 typeof-guarded and NOT probed (snapshots.js is optional — rule 6).
+V106: `resetRunPending()` (reset.js) runs after the integrity check and BEFORE
+`load()` — typeof-guarded, NOT probed. Missing reset.js = no wipe (safe).
 **Coupling:** the integrity guard verifies the critical cross-file functions
 loaded before any storage write and skips `load()`/`render()`/`save()` if not —
 this is the guard against the duplicate-`const` data-loss class (rule 1).
