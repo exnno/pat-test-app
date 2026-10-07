@@ -8,13 +8,24 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V102
-V103 = move items into an EXISTING job (below — scheduled, Peter V102 round).
-Then V104 S10 readings check (Peter now has his CoP copy — the figures are needed
-at its spec round), Stage 10 (snapshots, then factory reset), then permanent
-cloud delete + storage used (Stage 5 part 3), then a housekeeping release (favicon
-set, remove dead `setupLongPress`, the sheet-markup guard). Full order: roadmap
-v4.15.
+### Next after V103
+V104 S10 readings check (Peter has his CoP copy — the figures are needed at its
+spec round), then Stage 10 (snapshots, then factory reset), then permanent cloud
+delete + storage used (Stage 5 part 3), then a housekeeping release (favicon set,
+remove dead `setupLongPress`, the sheet-markup guard). Full order: roadmap v4.16.
+
+### V103 residuals (known, accepted)
+- A V102 or older phone still treats a target job already on it as ready (no
+  `_syncDestHolds`): if the original lands before the target, the moved items are
+  briefly missing there until the target's row arrives. Test phones, upgraded
+  together.
+- Deletes from the clash step ("Keep the one already there" / "Use this one
+  instead") look like ordinary deletes to another phone: if it holds the job
+  whole, it may ask the "fewer items" question once, as deleting by hand does.
+- An empty original after a merge (4B) stays on the Jobs list until deleted by
+  hand; it still has its certificate number and `movedOut`.
+- Asset numbers are matched exactly, as the per-job duplicate check always has
+  (no trimming or case-folding).
 
 ### V102 residuals (known, accepted)
 - A V101 phone shows a duplicated job's items twice in its own lifetime count
@@ -26,12 +37,6 @@ v4.15.
   still count twice — pre-existing, unchanged.
 - Asset numbers repeat across the original and the copy until one is trimmed (S4
   is not built; the same-job duplicate check is per job).
-
-### Move items to an EXISTING job (Peter, V101 round 2B) — SCHEDULED V103
-Move selected items into another unlocked job on this phone (fixes "logged on the
-wrong job"). Needs: a job picker; asset-number clashes in the target
-(`findDuplicateAssetIndex`); the target's certificate warning; `movedOut` already
-names any job id, so the sync side carries over unchanged.
 
 ### V101 residuals (known, accepted)
 - A phone on V100 or older treats a moved-out job as before: the "fewer items"

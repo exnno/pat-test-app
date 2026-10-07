@@ -208,6 +208,7 @@ function renderOverview() {
         <button class="bulk-menu-btn" data-action="bulk-edit-mode" data-arg="notes" data-bulk-edit="notes">Change notes</button>
         <button class="bulk-menu-btn danger" data-action="bulk-edit-mode" data-arg="delete" data-bulk-edit="delete">Delete selected</button>
         <button class="bulk-menu-btn bulk-menu-move" id="bulk-move-btn" data-action="move-job-open">Move to a new job\u2026</button>
+        <button class="bulk-menu-btn bulk-menu-move-to" id="bulk-move-to-btn" data-action="move-to-open">Move to another job\u2026</button>
       </div>
     </div>
   ` : '';
@@ -347,6 +348,7 @@ function renderOverview() {
       ${bulkNotesDialog}
       ${siteNotesSheet}
       ${renderMoveJobSheet(sess)}
+      ${renderMoveToSheet(sess)}
     </div>
   `;
 }
@@ -436,6 +438,156 @@ function renderMoveJobSheet(sess) {
         </div>
         <p class="move-job-error" id="move-job-error" role="alert">${escapeHTML(m.error || '')}</p>
         <button class="btn-primary sheet-pin" id="move-job-continue" data-action="move-job-continue">Continue</button>
+      </div>`;
+}
+
+// V103 (Stage 9B): Move to another job — an EXISTING one. Steps in one sheet
+// slot: 'pick' (the jobs, a filter at MOVE_TO_FILTER_AT+ — typing hides rows in
+// place), 'clash' (asset numbers already there, one card each: radios + a new
+// number field — no render while open, MAP rule 3), 'confirm' (buttons only, so a
+// repaint is allowed) and 'blocked'. Logic: session.js.
+function renderMoveToSheet(sess) {
+  const m = state.moveTo;
+  if (!m || !sess || String(m.from) !== String(sess.id)) return '';
+  const head = (title) => `
+      <div class="modal-backdrop" id="move-to-backdrop" data-action="move-to-close"></div>
+      <div class="bulk-sheet move-job-sheet move-to-sheet" role="dialog" aria-label="${escapeHTML(title)}">
+        <div class="bulk-sheet-handle"></div>
+        <div class="bulk-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+          <button class="fail-close-btn" id="move-to-close" data-action="move-to-close" aria-label="Cancel">\u00d7</button>
+        </div>`;
+  const plural = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+  if (m.step === 'blocked') {
+    return head('Can\u2019t move these items') + `
+        <p class="move-job-why">${escapeHTML(m.why || '')}</p>
+        <button class="btn-primary" id="move-to-ok" data-action="move-to-close">OK</button>
+      </div>`;
+  }
+  const sum = moveJobSummary(sess, m.ids);
+  if (m.step === 'pick') {
+    const jobs = moveToTargets(sess);
+    const q = String(m.filter || '').trim().toLowerCase();
+    let shown = 0;
+    const rows = jobs.map((s) => {
+      const hay = moveToHay(s);
+      const hit = !q || hay.indexOf(q) !== -1;
+      if (hit) shown++;
+      const n = (s.items || []).length;
+      const sub = [formatDate(s.date), plural(n, 'item')].filter(Boolean).join(' \u00b7 ');
+      if (s.locked) {
+        return `<li class="move-to-job is-locked" data-hay="${escapeHTML(hay)}"${hit ? '' : ' hidden'}>
+            <span class="move-to-job-title">\ud83d\udd12 ${escapeHTML(moveToTitle(s))}</span>
+            <span class="muted move-to-job-sub">${escapeHTML(sub)} \u00b7 Locked \u2014 unlock it first</span></li>`;
+      }
+      return `<li class="move-to-job" data-hay="${escapeHTML(hay)}"${hit ? '' : ' hidden'}>
+            <button type="button" class="move-to-job-btn" data-action="move-to-pick" data-arg="${escapeHTML(String(s.id))}">
+              <span class="move-to-job-title">${escapeHTML(moveToTitle(s))}</span>
+              <span class="muted move-to-job-sub">${escapeHTML(sub)}</span>
+            </button></li>`;
+    }).join('');
+    const filter = jobs.length > MOVE_TO_FILTER_AT ? `
+          <input class="input move-to-filter" id="move-to-filter" type="search" data-input-action="move-to-filter" value="${escapeHTML(m.filter || '')}" placeholder="Find a job" autocomplete="off">` : '';
+    return head(`Move ${plural(sum.n, 'item')} to\u2026`) + `
+        <div class="sheet-scroll move-job-scroll">${filter}
+          <ul class="move-to-list">${rows}</ul>
+          <p class="muted move-job-note" id="move-to-none"${shown ? ' hidden' : ''}>No job matches.</p>
+        </div>
+      </div>`;
+  }
+  const target = (state.sessions || []).find(s => s && String(s.id) === String(m.to));
+  if (!target) return '';
+  const to = moveToTitle(target);
+  if (m.step === 'clash') {
+    const tItem = (id) => (target.items || []).find(it => it && String(it.id) === String(id));
+    const sItem = (id) => (sess.items || []).find(it => it && String(it.id) === String(id));
+    const side = (label, it) => {
+      if (!it) return '';
+      const res = it.result === 'fail' ? '<span class="fail-text">FAIL</span>' : (it.result === 'pass' ? '<span class="pass-text">PASS</span>' : '');
+      const ph = (typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id) : 0;
+      const when = it.ts ? formatTimestampCSV(it.ts) : '';
+      const bits = [it.itemType, it.location].filter(x => x != null && String(x).trim() !== '').map(x => escapeHTML(String(x)));
+      return `<div class="move-to-side"><span class="move-to-side-label">${label}</span>
+              <span>${bits.join(' \u00b7 ') || '(no details)'} ${res}${ph ? ' \ud83d\udcf7' + ph : ''}</span>
+              ${when ? `<span class="muted move-to-side-when">${escapeHTML(when)}</span>` : ''}</div>`;
+    };
+    const opts = [
+      ['leave', 'Leave it here'],
+      ['keep', 'Keep the one already there (delete this one)'],
+      ['replace', 'Use this one instead (delete the one there)'],
+      ['renumber', 'Give it a new number']
+    ];
+    const cards = m.clashes.map((c, i) => {
+      const it = sItem(c.id);
+      if (!it) return '';
+      return `<div class="move-to-card">
+            <p class="move-to-card-no">${escapeHTML(String(it.assetNo))}</p>
+            ${side('Moving', it)}
+            ${side('Already in ' + escapeHTML(to), tItem(c.with))}
+            <div class="move-to-opts" role="radiogroup">
+              ${opts.map(([v, l]) => `<label class="move-to-opt"><input type="radio" name="move-to-c${i}" value="${v}" data-change-action="move-to-choice" data-arg="${escapeHTML(c.id)}"${c.choice === v ? ' checked' : ''}> ${l}</label>`).join('')}
+            </div>
+            <div class="move-to-new" id="move-to-new-${i}"${c.choice === 'renumber' ? '' : ' hidden'}>
+              <label class="label" for="move-to-newno-${i}">New asset number</label>
+              <input class="input" id="move-to-newno-${i}" data-input-action="move-to-newno" data-arg="${escapeHTML(c.id)}" value="${escapeHTML(c.newNo || '')}" autocomplete="off" autocapitalize="characters">
+            </div>
+          </div>`;
+    }).join('');
+    const all = m.clashes.length >= 3 ? `
+          <div class="move-to-all"><span class="muted">Apply to all:</span>
+            ${opts.filter(o => o[0] !== 'renumber').map(([v, l]) => `<button type="button" class="btn-secondary move-to-all-btn" data-action="move-to-all" data-arg="${v}">${escapeHTML(l.replace(/ \(.*\)$/, ''))}</button>`).join('')}
+          </div>` : '';
+    return head(`Already in ${to}`) + `
+        <div class="sheet-scroll move-job-scroll">
+          <p class="move-job-note">${m.clashes.length === 1 ? 'This asset number is' : 'These asset numbers are'} already in <strong>${escapeHTML(to)}</strong>. A job can\u2019t hold the same number twice \u2014 choose what happens to each.</p>${all}
+          ${cards}
+        </div>
+        <p class="move-job-error" id="move-to-error" role="alert">${escapeHTML(m.error || '')}</p>
+        <button class="btn-primary sheet-pin" id="move-to-continue" data-action="move-to-continue">Continue</button>
+        <button class="btn-secondary move-job-back" id="move-to-back" data-action="move-to-back">Back</button>
+      </div>`;
+  }
+  // 'confirm'
+  const plan = moveToPlan(sess, target, m);
+  const from = sess.site || sess.name || 'this job';
+  const moving = plan.move;
+  let fails = 0, photos = 0;
+  for (const it of moving) {
+    if (it.result === 'fail') fails++;
+    photos += (typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id) : 0;
+  }
+  const bits = [plural(moving.length, 'item')];
+  if (fails) bits.push(plural(fails, 'fail'));
+  if (photos) bits.push(plural(photos, 'photo'));
+  const notes = [];
+  const del = plan.delFrom.concat(plan.delTo);
+  if (del.length) {
+    const dp = del.reduce((t, id) => t + ((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(id) : 0), 0);
+    notes.push(`\u26a0 ${plural(del.length, 'item')} will be deleted${dp ? ' (with ' + plural(dp, 'photo') + ')' : ''} \u2014 this can\u2019t be undone.`);
+  }
+  if (sess.certNo || sess.reportAt) {
+    notes.push(`\u26a0 A certificate has already been made for this job${sess.certNo ? ' (No. ' + sess.certNo + ')' : ''}. It lists these items \u2014 make it again after moving.`);
+  }
+  if (target.certNo || target.reportAt) {
+    notes.push(`\u26a0 A certificate has already been made for ${to}${target.certNo ? ' (No. ' + target.certNo + ')' : ''}. Make it again after the move to include these items.`);
+  }
+  const tFrom = instrumentDisplayName(instrumentForSession(sess));
+  const tTo = instrumentDisplayName(instrumentForSession(target));
+  if (tFrom !== tTo) {
+    notes.push(`\u26a0 These items were logged with ${tFrom || 'no tester set'}; ${to} uses ${tTo || 'no tester set'}. Its certificate will show ${tTo || 'no tester'} for them.`);
+  }
+  const renum = Object.keys(plan.renumber).length;
+  const left = [];
+  if (renum) left.push(`${plural(renum, 'item')} will get a new asset number.`);
+  if (sess.items.length - moving.length - plan.delFrom.length <= 0) left.push(`Every item leaves \u2014 ${from} will be left empty. Delete it from the Jobs list when you\u2019re ready.`);
+  if (photos || moving.some(it => mapPinOf(it))) left.push('Their photos and map pins go with them.');
+  return head('Are you sure?') + `
+        <p class="move-job-msg">Move ${escapeHTML(bits.join(' \u00b7 '))} from <strong>${escapeHTML(from)}</strong> into <strong>${escapeHTML(to)}</strong>?</p>
+        ${notes.map(x => `<p class="move-job-warn">${escapeHTML(x)}</p>`).join('')}
+        ${left.map(x => `<p class="muted move-job-note">${escapeHTML(x)}</p>`).join('')}
+        <button class="btn-primary" id="move-to-go" data-action="move-to-go">Move ${plural(moving.length, 'item')}</button>
+        <button class="btn-secondary move-job-back" id="move-to-back" data-action="move-to-back">Back</button>
       </div>`;
 }
 

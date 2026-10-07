@@ -1,4 +1,4 @@
-# PATGo — Code Map (V102)
+# PATGo — Code Map (V103)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -633,6 +633,15 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   id alone — a copy with the same ids would share them. Markup:
   **render-review.js** `renderMoveJobSheet`. `moveOfferShow` appends into #app
   after the render, like `mapPinOfferShow`.
+- V103 move into an EXISTING job (block after V101's move, before V102's duplicate):
+  `state.moveTo` (cleared by `exitSelectionMode`). `moveToClashes` uses
+  `findDuplicateAssetIndex` (the per-job asset rule); `moveToPlan` is the one place
+  the choices become moves/deletes/renumbers — render (confirm) and
+  `moveItemsToExistingJob` both call it. The move re-checks lock, items AND the
+  clash set before acting; deletes sweep photos first (rule 5). `moveItemsToExistingJob`
+  is the second writer of `movedOut` (`_moveOutAfter`, V101's rule) and drops
+  arriving ids from the TARGET's `movedOut`. Markup: **render-review.js**
+  `renderMoveToSheet`; offer reuses `moveOfferShow`.
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
 (scroll reset) live in `render()` via `_lastRenderedView`, not in `setView`.
 
@@ -775,6 +784,10 @@ blocked), drawn from `renderEditSession` after its "Duplicate this job…" card
 (below Save/Cancel, `#ef-dup-error` for the unsaved-changes line). Same rules as
 Move's sheet; reuses the `.move-job-*` styles; `_syncSafeToRepaint` refuses while
 `state.dupJob` is set.
+V103: `renderMoveToSheet(sess)` (Move to another job — pick / clash / confirm /
+blocked), drawn from `renderOverview` after V101's. Pick and clash hold inputs (the
+filter, new numbers, radios): updated in place, never re-rendered while open;
+`_syncSafeToRepaint` refuses while `state.moveTo` is set. Styles `.move-to-*`.
 
 ### render-settings.js (~1377 ln) — settings screens that own a setting
 The two-level Settings hub, its search, every `renderSettings*` sub-page with a
@@ -878,6 +891,10 @@ page — then it comes down first (`_syncTakeJob`, window ignored). `st.ph.mv`
 pull, before deletes); the rows pull keeps an `mv` job over the row's. Written by
 `syncNoteMoved` (session.js, via `syncWhenIdle`) and the pull's moved-out path
 (`_syncNoteMovedInState`).
+⚠ V103: a destination ON this phone is ready only when `_syncDestHolds` — its
+local copy holds every item sent to it, or its own `movedOut` sends it on. A
+stale copy (move into an EXISTING job) waits; the next run settles it.
+`_syncMoveDestReady` takes `moves.to`.
 **Touch to:** change what syncs, when, or how; add record kinds or photos.
 **Coupling:** asks **cloud.js** who is signed in (`cloudAvailable`,
 `cloudUserId`, `cloudClient`). Triggers: **storage.js** `saveSessions()` (one

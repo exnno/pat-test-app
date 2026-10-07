@@ -2860,6 +2860,7 @@ function exitSelectionMode() {
   state.bulkEdit.notesValue = '';
   state.bulkEdit.notesMode = 'replace';
   state.moveJob = null;   // V101
+  state.moveTo = null;    // V103
 }
 
 function toggleSelected(idx) {
@@ -3289,6 +3290,317 @@ function openMovedJob(id) {
   loadFormForCursor();
   save();
   setView('overview');
+}
+
+// ---------- V103: move selected items into an EXISTING job (roadmap Stage 9B) ----------
+// Locked: 1A a second option in Edit selected, "Move to another job…" (V101's
+// new-job path untouched); 2A the other jobs on this phone, newest first, locked
+// ones greyed with why, a filter once there are more than MOVE_TO_FILTER_AT;
+// 3A asset numbers already in the target are resolved per item before anything
+// moves — Leave it here (pre-selected, 3.2A) / Keep the one already there /
+// Use this one instead / Give it a new number (3.1A), with "Apply to all" at 3+;
+// 4B every item may go (the original is left empty); 5A the confirm warns about
+// either job's certificate and a different tester; 6A items go after the
+// target's own; 7A stay on the original, "· Open" offer (V101's).
+//
+// ⚠ Same ids, same rules as V101: items MOVE, photos are re-labelled to the job
+// holding their item (photosSettleJobs + syncNoteMoved), the original records
+// `movedOut`. The target may itself carry `movedOut` — an id coming back into it
+// is dropped from it, or another phone would think the item is still elsewhere.
+//
+// ⚠ DELETES ARE PART OF THE MOVE (3.3A). "Keep the one already there" deletes
+// the item being moved; "Use this one instead" deletes the target's item and the
+// moved one takes its place in the list. Photos are swept BEFORE the items go
+// (MAP rule 5) and a deleted item is NOT recorded in `movedOut` — to another
+// phone it is an ordinary delete, exactly as deleting by hand.
+//
+// ⚠ A job never holds the same asset number twice: "keep both" is not offered,
+// and new numbers are checked against everything the target will hold after.
+// Matching is findDuplicateAssetIndex's (exact, blank ignored) — the per-job rule.
+
+function _moveToSel(sess) {
+  return state.selectedIndices
+    .map(i => sess.items[i] && sess.items[i].id)
+    .filter(id => id != null)
+    .map(String);
+}
+
+// Every other job on this phone, newest first (date, then last change).
+function moveToTargets(sess) {
+  return (state.sessions || [])
+    .filter(s => s && sess && String(s.id) !== String(sess.id))
+    .slice()
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) ||
+      String(b.lastModified || '').localeCompare(String(a.lastModified || '')));
+}
+function moveToTitle(s) { return (s && (s.site || s.name)) || 'Untitled job'; }
+// What the filter box matches against: the title, the job name and the date as shown.
+function moveToHay(s) {
+  return [moveToTitle(s), s && s.name, formatDate(s && s.date)].filter(Boolean).join(' ').toLowerCase();
+}
+
+function moveToBlockReason(sess, ids) {
+  if (!sess) return 'This job is no longer on this phone.';
+  if (sess.locked) return 'This job is locked. Unlock it in Session settings first, then move the items.';
+  if (!(ids || []).length) return 'Select the items to move first.';
+  if (!moveToTargets(sess).length) return 'There are no other jobs on this phone. Use \u201cMove to a new job\u201d instead.';
+  return '';
+}
+
+function openMoveTo() {
+  const sess = activeSession();
+  if (!sess) return;
+  const ids = _moveToSel(sess);
+  state.bulkEdit.menuOpen = false;
+  const why = moveToBlockReason(sess, ids);
+  state.moveTo = why
+    ? { step: 'blocked', why, ids: [], from: sess.id }
+    : { step: 'pick', ids, from: sess.id, to: '', filter: '', clashes: [], error: '' };
+  render();
+}
+
+function closeMoveTo() {
+  state.moveTo = null;
+  render();
+}
+
+// Typing in the filter: rows hidden in place (no render — MAP rule 3).
+function setMoveToFilter(value) {
+  const m = state.moveTo;
+  if (!m || m.step !== 'pick') return;
+  m.filter = String(value == null ? '' : value);
+  const q = m.filter.trim().toLowerCase();
+  try {
+    let shown = 0;
+    document.querySelectorAll('.move-to-job').forEach((el) => {
+      const hit = !q || String(el.getAttribute('data-hay') || '').indexOf(q) !== -1;
+      el.hidden = !hit;
+      if (hit) shown++;
+    });
+    const none = document.getElementById('move-to-none');
+    if (none) none.hidden = shown > 0;
+  } catch (e) { /* no DOM */ }
+}
+
+// The items being moved whose asset number the target already holds — one entry
+// each, with the target item it clashes with. Order follows the original.
+function moveToClashes(sess, target, ids) {
+  const out = [];
+  if (!target || !Array.isArray(target.items)) return out;
+  for (const it of _moveJobItems(sess, ids)) {
+    if (!it.assetNo) continue;
+    const k = findDuplicateAssetIndex(target, it.assetNo, -1);
+    if (k !== -1) out.push({ id: String(it.id), with: String(target.items[k].id), choice: 'leave', newNo: '' });
+  }
+  return out;
+}
+const MOVE_TO_CHOICES = ['leave', 'keep', 'replace', 'renumber'];
+
+function pickMoveTo(targetId) {
+  const m = state.moveTo;
+  if (!m || m.step !== 'pick') return;
+  const sess = activeSession();
+  const target = (state.sessions || []).find(s => s && String(s.id) === String(targetId));
+  if (!sess || !target || String(target.id) === String(sess.id) || target.locked) return;
+  m.to = String(target.id);
+  m.clashes = moveToClashes(sess, target, m.ids);
+  m.error = '';
+  m.step = m.clashes.length ? 'clash' : 'confirm';
+  render();
+}
+
+function _moveToNewRow(i, on) {
+  try { const el = document.getElementById('move-to-new-' + i); if (el) el.hidden = !on; } catch (e) { /* no DOM */ }
+}
+function setMoveToChoice(itemId, choice) {
+  const m = state.moveTo;
+  if (!m || m.step !== 'clash' || MOVE_TO_CHOICES.indexOf(choice) === -1) return;
+  const i = m.clashes.findIndex(c => c.id === String(itemId));
+  if (i === -1) return;
+  m.clashes[i].choice = choice;
+  _moveToNewRow(i, choice === 'renumber');
+}
+// "Apply to all" — the radios are set in place to match (no render).
+function setMoveToAll(choice) {
+  const m = state.moveTo;
+  if (!m || m.step !== 'clash' || MOVE_TO_CHOICES.indexOf(choice) === -1) return;
+  m.clashes.forEach((c, i) => {
+    c.choice = choice;
+    try {
+      const r = document.querySelector('input[name="move-to-c' + i + '"][value="' + choice + '"]');
+      if (r) r.checked = true;
+    } catch (e) { /* no DOM */ }
+    _moveToNewRow(i, choice === 'renumber');
+  });
+}
+function setMoveToNewNo(itemId, value) {
+  const m = state.moveTo;
+  if (!m || m.step !== 'clash') return;
+  const c = m.clashes.find(x => x.id === String(itemId));
+  if (c) c.newNo = String(value == null ? '' : value);
+}
+
+// What the choices add up to, from the jobs as they are NOW: the items that
+// move (in the original's order), which of them replace a target item, the
+// renumbers, and what is deleted on each side. `error` when it can't go ahead.
+function moveToPlan(sess, target, m) {
+  const plan = { move: [], replace: {}, renumber: {}, delFrom: [], delTo: [], error: '' };
+  const by = {};
+  for (const c of (m.clashes || [])) by[c.id] = c;
+  for (const it of _moveJobItems(sess, m.ids)) {
+    const id = String(it.id);
+    const c = by[id];
+    const ch = c ? c.choice : '';
+    if (ch === 'leave') continue;
+    if (ch === 'keep') { plan.delFrom.push(id); continue; }
+    if (ch === 'replace') {
+      if (plan.delTo.indexOf(c.with) === -1) { plan.delTo.push(c.with); plan.replace[c.with] = id; }
+    } else if (ch === 'renumber') {
+      const no = String(c.newNo || '').trim();
+      if (!no) { plan.error = `Enter a new asset number for ${it.assetNo}.`; return plan; }
+      plan.renumber[id] = no;
+    }
+    plan.move.push(it);
+  }
+  if (!plan.move.length) {
+    plan.error = `Nothing would move to ${moveToTitle(target)} with these choices. Choose another option, or close.`;
+    return plan;
+  }
+  // Every asset number the target will hold afterwards, once each.
+  const gone = new Set(plan.delTo);
+  const seen = new Set();
+  for (const it of (target.items || [])) if (it && it.assetNo && !gone.has(String(it.id))) seen.add(it.assetNo);
+  for (const it of plan.move) {
+    const no = plan.renumber[String(it.id)] || it.assetNo;
+    if (!no) continue;
+    if (seen.has(no)) {
+      plan.error = plan.renumber[String(it.id)]
+        ? `${no} is already in ${moveToTitle(target)}, or used twice here. Choose another number.`
+        : `${no} would be in ${moveToTitle(target)} twice.`;
+      return plan;
+    }
+    seen.add(no);
+  }
+  return plan;
+}
+
+function moveToContinue() {
+  const m = state.moveTo;
+  if (!m || m.step !== 'clash') return;
+  const sess = activeSession();
+  const target = (state.sessions || []).find(s => s && String(s.id) === String(m.to));
+  if (!sess || !target) { closeMoveTo(); return; }
+  const plan = moveToPlan(sess, target, m);
+  if (plan.error) {
+    // No render: the step holds typing (MAP rule 3). Say it in place.
+    m.error = plan.error;
+    try { const el = document.getElementById('move-to-error'); if (el) el.textContent = m.error; } catch (e) { /* no DOM */ }
+    return;
+  }
+  m.error = '';
+  m.step = 'confirm';
+  render();
+}
+
+function moveToBack() {
+  const m = state.moveTo;
+  if (!m) return;
+  if (m.step === 'confirm') m.step = (m.clashes && m.clashes.length) ? 'clash' : 'pick';
+  else if (m.step === 'clash') { m.step = 'pick'; m.clashes = []; m.to = ''; }
+  else return;
+  m.error = '';
+  render();
+}
+
+// The original's `movedOut` after some items leave for `destId` — V101's rule:
+// entries for items still here are dropped, the newest go last, bounded.
+function _moveOutAfter(sess, keep, goingIds, destId) {
+  const out = {};
+  const prev = (sess.movedOut && typeof sess.movedOut === 'object' && !Array.isArray(sess.movedOut)) ? sess.movedOut : {};
+  const stays = new Set(keep.map(it => String(it && it.id)));
+  for (const k of Object.keys(prev)) if (!stays.has(k) && typeof prev[k] === 'string') out[k] = prev[k];
+  for (const id of goingIds) { delete out[id]; out[id] = destId; }
+  const keys = Object.keys(out);
+  if (keys.length > MOVED_OUT_MAX) for (const k of keys.slice(0, keys.length - MOVED_OUT_MAX)) delete out[k];
+  return out;
+}
+
+function moveItemsToExistingJob() {
+  const m = state.moveTo;
+  if (!m || m.step !== 'confirm') return;
+  const sess = activeSession();
+  if (!sess || String(sess.id) !== String(m.from)) { closeMoveTo(); return; }
+  const target = (state.sessions || []).find(s => s && String(s.id) === String(m.to));
+  const blocked = (why) => { state.moveTo = { step: 'blocked', why, ids: [], from: sess.id }; render(); };
+  // ⚠ Re-checked at the moment of moving: a sync may have changed either job
+  // since the choices were made. Anything other than what was reviewed → stop.
+  if (sess.locked) return blocked(moveToBlockReason(sess, m.ids));
+  if (!target) return blocked('The job you chose is no longer on this phone.');
+  if (target.locked) return blocked(`${moveToTitle(target)} has been locked. Unlock it in Session settings first, then move the items.`);
+  const changed = 'One of the jobs changed while you were choosing. Check the items and try again.';
+  if (_moveJobItems(sess, m.ids).length !== m.ids.length) return blocked(changed);
+  const now0 = moveToClashes(sess, target, m.ids).map(c => c.id + '>' + c.with).join(',');
+  if (now0 !== (m.clashes || []).map(c => c.id + '>' + c.with).join(',')) return blocked(changed);
+  const plan = moveToPlan(sess, target, m);
+  if (plan.error) return blocked(changed);
+
+  // Photos of deleted items first (MAP rule 5 — the ids must still be findable).
+  const del = plan.delFrom.concat(plan.delTo);
+  if (del.length && typeof photosDeleteForItems === 'function') {
+    try { Promise.resolve(photosDeleteForItems(del)).catch((e) => console.error('photosDeleteForItems failed', e)); }
+    catch (e) { console.error('photosDeleteForItems failed', e); }
+  }
+
+  const now = new Date().toISOString();
+  for (const id of Object.keys(plan.renumber)) {
+    const it = plan.move.find(x => String(x.id) === id);
+    if (it) it.assetNo = plan.renumber[id];
+  }
+  const goingIds = new Set(plan.move.map(it => String(it.id)));
+  const leaving = new Set(plan.delFrom.concat(Array.from(goingIds)));
+  const keep = sess.items.filter(it => !(it && leaving.has(String(it.id))));
+
+  // The target: a replaced item's place is taken by the one replacing it (3A);
+  // everything else goes after its own items, in the original's order (6A).
+  const byId = new Map(plan.move.map(it => [String(it.id), it]));
+  const placed = new Set();
+  const items = [];
+  for (const it of target.items) {
+    const k = String(it && it.id);
+    if (plan.replace[k]) { items.push(byId.get(plan.replace[k])); placed.add(plan.replace[k]); }
+    else if (plan.delTo.indexOf(k) === -1) items.push(it);
+  }
+  for (const it of plan.move) if (!placed.has(String(it.id))) items.push(it);
+  target.items = items;
+  if (target.movedOut && typeof target.movedOut === 'object' && !Array.isArray(target.movedOut)) {
+    for (const id of goingIds) delete target.movedOut[id];
+  }
+
+  sess.movedOut = _moveOutAfter(sess, keep, goingIds, String(target.id));
+  sess.items = keep;
+  for (const s of [sess, target]) {
+    markSessionDirty(s);
+    s.lastModified = now;
+    _invalidateSessionEncoding(s);
+  }
+  state.sessions = state.sessions.slice();
+  state.lastLog = null;   // Undo belongs to items that are still where they were logged
+  if (state.cursor > sess.items.length) state.cursor = sess.items.length;
+  exitSelectionMode();
+  state.moveTo = null;
+
+  const moved = {};
+  for (const id of goingIds) moved[id] = String(target.id);
+  if (typeof photosSettleJobs === 'function') { try { photosSettleJobs(); } catch (e) { console.error('photosSettleJobs failed', e); } }
+  if (typeof syncNoteMoved === 'function') {
+    try { Promise.resolve(syncNoteMoved(moved)).catch((e) => console.error('syncNoteMoved failed', e)); }
+    catch (e) { console.error('syncNoteMoved failed', e); }
+  }
+
+  save();
+  loadFormForCursor();
+  render();
+  moveOfferShow(target.id, plan.move.length, moveToTitle(target));
 }
 
 // ---------- V102: duplicate a job (roadmap Stage 9 part 2) ----------

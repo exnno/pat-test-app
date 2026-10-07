@@ -519,6 +519,15 @@ registerActions({
   'move-job-go': () => moveItemsToNewJob(),
   'move-open-new': (arg) => openMovedJob(arg),
 
+  // V103 (Stage 9B): Move to another job — an existing one (session.js).
+  'move-to-open': () => openMoveTo(),
+  'move-to-close': () => closeMoveTo(),
+  'move-to-pick': (arg) => pickMoveTo(arg),
+  'move-to-all': (arg) => setMoveToAll(arg),
+  'move-to-continue': () => moveToContinue(),
+  'move-to-back': () => moveToBack(),
+  'move-to-go': () => moveItemsToExistingJob(),
+
   // V102 (Stage 9, duplicate): Session settings → Duplicate this job (session.js).
   'dup-job-open': () => openDupJob(),
   'dup-job-close': () => closeDupJob(),
@@ -1103,6 +1112,8 @@ registerInputActions({
   'bulk-notes': (v) => { state.bulkEdit.notesValue = v; },
   'move-job-field': (v, el) => setMoveJobField(el && el.dataset ? el.dataset.arg : '', v),   // V101
   'dup-job-field': (v, el) => setDupJobField(el && el.dataset ? el.dataset.arg : '', v),     // V102
+  'move-to-filter': (v) => setMoveToFilter(v),                                              // V103
+  'move-to-newno': (v, el) => setMoveToNewNo(el && el.dataset ? el.dataset.arg : '', v),    // V103
 
   // Edit-session form
   'ef-site': (v) => { state.editForm.site = v; },
@@ -1142,6 +1153,7 @@ registerInputActions({
 registerChangeActions({
   'move-job-field': (v, el) => setMoveJobField(el && el.dataset ? el.dataset.arg : '', v),   // V101 (the tester picker)
   'dup-job-field': (v, el) => setDupJobField(el && el.dataset ? el.dataset.arg : '', v),     // V102 (the tester picker)
+  'move-to-choice': (v, el) => setMoveToChoice(el && el.dataset ? el.dataset.arg : '', v),   // V103 (a clash card's radios)
   // Sessions list area — sort / status / lock filters (were in render-core.js).
   // Each persists and refreshes just the list area.
   'sessions-sort': (v) => { state.sort = v; save(); refreshSessionsListAreaOnly(); },

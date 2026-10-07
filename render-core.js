@@ -234,9 +234,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Duplicate a job.</strong> Open a job, tap <strong>Session settings</strong>, then <strong>Duplicate this job</strong> at the bottom. You get a full copy as a new job &mdash; every item with its result, readings, notes, map pin and photos.</li>
-        <li><strong>Split a job the other way round.</strong> Logged two clients in one job? Duplicate it, give the copy the other client and site, then on each job use <strong>Select items</strong> to delete what doesn't belong.</li>
-        <li><strong>Safe by design.</strong> The copy starts unlocked and not exported, with its own certificate number. Photos only in the cloud are fetched first. The original isn't changed.</li>
+        <li><strong>Move items into another job.</strong> Logged something on the wrong job? On the Overview, <strong>Select items</strong>, then <strong>Edit selected</strong> &rarr; <strong>Move to another job</strong> and pick the job they belong in. Photos and map pins go with them.</li>
+        <li><strong>Same asset number in both?</strong> You'll see the two side by side and choose for each: leave it where it is, keep the one already there, use this one instead, or give it a new number. A job never holds the same number twice.</li>
+        <li><strong>Moving everything is fine.</strong> Merge two jobs by moving every item &mdash; the empty job is left for you to delete. You'll be warned if either job already has a certificate, or if the two use different testers.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

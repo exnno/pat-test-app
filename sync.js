@@ -1041,8 +1041,26 @@ function _syncHasJob(id) {
 // A job items moved to is safe to rely on when it is on this phone, cleared from
 // it (the cloud keeps it — V80 C), or was just read live from the cloud. Deleted
 // here, or not in the cloud (yet), is not: the items would be on no job here.
-function _syncMoveDestReady(d, pruned, destRows) {
-  if (_syncHasJob(d) || pruned.has(d)) return true;
+//
+// V103: ON THIS PHONE IS NOT ENOUGH. Items can now move into a job that already
+// existed, and this phone's copy of it may predate the move — then applying the
+// smaller job first would leave the items on no job here, and a "keep this
+// phone's copy" on that job would push it to the cloud without them. So a job
+// here counts only once it HOLDS each item sent to it — or records it moved on
+// again (`movedOut`, V101's one-hop trust). Until then the smaller job waits;
+// that job's own row lands, and the next run settles it by itself. `to` is
+// _syncMovedOut's {itemId: jobId}.
+function _syncDestHolds(d, to) {
+  const s = (state.sessions || []).find(x => x && String(x.id) === String(d));
+  if (!s || !Array.isArray(s.items)) return false;
+  const have = new Set(s.items.map(it => String(it && it.id)));
+  const mo = (s.movedOut && typeof s.movedOut === 'object' && !Array.isArray(s.movedOut)) ? s.movedOut : {};
+  return Object.keys(to || {}).filter(k => to[k] === String(d)).every(k =>
+    have.has(k) || (typeof mo[k] === 'string' && mo[k] !== '' && mo[k] !== String(d)));
+}
+function _syncMoveDestReady(d, pruned, destRows, to) {
+  if (_syncHasJob(d)) return _syncDestHolds(d, to);
+  if (pruned.has(d)) return true;
   if ((state.tombstones || []).some(t => t && t.kind === 'session' && String(t.id) === d)) return false;
   const row = destRows.get(d);
   return !!(row && row.deleted !== true && _syncValidDoc(row.doc, d));
@@ -1292,7 +1310,7 @@ function _syncPull(c, uid, st, out) {
     // went to is here already, cleared here (so in the cloud), or fetched in this
     // very page — it comes down first. Anything short of that asks, as before.
     const moves = _syncMovedOut(local, doc);
-    const ready = moves.covered && moves.dests.every(d => _syncMoveDestReady(d, pruned, destRows));
+    const ready = moves.covered && moves.dests.every(d => _syncMoveDestReady(d, pruned, destRows, moves.to));
     if (doc.items.length < local.items.length && !ready) {
       _syncHeldNote({ id, reason: 'fewer-items', name,
         localItems: local.items.length, cloudItems: doc.items.length });
@@ -3520,6 +3538,7 @@ function _syncSafeToRepaint() {
   // typing away (MAP rule 3), so the repaint is owed until the engineer leaves.
   if (SYNC_NO_REPAINT_VIEWS.indexOf(state.view) !== -1) return false;
   if (state.moveJob) return false;   // V101: the Move sheet holds a selection and typing
+  if (state.moveTo) return false;    // V103: the Move to another job sheet — choices and typing
   if (state.dupJob) return false;    // V102: the Duplicate sheet holds typing, or a copy under way
   try {
     const a = document.activeElement;

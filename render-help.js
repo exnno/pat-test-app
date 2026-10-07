@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">✨ Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V102: rolled forward — V102 on top, V99 dropped. -->
+      <!-- v8: rolling 3-version changelog. V103: rolled forward — V103 on top, V100 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V103</strong> &middot; October 2026</p>
+        <p class="muted">Move items into another job: on the Overview, Select items, then Edit selected &rarr; Move to another job, and pick the job they belong in. If an asset number is already there, you choose for each item &mdash; leave it, keep the one there, use this one instead, or give it a new number. Moving every item merges two jobs.</p>
         <p><strong>V102</strong> &middot; October 2026</p>
         <p class="muted">Duplicate a job: in a job's Session settings, tap Duplicate this job. Check the client and site for the copy, confirm, and the copy opens &mdash; every item, reading, note and photo included. Handy for splitting a job: duplicate it, then remove from each what doesn't belong.</p>
         <p><strong>V101</strong> &middot; October 2026</p>
         <p class="muted">Move items to a new job: on the Overview, Select items, then Edit selected &rarr; Move to a new job. Check what's moving, enter the new client and site, and confirm. Photos and map pins go with their items; a locked job can't be split.</p>
-        <p><strong>V100</strong> &middot; October 2026</p>
-        <p class="muted">Reminders, on a new page under Settings &rarr; Phone &amp; Display: a nudge when a locked job still has no certificate or CSV export, a time each day to remind you about jobs still unlocked, and a choice of how often the backup reminder appears. Making the certificate now counts as finishing a job. And it's version 100 &mdash; thank you for testing with PATGo.</p>
 
         </div>
 
