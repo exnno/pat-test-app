@@ -136,4 +136,24 @@ function recentDate(daysAgo) {
 }
 const RECENT_DATE = recentDate(1);
 
-module.exports = { RECENT_DATE, recentDate, CANARY, freshApp, withInstrument, addInstrument, withSession, withItem, populated, confirmSheet, tick };
+/* V105: restore a backup file and wait for the FileReader to finish — until a
+   new sheet (the confirm, or the "not a backup" info sheet) is on screen, or 2 s.
+   Replaces a fixed `await tick(5)`: the stub's readAsText awaits a real
+   Blob.text(), which is real async work, and under load 5 ms was not always
+   enough — 03f went red about 1 run in 7 alone, and every time with two suites
+   side by side. A test that expects NO confirm sheet (03h) was the worse case:
+   it passed vacuously whenever the read had not finished. Resolves true when a
+   sheet appeared. */
+async function restoreFile(app, file, ms = 2000) {
+  const count = () => app.doc.querySelectorAll('.bulk-sheet').length;
+  const before = count();
+  app.fn('restoreBackupFromFile')(file);
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (count() > before) return true;
+    await tick(5);
+  }
+  return false;
+}
+
+module.exports = { RECENT_DATE, recentDate, CANARY, freshApp, withInstrument, addInstrument, withSession, withItem, populated, confirmSheet, tick, restoreFile };
