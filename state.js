@@ -64,6 +64,11 @@ let state = {
   // ids (selected item ids, captured on open), from (job id), client, site, name,
   // date, engineer, instrumentId, prefix, error, why }.
   moveJob: null,
+  // V102: the Duplicate sheet on Session settings — null, or { step: 'form'|'confirm'|
+  // 'working'|'partial'|'blocked', from (job id), client, site, client0, site0 (the
+  // pre-filled pair), name, date, engineer, instrumentId, prefix, error, failed
+  // (cloud photos that couldn't be fetched), skipCloud, why }.
+  dupJob: null,
   failModalStage: 'reasons',
   failOtherText: '',
 

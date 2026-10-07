@@ -234,9 +234,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Move items to a new job.</strong> Logged two clients in one job? On the Overview, tap <strong>Select items</strong>, pick the ones that belong elsewhere, then <strong>Edit selected &rarr; Move to a new job</strong>. Enter the new job's client and site, check the list, and confirm.</li>
-        <li><strong>Everything goes with them.</strong> Photos, map pins, readings and notes move with their items, and asset numbers stay the same. The new job starts with the same date, engineer and tester &mdash; change them under More details if you need to.</li>
-        <li><strong>Safe by design.</strong> A locked job can't be split, and at least one item always stays behind. If a certificate was already made for the job, you're reminded to make it again.</li>
+        <li><strong>Duplicate a job.</strong> Open a job, tap <strong>Session settings</strong>, then <strong>Duplicate this job</strong> at the bottom. You get a full copy as a new job &mdash; every item with its result, readings, notes, map pin and photos.</li>
+        <li><strong>Split a job the other way round.</strong> Logged two clients in one job? Duplicate it, give the copy the other client and site, then on each job use <strong>Select items</strong> to delete what doesn't belong.</li>
+        <li><strong>Safe by design.</strong> The copy starts unlocked and not exported, with its own certificate number. Photos only in the cloud are fetched first. The original isn't changed.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

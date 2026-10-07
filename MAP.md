@@ -1,4 +1,4 @@
-# PATGo — Code Map (V101)
+# PATGo — Code Map (V102)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -444,6 +444,10 @@ Every add/delete must keep BOTH mirrors in step.
 `photoItemJobs` + `photosSettleJobs` re-label after a move (session.js), after a
 pull that changed jobs (sync.js) and at boot (boot.js). A path that moves items
 between jobs must end in `photosSettleJobs`, or deleting the old job sweeps them.
+⚠ V102: `photosCopyForItems(itemMap, jobId)` (duplicate) writes NEW photos (new
+ids, the copy's item + job) in ONE readwrite transaction — reads and puts share
+it, so it is all or nothing. The caller (session.js `_dupJobCommit`) makes the
+job only after it resolves ok. Mirror/index updated only after `oncomplete`.
 ⚠ v90: `photosRemoveQuiet(ids, keepPreview)` is also the manager's "Remove from
 phone" (known-in-cloud only, caller checks); notes nothing either way.
 ⚠ v89: cloud-only lookups (`photoCloudOnlyForItem`, `photoCountForItemAll`,
@@ -605,6 +609,20 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   `lockedAt` only through `lockedAtMs` (ignores it on an unlocked job). The
   `remindexport` list filter is transient (storage load drops it).
   `setView` clears `state.partyOpen` / `state.egg` (**render-help.js**).
+- V102 duplicate (block after the move, before "Edit-session flow"): `state.dupJob`
+  (cleared by `setView`; a copy under way still finishes). `openDupJob` refuses
+  while `editFormDirty` (Session settings has unsaved typing — message in place,
+  no render). `duplicateJob` → cloud-only photos via **sync.js**
+  `syncPhotoDownload` (failures → step 'partial') → `_dupJobCommit`: items copied
+  FIRST (new ids, `copyOf` = first original's id), then **photos.js**
+  `photosCopyForItems`, then the job (`_dupJobBuild`). Unchanged client + site
+  (`client0`/`site0`) keep the original's title and links; changed ones go
+  through ensureClient/ensureSite like createSession.
+- V102 lifetime stats: `tallySessions(sessions, alreadyCounted)` counts each
+  `statsKeyOf(it)` once (`copyOf` || id). `archiveSessionStats` /
+  `unarchiveSessionStats` pass `statsKeysStaying(going)` — keys still held by
+  other jobs (by job ID), so a copy's partner is never archived twice. Any new
+  path that copies items must set `copyOf`, or stats double.
 - V101 move to a new job (block before "Edit-session flow"): `openMoveJob` captures
   the selection as item IDS in `state.moveJob` (cleared by `exitSelectionMode`, so
   by `setView`); `moveJobBlockReason` (locked, all items) is checked on open AND at
@@ -752,6 +770,11 @@ V101: `renderMoveJobSheet(sess)` (Move to a new job — form / confirm / blocked
 drawn from `renderOverview`; logic in session.js. The form holds inputs: never
 re-rendered while typing, its fields write `state.moveJob` on input; sync.js
 `_syncSafeToRepaint` refuses while `state.moveJob` is set.
+V102: `renderDupJobSheet(sess)` (Duplicate — form / confirm / working / partial /
+blocked), drawn from `renderEditSession` after its "Duplicate this job…" card
+(below Save/Cancel, `#ef-dup-error` for the unsaved-changes line). Same rules as
+Move's sheet; reuses the `.move-job-*` styles; `_syncSafeToRepaint` refuses while
+`state.dupJob` is set.
 
 ### render-settings.js (~1377 ln) — settings screens that own a setting
 The two-level Settings hub, its search, every `renderSettings*` sub-page with a

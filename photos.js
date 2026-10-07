@@ -741,6 +741,55 @@ function photosSettleJobs() {
   }).then(({ ok }) => (ok ? fix.size : -1)).catch(() => -1);
 }
 
+// V102 (Stage 9, duplicate — 12A). Copy every photo of some items onto their
+// copies: `itemMap` is Map(oldItemId → newItemId), `sessionId` the copy's job.
+// Each copy is a NEW photo — its own id, so it is uploaded as a photo of its
+// own and deleting either job never touches the other's (photos are swept by
+// item and by job, photosDeleteForItem / photosDeleteForSessions).
+//
+// ⚠ ONE TRANSACTION, so it is all or nothing: a phone that runs out of space
+// part-way copies NO photos, and the caller then makes no job — there is never
+// a copy missing some of its photos, or photos left with no job. The reads and
+// the writes share the transaction; each copy is put from its read's onsuccess,
+// while the transaction is still active. Only items the mirror says have photos
+// are read. Resolves { ok, n }; no photo store at all is ok with nothing copied.
+function photosCopyForItems(itemMap, sessionId) {
+  if (!photosSupported()) return Promise.resolve({ ok: true, n: 0 });
+  const want = [];
+  for (const [from, to] of (itemMap || new Map())) {
+    if (from && to && photoCountForItem(from) > 0) want.push([String(from), String(to)]);
+  }
+  if (!want.length) return Promise.resolve({ ok: true, n: 0 });
+  const copies = [];
+  return _photoTx('readwrite', (store) => {
+    const idx = store.index('itemId');
+    for (const [from, to] of want) {
+      const req = idx.getAll(from);
+      req.onsuccess = () => {
+        for (const r of (req.result || [])) {
+          if (!r || !r.blob) continue;
+          const c = {
+            id: (typeof newId === 'function') ? newId() : String(Date.now()) + Math.random().toString(36).slice(2),
+            itemId: to,
+            sessionId: String(sessionId || ''),
+            blob: r.blob,
+            w: r.w || 0,
+            h: r.h || 0,
+            bytes: (typeof r.bytes === 'number' && r.bytes > 0) ? r.bytes : 0,
+            at: (typeof r.at === 'string' && r.at) ? r.at : new Date().toISOString()
+          };
+          store.put(c);
+          copies.push(c);
+        }
+      };
+    }
+  }).then(({ ok }) => {
+    if (!ok) return { ok: false, n: 0 };
+    for (const c of copies) { _photoIndexAdd(c.itemId, c.bytes); _photoMetaPut(c); }
+    return { ok: true, n: copies.length };
+  }).catch(() => ({ ok: false, n: 0 }));
+}
+
 // The engineer deletes a photo that is only in the cloud (5A: any phone that can
 // see it). The ledger carries it; sync.js deletes the row and file.
 function photoDeleteCloudOnly(photoId) {

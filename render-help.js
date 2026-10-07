@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">✨ Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V101: rolled forward — V101 on top, V98 dropped. -->
+      <!-- v8: rolling 3-version changelog. V102: rolled forward — V102 on top, V99 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V102</strong> &middot; October 2026</p>
+        <p class="muted">Duplicate a job: in a job's Session settings, tap Duplicate this job. Check the client and site for the copy, confirm, and the copy opens &mdash; every item, reading, note and photo included. Handy for splitting a job: duplicate it, then remove from each what doesn't belong.</p>
         <p><strong>V101</strong> &middot; October 2026</p>
         <p class="muted">Move items to a new job: on the Overview, Select items, then Edit selected &rarr; Move to a new job. Check what's moving, enter the new client and site, and confirm. Photos and map pins go with their items; a locked job can't be split.</p>
         <p><strong>V100</strong> &middot; October 2026</p>
         <p class="muted">Reminders, on a new page under Settings &rarr; Phone &amp; Display: a nudge when a locked job still has no certificate or CSV export, a time each day to remind you about jobs still unlocked, and a choice of how often the backup reminder appears. Making the certificate now counts as finishing a job. And it's version 100 &mdash; thank you for testing with PATGo.</p>
-        <p><strong>V99</strong> &middot; October 2026</p>
-        <p class="muted">Map pins for fails: mark where a failed item is with its what3words address. Switch it on under Settings &rarr; Logging &rarr; Logging Options, then tap 📍 on a fail (or the offer straight after logging one), open what3words and paste the three words. Pins show on the Overview, print with the fail under Remedial actions, and can go in a Map pin CSV column.</p>
 
         </div>
 

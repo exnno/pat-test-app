@@ -3739,6 +3739,11 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .move-offer:active { background: var(--accent-hover); }
 
+/* @@ duplicate a job (V102, Stage 9) — the sheet reuses the .move-job-* rules */
+.dup-job-card { margin-top: 12px; }
+.dup-job-open { display: block; width: 100%; }
+.dup-job-hint { margin: 8px 0 0; font-size: 13px; }
+
 /* @@ scanner */
 /* ---------------------------------------------------------------------------
    v65: HID barcode scanner.

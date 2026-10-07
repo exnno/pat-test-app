@@ -8,15 +8,26 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V101
-V102 = Stage 9 part 2, duplicate a job (locked at the V101 round: 9C a full copy
-WITH items — every job, item and photo gets a NEW id, never shared; 12A photos on
-the phone are copied, cloud-only ones download first or the duplicate goes
-without them; 13A a locked job can be duplicated, the copy starts unlocked with no
-certificate number; always on, like Move). Spec round for the rest (where it
-lives, what is copied, the confirm).
+### Next after V102
+V103 = move items into an EXISTING job (below — scheduled, Peter V102 round).
+Then V104 S10 readings check (Peter now has his CoP copy — the figures are needed
+at its spec round), Stage 10 (snapshots, then factory reset), then permanent
+cloud delete + storage used (Stage 5 part 3), then a housekeeping release (favicon
+set, remove dead `setupLongPress`, the sheet-markup guard). Full order: roadmap
+v4.15.
 
-### Move items to an EXISTING job (Peter, V101 round 2B — parked)
+### V102 residuals (known, accepted)
+- A V101 phone shows a duplicated job's items twice in its own lifetime count
+  (it doesn't read `copyOf`). Test phones only, upgraded together.
+- Cloud-only photos fetched for a duplicate stay on the phone under the ORIGINAL
+  too (that is how they are copied); clear them from the photo manager if space
+  matters.
+- CSV "Import as duplicate" (v30s) makes items without `copyOf`, so its copies
+  still count twice — pre-existing, unchanged.
+- Asset numbers repeat across the original and the copy until one is trimmed (S4
+  is not built; the same-job duplicate check is per job).
+
+### Move items to an EXISTING job (Peter, V101 round 2B) — SCHEDULED V103
 Move selected items into another unlocked job on this phone (fixes "logged on the
 wrong job"). Needs: a job picker; asset-number clashes in the target
 (`findDuplicateAssetIndex`); the target's certificate warning; `movedOut` already
@@ -86,7 +97,7 @@ names any job id, so the sync side carries over unchanged.
 - 5A: a V97 phone that edits a site sends it back without its notes and V98
   phones take that. Test phones only — upgrade both together.
 
-### S10 readings check — PARKED at the V96 round (Peter: limits from his own copy of the CoP)
+### S10 readings check — SCHEDULED V104 (Peter has his CoP copy, V102 round; was parked at V96)
 Spec drafted at the V96 round, not answered: 1 leakage 5 mA all classes (5th ed.)
 vs 3.5 mA; 2 earth with the cord unknown — warn above 0.5 Ω (A) / 0.3 Ω (B) / no
 check (C); 3 PASS sheet only vs also FAIL; 4 warning sheet with Log as FAIL (tagged
@@ -98,7 +109,7 @@ earth (0.1 + R) Ω with tolerance leeway, older kit up to 0.5 Ω; leakage 5 mA.
 Peter to confirm against the book (and whether the 4th-ed 0.3 MΩ heating figure
 survives). Readings off → no check. The switch lands in Logging → Test Readings.
 
-### Settings redo part 3 (Stage 7, optional) — the look pass
+### Settings redo part 3 (Stage 7) — the look pass — SCHEDULED, first of Stage 12 (Peter, V102 round)
 V97 did part 2 (Backup & Restore split, Phone Storage, Logging Options, About copy).
 Left: emoji icons and casing inside pages (e.g. "Clear photos from this phone",
 section headings), and whether Smart Quick Pick on/off should leave Quick Pick
@@ -442,7 +453,8 @@ unboundedly; tidy it if that sheet is ever touched for another reason.
 
 ### General sheet-markup guard — the part of the audit not built
 
-**Not scheduled.** Harness 12d catches any CSS rule that hand-rolls a scroller
+**Scheduled (Peter, V102 round)** in the housekeeping release with the favicon set
+and removing `setupLongPress`; needs its own short spec round. Harness 12d catches any CSS rule that hand-rolls a scroller
 without `min-height: 0`, which covers sheets nobody has written yet. What it does
 NOT catch is a new sheet whose growing body is never marked at all — there is no
 rule to inspect, because the mistake is an absence.
@@ -730,7 +742,7 @@ survives those documents being archived.
 | Per-instrument "in service" toggle | Only if overdue calibration nags on a retired instrument prove annoying in practice |
 | ~~Sheet-scroller audit~~ | **SHIPPED V76.** The general sheet-markup guard, the part deliberately not built, is still open above |
 | S4 asset ID already used at this site | **Very low priority, considered not needed (Peter, V95 round).** Peter gives every item a new number, and the same-job duplicate check already blocks repeats within a job. If a customer who numbers each site from 1 asks: a phone-only check against same-site jobs in the last 30 days needs no SQL (V95 round option B); a cloud-wide check would need a generated `asset_nos` column |
-| Scan into other fields (location, item type) | Raised implicitly by V67. Currently a scan is refused when any other text field has focus (the deliberate V65 "known limit"). Only worth revisiting if Peter starts labelling locations |
+| Scan into other fields (location, item type) | **Liked, not a priority (Peter, V102 round).** Raised implicitly by V67. Currently a scan is refused when any other text field has focus (the deliberate V65 "known limit"). Only worth revisiting if Peter starts labelling locations |
 
 ### Discussed and NOT proceeding
 Kept so these don't get re-raised and re-argued from scratch.
@@ -753,6 +765,7 @@ starting changes the calculus — don't rebuild the reasoning from nothing.
   confirmed JSON backups. ⚠ PWA data is origin-bound — never migrate first.
 - Cold-user testing: phone handed over, three appliances, one certificate, no
   intervention. Needed before any documentation or tour rebuild.
-- Tight-cropped favicon set for tab legibility (deferred from V58).
+- Tight-cropped favicon set for tab legibility (deferred from V58) — SCHEDULED in
+  the housekeeping release (Peter, V102 round).
 - `backupVersion` bump to 6 — reserved for a genuinely incompatible schema
   change. Not yet triggered.

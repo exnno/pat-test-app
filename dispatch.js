@@ -519,6 +519,14 @@ registerActions({
   'move-job-go': () => moveItemsToNewJob(),
   'move-open-new': (arg) => openMovedJob(arg),
 
+  // V102 (Stage 9, duplicate): Session settings → Duplicate this job (session.js).
+  'dup-job-open': () => openDupJob(),
+  'dup-job-close': () => closeDupJob(),
+  'dup-job-continue': () => dupJobContinue(),
+  'dup-job-back': () => dupJobBack(),
+  'dup-job-go': () => { duplicateJob(false); },
+  'dup-job-without': () => { duplicateJob(true); },
+
   // Overview body rows
   'jump-to-item': (arg) => jumpTo(parseInt(arg, 10)),
   'delete-item': (arg) => openConfirmSheet({
@@ -1094,6 +1102,7 @@ registerInputActions({
   'bulk-type': (v) => { state.bulkEdit.typeValue = v; },
   'bulk-notes': (v) => { state.bulkEdit.notesValue = v; },
   'move-job-field': (v, el) => setMoveJobField(el && el.dataset ? el.dataset.arg : '', v),   // V101
+  'dup-job-field': (v, el) => setDupJobField(el && el.dataset ? el.dataset.arg : '', v),     // V102
 
   // Edit-session form
   'ef-site': (v) => { state.editForm.site = v; },
@@ -1132,6 +1141,7 @@ registerInputActions({
 // ===========================================================================
 registerChangeActions({
   'move-job-field': (v, el) => setMoveJobField(el && el.dataset ? el.dataset.arg : '', v),   // V101 (the tester picker)
+  'dup-job-field': (v, el) => setDupJobField(el && el.dataset ? el.dataset.arg : '', v),     // V102 (the tester picker)
   // Sessions list area — sort / status / lock filters (were in render-core.js).
   // Each persists and refreshes just the list area.
   'sessions-sort': (v) => { state.sort = v; save(); refreshSessionsListAreaOnly(); },

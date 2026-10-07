@@ -3520,6 +3520,7 @@ function _syncSafeToRepaint() {
   // typing away (MAP rule 3), so the repaint is owed until the engineer leaves.
   if (SYNC_NO_REPAINT_VIEWS.indexOf(state.view) !== -1) return false;
   if (state.moveJob) return false;   // V101: the Move sheet holds a selection and typing
+  if (state.dupJob) return false;    // V102: the Duplicate sheet holds typing, or a copy under way
   try {
     const a = document.activeElement;
     if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) return false;

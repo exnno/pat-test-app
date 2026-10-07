@@ -594,8 +594,113 @@ function renderEditSession() {
           <button class="btn-primary" id="ef-save" data-action="edit-save">Save</button>
         </div>
       </div>
+      <!-- V102 (1B): below Save/Cancel, so it never reads as part of the form. -->
+      <div class="card dup-job-card">
+        <button class="btn-secondary dup-job-open" id="ef-dup-btn" data-action="dup-job-open">Duplicate this job\u2026</button>
+        <p class="muted dup-job-hint">A full copy \u2014 items, results, readings, notes and photos \u2014 as a new job.</p>
+        <p class="move-job-error" id="ef-dup-error" role="alert"></p>
+      </div>
     </div>
+    ${renderDupJobSheet(sess)}
   `;
+}
+
+// V102 (Stage 9, duplicate): one sheet slot, five steps — 'form' (client + site,
+// More details; typing, so it never renders itself — MAP rule 3), 'confirm' (the
+// "Are you sure?", buttons only), 'working' (fetching / copying; no buttons),
+// 'partial' (cloud photos that couldn't be fetched: 4A) and 'blocked'. Shares
+// the Move sheet's styles. Logic: session.js.
+function renderDupJobSheet(sess) {
+  const m = state.dupJob;
+  if (!m || !sess || String(m.from) !== String(sess.id)) return '';
+  const working = m.step === 'working';
+  const head = (title) => `
+      <div class="modal-backdrop" id="dup-job-backdrop" ${working ? '' : 'data-action="dup-job-close"'}></div>
+      <div class="bulk-sheet move-job-sheet dup-job-sheet" role="dialog" aria-label="${escapeHTML(title)}">
+        <div class="bulk-sheet-handle"></div>
+        <div class="bulk-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+          ${working ? '<span class="fail-close-spacer"></span>' : '<button class="fail-close-btn" id="dup-job-close" data-action="dup-job-close" aria-label="Cancel">\u00d7</button>'}
+        </div>`;
+  const plural = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+  if (m.step === 'blocked') {
+    return head('Can\u2019t duplicate this job') + `
+        <p class="move-job-why">${escapeHTML(m.why || '')}</p>
+        <button class="btn-primary" id="dup-job-ok" data-action="dup-job-close">OK</button>
+      </div>`;
+  }
+  if (working) {
+    return head('Duplicating\u2026') + `
+        <p class="move-job-msg" id="dup-job-progress" role="status">Copying\u2026</p>
+        <p class="muted move-job-note">Keep the app open until the copy opens.</p>
+      </div>`;
+  }
+  if (m.step === 'partial') {
+    return head('Some photos aren\u2019t here') + `
+        <p class="move-job-msg">${escapeHTML(plural(m.failed || 0, 'photo'))} only in the cloud couldn\u2019t be fetched \u2014 check you\u2019re online and signed in. Duplicate without ${m.failed === 1 ? 'it' : 'them'}? The original keeps ${m.failed === 1 ? 'it' : 'them'} either way.</p>
+        <button class="btn-primary" id="dup-job-without" data-action="dup-job-without">Duplicate without ${m.failed === 1 ? 'it' : 'them'}</button>
+        <button class="btn-secondary move-job-back" id="dup-job-back" data-action="dup-job-back">Back</button>
+      </div>`;
+  }
+  const sum = dupJobSummary(sess);
+  if (m.step === 'confirm') {
+    const from = sess.site || sess.name || 'this job';
+    const to = moveJobTitle(m.client, m.site);
+    const bits = [plural(sum.n, 'item')];
+    if (sum.fails) bits.push(plural(sum.fails, 'fail'));
+    if (sum.photos) bits.push(plural(sum.photos, 'photo') + (sum.bytes ? ' (about ' + formatBytes(sum.bytes) + ')' : ''));
+    const cloud = sum.cloud ? `
+        <p class="muted move-job-note">${escapeHTML(plural(sum.cloud, 'photo'))} ${sum.cloud === 1 ? 'is' : 'are'} only in the cloud and will be fetched first.</p>` : '';
+    const space = sum.photos ? `
+        <p class="muted move-job-note">The copied photos take up space again, on this phone and in the cloud.</p>` : '';
+    return head('Are you sure?') + `
+        <p class="move-job-msg">Copy ${escapeHTML(bits.join(' \u00b7 '))} from <strong>${escapeHTML(from)}</strong> into a new job for <strong>${escapeHTML(to)}</strong>?</p>${cloud}${space}
+        <p class="muted move-job-note">The copy is unlocked and not exported, and gets its own certificate number when you make one. Both jobs hold the same items until you remove what doesn\u2019t belong.</p>
+        <button class="btn-primary" id="dup-job-go" data-action="dup-job-go">Duplicate</button>
+        <button class="btn-secondary move-job-back" id="dup-job-back" data-action="dup-job-back">Back</button>
+      </div>`;
+  }
+  // 'form'
+  const clientOpts = Array.from(new Set((state.clients || []).map(c => c && c.name).filter(Boolean)))
+    .map(x => `<option value="${escapeHTML(x)}"></option>`).join('');
+  const siteOpts = Array.from(new Set((state.sites || []).map(x => x && x.name).filter(Boolean)))
+    .map(x => `<option value="${escapeHTML(x)}"></option>`).join('');
+  const insts = (typeof instrumentList === 'function') ? instrumentList() : [];
+  const tester = insts.length ? `
+            <label class="label" for="dup-job-tester">Tester</label>
+            <select class="input" id="dup-job-tester" data-change-action="dup-job-field" data-arg="instrumentId">
+              <option value=""${m.instrumentId ? '' : ' selected'}>The tester in use</option>
+              ${insts.map(i => `<option value="${escapeHTML(String(i.id))}"${String(i.id) === String(m.instrumentId) ? ' selected' : ''}>${escapeHTML(instrumentDisplayName(i))}</option>`).join('')}
+            </select>` : '';
+  const field = (id, key, label, extra) => `
+            <label class="label" for="${id}">${label}</label>
+            <input class="input" id="${id}" data-input-action="dup-job-field" data-arg="${key}" value="${escapeHTML(m[key] || '')}" ${extra || ''}>`;
+  const what = [plural(sum.n, 'item')];
+  if (sum.fails) what.push(plural(sum.fails, 'fail'));
+  if (sum.photos) what.push(plural(sum.photos, 'photo'));
+  return head('Duplicate this job') + `
+        <div class="sheet-scroll move-job-scroll">
+          <p class="muted move-job-note">Copying ${escapeHTML(what.join(' \u00b7 '))}, with everything on them.</p>
+          <label class="label" for="dup-job-client">Copy\u2019s client</label>
+          <input class="input" id="dup-job-client" data-input-action="dup-job-field" data-arg="client" value="${escapeHTML(m.client || '')}" list="dup-job-clients" autocomplete="off" placeholder="Client">
+          <datalist id="dup-job-clients">${clientOpts}</datalist>
+          <label class="label" for="dup-job-site">Copy\u2019s site</label>
+          <input class="input" id="dup-job-site" data-input-action="dup-job-field" data-arg="site" value="${escapeHTML(m.site || '')}" list="dup-job-sites" autocomplete="off" placeholder="Site">
+          <datalist id="dup-job-sites">${siteOpts}</datalist>
+          <details class="move-job-more">
+            <summary>More details</summary>
+            ${field('dup-job-name', 'name', 'Job name', 'autocomplete="off"')}
+            ${field('dup-job-date', 'date', 'Date', 'type="date"')}
+            ${field('dup-job-engineer', 'engineer', 'Engineer', 'autocomplete="off"')}
+            ${tester}
+            ${field('dup-job-prefix', 'prefix', 'Asset prefix', 'autocomplete="off" autocapitalize="characters"')}
+            <p class="muted move-job-note">Copied from this job, with its job notes.</p>
+          </details>
+        </div>
+        <p class="move-job-error" id="dup-job-error" role="alert">${escapeHTML(m.error || '')}</p>
+        <button class="btn-primary sheet-pin" id="dup-job-continue" data-action="dup-job-continue">Continue</button>
+      </div>`;
 }
 
 // ============== PATGo PWA — v56 — Retest reminders ==============

@@ -1208,12 +1208,20 @@ function sessionCountsForStats(sess) {
 // Tally one array of sessions into { items, fails, types }. Pure — no state
 // access, no mutation of the input. Used by BOTH halves (the live count and the
 // archive hook), so the two can never disagree about what counts.
-function tallySessions(sessions) {
+function tallySessions(sessions, alreadyCounted) {
+  // V102: an item and its copies (a duplicated job, `copyOf`) are ONE item
+  // tested, counted once however many jobs hold it — so duplicating a job and
+  // then trimming each copy leaves the lifetime figures where they were.
+  // `alreadyCounted` (a Set of stats keys) skips items counted elsewhere: the
+  // archive hook passes the keys of the jobs that STAY.
   const out = { items: 0, fails: 0, types: {} };
+  const seen = alreadyCounted ? new Set(alreadyCounted) : new Set();
   (sessions || []).forEach(sess => {
     if (!sessionCountsForStats(sess)) return;
     (sess.items || []).forEach(it => {
       if (!it) return;
+      const key = statsKeyOf(it);
+      if (key) { if (seen.has(key)) return; seen.add(key); }
       out.items++;
       if (it.result === 'fail') out.fails++;
       const t = (it.itemType || '').trim();
@@ -1221,6 +1229,29 @@ function tallySessions(sessions) {
     });
   });
   return out;
+}
+
+// V102: what makes two items “the same item tested”. A copy carries `copyOf`,
+// the id of the item it was first copied from (a copy of a copy keeps the
+// first), so every copy shares its original's key. '' (no id at all) is never
+// de-duplicated.
+function statsKeyOf(it) {
+  if (!it) return '';
+  if (it.copyOf != null && String(it.copyOf) !== '') return String(it.copyOf);
+  return it.id != null ? String(it.id) : '';
+}
+
+// V102: the stats keys held by counting jobs NOT in `going` — items still
+// counted live, which a removal must not archive a second time.
+function statsKeysStaying(going) {
+  // By id, not object: a pull may hold a different object for the same job.
+  const leaving = new Set((going || []).filter(Boolean).map(x => String(x.id)));
+  const keys = new Set();
+  for (const sess of (state.sessions || [])) {
+    if (!sess || leaving.has(String(sess.id)) || !sessionCountsForStats(sess)) continue;
+    for (const it of (sess.items || [])) { const k = statsKeyOf(it); if (k) keys.add(k); }
+  }
+  return keys;
 }
 
 // Fold a set of sessions that are ABOUT TO BE REMOVED into the archived bucket.
@@ -1232,7 +1263,8 @@ function tallySessions(sessions) {
 // Calling it twice for the same session would double-count, which is why it is
 // deliberately NOT a general-purpose helper — it is paired with a removal.
 function archiveSessionStats(sessions) {
-  const add = tallySessions(sessions);
+  // V102: an item a job that stays still holds (its copy) is still counted live.
+  const add = tallySessions(sessions, statsKeysStaying(sessions));
   const bucket = state.archivedStats || makeEmptyArchivedStats();
   bucket.items = (bucket.items || 0) + add.items;
   bucket.fails = (bucket.fails || 0) + add.fails;
@@ -1248,7 +1280,9 @@ function archiveSessionStats(sessions) {
 // now it counts live again, so they come out — never below zero (a phone
 // restored from a backup may not have archived it).
 function unarchiveSessionStats(sessions) {
-  const sub = tallySessions(sessions);
+  // V102: only what was archived comes out — an item another job here holds was
+  // still counted live, so it never joined the archive.
+  const sub = tallySessions(sessions, statsKeysStaying(sessions));
   const bucket = state.archivedStats || makeEmptyArchivedStats();
   bucket.items = Math.max(0, (bucket.items || 0) - sub.items);
   bucket.fails = Math.max(0, (bucket.fails || 0) - sub.fails);
@@ -2782,6 +2816,7 @@ function setView(v) {
   // dialog can't leak across pages. The expanded-client accordion can persist
   // harmlessly.
   state.siteNotesSheet = null;   // V98: the Overview's site-notes sheet
+  state.dupJob = null;           // V102: the Duplicate sheet (a copy under way still finishes)
   // V99: leaving the screen closes the map pin sheet and forgets the reload note.
   if (state.mapPinSheet) { state.mapPinSheet = null; _mapPinForgetOpen(); }
   // V100: the replayed 100 moment and "PATGo tests itself" belong to About.
@@ -3254,6 +3289,278 @@ function openMovedJob(id) {
   loadFormForCursor();
   save();
   setView('overview');
+}
+
+// ---------- V102: duplicate a job (roadmap Stage 9 part 2) ----------
+// Locked: 1B in Session settings ("Duplicate this job…", below Save/Cancel); 2A
+// a sheet like Move's — client + site and More details pre-filled from this job,
+// editable, then "Are you sure?" with the counts; 3A job notes copied; 4A photos
+// only in the cloud are fetched first, and if any can't be, the sheet says how
+// many and offers "Duplicate without them"; 5A the copy opens; 6A always on.
+// 9C (V101 round) a FULL copy with new ids for the job, every item and every
+// photo; 12A photos copied; 13A a locked job may be duplicated (the copy is not).
+//
+// ⚠ NEW ITEM IDS, ALWAYS. Photos are found and deleted by item id alone (V101's
+// warning above): a copy sharing ids would share — and delete — the original's
+// photos, and photosSettleJobs would find each id in two jobs and settle neither.
+//
+// ⚠ PHOTOS FIRST, THE JOB LAST. photosCopyForItems is one transaction (all or
+// nothing); the job is only made once it has succeeded, and made whatever the
+// sheet is doing by then — the copy was confirmed, and photos with no job would
+// be the worse leftover. The items are copied BEFORE the photos, from the job as
+// it is at that moment, so the copy's items and its photos always agree.
+//
+// Not copied: the certificate number (its own the first time it is made), the
+// lock and lock time, export/certificate state, `movedOut`, the retest contact
+// status. Everything on the items is copied as it is — results, readings, notes,
+// times, map pins — and asset numbers stay the same.
+//
+// The sheet sits on the Session settings screen, which holds a Save/Cancel form:
+// it opens only when nothing there is unsaved, or the edits would be lost behind
+// it (the red line says so, in place — no render, MAP rule 3).
+
+function dupJobBlockReason(sess) {
+  if (!sess) return 'This job is no longer on this phone.';
+  return '';
+}
+
+// Anything typed into Session settings and not saved yet.
+function editFormDirty(sess) {
+  const f = state.editForm;
+  if (!sess || !f) return false;
+  return String(f.name || '') !== String(sess.name || '') ||
+    String(f.site || '') !== String(sess.site || '') ||
+    String(f.engineer || '') !== String(sess.engineer || '') ||
+    String(f.prefix || '') !== String(sess.prefix || '') ||
+    String(f.date || '') !== String(sess.date || '') ||
+    !!f.locked !== !!sess.locked ||
+    String(f.instrumentId || '') !== String(sess.instrumentId || '');
+}
+
+function openDupJob() {
+  const sess = activeSession();
+  if (!sess) return;
+  if (editFormDirty(sess)) {
+    try { const el = document.getElementById('ef-dup-error'); if (el) el.textContent = 'Save or cancel your changes first.'; } catch (e) { /* no DOM */ }
+    return;
+  }
+  const why = dupJobBlockReason(sess);
+  const parts = splitSiteSnapshot(sess.site || '');
+  state.dupJob = why
+    ? { step: 'blocked', why, from: sess.id }
+    : {
+        step: 'form', from: sess.id,
+        client: parts.client, site: parts.site,
+        client0: parts.client, site0: parts.site,   // unchanged → the original's own links
+        name: (sess.name ? sess.name + ' (copy)' : ''),
+        date: sess.date || todayISO(),
+        engineer: sess.engineer || '',
+        instrumentId: sess.instrumentId || '',
+        prefix: sess.prefix || '',
+        error: '', failed: 0, skipCloud: false
+      };
+  render();
+}
+
+function closeDupJob() {
+  const m = state.dupJob;
+  if (m && m.step === 'working') return;   // nothing to cancel half-way
+  state.dupJob = null;
+  render();
+}
+
+// Field edits arrive here from data-input-action (no render — MAP rule 3).
+function setDupJobField(field, value) {
+  const m = state.dupJob;
+  if (!m || m.step !== 'form') return;
+  if (['client', 'site', 'name', 'date', 'engineer', 'instrumentId', 'prefix'].indexOf(field) === -1) return;
+  m[field] = String(value == null ? '' : value);
+}
+
+// What the copy will hold: items, fails, photos (on this phone and only in the
+// cloud) and roughly how much space the photos take.
+function dupJobSummary(sess) {
+  const out = { n: 0, fails: 0, photos: 0, cloud: 0, bytes: 0 };
+  if (!sess || !Array.isArray(sess.items)) return out;
+  const ids = new Set();
+  for (const it of sess.items) {
+    if (!it) continue;
+    out.n++;
+    if (it.result === 'fail') out.fails++;
+    if (it.id != null) ids.add(String(it.id));
+    out.photos += (typeof photoCountForItem === 'function') ? photoCountForItem(it.id) : 0;
+  }
+  const meta = state.photoMeta || {};
+  for (const id of Object.keys(meta)) if (meta[id] && ids.has(String(meta[id].i))) out.bytes += meta[id].b || 0;
+  const cloud = (typeof photoCloudOnlyForSession === 'function') ? photoCloudOnlyForSession(sess) : [];
+  out.cloud = cloud.length;
+  out.photos += cloud.length;
+  for (const e of cloud) out.bytes += e.b || 0;
+  return out;
+}
+
+function dupJobContinue() {
+  const m = state.dupJob;
+  if (!m || m.step !== 'form') return;
+  if (!String(m.client || '').trim() && !String(m.site || '').trim()) {
+    m.error = 'Enter a client or a site for the copy.';
+    try { const el = document.getElementById('dup-job-error'); if (el) el.textContent = m.error; } catch (e) { /* no DOM */ }
+    return;
+  }
+  m.error = '';
+  m.step = 'confirm';
+  render();
+}
+
+function dupJobBack() {
+  const m = state.dupJob;
+  if (!m || (m.step !== 'confirm' && m.step !== 'partial')) return;
+  m.step = 'form';
+  m.skipCloud = false;
+  render();
+}
+
+// Progress, written in place: the working step has no buttons, but a repaint
+// per photo would be pointless churn.
+function _dupJobProgress(text) {
+  try { const el = document.getElementById('dup-job-progress'); if (el) el.textContent = text; } catch (e) { /* no DOM */ }
+}
+
+// The Duplicate button (and "Duplicate without them"). Resolves when done, for
+// the harness; the app ignores the promise.
+function duplicateJob(skipCloud) {
+  const m = state.dupJob;
+  if (!m || (m.step !== 'confirm' && m.step !== 'partial')) return Promise.resolve(false);
+  const sess = (state.sessions || []).find(s => s && String(s.id) === String(m.from));
+  if (!sess) { state.dupJob = { step: 'blocked', why: dupJobBlockReason(null), from: m.from }; render(); return Promise.resolve(false); }
+  if (skipCloud) m.skipCloud = true;
+  const cloud = m.skipCloud ? [] : ((typeof photoCloudOnlyForSession === 'function') ? photoCloudOnlyForSession(sess) : []);
+  m.step = 'working';
+  render();
+  // 4A: fetched first. syncPhotoDownload answers "failed" for all of them when
+  // signed out or offline, so the one question covers every reason.
+  const fetch = (cloud.length && typeof syncPhotoDownload === 'function')
+    ? syncPhotoDownload(cloud.map(e => e.id), (done, all) => _dupJobProgress(`Fetching photos from the cloud\u2026 ${done} of ${all}`))
+    : Promise.resolve({ got: 0, failed: 0 });
+  return Promise.resolve(fetch).then((res) => {
+    if (res && res.failed > 0) {
+      if (state.dupJob !== m) return false;   // the sheet went: nothing was copied
+      m.step = 'partial';
+      m.failed = res.failed;
+      render();
+      return false;
+    }
+    return _dupJobCommit(m);
+  }).catch((e) => { console.error('duplicateJob failed', e); return _dupJobFail(m); });
+}
+
+function _dupJobFail(m, why) {
+  if (state.dupJob === m) {
+    state.dupJob = { step: 'blocked', from: m.from,
+      why: why || 'The copy could not be made. Nothing was duplicated \u2014 try again.' };
+    render();
+  }
+  return false;
+}
+
+function _dupJobCommit(m) {
+  const sess = (state.sessions || []).find(s => s && String(s.id) === String(m.from));
+  if (!sess) return _dupJobFail(m, dupJobBlockReason(null));
+  _dupJobProgress('Copying\u2026');
+  // The items, now: new ids, everything else as it is.
+  const itemMap = new Map();
+  const items = (sess.items || []).filter(Boolean).map((it) => {
+    const c = JSON.parse(JSON.stringify(it));
+    c.id = newId();
+    // Lifetime stats count an item and its copies once (statsKeyOf).
+    if (it.id != null && (it.copyOf == null || String(it.copyOf) === '')) c.copyOf = String(it.id);
+    if (it.id != null) itemMap.set(String(it.id), c.id);
+    return c;
+  });
+  // The job's own fields, from the same moment.
+  const src = JSON.parse(JSON.stringify(sess));
+  const jobId = newId();
+  const copyPhotos = (typeof photosCopyForItems === 'function')
+    ? photosCopyForItems(itemMap, jobId) : Promise.resolve({ ok: true, n: 0 });
+  return copyPhotos.then((r) => {
+    if (!r || !r.ok) {
+      return _dupJobFail(m, 'The photos could not be copied \u2014 this phone may be short of space. Nothing was duplicated.');
+    }
+    const job = _dupJobBuild(m, src, jobId, items);
+    state.sessions.unshift(job);
+    state.sessions = state.sessions.slice();
+    if (state.dupJob === m) {
+      // 5A: open the copy.
+      state.dupJob = null;
+      state.activeId = job.id;
+      state.lastLog = null;
+      state.cursor = job.items.length;
+      loadFormForCursor();
+      save();
+      setView('overview');
+      showToast('Duplicated \u2014 this is the copy');
+    } else {
+      save();
+      showToast(`Duplicated ${job.site || job.name || 'the job'}`);
+    }
+    return job;
+  });
+}
+
+// The copy's job record. `src` is the original as it was when copying began.
+function _dupJobBuild(m, src, jobId, items) {
+  const clientName = String(m.client || '').trim();
+  const siteName = String(m.site || '').trim();
+  let site, clientId = '', siteId = '';
+  if (clientName === String(m.client0 || '').trim() && siteName === String(m.site0 || '').trim()) {
+    // Unchanged: exactly the original's title and links — never a new list entry
+    // made from a title that was edited in Session settings.
+    site = src.site || '';
+    clientId = src.clientId || '';
+    siteId = src.siteId || '';
+  } else {
+    // Same resolution as createSession() / the move.
+    let clientRec = null, siteRec = null;
+    if (clientName && siteName) {
+      clientRec = ensureClient(clientName);
+      if (clientRec) siteRec = ensureSite(clientRec.id, siteName);
+    } else if (clientName) {
+      clientRec = ensureClient(clientName);
+    } else {
+      siteRec = ensureOrphanSite(siteName);
+    }
+    site = moveJobTitle(clientName, siteName);
+    clientId = clientRec ? clientRec.id : '';
+    siteId = siteRec ? siteRec.id : '';
+  }
+  const now = new Date().toISOString();
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(m.date || '')) ? m.date : (src.date || todayISO());
+  const job = {
+    id: jobId,
+    name: String(m.name || '').trim() || `Session ${state.sessions.length + 1}`,
+    site,
+    clientId,
+    siteId,
+    engineer: String(m.engineer || '').trim(),
+    prefix: String(m.prefix || '').trim(),
+    date,
+    startNumber: src.startNumber || 1,
+    instrumentId: String(m.instrumentId || ''),
+    items,
+    locked: false,              // 13A: a locked job may be copied; the copy is open
+    notes: src.notes || '',     // 3A
+    certNo: '',                 // its own number, the first time it is made
+    userId: null,
+    lastModified: now,
+    syncedAt: null
+  };
+  if (src.startPad) job.startPad = src.startPad;
+  if (src.instrumentSnapshot && job.instrumentId === String(src.instrumentId || '')) {
+    job.instrumentSnapshot = JSON.parse(JSON.stringify(src.instrumentSnapshot));
+  }
+  if (src.retestTrack) { job.retestTrack = true; job.retestMonths = src.retestMonths; job.retestContact = null; }
+  normaliseSessionRetest(job);
+  return job;
 }
 
 // Edit-session flow
