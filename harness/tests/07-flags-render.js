@@ -44,12 +44,13 @@ module.exports = function run() {
     t.eq(st.scannerEnabled, false, 'scanner respects an explicit 0');
   });
 
-  t.group('07d — SCANNER_KEY is the only flag read as !== \'0\'', () => {
-    // Stated in MAP rule 9. If a second flag adopts this shape the rule needs
+  t.group('07d — only the listed flags are read as !== \'0\'', () => {
+    // Stated in MAP rule 9. If another flag adopts this shape the rule needs
     // rewriting, so surface it rather than let the map quietly go stale.
+    // V104: READINGS_CHECK_KEY joined (S10 check, default ON — 7A); rule 9 updated.
     const src = fs.readFileSync(path.join(APP_DIR, 'storage.js'), 'utf8');
-    const hits = [...src.matchAll(/getItem\(([A-Z_]+)\)\s*!==\s*'0'/g)].map(m => m[1]);
-    t.deepEq(hits, ['SCANNER_KEY'], `only SCANNER_KEY uses the !== '0' shape (found ${JSON.stringify(hits)})`);
+    const hits = [...src.matchAll(/getItem\(([A-Z_]+)\)\s*!==\s*'0'/g)].map(m => m[1]).sort();
+    t.deepEq(hits, ['READINGS_CHECK_KEY', 'SCANNER_KEY'], `only the listed flags use the !== '0' shape (found ${JSON.stringify(hits)})`);
   });
 
   t.group('07e — report settings polarity is preserved', () => {
