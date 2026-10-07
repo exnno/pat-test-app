@@ -414,6 +414,10 @@ registerActions({
   'readings-toggle-polarity': () => toggleReadingsPolarity(),
   'readings-commit': () => commitReadingsSheet(),
   'readings-cancel': () => cancelReadingsSheet(),
+  // V104 (S10): the confirm step for a reading outside its usual limit.
+  'readings-pass-anyway': () => commitReadingsSheet(true),
+  'readings-change-to-fail': () => readingsChangeToFail(),
+  'readings-confirm-back': () => readingsConfirmBack(),
 
   // Multi Pick sheet
   'multipick-open': () => { const sess = activeSession(); if (sess && sess.locked) return; state.multiPickSheetOpen = true; render(); },
@@ -1271,6 +1275,31 @@ registerChangeActions({
     state.readingsEnabled = !!checked;
     localStorage.setItem(READINGS_KEY, state.readingsEnabled ? '1' : '0');
     // v86: the switch syncs (settings_work) — arm the trigger, as save() would.
+    if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error(e); } }
+    render();
+  },
+
+  // V104 (S10): the readings check switch (default ON) and the earth ceiling.
+  // Same instant-persist pattern as readings-toggle; both sync (settings_work).
+  'readings-check-toggle': (checked) => {
+    state.readingsCheckEnabled = !!checked;
+    localStorage.setItem(READINGS_CHECK_KEY, state.readingsCheckEnabled ? '1' : '0');
+    if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error(e); } }
+    render();
+  },
+  // A change event (fires on leaving the box), so the render can't drop a
+  // keyboard mid-typing. Out of range is refused with a toast and the box put
+  // back — never silently swapped for the default.
+  'readings-earth-limit': (v, el) => {
+    const n = Number(String(v == null ? '' : v).trim());
+    // Empty reads as 0, which is below the range, so it is refused too.
+    if (!isFinite(n) || n < READING_EARTH_LIMIT_MIN || n > READING_EARTH_LIMIT_MAX) {
+      showToast('Enter an earth limit from 0.10 to 0.50 \u03A9');
+      if (el) el.value = normaliseEarthLimit(state.readingsEarthLimit).toFixed(2);
+      return;
+    }
+    state.readingsEarthLimit = normaliseEarthLimit(n);
+    localStorage.setItem(READINGS_EARTH_LIMIT_KEY, String(state.readingsEarthLimit));
     if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error(e); } }
     render();
   },

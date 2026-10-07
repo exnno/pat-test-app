@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">✨ Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V103: rolled forward — V103 on top, V100 dropped. -->
+      <!-- v8: rolling 3-version changelog. V104: rolled forward — V104 on top, V101 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V104</strong> &middot; October 2026</p>
+        <p class="muted">Readings check: with test readings on, a PASS reading outside the usual limit gets a note under its box, and saving asks once &mdash; change to FAIL or save as PASS anyway. Insulation 1.0 M&Omega; (Class I) / 2.0 M&Omega; (Class II), leakage 5 mA, and your own earth limit. Settings &rarr; Logging &rarr; Test Readings.</p>
         <p><strong>V103</strong> &middot; October 2026</p>
         <p class="muted">Move items into another job: on the Overview, Select items, then Edit selected &rarr; Move to another job, and pick the job they belong in. If an asset number is already there, you choose for each item &mdash; leave it, keep the one there, use this one instead, or give it a new number. Moving every item merges two jobs.</p>
         <p><strong>V102</strong> &middot; October 2026</p>
         <p class="muted">Duplicate a job: in a job's Session settings, tap Duplicate this job. Check the client and site for the copy, confirm, and the copy opens &mdash; every item, reading, note and photo included. Handy for splitting a job: duplicate it, then remove from each what doesn't belong.</p>
-        <p><strong>V101</strong> &middot; October 2026</p>
-        <p class="muted">Move items to a new job: on the Overview, Select items, then Edit selected &rarr; Move to a new job. Check what's moving, enter the new client and site, and confirm. Photos and map pins go with their items; a locked job can't be split.</p>
 
         </div>
 

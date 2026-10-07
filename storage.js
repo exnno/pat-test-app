@@ -569,6 +569,9 @@ function loadV11Settings() {
   // shipped reason the user hasn't overridden. A reason with no entry at all
   // (e.g. a custom one) is treated as 'visual' at read time by readingTagForReason().
   state.readingsEnabled = localStorage.getItem(READINGS_KEY) === '1';
+  // V104 (S10): the check DEFAULTS ON — only an explicit '0' is off.
+  state.readingsCheckEnabled = localStorage.getItem(READINGS_CHECK_KEY) !== '0';
+  state.readingsEarthLimit = normaliseEarthLimit(localStorage.getItem(READINGS_EARTH_LIMIT_KEY));
   state.failReasonTags = loadFailReasonTags();
 
   // v65: HID barcode scanner. ⚠ Note the comparison — this flag DEFAULTS ON, so
@@ -969,6 +972,9 @@ function _saveSettingsWrites() {
   // hot logging path needs no change — only this flag and the tag map (both
   // set in Settings, which calls full save()) are written here.
   localStorage.setItem(READINGS_KEY, state.readingsEnabled ? '1' : '0');
+  // V104 (S10): written explicitly so OFF persists (absent reads as on).
+  localStorage.setItem(READINGS_CHECK_KEY, state.readingsCheckEnabled ? '1' : '0');
+  localStorage.setItem(READINGS_EARTH_LIMIT_KEY, String(normaliseEarthLimit(state.readingsEarthLimit)));
   localStorage.setItem(FAIL_REASON_TAGS_KEY, JSON.stringify(state.failReasonTags || {}));
   // v65: barcode scanner on/off. Written explicitly as '1'/'0' (rather than
   // relying on the absent-means-on default) so that switching it OFF actually

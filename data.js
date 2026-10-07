@@ -127,7 +127,7 @@ const SETTINGS_PAGE_META = {
   settingsUser:        { icon: '👤', title: 'Engineer & Tester',     aliases: 'user settings engineer name calibration cal due instrument tester testers multiple megger seaward kewtech' },
   settingsItems:       { icon: '⚡', title: 'Quick Pick Items',      aliases: 'item types presets quick pick buttons' },
   settingsFails:       { icon: '⚠️', title: 'Fail Reasons',          aliases: 'quick pick fail reasons failure tags' },
-  settingsReadings:    { icon: '🔬', title: 'Test Readings',          aliases: 'test readings ohms megohms leakage insulation earth continuity class measurements' },
+  settingsReadings:    { icon: '🔬', title: 'Test Readings',          aliases: 'test readings ohms megohms leakage insulation earth continuity class measurements limits check limit' },
   settingsMultiPick:   { icon: '🧰', title: 'Multi Pick',            aliases: 'multi pick bulk multiple slots quick pick tile' },
   settingsDescriptions:{ icon: '📝', title: 'Descriptions',          aliases: 'item description list descriptions notes labels spelling typo fix rename' },
   settingsScanner:     { icon: '🏷️', title: 'Barcode Scanner',      aliases: 'barcode scanner scan wedge hid bluetooth label qr code reader asset number' },
@@ -243,6 +243,29 @@ const READING_FIELD_META = {
 // "Polarity" column emits only when some Class I item in the session has it
 // ticked (emit-only-if-used, mirroring the numeric reading columns).
 const READING_POLARITY_CLASSES = ['I'];
+
+// V104 (S10): the readings check — the usual limit each reading is checked
+// against on a PASS (IET CoP 5th edition; Peter checked these against his copy,
+// V104 round). kind 'max': a pass is at or below the limit; 'min': at or above.
+// A class with no entry is not checked — Class III insulation has no figure in
+// the CoP (Peter, Q1). Earth's `null` means "the engineer's own ceiling"
+// (state.readingsEarthLimit, Settings → Test Readings): the real limit is
+// (0.1 + R) Ω and the app doesn't know the lead (2A).
+// ⚠ Leakage is ONE 5 mA limit for Class I and II since the 5th edition. The old
+// 0.75 / 3.5 / 0.25 mA figures are gone — don't put them back. There is no
+// heater exception for insulation: the 0.3 MΩ heater figure was older guidance
+// and isn't in the 5th edition (Peter's copy, Q1/Q8).
+const READING_LIMITS = {
+  earth:      { kind: 'max', byClass: { 'I': null } },
+  insulation: { kind: 'min', byClass: { 'I': 1.0, 'II': 2.0 } },
+  leakage:    { kind: 'max', byClass: { 'I': 5, 'II': 5 } }
+};
+// The earth ceiling (ohms). 0.15 ≈ a typical 2 m, 0.75 mm² lead (0.1 + 0.052).
+// The bounds stop a typo making the check useless: 0.5 Ω is the 5th edition's
+// absolute ceiling for older equipment, 0.1 Ω the bare limit with no lead.
+const READING_EARTH_LIMIT_DEFAULT = 0.15;
+const READING_EARTH_LIMIT_MIN = 0.1;
+const READING_EARTH_LIMIT_MAX = 0.5;
 
 
 // ---------- Fail reason tags ----------

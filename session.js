@@ -1782,6 +1782,7 @@ function cancelFailModal() {
   state.failModalOpen = false;
   state.failModalStage = 'reasons';
   state.failOtherText = '';
+  state.readingsCarry = null;   // V104: a "Change to FAIL" backed out of — nothing logged
   // v62: nothing was logged, so any photo staged in the sheet is discarded and
   // its object URL released. Staged photos are never written to the store until
   // the item they belong to actually exists.
@@ -2337,10 +2338,24 @@ function openReadingsSheet(mode, failReason) {
   }
   // Fresh FAIL: leave measurement fields blank (recording the actual reading).
 
+  // V104 (S10, 5A): arriving from "Change to FAIL" on the confirm step — the
+  // readings typed on the PASS sheet come with it. Read, then cleared, here and
+  // nowhere else (MAP rule 4): every other path to this sheet starts clean.
+  const carry = state.readingsCarry;
+  state.readingsCarry = null;
+  if (carry && mode === 'fail') {
+    if (READING_CLASSES.indexOf(carry.class) !== -1) draft.class = carry.class;
+    ['earth', 'insulation', 'leakage'].forEach(k => {
+      if (typeof carry[k] === 'string') draft[k] = carry[k];
+    });
+    draft.polarity = carry.polarity === true;
+  }
+
   state.readingsSheetMode = mode;
   state.readingsPendingResult = (mode === 'fail') ? 'fail' : 'pass';
   state.readingsPendingFailReason = (mode === 'fail') ? (failReason || null) : null;
   state.readingsDraft = draft;
+  state.readingsSheetStage = 'entry';
   state.readingsSheetOpen = true;
   render();
 }
@@ -2387,6 +2402,9 @@ function setReadingsField(field, value) {
   if (!state.readingsDraft) state.readingsDraft = { class: state.lastReadingsClass || READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '', polarity: false };
   state.readingsDraft[field] = value;
   // No render — the input already holds the text; re-rendering would steal focus.
+  // V104 (S10): the limit note under this box is updated in place instead (MAP
+  // rule 3 — this sheet has inputs).
+  if (typeof refreshReadingNote === 'function') refreshReadingNote(field);
 }
 
 // v54: toggle the Class I polarity checkbox on the readings sheet. Unlike the
@@ -2407,8 +2425,59 @@ function toggleReadingsPolarity() {
 // Readings are optional even when the feature is on (locked decision): an
 // all-blank sheet commits a pass/fail with just the class (or nothing) — never
 // blocked. lastReadingsClass is remembered for the next item.
-function commitReadingsSheet() {
+// V104 (S10): the readings in this draft that are DEFINITELY outside their usual
+// limit → [{ field, value, kind, limit, cls }]. Empty when the feature or the
+// check is off, or on a FAIL sheet (already failing — 6A), so callers just test
+// .length. The limits are READING_LIMITS (data.js); the verdict is utils.js's.
+function readingsOverLimit(draft, mode) {
+  if (!state.readingsEnabled || !state.readingsCheckEnabled) return [];
+  if (mode !== 'pass') return [];
+  const d = draft || {};
+  const cls = (READING_CLASSES.indexOf(d.class) !== -1) ? d.class : READING_CLASS_DEFAULT;
+  const out = [];
+  (READING_FIELDS_BY_CLASS[cls] || []).forEach(k => {
+    const lim = readingLimitFor(k, cls, state.readingsEarthLimit);
+    if (!lim) return;
+    const v = (typeof d[k] === 'string') ? d[k].trim() : '';
+    if (v && readingBreaksLimit(v, lim.kind, lim.limit)) out.push({ field: k, value: v, kind: lim.kind, limit: lim.limit, cls });
+  });
+  return out;
+}
+
+// V104 (S10, 5A): "Change to FAIL" on the confirm step. Nothing has been logged:
+// the typed readings are kept in readingsCarry and the ordinary fail flow takes
+// over — pick a reason, then the fail readings sheet opens with them in
+// (openReadingsSheet). It never fails anything by itself. A multi-pick tile is
+// passes only, so it can't change (and never reaches this sheet anyway).
+function readingsChangeToFail() {
+  if (state.form && state.form.qpTile) return;
+  const d = state.readingsDraft || {};
+  const carry = { class: d.class, earth: d.earth || '', insulation: d.insulation || '', leakage: d.leakage || '', polarity: d.polarity === true };
+  closeReadingsSheetState();   // clears any old carry — so set the new one AFTER
+  state.readingsCarry = carry;
+  state.failModalStage = 'reasons';
+  state.failOtherText = '';
+  state.failModalOpen = true;
+  render();
+}
+
+// V104 (S10, 5A): back from the confirm step to the readings, as typed.
+function readingsConfirmBack() {
+  state.readingsSheetStage = 'entry';
+  render();
+}
+
+// force === true is "Save as PASS anyway": the confirm step has been seen.
+function commitReadingsSheet(force) {
   const draft = state.readingsDraft || {};
+  // V104 (S10, 5A): a PASS with a reading definitely outside its usual limit
+  // stops once on a read-only confirm step. Rendering here is safe: it leaves
+  // the inputs for a sheet with none (MAP rule 3).
+  if (force !== true && state.readingsSheetMode === 'pass' && readingsOverLimit(draft, 'pass').length) {
+    state.readingsSheetStage = 'confirm';
+    render();
+    return;
+  }
   const cls = (READING_CLASSES.indexOf(draft.class) !== -1) ? draft.class : READING_CLASS_DEFAULT;
   const applicable = READING_FIELDS_BY_CLASS[cls] || [];
   const readings = { class: cls };
@@ -2451,6 +2520,8 @@ function closeReadingsSheetState() {
   state.readingsPendingResult = null;
   state.readingsPendingFailReason = null;
   state.readingsDraft = { class: state.lastReadingsClass || READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '', polarity: false };
+  state.readingsSheetStage = 'entry';   // V104
+  state.readingsCarry = null;           // V104 — readingsChangeToFail sets it after this
 }
 
 

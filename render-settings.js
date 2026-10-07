@@ -487,6 +487,35 @@ function renderSettingsFails() {
   `;
 }
 
+// V104 (S10): the readings check — shown on the Test Readings page only while
+// readings are on. A switch (default ON, 7A) and, while it's on, the earth
+// ceiling (2A). The limits themselves are READING_LIMITS (data.js) and are not
+// editable — they're the CoP's, not a preference.
+function renderSettingsReadingsCheck() {
+  const on = state.readingsCheckEnabled !== false;
+  const earth = normaliseEarthLimit(state.readingsEarthLimit).toFixed(2);
+  return `
+      <div class="settings-section">
+        <h2 class="h2">Check readings</h2>
+        <p class="muted">When a PASS reading is outside the usual limit, a note appears under the box and you're asked once before it saves as a pass. It never fails anything for you. A reading typed as "&lt;5" or "≥19.99" is only flagged when it's definitely outside.</p>
+        <p class="muted">Usual limits (IET Code of Practice, 5th edition): insulation at least 1.0 MΩ for Class I and 2.0 MΩ for Class II; leakage at most 5 mA. Class III isn't checked.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Check against usual limits</div>
+            <div class="toggle-row-sub">${on ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="readings-check-toggle" data-change-action="readings-check-toggle" ${on ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        ${on ? `
+        <label class="reading-field-label" for="readings-earth-limit">Earth continuity limit (Ω)</label>
+        <input class="input" id="readings-earth-limit" data-change-action="readings-earth-limit" value="${earth}" inputmode="decimal" autocomplete="off">
+        <p class="muted">The real limit is 0.1 Ω plus the lead's own resistance, which depends on the lead. Set the highest reading you'd pass without checking — 0.15 suits a typical 2 m lead. Between 0.10 and 0.50.</p>` : ''}
+      </div>`;
+}
+
 // v53: Test Readings settings page. A single master toggle (default OFF) plus a
 // plain-language explanation of what turning it on does. Lives in the Testing
 // Setup category. The toggle persists instantly via its own change handler (like
@@ -514,8 +543,9 @@ function renderSettingsReadings() {
       <div class="settings-section">
         <h2 class="h2">A few things to know</h2>
         <p class="muted">The equipment class decides which boxes appear — Class II has no earth continuity, Class III is insulation only. You can tag each fail reason (on the Quick Pick Fail page) so the right box shows when something fails. Readings are optional even when this is on — an empty box just records no value.</p>
-        <p class="muted">To include readings in your CSV export, turn the reading columns on under Settings → Reports &amp; Exports → CSV Columns. Readings will appear on the PDF certificate in a future update.</p>
-      </div>` : ''}
+        <p class="muted">To include readings in your CSV export, turn the reading columns on under Settings → Reports &amp; Exports → CSV Columns. Readings show on the PDF certificate too — switch them on or off under Report Settings → What to include.</p>
+      </div>
+      ${renderSettingsReadingsCheck()}` : ''}
     </div>
   `;
 }

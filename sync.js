@@ -1982,8 +1982,12 @@ function _syncGeneralNormalise(id, raw) {
   const str = (v) => typeof v === 'string' ? v.trim() : '';
   const strList = (v) => Array.isArray(v) ? v.map(x => str(x == null ? '' : String(x))).filter(Boolean) : [];
   if (sid === SYNC_WORK_ID) {
+    // V104 (S10): readingsCheck DEFAULTS ON (!== false) and earthLimit is
+    // normalised — so a row from a V103 phone, which has neither, reads as the
+    // defaults rather than switching the check off.
     return { id: sid, engineer: str(r.engineer), timestamps: r.timestamps === true, readings: r.readings === true,
-             sqp: r.sqp === true, retest: r.retest === true };
+             sqp: r.sqp === true, retest: r.retest === true,
+             readingsCheck: r.readingsCheck !== false, earthLimit: normaliseEarthLimit(r.earthLimit) };
   }
   if (sid === SYNC_FAILS_ID) {
     const reasons = strList(r.reasons);
@@ -2042,7 +2046,8 @@ function _syncGeneralRecord(id) {
   const sid = String(id);
   if (sid === SYNC_WORK_ID) {
     return _syncGeneralNormalise(sid, { engineer: state.engineer, timestamps: !!state.timestampsEnabled,
-      readings: !!state.readingsEnabled, sqp: !!state.sqpEnabled, retest: !!state.retestRemindersEnabled });
+      readings: !!state.readingsEnabled, sqp: !!state.sqpEnabled, retest: !!state.retestRemindersEnabled,
+      readingsCheck: state.readingsCheckEnabled !== false, earthLimit: state.readingsEarthLimit });
   }
   if (sid === SYNC_FAILS_ID) {
     const reasons = Array.isArray(state.failReasons) ? state.failReasons : [];
@@ -2096,7 +2101,8 @@ function _syncGeneralValid(id, doc) {
   const obj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
   if (sid === SYNC_WORK_ID) {
     return (doc.engineer === undefined || typeof doc.engineer === 'string')
-      && ['timestamps', 'readings', 'sqp', 'retest'].every(k => bool(doc[k]));
+      && ['timestamps', 'readings', 'sqp', 'retest', 'readingsCheck'].every(k => bool(doc[k]))
+      && (doc.earthLimit === undefined || typeof doc.earthLimit === 'number');
   }
   // There must always be at least one fail reason (saveFailsSettings refuses none).
   if (sid === SYNC_FAILS_ID) return arr(doc.reasons) && doc.reasons.some(x => typeof x === 'string' && x.trim()) && (doc.tags === undefined || obj(doc.tags));
@@ -2117,6 +2123,8 @@ function _syncApplyGeneral(id, doc) {
     state.engineer = d.engineer;
     state.timestampsEnabled = d.timestamps;
     state.readingsEnabled = d.readings;
+    state.readingsCheckEnabled = d.readingsCheck;   // V104
+    state.readingsEarthLimit = d.earthLimit;        // V104
     state.retestRemindersEnabled = d.retest;
     state.sqpEnabled = d.sqp;
     // setSqp()'s side effects, without its save()/render(): switching on with no
@@ -2204,6 +2212,8 @@ function _syncGeneralDiffs(id, local, doc) {
     add('Engineer name', L.engineer, C.engineer);
     add('Item times', onOff(L.timestamps), onOff(C.timestamps));
     add('Test readings', onOff(L.readings), onOff(C.readings));
+    add('Readings check', onOff(L.readingsCheck), onOff(C.readingsCheck));
+    add('Earth limit', L.earthLimit.toFixed(2) + ' \u03A9', C.earthLimit.toFixed(2) + ' \u03A9');
     add('Smart Quick Pick', onOff(L.sqp), onOff(C.sqp));
     add('Retest reminders', onOff(L.retest), onOff(C.retest));
   } else if (sid === SYNC_FAILS_ID) {

@@ -4379,3 +4379,30 @@ body.has-selection-bar .cloud-tab { padding-bottom: 100px; }
 @media (prefers-reduced-motion: reduce) {
   .party-spark, .party-100, .egg-row, .egg-sticker, .egg-cert { transition: none; }
 }
+
+/* @@ readings check (V104, S10) — the amber note under a reading box, and the
+   read-only confirm step that replaces the readings sheet when a PASS reading is
+   outside the usual limit. The note is always in the DOM; [hidden] hides it. */
+.reading-limit-note {
+  margin-top: 6px;
+  padding: 8px 10px;
+  font-size: 14px;
+  line-height: 1.35;
+  background: var(--warn-soft-bg);
+  color: var(--warn-soft-text);
+  border: 1px solid var(--warn-soft-border);
+  border-radius: 8px;
+}
+.reading-limit-note[hidden] { display: none; }
+.reading-confirm-row {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--warn-soft-bg);
+  color: var(--warn-soft-text);
+  border: 1px solid var(--warn-soft-border);
+  border-radius: 10px;
+}
+.reading-confirm-head { display: flex; justify-content: space-between; gap: 10px; font-size: 16px; }
+.reading-confirm-note { margin-top: 4px; font-size: 14px; line-height: 1.35; }
+.reading-change-fail-btn { width: 100%; margin-top: 20px; padding: 16px 0; font-size: 17px; border-radius: 12px; }
+.readings-confirm .reading-pass-anyway-btn { margin-top: 10px; }

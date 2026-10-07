@@ -1,4 +1,4 @@
-# PATGo — Code Map (V103)
+# PATGo — Code Map (V104)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -65,8 +65,8 @@ is discoverable from the file you happen to be editing.
 
 9. **Feature-flag polarity.** Default-ON flags read `!== false`; default-OFF flags
    read `=== true`. Copying the wrong neighbour silently switches a feature on for
-   every existing user. `SCANNER_KEY` is the only default-ON flag and the only one
-   read as `!== '0'`. ⚠ `SCANNER_PAIRED_KEY` (v67) sits on the NEXT LINE in
+   every existing user. `SCANNER_KEY` and `READINGS_CHECK_KEY` (V104) are the only
+   default-ON flags read as `!== '0'` — a third needs adding to 07d's list. ⚠ `SCANNER_PAIRED_KEY` (v67) sits on the NEXT LINE in
    storage.js and is ordinary opt-in `=== '1'`. Harness-asserted both ways.
 
 10. **`backupVersion` is 5.** Additive fields ride through encode/decode wholesale
@@ -225,7 +225,8 @@ Rules 8, 9, 10 above all originate here.
 ### data.js (~380 ln) — static tables and lists
 Split out of config.js in V71, byte identical. Built-in defaults
 (`DEFAULT_ITEM_TYPES`, `DEFAULT_FAIL_REASONS`, `DEFAULT_DESCRIPTIONS`,
-`DEFAULT_CSV_COLUMNS`), the v53 reading-field tables and fail-reason tags,
+`DEFAULT_CSV_COLUMNS`), the v53 reading-field tables and fail-reason tags, the
+V104 readings-check limits (`READING_LIMITS`, `READING_EARTH_LIMIT_*`),
 `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META` (single source of truth for the
 Settings hub, sub-lists, search aliases and back-nav), `SETUP_SECTIONS`, the
 bug-report option lists, `PATGO_FOOTER_LOGO`, `CSA_RESISTANCE`/`CALC_LENGTHS`.
@@ -257,7 +258,10 @@ flat fields) are never saved, backed up or validated. Rule 7 applies.
 
 ### utils.js (~265 ln) — pure helpers, no state access
 Formatting, escaping, colour, asset-number splitting/padding, long-press
-detector, boundary validators for item readings, `newId()`.
+detector, boundary validators for item readings, `newId()`. V104: the readings
+check's pure half — read the typed shorthand, the limit for a reading + class,
+"definitely outside?", the earth-ceiling normaliser (used by storage, backup,
+sync, dispatch, settings).
 **Touch to:** add a stateless helper.
 ⚠ v78: `newId()` (crypto.randomUUID, uid()-shaped fallback) is the ONLY way a
 NEW record gets an id. Minting sites: clients.js ×5, session.js ×5 (session,
@@ -540,7 +544,11 @@ sequential for iOS memory.
 **Touch to:** change preview rasterising, the lazy load, or the PDF.js version.
 **Coupling:** throws on parse failure so report.js falls back to its iframe view.
 
-### session.js (~2490 ln) — sessions and items
+### session.js (~2560 ln) — sessions and items
+⚠ V104 readings check: `readingsCarry` (a PASS sheet's readings across "Change to
+FAIL") is read-then-cleared ONLY in `openReadingsSheet` (rule 4); dropped by
+`closeReadingsSheetState` (so `readingsChangeToFail` sets it AFTER that call) and
+by `cancelFailModal`.
 Session/item lifecycle, form and cursor, validation, suggestions,
 ⚠ V87: retest reminders are by MONTH — `retestStatus(sess, now)` buckets
 ('upcoming' = due next month, 'duesoon' = due this month, 'overdue' from the 1st
@@ -711,8 +719,13 @@ instrument flat mirror and must keep calling `adoptMirrorIntoInstruments()`
 (rule 7). `onboardSetupImport()` delegates to setup.js; the final step can hand
 off to tour.js. Extracted from session.js in v70, byte identical.
 
-### render-core.js (~1850 ln) — dispatcher + the logging screens
-Owns `const app` and the `render()` dispatcher. Sessions list, entry screen,
+### render-core.js (~1890 ln) — dispatcher + the logging screens
+Owns `const app` and the `render()` dispatcher.
+⚠ V104 readings check: the readings sheet's limit notes are ALWAYS in the DOM
+(hidden when fine) because typing repaints them in place (`refreshReadingNote`,
+called from session.js `setReadingsField`, rule 3). Which readings are over is
+session.js `readingsOverLimit`; the confirm step replaces the sheet when
+`readingsSheetStage === 'confirm'`. Sessions list, entry screen,
 empty states, welcome modal AND its `dismissWelcome()` handler (moved here
 v70 — see rule 8), first-run wizard markup, signature pad, calibration banner,
 retest/backup banners, asset-history sheet, import conflict/summary modals,
@@ -876,6 +889,9 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
 ### sync.js (~4300 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves
+V104: the settings_work row also carries `readingsCheck` (default ON — read
+`!== false`) and `earthLimit` (normaliseEarthLimit); normalise / record / valid /
+apply / diffs all list them.
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session

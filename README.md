@@ -21,7 +21,7 @@ Everything works in aeroplane mode; nothing needs an account.
 - Quick Pick — up to nine one-tap item types, switchable presets, and Smart Quick
   Pick, which learns what gets logged where
 - Multi Pick for a fixed mixed sequence; "Log again ×N" for a run of the same item
-- A fail flow with reasons, optional test readings, and photo evidence
+- A fail flow with reasons, optional test readings (checked against the usual limits), and photo evidence
 - PDF certificates and CSV export/import
 - Backup and restore to a file, and an Export/Import Setup bundle for a new phone
 - Bluetooth HID barcode scanner support (keyboard-wedge mode)

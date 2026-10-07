@@ -234,9 +234,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Move items into another job.</strong> Logged something on the wrong job? On the Overview, <strong>Select items</strong>, then <strong>Edit selected</strong> &rarr; <strong>Move to another job</strong> and pick the job they belong in. Photos and map pins go with them.</li>
-        <li><strong>Same asset number in both?</strong> You'll see the two side by side and choose for each: leave it where it is, keep the one already there, use this one instead, or give it a new number. A job never holds the same number twice.</li>
-        <li><strong>Moving everything is fine.</strong> Merge two jobs by moving every item &mdash; the empty job is left for you to delete. You'll be warned if either job already has a certificate, or if the two use different testers.</li>
+        <li><strong>Readings check.</strong> If you record test readings, a PASS reading outside the usual limit now gets an amber note under its box &mdash; insulation below 1.0 M&Omega; (Class I) or 2.0 M&Omega; (Class II), or leakage over 5 mA.</li>
+        <li><strong>Asked once, never decided for you.</strong> Saving a pass with a reading outside the limit asks first: <strong>Change to FAIL</strong> (your readings come with it) or <strong>Save as PASS anyway</strong>. Readings typed as &ldquo;&lt;5&rdquo; or &ldquo;&ge;19.99&rdquo; are only flagged when they're definitely outside.</li>
+        <li><strong>Earth is your call.</strong> The earth limit depends on the lead, so you set the highest you'd pass without checking (0.15 &Omega; to start). Switch the check off or change the earth limit in Settings &rarr; Logging &rarr; Test Readings.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -1473,6 +1473,35 @@ function syncWaitingBanner() {
        + ' style="margin-left:4px;font-weight:600">' + (busy ? 'Updating\u2026' : 'Update now') + '</button></div>';
 }
 
+// V104 (S10): the plain-words note for one over-limit reading (an entry from
+// readingsOverLimit, session.js). Earth names the real rule, because the app's
+// figure is the engineer's own ceiling, not the CoP limit (2A).
+function readingLimitNoteText(o) {
+  if (!o) return '';
+  if (o.field === 'earth') {
+    return 'Over your earth limit of ' + o.limit.toFixed(2) + ' \u03A9. The usual limit is 0.1 \u03A9 plus the lead\u2019s own resistance \u2014 check it before passing.';
+  }
+  if (o.field === 'insulation') {
+    return 'Below the usual minimum of ' + o.limit.toFixed(1) + ' M\u03A9 for Class ' + o.cls + ' \u2014 consider a fail.';
+  }
+  if (o.field === 'leakage') {
+    return 'Over the usual maximum of ' + String(o.limit) + ' mA \u2014 consider a fail.';
+  }
+  return '';
+}
+
+// V104 (S10): update ONE box's limit note in place while typing. The readings
+// sheet has inputs, so it must not render (MAP rule 3) — the note element is
+// always present (hidden when fine) so this only flips it.
+function refreshReadingNote(field) {
+  const el = document.getElementById('reading-note-' + field);
+  if (!el) return;
+  const mode = state.readingsSheetMode === 'fail' ? 'fail' : 'pass';
+  const hit = readingsOverLimit(state.readingsDraft, mode).filter(o => o.field === field)[0];
+  el.textContent = hit ? readingLimitNoteText(hit) : '';
+  el.hidden = !hit;
+}
+
 function renderEntry() {
   const sess = activeSession();
   if (!sess) { state.view = 'sessions'; return renderSessions(); }
@@ -1859,13 +1888,19 @@ function renderEntry() {
       <button class="reading-class-btn ${c === cls ? 'active' : ''}" data-action="readings-set-class" data-arg="${c}">Class ${c}</button>
     `).join('');
 
+    // V104 (S10): readings definitely outside their usual limit (PASS only).
+    const overList = readingsOverLimit(draft, mode);
     const fieldRows = fields.map(k => {
       const meta = READING_FIELD_META[k];
       if (!meta) return '';
       const val = (typeof draft[k] === 'string') ? draft[k] : '';
+      const over = overList.filter(o => o.field === k)[0];
+      // The note is always in the DOM (hidden when fine) so typing can flip it
+      // in place — refreshReadingNote.
       return `
         <label class="reading-field-label">${escapeHTML(meta.label)} <span class="reading-unit">(${escapeHTML(meta.unit)})</span></label>
         <input class="input reading-input" id="f-reading-${k}" data-input-action="f-reading-${k}" value="${escapeHTML(val)}" inputmode="text" autocomplete="off" placeholder="${escapeHTML(meta.passPlaceholder)}">
+        <div class="reading-limit-note" id="reading-note-${k}" role="status"${over ? '' : ' hidden'}>${over ? escapeHTML(readingLimitNoteText(over)) : ''}</div>
       `;
     }).join('');
 
@@ -1891,7 +1926,25 @@ function renderEntry() {
       ? 'Pre-filled with typical pass values — edit if needed, or just tap OK.'
       : 'Record the reading for this failure, then save.';
 
-    readingsSheet = `
+    readingsSheet = (mode === 'pass' && state.readingsSheetStage === 'confirm' && overList.length) ? `
+      <div class="modal-backdrop" id="readings-backdrop" data-action="readings-confirm-back"></div>
+      <div class="fail-sheet readings-sheet readings-confirm" role="dialog" aria-label="Reading outside the usual limit">
+        <div class="fail-sheet-handle"></div>
+        <div class="fail-sheet-header">
+          <button class="fail-close-btn" id="readings-confirm-back" data-action="readings-confirm-back" aria-label="Back to readings">‹</button>
+          <h3 class="fail-sheet-title">${overList.length === 1 ? 'Check this reading' : 'Check these readings'}</h3>
+          <span class="fail-close-spacer"></span>
+        </div>
+        <p class="multipick-sheet-hint">Class ${escapeHTML(cls)} \u2014 ${overList.length === 1 ? 'this reading is' : 'these readings are'} outside the usual limit. Nothing has been saved yet.</p>
+        ${overList.map(o => `
+          <div class="reading-confirm-row">
+            <div class="reading-confirm-head"><span>${escapeHTML((READING_FIELD_META[o.field] || {}).label || o.field)}</span><strong>${escapeHTML(o.value)} ${escapeHTML((READING_FIELD_META[o.field] || {}).unit || '')}</strong></div>
+            <div class="reading-confirm-note">${escapeHTML(readingLimitNoteText(o))}</div>
+          </div>`).join('')}
+        ${(state.form && state.form.qpTile) ? '' : `<button class="btn-danger reading-change-fail-btn" id="readings-change-to-fail" data-action="readings-change-to-fail">Change to FAIL</button>`}
+        <button class="reading-ok-btn reading-pass-anyway-btn" id="readings-pass-anyway" data-action="readings-pass-anyway">Save as PASS anyway</button>
+      </div>
+    ` : `
       <div class="modal-backdrop" id="readings-backdrop" data-action="readings-cancel"></div>
       <div class="fail-sheet readings-sheet" role="dialog" aria-label="Test readings">
         <div class="fail-sheet-handle"></div>

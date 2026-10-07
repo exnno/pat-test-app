@@ -406,6 +406,69 @@ function normaliseItemReadings(r) {
   return out;
 }
 
+// V104 (S10): read a reading AS TYPED into { op, n }. Readings are stored exactly
+// as typed — '<0.1', '≥19.99', '0.32', '0.32Ω', '> 299 MΩ' — so the check has to
+// read the shorthand. op is '=', '<', '<=', '>' or '>='. An optional unit or
+// letters may follow the number. Anything else (words, two numbers, a comma
+// decimal) is null, and null means the check says NOTHING (3A) — never a guess.
+// ⚠ Device bytes: iOS types ≤ ≥ as U+2264/U+2265 and Ω as Greek U+03A9, not the
+// ohm sign U+2126 (the V68 lesson) — all of them are accepted.
+function parseReadingValue(s) {
+  if (typeof s !== 'string') return null;
+  const t = s.replace(/\s+/g, '');
+  const m = t.match(/^(<=|>=|=<|=>|\u2264|\u2265|<|>|=)?(\d+(?:\.\d+)?|\.\d+)([A-Za-z\u2126\u03A9\u00B5\u03BC]*)$/);
+  if (!m) return null;
+  const opMap = { '<=': '<=', '=<': '<=', '\u2264': '<=', '>=': '>=', '=>': '>=', '\u2265': '>=', '<': '<', '>': '>', '=': '=' };
+  const n = Number(m[2]);
+  if (!isFinite(n)) return null;
+  return { op: m[1] ? opMap[m[1]] : '=', n };
+}
+
+// V104 (S10): the earth ceiling, from anything (a stored string, a backup's
+// number, a synced value). Out of range or unreadable → the default, so garbage
+// can never switch the earth check off or make it fire on everything.
+function normaliseEarthLimit(v) {
+  let n = NaN;
+  if (typeof v === 'number') n = v;
+  else if (typeof v === 'string' && v.trim() !== '') n = Number(v.trim());
+  if (!isFinite(n) || n < READING_EARTH_LIMIT_MIN || n > READING_EARTH_LIMIT_MAX) return READING_EARTH_LIMIT_DEFAULT;
+  return Math.round(n * 100) / 100;
+}
+
+// V104 (S10): the limit for one reading on one class → { kind, limit }, or null
+// when that reading isn't checked for that class (READING_LIMITS, data.js).
+function readingLimitFor(field, cls, earthLimit) {
+  const row = READING_LIMITS[field];
+  if (!row || !row.byClass || !Object.prototype.hasOwnProperty.call(row.byClass, cls)) return null;
+  const v = row.byClass[cls];
+  return { kind: row.kind, limit: (v === null) ? normaliseEarthLimit(earthLimit) : v };
+}
+
+// V104 (S10): is this reading DEFINITELY outside its limit? (3A)
+//   max (earth, leakage): '0.32' > 0.15 is over; '>5' or '≥6' is over; '<5' or
+//     '≤8' is "at most" — it can't be shown to be over, so it never fires.
+//   min (insulation): '0.8' < 1.0 is under; '<1' or '≤0.5' is under; '>' / '≥'
+//     never fires.
+// false covers "fine", "can't tell" and "unreadable" alike — all silent.
+function readingBreaksLimit(text, kind, limit) {
+  const p = parseReadingValue(text);
+  if (!p || typeof limit !== 'number' || !isFinite(limit)) return false;
+  const n = p.n;
+  if (kind === 'max') {
+    if (p.op === '=')  return n > limit;
+    if (p.op === '>')  return n >= limit;
+    if (p.op === '>=') return n > limit;
+    return false;
+  }
+  if (kind === 'min') {
+    if (p.op === '=')  return n < limit;
+    if (p.op === '<')  return n <= limit;
+    if (p.op === '<=') return n < limit;
+    return false;
+  }
+  return false;
+}
+
 // v75: the ONE way anything inside a bottom sheet takes focus.
 //
 // A bare `.focus()` on a field inside a `position: fixed` sheet makes iOS scroll

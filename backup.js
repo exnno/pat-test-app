@@ -66,6 +66,10 @@ function buildBackup() {
     // without these keys restore with the feature OFF and the default tags.
     readingsEnabled: state.readingsEnabled,
     failReasonTags: state.failReasonTags,
+    // V104 (S10): the readings check switch + earth ceiling. Additive — no
+    // backupVersion bump; an older backup restores with the defaults.
+    readingsCheckEnabled: state.readingsCheckEnabled,
+    readingsEarthLimit: state.readingsEarthLimit,
     // v65: barcode scanner on/off. Additive and missing-field-tolerant, so NO
     // backupVersion bump — a pre-v65 backup simply has no key and restores with
     // the default (ON), which is also what a fresh install gets.
@@ -357,6 +361,14 @@ function restoreBackupFromFile(file) {
     // back inside `sessions` above (validated per item).
     if (typeof data.readingsEnabled === 'boolean') {
       state.readingsEnabled = data.readingsEnabled;
+    }
+    // V104 (S10): only a real boolean / a number is taken; the limit goes through
+    // normaliseEarthLimit, so an out-of-range value restores as the default.
+    if (typeof data.readingsCheckEnabled === 'boolean') {
+      state.readingsCheckEnabled = data.readingsCheckEnabled;
+    }
+    if (typeof data.readingsEarthLimit === 'number') {
+      state.readingsEarthLimit = normaliseEarthLimit(data.readingsEarthLimit);
     }
 
     // v65: barcode scanner flag. Restored only when the backup actually carries

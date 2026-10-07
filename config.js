@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V103';
+const APP_VERSION = 'V104';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V103';
+const WELCOME_VERSION = 'V104';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -885,6 +885,15 @@ const SQP_HISTORY_KEY = 'pat:sqphistory';   // v18: JSON { loc: { type: count } 
 // item.readings, which is why it's a clean self-contained object of as-typed
 // text values, not parsed numbers.
 const READINGS_KEY = 'pat:readingsenabled';   // v53: '1' | '0', default '0'
+// V104 (S10): the readings check. ⚠ DEFAULTS ON (7A) — only an explicit '0'
+// turns it off, the same absent-means-on reading as SCANNER_KEY. save() always
+// writes '1'/'0', so switching it off persists. It only does anything while
+// READINGS_KEY is on.
+const READINGS_CHECK_KEY = 'pat:readingscheck';
+// V104 (S10, 2A): the engineer's earth-continuity ceiling in ohms, stored as a
+// string. Unreadable or out of range reads back as READING_EARTH_LIMIT_DEFAULT
+// (data.js) through normaliseEarthLimit (utils.js).
+const READINGS_EARTH_LIMIT_KEY = 'pat:readingsearthlimit';
 
 // ---------------------------------------------------------------------------
 // v65: HID barcode scanner ("keyboard wedge").

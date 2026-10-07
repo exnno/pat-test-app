@@ -506,6 +506,17 @@ let state = {
   readingsDraft: { class: READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '', polarity: false },
   readingsPendingResult: null,        // 'pass' | 'fail' — the result being logged
   readingsPendingFailReason: null,    // the fail reason text (fail mode only)
+  // V104 (S10): the readings check. readingsCheckEnabled and readingsEarthLimit
+  // are persisted (READINGS_CHECK_KEY / READINGS_EARTH_LIMIT_KEY), backed up and
+  // synced in the settings_work row. readingsSheetStage ('entry' | 'confirm') is
+  // the sheet's own step; readingsCarry holds a PASS sheet's readings across
+  // "Change to FAIL" until the fail readings sheet takes them. Both transient —
+  // reset by closeReadingsSheetState (session.js), so any close or navigation
+  // drops them.
+  readingsCheckEnabled: true,
+  readingsEarthLimit: READING_EARTH_LIMIT_DEFAULT,
+  readingsSheetStage: 'entry',
+  readingsCarry: null,
 
   // v65: HID barcode scanner. ONE persisted flag; everything else here is
   // transient and deliberately so.

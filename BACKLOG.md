@@ -8,11 +8,22 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V103
-V104 S10 readings check (Peter has his CoP copy — the figures are needed at its
-spec round), then Stage 10 (snapshots, then factory reset), then permanent cloud
+### Next after V104
+Stage 10 (snapshots, then factory reset), then permanent cloud
 delete + storage used (Stage 5 part 3), then a housekeeping release (favicon set,
 remove dead `setupLongPress`, the sheet-markup guard). Full order: roadmap v4.16.
+
+### V104 residuals (known, accepted)
+- A V103 phone doesn't carry the readings check settings in the settings_work
+  row: if it saves its settings, the other phone's switch and earth limit go back
+  to the defaults (on, 0.15 Ω). Test phones, upgraded together.
+- The check runs on the readings sheet only (6A). Items already saved over a
+  limit aren't marked on Review — backlog below if wanted.
+- Earth is checked against one ceiling, not 0.1 Ω + R for the item's actual lead
+  (2A). A per-item lead picker (length + size → exact limit) is backlog.
+- "Change to FAIL" carries every reading typed on the PASS sheet, so a fail whose
+  reason shows one box still saves the others (as typed, as the pass would have).
+- Comma decimals ("0,5") are not read — silent, never guessed.
 
 ### V103 residuals (known, accepted)
 - A V102 or older phone still treats a target job already on it as ready (no
@@ -735,6 +746,9 @@ wrong reads. **Remove `PAThandoff_v70.md` from the project once V71 is deployed.
 ---
 
 ## Feature backlog
+- Readings check, from V104: mark already-saved PASS items with a reading
+  outside its limit on Review (6B, not taken); a lead picker on the readings sheet
+  so earth is checked against the exact 0.1 Ω + R (2C, not taken).
 
 Consolidated here from the V66 handoff roadmap and the V61/V62 roadmap, so it
 survives those documents being archived.
