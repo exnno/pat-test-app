@@ -453,6 +453,42 @@ module.exports = async function () {
       'the re-send marker is cleared once it lands, or every later push would send it again');
   });
 
+  /* ------------------------------------------------------------------ 17j2 */
+  // V106 harness. Pins M176 (sync.js decide(): `if (st.resend[id]) return;`),
+  // which survived every mutation run from V92 until this was added.
+  //
+  // V81's deadlock — the answered job re-held by the next pull, then skipped by
+  // the push for being held, for ever — can no longer happen even without that
+  // line: since V92 needsDoc() never fetches the doc of a job marked resend, and
+  // a row without its doc can only wait, never be held. So 17j stays green with
+  // M176 applied. What the line still decides is that the stale cloud row is
+  // SETTLED, not merely unread: the push half of this very run replaces it. Without
+  // it the run that sends the answer leaves the cursor where it was.
+  //
+  // The row carries its fingerprint, as every row a V92+ phone writes does, so
+  // the precondition pull really does fetch the doc and hold the job.
+  await t.group('17j2 — the run that sends "keep this phone’s copy" counts the old cloud row as settled', async () => {
+    const app = signedIn();
+    const local = sentJob(app, 'ZZANSWERED');
+    const id = String(local.id);
+    const row = cloudJob(id, 'ZZANSWERED', ['C-1', 'C-2'], T2);
+    row.fp = app.fn('syncHash')(app.fn('_syncCanonical')(row.doc));
+    app.srv.cloud.push(row);
+    editJob(app, id, 'ZZMINE');
+    await app.fn('syncPull')();
+    await tick(5);
+    t.eq(held(app).length, 1, 'precondition: changed in both places, so it is held');
+    t.eq(syncState(app).pulledAt, null, 'precondition: and the cursor stopped at it');
+
+    await app.fn('syncHeldResolve')(id, 'phone');
+    await tick(10);
+
+    t.eq(held(app).length, 0, 'the question is answered');
+    t.eq(app.srv.rows().filter(r => String(r.id) === id).length, 1, 'the phone’s copy was sent');
+    t.eq(syncState(app).pulledAt, T2,
+      'and the cursor moved past the row it replaced — an answered question is settled, not still waiting');
+  });
+
   /* ------------------------------------------------------------------ 17k */
   await t.group('17k — answering "use the cloud copy" re-reads it and applies it', async () => {
     const app = signedIn();
@@ -681,6 +717,41 @@ module.exports = async function () {
     t.notEq(canon({ a: 1 }), canon({ a: 2 }), 'but a real difference still does');
   });
 
+  /* ------------------------------------------------------------------ 17s2 */
+  // V106 harness. Pins M267 (sync.js decide(): `if (hash === st.sent[id]) {
+  // _syncHeldClear(id); return; }`), which survived every mutation run from V92
+  // until this was added.
+  //
+  // The v83.1 case, and a routine one: push, keep logging, and the next run reads
+  // the push back. The cloud holds exactly what this phone sent, so only this
+  // phone moved. Before v83.1 that fell through to "both changed" and the job was
+  // held. Since V92 needsDoc() also settles it (`fp === st.sent[id]`), so even
+  // without the line the job is not held — but it waits, and the cursor stays put
+  // on every run while the engineer keeps logging.
+  await t.group('17s2 — push, keep logging, read the push back: settled, not waited on (v83.1)', async () => {
+    const app = signedIn();
+    withSession(app, { site: 'ZZOWNPUSH' });
+    withItem(app, { assetNo: CANARY.asset, result: 'pass' });
+    const id = String(app.fn('activeSession')().id);
+    app.run('state.activeId = null');
+    app.stopTimer();
+    await app.fn('syncPush')({ pull: true });
+    app.stopTimer();
+    await tick(5);
+    const mine = app.srv.cloud.find(r => String(r.id) === id);
+    t.ok(mine && mine.fp, 'precondition: the job is in the cloud, with its fingerprint');
+    t.eq(mine && mine.updated_at, T3, 'precondition: stamped by the server');
+
+    editJob(app, id, 'ZZSTILLLOGGING');
+    await app.fn('syncPull')();
+    await tick(5);
+
+    t.eq(held(app).length, 0, 'no question is asked — there is only one side to it');
+    t.includes(JSON.stringify(jobById(app, id).items), 'ZZSTILLLOGGING', 'the new item is untouched');
+    t.eq(syncState(app).pulledAt, T3,
+      'and the cursor moves past the phone’s own push — read back, settled');
+  });
+
   /* ------------------------------------------------------------------ 17t */
   // v81.2, decision 1A. Peter's V81.1 report: everything worked and almost
   // nothing showed until he tapped between jobs. The only repaint sync did was
@@ -710,6 +781,41 @@ module.exports = async function () {
     app.run('_syncFlushRepaint()');
     t.ok(app.run('__renders') > 0, 'the owed repaint happens once the field blurs');
     app.run('render = _origRender;');
+  });
+
+  /* ------------------------------------------------------------------ 17t2 */
+  // V106 harness. Pins M187 (sync.js _syncPull: `if (changed || waitingMoved)
+  // _syncRepaintApp();`), which survived every mutation run from V91 until this
+  // was added.
+  //
+  // 17t tests on the jobs list, and since V91 the jobs list is ALSO repainted by
+  // _syncSafetyRepaint() after every run that changes which jobs are safe in the
+  // cloud — so 17t's first assertion is met by the wrong mechanism with M187
+  // applied. And 17r checks the waiting banner by calling renderEntry() itself,
+  // which builds the screen from state whether or not the screen was redrawn.
+  //
+  // This reads the PAGE, on the entry screen, which nothing but the pull's own
+  // repaint redraws. Correct state that never reaches the screen is
+  // indistinguishable from a broken app.
+  await t.group('17t2 — a change waiting for the open job reaches the screen by itself, without a tap', async () => {
+    const app = signedIn();
+    const local = sentJob(app, 'ZZONSCREEN');
+    const id = String(local.id);
+    app.fn('openSession')(id);
+    app.stopTimer();
+    app.fn('render')();
+    const screen = () => app.doc.getElementById('app').innerHTML;
+    t.eq(app.state().view, 'entry', 'precondition: standing in the job');
+    t.excludes(screen(), 'other device', 'precondition: nothing waiting is shown');
+
+    app.srv.cloud.push(cloudJob(id, 'ZZONSCREEN', ['A', 'B', 'C'], T2));
+    await app.fn('syncPull')();
+    await tick(5);
+
+    t.ok(app.state().sync.waiting, 'the change is waiting (state)');
+    t.includes(screen(), 'other device',
+      '…and the banner is on the screen itself, not just in state');
+    t.eq(jobById(app, id).items.length, 1, 'the open job is still untouched');
   });
 
   /* ------------------------------------------------------------------ 17u */
