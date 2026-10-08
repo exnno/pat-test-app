@@ -536,6 +536,36 @@ module.exports = async function () {
     t.eq(app.state().photoCloud.ZZW1 && app.state().photoCloud.ZZW1.s, 'ZZJOB-W', 'the screen\u2019s view follows');
   });
 
+  /* ------------------------------------------------------------------ 27h2 */
+  // V106 harness. syncWhenIdle() (sync.js) is the shared "wait until no run is
+  // going, then write in one step" used by syncNoteMoved (items moved to another
+  // job), syncBringBack and Remove from phone. Its wait had no test of its own:
+  // M407 was meant for the V90 copy of the same line in syncPhotoKnowForDelete,
+  // but the runner replaces the FIRST match, which is this one — so M407 broke
+  // syncWhenIdle, nothing noticed, and the V90 line was never broken at all.
+  // M407 is re-anchored; M725 breaks this one, and this group is what catches it.
+  // Driven through syncNoteMoved, the caller session.js really uses.
+  await t.group('27h2 — a moved item’s photo is re-labelled only once no sync is running (syncWhenIdle)', async () => {
+    const app = await signedIn();
+    const a = await jobWithPhotos(app, 'ZZMOVEWAIT', 1);
+    await run(app);
+    const pid = String(a.ids[0]);
+    const was = String(a.sess.id);
+    t.eq(known(app)[pid] && known(app)[pid].s, was, 'precondition: the photo is known in the cloud against its job');
+
+    app.run('globalThis.__zzRelease = null; _syncRunning = new Promise(r => { globalThis.__zzRelease = r; })');
+    const p = app.run('syncNoteMoved(' + JSON.stringify({ [String(a.item.id)]: 'ZZJOB-MOVED' }) + ')');
+    await tick(10);
+    t.eq(known(app)[pid].s, was, 'nothing written while a run holds the sync state');
+
+    app.run('_syncRunning = null; globalThis.__zzRelease(true)');
+    const n = await p;
+    app.stopTimer();
+    await tick(5);
+    t.eq(n, 1, 'written once it finished');
+    t.eq(known(app)[pid].s, 'ZZJOB-MOVED', '…against the job the item moved to');
+  });
+
   /* ------------------------------------------------------------------ 27i */
   await t.group('27i — Download: cloud-only photos of jobs on this phone; a found photo\u2019s job is not here, so it is not downloaded', async () => {
     const app = await signedIn();
