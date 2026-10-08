@@ -1322,7 +1322,7 @@ const MUTATIONS = [
     file: 'sync.js',
     from: "    if (st.resend[id]) return;",
     to:   "",
-    why:  'the deadlock this release nearly shipped: the pull re-asks a question it has been given the answer to, the push then skips the job for being held, and the job can never be sent again. Both halves individually look correct',
+    why:  'the deadlock this release nearly shipped: the pull re-asks a question it has been given the answer to, the push then skips the job for being held, and the job can never be sent again. Both halves individually look correct. Since V92 needsDoc() also prevents the hold, so what this line still decides is that the stale row is settled: without it the cursor stops (17j2)',
   },
   {
     name: 'M177 (V81) the Sync page leaves off the held-jobs card',
@@ -1404,7 +1404,7 @@ const MUTATIONS = [
     file: 'sync.js',
     from: "    if (changed || waitingMoved) _syncRepaintApp();",
     to:   "",
-    why:  'V81.1 as Peter found it. Everything works and almost nothing shows: a deleted job sits in the list, the waiting banner never appears, and the fix is to tap between jobs until a render happens. Correct state that never reaches the screen is indistinguishable from a broken app',
+    why:  'V81.1 as Peter found it. Everything works and almost nothing shows: a deleted job sits in the list, the waiting banner never appears, and the fix is to tap between jobs until a render happens. Correct state that never reaches the screen is indistinguishable from a broken app (17t2 \u2014 17t alone is also satisfied by the V91 safety repaint)',
   },
   {
     name: 'M188 (V81.2) a repaint tears down a focused field',
@@ -1980,7 +1980,7 @@ const MUTATIONS = [
     file: 'sync.js',
     from: "    if (hash === st.sent[id]) { _syncHeldClear(id); return; }\n",
     to:   "",
-    why:  'push, keep logging, next run reads the push back: a question with only one side to it, and the job stops syncing until answered',
+    why:  'push, keep logging, next run reads the push back: a question with only one side to it, and the job stops syncing until answered. Since V92 needsDoc() also prevents the hold, so without this line the job waits and the cursor stops on every run while logging (17s2)',
   },
   {
     name: 'M268 (V83.1) a record the cloud still has as this phone sent it is held when edited since',
@@ -2965,10 +2965,14 @@ const MUTATIONS = [
     why:  "the V89 delete path only deletes what it knows: the photo would never go (27g)",
   },
   {
-    name: "M407 (V90) making a photo known does not wait for a run",
+    name: "M407 (V90, re-anchored V106 harness) making a photo known does not wait for a run",
     file: "sync.js",
-    from: "    if (_syncRunning) return _syncRunning.then(go, go);\n",
-    to:   "",
+    // The bare line also opens syncWhenIdle(), EARLIER in sync.js, and the runner
+    // replaces the first match — so until V106 this broke syncWhenIdle instead,
+    // survived, and the V90 line was never broken. Anchored on the two lines that
+    // follow it, which only syncPhotoKnowForDelete has. syncWhenIdle is M725.
+    from: "    if (_syncRunning) return _syncRunning.then(go, go);\n    const st = _syncLoad();\n    if (st.userId !== uid) return 0;\n",
+    to:   "    const st = _syncLoad();\n    if (st.userId !== uid) return 0;\n",
     why:  "a running sync saves its own copy of the state and would overwrite it (27h)",
   },
   {
@@ -5191,6 +5195,13 @@ const MUTATIONS = [
     from: "    return _resetClearStores();\n  }).then(() => { _resetReload(); return true; });",
     to:   "    _resetClearStores();\n  }).then(() => { _resetReload(); return true; });",
     why:  "the page ends mid-clear: photos and snapshot copies survive until the next start-up, or for good if the boot pass can't run (43e)",
+  },
+  {
+    name: "M725 (V106 harness) syncWhenIdle does not wait for a run",
+    file: "sync.js",
+    from: "  const go = () => {\n    if (_syncRunning) return _syncRunning.then(go, go);\n    return fn();\n  };",
+    to:   "  const go = () => {\n    return fn();\n  };",
+    why:  "moving items, bringing jobs back and Remove from phone all write the sync state while a run holds its own copy, which the run then saves over them (27h2)",
   },
 ];
 
