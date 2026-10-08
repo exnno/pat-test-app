@@ -266,6 +266,7 @@ module.exports = async function () {
   /* ------------------------------------------------------------------ 26d */
   await t.group('26d — a tap downloads it; it keeps its id, counts as on the phone and never goes up again', async () => {
     const app = await signedIn();
+    app.run('photoThumbBlob = () => Promise.resolve(null)');   // Node cannot decode an image; without this the 10 s guard in _syncThumbUpload is waited out for real (same outcome: no preview)
     const { sess, item } = await jobWithFail(app, 'ZZDL');
     app.srv.otherRow({ id: 'ZZD1', session_id: String(sess.id), item_id: String(item.id) });
     await run(app);
@@ -455,6 +456,7 @@ module.exports = async function () {
   /* ------------------------------------------------------------------ 26l */
   await t.group('26l — the certificate asks before building; Cancel stamps no number (4A)', async () => {
     const app = await signedIn();
+    app.run('photoThumbBlob = () => Promise.resolve(null)');   // Node cannot decode an image; without this the 10 s guard in _syncThumbUpload is waited out for real (same outcome: no preview)
     const { sess, item } = await jobWithFail(app, 'ZZCERT');
     app.srv.otherRow({ id: 'ZZP1', session_id: String(sess.id), item_id: String(item.id), bytes: 1200000 });
     await run(app);
