@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V106';
+const APP_VERSION = 'V107';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V106';
+const WELCOME_VERSION = 'V107';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -500,6 +500,10 @@ const SYNC_WINDOW_DAYS = 30;
 // per request, and the most it will read (said on screen if reached).
 const SYNC_CLOUD_PAGE = 1000;
 const SYNC_CLOUD_MAX = 20000;
+// V107 (Stage 5 part 3, 4B): deleting jobs from the cloud tab asks for the word
+// typed when this many or more are chosen, or when any has a certificate.
+const CLOUD_DELETE_WORD = 'DELETE';
+const CLOUD_DELETE_TYPE_AT = 5;
 // v81.2 (decision 2D). Reading is driven by what the engineer DOES — every
 // screen change is a moment they might be expecting the other phone's work —
 // with a slow backstop for standing still. The interval matters far more than

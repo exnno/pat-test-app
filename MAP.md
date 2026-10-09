@@ -1,4 +1,4 @@
-# PATGo — Code Map (V106)
+# PATGo — Code Map (V107)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -219,6 +219,9 @@ a restore test awaits a tick after confirming (03f/03f2/03i, 41f).
 which waits for the read to finish (a new sheet on screen, max 2 s). Never a fixed
 `tick(5)`: the stub awaits a real Blob read, and under load 5 ms flaked 03f and let
 03h pass vacuously.
+⚠ V107: group 44's fake applies a PATCH (supabase-js `update`) to the rows its
+filters match and answers its `select`; the older fakes (16–43) still answer a
+PATCH with 204 and change nothing — a test of an UPDATE must use 44's.
 See `harness/README.md`.
 
 ---
@@ -783,6 +786,11 @@ box is an input: `cloudJobsSearch` → `refreshCloudListAreaOnly` (render-review
 never render(). Markup `renderCloudJobsHTML`/`renderCloudListAreaHTML` in
 **render-review.js**, drawn by **render-core.js** `renderSessions`; actions
 `jobs-tab`, `cloud-*` (+ input `cloud-search`) in **dispatch.js**.
+⚠ V107: CLOUD DELETE (`cloudDeleteOverview`, `cloudDeleteConfirmMatches`,
+`cloudJobsDeleteSelected`, `_cloudDelete`). Select → Delete… → **render-review.js**
+`openCloudDeleteSheet` → **sync.js** `syncCloudDelete`. Word `CLOUD_DELETE_WORD`
+at `CLOUD_DELETE_TYPE_AT`+ jobs or any locked/certificated (config.js). Deleted ids
+drop off `cj.jobs` without a re-read; a re-read only after `missing`/error.
 
 ### onboarding.js (~195 ln) — first-run wizard — NEW v70
 The wizard state machine (step capture, paging, fresh/import fork, theme pick,
@@ -876,6 +884,11 @@ V103: `renderMoveToSheet(sess)` (Move to another job — pick / clash / confirm 
 blocked), drawn from `renderOverview` after V101's. Pick and clash hold inputs (the
 filter, new numbers, radios): updated in place, never re-rendered while open;
 `_syncSafeToRepaint` refuses while `state.moveTo` is set. Styles `.move-to-*`.
+V107: `openCloudDeleteSheet(o, onYes)` — the review before a cloud delete (cloud
+tab Select → Delete…), drawn on body like reset.js's sheet (holds the DELETE box:
+never re-rendered while open). Overview from settings-actions.js
+`cloudDeleteOverview`; reuses `.reset-*` styles plus `.cloud-del-*`. The button
+re-checks the word on the tap; the action checks it again (44i, M737/M738).
 
 ### render-settings.js (~1377 ln) — settings screens that own a setting
 The two-level Settings hub, its search, every `renderSettings*` sub-page with a
@@ -965,7 +978,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~4300 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves
+### sync.js (~4520 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete
 V104: the settings_work row also carries `readingsCheck` (default ON — read
 `!== false`) and `earthLimit` (normaliseEarthLimit); normalise / record / valid /
 apply / diffs all list them.
@@ -1153,6 +1166,15 @@ month (`st.rtMonth`), fail-soft. `syncCloudList` (replaces `syncClearedLook`)
 reads `_SYNC_CLOUD_JOB_COLS` incl. server columns `n_items`/`n_fails` and the
 view `session_photo_counts` (**supabase/v93-archive.sql**). Harness 30a–30i,
 M452–M474.
+⚠ V107: `syncCloudDelete(ids)` — jobs NOT on this phone, from the cloud tab
+(**settings-actions.js** `_cloudDelete`). HOLDS THE RUN LOCK itself (sets
+`_syncRunning` to its own promise, inside `syncWhenIdle`), then: photo rows read →
+sessions UPDATE (doc {}, fp null, deleted true; live rows only, `select('id')` says
+which) → for those only: forget sent/conf/resend/held + SYNC_PRUNED entry, photos
+into `st.ph.sent` + 'photo' tombstones → **photos.js** `photosDeleteForSessions`
+→ release → a READING run (the photo half only runs in those). Never a session
+tombstone or `st.gone` (a job back live would lose its photos). Rows before photos
+— never the other order. Harness 44a–44i, M726–M739.
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
 19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q, 27a–27m, 28a–28i and
 29a–29i and 30a–30i, mutations M142–M295, M306–M325, M355–M395, M396–M418, M419–M434, M436–M451, M452–M474.

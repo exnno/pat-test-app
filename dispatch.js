@@ -252,6 +252,7 @@ registerActions({
   'cloud-tap':          (arg) => cloudJobsTap(arg),
   'cloud-select-toggle': () => cloudJobsToggleSelecting(),
   'cloud-bring':        () => cloudJobsBringSelected(),
+  'cloud-delete':       () => cloudJobsDeleteSelected(),        // V107 (Stage 5 pt 3)
   'tidy-jobs':          () => tidyJobsRemove(),
   'tidy-photos':        () => tidyPhotosRemove(),
   'tidy-review':        () => tidyOfferReview(),

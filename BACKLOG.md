@@ -8,10 +8,55 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V106
-Stage 5 part 3 — permanent cloud delete + storage used (own spec round), then a
+### Next after V107
+V108 — Stage 5 part 3 second half: storage used (account total, biggest jobs,
+photo usage; needs a small SQL file for job sizes — own spec round). Then the
 housekeeping release (favicon set, remove dead `setupLongPress`, the
-sheet-markup guard). Full order: roadmap v4.19.
+sheet-markup guard). Full order: roadmap v4.20.
+
+### V107 residuals (known, accepted)
+- Not yet tested on real phones (two-phone: delete on one, the other syncs).
+- Order is rows first, photos second. A closed app or lost signal in the moment
+  between the job update and the bookkeeping leaves that job's photos in the
+  cloud with no job; Manage Photos → Look in the cloud → "Photos with no job"
+  lists them for Delete everywhere.
+- A phone that had CHANGED a deleted job and answers "keep this phone's copy"
+  keeps its items, not its photos — the cloud photos were deleted, and that
+  phone's rows pull removes its local copies as it does after any delete
+  everywhere today.
+- The review's counts come from the list as last read (⟳ Refresh re-reads).
+- Deleted jobs and photos leave a small "deleted" marker row each (~200 bytes)
+  so phones that were offline learn of it — see "Cloud — clear old delete
+  markers" below.
+
+### Cloud — "Save a backup file of these first" before a cloud delete (V107 5B — backlog only, NOT on the roadmap)
+Peter, V107 round: put in the backlog, not the roadmap, so it doesn't delay
+launch. A button on the cloud delete review that downloads the chosen jobs and
+saves them as a backup file. Needs every job's contents downloaded (egress, R17)
+and a backup writer for jobs that aren't on the phone.
+
+### Cloud — clear old delete markers (Peter's question, V107 round) — belongs in Stage 12's clean-up job
+Every delete leaves a marker row (jobs: emptied doc, deleted true; photos: the row,
+deleted true — the files themselves are removed). ~200 bytes each; 10,000 ≈ 2 MB,
+against 500 MB free / 8 GB Pro. They exist so a phone that was offline learns of
+a delete; removed too early, that phone keeps its copy and could send it back.
+Plan: Stage 12's scheduled clean-up job (already server code for R7/R8) also
+removes markers older than ~12 months, AND phones gain a guard — one that hasn't
+synced for longer than that re-checks every job it holds against the cloud
+instead of trusting its fingerprints. Not a version of its own.
+
+### From the V106 harness amendment (8 Oct) — carried in at V107
+- 11 mutations anchor on text that occurs more than once in their file: M16,
+  M116, M127, M150 (8×), M200 (3×), M263, M268 (3×), M300, M547, M580, M586.
+  All caught, but each may break a different copy than its author meant (M407's
+  fault). Own harness release: re-anchor each, and make the runner abort on a
+  non-unique anchor (DEFENCE 3), as it already aborts on a missing one. (V107's
+  first draft briefly made M150 10× and M401 2× — caught by the anchor scan and
+  rewritten; that scan is the only guard until DEFENCE 3 exists.)
+- The 10 s preview guard in _syncThumbUpload (sync.js) has no test of its own.
+- Option: mutate.js stops each suite at the first failure (unmeasured; guess
+  1/3–1/2 off the sweep). Runner change: own release.
+- Option: move run-mutations.sh into harness/ so it versions with the repo.
 
 ### V106 residuals (known, accepted)
 - Reset is local only. A signed-in phone after "Clear my work" is a fresh phone
@@ -418,7 +463,8 @@ client (address, contact).
 A job pulled onto a second device now shows its photos as ☁ tiles with previews;
 each comes down on a tap. Offline, or signed out, it still fails soft.
 
-### Cloud — permanent delete of cleared jobs (Peter, V80 spec)
+### ~~Cloud — permanent delete of cleared jobs (Peter, V80 spec)~~ — SHIPPED IN V107
+Cloud tab → Select → Delete…; drops the id from SYNC_PRUNED_KEY as planned below.
 Clearing old jobs leaves them in the cloud archive (5A). Peter wants a way to
 delete them from the cloud too, at some point. Pull now exists, so the blocker
 is gone — what is still missing is a view of what the cloud holds. Would send an

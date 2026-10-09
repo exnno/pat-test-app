@@ -1430,6 +1430,11 @@ body.has-update-banner .screen { padding-top: 64px; }
   border-radius: 8px;
 }
 .reset-busy { padding: 40px 16px; text-align: center; color: var(--text-muted); }
+/* V107: the cloud delete review (render-review.js openCloudDeleteSheet) —
+   the reset sheet's look, with one row per job. */
+.cloud-del-list li { margin: 6px 0; line-height: 1.35; }
+.cloud-del-list .muted { font-size: 13px; }
+.cloud-del-cert { font-size: 13px; font-weight: 600; color: var(--fail-soft-text); }
 
 /* Storage usage card */
 .storage-card {

@@ -4300,6 +4300,183 @@ function syncBringBack(ids) {
   });
 }
 
+// ---- V107 (Stage 5 part 3): delete jobs from the cloud that are NOT on this phone ----
+// The cloud tab's Select → Delete… (2A). Only for jobs this phone does not hold:
+// a job on the phone is deleted with its own 🗑 → Delete everywhere, which runs
+// deleteSession()'s sweeps. One that has arrived on the phone since the list was
+// read is skipped (`skipped`), never deleted from here.
+//
+// In this order, holding the run lock (_syncRunning) so no pull or push starts
+// in between — a run holds its own copy of the sync state and would overwrite
+// what this writes (the reason syncWhenIdle exists):
+//   1. reads the jobs' photo ROWS (never an image — R17): id, job, item, size;
+//   2. empties and marks deleted each job's row — the same row a delete
+//      everywhere sends (doc {}, fp null, deleted true) — with an UPDATE, so only
+//      rows still live are touched and the answer says which were. Other phones
+//      learn of it as they learn of any delete: an unchanged copy goes, a changed
+//      copy asks first ("deleted on another phone") — never lost silently;
+//   3. only for the jobs the cloud took: forgets them here (sent, conf, resend,
+//      held, and the cleared list — left there, the pull would skip their row for
+//      ever: the V80 backlog note), makes their photos KNOWN (st.ph.sent) and
+//      records a 'photo' tombstone for each, so the next run's photo half marks
+//      the rows deleted and removes both files — the V89 ledger path, which
+//      retries until it lands;
+//   4. sweeps any copy of those photos still on this phone (cleared-job
+//      leftovers). A copy on the phone reads as "live" and would stop the delete.
+// Then the lock is released and a READING run starts (the photo half runs only
+// in those): it carries the photo deletes, and any trigger that arrived meanwhile
+// (syncPush saw the lock) runs with it.
+//
+// ⚠ ORDER. The job rows go BEFORE any photo is marked. A failure or a closed app
+// between 2 and 3 leaves photos with no job in the cloud (the photo manager's
+// "Photos with no job" lists them); the other order could delete the photos of
+// a job that was never deleted.
+// ⚠ No session tombstone and no st.gone. The push sends a tombstone only for a
+// job it sent (rule 32's guards), and st.gone[id] would make the photo half
+// delete the job's photos again if it ever came back live (a phone that changed
+// it and chose to keep its copy). Forgetting the job is enough: a deleted row
+// for an id this phone doesn't know changes nothing here.
+// Lifetime stats are untouched: a cleared job's tallies stay archived (no delete
+// lowers the counter, v59), and a job never on this phone was never counted.
+// Resolves { ok, offline, error, deleted, photos, skipped, missing, ids } —
+// `ids` the jobs the cloud took (the tab drops them without reading again).
+function syncCloudDelete(ids) {
+  const want = Array.from(new Set((ids || []).map(String).filter(Boolean)));
+  const res = { ok: false, offline: false, error: '', deleted: 0, photos: 0, skipped: 0, missing: 0, ids: [] };
+  if (!want.length) { res.ok = true; return Promise.resolve(res); }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  return syncWhenIdle(() => {
+    let release;
+    const lock = new Promise((r) => { release = r; });
+    _syncRunning = lock;
+    return _syncCloudDeleteRun(uid, want, res).catch((e) => {
+      res.ok = false;
+      res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
+      return res;
+    }).then(() => {
+      if (_syncRunning === lock) _syncRunning = null;
+      release();
+      const again = _syncAgain, force = _syncAgainForce, pull = _syncAgainPull;
+      _syncAgain = false; _syncAgainForce = false; _syncAgainPull = false;
+      // ⚠ A READING run (pull): the photo half — which carries the deletes —
+      // runs only in those (v88).
+      if (res.deleted || again) { try { syncPush({ force, pull: pull || !!res.deleted }); } catch (e) { /* the next trigger runs it */ } }
+      return res;
+    });
+  });
+}
+
+function _syncCloudDeleteRun(uid, want, res) {
+  const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+  const ids = want.filter(id => !local.has(id));
+  res.skipped = want.length - ids.length;
+  if (!ids.length) { res.ok = true; return Promise.resolve(res); }
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  const size = (typeof SYNC_BROWSE_PAGE === 'number') ? SYNC_BROWSE_PAGE : 1000;
+  const photos = [];
+  const done = [];
+  let c = null, failed = null;
+  return cloudClient().then((cl) => {
+    c = cl;
+    // 1. The photo rows, keyset paged within each batch of jobs.
+    let chain = Promise.resolve();
+    for (let k = 0; k < ids.length; k += batch) {
+      const chunk = ids.slice(k, k + batch);
+      const page = (after) => {
+        let q = c.from('photos').select('id,session_id,item_id,bytes').eq('user_id', uid).eq('deleted', false).in('session_id', chunk);
+        if (after) { q = q.gt('id', after); }
+        return q.order('id', { ascending: true }).limit(size).then((r) => {
+          if (r && r.error) { throw r.error; }
+          const got = (r && r.data) || [];
+          for (const row of got) {
+            const id = String(row && row.id != null ? row.id : '');
+            const s = String(row && row.session_id != null ? row.session_id : '');
+            const i = String(row && row.item_id != null ? row.item_id : '');
+            if (!id || !s || !i) continue;
+            const e = { id, s, i };
+            const b = Number(row.bytes);
+            if (b > 0 && isFinite(b)) e.b = Math.round(b);
+            photos.push(e);
+          }
+          if (got.length < size) return;
+          return page(String(got[got.length - 1].id));
+        });
+      };
+      chain = chain.then(() => page(''));
+    }
+    return chain;
+  }).then(() => {
+    const su = _syncLoad().userId;
+    if (su && su !== uid) { res.error = 'Signed in as someone else now.'; return; }
+    // 2. The job rows. A batch that fails stops the rest; those already taken
+    //    are still settled below.
+    const now = new Date().toISOString();
+    const rowsAt = (typeof SYNC_BATCH_ROWS === 'number') ? SYNC_BATCH_ROWS : 25;
+    let chain = Promise.resolve();
+    for (let k = 0; k < ids.length; k += rowsAt) {
+      const chunk = ids.slice(k, k + rowsAt);
+      chain = chain.then(() => c.from('sessions')
+        .update({ doc: {}, fp: null, deleted: true, last_modified: now })
+        .eq('user_id', uid).eq('deleted', false).in('id', chunk).select('id'))
+        .then((r) => {
+          if (r && r.error) { throw r.error; }
+          for (const row of ((r && r.data) || [])) {
+            const id = String(row && row.id != null ? row.id : '');
+            if (id && chunk.indexOf(id) !== -1 && done.indexOf(id) === -1) done.push(id);
+          }
+        });
+    }
+    return chain.catch((e) => { failed = e; });
+  }).then(() => {
+    if (res.error) return;
+    // 3. Settle what the cloud took, in one synchronous step (the lock is held).
+    const gone = new Set(done);
+    const mine = photos.filter(p => gone.has(p.s));
+    if (gone.size) {
+      const st = _syncStateFor(uid);
+      if (st.userId === uid) {
+        for (const id of gone) {
+          delete st.sent[id]; delete st.resend[id];
+          if (st.conf) delete st.conf[id];
+        }
+        for (const p of mine) {
+          if (st.ph.sent[p.id]) continue;
+          const o = { s: p.s, i: p.i };
+          if (p.b) o.b = p.b;
+          st.ph.sent[p.id] = o;
+        }
+        _syncSave(st);
+      }
+      for (const id of gone) _syncHeldClear(id);
+      const list = _syncPrunedLoad();
+      const kept = list.filter(e => !gone.has(e.id));
+      if (kept.length !== list.length) _syncPrunedSave(kept);
+      for (const p of mine) {
+        if (typeof recordTombstone === 'function') recordTombstone('photo', p.id);
+        if (typeof photoThumbForget === 'function') { try { photoThumbForget(p.id); } catch (e) { /* display only */ } }
+      }
+      if (mine.length && typeof saveTombstones === 'function') saveTombstones();
+    }
+    res.deleted = done.length;
+    res.ids = done.slice();
+    res.photos = mine.length;
+    res.missing = failed ? 0 : ids.length - done.length;
+    // 4. This phone's copies of those photos — awaited, so the run that follows
+    //    sees them gone; done for the jobs taken even when a later batch failed.
+    let sweep = Promise.resolve();
+    if (gone.size && typeof photosDeleteForSessions === 'function') {
+      try { sweep = Promise.resolve(photosDeleteForSessions(Array.from(gone))); } catch (e) { sweep = Promise.reject(e); }
+      sweep = sweep.catch((e) => { console.error('Cloud delete: photos left on this phone (non-fatal).', e); });
+    }
+    return sweep.then(() => {
+      if (failed) throw failed;
+      res.ok = true;
+    });
+  }).then(() => res);
+}
+
 // The shared half of syncBringBack and the retest look: add each valid live row
 // asked for that isn't on the phone, take every one now here off the cleared
 // list, and un-archive the stats of those that WERE cleared (and only those).

@@ -1458,6 +1458,7 @@ function renderCloudJobsHTML() {
       <div class="selection-bar pm-bar">
         <span class="selection-bar-count">${n} selected</span>
         <button class="selection-bar-action pm-bar-btn" data-action="cloud-bring" ${n && !cj.busy ? '' : 'disabled'}>Bring onto this phone</button>
+        <button class="selection-bar-action pm-bar-btn is-danger" data-action="cloud-delete" ${n && !cj.busy ? '' : 'disabled'}>Delete\u2026</button>
       </div>`;
   }
   return `
@@ -1504,6 +1505,77 @@ function renderCloudListAreaHTML(model) {
     return `<h3 class="cloud-month">${escapeHTML(g.label)}</h3>${rows}`;
   }).join('');
   return head + groups;
+}
+
+// V107 (Stage 5 part 3): the review before a cloud delete. `o` is
+// settings-actions.js cloudDeleteOverview(); `onYes(typed)` does the delete and
+// checks the word again itself (the disabled button is only a hint).
+// Each job is named with its counts and certificate; what goes, that other
+// phones lose it too, and that no copy is kept (5A) are said plainly. The word
+// box appears only when o.needWord (4B). Drawn on body; never render() while
+// open — it has an input (MAP rule 3). The box is not focused on open: the
+// keyboard would cover the list (as reset.js).
+function openCloudDeleteSheet(o, onYes) {
+  if (typeof _openSheet !== 'function' || !o || !o.n) return;
+  const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const word = (typeof CLOUD_DELETE_WORD === 'string') ? CLOUD_DELETE_WORD : 'DELETE';
+  const rows = o.jobs.map((j) => {
+    const bits = [j.client ? escapeHTML(j.client) : '', escapeHTML(formatDate(j.date))];
+    if (typeof j.items === 'number') bits.push(pl(j.items, 'item'));
+    if (j.photos) bits.push(`\ud83d\udcf7 ${j.photos}`);
+    return `<li><strong>${escapeHTML(j.title || j.site || j.name || 'Untitled job')}</strong><br><span class="muted">${bits.filter(Boolean).join(' \u00b7 ')}</span>` +
+      (j.certNo ? `<br><span class="cloud-del-cert">Certificate ${escapeHTML(j.certNo)}</span>` : (j.locked ? `<br><span class="cloud-del-cert">Locked</span>` : '')) + `</li>`;
+  }).join('');
+  const totals = [pl(o.n, 'job'), pl(o.items, 'item')];
+  if (o.photos) totals.push(pl(o.photos, 'photo'));
+  const certLine = o.certJobs
+    ? `<p class="reset-warn" id="cloud-del-certs">&#9888; ${o.certJobs === 1 ? 'One of these has' : `${o.certJobs} of these have`} a certificate${o.certs.length ? ` (${escapeHTML(o.certs.join(', '))})` : ''}. Deleting ${o.certJobs === 1 ? 'it' : 'them'} deletes your record of ${o.certJobs === 1 ? 'that test' : 'those tests'}.</p>`
+    : '';
+  const yesLabel = `Yes, delete ${o.n === 1 ? 'this job' : pl(o.n, 'job')} for good`;
+  const { sheet, backdrop, cleanup } = _openSheet('Delete from the cloud');
+  sheet.classList.add('reset-sheet', 'cloud-del-sheet');
+  sheet.innerHTML = `
+    <div class="bulk-sheet-handle"></div>
+    <div class="bulk-sheet-header">
+      <span class="fail-close-spacer"></span>
+      <h3 class="bulk-sheet-title">Delete from the cloud &mdash; are you sure?</h3>
+      <button class="fail-close-btn" id="cloud-del-cancel" aria-label="Cancel">&times;</button>
+    </div>
+    <div class="sheet-scroll reset-overview">
+      ${certLine}
+      <h4 class="reset-h reset-h-gone">Deleted for good &mdash; ${escapeHTML(totals.join(' \u00b7 '))}</h4>
+      <ul class="reset-list reset-list-gone cloud-del-list" id="cloud-del-jobs">${rows}</ul>
+      <p class="reset-note">${o.n === 1 ? 'It goes' : 'They go'} from the cloud and from any other phone that has ${o.n === 1 ? 'it' : 'them'}, with ${o.photosKnown ? 'the photos' : 'any photos'}. A phone that has changed one and not sent it yet will ask before letting it go.</p>
+      <p class="reset-note">Want a copy? Bring the job onto this phone first, then make its certificate or export it.</p>
+      <p class="reset-final" id="cloud-del-final">No copy is kept, and it can&rsquo;t be undone.</p>
+    </div>
+    <div class="sheet-pin">
+      ${o.needWord ? `<label class="label" for="cloud-del-input">Type ${word} to confirm</label>
+      <input class="input" id="cloud-del-input" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12" placeholder="${word}">` : ''}
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button class="btn-secondary" id="cloud-del-no">Cancel</button>
+        <button class="btn-danger" id="cloud-del-yes" style="flex:1" ${o.needWord ? 'disabled' : ''}>${escapeHTML(yesLabel)}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+  const inp = document.getElementById('cloud-del-input');
+  const yes = document.getElementById('cloud-del-yes');
+  const x = document.getElementById('cloud-del-cancel');
+  const no = document.getElementById('cloud-del-no');
+  if (x) x.addEventListener('click', cleanup);
+  if (no) no.addEventListener('click', cleanup);
+  const sync = () => {
+    if (yes && o.needWord) yes.disabled = !(typeof cloudDeleteConfirmMatches === 'function' && cloudDeleteConfirmMatches(inp ? inp.value : ''));
+  };
+  if (inp) { inp.addEventListener('input', sync); inp.addEventListener('keyup', sync); }
+  if (yes) yes.addEventListener('click', () => {
+    const typed = inp ? inp.value : '';
+    if (o.needWord && !(typeof cloudDeleteConfirmMatches === 'function' && cloudDeleteConfirmMatches(typed))) { sync(); return; }
+    cleanup();   // first: the delete repaints the Jobs screen
+    onYes(typed);
+  });
 }
 
 // The cloud search's partial refresh — the input itself is left alone.

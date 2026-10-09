@@ -237,9 +237,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Reset this phone.</strong> New in Settings &rarr; Data &rarr; <strong>Reset This Phone</strong>, for handing a phone on or starting again.</li>
-        <li><strong>Three choices.</strong> Clear just your work (jobs, clients and sites, photos), your work and your settings, or everything including your sign-in.</li>
-        <li><strong>No surprises.</strong> Before anything happens it lists exactly what will be deleted and what will be kept, and you type RESET to confirm. Nothing is ever deleted from your cloud account.</li>
+        <li><strong>Delete old jobs from the cloud.</strong> If you use the cloud: Jobs &rarr; <strong>&#9729; In the cloud</strong> &rarr; Select, tick the jobs, then <strong>Delete&hellip;</strong>. No need to bring them onto the phone first.</li>
+        <li><strong>Gone everywhere.</strong> They go from the cloud and from any other phone that has them, with their photos. A phone that has changed one and not sent it yet asks first.</li>
+        <li><strong>No surprises.</strong> You see every job, its items and its certificate before anything happens. For 5 or more jobs, or any with a certificate, you type DELETE to confirm. No copy is kept.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

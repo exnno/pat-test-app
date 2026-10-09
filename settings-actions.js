@@ -1649,7 +1649,7 @@ function savePhotoAge() {
 //
 // Tap a job → it comes down onto this phone and opens (5A, syncBringBack: one
 // download; a locked job stays locked). Select → Bring onto this phone for
-// several. Nothing here deletes anything (permanent delete is Stage 5 part 3).
+// several. V107: Select → Delete… deletes from the cloud (below, cloudDeleteOverview).
 //
 // ⚠ The search box is an input: typing refreshes only #cloud-list-area (as the
 // Jobs search does), never render(), or iOS drops the keyboard (MAP rule 3).
@@ -1808,6 +1808,93 @@ function _cloudBring(ids, open) {
     else showToast(ids.length === 1 ? 'That job isn\u2019t in the cloud any more' : 'Those jobs aren\u2019t in the cloud any more');
     // Deleted elsewhere since the list was read: read it again.
     if (res.missing && state.cloudJobs === cj) cloudJobsLoad(true);
+    if (state.view === 'sessions') render();
+  });
+}
+
+// ---- V107 (Stage 5 part 3): delete jobs from the cloud ----------------------------
+// Select → tick jobs → Delete… (2A, 7A one at a time) → the review sheet
+// (render-review.js openCloudDeleteSheet): every job named with its counts and
+// certificate, what goes, that other phones lose it too, no copy kept (5A) →
+// "Yes, delete N jobs for good" (R20: the second step names it). At
+// CLOUD_DELETE_TYPE_AT or more, or when any has a certificate, DELETE must be
+// typed too (4B). Jobs with a certificate may be deleted (3A). Always on (6A).
+// The work is sync.js syncCloudDelete; nothing here touches the cloud.
+
+// What the sheet says, worked out from the list already read (never a doc).
+// Pure. Ids not in the list (gone since) are left out.
+function cloudDeleteOverview(ids) {
+  const m = cloudJobsModel();
+  const all = new Map(((state.cloudJobs && state.cloudJobs.jobs) || []).map(j => [j.id, j]));
+  const jobs = [];
+  for (const raw of (ids || [])) {
+    const id = String(raw);
+    const j = m.byId.get(id) || all.get(id);
+    if (j && !jobs.some(x => x.id === id)) jobs.push(j);
+  }
+  const num = (v) => (typeof v === 'number' && isFinite(v) && v > 0) ? v : 0;
+  const certs = jobs.filter(j => j.certNo || j.locked);
+  const items = jobs.reduce((n, j) => n + num(j.items), 0);
+  const photos = jobs.reduce((n, j) => n + num(j.photos), 0);
+  const at = (typeof CLOUD_DELETE_TYPE_AT === 'number') ? CLOUD_DELETE_TYPE_AT : 5;
+  return {
+    ids: jobs.map(j => j.id), jobs, n: jobs.length, items, photos,
+    photosKnown: !!(state.cloudJobs && state.cloudJobs.photos),
+    certs: certs.map(j => j.certNo).filter(Boolean),
+    certJobs: certs.length,
+    needWord: jobs.length >= at || certs.length > 0,
+  };
+}
+
+function cloudDeleteConfirmMatches(v) {
+  const word = (typeof CLOUD_DELETE_WORD === 'string') ? CLOUD_DELETE_WORD : 'DELETE';
+  return String(v == null ? '' : v).trim().toUpperCase() === word;
+}
+
+function cloudJobsDeleteSelected() {
+  const cj = state.cloudJobs;
+  if (!cj || cj.busy) return;
+  const o = cloudDeleteOverview(Object.keys(cj.selected || {}));
+  if (!o.n) return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    showToast('No signal — try again when you’re connected');
+    return;
+  }
+  if (typeof openCloudDeleteSheet !== 'function') return;
+  openCloudDeleteSheet(o, (typed) => {
+    // Checked again here: a disabled button is a hint, not a guard.
+    if (o.needWord && !cloudDeleteConfirmMatches(typed)) return false;
+    _cloudDelete(o.ids);
+    return true;
+  });
+}
+
+function _cloudDelete(ids) {
+  const cj = state.cloudJobs;
+  if (!cj || typeof syncCloudDelete !== 'function') return;
+  cj.busy = ids.length === 1 ? 'Deleting it from the cloud…' : `Deleting ${ids.length} jobs from the cloud…`;
+  render();
+  syncCloudDelete(ids).then((res) => {
+    const gone = new Set(res.ids || []);
+    if (state.cloudJobs === cj) {
+      cj.busy = '';
+      cj.jobs = (cj.jobs || []).filter(j => !gone.has(j.id));
+      for (const id of gone) delete cj.selected[id];
+      if (res.ok) { cj.selecting = false; cj.selected = {}; }
+    }
+    const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    const bits = [];
+    if (res.deleted) bits.push(`Deleted ${pl(res.deleted, 'job')} from the cloud` + (res.photos ? ` with ${pl(res.photos, 'photo')}` : ''));
+    if (res.missing) bits.push(`${res.missing} ${res.missing === 1 ? 'was' : 'were'} already gone`);
+    if (res.skipped) bits.push(`${res.skipped} ${res.skipped === 1 ? 'is' : 'are'} on this phone now — delete ${res.skipped === 1 ? 'it' : 'them'} from the phone tab`);
+    if (res.offline) showToast('No signal — nothing was deleted');
+    else if (res.error) {
+      const e = String(res.error);
+      showToast((res.deleted ? bits[0] + ', then ' : 'Nothing was deleted: ') + e.charAt(0).toLowerCase() + e.slice(1));
+    }
+    else if (bits.length) showToast(bits.join(' · '));
+    // Something changed that the list didn't know: read it again.
+    if ((res.missing || res.error) && state.cloudJobs === cj) cloudJobsLoad(true);
     if (state.view === 'sessions') render();
   });
 }
