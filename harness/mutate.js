@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V106';",
-    to:   "const APP_VERSION = 'V106';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V107';",
+    to:   "const APP_VERSION = 'V107';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -637,8 +637,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V104</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V104</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V103</strong> &middot; October 2026</p>',
+    from: '        <p><strong>V105</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V105</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V104</strong> &middot; October 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -5202,6 +5202,104 @@ const MUTATIONS = [
     from: "  const go = () => {\n    if (_syncRunning) return _syncRunning.then(go, go);\n    return fn();\n  };",
     to:   "  const go = () => {\n    return fn();\n  };",
     why:  "moving items, bringing jobs back and Remove from phone all write the sync state while a run holds its own copy, which the run then saves over them (27h2)",
+  },
+  {
+    name: "M726 (V107) the cloud delete takes a job that is on this phone",
+    file: "sync.js",
+    from: "  const ids = want.filter(id => !local.has(id));\n  res.skipped = want.length - ids.length;",
+    to:   "  const ids = want.slice();\n  res.skipped = want.length - ids.length;",
+    why:  "a job on the phone would be emptied in the cloud behind deleteSession()'s back: no stats archived, no photo sweep, and the phone's copy then reads as changed-here-deleted-there (44c)",
+  },
+  {
+    name: "M727 (V107) the cloud delete marks the row deleted but keeps its contents",
+    file: "sync.js",
+    from: "        .update({ doc: {}, fp: null, deleted: true, last_modified: now })",
+    to:   "        .update({ fp: null, deleted: true, last_modified: now })",
+    why:  "the job's contents stay in the database after the engineer was told they were deleted for good — not the row every other delete leaves (44a)",
+  },
+  {
+    name: "M728 (V107) the photos of every chosen job are marked, not only the jobs the cloud took",
+    file: "sync.js",
+    from: "    const gone = new Set(done);\n    const mine = photos.filter(p => gone.has(p.s));",
+    to:   "    const gone = new Set(ids);\n    const mine = photos.filter(p => gone.has(p.s));",
+    why:  "a refused or partial update still sends the photos of jobs that were NOT deleted to the delete ledger: a live job loses its photos (44e, 44f)",
+  },
+  {
+    name: "M729 (V107) a deleted job stays on the cleared list",
+    file: "sync.js",
+    from: "      if (kept.length !== list.length) _syncPrunedSave(kept);\n",
+    to:   "",
+    why:  "the V80 trap: the pull skips a cleared job's row for ever, so if another phone brings it back live this phone never sees it (44b)",
+  },
+  {
+    name: "M730 (V107) the job's photos are never put on the delete ledger",
+    file: "sync.js",
+    from: "        if (typeof recordTombstone === 'function') recordTombstone('photo', p.id);\n",
+    to:   "",
+    why:  "the job goes but its photos stay in the cloud — rows and files — using the account's storage for ever, with no job to find them by (44a)",
+  },
+  {
+    name: "M731 (V107) this phone's copies of the photos are not swept",
+    file: "sync.js",
+    from: "      try { sweep = Promise.resolve(photosDeleteForSessions(Array.from(gone))); } catch (e) { sweep = Promise.reject(e); }",
+    to:   "      sweep = Promise.resolve();",
+    why:  "a copy left on the phone reads as live, so the ledger never deletes the cloud photo: it stays in the cloud for ever (44h)",
+  },
+  {
+    name: "M732 (V107) the cloud delete does not hold the run lock",
+    file: "sync.js",
+    from: "    const lock = new Promise((r) => { release = r; });\n    _syncRunning = lock;",
+    to:   "    const lock = new Promise((r) => { release = r; });",
+    why:  "a run started mid-delete holds its own copy of the sync state and saves it over the delete's bookkeeping: the cleared list and the photo knowledge come back (44g)",
+  },
+  {
+    name: "M733 (V107) no run follows the delete",
+    file: "sync.js",
+    from: "      if (res.deleted || again) { try { syncPush({ force, pull: pull || !!res.deleted }); }",
+    to:   "      if (again) { try { syncPush({ force, pull }); }",
+    why:  "the photo deletes wait for whatever trigger comes next — the engineer sees the job gone and its photos stay in the cloud until then (44g)",
+  },
+  {
+    name: "M734 (V107) the deleted job is still counted as sent here",
+    file: "sync.js",
+    from: "          delete st.sent[id]; delete st.resend[id];\n",
+    to:   "          delete st.resend[id];\n",
+    why:  "the next pull meets the deleted row for a job this phone 'sent' and records it gone — the push then treats it as this phone's own delete (44b)",
+  },
+  {
+    name: "M735 (V107) DELETE is not asked for 5 or more jobs",
+    file: "settings-actions.js",
+    from: "    needWord: jobs.length >= at || certs.length > 0,",
+    to:   "    needWord: certs.length > 0,",
+    why:  "4B: a batch of plain jobs goes on two taps (44i)",
+  },
+  {
+    name: "M736 (V107) DELETE is not asked when a job has a certificate",
+    file: "settings-actions.js",
+    from: "  const certs = jobs.filter(j => j.certNo || j.locked);",
+    to:   "  const certs = jobs.filter(j => j.certNo);",
+    why:  "a locked job without a printed number goes without the word, and is left out of the warning (44i)",
+  },
+  {
+    name: "M737 (V107) the sheet's button does not check the word on the tap",
+    file: "render-review.js",
+    from: "    if (o.needWord && !(typeof cloudDeleteConfirmMatches === 'function' && cloudDeleteConfirmMatches(typed))) { sync(); return; }\n",
+    to:   "",
+    why:  "the sheet closes as if confirmed on a wrong word; only the action's own check stops the delete (44i)",
+  },
+  {
+    name: "M738 (V107) the action does not check the word itself",
+    file: "settings-actions.js",
+    from: "    if (o.needWord && !cloudDeleteConfirmMatches(typed)) return false;\n",
+    to:   "",
+    why:  "any caller that skips the sheet's check deletes on a wrong word (44i)",
+  },
+  {
+    name: "M739 (V107) the Delete… button is not wired",
+    file: "dispatch.js",
+    from: "  'cloud-delete':       () => cloudJobsDeleteSelected(),        // V107 (Stage 5 pt 3)\n",
+    to:   "",
+    why:  "the button draws and does nothing (44i)",
   },
 ];
 
