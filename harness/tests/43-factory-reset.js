@@ -401,24 +401,20 @@ module.exports = async function run() {
   });
 
   /* ------------------------------------------------------------------ 43j */
-  t.group('43j — wiring and release: optional subsystem, load order, boot placement, V106', () => {
+  t.group('43j — wiring: optional subsystem, load order, boot placement', () => {
     const idx = fs.readFileSync(path.join(APP_DIR, 'index.html'), 'utf8');
     const a = idx.indexOf('<script src="snapshots.js">'), b = idx.indexOf('<script src="reset.js">'), c = idx.indexOf('<script src="session.js">');
     t.ok(a > -1 && b > a && c > b, 'index.html: snapshots → reset → session');
     const sw = fs.readFileSync(path.join(APP_DIR, 'sw.js'), 'utf8');
     t.includes(sw, "'./reset.js',", 'precached');
-    t.includes(sw, "const CACHE_VERSION = 'pat-v106';", 'cache key pat-v106');
+    // V107: the four release pins (cache key, APP_VERSION, WELCOME_VERSION, welcome
+    // copy) retired — 44j pins the current release.
     const boot = fs.readFileSync(path.join(APP_DIR, 'boot.js'), 'utf8');
     const probe = boot.slice(boot.indexOf('const requiredFns = ['), boot.indexOf('];', boot.indexOf('const requiredFns = [')));
     t.excludes(probe, 'reset', 'NOT probed — optional subsystem (MAP rule 6)');
     const call = boot.indexOf('resetRunPending()');
     t.ok(call > boot.indexOf('_bootIntegrity = bootIntegrityOK()'), 'after the integrity check');
     t.ok(call > -1 && call < boot.indexOf('  load();'), 'before load()');
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V106', 'APP_VERSION V106');
-    t.eq(app.run('WELCOME_VERSION'), 'V106', 'welcome rolled');
-    const core = fs.readFileSync(path.join(APP_DIR, 'render-core.js'), 'utf8');
-    t.includes(core, '<strong>Reset this phone.</strong>', 'the welcome copy is this release\u2019s');
     const rjs = fs.readFileSync(path.join(APP_DIR, 'reset.js'), 'utf8');
     t.excludes(rjs, 'localStorage.clear(', 'never a blanket clear (the origin is shared)');
     // Rule 6 the other way: no reset.js — boots, no row, and a waiting marker deletes nothing.
