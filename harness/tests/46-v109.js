@@ -442,18 +442,10 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 46d */
-  await t.group('46d — release: V109, cache, welcome copy, changelog; setupLongPress gone from every app file', () => {
-    const app = boot();
-    t.eq(app.run('APP_VERSION'), 'V109', 'APP_VERSION V109');
-    t.eq(app.run('WELCOME_VERSION'), 'V109', 'welcome rolled');
-    const sw = fs.readFileSync(path.join(APP_DIR, 'sw.js'), 'utf8');
-    t.includes(sw, "const CACHE_VERSION = 'pat-v109';", 'cache key pat-v109');
-    const core = fs.readFileSync(path.join(APP_DIR, 'render-core.js'), 'utf8');
-    t.includes(core, '<strong>Cloud Storage from your jobs.</strong>', 'the welcome copy is this release’s');
-    const help = fs.readFileSync(path.join(APP_DIR, 'render-help.js'), 'utf8');
-    const v9 = help.indexOf('<p><strong>V109</strong>'), v8 = help.indexOf('<p><strong>V108</strong>'), v7 = help.indexOf('<p><strong>V107</strong>');
-    t.ok(v9 > -1 && v8 > v9 && v7 > v8, 'About: V109, V108, V107');
-    t.excludes(help, '<p><strong>V106</strong>', 'V106 rolled off');
+  // V110: the V109 release pins (version, cache, welcome copy, changelog) were
+  // retired to 47f, the same hand-on as 45j → 46d at V109. What stays is V109's
+  // own lasting change: the hold gesture has one implementation.
+  await t.group('46d — V109: setupLongPress gone from every app file', () => {
     const files = fs.readdirSync(APP_DIR).filter(f => f.endsWith('.js') && !/\.min\.js$|^supabase\.umd\.js$/.test(f));
     const users = files.filter(f => fs.readFileSync(path.join(APP_DIR, f), 'utf8').includes('setupLongPress('));
     t.deepEq(users, [], 'no app file defines or calls setupLongPress');

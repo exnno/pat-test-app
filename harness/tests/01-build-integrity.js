@@ -126,4 +126,41 @@ module.exports = function run() {
       'a mutation its hinted file does not catch still runs the whole suite');
     t.includes(mut, "const FULL = process.argv.includes('--full');", '--full turns both shortcuts off');
   });
+
+  // V110 (spec 4A): the shortcut only works if a mutation's `why` names a real
+  // test group, so keep that true. The mutation list is read by running
+  // mutate.js up to (not including) its main() in a sandbox — the runner itself
+  // is untouched. A hint-shaped token is anything hintFiles() would act on.
+  function loadMutations() {
+    const src = fs.readFileSync(path.join(APP_DIR, 'harness', 'mutate.js'), 'utf8');
+    const cut = src.indexOf('\nfunction main()');
+    const body = src.slice(0, cut).replace(/^#!.*\n/, '');
+    const box = { require, __dirname: path.join(APP_DIR, 'harness'), process, console, module: {} };
+    vm.runInNewContext(body + '\n;module.exports = { MUTATIONS, hintFiles };', box);
+    return box.module.exports;
+  }
+  const HINT = /\b(\d\d)[a-z]\d?\b/g;
+  const groupIds = new Set();
+  for (const f of fs.readdirSync(path.join(APP_DIR, 'harness', 'tests')).filter(x => x.endsWith('.js'))) {
+    const src = fs.readFileSync(path.join(APP_DIR, 'harness', 'tests', f), 'utf8');
+    for (const m of src.matchAll(/\bgroup\(\s*['"`](\d\d[a-z]\d?) /g)) groupIds.add(m[1]);
+  }
+
+  t.group('01j — every test group a mutation names exists', () => {
+    const { MUTATIONS } = loadMutations();
+    t.ok(MUTATIONS.length > 700 && groupIds.size > 500, `read ${MUTATIONS.length} mutations and ${groupIds.size} test groups`);
+    const bad = [];
+    for (const m of MUTATIONS) for (const x of String(m.why || '').matchAll(HINT)) {
+      if (!groupIds.has(x[0])) bad.push(`${m.name.split(' ')[0]} names "${x[0]}"`);
+    }
+    t.deepEq(bad, [], 'a hint naming no group sends its mutation down the slow path (or to the wrong file) without a word — rename it to the group that catches it, or reword');
+  });
+
+  t.group('01k — every mutation names the test group that catches it', () => {
+    // V110 proved a group for every one of the 376 that had none — none is left
+    // over, so the rule is simply: all of them, from now on.
+    const { MUTATIONS, hintFiles } = loadMutations();
+    const untagged = MUTATIONS.filter(m => !hintFiles(m).length).map(m => m.name.split(' ')[0]);
+    t.deepEq(untagged, [], 'a mutation with no test group in its `why` — end it with the group that catches it, e.g. "(47b)"');
+  });
 };
