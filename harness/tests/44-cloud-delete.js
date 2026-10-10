@@ -569,20 +569,12 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 44j */
-  await t.group('44j — release: V107, cache, welcome copy, changelog, dispatch, constants', async () => {
+  await t.group('44j — V107 constants and dispatch', async () => {
+    // V108: the release pins (APP_VERSION, WELCOME_VERSION, cache key, welcome
+    // copy, changelog order) retired — 45j pins the current release.
     const app = boot();
-    t.eq(app.run('APP_VERSION'), 'V107', 'APP_VERSION V107');
-    t.eq(app.run('WELCOME_VERSION'), 'V107', 'welcome rolled');
     t.eq(app.run('CLOUD_DELETE_WORD'), 'DELETE', 'the word');
     t.eq(app.run('CLOUD_DELETE_TYPE_AT'), 5, 'typed from 5 jobs (4B)');
-    const sw = fs.readFileSync(path.join(APP_DIR, 'sw.js'), 'utf8');
-    t.includes(sw, "const CACHE_VERSION = 'pat-v107';", 'cache key pat-v107');
-    const core = fs.readFileSync(path.join(APP_DIR, 'render-core.js'), 'utf8');
-    t.includes(core, '<strong>Delete old jobs from the cloud.</strong>', 'the welcome copy is this release’s');
-    const help = fs.readFileSync(path.join(APP_DIR, 'render-help.js'), 'utf8');
-    const v7 = help.indexOf('<p><strong>V107</strong>'), v6 = help.indexOf('<p><strong>V106</strong>');
-    t.ok(v7 > -1 && v6 > v7, 'About: V107 on top of V106');
-    t.excludes(help, '<p><strong>V104</strong>', 'V104 rolled off');
     const disp = fs.readFileSync(path.join(APP_DIR, 'dispatch.js'), 'utf8');
     t.includes(disp, "'cloud-delete':", 'dispatch wires cloud-delete');
   });
