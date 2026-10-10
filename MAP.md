@@ -224,6 +224,11 @@ filters match and answers its `select`; the older fakes (16–43) still answer a
 PATCH with 204 and change nothing — a test of an UPDATE must use 44's.
 ⚠ V108: group 45's fake (44's, extended) answers `doc_bytes` (the JSON's byte
 length) and the view's `b`, and `srv.noV108` answers "column does not exist".
+⚠ V108 harness amendment — mutate.js speed-ups: a mutation's own test file (named
+in its `why`, e.g. "(45a)") runs alone first, trusted only if it passed alone on
+unmutated code; otherwise the full suite runs with PATGO_BAIL=1 (run.js stops after
+the first failing FILE, never reorders). `--full` = the old behaviour (every failing
+group listed). Guarded by 01i, M761–M763.
 See `harness/README.md`.
 
 ---

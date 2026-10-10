@@ -76,8 +76,12 @@ instead of trusting its fingerprints. Not a version of its own.
   first draft briefly made M150 10× and M401 2× — caught by the anchor scan and
   rewritten; that scan is the only guard until DEFENCE 3 exists.)
 - The 10 s preview guard in _syncThumbUpload (sync.js) has no test of its own.
-- Option: mutate.js stops each suite at the first failure (unmeasured; guess
-  1/3–1/2 off the sweep). Runner change: own release.
+- ~~Option: mutate.js stops each suite at the first failure~~ — DONE as the V108
+  harness amendment (10 Oct): bail after the first failing test file, plus the
+  mutation's own test file run first. Measured: V108's 24 mutations ~20 min → 28 s;
+  an older batch without group hints (M30x) 6.5 min → 1.9 min. `--full` keeps
+  the old behaviour. Further speed-up available: add the test group to the `why`
+  of the ~380 older mutations that don't name one (they then get the 1-file path).
 - Option: move run-mutations.sh into harness/ so it versions with the repo.
 
 ### V106 residuals (known, accepted)
