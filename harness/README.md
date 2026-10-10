@@ -51,6 +51,8 @@ starting from nothing.
 | `fixture.js` | Standard app states, built through real app functions. |
 | `run.js` | Entry point. Picks up `tests/*.js` automatically. |
 | `mutate.js` | Deliberately breaks the app and checks the suite goes red. |
+| `sheets.js` | V110. Finds every bottom sheet in the app source, for group 47. |
+| `sheet-register.js` | V110. The sheets with no `.sheet-scroll`, each with the reason nothing in it grows. |
 | `tests/` | The standing assertions. |
 
 ---
@@ -64,7 +66,10 @@ Adding coverage for a release:
 
 1. Add `tests/NN-thing.js` (or a group to an existing file). `run.js` finds it.
 2. **Add a matching mutation to `mutate.js`.** An assertion nobody has tried to
-   break is an assertion nobody knows works.
+   break is an assertion nobody knows works. **End its `why` with the group that
+   catches it**, e.g. `"(47b)"` — the runner runs that one file first, and 01k
+   fails any mutation without one. Its `from` must occur exactly once in the
+   file (check the count; the runner breaks the FIRST match).
 3. Run both. Green suite *and* zero survivors, or it isn't done.
 4. **Zero ABORTS too.** An abort means the mutation's anchor text no longer
    exists, so nothing was broken and nothing was proved — it is not a pass, and
@@ -72,6 +77,9 @@ Adding coverage for a release:
    are anchored on text that rolls every release and will abort every time if
    nobody re-points them: **M66** (`APP_VERSION`) and **M82** (the oldest About
    changelog entry). Re-point them as part of the release, not afterwards.
+5. **A new bottom sheet:** mark the part that can grow `.sheet-scroll` (and what
+   sits below it `.sheet-pin`), or add it to `sheet-register.js` with the reason
+   nothing in it grows. Group 47 fails until one of the two is true.
 
 ### Before you write an assertion, ask whether it could pass on broken code
 
