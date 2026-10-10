@@ -110,4 +110,20 @@ module.exports = function run() {
       t.notOk(/(?<![.\w])(alert|confirm|prompt)\s*\(/.test(src), `${f} calls no native dialog`);
     }
   });
+
+  // V108 harness amendment: the mutation runner's two speed-ups. Neither may
+  // ever turn a survivor into "caught": a bail only stops AFTER a failure, a
+  // hinted file is only trusted once it has passed on unmutated code, and a
+  // mutation the hint misses still runs the whole suite. Source guards — the
+  // runner cannot run itself headlessly from inside the suite.
+  t.group('01i — the mutation runner\'s speed-ups cannot hide a survivor', () => {
+    const run = fs.readFileSync(path.join(APP_DIR, 'harness', 'run.js'), 'utf8');
+    t.includes(run, "const bail = process.env.PATGO_BAIL === '1';", 'run.js bails only when the mutation runner asks');
+    t.includes(run, 'if (bail && t.failures.length) break;', '…and only after a failure');
+    const mut = fs.readFileSync(path.join(APP_DIR, 'harness', 'mutate.js'), 'utf8');
+    t.includes(mut, 'if (!runFileFails(tmp, f)) goodHints.add(f);', 'a hinted test file is trusted only once it passes on unmutated code');
+    t.includes(mut, 'hintFiles(m).some(f => goodHints.has(f) && runFileFails(tmp, f)))\n      || runSuiteExpectingFailure(tmp, !FULL);',
+      'a mutation its hinted file does not catch still runs the whole suite');
+    t.includes(mut, "const FULL = process.argv.includes('--full');", '--full turns both shortcuts off');
+  });
 };
