@@ -516,8 +516,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V108';",
-    to:   "const APP_VERSION = 'V108';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V109';",
+    to:   "const APP_VERSION = 'V109';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can',
   },
   {
@@ -637,8 +637,8 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V106</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V106</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V105</strong> &middot; October 2026</p>',
+    from: '        <p><strong>V107</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V107</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V106</strong> &middot; October 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later',
   },
 
@@ -5467,6 +5467,76 @@ const MUTATIONS = [
     from: "\n      || runSuiteExpectingFailure(tmp, !FULL);",
     to:   "\n      || false;",
     why:  "a mutation only some other file catches would score as SURVIVED \u2014 or, worse, a hint shape like this could score as caught (01i)",
+  },
+  {
+    name: "M764 (V109) the cloud tab's top row loses Cloud Storage once the list is read",
+    file: "render-review.js",
+    from: "      <div class=\"cloud-head\">${storageBtn}${selectBtn}</div>",
+    to:   "      <div class=\"cloud-head\">${selectBtn}</div>",
+    why:  "2A: the link shows only before the list is read (46a 46b)",
+  },
+  {
+    name: "M765 (V109) no Cloud Storage before the cloud list is read",
+    file: "render-review.js",
+    from: "    return `<div class=\"cloud-tab\"><div class=\"cloud-head\">${storageBtn}</div>${msg}</div>`;",
+    to:   "    return `<div class=\"cloud-tab\">${msg}</div>`;",
+    why:  "2A: always there \u2014 not only once the list has been read (46a)",
+  },
+  {
+    name: "M766 (V109) Cloud Storage stays while ticking jobs",
+    file: "render-review.js",
+    from: "  const storageBtn = (cj.selecting || typeof cloudStoreOpen !== 'function') ? ''",
+    to:   "  const storageBtn = (typeof cloudStoreOpen !== 'function') ? ''",
+    why:  "2A: hidden while selecting, so it never sits beside the selection bar (46a)",
+  },
+  {
+    name: "M767 (V109) the cloud tab's Cloud Storage button is wired to the wrong action",
+    file: "render-review.js",
+    from: "<button class=\"pm-look-link cloud-storage-link\" data-action=\"cs-open\">",
+    to:   "<button class=\"pm-look-link cloud-storage-link\" data-action=\"cloud-refresh\">",
+    why:  "the button draws and only re-reads the list \u2014 the V67 shape; 46b taps the DRAWN button (46a 46b)",
+  },
+  {
+    name: "M768 (V109) Cloud Storage opened from the Jobs screen goes back to Phone Storage",
+    file: "settings-actions.js",
+    from: "  _cloudStoreReset(_MGR_RETURN_VIEWS.indexOf(state.view) !== -1 && state.view !== 'cloudStorage' ? state.view : 'settingsStorage');",
+    to:   "  _cloudStoreReset(_MGR_RETURN_VIEWS.indexOf(state.view) !== -1 && state.view !== 'cloudStorage' && state.view !== 'sessions' ? state.view : 'settingsStorage');",
+    why:  "Back from Cloud Storage must land on the cloud tab it was opened from (46b)",
+  },
+  {
+    name: "M769 (V109) the tab icon is still the 192 px app icon",
+    file: "index.html",
+    from: '  <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">',
+    to:   '  <link rel="icon" href="icon-192.png">',
+    why:  "4A: the two-line logo is a blur at 16 px (46c)",
+  },
+  {
+    name: "M770 (V109) the home-screen icon is still the 192 px file",
+    file: "index.html",
+    from: '  <link rel="apple-touch-icon" href="apple-touch-icon.png">',
+    to:   '  <link rel="apple-touch-icon" href="icon-192.png">',
+    why:  "4A: iOS asks for 180 px; the proper file sat unused since July (46c)",
+  },
+  {
+    name: "M771 (V109) favicon.ico is not precached",
+    file: "sw.js",
+    from: "  './favicon.ico',\n",
+    to:   "",
+    why:  "offline, the tab shows no icon (46c)",
+  },
+  {
+    name: "M772 (V109) the cache key is not bumped",
+    file: "sw.js",
+    from: "const CACHE_VERSION = 'pat-v109';",
+    to:   "const CACHE_VERSION = 'pat-v108';",
+    why:  "every installed phone stays on V108 \u2014 the classic deploy miss (46d)",
+  },
+  {
+    name: "M773 (V109) setupLongPress comes back",
+    file: "utils.js",
+    from: "// v53: Test Readings \u2014 validate/normalise",
+    to:   "function setupLongPress(element, ms, cb) { if (element) element.addEventListener('pointerdown', () => setTimeout(cb, ms || 2000)); }\n\n// v53: Test Readings \u2014 validate/normalise",
+    why:  "a second hold implementation is the defect 13n exists to refuse (13n 46d)",
   },
 ];
 
