@@ -110,6 +110,14 @@ alter table public.sessions add column if not exists n_items integer
   generated always as (public.job_item_count(doc)) stored;
 alter table public.sessions add column if not exists n_fails integer
   generated always as (public.job_fail_count(doc)) stored;
+-- V108: each job's size (its contents as text) for Settings → Data → Cloud
+-- Storage. Existing projects: supabase/v108-storage.sql (plus self-checks).
+create or replace function public.job_doc_bytes(d jsonb)
+returns integer language sql immutable set search_path = '' as $$
+  select coalesce(octet_length(d::text), 0)
+$$;
+alter table public.sessions add column if not exists doc_bytes integer
+  generated always as (public.job_doc_bytes(doc)) stored;
 
 -- [v1.2] updated_at must move on EVERY update, not just insert. The sync pull
 -- asks for "rows changed since X" by updated_at; a default alone only stamps
@@ -197,10 +205,11 @@ grant  select, insert, update, delete on public.sessions, public.records, public
 
 -- V93: photos per job for the cloud job cards. security_invoker: it reads the
 -- photos table with the READER's rights, so "own photos" decides what it can
--- count. Isolation checks 8a–8c.
+-- count. Isolation checks 8a–8d. V108: + b, the bytes of those photos (last
+-- column — a view may only gain columns at the end).
 create or replace view public.session_photo_counts
   with (security_invoker = true) as
-  select user_id, session_id, count(*)::integer as n
+  select user_id, session_id, count(*)::integer as n, coalesce(sum(bytes), 0)::bigint as b
   from public.photos
   where deleted = false
   group by user_id, session_id;

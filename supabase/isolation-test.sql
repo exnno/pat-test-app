@@ -10,6 +10,7 @@
 -- say PASS. Any FAIL: do not promote, and bring the output to the next chat.
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
+-- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
 -- V89: CHECKS 4e/4f NEED ONE PREVIEW FROM ACCOUNT A — any photo uploaded by a
 -- V89 phone has one (or wait for a V89 phone holding older photos to add them).
 -- V88: CHECK 4c NEEDS ONE REAL PHOTO FROM ACCOUNT A. Before running, sign in
@@ -31,6 +32,7 @@ declare
   email_b text := 'CHANGE-ME-B@example.com';   -- ← account B (a second address)
   a uuid; b uuid;
   n int; ok boolean; msg text; plan_after text;
+  j bigint; k int;   -- V108 (8d)
   real_a text;   -- V88: one real photo file of A's, if there is one
   thumb_a text;  -- V89: one real preview file of A's, if there is one
   res text[] := '{}';
@@ -250,13 +252,29 @@ begin
     res := res || array['8a|B cannot count A''s photos|FAIL|' || sqlerrm];
   end;
   begin
-    insert into public.photos (id, user_id, session_id, item_id, storage_path, last_modified)
-    values ('iso-test-B', b, 'iso-test-B', 'x', b::text || '/iso-test-B.jpg', now());
+    insert into public.photos (id, user_id, session_id, item_id, storage_path, bytes, last_modified)
+    values ('iso-test-B', b, 'iso-test-B', 'x', b::text || '/iso-test-B.jpg', 1234, now());
     select coalesce(sum(v.n), 0) into n from public.session_photo_counts v where v.session_id = 'iso-test-B';
     res := res || array['8b|control: B''s own photo is counted|'
                   || case when n = 1 then 'PASS|' else 'FAIL|counted ' || n end];
   exception when others then
     res := res || array['8b|control: B''s own photo is counted|FAIL|' || sqlerrm];
+  end;
+  -- 8d. (V108) The same view's photo SIZES: B adds up none of A's bytes, and
+  -- — the control — B's own photo (1234 bytes, 8b) IS added up. The view is
+  -- read through to_jsonb so a project without v108-storage.sql run gives a
+  -- named FAIL rather than stopping the whole test.
+  begin
+    select coalesce(sum((to_jsonb(v)->>'b')::bigint), -1) into n from public.session_photo_counts v where v.session_id = 'iso-test-A';
+    select coalesce(sum((to_jsonb(v)->>'b')::bigint), 0) into j from public.session_photo_counts v where v.session_id = 'iso-test-B';
+    select count(*) into k from public.session_photo_counts v where v.session_id = 'iso-test-B' and to_jsonb(v) ? 'b';
+    res := res || array['8d|B cannot add up A''s photo sizes; B''s own are|'
+                  || case when k = 0 then 'FAIL|photo sizes missing — run supabase/v108-storage.sql'
+                          when n = -1 and j = 1234 then 'PASS|'
+                          when n <> -1 then 'FAIL|B saw ' || n || ' bytes of A''s photos'
+                          else 'FAIL|B''s own photo added up to ' || j end];
+  exception when others then
+    res := res || array['8d|B cannot add up A''s photo sizes; B''s own are|FAIL|' || sqlerrm];
   end;
 
   -- 5. B cannot change B's own plan (no update route on profiles at all).
