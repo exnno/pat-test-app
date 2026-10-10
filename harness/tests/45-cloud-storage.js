@@ -591,19 +591,10 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 45j */
-  await t.group('45j — release: V108, cache, welcome copy, changelog, dispatch, constant, SQL files', async () => {
+  // V109: the release pins (version, cache, welcome, changelog) moved to 46d.
+  await t.group('45j — V108 constant, dispatch and SQL files', async () => {
     const app = boot();
-    t.eq(app.run('APP_VERSION'), 'V108', 'APP_VERSION V108');
-    t.eq(app.run('WELCOME_VERSION'), 'V108', 'welcome rolled');
     t.eq(app.run('CLOUD_STORAGE_TOP'), 10, 'ten biggest (3A)');
-    const sw = fs.readFileSync(path.join(APP_DIR, 'sw.js'), 'utf8');
-    t.includes(sw, "const CACHE_VERSION = 'pat-v108';", 'cache key pat-v108');
-    const core = fs.readFileSync(path.join(APP_DIR, 'render-core.js'), 'utf8');
-    t.includes(core, '<strong>See your cloud space.</strong>', 'the welcome copy is this release’s');
-    const help = fs.readFileSync(path.join(APP_DIR, 'render-help.js'), 'utf8');
-    const v8 = help.indexOf('<p><strong>V108</strong>'), v7 = help.indexOf('<p><strong>V107</strong>'), v6 = help.indexOf('<p><strong>V106</strong>');
-    t.ok(v8 > -1 && v7 > v8 && v6 > v7, 'About: V108, V107, V106');
-    t.excludes(help, '<p><strong>V105</strong>', 'V105 rolled off');
     const disp = fs.readFileSync(path.join(APP_DIR, 'dispatch.js'), 'utf8');
     for (const a of ['cs-open', 'cs-back', 'cs-refresh', 'cs-select-toggle', 'cs-tap', 'cs-delete', 'cs-photos']) t.includes(disp, `'${a}':`, 'dispatch wires ' + a);
     const sql = fs.readFileSync(path.join(APP_DIR, 'supabase', 'v108-storage.sql'), 'utf8');
