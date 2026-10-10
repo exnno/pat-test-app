@@ -1,4 +1,4 @@
-# PATGo — Code Map (V109)
+# PATGo — Code Map (V110)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -113,6 +113,12 @@ is discoverable from the file you happen to be editing.
     `overflow-y: auto` with `flex: 1 1 auto` and no `min-height: 0` — including
     rules for sheets that do not exist yet.
 
+    V110: harness 47 covers the other half — a sheet whose growing body was never
+    marked has no CSS rule to inspect. Every sheet the finder (`harness/sheets.js`)
+    sees must carry `.sheet-scroll` or be named in `harness/sheet-register.js`
+    with the reason nothing in it grows. **A new sheet fails 47b until you decide
+    which.** A register entry for a sheet that is gone, or now scrolls, fails 47c.
+
 15. **Banned: locking body scroll while a sheet is open.** Same family as the
     `100dvh + overflow:hidden` layout rolled back in v12.1. Harness 11i asserts
     on the shipped source, comments stripped.
@@ -196,7 +202,8 @@ property-bound handler could only be tested by hand-calling it — the V67
 "listener never bound" blind spot. Do not narrow it back.
 ⚠ Two mutations are anchored on text that ROLLS every release and abort silently
 if not re-pointed: **M66** (`APP_VERSION` in config.js) and **M82** (the oldest
-About changelog entry). Re-point both as part of the release, and treat a non-zero
+About changelog entry). (M772, the cache key, is anchored on the stable
+`'pat-v` prefix since V110 and never needs it.) Re-point both as part of the release, and treat a non-zero
 abort count as a failed run — an aborted mutation is not a caught one.
 ⚠ V95: pull fixtures date their jobs with `RECENT_DATE` (fixture.js). V93's
 30-day window makes a fixed date a time bomb — group 17 went red on 2 Oct with
@@ -224,13 +231,24 @@ PATCH with 204 and change nothing — a test of an UPDATE must use 44's.
 ⚠ V108: group 45's fake (44's, extended) answers `doc_bytes` (the JSON's byte
 length) and the view's `b`, and `srv.noV108` answers "column does not exist".
 ⚠ V109: group 46 copies 45's helpers and taps the cloud tab's DRAWN button
-(`tapRendered` reads its data-action from the markup). Release pins live in the
-newest group (46d); 45j keeps only V108's constant, dispatch and SQL checks.
+(`tapRendered` reads its data-action from the markup). 46d keeps only the
+setupLongPress check since V110.
+⚠ V110: release pins live in the newest group (47f). `sheets.js` = the sheet
+finder (a small JS scanner: which template a sheet sits in, where a statement
+ends — it follows `${var}` and top-level helper calls into the body). Keys are
+`file · aria-label`, or `file · fn()` for a templated label (+ ` #2`).
+`sheet-register.js` = the sheets with no scroller and why. Groups 47a–47e.
 ⚠ V108 harness amendment — mutate.js speed-ups: a mutation's own test file (named
 in its `why`, e.g. "(45a)") runs alone first, trusted only if it passed alone on
 unmutated code; otherwise the full suite runs with PATGO_BAIL=1 (run.js stops after
 the first failing FILE, never reorders). `--full` = the old behaviour (every failing
 group listed). Guarded by 01i, M761–M763.
+⚠ V110: every mutation's `why` names the test group that catches it ("(47b)") —
+01j fails on a group that does not exist, 01k on any mutation without one (all
+783 had one proved at V110 — the old 376 by running the named file alone with
+the break in place). Every mutation's `from` is unique in its file (the 11
+repeats were re-anchored in V110); the anchor scan still runs by hand — the
+runner does not refuse a repeat yet (DEFENCE 3, BACKLOG).
 See `harness/README.md`.
 
 ---

@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">✨ Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V109: rolled forward — V109 on top, V106 dropped. -->
+      <!-- v8: rolling 3-version changelog. V110: rolled forward — V110 on top, V107 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V110</strong> &middot; October 2026</p>
+        <p class="muted">Log again (hold Copy last): a long note in the preview now scrolls, so the number box and Add stay on screen. Every pop-up in the app is now checked automatically to make sure it can scroll to its buttons.</p>
         <p><strong>V109</strong> &middot; October 2026</p>
         <p class="muted">Cloud Storage is now one tap from your jobs: Jobs &rarr; &#9729; In the cloud &rarr; &#9729; Cloud Storage. It&rsquo;s still in Settings &rarr; Data too. On a computer, the browser tab shows a clearer PATGo icon.</p>
         <p><strong>V108</strong> &middot; October 2026</p>
         <p class="muted">Cloud Storage: Settings &rarr; Data &rarr; Cloud Storage shows how much space your jobs and photos take in the cloud, and your ten biggest jobs. Select ones that aren&rsquo;t on this phone to delete them from the cloud, with the same check as the cloud tab.</p>
-        <p><strong>V107</strong> &middot; October 2026</p>
-        <p class="muted">Delete jobs from the cloud: Jobs &rarr; &#9729; In the cloud &rarr; Select, tick the jobs, then Delete&hellip;. They go from the cloud and any other phone that has them, with their photos. You see every job and its certificate first; for 5 or more, or any with a certificate, you type DELETE. No copy is kept.</p>
 
 
         </div>

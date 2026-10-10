@@ -240,9 +240,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Cloud Storage from your jobs.</strong> If you use the cloud: Jobs &rarr; &#9729; In the cloud now has <strong>&#9729; Cloud Storage &rsaquo;</strong> at the top &mdash; see how much space your jobs and photos take without going into Settings. Back brings you straight back to the list.</li>
-        <li><strong>Still in Settings too.</strong> Settings &rarr; Data &rarr; Cloud Storage works as before.</li>
-        <li><strong>A clearer tab icon.</strong> On a computer, the browser tab now shows the PATGo plug, so it&rsquo;s easy to spot.</li>
+        <li><strong>Long notes in Log again.</strong> When you hold <strong>Copy last</strong> to log more of the same item, a long note in the preview now scrolls, so the number box and <strong>Add</strong> always stay on screen.</li>
+        <li><strong>Pop-ups checked.</strong> Every pop-up in the app is now checked automatically, so one with a long list or long notes can always scroll to its buttons.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -1822,12 +1821,14 @@ function renderEntry() {
   // identical items. Same bottom-sheet pattern as Multi Pick and the preset
   // switcher.
   //
-  // ⚠ No .sheet-scroll here, and that is correct rather than an omission: every
-  // part of this sheet is fixed — four preset buttons, one label, one input, one
-  // Add button. Nothing in it grows from user data, which is the test MAP rule 14
-  // actually applies. It DOES raise the keyboard for the custom box, so it is an
-  // E-group sheet in the V76 audit's terms and inherits the v75 keyboard vars
-  // from .fail-sheet without opting out of them.
+  // V110: the notes preview is the one part that grows from user data — an
+  // item's notes have no length limit — so IT is the .sheet-scroll, and the three
+  // controls under it are .sheet-pin (MAP rule 14: a sibling below a scroller
+  // compresses unless pinned, and the custom box + Add is what a long note would
+  // otherwise push off the screen). Until V110 this note said nothing here grows;
+  // the buttons, label and input are fixed, but the preview never was. The sheet
+  // guard (harness 47) found it. It raises the keyboard for the custom box, so it
+  // still inherits the v75 keyboard vars from .fail-sheet without opting out.
   //
   // The preview line is load-bearing, not decoration. This sheet duplicates the
   // source item's notes, which is right for a fail (the reason lives there) and
@@ -1839,7 +1840,7 @@ function renderEntry() {
     const src = sess.items[sess.items.length - 1];
     const srcNotes = String(src.notes || '').trim();
     const notesLine = srcNotes
-      ? `<p class="repeat-preview-notes">Notes copied too: “${escapeHTML(srcNotes)}”</p>`
+      ? `<p class="repeat-preview-notes sheet-scroll">Notes copied too: “${escapeHTML(srcNotes)}”</p>`
       : '';
     repeatSheet = `
       <div class="modal-backdrop" id="repeat-backdrop" data-action="repeat-close"></div>
@@ -1852,13 +1853,13 @@ function renderEntry() {
         </div>
         <p class="multipick-sheet-hint">Adds more copies of <strong>${escapeHTML(src.itemType)} · ${escapeHTML(capitalise(src.result))}</strong>, numbered on from the last one and using the location on the form.</p>
         ${notesLine}
-        <div class="repeat-count-grid">
+        <div class="repeat-count-grid sheet-pin">
           ${REPEAT_PRESET_COUNTS.map(n => `
             <button class="repeat-count-btn" data-action="repeat-fire" data-arg="${n}">+${n}</button>
           `).join('')}
         </div>
-        <label class="label" for="repeat-custom">Or a number (1–${REPEAT_MAX_N})</label>
-        <div class="repeat-custom-row">
+        <label class="label sheet-pin" for="repeat-custom">Or a number (1–${REPEAT_MAX_N})</label>
+        <div class="repeat-custom-row sheet-pin">
           <input class="input" id="repeat-custom" type="number" inputmode="numeric" min="1" max="${REPEAT_MAX_N}" placeholder="e.g. 12">
           <button class="btn-primary repeat-custom-add" id="repeat-custom-add" data-action="repeat-fire-custom">Add</button>
         </div>

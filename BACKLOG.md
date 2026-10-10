@@ -8,12 +8,33 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V109
-V109 = the cloud-tab link to Cloud Storage, the favicon set and removing
-`setupLongPress` (spec 1A — the housekeeping release split). Next: V110 = the
-general sheet-markup guard on its own, spec ALREADY LOCKED at the V109 round
-(5A register, 6A fix one-class gaps) — see "General sheet-markup guard" below.
-Then Stage 11. Full order: roadmap v4.22.
+### Next after V110
+V110 = the general sheet-markup guard (5A register, 6A — one gap fixed: Log
+again's notes preview) plus mutation housekeeping (spec 1A 2A 3A 4A 5B 6A 7A):
+every mutation's `why` names its test group where one could be proved, 01j/01k
+keep it so, the 11 repeated anchors re-anchored. Next: Stage 11 (organisation
+foundation, own spec round). Full order: roadmap v4.23.
+
+### V110 residuals (known, accepted)
+- Every mutation now names its group (01k) — all 376 untagged ones were proved
+  by running the named file alone with the break in place. Timed: the named file
+  alone takes under a second for most (median 0.8 s, 90% under 2.5 s). Slowest:
+  M132 (15x), ~60 s, because group 15 waits out timeouts — still no slower than
+  the whole suite. M133 is tagged 15c, not the 45 file the search found first
+  (45 catches it only by timing out, 3+ minutes).
+- The register's reasons are a person's reading of the markup; 47 only checks
+  each sheet has one. A listed sheet that later gains a list or user text passes
+  until someone re-reads its reason (the register's header says so).
+- The sheet finder reads `${var}` and helper calls one way only; a sheet whose
+  scroller lives in a variable assigned in ANOTHER function would read as
+  unmarked (fails safe — 47b goes red, it never goes green wrongly).
+- Re-anchoring moved three mutations onto the copy their names describe
+  (M150 the job upload, M263 the jobs pager, M300 the code box). The copies they
+  used to break are now broken by nothing: `syncVerifyJobs`' error check
+  (sync.js) and `settingsCategoryBlurb`'s locked line (render-settings.js);
+  the records pager's dedupe is still M264's.
+- DEFENCE 3 (the runner refusing a repeated anchor) is still not built — the
+  anchor scan runs by hand. All 0 repeats at V110.
 
 ### V109 residuals (known, accepted)
 - The tab icon is checked by eye only (46c proves the file holds 16/32/48 and is
@@ -76,20 +97,17 @@ synced for longer than that re-checks every job it holds against the cloud
 instead of trusting its fingerprints. Not a version of its own.
 
 ### From the V106 harness amendment (8 Oct) — carried in at V107
-- 11 mutations anchor on text that occurs more than once in their file: M16,
-  M116, M127, M150 (8×), M200 (3×), M263, M268 (3×), M300, M547, M580, M586.
-  All caught, but each may break a different copy than its author meant (M407's
-  fault). Own harness release: re-anchor each, and make the runner abort on a
-  non-unique anchor (DEFENCE 3), as it already aborts on a missing one. (V107's
-  first draft briefly made M150 10× and M401 2× — caught by the anchor scan and
-  rewritten; that scan is the only guard until DEFENCE 3 exists.)
+- ~~11 mutations anchor on text that occurs more than once~~ — RE-ANCHORED IN
+  V110 (5B). Still open: make the runner abort on a non-unique anchor
+  (DEFENCE 3), as it already aborts on a missing one; the anchor scan is the only
+  guard until then.
 - The 10 s preview guard in _syncThumbUpload (sync.js) has no test of its own.
 - ~~Option: mutate.js stops each suite at the first failure~~ — DONE as the V108
   harness amendment (10 Oct): bail after the first failing test file, plus the
   mutation's own test file run first. Measured: V108's 24 mutations ~20 min → 28 s;
   an older batch without group hints (M30x) 6.5 min → 1.9 min. `--full` keeps
-  the old behaviour. Further speed-up available: add the test group to the `why`
-  of the ~380 older mutations that don't name one (they then get the 1-file path).
+  the old behaviour. ~~Further speed-up: add the test group to the `why` of the
+  ~380 older mutations~~ — DONE IN V110 (see V110 residuals for the ones left).
 - Option: move run-mutations.sh into harness/ so it versions with the repo.
 
 ### V106 residuals (known, accepted)
@@ -562,7 +580,11 @@ in the stylesheet than the shell's `overflow: hidden`, and its header scrolls aw
 with the content. Correct by coincidence. Photo count is capped so it cannot grow
 unboundedly; tidy it if that sheet is ever touched for another reason.
 
-### General sheet-markup guard — the part of the audit not built
+### ~~General sheet-markup guard — the part of the audit not built~~ — SHIPPED IN V110
+Built as harness 47 + `harness/sheets.js` + `harness/sheet-register.js`. 44
+sheets found; 25 scroll, 19 registered with reasons, 1 gap fixed (Log again's
+notes preview). The spec notes below are kept for the reasoning.
+
 
 **V110 — spec LOCKED at the V109 round (Peter, 10 Oct: defaults).** Split from the
 housekeeping release (1A) so it rides alone.
@@ -865,7 +887,7 @@ survives those documents being archived.
 | ~~"Log this item ×N"~~ | **SHIPPED V77.** Built exactly as the proposed resolution said — a hold on Copy-last, no new control. Counts +2/+3/+5/+10 or a custom number capped at 20 |
 | Weekly/batch PDF export | Parked pending a direct tester ask — good idea, but wanted from testers before committing time |
 | Per-instrument "in service" toggle | Only if overdue calibration nags on a retired instrument prove annoying in practice |
-| ~~Sheet-scroller audit~~ | **SHIPPED V76.** The general sheet-markup guard, the part deliberately not built, is still open above |
+| ~~Sheet-scroller audit~~ | **SHIPPED V76.** The general sheet-markup guard followed in V110 |
 | S4 asset ID already used at this site | **Very low priority, considered not needed (Peter, V95 round).** Peter gives every item a new number, and the same-job duplicate check already blocks repeats within a job. If a customer who numbers each site from 1 asks: a phone-only check against same-site jobs in the last 30 days needs no SQL (V95 round option B); a cloud-wide check would need a generated `asset_nos` column |
 | Scan into other fields (location, item type) | **Liked, not a priority (Peter, V102 round).** Raised implicitly by V67. Currently a scan is refused when any other text field has focus (the deliberate V65 "known limit"). Only worth revisiting if Peter starts labelling locations |
 

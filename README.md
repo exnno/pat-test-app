@@ -122,7 +122,7 @@ mutation survives **or** fails to apply. Both must be clean before a release, an
 
 ### Before changing anything
 
-1. Read `MAP.md`'s cross-cutting rules, then the current `PAThandoff_vNN.md`.
+1. Read `MAP.md`'s cross-cutting rules, then the current handoff.
 2. **Fetch the live repo and byte-compare.** The source of truth is what is
    deployed, not what a document says about it. Code wins over docs.
 3. Establish a green harness baseline *first*, so a red result later is
@@ -156,9 +156,11 @@ separately from behaviour changes.
   behaviour release
 - About changelog rolled — three versions, oldest dropped (`render-help.js`)
 - `MAP.md` accurate, `FEATURES.md` gains a section, `BACKLOG.md` reconciled
-- New assertions in `harness/tests/`, and **a matching mutation for each**
+- New assertions in `harness/tests/`, and **a matching mutation for each**, its
+  `why` ending with the test group that catches it (harness 01k)
 - Re-point the release-anchored mutations **M66** and **M82**, or they abort
-- A new `PAThandoff_vNN.md`, including the post-commit test checklist
+- The handoff updated (it lives in the Claude project, never here), including the
+  post-commit test checklist
 - From v79: `supabase/isolation-test.sql` run in the test project, all PASS,
   result recorded in the handoff — before any promotion to `Release`
 
