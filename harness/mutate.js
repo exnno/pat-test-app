@@ -5447,15 +5447,72 @@ const MUTATIONS = [
     to:   "    photosKnown: !!(state.cloudJobs",
     why:  "Cloud Storage always has the counts; the sheet hedges for no reason (45f)",
   },
+  {
+    name: "M761 (V108 harness) run.js bails on a normal run",
+    file: "harness/run.js",
+    from: "  const bail = process.env.PATGO_BAIL === '1';",
+    to:   "  const bail = true;",
+    why:  "an ordinary `node harness/run.js` stops at the first failing file and hides every later failure (01i)",
+  },
+  {
+    name: "M762 (V108 harness) a hinted test file is trusted without checking it",
+    file: "harness/mutate.js",
+    from: "\n    const failed = (!FULL && hintFiles(m).some(f => goodHints.has(f) && runFileFails(tmp, f))",
+    to:   "\n    const failed = (!FULL && hintFiles(m).some(f => runFileFails(tmp, f))",
+    why:  "a test file that already fails on clean code would mark every mutation pointing at it as caught (01i)",
+  },
+  {
+    name: "M763 (V108 harness) a hint that misses ends the run",
+    file: "harness/mutate.js",
+    from: "\n      || runSuiteExpectingFailure(tmp, !FULL);",
+    to:   "\n      || false;",
+    why:  "a mutation only some other file catches would score as SURVIVED \u2014 or, worse, a hint shape like this could score as caught (01i)",
+  },
 ];
 
 
+/* SPEED (V109 harness): two shortcuts, neither of which can turn a survivor
+   into a "caught".
+   1. A mutation's `why` usually names the test group written for it ("(45a)").
+      That test FILE is run on its own first, in its own process; if it fails,
+      the mutation is caught and the full suite is skipped. Every hinted file is
+      first run alone on the UNMUTATED copy — one that fails there is never used
+      as a hint (it would make every mutation pointing at it look caught).
+   2. Otherwise the full suite runs with PATGO_BAIL=1: it stops after the first
+      test file with a failure (run.js). A mutation nothing catches still runs
+      the WHOLE suite, exactly as before.
+   `node harness/mutate.js --full [filter]` turns both off (the old behaviour —
+   use it when you want every failing group listed, as the probe does). */
+const FULL = process.argv.includes('--full');
+const TEST_FILES = fs.readdirSync(path.join(APP_DIR, 'harness', 'tests')).filter(f => f.endsWith('.js')).sort();
+
+function hintFiles(m) {
+  const out = [];
+  for (const x of String(m.why || '').matchAll(/\b(\d\d)[a-z]\d?\b/g)) {
+    const f = TEST_FILES.find(n => n.startsWith(x[1] + '-'));
+    if (f && !out.includes(f)) out.push(f);
+  }
+  return out;
+}
+
 function main() {
-  const filter = process.argv[2];
+  const filter = process.argv.slice(2).find(a => a !== '--full');
   const list = MUTATIONS.filter(m => !filter || m.name.includes(filter) || m.file.includes(filter));
 
   const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'patgo-mutate-'));
   copyTree(APP_DIR, tmp);
+
+  // Shortcut 1's safety check: each hinted test file must pass on its own on
+  // the unmutated code, or it is not used.
+  const goodHints = new Set();
+  if (!FULL) {
+    const wanted = new Set();
+    for (const m of list) for (const f of hintFiles(m)) wanted.add(f);
+    for (const f of wanted) {
+      if (!runFileFails(tmp, f)) goodHints.add(f);
+      else console.log(`  (hint ${f} fails on unmutated code — not used as a shortcut)`);
+    }
+  }
 
   console.log(`Mutation run — ${list.length} mutation${list.length === 1 ? '' : 's'}\n`);
 
@@ -5476,7 +5533,8 @@ function main() {
     }
 
     fs.writeFileSync(target, original.replace(m.from, m.to));
-    const failed = runSuiteExpectingFailure(tmp);
+    const failed = (!FULL && hintFiles(m).some(f => goodHints.has(f) && runFileFails(tmp, f)))
+      || runSuiteExpectingFailure(tmp, !FULL);
     fs.writeFileSync(target, original);
 
     if (failed) {
@@ -5499,14 +5557,20 @@ function main() {
   process.exit(survived.length || aborted.length ? 1 : 0);
 }
 
-function runSuiteExpectingFailure(dir) {
+// One test file alone (shortcut 1). True = it did NOT come back green.
+function runFileFails(dir, file) {
+  return runSuiteExpectingFailure(dir, false, [file.replace(/\.js$/, '')]);
+}
+
+function runSuiteExpectingFailure(dir, bail, only) {
   let out;
   try {
     // v82: belt and braces with assert.js's group timeout. A suite that never
     // ends is not a pass; it is killed here and scored as caught, because it
     // never reported green.
-    out = execFileSync(process.execPath, [path.join(dir, 'harness', 'run.js')], {
+    out = execFileSync(process.execPath, [path.join(dir, 'harness', 'run.js')].concat(only || []), {
       cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 180000,
+      env: Object.assign({}, process.env, { PATGO_BAIL: bail ? '1' : '' }),
     });
   } catch (e) {
     // Non-zero exit is the normal "caught it" path.

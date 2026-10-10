@@ -34,9 +34,16 @@ async function main() {
 
   console.log(`PATGo harness — ${files.length} test file${files.length === 1 ? '' : 's'}`);
 
+  // PATGO_BAIL=1 (set by mutate.js for a mutation run): stop after the first
+  // test FILE that has a failure. A mutation run only needs to know whether
+  // anything failed, so the rest of the suite is wasted time once something
+  // has. Files still run in their usual order — never reordered — so a bail
+  // run can only stop sooner, never fail differently. Never set for a normal run.
+  const bail = process.env.PATGO_BAIL === '1';
   for (const f of files) {
     const mod = require(path.join(TEST_DIR, f));
     await mod();
+    if (bail && t.failures.length) break;
   }
 
   const failed = t.report();

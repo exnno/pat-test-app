@@ -15,7 +15,13 @@ node harness/run.js            # every standing test
 node harness/run.js 04 06      # only matching test files
 node harness/mutate.js         # prove the assertions aren't hollow
 node harness/mutate.js M07     # one mutation
+node harness/mutate.js --full M07   # the slow way: every failing group listed
 ```
+
+Since the V108 harness amendment `mutate.js` takes two shortcuts that can only
+stop a run sooner, never change its verdict: the mutation's own test file (named
+in its `why`) runs alone first, and otherwise the suite stops after the first
+failing file (`PATGO_BAIL=1`). A mutation nothing catches still runs everything.
 
 `run.js` exits non-zero on any failure. `mutate.js` exits non-zero if any
 mutation survives **or** any mutation fails to apply.
