@@ -10,7 +10,7 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v108';
+const CACHE_VERSION = 'pat-v109';
 const ASSETS = [
   './',
   './index.html',
@@ -59,7 +59,12 @@ const ASSETS = [
   './boot.js',
   './manifest.webmanifest',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  // V109: the browser-tab icon (the plug on its own, 16/32/48 px) and the
+  // 180 px home-screen icon. Both live at the site root; precached so the tab
+  // icon still shows offline.
+  './favicon.ico',
+  './apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (event) => {
