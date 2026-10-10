@@ -874,7 +874,7 @@ function settingsOpenCategory(id) {
 // tidy offer. Back used to go to the Backup page from all of them. Now each
 // opener notes where it was, and Back goes there. V97: their buttons moved to
 // Phone Storage, which is also the fallback.
-const _MGR_RETURN_VIEWS = ['settingsStorage', 'settingsBackup', 'settingsCategory', 'settings', 'sessions'];
+const _MGR_RETURN_VIEWS = ['settingsStorage', 'settingsBackup', 'settingsCategory', 'settings', 'sessions', 'cloudStorage'];   // V108: + Cloud Storage
 function mgrNoteReturn() {
   state.mgrReturnView = _MGR_RETURN_VIEWS.indexOf(state.view) !== -1 ? state.view : 'settingsStorage';
 }
@@ -882,6 +882,8 @@ function mgrGoBack() {
   const v = state.mgrReturnView || 'settingsStorage';
   state.mgrReturnView = null;
   setView(v);
+  // V108: back on Cloud Storage from Manage Photos — photos may have gone.
+  if (v === 'cloudStorage' && typeof cloudStoreLoad === 'function') cloudStoreLoad();
 }
 
 function photoMgrOpen() {
@@ -1823,13 +1825,15 @@ function _cloudBring(ids, open) {
 
 // What the sheet says, worked out from the list already read (never a doc).
 // Pure. Ids not in the list (gone since) are left out.
-function cloudDeleteOverview(ids) {
-  const m = cloudJobsModel();
-  const all = new Map(((state.cloudJobs && state.cloudJobs.jobs) || []).map(j => [j.id, j]));
+// V108: `pool` — the jobs to name them from when the caller isn't the cloud tab
+// (Cloud Storage passes its biggest jobs, already named). Omitted: the cloud tab.
+function cloudDeleteOverview(ids, pool) {
+  const m = pool ? null : cloudJobsModel();
+  const all = new Map((pool || (state.cloudJobs && state.cloudJobs.jobs) || []).map(j => [j.id, j]));
   const jobs = [];
   for (const raw of (ids || [])) {
     const id = String(raw);
-    const j = m.byId.get(id) || all.get(id);
+    const j = (m && m.byId.get(id)) || all.get(id);
     if (j && !jobs.some(x => x.id === id)) jobs.push(j);
   }
   const num = (v) => (typeof v === 'number' && isFinite(v) && v > 0) ? v : 0;
@@ -1839,7 +1843,7 @@ function cloudDeleteOverview(ids) {
   const at = (typeof CLOUD_DELETE_TYPE_AT === 'number') ? CLOUD_DELETE_TYPE_AT : 5;
   return {
     ids: jobs.map(j => j.id), jobs, n: jobs.length, items, photos,
-    photosKnown: !!(state.cloudJobs && state.cloudJobs.photos),
+    photosKnown: pool ? true : !!(state.cloudJobs && state.cloudJobs.photos),
     certs: certs.map(j => j.certNo).filter(Boolean),
     certJobs: certs.length,
     needWord: jobs.length >= at || certs.length > 0,
@@ -1896,5 +1900,171 @@ function _cloudDelete(ids) {
     // Something changed that the list didn't know: read it again.
     if ((res.missing || res.error) && state.cloudJobs === cj) cloudJobsLoad(true);
     if (state.view === 'sessions') render();
+  });
+}
+
+// ---- V108 (Stage 5 part 3, second half): Cloud Storage --------------------------
+// Settings → Data → Cloud Storage (1A), signed in only. What the account holds in
+// the cloud — jobs, photos, the total; figures only, no limit (2A) — and its
+// CLOUD_STORAGE_TOP biggest jobs (3A, jobs on this phone included and marked).
+// Select → Delete… deletes biggest jobs that are NOT on this phone, through
+// V107's own review, word and sync (4A) — no second delete path. A job on this
+// phone can't be ticked: it keeps 🗑 → Delete everywhere on the phone's list.
+// Photos: a line and the Manage Photos button (5A). Read every time the page is
+// opened, with ⟳ (6A); the last figures stay on screen while it reads. Memory
+// only (state.cloudStore), never saved.
+// The read is sync.js syncCloudStorage; nothing here touches the cloud.
+
+function _cloudStoreReset(ret) {
+  const old = state.cloudStore || {};
+  state.cloudStore = { loading: false, ok: !!old.ok, error: '', needsUpdate: false, at: old.at || '', uid: old.uid || '',
+    jobs: old.jobs || { n: 0, bytes: 0 }, photos: old.photos || { n: 0, bytes: 0 }, top: old.top || [],
+    capped: !!old.capped, selecting: false, selected: {}, busy: '', ret: ret || old.ret || 'settingsStorage',
+    gen: (old.gen || 0) + 1 };
+}
+
+function cloudStoreOpen() {
+  _cloudStoreReset(_MGR_RETURN_VIEWS.indexOf(state.view) !== -1 && state.view !== 'cloudStorage' ? state.view : 'settingsStorage');
+  // Another account's figures are never shown, not even while reading.
+  const uid = (typeof _syncCurrentUserId === 'function') ? _syncCurrentUserId() : '';
+  if (state.cloudStore.uid && state.cloudStore.uid !== uid) _cloudStoreForget();
+  setView('cloudStorage');
+  cloudStoreLoad();
+}
+
+function _cloudStoreForget() {
+  Object.assign(state.cloudStore, { ok: false, at: '', uid: '', jobs: { n: 0, bytes: 0 }, photos: { n: 0, bytes: 0 }, top: [], capped: false });
+}
+
+function cloudStoreBack() {
+  const cs = state.cloudStore || {};
+  const v = cs.ret || 'settingsStorage';
+  cs.selecting = false; cs.selected = {};
+  setView(v);
+}
+
+function cloudStoreLoad() {
+  if (!state.cloudStore) _cloudStoreReset();
+  const cs = state.cloudStore;
+  if (cs.loading || typeof syncCloudStorage !== 'function') return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    cs.error = 'No signal — Cloud Storage needs a connection.';
+    if (state.view === 'cloudStorage') render();
+    return;
+  }
+  cs.loading = true;
+  cs.error = '';
+  if (state.view === 'cloudStorage') render();
+  syncCloudStorage().then((res) => {
+    if (state.cloudStore !== cs) return;
+    cs.loading = false;
+    if (res.ok) {
+      Object.assign(cs, { ok: true, error: '', needsUpdate: false, at: new Date().toISOString(), uid: res.uid,
+        jobs: res.jobs, photos: res.photos, top: res.top, capped: res.capped });
+      // A ticked job that has left the list can't stay ticked.
+      const ids = new Set(res.top.map(j => j.id));
+      for (const id of Object.keys(cs.selected)) if (!ids.has(id)) delete cs.selected[id];
+    } else {
+      cs.needsUpdate = !!res.needsUpdate;
+      cs.error = res.offline ? 'No signal — Cloud Storage needs a connection.' : (res.error || 'Couldn’t reach the cloud. Try again.');
+    }
+    if (state.view === 'cloudStorage') render();
+  });
+}
+
+// What the page shows. Pure. A job is "on this phone" by the phone's own list,
+// at draw time — a job brought down since the read moves across by itself.
+function cloudStoreModel() {
+  const cs = state.cloudStore || {};
+  const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+  const clientName = (id) => {
+    const c = (id && typeof clientById === 'function') ? clientById(id) : null;
+    return c && c.name ? c.name : '';
+  };
+  const rows = (cs.top || []).map(j => Object.assign({}, j, {
+    client: clientName(j.clientId), title: j.site || j.name || 'Untitled job', onPhone: local.has(j.id),
+  }));
+  const jobs = cs.jobs || { n: 0, bytes: 0 };
+  const photos = cs.photos || { n: 0, bytes: 0 };
+  const sel = Object.keys(cs.selected || {}).filter(id => rows.some(r => r.id === id && !r.onPhone));
+  return { rows, jobs, photos, total: (jobs.bytes || 0) + (photos.bytes || 0), selected: sel,
+    selectable: rows.filter(r => !r.onPhone).length };
+}
+
+function cloudStoreToggleSelecting() {
+  const cs = state.cloudStore;
+  if (!cs || cs.busy) return;
+  cs.selecting = !cs.selecting;
+  cs.selected = {};
+  render();
+}
+
+// Only in Select. A job on this phone is never ticked (4A).
+function cloudStoreTap(id) {
+  const cs = state.cloudStore;
+  if (!cs || !id || cs.busy || !cs.selecting) return;
+  const key = String(id);
+  const row = cloudStoreModel().rows.find(r => r.id === key);
+  if (!row) return;
+  if (row.onPhone) {
+    showToast('That job is on this phone — delete it from the phone’s job list');
+    return;
+  }
+  if (cs.selected[key]) delete cs.selected[key]; else cs.selected[key] = true;
+  render();
+}
+
+function cloudStoreDeleteSelected() {
+  const cs = state.cloudStore;
+  if (!cs || cs.busy) return;
+  const m = cloudStoreModel();
+  // m.selected never holds a job on this phone (cloudStoreModel) — the one guard.
+  const o = cloudDeleteOverview(m.selected, m.rows);
+  if (!o.n) return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    showToast('No signal — try again when you’re connected');
+    return;
+  }
+  if (typeof openCloudDeleteSheet !== 'function') return;
+  openCloudDeleteSheet(o, (typed) => {
+    // Checked again here, as V107's own action does: the button is a hint.
+    if (o.needWord && !cloudDeleteConfirmMatches(typed)) return false;   // V108
+    _cloudStoreDelete(o.ids);
+    return true;
+  });
+}
+
+function _cloudStoreDelete(ids) {
+  const cs = state.cloudStore;
+  if (!cs || typeof syncCloudDelete !== 'function') return;
+  cs.busy = ids.length === 1 ? 'Deleting it from the cloud…' : `Deleting ${ids.length} jobs from the cloud…`;
+  render();
+  syncCloudDelete(ids).then((res) => {
+    const gone = new Set(res.ids || []);
+    // The cloud tab's list, if read, loses them too.
+    if (state.cloudJobs && state.cloudJobs.jobs) state.cloudJobs.jobs = state.cloudJobs.jobs.filter(j => !gone.has(j.id));
+    if (state.cloudStore === cs) {
+      cs.busy = '';
+      cs.top = (cs.top || []).filter(j => !gone.has(j.id));
+      for (const id of gone) delete cs.selected[id];
+      if (res.ok) { cs.selecting = false; cs.selected = {}; }
+    }
+    const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    const bits = [];
+    if (res.deleted) bits.push(`Deleted ${pl(res.deleted, 'job')} from the cloud` + (res.photos ? ` with ${pl(res.photos, 'photo')}` : ''));
+    if (res.missing) bits.push(`${res.missing} ${res.missing === 1 ? 'was' : 'were'} already gone`);
+    if (res.skipped) bits.push(`${res.skipped} ${res.skipped === 1 ? 'is' : 'are'} on this phone now`);
+    if (res.offline) showToast('No signal — nothing was deleted');
+    else if (res.error) {
+      const e = String(res.error);
+      showToast((res.deleted ? bits[0] + ', then ' : 'Nothing was deleted: ') + e.charAt(0).toLowerCase() + e.slice(1));
+    }
+    else if (bits.length) showToast(bits.join(' · '));
+    // The totals and the biggest jobs have changed: read them again — AFTER the
+    // run syncCloudDelete starts, which is the one that removes the photo rows
+    // (V107); read before it and the photos are still counted.
+    if (state.view === 'cloudStorage') render();
+    const again = () => { if (state.cloudStore === cs && state.view === 'cloudStorage') cloudStoreLoad(); };
+    if (typeof syncWhenIdle === 'function') syncWhenIdle(again); else again();
   });
 }

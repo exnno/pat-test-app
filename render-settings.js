@@ -93,6 +93,11 @@ function settingsPageSubtitle(pageId) {
       return `Undo ${state.undoEnabled ? 'on' : 'off'} · Map pins ${state.mapPinEnabled ? 'on' : 'off'} · Item times ${state.timestampsEnabled ? 'on' : 'off'}`;
     case 'settingsReminders': return reminderSettingsSummary();   // V100
     case 'settingsSetup':   return 'Share your setup to another device';
+    case 'cloudStorage': {   // V108: the last figures read this app session, if any
+      const cs = state.cloudStore;
+      if (cs && cs.ok && typeof cloudBytesText === 'function') return `About ${cloudBytesText((cs.jobs.bytes || 0) + (cs.photos.bytes || 0))} in the cloud`;
+      return 'Space your jobs and photos take in the cloud';
+    }
     case 'settingsReset':   return 'Clear this phone, or start again as new';   // V106
     case 'settingsCalculator': return 'Earth continuity limit';
     case 'settingsAbout':   return `PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}`;
@@ -176,6 +181,10 @@ function settingsPageVisible(pageId) {
     return typeof syncActive === 'function' && syncActive() && typeof renderJobManager === 'function';
   }
   if (pageId === 'photoManager') return typeof renderPhotoManager === 'function';
+  // V108 (1A): Cloud Storage, like Jobs on this phone, only while syncing.
+  if (pageId === 'cloudStorage') {
+    return typeof syncActive === 'function' && syncActive() && typeof renderCloudStorage === 'function';
+  }
   // V106: Reset This Phone lives in reset.js, an optional subsystem (MAP rule 6).
   if (pageId === 'settingsReset') return typeof renderSettingsReset === 'function';
   return !!SETTINGS_PAGE_META[pageId];
@@ -967,6 +976,7 @@ function renderSettingsStorage() {
   const pruneBlock = cloudOn ? `
           ${renderTidyBlock(tidyM, 'backup-tidy') || `<p class="muted" style="margin-top:10px;font-size:12px">Nothing older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} is ready to come off this phone right now.</p>`}
           <button class="backup-action-btn" id="jobs-manage-btn" data-action="jm-open" style="margin-top:10px">🛡 Jobs on This Phone</button>
+          ${typeof renderCloudStorage === 'function' ? `<button class="backup-action-btn" id="cloud-storage-btn" data-action="cs-open" style="margin-top:6px">☁️ Cloud Storage ›</button>` : ''}
   ` : prunable.length > 0 ? `
           <div class="prune-suggestion">
             <p class="prune-suggestion-text">${prunable.length} exported job${prunable.length === 1 ? '' : 's'} older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} can be cleared to free space.</p>

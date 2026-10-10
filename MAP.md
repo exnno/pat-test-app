@@ -1,4 +1,4 @@
-# PATGo — Code Map (V107)
+# PATGo — Code Map (V108)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -222,6 +222,8 @@ which waits for the read to finish (a new sheet on screen, max 2 s). Never a fix
 ⚠ V107: group 44's fake applies a PATCH (supabase-js `update`) to the rows its
 filters match and answers its `select`; the older fakes (16–43) still answer a
 PATCH with 204 and change nothing — a test of an UPDATE must use 44's.
+⚠ V108: group 45's fake (44's, extended) answers `doc_bytes` (the JSON's byte
+length) and the view's `b`, and `srv.noV108` answers "column does not exist".
 See `harness/README.md`.
 
 ---
@@ -247,7 +249,7 @@ so every phone holds an explicit preset name and never reads
 install. Applies to any tuning value with a stored counterpart. Mutation M85.
 Rules 8, 9, 10 above all originate here.
 
-### data.js (~380 ln) — static tables and lists
+### data.js (~440 ln) — static tables and lists
 Split out of config.js in V71, byte identical. Built-in defaults
 (`DEFAULT_ITEM_TYPES`, `DEFAULT_FAIL_REASONS`, `DEFAULT_DESCRIPTIONS`,
 `DEFAULT_CSV_COLUMNS`), the v53 reading-field tables and fail-reason tags, the
@@ -264,7 +266,7 @@ and searchability are filtered in **render-settings.js**
 SYNC_GENERAL_VIEWS, SYNC_NO_REPAINT_VIEWS untouched). Hub order is NOT the array
 order: `settingsCategoriesInOrder` (render-settings.js) puts catCloud last while
 locked. A page meta may carry `action` (row opens through that ACTIONS entry —
-photoManager `pm-open`, jobManager `jm-open`); its visibility is
+photoManager `pm-open`, jobManager `jm-open`, V108 cloudStorage `cs-open`); its visibility is
 `settingsPageVisible` (render-settings.js). 33b: every SETTINGS_PAGE_META key must
 sit in exactly one group. A renamed page also needs its `renderSettingsSubHeader`
 title changed and the old name kept in `aliases`.
@@ -731,7 +733,7 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
 (scroll reset) live in `render()` via `_lastRenderedView`, not in `setView`.
 
-### settings-actions.js (~1620 ln) — the write half of the Settings screens + the photo manager (v90) + jobs on this phone (v91) + the Jobs screen's cloud tab (v93) — NEW v70
+### settings-actions.js (~2070 ln) — the write half of the Settings screens + the photo manager (v90) + jobs on this phone (v91) + the Jobs screen's cloud tab (v93) + Cloud Storage (V108) — NEW v70
 Per-page saves, Report Settings (text, logo, filename tokens), signature capture
 (draw and upload), CSV column ordering, Export/Import Setup UI handlers, the
 editable list settings (item types, fail reasons, descriptions) and the
@@ -791,6 +793,18 @@ never render(). Markup `renderCloudJobsHTML`/`renderCloudListAreaHTML` in
 `openCloudDeleteSheet` → **sync.js** `syncCloudDelete`. Word `CLOUD_DELETE_WORD`
 at `CLOUD_DELETE_TYPE_AT`+ jobs or any locked/certificated (config.js). Deleted ids
 drop off `cj.jobs` without a re-read; a re-read only after `missing`/error.
+V108: `cloudDeleteOverview(ids, pool)` — `pool` names the jobs when the caller
+isn't the cloud tab (Cloud Storage); omitted, the cloud tab as before.
+⚠ V108: CLOUD STORAGE (`cloudStore*`, `_cloudStore*`), view `cloudStorage`,
+`state.cloudStore` (memory only, created on first open). `cloudStoreOpen` notes its
+own return (`cs.ret`, from `_MGR_RETURN_VIEWS`) and reads every open →
+**sync.js** `syncCloudStorage`. `cloudStoreModel()` synchronous: `onPhone` from
+`state.sessions` at draw time; `selected` NEVER holds a phone job (the one guard;
+sync's `skipped` is the backstop). Delete… → `cloudDeleteOverview(sel, rows)` →
+**render-review.js** `openCloudDeleteSheet` → `syncCloudDelete` → re-read inside
+`syncWhenIdle` (after the follow-up run that removes the photos — M749).
+`'cloudStorage'` is in `_MGR_RETURN_VIEWS` (Manage Photos returns to it) and
+`mgrGoBack` re-reads on arriving there. Actions `cs-*` in **dispatch.js**.
 
 ### onboarding.js (~195 ln) — first-run wizard — NEW v70
 The wizard state machine (step capture, paging, fresh/import fork, theme pick,
@@ -841,7 +855,7 @@ blur / suggestion pick (no render). Multi Pick tiles + `failDisabled` + the
 Copy last / ↶ Undo row (`state.undoEnabled`) are built here — the tile block
 must read `sess.locked`, not `isLocked` (declared later: TDZ).
 
-### render-review.js (~1130 ln) — review & manage screens — NEW v72
+### render-review.js (~1680 ln) — review & manage screens — NEW v72
 Overview (+ `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
 `refreshOverviewBody`, `refreshOverviewSelection`), Edit Session, Retest
 Reminders, the Reports hub, and the shared photo-evidence markup
@@ -889,8 +903,11 @@ tab Select → Delete…), drawn on body like reset.js's sheet (holds the DELETE
 never re-rendered while open). Overview from settings-actions.js
 `cloudDeleteOverview`; reuses `.reset-*` styles plus `.cloud-del-*`. The button
 re-checks the word on the tap; the action checks it again (44i, M737/M738).
+V108: `renderCloudStorage()` (view `cloudStorage`; **render-core.js** falls back to
+Phone Storage when signed out or missing) and `cloudBytesText(b)` (formatBytes +
+GB; also used by render-settings.js's row subtitle). No inputs — may render.
 
-### render-settings.js (~1377 ln) — settings screens that own a setting
+### render-settings.js (~1765 ln) — settings screens that own a setting
 The two-level Settings hub, its search, every `renderSettings*` sub-page with a
 write handler behind it, `renderSettingsSubHeader()`, the earth-resistance
 calculator, `renderPhotoBackupSection()` (photo FILES, inside Backup & Restore)
@@ -910,6 +927,9 @@ V100: `renderSettingsReminders()` (view `settingsReminders`, Phone & Display) an
 `reminderSettingsSummary()`; labels in `REMINDER_LABELS`, values validated by
 **session.js** `normaliseReminders`, written by **settings-actions.js**
 `setReminder`.
+V108: Data's Cloud Storage row (`settingsPageVisible` — syncing only, like Jobs
+on this phone), its subtitle (last figures this session, `cloudBytesText`), and a
+"☁️ Cloud Storage ›" button on Phone Storage (signed in). The page is render-review.js.
 ⚠ v85: the hub hides the Cloud group where there is no cloud; search skips its
 pages and the group paints `renderCloudLocked()` (render-help.js) until
 `cloudPagesUnlocked()` (cloud.js).
@@ -978,7 +998,7 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~4520 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete
+### sync.js (~4680 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read
 V104: the settings_work row also carries `readingsCheck` (default ON — read
 `!== false`) and `earthLimit` (normaliseEarthLimit); normalise / record / valid /
 apply / diffs all list them.
@@ -1175,6 +1195,11 @@ into `st.ph.sent` + 'photo' tombstones → **photos.js** `photosDeleteForSession
 → release → a READING run (the photo half only runs in those). Never a session
 tombstone or `st.gone` (a job back live would lose its photos). Rows before photos
 — never the other order. Harness 44a–44i, M726–M739.
+⚠ V108: `syncCloudStorage()` — Cloud Storage's read, LISTS only (R17): `id,doc_bytes`
+for every live job (sizePage), the view with `b` (bytesPage), then
+`_SYNC_CLOUD_JOB_COLS` for the CLOUD_STORAGE_TOP biggest only (one `in` request).
+Server columns from **supabase/v108-storage.sql**; "column does not exist"
+(42703) → `needsUpdate`. Memory only. Harness 45a–45d, M740–M745, M758.
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
 19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q, 27a–27m, 28a–28i and
 29a–29i and 30a–30i, mutations M142–M295, M306–M325, M355–M395, M396–M418, M419–M434, M436–M451, M452–M474.
@@ -1344,8 +1369,10 @@ another file having parsed. Don't "DRY" this.
 - `supabase/schema.sql`, `supabase/isolation-test.sql` — server side (v79). Pasted
   into the Supabase SQL editor by hand; not loaded by the app. `schema.sql` is the
   whole server for a NEW project; `supabase/v92-fingerprint.sql` and
-  `supabase/v93-archive.sql` are the paste-once changes for an existing one (they
-  check themselves, F1–F3 and A1–A5). Harness 29e and 30i read them.
+  `supabase/v93-archive.sql` and `supabase/v108-storage.sql` are the paste-once
+  changes for an existing one (they check themselves, F1–F3, A1–A5, B1–B5).
+  Harness 29e, 30i and 45j read them.
   ⚠ v93: `session_photo_counts` is a VIEW — it must stay `security_invoker`
-  (isolation 8a–8c), or it counts every account's photos.
+  (isolation 8a–8d), or it counts every account's photos. V108 added `b` (bytes)
+  as its LAST column — a replaced view may only gain columns at the end.
 - `manifest.webmanifest` — icons, name, display mode.

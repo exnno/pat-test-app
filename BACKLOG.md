@@ -8,11 +8,33 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V107
-V108 — Stage 5 part 3 second half: storage used (account total, biggest jobs,
-photo usage; needs a small SQL file for job sizes — own spec round). Then the
-housekeeping release (favicon set, remove dead `setupLongPress`, the
-sheet-markup guard). Full order: roadmap v4.20.
+### Next after V108
+Stage 5 part 3 complete (V107 cloud delete, V108 Cloud Storage). Next: the
+housekeeping release (favicon set, remove dead `setupLongPress`, the sheet-markup
+guard). Full order: roadmap v4.21.
+
+### V108 residuals (known, accepted)
+- Not yet tested on real phones or against the real database. The V108 SQL's own
+  checks (B1–B5) and isolation 8d cover the server side.
+- Sizes are approximate: a job is measured as its text (`doc::text`, the database
+  stores it compressed); photos at full size, previews (~10 KB each) not counted;
+  the deleted-marker rows (~200 bytes each) not counted.
+- Photos with no live job (a crash mid-delete, a phone that never synced again)
+  count in the photo total but belong to no job in the list; Manage Photos →
+  Look in the cloud → "Photos with no job" finds them.
+- Biggest jobs are judged by the job plus its photos; a job brought onto the phone
+  since the read moves to "on this phone" at once (worked out at draw time).
+- Reads every open: ~50 bytes a job + one row per job with photos. At SYNC_CLOUD_MAX
+  (20,000 jobs) it says the totals are from the first 20,000.
+- A delete from Cloud Storage re-reads after the follow-up sync run; if that run
+  fails to remove the photos, the figures still count them (honest), and the next
+  run removes them.
+- Placement: roadmap v4.20 had planned this view "from the cloud tab, not
+  Settings"; Peter chose Settings → Data at the round (1A). Option if wanted: a
+  "Cloud Storage" link on the cloud tab (one line, no new logic).
+- Harness 25l failed once while the mutation probe ran under heavy load (M753's
+  run; the same mutation re-run alone: 45i only). Green on every plain run —
+  a timing sensitivity to watch in the full sweep.
 
 ### V107 residuals (known, accepted)
 - Not yet tested on real phones (two-phone: delete on one, the other syncs).

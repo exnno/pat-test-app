@@ -253,6 +253,14 @@ registerActions({
   'cloud-select-toggle': () => cloudJobsToggleSelecting(),
   'cloud-bring':        () => cloudJobsBringSelected(),
   'cloud-delete':       () => cloudJobsDeleteSelected(),        // V107 (Stage 5 pt 3)
+  // V108 (Stage 5 pt 3, second half): Settings → Data → Cloud Storage.
+  'cs-open':            () => cloudStoreOpen(),
+  'cs-back':            () => cloudStoreBack(),
+  'cs-refresh':         () => cloudStoreLoad(),
+  'cs-select-toggle':   () => cloudStoreToggleSelecting(),
+  'cs-tap':             (arg) => cloudStoreTap(arg),
+  'cs-delete':          () => cloudStoreDeleteSelected(),
+  'cs-photos':          () => { if (state.cloudStore) { state.cloudStore.selecting = false; state.cloudStore.selected = {}; } mgrNoteReturn(); photoMgrOpen(); },
   'tidy-jobs':          () => tidyJobsRemove(),
   'tidy-photos':        () => tidyPhotosRemove(),
   'tidy-review':        () => tidyOfferReview(),

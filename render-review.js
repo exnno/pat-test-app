@@ -1584,3 +1584,99 @@ function refreshCloudListAreaOnly() {
   if (!wrap) return;
   wrap.innerHTML = renderCloudListAreaHTML();
 }
+
+// V108 (Stage 5 part 3, second half): Settings → Data → Cloud Storage. Markup
+// only; settings-actions.js cloudStoreModel() works it out and sync.js
+// syncCloudStorage() reads it. Figures, no limit (2A); the biggest jobs (3A)
+// with ☁ / "on this phone"; Select → Delete… for cloud-only ones, through V107's
+// openCloudDeleteSheet (4A); Manage Photos (5A). No inputs — render() may run
+// while it is up (MAP rule 3).
+// Cloud figures can pass 1 GB (formatBytes stops at MB, which suits a phone).
+function cloudBytesText(b) {
+  const n = (typeof b === 'number' && isFinite(b) && b > 0) ? b : 0;
+  if (n >= 1024 * 1024 * 1024) return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  return formatBytes(n);
+}
+
+function renderCloudStorage() {
+  const cs = state.cloudStore || {};
+  const m = cloudStoreModel();
+  const about = (b) => 'about ' + cloudBytesText(b || 0);
+  const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const header = `
+    <header class="header-row">
+      <button class="icon-btn" data-action="cs-back" aria-label="Back">‹</button>
+      <div class="site-name">Cloud Storage</div>
+      ${cs.ok && m.selectable ? `<button class="pm-select-btn" data-action="cs-select-toggle" ${cs.busy ? 'disabled' : ''}>${cs.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
+    </header>`;
+  const busy = cs.busy ? `<p class="pm-busy" id="cs-busy" role="status">${escapeHTML(cs.busy)}</p>` : '';
+  const err = cs.error ? `<p class="pm-note pm-error" id="cs-error">${escapeHTML(cs.error)}</p>` +
+    (cs.needsUpdate ? `<p class="muted pm-note" id="cs-needs-update">It’s a one-off step on the cloud’s side (the V108 database update). Nothing on this phone is affected.</p>` : '') : '';
+  if (!cs.ok) {
+    const body = cs.loading
+      ? `<p class="muted pm-note" role="status">Reading the cloud…</p>`
+      : `${err}<button class="btn-secondary cloud-retry" data-action="cs-refresh">Try again</button>`;
+    return `<div class="screen cs-screen">${header}${body}</div>`;
+  }
+  const when = cs.at ? escapeHTML(new Date(cs.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) : '';
+  const checked = cs.loading
+    ? `<p class="muted pm-note cs-checked" role="status">Reading the cloud…</p>`
+    : `<p class="muted pm-note cs-checked">Checked ${when} · <button class="pm-look-link" data-action="cs-refresh" aria-label="Read the cloud again">⟳ Refresh</button></p>`;
+  const totals = `
+    <div class="settings-section pm-totals" id="cs-totals">
+      <div class="pm-total-row"><span>📋 Jobs</span><strong>${escapeHTML(m.jobs.n.toLocaleString('en-GB'))} · ${escapeHTML(about(m.jobs.bytes))}</strong></div>
+      <div class="pm-total-row"><span>📷 Photos</span><strong>${escapeHTML(m.photos.n.toLocaleString('en-GB'))} · ${escapeHTML(about(m.photos.bytes))}</strong></div>
+      <div class="pm-total-row cs-total"><span>☁ In the cloud</span><strong>${escapeHTML(about(m.total))}</strong></div>
+      ${cs.capped ? `<p class="muted pm-note">Counted from the first ${SYNC_CLOUD_MAX.toLocaleString('en-GB')} jobs — there is more than this.</p>` : ''}
+      ${checked}
+      <p class="muted pm-note">Sizes are approximate. Photos are counted at full size. This phone’s own space is on Phone Storage.</p>
+      <button class="backup-action-btn" id="cs-photos-btn" data-action="cs-photos" ${cs.busy ? 'disabled' : ''}>🖼 Manage Photos</button>
+    </div>`;
+  const sel = cs.selected || {};
+  const cards = m.rows.map((j) => {
+    const on = !!sel[j.id] && !j.onPhone;
+    const counts = [];
+    if (typeof j.items === 'number') counts.push(pl(j.items, 'item'));
+    if (j.photos) counts.push(`<span class="photo-text">📷 ${j.photos}</span>`);
+    const meta = [j.client ? escapeHTML(j.client) : '', escapeHTML(formatDate(j.date))].concat(counts).filter(Boolean).join(' · ');
+    const where = j.onPhone
+      ? `<span class="cs-where">on this phone</span>`
+      : `<span class="session-cloud" title="Only in the cloud" aria-label="Only in the cloud">☁</span>`;
+    const tick = cs.selecting && !j.onPhone ? `<span class="jm-tick${on ? ' is-on' : ''}" aria-hidden="true">${on ? '✓' : ''}</span>` : '';
+    const parts = j.photoBytes ? ` <span class="muted">(job ${escapeHTML(cloudBytesText(j.bytes))} + photos ${escapeHTML(cloudBytesText(j.photoBytes))})</span>` : '';
+    return `
+        <div class="session-card cloud-card cs-card${on ? ' is-selected' : ''}${j.locked ? ' locked' : ''}${j.onPhone ? ' cs-on-phone' : ''}" data-id="${escapeHTML(j.id)}">
+          <div class="session-info" data-action="cs-tap" data-arg="${escapeHTML(j.id)}">
+            <div class="session-title">${tick}${j.onPhone ? '' : where}${j.locked ? '<span class="session-lock" title="Locked">🔒</span>' : ''}${escapeHTML(j.title)}</div>
+            <div class="session-meta">${meta}</div>
+            <div class="session-meta cs-size"><strong>${escapeHTML(about(j.total))}</strong>${parts}${j.onPhone ? ' · ' + where : ''}</div>
+            ${j.certNo ? `<div class="session-meta cloud-cert">Certificate ${escapeHTML(j.certNo)}</div>` : ''}
+          </div>
+        </div>`;
+  }).join('');
+  const top = m.rows.length ? `
+    <div class="settings-section" id="cs-top">
+      <h2 class="h2">Biggest jobs</h2>
+      ${cards}
+      <p class="muted pm-note">Only jobs that aren’t on this phone can be deleted here. A job on this phone is deleted from the phone’s job list (🗑 → Delete everywhere).</p>
+    </div>` : `<p class="muted pm-note">No jobs in the cloud yet.</p>`;
+  let bar = '';
+  if (cs.selecting) {
+    const pick = m.rows.filter(r => m.selected.indexOf(r.id) !== -1);
+    const bytes = pick.reduce((n, r) => n + (r.total || 0), 0);
+    bar = `
+      <div class="selection-bar pm-bar">
+        <span class="selection-bar-count">${pick.length} selected${pick.length ? ` · ${escapeHTML(about(bytes))}` : ''}</span>
+        <button class="selection-bar-action pm-bar-btn is-danger" data-action="cs-delete" ${pick.length && !cs.busy ? '' : 'disabled'}>Delete…</button>
+      </div>`;
+  }
+  return `
+    <div class="screen cs-screen">
+      ${header}
+      ${busy}
+      ${err}
+      ${totals}
+      ${top}
+    </div>
+    ${bar}`;
+}

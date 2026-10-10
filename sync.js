@@ -4247,6 +4247,120 @@ function syncCloudList() {
     });
 }
 
+// V108 (Stage 5 part 3, second half): Settings → Data → Cloud Storage. How much
+// the account holds in the cloud — the jobs, the photos, the total — and its
+// biggest jobs (CLOUD_STORAGE_TOP, 3A: the job plus its photos, jobs on this
+// phone included — they take cloud space too).
+//
+// Three reads, all LISTS (R17 — never a job's contents, never a photo):
+//   1. every live job's id and doc_bytes (a column the DATABASE works out from
+//      the job — supabase/v108-storage.sql), ≈ 50 bytes a job;
+//   2. the photo-count view with b, the bytes of each job's photos (same SQL);
+//   3. names and counts (the cloud tab's columns) for the biggest jobs only.
+// Photos whose job is gone or deleted still count in the photo total — they
+// take space — but belong to no job in the list.
+// Keyset paged, SYNC_CLOUD_PAGE a request, at most SYNC_CLOUD_MAX jobs (capped:
+// the totals are then "at least" — said on screen).
+// ⚠ Memory only (rule 25): nothing is written or remembered here.
+// Without the V108 SQL the database answers "column does not exist": the result
+// says so (needsUpdate) instead of a raw error, and the page names the fix.
+// Resolves { ok, offline, error, needsUpdate, uid, capped,
+//   jobs: { n, bytes }, photos: { n, bytes }, top: [{ id, site, name, date,
+//   clientId, locked, certNo, items, fails, photos, bytes, photoBytes, total }] }.
+function syncCloudStorage() {
+  const res = { ok: false, offline: false, error: '', needsUpdate: false, uid: '', capped: false,
+    jobs: { n: 0, bytes: 0 }, photos: { n: 0, bytes: 0 }, top: [] };
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  res.uid = uid;
+  const num = (v) => { const x = Number(v); return (isFinite(x) && x > 0) ? Math.round(x) : 0; };
+  const str = (v) => (typeof v === 'string') ? v : '';
+  const sizes = new Map();    // job id → its doc bytes
+  const photos = new Map();   // job id → { n, b }
+  let client = null;
+  function sizePage(after) {
+    let q = client.from('sessions').select('id,doc_bytes').eq('user_id', uid).eq('deleted', false);
+    if (after) q = q.gt('id', after);
+    return q.order('id', { ascending: true }).limit(SYNC_CLOUD_PAGE).then((r) => {
+      if (r && r.error) throw r.error;
+      const rows = (r && r.data) || [];
+      for (const j of rows) {
+        const id = String(j && j.id != null ? j.id : '');
+        if (id) sizes.set(id, num(j.doc_bytes));
+      }
+      if (rows.length < SYNC_CLOUD_PAGE) return;
+      if (sizes.size >= SYNC_CLOUD_MAX) { res.capped = true; return; }
+      return sizePage(String(rows[rows.length - 1].id));
+    });
+  }
+  function bytesPage(after, k) {
+    let q = client.from('session_photo_counts').select('session_id,n,b').eq('user_id', uid);
+    if (after) q = q.gt('session_id', after);
+    return q.order('session_id', { ascending: true }).limit(SYNC_CLOUD_PAGE).then((r) => {
+      if (r && r.error) throw r.error;
+      const rows = (r && r.data) || [];
+      for (const x of rows) {
+        const sid = String(x && x.session_id != null ? x.session_id : '');
+        if (!sid) continue;
+        const n = num(x.n), b = num(x.b);
+        photos.set(sid, { n, b });
+        res.photos.n += n;
+        res.photos.bytes += b;
+      }
+      if (rows.length < SYNC_CLOUD_PAGE) return;
+      if (k >= SYNC_CLOUD_MAX / SYNC_CLOUD_PAGE) { res.capped = true; return; }
+      return bytesPage(String(rows[rows.length - 1].session_id), k + 1);
+    });
+  }
+  return cloudClient().then((c) => { client = c; return sizePage(''); })
+    .then(() => bytesPage('', 1))
+    .then(() => {
+      const all = [];
+      for (const [id, bytes] of sizes) {
+        const p = photos.get(id) || { n: 0, b: 0 };
+        res.jobs.n += 1;
+        res.jobs.bytes += bytes;
+        all.push({ id, bytes, photos: p.n, photoBytes: p.b, total: bytes + p.b });
+      }
+      // Biggest first; equal sizes by id, so the list never shuffles between reads.
+      all.sort((a, b) => (b.total - a.total) || (a.id < b.id ? -1 : (a.id > b.id ? 1 : 0)));
+      const top = all.slice(0, (typeof CLOUD_STORAGE_TOP === 'number' && CLOUD_STORAGE_TOP > 0) ? CLOUD_STORAGE_TOP : 10);
+      if (!top.length) return;
+      return client.from('sessions')
+        .select(_SYNC_CLOUD_JOB_COLS).eq('user_id', uid).eq('deleted', false)
+        .in('id', top.map(t => t.id)).then((r) => {
+          if (r && r.error) { throw r.error; }
+          const picks = new Map();
+          for (const j of ((r && r.data) || [])) {
+            const id = String(j && j.id != null ? j.id : '');
+            if (id) picks.set(id, j);
+          }
+          // A job deleted between the reads is simply left out.
+          for (const t of top) {
+            const j = picks.get(t.id);
+            if (!j) continue;
+            res.top.push(Object.assign({ site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
+              locked: j.locked === true || j.locked === 'true', certNo: str(j.certNo),
+              items: (typeof j.n_items === 'number' && j.n_items >= 0) ? j.n_items : null,
+              fails: num(j.n_fails) }, t));
+          }
+        });
+    })
+    .then(() => { res.ok = true; return res; })
+    .catch((e) => {
+      const msg = String((e && e.message) || '');
+      if (e && (e.code === '42703' || /doc_bytes|session_photo_counts\.b\b/.test(msg))) {
+        res.needsUpdate = true;
+        res.error = 'The cloud needs a small update before it can show sizes.';
+      } else {
+        res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
+      }
+      res.jobs = { n: 0, bytes: 0 }; res.photos = { n: 0, bytes: 0 }; res.top = [];
+      return res;
+    });
+}
+
 // Bring jobs from the cloud onto this phone: each job's row is read (the one
 // download a job on request needs), checked like any pulled job, and added
 // through _syncTakeJob — exactly as the pull adds one, plus st.conf (safe the

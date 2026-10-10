@@ -115,7 +115,7 @@ const SETTINGS_CATEGORIES = [
   { id: 'catApp',     icon: '🎨', title: 'Phone & Display', blurb: 'Theme, sound, vibration and reminders on this phone',
     pages: ['settingsDisplay', 'settingsReminders'] },   // V100 (7A): + Reminders
   { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Backups, space on this phone, photos, moving your setup, and resetting this phone',
-    pages: ['settingsBackup', 'settingsStorage', 'photoManager', 'jobManager', 'settingsSetup', 'settingsReset'] },   // V106: + Reset (last)
+    pages: ['settingsBackup', 'settingsStorage', 'cloudStorage', 'photoManager', 'jobManager', 'settingsSetup', 'settingsReset'] },   // V106: + Reset (last). V108: + Cloud Storage after Phone Storage (1A)
   { id: 'catHelp',    icon: 'ℹ️', title: 'Help', blurb: 'About this app, what the terms mean, and how to get in touch',
     pages: ['settingsAbout', 'settingsGlossary', 'settingsContact'] }
 ];
@@ -156,6 +156,9 @@ const SETTINGS_PAGE_META = {
   // settingsPageVisible: Jobs on this phone exists only while syncing.
   photoManager:        { icon: '🖼', title: 'Manage Photos',          aliases: 'photos pictures images storage space delete remove download cloud', action: 'pm-open' },
   jobManager:          { icon: '🛡', title: 'Jobs on This Phone',     aliases: 'jobs sessions remove clear safe cloud storage space tidy', action: 'jm-open' },
+  // V108 (Stage 5 part 3, 1A): the cloud's figures beside the phone's. Signed in
+  // only (render-settings.js settingsPageVisible); opened by its own function.
+  cloudStorage:        { icon: '☁️', title: 'Cloud Storage',          aliases: 'cloud storage space used size sizes biggest largest jobs photos total account megabytes mb gb delete free up', action: 'cs-open' },
   settingsSetup:       { icon: '🔁', title: 'Export / Import Setup', aliases: 'setup share configuration new device employee copy presets transfer' },
   settingsAbout:       { icon: 'ℹ️', title: 'About',                 aliases: 'about version changelog whats new' },
   settingsGlossary:    { icon: '📖', title: 'Glossary',              aliases: 'glossary terms jargon what does mean definitions help explain quick pick smart multi pick preset asset session client site overview readings class earth insulation leakage polarity fail reason tag retest certificate template csv backup setup calibration pruning' },

@@ -144,6 +144,9 @@ function render() {
   else if (v === 'photoManager') html = (typeof renderPhotoManager === 'function') ? renderPhotoManager() : renderSettingsStorage();
   // V91 (Stage 4, 5A): Jobs on this phone — same fallback.
   else if (v === 'jobManager') html = (typeof renderJobManager === 'function') ? renderJobManager() : renderSettingsStorage();
+  // V108 (Stage 5 part 3): Cloud Storage — signed in only; signed out (or its
+  // markup missing) it falls back to Phone Storage, never a blank screen.
+  else if (v === 'cloudStorage') html = (typeof renderCloudStorage === 'function' && typeof syncActive === 'function' && syncActive()) ? renderCloudStorage() : renderSettingsStorage();
   else if (v === 'settingsSetup') html = renderSettingsSetup();   // v33
   // V106 (Stage 10 part 2): Reset This Phone — reset.js is optional, so a stale
   // view without it falls back to Backup & Restore, never a blank screen.
@@ -237,9 +240,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Delete old jobs from the cloud.</strong> If you use the cloud: Jobs &rarr; <strong>&#9729; In the cloud</strong> &rarr; Select, tick the jobs, then <strong>Delete&hellip;</strong>. No need to bring them onto the phone first.</li>
-        <li><strong>Gone everywhere.</strong> They go from the cloud and from any other phone that has them, with their photos. A phone that has changed one and not sent it yet asks first.</li>
-        <li><strong>No surprises.</strong> You see every job, its items and its certificate before anything happens. For 5 or more jobs, or any with a certificate, you type DELETE to confirm. No copy is kept.</li>
+        <li><strong>See your cloud space.</strong> If you use the cloud: Settings &rarr; Data &rarr; <strong>Cloud Storage</strong> shows how much your jobs and photos take up in the cloud, and the total.</li>
+        <li><strong>Your biggest jobs.</strong> The ten jobs taking the most space, photos included, each marked &#9729; or &ldquo;on this phone&rdquo;.</li>
+        <li><strong>Make room.</strong> Select a big job that isn&rsquo;t on this phone, then <strong>Delete&hellip;</strong> &mdash; the same careful check as the cloud tab. <strong>Manage Photos</strong> is one tap away.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -477,7 +480,8 @@ function render() {
   // Toggle body class for selection bar spacing
   if ((state.view === 'overview' && state.selectionMode)
       || (state.view === 'photoManager' && state.photoMgr && state.photoMgr.selecting)
-      || (state.view === 'jobManager' && state.jobMgr && state.jobMgr.selecting)) {
+      || (state.view === 'jobManager' && state.jobMgr && state.jobMgr.selecting)
+      || (state.view === 'cloudStorage' && state.cloudStore && state.cloudStore.selecting)) {   // V108
     document.body.classList.add('has-selection-bar');
   } else {
     document.body.classList.remove('has-selection-bar');
