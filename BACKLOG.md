@@ -8,10 +8,20 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V108
-Stage 5 part 3 complete (V107 cloud delete, V108 Cloud Storage). Next: the
-housekeeping release (favicon set, remove dead `setupLongPress`, the sheet-markup
-guard). Full order: roadmap v4.21.
+### Next after V109
+V109 = the cloud-tab link to Cloud Storage, the favicon set and removing
+`setupLongPress` (spec 1A — the housekeeping release split). Next: V110 = the
+general sheet-markup guard on its own, spec ALREADY LOCKED at the V109 round
+(5A register, 6A fix one-class gaps) — see "General sheet-markup guard" below.
+Then Stage 11. Full order: roadmap v4.22.
+
+### V109 residuals (known, accepted)
+- The tab icon is checked by eye only (46c proves the file holds 16/32/48 and is
+  wired and precached, not how it looks).
+- The new home-screen icon reaches only phones that add PATGo to the home screen
+  afresh; existing installs keep the icon they were given.
+- `patgo-mark-128.png` (uploaded with the icon set, July) is not used by the app;
+  left in place — it may serve the landing page.
 
 ### V108 residuals (known, accepted)
 - Not yet tested on real phones or against the real database. The V108 SQL's own
@@ -29,9 +39,7 @@ guard). Full order: roadmap v4.21.
 - A delete from Cloud Storage re-reads after the follow-up sync run; if that run
   fails to remove the photos, the figures still count them (honest), and the next
   run removes them.
-- Placement: roadmap v4.20 had planned this view "from the cloud tab, not
-  Settings"; Peter chose Settings → Data at the round (1A). Option if wanted: a
-  "Cloud Storage" link on the cloud tab (one line, no new logic).
+- ~~Placement: a link from the cloud tab~~ — DONE in V109 (2A, 3A: both ways in).
 - Harness 25l failed once while the mutation probe ran under heavy load (M753's
   run; the same mutation re-run alone: 45i only). Green on every plain run —
   a timing sensitivity to watch in the full sweep.
@@ -414,9 +422,8 @@ promotion to `Release` — all PASS at V84 incl. 6a–6d. V85 changed no SQL.
   `shouldCreateUser: false` + RLS. Remove the code at commercial launch.
 - Free users on the GitHub Pages address now SEE a "Cloud" row (1A); it asks
   for a code they don't have. Accepted by Peter at V85.
-- `setupLongPress` (utils.js) has no caller since the About long-press went.
-  Dead code — remove in a structural release, not a feature one (13x source-
-  guards that it exists; update that test with the removal).
+- ~~`setupLongPress` (utils.js) has no caller~~ — REMOVED in V109 (13n now
+  guards that it stays gone).
 
 ### Cloud — V86 residuals (known, accepted)
 - Two phones that both change the descriptions list's ORDER (not its contents)
@@ -557,8 +564,19 @@ unboundedly; tidy it if that sheet is ever touched for another reason.
 
 ### General sheet-markup guard — the part of the audit not built
 
-**Scheduled (Peter, V102 round)** in the housekeeping release with the favicon set
-and removing `setupLongPress`; needs its own short spec round. Harness 12d catches any CSS rule that hand-rolls a scroller
+**V110 — spec LOCKED at the V109 round (Peter, 10 Oct: defaults).** Split from the
+housekeeping release (1A) so it rides alone.
+- 5A: a REGISTER in the harness. The guard finds every sheet (`.bulk-sheet` /
+  `.fail-sheet` markup, `_openSheet(` callers); each must use `.sheet-scroll` or be
+  named in the register with a one-line reason ("two buttons, fixed wording"). A
+  new sheet fails the run until someone decides. No app file changes for the
+  guard itself. (Not B — a marker attribute on ~25 sheets in six files; not C — a
+  "builds a list" guess, which misses caller text.)
+- 6A: a real gap it finds (a body that can grow, no scroller) is fixed in V110 when
+  the fix is only adding the existing `.sheet-scroll` class; each named in the
+  handoff and the test checklist. Anything bigger → its own release.
+- Rough first pass at the V109 round: ~45 sheet sites, about half with no scroller
+  in their markup — most expected to be fixed confirms. Harness 12d catches any CSS rule that hand-rolls a scroller
 without `min-height: 0`, which covers sheets nobody has written yet. What it does
 NOT catch is a new sheet whose growing body is never marked at all — there is no
 rule to inspect, because the mistake is an absence.
@@ -872,7 +890,5 @@ starting changes the calculus — don't rebuild the reasoning from nothing.
   confirmed JSON backups. ⚠ PWA data is origin-bound — never migrate first.
 - Cold-user testing: phone handed over, three appliances, one certificate, no
   intervention. Needed before any documentation or tour rebuild.
-- Tight-cropped favicon set for tab legibility (deferred from V58) — SCHEDULED in
-  the housekeeping release (Peter, V102 round).
 - `backupVersion` bump to 6 — reserved for a genuinely incompatible schema
   change. Not yet triggered.

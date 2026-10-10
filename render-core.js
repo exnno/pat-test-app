@@ -240,9 +240,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>See your cloud space.</strong> If you use the cloud: Settings &rarr; Data &rarr; <strong>Cloud Storage</strong> shows how much your jobs and photos take up in the cloud, and the total.</li>
-        <li><strong>Your biggest jobs.</strong> The ten jobs taking the most space, photos included, each marked &#9729; or &ldquo;on this phone&rdquo;.</li>
-        <li><strong>Make room.</strong> Select a big job that isn&rsquo;t on this phone, then <strong>Delete&hellip;</strong> &mdash; the same careful check as the cloud tab. <strong>Manage Photos</strong> is one tap away.</li>
+        <li><strong>Cloud Storage from your jobs.</strong> If you use the cloud: Jobs &rarr; &#9729; In the cloud now has <strong>&#9729; Cloud Storage &rsaquo;</strong> at the top &mdash; see how much space your jobs and photos take without going into Settings. Back brings you straight back to the list.</li>
+        <li><strong>Still in Settings too.</strong> Settings &rarr; Data &rarr; Cloud Storage works as before.</li>
+        <li><strong>A clearer tab icon.</strong> On a computer, the browser tab now shows the PATGo plug, so it&rsquo;s easy to spot.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

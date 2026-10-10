@@ -4250,6 +4250,8 @@ body.has-selection-bar .screen.jm-screen { padding-bottom: 120px; }
 .jobs-tab.is-on { background: var(--accent-soft); color: var(--accent-text); }
 .cloud-head { display: flex; justify-content: flex-end; min-height: 4px; }
 .cloud-head:empty { display: none; }
+/* V109 (2A): Cloud Storage on the cloud tab — left of Select, a full-height tap target. */
+.cloud-head .cloud-storage-link { margin-right: auto; align-self: center; min-height: 40px; font-size: 14px; text-decoration: none; }
 .cloud-month {
   margin: 16px 2px 6px;
   font-size: 13px;

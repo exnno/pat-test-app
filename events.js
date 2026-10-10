@@ -183,10 +183,9 @@ function bindFocusFields() {
   // the drift slop and the capture-phase tap swallow are exactly the parts that
   // are easy to omit, and a per-site implementation is how the app ended up with
   // three sheet scrollers before V76. There is now ONE hold implementation for
-  // interactive controls. (utils.js's setupLongPress is the other one and is
-  // deliberately left alone — it is pointer-based, has no tap suppression, and
-  // serves the About-title reveal, which is a plain heading with no click action
-  // to swallow. Do not add a third; extend one of these two.)
+  // interactive controls — and since V109 the only one: utils.js's pointer-based
+  // setupLongPress (no caller since the About long-press went) was removed. Do
+  // not add a second; extend this one.)
   attachHoldGesture($('quick-grid'), QUICK_PICK_LONGPRESS_MS, () => {
     openPresetSheet();   // re-renders; handlers are rebound on the next paint
   });

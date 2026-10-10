@@ -1438,12 +1438,21 @@ function renderJobManager() {
 function renderCloudJobsHTML() {
   const cj = state.cloudJobs || {};
   const busy = cj.busy ? `<p class="pm-busy" id="cloud-busy" role="status">${escapeHTML(cj.busy)}</p>` : '';
+  // V109 (2A): Cloud Storage one tap from the cloud tab — the roadmap's original
+  // placement (cloud views live where jobs live). Shown whether or not the list
+  // has been read, and even with no cloud-only jobs: jobs on this phone take
+  // cloud space too. Hidden while ticking jobs, so it never sits beside the
+  // selection bar. Settings → Data → Cloud Storage stays (3A). Back returns
+  // here: cloudStoreOpen notes 'sessions' as the view to go back to, and the
+  // Jobs screen remembers its tab.
+  const storageBtn = (cj.selecting || typeof cloudStoreOpen !== 'function') ? ''
+    : `<button class="pm-look-link cloud-storage-link" data-action="cs-open">\u2601 Cloud Storage \u203a</button>`;
   if (!cj.ok) {
     let msg;
     if (cj.loading) msg = `<p class="muted pm-note" role="status">Reading the cloud\u2026</p>`;
     else if (cj.error) msg = `<p class="pm-note pm-error">${escapeHTML(cj.error)}</p><button class="btn-secondary cloud-retry" data-action="cloud-refresh">Try again</button>`;
     else msg = `<p class="muted pm-note">Jobs that aren't on this phone stay in the cloud. <button class="pm-look-link" data-action="cloud-refresh">Show them</button></p>`;
-    return `<div class="cloud-tab">${msg}</div>`;
+    return `<div class="cloud-tab"><div class="cloud-head">${storageBtn}</div>${msg}</div>`;
   }
   const m = cloudJobsModel();
   const search = m.total ? `
@@ -1463,7 +1472,7 @@ function renderCloudJobsHTML() {
   }
   return `
     <div class="cloud-tab">
-      <div class="cloud-head">${selectBtn}</div>
+      <div class="cloud-head">${storageBtn}${selectBtn}</div>
       ${search}
       ${busy}
       <div id="cloud-list-area">${renderCloudListAreaHTML(m)}</div>

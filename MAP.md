@@ -1,4 +1,4 @@
-# PATGo — Code Map (V108)
+# PATGo — Code Map (V109)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -125,10 +125,9 @@ is discoverable from the file you happen to be editing.
     gets one or two of the three. There is exactly one `.ontouchstart =` in the
     whole app and harness 13n fails if a second appears.
 
-    The other implementation, `setupLongPress()` (utils.js), is pointer-based
-    with no tap suppression and serves the About-title cloud reveal — a plain
-    heading with no click action to swallow. Two, with that division stated, is
-    the shipped state. A third is the defect; extend one of these instead.
+    It is the ONLY one: utils.js's pointer-based `setupLongPress()` (no caller
+    since the About long-press went) was removed in V109. A second is the
+    defect (13n); extend this one instead.
 
     ⚠ A control carrying a hold must also declare `-webkit-touch-callout: none`
     and BOTH forms of `user-select: none` in styles.css, per site — iOS answers a
@@ -224,6 +223,9 @@ filters match and answers its `select`; the older fakes (16–43) still answer a
 PATCH with 204 and change nothing — a test of an UPDATE must use 44's.
 ⚠ V108: group 45's fake (44's, extended) answers `doc_bytes` (the JSON's byte
 length) and the view's `b`, and `srv.noV108` answers "column does not exist".
+⚠ V109: group 46 copies 45's helpers and taps the cloud tab's DRAWN button
+(`tapRendered` reads its data-action from the markup). Release pins live in the
+newest group (46d); 45j keeps only V108's constant, dispatch and SQL checks.
 ⚠ V108 harness amendment — mutate.js speed-ups: a mutation's own test file (named
 in its `why`, e.g. "(45a)") runs alone first, trusted only if it passed alone on
 unmutated code; otherwise the full suite runs with PATGO_BAIL=1 (run.js stops after
@@ -289,8 +291,7 @@ survives navigation. Derived mirrors (`photoIndex`, `photoBytes`, the instrument
 flat fields) are never saved, backed up or validated. Rule 7 applies.
 
 ### utils.js (~265 ln) — pure helpers, no state access
-Formatting, escaping, colour, asset-number splitting/padding, long-press
-detector, boundary validators for item readings, `newId()`. V104: the readings
+Formatting, escaping, colour, asset-number splitting/padding, boundary validators for item readings, `newId()`. V104: the readings
 check's pure half — read the typed shorthand, the limit for a reading + class,
 "definitely outside?", the earth-ceiling normaliser (used by storage, backup,
 sync, dispatch, settings).
@@ -845,7 +846,7 @@ The **calibration banner is ONE banner** covering the worst instrument with
 `renderPhotoStripSheet()`, which now live in **render-review.js**.
 ⚠ v85: the dispatcher paints the three cloud views only when
 `cloudPagesUnlocked()` (cloud.js); otherwise `renderCloudLocked()`. The V43 About
-long-press is gone — `setupLongPress` (utils.js) now has no caller.
+long-press is gone (V109 removed the dead `setupLongPress`).
 ⚠ v93: `renderSessions()` draws the "On this phone | ☁ In the cloud" tabs when
 `syncActive()`; the cloud tab returns early with **render-review.js**
 `renderCloudJobsHTML()` (no banners, no new-session form there).
@@ -884,7 +885,9 @@ v91: `renderJobManager()` (view `jobManager`, same fallback) and
 `renderTidyBlock()` (also used by render-settings.js's Phone Storage page).
 v93: `renderCloudJobsHTML()`, `renderCloudListAreaHTML()` and
 `refreshCloudListAreaOnly()` — the Jobs screen's cloud tab (called from
-render-core.js, model in settings-actions.js).
+render-core.js, model in settings-actions.js). V109: its top row (`.cloud-head`)
+carries `cs-open` (Cloud Storage) in every state but selecting; Back returns to
+the tab because 'sessions' is in `_MGR_RETURN_VIEWS` (settings-actions.js).
 V98: the Overview's title bar is `.header-row.header-sticky` (styles.css; both the
 normal and selection headers). The site-notes card and its sheet
 (`state.siteNotesSheet`, cleared by setView) are drawn here; the sheet holds an
@@ -1381,3 +1384,7 @@ another file having parsed. Don't "DRY" this.
   (isolation 8a–8d), or it counts every account's photos. V108 added `b` (bytes)
   as its LAST column — a replaced view may only gain columns at the end.
 - `manifest.webmanifest` — icons, name, display mode.
+- Icons (V109): `favicon.ico` (the plug alone, 16/32/48 — browser tab) and
+  `apple-touch-icon.png` (180, home screen) are linked in **index.html** and
+  precached in **sw.js** ASSETS; `icon-192/512.png` are the manifest's.
+  `patgo-mark-128.png` is not used by the app. Harness 46c.
