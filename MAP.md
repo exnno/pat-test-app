@@ -1,4 +1,4 @@
-# PATGo — Code Map (V110)
+# PATGo — Code Map (V111)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -149,6 +149,15 @@ is discoverable from the file you happen to be editing.
     A new IndexedDB database needs adding to `_resetDeleteDatabases` and
     `_resetClearStores` by hand (nothing enforces that one).
 
+18. **Every cloud read names its owner (V111).** A read, update or delete of
+    `sessions` / `records` / `photos` / `session_photo_counts` carries
+    `.eq('user_id', uid)`; an upsert lands on `onConflict: 'user_id,id'`. Never
+    rely on the database rules to narrow it: from V112's business rules an
+    Owner, Team leader or Office login may READ other members' rows, and ids are
+    unique per account only. All such calls live in sync.js today (cloud.js
+    reads only `profiles`, by the login's own id). Harness 48a fails any new
+    call without it, in any app file.
+
 ---
 
 ## Load order (index.html) — 33 first-party files
@@ -195,7 +204,7 @@ NOT in `index.html`, NOT in `sw.js` ASSETS — test 01c fails if either changes.
 **Touch to:** validate a release (`node harness/run.js`, `node harness/mutate.js`),
 or add this release's assertions and mutations. Never delete from `tests/`.
 **Coupling:** derives load order from `index.html`; source-guards `report.js`,
-`csv.js` and the flat-field writers (rule 7); asserts rules 1, 8, 9, 11, 14, 15, 16.
+`csv.js` and the flat-field writers (rule 7); asserts rules 1, 8, 9, 11, 14, 15, 16, 18.
 ⚠ v77: the stub's `dispatchEvent` now fires `on<type>` PROPERTY handlers as well
 as `addEventListener` registrations, the way a real element does. Without it a
 property-bound handler could only be tested by hand-calling it — the V67
@@ -238,6 +247,11 @@ finder (a small JS scanner: which template a sheet sits in, where a statement
 ends — it follows `${var}` and top-level helper calls into the body). Keys are
 `file · aria-label`, or `file · fn()` for a templated label (+ ` #2`).
 `sheet-register.js` = the sheets with no scroller and why. Groups 47a–47e.
+⚠ V111: release pins live in 48f. Group 48 copies 45's helpers with the fake
+keyed on (user_id, id) like the real primary key, and NO rules applied — it
+returns every account's rows, the widest read V112 allows (an Owner). A test of
+"only my rows" seeds a second account's rows (`MATE`) where an unfiltered read
+would take them. 48a's chain reader (`readChain`) skips comments between links.
 ⚠ V108 harness amendment — mutate.js speed-ups: a mutation's own test file (named
 in its `why`, e.g. "(45a)") runs alone first, trusted only if it passed alone on
 unmutated code; otherwise the full suite runs with PATGO_BAIL=1 (run.js stops after
@@ -1024,7 +1038,9 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 
-### sync.js (~4680 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read
+### sync.js (~4700 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read
+⚠ V111: every table read names its owner — rule 18 (comment above
+`_syncCurrentUserId`; harness 48).
 V104: the settings_work row also carries `readingsCheck` (default ON — read
 `!== false`) and `earthLimit` (normaliseEarthLimit); normalise / record / valid /
 apply / diffs all list them.

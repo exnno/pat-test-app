@@ -8,12 +8,36 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V110
-V110 = the general sheet-markup guard (5A register, 6A — one gap fixed: Log
-again's notes preview) plus mutation housekeeping (spec 1A 2A 3A 4A 5B 6A 7A):
-every mutation's `why` names its test group where one could be proved, 01j/01k
-keep it so, the 11 repeated anchors re-anchored. Next: Stage 11 (organisation
-foundation, own spec round). Full order: roadmap v4.23.
+### Next after V111
+V111 = Stage 11 part 1 (spec 1A, 9A): the seven cloud reads that left "whose
+rows" to the database rules now name the account (harness 48). Next: **V112 =
+Stage 11 part 2, the database** — businesses, memberships, a business stamp on
+every job / record / photo row, new rules, isolation checks across businesses.
+Locked at the V111 round: 2A (a business column on rows, filled by the
+database from the writer — phones never send it; Peter asked the difference,
+answered: A, settled by his answer to 3), 4A (every existing account
+a business of one, Owner; new sign-ups the same; name blank), 5A (deleting a
+login no longer deletes its rows — Peter: "we need to get this right"; an
+employee's data stays valid), 7A (photo files follow the read rule; paths
+unchanged). Proposed, awaiting Peter: **3C** (several businesses per person
+allowed by the structure from day one, Peter: "a priority"; a default business
+stamps new rows; the "working for…" choice comes with Stage 16), **6A** (read
+by role — Owner/Team leader/Office read the business, Engineer own; everyone
+writes only their own), **8A** (plan/trial stay on the person; Stage 13 moves
+billing to the business). Full order: roadmap v4.24.
+
+### V111 residuals (known, accepted)
+- ⚠ A phone that never updates past V110 still reads owner-blind. Harmless
+  while every business has one member; once Stage 16 lets a second member in,
+  an Owner's V110 phone would pull the team's jobs as its own. Stage 16 (or
+  Stage 13) needs a minimum-version check before the first invite.
+- Upserts are checked for `onConflict: 'user_id,id'` only; that the row
+  carries `user_id: uid` is left to the rules' write check (V112 keeps writes
+  own-only, so a wrong owner is refused, not stored).
+- 48 proves the phone against a server that applies NO rules (the widest read).
+  The V112 rules themselves are proved only by `isolation-test.sql`.
+- Photo FILES are fetched by path `{uid}/…` — already this account's own; no
+  filter needed, and none is checked.
 
 ### V110 residuals (known, accepted)
 - Every mutation now names its group (01k) — all 376 untagged ones were proved

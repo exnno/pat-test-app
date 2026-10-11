@@ -356,6 +356,18 @@ function _syncCurrentUserId() {
   return (typeof cloudUserId === 'function') ? cloudUserId() : '';
 }
 
+// V111 (Stage 11, 1A) — EVERY read of sessions / records / photos /
+// session_photo_counts names its owner: .eq('user_id', uid). Never leave it
+// to the database rules. Today the rules return only your own rows, so the
+// filter changes nothing; from Stage 11's business rules (V112) an Owner, Team
+// leader or Office login may READ other members' rows, and a read without the
+// filter would pull a teammate's jobs onto this phone as if they were its own,
+// then push them back under this account. Worse, ids are unique only per
+// account (primary key user_id + id — utils.js), so a teammate's job could
+// land on top of one of yours with the same id. Harness 48 fails any read of
+// these tables without the filter (48a) and proves each one against a server
+// that returns everyone's rows (48b–48e).
+
 // ---- status (Sync page, prune guard) ---------------------------------------------
 // Synchronous: hashes every job, so call it only where that's affordable (the
 // Sync page render, a prune confirm) — never on the logging hot path.
@@ -1393,6 +1405,7 @@ function _syncPull(c, uid, st, out) {
   function page(from) {
     return c.from('sessions')
       .select(_SYNC_JOB_LIST_COLS)
+      .eq('user_id', uid)   // V111: this account's jobs only — never the rules alone
       .gte('updated_at', from)
       .order('updated_at', { ascending: true })
       .limit(SYNC_PULL_PAGE)
@@ -3022,6 +3035,7 @@ function _syncPullRecords(c, uid, st, out) {
   function page(from) {
     return c.from('records')
       .select('id,kind,doc,deleted,last_modified,updated_at')
+      .eq('user_id', uid)   // V111: this account's records only
       .in('kind', SYNC_RECORD_KINDS)
       .gte('updated_at', from)
       .order('updated_at', { ascending: true })
@@ -3244,7 +3258,7 @@ function syncHeldResolve(id, choice) {
 
   return cloudClient()
     .then((c) => c.from('sessions').select('id,doc,deleted,last_modified,updated_at')
-      .eq('id', sid).limit(1)
+      .eq('user_id', _syncCurrentUserId()).eq('id', sid).limit(1)   // V111: ids are unique per account only
       .then((r) => {
         if (r && r.error) throw r.error;
         const row = (r && r.data && r.data[0]) || null;
@@ -3315,7 +3329,7 @@ function _syncHeldResolveRecord(kind, sid, choice, key) {
 
   return cloudClient()
     .then((c) => c.from('records').select('id,kind,doc,deleted,last_modified,updated_at')
-      .eq('id', sid).limit(1)
+      .eq('user_id', _syncCurrentUserId()).eq('id', sid).limit(1)   // V111: this account's copy of the record
       .then((r) => {
         if (r && r.error) throw r.error;
         const row = (r && r.data && r.data[0]) || null;
@@ -3504,7 +3518,8 @@ function syncHeldDiff(id) {
     _syncRepaint();
   };
   return cloudClient()
-    .then((c) => c.from('sessions').select('id,doc,deleted,updated_at').eq('id', sid).limit(1))
+    .then((c) => c.from('sessions').select('id,doc,deleted,updated_at')
+      .eq('user_id', _syncCurrentUserId()).eq('id', sid).limit(1))   // V111: compare with this account's copy
     .then((r) => {
       if (r && r.error) throw r.error;
       const row = (r && r.data && r.data[0]) || null;
@@ -3750,7 +3765,7 @@ function _syncPhotoRowsPull(c, uid, st, out) {
   let chain = Promise.resolve();
   for (let i = 0; i < need.length; i += batch) {
     const chunk = need.slice(i, i + batch);
-    chain = chain.then(() => c.from('photos').select(_SYNC_PHOTO_COLS).in('session_id', chunk).eq('deleted', false))
+    chain = chain.then(() => c.from('photos').select(_SYNC_PHOTO_COLS).eq('user_id', uid).in('session_id', chunk).eq('deleted', false))
       .then((r) => {
         if (r && r.error) throw r.error;
         for (const row of ((r && r.data) || [])) decide(row);
@@ -3765,6 +3780,7 @@ function _syncPhotoRowsPull(c, uid, st, out) {
   function page(from) {
     return c.from('photos')
       .select(_SYNC_PHOTO_COLS)
+      .eq('user_id', uid)   // V111: this account's photo rows only
       .gte('updated_at', from)
       .order('updated_at', { ascending: true })
       .limit(SYNC_PULL_PAGE)
