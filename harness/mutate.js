@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V110';",
-    to:   "const APP_VERSION = 'V110';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V111';",
+    to:   "const APP_VERSION = 'V111';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V108</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V107</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V106</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (46d)',
+    from: '        <p><strong>V109</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V108</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V107</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 48f)',
   },
 
   {
@@ -1940,8 +1940,10 @@ const MUTATIONS = [
   {
     name: 'M261 (V83.1) the jobs pager asks for rows AFTER the mark again',
     file: 'sync.js',
-    from: "    return c.from('sessions')\n      .select(_SYNC_JOB_LIST_COLS)\n      .gte('updated_at', from)",
-    to:   "    return c.from('sessions')\n      .select(_SYNC_JOB_LIST_COLS)\n      .gt('updated_at', from)",
+    // V111: re-anchored on the line before the stamp (the owner filter now sits
+    // between select and gte).
+    from: "      .eq('user_id', uid)   // V111: this account's jobs only \u2014 never the rules alone\n      .gte('updated_at', from)",
+    to:   "      .eq('user_id', uid)   // V111: this account's jobs only \u2014 never the rules alone\n      .gt('updated_at', from)",
     why:  'a page that ends part-way through an upload batch steps over the rest of it for good — the V81–V83 bug (17b)',
   },
   {
@@ -2821,8 +2823,9 @@ const MUTATIONS = [
   {
     name: "M385 (V89) the photo pager steps past the boundary stamp",
     file: "sync.js",
-    from: "      .select(_SYNC_PHOTO_COLS)\n      .gte('updated_at', from)",
-    to:   "      .select(_SYNC_PHOTO_COLS)\n      .gt('updated_at', from)",
+    // V111: re-anchored past the owner filter.
+    from: "      .eq('user_id', uid)   // V111: this account's photo rows only\n      .gte('updated_at', from)",
+    to:   "      .eq('user_id', uid)   // V111: this account's photo rows only\n      .gt('updated_at', from)",
     why:  "rules 10/14: the V83.1 pager shape for photo rows too (26m)",
   },
   {
@@ -5541,7 +5544,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 47f)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 48f)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5634,6 +5637,68 @@ const MUTATIONS = [
     from: "they would all read as unmarked \u002847b)",
     to:   "they would all read as unmarked",
     why:  "4A: every mutation names the group that catches it, so the sweep never falls back to the whole suite (01k)",
+  },  {
+    name: "M786 (V111) the jobs pull leaves its owner to the rules",
+    file: "sync.js",
+    from: ".select(_SYNC_JOB_LIST_COLS)\n      .eq('user_id', uid)   // V111: this account's jobs only \u2014 never the rules alone\n",
+    to:   ".select(_SYNC_JOB_LIST_COLS)\n",
+    why:  "under V112's business rules an Owner reads every member's jobs: a teammate's delete of a job with your job's id would remove yours from this phone (48a 48b)",
+  },
+  {
+    name: "M787 (V111) the records pull leaves its owner to the rules",
+    file: "sync.js",
+    from: "      .eq('user_id', uid)   // V111: this account's records only\n",
+    to:   "",
+    why:  "a teammate's later edit of a client with your client's id would replace yours on this phone (48a 48c 48e)",
+  },
+  {
+    name: "M788 (V111) Use the cloud copy (job) reads by id alone",
+    file: "sync.js",
+    from: ".eq('user_id', _syncCurrentUserId()).eq('id', sid).limit(1)   // V111: ids are unique per account only",
+    to:   ".eq('id', sid).limit(1)",
+    why:  "ids are unique per account only, so a read by id alone can return a teammate's job and put it in place of yours (48a 48e)",
+  },
+  {
+    name: "M789 (V111) Use the cloud copy (record) reads by id alone",
+    file: "sync.js",
+    from: ".eq('user_id', _syncCurrentUserId()).eq('id', sid).limit(1)   // V111: this account's copy of the record",
+    to:   ".eq('id', sid).limit(1)",
+    why:  "a held client answered with the cloud copy could take a teammate's client of the same id (48a 48e)",
+  },
+  {
+    name: "M790 (V111) Compare reads by id alone",
+    file: "sync.js",
+    from: ".eq('user_id', _syncCurrentUserId()).eq('id', sid).limit(1))   // V111: compare with this account's copy",
+    to:   ".eq('id', sid).limit(1))",
+    why:  "Compare could set your job beside a teammate's same-id job, or say your cloud copy is gone when theirs was deleted (48a 48e)",
+  },
+  {
+    name: "M791 (V111) the late-job photo read leaves its owner to the rules",
+    file: "sync.js",
+    from: ".select(_SYNC_PHOTO_COLS).eq('user_id', uid).in('session_id', chunk)",
+    to:   ".select(_SYNC_PHOTO_COLS).in('session_id', chunk)",
+    why:  "a teammate's photo rows on a job with your job's id would be counted as your job's photos (48a 48d)",
+  },
+  {
+    name: "M792 (V111) the photo pull leaves its owner to the rules",
+    file: "sync.js",
+    from: "      .eq('user_id', uid)   // V111: this account's photo rows only\n",
+    to:   "",
+    why:  "the photo pager would take a teammate's rows as this phone's (48a 48d)",
+  },
+  {
+    name: "M793 (V111) a jobs upsert stops landing on (user_id, id)",
+    file: "sync.js",
+    from: ".then(() => c.from('sessions').upsert(batch.map(w => w.row), { onConflict: 'user_id,id' }))",
+    to:   ".then(() => c.from('sessions').upsert(batch.map(w => w.row), { onConflict: 'id' }))",
+    why:  "ids are unique per account only: an upsert keyed on id alone would collide with a teammate's job of the same id (48a)",
+  },
+  {
+    name: "M794 (V111 harness) the owner guard reads no tables",
+    file: "harness/tests/48-owner-reads.js",
+    from: "const TABLES = ['sessions', 'records', 'photos', 'session_photo_counts'];",
+    to:   "const TABLES = [];",
+    why:  "a guard that finds no calls passes while proving nothing \u2014 the floor on the count is what stops it (48a)",
   },
 ];
 

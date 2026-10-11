@@ -80,6 +80,11 @@ Adding coverage for a release:
 5. **A new bottom sheet:** mark the part that can grow `.sheet-scroll` (and what
    sits below it `.sheet-pin`), or add it to `sheet-register.js` with the reason
    nothing in it grows. Group 47 fails until one of the two is true.
+6. **A new read of the cloud tables** (`sessions`, `records`, `photos`,
+   `session_photo_counts`): give it `.eq('user_id', uid)` (an upsert:
+   `onConflict: 'user_id,id'`). Group 48a fails until it does (V111, MAP rule 18).
+   A test that it reads only this account's rows seeds a second account's rows in
+   48's fake, which applies no rules — the widest read V112 allows.
 
 ### Before you write an assertion, ask whether it could pass on broken code
 
@@ -95,6 +100,12 @@ looked green. The specific ways they were hollow:
   like that get **source guards** (`04h`, `04i`, `04j`) — not a promise to test
   them properly later.
 - **Never reaching the code at all.** Test data that doesn't hit the branch.
+- **Asserting on the wrong thing entirely.** V111's 48d first read
+  `'ZZMATEPH1' in sent` — `sent` was the helper FUNCTION, not its result, so the
+  check could never fail. Its own mutation (M792) survived everything but the
+  source guard, which is how it was found. The same release's 48e first let the
+  sync that follows an answer re-read the right row and quietly repair a wrong
+  answer (M789 survived the outcome check): stamp the row behind the cursor.
 
 ### If a test fails, suspect the harness first
 
