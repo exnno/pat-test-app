@@ -19,13 +19,13 @@
    chain reader is checked against an independent plain count, so it cannot
    pass by finding nothing.
    48b–48e run the real sync against a fake server that does NOT apply the
-   rules — it returns every account's rows, as the V112 rules will for an
+   rules — it returns every account's rows, as the V113 rules will for an
    Owner — seeded with a teammate's rows that would do damage if read: a
    delete of a job with your job's id, a later edit of your client, photo rows
    on your job's id, a first-in-table copy of a held job. Helpers are 45's,
    with the fake keyed on (user_id, id) like the real primary key.
 
-   ⚠ WHAT THIS FILE CANNOT PROVE. The rules themselves (V112's SQL and
+   ⚠ WHAT THIS FILE CANNOT PROVE. The rules themselves (V113's SQL — the database release, renumbered from V112 — and
    isolation-test.sql do). Reads in vendored code (supabase.umd.js) are out of
    scope; cloud.js reads profiles by the login's own id, which no team rule
    widens. */
@@ -474,16 +474,5 @@ module.exports = async function () {
     t.ok(one.length >= 3 && one.every(u => u.includes('user_id=eq.' + UID)), 'every one-row read asks for this account by name');
   });
 
-  /* ------------------------------------------------------------------ 48f */
-  await t.group('48f — release: V111, cache, no welcome (9A), changelog', () => {
-    const app = bootApp();
-    t.eq(app.run('APP_VERSION'), 'V111', 'APP_VERSION V111');
-    t.eq(app.run('WELCOME_VERSION'), 'V110', 'the welcome stays V110 — nothing to see this release (9A)');
-    const sw = fs.readFileSync(path.join(APP_DIR, 'sw.js'), 'utf8');
-    t.includes(sw, "const CACHE_VERSION = 'pat-v111';", 'cache key pat-v111');
-    const help = fs.readFileSync(path.join(APP_DIR, 'render-help.js'), 'utf8');
-    const a = help.indexOf('<p><strong>V111</strong>'), b = help.indexOf('<p><strong>V110</strong>'), c = help.indexOf('<p><strong>V109</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V111, V110, V109');
-    t.excludes(help, '<p><strong>V108</strong>', 'V108 rolled off');
-  });
+  // 48f (V111 release pins) moved to 49k in V112, as 47f moved to 48f.
 };
