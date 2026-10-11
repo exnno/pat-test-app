@@ -108,17 +108,7 @@ module.exports = async function () {
       'and the finder sees it (it left the register)');
   });
 
-  await t.group('47f — release: V110, cache, welcome copy, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V110', 'APP_VERSION V110');
-    t.eq(app.run('WELCOME_VERSION'), 'V110', 'welcome rolled');
-    const sw = fs.readFileSync(path.join(APP_DIR, 'sw.js'), 'utf8');
-    t.includes(sw, "const CACHE_VERSION = 'pat-v110';", 'cache key pat-v110');
-    const core = fs.readFileSync(path.join(APP_DIR, 'render-core.js'), 'utf8');
-    t.includes(core, '<strong>Long notes in Log again.</strong>', 'the welcome copy is this release’s');
-    const help = fs.readFileSync(path.join(APP_DIR, 'render-help.js'), 'utf8');
-    const a = help.indexOf('<p><strong>V110</strong>'), b = help.indexOf('<p><strong>V109</strong>'), c = help.indexOf('<p><strong>V108</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V110, V109, V108');
-    t.excludes(help, '<p><strong>V107</strong>', 'V107 rolled off');
-  });
+  // V111: the V110 release pins (version, cache, welcome copy, changelog) were
+  // retired to 48f, the same hand-on as 46d → 47f at V110. 47a–47e are V110's
+  // lasting checks and stay.
 };
