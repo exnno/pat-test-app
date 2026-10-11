@@ -240,8 +240,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Long notes in Log again.</strong> When you hold <strong>Copy last</strong> to log more of the same item, a long note in the preview now scrolls, so the number box and <strong>Add</strong> always stay on screen.</li>
-        <li><strong>Pop-ups checked.</strong> Every pop-up in the app is now checked automatically, so one with a long list or long notes can always scroll to its buttons.</li>
+        <li><strong>No more lost settings.</strong> If you change something on a settings page and tap Back without saving, PATGo now asks: <strong>Save</strong>, <strong>Discard changes</strong> or keep editing. Edit session asks too.</li>
+        <li><strong>Save takes you back.</strong> Saving a settings page now returns you to the section you came from, the same place Back does.</li>
+        <li><strong>Setting up a new phone.</strong> The branding step now has a <strong>Make PDF reports</strong> switch, so a new phone is ready to make certificates straight away.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -343,6 +344,18 @@ function render() {
         ${logoPreview}
         <label class="label" style="margin-top:12px">Report colour</label>
         <div class="wizard-theme-row">${themes}</div>
+        <!-- V112 (4A): reports start OFF (Settings says why); a phone being set up
+             is the moment to choose. ON for a new phone, current value on a re-run. -->
+        <div class="lock-toggle-row" style="margin-top:14px">
+          <div class="lock-toggle-text">
+            <div class="lock-toggle-title">Make PDF reports</div>
+            <div class="lock-toggle-sub">Adds the Reports button, so you can make a certificate from any job. You can turn it off in Settings → Reports &amp; Exports.</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="wizard-reports" data-change-action="wizard-reports" ${state.wizardReportsOn ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
       `;
       footHTML = `
         <button class="btn-primary" data-action="wizard-next">Continue</button>
@@ -510,6 +523,9 @@ function render() {
   // Record the view actually committed this render, for next render's comparison.
   _lastRenderedView = state.view;
   bindFocusFields();
+  // V112: the unsaved-changes guard reads what this paint put on the page
+  // (settings-actions.js). After the DOM is in, before anything focuses.
+  if (typeof unsavedAfterRender === 'function') { try { unsavedAfterRender(); } catch (e) {} }
   if (state.signaturePadOpen) initSignaturePad();   // v34
   // V100: fire the 100 moment's sparks once (render-help.js). Cosmetic — never
   // allowed to break a render.

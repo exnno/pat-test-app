@@ -8,23 +8,55 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V111
-V111 = Stage 11 part 1 (spec 1A, 9A): the seven cloud reads that left "whose
-rows" to the database rules now name the account (harness 48). Next: **V112 =
-Stage 11 part 2, the database** — businesses, memberships, a business stamp on
-every job / record / photo row, new rules, isolation checks across businesses.
-Locked at the V111 round: 2A (a business column on rows, filled by the
-database from the writer — phones never send it; Peter asked the difference,
-answered: A, settled by his answer to 3), 4A (every existing account
-a business of one, Owner; new sign-ups the same; name blank), 5A (deleting a
-login no longer deletes its rows — Peter: "we need to get this right"; an
-employee's data stays valid), 7A (photo files follow the read rule; paths
-unchanged). Proposed, awaiting Peter: **3C** (several businesses per person
-allowed by the structure from day one, Peter: "a priority"; a default business
-stamps new rows; the "working for…" choice comes with Stage 16), **6A** (read
-by role — Owner/Team leader/Office read the business, Engineer own; everyone
-writes only their own), **8A** (plan/trial stay on the person; Stage 13 moves
-billing to the business). Full order: roadmap v4.24.
+### Next after V112
+V112 = browser-test fixes (spec 0A 1A 2A 3A 4A 5A 6A): Back asks before losing
+unsaved changes on the seven Settings Save pages and Edit session; Save lands
+where Back would; setup's branding step offers *Make PDF reports*; setup counts
+as having seen What's new (harness 49). **0A: the database release moved from
+V112 to V113, unchanged.** Next: **V113 = Stage 11 part 2, the database** —
+businesses, memberships, a business stamp on every job / record / photo row, new
+rules, isolation checks across businesses. Locked at the V111 round: 2A (a
+business column on rows, filled by the database from the writer — phones never
+send it), 4A (every existing account a business of one, Owner; new sign-ups the
+same; name blank), 5A (deleting a login no longer deletes its rows — Peter: "we
+need to get this right"; an employee's data stays valid), 7A (photo files follow
+the read rule; paths unchanged). Proposed, still awaiting Peter: **3C** (several
+businesses per person allowed by the structure from day one, Peter: "a
+priority"; a default business stamps new rows; the "working for…" choice comes
+with Stage 16), **6A** (read by role — Owner/Team leader/Office read the
+business, Engineer own; everyone writes only their own), **8A** (plan/trial stay
+on the person; Stage 13 moves billing to the business). Full order: roadmap.
+
+### From the V112 browser test (11 Oct) — backlogged at 6A
+- **About / Privacy wording is out of date.** About says "Nothing is uploaded,
+  no account needed"; Privacy says "The app makes no network calls after the
+  initial install". Both untrue for a signed-in (sync) user. Write the final
+  wording from the privacy + processor terms (outstanding), not twice
+  (render-help.js, settings About).
+- **CSV import "Merge into existing session" appends every row, duplicates and
+  all** (csv.js `commitImportedSession`): importing the same file twice doubles
+  the job, with repeated asset numbers on the certificate. At least warn ("N of
+  these match items already in this job").
+- Smaller, seen in the same test (not specced): the job card's "3 fail" wraps to
+  a second line at 375 px; copying the CSV to the clipboard marks a job
+  "Exported"; the branding step's company placeholder reads "e.g. Birchley PAT
+  Services"; the merge does not update the job's `lastModified`; tapping outside
+  the Site notes sheet discards typed notes without asking (2B, not taken);
+  Settings Save buttons sit at the bottom of long pages (1C — fold into the
+  settings menu redo).
+
+### V112 residuals (known, accepted)
+- The guard covers the on-screen Back arrow only. Leaving by "Refresh" on the
+  update banner, or the app being closed, still drops unsaved typing (a
+  standalone PWA has no browser Back; nothing else leaves these pages).
+- On Report Settings the template sheets, logo and signature save instantly as
+  before; Discard keeps them (they are already saved). Discard re-reads saved
+  settings, so it also drops any in-memory-only report change made elsewhere
+  before the page was opened (none known).
+- Multi Pick's Quick Pick tile pickers are compared as shown; a value fixed up by
+  the page's own clash rule (`mpQpPicked`) counts as a change, which it is.
+- Group 49 fills boxes as the browser would (the stub does not parse values);
+  the paint wiring itself is proved by 49b and by M797.
 
 ### V111 residuals (known, accepted)
 - ⚠ A phone that never updates past V110 still reads owner-blind. Harmless
@@ -32,10 +64,10 @@ billing to the business). Full order: roadmap v4.24.
   an Owner's V110 phone would pull the team's jobs as its own. Stage 16 (or
   Stage 13) needs a minimum-version check before the first invite.
 - Upserts are checked for `onConflict: 'user_id,id'` only; that the row
-  carries `user_id: uid` is left to the rules' write check (V112 keeps writes
+  carries `user_id: uid` is left to the rules' write check (V113 keeps writes
   own-only, so a wrong owner is refused, not stored).
 - 48 proves the phone against a server that applies NO rules (the widest read).
-  The V112 rules themselves are proved only by `isolation-test.sql`.
+  The V113 rules themselves are proved only by `isolation-test.sql`.
 - Photo FILES are fetched by path `{uid}/…` — already this account's own; no
   filter needed, and none is checked.
 

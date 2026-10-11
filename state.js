@@ -378,6 +378,10 @@ let state = {
   wizardStep: 1,
   wizardPath: '',
   wizardSeedDemo: false,
+  // V112 (4A): the step-4 "Make PDF reports" switch. Transient. ON for a new
+  // phone; restartOnboarding() sets it from the phone's current setting, so a
+  // re-run cannot quietly switch reports back on. Applied on Continue from step 4.
+  wizardReportsOn: true,
 
   // v42: full-screen feature walkthrough (decision 6-i). Transient — never
   // persisted, never in backups (the tour keeps no data). tourOpen gates the

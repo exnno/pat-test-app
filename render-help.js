@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">✨ Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V111: rolled forward — V111 on top, V108 dropped. -->
+      <!-- v8: rolling 3-version changelog. V112: rolled forward — V112 on top, V109 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V112</strong> &middot; October 2026</p>
+        <p class="muted">Tapping Back on a settings page (or Edit session) with unsaved changes now asks whether to save them, instead of losing them. Save returns you to where you came from. Setting up a new phone now offers to switch PDF reports on, and skips the What&rsquo;s new message.</p>
         <p><strong>V111</strong> &middot; October 2026</p>
         <p class="muted">Behind the scenes, ready for teams: when this phone syncs, it now asks the cloud for your own jobs, clients and photos by name. Nothing changes on screen.</p>
         <p><strong>V110</strong> &middot; October 2026</p>
         <p class="muted">Log again (hold Copy last): a long note in the preview now scrolls, so the number box and Add stay on screen. Every pop-up in the app is now checked automatically to make sure it can scroll to its buttons.</p>
-        <p><strong>V109</strong> &middot; October 2026</p>
-        <p class="muted">Cloud Storage is now one tap from your jobs: Jobs &rarr; &#9729; In the cloud &rarr; &#9729; Cloud Storage. It&rsquo;s still in Settings &rarr; Data too. On a computer, the browser tab shows a clearer PATGo icon.</p>
 
 
         </div>

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V111)
+# PATGo — Code Map (V112)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -152,11 +152,19 @@ is discoverable from the file you happen to be editing.
 18. **Every cloud read names its owner (V111).** A read, update or delete of
     `sessions` / `records` / `photos` / `session_photo_counts` carries
     `.eq('user_id', uid)`; an upsert lands on `onConflict: 'user_id,id'`. Never
-    rely on the database rules to narrow it: from V112's business rules an
+    rely on the database rules to narrow it: from V113's business rules (renumbered from V112) an
     Owner, Team leader or Office login may READ other members' rows, and ids are
     unique per account only. All such calls live in sync.js today (cloud.js
     reads only `profiles`, by the login's own id). Harness 48a fails any new
     call without it, in any app file.
+
+19. **A page with a Save button is guarded (V112).** Its Back must go through
+    `unsavedLeave()` and the page must be listed in `UNSAVED_PAGES`
+    (settings-actions.js) with the inputs its Save reads — or Back silently
+    throws the typing away. Edits that live in STATE before Save (CSV moves, the
+    Edit session draft) need a `slice` (+ `revert`); a page mixing instant saves
+    (Report) compares with what is SAVED. Save lands via `settingsBackNav()`.
+    Harness 49a fails a new Settings Save page that is not listed.
 
 ---
 
@@ -249,9 +257,14 @@ ends — it follows `${var}` and top-level helper calls into the body). Keys are
 `sheet-register.js` = the sheets with no scroller and why. Groups 47a–47e.
 ⚠ V111: release pins live in 48f. Group 48 copies 45's helpers with the fake
 keyed on (user_id, id) like the real primary key, and NO rules applied — it
-returns every account's rows, the widest read V112 allows (an Owner). A test of
+returns every account's rows, the widest read V113 allows (an Owner). A test of
 "only my rows" seeds a second account's rows (`MATE`) where an unfiltered read
 would take them. 48a's chain reader (`readChain`) skips comments between links.
+⚠ V112: release pins live in 49k. Group 49 "paints" a page: render() (real
+wiring), then fills the registered inputs with what the browser would show (the
+stub does not parse value=/checked=), then `unsavedAfterRender()`; 49b proves
+render() takes the read itself. The guard's question is found as the body child
+with aria-label "Save your changes?" (choice-sheet ids linger in the registry).
 ⚠ V108 harness amendment — mutate.js speed-ups: a mutation's own test file (named
 in its `why`, e.g. "(45a)") runs alone first, trusted only if it passed alone on
 unmutated code; otherwise the full suite runs with PATGO_BAIL=1 (run.js stops after
@@ -771,7 +784,7 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
 (scroll reset) live in `render()` via `_lastRenderedView`, not in `setView`.
 
-### settings-actions.js (~2070 ln) — the write half of the Settings screens + the photo manager (v90) + jobs on this phone (v91) + the Jobs screen's cloud tab (v93) + Cloud Storage (V108) — NEW v70
+### settings-actions.js (~2250 ln) — the write half of the Settings screens + the photo manager (v90) + jobs on this phone (v91) + the Jobs screen's cloud tab (v93) + Cloud Storage (V108) — NEW v70
 Per-page saves, Report Settings (text, logo, filename tokens), signature capture
 (draw and upload), CSV column ordering, Export/Import Setup UI handlers, the
 editable list settings (item types, fail reasons, descriptions) and the
@@ -783,6 +796,10 @@ changed; `deleteReportTemplate` records a `template` tombstone and saves via
 save() (18r: nothing outside storage/sync calls saveSettings()).
 **Touch to:** change what a Settings screen SAVES. To change how one is drawn,
 go to render-settings.js; to change a default, config.js.
+⚠ V112: the unsaved-changes guard (`UNSAVED_PAGES`, `unsavedAfterRender` — called
+from render()'s tail in render-core.js — `unsavedLeave`, `unsavedRevert`) and
+`settingsBackNav()` (Back's navigation, moved from dispatch.js; every page Save
+ends with it). Rule 19.
 **Coupling:** `saveReportSettingsForm()` reads the DOM, so any re-render must
 call `captureReportTextInputs()` first or unsaved text is lost (dispatch.js
 depends on this). `setTheme` delegates to `applyTheme` (session.js). Extracted
@@ -844,7 +861,7 @@ sync's `skipped` is the backstop). Delete… → `cloudDeleteOverview(sel, rows)
 `'cloudStorage'` is in `_MGR_RETURN_VIEWS` (Manage Photos returns to it) and
 `mgrGoBack` re-reads on arriving there. Actions `cs-*` in **dispatch.js**.
 
-### onboarding.js (~195 ln) — first-run wizard — NEW v70
+### onboarding.js (~250 ln) — first-run wizard — NEW v70
 The wizard state machine (step capture, paging, fresh/import fork, theme pick,
 demo toggle, finish, skip), `restartOnboarding()`, and `seedDemoSession()`.
 Holds `WIZARD_LAST_STEP`.
@@ -853,6 +870,10 @@ Holds `WIZARD_LAST_STEP`.
 instrument flat mirror and must keep calling `adoptMirrorIntoInstruments()`
 (rule 7). `onboardSetupImport()` delegates to setup.js; the final step can hand
 off to tour.js. Extracted from session.js in v70, byte identical.
+⚠ V112: Continue on step 4 applies `state.wizardReportsOn` to
+`reportSettings.enabled` and saves (a later Skip does not save()).
+`restartOnboarding()` sets the switch from the current setting. Finish / skip /
+import call `markWelcomeSeenAtSetup()` (WELCOME_KEY, config.js).
 
 ### render-core.js (~1890 ln) — dispatcher + the logging screens
 Owns `const app` and the `render()` dispatcher.
@@ -1338,11 +1359,13 @@ and write `state` and call `render()`. Everything else
 is delegated in dispatch.js — these stay direct because focus/blur/pointer timing
 can't be safely delegated.
 
-### dispatch.js (~1100 ln) — delegated event handling
+### dispatch.js (~1470 ln) — delegated event handling
 Three registries attached once to `#app` at boot: `ACTIONS` (click, ancestor-walk
 by `data-action`/`data-arg`), `INPUT_ACTIONS` (`data-input-action`),
 `CHANGE_ACTIONS` (`data-change-action`).
 **Touch to:** add or route any delegated click / input / change handler.
+V112: `back-to-settings` and `edit-back` (Edit session's arrow) route through
+`unsavedLeave()` (settings-actions.js); `edit-cancel` stays a plain discard.
 **Coupling:** only the four focus-sensitive fields and the two hold gestures are
 **not** here (events.js). Text-input actions must not `render()` on keystroke.
 File inputs must clear `el.value` immediately or re-choosing the same file fires

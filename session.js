@@ -3963,6 +3963,21 @@ function startEditSession() {
   render();
 }
 
+// V112: read the Edit session inputs into the draft. Used by Save and by the
+// Back guard (settings-actions.js), so both see the page exactly the same way.
+// Each lookup is guarded: the guard may run on a page that is mid-teardown.
+function captureEditSessionForm() {
+  const $ = id => document.getElementById(id);
+  const f = state.editForm;
+  if (!f) return;
+  if ($('ef-site')) f.site = $('ef-site').value;
+  if ($('ef-engineer')) f.engineer = $('ef-engineer').value;
+  if ($('ef-name')) f.name = $('ef-name').value;
+  if ($('ef-date')) f.date = $('ef-date').value;
+  if ($('ef-prefix')) f.prefix = $('ef-prefix').value;
+  f.locked = $('ef-locked') ? $('ef-locked').checked : false;   // v8
+}
+
 function saveSessionEdits() {
   const sess = activeSession();
   if (!sess) return;

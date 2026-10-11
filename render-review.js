@@ -707,7 +707,7 @@ function renderEditSession() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="cancel-edit-btn" data-action="edit-cancel" aria-label="Cancel">‹</button>
+        <button class="icon-btn" id="cancel-edit-btn" data-action="edit-back" aria-label="Back">‹</button>
         <div class="site-name">Edit session</div>
         <span style="width:40px"></span>
       </header>

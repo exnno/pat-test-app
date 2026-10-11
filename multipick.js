@@ -285,5 +285,5 @@ function saveMultiPickSettings() {
   // Through the normaliser, so a clash or a stray value can't be stored.
   state.multiPick = normaliseMultiPickConfig({ enabled, slots: slots.slice(0, MULTIPICK_MAX_SLOTS) });
   save();
-  setView('settings');
+  settingsBackNav();   // V112 (3A): Save lands where Back would
 }

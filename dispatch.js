@@ -571,14 +571,11 @@ registerActions({
 // ---------------------------------------------------------------------------
 registerActions({
   'edit-cancel': () => setView('overview'),
+  // V112 (2A): the header arrow asks first if the draft changed. The Cancel
+  // button beside Save stays a plain discard — it says what it does.
+  'edit-back': () => unsavedLeave(() => setView('overview')),
   'edit-save': () => {
-    const $ = id => document.getElementById(id);
-    state.editForm.site = $('ef-site').value;
-    state.editForm.engineer = $('ef-engineer').value;
-    state.editForm.name = $('ef-name').value;
-    state.editForm.date = $('ef-date').value;
-    state.editForm.prefix = $('ef-prefix').value;
-    state.editForm.locked = $('ef-locked') ? $('ef-locked').checked : false;   // v8
+    captureEditSessionForm();   // V112: shared with the Back guard (session.js)
     saveSessionEdits();
   }
 });
@@ -605,38 +602,10 @@ registerActions({
   // back from a category returns to the hub. setView is also used directly when
   // jumping to a page from a flat search result (settingsCategory stays null →
   // back goes to the hub, which is correct: there's no category context).
-  'back-to-settings': () => {
-    // v35: if we arrived at Report Settings via the preview's "Edit settings"
-    // deep-link, going back returns straight to a freshly-rebuilt preview.
-    if (state.reportPreviewReturnSessionId && state.view === 'settingsReport') {
-      const sid = state.reportPreviewReturnSessionId;
-      state.reportPreviewReturnSessionId = null;
-      setView('reports');   // a sensible underlay behind the preview overlay
-      // v64: async now (it may need to read photos before rebuilding the preview).
-      reopenReportPreview(sid).catch(() => {});
-      return;
-    }
-    // v77: if we arrived at Quick Pick Items from the entry screen's preset
-    // switcher ("⚙ Edit presets"), Back returns there rather than climbing into
-    // the Settings hierarchy the user never walked down. Consume the marker
-    // BEFORE setView, exactly as the report-preview branch above does — setView
-    // would clear it on the way out anyway, but reading it first is what makes
-    // the two branches the same shape.
-    if (state.presetEditReturnView && state.view === 'settingsItems') {
-      const back = state.presetEditReturnView;
-      state.presetEditReturnView = null;
-      setView(back);
-      return;
-    }
-    if (state.view === 'settingsCategory') {
-      state.settingsCategory = null;
-      setView('settings');
-    } else if (state.settingsCategory) {
-      setView('settingsCategory');
-    } else {
-      setView('settings');
-    }
-  },
+  // V112 (1A 2A): Back asks first when the page holds unsaved changes. The
+  // navigation itself moved to settingsBackNav() (settings-actions.js) so the
+  // Save handlers can land in the same place (3A).
+  'back-to-settings': () => unsavedLeave(settingsBackNav),
 
   // v30: Reports hub nav + actions. open-reports is defence-checked against the
   // master switch (the button is already hidden when off, this is a backstop).
@@ -1214,6 +1183,9 @@ registerChangeActions({
   // finish on the fresh path. No re-render needed (the checkbox holds its own
   // visual state), so just record the value.
   'wizard-seed-demo': (checked) => { wizardToggleDemo(checked); },
+  // V112 (4A): the step-4 reports switch. Recorded only — no re-render (the
+  // switch shows its own state, and step 4 holds a typed company name).
+  'wizard-reports': (checked) => { state.wizardReportsOn = !!checked; },
 
   // Overview — fails-only toggle + the per-row selection checkbox
   // (checkbox was in render-core.js bindOverviewBodyEvents).

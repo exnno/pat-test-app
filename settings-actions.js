@@ -36,7 +36,191 @@ function saveUserSettings() {
   // mirror of the active instrument and must never be written from here, or the
   // next syncActiveInstrumentMirror() would overwrite the write anyway.
   save();
-  setView('settings');
+  settingsBackNav();   // V112 (3A): Save lands where Back would
+}
+
+// ---------- V112 (1A 2A 3A): Back asks before it throws changes away ----------
+//
+// Seven Settings pages, and Edit session, keep what you type in the page itself
+// until you tap Save — and Save sits at the bottom of a long page while the Back
+// arrow is at the top. Before V112, Back simply left: everything typed, and on
+// Report Settings every switch flipped, was gone (the switches half-stuck in
+// memory until the app restarted). Now Back asks — Save / Discard changes /
+// Keep editing — but ONLY when something actually changed; an untouched page
+// leaves exactly as before, with no question.
+//
+// HOW "CHANGED" IS DECIDED, and why there are three ways:
+//
+//   • fields — the inputs Save reads. Read straight after every paint of the
+//     page (unsavedAfterRender, called from the render tail) and again on Back.
+//     After every paint, not just the first: a repaint draws from STATE, so the
+//     baseline is always "what the page showed" — a preset switched on Quick Pick
+//     Items (saved instantly) re-baselines instead of reading as an edit.
+//   • slice — for pages where an edit lives in STATE before Save (a CSV column
+//     moved up or down; the Edit session draft, which every keystroke mirrors).
+//     Those survive a repaint, so the per-paint field baseline cannot see them;
+//     the slice is compared with a copy taken when the page was FIRST opened, and
+//     that copy is what Discard puts back.
+//   • report — Report Settings mixes switches that wait for Save with ones that
+//     save instantly (Enable reports, the logo, templates). Compared with what is
+//     SAVED (loadReportSettings), so an instant save is never "unsaved"; and also
+//     with the page as opened, so a phone whose memory already differed from disk
+//     is not asked about changes nobody made. Discard re-reads what is saved.
+//
+// ⚠ Fields are looked up through `document`, one selector at a time — not a
+// comma list on #app. Same result on the phone, and it is the shape the harness
+// stub can answer (it registers ids, it does not parse markup).
+// ⚠ The question is a choice SHEET (feedback.js), built without render(): the
+// page underneath still holds the unsaved typing, and a repaint would wipe it —
+// the very thing this guard exists to stop (MAP rule 3).
+// ⚠ If the check itself throws, it counts as CHANGED: being asked once too often
+// is an annoyance; losing someone's typing is not recoverable.
+const UNSAVED_PAGES = {
+  settingsUser:         { fields: ['#settings-engineer'], save: () => saveUserSettings() },
+  settingsItems:        { fields: ['#settings-types'], save: () => saveItemTypesSettings() },
+  settingsFails:        { fields: ['#settings-reasons'], save: () => saveFailReasonsSettings() },
+  settingsDescriptions: { fields: ['#settings-descriptions'], save: () => saveDescriptionsSettings() },
+  settingsCsv: {
+    fields: ['.csv-col-row', '.csv-col-visible', '.csv-col-header'],
+    slice: () => state.csvColumns,
+    revert: (copy) => { state.csvColumns = copy; },
+    save: () => saveCsvColumnsSettings(),
+  },
+  settingsMultiPick: {
+    fields: ['#multipick-enabled', '.mp-slot-name', '.mp-slot-seq', '.mp-slot-qp'],
+    save: () => saveMultiPickSettings(),
+  },
+  settingsReport: { report: true, save: () => saveReportSettingsForm() },
+  editSession: {
+    fields: ['#ef-site', '#ef-engineer', '#ef-name', '#ef-date', '#ef-prefix', '#ef-locked', '#ef-instrument'],
+    capture: () => captureEditSessionForm(),
+    slice: () => state.editForm,
+    save: () => { captureEditSessionForm(); saveSessionEdits(); },
+  },
+};
+
+let _unsaved = null;   // { view, dom, slice, report } for the page on screen
+
+// Key order fixed, so two equal objects always compare equal as text.
+function _unsavedText(v) {
+  const norm = (x) => {
+    if (Array.isArray(x)) return x.map(norm);
+    if (x && typeof x === 'object') {
+      const o = {};
+      Object.keys(x).sort().forEach(k => { o[k] = norm(x[k]); });
+      return o;
+    }
+    return x;
+  };
+  return JSON.stringify(norm(v === undefined ? null : v));
+}
+
+function unsavedFieldSnapshot(selectors) {
+  const out = [];
+  (selectors || []).forEach(sel => {
+    document.querySelectorAll(sel).forEach(el => {
+      if (el.type === 'checkbox' || el.type === 'radio') out.push(sel + '=' + (el.checked ? '1' : '0'));
+      else if (el.dataset && el.dataset.colId && !('value' in el && el.value)) out.push(sel + '@' + el.dataset.colId);
+      else out.push(sel + '=' + String(el.value == null ? '' : el.value));
+    });
+  });
+  return JSON.stringify(out);
+}
+
+function _unsavedReportNow() {
+  return _unsavedText(normaliseReportSettings(state.reportSettings));
+}
+
+// Render tail (render-core.js). Opening a guarded page takes the slice/report
+// copies; every paint of it re-reads the fields. Any other page clears the guard.
+function unsavedAfterRender() {
+  const page = UNSAVED_PAGES[state.view];
+  if (!page) { _unsaved = null; return; }
+  if (!_unsaved || _unsaved.view !== state.view) {
+    _unsaved = {
+      view: state.view,
+      slice: page.slice ? _unsavedText(page.slice()) : null,
+      sliceCopy: page.slice ? JSON.parse(_unsavedText(page.slice())) : null,
+      report: page.report ? _unsavedReportNow() : null,
+    };
+  }
+  _unsaved.dom = unsavedFieldSnapshot(page.fields);
+}
+
+function unsavedChanges() {
+  const page = UNSAVED_PAGES[state.view];
+  if (!page) return false;
+  // A guarded page with no baseline means the paint-time read failed: ask.
+  if (!_unsaved || _unsaved.view !== state.view) return true;
+  if (page.report) {
+    captureReportTextInputs();   // the page's typing, into state, as Save would
+    const now = _unsavedReportNow();
+    return now !== _unsaved.report && now !== _unsavedText(loadReportSettings());
+  }
+  if (page.capture) page.capture();
+  if (page.slice && _unsavedText(page.slice()) !== _unsaved.slice) return true;
+  return unsavedFieldSnapshot(page.fields) !== _unsaved.dom;
+}
+
+// Put memory back to what is saved — the half of Discard that is not "leave".
+function unsavedRevert() {
+  const page = UNSAVED_PAGES[state.view];
+  if (!page || !_unsaved) return;
+  if (page.report) state.reportSettings = loadReportSettings();
+  if (page.revert && _unsaved.sliceCopy) page.revert(_unsaved.sliceCopy);
+  if (state.view === 'settingsDescriptions') state.descTextMode = false;   // as Save leaves it
+}
+
+// Every guarded Back goes through here. `nav` is what Back did before V112.
+function unsavedLeave(nav) {
+  let changed;
+  try { changed = unsavedChanges(); } catch (e) { changed = true; }
+  if (!changed) { nav(); return; }
+  const page = UNSAVED_PAGES[state.view];
+  openChoiceSheet({
+    title: 'Save your changes?',
+    message: 'You changed something on this page and haven’t saved it yet.',
+    choices: [
+      { label: 'Save', style: 'primary', onPick: () => page.save() },
+      { label: 'Discard changes', style: 'danger', onPick: () => { unsavedRevert(); nav(); } },
+    ],
+    cancelLabel: 'Keep editing',
+  });
+}
+
+// What a Settings page's Back arrow does (moved here from dispatch.js in V112 so
+// the Save handlers can land in the same place — 3A). Unchanged behaviour.
+function settingsBackNav() {
+  // v35: if we arrived at Report Settings via the preview's "Edit settings"
+  // deep-link, going back returns straight to a freshly-rebuilt preview.
+  if (state.reportPreviewReturnSessionId && state.view === 'settingsReport') {
+    const sid = state.reportPreviewReturnSessionId;
+    state.reportPreviewReturnSessionId = null;
+    setView('reports');   // a sensible underlay behind the preview overlay
+    // v64: async now (it may need to read photos before rebuilding the preview).
+    reopenReportPreview(sid).catch(() => {});
+    return;
+  }
+  // v77: if we arrived at Quick Pick Items from the entry screen's preset
+  // switcher ("⚙ Edit presets"), Back returns there rather than climbing into
+  // the Settings hierarchy the user never walked down. Consume the marker
+  // BEFORE setView, exactly as the report-preview branch above does — setView
+  // would clear it on the way out anyway, but reading it first is what makes
+  // the two branches the same shape.
+  if (state.presetEditReturnView && state.view === 'settingsItems') {
+    const back = state.presetEditReturnView;
+    state.presetEditReturnView = null;
+    setView(back);
+    return;
+  }
+  if (state.view === 'settingsCategory') {
+    state.settingsCategory = null;
+    setView('settings');
+  } else if (state.settingsCategory) {
+    setView('settingsCategory');
+  } else {
+    setView('settings');
+  }
 }
 
 // ---------- v30: Report Settings ----------
@@ -105,7 +289,7 @@ function saveReportSettingsForm() {
     reopenReportPreview(sid);
     return;
   }
-  setView('settings');
+  settingsBackNav();   // V112 (3A): Save lands where Back would
 }
 
 // Logo upload: read the chosen image, downscale its longest edge to
@@ -264,7 +448,7 @@ function saveDrawnSignature() {
 //     shouldn't block the save.
 function saveCsvColumnsSettings() {
   const rows = document.querySelectorAll('.csv-col-row');
-  if (!rows.length) { setView('settings'); return; }
+  if (!rows.length) { settingsBackNav(); return; }
   const next = [];
   rows.forEach(row => {
     const id = row.dataset.colId;
@@ -283,7 +467,7 @@ function saveCsvColumnsSettings() {
   state.csvColumns = next;
   ensureAllCsvColumns();
   save();
-  setView('settings');
+  settingsBackNav();   // V112 (3A)
 }
 
 function resetCsvColumnsSettings() {
@@ -544,7 +728,7 @@ function saveItemTypesSettings() {
     syncItemTypesFromActivePreset();
   }
   save();
-  setView('settings');
+  settingsBackNav();   // V112 (3A)
 }
 
 function saveFailReasonsSettings() {
@@ -552,7 +736,7 @@ function saveFailReasonsSettings() {
     .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 6);
   state.failReasons = reasons.length ? reasons : DEFAULT_FAIL_REASONS.slice();
   save();
-  setView('settings');
+  settingsBackNav();   // V112 (3A)
 }
 
 function saveDescriptionsSettings() {
@@ -567,7 +751,7 @@ function saveDescriptionsSettings() {
   });
   state.descTextMode = false;   // V95
   save();
-  setView('settings');
+  settingsBackNav();   // V112 (3A)
 }
 
 // ---------- V95 (3A, 4A): fix a description's spelling ----------

@@ -25,6 +25,7 @@ Everything works in aeroplane mode; nothing needs an account.
 - PDF certificates and CSV export/import
 - Backup and restore to a file, and an Export/Import Setup bundle for a new phone
 - Bluetooth HID barcode scanner support (keyboard-wedge mode)
+- Settings pages and Edit session ask before Back throws away unsaved changes (V112); first-time setup offers to switch PDF reports on
 
 `FEATURES.md` is the full reference — one `##` section per capability and per
 release. Don't read it whole: `grep -n '^## ' FEATURES.md`, then `sed` the section.
