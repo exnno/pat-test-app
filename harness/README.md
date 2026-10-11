@@ -84,7 +84,7 @@ Adding coverage for a release:
    `session_photo_counts`): give it `.eq('user_id', uid)` (an upsert:
    `onConflict: 'user_id,id'`). Group 48a fails until it does (V111, MAP rule 18).
    A test that it reads only this account's rows seeds a second account's rows in
-   48's fake, which applies no rules — the widest read V112 allows.
+   48's fake, which applies no rules — the widest read V113 allows (the database release, renumbered from V112).
 
 ### Before you write an assertion, ask whether it could pass on broken code
 
@@ -178,6 +178,15 @@ bug; leaving it red trains everyone to ignore the suite.
   suite after 180s and scores it caught. The full run is ~225 × 6s ≈ 25 min —
   in a tool with a per-command time limit, run it in slices with the name or
   file filter.
+- **A registered input starts EMPTY (V112).** The stub registers ids from
+  render()'s markup but does not read `value=` or `checked=`. A test whose
+  assertion depends on what a box shows must fill it the way the browser's paint
+  would (group 49's `paint()` / `paintWizard()`), and prove separately that the
+  real render() does the read. Two shapes caught while building 49: flipping a
+  STAND-IN element through the change delegation leaves the real box unchanged,
+  so a later DOM read overrides the handler — flip the registered element itself;
+  and a test that reads a missing saved blob as `null` fails by a group throw,
+  not by its assertion (M811) — default to `{}` so the assertion is what fails.
 
 ---
 
