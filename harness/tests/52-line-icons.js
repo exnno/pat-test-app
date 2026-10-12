@@ -15,16 +15,16 @@
      52b  what icon() draws: an SVG that takes the text colour, hidden from
           screen readers, named by class so a test can find it.
      52c  sweep: no old emoji icon on ANY screen (every view and Settings page,
-          drawn through render()), and the sweep CAN see one (classic on).
+          drawn through render()), and the sweep CAN see one (V116: icon()
+          swapped for an emoji-drawing stand-in — the Classic switch is gone).
      52d  Settings rows: the page's icon in the accent colour (13A).
      52e  the button rule: export/share = upload, import = download, a page
           opener ends in a chevron, the template save is plain words, + New.
      52f  1A 2A 3A: banners put the icon outside the escaped text (a name with
           markup in it is still escaped); empty states and wizard icons.
-     52g  14B the switch: off by default, through #app, stored per phone,
-          carried by backups (older backups leave it), cleared by reset.
-     52h  release: V115, What's new, cache, changelog, icons.js loaded and
-          probed. */
+     52g  RETIRED V116 with the Classic emoji switch (1A) — see group 53.
+     52h  icons.js loaded and probed. (V116: the V115 release lines moved
+          out — group 53 pins the current release.) */
 
 'use strict';
 
@@ -40,20 +40,6 @@ const strip = (s) => s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:\\'"`])\/
 
 // The old emoji used as icons. ● ○ → Ω × stay as text by design (BACKLOG V115).
 const OLD = /[\u{1F300}-\u{1FAFF}☀-⛿✀-➿⬆⬇↶↺↻＋⎘⏰⏱⏭▾▸▲▼⌄▦‹›⟳ℹ]/u;
-
-function fire(app, type, el) {
-  app.doc.getElementById('app').dispatchEvent({
-    type, target: el, defaultPrevented: false,
-    preventDefault() { this.defaultPrevented = true; }, stopPropagation() {},
-  });
-}
-function toggle(app, action, checked) {
-  const el = app.doc.createElement('input');
-  el.type = 'checkbox';
-  el.dataset.changeAction = action;
-  el.checked = checked;
-  fire(app, 'change', el);
-}
 
 // A job with a fail and a pass, and the optional features on, so the screens
 // draw their buttons. Retest reminders on so the Retest page draws its how-to.
@@ -127,11 +113,14 @@ module.exports = async function () {
     t.ok(views.length >= 30, `every view and Settings page drawn (${views.length})`);
     t.ok(svgs > 100, `…with line icons on them (${svgs})`);
     t.eq(bad.join(' | '), '', 'no emoji used as an icon anywhere');
-    // Prove the sweep is not blind: the same screens with the classic switch on.
-    const old = busyApp({ localStorage: { 'pat:iconsclassic': '1' } });
+    // Prove the sweep is not blind: the same screens with icon() replaced by a
+    // stand-in that draws an emoji (V116 — the Classic switch that did this is
+    // gone). If OLD or the svg-stripping ever stops seeing emoji, this fails.
+    const old = busyApp();
+    old.run("icon = function () { return '<span>\u{1F5D1}</span>'; }");
     let seen = 0;
     for (const v of VIEWS(old)) if (OLD.test(draw(old, v).replace(/<svg[\s\S]*?<\/svg>/g, ''))) seen++;
-    t.ok(seen >= 25, `with Classic emoji on, the sweep finds emoji on ${seen} screens`);
+    t.ok(seen >= 25, `with an emoji-drawing icon(), the sweep finds emoji on ${seen} screens`);
     // The text-only places keep their characters (they can't hold an svg).
     t.includes(read('report.js'), "polarity === true) ? '✓'", 'the PDF polarity column is untouched');
   });
@@ -219,52 +208,12 @@ module.exports = async function () {
     t.ok(/\.empty-state-icon \.ic \{ width: 44px; height: 44px;/.test(css) && /\.wizard-icon \.ic \{ width: 48px; height: 48px;/.test(css), '…both large');
   });
 
-  /* ------------------------------------------------------------------ 52g */
-  await t.group('52g — Classic emoji icons (14B): off by default, per phone, through #app, backed up, reset', () => {
-    const app = freshApp();
-    t.eq(app.state().iconsClassic, false, 'off by default');
-    t.eq(freshApp({ localStorage: { 'pat:iconsclassic': 'yes' } }).state().iconsClassic, false, 'garbage in storage → off');
-    const p = draw(app, 'settingsDisplay');
-    t.includes(p, 'Classic emoji icons', 'the switch, worded as locked (4A)');
-    t.includes(p, 'Shows the emoji the app used before V115. Temporary', '…with its note');
-    t.includes(p, 'data-change-action="icons-classic"', '…wired to its action');
-    toggle(app, 'icons-classic', true);
-    t.eq(app.state().iconsClassic, true, 'switched on through #app');
-    t.eq(app.storage.getItem('pat:iconsclassic'), '1', 'stored on this phone');
-    t.eq(app.fn('icon')('trash-2'), '<span class="ic-emoji" aria-hidden="true">\u{1F5D1}</span>', 'icon() now gives the old emoji');
-    t.ok(app.fn('icon')('share').startsWith('<svg'), 'share was always a line icon — it stays one');
-    t.includes(html(app), 'Classic emoji', 'the page repainted (summary or switch)');
-    const b = JSON.parse(JSON.stringify(app.fn('buildBackup')()));
-    t.eq(b.iconsClassic, true, 'a backup carries it');
-    toggle(app, 'icons-classic', false);
-    t.eq(app.storage.getItem('pat:iconsclassic'), '0', 'off is stored too');
-    app.fn('applyBackupData')(b);
-    t.eq(app.state().iconsClassic, true, 'restoring the backup brings it back');
-    delete b.iconsClassic;
-    toggle(app, 'icons-classic', false);
-    app.fn('applyBackupData')(b);
-    t.eq(app.state().iconsClassic, false, 'an older backup without it leaves this phone’s own');
-    b.iconsClassic = 'on';
-    app.fn('applyBackupData')(b);
-    t.eq(app.state().iconsClassic, false, 'only a true/false is taken');
-    t.includes(read('reset.js'), "['ICONS_CLASSIC_KEY', ICONS_CLASSIC_KEY, 'settings'],", 'Reset This Phone clears it');
-  });
+  /* 52g — RETIRED V116 (1A): the Classic emoji switch it tested is gone. Its
+     replacement checks (the switch is absent, the old choice is deleted, a V115
+     backup carrying it still restores) are group 53. */
 
   /* ------------------------------------------------------------------ 52h */
-  await t.group('52h — release: V115, What’s new, cache, changelog, icons.js loaded and probed', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V115', 'APP_VERSION V115');
-    t.eq(app.run('WELCOME_VERSION'), 'V115', 'What’s new rolls for V115');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v115';", 'cache key pat-v115');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>New line icons.</strong>', 'What’s new: icons');
-    t.includes(core, '<li><strong>Export and import arrows.</strong>', 'What’s new: arrows');
-    t.includes(core, '<li><strong>Prefer the old look?</strong>', 'What’s new: the switch');
-    t.excludes(core, '<li><strong>Settings says jobs.</strong>', 'V114’s copy is gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V115</strong>'), b = help.indexOf('<p><strong>V114</strong>'), c = help.indexOf('<p><strong>V113</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V115, V114, V113');
-    t.excludes(help, '<p><strong>V112</strong>', 'V112 rolled off');
+  await t.group('52h — icons.js loaded and probed', () => {
     const idx = read('index.html');
     t.ok(idx.indexOf('src="utils.js"') < idx.indexOf('src="icons.js"') && idx.indexOf('src="icons.js"') < idx.indexOf('src="storage.js"'), 'icons.js loads after utils.js, before anything that draws');
     t.includes(read('sw.js'), "  './icons.js',", 'and is precached');
