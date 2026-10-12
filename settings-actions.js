@@ -980,6 +980,12 @@ function setSound(enabled) {
   if (state.soundEnabled) playSound('pass');
 }
 
+// V115 (14B): Classic emoji icons on/off. The caller repaints; icon() reads the flag.
+function setIconsClassic(enabled) {
+  state.iconsClassic = !!enabled;
+  save();
+}
+
 // v17: item timestamps on/off.
 // v61: this NO LONGER GATES CAPTURE. `ts` is now stamped on every item's first
 // log regardless of this flag (see saveItem and the note in config.js); the flag
@@ -1669,7 +1675,7 @@ function jobsRemoveAsk(ids, onDone) {
     openConfirmSheet({
       title: `Remove ${_jmPlural(g.clear.length, 'job')} from this phone?`,
       message: `${g.clear.length === 1 ? 'It stays' : 'They stay'} in the cloud and on your other phones, with ${g.clear.length === 1 ? 'its' : 'their'} photos (${_jmPlural(items, 'item')}). ` +
-        `You can bring ${g.clear.length === 1 ? 'it' : 'them'} back from the Jobs screen \u2192 \u2601 In the cloud.` +
+        `You can bring ${g.clear.length === 1 ? 'it' : 'them'} back from the Jobs screen \u2192 In the cloud.`   /* V115: plain text — no icon in a message */ +
         (kept ? ` ${_jmPlural(kept, 'job')} not safe in the cloud yet ${kept === 1 ? 'stays' : 'stay'} on this phone.` : '') +
         (online ? '' : ' No signal right now: checked against the last sync.'),
       confirmLabel: 'Remove',

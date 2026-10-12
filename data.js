@@ -102,71 +102,73 @@ const BUG_REPORT_REPRO_DEFAULT = 'unsure';
 // A group with ONE visible page opens that page straight from the hub
 // (settings-actions.js settingsOpenCategory) — no one-row list in between.
 const SETTINGS_CATEGORIES = [
-  { id: 'catCloud',   icon: '☁️', title: 'Account & Sync', blurb: 'Your account, syncing between phones, and your subscription',
+  { id: 'catCloud',   icon: 'cloud', title: 'Account & Sync', blurb: 'Your account, syncing between phones, and your subscription',
     pages: ['cloudAccount', 'cloudSync', 'cloudSubscription'] },
-  { id: 'catUser',    icon: '👤', title: 'Engineer & Tester', blurb: 'Your name and your test instruments',
+  { id: 'catUser',    icon: 'user', title: 'Engineer & Tester', blurb: 'Your name and your test instruments',
     pages: ['settingsUser'] },
-  { id: 'catTesting', icon: '⚡', title: 'Logging', blurb: 'Quick Pick, fail reasons, descriptions and the tools you use while testing',
+  { id: 'catTesting', icon: 'zap', title: 'Logging', blurb: 'Quick Pick, fail reasons, descriptions and the tools you use while testing',
     pages: ['settingsItems', 'settingsFails', 'settingsDescriptions', 'settingsMultiPick', 'settingsReadings', 'settingsScanner', 'settingsCalculator', 'settingsLogging'] },
-  { id: 'catClients', icon: '🏢', title: 'Clients & Retests', blurb: 'Your clients and sites, and reminders to rebook them',
+  { id: 'catClients', icon: 'building-2', title: 'Clients & Retests', blurb: 'Your clients and sites, and reminders to rebook them',
     pages: ['settingsClients', 'settingsRetest'] },
-  { id: 'catReports', icon: '📄', title: 'Reports & Exports', blurb: 'The PDF certificate and the CSV export',
+  { id: 'catReports', icon: 'file-text', title: 'Reports & Exports', blurb: 'The PDF certificate and the CSV export',
     pages: ['settingsReport', 'settingsCsv'] },
-  { id: 'catApp',     icon: '🎨', title: 'Phone & Display', blurb: 'Theme, sound, vibration and reminders on this phone',
+  { id: 'catApp',     icon: 'palette', title: 'Phone & Display', blurb: 'Theme, sound, vibration and reminders on this phone',
     pages: ['settingsDisplay', 'settingsReminders'] },   // V100 (7A): + Reminders
-  { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Backups, space on this phone, photos, moving your setup, and resetting this phone',
+  { id: 'catData',    icon: 'database', title: 'Data', blurb: 'Backups, space on this phone, photos, moving your setup, and resetting this phone',
     pages: ['settingsBackup', 'settingsStorage', 'cloudStorage', 'photoManager', 'jobManager', 'settingsSetup', 'settingsReset'] },   // V106: + Reset (last). V108: + Cloud Storage after Phone Storage (1A)
-  { id: 'catHelp',    icon: 'ℹ️', title: 'Help', blurb: 'About this app, what the terms mean, and how to get in touch',
+  { id: 'catHelp',    icon: 'info', title: 'Help', blurb: 'About this app, what the terms mean, and how to get in touch',
     pages: ['settingsAbout', 'settingsGlossary', 'settingsContact'] }
 ];
 
+// V115: every `icon` in SETTINGS_CATEGORIES and SETTINGS_PAGE_META is a Lucide
+// name, drawn by icon() (icons.js) in --accent. Not an emoji any more.
 // Per-page metadata for the category sub-lists and for search. icon/title shown
 // on the row; `aliases` widen search matching. Subtitles are computed live in
 // renderSettingsCategory (counts/status), so they're not stored here.
 const SETTINGS_PAGE_META = {
-  settingsUser:        { icon: '👤', title: 'Engineer & Tester',     aliases: 'user settings engineer name calibration cal due instrument tester testers multiple megger seaward kewtech' },
-  settingsItems:       { icon: '⚡', title: 'Quick Pick Items',      aliases: 'item types presets quick pick buttons' },
-  settingsFails:       { icon: '⚠️', title: 'Fail Reasons',          aliases: 'quick pick fail reasons failure tags' },
-  settingsReadings:    { icon: '🔬', title: 'Test Readings',          aliases: 'test readings ohms megohms leakage insulation earth continuity class measurements limits check limit' },
-  settingsMultiPick:   { icon: '🧰', title: 'Multi Pick',            aliases: 'multi pick bulk multiple slots quick pick tile' },
-  settingsDescriptions:{ icon: '📝', title: 'Descriptions',          aliases: 'item description list descriptions notes labels spelling typo fix rename' },
-  settingsScanner:     { icon: '🏷️', title: 'Barcode Scanner',      aliases: 'barcode scanner scan wedge hid bluetooth label qr code reader asset number' },
-  settingsReport:      { icon: '📄', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration signature sign colour color theme header accent cert number template preset notes remedial actions fails failed summary' },
-  settingsCsv:         { icon: '📊', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
-  settingsClients:     { icon: '🏢', title: 'Clients',               aliases: 'clients sites customers addresses' },
-  settingsRetest:      { icon: '🔔', title: 'Retest Reminders',       aliases: 'retest reminders rebook chase due overdue recall renewal commercial repeat business follow up contact customer' },
+  settingsUser:        { icon: 'user', title: 'Engineer & Tester',     aliases: 'user settings engineer name calibration cal due instrument tester testers multiple megger seaward kewtech' },
+  settingsItems:       { icon: 'zap', title: 'Quick Pick Items',      aliases: 'item types presets quick pick buttons' },
+  settingsFails:       { icon: 'triangle-alert', title: 'Fail Reasons',          aliases: 'quick pick fail reasons failure tags' },
+  settingsReadings:    { icon: 'gauge', title: 'Test Readings',          aliases: 'test readings ohms megohms leakage insulation earth continuity class measurements limits check limit' },
+  settingsMultiPick:   { icon: 'layers', title: 'Multi Pick',            aliases: 'multi pick bulk multiple slots quick pick tile' },
+  settingsDescriptions:{ icon: 'list', title: 'Descriptions',          aliases: 'item description list descriptions notes labels spelling typo fix rename' },
+  settingsScanner:     { icon: 'scan-barcode', title: 'Barcode Scanner',      aliases: 'barcode scanner scan wedge hid bluetooth label qr code reader asset number' },
+  settingsReport:      { icon: 'file-text', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration signature sign colour color theme header accent cert number template preset notes remedial actions fails failed summary' },
+  settingsCsv:         { icon: 'table', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
+  settingsClients:     { icon: 'building-2', title: 'Clients',               aliases: 'clients sites customers addresses' },
+  settingsRetest:      { icon: 'bell', title: 'Retest Reminders',       aliases: 'retest reminders rebook chase due overdue recall renewal commercial repeat business follow up contact customer' },
   // V100: the row is "Theme & Sound" now that the group holds two pages (a row
   // named the same as its group read oddly); the old name stays in search.
-  settingsDisplay:     { icon: '🎨', title: 'Theme & Sound',         aliases: 'phone and display settings theme dark light haptics vibration sound appearance' },
+  settingsDisplay:     { icon: 'palette', title: 'Theme & Sound',         aliases: 'phone and display settings theme dark light haptics vibration sound appearance icons emoji classic' },
   // V100 (7A): the three in-app reminders — all per phone.
-  settingsReminders:   { icon: '⏰', title: 'Reminders',             aliases: 'reminders reminder nag alert prompt not exported export locked lock unlocked end of day backup back up certificate notification remind me' },
+  settingsReminders:   { icon: 'alarm-clock', title: 'Reminders',             aliases: 'reminders reminder nag alert prompt not exported export locked lock unlocked end of day backup back up certificate notification remind me' },
   // V97 (3A): Undo and item times moved here from Phone & Display — item times
   // sync with the engineer settings, so they never belonged under "this phone".
-  settingsLogging:     { icon: '⚙️', title: 'Logging Options',       aliases: 'undo take back last item timestamps item times record time logged display settings map pin pins what3words w3w fail location where gps' },
-  settingsCalculator:  { icon: '🧮', title: 'Resistance Calculator', aliases: 'earth continuity resistance limit ohms calculator csa' },
-  settingsBackup:      { icon: '💾', title: 'Backup & Restore',      aliases: 'backup restore export import data save json photos file snapshot snapshots daily undo' },   // V105: snapshots
+  settingsLogging:     { icon: 'settings', title: 'Logging Options',       aliases: 'undo take back last item timestamps item times record time logged display settings map pin pins what3words w3w fail location where gps' },
+  settingsCalculator:  { icon: 'calculator', title: 'Resistance Calculator', aliases: 'earth continuity resistance limit ohms calculator csa' },
+  settingsBackup:      { icon: 'save', title: 'Backup & Restore',      aliases: 'backup restore export import data save json photos file snapshot snapshots daily undo' },   // V105: snapshots
   // V97 (1A, 2A): split out of Backup & Restore — everything about space.
-  settingsStorage:     { icon: '📦', title: 'Phone Storage',         aliases: 'storage space full clear old jobs sessions prune protect keep data meter tidy free up delete photos age' },
+  settingsStorage:     { icon: 'hard-drive', title: 'Phone Storage',         aliases: 'storage space full clear old jobs sessions prune protect keep data meter tidy free up delete photos age' },
   // V106 (Stage 10 part 2, 9A): the last row in Data. Hidden without reset.js.
-  settingsReset:       { icon: '🧹', title: 'Reset This Phone',      aliases: 'reset factory wipe erase clear delete everything all data start again fresh new install hand on give sell sign out' },
+  settingsReset:       { icon: 'eraser', title: 'Reset This Phone',      aliases: 'reset factory wipe erase clear delete everything all data start again fresh new install hand on give sell sign out' },
   // V96 (3A): the photo manager and Jobs on this phone get their own rows in
   // Data. They are screens of their own already (V90, V91); `action` opens them
   // through their own open functions (which set their state up) instead of a
   // bare setView. `whenVisible` is checked in render-settings.js
   // settingsPageVisible: Jobs on this phone exists only while syncing.
-  photoManager:        { icon: '🖼', title: 'Manage Photos',          aliases: 'photos pictures images storage space delete remove download cloud', action: 'pm-open' },
-  jobManager:          { icon: '🛡', title: 'Jobs on This Phone',     aliases: 'jobs sessions remove clear safe cloud storage space tidy', action: 'jm-open' },
+  photoManager:        { icon: 'images', title: 'Manage Photos',          aliases: 'photos pictures images storage space delete remove download cloud', action: 'pm-open' },
+  jobManager:          { icon: 'shield-check', title: 'Jobs on This Phone',     aliases: 'jobs sessions remove clear safe cloud storage space tidy', action: 'jm-open' },
   // V108 (Stage 5 part 3, 1A): the cloud's figures beside the phone's. Signed in
   // only (render-settings.js settingsPageVisible); opened by its own function.
-  cloudStorage:        { icon: '☁️', title: 'Cloud Storage',          aliases: 'cloud storage space used size sizes biggest largest jobs photos total account megabytes mb gb delete free up', action: 'cs-open' },
-  settingsSetup:       { icon: '🔁', title: 'Export / Import Setup', aliases: 'setup share configuration new device employee copy presets transfer' },
-  settingsAbout:       { icon: 'ℹ️', title: 'About',                 aliases: 'about version changelog whats new' },
-  settingsGlossary:    { icon: '📖', title: 'Glossary',              aliases: 'glossary terms jargon what does mean definitions help explain quick pick smart multi pick preset asset session client site overview readings class earth insulation leakage polarity fail reason tag retest certificate template csv backup setup calibration pruning job locked setup file clearing old jobs' },
-  settingsContact:     { icon: '✉️', title: 'Contact',              aliases: 'contact support email help feedback website' },
+  cloudStorage:        { icon: 'cloud', title: 'Cloud Storage',          aliases: 'cloud storage space used size sizes biggest largest jobs photos total account megabytes mb gb delete free up', action: 'cs-open' },
+  settingsSetup:       { icon: 'arrow-left-right', title: 'Export / Import Setup', aliases: 'setup share configuration new device employee copy presets transfer' },
+  settingsAbout:       { icon: 'info', title: 'About',                 aliases: 'about version changelog whats new' },
+  settingsGlossary:    { icon: 'book-open', title: 'Glossary',              aliases: 'glossary terms jargon what does mean definitions help explain quick pick smart multi pick preset asset session client site overview readings class earth insulation leakage polarity fail reason tag retest certificate template csv backup setup calibration pruning job locked setup file clearing old jobs' },
+  settingsContact:     { icon: 'mail', title: 'Contact',              aliases: 'contact support email help feedback website' },
   // v85: the Cloud group (searchable only once unlocked — see catCloud above).
-  cloudAccount:        { icon: '👤', title: 'Account',               aliases: 'cloud account sign in sign out email login' },
-  cloudSync:           { icon: '🔄', title: 'Sync',                  aliases: 'cloud sync upload send devices phones check for updates' },
-  cloudSubscription:   { icon: '💳', title: 'Subscription',          aliases: 'cloud subscription plan trial billing' }
+  cloudAccount:        { icon: 'user', title: 'Account',               aliases: 'cloud account sign in sign out email login' },
+  cloudSync:           { icon: 'refresh-cw', title: 'Sync',                  aliases: 'cloud sync upload send devices phones check for updates' },
+  cloudSubscription:   { icon: 'credit-card', title: 'Subscription',          aliases: 'cloud subscription plan trial billing' }
 };
 
 

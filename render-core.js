@@ -177,7 +177,7 @@ function render() {
   // Update banner sits above the screen
   const banner = state.updateAvailable ? `
     <div class="update-banner" role="status">
-      <span class="update-banner-text">⟳ Update available</span>
+      <span class="update-banner-text">${icon('refresh-cw')} Update available</span>
       <div class="update-banner-actions">
         <button class="update-refresh-btn" id="update-refresh" data-action="update-refresh">Refresh</button>
         <button class="update-dismiss-btn" id="update-dismiss" data-action="update-dismiss" aria-label="Dismiss">×</button>
@@ -240,9 +240,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Settings says jobs.</strong> Settings pages now say <strong>jobs</strong> instead of sessions, the same word the rest of PATGo uses. Where a screen is still called a session, like <strong>PAT Sessions</strong> and <strong>Session settings</strong>, Settings names it exactly as you see it.</li>
-        <li><strong>One style for headings.</strong> Headings, buttons and switches inside Settings now share one style. Page names, like <strong>Manage Photos</strong>, keep their capitals so they are easy to spot.</li>
-        <li><strong>Glossary brought up to date.</strong> Job, Locked job, Setup file and Clearing old jobs now match the words on screen, and the barcode scanner entry points to <strong>Logging</strong>, where it lives now.</li>
+        <li><strong>New line icons.</strong> The emoji across PATGo are now clean line icons that match your light or dark theme. Every button still says what it does.</li>
+        <li><strong>Export and import arrows.</strong> Arrows now point the usual way: up to export or share, down to import or download. Buttons that open another page show a small arrow on the right.</li>
+        <li><strong>Prefer the old look?</strong> For this version only, Settings &rarr; Phone &amp; Display &rarr; Theme &amp; Sound has a <strong>Classic emoji icons</strong> switch.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -261,7 +261,7 @@ function render() {
     const step = state.wizardStep || 1;
     const rs = state.reportSettings || {};
     const skipBtn = `<button class="wizard-skip" data-action="wizard-skip">Skip for now</button>`;
-    const backBtn = `<button class="wizard-back" data-action="wizard-back">‹ Back</button>`;
+    const backBtn = `<button class="wizard-back" data-action="wizard-back">${icon('chevron-left')} Back</button>`;
     let bodyHTML = '';
     let footHTML = '';
 
@@ -295,20 +295,20 @@ function render() {
       `;
     } else if (step === 2) {
       bodyHTML = `
-        <div class="wizard-icon">📲</div>
+        <div class="wizard-icon">${icon('smartphone')}</div>
         <h3 class="bulk-sheet-title">Set up this device</h3>
         <p class="wizard-lead">Already got another phone set up how you like it? Bring its settings straight across. Starting from scratch? We'll walk you through it.</p>
         <input type="file" id="wizard-import-file" data-change-action="wizard-import-file" accept="application/json,.json" style="display:none">
       `;
       footHTML = `
-        <button class="btn-primary" data-action="wizard-import">⬇ Import a setup file</button>
+        <button class="btn-primary" data-action="wizard-import">${icon('download')} Import a setup file</button>
         <button class="btn-secondary" data-action="wizard-fresh">Start fresh</button>
         ${backBtn}
         ${skipBtn}
       `;
     } else if (step === 3) {
       bodyHTML = `
-        <div class="wizard-icon">👤</div>
+        <div class="wizard-icon">${icon('user')}</div>
         <h3 class="bulk-sheet-title">Your details</h3>
         <p class="wizard-lead">These show up on your reports. Both are optional, and you can add or change them any time in Settings.</p>
         <label class="label">Your name (the engineer)</label>
@@ -325,7 +325,7 @@ function render() {
       const logoPreview = rs.logo
         ? `<img class="wizard-logo-preview" src="${rs.logo}" alt="Company logo">
            <button class="btn-secondary" data-action="report-logo-remove">Remove logo</button>`
-        : `<button class="btn-secondary" data-action="report-logo-pick">⬆ Add a logo (optional)</button>`;
+        : `<button class="btn-secondary" data-action="report-logo-pick">${icon('upload')} Add a logo (optional)</button>`;
       const themes = (typeof REPORT_COLOR_THEMES !== 'undefined' ? REPORT_COLOR_THEMES : [])
         .map(t => {
           const on = (rs.headerColor === t.header && rs.accentColor === t.accent) ? ' is-on' : '';
@@ -334,7 +334,7 @@ function render() {
                   </button>`;
         }).join('');
       bodyHTML = `
-        <div class="wizard-icon">🎨</div>
+        <div class="wizard-icon">${icon('palette')}</div>
         <h3 class="bulk-sheet-title">Your report branding</h3>
         <p class="wizard-lead">This is what your clients see on every PDF report. All optional — leave it for now and set it up later if you'd rather.</p>
         <label class="label">Company name</label>
@@ -365,7 +365,7 @@ function render() {
     } else if (step === 5) {
       const checked = state.wizardSeedDemo ? 'checked' : '';
       bodyHTML = `
-        <div class="wizard-icon">📋</div>
+        <div class="wizard-icon">${icon('clipboard-list')}</div>
         <h3 class="bulk-sheet-title">Add an example job?</h3>
         <p class="wizard-lead">Want to see how it all hangs together first? We can drop in one example session with a few test results, so you can explore Sessions, the Overview and a report straight away. It's clearly labelled, and you can delete it whenever you like.</p>
         <label class="label" style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;font-weight:600">
@@ -383,7 +383,7 @@ function render() {
       // primary action with a one-line "what you'll see", "Go to the app" is a
       // clean secondary, and a muted line reassures you can replay it later.
       bodyHTML = `
-        <div class="wizard-icon">🎉</div>
+        <div class="wizard-icon">${icon('party-popper')}</div>
         <h3 class="bulk-sheet-title">You're all set</h3>
         <p class="wizard-lead">Your phone's ready to go. Start a new session whenever you're on a job — pick a location, tap an item type, then tap PASS or FAIL.</p>
         <div class="wizard-finish-tour">
@@ -715,7 +715,7 @@ function nfSiteNotesHTML() {
   const text = siteNotesOf(site);
   if (!text) return '';
   return `<div class="site-notes-card site-notes-card-static">
-      <span class="site-notes-head">📝 Site notes &middot; ${escapeHTML(site.name)}</span>
+      <span class="site-notes-head">${icon('list')} Site notes &middot; ${escapeHTML(site.name)}</span>
       <span class="site-notes-text site-notes-text-full">${escapeHTML(text)}</span>
     </div>`;
 }
@@ -731,13 +731,14 @@ function refreshNfSiteNotesOnly() {
 // an optional primary action button. Used on the Sessions list, Overview,
 // Clients and Reports screens so "nothing here yet" always looks intentional and
 // points to the next step rather than showing a bare line of text.
-function emptyStateHTML(icon, title, body, actionLabel, actionName) {
+// V115 (2A): iconName is a Lucide name (icons.js), drawn large in soft grey.
+function emptyStateHTML(iconName, title, body, actionLabel, actionName) {
   const btn = (actionLabel && actionName)
     ? `<button class="btn-primary empty-state-action" data-action="${actionName}">+ ${escapeHTML(actionLabel)}</button>`
     : '';
   return `
     <div class="empty-state">
-      <div class="empty-state-icon" aria-hidden="true">${icon}</div>
+      <div class="empty-state-icon" aria-hidden="true">${icon(iconName)}</div>
       <div class="empty-state-title">${escapeHTML(title)}</div>
       <p class="empty-state-body">${escapeHTML(body)}</p>
       ${btn}
@@ -762,17 +763,17 @@ function renderCalWarningBanner() {
   let cls, label;
   if (worst.status === 'overdue') {
     cls = 'cal-overdue';
-    label = `⚠ ${worst.name} calibration overdue (${worst.days} day${worst.days === 1 ? '' : 's'} ago)${more}`;
+    label = `${worst.name} calibration overdue (${worst.days} day${worst.days === 1 ? '' : 's'} ago)${more}`;
   } else if (worst.days === 0) {
     cls = 'cal-due-soon';
-    label = `⚠ ${worst.name} calibration due today${more}`;
+    label = `${worst.name} calibration due today${more}`;
   } else {
     cls = 'cal-due-soon';
-    label = `⚠ ${worst.name} calibration due in ${worst.days} day${worst.days === 1 ? '' : 's'}${more}`;
+    label = `${worst.name} calibration due in ${worst.days} day${worst.days === 1 ? '' : 's'}${more}`;
   }
   return `
     <div class="cal-banner ${cls}" role="status">
-      <span class="cal-banner-text">${escapeHTML(label)}</span>
+      <span class="cal-banner-text">${icon('triangle-alert')} ${escapeHTML(label)}</span>
       <button class="cal-banner-action" data-action="edit-cal-date">Update</button>
     </div>
   `;
@@ -792,14 +793,14 @@ function renderRetestBanner() {
   const cls = overdue > 0 ? 'cal-overdue' : 'cal-due-soon';
   let label;
   if (overdue > 0) {
-    label = `🔔 ${overdue} retest${overdue === 1 ? '' : 's'} overdue` +
+    label = `${overdue} retest${overdue === 1 ? '' : 's'} overdue` +
       (due.length > overdue ? ` · ${due.length - overdue} due` : '');
   } else {
-    label = `🔔 ${due.length} client${due.length === 1 ? '' : 's'} due for retest`;
+    label = `${due.length} client${due.length === 1 ? '' : 's'} due for retest`;
   }
   return `
     <div class="cal-banner ${cls}" role="status">
-      <span class="cal-banner-text">${escapeHTML(label)}</span>
+      <span class="cal-banner-text">${icon('bell')} ${escapeHTML(label)}</span>
       <button class="cal-banner-action" data-action="open-retest-reminders">View</button>
     </div>
   `;
@@ -846,7 +847,7 @@ function renderSessions() {
   ` : `
     <div class="sessions-actions-row">
       <button class="btn-primary" id="new-session-btn" data-action="new-session">+ New session</button>
-      <button class="btn-secondary" id="import-session-btn" data-action="import-session">⬆ Import (.csv)</button>
+      <button class="btn-secondary" id="import-session-btn" data-action="import-session">${icon('download')} Import (.csv)</button>
     </div>
     <input type="file" id="import-session-file" data-change-action="import-file" accept=".csv,text/csv" style="display:none">
   `;
@@ -908,13 +909,13 @@ function renderSessions() {
   const tabs = signedIn ? `
       <div class="jobs-tabs" role="tablist">
         <button class="jobs-tab${cloudTab ? '' : ' is-on'}" role="tab" aria-selected="${cloudTab ? 'false' : 'true'}" data-action="jobs-tab" data-arg="phone">On this phone</button>
-        <button class="jobs-tab${cloudTab ? ' is-on' : ''}" role="tab" aria-selected="${cloudTab ? 'true' : 'false'}" data-action="jobs-tab" data-arg="cloud">\u2601 In the cloud</button>
+        <button class="jobs-tab${cloudTab ? ' is-on' : ''}" role="tab" aria-selected="${cloudTab ? 'true' : 'false'}" data-action="jobs-tab" data-arg="cloud">${icon('cloud')} In the cloud</button>
       </div>` : '';
   const header = `
       <header class="header">
         <h1 class="h1">PAT Sessions</h1>
-        ${state.reportSettings.enabled ? '<button class="icon-btn" id="reports-btn" data-action="open-reports" aria-label="Reports">📄</button>' : ''}
-        <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">⚙</button>
+        ${state.reportSettings.enabled ? '<button class="icon-btn" id="reports-btn" data-action="open-reports" aria-label="Reports">' + icon('file-text') + '</button>' : ''}
+        <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">${icon('settings')}</button>
       </header>`;
   if (cloudTab) {
     return `
@@ -963,7 +964,7 @@ function renderAssetHistorySheet() {
   const body = rows.length ? rows.map(r => {
     const it = r.item;
     const isFail = it.result === 'fail';
-    const resultChip = `<span class="asset-history-result ${isFail ? 'fail' : 'pass'}">${isFail ? '✗ FAIL' : '✓ PASS'}</span>`;
+    const resultChip = `<span class="asset-history-result ${isFail ? 'fail' : 'pass'}">${isFail ? icon('x') + ' FAIL' : icon('check') + ' PASS'}</span>`;
     // A fail reason is stored in the item's notes (that's where pickFailReason
     // puts it), so notes carry it for free — no special case needed.
     const metaBits = [];
@@ -983,7 +984,7 @@ function renderAssetHistorySheet() {
       if (rd.earth) bits.push(`${escapeHTML(String(rd.earth))} Ω`);
       if (rd.insulation) bits.push(`${escapeHTML(String(rd.insulation))} MΩ`);
       if (rd.leakage) bits.push(`${escapeHTML(String(rd.leakage))} mA`);
-      if (rd.polarity) bits.push('Polarity ✓');
+      if (rd.polarity) bits.push('Polarity ' + icon('check'));
       if (bits.length) {
         readingsLine = `<div class="asset-history-readings">${bits.join(' · ')}</div>`;
       }
@@ -1115,10 +1116,11 @@ function renderReminderBanners() {
   let exp = [], unl = [];
   try { exp = (typeof exportReminderDue === 'function') ? exportReminderDue() : []; } catch (e) { exp = []; }
   try { unl = (typeof unlockedReminderDue === 'function') ? unlockedReminderDue() : []; } catch (e) { unl = []; }
+  // V115 (1A): the alarm-clock icon sits outside the escaped text — never inside it.
   const one = (cls, text, review, dismiss) => `
     <div class="backup-banner reminder-banner ${cls}" role="status">
       <div class="backup-banner-body">
-        <div class="backup-banner-text">${escapeHTML(text)}</div>
+        <div class="backup-banner-text">${icon('alarm-clock')} ${escapeHTML(text)}</div>
         <div class="backup-banner-actions">
           <button class="backup-banner-action primary" data-action="${review}">Review</button>
         </div>
@@ -1128,11 +1130,11 @@ function renderReminderBanners() {
   let out = '';
   if (exp.length) {
     const n = exp.length;
-    out += one('reminder-export', `⏰ ${n} locked job${n === 1 ? ' has' : 's have'} no certificate or CSV export yet.`, 'remind-export-review', 'remind-export-dismiss');
+    out += one('reminder-export', `${n} locked job${n === 1 ? ' has' : 's have'} no certificate or CSV export yet.`, 'remind-export-review', 'remind-export-dismiss');
   }
   if (unl.length) {
     const n = unl.length;
-    out += one('reminder-unlocked', `⏰ ${n} job${n === 1 ? ' is' : 's are'} still unlocked. Finished? Lock ${n === 1 ? 'it' : 'them'} in Session settings.`, 'remind-unlocked-review', 'remind-unlocked-dismiss');
+    out += one('reminder-unlocked', `${n} job${n === 1 ? ' is' : 's are'} still unlocked. Finished? Lock ${n === 1 ? 'it' : 'them'} in Session settings.`, 'remind-unlocked-review', 'remind-unlocked-dismiss');
   }
   return out;
 }
@@ -1190,7 +1192,7 @@ function renderSessionsListAreaHTML() {
   const historyCardHTML = historyOffer ? `
     <button type="button" class="asset-history-card" data-action="asset-history-open" data-arg="${escapeHTML(historyOffer.assetNo)}">
       <span class="asset-history-card-text">
-        <span class="asset-history-card-title">🕘 Asset ${escapeHTML(historyOffer.assetNo)}</span>
+        <span class="asset-history-card-title">${icon('history')} Asset ${escapeHTML(historyOffer.assetNo)}</span>
         <span class="asset-history-card-sub">Tested in ${historyOffer.jobCount} jobs — see the full history</span>
       </span>
       <span class="asset-history-card-cta">View →</span>
@@ -1211,7 +1213,7 @@ function renderSessionsListAreaHTML() {
   const nudgeHTML = (!queryTrimmed && sortedAll.length > 0 && unexported > 0)
     ? `<button type="button" class="export-nudge" id="bulk-export-btn" data-action="bulk-export-unexported" aria-label="Export ${unexported} not-yet-exported session${unexported === 1 ? '' : 's'}">
         <span class="export-nudge-text">${unexported} session${unexported === 1 ? '' : 's'} not yet exported</span>
-        <span class="export-nudge-cta">${SHARE_ICON_SVG} Export all</span>
+        <span class="export-nudge-cta">${icon('share', 'share-icon')} Export all</span>
       </button>`
     : '';
 
@@ -1252,7 +1254,7 @@ function renderSessionsListAreaHTML() {
 
   let list;
   if (sortedAll.length === 0 && !state.newForm.show) {
-    list = emptyStateHTML('📋', 'No sessions yet',
+    list = emptyStateHTML('clipboard-list', 'No sessions yet',
       'Start logging appliance tests and they\'ll appear here.',
       'Start your first session', 'new-session');
   } else if (queryTrimmed && filtered.length === 0) {
@@ -1274,19 +1276,19 @@ function renderSessionsListAreaHTML() {
       // the cloud. Nothing at all for a job with no photos.
       const pc = (typeof photoCountsForSession === 'function') ? photoCountsForSession(s) : { total: 0, cloud: 0 };
       const photoMeta = pc.total
-        ? ` · <span class="photo-text">📷 ${pc.total}${pc.cloud ? ` (${pc.cloud} in cloud)` : ''}</span>`
+        ? ` · <span class="photo-text">${icon('camera')} ${pc.total}${pc.cloud ? ` (${pc.cloud} in cloud)` : ''}</span>`
         : '';
       // v8: subtle 🔒 prefix on locked sessions so they're easy to spot in the list.
-      const lockMark = s.locked ? '<span class="session-lock" title="Locked">🔒</span>' : '';
+      const lockMark = s.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : '';
       const safeR = safety ? safety.map.get(String(s.id)) : null;
-      const safeMark = (safeR && safeR.safe) ? '<span class="session-safe" title="Safe in the cloud" aria-label="Safe in the cloud">🛡</span>' : '';
+      const safeMark = (safeR && safeR.safe) ? '<span class="session-safe" title="Safe in the cloud" aria-label="Safe in the cloud">' + icon('shield-check') + '</span>' : '';
       // v14: export-status badge in the meta row. 'exported' → ✓ Exported;
       // 'modified' → ✓✎ Modified since export; 'none' → no badge.
       const xStatus = exportStatus(s);
       const exportBadge = xStatus === 'exported'
-        ? '<span class="export-badge exported" title="Exported">✓ Exported</span>'
+        ? '<span class="export-badge exported" title="Exported">' + icon('check') + ' Exported</span>'
         : (xStatus === 'modified'
-            ? '<span class="export-badge modified" title="Edited since last export">✓✎ Modified since export</span>'
+            ? '<span class="export-badge modified" title="Edited since last export">' + icon('check') + icon('pencil') + ' Modified since export</span>'
             : '');
       // v10: when the query only hit item-level fields, show how many items matched
       // and (via data-open-at) jump straight to the first match.
@@ -1301,8 +1303,8 @@ function renderSessionsListAreaHTML() {
         // V87: month wording, not day counts — a retest is due for a whole month.
         const rCls = rStatus === 'overdue' ? 'retest-chip-overdue'
           : (rStatus === 'duesoon' ? 'retest-chip-soon' : 'retest-chip-upcoming');
-        const rLabel = `🔔 ${retestChipLabel(rStatus)}`;
-        retestChip = `<div class="session-export-row"><span class="retest-chip ${rCls}">${escapeHTML(rLabel)}</span></div>`;
+        const rLabel = retestChipLabel(rStatus);
+        retestChip = `<div class="session-export-row"><span class="retest-chip ${rCls}">${icon('bell')} ${escapeHTML(rLabel)}</span></div>`;
       }
       const openAttr = matchedItemIndex !== -1
         ? `data-action="open-session" data-arg="${s.id}" data-open="${s.id}" data-open-at="${matchedItemIndex}"`
@@ -1316,9 +1318,9 @@ function renderSessionsListAreaHTML() {
             ${retestChip}
             ${itemBadge}
           </div>
-          <button class="icon-btn-sm" data-action="copy-session" data-arg="${s.id}" aria-label="Copy CSV" title="Copy CSV">📋</button>
-          <button class="icon-btn-sm" data-action="export-session" data-arg="${s.id}" data-export="${s.id}" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
-          <button class="icon-btn-sm" data-action="delete-session" data-arg="${s.id}" data-delete-session="${s.id}" aria-label="Delete">🗑</button>
+          <button class="icon-btn-sm" data-action="copy-session" data-arg="${s.id}" aria-label="Copy CSV" title="Copy CSV">${icon('clipboard-list')}</button>
+          <button class="icon-btn-sm" data-action="export-session" data-arg="${s.id}" data-export="${s.id}" aria-label="Share CSV">${icon('share', 'share-icon')}</button>
+          <button class="icon-btn-sm" data-action="delete-session" data-arg="${s.id}" data-delete-session="${s.id}" aria-label="Delete">${icon('trash-2')}</button>
         </div>
       `;
     }).join('');
@@ -1561,13 +1563,13 @@ function renderEntry() {
   const quickButtons = shownTypes.map(t => `
     <button class="quick-btn ${state.form.itemType === t ? 'active' : ''}" data-action="quick-pick" data-arg="${escapeHTML(t)}" data-type="${escapeHTML(t)}">${escapeHTML(t)}</button>
   `).join('') + tiles.map(tl => `
-    <button class="quick-btn qp-tile qp-tile-${tl.qp} ${state.form.qpTile === tl.qp ? 'active' : ''}" data-action="qp-tile" data-arg="${tl.qp}"${tileOff}><span class="qp-tile-plus">＋</span>${escapeHTML(qpTileLabel(tl.slot))}</button>
+    <button class="quick-btn qp-tile qp-tile-${tl.qp} ${state.form.qpTile === tl.qp ? 'active' : ''}" data-action="qp-tile" data-arg="${tl.qp}"${tileOff}><span class="qp-tile-plus">${icon('plus')}</span>${escapeHTML(qpTileLabel(tl.slot))}</button>
   `).join('');
 
   const notesBlock = state.form.showNotes
     ? `<label class="label">Notes</label>
        <textarea class="textarea" id="f-notes" data-input-action="f-notes" rows="2" placeholder="Optional">${escapeHTML(state.form.notes)}</textarea>`
-    : `<button class="notes-toggle" id="show-notes-btn" data-action="show-notes">✎ Add note</button>`;
+    : `<button class="notes-toggle" id="show-notes-btn" data-action="show-notes">${icon('pencil')} Add note</button>`;
 
   const resultBadge = isExisting && existing.result
     ? `<span class="result-badge ${existing.result}">· ${capitalise(existing.result).toUpperCase()}</span>`
@@ -1612,7 +1614,7 @@ function renderEntry() {
     && (typeof photosSupported !== 'function' || photosSupported()));
   const entryPhotoBtn = showEntryPhotoRow ? `
       <button class="entry-photo-btn" id="entry-photo-btn" data-action="photo-strip-open" data-arg="${escapeHTML(entryItem.id)}">
-        📷 ${entryPhotoCount ? `Photos (${entryPhotoCount})${entryPhotoCloud ? ' ☁' : ''}` : 'Add a photo'}
+        ${icon('camera')} ${entryPhotoCount ? `Photos (${entryPhotoCount})${entryPhotoCloud ? ' ' + icon('cloud') : ''}` : 'Add a photo'}
       </button>
   ` : '';
   // V99 (4A, 9A): the map pin button, on a SAVED item only — never the fail
@@ -1624,7 +1626,7 @@ function renderEntry() {
   const showEntryPin = !!(entryItem && entryItem.id
     && (entryPin || (state.mapPinEnabled && entryItem.result === 'fail')));
   const entryPinBtn = showEntryPin ? `
-      <button class="entry-photo-btn entry-pin-btn${entryPin ? ' has-pin' : ''}" id="entry-pin-btn" data-action="map-pin-open" data-arg="${escapeHTML(entryItem.id)}">📍 ${entryPin ? '///' + escapeHTML(entryPin) : 'Add map pin'}</button>
+      <button class="entry-photo-btn entry-pin-btn${entryPin ? ' has-pin' : ''}" id="entry-pin-btn" data-action="map-pin-open" data-arg="${escapeHTML(entryItem.id)}">${icon('map-pin')} ${entryPin ? '///' + escapeHTML(entryPin) : 'Add map pin'}</button>
   ` : '';
   const entryPhotoRow = (entryPhotoBtn && entryPinBtn)
     ? `<div class="entry-aux-row">${entryPhotoBtn}${entryPinBtn}</div>`
@@ -1651,7 +1653,7 @@ function renderEntry() {
     `;
   } else {
     failSheetInner = `
-      <button class="fail-other-back" id="fail-other-back" data-action="fail-other-back">‹ Back to reasons</button>
+      <button class="fail-other-back" id="fail-other-back" data-action="fail-other-back">${icon('chevron-left')} Back to reasons</button>
       <textarea class="fail-other-input" id="fail-other-input" data-input-action="fail-other" placeholder="Type reason…" rows="3">${escapeHTML(state.failOtherText)}</textarea>
       <button class="fail-other-save" id="fail-other-save" data-action="fail-other-save">Save fail</button>
     `;
@@ -1695,7 +1697,7 @@ function renderEntry() {
   const progressRow = `
     <div class="progress-row"${flashSearchJump ? ' data-search-jump="1"' : ''}>
       <div class="progress">Item ${state.cursor + 1} ${isExisting ? `of ${sess.items.length}` : '(new)'}${resultBadge}<span class="loc-count" id="loc-count">${locationCountText()}</span></div>
-      ${isExisting ? `<button class="del-icon-top" id="del-item-btn" data-action="delete-current-item" aria-label="Delete item" title="Delete item">🗑</button>` : ''}
+      ${isExisting ? `<button class="del-icon-top" id="del-item-btn" data-action="delete-current-item" aria-label="Delete item" title="Delete item">${icon('trash-2')}</button>` : ''}
     </div>
   `;
 
@@ -1705,7 +1707,7 @@ function renderEntry() {
   const isLocked = !!sess.locked;
   const lockBanner = isLocked ? `
     <div class="lock-banner" role="status">
-      <span class="lock-banner-text">🔒 Session locked — no new entries</span>
+      <span class="lock-banner-text">${icon('lock')} Session locked — no new entries</span>
       <button class="lock-banner-action" id="lock-unlock-btn" data-action="unlock-session">Unlock</button>
     </div>
   ` : '';
@@ -1719,14 +1721,14 @@ function renderEntry() {
   // (about 70/30), and its label shortens so the item it copies still shows.
   // Undo is ALWAYS drawn while switched on — greyed when there is nothing to
   // undo — so nothing moves under the thumb. Off: the row is V93's exactly.
-  const copyLabel = state.undoEnabled ? '⎘ Copy last' : '⎘ Copy last result';
+  const copyLabel = icon('copy') + (state.undoEnabled ? ' Copy last' : ' Copy last result');
   const copyBtnHTML = `<button class="copy-last-btn" id="copy-last-btn" data-action="copy-last" ${copyDisabled}>
         ${copyLabel}${lastInfo}
       </button>`;
   const copyUndoRow = state.undoEnabled
     ? `<div class="copy-undo-row">
         ${copyBtnHTML}
-        <button class="undo-btn" id="undo-btn" data-action="undo-last" aria-label="Undo the last item logged" ${(typeof undoAvailable === 'function' && undoAvailable()) ? '' : 'disabled'}>↶ Undo</button>
+        <button class="undo-btn" id="undo-btn" data-action="undo-last" aria-label="Undo the last item logged" ${(typeof undoAvailable === 'function' && undoAvailable()) ? '' : 'disabled'}>${icon('undo-2')} Undo</button>
       </div>`
     : copyBtnHTML;
 
@@ -1739,7 +1741,7 @@ function renderEntry() {
   const mpEnabled = !!(state.multiPick && state.multiPick.enabled);
   const multiPickButton = mpEnabled ? `
     <button class="multipick-btn" id="multipick-btn" data-action="multipick-open" ${isLocked ? 'disabled' : ''}>
-      ＋ Multi Pick
+      ${icon('plus')} Multi Pick
     </button>
   ` : '';
 
@@ -1804,7 +1806,7 @@ function renderEntry() {
             : 'No items yet';
           return `
             <button class="preset-switch-option${isActive ? ' active' : ''}" data-action="preset-sheet-pick" data-arg="${escapeHTML(p.id)}">
-              <span class="preset-switch-tick">${isActive ? '✓' : ''}</span>
+              <span class="preset-switch-tick">${isActive ? icon('check') : ''}</span>
               <span class="preset-switch-text">
                 <span class="preset-switch-name">${escapeHTML(p.name || 'Untitled preset')}</span>
                 <span class="preset-switch-sub">${escapeHTML(sub)}</span>
@@ -1813,7 +1815,7 @@ function renderEntry() {
           `;
         }).join('')}
       </div>
-      <button class="preset-switch-edit sheet-pin" data-action="preset-sheet-edit">⚙ Edit presets</button>
+      <button class="preset-switch-edit sheet-pin" data-action="preset-sheet-edit">${icon('settings')} Edit presets</button>
     ` : `
       <p class="multipick-empty">No presets set up yet. Add them in Settings.</p>
     `;
@@ -1939,7 +1941,7 @@ function renderEntry() {
     const polarityOn = draft.polarity === true;
     const polarityRow = (READING_POLARITY_CLASSES.indexOf(cls) !== -1)
       ? `<button class="reading-polarity-row${polarityOn ? ' checked' : ''}" data-action="readings-toggle-polarity" role="checkbox" aria-checked="${polarityOn ? 'true' : 'false'}">
-          <span class="reading-polarity-box">${polarityOn ? '✓' : ''}</span>
+          <span class="reading-polarity-box">${polarityOn ? icon('check') : ''}</span>
           <span class="reading-polarity-label">Polarity correct</span>
         </button>`
       : '';
@@ -1955,7 +1957,7 @@ function renderEntry() {
       <div class="fail-sheet readings-sheet readings-confirm" role="dialog" aria-label="Reading outside the usual limit">
         <div class="fail-sheet-handle"></div>
         <div class="fail-sheet-header">
-          <button class="fail-close-btn" id="readings-confirm-back" data-action="readings-confirm-back" aria-label="Back to readings">‹</button>
+          <button class="fail-close-btn" id="readings-confirm-back" data-action="readings-confirm-back" aria-label="Back to readings">${icon('chevron-left')}</button>
           <h3 class="fail-sheet-title">${overList.length === 1 ? 'Check this reading' : 'Check these readings'}</h3>
           <span class="fail-close-spacer"></span>
         </div>
@@ -1973,7 +1975,7 @@ function renderEntry() {
       <div class="fail-sheet readings-sheet" role="dialog" aria-label="Test readings">
         <div class="fail-sheet-handle"></div>
         <div class="fail-sheet-header">
-          <button class="fail-close-btn" id="readings-cancel" data-action="readings-cancel" aria-label="Cancel">‹</button>
+          <button class="fail-close-btn" id="readings-cancel" data-action="readings-cancel" aria-label="Cancel">${icon('chevron-left')}</button>
           <h3 class="fail-sheet-title">${title}</h3>
           <span class="fail-close-spacer"></span>
         </div>
@@ -1991,9 +1993,9 @@ function renderEntry() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="sessions-btn" data-action="go-sessions" aria-label="Back to sessions">‹</button>
+        <button class="icon-btn" id="sessions-btn" data-action="go-sessions" aria-label="Back to sessions">${icon('chevron-left')}</button>
         <div class="site-name">${escapeHTML(sess.site || sess.name)}</div>
-        <button class="icon-btn" id="overview-btn" data-action="go-overview" aria-label="Overview">▦</button>
+        <button class="icon-btn" id="overview-btn" data-action="go-overview" aria-label="Overview">${icon('layout-grid')}</button>
       </header>
 
       ${lockBanner}
@@ -2019,8 +2021,8 @@ function renderEntry() {
       ${notesBlock}
 
       <div class="pass-fail-row">
-        <button class="pass-btn" id="pass-btn" data-action="log-pass" ${passFailDisabled}><span class="icon">✓</span>PASS</button>
-        <button class="fail-btn" id="fail-btn" data-action="log-fail" ${failDisabled}><span class="icon">✗</span>FAIL</button>
+        <button class="pass-btn" id="pass-btn" data-action="log-pass" ${passFailDisabled}><span class="icon">${icon('check')}</span>PASS</button>
+        <button class="fail-btn" id="fail-btn" data-action="log-fail" ${failDisabled}><span class="icon">${icon('x')}</span>FAIL</button>
       </div>
 
       ${entryPhotoRow}
@@ -2028,9 +2030,9 @@ function renderEntry() {
       ${copyUndoRow}
 
       <div class="nav-row">
-        <button class="nav-btn" id="prev-btn" data-action="cursor-prev" ${state.cursor === 0 ? 'disabled' : ''}>‹ Prev</button>
-        <button class="nav-btn" id="skip-new-btn" data-action="skip-new" ${!isExisting ? 'disabled' : ''}>⏭ New</button>
-        <button class="nav-btn" id="next-btn" data-action="cursor-next" ${state.cursor >= sess.items.length ? 'disabled' : ''}>Next ›</button>
+        <button class="nav-btn" id="prev-btn" data-action="cursor-prev" ${state.cursor === 0 ? 'disabled' : ''}>${icon('chevron-left')} Prev</button>
+        <button class="nav-btn" id="skip-new-btn" data-action="skip-new" ${!isExisting ? 'disabled' : ''}>${icon('skip-forward')} New</button>
+        <button class="nav-btn" id="next-btn" data-action="cursor-next" ${state.cursor >= sess.items.length ? 'disabled' : ''}>Next ${icon('chevron-right')}</button>
       </div>
 
       ${multiPickButton}
@@ -2069,7 +2071,7 @@ function renderMapPinSheet() {
         <div class="bulk-sheet-handle"></div>
         <div class="bulk-sheet-header">
           <span class="fail-close-spacer"></span>
-          <h3 class="bulk-sheet-title">📍 Map pin</h3>
+          <h3 class="bulk-sheet-title">${icon('map-pin')} Map pin</h3>
           <button class="fail-close-btn" id="map-pin-cancel" data-action="map-pin-cancel" aria-label="Cancel">×</button>
         </div>
         <p class="muted" style="margin:0 0 10px">${label ? escapeHTML(label) + '. ' : ''}Open what3words, copy the three words for where this item is, then come back and paste them here.</p>

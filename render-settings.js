@@ -55,6 +55,7 @@ function settingsPageSubtitle(pageId) {
       const themeSummary = state.theme === 'system' ? 'System' : (state.theme === 'dark' ? 'Dark' : 'Light');
       const extras = [];
       if (state.soundEnabled) extras.push('Sound on');
+      if (state.iconsClassic) extras.push('Classic emoji');   // V115 (14B)
       return [themeSummary, state.hapticsEnabled ? 'Haptics on' : 'Haptics off', ...extras].join(' · ');
     }
     case 'settingsCsv': {
@@ -135,17 +136,17 @@ function settingsPageSubtitle(pageId) {
 // A single settings row button (used by category sub-lists and search results).
 // `context` is an optional muted suffix (e.g. the category name in search results).
 function settingsPageRowHTML(pageId, context) {
-  const meta = SETTINGS_PAGE_META[pageId] || { icon: '•', title: pageId };
+  const meta = SETTINGS_PAGE_META[pageId] || { icon: '', title: pageId };
   const sub = settingsPageSubtitle(pageId);
   const ctx = context ? `<span class="settings-row-context">${escapeHTML(context)}</span>` : '';
   return `
     <button class="settings-row" data-action="${meta.action || 'settings-page'}" data-arg="${pageId}" data-page="${pageId}">
-      <span class="settings-row-icon">${meta.icon}</span>
+      <span class="settings-row-icon">${icon(meta.icon)}</span>
       <div class="settings-row-text">
         <div class="settings-row-title">${escapeHTML(meta.title)}${ctx}</div>
         ${sub ? `<div class="settings-row-sub">${escapeHTML(sub)}</div>` : ''}
       </div>
-      <span class="settings-row-chevron">›</span>
+      <span class="settings-row-chevron">${icon('chevron-right')}</span>
     </button>`;
 }
 
@@ -227,12 +228,12 @@ function renderSettingsHubBodyHTML() {
   }
   return `<div class="settings-list">${settingsCategoriesInOrder().map(cat => `
       <button class="settings-row" data-action="settings-category" data-arg="${cat.id}">
-        <span class="settings-row-icon">${cat.icon}</span>
+        <span class="settings-row-icon">${icon(cat.icon)}</span>
         <div class="settings-row-text">
           <div class="settings-row-title">${escapeHTML(cat.title)}</div>
           <div class="settings-row-sub">${escapeHTML(settingsCategoryBlurb(cat))}</div>
         </div>
-        <span class="settings-row-chevron">›</span>
+        <span class="settings-row-chevron">${icon('chevron-right')}</span>
       </button>`).join('')}</div>`;
 }
 
@@ -249,7 +250,7 @@ function renderSettingsHub() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">‹</button>
+        <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">${icon('chevron-left')}</button>
         <div class="site-name">Settings</div>
         <span style="width:40px"></span>
       </header>
@@ -300,7 +301,7 @@ function renderSettingsCategory() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="back-to-settings-btn" data-action="back-to-settings" aria-label="Back">‹</button>
+        <button class="icon-btn" id="back-to-settings-btn" data-action="back-to-settings" aria-label="Back">${icon('chevron-left')}</button>
         <div class="site-name">${escapeHTML(cat.title)}</div>
         <span style="width:40px"></span>
       </header>
@@ -315,7 +316,7 @@ function renderSettingsCategory() {
 function renderSettingsSubHeader(title) {
   return `
     <header class="header-row">
-      <button class="icon-btn" id="back-to-settings-btn" data-action="back-to-settings" aria-label="Back">‹</button>
+      <button class="icon-btn" id="back-to-settings-btn" data-action="back-to-settings" aria-label="Back">${icon('chevron-left')}</button>
       <div class="site-name">${escapeHTML(title)}</div>
       <span style="width:40px"></span>
     </header>
@@ -400,13 +401,13 @@ function renderSettingsItems() {
         <p class="muted">${escapeHTML(presetSummary)}. The selected preset is what shows on the entry screen.</p>
         <select class="input" id="settings-preset-select" data-change-action="preset-switch">${presetOptions}</select>
         <div class="preset-actions-row">
-          <button class="preset-action-btn" id="preset-new-btn" data-action="preset-new">＋ New</button>
-          <button class="preset-action-btn" id="preset-rename-btn" data-action="preset-rename">✎ Rename</button>
-          <button class="preset-action-btn preset-action-danger" id="preset-delete-btn" data-action="preset-delete"${canDelete ? '' : ' disabled'}>🗑 Delete</button>
+          <button class="preset-action-btn" id="preset-new-btn" data-action="preset-new">+ New</button>
+          <button class="preset-action-btn" id="preset-rename-btn" data-action="preset-rename">Rename</button>
+          <button class="preset-action-btn preset-action-danger" id="preset-delete-btn" data-action="preset-delete"${canDelete ? '' : ' disabled'}>${icon('trash-2')} Delete</button>
         </div>
         <!-- v47: long-press shortcut tip. Tells the user about the hidden
              entry-screen gesture (there is no on-screen hint there by design). -->
-        <p class="settings-tip">💡 <strong>Quick tip:</strong> on the test screen, press and hold the row of quick-pick buttons for a couple of seconds to switch presets without coming back here. It only changes the buttons — it never logs anything.</p>
+        <p class="settings-tip">${icon('lightbulb')} <strong>Quick tip:</strong> on the test screen, press and hold the row of quick-pick buttons for a couple of seconds to switch presets without coming back here. It only changes the buttons — it never logs anything.</p>
       </div>
 
       <div class="settings-section">
@@ -435,13 +436,13 @@ function renderSettingsItems() {
         </div>
         <p class="muted" style="margin-top:12px;font-size:12px">${sqpHistoryNote}</p>
         <div class="preset-actions-row" style="margin-top:8px">
-          <button class="preset-action-btn" id="sqp-rebuild-btn" data-action="sqp-rebuild">↻ Rebuild from my data</button>
-          <button class="preset-action-btn preset-action-danger" id="sqp-clear-btn" data-action="sqp-clear">🗑 Clear history</button>
+          <button class="preset-action-btn" id="sqp-rebuild-btn" data-action="sqp-rebuild">${icon('rotate-cw')} Rebuild from my data</button>
+          <button class="preset-action-btn preset-action-danger" id="sqp-clear-btn" data-action="sqp-clear">${icon('trash-2')} Clear history</button>
         </div>
       </div>
 
       <div class="btn-row" style="margin-top:24px">
-        <button class="btn-secondary" id="settings-items-reset" data-action="settings-items-reset">↺ Reset to defaults</button>
+        <button class="btn-secondary" id="settings-items-reset" data-action="settings-items-reset">${icon('rotate-ccw')} Reset to defaults</button>
         <button class="btn-primary" id="settings-items-save" data-action="settings-items-save">Save</button>
       </div>
 
@@ -491,7 +492,7 @@ function renderSettingsFails() {
         <textarea class="textarea" id="settings-reasons" style="min-height:200px">${escapeHTML(state.failReasons.join('\n'))}</textarea>
       </div>
       <div class="btn-row" style="margin-top:24px">
-        <button class="btn-secondary" id="settings-fails-reset" data-action="settings-fails-reset">↺ Reset to defaults</button>
+        <button class="btn-secondary" id="settings-fails-reset" data-action="settings-fails-reset">${icon('rotate-ccw')} Reset to defaults</button>
         <button class="btn-primary" id="settings-fails-save" data-action="settings-fails-save">Save</button>
       </div>
       ${tagsSection}
@@ -702,7 +703,7 @@ function renderSettingsMultiPick() {
         <p class="muted">For each one, type the item types you want logged, <strong>separated by commas</strong>, in the order they should be added. Add a name to label the button, or leave it blank to show the list itself. Leave a multi-pick's items blank to hide it. Up to ${MULTIPICK_MAX_SLOTS}.</p>
         <div class="mp-example">Example — items <strong>Lead, AC Adapter, Lead, PC, Lead, Monitor</strong> log six passes in that order, each on whatever location is in the entry screen's Location field.</div>
         ${slotRows.join('')}
-        <p class="muted">💡 <strong>Quick Pick tile</strong> (optional): puts that multi-pick on the bottom row of the Quick Pick buttons. Tap the tile, then <strong>PASS</strong> — the whole list is logged, the first item taking the asset number on screen. Each tile takes one button's place, so your preset shows one fewer item type per tile.</p>
+        <p class="muted">${icon('lightbulb')} <strong>Quick Pick tile</strong> (optional): puts that multi-pick on the bottom row of the Quick Pick buttons. Tap the tile, then <strong>PASS</strong> — the whole list is logged, the first item taking the asset number on screen. Each tile takes one button's place, so your preset shows one fewer item type per tile.</p>
       </div>
 
       <!-- v77: discoverability for the "Log again ×N" hold. Placed here, on the
@@ -713,7 +714,7 @@ function renderSettingsMultiPick() {
            already dismissed. Multi Pick is for a fixed MIXED list; this is for a
            run of the SAME item, which is why they are different features and why
            saying so here is useful rather than noise. -->
-      <p class="settings-tip">💡 <strong>Quick tip:</strong> for a run of the <em>same</em> item — ten identical desk lamps, say — you don't need a multi-pick. Log the first one, then press and hold <strong>Copy last result</strong> on the test screen and choose how many more to add.</p>
+      <p class="settings-tip">${icon('lightbulb')} <strong>Quick tip:</strong> for a run of the <em>same</em> item — ten identical desk lamps, say — you don't need a multi-pick. Log the first one, then press and hold <strong>Copy last result</strong> on the test screen and choose how many more to add.</p>
 
       <button class="btn-primary" id="settings-multipick-save" data-action="settings-multipick-save" style="margin-top:24px">Save</button>
     </div>
@@ -738,13 +739,13 @@ function renderSettingsDescriptions() {
         <button class="btn-primary" id="settings-descriptions-save" data-action="settings-descriptions-save">Save</button>
       </div>
       <div class="btn-row" style="margin-top:12px">
-        <button class="btn-secondary" id="settings-descriptions-reset" data-action="settings-descriptions-reset">↺ Reset to defaults</button>
+        <button class="btn-secondary" id="settings-descriptions-reset" data-action="settings-descriptions-reset">${icon('rotate-ccw')} Reset to defaults</button>
       </div>
     </div>
   `;
   }
   const rows = state.descriptions.map((d, i) =>
-    `<button class="desc-row" data-action="desc-edit" data-arg="${i}" data-desc="${escapeHTML(d.toLowerCase())}"><span class="desc-row-text">${escapeHTML(d)}</span><span class="desc-row-edit">✎</span></button>`
+    `<button class="desc-row" data-action="desc-edit" data-arg="${i}" data-desc="${escapeHTML(d.toLowerCase())}"><span class="desc-row-text">${escapeHTML(d)}</span><span class="desc-row-edit">${icon('pencil')}</span></button>`
   ).join('');
   return `
     <div class="screen">
@@ -816,6 +817,21 @@ function renderSettingsDisplay() {
         </div>
       </div>
 
+      <div class="settings-section">
+        <h2 class="h2">Icons</h2>
+        <p class="muted">Shows the emoji the app used before V115. Temporary — it goes in a later update unless you need it.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Classic emoji icons</div>
+            <div class="toggle-row-sub">${state.iconsClassic ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="icons-classic-toggle" data-change-action="icons-classic" ${state.iconsClassic ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
     </div>
   `;
 }
@@ -831,7 +847,7 @@ function renderSettingsLogging() {
       ${renderSettingsSubHeader('Logging Options')}
       <div class="settings-section">
         <h2 class="h2">Undo button</h2>
-        <p class="muted">Puts <strong>↶ Undo</strong> beside Copy last on the test screen. It takes back the last item you logged — or the whole batch from Log again or Multi Pick — after asking. Only the most recent, and only while those items are untouched. This phone only.</p>
+        <p class="muted">Puts <strong>${icon('undo-2')} Undo</strong> beside Copy last on the test screen. It takes back the last item you logged — or the whole batch from Log again or Multi Pick — after asking. Only the most recent, and only while those items are untouched. This phone only.</p>
         <div class="toggle-row">
           <div class="toggle-row-text">
             <div class="toggle-row-title">Show Undo</div>
@@ -846,7 +862,7 @@ function renderSettingsLogging() {
 
       <div class="settings-section">
         <h2 class="h2">Map pins for fails</h2>
-        <p class="muted">Puts <strong>📍 Add map pin</strong> on a failed item, and offers it for a few seconds after you log a fail. Open what3words, copy the three words for where the item is, come back and paste them. Pins show on the Overview, print with each fail under Remedial actions on the report, and can go in a Map pin column (Settings &rarr; CSV Columns). Turning this off only hides the button &mdash; pins already added still show and print. This phone only.</p>
+        <p class="muted">Puts <strong>${icon('map-pin')} Add map pin</strong> on a failed item, and offers it for a few seconds after you log a fail. Open what3words, copy the three words for where the item is, come back and paste them. Pins show on the Overview, print with each fail under Remedial actions on the report, and can go in a Map pin column (Settings &rarr; CSV Columns). Turning this off only hides the button &mdash; pins already added still show and print. This phone only.</p>
         <div class="toggle-row">
           <div class="toggle-row-text">
             <div class="toggle-row-title">Map pins</div>
@@ -883,7 +899,7 @@ function renderSettingsLogging() {
 function storageProtectionHTML() {
   const v = state.storageProtection;
   if (v === 'protected') {
-    return `<p class="muted"><strong style="color:var(--pass)">✓ Protected.</strong> This phone won't clear PATGo's data to free up space. Keep exporting backups &mdash; protection doesn't cover a lost or broken phone.</p>`;
+    return `<p class="muted"><strong style="color:var(--pass)">${icon('check')} Protected.</strong> This phone won't clear PATGo's data to free up space. Keep exporting backups &mdash; protection doesn't cover a lost or broken phone.</p>`;
   }
   if (v === 'not') {
     return `<p class="muted"><strong>Not protected.</strong> If this phone runs short of space, it may clear PATGo's data. Using the app from its home-screen icon helps the phone decide to keep it. Until then, export backups regularly.</p>
@@ -928,7 +944,7 @@ function renderSettingsBackup() {
       <div class="settings-section">
         <h2 class="h2">Backup</h2>
         <p class="muted">Save a complete copy of all jobs and settings as a single JSON file. Keep it somewhere safe — it's the only safety net if the browser ever clears its data.</p>
-        <button class="backup-action-btn primary" id="backup-export-btn" data-action="backup-export">⬇ Export backup (.json)</button>
+        <button class="backup-action-btn primary" id="backup-export-btn" data-action="backup-export">${icon('upload')} Export backup (.json)</button>
       </div>
 
       ${undoRepairBlock}
@@ -937,7 +953,7 @@ function renderSettingsBackup() {
         <h2 class="h2">Restore</h2>
         <p class="muted">Import a previously exported backup file. <strong>This will replace all current data on this device.</strong> You'll be asked to confirm before anything is overwritten.</p>
         <input type="file" id="backup-import-file" data-change-action="backup-import-file" accept="application/json,.json" style="display:none">
-        <button class="backup-action-btn danger" id="backup-import-btn" data-action="backup-import">⬆ Import backup (.json)</button>
+        <button class="backup-action-btn danger" id="backup-import-btn" data-action="backup-import">${icon('download')} Import backup (.json)</button>
       </div>
 
       ${snapshotsBlock}
@@ -975,8 +991,8 @@ function renderSettingsStorage() {
   const tidyM = cloudOn && typeof tidyModel === 'function' ? tidyModel(false) : null;
   const pruneBlock = cloudOn ? `
           ${renderTidyBlock(tidyM, 'backup-tidy') || `<p class="muted" style="margin-top:10px;font-size:12px">Nothing older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} is ready to come off this phone right now.</p>`}
-          <button class="backup-action-btn" id="jobs-manage-btn" data-action="jm-open" style="margin-top:10px">🛡 Jobs on This Phone</button>
-          ${typeof renderCloudStorage === 'function' ? `<button class="backup-action-btn" id="cloud-storage-btn" data-action="cs-open" style="margin-top:6px">☁️ Cloud Storage ›</button>` : ''}
+          <button class="backup-action-btn" id="jobs-manage-btn" data-action="jm-open" style="margin-top:10px">${icon('shield-check')} Jobs on This Phone ${icon('chevron-right', 'ic-trail')}</button>
+          ${typeof renderCloudStorage === 'function' ? `<button class="backup-action-btn" id="cloud-storage-btn" data-action="cs-open" style="margin-top:6px">${icon('cloud')} Cloud Storage ${icon('chevron-right', 'ic-trail')}</button>` : ''}
   ` : prunable.length > 0 ? `
           <div class="prune-suggestion">
             <p class="prune-suggestion-text">${prunable.length} exported job${prunable.length === 1 ? '' : 's'} older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} can be cleared to free space.</p>
@@ -1055,9 +1071,9 @@ function renderSetupSection() {
       <div class="settings-section">
         <h2 class="h2">Share setup</h2>
         <p class="muted">Send your configuration to another phone or a new engineer so it's set up just like this one. This shares <strong>settings only</strong> — your jobs, clients and sites are never included.</p>
-        <button class="backup-action-btn primary" id="setup-share-btn" data-action="setup-share">⬆ Share setup…</button>
+        <button class="backup-action-btn primary" id="setup-share-btn" data-action="setup-share">${icon('upload')} Share setup…</button>
         <button class="setup-disclose" data-action="setup-include-toggle-open" aria-expanded="${open ? 'true' : 'false'}">
-          ${open ? '▾' : '▸'} Choose what to include
+          ${icon(open ? 'chevron-down' : 'chevron-right')} Choose what to include
         </button>
         ${open ? `<div class="setup-include-list">${rows}</div>` : ''}
         ${errBlock}
@@ -1067,7 +1083,7 @@ function renderSetupSection() {
         <h2 class="h2">Import setup</h2>
         <p class="muted">Load a setup file from another device. This replaces the matching settings on this phone (you'll see exactly what before it's applied). <strong>Your jobs are not touched.</strong></p>
         <input type="file" id="setup-import-file" data-change-action="setup-import-file" accept="application/json,.json" style="display:none">
-        <button class="backup-action-btn" id="setup-import-btn" data-action="setup-import">⬇ Import setup (.json)</button>
+        <button class="backup-action-btn" id="setup-import-btn" data-action="setup-import">${icon('download')} Import setup (.json)</button>
       </div>
   `;
 }
@@ -1112,8 +1128,8 @@ function renderSettingsCsv() {
       <div class="csv-col-row" data-col-id="${escapeHTML(c.id)}">
         <div class="csv-col-row-top">
           <div class="csv-col-arrows">
-            <button class="csv-col-arrow" data-action="csv-up" data-arg="${escapeHTML(c.id)}" data-csv-up="${escapeHTML(c.id)}" ${isFirst ? 'disabled' : ''} aria-label="Move up">▲</button>
-            <button class="csv-col-arrow" data-action="csv-down" data-arg="${escapeHTML(c.id)}" data-csv-down="${escapeHTML(c.id)}" ${isLast ? 'disabled' : ''} aria-label="Move down">▼</button>
+            <button class="csv-col-arrow" data-action="csv-up" data-arg="${escapeHTML(c.id)}" data-csv-up="${escapeHTML(c.id)}" ${isFirst ? 'disabled' : ''} aria-label="Move up">${icon('chevron-up')}</button>
+            <button class="csv-col-arrow" data-action="csv-down" data-arg="${escapeHTML(c.id)}" data-csv-down="${escapeHTML(c.id)}" ${isLast ? 'disabled' : ''} aria-label="Move down">${icon('chevron-down')}</button>
           </div>
           <label class="csv-col-vis-label">
             <input type="checkbox" class="csv-col-visible" ${c.visible ? 'checked' : ''}>
@@ -1136,7 +1152,7 @@ function renderSettingsCsv() {
       </div>
 
       <button class="btn-primary" id="settings-csv-save" data-action="settings-csv-save" style="margin-top:8px">Save</button>
-      <button class="btn-secondary" id="settings-csv-reset" data-action="settings-csv-reset" style="margin-top:8px;width:100%">Reset to defaults</button>
+      <button class="btn-secondary" id="settings-csv-reset" data-action="settings-csv-reset" style="margin-top:8px;width:100%">${icon('rotate-ccw')} Reset to defaults</button>
     </div>
   `;
 }
@@ -1179,7 +1195,7 @@ function renderSettingsRetest() {
         <h2 class="h2">How it works</h2>
         <p class="muted">Open any job, tap <strong>Session settings</strong>, and switch on <strong>Remind me to chase this for retest</strong>. Only the jobs you flag appear on your chase list — so subcontract work and one-offs never clutter it.</p>
         <p class="muted" style="margin-top:8px">A retest is due for a whole month: a job tested on 30 September with a 12-month interval is due <strong>September</strong> the following year. The interval is taken from your Report Settings default (currently <strong>${defMonths} month${defMonths === 1 ? '' : 's'}</strong>) at the moment you flag it, and you can change it per job.</p>
-        <p class="muted" style="margin-top:8px">The job joins your chase list on the <strong>1st of the month before</strong> it's due, so you have a full month to ring the customer. A banner appears on your PAT Sessions screen and the job shows a 🔔 chip: <em>due next month</em>, <em>due this month</em>, then <em>overdue</em> from the 1st of the month after.</p>
+        <p class="muted" style="margin-top:8px">The job joins your chase list on the <strong>1st of the month before</strong> it's due, so you have a full month to ring the customer. A banner appears on your PAT Sessions screen and the job shows a ${icon('bell')} chip: <em>due next month</em>, <em>due this month</em>, then <em>overdue</em> from the 1st of the month after.</p>
         <p class="muted" style="margin-top:8px">When you've contacted the customer, mark the job <strong>Rebooked</strong> or <strong>Declined</strong> to clear it from the list.</p>
       </div>
       <div class="settings-section">
@@ -1233,7 +1249,7 @@ function renderSettingsReminders() {
       </div>
       <div class="settings-section">
         <p class="muted" style="margin:0 0 10px">Reminders show inside the app when you open it &mdash; they aren't notifications on your phone. Each one's &times; hides it for the rest of the day. These settings are for this phone only.</p>
-        <button class="btn-secondary" style="width:100%" data-action="settings-page" data-arg="settingsRetest">🔔 Retest reminders</button>
+        <button class="btn-secondary" style="width:100%" data-action="settings-page" data-arg="settingsRetest">${icon('bell')} Retest reminders ${icon('chevron-right', 'ic-trail')}</button>
       </div>
     </div>
   `;
@@ -1248,7 +1264,7 @@ function renderSettingsClients() {
   const clients = sortedClients();
 
   const emptyState = clients.length === 0
-    ? emptyStateHTML('🏢', 'No clients yet',
+    ? emptyStateHTML('building-2', 'No clients yet',
         'Add a client below, then add the sites you test at — they\'ll appear as quick picks when you start a new job.')
     : '';
 
@@ -1264,11 +1280,11 @@ function renderSettingsClients() {
       <div class="client-sites">
         ${sites.length ? sites.map(s => `
           <div class="client-site-row">
-            <span class="client-site-name">${siteNotesOf(s) ? '<span class="site-notes-mark" title="Has site notes">📝</span> ' : ''}${escapeHTML(s.name)}</span>
+            <span class="client-site-name">${siteNotesOf(s) ? `<span class="site-notes-mark" title="Has site notes">${icon('list')}</span> ` : ''}${escapeHTML(s.name)}</span>
             <div class="client-site-actions">
               <button class="link-btn" data-action="site-assign" data-arg="${escapeHTML(s.id)}">Move</button>
               <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Edit</button>
-              <button class="link-btn danger" data-action="site-delete" data-arg="${escapeHTML(s.id)}" data-site-delete="${escapeHTML(s.id)}">Delete</button>
+              <button class="link-btn danger" data-action="site-delete" data-arg="${escapeHTML(s.id)}" data-site-delete="${escapeHTML(s.id)}">${icon('trash-2')} Delete</button>
             </div>
           </div>
         `).join('') : `<p class="muted" style="margin:4px 0 8px">No sites for this client yet.</p>`}
@@ -1283,11 +1299,11 @@ function renderSettingsClients() {
             <span class="client-head-name">${escapeHTML(c.name)}</span>
             <span class="client-head-sub">${escapeHTML(sub)}</span>
           </span>
-          <span class="client-head-chevron">${expanded ? '⌄' : '›'}</span>
+          <span class="client-head-chevron">${icon(expanded ? 'chevron-down' : 'chevron-right')}</span>
         </button>
         <div class="client-head-actions">
           <button class="link-btn" data-action="client-rename" data-arg="${escapeHTML(c.id)}" data-client-rename="${escapeHTML(c.id)}">Rename</button>
-          <button class="link-btn danger" data-action="client-delete" data-arg="${escapeHTML(c.id)}" data-client-delete="${escapeHTML(c.id)}">Delete</button>
+          <button class="link-btn danger" data-action="client-delete" data-arg="${escapeHTML(c.id)}" data-client-delete="${escapeHTML(c.id)}">${icon('trash-2')} Delete</button>
         </div>
         ${sitesBlock}
       </div>
@@ -1308,11 +1324,11 @@ function renderSettingsClients() {
       <div class="client-sites">
         ${orphans.map(s => `
           <div class="client-site-row">
-            <span class="client-site-name">${siteNotesOf(s) ? '<span class="site-notes-mark" title="Has site notes">📝</span> ' : ''}${escapeHTML(s.name)}</span>
+            <span class="client-site-name">${siteNotesOf(s) ? `<span class="site-notes-mark" title="Has site notes">${icon('list')}</span> ` : ''}${escapeHTML(s.name)}</span>
             <div class="client-site-actions">
               <button class="link-btn" data-action="site-assign" data-arg="${escapeHTML(s.id)}">Assign to client…</button>
               <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Edit</button>
-              <button class="link-btn danger" data-action="site-delete" data-arg="${escapeHTML(s.id)}" data-site-delete="${escapeHTML(s.id)}">Delete</button>
+              <button class="link-btn danger" data-action="site-delete" data-arg="${escapeHTML(s.id)}" data-site-delete="${escapeHTML(s.id)}">${icon('trash-2')} Delete</button>
             </div>
           </div>
         `).join('')}
@@ -1412,7 +1428,7 @@ function renderSettingsClients() {
   // or removes existing ones), so safe to offer alongside the manual list.
   const rebuildBlock = state.sessions.length ? `
     <div class="settings-section">
-      <button class="preset-action-btn" id="clients-rebuild-btn" data-action="clients-rebuild">↻ Rebuild from my jobs</button>
+      <button class="preset-action-btn" id="clients-rebuild-btn" data-action="clients-rebuild">${icon('rotate-cw')} Rebuild from my jobs</button>
       <p class="muted" style="margin:8px 0 0;font-size:12px">Scans every saved job and adds any client or site that isn't already listed. Useful after importing jobs. It only adds — it never changes or removes what's here.</p>
     </div>
   ` : '';
@@ -1451,8 +1467,8 @@ function renderSettingsReport() {
   // Logo preview (if set) with a Remove button; otherwise a file picker.
   const logoBlock = rs.logo
     ? `<div class="report-logo-preview"><img src="${rs.logo}" alt="Company logo" style="max-width:160px;max-height:80px;display:block;margin:8px 0;border-radius:6px"></div>
-       <button class="preset-action-btn preset-action-danger" id="report-logo-remove" data-action="report-logo-remove">🗑 Remove logo</button>`
-    : `<button class="preset-action-btn" id="report-logo-pick-btn" data-action="report-logo-pick">⬆ Upload logo</button>`;
+       <button class="preset-action-btn preset-action-danger" id="report-logo-remove" data-action="report-logo-remove">${icon('trash-2')} Remove logo</button>`
+    : `<button class="preset-action-btn" id="report-logo-pick-btn" data-action="report-logo-pick">${icon('upload')} Upload logo</button>`;
   const logoError = state.reportSettingsError
     ? `<p class="muted" style="color:#c0392b;margin-top:8px;font-size:12px">${escapeHTML(state.reportSettingsError)}</p>`
     : '';
@@ -1476,7 +1492,7 @@ function renderSettingsReport() {
           <span class="template-actions">
             <button class="preset-action-btn" data-action="report-template-apply" data-arg="${escapeHTML(t.id)}">Apply</button>
             <button class="preset-action-btn" data-action="report-template-rename" data-arg="${escapeHTML(t.id)}">Rename</button>
-            <button class="preset-action-btn preset-action-danger" data-action="report-template-delete" data-arg="${escapeHTML(t.id)}">Delete</button>
+            <button class="preset-action-btn preset-action-danger" data-action="report-template-delete" data-arg="${escapeHTML(t.id)}">${icon('trash-2')} Delete</button>
           </span>
         </div>`).join('')}</div>`
     : `<p class="muted" style="font-style:italic">No templates yet.</p>`;
@@ -1489,13 +1505,13 @@ function renderSettingsReport() {
   const sigBlock = rs.signature
     ? `<div class="report-sig-preview"><img src="${rs.signature}" alt="Signature" style="max-width:200px;max-height:70px;display:block;margin:8px 0;border-radius:6px;background:#fff;padding:4px"></div>
        <div class="btn-row">
-         <button class="preset-action-btn" data-action="signature-draw">✍ Draw again</button>
-         <button class="preset-action-btn" data-action="signature-upload">⬆ Upload</button>
+         <button class="preset-action-btn" data-action="signature-draw">${icon('signature')} Draw again</button>
+         <button class="preset-action-btn" data-action="signature-upload">${icon('upload')} Upload</button>
        </div>
-       <button class="preset-action-btn preset-action-danger" data-action="signature-remove" style="margin-top:8px">🗑 Remove signature</button>`
+       <button class="preset-action-btn preset-action-danger" data-action="signature-remove" style="margin-top:8px">${icon('trash-2')} Remove signature</button>`
     : `<div class="btn-row">
-         <button class="preset-action-btn" data-action="signature-draw">✍ Draw signature</button>
-         <button class="preset-action-btn" data-action="signature-upload">⬆ Upload image</button>
+         <button class="preset-action-btn" data-action="signature-draw">${icon('signature')} Draw signature</button>
+         <button class="preset-action-btn" data-action="signature-upload">${icon('upload')} Upload image</button>
        </div>`;
   const sigPositionControl = rs.signature
     ? `<label class="label" style="margin-top:12px">Position on the report</label>
@@ -1597,7 +1613,7 @@ function renderSettingsReport() {
         <h2 class="h2">Templates</h2>
         <p class="muted">Save your current report settings as a named template, then switch between them. Applying a template replaces all your report settings — including logo, signature and colours.</p>
         ${templatesBlock}
-        <button class="preset-action-btn" data-action="report-template-save-new" style="margin-top:10px">💾 Save current settings as template…</button>
+        <button class="preset-action-btn" data-action="report-template-save-new" style="margin-top:10px">Save current settings as template…</button>
       </div>
 
       <div class="settings-section">
@@ -1720,7 +1736,7 @@ function renderPhotoBackupSection() {
   const stats = (typeof photoStatsSync === 'function') ? photoStatsSync() : { count: 0, bytes: 0 };
 
   const exportBlock = stats.count
-    ? `<button class="backup-action-btn primary" id="photo-export-btn" data-action="photo-export">⬇ Export photos (.json)</button>
+    ? `<button class="backup-action-btn primary" id="photo-export-btn" data-action="photo-export">${icon('upload')} Export photos (.json)</button>
        <p class="muted" style="margin-top:8px;font-size:12px">${stats.count} photo${stats.count === 1 ? '' : 's'} on this device · about ${escapeHTML(formatBytes(Math.round(stats.bytes * 1.37)))} as a file.</p>`
     : `<p class="muted" style="font-size:12px">No photos on this device yet. Photos are added from the FAIL screen.</p>`;
 
@@ -1730,7 +1746,7 @@ function renderPhotoBackupSection() {
         <p class="muted"><strong>Photos are not included in your backup.</strong> They're far too large for it — putting them in would risk the backup itself failing to save. Export them separately and keep both files together.</p>
         ${exportBlock}
         <input type="file" id="photo-import-file" data-change-action="photo-import-file" accept="application/json,.json" style="display:none">
-        <button class="backup-action-btn" id="photo-import-btn" data-action="photo-import" style="margin-top:10px">⬆ Import photos (.json)</button>
+        <button class="backup-action-btn" id="photo-import-btn" data-action="photo-import" style="margin-top:10px">${icon('download')} Import photos (.json)</button>
         <p class="muted" style="margin-top:8px;font-size:12px">Importing adds to what's already here — it never replaces your jobs. Restore your backup first, then import photos.</p>
       </div>
   `;
@@ -1746,11 +1762,11 @@ function renderPhotoStorageSection() {
   // as the photo-wipe action in dispatch.js.
   const clears = (typeof syncActive === 'function' && syncActive());
   const wipeBlock = stats.count
-    ? `<button class="backup-action-btn danger" id="photo-wipe-btn" data-action="photo-wipe" style="margin-top:10px">🗑 ${clears ? 'Clear photos from this phone' : 'Delete all photos'}</button>`
+    ? `<button class="backup-action-btn danger" id="photo-wipe-btn" data-action="photo-wipe" style="margin-top:10px">${icon('trash-2')} ${clears ? 'Clear photos from this phone' : 'Delete all photos'}</button>`
     : '';
   // V90 (R18): the photo manager. Signed out it shows this phone's photos.
   const manageBlock = (typeof renderPhotoManager === 'function')
-    ? `<button class="backup-action-btn primary" id="photo-manage-btn" data-action="pm-open">🖼 Manage Photos</button>`
+    ? `<button class="backup-action-btn primary" id="photo-manage-btn" data-action="pm-open">${icon('images')} Manage Photos ${icon('chevron-right', 'ic-trail')}</button>`
     : '';
   if (!manageBlock && !wipeBlock) return '';
   return `

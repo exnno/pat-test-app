@@ -98,7 +98,10 @@ function bootIntegrityOK() {
     // is correct. It also declares one const, GLOSSARY_GROUPS, which a
     // requiredFns entry could NOT see (see the data.js note below); the function
     // probe covers the file either way.
-    'renderSettingsAbout'
+    'renderSettingsAbout',
+    // V115: sole probe for icons.js. Every screen draws through icon(), so a
+    // deploy missing this file must stop here, not blank the first render.
+    'icon'
   ];
   for (const name of requiredFns) {
     if (typeof window[name] !== 'function') {

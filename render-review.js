@@ -55,7 +55,7 @@ function renderOverviewBodyHTML(sess) {
     if (state.showFailsOnly) return `<p class="muted">No fails in this session.</p>`;
     // Genuinely empty session → rich empty state. No action button: the entry
     // controls to log the first item are right there on the screen.
-    return emptyStateHTML('⚡', 'No items logged yet',
+    return emptyStateHTML('zap', 'No items logged yet',
       'Use the item buttons to log your first test for this session.');
   }
   const sel = state.selectionMode;
@@ -74,7 +74,7 @@ function renderOverviewBodyHTML(sess) {
             : '';
           const actionCol = sel
             ? `<td class="td td-action"></td>`
-            : `<td class="td td-action" data-action="delete-item" data-arg="${i}" data-del-item="${i}">🗑</td>`;
+            : `<td class="td td-action" data-action="delete-item" data-arg="${i}" data-del-item="${i}">${icon('trash-2')}</td>`;
           const rowAttr = sel ? `data-action="row-toggle" data-arg="${i}" data-row-toggle="${i}"` : `data-action="jump-to-item" data-arg="${i}" data-jump="${i}"`;
           const rowClass = sel && checked ? 'tr selected' : 'tr';
           // v17: when timestamps are on, show HH:MM subtly beneath the item
@@ -94,11 +94,11 @@ function renderOverviewBodyHTML(sess) {
           const photoN = (it.result === 'fail' && it.id)
             ? ((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id) : photoCountForItem(it.id)) : 0;
           const photoCloudN = (photoN && typeof photoCloudOnlyCountForItem === 'function') ? photoCloudOnlyCountForItem(it.id) : 0;
-          const photoMark = photoCloudN ? ' ☁' : '';
+          const photoMark = photoCloudN ? ' ' + icon('cloud') : '';
           const photoChip = !photoN ? ''
             : (sel
-              ? `<span class="photo-chip is-static">📷 ${photoN}${photoMark}</span>`
-              : `<button class="photo-chip" data-action="photo-strip-open" data-arg="${escapeHTML(it.id)}" aria-label="View ${photoN} photo${photoN === 1 ? '' : 's'}${photoCloudN ? `, ${photoCloudN} in the cloud only` : ''}">📷 ${photoN}${photoMark}</button>`);
+              ? `<span class="photo-chip is-static">${icon('camera')} ${photoN}${photoMark}</span>`
+              : `<button class="photo-chip" data-action="photo-strip-open" data-arg="${escapeHTML(it.id)}" aria-label="View ${photoN} photo${photoN === 1 ? '' : 's'}${photoCloudN ? `, ${photoCloudN} in the cloud only` : ''}">${icon('camera')} ${photoN}${photoMark}</button>`);
           // V99 (6A, 9A): 📍 on any item with a map pin, switch on or off. Static —
           // tapping the row opens the item, where the pin is.
           const itPin = (typeof mapPinOf === 'function') ? mapPinOf(it) : '';
@@ -141,7 +141,7 @@ function renderOverview() {
     const n = state.selectedIndices.length;
     header = `
       <header class="header-row header-sticky">
-        <button class="icon-btn" id="cancel-selection-btn" data-action="cancel-selection" aria-label="Cancel selection">✕</button>
+        <button class="icon-btn" id="cancel-selection-btn" data-action="cancel-selection" aria-label="Cancel selection">${icon('x')}</button>
         <div class="site-name">${n} selected</div>
         <span style="width:40px"></span>
       </header>
@@ -149,12 +149,12 @@ function renderOverview() {
   } else {
     header = `
       <header class="header-row header-sticky">
-        <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">‹</button>
+        <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">${icon('chevron-left')}</button>
         <div class="site-name">Overview</div>
         <div class="header-actions">
-          ${state.reportSettings.enabled ? `<button class="icon-btn" id="produce-report-btn" data-action="produce-report" data-arg="${sess.id}" aria-label="Produce report" title="Produce report">📄</button>` : ''}
-          <button class="icon-btn" id="copy-btn" data-action="copy-current" aria-label="Copy CSV" title="Copy CSV">📋</button>
-          <button class="icon-btn" id="export-btn" data-action="export-current" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
+          ${state.reportSettings.enabled ? `<button class="icon-btn" id="produce-report-btn" data-action="produce-report" data-arg="${sess.id}" aria-label="Produce report" title="Produce report">${icon('file-text')}</button>` : ''}
+          <button class="icon-btn" id="copy-btn" data-action="copy-current" aria-label="Copy CSV" title="Copy CSV">${icon('clipboard-list')}</button>
+          <button class="icon-btn" id="export-btn" data-action="export-current" aria-label="Share CSV">${icon('share', 'share-icon')}</button>
         </div>
       </header>
     `;
@@ -186,7 +186,7 @@ function renderOverview() {
   const selectionBar = state.selectionMode ? `
     <div class="selection-bar">
       <span class="selection-bar-count">${state.selectedIndices.length} selected</span>
-      <button class="selection-bar-action" id="bulk-edit-menu-btn" data-action="bulk-menu-open" ${state.selectedIndices.length === 0 ? 'disabled' : ''}>Edit selected ▾</button>
+      <button class="selection-bar-action" id="bulk-edit-menu-btn" data-action="bulk-menu-open" ${state.selectedIndices.length === 0 ? 'disabled' : ''}>Edit selected ${icon('chevron-down')}</button>
     </div>
   ` : '';
 
@@ -309,7 +309,7 @@ function renderOverview() {
   const notesText = siteNotesOf(notesSite);
   const siteNotes = !notesSite ? '' : (notesText ? `
       <button type="button" class="site-notes-card" id="site-notes-card" data-action="site-notes-open">
-        <span class="site-notes-head">📝 Site notes &middot; ${escapeHTML(notesSite.name)}</span>
+        <span class="site-notes-head">${icon('list')} Site notes &middot; ${escapeHTML(notesSite.name)}</span>
         <span class="site-notes-text">${escapeHTML(notesText)}</span>
         <span class="site-notes-more">Tap to read all or edit</span>
       </button>` : `
@@ -386,7 +386,7 @@ function renderMoveJobSheet(sess) {
     if (sum.fails) bits.push(plural(sum.fails, 'fail'));
     if (sum.photos) bits.push(plural(sum.photos, 'photo'));
     const cert = (sess.certNo || sess.reportAt) ? `
-        <p class="move-job-warn">\u26a0 A certificate has already been made for this job${sess.certNo ? ' (No. ' + escapeHTML(sess.certNo) + ')' : ''}. It lists these items \u2014 make it again after moving. This job keeps its certificate number; the new job gets its own.</p>` : '';
+        <p class="move-job-warn">${icon('triangle-alert')} A certificate has already been made for this job${sess.certNo ? ' (No. ' + escapeHTML(sess.certNo) + ')' : ''}. It lists these items \u2014 make it again after moving. This job keeps its certificate number; the new job gets its own.</p>` : '';
     const goes = (sum.photos || sum.pins) ? `
         <p class="muted move-job-note">Their ${[sum.photos ? 'photos' : '', sum.pins ? 'map pins' : ''].filter(Boolean).join(' and ')} go with them.</p>` : '';
     return head('Are you sure?') + `
@@ -400,7 +400,7 @@ function renderMoveJobSheet(sess) {
     const res = it.result === 'fail' ? '<span class="fail-text">FAIL</span>' : (it.result === 'pass' ? '<span class="pass-text">PASS</span>' : '');
     const ph = (typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id) : 0;
     const bits = [it.assetNo, it.itemType, it.location].filter(x => x != null && String(x).trim() !== '').map(x => escapeHTML(String(x)));
-    return `<li class="move-job-item"><span>${bits.join(' \u00b7 ') || '(no details)'}</span> ${res}${ph ? ' \ud83d\udcf7' + ph : ''}${mapPinOf(it) ? ' \ud83d\udccd' : ''}</li>`;
+    return `<li class="move-job-item"><span>${bits.join(' \u00b7 ') || '(no details)'}</span> ${res}${ph ? ' ' + icon('camera') + ph : ''}${mapPinOf(it) ? ' ' + icon('map-pin') : ''}</li>`;
   }).join('');
   const clientOpts = Array.from(new Set((state.clients || []).map(c => c && c.name).filter(Boolean)))
     .map(x => `<option value="${escapeHTML(x)}"></option>`).join('');
@@ -478,7 +478,7 @@ function renderMoveToSheet(sess) {
       const sub = [formatDate(s.date), plural(n, 'item')].filter(Boolean).join(' \u00b7 ');
       if (s.locked) {
         return `<li class="move-to-job is-locked" data-hay="${escapeHTML(hay)}"${hit ? '' : ' hidden'}>
-            <span class="move-to-job-title">\ud83d\udd12 ${escapeHTML(moveToTitle(s))}</span>
+            <span class="move-to-job-title">${icon('lock')} ${escapeHTML(moveToTitle(s))}</span>
             <span class="muted move-to-job-sub">${escapeHTML(sub)} \u00b7 Locked \u2014 unlock it first</span></li>`;
       }
       return `<li class="move-to-job" data-hay="${escapeHTML(hay)}"${hit ? '' : ' hidden'}>
@@ -509,7 +509,7 @@ function renderMoveToSheet(sess) {
       const when = it.ts ? formatTimestampCSV(it.ts) : '';
       const bits = [it.itemType, it.location].filter(x => x != null && String(x).trim() !== '').map(x => escapeHTML(String(x)));
       return `<div class="move-to-side"><span class="move-to-side-label">${label}</span>
-              <span>${bits.join(' \u00b7 ') || '(no details)'} ${res}${ph ? ' \ud83d\udcf7' + ph : ''}</span>
+              <span>${bits.join(' \u00b7 ') || '(no details)'} ${res}${ph ? ' ' + icon('camera') + ph : ''}</span>
               ${when ? `<span class="muted move-to-side-when">${escapeHTML(when)}</span>` : ''}</div>`;
     };
     const opts = [
@@ -564,18 +564,18 @@ function renderMoveToSheet(sess) {
   const del = plan.delFrom.concat(plan.delTo);
   if (del.length) {
     const dp = del.reduce((t, id) => t + ((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(id) : 0), 0);
-    notes.push(`\u26a0 ${plural(del.length, 'item')} will be deleted${dp ? ' (with ' + plural(dp, 'photo') + ')' : ''} \u2014 this can\u2019t be undone.`);
+    notes.push(`${plural(del.length, 'item')} will be deleted${dp ? ' (with ' + plural(dp, 'photo') + ')' : ''} \u2014 this can\u2019t be undone.`);
   }
   if (sess.certNo || sess.reportAt) {
-    notes.push(`\u26a0 A certificate has already been made for this job${sess.certNo ? ' (No. ' + sess.certNo + ')' : ''}. It lists these items \u2014 make it again after moving.`);
+    notes.push(`A certificate has already been made for this job${sess.certNo ? ' (No. ' + sess.certNo + ')' : ''}. It lists these items \u2014 make it again after moving.`);
   }
   if (target.certNo || target.reportAt) {
-    notes.push(`\u26a0 A certificate has already been made for ${to}${target.certNo ? ' (No. ' + target.certNo + ')' : ''}. Make it again after the move to include these items.`);
+    notes.push(`A certificate has already been made for ${to}${target.certNo ? ' (No. ' + target.certNo + ')' : ''}. Make it again after the move to include these items.`);
   }
   const tFrom = instrumentDisplayName(instrumentForSession(sess));
   const tTo = instrumentDisplayName(instrumentForSession(target));
   if (tFrom !== tTo) {
-    notes.push(`\u26a0 These items were logged with ${tFrom || 'no tester set'}; ${to} uses ${tTo || 'no tester set'}. Its certificate will show ${tTo || 'no tester'} for them.`);
+    notes.push(`These items were logged with ${tFrom || 'no tester set'}; ${to} uses ${tTo || 'no tester set'}. Its certificate will show ${tTo || 'no tester'} for them.`);
   }
   const renum = Object.keys(plan.renumber).length;
   const left = [];
@@ -584,7 +584,7 @@ function renderMoveToSheet(sess) {
   if (photos || moving.some(it => mapPinOf(it))) left.push('Their photos and map pins go with them.');
   return head('Are you sure?') + `
         <p class="move-job-msg">Move ${escapeHTML(bits.join(' \u00b7 '))} from <strong>${escapeHTML(from)}</strong> into <strong>${escapeHTML(to)}</strong>?</p>
-        ${notes.map(x => `<p class="move-job-warn">${escapeHTML(x)}</p>`).join('')}
+        ${notes.map(x => `<p class="move-job-warn">${icon('triangle-alert')} ${escapeHTML(x)}</p>`).join('')}
         ${left.map(x => `<p class="muted move-job-note">${escapeHTML(x)}</p>`).join('')}
         <button class="btn-primary" id="move-to-go" data-action="move-to-go">Move ${plural(moving.length, 'item')}</button>
         <button class="btn-secondary move-job-back" id="move-to-back" data-action="move-to-back">Back</button>
@@ -653,7 +653,7 @@ function renderEditSession() {
       : 'From the first item logged to the last. It includes any breaks, so it is not time on tools.';
     durationBlock = `
       <div class="session-duration-row">
-        <div class="session-duration-label">⏱ Testing time</div>
+        <div class="session-duration-label">${icon('timer')} Testing time</div>
         <div class="session-duration-value">${escapeHTML(dur.text)}</div>
         <div class="session-duration-sub">${sub}</div>
       </div>
@@ -667,7 +667,7 @@ function renderEditSession() {
       retestBlock = `
         <div class="lock-toggle-row">
           <div class="lock-toggle-text">
-            <div class="lock-toggle-title">🔔 Remind me to chase this for retest</div>
+            <div class="lock-toggle-title">${icon('bell')} Remind me to chase this for retest</div>
             <div class="lock-toggle-sub">Adds this job to your retest chase list so you're reminded to contact the customer and rebook when it's due. Use it for clients you want to win repeat work from.</div>
           </div>
           <label class="toggle-switch">
@@ -682,14 +682,14 @@ function renderEditSession() {
       const contact = sess.retestContact;
       let contactLine = '';
       if (contact && contact.status === 'booked') {
-        contactLine = `<div class="lock-toggle-sub" style="margin-top:6px;color:var(--pass)">✓ Marked as rebooked${contact.at ? ' on ' + escapeHTML(formatDate(contact.at.slice(0, 10))) : ''}. Clear it below to chase again.</div>`;
+        contactLine = `<div class="lock-toggle-sub" style="margin-top:6px;color:var(--pass)">${icon('check')} Marked as rebooked${contact.at ? ' on ' + escapeHTML(formatDate(contact.at.slice(0, 10))) : ''}. Clear it below to chase again.</div>`;
       } else if (contact && contact.status === 'declined') {
         contactLine = `<div class="lock-toggle-sub" style="margin-top:6px;color:var(--muted)">Marked as declined${contact.at ? ' on ' + escapeHTML(formatDate(contact.at.slice(0, 10))) : ''} (lost the job). Clear it below to chase again.</div>`;
       }
       retestBlock = `
         <div class="lock-toggle-row">
           <div class="lock-toggle-text">
-            <div class="lock-toggle-title">🔔 Retest reminder on</div>
+            <div class="lock-toggle-title">${icon('bell')} Retest reminder on</div>
             <div class="lock-toggle-sub">Due ${dueStr ? '<strong>' + escapeHTML(dueStr) + '</strong>' : '—'} (the month of this test + the interval below — a retest is due for the whole month). This job is on your chase list.</div>
             ${contactLine}
           </div>
@@ -707,7 +707,7 @@ function renderEditSession() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="cancel-edit-btn" data-action="edit-back" aria-label="Back">‹</button>
+        <button class="icon-btn" id="cancel-edit-btn" data-action="edit-back" aria-label="Back">${icon('chevron-left')}</button>
         <div class="site-name">Edit session</div>
         <span style="width:40px"></span>
       </header>
@@ -729,7 +729,7 @@ function renderEditSession() {
              corrected without unlocking the whole session. -->
         <div class="lock-toggle-row">
           <div class="lock-toggle-text">
-            <div class="lock-toggle-title">🔒 Lock session</div>
+            <div class="lock-toggle-title">${icon('lock')} Lock session</div>
             <div class="lock-toggle-sub">Prevents new entries from the test screen. Edits via the overview still work.</div>
           </div>
           <label class="toggle-switch">
@@ -882,7 +882,7 @@ function renderRetestReminders() {
             <button class="fail-close-btn" id="retest-action-close" data-action="retest-action-close" aria-label="Close">×</button>
           </div>
           <p style="margin:0 0 14px;font-size:14px;line-height:1.5;color:var(--text)">Once you've contacted the customer, mark the outcome to clear this from your chase list.</p>
-          <button class="btn-primary" style="margin-bottom:8px" data-action="retest-mark-booked" data-arg="${s.id}">✓ Rebooked — job won</button>
+          <button class="btn-primary" style="margin-bottom:8px" data-action="retest-mark-booked" data-arg="${s.id}">${icon('check')} Rebooked — job won</button>
           <button class="btn-secondary" style="margin-bottom:8px" data-action="retest-mark-declined" data-arg="${s.id}">Declined — lost the job</button>
           <button class="btn-tertiary" data-action="retest-untrack" data-arg="${s.id}">Stop reminding me about this job</button>
         </div>
@@ -892,7 +892,7 @@ function renderRetestReminders() {
 
   let list;
   if (due.length === 0) {
-    list = emptyStateHTML('🔔', 'No retests due',
+    list = emptyStateHTML('bell', 'No retests due',
       'When a job you\'ve flagged comes due, it\'ll appear here so you can ring the customer and rebook. Flag a job under its Session settings.');
   } else {
     list = due.map(s => {
@@ -911,9 +911,9 @@ function renderRetestReminders() {
             <div class="session-title">${titleLine}</div>
             ${clientLine}
             <div class="session-meta">Last tested ${formatDate(s.date)} · ${itemCount} item${itemCount === 1 ? '' : 's'} · due ${dueStr || '—'}</div>
-            <div class="session-export-row"><span class="retest-chip ${chipCls}">🔔 ${escapeHTML(chipLabel)}</span></div>
+            <div class="session-export-row"><span class="retest-chip ${chipCls}">${icon('bell')} ${escapeHTML(chipLabel)}</span></div>
           </div>
-          <button class="icon-btn-sm" data-action="retest-action-open" data-arg="${s.id}" aria-label="Mark contacted" title="Mark contacted">✓</button>
+          <button class="icon-btn-sm" data-action="retest-action-open" data-arg="${s.id}" aria-label="Mark contacted" title="Mark contacted">${icon('check')}</button>
         </div>
       `;
     }).join('');
@@ -922,9 +922,9 @@ function renderRetestReminders() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="retest-back-btn" data-action="go-sessions" aria-label="Back">‹</button>
+        <button class="icon-btn" id="retest-back-btn" data-action="go-sessions" aria-label="Back">${icon('chevron-left')}</button>
         <div class="site-name">Retest reminders</div>
-        <button class="icon-btn" id="retest-settings-btn" data-action="settings-page" data-arg="settingsRetest" data-page="settingsRetest" aria-label="Retest settings">⚙</button>
+        <button class="icon-btn" id="retest-settings-btn" data-action="settings-page" data-arg="settingsRetest" data-page="settingsRetest" aria-label="Retest settings">${icon('settings')}</button>
       </header>
       <div class="settings-section" style="margin-top:4px">
         <p class="muted" style="margin-top:0">Jobs you've flagged that are coming due for retest, most urgent first. Ring the customer to rebook, then mark each one done.</p>
@@ -955,20 +955,20 @@ function renderReports() {
 
   let list;
   if (sorted.length === 0) {
-    list = emptyStateHTML('📄', 'Nothing to report yet',
+    list = emptyStateHTML('file-text', 'Nothing to report yet',
       'Once you\'ve logged a session, you can turn it into a PDF report here.');
   } else {
     list = sorted.map(s => {
       const passes = s.items.filter(i => i.result === 'pass').length;
       const fails = s.items.filter(i => i.result === 'fail').length;
-      const lockMark = s.locked ? '<span class="session-lock" title="Locked">🔒</span>' : '';
+      const lockMark = s.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : '';
       return `
         <div class="session-card">
           <div class="session-info" data-action="produce-report" data-arg="${s.id}">
             <div class="session-title">${lockMark}${escapeHTML(s.site || s.name)}</div>
             <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span></div>
           </div>
-          <button class="icon-btn-sm" data-action="produce-report" data-arg="${s.id}" aria-label="Produce report">📄</button>
+          <button class="icon-btn-sm" data-action="produce-report" data-arg="${s.id}" aria-label="Produce report">${icon('file-text')}</button>
         </div>
       `;
     }).join('');
@@ -977,9 +977,9 @@ function renderReports() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="reports-back-btn" data-action="go-sessions" aria-label="Back">‹</button>
+        <button class="icon-btn" id="reports-back-btn" data-action="go-sessions" aria-label="Back">${icon('chevron-left')}</button>
         <div class="site-name">Reports</div>
-        <button class="icon-btn" id="reports-settings-btn" data-action="settings-page" data-arg="settingsReport" data-page="settingsReport" aria-label="Report Settings">⚙</button>
+        <button class="icon-btn" id="reports-settings-btn" data-action="settings-page" data-arg="settingsReport" data-page="settingsReport" aria-label="Report Settings">${icon('settings')}</button>
       </header>
       <div class="settings-section" style="margin-top:4px">
         <p class="muted" style="margin-top:0">Choose a session to produce a PDF Portable Appliance Test Report. You can preview it before sharing or saving.</p>
@@ -1017,7 +1017,7 @@ function renderFailPhotoStripInner() {
 
   const addControl = (photos.length >= cap)
     ? `<span class="photo-add-full">${cap} photo maximum</span>`
-    : `<button class="photo-add-btn" id="fail-photo-pick-btn" data-action="fail-photo-pick">📷 ${photos.length ? 'Add another' : 'Add photo'}</button>`;
+    : `<button class="photo-add-btn" id="fail-photo-pick-btn" data-action="fail-photo-pick">${icon('camera')} ${photos.length ? 'Add another' : 'Add photo'}</button>`;
 
   return thumbs + addControl;
 }
@@ -1047,10 +1047,10 @@ function renderPhotoStripSheet() {
       if (!p.cloud) return `<img src="${p.url}" alt="Photo ${i + 1}" loading="lazy">`;
       const inner = p.url
         ? `<img src="${p.url}" alt="Photo ${i + 1}, in the cloud" loading="lazy">`
-        : `<span class="photo-cloud-blank" aria-hidden="true">☁</span>`;
+        : `<span class="photo-cloud-blank" aria-hidden="true">${icon('cloud')}</span>`;
       return `<button class="photo-cloud-tile${p.busy ? ' is-busy' : ''}" data-action="photo-download" data-arg="${escapeHTML(p.id)}" aria-label="Download photo ${i + 1}" ${p.busy ? 'disabled' : ''}>
               ${inner}
-              <span class="photo-cloud-badge">${p.busy ? 'Downloading…' : '☁ Tap to download'}</span>
+              <span class="photo-cloud-badge">${p.busy ? 'Downloading…' : icon('cloud-download') + ' Tap to download'}</span>
             </button>`;
     };
     body = `
@@ -1071,12 +1071,12 @@ function renderPhotoStripSheet() {
   const cloudBytes = cloudTiles.reduce((n, p) => n + (p.bytes || 0), 0);
   const anyBusy = cloudTiles.some((p) => p.busy);
   const downloadAll = cloudTiles.length >= 2
-    ? `<button class="photo-add-btn wide photo-download-all" data-action="photo-download-all" ${anyBusy ? 'disabled' : ''}>☁ Download all (${cloudTiles.length} · ${escapeHTML(formatBytes(cloudBytes))})</button>`
+    ? `<button class="photo-add-btn wide photo-download-all" data-action="photo-download-all" ${anyBusy ? 'disabled' : ''}>${icon('cloud-download')} Download all (${cloudTiles.length} · ${escapeHTML(formatBytes(cloudBytes))})</button>`
     : '';
 
   const addControl = (count >= cap)
     ? `<p class="muted photo-strip-note">${cap} photo maximum reached.</p>`
-    : `<button class="photo-add-btn wide" id="photo-strip-add-btn" data-action="photo-strip-add" ${state.photoStripLoading ? 'disabled' : ''}>📷 Add another photo</button>`;
+    : `<button class="photo-add-btn wide" id="photo-strip-add-btn" data-action="photo-strip-add" ${state.photoStripLoading ? 'disabled' : ''}>${icon('camera')} Add another photo</button>`;
 
   return `
     <div class="modal-backdrop" id="photo-strip-backdrop" data-action="photo-strip-close"></div>
@@ -1121,13 +1121,13 @@ function _pmTile(e, pm, vis) {
   const url = photoThumbCached(e.id);
   const inner = url
     ? `<img src="${escapeHTML(url)}" alt="" loading="lazy">`
-    : `<span class="pm-thumb-blank" aria-hidden="true">${e.local ? '\ud83d\udcf7' : '\u2601'}</span>`;
-  const badge = !vis ? '' : (!e.local ? '\u2601 Cloud only' : (!e.cloud ? 'Not uploaded' : ''));
+    : `<span class="pm-thumb-blank" aria-hidden="true">${icon(e.local ? 'camera' : 'cloud')}</span>`;
+  const badge = !vis ? '' : (!e.local ? icon('cloud') + ' Cloud only' : (!e.cloud ? 'Not uploaded' : ''));
   const label = `${e.local ? 'Photo on this phone' : 'Photo in the cloud'}${sel ? ', selected' : ''}`;
   return `<button class="pm-tile${sel ? ' is-selected' : ''}${e.local ? '' : ' is-cloud'}" data-action="pm-tile" data-arg="${escapeHTML(e.id)}" aria-label="${label}">
       <span class="pm-thumb" id="pm-t-${escapeHTML(e.id)}">${inner}</span>
       ${badge ? `<span class="pm-badge">${badge}</span>` : ''}
-      ${pm.selecting ? `<span class="pm-tick" aria-hidden="true">${sel ? '\u2713' : ''}</span>` : ''}
+      ${pm.selecting ? `<span class="pm-tick" aria-hidden="true">${sel ? icon('check') : ''}</span>` : ''}
     </button>`;
 }
 
@@ -1139,7 +1139,7 @@ function _pmPreviewSheet(m, pm) {
   const vis = m.vis;
   const img = p.url
     ? `<img src="${escapeHTML(p.url)}" alt="Photo">`
-    : `<span class="pm-thumb-blank">${p.loading ? 'Loading\u2026' : '\u2601 No preview yet'}</span>`;
+    : `<span class="pm-thumb-blank">${p.loading ? 'Loading\u2026' : icon('cloud') + ' No preview yet'}</span>`;
   const where = !vis ? 'On this phone'
     : (!e.local ? 'Only in the cloud' : (e.cloud ? 'On this phone and in the cloud' : 'On this phone \u00b7 not uploaded yet'));
   const job = [e.client, e.title, formatDate(e.date)].filter(Boolean).join(' \u00b7 ');
@@ -1150,10 +1150,10 @@ function _pmPreviewSheet(m, pm) {
     where + (e.local ? '' : (e.onPhone ? '' : ' \u00b7 its job isn\u2019t on this phone')),
   ].filter(Boolean);
   const btns = [];
-  if (vis && !e.local && e.src === 'known' && e.onPhone) btns.push(`<button class="btn-primary" data-action="pm-download" data-arg="${escapeHTML(e.id)}">\u2601 Download</button>`);
+  if (vis && !e.local && e.src === 'known' && e.onPhone) btns.push(`<button class="btn-primary" data-action="pm-download" data-arg="${escapeHTML(e.id)}">${icon('cloud-download')} Download</button>`);
   if (vis && e.local && e.cloud) btns.push(`<button class="btn-secondary" data-action="pm-remove" data-arg="${escapeHTML(e.id)}">Remove from phone</button>`);
-  if (e.locked) btns.push(`<p class="muted pm-note">\ud83d\udd12 This job is locked. Unlock it to delete its photos.</p>`);
-  else if (e.local || vis) btns.push(`<button class="btn-danger" data-action="pm-delete" data-arg="${escapeHTML(e.id)}">${vis ? 'Delete everywhere' : 'Delete'}</button>`);
+  if (e.locked) btns.push(`<p class="muted pm-note">${icon('lock')} This job is locked. Unlock it to delete its photos.</p>`);
+  else if (e.local || vis) btns.push(`<button class="btn-danger" data-action="pm-delete" data-arg="${escapeHTML(e.id)}">${icon('trash-2')} ${vis ? 'Delete everywhere' : 'Delete'}</button>`);
   return `
     <div class="modal-backdrop" data-action="pm-preview-close"></div>
     <div class="bulk-sheet" role="dialog" aria-label="Photo">
@@ -1183,7 +1183,7 @@ function renderPhotoManager() {
 
   const header = `
     <header class="header-row">
-      <button class="icon-btn" data-action="pm-back" aria-label="Back">\u2039</button>
+      <button class="icon-btn" data-action="pm-back" aria-label="Back">${icon('chevron-left')}</button>
       <div class="site-name">Manage Photos</div>
       ${anything ? `<button class="pm-select-btn" data-action="pm-select-toggle" ${pm.busy ? 'disabled' : ''}>${pm.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
     </header>`;
@@ -1221,8 +1221,8 @@ function renderPhotoManager() {
 
   const totals = `
     <div class="settings-section pm-totals">
-      <div class="pm-total-row"><span>\ud83d\udcf1 On this phone</span><strong>${plural(t.phoneN)} \u00b7 ${escapeHTML(formatBytes(t.phoneB))}</strong></div>
-      ${vis ? `<div class="pm-total-row"><span>\u2601 In the cloud${t.cloudAll ? '' : ' <span class="muted">(jobs on this phone)</span>'}</span><strong>${plural(t.cloudN)} \u00b7 ${escapeHTML(formatBytes(t.cloudB))}</strong></div>` : ''}
+      <div class="pm-total-row"><span>${icon('smartphone')} On this phone</span><strong>${plural(t.phoneN)} \u00b7 ${escapeHTML(formatBytes(t.phoneB))}</strong></div>
+      ${vis ? `<div class="pm-total-row"><span>${icon('cloud')} In the cloud${t.cloudAll ? '' : ' <span class="muted">(jobs on this phone)</span>'}</span><strong>${plural(t.cloudN)} \u00b7 ${escapeHTML(formatBytes(t.cloudB))}</strong></div>` : ''}
       ${look}
     </div>`;
 
@@ -1248,7 +1248,7 @@ function renderPhotoManager() {
   let body;
   if (!m.total) {
     body = !anything
-      ? emptyStateHTML('\ud83d\udcf7', 'No photos yet', 'Photos are added from the FAIL screen. They\u2019ll appear here, grouped by job.')
+      ? emptyStateHTML('camera', 'No photos yet', 'Photos are added from the FAIL screen. They\u2019ll appear here, grouped by job.')
       : `<p class="muted pm-note">No photos match this filter.</p>`;
   } else {
     body = m.groups.map((g) => {
@@ -1259,9 +1259,9 @@ function renderPhotoManager() {
       return `
         <section class="pm-group">
           <div class="pm-group-head">
-            ${pm.selecting ? `<button class="pm-group-tick${allSel ? ' is-on' : ''}" data-action="pm-select-job" data-arg="${escapeHTML(g.key)}" aria-label="${allSel ? 'Deselect' : 'Select'} every photo in this job">${allSel ? '\u2713' : ''}</button>` : ''}
+            ${pm.selecting ? `<button class="pm-group-tick${allSel ? ' is-on' : ''}" data-action="pm-select-job" data-arg="${escapeHTML(g.key)}" aria-label="${allSel ? 'Deselect' : 'Select'} every photo in this job">${allSel ? icon('check') : ''}</button>` : ''}
             <div class="pm-group-text">
-              <div class="pm-group-title">${g.locked ? '<span class="session-lock" title="Locked">\ud83d\udd12</span>' : ''}${escapeHTML(g.title)}</div>
+              <div class="pm-group-title">${g.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : ''}${escapeHTML(g.title)}</div>
               <div class="pm-group-sub">${escapeHTML(sub.filter(Boolean).join(' \u00b7 '))}</div>
             </div>
           </div>
@@ -1283,8 +1283,8 @@ function renderPhotoManager() {
       <div class="selection-bar pm-bar">
         <span class="selection-bar-count">${nSel} selected${nSel ? ` \u00b7 ${escapeHTML(formatBytes(bytes))}` : ''}</span>
         ${vis ? `<button class="selection-bar-action pm-bar-btn" data-action="pm-remove" ${off(canRemove)}>Remove from phone</button>
-        <button class="selection-bar-action pm-bar-btn" data-action="pm-download" ${off(canDown)}>Download</button>` : ''}
-        <button class="selection-bar-action pm-bar-btn is-danger" data-action="pm-delete" ${off(canDel)}>${vis ? 'Delete everywhere' : 'Delete'}</button>
+        <button class="selection-bar-action pm-bar-btn" data-action="pm-download" ${off(canDown)}>${icon('cloud-download')} Download</button>` : ''}
+        <button class="selection-bar-action pm-bar-btn is-danger" data-action="pm-delete" ${off(canDel)}>${icon('trash-2')} ${vis ? 'Delete everywhere' : 'Delete'}</button>
       </div>`;
   }
 
@@ -1339,7 +1339,7 @@ function renderJobManager() {
   const m = jobMgrModel();
   const header = `
     <header class="header-row">
-      <button class="icon-btn" data-action="jm-back" aria-label="Back">\u2039</button>
+      <button class="icon-btn" data-action="jm-back" aria-label="Back">${icon('chevron-left')}</button>
       <div class="site-name">Jobs on This Phone</div>
       ${m.active && m.counts.all ? `<button class="pm-select-btn" data-action="jm-select-toggle" ${jm.busy ? 'disabled' : ''}>${jm.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
     </header>`;
@@ -1353,7 +1353,7 @@ function renderJobManager() {
 
   const summary = `
     <div class="settings-section pm-totals">
-      <div class="pm-total-row"><span>\ud83d\udee1 Safe in the cloud</span><strong>${m.counts.safe} of ${m.counts.all}</strong></div>
+      <div class="pm-total-row"><span>${icon('shield-check')} Safe in the cloud</span><strong>${m.counts.safe} of ${m.counts.all}</strong></div>
       <p class="muted pm-note">A job can come off this phone once the cloud copy matches it and all its photos are uploaded. It stays in the cloud and on your other phones, and you can bring it back.</p>
     </div>`;
 
@@ -1380,19 +1380,21 @@ function renderJobManager() {
   } else {
     body = m.rows.map((x) => {
       const sel = !!(jm.selected || {})[x.id];
-      const meta = [x.client, formatDate(x.date), `${x.items} item${x.items === 1 ? '' : 's'}`, x.photos ? `\ud83d\udcf7 ${x.photos}` : ''].filter(Boolean).join(' \u00b7 ');
+      const meta = [x.client, formatDate(x.date), `${x.items} item${x.items === 1 ? '' : 's'}`].filter(Boolean).join(' \u00b7 ');
+      // V115: the photo count's camera is markup, so it joins after the escaped text.
+      const photoBit = x.photos ? ` \u00b7 ${icon('camera')} ${x.photos}` : '';
       const status = x.r.safe
-        ? `<span class="jm-status is-safe">\ud83d\udee1 ${escapeHTML(syncSafetyText(x.r))}</span>`
+        ? `<span class="jm-status is-safe">${icon('shield-check')} ${escapeHTML(syncSafetyText(x.r))}</span>`
         : `<span class="jm-status">${escapeHTML(syncSafetyText(x.r))}</span>`;
       const tick = jm.selecting
-        ? `<span class="jm-tick${sel ? ' is-on' : ''}${x.removable ? '' : ' is-off'}" aria-hidden="true">${sel ? '\u2713' : ''}</span>`
+        ? `<span class="jm-tick${sel ? ' is-on' : ''}${x.removable ? '' : ' is-off'}" aria-hidden="true">${sel ? icon('check') : ''}</span>`
         : '';
       return `
         <div class="jm-row${sel ? ' is-selected' : ''}${jm.selecting && !x.removable ? ' is-dim' : ''}" data-action="jm-tap" data-arg="${escapeHTML(x.id)}">
           ${tick}
           <div class="jm-text">
-            <div class="pm-group-title">${x.locked ? '<span class="session-lock" title="Locked">\ud83d\udd12</span>' : ''}${escapeHTML(x.title)}</div>
-            <div class="pm-group-sub">${escapeHTML(meta)}</div>
+            <div class="pm-group-title">${x.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : ''}${escapeHTML(x.title)}</div>
+            <div class="pm-group-sub">${escapeHTML(meta)}${photoBit}</div>
             <div class="jm-status-row">${status}</div>
           </div>
         </div>`;
@@ -1401,7 +1403,7 @@ function renderJobManager() {
 
   // V93 (7A): cleared jobs live with every other cloud job — on the Jobs
   // screen's cloud tab. One path, not two.
-  const cleared = `<p class="muted pm-note">Jobs you remove from this phone stay in the cloud, with every older job. <button class="pm-look-link" data-action="jm-cloud-link">See them in \u2601 In the cloud</button> on the Jobs screen \u2014 tap one to bring it back.</p>`;
+  const cleared = `<p class="muted pm-note">Jobs you remove from this phone stay in the cloud, with every older job. <button class="pm-look-link" data-action="jm-cloud-link">See them in ${icon('cloud')} In the cloud</button> on the Jobs screen \u2014 tap one to bring it back.</p>`;
 
   let bar = '';
   if (jm.selecting) {
@@ -1446,7 +1448,7 @@ function renderCloudJobsHTML() {
   // here: cloudStoreOpen notes 'sessions' as the view to go back to, and the
   // Jobs screen remembers its tab.
   const storageBtn = (cj.selecting || typeof cloudStoreOpen !== 'function') ? ''
-    : `<button class="pm-look-link cloud-storage-link" data-action="cs-open">\u2601 Cloud Storage \u203a</button>`;
+    : `<button class="pm-look-link cloud-storage-link" data-action="cs-open">${icon('cloud')} Cloud Storage ${icon('chevron-right', 'ic-trail')}</button>`;
   if (!cj.ok) {
     let msg;
     if (cj.loading) msg = `<p class="muted pm-note" role="status">Reading the cloud\u2026</p>`;
@@ -1467,7 +1469,7 @@ function renderCloudJobsHTML() {
       <div class="selection-bar pm-bar">
         <span class="selection-bar-count">${n} selected</span>
         <button class="selection-bar-action pm-bar-btn" data-action="cloud-bring" ${n && !cj.busy ? '' : 'disabled'}>Bring onto this phone</button>
-        <button class="selection-bar-action pm-bar-btn is-danger" data-action="cloud-delete" ${n && !cj.busy ? '' : 'disabled'}>Delete\u2026</button>
+        <button class="selection-bar-action pm-bar-btn is-danger" data-action="cloud-delete" ${n && !cj.busy ? '' : 'disabled'}>${icon('trash-2')} Delete\u2026</button>
       </div>`;
   }
   return `
@@ -1488,7 +1490,7 @@ function renderCloudListAreaHTML(model) {
   const count = q
     ? `${m.shown} of ${m.total} job${m.total === 1 ? '' : 's'} match`
     : `${m.total} job${m.total === 1 ? '' : 's'} only in the cloud`;
-  const head = `<p class="muted pm-note cloud-count">${count} \u00b7 checked ${when} \u00b7 <button class="pm-look-link" data-action="cloud-refresh" aria-label="Read the cloud list again">\u27f3 Refresh</button></p>` +
+  const head = `<p class="muted pm-note cloud-count">${count} \u00b7 checked ${when} \u00b7 <button class="pm-look-link" data-action="cloud-refresh" aria-label="Read the cloud list again">${icon('refresh-cw')} Refresh</button></p>` +
     (cj.capped ? `<p class="muted pm-note">Showing the first ${SYNC_CLOUD_MAX.toLocaleString('en-GB')} jobs.</p>` : '');
   if (!m.total) return head + `<p class="muted pm-note">Every job in the cloud is on this phone.</p>`;
   if (!m.shown) return head + `<p class="muted pm-note">No cloud jobs match.</p>`;
@@ -1499,13 +1501,13 @@ function renderCloudListAreaHTML(model) {
       const counts = [];
       if (j.items !== null && j.items !== undefined) counts.push(`${j.items} item${j.items === 1 ? '' : 's'}`);
       if (j.fails) counts.push(`<span class="fail-text">${j.fails} fail</span>`);
-      if (j.photos) counts.push(`<span class="photo-text">\ud83d\udcf7 ${j.photos}</span>`);
+      if (j.photos) counts.push(`<span class="photo-text">${icon('camera')} ${j.photos}</span>`);
       const meta = [j.client ? escapeHTML(j.client) : '', escapeHTML(formatDate(j.date))].concat(counts).filter(Boolean).join(' \u00b7 ');
-      const tick = cj.selecting ? `<span class="jm-tick${on ? ' is-on' : ''}" aria-hidden="true">${on ? '\u2713' : ''}</span>` : '';
+      const tick = cj.selecting ? `<span class="jm-tick${on ? ' is-on' : ''}" aria-hidden="true">${on ? icon('check') : ''}</span>` : '';
       return `
         <div class="session-card cloud-card${on ? ' is-selected' : ''}${j.locked ? ' locked' : ''}">
           <div class="session-info" data-action="cloud-tap" data-arg="${escapeHTML(j.id)}">
-            <div class="session-title">${tick}<span class="session-cloud" title="Only in the cloud" aria-label="Only in the cloud">\u2601</span>${j.locked ? '<span class="session-lock" title="Locked">\ud83d\udd12</span>' : ''}${escapeHTML(j.title)}</div>
+            <div class="session-title">${tick}<span class="session-cloud" title="Only in the cloud" aria-label="Only in the cloud">${icon('cloud')}</span>${j.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : ''}${escapeHTML(j.title)}</div>
             <div class="session-meta">${meta}</div>
             ${j.certNo ? `<div class="session-meta cloud-cert">Certificate ${escapeHTML(j.certNo)}</div>` : ''}
           </div>
@@ -1531,7 +1533,7 @@ function openCloudDeleteSheet(o, onYes) {
   const rows = o.jobs.map((j) => {
     const bits = [j.client ? escapeHTML(j.client) : '', escapeHTML(formatDate(j.date))];
     if (typeof j.items === 'number') bits.push(pl(j.items, 'item'));
-    if (j.photos) bits.push(`\ud83d\udcf7 ${j.photos}`);
+    if (j.photos) bits.push(`${icon('camera')} ${j.photos}`);
     return `<li><strong>${escapeHTML(j.title || j.site || j.name || 'Untitled job')}</strong><br><span class="muted">${bits.filter(Boolean).join(' \u00b7 ')}</span>` +
       (j.certNo ? `<br><span class="cloud-del-cert">Certificate ${escapeHTML(j.certNo)}</span>` : (j.locked ? `<br><span class="cloud-del-cert">Locked</span>` : '')) + `</li>`;
   }).join('');
@@ -1614,7 +1616,7 @@ function renderCloudStorage() {
   const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
   const header = `
     <header class="header-row">
-      <button class="icon-btn" data-action="cs-back" aria-label="Back">‹</button>
+      <button class="icon-btn" data-action="cs-back" aria-label="Back">${icon('chevron-left')}</button>
       <div class="site-name">Cloud Storage</div>
       ${cs.ok && m.selectable ? `<button class="pm-select-btn" data-action="cs-select-toggle" ${cs.busy ? 'disabled' : ''}>${cs.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
     </header>`;
@@ -1630,33 +1632,33 @@ function renderCloudStorage() {
   const when = cs.at ? escapeHTML(new Date(cs.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) : '';
   const checked = cs.loading
     ? `<p class="muted pm-note cs-checked" role="status">Reading the cloud…</p>`
-    : `<p class="muted pm-note cs-checked">Checked ${when} · <button class="pm-look-link" data-action="cs-refresh" aria-label="Read the cloud again">⟳ Refresh</button></p>`;
+    : `<p class="muted pm-note cs-checked">Checked ${when} · <button class="pm-look-link" data-action="cs-refresh" aria-label="Read the cloud again">${icon('refresh-cw')} Refresh</button></p>`;
   const totals = `
     <div class="settings-section pm-totals" id="cs-totals">
-      <div class="pm-total-row"><span>📋 Jobs</span><strong>${escapeHTML(m.jobs.n.toLocaleString('en-GB'))} · ${escapeHTML(about(m.jobs.bytes))}</strong></div>
-      <div class="pm-total-row"><span>📷 Photos</span><strong>${escapeHTML(m.photos.n.toLocaleString('en-GB'))} · ${escapeHTML(about(m.photos.bytes))}</strong></div>
-      <div class="pm-total-row cs-total"><span>☁ In the cloud</span><strong>${escapeHTML(about(m.total))}</strong></div>
+      <div class="pm-total-row"><span>${icon('clipboard-list')} Jobs</span><strong>${escapeHTML(m.jobs.n.toLocaleString('en-GB'))} · ${escapeHTML(about(m.jobs.bytes))}</strong></div>
+      <div class="pm-total-row"><span>${icon('camera')} Photos</span><strong>${escapeHTML(m.photos.n.toLocaleString('en-GB'))} · ${escapeHTML(about(m.photos.bytes))}</strong></div>
+      <div class="pm-total-row cs-total"><span>${icon('cloud')} In the cloud</span><strong>${escapeHTML(about(m.total))}</strong></div>
       ${cs.capped ? `<p class="muted pm-note">Counted from the first ${SYNC_CLOUD_MAX.toLocaleString('en-GB')} jobs — there is more than this.</p>` : ''}
       ${checked}
       <p class="muted pm-note">Sizes are approximate. Photos are counted at full size. This phone’s own space is on Phone Storage.</p>
-      <button class="backup-action-btn" id="cs-photos-btn" data-action="cs-photos" ${cs.busy ? 'disabled' : ''}>🖼 Manage Photos</button>
+      <button class="backup-action-btn" id="cs-photos-btn" data-action="cs-photos" ${cs.busy ? 'disabled' : ''}>${icon('images')} Manage Photos ${icon('chevron-right', 'ic-trail')}</button>
     </div>`;
   const sel = cs.selected || {};
   const cards = m.rows.map((j) => {
     const on = !!sel[j.id] && !j.onPhone;
     const counts = [];
     if (typeof j.items === 'number') counts.push(pl(j.items, 'item'));
-    if (j.photos) counts.push(`<span class="photo-text">📷 ${j.photos}</span>`);
+    if (j.photos) counts.push(`<span class="photo-text">${icon('camera')} ${j.photos}</span>`);
     const meta = [j.client ? escapeHTML(j.client) : '', escapeHTML(formatDate(j.date))].concat(counts).filter(Boolean).join(' · ');
     const where = j.onPhone
       ? `<span class="cs-where">on this phone</span>`
-      : `<span class="session-cloud" title="Only in the cloud" aria-label="Only in the cloud">☁</span>`;
-    const tick = cs.selecting && !j.onPhone ? `<span class="jm-tick${on ? ' is-on' : ''}" aria-hidden="true">${on ? '✓' : ''}</span>` : '';
+      : `<span class="session-cloud" title="Only in the cloud" aria-label="Only in the cloud">${icon('cloud')}</span>`;
+    const tick = cs.selecting && !j.onPhone ? `<span class="jm-tick${on ? ' is-on' : ''}" aria-hidden="true">${on ? icon('check') : ''}</span>` : '';
     const parts = j.photoBytes ? ` <span class="muted">(job ${escapeHTML(cloudBytesText(j.bytes))} + photos ${escapeHTML(cloudBytesText(j.photoBytes))})</span>` : '';
     return `
         <div class="session-card cloud-card cs-card${on ? ' is-selected' : ''}${j.locked ? ' locked' : ''}${j.onPhone ? ' cs-on-phone' : ''}" data-id="${escapeHTML(j.id)}">
           <div class="session-info" data-action="cs-tap" data-arg="${escapeHTML(j.id)}">
-            <div class="session-title">${tick}${j.onPhone ? '' : where}${j.locked ? '<span class="session-lock" title="Locked">🔒</span>' : ''}${escapeHTML(j.title)}</div>
+            <div class="session-title">${tick}${j.onPhone ? '' : where}${j.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : ''}${escapeHTML(j.title)}</div>
             <div class="session-meta">${meta}</div>
             <div class="session-meta cs-size"><strong>${escapeHTML(about(j.total))}</strong>${parts}${j.onPhone ? ' · ' + where : ''}</div>
             ${j.certNo ? `<div class="session-meta cloud-cert">Certificate ${escapeHTML(j.certNo)}</div>` : ''}
@@ -1667,7 +1669,7 @@ function renderCloudStorage() {
     <div class="settings-section" id="cs-top">
       <h2 class="h2">Biggest jobs</h2>
       ${cards}
-      <p class="muted pm-note">Only jobs that aren’t on this phone can be deleted here. A job on this phone is deleted from the phone’s job list (🗑 → Delete everywhere).</p>
+      <p class="muted pm-note">Only jobs that aren’t on this phone can be deleted here. A job on this phone is deleted from the phone’s job list (${icon('trash-2')} → Delete everywhere).</p>
     </div>` : `<p class="muted pm-note">No jobs in the cloud yet.</p>`;
   let bar = '';
   if (cs.selecting) {
@@ -1676,7 +1678,7 @@ function renderCloudStorage() {
     bar = `
       <div class="selection-bar pm-bar">
         <span class="selection-bar-count">${pick.length} selected${pick.length ? ` · ${escapeHTML(about(bytes))}` : ''}</span>
-        <button class="selection-bar-action pm-bar-btn is-danger" data-action="cs-delete" ${pick.length && !cs.busy ? '' : 'disabled'}>Delete…</button>
+        <button class="selection-bar-action pm-bar-btn is-danger" data-action="cs-delete" ${pick.length && !cs.busy ? '' : 'disabled'}>${icon('trash-2')} Delete…</button>
       </div>`;
   }
   return `

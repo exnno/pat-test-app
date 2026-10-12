@@ -8,18 +8,38 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V114
-V114 = Stage 7 part 3, the settings look pass, first release of Stage 12 (spec 1A
-3A 4A 5A 6A 10A 11A): Settings says jobs, quoting screens by their on-screen names
-(PAT Sessions, Session settings, New session, Edit session); headings / buttons /
-switches sentence case, page names keep capitals; Glossary matched to the screen;
-welcome rolled; harness 51. No icons, layouts or settings changed.
-**Next: V115 — line icons app-wide** (spec below, locked 12 Oct). Then the page
-splits (below), then the rest of Stage 12. Outstanding (Peter): Supabase Pro +
-production project, ICO fee, privacy + processor terms (and the About/Privacy
-wording from them).
+### Next after V115
+V115 = line icons app-wide (spec 8A 9A 12A 13A 14B, round 1A 2A 3A 4A): one new
+file icons.js + icon(name); every emoji used as an icon is a Lucide line icon;
+Settings icons in --accent; button rule applied; banners icon-first outside the
+escaped words; empty states grey, wizard blue; temporary Classic emoji switch;
+welcome rolled; harness 52, M851–M872.
+**Next: V116 — remove the Classic emoji switch** (14B) unless someone asked to
+keep it — small, can ride with the next release. Then the page splits (below),
+then the rest of Stage 12. Outstanding (Peter): Supabase Pro + production
+project, ICO fee, privacy + processor terms (and the About/Privacy wording from
+them).
 
-### V115 — line icons across the whole app (LOCKED 12 Oct, Peter) — NEXT
+### V115 residuals (known, accepted)
+- Classic emoji icons (14B) is approximate: one emoji per icon name, so a few
+  spots show a neighbour's old emoji (Backup & Restore and the Data group both
+  💾; refresh buttons show 🔄; the old ⬇/⬆ export/import arrows come back the
+  NEW way round). It goes at V116 — to remove: icons.js header lists the parts.
+- Delete buttons not on the spec's list stay plain words: the photo strip's
+  small Delete on each thumbnail, Overview's "Delete selected", and red final
+  confirms (as the rule says). Trash added to In the cloud's Delete… and Manage
+  Photos' preview Delete, the same kind as the listed ones.
+- The share glyph is Lucide's current share (path drawn slightly differently
+  from the v10 copy) — same shape at phone size.
+- Descriptions draws a pencil per row (~140 small SVGs, ~45 KB of markup on that
+  page). Fine on a phone; if it ever feels slow, one shared <symbol> + <use> is
+  the fix, not a return to emoji.
+- The walkthrough (tour) mock screens follow the new icons, including the
+  backup mock's arrows.
+- Plain-text places keep characters by design: PDF certificate (polarity ✓ →
+  "Yes" on the PDF), CSV, copied/emailed text, tooltips, confirm messages.
+
+### ~~V115 — line icons across the whole app~~ — SHIPPED IN V115 (locked spec kept below for reference)
 Decisions: 8A line icons replace emoji used as icons, whole app, own release ·
 9A/12A Lucide (ISC; keep its licence notice in the icons file) · 10A V114 changed
 no icons · 13A Settings-list icons in --accent (#2563eb / #3b82f6) · 14B a
@@ -57,9 +77,11 @@ Marks: 🔒 lock · ✓ check · ✗ ✕ x · 🕘 history · ⏱ timer · 💡 
 🎉 party-popper. Chevrons: ‹ chevron-left · › chevron-right · ▾ ⌄ ▼ chevron-down
 · ▲ chevron-up. Stay as text: → in sentences, ≤ ≥ Ω, ● ○ (bug sheet dot);
 PASS/FAIL colours unchanged.
-Open for V115's spec round: emoji inside sentences (banners "⏰ 2 jobs…", toasts)
-— icon at the start of the banner, or drop; empty-state icons; the setup
-wizard's big icons; how the 14B switch is worded.
+Spec round (12 Oct, Peter "1A 2A 3A 4A"): 1A icon at the start of a banner or
+note, same colour as the words (toasts had none); 2A empty states large line
+icon, soft grey; 3A wizard large line icons in PATGo blue; 4A "Classic emoji
+icons" with "Shows the emoji the app used before V115. Temporary — it goes in a
+later update unless you need it."
 
 ### Settings pages too crowded — split before launch (V114 6A, Peter: "near the top")
 Report Settings (long: company, logo, colours, file name, numbers, templates,

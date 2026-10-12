@@ -2287,7 +2287,7 @@ function mapPinOfferShow(itemId) {
   el.className = 'map-pin-offer';
   el.setAttribute('data-action', 'map-pin-offer');
   el.setAttribute('data-arg', itemId);
-  el.textContent = '\uD83D\uDCCD Add map pin';
+  el.innerHTML = icon('map-pin') + ' Add map pin';   // V115: fixed markup, no user text
   app.appendChild(el);
   _mapPinOfferTimer = setTimeout(mapPinOfferHide, MAP_PIN_OFFER_MS);
   return true;

@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V114';
+const APP_VERSION = 'V115';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V114';
+const WELCOME_VERSION = 'V115';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -1074,6 +1074,11 @@ const SQP_STAPLE_DEFENCE = 2;     // v27: preset button at/above this score is p
 // Sound (plus the always-on visual flash) is the replacement confirmation
 // channel for those devices, but it's off until the user turns it on.
 const SOUNDFX_KEY = 'pat:soundfx';          // v17: '1' | '0', default '0'
+
+// V115 (14B): the temporary "Classic emoji icons" switch (Theme & Sound). Per
+// phone, '1' | '0', default OFF — only an explicit '1' turns it on. Read by
+// icon() in icons.js. Remove at V116 unless needed (see icons.js header).
+const ICONS_CLASSIC_KEY = 'pat:iconsclassic';
 
 // v17: Item timestamps. Stored as '1'|'0', default OFF ('0'). When ON, each
 // item gets a `ts` (ISO string) stamped the moment it's first saved, shown in

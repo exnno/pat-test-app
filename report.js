@@ -1124,7 +1124,7 @@ function openReportPreview(doc, session) {
   function quickAdjustHTML() {
     const hasSig = !!(rs.signature && rs.signature);
     const chip = (action, on, label) =>
-      `<button class="qa-chip ${on ? 'on' : ''}" data-qa="${action}">${on ? '✓ ' : ''}${label}</button>`;
+      `<button class="qa-chip ${on ? 'on' : ''}" data-qa="${action}">${on ? icon('check') + ' ' : ''}${label}</button>`;
     return `
       <div class="report-qa-row">
         ${chip('fails', rs.showFails, 'List all items')}
@@ -1165,7 +1165,7 @@ function openReportPreview(doc, session) {
       <div class="report-preview-fallback">
         <div class="report-qa-label">Quick adjust</div>
         ${quickAdjustHTML()}
-        <button class="btn-secondary report-edit-settings-btn" id="report-edit-settings">⚙ Edit report settings</button>
+        <button class="btn-secondary report-edit-settings-btn" id="report-edit-settings">${icon('settings')} Edit report settings</button>
         <label class="label report-filename-label" for="report-filename-input">File name</label>
         <div class="report-filename-row">
           <input class="input report-filename-input" id="report-filename-input" value="${baseName.replace(/"/g, '&quot;')}" autocapitalize="off" autocomplete="off" spellcheck="false">

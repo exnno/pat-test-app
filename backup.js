@@ -55,6 +55,7 @@ function buildBackup() {
     multiPick: state.multiPick,
     // v17: feedback + timestamp settings.
     soundEnabled: state.soundEnabled,
+    iconsClassic: state.iconsClassic,   // V115 (14B): per phone; absent in older backups
     timestampsEnabled: state.timestampsEnabled,
     undoEnabled: state.undoEnabled,   // V94: per phone; absent in older backups
     mapPinEnabled: state.mapPinEnabled,   // V99: per phone; absent in older backups
@@ -346,6 +347,10 @@ function applyBackupData(data, opts) {
     // these keys leave the defaults (both off) intact.
     if (typeof data.soundEnabled === 'boolean') {
       state.soundEnabled = data.soundEnabled;
+    }
+    // V115 (14B): Classic emoji icons. Boolean only; an older backup leaves this phone's own.
+    if (typeof data.iconsClassic === 'boolean') {
+      state.iconsClassic = data.iconsClassic;
     }
     // V94: Undo button. Boolean only; an older backup leaves this phone's own.
     if (typeof data.undoEnabled === 'boolean') {

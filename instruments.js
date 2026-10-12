@@ -552,7 +552,7 @@ function renderInstrumentListHTML() {
             <span class="instrument-head-name">${escapeHTML(instrumentDisplayName(inst))}${isActive ? ' <span class="instrument-badge">In use</span>' : ''}</span>
             <span class="instrument-head-sub">${sub}${usedLine}${chip}</span>
           </span>
-          <span class="instrument-head-chevron">›</span>
+          <span class="instrument-head-chevron">${icon('chevron-right')}</span>
         </button>
         ${isActive ? '' : `
         <div class="instrument-head-actions">
@@ -587,7 +587,7 @@ function renderSettingsInstrument() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" data-action="instrument-editor-close" aria-label="Back">‹</button>
+        <button class="icon-btn" data-action="instrument-editor-close" aria-label="Back">${icon('chevron-left')}</button>
         <div class="site-name">Test instrument</div>
         <span style="width:40px"></span>
       </header>
@@ -618,7 +618,7 @@ function renderSettingsInstrument() {
       </div>
 
       ${isActive ? `
-      <p class="muted" style="margin:0 0 8px;font-size:13px">✓ This is the instrument new jobs are recorded against.</p>
+      <p class="muted" style="margin:0 0 8px;font-size:13px">${icon('check')} This is the instrument new jobs are recorded against.</p>
       ` : `
       <button class="btn-secondary" data-action="instrument-make-active" data-arg="${escapeHTML(inst.id)}" style="margin-bottom:8px">Use this instrument for new jobs</button>
       `}

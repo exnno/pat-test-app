@@ -1588,6 +1588,30 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 /* ===== v10 additions ===== */
 
 /* @@ icons */
+/* V115: line icons from icons.js icon(). They take the text colour
+   (currentColor) and the text size, so an icon sits where an emoji did.
+   Declared BEFORE .share-icon so its fixed sizes still win (same specificity,
+   later rule wins). Size a context by its container's .ic, not the svg. */
+.ic {
+  width: 1.15em;
+  height: 1.15em;
+  display: inline-block;
+  vertical-align: -0.2em;
+  flex-shrink: 0;
+}
+.ic-trail { margin-left: 2px; color: var(--text-hint); }   /* › on a button that opens another page */
+.settings-row-icon { color: var(--accent); }                /* 13A */
+.settings-row-icon .ic { width: 22px; height: 22px; vertical-align: middle; }
+.settings-row-chevron .ic { width: 20px; height: 20px; vertical-align: middle; }
+.empty-state-icon { color: var(--text-hint); }              /* 2A: soft grey */
+.empty-state-icon .ic { width: 44px; height: 44px; stroke-width: 1.5; }
+.wizard-icon { color: var(--accent); }                      /* 3A: PATGo blue */
+.wizard-icon .ic { width: 48px; height: 48px; stroke-width: 1.5; }
+.icon-btn .ic { width: 22px; height: 22px; }
+.pass-btn .icon .ic, .fail-btn .icon .ic { width: 30px; height: 30px; stroke-width: 2.5; }
+.preset-switch-tick .ic, .pm-tick .ic, .jm-tick .ic, .pm-group-tick .ic,
+.reading-polarity-box .ic { stroke-width: 3; vertical-align: middle; }
+
 /* Inline SVG share-glyph (replaces the ⬇ unicode arrow on Export buttons).
    Uses currentColor so it inherits whatever colour the surrounding button has
    (--text-muted inside .icon-btn-sm on the sessions list, --neutral-text on

@@ -58,19 +58,19 @@ function renderSettingsAbout() {
         <p>A fast, offline-first portable appliance testing app for working PAT engineers. Built around speed of data entry — pass/fail decisions in two taps, no fighting the interface.</p>
         <p>${aboutWhereDataLives()} The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
         <!-- V100 (9A): replay the 100 moment from the V100 welcome. -->
-        <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">✨ Play the V100 moment again</button>
+        <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V114: rolled forward — V114 on top, V111 dropped. -->
+      <!-- v8: rolling 3-version changelog. V115: rolled forward — V115 on top, V112 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V115</strong> &middot; October 2026</p>
+        <p class="muted">New line icons across the app in place of emoji, matching light and dark themes. Export arrows point up and import arrows down, and buttons that open another page show an arrow. A Classic emoji icons switch in Theme &amp; Sound brings the old look back for this version.</p>
         <p><strong>V114</strong> &middot; October 2026</p>
         <p class="muted">Tidier Settings: the pages now say jobs rather than sessions, headings follow one consistent style, and the Glossary matches the words on screen.</p>
         <p><strong>V113</strong> &middot; October 2026</p>
         <p class="muted">Behind the scenes, ready for teams: the cloud now keeps every job, client and photo under your business, and an account that still has jobs can no longer be deleted by mistake. Nothing changes on screen.</p>
-        <p><strong>V112</strong> &middot; October 2026</p>
-        <p class="muted">Tapping Back on a settings page (or Edit session) with unsaved changes now asks whether to save them, instead of losing them. Save returns you to where you came from. Setting up a new phone now offers to switch PDF reports on, and skips the What&rsquo;s new message.</p>
 
 
         </div>
@@ -78,13 +78,13 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h3>Set up another device</h3>
         <p class="muted">Walk through the first-time setup again on this phone — useful for re-importing a setup file or refreshing your details.</p>
-        <button class="backup-action-btn" id="about-restart-onboarding" data-action="restart-onboarding" style="margin-top:8px">↻ Run first-time setup again</button>
+        <button class="backup-action-btn" id="about-restart-onboarding" data-action="restart-onboarding" style="margin-top:8px">${icon('rotate-cw')} Run first-time setup again</button>
       </div>
 
       <div class="info-card">
         <h3>Show me around</h3>
         <p class="muted">A quick guided tour of the basics — jobs, Quick Pick, the Overview, reports and backups. Handy if you're getting started or showing someone else the ropes.</p>
-        <button class="backup-action-btn" id="about-open-tour" data-action="open-tour" style="margin-top:8px">🧭 Show me around the app again</button>
+        <button class="backup-action-btn" id="about-open-tour" data-action="open-tour" style="margin-top:8px">${icon('compass')} Show me around the app again</button>
       </div>
 
       <div class="info-card">
@@ -98,7 +98,7 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h3>If the app stops responding</h3>
         <p class="muted">If taps stop registering anywhere in the app, tap Reload below. Your jobs and settings are not affected — only the app itself reloads.</p>
-        <button class="backup-action-btn" id="about-reload-btn" data-action="about-reload" style="margin-top:8px">⟳ Reload app</button>
+        <button class="backup-action-btn" id="about-reload-btn" data-action="about-reload" style="margin-top:8px">${icon('refresh-cw')} Reload app</button>
       </div>
 
       <div class="info-card">
@@ -220,7 +220,7 @@ function renderSettingsContact() {
       <div class="info-card">
         <h3>Report a problem</h3>
         <p>Found a bug, or got an idea? Tap below. The app fills in your version, phone and settings automatically — you just describe what happened.</p>
-        <button class="bug-report-btn" id="bug-open" data-action="bug-open">🐞 Report a problem</button>
+        <button class="bug-report-btn" id="bug-open" data-action="bug-open">${icon('bug')} Report a problem</button>
         <p class="muted" style="font-size:12px;margin-top:10px">Your job data stays on your phone. Reports carry counts and settings only — never client names, sites or asset numbers.</p>
       </div>
       ${renderBugSheet()}
@@ -283,7 +283,7 @@ function renderBugSheet() {
     <div class="fail-sheet bug-sheet" role="dialog" aria-label="Report a problem">
       <div class="fail-sheet-handle"></div>
       <div class="fail-sheet-header">
-        <button class="fail-close-btn" id="bug-cancel" data-action="bug-close" aria-label="Cancel">‹</button>
+        <button class="fail-close-btn" id="bug-cancel" data-action="bug-close" aria-label="Cancel">${icon('chevron-left')}</button>
         <h3 class="fail-sheet-title">Report a problem</h3>
         <span class="fail-close-spacer"></span>
       </div>
@@ -435,7 +435,7 @@ function renderCloudSync() {
     body = `
       <div class="info-card">
         <p class="muted" id="sync-signed-out">Sign in on the Account page first. Until you do, nothing leaves this phone.</p>
-        <button class="backup-action-btn" id="sync-go-account" data-action="open-cloud-page" data-arg="account" style="margin-top:8px">👤 Account</button>
+        <button class="backup-action-btn" id="sync-go-account" data-action="open-cloud-page" data-arg="account" style="margin-top:8px">${icon('user')} Account ${icon('chevron-right', 'ic-trail')}</button>
       </div>`;
   } else {
     const sum = syncStatusSummary();
@@ -501,8 +501,8 @@ function renderSyncHeld(sy) {
   const n = (v, one, many) => `${v} ${v === 1 ? one : many}`;
   const keyOf = (h) => (typeof syncHeldKey === 'function') ? syncHeldKey(h) : String(h.id);
   const btns = (key, dis, phone, cloud) => `
-        <button class="backup-action-btn" data-action="sync-keep-phone" data-arg="${escapeHTML(key)}" ${dis} style="margin-top:8px">📱 ${phone}</button>
-        ${cloud ? `<button class="link-btn" data-action="sync-keep-cloud" data-arg="${escapeHTML(key)}" ${dis} style="margin-top:8px">☁ ${cloud}</button>` : ''}`;
+        <button class="backup-action-btn" data-action="sync-keep-phone" data-arg="${escapeHTML(key)}" ${dis} style="margin-top:8px">${icon('smartphone')} ${phone}</button>
+        ${cloud ? `<button class="link-btn" data-action="sync-keep-cloud" data-arg="${escapeHTML(key)}" ${dis} style="margin-top:8px">${icon('cloud')} ${cloud}</button>` : ''}`;
 
   const jobRow = (h) => {
     const key = keyOf(h);
@@ -529,7 +529,7 @@ function renderSyncHeld(sy) {
     }
     const busyDiff = diffing === String(h.id);
     const cmp = compare
-      ? `<button class="backup-action-btn" data-action="sync-held-diff" data-arg="${escapeHTML(String(h.id))}" ${busyDiff || dis ? 'disabled' : ''} style="margin-top:8px">${busyDiff ? 'Checking\u2026' : '🔍 What\u2019s different?'}</button>`
+      ? `<button class="backup-action-btn" data-action="sync-held-diff" data-arg="${escapeHTML(String(h.id))}" ${busyDiff || dis ? 'disabled' : ''} style="margin-top:8px">${busyDiff ? 'Checking\u2026' : icon('search') + ' What\u2019s different?'}</button>`
       : '';
     return `
       <div class="info-card sync-held-row" data-held-id="${escapeHTML(key)}" style="margin-top:8px">

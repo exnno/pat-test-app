@@ -113,17 +113,8 @@ function downloadCSV(session) {
   URL.revokeObjectURL(url);
 }
 
-// v10: Inline iOS share-style glyph (square with arrow protruding from the top).
-// Replaces the ⬇ unicode arrow on Export buttons. Uses currentColor so it
-// inherits the surrounding button colour. Used both in the sessions list
-// (.icon-btn-sm, muted) and in the overview header (.icon-btn, neutral).
-const SHARE_ICON_SVG =
-  '<svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-  'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-  '<path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>' +
-  '<line x1="12" y1="3" x2="12" y2="15"/>' +
-  '<polyline points="7 8 12 3 17 8"/>' +
-  '</svg>';
+// V115: the share glyph that lived here (SHARE_ICON_SVG, v10) is now icon('share',
+// 'share-icon') in icons.js — the Lucide original it was drawn from.
 
 // v10: Share or download a session's CSV. Prefers the native share sheet via
 // Web Share API (iOS Safari, modern Android Chrome) so the engineer can send

@@ -28,6 +28,7 @@ Everything works in aeroplane mode; nothing needs an account.
 - Settings pages and Edit session ask before Back throws away unsaved changes (V112); first-time setup offers to switch PDF reports on
 - Cloud (test): every account is a business in the database, ready for teams — roles, a business stamp on every job, and no deleting a login that still has work (V113)
 - Settings speaks one language: jobs throughout, one heading style, and a Glossary that matches the screen (V114)
+- Line icons (Lucide) in place of emoji across the app, following light and dark themes (V115)
 
 `FEATURES.md` is the full reference — one `##` section per capability and per
 release. Don't read it whole: `grep -n '^## ' FEATURES.md`, then `sed` the section.
@@ -62,7 +63,7 @@ is no toolchain to rot between releases.
 
 ```
 index.html            script tags, in a load order that matters
-config.js … boot.js   33 first-party modules (see below)
+config.js … boot.js   34 first-party modules (see below)
 styles.css            one stylesheet, ordered by release, banner-indexed
 sw.js                 service worker + the precache ASSETS list
 manifest.webmanifest  PWA manifest
@@ -79,10 +80,10 @@ harness/              the committed test harness — NOT shipped
 MAP.md  FEATURES.md  BACKLOG.md
 ```
 
-### Load order — 33 files, and it is not arbitrary
+### Load order — 34 files, and it is not arbitrary
 
 ```
-config → data → state → utils → storage → clients → instruments → sqp
+config → data → state → utils → icons → storage → clients → instruments → sqp
 → multipick → feedback → bugreport → photos → csv → backup → snapshots
 → reset → session → settings-actions → setup → tour → onboarding → report → pdfpreview
 → render-core → render-review → render-settings → render-help
@@ -93,7 +94,7 @@ config → data → state → utils → storage → clients → instruments → 
 readability choice: `state.js` seeds itself from `data.js` constants in a
 top-level initialiser that runs at load. `boot.js` must be last — it runs on load.
 
-`sw.js` ASSETS lists **36** `.js` entries: these 33 plus the two jsPDF files and
+`sw.js` ASSETS lists **37** `.js` entries: these 34 plus the two jsPDF files and
 `supabase.umd.js`, which are precached but injected on demand rather than
 script-tagged.
 

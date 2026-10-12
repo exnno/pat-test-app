@@ -1,4 +1,4 @@
-# PATGo — Code Map (V114)
+# PATGo — Code Map (V115)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -166,11 +166,20 @@ is discoverable from the file you happen to be editing.
     (Report) compares with what is SAVED. Save lands via `settingsBackNav()`.
     Harness 49a fails a new Settings Save page that is not listed.
 
+20. **Every icon goes through `icon(name)` (icons.js, V115).** Never type an
+    emoji or a glyph (⬇ 🗑 › ☁ …) into markup again — harness 52c sweeps every
+    screen for one. `icon()` returns HTML: never put it inside `escapeHTML()`
+    or a `title=` / `aria-label` / `textContent` — put it beside the escaped
+    words (`${icon('bell')} ${escapeHTML(label)}`). Plain-text places (PDF,
+    CSV, copied text, confirm-sheet messages) keep plain characters. A new name
+    must be added to `ICON_PATHS` (52a fails otherwise). Settings tables
+    (data.js) hold Lucide NAMES, not emoji. Button rule: BACKLOG "V115".
+
 ---
 
-## Load order (index.html) — 33 first-party files
+## Load order (index.html) — 34 first-party files
 
-`config` → `data` → `state` → `utils` → `storage` → `clients` → `instruments` → `sqp`
+`config` → `data` → `state` → `utils` → `icons` → `storage` → `clients` → `instruments` → `sqp`
 → `multipick` → `feedback` → `bugreport` → `photos` → `csv` → `backup`
 → `snapshots` → `reset` → `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
 → `pdfpreview` → `render-core` → `render-review` → `render-settings` → `render-help`
@@ -181,7 +190,7 @@ choice. `state.js` seeds `itemTypes`/`failReasons` from `DEFAULT_ITEM_TYPES` /
 `DEFAULT_FAIL_REASONS` in its top-level initialiser, which runs at load, so
 `data.js` must precede it. Harness 09h/09i, mutation M61.
 
-`sw.js` ASSETS lists **36** `.js` entries: these 33 plus 3 lazy-loaded vendored
+`sw.js` ASSETS lists **37** `.js` entries: these 34 plus 3 lazy-loaded vendored
 files (precached, not `<script>` tags): the jsPDF pair (report.js injects them)
 and `supabase.umd.js` (cloud.js injects it, v79).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
@@ -267,10 +276,15 @@ render() takes the read itself. The guard's question is found as the body child
 with aria-label "Save your changes?" (choice-sheet ids linger in the registry).
 ⚠ V113: Group 50 reads the SQL files' TEXT; the rules themselves are proved by
 the SQL files' own checks and isolation-test.sql. (50e and 49k retired at V114.)
-⚠ V114: release pins live in 51g. 49j reads WELCOME_VERSION live (survives every
-roll). Group 51 draws every Settings page (one job, retest reminders on) and reads
+⚠ V114: Group 51 draws every Settings page (one job, retest reminders on) and reads
 its visible text; 51e allows "session" only in the screen names listed in NAMED.
-M836 and M772 are anchored on stable prefixes — only M66/M82 need re-pointing.
+M836 and M772 are anchored on stable prefixes — only M66/M82 need re-pointing
+(and M846, re-aimed at each welcome's first line).
+⚠ V115: release pins live in 52h (51g keeps only V114's About line). Group 52
+compares against the app's OWN `icon(name)` output (`app.fn('icon')('camera')`),
+never a pasted SVG — so the expected text follows icons.js. 52c draws every view
+and Settings page and fails on any old glyph; it proves itself by finding them
+again with Classic emoji on. load.js bridges ICON_PATHS / ICON_EMOJI.
 ⚠ V108 harness amendment — mutate.js speed-ups: a mutation's own test file (named
 in its `why`, e.g. "(45a)") runs alone first, trusted only if it passed alone on
 unmutated code; otherwise the full suite runs with PATGO_BAIL=1 (run.js stops after
@@ -340,6 +354,17 @@ in-memory caches and mirrors.
 `loadFormForCursor` (session.js) — a new transient needs adding there or it
 survives navigation. Derived mirrors (`photoIndex`, `photoBytes`, the instrument
 flat fields) are never saved, backed up or validated. Rule 7 applies.
+
+### icons.js (~120 ln) — line icons — NEW V115
+`ICON_PATHS` (Lucide SVG children, only those used), `ICON_EMOJI` (the old
+emoji, for the temporary 14B Classic emoji switch only) and `icon(name, cls)`.
+Lucide ISC notice in its header; full notices in THIRD-PARTY-LICENSES.txt.
+**Touch to:** add or swap an icon (rule 20).
+**Coupling:** reads `state.iconsClassic` at call time (ICONS_CLASSIC_KEY in
+config.js; storage/backup/reset carry it; dispatch `icons-classic`). Probed in
+boot.js (`'icon'`). Sizes and colours per context in styles.css (`@@ icons`).
+⚠ V116: removing 14B = ICON_EMOJI + the branch in icon() + the key and its
+load/save/backup/reset lines + the switch (render-settings Theme & Sound) + 52g.
 
 ### utils.js (~265 ln) — pure helpers, no state access
 Formatting, escaping, colour, asset-number splitting/padding, boundary validators for item readings, `newId()`. V104: the readings
@@ -553,6 +578,7 @@ M363/M368. The wipe action (dispatch.js) branches on `syncActive()`.
 
 ### csv.js (~665 ln) — CSV build + import
 Cell resolution per column, export/share/copy, import parsing and conflict flow.
+V115: the share glyph (SHARE_ICON_SVG) moved to icons.js as `icon('share', 'share-icon')`.
 **Touch to:** change CSV columns, export, or import parsing.
 **Coupling:** column list from config.js; `splitSiteSnapshot` from clients.js;
 instrument columns via `instrumentForSession()` (rule 7, source-guarded in the

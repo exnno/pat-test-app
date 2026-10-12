@@ -72,8 +72,8 @@ const TOUR_SLIDES = [
           <button class="tour-qp">Lamp</button>
         </div>
         <div class="tour-passfail">
-          <button class="tour-pf tour-pf-pass tour-hl">✓ PASS</button>
-          <button class="tour-pf tour-pf-fail">✕ FAIL</button>
+          <button class="tour-pf tour-pf-pass tour-hl">${icon('check')} PASS</button>
+          <button class="tour-pf tour-pf-fail">${icon('x')} FAIL</button>
         </div>
       </div>`
   },
@@ -113,7 +113,7 @@ const TOUR_SLIDES = [
           <div class="tour-doc-line short"></div>
           <div class="tour-doc-line"></div>
         </div>
-        <button class="tour-cta tour-hl">📄 Produce report</button>
+        <button class="tour-cta tour-hl">${icon('file-text')} Produce report</button>
       </div>`
   },
   {
@@ -123,8 +123,8 @@ const TOUR_SLIDES = [
     mock: () => `
       <div class="tour-screen">
         <div class="tour-bar">Backup &amp; Restore</div>
-        <button class="tour-cta tour-hl">⬇ Back up now</button>
-        <button class="tour-cta tour-cta-ghost">⬆ Restore from a backup</button>
+        <button class="tour-cta tour-hl">${icon('upload')} Back up now</button>
+        <button class="tour-cta tour-cta-ghost">${icon('download')} Restore from a backup</button>
         <div class="tour-note">Your last backup: never — take one today.</div>
       </div>`
   }
@@ -194,7 +194,7 @@ function renderTour() {
     <div class="tour-wrap" role="dialog" aria-label="App walkthrough">
       <div class="tour-top">
         <span class="tour-counter">${step + 1} / ${total}</span>
-        <button class="tour-x" data-action="tour-skip" aria-label="Close walkthrough">✕</button>
+        <button class="tour-x" data-action="tour-skip" aria-label="Close walkthrough">${icon('x')}</button>
       </div>
 
       <div class="tour-stage">
@@ -209,8 +209,8 @@ function renderTour() {
       <div class="tour-dots">${dots}</div>
 
       <div class="tour-nav">
-        <button class="tour-prev" data-action="tour-prev" ${isFirst ? 'style="visibility:hidden"' : ''} aria-label="Previous">‹ Back</button>
-        <button class="btn-primary tour-next" data-action="tour-next">${isLast ? 'Done' : 'Next ›'}</button>
+        <button class="tour-prev" data-action="tour-prev" ${isFirst ? 'style="visibility:hidden"' : ''} aria-label="Previous">${icon('chevron-left')} Back</button>
+        <button class="btn-primary tour-next" data-action="tour-next">${isLast ? 'Done' : 'Next ' + icon('chevron-right')}</button>
       </div>
     </div>
   `;
