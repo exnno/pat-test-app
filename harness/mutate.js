@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V112';",
-    to:   "const APP_VERSION = 'V112';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V113';",
+    to:   "const APP_VERSION = 'V113';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V110</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V109</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V110</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 49k)',
+    from: '        <p><strong>V111</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V110</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V111</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 50e)',
   },
 
   {
@@ -5545,7 +5545,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 49k)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 50e)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5903,6 +5903,97 @@ const MUTATIONS = [
     from: "  if (!page) { _unsaved = null; return; }",
     to:   "  if (!page) { return; }",
     why:  "reopening a page compares against the LAST visit, so an untouched page asks (49e)",
+  },
+  {
+    name: "M824 (V113) an update can move a row to another business",
+    file: "supabase/v113-organisations.sql",
+    from: "  elsif old.org_id is not null then\n    new.org_id := old.org_id;\n",
+    to:   "",
+    why:  "a job could be re-stamped into a business its writer belongs to, and every phone upsert would be free to move it (50a)",
+  },
+  {
+    name: "M825 (V113) the delete guard leaves jobs out",
+    file: "supabase/v113-organisations.sql",
+    from: "foreach t in array array['sessions','photos'] loop\n    execute format('drop trigger if exists wipe_guard",
+    to:   "foreach t in array array['photos'] loop\n    execute format('drop trigger if exists wipe_guard",
+    why:  "an Engineer in a team could empty the business's jobs from the cloud — Peter's leaver case (50a)",
+  },
+  {
+    name: "M826 (V113) Engineers may delete from the cloud",
+    file: "supabase/v113-organisations.sql",
+    from: "      or coalesce(public.my_role(o) in ('owner','team_leader','office'), false)\n      or (public.my_role(o) is not null and public.org_size(o) = 1)",
+    to:   "      or coalesce(public.my_role(o) in ('owner','team_leader','office','engineer'), false)\n      or (public.my_role(o) is not null and public.org_size(o) = 1)",
+    why:  "12A undone in one word: the guard exists and fires, and lets everyone through (50a)",
+  },
+  {
+    name: "M827 (V113) deleting a login still deletes its jobs",
+    file: "supabase/v113-organisations.sql",
+    from: "             and c.confdeltype <> 'r' loop",
+    to:   "             and false loop",
+    why:  "the V112 cascade survives on every existing project: one dashboard delete wipes an engineer's work (50a)",
+  },
+  {
+    name: "M828 (V113) stamping counts as a change",
+    file: "supabase/v113-organisations.sql",
+    from: "    execute format('alter table public.%I disable trigger touch_updated_at', t);\n",
+    to:   "",
+    why:  "every row's change time moves, so every phone re-reads every job, record and photo row on its next sync (50a)",
+  },
+  {
+    name: "M829 (V113) Engineers read the whole business",
+    file: "supabase/v113-organisations.sql",
+    from: "  select coalesce(public.my_role(o) in ('owner','team_leader','office'), false)\n$$;\n\n-- 12A",
+    to:   "  select public.my_role(o) is not null\n$$;\n\n-- 12A",
+    why:  "6A widened: an Engineer sees every colleague's jobs and photos (50a)",
+  },
+  {
+    name: "M830 (V113) a person may have one business only",
+    file: "supabase/v113-organisations.sql",
+    from: "create unique index if not exists memberships_one_default on public.memberships (user_id) where is_default;",
+    to:   "create unique index if not exists memberships_one_default on public.memberships (user_id);",
+    why:  "3C lost: a subcontractor can't be Engineer in someone else's business as well as Owner of their own (50a)",
+  },
+  {
+    name: "M831 (V113) a new project keeps the job cascade",
+    file: "supabase/schema.sql",
+    from: "  user_id        uuid not null references auth.users(id) on delete restrict,\n  doc            jsonb not null,\n  deleted        boolean not null default false,\n  last_modified  timestamptz not null,\n  updated_at     timestamptz not null default now(),\n  primary key (user_id, id)\n);\ncreate index if not exists sessions_user_updated",
+    to:   "  user_id        uuid not null references auth.users(id) on delete cascade,\n  doc            jsonb not null,\n  deleted        boolean not null default false,\n  last_modified  timestamptz not null,\n  updated_at     timestamptz not null default now(),\n  primary key (user_id, id)\n);\ncreate index if not exists sessions_user_updated",
+    why:  "the production project (made from schema.sql) would ship without 10A on its jobs (50b)",
+  },
+  {
+    name: "M832 (V113) schema.sql misses a V113 line",
+    file: "supabase/schema.sql",
+    from: "create unique index if not exists memberships_one_default on public.memberships (user_id) where is_default;\n",
+    to:   "",
+    why:  "the two SQL files drift: a new project differs from an upgraded one (50b)",
+  },
+  {
+    name: "M833 (V113) the isolation test leaves B in A's business",
+    file: "supabase/isolation-test.sql",
+    from: "    delete from public.memberships where org_id = org_a and user_id = b;\n",
+    to:   "",
+    why:  "Peter's second test account stays a member of his real business after every run (50c)",
+  },
+  {
+    name: "M834 (V113) the login-delete check is not undone",
+    file: "supabase/isolation-test.sql",
+    from: "      delete from auth.users where id = b;\n      raise exception 'iso-undo';",
+    to:   "      delete from auth.users where id = b;",
+    why:  "on a project without 10A the test would really delete account B (50c)",
+  },
+  {
+    name: "M835 (V113) a phone sends the business stamp",
+    file: "sync.js",
+    from: "        row: { id, user_id: uid, doc: {}, fp: null, deleted: true, last_modified: at } });",
+    to:   "        row: { id, user_id: uid, org_id: null, doc: {}, fp: null, deleted: true, last_modified: at } });",
+    why:  "2A's promise broken: a phone that names the column fails against a database without it, and one that sends null outranks the stamp (50d)",
+  },
+  {
+    name: "M836 (V113) a welcome rolls for a release with nothing on screen",
+    file: "config.js",
+    from: "const WELCOME_VERSION = 'V112';",
+    to:   "const WELCOME_VERSION = 'V113';",
+    why:  "11B: a What's new sheet with nothing new to show (50e)",
   },
 ];
 

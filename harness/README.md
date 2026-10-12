@@ -199,3 +199,13 @@ bug; leaving it red trains everyone to ignore the suite.
 - **Touch interaction.** Stubbed DOM cannot reproduce pointer-then-click
   sequencing. Long-press, Quick Pick timing and scroll-drag need a real device.
 - **Service worker behaviour.** Cache-first update semantics need a real browser.
+- **The database rules (V113).** A Postgres policy cannot run here. Group 50
+  pins the TEXT of the SQL decisions (and that schema.sql carries every V113
+  line); whether the rules WORK is proved by the SQL files' own checks (O1–O9)
+  and `supabase/isolation-test.sql` (9a–16b), run in the Supabase SQL editor.
+  At V113 both were run against a local Postgres 16 with a stand-in for
+  Supabase's `auth` and `storage` schemas (roles anon/authenticated, `auth.uid()`
+  from `request.jwt.claims`, `storage.objects` + `storage.foldername`), and
+  twelve broken copies of the migration were each caught by them. The stand-in
+  is not committed: it is a test aid, not the real Supabase, and a pass there
+  does not replace Peter's run on the test project.
