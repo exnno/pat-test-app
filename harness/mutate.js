@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V116';",
-    to:   "const APP_VERSION = 'V116';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V117';",
+    to:   "const APP_VERSION = 'V117';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V114</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V113</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V114</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 53d)',
+    from: '        <p><strong>V115</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V114</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V115</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 54e)',
   },
 
   {
@@ -5545,7 +5545,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 53d)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 54e)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5996,7 +5996,7 @@ const MUTATIONS = [
     // each release's own group pins which welcome is current.
     from: "const WELCOME_VERSION = 'V",
     to:   "const WELCOME_VERSION = 'V0",
-    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (53d)",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (54e)",
   },
   {
     name: "M837 (V114) Engineer & Tester says sessions again",
@@ -6062,13 +6062,13 @@ const MUTATIONS = [
     why:  "Settings would name a screen the engineer cannot find (51b)",
   },
   {
-    name: "M846 (V114; re-aimed V115, V116) the What's new sheet loses a line",
+    name: "M846 (V114; re-aimed V115, V116, V117) the What's new sheet loses a line",
     file: "render-core.js",
-    // V116: V115's first line rolled off with its welcome; re-aimed at this
+    // V117: V116's first line rolled off with its welcome; re-aimed at this
     // release's first line. Re-aim it at each welcome's copy, or retire it.
-    from: "<li><strong>Line icons are here to stay.</strong>",
-    to:   "<li><strong>Line icons.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (53d)",
+    from: "<li><strong>Report Settings is now two pages.</strong>",
+    to:   "<li><strong>Two pages.</strong>",
+    why:  "11A: the welcome says plainly what changed on screen (54e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6241,6 +6241,93 @@ const MUTATIONS = [
     from: "vibration sound appearance'",
     to:   "vibration sound appearance icons emoji classic'",
     why:  "a search for the retired switch must not land on a page without it (53a)",
+  },
+  // ---- V117 (1A): Report Settings split into Company & Branding + Certificate
+  // Content. Group 54 + 21r cover it; 49a/49f/21c/52e were re-aimed at the half
+  // that now holds what they test.
+  {
+    name: "M879 (V117) Certificate Content is left out of Reports & Exports",
+    file: "data.js",
+    from: "    pages: ['settingsReport', 'settingsReportContent', 'settingsCsv'] },",
+    to:   "    pages: ['settingsReport', 'settingsCsv'] },",
+    why:  "half the old page would be unreachable from the menu (33b 54a)",
+  },
+  {
+    name: "M880 (V117) the Certificate Content view has no route",
+    file: "render-core.js",
+    from: "  else if (v === 'settingsReportContent') html = renderSettingsReportContent();   // V117 (1A)\n",
+    to:   "",
+    why:  "the row opens a page that never draws (21c 52e 54a)",
+  },
+  {
+    name: "M881 (V117) the second half draws the first half's title",
+    file: "render-settings.js",
+    from: "        ${renderSettingsSubHeader('Certificate Content')}",
+    to:   "        ${renderSettingsSubHeader('Company & Branding')}",
+    why:  "two pages with one name: the engineer cannot tell which half is open (54a)",
+  },
+  {
+    name: "M882 (V117) Certificate Content loses the old name from search",
+    file: "data.js",
+    from: "settingsReportContent: { icon: 'file-text', title: 'Certificate Content', aliases: 'report settings pdf",
+    to:   "settingsReportContent: { icon: 'file-text', title: 'Certificate Content', aliases: 'pdf",
+    why:  "anyone searching the page's old name would find only half of it (54a)",
+  },
+  {
+    name: "M883 (V117) report settings open means the first half only",
+    file: "config.js",
+    from: "const REPORT_SETTINGS_VIEWS = ['settingsReport', 'settingsReportContent'];",
+    to:   "const REPORT_SETTINGS_VIEWS = ['settingsReport'];",
+    why:  "sync would apply and send under Certificate Content's unsaved switches and counter (21r 54b)",
+  },
+  {
+    name: "M884 (V117) the pull applies cloud report settings under Certificate Content",
+    file: "sync.js",
+    from: "  const reportOpen = REPORT_SETTINGS_VIEWS.indexOf(state.view) !== -1;   // V117: either half\n",
+    to:   "  const reportOpen = state.view === 'settingsReport';\n",
+    why:  "a pull replaces the settings under the open page, and its Save writes the old ones back over the cloud's (21r 54b)",
+  },
+  {
+    name: "M885 (V117) the push sends Certificate Content's unsaved switches",
+    file: "sync.js",
+    from: "  const reportOpen = REPORT_SETTINGS_VIEWS.indexOf(state.view) !== -1;   // v84: unsaved toggles; V117: either half\n",
+    to:   "  const reportOpen = state.view === 'settingsReport';   // v84: unsaved toggles\n",
+    why:  "a switch flipped but not saved goes to the cloud and the other phones (21r 54b)",
+  },
+  {
+    name: "M886 (V117) Certificate Content has no unsaved-changes guard",
+    file: "settings-actions.js",
+    from: "  settingsReportContent: { report: true, save: () => saveReportSettingsForm() },   // V117 (1A): same object, same Save\n",
+    to:   "",
+    why:  "Back on the second half would drop a flipped switch or typed declaration without asking (49a 49f)",
+  },
+  {
+    name: "M887 (V117) saving one half blanks the other half's company name",
+    file: "settings-actions.js",
+    from: "  if (name) rs.companyName = name.value.trim();\n",
+    to:   "  rs.companyName = name ? name.value.trim() : '';\n",
+    why:  "the split's real trap: each half's Save saves the whole object, so a field off screen must be left alone (54c)",
+  },
+  {
+    name: "M888 (V117) the templates note forgets the other page",
+    file: "render-settings.js",
+    from: "replaces all your report settings on both pages — including the logo, signature and colours on Company &amp; Branding.",
+    to:   "replaces all your report settings — including logo, signature and colours.",
+    why:  "applying a template changes settings on a page the engineer is not looking at; the note must say so (54d)",
+  },
+  {
+    name: "M889 (V117) the Certificate Content row has no summary line",
+    file: "render-settings.js",
+    from: "    case 'settingsReportContent': {   // V117 (1A)\n",
+    to:   "    case 'settingsReportContent_off': {   // V117 (1A)\n",
+    why:  "every Settings row says where it stands at a glance (54d)",
+  },
+  {
+    name: "M890 (V117) the Reports tip still sends people to Report Settings",
+    file: "render-review.js",
+    from: "add your company name and logo in Company &amp; Branding so",
+    to:   "add your company name and logo in Report Settings so",
+    why:  "the tip would name a page that no longer exists (54d)",
   },
 ];
 
