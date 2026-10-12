@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V115';",
-    to:   "const APP_VERSION = 'V115';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V116';",
+    to:   "const APP_VERSION = 'V116';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V113</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V112</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V113</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 52h)',
+    from: '        <p><strong>V114</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V113</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V114</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 53d)',
   },
 
   {
@@ -5545,7 +5545,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 52h)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 53d)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5996,7 +5996,7 @@ const MUTATIONS = [
     // each release's own group pins which welcome is current.
     from: "const WELCOME_VERSION = 'V",
     to:   "const WELCOME_VERSION = 'V0",
-    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (52h)",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (53d)",
   },
   {
     name: "M837 (V114) Engineer & Tester says sessions again",
@@ -6062,13 +6062,13 @@ const MUTATIONS = [
     why:  "Settings would name a screen the engineer cannot find (51b)",
   },
   {
-    name: "M846 (V114; re-aimed V115) the What's new sheet loses a line",
+    name: "M846 (V114; re-aimed V115, V116) the What's new sheet loses a line",
     file: "render-core.js",
-    // V115: V114's Glossary line rolled off with its welcome; re-aimed at this
+    // V116: V115's first line rolled off with its welcome; re-aimed at this
     // release's first line. Re-aim it at each welcome's copy, or retire it.
-    from: "<li><strong>New line icons.</strong>",
-    to:   "<li><strong>New icons.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (52h)",
+    from: "<li><strong>Line icons are here to stay.</strong>",
+    to:   "<li><strong>Line icons.</strong>",
+    why:  "11A: the welcome says plainly what changed on screen (53d)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6121,62 +6121,8 @@ const MUTATIONS = [
     to:   "fill=\"currentColor\" stroke=\"currentColor\" ",
     why:  "9A: line icons in the text colour (52b)",
   },
-  {
-    name: "M854 (V115) icon() ignores the Classic switch and always gives emoji",
-    file: "icons.js",
-    from: "state.iconsClassic === true && has(ICON_EMOJI, name)",
-    to:   "has(ICON_EMOJI, name)",
-    why:  "8A: emoji everywhere again (52a 52b 52c 52d 52f)",
-  },
-  {
-    name: "M855 (V115) Classic emoji reads as on by default",
-    file: "storage.js",
-    from: "state.iconsClassic = localStorage.getItem(ICONS_CLASSIC_KEY) === '1';",
-    to:   "state.iconsClassic = localStorage.getItem(ICONS_CLASSIC_KEY) !== '0';",
-    why:  "14B: off by default; garbage reads off (07d 52c 52g)",
-  },
-  {
-    name: "M856 (V115) the Classic switch is not saved",
-    file: "storage.js",
-    from: "  localStorage.setItem(ICONS_CLASSIC_KEY, state.iconsClassic ? '1' : '0');   // V115 (14B)\n",
-    to:   "",
-    why:  "14B: the choice must survive closing the app (52g)",
-  },
-  {
-    name: "M857 (V115) backups leave the Classic switch out",
-    file: "backup.js",
-    from: "    iconsClassic: state.iconsClassic,   // V115 (14B): per phone; absent in older backups\n",
-    to:   "",
-    why:  "a restore must bring the phone back as it was (52g)",
-  },
-  {
-    name: "M858 (V115) restore takes anything for the Classic switch",
-    file: "backup.js",
-    from: "if (typeof data.iconsClassic === 'boolean') {",
-    to:   "if (data.iconsClassic !== undefined) {",
-    why:  "garbage from a hand-edited backup must not reach state (52g)",
-  },
-  {
-    name: "M859 (V115) Reset This Phone forgets the Classic switch",
-    file: "reset.js",
-    from: "  ['ICONS_CLASSIC_KEY', ICONS_CLASSIC_KEY, 'settings'],   // V115 (14B)\n",
-    to:   "",
-    why:  "a reset must leave nothing of this phone's settings behind (43a 52g)",
-  },
-  {
-    name: "M860 (V115) the Classic switch is not wired",
-    file: "dispatch.js",
-    from: "  'icons-classic': (checked) => { setIconsClassic(checked); render(); },   // V115 (14B)\n",
-    to:   "",
-    why:  "the V67 lesson: the switch must work through #app, not only by calling the setter (52g)",
-  },
-  {
-    name: "M861 (V115) the switch's note loses its warning that it is temporary",
-    file: "render-settings.js",
-    from: "Shows the emoji the app used before V115. Temporary",
-    to:   "Shows the emoji the app used before V115. Handy",
-    why:  "4A wording: it says plainly that the switch goes (52g)",
-  },
+  // M854–M861 (V115, the Classic emoji switch 14B) RETIRED V116 with the switch
+  // (1A): every line they broke is gone. Group 53 + M873–M878 cover the removal.
   {
     name: "M862 (V115) Export backup points down again",
     file: "render-settings.js",
@@ -6253,6 +6199,48 @@ const MUTATIONS = [
     from: "    'icon'\n  ];",
     to:   "  ];",
     why:  "one probe per script file: a deploy missing icons.js must stop at boot (52h)",
+  },
+  {
+    name: "M873 (V116) the retired switch's stored choice is left on the phone",
+    file: "storage.js",
+    from: "  try { localStorage.removeItem(ICONS_CLASSIC_KEY); } catch {}\n",
+    to:   "",
+    why:  "2A: a phone that had Classic emoji on must keep nothing of it behind (53b)",
+  },
+  {
+    name: "M874 (V116) a V115 backup brings the retired switch back",
+    file: "backup.js",
+    from: "    // switch). Deliberately not read — restore takes named fields only.\n",
+    to:   "    // switch). Deliberately not read — restore takes named fields only.\n    if (typeof data.iconsClassic === 'boolean') state.iconsClassic = data.iconsClassic;\n",
+    why:  "restore takes named fields only; a retired setting must not creep back into state (53c)",
+  },
+  {
+    name: "M875 (V116) new backups still write the retired switch",
+    file: "backup.js",
+    from: "    soundEnabled: state.soundEnabled,\n    timestampsEnabled",
+    to:   "    soundEnabled: state.soundEnabled,\n    iconsClassic: state.iconsClassic,\n    timestampsEnabled",
+    why:  "a new backup carries nothing about a setting that no longer exists (53c)",
+  },
+  {
+    name: "M876 (V116) icon() still honours a leftover Classic flag",
+    file: "icons.js",
+    from: "  if (!has(ICON_PATHS, name)) return '';",
+    to:   "  if (typeof state !== 'undefined' && state && state.iconsClassic) return '<span class=\"ic-emoji\">\\u{1F5D1}</span>';\n  if (!has(ICON_PATHS, name)) return '';",
+    why:  "1A: line icons always, whatever an old phone or backup left behind (53a)",
+  },
+  {
+    name: "M877 (V116) Theme & Sound still mentions Classic emoji",
+    file: "render-settings.js",
+    from: "<div class=\"toggle-row-title\">Sound on pass / fail / copy</div>",
+    to:   "<div class=\"toggle-row-title\">Sound on pass / fail / copy</div><div class=\"muted\">Classic emoji icons</div>",
+    why:  "1A: the switch and its words are gone from the page (53a)",
+  },
+  {
+    name: "M878 (V116) the search words still offer classic / emoji",
+    file: "data.js",
+    from: "vibration sound appearance'",
+    to:   "vibration sound appearance icons emoji classic'",
+    why:  "a search for the retired switch must not land on a page without it (53a)",
   },
 ];
 
