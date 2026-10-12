@@ -89,6 +89,12 @@ Adding coverage for a release:
    `onConflict: 'user_id,id'`). Group 48a fails until it does (V111, MAP rule 18).
    A test that it reads only this account's rows seeds a second account's rows in
    48's fake, which applies no rules — the widest read V113 allows (the database release, renumbered from V112).
+7. **Anything about an icon (V115):** build the expected text from the app's own
+   helper — `app.fn('icon')('camera') + ' 1'` — never paste an SVG or an emoji.
+   ⚠ When a visible glyph changes, a NEGATIVE check on the old glyph
+   (`excludes(html, '☁')`) goes on passing with nothing tested: V115 found one
+   (28a) and re-aimed it at the icon's class (`ic-cloud`). Search the tests for
+   the old character before calling a swap done. 52c sweeps every screen.
 
 ### Before you write an assertion, ask whether it could pass on broken code
 

@@ -75,6 +75,7 @@ const DEFAULT_BRIDGE = [
   'SETTINGS_CATEGORIES', 'SETTINGS_PAGE_META',
   'GLOSSARY_GROUPS',
   'SCANNER_KEY',
+  'ICON_PATHS', 'ICON_EMOJI',   // V115 (group 52)
 ];
 
 /* Boot the app.

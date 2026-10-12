@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V114';",
-    to:   "const APP_VERSION = 'V114';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V115';",
+    to:   "const APP_VERSION = 'V115';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -622,8 +622,8 @@ const MUTATIONS = [
   {
     name: 'M80 (V73) the boot guard stops probing for render-help.js',
     file: 'boot.js',
-    from: "    'renderSettingsAbout'\n  ];",
-    to:   "  ];",
+    from: "    'renderSettingsAbout',\n    // V115: sole probe",
+    to:   "    // V115: sole probe",
     why:  'one probe per script file. Without it a deploy that commits index.html but never uploads render-help.js boots looking healthy and dies the first time anyone opens About — which is also the page users are told to open to check the version (09v)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V112</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V111</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V112</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 51g)',
+    from: '        <p><strong>V113</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V112</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V113</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 52h)',
   },
 
   {
@@ -2530,8 +2530,8 @@ const MUTATIONS = [
   {
     name: "M343 (V87) the Jobs chip keeps day wording",
     file: "render-core.js",
-    from: "        const rLabel = `🔔 ${retestChipLabel(rStatus)}`;",
-    to:   "        const rLabel = `🔔 Retest due`;",
+    from: "        const rLabel = retestChipLabel(rStatus);",
+    to:   "        const rLabel = 'Retest due';",
     why:  "11A: the three month states are not shown where the engineer looks (24d)",
   },
   {
@@ -2901,8 +2901,8 @@ const MUTATIONS = [
   },  {
     name: "M396 (V90) signed in, the Backup button still says Delete",
     file: "render-settings.js",
-    from: "🗑 ${clears ? 'Clear photos from this phone' : 'Delete all photos'}",
-    to:   "🗑 ${clears ? 'Delete all photos' : 'Delete all photos'}",
+    from: "${icon('trash-2')} ${clears ? 'Clear photos from this phone' : 'Delete all photos'}",
+    to:   "${icon('trash-2')} ${clears ? 'Delete all photos' : 'Delete all photos'}",
     why:  "Peter's V90 wording: signed in the button only clears (27b)",
   },
   {
@@ -3928,8 +3928,8 @@ const MUTATIONS = [
   {
     name: "M542 (V98.1) the notes marker goes after the site name",
     file: "render-settings.js",
-    from: "<span class=\"client-site-name\">${siteNotesOf(s) ? '<span class=\"site-notes-mark\" title=\"Has site notes\">📝</span> ' : ''}${escapeHTML(s.name)}</span>\n            <div class=\"client-site-actions\">\n              <button class=\"link-btn\" data-action=\"site-assign\" data-arg=\"${escapeHTML(s.id)}\">Move</button>",
-    to:   "<span class=\"client-site-name\">${escapeHTML(s.name)}${siteNotesOf(s) ? ' <span class=\"site-notes-mark\" title=\"Has site notes\">📝</span>' : ''}</span>\n            <div class=\"client-site-actions\">\n              <button class=\"link-btn\" data-action=\"site-assign\" data-arg=\"${escapeHTML(s.id)}\">Move</button>",
+    from: "<span class=\"client-site-name\">${siteNotesOf(s) ? `<span class=\"site-notes-mark\" title=\"Has site notes\">${icon('list')}</span> ` : ''}${escapeHTML(s.name)}</span>\n            <div class=\"client-site-actions\">\n              <button class=\"link-btn\" data-action=\"site-assign\" data-arg=\"${escapeHTML(s.id)}\">Move</button>",
+    to:   "<span class=\"client-site-name\">${escapeHTML(s.name)}${siteNotesOf(s) ? ` <span class=\"site-notes-mark\" title=\"Has site notes\">${icon('list')}</span>` : ''}</span>\n            <div class=\"client-site-actions\">\n              <button class=\"link-btn\" data-action=\"site-assign\" data-arg=\"${escapeHTML(s.id)}\">Move</button>",
     why:  "a long site name ends in an ellipsis and swallows the marker — the V98 bug Peter found on a real phone (35i)",
   },
   {
@@ -5017,8 +5017,8 @@ const MUTATIONS = [
   {
     name: "M697 (V105) snapshots.js probed at boot",
     file: "boot.js",
-    from: "    'renderSettingsAbout'\n  ];",
-    to:   "    'renderSettingsAbout', 'snapshotsBoot'\n  ];",
+    from: "    'icon'\n  ];",
+    to:   "    'icon', 'snapshotsBoot'\n  ];",
     why:  "rule 6: a missing optional file would block boot (42j)",
   },
   {
@@ -5545,7 +5545,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 51g)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 52h)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5996,7 +5996,7 @@ const MUTATIONS = [
     // each release's own group pins which welcome is current.
     from: "const WELCOME_VERSION = 'V",
     to:   "const WELCOME_VERSION = 'V0",
-    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (51g)",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (52h)",
   },
   {
     name: "M837 (V114) Engineer & Tester says sessions again",
@@ -6008,8 +6008,8 @@ const MUTATIONS = [
   {
     name: "M838 (V114) the Clients rebuild button says sessions again",
     file: "render-settings.js",
-    from: "↻ Rebuild from my jobs</button>",
-    to:   "↻ Rebuild from my sessions</button>",
+    from: "${icon('rotate-cw')} Rebuild from my jobs</button>",
+    to:   "${icon('rotate-cw')} Rebuild from my sessions</button>",
     why:  "4A, on a button (51a 51e)",
   },
   {
@@ -6062,11 +6062,13 @@ const MUTATIONS = [
     why:  "Settings would name a screen the engineer cannot find (51b)",
   },
   {
-    name: "M846 (V114) the What's new sheet loses its Glossary line",
+    name: "M846 (V114; re-aimed V115) the What's new sheet loses a line",
     file: "render-core.js",
-    from: "<li><strong>Glossary brought up to date.</strong>",
-    to:   "<li><strong>Glossary updated.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (51g)",
+    // V115: V114's Glossary line rolled off with its welcome; re-aimed at this
+    // release's first line. Re-aim it at each welcome's copy, or retire it.
+    from: "<li><strong>New line icons.</strong>",
+    to:   "<li><strong>New icons.</strong>",
+    why:  "11A: the welcome says plainly what changed on screen (52h)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6095,6 +6097,162 @@ const MUTATIONS = [
     from: "<div class=\"toggle-row-title\">Record item times</div>",
     to:   "<div class=\"toggle-row-title\">Record Item Times</div>",
     why:  "3A on a switch, not a heading: proves 51c reads switch titles too (51c)",
+  },
+  // ---------------------------------------------------------------- V115
+  // Line icons (group 52). Each probed with the full suite on its own copy.
+  {
+    name: "M851 (V115) an icon goes missing from icons.js",
+    file: "icons.js",
+    from: "  'trash-2': '<path",
+    to:   "  'trash-2-gone': '<path",
+    why:  "a name the app calls draws nothing — a button silently loses its icon (52a 52b)",
+  },
+  {
+    name: "M852 (V115) icons are read out by screen readers",
+    file: "icons.js",
+    from: "aria-hidden=\"true\" focusable=\"false\">",
+    to:   "focusable=\"false\">",
+    why:  "the words carry the meaning; an icon must stay hidden (52b)",
+  },
+  {
+    name: "M853 (V115) icons are filled shapes, not lines",
+    file: "icons.js",
+    from: "fill=\"none\" stroke=\"currentColor\" ",
+    to:   "fill=\"currentColor\" stroke=\"currentColor\" ",
+    why:  "9A: line icons in the text colour (52b)",
+  },
+  {
+    name: "M854 (V115) icon() ignores the Classic switch and always gives emoji",
+    file: "icons.js",
+    from: "state.iconsClassic === true && has(ICON_EMOJI, name)",
+    to:   "has(ICON_EMOJI, name)",
+    why:  "8A: emoji everywhere again (52a 52b 52c 52d 52f)",
+  },
+  {
+    name: "M855 (V115) Classic emoji reads as on by default",
+    file: "storage.js",
+    from: "state.iconsClassic = localStorage.getItem(ICONS_CLASSIC_KEY) === '1';",
+    to:   "state.iconsClassic = localStorage.getItem(ICONS_CLASSIC_KEY) !== '0';",
+    why:  "14B: off by default; garbage reads off (07d 52c 52g)",
+  },
+  {
+    name: "M856 (V115) the Classic switch is not saved",
+    file: "storage.js",
+    from: "  localStorage.setItem(ICONS_CLASSIC_KEY, state.iconsClassic ? '1' : '0');   // V115 (14B)\n",
+    to:   "",
+    why:  "14B: the choice must survive closing the app (52g)",
+  },
+  {
+    name: "M857 (V115) backups leave the Classic switch out",
+    file: "backup.js",
+    from: "    iconsClassic: state.iconsClassic,   // V115 (14B): per phone; absent in older backups\n",
+    to:   "",
+    why:  "a restore must bring the phone back as it was (52g)",
+  },
+  {
+    name: "M858 (V115) restore takes anything for the Classic switch",
+    file: "backup.js",
+    from: "if (typeof data.iconsClassic === 'boolean') {",
+    to:   "if (data.iconsClassic !== undefined) {",
+    why:  "garbage from a hand-edited backup must not reach state (52g)",
+  },
+  {
+    name: "M859 (V115) Reset This Phone forgets the Classic switch",
+    file: "reset.js",
+    from: "  ['ICONS_CLASSIC_KEY', ICONS_CLASSIC_KEY, 'settings'],   // V115 (14B)\n",
+    to:   "",
+    why:  "a reset must leave nothing of this phone's settings behind (43a 52g)",
+  },
+  {
+    name: "M860 (V115) the Classic switch is not wired",
+    file: "dispatch.js",
+    from: "  'icons-classic': (checked) => { setIconsClassic(checked); render(); },   // V115 (14B)\n",
+    to:   "",
+    why:  "the V67 lesson: the switch must work through #app, not only by calling the setter (52g)",
+  },
+  {
+    name: "M861 (V115) the switch's note loses its warning that it is temporary",
+    file: "render-settings.js",
+    from: "Shows the emoji the app used before V115. Temporary",
+    to:   "Shows the emoji the app used before V115. Handy",
+    why:  "4A wording: it says plainly that the switch goes (52g)",
+  },
+  {
+    name: "M862 (V115) Export backup points down again",
+    file: "render-settings.js",
+    from: "data-action=\"backup-export\">${icon('upload')} Export backup (.json)</button>",
+    to:   "data-action=\"backup-export\">${icon('download')} Export backup (.json)</button>",
+    why:  "the button rule: export = upload, import = download (52e)",
+  },
+  {
+    name: "M863 (V115) Manage Photos loses its page arrow",
+    file: "render-settings.js",
+    from: "data-action=\"pm-open\">${icon('images')} Manage Photos ${icon('chevron-right', 'ic-trail')}</button>",
+    to:   "data-action=\"pm-open\">${icon('images')} Manage Photos</button>",
+    why:  "the button rule: a button that opens another page ends in › (52e)",
+  },
+  {
+    name: "M864 (V115) the template save gets Backup's emoji back",
+    file: "render-settings.js",
+    from: ">Save current settings as template…</button>",
+    to:   ">💾 Save current settings as template…</button>",
+    why:  "the button rule: plain words; and no emoji on a screen (52c 52e)",
+  },
+  {
+    name: "M865 (V115) the calibration banner escapes its own icon",
+    file: "render-core.js",
+    from: "<span class=\"cal-banner-text\">${icon('triangle-alert')} ${escapeHTML(label)}</span>",
+    to:   "<span class=\"cal-banner-text\">${escapeHTML(icon('triangle-alert') + ' ' + label)}</span>",
+    why:  "1A: the icon sits outside the escaped words, or the engineer sees raw <svg> text (52f)",
+  },
+  {
+    name: "M866 (V115) the reminder banners lose their icon",
+    file: "render-core.js",
+    from: "<div class=\"backup-banner-text\">${icon('alarm-clock')} ${escapeHTML(text)}</div>",
+    to:   "<div class=\"backup-banner-text\">${escapeHTML(text)}</div>",
+    why:  "1A: an icon at the start of the banner (52f)",
+  },
+  {
+    name: "M867 (V115) an empty state prints the icon's name",
+    file: "render-core.js",
+    from: "<div class=\"empty-state-icon\" aria-hidden=\"true\">${icon(iconName)}</div>",
+    to:   "<div class=\"empty-state-icon\" aria-hidden=\"true\">${iconName}</div>",
+    why:  "2A: a picture, not the word clipboard-list (52f)",
+  },
+  {
+    name: "M868 (V115) the wizard's first step keeps its emoji",
+    file: "render-core.js",
+    from: "<div class=\"wizard-icon\">${icon('smartphone')}</div>",
+    to:   "<div class=\"wizard-icon\">📲</div>",
+    why:  "3A: every wizard icon is a line icon (52f)",
+  },
+  {
+    name: "M869 (V115) Settings rows print the icon's name",
+    file: "render-settings.js",
+    from: "<span class=\"settings-row-icon\">${icon(cat.icon)}</span>",
+    to:   "<span class=\"settings-row-icon\">${cat.icon}</span>",
+    why:  "13A: the hub draws each group's icon (52d)",
+  },
+  {
+    name: "M870 (V115) Settings icons lose the accent colour",
+    file: "styles.css",
+    from: ".settings-row-icon { color: var(--accent); }",
+    to:   ".settings-row-icon { color: inherit; }",
+    why:  "13A: Settings-list icons in PATGo blue (52d)",
+  },
+  {
+    name: "M871 (V115) icons.js drops out of the offline precache",
+    file: "sw.js",
+    from: "  './icons.js',             // V115\n",
+    to:   "",
+    why:  "offline, every screen would draw without its file — the cache-first trap (01c 52h)",
+  },
+  {
+    name: "M872 (V115) the boot guard stops probing for icons.js",
+    file: "boot.js",
+    from: "    'icon'\n  ];",
+    to:   "  ];",
+    why:  "one probe per script file: a deploy missing icons.js must stop at boot (52h)",
   },
 ];
 
