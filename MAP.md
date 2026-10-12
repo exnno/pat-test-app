@@ -1,4 +1,4 @@
-# PATGo — Code Map (V113)
+# PATGo — Code Map (V114)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -265,9 +265,12 @@ wiring), then fills the registered inputs with what the browser would show (the
 stub does not parse value=/checked=), then `unsavedAfterRender()`; 49b proves
 render() takes the read itself. The guard's question is found as the body child
 with aria-label "Save your changes?" (choice-sheet ids linger in the registry).
-⚠ V113: release pins live in 50e (49k keeps only V112's welcome copy, still
-current — V113 rolled none). Group 50 reads the SQL files' TEXT; the rules
-themselves are proved by the SQL files' own checks and isolation-test.sql.
+⚠ V113: Group 50 reads the SQL files' TEXT; the rules themselves are proved by
+the SQL files' own checks and isolation-test.sql. (50e and 49k retired at V114.)
+⚠ V114: release pins live in 51g. 49j reads WELCOME_VERSION live (survives every
+roll). Group 51 draws every Settings page (one job, retest reminders on) and reads
+its visible text; 51e allows "session" only in the screen names listed in NAMED.
+M836 and M772 are anchored on stable prefixes — only M66/M82 need re-pointing.
 ⚠ V108 harness amendment — mutate.js speed-ups: a mutation's own test file (named
 in its `why`, e.g. "(45a)") runs alone first, trusted only if it passed alone on
 unmutated code; otherwise the full suite runs with PATGO_BAIL=1 (run.js stops after
@@ -982,6 +985,10 @@ from config.js in v71), not here. Scanner test-log markup lives in **scanner.js*
 (it repaints without a render). Bug sheet logic lives in **bugreport.js**.
 Instrument settings live in **instruments.js**. The stats footer reads
 `computeAppStats()` (session.js) and returns `''` when null.
+⚠ V114: Settings text says "jobs" but quotes screens by their on-screen names —
+"PAT Sessions" (render-core.js h1), "Session settings" (render-review.js button),
+"New session" (render-core.js h2). Renaming any of those = update the text here
+and in render-help.js's Glossary too; 51b goes red until you do.
 ⚠ v73: About, Glossary, Contact, the bug-sheet markup and the cloud stubs left
 for **render-help.js**, and those pages still call `renderSettingsSubHeader()`
 from here. The About changelog is no longer in this file.

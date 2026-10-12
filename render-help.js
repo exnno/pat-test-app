@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">✨ Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V113: rolled forward — V113 on top, V110 dropped. -->
+      <!-- v8: rolling 3-version changelog. V114: rolled forward — V114 on top, V111 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V114</strong> &middot; October 2026</p>
+        <p class="muted">Tidier Settings: the pages now say jobs rather than sessions, headings follow one consistent style, and the Glossary matches the words on screen.</p>
         <p><strong>V113</strong> &middot; October 2026</p>
         <p class="muted">Behind the scenes, ready for teams: the cloud now keeps every job, client and photo under your business, and an account that still has jobs can no longer be deleted by mistake. Nothing changes on screen.</p>
         <p><strong>V112</strong> &middot; October 2026</p>
         <p class="muted">Tapping Back on a settings page (or Edit session) with unsaved changes now asks whether to save them, instead of losing them. Save returns you to where you came from. Setting up a new phone now offers to switch PDF reports on, and skips the What&rsquo;s new message.</p>
-        <p><strong>V111</strong> &middot; October 2026</p>
-        <p class="muted">Behind the scenes, ready for teams: when this phone syncs, it now asks the cloud for your own jobs, clients and photos by name. Nothing changes on screen.</p>
 
 
         </div>
@@ -83,7 +83,7 @@ function renderSettingsAbout() {
 
       <div class="info-card">
         <h3>Show me around</h3>
-        <p class="muted">A quick guided tour of the basics — Sessions, Quick Pick, the Overview, reports and backups. Handy if you're getting started or showing someone else the ropes.</p>
+        <p class="muted">A quick guided tour of the basics — jobs, Quick Pick, the Overview, reports and backups. Handy if you're getting started or showing someone else the ropes.</p>
         <button class="backup-action-btn" id="about-open-tour" data-action="open-tour" style="margin-top:8px">🧭 Show me around the app again</button>
       </div>
 
@@ -97,7 +97,7 @@ function renderSettingsAbout() {
            near the bottom (a maintenance utility, not a primary action). -->
       <div class="info-card">
         <h3>If the app stops responding</h3>
-        <p class="muted">If taps stop registering anywhere in the app, tap Reload below. Your sessions and settings are not affected — only the app itself reloads.</p>
+        <p class="muted">If taps stop registering anywhere in the app, tap Reload below. Your jobs and settings are not affected — only the app itself reloads.</p>
         <button class="backup-action-btn" id="about-reload-btn" data-action="about-reload" style="margin-top:8px">⟳ Reload app</button>
       </div>
 
@@ -130,7 +130,7 @@ const GLOSSARY_GROUPS = [
       ['Location', 'Where in the building the item is. It sticks between items, so you set it once per room and it carries down the list.'],
       ['Asset number', 'The number identifying the item. The app fills in the next one automatically, and you can set a prefix so they come out as OFF-001, OFF-002 and so on.'],
       ['Copy last', 'Repeats the item you just logged — same type, same location — so a run of identical items is one tap each.'],
-      ['Barcode scanner', 'A Bluetooth scanner that pairs with your phone as a keyboard — often sold as a "wedge" or HID scanner. Scan an asset label on the test screen and the number goes into the asset box without you touching the phone; scan on the Sessions list and it searches for that asset. There is no button to press: it works because the scanner types. See Settings → Testing Setup → Barcode Scanner.'],
+      ['Barcode scanner', 'A Bluetooth scanner that pairs with your phone as a keyboard — often sold as a "wedge" or HID scanner. Scan an asset label on the test screen and the number goes into the asset box without you touching the phone; scan on the PAT Sessions screen and it searches for that asset. There is no button to press: it works because the scanner types. See Settings → Logging → Barcode Scanner.'],
       ['Fail reason', 'The reason an item failed, chosen from your own list when you tap FAIL.'],
       ['Fail tag', 'Only relevant when Test Readings is on. Each fail reason is tagged with the kind of test it relates to, so failing an item shows you the one measurement box that matters instead of all of them.']
     ]
@@ -149,32 +149,32 @@ const GLOSSARY_GROUPS = [
   {
     title: 'Jobs & sessions',
     terms: [
-      ['Session', 'One job — one visit to one site. Everything you test on that visit sits inside it. A session is the thing you export, report on and back up.'],
+      ['Job', 'One visit to one site. Everything you test on that visit sits inside it. A job is the thing you export, report on and back up. Some screens still call it a session: the main list is PAT Sessions, and a job\'s own settings are under Session settings.'],
       ['Client', 'The company you are working for. One client can have several sites.'],
       ['Site', 'The building or address you are testing at. A site can sit under a client, or stand on its own if you have not assigned it to one.'],
-      ['Overview', 'The list of everything logged in the current session, where you can review, edit, select and bulk-edit items.'],
-      ['Locked session', 'A finished session. It is read-only so you cannot change it by accident. Unlock it if you genuinely need to edit it.'],
-      ['Retest reminder', 'An optional feature, off by default. Flags a session for a retest a set number of months out, and lists the ones coming due so you can chase the repeat work.'],
-      ['Calibration', 'Your tester\'s calibration due date. Set it and the app warns you when it is close or overdue. From V66 the warning covers every instrument you have saved, and names the one that is due.'],
+      ['Overview', 'The list of everything logged in the current job, where you can review, edit, select and bulk-edit items.'],
+      ['Locked job', 'A finished job. It is read-only so you cannot change it by accident. Unlock it if you genuinely need to edit it.'],
+      ['Retest reminder', 'An optional feature, off by default. Flags a job for a retest a set number of months out, and lists the ones coming due so you can chase the repeat work.'],
+      ['Calibration', 'Your tester\'s calibration due date. Set it and the app warns you when it is close or overdue. The warning covers every instrument you have saved, and names the one that is due.'],
       ['Test instrument', 'The PAT tester itself. You can save up to five under Settings → Engineer & Tester, each with its own calibration details, and mark one as In use. Every job you start is recorded against the instrument in use at that moment, so its certificate keeps naming that tester even after you recalibrate or switch to another one. Change it for a single job under Session settings.']
     ]
   },
   {
     title: 'Output',
     terms: [
-      ['Report', 'The PDF certificate for a session — your details, the client\'s, and the full list of items tested. Preview it before you send it.'],
+      ['Report', 'The PDF certificate for a job — your details, the client\'s, and the full list of items tested. Preview it before you send it.'],
       ['Report template', 'A saved set of report settings — logo, colours, declaration wording — so you can switch between looks without setting it all up again.'],
-      ['Certificate number', 'An optional reference stamped onto a session the first time you produce its report. Once assigned it does not change.'],
-      ['CSV export', 'A spreadsheet file of a session, for sending on or opening in Excel. You choose which columns it contains.'],
-      ['Exported', 'Marks whether a session has been sent out yet. If you change a session after exporting it, it goes back to needing export, so nothing quietly goes stale.']
+      ['Certificate number', 'An optional reference stamped onto a job the first time you produce its report. Once assigned it does not change.'],
+      ['CSV export', 'A spreadsheet file of a job, for sending on or opening in Excel. You choose which columns it contains.'],
+      ['Exported', 'Marks whether a job has been sent out yet. If you change a job after exporting it, it goes back to needing export, so nothing quietly goes stale.']
     ]
   },
   {
     title: 'Data',
     terms: [
-      ['Backup', 'A file containing everything — all sessions, clients, sites and settings. This is the one to keep safe. Restoring it puts the app back exactly as it was.'],
-      ['Export Setup', 'A file containing only your configuration — presets, lists, report settings, columns. No job data. Use it to set up a second phone or hand your setup to someone else.'],
-      ['Pruning', 'Deleting sessions older than an age you choose, to keep the app tidy. It will not prune anything you have not exported yet.'],
+      ['Backup', 'A file containing everything — all jobs, clients, sites and settings. This is the one to keep safe. Restoring it puts the app back exactly as it was.'],
+      ['Setup file', 'A file containing only your configuration — presets, lists, report settings, columns. No job data. Use it to set up a second phone or hand your setup to someone else.'],
+      ['Clearing old jobs', 'Deleting jobs older than an age you choose, to keep the app tidy. It will not clear anything you have not exported yet.'],
       ['Offline', 'The app runs entirely on this phone and needs no signal. Your data is stored on the device, not on a server — which is exactly why backups matter.']
     ]
   }

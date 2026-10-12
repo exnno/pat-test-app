@@ -337,7 +337,7 @@ function renderSettingsUser() {
       ${renderSettingsSubHeader('Engineer & Tester')}
       <div class="settings-section">
         <h2 class="h2">Engineer name</h2>
-        <p class="muted">Used as the default for new sessions and shown on exported CSVs.</p>
+        <p class="muted">Used as the default for new jobs and shown on exported CSVs.</p>
         <input class="input" id="settings-engineer" value="${escapeHTML(state.engineer)}" placeholder="Your name">
       </div>
 
@@ -366,8 +366,8 @@ function renderSettingsItems() {
   // Clear buttons have context. Counts the learned locations.
   const sqpLocCount = Object.keys(state.sqpHistory || {}).length;
   const sqpHistoryNote = sqpLocCount === 0
-    ? 'No history learned yet. Turning this on builds it from your existing sessions; it then keeps learning as you log items.'
-    : `Learned from ${sqpLocCount} location${sqpLocCount === 1 ? '' : 's'}. Rebuild re-scans all your sessions; Clear empties it (re-enabling rebuilds it).`;
+    ? 'No history learned yet. Turning this on builds it from your existing jobs; it then keeps learning as you log items.'
+    : `Learned from ${sqpLocCount} location${sqpLocCount === 1 ? '' : 's'}. Rebuild re-scans all your jobs; Clear empties it (re-enabling rebuilds it).`;
 
   // v9: presets dialog (rename / new) — uses the existing bulk-sheet bottom-sheet
   // pattern so it visually matches the bulk-edit-location dialog and the fail
@@ -586,7 +586,7 @@ function renderSettingsScanner() {
       ${renderSettingsSubHeader('Barcode Scanner')}
       <div class="settings-section">
         <h2 class="h2">Scan asset labels</h2>
-        <p class="muted">If you have a Bluetooth barcode scanner that pairs with your phone as a keyboard — sometimes called a "wedge" or HID scanner — the app will pick up what it sends. On the entry screen a scan fills in the asset number; on the Sessions list it searches for that asset, so you can see where it was last tested.</p>
+        <p class="muted">If you have a Bluetooth barcode scanner that pairs with your phone as a keyboard — sometimes called a "wedge" or HID scanner — the app will pick up what it sends. On the entry screen a scan fills in the asset number; on the PAT Sessions screen it searches for that asset, so you can see where it was last tested.</p>
         <p class="muted">Leave this on even if you don't own a scanner — it does nothing at all until one is paired. Typing a number by hand is unaffected: the app tells a scanner apart from a person by how fast the characters arrive, so nothing you type can be mistaken for a scan.</p>
         <div class="toggle-row">
           <div class="toggle-row-text">
@@ -861,7 +861,7 @@ function renderSettingsLogging() {
 
       <div class="settings-section">
         <h2 class="h2">Item timestamps</h2>
-        <p class="muted">Shows the time each item was first logged. When on, the time appears beneath the item in a session's overview and a Time column becomes available for CSV export (switch it on under Settings → CSV Columns). Since V61 the app records item times on every job whether this is on or not, so switching it on will show times for everything logged from V61 onwards — not only from the moment you switch it. This setting decides what you see and export, nothing else.</p>
+        <p class="muted">Shows the time each item was first logged. When on, the time appears beneath the item in a job's Overview and a Time column becomes available for CSV export (switch it on under Settings → Reports &amp; Exports → CSV Columns). Since V61 the app records item times on every job whether this is on or not, so switching it on will show times for everything logged from V61 onwards — not only from the moment you switch it. This setting decides what you see and export, nothing else.</p>
         <div class="toggle-row">
           <div class="toggle-row-text">
             <div class="toggle-row-title">Record item times</div>
@@ -1054,7 +1054,7 @@ function renderSetupSection() {
   return `
       <div class="settings-section">
         <h2 class="h2">Share setup</h2>
-        <p class="muted">Send your configuration to another phone or a new engineer so it's set up just like this one. This shares <strong>settings only</strong> — your sessions, clients and sites are never included.</p>
+        <p class="muted">Send your configuration to another phone or a new engineer so it's set up just like this one. This shares <strong>settings only</strong> — your jobs, clients and sites are never included.</p>
         <button class="backup-action-btn primary" id="setup-share-btn" data-action="setup-share">⬆ Share setup…</button>
         <button class="setup-disclose" data-action="setup-include-toggle-open" aria-expanded="${open ? 'true' : 'false'}">
           ${open ? '▾' : '▸'} Choose what to include
@@ -1065,7 +1065,7 @@ function renderSetupSection() {
 
       <div class="settings-section">
         <h2 class="h2">Import setup</h2>
-        <p class="muted">Load a setup file from another device. This replaces the matching settings on this phone (you'll see exactly what before it's applied). <strong>Your sessions are not touched.</strong></p>
+        <p class="muted">Load a setup file from another device. This replaces the matching settings on this phone (you'll see exactly what before it's applied). <strong>Your jobs are not touched.</strong></p>
         <input type="file" id="setup-import-file" data-change-action="setup-import-file" accept="application/json,.json" style="display:none">
         <button class="backup-action-btn" id="setup-import-btn" data-action="setup-import">⬇ Import setup (.json)</button>
       </div>
@@ -1079,7 +1079,7 @@ function renderSettingsSetup() {
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Export / Import Setup')}
-      <p class="muted" style="margin:0 16px 4px">Copy this device's configuration to another phone or a new engineer. <strong>Settings only</strong> — sessions, clients and sites are never shared.</p>
+      <p class="muted" style="margin:0 16px 4px">Copy this device's configuration to another phone or a new engineer. <strong>Settings only</strong> — jobs, clients and sites are never shared.</p>
       ${renderSetupSection()}
     </div>
   `;
@@ -1177,9 +1177,9 @@ function renderSettingsRetest() {
       ${on ? `
       <div class="settings-section">
         <h2 class="h2">How it works</h2>
-        <p class="muted">Open any session, tap <strong>Session settings</strong>, and switch on <strong>Remind me to chase this for retest</strong>. Only the jobs you flag appear on your chase list — so subcontract work and one-offs never clutter it.</p>
+        <p class="muted">Open any job, tap <strong>Session settings</strong>, and switch on <strong>Remind me to chase this for retest</strong>. Only the jobs you flag appear on your chase list — so subcontract work and one-offs never clutter it.</p>
         <p class="muted" style="margin-top:8px">A retest is due for a whole month: a job tested on 30 September with a 12-month interval is due <strong>September</strong> the following year. The interval is taken from your Report Settings default (currently <strong>${defMonths} month${defMonths === 1 ? '' : 's'}</strong>) at the moment you flag it, and you can change it per job.</p>
-        <p class="muted" style="margin-top:8px">The job joins your chase list on the <strong>1st of the month before</strong> it's due, so you have a full month to ring the customer. A banner appears on your Sessions screen and the job shows a 🔔 chip: <em>due next month</em>, <em>due this month</em>, then <em>overdue</em> from the 1st of the month after.</p>
+        <p class="muted" style="margin-top:8px">The job joins your chase list on the <strong>1st of the month before</strong> it's due, so you have a full month to ring the customer. A banner appears on your PAT Sessions screen and the job shows a 🔔 chip: <em>due next month</em>, <em>due this month</em>, then <em>overdue</em> from the 1st of the month after.</p>
         <p class="muted" style="margin-top:8px">When you've contacted the customer, mark the job <strong>Rebooked</strong> or <strong>Declined</strong> to clear it from the list.</p>
       </div>
       <div class="settings-section">
@@ -1249,7 +1249,7 @@ function renderSettingsClients() {
 
   const emptyState = clients.length === 0
     ? emptyStateHTML('🏢', 'No clients yet',
-        'Add a client below, then add the sites you test at — they\'ll appear as quick picks when you start a new session.')
+        'Add a client below, then add the sites you test at — they\'ll appear as quick picks when you start a new job.')
     : '';
 
   const listHtml = clients.map(c => {
@@ -1412,8 +1412,8 @@ function renderSettingsClients() {
   // or removes existing ones), so safe to offer alongside the manual list.
   const rebuildBlock = state.sessions.length ? `
     <div class="settings-section">
-      <button class="preset-action-btn" id="clients-rebuild-btn" data-action="clients-rebuild">↻ Rebuild from my sessions</button>
-      <p class="muted" style="margin:8px 0 0;font-size:12px">Scans every saved session and adds any client or site that isn't already listed. Useful after importing sessions. It only adds — it never changes or removes what's here.</p>
+      <button class="preset-action-btn" id="clients-rebuild-btn" data-action="clients-rebuild">↻ Rebuild from my jobs</button>
+      <p class="muted" style="margin:8px 0 0;font-size:12px">Scans every saved job and adds any client or site that isn't already listed. Useful after importing jobs. It only adds — it never changes or removes what's here.</p>
     </div>
   ` : '';
 
@@ -1421,7 +1421,7 @@ function renderSettingsClients() {
     <div class="screen">
       ${renderSettingsSubHeader('Clients')}
       <div class="settings-section">
-        <p class="muted" style="margin-top:0">Your clients and the sites you test at. These appear as quick picks on the New Session screen. Editing or deleting here never changes sessions you've already saved.</p>
+        <p class="muted" style="margin-top:0">Your clients and the sites you test at. These appear as quick picks on the New session screen. Editing or deleting here never changes jobs you've already saved.</p>
         <button class="btn-primary" id="client-add-btn" data-action="client-add" style="margin-top:4px">+ Add client</button>
       </div>
       ${emptyState}
@@ -1511,7 +1511,7 @@ function renderSettingsReport() {
 
       <div class="settings-section">
         <h2 class="h2">Reports</h2>
-        <p class="muted">Turn on to produce PDF reports from your sessions. While off, the Reports button is hidden everywhere — so a freshly set-up device won't generate a report until you've configured it here and switched this on.</p>
+        <p class="muted">Turn on to produce PDF reports from your jobs. While off, the Reports button is hidden everywhere — so a freshly set-up device won't generate a report until you've configured it here and switched this on.</p>
         ${toggle('report-enabled', 'Enable reports', rs.enabled)}
       </div>
 
@@ -1561,7 +1561,7 @@ function renderSettingsReport() {
 
       <div class="settings-section">
         <h2 class="h2">PDF file name</h2>
-        <p class="muted">Sets the name each report file is saved with. Tap a chip to insert a detail that fills in automatically for each session. You can still rename any single report just before sharing it.</p>
+        <p class="muted">Sets the name each report file is saved with. Tap a chip to insert a detail that fills in automatically for each job. You can still rename any single report just before sharing it.</p>
         <input class="input" id="report-filename-pattern" value="${escapeHTML(rs.reportFilenamePattern || REPORT_FILENAME_DEFAULT)}" placeholder="${escapeHTML(REPORT_FILENAME_DEFAULT)}" autocapitalize="off" autocomplete="off" spellcheck="false">
         <div class="filename-token-chips">
           ${REPORT_FILENAME_TOKENS.map(t =>
@@ -1573,7 +1573,7 @@ function renderSettingsReport() {
 
       <div class="settings-section">
         <h2 class="h2">Certificate numbers</h2>
-        <p class="muted">Optional. When on, each session gets a unique certificate number the first time you produce its report — built from your prefix and a counter. The number is kept with that session, so re-generating the report always shows the same number.</p>
+        <p class="muted">Optional. When on, each job gets a unique certificate number the first time you produce its report — built from your prefix and a counter. The number is kept with that job, so re-generating the report always shows the same number.</p>
         ${toggle('report-cert-enabled', 'Use certificate numbers', rs.certEnabled)}
         <div${rs.certEnabled ? '' : ' style="opacity:.5"'}>
           <label class="label" style="margin-top:12px">Prefix</label>
@@ -1682,7 +1682,7 @@ function renderSettingsCalculator() {
       ${renderSettingsSubHeader('Resistance Calculator')}
 
       <div class="settings-section">
-        <h2 class="h2">Earth Continuity Limit</h2>
+        <h2 class="h2">Earth continuity limit</h2>
         <p class="muted">For a Class I appliance, the earth continuity limit is (0.1 + R) Ω, where R is the resistance of the protective conductor in the supply cable. Values from IET Code of Practice Table V1.1.</p>
 
         <label class="label">CSA (cable cross-section)</label>

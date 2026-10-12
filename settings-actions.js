@@ -541,7 +541,7 @@ function setSessionCertNo(sessionId, value) {
     if (dupe) {
       openConfirmSheet({
         title: 'Duplicate certificate number',
-        message: `Certificate number "${v}" is already used by another session. Use it anyway?`,
+        message: `Certificate number "${v}" is already used by another job. Use it anyway?`,
         confirmLabel: 'Use it',
         danger: false,
         onConfirm: commit
@@ -918,7 +918,7 @@ function resetFailReasonsToDefaults() {
 function resetDescriptionsToDefaults() {
   openConfirmSheet({
     title: 'Reset descriptions?',
-    message: 'Reset Descriptions to the built-in defaults? This replaces the current list. Items already saved in past sessions are unaffected.',
+    message: 'Reset Descriptions to the built-in defaults? This replaces the current list. Items already saved in past jobs are unaffected.',
     confirmLabel: 'Reset',
     onConfirm: () => {
       state.descriptions = DEFAULT_DESCRIPTIONS.slice();

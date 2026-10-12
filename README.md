@@ -27,6 +27,7 @@ Everything works in aeroplane mode; nothing needs an account.
 - Bluetooth HID barcode scanner support (keyboard-wedge mode)
 - Settings pages and Edit session ask before Back throws away unsaved changes (V112); first-time setup offers to switch PDF reports on
 - Cloud (test): every account is a business in the database, ready for teams — roles, a business stamp on every job, and no deleting a login that still has work (V113)
+- Settings speaks one language: jobs throughout, one heading style, and a Glossary that matches the screen (V114)
 
 `FEATURES.md` is the full reference — one `##` section per capability and per
 release. Don't read it whole: `grep -n '^## ' FEATURES.md`, then `sed` the section.

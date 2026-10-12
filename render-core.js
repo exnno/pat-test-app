@@ -240,9 +240,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>No more lost settings.</strong> If you change something on a settings page and tap Back without saving, PATGo now asks: <strong>Save</strong>, <strong>Discard changes</strong> or keep editing. Edit session asks too.</li>
-        <li><strong>Save takes you back.</strong> Saving a settings page now returns you to the section you came from, the same place Back does.</li>
-        <li><strong>Setting up a new phone.</strong> The branding step now has a <strong>Make PDF reports</strong> switch, so a new phone is ready to make certificates straight away.</li>
+        <li><strong>Settings says jobs.</strong> Settings pages now say <strong>jobs</strong> instead of sessions, the same word the rest of PATGo uses. Where a screen is still called a session, like <strong>PAT Sessions</strong> and <strong>Session settings</strong>, Settings names it exactly as you see it.</li>
+        <li><strong>One style for headings.</strong> Headings, buttons and switches inside Settings now share one style. Page names, like <strong>Manage Photos</strong>, keep their capitals so they are easy to spot.</li>
+        <li><strong>Glossary brought up to date.</strong> Job, Locked job, Setup file and Clearing old jobs now match the words on screen, and the barcode scanner entry points to <strong>Logging</strong>, where it lives now.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

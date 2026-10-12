@@ -8,18 +8,79 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V113
-V113 = Stage 11 part 2, the database (spec 2A 3C 4A 5A 6A 7A 8A 9A 10A 11B
-12A): `supabase/v113-organisations.sql` — businesses and memberships (several per
-person, one default), a business stamp on every job / record / photo row filled
-by the database, reads by role (Owner / Team leader / Office read the business,
-Engineer own), writes own only and only while a member, the cloud-delete guard
-(Engineers refused in a business of more than one), no cascade from a login to
-its work; isolation 9a–16b; harness 50. Nothing on screen; no welcome.
-**Stage 11 is complete.** Next: **Stage 12 — launch readiness**, opening with
-the settings look pass (Stage 7 part 3), own spec round. Outstanding (Peter):
-Supabase Pro + production project, ICO fee, privacy + processor terms (and the
-About/Privacy wording from them).
+### Next after V114
+V114 = Stage 7 part 3, the settings look pass, first release of Stage 12 (spec 1A
+3A 4A 5A 6A 10A 11A): Settings says jobs, quoting screens by their on-screen names
+(PAT Sessions, Session settings, New session, Edit session); headings / buttons /
+switches sentence case, page names keep capitals; Glossary matched to the screen;
+welcome rolled; harness 51. No icons, layouts or settings changed.
+**Next: V115 — line icons app-wide** (spec below, locked 12 Oct). Then the page
+splits (below), then the rest of Stage 12. Outstanding (Peter): Supabase Pro +
+production project, ICO fee, privacy + processor terms (and the About/Privacy
+wording from them).
+
+### V115 — line icons across the whole app (LOCKED 12 Oct, Peter) — NEXT
+Decisions: 8A line icons replace emoji used as icons, whole app, own release ·
+9A/12A Lucide (ISC; keep its licence notice in the icons file) · 10A V114 changed
+no icons · 13A Settings-list icons in --accent (#2563eb / #3b82f6) · 14B a
+"Classic emoji" switch in Theme & Sound for V115 ONLY — remove at V116 unless
+someone needs it.
+Build: one new file (icons.js) holding the SVGs used + one helper (icon(name));
+every icon goes through it, so 14B is the helper choosing emoji vs SVG. Icons
+take currentColor. Button words never change meaning; icons aria-hidden. The
+existing SHARE_ICON_SVG (csv.js) is already Lucide-style — fold it in. New file
+→ index.html + sw.js ASSETS, load order before render files.
+Button rule (from the V114 round): icon only where it helps spot the action —
+upload = export/share/upload, download = import/download, cloud-download =
+from the cloud, trash-2 = delete/remove/clear, rotate-ccw = reset to defaults,
+rotate-cw = rebuild/run again, refresh-cw = refresh/reload; a button that opens
+another page shows that page's icon + chevron-right; everything else plain
+words; red final-confirm buttons plain. Changes vs today: "＋ New" → "+ New";
+"✎ Rename" → plain; CSV Columns Reset gains its icon; Backup & Restore and photo
+export/import arrows swapped (export = upload, import = download); Jobs on This
+Phone / Manage Photos (×2) / Retest Reminders / Account buttons gain ›; Clients'
+three Delete + Report templates Delete + Manage Photos / Cloud Storage Delete gain
+trash; Manage Photos "Download" gains cloud-download; "Save current settings as
+template…" loses its icon (💾 is Backup's); "Remove from phone" stays plain.
+Swap list (emoji → Lucide), from the "PATGo Icon Sets" comparison page:
+Pages: ☁️ cloud · 👤 user · ⚡ zap · ⚠️ triangle-alert · 🔬 gauge · 🧰 layers ·
+📝 list · 🏷️ scan-barcode · 📄 file-text · 📊 table · 🏢 building-2 · 🔔 bell ·
+🎨 palette · ⏰ alarm-clock · ⚙️ settings · 🧮 calculator · 💾 database (Data
+group) / save (Backup & Restore) · 📦 hard-drive · 🧹 eraser · 🖼 images ·
+🛡 shield-check · 🔁 arrow-left-right · ℹ️ info · 📖 book-open · ✉️ mail ·
+🔄 refresh-cw · 💳 credit-card.
+Actions: ⬆ upload · ⬇ download · ☁ cloud-download · 🗑 trash-2 · ↺ rotate-ccw ·
+↻ rotate-cw · ✎ pencil · ✍ signature · ＋ plus · ↶ undo-2 · ⎘ copy ·
+📋 clipboard-list · 📷 camera · 📍 map-pin · 🔍 search · ⏭ skip-forward · share.
+Marks: 🔒 lock · ✓ check · ✗ ✕ x · 🕘 history · ⏱ timer · 💡 lightbulb ·
+▦ layout-grid · 📱 📲 smartphone. One-offs: 🐞 bug · 🧭 compass · ✨ sparkles ·
+🎉 party-popper. Chevrons: ‹ chevron-left · › chevron-right · ▾ ⌄ ▼ chevron-down
+· ▲ chevron-up. Stay as text: → in sentences, ≤ ≥ Ω, ● ○ (bug sheet dot);
+PASS/FAIL colours unchanged.
+Open for V115's spec round: emoji inside sentences (banners "⏰ 2 jobs…", toasts)
+— icon at the start of the banner, or drop; empty-state icons; the setup
+wizard's big icons; how the 14B switch is worded.
+
+### Settings pages too crowded — split before launch (V114 6A, Peter: "near the top")
+Report Settings (long: company, logo, colours, file name, numbers, templates,
+what to include, retest, declaration, signature) and Quick Pick Items (presets +
+items + Smart Quick Pick). Structural release of its own (no behaviour change),
+after V115, before launch. 5A: Smart Quick Pick's switch stays with Quick Pick
+Items whatever the split.
+
+### V114 residuals (known, accepted)
+- The app outside Settings still says session in places: the PAT Sessions title,
+  Session settings button, New session screen, Edit session, the tour, the
+  example job's note. Renaming those screens is its own release (4B, backlogged
+  at V114) — Settings, the Glossary and 51b must follow it.
+- About → Privacy still says the app makes no network calls after install; wrong
+  while signed in to the cloud test. Rewritten with the privacy + processor terms
+  (Stage 12), not before.
+- The About changelog's V112 line says "Edit session" — history, left as written;
+  it rolls off at V115.
+- Data defaults (item types, fail reasons, CSV column headers) keep their Title
+  Case — they are the engineer's own lists and certificate text, not Settings
+  headings.
 
 ### From the V113 round (Peter, 11 Oct) — for Stage 16/17, not before
 - **Office editing.** Owner, Team leader and Office will need to EDIT others'
@@ -348,7 +409,7 @@ earth (0.1 + R) Ω with tolerance leeway, older kit up to 0.5 Ω; leakage 5 mA.
 Peter to confirm against the book (and whether the 4th-ed 0.3 MΩ heating figure
 survives). Readings off → no check. The switch lands in Logging → Test Readings.
 
-### Settings redo part 3 (Stage 7) — the look pass — SCHEDULED, first of Stage 12 (Peter, V102 round)
+### Settings redo part 3 (Stage 7) — the look pass — DONE V114 (wording + capitals); icons → V115; page splits → backlog above
 V97 did part 2 (Backup & Restore split, Phone Storage, Logging Options, About copy).
 Left: emoji icons and casing inside pages (e.g. "Clear photos from this phone",
 section headings), and whether Smart Quick Pick on/off should leave Quick Pick

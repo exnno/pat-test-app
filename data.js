@@ -161,7 +161,7 @@ const SETTINGS_PAGE_META = {
   cloudStorage:        { icon: '☁️', title: 'Cloud Storage',          aliases: 'cloud storage space used size sizes biggest largest jobs photos total account megabytes mb gb delete free up', action: 'cs-open' },
   settingsSetup:       { icon: '🔁', title: 'Export / Import Setup', aliases: 'setup share configuration new device employee copy presets transfer' },
   settingsAbout:       { icon: 'ℹ️', title: 'About',                 aliases: 'about version changelog whats new' },
-  settingsGlossary:    { icon: '📖', title: 'Glossary',              aliases: 'glossary terms jargon what does mean definitions help explain quick pick smart multi pick preset asset session client site overview readings class earth insulation leakage polarity fail reason tag retest certificate template csv backup setup calibration pruning' },
+  settingsGlossary:    { icon: '📖', title: 'Glossary',              aliases: 'glossary terms jargon what does mean definitions help explain quick pick smart multi pick preset asset session client site overview readings class earth insulation leakage polarity fail reason tag retest certificate template csv backup setup calibration pruning job locked setup file clearing old jobs' },
   settingsContact:     { icon: '✉️', title: 'Contact',              aliases: 'contact support email help feedback website' },
   // v85: the Cloud group (searchable only once unlocked — see catCloud above).
   cloudAccount:        { icon: '👤', title: 'Account',               aliases: 'cloud account sign in sign out email login' },

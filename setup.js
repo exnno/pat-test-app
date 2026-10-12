@@ -169,7 +169,7 @@ function importSetupFromFile(file) {
       title: `Import \u201c${name}\u201d?`,
       message:
         `This will REPLACE the following on this device: ${sectionLabels.join(', ')}. ` +
-        `Your sessions, clients and sites will NOT be changed.`,
+        `Your jobs, clients and sites will NOT be changed.`,
       confirmLabel: 'Import',
       danger: false,
       onConfirm: () => {
