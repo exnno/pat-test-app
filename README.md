@@ -26,6 +26,7 @@ Everything works in aeroplane mode; nothing needs an account.
 - Backup and restore to a file, and an Export/Import Setup bundle for a new phone
 - Bluetooth HID barcode scanner support (keyboard-wedge mode)
 - Settings pages and Edit session ask before Back throws away unsaved changes (V112); first-time setup offers to switch PDF reports on
+- Cloud (test): every account is a business in the database, ready for teams — roles, a business stamp on every job, and no deleting a login that still has work (V113)
 
 `FEATURES.md` is the full reference — one `##` section per capability and per
 release. Don't read it whole: `grep -n '^## ' FEATURES.md`, then `sed` the section.
@@ -72,6 +73,7 @@ supabase/             server SQL: schema.sql (run once), isolation-test.sql (eve
                       v92-fingerprint.sql (V92 change for an existing project)
                       v93-archive.sql (V93 change for an existing project)
                       v108-storage.sql (V108 change for an existing project)
+                      v113-organisations.sql (V113 businesses, for an existing project)
 harness/              the committed test harness — NOT shipped
 MAP.md  FEATURES.md  BACKLOG.md
 ```

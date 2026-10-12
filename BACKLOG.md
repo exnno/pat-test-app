@@ -8,24 +8,39 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V112
-V112 = browser-test fixes (spec 0A 1A 2A 3A 4A 5A 6A): Back asks before losing
-unsaved changes on the seven Settings Save pages and Edit session; Save lands
-where Back would; setup's branding step offers *Make PDF reports*; setup counts
-as having seen What's new (harness 49). **0A: the database release moved from
-V112 to V113, unchanged.** Next: **V113 = Stage 11 part 2, the database** —
-businesses, memberships, a business stamp on every job / record / photo row, new
-rules, isolation checks across businesses. Locked at the V111 round: 2A (a
-business column on rows, filled by the database from the writer — phones never
-send it), 4A (every existing account a business of one, Owner; new sign-ups the
-same; name blank), 5A (deleting a login no longer deletes its rows — Peter: "we
-need to get this right"; an employee's data stays valid), 7A (photo files follow
-the read rule; paths unchanged). Proposed, still awaiting Peter: **3C** (several
-businesses per person allowed by the structure from day one, Peter: "a
-priority"; a default business stamps new rows; the "working for…" choice comes
-with Stage 16), **6A** (read by role — Owner/Team leader/Office read the
-business, Engineer own; everyone writes only their own), **8A** (plan/trial stay
-on the person; Stage 13 moves billing to the business). Full order: roadmap.
+### Next after V113
+V113 = Stage 11 part 2, the database (spec 2A 3C 4A 5A 6A 7A 8A 9A 10A 11B
+12A): `supabase/v113-organisations.sql` — businesses and memberships (several per
+person, one default), a business stamp on every job / record / photo row filled
+by the database, reads by role (Owner / Team leader / Office read the business,
+Engineer own), writes own only and only while a member, the cloud-delete guard
+(Engineers refused in a business of more than one), no cascade from a login to
+its work; isolation 9a–16b; harness 50. Nothing on screen; no welcome.
+**Stage 11 is complete.** Next: **Stage 12 — launch readiness**, opening with
+the settings look pass (Stage 7 part 3), own spec round. Outstanding (Peter):
+Supabase Pro + production project, ICO fee, privacy + processor terms (and the
+About/Privacy wording from them).
+
+### From the V113 round (Peter, 11 Oct) — for Stage 16/17, not before
+- **Office editing.** Owner, Team leader and Office will need to EDIT others'
+  jobs. Not in V113 (6A): it arrives with the audit trail (Stage 17), as one
+  more rule; nothing in V113's structure changes for it.
+- **Engineer mistakes.** Engineers can't delete from the cloud in a team (12A).
+  Peter: "if they make a mistake with a job we may have to think about that" —
+  an engineer can still edit their own job (fix items, remove items); only
+  wiping the whole job / a photo is refused. Stage 16 decides what the phone
+  does when refused (likely: off this phone only, cloud copy kept, the owner
+  told) and whether a single photo removed mid-job counts as a wipe.
+- **Assigned, pre-filled jobs.** Peter envisages office / team leader / owner
+  creating jobs, part pre-populated, and assigning them to engineers — the
+  roadmap's Stage 17 "office-prepared jobs". Needs: a job created by one person
+  for another (today a row's writer is its owner — `user_id`), so the spec round
+  decides whose `user_id` an assigned job carries and how the engineer gets to
+  write to it.
+- **Leavers (R5).** A leaver's membership is ended, never their login deleted
+  (they may have their own business — 3C). Their phone still holds local copies
+  of the business's jobs and its sync will be refused for them: Stage 16 decides
+  what that phone does.
 
 ### From the V112 browser test (11 Oct) — backlogged at 6A
 - **About / Privacy wording is out of date.** About says "Nothing is uploaded,
@@ -44,6 +59,28 @@ on the person; Stage 13 moves billing to the business). Full order: roadmap.
   the Site notes sheet discards typed notes without asking (2B, not taken);
   Settings Save buttons sit at the bottom of long pages (1C — fold into the
   settings menu redo).
+
+### V113 residuals (known, accepted)
+- Only the database knows about businesses. The phone has no team screens, no
+  "working for…" choice (Stage 16), and every person has exactly one business.
+- A refused cloud delete (an Engineer in a business of more than one) has no
+  phone handling yet: the sync would report an error each run. Cannot happen
+  until Stage 16 adds a second member.
+- An Engineer can still empty their own job by EDITING it (remove its items);
+  only the delete itself is guarded. Edits of that kind are the audit trail's
+  job (Stage 17).
+- Records (clients, sites, presets…) are not delete-guarded: they are the
+  person's own lists until Stage 16 makes clients and sites the business's.
+- A photo FILE's delete is judged by its photo row's business, or the person's
+  default business when no row names it (paths carry no business). Fine while
+  everyone has one business; revisit with "working for…".
+- The isolation test does not add photo files (Supabase won't let SQL remove
+  them), so the file DELETE guard is checked by v113's O9 (the rule is there)
+  and was proved in a local Postgres, not by isolation-test.sql.
+- Each read rule calls a small database function per row. Fine at today's
+  volumes; Stage 12/13 should measure a big account's pull on Pro.
+- A login with no work left still leaves its (now empty) business behind when
+  deleted — harmless; Stage 12's clean-up job can remove empty businesses.
 
 ### V112 residuals (known, accepted)
 - The guard covers the on-screen Back arrow only. Leaving by "Refresh" on the

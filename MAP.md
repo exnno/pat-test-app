@@ -1,4 +1,4 @@
-# PATGo — Code Map (V112)
+# PATGo — Code Map (V113)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -152,7 +152,7 @@ is discoverable from the file you happen to be editing.
 18. **Every cloud read names its owner (V111).** A read, update or delete of
     `sessions` / `records` / `photos` / `session_photo_counts` carries
     `.eq('user_id', uid)`; an upsert lands on `onConflict: 'user_id,id'`. Never
-    rely on the database rules to narrow it: from V113's business rules (renumbered from V112) an
+    rely on the database rules to narrow it: under V113's business rules an
     Owner, Team leader or Office login may READ other members' rows, and ids are
     unique per account only. All such calls live in sync.js today (cloud.js
     reads only `profiles`, by the login's own id). Harness 48a fails any new
@@ -265,6 +265,9 @@ wiring), then fills the registered inputs with what the browser would show (the
 stub does not parse value=/checked=), then `unsavedAfterRender()`; 49b proves
 render() takes the read itself. The guard's question is found as the body child
 with aria-label "Save your changes?" (choice-sheet ids linger in the registry).
+⚠ V113: release pins live in 50e (49k keeps only V112's welcome copy, still
+current — V113 rolled none). Group 50 reads the SQL files' TEXT; the rules
+themselves are proved by the SQL files' own checks and isolation-test.sql.
 ⚠ V108 harness amendment — mutate.js speed-ups: a mutation's own test file (named
 in its `why`, e.g. "(45a)") runs alone first, trusted only if it passed alone on
 unmutated code; otherwise the full suite runs with PATGO_BAIL=1 (run.js stops after
@@ -1434,9 +1437,17 @@ another file having parsed. Don't "DRY" this.
 - `supabase/schema.sql`, `supabase/isolation-test.sql` — server side (v79). Pasted
   into the Supabase SQL editor by hand; not loaded by the app. `schema.sql` is the
   whole server for a NEW project; `supabase/v92-fingerprint.sql` and
-  `supabase/v93-archive.sql` and `supabase/v108-storage.sql` are the paste-once
-  changes for an existing one (they check themselves, F1–F3, A1–A5, B1–B5).
-  Harness 29e, 30i and 45j read them.
+  `supabase/v93-archive.sql`, `supabase/v108-storage.sql` and
+  `supabase/v113-organisations.sql` are the paste-once changes for an existing
+  one (they check themselves, F1–F3, A1–A5, B1–B5, O1–O9).
+  Harness 29e, 30i, 45j and 50a–50c read them.
+  ⚠ V113: schema.sql must carry every line of v113-organisations.sql between its
+  "businesses" and "self-check" banners (50b) — a new project = an upgraded one.
+  ⚠ V113: no app file may name `org_id` (50d) — the database stamps it (2A).
+  Policies call the `security definer` helpers (`my_role`, `can_read_org`,
+  `can_wipe`, `can_read_photo_file`, `can_wipe_photo_file`); never write a policy
+  that reads `memberships` under its own rules (recursion). ⚠ Same-event
+  triggers fire in NAME order: `org_stamp` must sort before `wipe_guard`.
   ⚠ v93: `session_photo_counts` is a VIEW — it must stay `security_invoker`
   (isolation 8a–8d), or it counts every account's photos. V108 added `b` (bytes)
   as its LAST column — a replaced view may only gain columns at the end.
