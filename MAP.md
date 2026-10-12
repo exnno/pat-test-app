@@ -1,4 +1,4 @@
-# PATGo — Code Map (V115)
+# PATGo — Code Map (V116)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -280,11 +280,11 @@ the SQL files' own checks and isolation-test.sql. (50e and 49k retired at V114.)
 its visible text; 51e allows "session" only in the screen names listed in NAMED.
 M836 and M772 are anchored on stable prefixes — only M66/M82 need re-pointing
 (and M846, re-aimed at each welcome's first line).
-⚠ V115: release pins live in 52h (51g keeps only V114's About line). Group 52
+⚠ V116: release pins live in 53d (52h keeps only icons.js load/probe). Group 52
 compares against the app's OWN `icon(name)` output (`app.fn('icon')('camera')`),
 never a pasted SVG — so the expected text follows icons.js. 52c draws every view
-and Settings page and fails on any old glyph; it proves itself by finding them
-again with Classic emoji on. load.js bridges ICON_PATHS / ICON_EMOJI.
+and Settings page and fails on any old glyph; it proves itself by swapping in an
+emoji-drawing icon() (`app.run`). 52g retired V116. load.js bridges ICON_PATHS.
 ⚠ V108 harness amendment — mutate.js speed-ups: a mutation's own test file (named
 in its `why`, e.g. "(45a)") runs alone first, trusted only if it passed alone on
 unmutated code; otherwise the full suite runs with PATGO_BAIL=1 (run.js stops after
@@ -356,15 +356,12 @@ survives navigation. Derived mirrors (`photoIndex`, `photoBytes`, the instrument
 flat fields) are never saved, backed up or validated. Rule 7 applies.
 
 ### icons.js (~120 ln) — line icons — NEW V115
-`ICON_PATHS` (Lucide SVG children, only those used), `ICON_EMOJI` (the old
-emoji, for the temporary 14B Classic emoji switch only) and `icon(name, cls)`.
+`ICON_PATHS` (Lucide SVG children, only those used) and `icon(name, cls)`.
 Lucide ISC notice in its header; full notices in THIRD-PARTY-LICENSES.txt.
 **Touch to:** add or swap an icon (rule 20).
-**Coupling:** reads `state.iconsClassic` at call time (ICONS_CLASSIC_KEY in
-config.js; storage/backup/reset carry it; dispatch `icons-classic`). Probed in
-boot.js (`'icon'`). Sizes and colours per context in styles.css (`@@ icons`).
-⚠ V116: removing 14B = ICON_EMOJI + the branch in icon() + the key and its
-load/save/backup/reset lines + the switch (render-settings Theme & Sound) + 52g.
+**Coupling:** none at call time (V116: Classic emoji switch 14B retired; its
+key ICONS_CLASSIC_KEY stays in config.js only for load()'s delete + reset row).
+Probed in boot.js (`'icon'`). Sizes and colours per context in styles.css (`@@ icons`).
 
 ### utils.js (~265 ln) — pure helpers, no state access
 Formatting, escaping, colour, asset-number splitting/padding, boundary validators for item readings, `newId()`. V104: the readings

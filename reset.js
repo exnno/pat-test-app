@@ -109,7 +109,7 @@ const RESET_KEY_PLAN = [
   ['SCAN_SPEED_KEY', SCAN_SPEED_KEY, 'settings'],
   ['REPAIR_DONE_KEY', REPAIR_DONE_KEY, 'settings'],
   ['SOUNDFX_KEY', SOUNDFX_KEY, 'settings'],
-  ['ICONS_CLASSIC_KEY', ICONS_CLASSIC_KEY, 'settings'],   // V115 (14B)
+  ['ICONS_CLASSIC_KEY', ICONS_CLASSIC_KEY, 'settings'],   // retired V116 switch; load() deletes it anyway
   ['TIMESTAMPS_KEY', TIMESTAMPS_KEY, 'settings'],
   ['UNDO_KEY', UNDO_KEY, 'settings'],
   ['MAP_PIN_KEY', MAP_PIN_KEY, 'settings'],

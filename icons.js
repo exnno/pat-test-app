@@ -1,4 +1,4 @@
-// PATGo — icons.js (V115)
+// PATGo — icons.js (V116)
 // (c) 2026 Peter Birchley. All rights reserved.
 //
 // Every icon in the app goes through icon(name). It returns an inline SVG line
@@ -6,15 +6,13 @@
 // from screen readers (the words beside it, or the button's aria-label, carry
 // the meaning — an icon never changes what a button says).
 //
-// V115 14B: the temporary "Classic emoji icons" switch (Theme & Sound, per
-// phone, off by default) makes icon() return the old emoji instead. That is the
-// ONLY reason ICON_EMOJI exists. It goes at V116 unless someone needs it; to
-// remove it, delete ICON_EMOJI, the branch in icon(), ICONS_CLASSIC_KEY
-// (config.js) and its load/save/backup/reset lines and the switch.
+// V116: the temporary V115 "Classic emoji icons" switch is gone (Peter, 1A),
+// and its emoji table with it. icon() always draws the line icon. The old
+// stored choice is deleted at startup (load(), storage.js).
 //
 // Only the icons the app uses are here. To add one: copy the children of the
 // <svg> from lucide-static's icons/<name>.svg (single-quoted string, double
-// quotes inside), and add its old emoji to ICON_EMOJI if it replaced one.
+// quotes inside).
 // Harness group 52 fails if code calls icon() with a name missing from here.
 //
 // Plain-text places can't hold an SVG and keep their characters: the PDF
@@ -102,76 +100,9 @@ const ICON_PATHS = {
   'zap': '<path d="M15.914 4a1.5 1.5 0 00-2.474-1.561l-9 9A1.5 1.5 0 005.5 14h4.002a.5.5 0 01.471.666L8.086 20a1.5 1.5 0 002.475 1.56l9-9A1.5 1.5 0 0018.5 10h-3.997a.5.5 0 01-.472-.667z"/>'
 };
 
-// 14B only (see above). share has no entry: it was already a line icon.
-const ICON_EMOJI = {
-  'alarm-clock': '⏰',
-  'arrow-left-right': '🔁',
-  'bell': '🔔',
-  'book-open': '📖',
-  'bug': '🐞',
-  'building-2': '🏢',
-  'calculator': '🧮',
-  'camera': '📷',
-  'check': '✓',
-  'chevron-down': '▾',
-  'chevron-left': '‹',
-  'chevron-right': '›',
-  'chevron-up': '▲',
-  'clipboard-list': '📋',
-  'cloud': '☁️',
-  'cloud-download': '☁',
-  'compass': '🧭',
-  'copy': '⎘',
-  'credit-card': '💳',
-  'database': '💾',
-  'download': '⬇',
-  'eraser': '🧹',
-  'file-text': '📄',
-  'gauge': '🔬',
-  'hard-drive': '📦',
-  'history': '🕘',
-  'images': '🖼',
-  'info': 'ℹ️',
-  'layers': '🧰',
-  'layout-grid': '▦',
-  'lightbulb': '💡',
-  'list': '📝',
-  'lock': '🔒',
-  'mail': '✉️',
-  'map-pin': '📍',
-  'palette': '🎨',
-  'party-popper': '🎉',
-  'pencil': '✎',
-  'plus': '＋',
-  'refresh-cw': '🔄',
-  'rotate-ccw': '↺',
-  'rotate-cw': '↻',
-  'save': '💾',
-  'scan-barcode': '🏷️',
-  'search': '🔍',
-  'settings': '⚙',
-  'shield-check': '🛡',
-  'signature': '✍',
-  'skip-forward': '⏭',
-  'smartphone': '📱',
-  'sparkles': '✨',
-  'table': '📊',
-  'timer': '⏱',
-  'trash-2': '🗑',
-  'triangle-alert': '⚠️',
-  'undo-2': '↶',
-  'upload': '⬆',
-  'user': '👤',
-  'x': '✕',
-  'zap': '⚡'
-};
-
 function icon(name, cls) {
   const extra = cls ? ' ' + cls : '';
   const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
-  if (typeof state !== 'undefined' && state && state.iconsClassic === true && has(ICON_EMOJI, name)) {
-    return `<span class="ic-emoji${extra}" aria-hidden="true">${ICON_EMOJI[name]}</span>`;
-  }
   if (!has(ICON_PATHS, name)) return '';
   return `<svg class="ic ic-${name}${extra}" viewBox="0 0 24 24" fill="none" stroke="currentColor" ` +
     `stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" focusable="false">` +

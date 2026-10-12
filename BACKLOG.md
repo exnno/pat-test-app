@@ -8,23 +8,34 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V115
+### Next after V116
+V116 = the Classic emoji switch (14B) retired (Peter 12 Oct, 1A 2A 3A): gone
+from Theme & Sound, search words, state, storage, backup and dispatch; icon()
+always draws the line icon; the stored choice is deleted at startup (2A); a
+V115 backup carrying it restores with the value ignored. Own small release
+(3A). Welcome rolled; harness group 53, M873–M878; 52g and M854–M861 retired.
+**Next: V117 — the Settings page split** (below, structural, 6A) — strictly
+structural, no behaviour change. Then the rest of Stage 12. Outstanding
+(Peter): Supabase Pro + production project, ICO fee, privacy + processor terms
+(and the About/Privacy wording from them).
+
+### V116 residuals (known, accepted)
+- `ICONS_CLASSIC_KEY` stays in config.js (and its factory-reset row) only so
+  load() can delete what V115 left behind — same pattern as PAT_AUTH_KEY. Can
+  go after a few releases, with its reset row and 53b's reset line.
+- 52c's "the sweep can see an emoji" control now swaps icon() for a stand-in
+  (it used the switch). Same proof, no app code needed for it.
+
+### Earlier: V115
 V115 = line icons app-wide (spec 8A 9A 12A 13A 14B, round 1A 2A 3A 4A): one new
 file icons.js + icon(name); every emoji used as an icon is a Lucide line icon;
 Settings icons in --accent; button rule applied; banners icon-first outside the
 escaped words; empty states grey, wizard blue; temporary Classic emoji switch;
 welcome rolled; harness 52, M851–M872.
-**Next: V116 — remove the Classic emoji switch** (14B) unless someone asked to
-keep it — small, can ride with the next release. Then the page splits (below),
-then the rest of Stage 12. Outstanding (Peter): Supabase Pro + production
-project, ICO fee, privacy + processor terms (and the About/Privacy wording from
-them).
+V116 removed the Classic emoji switch (above).
 
 ### V115 residuals (known, accepted)
-- Classic emoji icons (14B) is approximate: one emoji per icon name, so a few
-  spots show a neighbour's old emoji (Backup & Restore and the Data group both
-  💾; refresh buttons show 🔄; the old ⬇/⬆ export/import arrows come back the
-  NEW way round). It goes at V116 — to remove: icons.js header lists the parts.
+- ~~Classic emoji icons (14B) approximate~~ — moot: switch removed in V116.
 - Delete buttons not on the spec's list stay plain words: the photo strip's
   small Delete on each thumbnail, Overview's "Delete selected", and red final
   confirms (as the rule says). Trash added to In the cloud's Delete… and Manage
@@ -87,7 +98,7 @@ later update unless you need it."
 Report Settings (long: company, logo, colours, file name, numbers, templates,
 what to include, retest, declaration, signature) and Quick Pick Items (presets +
 items + Smart Quick Pick). Structural release of its own (no behaviour change),
-after V115, before launch. 5A: Smart Quick Pick's switch stays with Quick Pick
+next — V117 (Peter, V116 3A), before launch. 5A: Smart Quick Pick's switch stays with Quick Pick
 Items whatever the split.
 
 ### V114 residuals (known, accepted)

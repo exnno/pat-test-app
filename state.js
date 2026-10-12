@@ -453,9 +453,6 @@ let state = {
   // short Web Audio tone plays on pass/fail/copy alongside the haptic call.
   soundEnabled: false,
 
-  // V115 (14B): Classic emoji icons — temporary, per phone, default OFF.
-  iconsClassic: false,
-
   // V94 (15A, 16B): the ↶ Undo button beside Copy last. Per phone, default OFF.
   undoEnabled: false,
   // V99: map pins. mapPinEnabled = the per-phone switch (8A), default OFF.

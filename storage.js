@@ -523,6 +523,9 @@ function loadV11Settings() {
   // ever mistakes it for a real sign-in. Real sign-in state is derived in
   // cloudBoot() (cloud.js) from supabase-js's own storage, never from here.
   try { localStorage.removeItem(PAT_AUTH_KEY); } catch {}
+  // V116 (2A): the V115 Classic emoji switch is retired — delete its stored
+  // choice so a phone that had it on keeps nothing behind. Line icons always.
+  try { localStorage.removeItem(ICONS_CLASSIC_KEY); } catch {}
 
   // v33: first-run wizard gate. onboardedV33Seen is set true once the wizard is
   // completed OR skipped. We treat the install as "already onboarded" (so the
@@ -549,8 +552,6 @@ function loadV11Settings() {
   // v17: Sound feedback + Item timestamps. Both default OFF; only an explicit
   // '1' enables them. Anything else (absent key, '0', garbage) reads as off.
   state.soundEnabled = localStorage.getItem(SOUNDFX_KEY) === '1';
-  // V115 (14B): Classic emoji icons — same rule, default OFF.
-  state.iconsClassic = localStorage.getItem(ICONS_CLASSIC_KEY) === '1';
   // V94: Undo button — same rule, default OFF (16B).
   state.undoEnabled = localStorage.getItem(UNDO_KEY) === '1';
   // V99: map pins — same rule, default OFF.
@@ -964,7 +965,6 @@ function _saveSettingsWrites() {
   localStorage.setItem(MULTIPICK_KEY, JSON.stringify(state.multiPick));
   // v17: Sound feedback + Item timestamps settings.
   localStorage.setItem(SOUNDFX_KEY, state.soundEnabled ? '1' : '0');
-  localStorage.setItem(ICONS_CLASSIC_KEY, state.iconsClassic ? '1' : '0');   // V115 (14B)
   localStorage.setItem(UNDO_KEY, state.undoEnabled ? '1' : '0');   // V94
   localStorage.setItem(MAP_PIN_KEY, state.mapPinEnabled ? '1' : '0');   // V99
   localStorage.setItem(REMINDERS_KEY, JSON.stringify(normaliseReminders(state.reminders)));   // V100

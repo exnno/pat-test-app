@@ -980,12 +980,6 @@ function setSound(enabled) {
   if (state.soundEnabled) playSound('pass');
 }
 
-// V115 (14B): Classic emoji icons on/off. The caller repaints; icon() reads the flag.
-function setIconsClassic(enabled) {
-  state.iconsClassic = !!enabled;
-  save();
-}
-
 // v17: item timestamps on/off.
 // v61: this NO LONGER GATES CAPTURE. `ts` is now stamped on every item's first
 // log regardless of this flag (see saveItem and the note in config.js); the flag

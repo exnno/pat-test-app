@@ -55,7 +55,6 @@ function settingsPageSubtitle(pageId) {
       const themeSummary = state.theme === 'system' ? 'System' : (state.theme === 'dark' ? 'Dark' : 'Light');
       const extras = [];
       if (state.soundEnabled) extras.push('Sound on');
-      if (state.iconsClassic) extras.push('Classic emoji');   // V115 (14B)
       return [themeSummary, state.hapticsEnabled ? 'Haptics on' : 'Haptics off', ...extras].join(' · ');
     }
     case 'settingsCsv': {
@@ -812,21 +811,6 @@ function renderSettingsDisplay() {
           </div>
           <label class="toggle-switch">
             <input type="checkbox" id="sound-toggle" data-change-action="sound" ${state.soundEnabled ? 'checked' : ''}>
-            <span class="toggle-slider"></span>
-          </label>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="h2">Icons</h2>
-        <p class="muted">Shows the emoji the app used before V115. Temporary — it goes in a later update unless you need it.</p>
-        <div class="toggle-row">
-          <div class="toggle-row-text">
-            <div class="toggle-row-title">Classic emoji icons</div>
-            <div class="toggle-row-sub">${state.iconsClassic ? 'On' : 'Off'}</div>
-          </div>
-          <label class="toggle-switch">
-            <input type="checkbox" id="icons-classic-toggle" data-change-action="icons-classic" ${state.iconsClassic ? 'checked' : ''}>
             <span class="toggle-slider"></span>
           </label>
         </div>

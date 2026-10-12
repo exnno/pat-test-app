@@ -139,7 +139,7 @@ const SETTINGS_PAGE_META = {
   settingsRetest:      { icon: 'bell', title: 'Retest Reminders',       aliases: 'retest reminders rebook chase due overdue recall renewal commercial repeat business follow up contact customer' },
   // V100: the row is "Theme & Sound" now that the group holds two pages (a row
   // named the same as its group read oddly); the old name stays in search.
-  settingsDisplay:     { icon: 'palette', title: 'Theme & Sound',         aliases: 'phone and display settings theme dark light haptics vibration sound appearance icons emoji classic' },
+  settingsDisplay:     { icon: 'palette', title: 'Theme & Sound',         aliases: 'phone and display settings theme dark light haptics vibration sound appearance' },
   // V100 (7A): the three in-app reminders — all per phone.
   settingsReminders:   { icon: 'alarm-clock', title: 'Reminders',             aliases: 'reminders reminder nag alert prompt not exported export locked lock unlocked end of day backup back up certificate notification remind me' },
   // V97 (3A): Undo and item times moved here from Phone & Display — item times

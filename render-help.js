@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V115: rolled forward — V115 on top, V112 dropped. -->
+      <!-- v8: rolling 3-version changelog. V116: rolled forward — V116 on top, V113 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V116</strong> &middot; October 2026</p>
+        <p class="muted">The temporary Classic emoji icons switch has gone: line icons are now the only look, in light and dark themes.</p>
         <p><strong>V115</strong> &middot; October 2026</p>
         <p class="muted">New line icons across the app in place of emoji, matching light and dark themes. Export arrows point up and import arrows down, and buttons that open another page show an arrow. A Classic emoji icons switch in Theme &amp; Sound brings the old look back for this version.</p>
         <p><strong>V114</strong> &middot; October 2026</p>
         <p class="muted">Tidier Settings: the pages now say jobs rather than sessions, headings follow one consistent style, and the Glossary matches the words on screen.</p>
-        <p><strong>V113</strong> &middot; October 2026</p>
-        <p class="muted">Behind the scenes, ready for teams: the cloud now keeps every job, client and photo under your business, and an account that still has jobs can no longer be deleted by mistake. Nothing changes on screen.</p>
 
 
         </div>

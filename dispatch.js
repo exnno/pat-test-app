@@ -1236,7 +1236,6 @@ registerChangeActions({
   // Display settings toggles — each re-renders to refresh its On/Off sub-text
   'haptics': (checked) => { setHaptics(checked); render(); },
   'sound': (checked) => { setSound(checked); render(); },
-  'icons-classic': (checked) => { setIconsClassic(checked); render(); },   // V115 (14B)
   'undo': (checked) => { setUndo(checked); render(); },   // V94
   'map-pin-enabled': (checked) => { setMapPinEnabled(checked); render(); },   // V99
   // V100: the Reminders page (Phone & Display).

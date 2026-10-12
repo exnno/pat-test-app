@@ -240,9 +240,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>New line icons.</strong> The emoji across PATGo are now clean line icons that match your light or dark theme. Every button still says what it does.</li>
-        <li><strong>Export and import arrows.</strong> Arrows now point the usual way: up to export or share, down to import or download. Buttons that open another page show a small arrow on the right.</li>
-        <li><strong>Prefer the old look?</strong> For this version only, Settings &rarr; Phone &amp; Display &rarr; Theme &amp; Sound has a <strong>Classic emoji icons</strong> switch.</li>
+        <li><strong>Line icons are here to stay.</strong> The temporary Classic emoji icons switch in Theme &amp; Sound has gone, so PATGo always shows the line icons that match your light or dark theme. If you had it on, the line icons simply take over.</li>
+        <li><strong>Nothing else changes.</strong> Your jobs, settings and backups are just as they were.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
