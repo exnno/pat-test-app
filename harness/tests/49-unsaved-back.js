@@ -423,17 +423,10 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 49k */
-  await t.group('49k — release: V112, welcome rolled, cache, changelog', () => {
-    const app = bootApp();
-    t.eq(app.run('APP_VERSION'), 'V112', 'APP_VERSION V112');
-    t.eq(app.run('WELCOME_VERSION'), 'V112', 'the welcome rolls (behaviour release)');
-    const sw = fs.readFileSync(path.join(APP_DIR, 'sw.js'), 'utf8');
-    t.includes(sw, "const CACHE_VERSION = 'pat-v112';", 'cache key pat-v112');
-    const help = fs.readFileSync(path.join(APP_DIR, 'render-help.js'), 'utf8');
-    const a = help.indexOf('<p><strong>V112</strong>'), b = help.indexOf('<p><strong>V111</strong>'), c = help.indexOf('<p><strong>V110</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V112, V111, V110');
-    t.excludes(help, '<p><strong>V109</strong>', 'V109 rolled off');
+  // V113: the release pins (version, cache, changelog) moved to 50e; V113 rolls
+  // no welcome (11B), so V112's copy is still the one shown.
+  await t.group('49k — V112\'s welcome copy is still the current one', () => {
     const core = fs.readFileSync(path.join(APP_DIR, 'render-core.js'), 'utf8');
-    t.includes(core, 'No more lost settings.', 'the welcome copy is this release\'s');
+    t.includes(core, 'No more lost settings.', 'the welcome copy is V112\'s');
   });
 };
