@@ -76,6 +76,11 @@ function settingsPageSubtitle(pageId) {
       const rs = state.reportSettings;
       return !rs.enabled ? 'Off' : (rs.companyName ? `On · ${rs.companyName}` : 'On · no company name set');
     }
+    case 'settingsReportContent': {   // V117 (1A)
+      const rs = state.reportSettings;
+      const nt = (state.reportTemplates || []).length;
+      return `Certificate numbers ${rs.certEnabled ? 'on' : 'off'} · ${nt === 0 ? 'no templates' : `${nt} template${nt === 1 ? '' : 's'}`}`;
+    }
     case 'settingsRetest': {
       if (!state.retestRemindersEnabled) return 'Off';
       const n = activeRetestCount();
@@ -555,7 +560,7 @@ function renderSettingsReadings() {
       <div class="settings-section">
         <h2 class="h2">A few things to know</h2>
         <p class="muted">The equipment class decides which boxes appear — Class II has no earth continuity, Class III is insulation only. You can tag each fail reason (on the Quick Pick Fail page) so the right box shows when something fails. Readings are optional even when this is on — an empty box just records no value.</p>
-        <p class="muted">To include readings in your CSV export, turn the reading columns on under Settings → Reports &amp; Exports → CSV Columns. Readings show on the PDF certificate too — switch them on or off under Report Settings → What to include.</p>
+        <p class="muted">To include readings in your CSV export, turn the reading columns on under Settings → Reports &amp; Exports → CSV Columns. Readings show on the PDF certificate too — switch them on or off under Certificate Content → What to include.</p>
       </div>
       ${renderSettingsReadingsCheck()}` : ''}
     </div>
@@ -1178,7 +1183,7 @@ function renderSettingsRetest() {
       <div class="settings-section">
         <h2 class="h2">How it works</h2>
         <p class="muted">Open any job, tap <strong>Session settings</strong>, and switch on <strong>Remind me to chase this for retest</strong>. Only the jobs you flag appear on your chase list — so subcontract work and one-offs never clutter it.</p>
-        <p class="muted" style="margin-top:8px">A retest is due for a whole month: a job tested on 30 September with a 12-month interval is due <strong>September</strong> the following year. The interval is taken from your Report Settings default (currently <strong>${defMonths} month${defMonths === 1 ? '' : 's'}</strong>) at the moment you flag it, and you can change it per job.</p>
+        <p class="muted" style="margin-top:8px">A retest is due for a whole month: a job tested on 30 September with a 12-month interval is due <strong>September</strong> the following year. The interval is taken from your Certificate Content default (currently <strong>${defMonths} month${defMonths === 1 ? '' : 's'}</strong>) at the moment you flag it, and you can change it per job.</p>
         <p class="muted" style="margin-top:8px">The job joins your chase list on the <strong>1st of the month before</strong> it's due, so you have a full month to ring the customer. A banner appears on your PAT Sessions screen and the job shows a ${icon('bell')} chip: <em>due next month</em>, <em>due this month</em>, then <em>overdue</em> from the 1st of the month after.</p>
         <p class="muted" style="margin-top:8px">When you've contacted the customer, mark the job <strong>Rebooked</strong> or <strong>Declined</strong> to clear it from the list.</p>
       </div>
@@ -1432,7 +1437,7 @@ function renderSettingsClients() {
   `;
 }
 
-function renderSettingsReport() {
+function renderSettingsReport(part) {
   const rs = state.reportSettings;
   // Reusable toggle-row builder matching the SQP / Multi Pick markup. `id` is the
   // checkbox id (and its data-change-action). `on` is current state.
@@ -1505,9 +1510,105 @@ function renderSettingsReport() {
        </div>`
     : '';
 
+  // V117 (1A): the one long page is now two — Company & Branding (this view,
+  // 'settingsReport', kept so the preview's deep-link and Back are unchanged, 3A)
+  // and Certificate Content ('settingsReportContent'). Every section is moved
+  // byte-for-byte from the V116 page. Both halves edit the same
+  // state.reportSettings and share one Save (saveReportSettingsForm), which saves
+  // the WHOLE object; the other half's fields are just not on screen, so
+  // captureReportTextInputs leaves them alone (it guards every lookup).
+  // ⚠ "A report settings page is open" = REPORT_SETTINGS_VIEWS (config.js), never
+  // the 'settingsReport' view alone — sync must hold off on BOTH halves.
+  if (part === 'content') {
+    return `
+      <div class="screen">
+        ${renderSettingsSubHeader('Certificate Content')}
+
+        <div class="settings-section">
+          <h2 class="h2">What to include</h2>
+          ${toggle('report-show-engineer', 'Engineer name', rs.showEngineer)}
+          ${toggle('report-show-instrument', 'Test instrument', rs.showInstrument)}
+          ${toggle('report-show-calibration', 'Calibration details', rs.showCalibration)}
+          ${toggle('report-show-fails', 'List failed items', rs.showFails, rs.showFails ? 'All items listed' : 'Passes only')}
+          ${state.readingsEnabled ? toggle('report-show-readings', 'Test readings', rs.showReadings, rs.showReadings ? 'Readings columns shown when recorded' : 'Readings kept off the certificate') : ''}
+          ${toggle('report-show-duration', 'Testing time', rs.showDuration, rs.showDuration ? 'Prints how long the job took' : 'Kept off the certificate')}
+          ${toggle('report-show-photos', 'Photos', rs.showPhotos, rs.showPhotos ? 'Photo pages added after the declaration' : 'Kept off the certificate')}
+          ${rs.showPhotos ? `<p class="muted" style="margin-left:16px">Any photos you've taken are added at the end of the report, under the asset they belong to. The certificate itself doesn't change. Photos are made smaller for printing so the file stays small enough to send — on a very big job they're made smaller still, and past 150 photos the report says clearly that not all of them are shown.</p>` : ''}
+          ${toggle('report-show-remedial', 'Remedial actions', rs.showRemedial, rs.showRemedial ? 'Every fail listed at the end of the report' : 'Kept off the certificate')}
+          ${rs.showRemedial ? `<div style="margin-left:16px">
+            <p class="muted">A section at the end listing every failed item with its reason. Fails with a photo are shown with it when Photos is on (the photos then appear here, not on separate photo pages); the rest are listed together. Nothing is added to a job with no fails.</p>
+            ${toggle('report-remedial-action', 'Action line', rs.remedialActionOn !== false, rs.remedialActionOn !== false ? 'Printed under the heading' : 'Hidden')}
+            ${rs.remedialActionOn !== false ? `<textarea class="textarea" id="report-remedial-text" style="min-height:70px">${escapeHTML(rs.remedialActionText || '')}</textarea>` : ''}
+          </div>` : ''}
+          ${toggle('report-declaration', 'Declaration line', rs.declaration)}
+          ${toggle('report-show-appcredit', 'PATGo credit line', rs.showAppCredit, rs.showAppCredit ? 'Shown at the foot of the report' : 'Hidden')}
+          <div style="margin-left:16px${rs.showAppCredit ? '' : ';opacity:.5'}">
+            ${toggle('report-show-footerlogo', 'Show PATGo logo', rs.showFooterLogo, rs.showFooterLogo ? 'Small logo beside the credit line' : 'Text only')}
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 class="h2">Recommended retest</h2>
+          <p class="muted">Optional. When on, the report shows the month the retest is due (the month of the test plus the months below &mdash; for example <strong>September 2027</strong>). This is a guidance figure for your client — the IET Code of Practice sets no fixed interval and recommends a risk-based assessment.</p>
+          ${toggle('report-retest-enabled', 'Show recommended retest', rs.retestEnabled)}
+          <label class="label" style="margin-top:12px">Retest period (months)</label>
+          <input class="input" id="report-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(retestMonthsVal)}" placeholder="e.g. 12"${rs.retestEnabled ? '' : ' disabled style="opacity:.5"'}>
+        </div>
+
+        <div class="settings-section">
+          <h2 class="h2">Declaration text</h2>
+          <p class="muted">Printed above the signature line when the declaration is on. Edit to your own wording.</p>
+          <textarea class="textarea" id="report-declaration-text" style="min-height:90px">${escapeHTML(rs.declarationText)}</textarea>
+        </div>
+
+        <div class="settings-section">
+          <h2 class="h2">PDF file name</h2>
+          <p class="muted">Sets the name each report file is saved with. Tap a chip to insert a detail that fills in automatically for each job. You can still rename any single report just before sharing it.</p>
+          <input class="input" id="report-filename-pattern" value="${escapeHTML(rs.reportFilenamePattern || REPORT_FILENAME_DEFAULT)}" placeholder="${escapeHTML(REPORT_FILENAME_DEFAULT)}" autocapitalize="off" autocomplete="off" spellcheck="false">
+          <div class="filename-token-chips">
+            ${REPORT_FILENAME_TOKENS.map(t =>
+              `<button type="button" class="filename-token-chip" data-action="report-filename-token" data-arg="${escapeHTML(t)}">${escapeHTML(t.replace(/[{}]/g, ''))}</button>`
+            ).join('')}
+          </div>
+          <p class="muted" style="font-size:12px;margin-top:6px">Underscores become spaces, characters a file name can't hold are left out, and the date is written day first &mdash; for example <code>PAT Report Office 28-09-2026.pdf</code>.</p>
+        </div>
+
+        <div class="settings-section">
+          <h2 class="h2">Certificate numbers</h2>
+          <p class="muted">Optional. When on, each job gets a unique certificate number the first time you produce its report — built from your prefix and a counter. The number is kept with that job, so re-generating the report always shows the same number.</p>
+          ${toggle('report-cert-enabled', 'Use certificate numbers', rs.certEnabled)}
+          <div${rs.certEnabled ? '' : ' style="opacity:.5"'}>
+            <label class="label" style="margin-top:12px">Prefix</label>
+            <input class="input" id="report-cert-prefix" value="${escapeHTML(rs.certPrefix || '')}" placeholder="e.g. BPS- or BPS-{year}-" autocapitalize="characters" autocomplete="off" spellcheck="false"${rs.certEnabled ? '' : ' disabled'}>
+            <p class="muted" style="font-size:12px;margin-top:4px">Use <code>{year}</code> to insert the test year, e.g. <code>BPS-{year}-</code> → <code>BPS-2026-0001</code>.</p>
+            <div class="cert-number-row">
+              <div>
+                <label class="label">Digits</label>
+                <input class="input" id="report-cert-padding" type="number" inputmode="numeric" min="0" max="10" value="${escapeHTML(String(rs.certPadding))}"${rs.certEnabled ? '' : ' disabled'}>
+              </div>
+              <div>
+                <label class="label">Next number</label>
+                <input class="input" id="report-cert-next" type="number" inputmode="numeric" min="1" value="${escapeHTML(String(rs.certNextNumber))}"${rs.certEnabled ? '' : ' disabled'}>
+              </div>
+            </div>
+            <p class="muted" style="font-size:12px;margin-top:8px">Next certificate will look like: <strong>${escapeHTML(certPreview)}</strong></p>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 class="h2">Templates</h2>
+          <p class="muted">Save your current report settings as a named template, then switch between them. Applying a template replaces all your report settings on both pages — including the logo, signature and colours on Company &amp; Branding.</p>
+          ${templatesBlock}
+          <button class="preset-action-btn" data-action="report-template-save-new" style="margin-top:10px">Save current settings as template…</button>
+        </div>
+
+        <button class="btn-primary" id="settings-report-save" data-action="settings-report-save" style="margin-top:8px">Save</button>
+      </div>
+    `;
+}
   return `
     <div class="screen">
-      ${renderSettingsSubHeader('Report Settings')}
+      ${renderSettingsSubHeader('Company & Branding')}
 
       <div class="settings-section">
         <h2 class="h2">Reports</h2>
@@ -1560,84 +1661,6 @@ function renderSettingsReport() {
       </div>
 
       <div class="settings-section">
-        <h2 class="h2">PDF file name</h2>
-        <p class="muted">Sets the name each report file is saved with. Tap a chip to insert a detail that fills in automatically for each job. You can still rename any single report just before sharing it.</p>
-        <input class="input" id="report-filename-pattern" value="${escapeHTML(rs.reportFilenamePattern || REPORT_FILENAME_DEFAULT)}" placeholder="${escapeHTML(REPORT_FILENAME_DEFAULT)}" autocapitalize="off" autocomplete="off" spellcheck="false">
-        <div class="filename-token-chips">
-          ${REPORT_FILENAME_TOKENS.map(t =>
-            `<button type="button" class="filename-token-chip" data-action="report-filename-token" data-arg="${escapeHTML(t)}">${escapeHTML(t.replace(/[{}]/g, ''))}</button>`
-          ).join('')}
-        </div>
-        <p class="muted" style="font-size:12px;margin-top:6px">Underscores become spaces, characters a file name can't hold are left out, and the date is written day first &mdash; for example <code>PAT Report Office 28-09-2026.pdf</code>.</p>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="h2">Certificate numbers</h2>
-        <p class="muted">Optional. When on, each job gets a unique certificate number the first time you produce its report — built from your prefix and a counter. The number is kept with that job, so re-generating the report always shows the same number.</p>
-        ${toggle('report-cert-enabled', 'Use certificate numbers', rs.certEnabled)}
-        <div${rs.certEnabled ? '' : ' style="opacity:.5"'}>
-          <label class="label" style="margin-top:12px">Prefix</label>
-          <input class="input" id="report-cert-prefix" value="${escapeHTML(rs.certPrefix || '')}" placeholder="e.g. BPS- or BPS-{year}-" autocapitalize="characters" autocomplete="off" spellcheck="false"${rs.certEnabled ? '' : ' disabled'}>
-          <p class="muted" style="font-size:12px;margin-top:4px">Use <code>{year}</code> to insert the test year, e.g. <code>BPS-{year}-</code> → <code>BPS-2026-0001</code>.</p>
-          <div class="cert-number-row">
-            <div>
-              <label class="label">Digits</label>
-              <input class="input" id="report-cert-padding" type="number" inputmode="numeric" min="0" max="10" value="${escapeHTML(String(rs.certPadding))}"${rs.certEnabled ? '' : ' disabled'}>
-            </div>
-            <div>
-              <label class="label">Next number</label>
-              <input class="input" id="report-cert-next" type="number" inputmode="numeric" min="1" value="${escapeHTML(String(rs.certNextNumber))}"${rs.certEnabled ? '' : ' disabled'}>
-            </div>
-          </div>
-          <p class="muted" style="font-size:12px;margin-top:8px">Next certificate will look like: <strong>${escapeHTML(certPreview)}</strong></p>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="h2">Templates</h2>
-        <p class="muted">Save your current report settings as a named template, then switch between them. Applying a template replaces all your report settings — including logo, signature and colours.</p>
-        ${templatesBlock}
-        <button class="preset-action-btn" data-action="report-template-save-new" style="margin-top:10px">Save current settings as template…</button>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="h2">What to include</h2>
-        ${toggle('report-show-engineer', 'Engineer name', rs.showEngineer)}
-        ${toggle('report-show-instrument', 'Test instrument', rs.showInstrument)}
-        ${toggle('report-show-calibration', 'Calibration details', rs.showCalibration)}
-        ${toggle('report-show-fails', 'List failed items', rs.showFails, rs.showFails ? 'All items listed' : 'Passes only')}
-        ${state.readingsEnabled ? toggle('report-show-readings', 'Test readings', rs.showReadings, rs.showReadings ? 'Readings columns shown when recorded' : 'Readings kept off the certificate') : ''}
-        ${toggle('report-show-duration', 'Testing time', rs.showDuration, rs.showDuration ? 'Prints how long the job took' : 'Kept off the certificate')}
-        ${toggle('report-show-photos', 'Photos', rs.showPhotos, rs.showPhotos ? 'Photo pages added after the declaration' : 'Kept off the certificate')}
-        ${rs.showPhotos ? `<p class="muted" style="margin-left:16px">Any photos you've taken are added at the end of the report, under the asset they belong to. The certificate itself doesn't change. Photos are made smaller for printing so the file stays small enough to send — on a very big job they're made smaller still, and past 150 photos the report says clearly that not all of them are shown.</p>` : ''}
-        ${toggle('report-show-remedial', 'Remedial actions', rs.showRemedial, rs.showRemedial ? 'Every fail listed at the end of the report' : 'Kept off the certificate')}
-        ${rs.showRemedial ? `<div style="margin-left:16px">
-          <p class="muted">A section at the end listing every failed item with its reason. Fails with a photo are shown with it when Photos is on (the photos then appear here, not on separate photo pages); the rest are listed together. Nothing is added to a job with no fails.</p>
-          ${toggle('report-remedial-action', 'Action line', rs.remedialActionOn !== false, rs.remedialActionOn !== false ? 'Printed under the heading' : 'Hidden')}
-          ${rs.remedialActionOn !== false ? `<textarea class="textarea" id="report-remedial-text" style="min-height:70px">${escapeHTML(rs.remedialActionText || '')}</textarea>` : ''}
-        </div>` : ''}
-        ${toggle('report-declaration', 'Declaration line', rs.declaration)}
-        ${toggle('report-show-appcredit', 'PATGo credit line', rs.showAppCredit, rs.showAppCredit ? 'Shown at the foot of the report' : 'Hidden')}
-        <div style="margin-left:16px${rs.showAppCredit ? '' : ';opacity:.5'}">
-          ${toggle('report-show-footerlogo', 'Show PATGo logo', rs.showFooterLogo, rs.showFooterLogo ? 'Small logo beside the credit line' : 'Text only')}
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="h2">Recommended retest</h2>
-        <p class="muted">Optional. When on, the report shows the month the retest is due (the month of the test plus the months below &mdash; for example <strong>September 2027</strong>). This is a guidance figure for your client — the IET Code of Practice sets no fixed interval and recommends a risk-based assessment.</p>
-        ${toggle('report-retest-enabled', 'Show recommended retest', rs.retestEnabled)}
-        <label class="label" style="margin-top:12px">Retest period (months)</label>
-        <input class="input" id="report-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(retestMonthsVal)}" placeholder="e.g. 12"${rs.retestEnabled ? '' : ' disabled style="opacity:.5"'}>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="h2">Declaration text</h2>
-        <p class="muted">Printed above the signature line when the declaration is on. Edit to your own wording.</p>
-        <textarea class="textarea" id="report-declaration-text" style="min-height:90px">${escapeHTML(rs.declarationText)}</textarea>
-      </div>
-
-      <div class="settings-section">
         <h2 class="h2">Signature</h2>
         <p class="muted">Optional. Add your signature and it prints on the declaration line of every report. Draw it on screen, or upload a PNG/JPEG image. The blank signing line is used if you don't add one.</p>
         ${sigBlock}
@@ -1649,6 +1672,9 @@ function renderSettingsReport() {
     </div>
   `;
 }
+
+// V117 (1A): the second half of the old Report Settings page.
+function renderSettingsReportContent() { return renderSettingsReport('content'); }
 
 function computeEarthLimit(csaKey, lengthM) {
   const r = CSA_RESISTANCE[csaKey];

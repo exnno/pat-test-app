@@ -154,7 +154,8 @@ function render() {
   else if (v === 'settingsCsv') html = renderSettingsCsv();   // v11
   else if (v === 'settingsClients') html = renderSettingsClients();   // v19
   else if (v === 'settingsRetest') html = renderSettingsRetest();   // v56
-  else if (v === 'settingsReport') html = renderSettingsReport();   // v30
+  else if (v === 'settingsReport') html = renderSettingsReport();   // v30 — V117: Company & Branding
+  else if (v === 'settingsReportContent') html = renderSettingsReportContent();   // V117 (1A)
   else if (v === 'reports') html = renderReports();   // v30
   else if (v === 'retestReminders') html = renderRetestReminders();   // v56
   else if (v === 'settingsCalculator') html = renderSettingsCalculator();
@@ -240,8 +241,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Line icons are here to stay.</strong> The temporary Classic emoji icons switch in Theme &amp; Sound has gone, so PATGo always shows the line icons that match your light or dark theme. If you had it on, the line icons simply take over.</li>
-        <li><strong>Nothing else changes.</strong> Your jobs, settings and backups are just as they were.</li>
+        <li><strong>Report Settings is now two pages.</strong> In Settings → Reports &amp; Exports, <strong>Company &amp; Branding</strong> holds your company details, logo, colours and signature, and <strong>Certificate Content</strong> holds what the certificate includes, the declaration, file name, certificate numbers and templates.</li>
+        <li><strong>Nothing else changes.</strong> Every setting is just where it was on the old page, and your jobs and backups are untouched.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

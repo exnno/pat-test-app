@@ -91,6 +91,7 @@ const UNSAVED_PAGES = {
     save: () => saveMultiPickSettings(),
   },
   settingsReport: { report: true, save: () => saveReportSettingsForm() },
+  settingsReportContent: { report: true, save: () => saveReportSettingsForm() },   // V117 (1A): same object, same Save
   editSession: {
     fields: ['#ef-site', '#ef-engineer', '#ef-name', '#ef-date', '#ef-prefix', '#ef-locked', '#ef-instrument'],
     capture: () => captureEditSessionForm(),

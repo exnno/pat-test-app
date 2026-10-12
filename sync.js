@@ -2730,7 +2730,7 @@ function _syncPullRecords(c, uid, st, out) {
   const presetBefore = _syncActivePresetSig();
   const editing = String(state.instrumentEditorId || '');
   // v84: Report settings open — its toggles are already in state, unsaved.
-  const reportOpen = state.view === 'settingsReport';
+  const reportOpen = REPORT_SETTINGS_VIEWS.indexOf(state.view) !== -1;   // V117: either half
 
   function decide(row) {
     const id = String(row && row.id != null ? row.id : '');
@@ -3096,7 +3096,7 @@ function _syncPushRecords(c, uid, st, out) {
   const held = new Set(_syncHeldLoad().filter(e => e.kind !== 'session').map(e => e.id));
 
   const skip = out.skip || {};
-  const reportOpen = state.view === 'settingsReport';   // v84: unsaved toggles
+  const reportOpen = REPORT_SETTINGS_VIEWS.indexOf(state.view) !== -1;   // v84: unsaved toggles; V117: either half
   for (const kind of SYNC_RECORD_KINDS) {
     const live = new Set();
     for (const r of _syncRecordList(kind)) {

@@ -950,7 +950,7 @@ function renderReports() {
   });
 
   const needsCompany = !rs.companyName
-    ? `<div class="info-card" style="margin:0 0 12px"><p class="muted" style="margin:0">Tip: add your company name and logo in Report Settings so your reports are branded.</p></div>`
+    ? `<div class="info-card" style="margin:0 0 12px"><p class="muted" style="margin:0">Tip: add your company name and logo in Company &amp; Branding so your reports are branded.</p></div>`
     : '';
 
   let list;
@@ -979,7 +979,7 @@ function renderReports() {
       <header class="header-row">
         <button class="icon-btn" id="reports-back-btn" data-action="go-sessions" aria-label="Back">${icon('chevron-left')}</button>
         <div class="site-name">Reports</div>
-        <button class="icon-btn" id="reports-settings-btn" data-action="settings-page" data-arg="settingsReport" data-page="settingsReport" aria-label="Report Settings">${icon('settings')}</button>
+        <button class="icon-btn" id="reports-settings-btn" data-action="settings-page" data-arg="settingsReport" data-page="settingsReport" aria-label="Company and Branding">${icon('settings')}</button>
       </header>
       <div class="settings-section" style="margin-top:4px">
         <p class="muted" style="margin-top:0">Choose a session to produce a PDF Portable Appliance Test Report. You can preview it before sharing or saving.</p>

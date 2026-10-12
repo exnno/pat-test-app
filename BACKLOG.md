@@ -8,16 +8,24 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V116
-V116 = the Classic emoji switch (14B) retired (Peter 12 Oct, 1A 2A 3A): gone
-from Theme & Sound, search words, state, storage, backup and dispatch; icon()
-always draws the line icon; the stored choice is deleted at startup (2A); a
-V115 backup carrying it restores with the value ignored. Own small release
-(3A). Welcome rolled; harness group 53, M873–M878; 52g and M854–M861 retired.
-**Next: V117 — the Settings page split** (below, structural, 6A) — strictly
-structural, no behaviour change. Then the rest of Stage 12. Outstanding
-(Peter): Supabase Pro + production project, ICO fee, privacy + processor terms
-(and the About/Privacy wording from them).
+### Next after V117
+V117 = the Settings page split (Peter 12 Oct, 1A 2A 3A 4B 5B): Report Settings
+→ Company & Branding + Certificate Content; Quick Pick Items left alone (2A); the
+preview's Edit report settings still opens the first half (3A); a short welcome
+anyway (4B); the Logging group's 8 rows left as they are (5B — offered as a
+second group split, declined). Harness group 54 + 21r, M879–M890; 51g retired;
+53d → 54e. **Next: the rest of Stage 12.** Outstanding (Peter): Supabase Pro +
+production project, ICO fee, privacy + processor terms (and the About/Privacy
+wording from them).
+
+### V117 residuals (known, accepted)
+- The certificate preview's "Edit report settings" and the Reports list's
+  settings button both open Company & Branding (3A); what to include is one row
+  further, on Certificate Content.
+- The Logging group still has 8 rows (5B). If it grows again, the split offered
+  in the V117 round was: Quick Pick & Lists / Testing Tools.
+- The two halves share the Save button's id and action (settings-report-save);
+  49a counts it twice on purpose.
 
 ### V116 residuals (known, accepted)
 - `ICONS_CLASSIC_KEY` stays in config.js (and its factory-reset row) only so
@@ -94,7 +102,7 @@ icon, soft grey; 3A wizard large line icons in PATGo blue; 4A "Classic emoji
 icons" with "Shows the emoji the app used before V115. Temporary — it goes in a
 later update unless you need it."
 
-### Settings pages too crowded — split before launch (V114 6A, Peter: "near the top")
+### ~~Settings pages too crowded — split before launch~~ — DONE V117 (Report Settings split; Quick Pick Items left, 2A)
 Report Settings (long: company, logo, colours, file name, numbers, templates,
 what to include, retest, declaration, signature) and Quick Pick Items (presets +
 items + Smart Quick Pick). Structural release of its own (no behaviour change),

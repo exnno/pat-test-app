@@ -111,7 +111,7 @@ const SETTINGS_CATEGORIES = [
   { id: 'catClients', icon: 'building-2', title: 'Clients & Retests', blurb: 'Your clients and sites, and reminders to rebook them',
     pages: ['settingsClients', 'settingsRetest'] },
   { id: 'catReports', icon: 'file-text', title: 'Reports & Exports', blurb: 'The PDF certificate and the CSV export',
-    pages: ['settingsReport', 'settingsCsv'] },
+    pages: ['settingsReport', 'settingsReportContent', 'settingsCsv'] },   // V117 (1A): Report Settings split in two
   { id: 'catApp',     icon: 'palette', title: 'Phone & Display', blurb: 'Theme, sound, vibration and reminders on this phone',
     pages: ['settingsDisplay', 'settingsReminders'] },   // V100 (7A): + Reminders
   { id: 'catData',    icon: 'database', title: 'Data', blurb: 'Backups, space on this phone, photos, moving your setup, and resetting this phone',
@@ -133,7 +133,10 @@ const SETTINGS_PAGE_META = {
   settingsMultiPick:   { icon: 'layers', title: 'Multi Pick',            aliases: 'multi pick bulk multiple slots quick pick tile' },
   settingsDescriptions:{ icon: 'list', title: 'Descriptions',          aliases: 'item description list descriptions notes labels spelling typo fix rename' },
   settingsScanner:     { icon: 'scan-barcode', title: 'Barcode Scanner',      aliases: 'barcode scanner scan wedge hid bluetooth label qr code reader asset number' },
-  settingsReport:      { icon: 'file-text', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration signature sign colour color theme header accent cert number template preset notes remedial actions fails failed summary' },
+  // V117 (1A): the old Report Settings page, split in two. Both keep "report
+  // settings" in their search words so the old name still finds them.
+  settingsReport:      { icon: 'signature', title: 'Company & Branding',    aliases: 'report settings pdf report enable turn on logo branding brand company name address header title colour color theme accent signature sign' },
+  settingsReportContent: { icon: 'file-text', title: 'Certificate Content', aliases: 'report settings pdf report certificate what to include engineer instrument calibration readings testing time duration photos credit filename file name declaration cert number numbers template templates preset notes remedial actions fails failed summary retest recommended' },
   settingsCsv:         { icon: 'table', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
   settingsClients:     { icon: 'building-2', title: 'Clients',               aliases: 'clients sites customers addresses' },
   settingsRetest:      { icon: 'bell', title: 'Retest Reminders',       aliases: 'retest reminders rebook chase due overdue recall renewal commercial repeat business follow up contact customer' },

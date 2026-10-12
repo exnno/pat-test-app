@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V116';
+const APP_VERSION = 'V117';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -131,7 +131,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V116';
+const WELCOME_VERSION = 'V117';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -438,7 +438,10 @@ const SQP_RESET_KEY = 'pat:sqpResetAt';
 // fields that need not be focused (see _syncSafeToRepaint in sync.js).
 // v84: + Report settings, whose toggles change state before Save is tapped.
 // v86: + the general-settings pages (SYNC_GENERAL_VIEWS).
-const SYNC_NO_REPAINT_VIEWS = ['settingsInstrument', 'settingsItems', 'settingsUser', 'settingsReport',
+// V117 (1A): Report Settings is two pages now. Either one open = report settings
+// open (unsaved toggles in state). Used by sync.js and the list below.
+const REPORT_SETTINGS_VIEWS = ['settingsReport', 'settingsReportContent'];
+const SYNC_NO_REPAINT_VIEWS = ['settingsInstrument', 'settingsItems', 'settingsUser', ...REPORT_SETTINGS_VIEWS,
   'settingsFails', 'settingsDescriptions', 'settingsCsv', 'settingsMultiPick', 'settingsDisplay',
   'settingsReadings', 'settingsRetest', 'settingsLogging', 'settingsStorage'];   // V97
 // v82 (decision 6A): the "What's different?" sheet lists at most this many

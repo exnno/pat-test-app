@@ -1,4 +1,4 @@
-# PATGo — Code Map (V116)
+# PATGo — Code Map (V117)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -280,7 +280,7 @@ the SQL files' own checks and isolation-test.sql. (50e and 49k retired at V114.)
 its visible text; 51e allows "session" only in the screen names listed in NAMED.
 M836 and M772 are anchored on stable prefixes — only M66/M82 need re-pointing
 (and M846, re-aimed at each welcome's first line).
-⚠ V116: release pins live in 53d (52h keeps only icons.js load/probe). Group 52
+⚠ V117: release pins live in 54e (53d retired; 52h keeps only icons.js load/probe). Group 52
 compares against the app's OWN `icon(name)` output (`app.fn('icon')('camera')`),
 never a pasted SVG — so the expected text follows icons.js. 52c draws every view
 and Settings page and fails on any old glyph; it proves itself by swapping in an
@@ -814,7 +814,7 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
 (scroll reset) live in `render()` via `_lastRenderedView`, not in `setView`.
 
 ### settings-actions.js (~2250 ln) — the write half of the Settings screens + the photo manager (v90) + jobs on this phone (v91) + the Jobs screen's cloud tab (v93) + Cloud Storage (V108) — NEW v70
-Per-page saves, Report Settings (text, logo, filename tokens), signature capture
+Per-page saves, Report Settings — both V117 halves (text, logo, filename tokens), signature capture
 (draw and upload), CSV column ordering, Export/Import Setup UI handlers, the
 editable list settings (item types, fail reasons, descriptions) and the
 appearance/feedback toggles. Job notes, certificate-number override and report
@@ -1004,7 +1004,14 @@ calculator, `renderPhotoBackupSection()` (photo FILES, inside Backup & Restore)
 and `renderPhotoStorageSection()` (Manage Photos + clear, inside Phone Storage).
 **Touch to:** change any Settings page that changes a setting.
 **Coupling:** category structure and search aliases live in **data.js** (moved
-from config.js in v71), not here. Scanner test-log markup lives in **scanner.js**
+from config.js in v71), not here.
+⚠ V117: Report Settings is TWO views drawn by one function —
+`renderSettingsReport(part)`: 'settingsReport' = Company & Branding (kept id: the
+preview deep-link, report.js, lands here), 'settingsReportContent' = Certificate
+Content. One Save (`saveReportSettingsForm`) saves the whole object; capture must
+skip fields not on screen. "A report page is open" = `REPORT_SETTINGS_VIEWS`
+(config.js) — used by SYNC_NO_REPAINT_VIEWS, sync.js reportOpen ×2,
+UNSAVED_PAGES (settings-actions.js) has both views. Scanner test-log markup lives in **scanner.js**
 (it repaints without a render). Bug sheet logic lives in **bugreport.js**.
 Instrument settings live in **instruments.js**. The stats footer reads
 `computeAppStats()` (session.js) and returns `''` when null.
@@ -1202,7 +1209,7 @@ also refuses `SYNC_NO_REPAINT_VIEWS` (config.js).
 never held) — and kind `template` (`state.reportTemplates`). All hashed through
 `_syncReportProjection` (normalised, counter stripped). 5A `_syncNothingMade`:
 defaults / untouched starters / counter at 1 are never pushed while unsent.
-While `state.view === 'settingsReport'` the two report rows are neither applied
+While a report page is open (`REPORT_SETTINGS_VIEWS`, V117: either half) the two report rows are neither applied
 nor pushed. Held cards: group 'rp' (`_syncRecordGroup(kind, id)`). Pull saves
 through `_syncSaveLists()` — never `saveReportSettings()`/`saveReportTemplates()`,
 which arm the trigger (21q, M292).
