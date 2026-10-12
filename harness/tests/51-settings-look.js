@@ -25,7 +25,7 @@
      51f  messages Settings shows through confirm sheets (setup import, the
           certificate-number clash, reset descriptions) — source-guarded, as the
           sheets need a file or a typed clash to reach headlessly.
-     51g  V114's About entry (its release checks moved to 52h at V115). */
+     (51g, V114's About entry, retired at V117 when the entry rolled off.) */
 
 'use strict';
 
@@ -153,12 +153,5 @@ module.exports = async function () {
     t.includes(read('settings-actions.js'), 'Items already saved in past jobs are unaffected.', 'reset descriptions');
     t.includes(read('render-settings.js'), 'builds it from your existing jobs;', 'Smart Quick Pick: built from jobs');
     t.includes(read('render-settings.js'), 'Rebuild re-scans all your jobs;', 'Smart Quick Pick: rebuild re-scans jobs');
-  });
-
-  /* ------------------------------------------------------------------ 51g */
-  // V115: the release checks moved on to 52h. What stays is V114's About entry,
-  // until it rolls off at V117.
-  await t.group('51g — V114\u2019s About entry stays until it rolls off', () => {
-    t.includes(read('render-help.js'), 'the pages now say jobs rather than sessions', 'the V114 entry');
   });
 };

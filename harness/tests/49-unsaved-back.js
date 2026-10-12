@@ -118,11 +118,11 @@ const savedReport = (app) => JSON.parse(app.storage.getItem('pat:reportsettings'
 
 module.exports = async function () {
   /* ------------------------------------------------------------------ 49a */
-  await t.group('49a — the guard covers exactly the eight pages; every Back on them goes through it', () => {
+  await t.group('49a — the guard covers exactly the nine pages; every Back on them goes through it', () => {
     const app = bootApp();
     const pages = Object.keys(app.run('UNSAVED_PAGES')).sort();
     t.deepEq(pages, ['editSession', 'settingsCsv', 'settingsDescriptions', 'settingsFails', 'settingsItems',
-      'settingsMultiPick', 'settingsReport', 'settingsUser'], 'guarded pages (2A)');
+      'settingsMultiPick', 'settingsReport', 'settingsReportContent', 'settingsUser'], 'guarded pages (2A; V117 + Certificate Content)');
     const d = fs.readFileSync(path.join(APP_DIR, 'dispatch.js'), 'utf8');
     t.includes(d, "'back-to-settings': () => unsavedLeave(settingsBackNav),", 'Settings Back goes through the guard');
     t.includes(d, "'edit-back': () => unsavedLeave(() => setView('overview')),", 'the Edit session arrow goes through the guard');
@@ -135,7 +135,8 @@ module.exports = async function () {
     const rs = fs.readFileSync(path.join(APP_DIR, 'render-settings.js'), 'utf8');
     const saves = [...rs.matchAll(/data-action="(settings-[a-z]+-save)"/g)].map(m => m[1]).sort();
     t.deepEq(saves, ['settings-csv-save', 'settings-descriptions-save', 'settings-fails-save', 'settings-items-save',
-      'settings-multipick-save', 'settings-report-save', 'settings-user-save'], 'the seven Save pages are the seven guarded');
+      'settings-multipick-save', 'settings-report-save', 'settings-report-save', 'settings-user-save'],
+      'every Save button is on a guarded page (V117: the report Save twice, once per half)');
   });
 
   /* ------------------------------------------------------------------ 49b */
@@ -274,7 +275,8 @@ module.exports = async function () {
     t.eq(sheet(app), null, 'an instant save (Enable reports) is not "unsaved"');
     t.eq(savedReport(app).enabled, true, 'and it stays saved');
     // A display switch waits for Save: it asks, and Discard puts it back.
-    open(app, 'settingsReport', 'catReports'); paint(app, reportValues(app.state()));
+    // V117: that switch is on Certificate Content now.
+    open(app, 'settingsReportContent', 'catReports'); paint(app, reportValues(app.state()));
     const was = app.state().reportSettings.showFails;
     flip(app, 'report-show-fails', !was);   // waits for Save; repaints
     for (const [id, v] of Object.entries(reportValues(app.state()))) { const el = app.doc.getElementById(id); if (el) el.value = v; }

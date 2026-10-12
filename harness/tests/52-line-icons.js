@@ -162,7 +162,7 @@ module.exports = async function () {
     h = draw(app, 'settingsCsv');
     t.ok(btn(h, 'settings-csv-reset').includes(I('rotate-ccw') + ' Reset to defaults'), 'CSV Columns reset gains its icon');
     app.state().reportSettings.enabled = true;
-    h = draw(app, 'settingsReport');
+    h = draw(app, 'settingsReportContent');   // V117: templates moved to Certificate Content
     t.ok(/data-action="report-template-save-new"[^>]*>Save current settings/.test(h), 'the template save is plain words (💾 is Backup’s)');
     const rs = read('render-settings.js');
     // Signed in only (needs the cloud), so source-guarded like Account below.

@@ -14,7 +14,7 @@
           startup; the factory reset still classifies the name (43a rule).
      53c  backups: a new backup has no iconsClassic; a V115 backup that carries
           it still restores, and the value is ignored.
-     53d  release: V116, What's new, cache, changelog. */
+     (53d, V116's release lines, moved on to 54e at V117.) */
 
 'use strict';
 
@@ -89,21 +89,5 @@ module.exports = async function () {
     t.eq(app.state().iconsClassic, undefined, '…and the retired switch is ignored');
     app.fn('save')();
     t.eq(app.storage.getItem('pat:iconsclassic'), null, 'nothing about it reaches this phone’s storage');
-  });
-
-  /* ------------------------------------------------------------------ 53d */
-  await t.group('53d — release: V116, What’s new, cache, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V116', 'APP_VERSION V116');
-    t.eq(app.run('WELCOME_VERSION'), 'V116', 'What’s new rolls for V116');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v116';", 'cache key pat-v116');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>Line icons are here to stay.</strong>', 'What’s new: the switch has gone');
-    t.includes(core, '<li><strong>Nothing else changes.</strong>', 'What’s new: nothing else changes');
-    t.excludes(core, '<li><strong>Prefer the old look?</strong>', 'V115’s copy is gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V116</strong>'), b = help.indexOf('<p><strong>V115</strong>'), c = help.indexOf('<p><strong>V114</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V116, V115, V114');
-    t.excludes(help, '<p><strong>V113</strong>', 'V113 rolled off');
   });
 };
