@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V113';",
-    to:   "const APP_VERSION = 'V113';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V114';",
+    to:   "const APP_VERSION = 'V114';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V111</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V110</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V111</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 50e)',
+    from: '        <p><strong>V112</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V111</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V112</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 51g)',
   },
 
   {
@@ -5545,7 +5545,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 50e)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 51g)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5989,11 +5989,112 @@ const MUTATIONS = [
     why:  "2A's promise broken: a phone that names the column fails against a database without it, and one that sends null outranks the stamp (50d)",
   },
   {
-    name: "M836 (V113) a welcome rolls for a release with nothing on screen",
+    name: "M836 (V113; re-aimed V114) the What's new version is not this release's",
     file: "config.js",
-    from: "const WELCOME_VERSION = 'V112';",
-    to:   "const WELCOME_VERSION = 'V113';",
-    why:  "11B: a What's new sheet with nothing new to show (50e)",
+    // V114: was anchored on WELCOME_VERSION 'V112' (V113 rolled no welcome).
+    // Re-aimed at the stable prefix, like M772, so it never needs re-pointing:
+    // each release's own group pins which welcome is current.
+    from: "const WELCOME_VERSION = 'V",
+    to:   "const WELCOME_VERSION = 'V0",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (51g)",
+  },
+  {
+    name: "M837 (V114) Engineer & Tester says sessions again",
+    file: "render-settings.js",
+    from: "Used as the default for new jobs and shown",
+    to:   "Used as the default for new sessions and shown",
+    why:  "4A: Settings says jobs, the word the rest of the app uses (51a 51e)",
+  },
+  {
+    name: "M838 (V114) the Clients rebuild button says sessions again",
+    file: "render-settings.js",
+    from: "↻ Rebuild from my jobs</button>",
+    to:   "↻ Rebuild from my sessions</button>",
+    why:  "4A, on a button (51a 51e)",
+  },
+  {
+    name: "M839 (V114) a heading goes back to Title Case",
+    file: "render-settings.js",
+    from: "<h2 class=\"h2\">Earth continuity limit</h2>",
+    to:   "<h2 class=\"h2\">Earth Continuity Limit</h2>",
+    why:  "3A: one style for headings inside a page (51c)",
+  },
+  {
+    name: "M840 (V114) the Glossary says Locked session again",
+    file: "render-help.js",
+    from: "['Locked job', 'A finished job. It is read-only",
+    to:   "['Locked session', 'A finished session. It is read-only",
+    why:  "the Glossary explains a word the screen no longer uses (51d 51e)",
+  },
+  {
+    name: "M841 (V114) the Glossary sends you to a group that does not exist",
+    file: "render-help.js",
+    from: "See Settings → Logging → Barcode Scanner.",
+    to:   "See Settings → Testing Setup → Barcode Scanner.",
+    why:  "the Barcode Scanner path names the pre-V96 group, so following it finds nothing (51d)",
+  },
+  {
+    name: "M842 (V114) importing a setup says sessions",
+    file: "setup.js",
+    from: "`Your jobs, clients and sites will NOT be changed.`",
+    to:   "`Your sessions, clients and sites will NOT be changed.`",
+    why:  "4A in a confirm sheet, only reachable with a file (51f)",
+  },
+  {
+    name: "M843 (V114) the certificate-number clash says session",
+    file: "settings-actions.js",
+    from: "is already used by another job. Use it anyway?",
+    to:   "is already used by another session. Use it anyway?",
+    why:  "4A in a confirm sheet (51f)",
+  },
+  {
+    name: "M844 (V114) the button Settings quotes is renamed and Settings is not",
+    file: "render-review.js",
+    from: "data-action=\"edit-session\">Session settings</button>",
+    to:   "data-action=\"edit-session\">Job settings</button>",
+    why:  "Retest Reminders would tell the engineer to tap a button that no longer exists (51b)",
+  },
+  {
+    name: "M845 (V114) the main list is renamed and Settings is not",
+    file: "render-core.js",
+    from: "<h1 class=\"h1\">PAT Sessions</h1>",
+    to:   "<h1 class=\"h1\">PAT Jobs</h1>",
+    why:  "Settings would name a screen the engineer cannot find (51b)",
+  },
+  {
+    name: "M846 (V114) the What's new sheet loses its Glossary line",
+    file: "render-core.js",
+    from: "<li><strong>Glossary brought up to date.</strong>",
+    to:   "<li><strong>Glossary updated.</strong>",
+    why:  "11A: the welcome says plainly what changed on screen (51g)",
+  },
+  {
+    name: "M847 (V114) the retest how-to says Open any session",
+    file: "render-settings.js",
+    from: "Open any job, tap <strong>Session settings</strong>",
+    to:   "Open any session, tap <strong>Session settings</strong>",
+    why:  "4A on the Retest Reminders page, which only draws its how-to while reminders are on (51a 51e)",
+  },
+  {
+    name: "M848 (V114) Smart Quick Pick's status says sessions",
+    file: "render-settings.js",
+    from: "builds it from your existing jobs;",
+    to:   "builds it from your existing sessions;",
+    why:  "4A in a status line drawn only before any history exists (51e 51f)",
+  },
+  {
+    name: "M849 (V114) Logging Options says a session's overview",
+    file: "render-settings.js",
+    from: "beneath the item in a job's Overview",
+    to:   "beneath the item in a session's overview",
+    why:  "4A (51a 51e)",
+  },
+  {
+    name: "M850 (V114) a switch title goes back to Title Case",
+    file: "render-settings.js",
+    from: "<div class=\"toggle-row-title\">Record item times</div>",
+    to:   "<div class=\"toggle-row-title\">Record Item Times</div>",
+    why:  "3A on a switch, not a heading: proves 51c reads switch titles too (51c)",
   },
 ];
 

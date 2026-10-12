@@ -77,6 +77,10 @@ Adding coverage for a release:
    are anchored on text that rolls every release and will abort every time if
    nobody re-points them: **M66** (`APP_VERSION`) and **M82** (the oldest About
    changelog entry). Re-point them as part of the release, not afterwards.
+   Release mutations that only need "this release's value" anchor on a stable
+   prefix instead (M772 the cache key, M836 the What's new version — V114), and
+   the release's own group pins the value. A behaviour test that happens to
+   involve the version reads it live (49j, V114), so a roll never breaks it.
 5. **A new bottom sheet:** mark the part that can grow `.sheet-scroll` (and what
    sits below it `.sheet-pin`), or add it to `sheet-register.js` with the reason
    nothing in it grows. Group 47 fails until one of the two is true.
