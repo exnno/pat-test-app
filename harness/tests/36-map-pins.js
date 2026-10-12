@@ -105,7 +105,7 @@ module.exports = async function () {
     const { app } = failJob();
     t.eq(app.storage.getItem('pat:mapPin'), '1', 'on is saved as \u20181\u2019');
     t.includes(app.html(), 'id="entry-pin-btn"', 'on: 📍 on the saved fail');
-    t.includes(app.html(), '📍 Add map pin', 'saying Add map pin');
+    t.includes(app.html(), app.fn('icon')('map-pin') + ' Add map pin', 'saying Add map pin');
     t.includes(app.html(), 'entry-aux-row', 'sharing the photo button\u2019s row');
     const garbage = boot({ localStorage: { 'pat:mapPin': 'yes' } });
     t.eq(garbage.state().mapPinEnabled, false, 'garbage in storage → off');

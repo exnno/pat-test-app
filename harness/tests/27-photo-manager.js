@@ -271,7 +271,7 @@ module.exports = async function () {
     app.fn('setView')('settingsStorage');   // V97: the photo buttons moved to Phone Storage
     const html = app.html();
     t.includes(html, 'data-action="pm-open"', 'a Manage photos button on the Phone Storage page');
-    t.includes(html, '🗑 Delete all photos', 'signed out the wipe button says Delete — it really deletes');
+    t.includes(html, app.fn('icon')('trash-2') + ' Delete all photos', 'signed out the wipe button says Delete — it really deletes');
     t.excludes(html, 'Clear photos from this phone', '…not Clear');
     tap(app, 'pm-open');
     // Previews are made one at a time; under a full run give the round time.
@@ -303,7 +303,7 @@ module.exports = async function () {
     const localNotUp = await addPhotos(app, b.sess, b.item, 1, 'late');
     app.run('navigator.onLine = false');   // no run: the late photo stays not uploaded
     app.fn('setView')('settingsStorage');   // V97
-    t.includes(app.html(), '🗑 Clear photos from this phone', 'signed in the wipe button says Clear');
+    t.includes(app.html(), app.fn('icon')('trash-2') + ' Clear photos from this phone', 'signed in the wipe button says Clear');
     tap(app, 'pm-open'); await tick(40);
     const m = model(app);
     t.ok(m.vis, 'signed in: the cloud view');
@@ -322,7 +322,7 @@ module.exports = async function () {
     t.ok(model(app).groups.every(g => g.shown.every(x => x.local)), 'On this phone: only those');
     choose(app, 'pm-filter', 'rubbish'); await tick(10);
     t.eq(pm(app).filter, 'all', 'a value nobody offered collapses to All');
-    t.includes(app.html(), '☁ Cloud only', 'the tile badge says cloud only');
+    t.includes(app.html(), app.fn('icon')('cloud') + ' Cloud only', 'the tile badge says cloud only');
     t.includes(app.html(), 'Not uploaded', 'the tile badge says not uploaded');
     tap(app, 'pm-back'); tap(app, 'pm-open');   // online now: previews
     await until(() => app.srv.downloads().some(c => c.url.includes('ZZCLOUD1_t.jpg')));

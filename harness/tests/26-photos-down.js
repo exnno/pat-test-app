@@ -220,9 +220,9 @@ module.exports = async function () {
     t.eq(app.fn('photoCloudOnlyCountForItem')(item.id), 1, '…as cloud-only');
     t.eq(app.fn('photoCountForItem')(item.id), 0, 'this phone holds none of them');
     app.fn('setView')('overview'); app.fn('render')();
-    t.includes(app.html(), '📷 1 ☁', 'the Overview chip shows the cloud mark');
+    t.includes(app.html(), app.fn('icon')('camera') + ' 1 ' + app.fn('icon')('cloud'), 'the Overview chip shows the cloud mark');   // V115: line icons
     app.fn('setView')('sessions'); app.fn('render')();
-    t.includes(app.html(), '📷 1 (1 in cloud)', 'the jobs list shows photos after pass/fail');
+    t.includes(app.html(), app.fn('icon')('camera') + ' 1 (1 in cloud)', 'the jobs list shows photos after pass/fail');
     const pc = app.fn('photoCountsForSession')(sess);
     t.eq(pc.total, 1, 'job total'); t.eq(pc.cloud, 1, 'job cloud-only'); t.eq(pc.cloudBytes, 250000, 'job cloud-only size');
 
@@ -230,7 +230,7 @@ module.exports = async function () {
     app.run("state.cloud.status = 'signed-out'");
     t.eq(app.fn('photoCountForItemAll')(item.id), 0, 'signed out: cloud photos are not counted');
     app.fn('render')();
-    t.excludes(app.html(), '📷 1', 'signed out: nothing on the card');
+    t.excludes(app.html(), app.fn('icon')('camera') + ' 1', 'signed out: nothing on the card');
     app.run("state.cloud.status = 'signed-in'");
     // Another account's list, before its first run: never shown.
     app.run("state.photoCloudUser = 'someone-else'; state.photoCloudV++");
@@ -561,7 +561,7 @@ module.exports = async function () {
       { blob: new Blob(['ZZJPEG'], { type: 'image/jpeg' }), w: 10, h: 10, bytes: 6 })`);
     await tick(20);
     app.fn('setView')('sessions'); app.fn('render')();
-    t.includes(app.html(), '📷 1</span>', 'the jobs list shows this phone\u2019s photo count');
+    t.includes(app.html(), app.fn('icon')('camera') + ' 1</span>', 'the jobs list shows this phone\u2019s photo count');
     t.excludes(app.html(), 'in cloud', 'with no cloud wording');
     t.eq(calls.length, 0, 'no network request');
   });

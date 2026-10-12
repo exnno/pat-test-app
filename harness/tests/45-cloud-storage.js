@@ -434,7 +434,7 @@ module.exports = async function () {
     t.eq(app.state().view, 'cloudStorage', 'it opens');
     const h = app.html();
     t.includes(h, 'id="cs-totals"', 'the totals');
-    t.includes(h, '☁ In the cloud', 'the overall total');
+    t.includes(h, app.fn('icon')('cloud') + ' In the cloud', 'the overall total');
     t.includes(h, 'about 2.38 MB', 'sizes in MB, said as about');
     t.eq(app.fn('cloudBytesText')(3 * 1024 * 1024 * 1024), '3.00 GB', 'past 1 GB: GB');
     t.eq(app.fn('cloudBytesText')(2048), '2.0 KB', 'small: as the phone says it');
@@ -506,7 +506,7 @@ module.exports = async function () {
     t.includes(sh, 'Delete from the cloud', 'V107’s review sheet');
     t.includes(sh, 'ZZG1SITE', 'naming the job');
     t.includes(sh, 'No copy is kept', 'saying no copy is kept');
-    t.includes(sh, '📷 1', 'with its photo');
+    t.includes(sh, app.fn('icon')('camera') + ' 1', 'with its photo');
     const r0 = reads(app);
     app.doc.getElementById('cloud-del-yes').click();
     await until(() => app.srv.row('ZZG1').deleted === true);

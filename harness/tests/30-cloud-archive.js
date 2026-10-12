@@ -488,7 +488,7 @@ module.exports = async function () {
     t.includes(html, 'ZZ Acme Works', 'a cloud job is listed');
     t.includes(html, '3 items', '…with its item count (worked out by the database)');
     t.includes(html, '2 fail', '…its fails');
-    t.includes(html, '\ud83d\udcf7 2', '…and its photos, deleted ones left out');
+    t.includes(html, app.fn('icon')('camera') + ' 2', '…and its photos, deleted ones left out');
     t.includes(html, 'ZZCERT-77', '…and its certificate number');
     t.includes(html, 'session-cloud', 'marked \u2601 (R19)');
     t.includes(html, 'March 2024', 'grouped by month');

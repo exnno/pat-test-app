@@ -25,7 +25,7 @@
      51f  messages Settings shows through confirm sheets (setup import, the
           certificate-number clash, reset descriptions) — source-guarded, as the
           sheets need a file or a typed clash to reach headlessly.
-     51g  release: V114, What's new V114 with its copy, cache, changelog. */
+     51g  V114's About entry (its release checks moved to 52h at V115). */
 
 'use strict';
 
@@ -156,20 +156,9 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 51g */
-  await t.group('51g — release: V114, What\'s new, cache, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V114', 'APP_VERSION V114');
-    t.eq(app.run('WELCOME_VERSION'), 'V114', 'What\'s new rolls for V114 (11A)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v114';", 'cache key pat-v114');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>Settings says jobs.</strong>', 'What\'s new: jobs');
-    t.includes(core, '<li><strong>One style for headings.</strong>', 'What\'s new: headings');
-    t.includes(core, '<li><strong>Glossary brought up to date.</strong>', 'What\'s new: Glossary');
-    t.excludes(core, 'No more lost settings.', 'V112\'s copy is gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V114</strong>'), b = help.indexOf('<p><strong>V113</strong>'), c = help.indexOf('<p><strong>V112</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V114, V113, V112');
-    t.excludes(help, '<p><strong>V111</strong>', 'V111 rolled off');
-    t.includes(help, 'the pages now say jobs rather than sessions', 'the V114 entry');
+  // V115: the release checks moved on to 52h. What stays is V114's About entry,
+  // until it rolls off at V117.
+  await t.group('51g — V114\u2019s About entry stays until it rolls off', () => {
+    t.includes(read('render-help.js'), 'the pages now say jobs rather than sessions', 'the V114 entry');
   });
 };

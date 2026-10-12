@@ -330,7 +330,7 @@ module.exports = async function () {
     // Nothing on screen changed in that run (a push changes no job), so only
     // the safety repaint can have drawn it. V92 (4A): in the same sync.
     t.includes(app.html(), 'title="Safe in the cloud"', 'the 🛡 appears after the read-back, without another repaint');
-    t.excludes(app.html().split('title="Safe in the cloud"')[0].slice(-200), '\u2601', '…and it is not the ☁ (which means only in the cloud)');
+    t.excludes(app.html().split('title="Safe in the cloud"')[0].slice(-600), 'ic-cloud', '…and it is not the cloud mark (which means only in the cloud)');   // V115: was the ☁ glyph
     // In place, same array — as storage.js's own cache test sees it.
     app.run(`state.sessions.find(x => x.id === ${J(id)}).items.push({ id: 'ZZINPLACE', assetNo: 'ZZIP', result: 'pass' })`);
     app.fn('render')();

@@ -138,7 +138,7 @@ module.exports = async function run() {
     t.excludes(h, 'data-arg="Radio"', 'the preset\u2019s last types are the ones that drop off');
     t.includes(h, 'class="quick-btn qp-tile qp-tile-1 " data-action="qp-tile" data-arg="1">', 'slot 1 tile, enabled on a new item');
     t.includes(h, 'qp-tile-3', 'slot 3 tile');
-    t.includes(h, '＋</span>Desk PC', 'the tile shows the multi-pick\u2019s name with ＋');
+    t.includes(h, app.fn('icon')('plus') + '</span>Desk PC', 'the tile shows the multi-pick\u2019s name with +');
 
     withItem(app, { assetNo: '1', location: 'Office', itemType: 'Kettle' });
     const st = app.state();
@@ -253,7 +253,7 @@ module.exports = async function run() {
     const off = entryApp();
     t.eq(off.state().undoEnabled, false, 'off by default');
     t.excludes(html(off), 'undo-btn', 'off: no Undo button');
-    t.includes(html(off), '⎘ Copy last result', 'off: Copy last as before');
+    t.includes(html(off), off.fn('icon')('copy') + ' Copy last result', 'off: Copy last as before');
 
     const app = entryApp();
     const st = app.state();
@@ -262,7 +262,7 @@ module.exports = async function run() {
     t.eq(app.storage.getItem('pat:undo'), '1', 'switched on, stored per phone');
     app.fn('render')();
     t.includes(html(app), 'id="undo-btn" data-action="undo-last" aria-label="Undo the last item logged" disabled', 'on: Undo shown, greyed with nothing to undo');
-    t.includes(html(app), '⎘ Copy last', 'Copy last shortened beside it');
+    t.includes(html(app), app.fn('icon')('copy') + ' Copy last\n', 'Copy last shortened beside it');
 
     st.sqpEnabled = true; st.sqpHistory = {};
     withItem(app, { assetNo: '1', location: 'Hall', itemType: 'Kettle' });
