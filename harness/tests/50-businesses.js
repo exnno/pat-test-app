@@ -20,7 +20,7 @@
           again, and the login-delete check always undone.
      50d  the phone never sends a business stamp (2A — every app version keeps
           working because no phone knows the column exists).
-     50e  release: V113, no welcome (11B), cache, changelog.
+     50e  (retired V114: the release pins moved to 51g.)
 
    ⚠ WHAT THIS FILE CANNOT PROVE. That the rules WORK. That is the job of the
    SQL files' own checks (O1–O9, run once) and isolation-test.sql (every
@@ -127,15 +127,5 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 50e */
-  await t.group('50e — release: V113, no welcome, cache, changelog', () => {
-    const app = bootApp();
-    t.eq(app.run('APP_VERSION'), 'V113', 'APP_VERSION V113');
-    t.eq(app.run('WELCOME_VERSION'), 'V112', 'no welcome — nothing changes on screen (11B)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v113';", 'cache key pat-v113');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V113</strong>'), b = help.indexOf('<p><strong>V112</strong>'), c = help.indexOf('<p><strong>V111</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V113, V112, V111');
-    t.excludes(help, '<p><strong>V110</strong>', 'V110 rolled off');
-    t.includes(help, 'the cloud now keeps every job, client and photo under your business', 'the V113 entry');
-  });
+  // 50e (V113's release pins) retired at V114 — moved to 51g.
 };

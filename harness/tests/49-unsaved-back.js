@@ -398,7 +398,10 @@ module.exports = async function () {
 
   /* ------------------------------------------------------------------ 49j */
   await t.group('49j — setup counts as having seen What\'s new (5A)', () => {
-    const KEY = 'pat:' + 'V112'.toLowerCase() + 'welcome';
+    // V114: reads the live WELCOME_VERSION, so this behaviour test survives every
+    // welcome roll. Which version is current is pinned by the release group (51g).
+    const WV = freshApp().run('WELCOME_VERSION');
+    const KEY = 'pat:' + String(WV).toLowerCase() + 'welcome';
     for (const [label, finish] of [
       ['finished', (app) => tap(app, 'wizard-finish')],
       ['skipped', (app) => tap(app, 'wizard-skip')],
@@ -419,14 +422,9 @@ module.exports = async function () {
     // An existing phone that updates still gets it.
     const up = freshApp({ localStorage: { 'pat:onboardedV33': '1' } });
     up.fn('render')();
-    t.includes(html(up), "What's new in V112", 'an updating phone still sees What\'s new');
+    t.includes(html(up), "What's new in " + WV, 'an updating phone still sees What\'s new');
   });
 
-  /* ------------------------------------------------------------------ 49k */
-  // V113: the release pins (version, cache, changelog) moved to 50e; V113 rolls
-  // no welcome (11B), so V112's copy is still the one shown.
-  await t.group('49k — V112\'s welcome copy is still the current one', () => {
-    const core = fs.readFileSync(path.join(APP_DIR, 'render-core.js'), 'utf8');
-    t.includes(core, 'No more lost settings.', 'the welcome copy is V112\'s');
-  });
+  // 49k (V112's welcome copy is current) retired at V114: V114 rolls its own
+  // welcome, pinned in 51g.
 };
