@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V117: rolled forward — V117 on top, V114 dropped. -->
+      <!-- v8: rolling 3-version changelog. V118: rolled forward — V118 on top, V115 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V118</strong> &middot; October 2026</p>
+        <p class="muted">Grey text is easier to read: hints and secondary text are darker in the light theme and lighter in the dark theme.</p>
         <p><strong>V117</strong> &middot; October 2026</p>
         <p class="muted">Report Settings is now two shorter pages: Company &amp; Branding, and Certificate Content.</p>
         <p><strong>V116</strong> &middot; October 2026</p>
         <p class="muted">The temporary Classic emoji icons switch has gone: line icons are now the only look, in light and dark themes.</p>
-        <p><strong>V115</strong> &middot; October 2026</p>
-        <p class="muted">New line icons across the app in place of emoji, matching light and dark themes. Export arrows point up and import arrows down, and buttons that open another page show an arrow. A Classic emoji icons switch in Theme &amp; Sound brings the old look back for this version.</p>
 
 
         </div>

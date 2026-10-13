@@ -8,6 +8,40 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V118
+V118 = the accessibility pass, part 1: contrast (Peter 13 Oct, 1A 2A 3A 4C 5A
+6A, then A). Both greys pass 4.5:1 on every text surface in both themes (light
+#545c6b / #656e7c, dark #bcc6d5 / #a2aebe); the PASS button left (4C); no
+welcome (5A); harness group 55 measures every text colour from the live
+stylesheet (6A); M891–M897; 54e → 55e. **Next: the rest of the pass (2A) —
+screen-reader announcements and labels, then text size and zoom — plus the
+coloured words below (A: "V119").** ⚠ For V119's round: the coloured words
+are contrast and the announcements are markup — one concern each says two
+releases; offer the split. Outstanding (Peter): Supabase Pro + production
+project, ICO fee, privacy + processor terms.
+
+### V118 residuals (known, accepted)
+- Coloured words short of 4.5:1 (A — V119). Harness 55d reports each as a
+  known defect and flips to "appears fixed" by itself: light --pass on the page
+  2.99 / card 3.30 (green PASS words in lists); light --fail on the page 4.39;
+  dark --accent on cards 3.98 (blue links); dark --fail on cards 3.89; dark
+  --pass-shadow on cards 4.44. The fix is text-only shades (e.g. --pass-text)
+  so the buttons keep PATGo's colours — changing --pass would change the PASS
+  button, which 4C left alone.
+- The PASS button itself (4C): white on green is 3.30:1 light (passes for its
+  large bold label) and 2.28:1 dark (doesn't). Accepted by Peter.
+- `var(--muted)` is used twice but never defined (styles.css .retest-row-client;
+  render-review.js, the retest "Marked as declined" line), so those lines fall
+  back to the full text colour — readable, just not grey. One-word fix to
+  `--text-muted` when the screen-reader release passes those lines.
+- Text size: every font size is fixed px (302 of them) and index.html's viewport
+  has `user-scalable=no`, so neither the iPhone's Larger Text nor pinch-zoom
+  works. That is the last release of the pass (the entry screen's room is the
+  risk).
+- M82's tags say 15j, but 15j cannot see its break (the inserted older entry
+  sits ABOVE the real oldest, so 15j's oldest-entry check still matches). Same
+  on V117 — pre-existing, caught by 09w and 55e. Tag left for now.
+
 ### Next after V117
 V117 = the Settings page split (Peter 12 Oct, 1A 2A 3A 4B 5B): Report Settings
 → Company & Branding + Certificate Content; Quick Pick Items left alone (2A); the

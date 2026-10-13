@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V117';
+const APP_VERSION = 'V118';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';

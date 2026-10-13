@@ -90,8 +90,13 @@
 :root, .theme-force-light {
   --bg: #f3f4f6;
   --text: #111827;
-  --text-muted: #6b7280;
-  --text-hint: #9ca3af;
+  /* V118 (S15 contrast): both greys pass 4.5:1 on EVERY text surface in this
+     theme, not just the white card — they also sit on --bg, --neutral-bg and
+     the soft tints. Normal grey kept ~6:1 so the hint grey (~4.6:1) still reads
+     as the lighter of the two. Was #6b7280 / #9ca3af (4.39 / 2.31 on --bg).
+     Harness 55 measures every pair; change these and it re-checks them. */
+  --text-muted: #545c6b;
+  --text-hint: #656e7c;
   --card-bg: #ffffff;
   --input-bg: #ffffff;
   --border: #e5e7eb;
@@ -135,8 +140,11 @@
   :root:not(.theme-force-light) {
     --bg: #0f172a;
     --text: #f1f5f9;
-    --text-muted: #94a3b8;
-    --text-hint: #64748b;
+    /* V118: lighter, so both pass on --neutral-bg and --accent-soft too
+       (was #94a3b8 / #64748b: 4.04 / 2.18 there). Keep in step with
+       .theme-force-dark below — harness 55a fails if they differ. */
+    --text-muted: #bcc6d5;
+    --text-hint: #a2aebe;
     --card-bg: #1e293b;
     --input-bg: #1e293b;
     --border: #334155;
@@ -179,8 +187,8 @@
 .theme-force-dark {
   --bg: #0f172a;
   --text: #f1f5f9;
-  --text-muted: #94a3b8;
-  --text-hint: #64748b;
+  --text-muted: #bcc6d5;
+  --text-hint: #a2aebe;
   --card-bg: #1e293b;
   --input-bg: #1e293b;
   --border: #334155;

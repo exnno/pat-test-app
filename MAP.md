@@ -1,4 +1,4 @@
-# PATGo — Code Map (V117)
+# PATGo — Code Map (V118)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1467,6 +1467,10 @@ another file having parsed. Don't "DRY" this.
   ⚠ Do NOT reorder the file to match the index — several rules depend on being
   overridden by a later block. The banners describe the order, they don't
   license changing it.
+  ⚠ V118: text colours are MEASURED. Harness 55 reads the three theme blocks
+  (`:root, .theme-force-light`, the dark media block, `.theme-force-dark`) and
+  fails any text colour under 4.5:1 on its surfaces; the two dark blocks must
+  match token for token. Change a colour in one dark block → change the other.
 - `index.html` (~3KB) — the `<script>` chain. Small enough to read whole.
 - `sw.js` (~3.5KB) — `CACHE_VERSION` + `ASSETS`. Read whole.
 - `supabase.umd.js` — vendored supabase-js (MIT). NEVER read or grep it (218 KB,
