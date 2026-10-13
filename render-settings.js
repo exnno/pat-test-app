@@ -888,7 +888,7 @@ function renderSettingsLogging() {
 function storageProtectionHTML() {
   const v = state.storageProtection;
   if (v === 'protected') {
-    return `<p class="muted"><strong style="color:var(--pass)">${icon('check')} Protected.</strong> This phone won't clear PATGo's data to free up space. Keep exporting backups &mdash; protection doesn't cover a lost or broken phone.</p>`;
+    return `<p class="muted"><strong style="color:var(--pass-word)">${icon('check')} Protected.</strong> This phone won't clear PATGo's data to free up space. Keep exporting backups &mdash; protection doesn't cover a lost or broken phone.</p>`;
   }
   if (v === 'not') {
     return `<p class="muted"><strong>Not protected.</strong> If this phone runs short of space, it may clear PATGo's data. Using the app from its home-screen icon helps the phone decide to keep it. Until then, export backups regularly.</p>

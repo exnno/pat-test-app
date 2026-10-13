@@ -65,12 +65,12 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V119</strong> &middot; October 2026</p>
+        <p class="muted">Coloured words are easier to read: green pass, red fail and blue link text are a little stronger. The PASS and FAIL buttons look the same.</p>
         <p><strong>V118</strong> &middot; October 2026</p>
         <p class="muted">Grey text is easier to read: hints and secondary text are darker in the light theme and lighter in the dark theme.</p>
         <p><strong>V117</strong> &middot; October 2026</p>
         <p class="muted">Report Settings is now two shorter pages: Company &amp; Branding, and Certificate Content.</p>
-        <p><strong>V116</strong> &middot; October 2026</p>
-        <p class="muted">The temporary Classic emoji icons switch has gone: line icons are now the only look, in light and dark themes.</p>
 
 
         </div>

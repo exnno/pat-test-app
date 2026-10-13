@@ -167,7 +167,7 @@ function openNameSheet(opts) {
     ${blurb ? `<p class="sheet-scroll" style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text-muted)">${escapeHTML(blurb)}</p>` : ''}
     <input class="input sheet-pin" id="name-sheet-input" value="${escapeHTML(value)}" placeholder="${escapeHTML(placeholder)}" autocapitalize="on" autocomplete="off" maxlength="${maxlength}">
     <button class="btn-primary sheet-pin" id="name-sheet-save" style="margin-top:12px">${escapeHTML(confirmLabel)}</button>
-    ${typeof opts.onDelete === 'function' ? `<button class="btn-secondary sheet-pin" id="name-sheet-delete" style="margin-top:10px;color:var(--fail)">${escapeHTML(opts.deleteLabel || 'Delete')}</button>` : ''}
+    ${typeof opts.onDelete === 'function' ? `<button class="btn-secondary sheet-pin" id="name-sheet-delete" style="margin-top:10px;color:var(--fail-word)">${escapeHTML(opts.deleteLabel || 'Delete')}</button>` : ''}
   `;
   document.body.appendChild(backdrop);
   document.body.appendChild(sheet);

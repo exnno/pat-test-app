@@ -110,6 +110,16 @@
   --pass-shadow: #15803d;
   --fail: #dc2626;
   --fail-shadow: #b91c1c;
+  /* V119 (S15 contrast): colours for WORDS only — green/red/blue text, links.
+     Buttons, icons and borders keep --pass / --fail / --accent (PATGo's colours,
+     4C), which are too light (light) or too dark (dark) for small text. Each
+     word shade passes 4.5:1 on all 9 text surfaces and the two tinted
+     asset-history badges (harness 56b). Large display
+     text (the 100, Easter-egg stickers) and icons keep the brand colours — they
+     only need 3:1. */
+  --pass-word: #15783a;   /* a touch darker than --pass-shadow, so it also clears the pale green asset-history badge */
+  --fail-word: #b91c1c;
+  --accent-word: #2563eb;
   --fail-soft-bg: #fef2f2;
   --fail-soft-text: #991b1b;
   --fail-soft-border: #fecaca;
@@ -158,6 +168,11 @@
     --pass-shadow: #16a34a;
     --fail: #ef4444;
     --fail-shadow: #dc2626;
+    /* V119: in-between shades — the next full step (red-300 / blue-300) was
+       paler than needed; these just clear 4.5:1 on --neutral-bg and --accent-soft. */
+    --pass-word: #22c55e;
+    --fail-word: #fa8f8f;
+    --accent-word: #72b1fb;
     --fail-soft-bg: #2d0a0a;
     --fail-soft-text: #fca5a5;
     --fail-soft-border: #7f1d1d;
@@ -202,6 +217,9 @@
   --pass-shadow: #16a34a;
   --fail: #ef4444;
   --fail-shadow: #dc2626;
+  --pass-word: #22c55e;   /* V119: same as the media block above (55a) */
+  --fail-word: #fa8f8f;
+  --accent-word: #72b1fb;
   --fail-soft-bg: #2d0a0a;
   --fail-soft-text: #fca5a5;
   --fail-soft-border: #7f1d1d;
@@ -348,7 +366,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .suggestion-item:last-child { border-bottom: none; }
 .suggestion-item:active { background: var(--accent-soft); }
 
-.notes-toggle { background: transparent; border: none; color: var(--accent); font-size: 13px; font-weight: 600; padding: 8px 0; margin-top: 4px; text-align: left; display: block; }
+.notes-toggle { background: transparent; border: none; color: var(--accent-word); font-size: 13px; font-weight: 600; padding: 8px 0; margin-top: 4px; text-align: left; display: block; }
 
 /* @@ entry: pass/fail + copy last */
 /* Pass/Fail 75/25 split, same height */
@@ -360,11 +378,11 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .fail-btn .icon { display: block; font-size: 22px; margin-bottom: 4px; }
 
 /* Result-coloured text (used in entry header badge and overview table) */
-.pass-text { color: var(--pass); }
-.fail-text { color: var(--fail); }
+.pass-text { color: var(--pass-word); }
+.fail-text { color: var(--fail-word); }
 .result-badge { margin-left: 8px; font-weight: 700; }
-.result-badge.pass { color: var(--pass); }
-.result-badge.fail { color: var(--fail); }
+.result-badge.pass { color: var(--pass-word); }
+.result-badge.fail { color: var(--fail-word); }
 
 /* Copy-last button: full-width, secondary styling */
 .copy-last-btn {
@@ -385,7 +403,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .nav-row { display: flex; align-items: center; justify-content: space-between; margin-top: 18px; gap: 8px; }
 .nav-btn { display: inline-flex; align-items: center; gap: 4px; padding: 10px 14px; background: var(--card-bg); border: 1px solid var(--border-strong); border-radius: 8px; font-size: 14px; font-weight: 600; color: var(--neutral-text); }
-.delete-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; background: transparent; border: none; color: var(--fail); font-size: 13px; font-weight: 600; }
+.delete-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 12px; background: transparent; border: none; color: var(--fail-word); font-size: 13px; font-weight: 600; }
 
 .card { background: var(--card-bg); padding: 16px; border-radius: 12px; border: 1px solid var(--border); margin-bottom: 16px; }
 .session-card { display: flex; align-items: center; gap: 4px; background: var(--card-bg); padding: 12px 8px 12px 14px; border-radius: 10px; border: 1px solid var(--border); margin-bottom: 10px; }
@@ -415,8 +433,8 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .tr.selected { background: var(--accent-soft); }
 .td { padding: 10px 8px; border-bottom: 1px solid var(--row-separator); }
 .td-result { font-weight: 700; }
-.td-result.pass { color: var(--pass); }
-.td-result.fail { color: var(--fail); }
+.td-result.pass { color: var(--pass-word); }
+.td-result.fail { color: var(--fail-word); }
 .td-action { width: 36px; text-align: center; color: var(--text-hint); }
 .td-check { width: 36px; text-align: center; }
 .td-check input[type="checkbox"] {
@@ -854,7 +872,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 }
 .preset-action-btn:active { background: var(--row-active); }
 .preset-action-btn:disabled { opacity: 0.4; cursor: not-allowed; }
-.preset-action-danger { color: var(--fail); border-color: var(--fail-soft-border); }
+.preset-action-danger { color: var(--fail-word); border-color: var(--fail-soft-border); }
 .preset-action-danger:active { background: var(--fail-soft-bg); }
 
 /* @@ report: signature */
@@ -975,7 +993,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .fail-other-back {
   background: transparent;
   border: none;
-  color: var(--accent);
+  color: var(--accent-word);
   font-size: 14px;
   font-weight: 600;
   padding: 4px 0 12px;
@@ -1043,7 +1061,7 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 .update-refresh-btn {
   padding: 8px 14px;
   background: #fff;
-  color: var(--accent);
+  color: var(--accent-word);
   border: none;
   border-radius: 6px;
   font-size: 14px;
@@ -1376,7 +1394,7 @@ body.has-update-banner .screen { padding-top: 64px; }
 .backup-action-btn.primary:active { background: var(--accent-text); }
 .backup-action-btn.danger {
   border-color: var(--fail-soft-border);
-  color: var(--fail);
+  color: var(--fail-word);
 }
 
 /* V105 (S14): Daily snapshots on the Backup page */
@@ -1418,12 +1436,12 @@ body.has-update-banner .screen { padding-top: 64px; }
   border-radius: 10px;
 }
 .reset-level:active { background: var(--fail-soft-bg); }
-.reset-level-title { display: block; font-size: 15px; font-weight: 700; color: var(--fail); }
+.reset-level-title { display: block; font-size: 15px; font-weight: 700; color: var(--fail-word); }
 .reset-level-blurb { display: block; font-size: 13px; color: var(--text-muted); margin-top: 3px; line-height: 1.4; }
 .reset-overview { font-size: 14px; line-height: 1.45; color: var(--text); }
 .reset-h { margin: 12px 0 4px; font-size: 14px; font-weight: 700; }
-.reset-h-gone { color: var(--fail); }
-.reset-h-kept { color: var(--pass); }
+.reset-h-gone { color: var(--fail-word); }
+.reset-h-kept { color: var(--pass-word); }
 .reset-list { margin: 0 0 6px; padding-left: 20px; }
 .reset-list li { margin: 3px 0; }
 .reset-note { margin: 8px 0 0; font-size: 13px; color: var(--text-muted); }
@@ -1505,7 +1523,7 @@ body.has-update-banner .screen { padding-top: 64px; }
 }
 .info-card p:last-child { margin-bottom: 0; }
 .info-card .muted { color: var(--text-muted); font-size: 13px; }
-.info-card a { color: var(--accent); text-decoration: none; }
+.info-card a { color: var(--accent-word); text-decoration: none; }
 
 /* v58: Contact page links (email / website). The .info-card a rule above gives
    them the accent colour; this adds a finger-sized hit area and an underline so
@@ -1585,7 +1603,7 @@ body.has-update-banner .screen { padding-top: 64px; }
 .select-all-row button {
   background: transparent;
   border: none;
-  color: var(--accent);
+  color: var(--accent-word);
   font-weight: 600;
   padding: 4px 0;
   font-size: 13px;
@@ -1713,7 +1731,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .retest-row-client {
   font-size: 12px;
-  color: var(--muted);
+  color: var(--text-muted);   /* V119: was --muted, never defined */
   margin-top: 1px;
 }
 
@@ -1760,7 +1778,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   font-size: 14px;
   font-weight: 600;
   background: transparent;
-  color: var(--accent);
+  color: var(--accent-word);
   border: none;
   border-radius: 8px;
   margin-top: 4px;
@@ -2275,7 +2293,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   border-radius: 999px;
   white-space: nowrap;
 }
-.tour-chip-ok   { background: var(--accent-soft); color: var(--pass-shadow); }
+.tour-chip-ok   { background: var(--accent-soft); color: var(--pass-word); }
 .tour-chip-warn { background: var(--fail-soft-bg); color: var(--fail-soft-text); }
 .tour-input {
   width: 100%;
@@ -2329,8 +2347,8 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 /* Overview slide — matches the real header line, button row, search and the
    #/ITEM/RESULT table. */
 .tour-ov-summary { font-size: 12px; color: var(--text); }
-.tour-ov-pass { color: var(--pass-shadow); font-weight: 700; }
-.tour-ov-fail { color: var(--fail); font-weight: 700; }
+.tour-ov-pass { color: var(--pass-word); font-weight: 700; }
+.tour-ov-fail { color: var(--fail-word); font-weight: 700; }
 .tour-ov-btnrow { display: flex; gap: 8px; }
 .tour-ov-btn {
   flex: 1;
@@ -2365,8 +2383,8 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .tour-ov-trow { border-bottom: 1px solid var(--border); color: var(--text); }
 .tour-ov-trow:last-child { border-bottom: none; }
-.tour-ov-rpass { color: var(--pass-shadow); font-weight: 700; }
-.tour-ov-rfail { color: var(--fail); font-weight: 700; }
+.tour-ov-rpass { color: var(--pass-word); font-weight: 700; }
+.tour-ov-rfail { color: var(--fail-word); font-weight: 700; }
 .tour-doc {
   background: #fff;
   border: 1px solid var(--border-strong);
@@ -2460,7 +2478,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   background: var(--row-active);
 }
 .bulk-menu-btn.danger {
-  color: var(--fail);
+  color: var(--fail-word);
   border-color: var(--fail-soft-border);
   background: var(--fail-soft-bg);
 }
@@ -2714,11 +2732,11 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   padding: 4px 0;
   font-size: 13px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-word);
   cursor: pointer;
 }
 .link-btn:active { opacity: 0.6; }
-.link-btn.danger { color: var(--fail); }
+.link-btn.danger { color: var(--fail-word); }
 
 /* v26: inline validation message on the New Session form (Q1 — neither client
    nor site entered). */
@@ -2726,7 +2744,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   margin: 0 0 14px;
   font-size: 13px;
   font-weight: 600;
-  color: var(--fail);
+  color: var(--fail-word);
 }
 
 /* v26: "Unassigned" group on the Clients page — sites with no client. A static
@@ -3001,7 +3019,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   text-align: left;
   background: none;
   border: none;
-  color: var(--accent);
+  color: var(--accent-word);
   font-size: 14px;
   font-weight: 500;
   padding: 10px 2px;
@@ -3389,7 +3407,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .bug-diag summary {
   font-size: 13px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-word);
   cursor: pointer;
   padding: 6px 0;
 }
@@ -3486,7 +3504,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   flex: none;
   font-size: 14px;
   font-weight: 600;
-  color: var(--accent);
+  color: var(--accent-word);
 }
 
 /* The sheet itself. Reuses the .fail-sheet shell (the reliable iOS bottom-sheet
@@ -3531,8 +3549,8 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   padding: 2px 8px;
   border-radius: 999px;
 }
-.asset-history-result.pass { color: var(--pass); background: rgba(22, 163, 74, .12); }
-.asset-history-result.fail { color: var(--fail); background: rgba(220, 38, 38, .12); }
+.asset-history-result.pass { color: var(--pass-word); background: rgba(22, 163, 74, .12); }
+.asset-history-result.fail { color: var(--fail-word); background: rgba(220, 38, 38, .12); }
 .asset-history-job {
   margin-top: 4px;
   font-weight: 600;
@@ -3773,7 +3791,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .entry-aux-row { display: flex; gap: 8px; margin-top: 10px; }
 .entry-aux-row .entry-photo-btn { flex: 1 1 0; min-width: 0; margin-top: 0; }
 .entry-pin-btn { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.entry-pin-btn.has-pin { color: var(--accent); }
+.entry-pin-btn.has-pin { color: var(--accent-word); }
 /* The offer after a fail (5A): TOP of the screen, clear of PASS / FAIL, so a tap
    meant for the next item cannot land on it. Shown for MAP_PIN_OFFER_MS. */
 .map-pin-offer {
@@ -3800,7 +3818,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .map-pin-input-row .map-pin-paste { flex: 0 0 auto; }
 .map-pin-noapp-text { margin: 8px 0 0; }
 .map-pin-web { display: block; margin: 4px 0 0; }
-.map-pin-error { min-height: 1em; margin-top: 6px; font-size: 14px; font-weight: 600; color: var(--fail); }
+.map-pin-error { min-height: 1em; margin-top: 6px; font-size: 14px; font-weight: 600; color: var(--fail-word); }
 .map-pin-where { margin: 6px 0 0; }
 .map-pin-remove { display: block; margin: 12px auto 0; }
 .pin-chip { margin-left: 4px; font-size: 13px; }
@@ -3814,7 +3832,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .move-job-more { margin-top: 12px; }
 .move-job-more summary { padding: 8px 0; font-weight: 600; cursor: pointer; }
 .move-job-note { margin: 6px 0; font-size: 14px; }
-.move-job-error { min-height: 1em; margin: 4px 0 8px; font-size: 14px; font-weight: 600; color: var(--fail); }
+.move-job-error { min-height: 1em; margin: 4px 0 8px; font-size: 14px; font-weight: 600; color: var(--fail-word); }
 .move-job-msg, .move-job-why { margin: 0 0 12px; font-size: 16px; line-height: 1.4; }
 .move-job-warn { margin: 0 0 12px; padding: 10px 12px; font-size: 14px; line-height: 1.4; border-radius: 10px; background: var(--card-bg); border: 1px solid var(--fail); }
 .move-job-back { display: block; width: 100%; margin-top: 10px; }
@@ -4244,7 +4262,7 @@ body.has-selection-bar .screen.pm-screen { padding-bottom: 140px; }
 .jm-text { flex: 1; min-width: 0; }
 .jm-status-row { margin-top: 4px; }
 .jm-status { font-size: 12px; color: var(--text-muted); }
-.jm-status.is-safe { color: var(--pass); font-weight: 600; }
+.jm-status.is-safe { color: var(--pass-word); font-weight: 600; }
 .jm-tick {
   flex: 0 0 auto;
   width: 24px; height: 24px;
@@ -4460,7 +4478,7 @@ body.has-selection-bar .cs-screen { padding-bottom: 100px; }
 .egg-v-wait, .egg-v-test, .egg-v-done { display: none; }
 .egg-row.is-waiting .egg-v-wait { display: inline; color: var(--text-hint); }
 .egg-row.is-testing .egg-v-test { display: inline; color: var(--text-muted); font-weight: 600; }
-.egg-row.is-done .egg-v-done { display: inline; color: var(--pass); }
+.egg-row.is-done .egg-v-done { display: inline; color: var(--pass-word); }
 .egg-sticker {
   position: absolute; right: 6px; bottom: -6px; padding: 6px 14px; border: 3px solid var(--pass);
   border-radius: 8px; color: var(--pass); background: var(--card-bg); font-size: 26px; font-weight: 900;
@@ -4481,7 +4499,7 @@ body.has-selection-bar .cs-screen { padding-bottom: 100px; }
 .egg-cert-row { display: flex; justify-content: space-between; gap: 12px; padding: 6px 0; border-bottom: 1px dashed var(--accent-border); font-size: 14px; color: var(--text-muted); }
 .egg-cert-row strong { color: var(--text); text-align: right; }
 .egg-cert-result { font-size: 14px; color: var(--text); margin-top: 6px; }
-.egg-cert-pass { display: inline-block; margin-right: 6px; padding: 2px 8px; border: 2px solid var(--pass); border-radius: 6px; color: var(--pass); font-weight: 900; letter-spacing: 1px; }
+.egg-cert-pass { display: inline-block; margin-right: 6px; padding: 2px 8px; border: 2px solid var(--pass); border-radius: 6px; color: var(--pass-word); font-weight: 900; letter-spacing: 1px; }
 
 @media (prefers-reduced-motion: reduce) {
   .party-spark, .party-100, .egg-row, .egg-sticker, .egg-cert { transition: none; }

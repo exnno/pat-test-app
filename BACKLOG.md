@@ -8,6 +8,27 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V119
+V119 = the accessibility pass, part 2: coloured words (Peter 13 Oct, 1A 2A
+3A 4A 5A 6A 7A). The pass is now four releases (1A): contrast greys (V118),
+coloured words (V119), **screen-reader announcements and labels (V120), then
+text size and zoom (V121).** Words have their own shades (--pass-word /
+--fail-word / --accent-word); buttons, icons and borders keep --pass / --fail
+/ --accent (2A, 3A). Harness group 56 + M898–M909; 55e → 56e. The six V118
+known defects are gone (55d no longer measures button colours as text). No
+welcome (6A). Outstanding (Peter): Supabase Pro + production project, ICO fee,
+privacy + processor terms.
+
+### V119 residuals (known, accepted)
+- Icons and large display text keep the brand colours (3A): the dark Settings
+  icons are 3.98:1 on cards (icons need 3:1). Listed in harness 56's
+  BRAND_KEPT; a new icon on a brand colour must be added there or 56c fails.
+- Light green words on the yellow warning card are the tightest pair, ~5.0:1
+  (fine). Dark red and blue are tightest on the grey note box / blue tint, 4.63.
+- The PASS button itself (V118 4C) is unchanged: dark 2.28:1, accepted.
+- Text size (fixed px, user-scalable=no) — V121, last of the pass.
+- M82's 15j tag (V118 residual) still stands — tag left.
+
 ### Next after V118
 V118 = the accessibility pass, part 1: contrast (Peter 13 Oct, 1A 2A 3A 4C 5A
 6A, then A). Both greys pass 4.5:1 on every text surface in both themes (light
@@ -21,19 +42,10 @@ releases; offer the split. Outstanding (Peter): Supabase Pro + production
 project, ICO fee, privacy + processor terms.
 
 ### V118 residuals (known, accepted)
-- Coloured words short of 4.5:1 (A — V119). Harness 55d reports each as a
-  known defect and flips to "appears fixed" by itself: light --pass on the page
-  2.99 / card 3.30 (green PASS words in lists); light --fail on the page 4.39;
-  dark --accent on cards 3.98 (blue links); dark --fail on cards 3.89; dark
-  --pass-shadow on cards 4.44. The fix is text-only shades (e.g. --pass-text)
-  so the buttons keep PATGo's colours — changing --pass would change the PASS
-  button, which 4C left alone.
+- ~~Coloured words short of 4.5:1~~ — FIXED V119 (word shades, group 56).
 - The PASS button itself (4C): white on green is 3.30:1 light (passes for its
   large bold label) and 2.28:1 dark (doesn't). Accepted by Peter.
-- `var(--muted)` is used twice but never defined (styles.css .retest-row-client;
-  render-review.js, the retest "Marked as declined" line), so those lines fall
-  back to the full text colour — readable, just not grey. One-word fix to
-  `--text-muted` when the screen-reader release passes those lines.
+- ~~`var(--muted)` used twice, never defined~~ — FIXED V119 (5A, now --text-muted).
 - Text size: every font size is fixed px (302 of them) and index.html's viewport
   has `user-scalable=no`, so neither the iPhone's Larger Text nor pinch-zoom
   works. That is the last release of the pass (the entry screen's room is the

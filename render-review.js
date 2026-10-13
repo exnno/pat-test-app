@@ -682,9 +682,9 @@ function renderEditSession() {
       const contact = sess.retestContact;
       let contactLine = '';
       if (contact && contact.status === 'booked') {
-        contactLine = `<div class="lock-toggle-sub" style="margin-top:6px;color:var(--pass)">${icon('check')} Marked as rebooked${contact.at ? ' on ' + escapeHTML(formatDate(contact.at.slice(0, 10))) : ''}. Clear it below to chase again.</div>`;
+        contactLine = `<div class="lock-toggle-sub" style="margin-top:6px;color:var(--pass-word)">${icon('check')} Marked as rebooked${contact.at ? ' on ' + escapeHTML(formatDate(contact.at.slice(0, 10))) : ''}. Clear it below to chase again.</div>`;
       } else if (contact && contact.status === 'declined') {
-        contactLine = `<div class="lock-toggle-sub" style="margin-top:6px;color:var(--muted)">Marked as declined${contact.at ? ' on ' + escapeHTML(formatDate(contact.at.slice(0, 10))) : ''} (lost the job). Clear it below to chase again.</div>`;
+        contactLine = `<div class="lock-toggle-sub" style="margin-top:6px;color:var(--text-muted)">Marked as declined${contact.at ? ' on ' + escapeHTML(formatDate(contact.at.slice(0, 10))) : ''} (lost the job). Clear it below to chase again.</div>`;
       }
       retestBlock = `
         <div class="lock-toggle-row">

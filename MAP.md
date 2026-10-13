@@ -1,4 +1,4 @@
-# PATGo — Code Map (V118)
+# PATGo — Code Map (V119)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1471,6 +1471,13 @@ another file having parsed. Don't "DRY" this.
   (`:root, .theme-force-light`, the dark media block, `.theme-force-dark`) and
   fails any text colour under 4.5:1 on its surfaces; the two dark blocks must
   match token for token. Change a colour in one dark block → change the other.
+  ⚠ V119: WORDS vs BUTTONS. Green/red/blue text uses `--pass-word` /
+  `--fail-word` / `--accent-word`; `--pass` / `--fail` / `--accent` are for
+  buttons, icons, borders, fills. Harness 56c fails any `color:` rule on a
+  button colour unless its selector is in 56's BRAND_KEPT (icons + 26px+
+  display text). New icon on a brand colour → add it there; new word → use a
+  -word token. Same for inline `style="color:…"` in scripts (feedback.js,
+  render-review.js, render-settings.js carry three).
 - `index.html` (~3KB) — the `<script>` chain. Small enough to read whole.
 - `sw.js` (~3.5KB) — `CACHE_VERSION` + `ASSETS`. Read whole.
 - `supabase.umd.js` — vendored supabase-js (MIT). NEVER read or grep it (218 KB,
