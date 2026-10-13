@@ -5545,7 +5545,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 56e)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 56e 57d)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -6465,6 +6465,54 @@ const MUTATIONS = [
     from: "  --pass-word: #15783a;",
     to:   "  --pass-word: #15803d;",
     why:  "#15803d clears the 9 surfaces but is 4.39:1 on the asset-history PASS badge's green tint \u2014 the tint check (56b)",
+  },  {
+    name: "M910 (V119.1) the Site column carries the client again when Client is hidden",
+    file: "csv.js",
+    from: "    case 'site':        return splitSiteSnapshot(session.site).site;",
+    to:   "    case 'site': { const _cc = state.csvColumns.find(c => c.id === 'client'); return _cc && _cc.visible ? splitSiteSnapshot(session.site).site : session.site; }",
+    why:  "1B: the exact pre-V119.1 branch \u2014 the bug Peter reported (57a)",
+  },
+  {
+    name: "M911 (V119.1) certificate details are drawn on one line again",
+    file: "report.js",
+    from: "    const lines = doc.splitTextToSize(String(pair[1] || ''), valW);",
+    to:   "    const lines = [String(pair[1] || '')];",
+    why:  "3A: a long site runs off the page / into the next label (57b)",
+  },
+  {
+    name: "M912 (V119.1) the left column wraps at the page edge, not its own edge",
+    file: "report.js",
+    from: "    const colEnd = col === 0 ? margin + colGap - 10 : pageW - margin;",
+    to:   "    const colEnd = pageW - margin;",
+    why:  "3A: a long client wraps under the Site label instead of inside its column (57b)",
+  },
+  {
+    name: "M913 (V119.1) a wrapped row does not push the next row down",
+    file: "report.js",
+    from: "    if (col === 0 && i > 0) { y += 15 + (rowLines - 1) * DETAIL_LINE; rowLines = 1; }",
+    to:   "    if (col === 0 && i > 0) { y += 15; rowLines = 1; }",
+    why:  "3A: the wrapped lines collide with the next row's labels (57b)",
+  },
+  {
+    name: "M914 (V119.1) a wrapped last row does not push the totals down",
+    file: "report.js",
+    from: "  y += (rowLines - 1) * DETAIL_LINE;\n  if (detailPairs.length % 2 === 1) y += 15;",
+    to:   "  if (detailPairs.length % 2 === 1) y += 15;",
+    why:  "3A: a long engineer name collides with Items tested (57b)",
+  },
+  {
+    name: "M915 (V119.1) the row height ignores how many lines a value took",
+    file: "report.js",
+    from: "    if (lines.length > rowLines) rowLines = lines.length;",
+    to:   "",
+    why:  "3A: the row stays one line tall however long the value (57b)",
+  },
+  {
+    name: "M916 (V119.1) the hotfix ships without its cache key",
+    file: "sw.js",
+    from: "const CACHE_VERSION = 'pat-v119-1';",
+    to:   "const CACHE_VERSION = 'pat-v119';",
+    why:  "a hotfix that keeps V119's key never reaches installed phones (57d)",
   },
 ];
 
