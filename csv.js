@@ -15,20 +15,15 @@ function csvCellValue(colId, session, item) {
     case 'engineer':    return session.engineer || '';
     case 'description': return item.itemType;
     // v26 (Q4=B): Client/Site column split. The session stores ONE combined
-    // `site` snapshot ("Client — Site", or just one part). We resolve the two
-    // parts on the fly. To avoid changing exports for users who DON'T turn the
-    // new Client column on, the 'site' column's output adapts:
-    //   • Client column hidden  → 'site' emits the FULL snapshot (unchanged
-    //                              from pre-v26 — "Client — Site" as before).
-    //   • Client column visible  → 'site' emits only the SITE part, and the
-    //                              'client' column carries the client part, so
-    //                              the two columns together reconstruct it.
+    // `site` snapshot ("Client — Site", or just one part); the two parts are
+    // resolved on the fly.
+    // V119.1 (Peter, 1B): the Site column is ALWAYS just the site. Before, with
+    // the Client column hidden (its default) it carried the whole "Client — Site"
+    // text, which Peter reported as a bug. The Client column is left exactly as
+    // each user has it — hidden means the client is simply not in the export.
+    // ⚠ Do not bring back a Client-visibility branch here: that is the bug.
     case 'client':      return splitSiteSnapshot(session.site).client;
-    case 'site': {
-      const clientCol = state.csvColumns.find(c => c.id === 'client');
-      const clientVisible = clientCol ? clientCol.visible : false;
-      return clientVisible ? splitSiteSnapshot(session.site).site : session.site;
-    }
+    case 'site':        return splitSiteSnapshot(session.site).site;
     case 'location':    return item.location;
     case 'date':        return formatDate(session.date);
     case 'result':      return csvResultLabel(item.result);

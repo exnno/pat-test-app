@@ -8,6 +8,18 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### V119.1 hotfix (13 Oct, Peter 1B 2B 3A 4B)
+CSV Site column always just the site (1B); certificate details wrap in their
+column (3A); file name {site} unchanged (2B). Cache pat-v119-1 only. Harness
+group 57 + M910–M916. **V120 is still the screen-reader pass** (4B), then V121
+text size.
+Residuals: with the Client column hidden (default) the client is not in a CSV
+at all, and re-importing that file makes a site with no client (1B, accepted —
+show the Client column to keep it). A single unbroken word wider than its
+column is split mid-word by jsPDF (rare). The company name/address block at the
+top right of the certificate was not changed — not reported, not checked for
+very long text.
+
 ### Next after V119
 V119 = the accessibility pass, part 2: coloured words (Peter 13 Oct, 1A 2A
 3A 4A 5A 6A 7A). The pass is now four releases (1A): contrast greys (V118),

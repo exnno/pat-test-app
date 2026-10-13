@@ -639,19 +639,33 @@ function buildReportDoc(session, photoData) {
   // Two-column label/value layout. The value is placed just after the label's
   // measured width (min 96pt) so a long label like "Recommended retest" never
   // overlaps its value, while short labels keep the values aligned.
+  // V119.1 (Peter, 3A): a value now wraps inside its OWN column. Before, it was
+  // drawn on one line with no width limit, so a long site name ran into the
+  // right-hand label, or off the page from the right column. Each value's width
+  // runs from its start to the end of its column (less a 10pt gap on the left
+  // column). A row is as tall as its tallest value; a one-line row moves down
+  // 15pt exactly as before, so a certificate with ordinary-length details is
+  // unchanged. One unbreakable word wider than the column is split by jsPDF.
   const colGap = (pageW - margin * 2) / 2;
+  const DETAIL_LINE = 12;              // spacing between a value's wrapped lines
+  let rowLines = 1;                    // lines in the tallest value of this row
   detailPairs.forEach((pair, i) => {
     const col = i % 2;
     const x = margin + col * colGap;
-    if (col === 0 && i > 0) y += 15;
+    if (col === 0 && i > 0) { y += 15 + (rowLines - 1) * DETAIL_LINE; rowLines = 1; }
     const label = pair[0] + ':';
     doc.setFont(undefined, 'bold');
     doc.text(label, x, y);
     const labelW = doc.getTextWidth(label);
     const valX = x + Math.max(96, labelW + 8);
     doc.setFont(undefined, 'normal');
-    doc.text(String(pair[1] || ''), valX, y);
+    const colEnd = col === 0 ? margin + colGap - 10 : pageW - margin;
+    const valW = Math.max(40, colEnd - valX);
+    const lines = doc.splitTextToSize(String(pair[1] || ''), valW);
+    doc.text(lines, valX, y, { lineHeightFactor: DETAIL_LINE / 10 });   // 10pt: the size set above
+    if (lines.length > rowLines) rowLines = lines.length;
   });
+  y += (rowLines - 1) * DETAIL_LINE;
   if (detailPairs.length % 2 === 1) y += 15;
   y += 22;
 
