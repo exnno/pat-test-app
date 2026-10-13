@@ -199,7 +199,8 @@ module.exports = async function () {
     t.eq(app.run('APP_VERSION'), 'V119', 'APP_VERSION V119');
     // 6A: no welcome. The sheet stays V117's.
     t.eq(app.run('WELCOME_VERSION'), 'V117', 'What’s new not rolled for V119 (6A)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v119';", 'cache key pat-v119');
+    // V119.1: a hotfix suffix is still V119's key (57d pins the exact hotfix key).
+    t.ok(/const CACHE_VERSION = 'pat-v119(-\d+)?';/.test(read('sw.js')), 'cache key pat-v119 (or a V119 hotfix)');
     t.includes(read('render-core.js'), '<li><strong>Report Settings is now two pages.</strong>', 'V117’s What’s new still in place');
     const help = read('render-help.js');
     const a = help.indexOf('<p><strong>V119</strong>'), b = help.indexOf('<p><strong>V118</strong>'), c = help.indexOf('<p><strong>V117</strong>');
