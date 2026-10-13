@@ -16,9 +16,10 @@
      55a  the two dark blocks agree (phone setting / chosen in Settings).
      55b  both greys pass 4.5:1 on every text surface, in both themes.
      55c  the normal grey stays clearly stronger than the hint grey.
-     55d  every other text colour passes on the page and the card — the known
-          V119 shortfalls reported, not failed.
-     55e  release: V118, no What's new, cache, changelog. */
+     55d  every other text colour passes on the page and the card.
+     (55e, V118's release lines, moved on to 56e at V119. 55d's six known
+      shortfalls were fixed by V119: words moved off the button colours onto
+      --pass-word / --fail-word / --accent-word, measured by 56b.) */
 
 'use strict';
 
@@ -70,18 +71,12 @@ const GREYS = ['--text-muted', '--text-hint'];
 const AA = 4.5;
 
 // Text colours other than the greys, checked on the page and the card.
-const WORDS = ['--text', '--accent', '--accent-text', '--neutral-text', '--quick-text',
-               '--pass', '--pass-shadow', '--fail', '--fail-soft-text', '--warn-soft-text'];
-// V119's (Peter, V118 round "A"). Each entry reports under KNOWN DEFECTS and says
-// "appears fixed" once it passes — then delete it here and it becomes a hard check.
-const KNOWN_V119 = {
-  'light --pass on --bg': 'green PASS words in lists',
-  'light --pass on --card-bg': 'green PASS words in lists',
-  'light --fail on --bg': 'red FAIL words on the page background',
-  'dark --accent on --card-bg': 'blue links and words on cards',
-  'dark --fail on --card-bg': 'red FAIL words on cards',
-  'dark --pass-shadow on --card-bg': 'darker green words on cards',
-};
+// V119: --pass, --pass-shadow, --fail and --accent are no longer text colours —
+// they are the buttons', icons' and borders' (4C, 3A). The words use the
+// *-word shades, which 56b measures on all 9 surfaces; 56c keeps the words off
+// the button colours.
+const WORDS = ['--text', '--accent-text', '--neutral-text', '--quick-text',
+               '--fail-soft-text', '--warn-soft-text'];
 
 module.exports = async function () {
 
@@ -132,41 +127,17 @@ module.exports = async function () {
   /* ------------------------------------------------------------------ 55d */
   await t.group('55d — the other text colours pass on the page and the card', () => {
     const th = themes();
-    const seen = new Set();
     for (const [name, T] of [['light', th.light], ['dark', th.darkMedia]]) {
       for (const w of WORDS) {
         for (const s of ['--bg', '--card-bg']) {
           const key = `${name} ${w} on ${s}`;
           if (!(T[w] && T[s])) { t.ok(false, `${key}: colour missing`); continue; }
           const r = ratio(T[w], T[s]);
-          if (KNOWN_V119[key]) {
-            seen.add(key);
-            // known(condition) = "the defect is still there"; once V119 fixes a pair
-            // it prints APPEARS FIXED instead.
-            t.known(r < AA, `${key} = ${r2(r)}:1 (needs ${AA})`, 'V119 (Peter, V118 round A): ' + KNOWN_V119[key]);
-          } else {
-            t.ok(r >= AA, `${key}: ${T[w]} on ${T[s]} = ${r2(r)}:1 (needs ${AA})`);
-          }
+          t.ok(r >= AA, `${key}: ${T[w]} on ${T[s]} = ${r2(r)}:1 (needs ${AA})`);
         }
       }
     }
-    // A stale entry (renamed token, removed surface) would sit here forever unread.
-    t.deepEq(Object.keys(KNOWN_V119).filter(k => !seen.has(k)), [], 'every known shortfall still names a real pair');
   });
 
-  /* ------------------------------------------------------------------ 55e */
-  await t.group('55e — release: V118, no What’s new, cache, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V118', 'APP_VERSION V118');
-    // 5A: no welcome. The sheet stays V117's, so a phone that saw it sees nothing new.
-    t.eq(app.run('WELCOME_VERSION'), 'V117', 'What’s new not rolled for V118 (5A)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v118';", 'cache key pat-v118');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>Report Settings is now two pages.</strong>', 'V117’s What’s new still in place');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V118</strong>'), b = help.indexOf('<p><strong>V117</strong>'), c = help.indexOf('<p><strong>V116</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V118, V117, V116');
-    t.excludes(help, '<p><strong>V115</strong>', 'V115 rolled off');
-    t.includes(help, 'Grey text is easier to read', 'About: V118’s line');
-  });
+  // 55e (V118's release lines) moved on to 56e at V119.
 };
