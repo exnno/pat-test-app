@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V117';",
-    to:   "const APP_VERSION = 'V117';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V118';",
+    to:   "const APP_VERSION = 'V118';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V115</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V114</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V115</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 54e)',
+    from: '        <p><strong>V116</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V115</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V116</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 55e)',
   },
 
   {
@@ -5545,7 +5545,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 54e)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 55e)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5996,7 +5996,7 @@ const MUTATIONS = [
     // each release's own group pins which welcome is current.
     from: "const WELCOME_VERSION = 'V",
     to:   "const WELCOME_VERSION = 'V0",
-    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (54e)",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (55e)",
   },
   {
     name: "M837 (V114) Engineer & Tester says sessions again",
@@ -6066,9 +6066,10 @@ const MUTATIONS = [
     file: "render-core.js",
     // V117: V116's first line rolled off with its welcome; re-aimed at this
     // release's first line. Re-aim it at each welcome's copy, or retire it.
+    // V118: no welcome (5A) — V117's sheet stays, so the anchor stays; 55e pins it.
     from: "<li><strong>Report Settings is now two pages.</strong>",
     to:   "<li><strong>Two pages.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (54e)",
+    why:  "11A: the welcome says plainly what changed on screen (55e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6328,6 +6329,57 @@ const MUTATIONS = [
     from: "add your company name and logo in Company &amp; Branding so",
     to:   "add your company name and logo in Report Settings so",
     why:  "the tip would name a page that no longer exists (54d)",
+  },
+  /* ---- V118: grey text contrast (S15 part 1). Anchors carry the line before
+     or the indent, because the two dark blocks hold the same values. ---- */
+  {
+    name: "M891 (V118) light normal grey goes back to the old #6b7280",
+    file: "styles.css",
+    from: "  --text-muted: #545c6b;",
+    to:   "  --text-muted: #6b7280;",
+    why:  "3A: the old grey is 4.39:1 on the page background, under the standard — and weaker than the new hint grey, so 55c sees it too (55b 55c)",
+  },
+  {
+    name: "M892 (V118) light hint grey goes back to the old #9ca3af",
+    file: "styles.css",
+    from: "  --text-hint: #656e7c;",
+    to:   "  --text-hint: #9ca3af;",
+    why:  "3A: the old hint grey is 2.3:1 \u2014 the main shortfall this release fixes (55b)",
+  },
+  {
+    name: "M893 (V118) the dark-by-phone-setting hint grey is left at the old value",
+    file: "styles.css",
+    from: "--text-muted: #bcc6d5;\n    --text-hint: #a2aebe;",
+    to:   "--text-muted: #bcc6d5;\n    --text-hint: #64748b;",
+    why:  "fixed in one dark block but not the other: passes on one phone, fails on the next (55a 55b)",
+  },
+  {
+    name: "M894 (V118) the dark-chosen-in-Settings normal grey is left at the old value",
+    file: "styles.css",
+    from: "--text-muted: #bcc6d5;\n  --text-hint: #a2aebe;",
+    to:   "--text-muted: #94a3b8;\n  --text-hint: #a2aebe;",
+    why:  "the same miss in the other dark block; the old normal grey is also weaker than the new hint (55a 55b 55c)",
+  },
+  {
+    name: "M895 (V118) light normal grey made the same as the hint",
+    file: "styles.css",
+    from: "  --text-muted: #545c6b;\n  --text-hint",
+    to:   "  --text-muted: #656e7c;\n  --text-hint",
+    why:  "both pass, but the two greys stop meaning different things (55c)",
+  },
+  {
+    name: "M896 (V118) a word colour that passes today is made too pale",
+    file: "styles.css",
+    from: "  --accent-text: #1e40af;",
+    to:   "  --accent-text: #93c5fd;",
+    why:  "6A: the guard covers every text colour, not only the two greys this release changed (55d)",
+  },
+  {
+    name: "M897 (V118) the About changelog loses V118's line",
+    file: "render-help.js",
+    from: "Grey text is easier to read: hints",
+    to:   "Hints",
+    why:  "the About page must say what changed in this version (55e)",
   },
 ];
 
