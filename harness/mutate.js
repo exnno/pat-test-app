@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V118';",
-    to:   "const APP_VERSION = 'V118';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V119';",
+    to:   "const APP_VERSION = 'V119';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V116</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V115</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V116</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 55e)',
+    from: '        <p><strong>V117</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V116</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V117</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 56e)',
   },
 
   {
@@ -5545,7 +5545,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 55e)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 56e)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5996,7 +5996,7 @@ const MUTATIONS = [
     // each release's own group pins which welcome is current.
     from: "const WELCOME_VERSION = 'V",
     to:   "const WELCOME_VERSION = 'V0",
-    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (55e)",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (56e)",
   },
   {
     name: "M837 (V114) Engineer & Tester says sessions again",
@@ -6067,9 +6067,10 @@ const MUTATIONS = [
     // V117: V116's first line rolled off with its welcome; re-aimed at this
     // release's first line. Re-aim it at each welcome's copy, or retire it.
     // V118: no welcome (5A) — V117's sheet stays, so the anchor stays; 55e pins it.
+    // V119: no welcome again (6A) — anchor unchanged; 56e pins it.
     from: "<li><strong>Report Settings is now two pages.</strong>",
     to:   "<li><strong>Two pages.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (55e)",
+    why:  "11A: the welcome says plainly what changed on screen (56e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6379,7 +6380,91 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Grey text is easier to read: hints",
     to:   "Hints",
-    why:  "the About page must say what changed in this version (55e)",
+    why:  "the About page must say what changed in this version \u2014 V118's line stays until it rolls off (56e)",
+  },
+  {
+    name: "M898 (V119) light red words go back to the button red",
+    file: "styles.css",
+    from: "  --fail-word: #b91c1c;",
+    to:   "  --fail-word: #dc2626;",
+    why:  "4A: the button red is 4.39:1 on the page background \u2014 V118's light FAIL-word shortfall (56b)",
+  },
+  {
+    name: "M899 (V119) dark blue words take the full step blue-400 only",
+    file: "styles.css",
+    from: "    --accent-word: #72b1fb;",
+    to:   "    --accent-word: #60a5fa;",
+    why:  "4A: #60a5fa passes on cards but is 4.07:1 on the grey note box and the blue tint \u2014 why the in-between shade (55a 56b)",
+  },
+  {
+    name: "M900 (V119) the dark-chosen-in-Settings red word is left at red-400",
+    file: "styles.css",
+    from: "--fail-word: #fa8f8f;\n  --accent-word",
+    to:   "--fail-word: #f87171;\n  --accent-word",
+    why:  "fixed in one dark block but not the other: passes with the phone in dark mode, fails with Dark chosen in Settings (55a 56b)",
+  },
+  {
+    name: "M901 (V119) green PASS text goes back to the button green",
+    file: "styles.css",
+    from: ".pass-text { color: var(--pass-word); }",
+    to:   ".pass-text { color: var(--pass); }",
+    why:  "2A: a word back on a button colour is the V118 shortfall again (56c)",
+  },
+  {
+    name: "M902 (V119) blue tertiary words go back to the button blue",
+    file: "styles.css",
+    from: "  background: transparent;\n  color: var(--accent-word);\n  border: none;\n  border-radius: 8px;",
+    to:   "  background: transparent;\n  color: var(--accent);\n  border: none;\n  border-radius: 8px;",
+    why:  "dark: the button blue is 3.98:1 on cards (56c)",
+  },
+  {
+    name: "M903 (V119) Marked as rebooked keeps the button green",
+    file: "render-review.js",
+    from: "color:var(--pass-word)\">${icon('check')} Marked as rebooked",
+    to:   "color:var(--pass)\">${icon('check')} Marked as rebooked",
+    why:  "5A: words written into a script must use the word shades too (56c)",
+  },
+  {
+    name: "M904 (V119) the retest client line goes back to the undefined var(--muted)",
+    file: "styles.css",
+    from: "color: var(--text-muted);   /* V119: was --muted",
+    to:   "color: var(--muted);   /* V119: was --muted",
+    why:  "5A: an undefined colour silently falls back to full text colour (56c)",
+  },
+  {
+    name: "M905 (V119) the PASS button picks up the darker word green",
+    file: "styles.css",
+    from: "font-weight: 800; letter-spacing: 0.05em; background: var(--pass); color: #fff;",
+    to:   "font-weight: 800; letter-spacing: 0.05em; background: var(--pass-word); color: #fff;",
+    why:  "4C: the PASS button keeps PATGo green \u2014 the word shades are for words (56d)",
+  },
+  {
+    name: "M906 (V119) the Settings icons switch to the word blue",
+    file: "styles.css",
+    from: ".settings-row-icon { color: var(--accent); }",
+    to:   ".settings-row-icon { color: var(--accent-word); }",
+    why:  "3A: icons stay PATGo blue (3:1 is enough, and they pass) (52d 56d)",
+  },
+  {
+    name: "M907 (V119) the About changelog loses V119's line",
+    file: "render-help.js",
+    from: "Coloured words are easier to read: green",
+    to:   "Green",
+    why:  "the About page must say what changed in this version (56e)",
+  },
+  {
+    name: "M908 (V119) dark green words take the old darker green",
+    file: "styles.css",
+    from: "    --pass-word: #22c55e;",
+    to:   "    --pass-word: #16a34a;",
+    why:  "#16a34a is 4.44:1 on cards \u2014 V118's dark --pass-shadow shortfall (55a 56b)",
+  },
+  {
+    name: "M909 (V119) light green words stop at #15803d",
+    file: "styles.css",
+    from: "  --pass-word: #15783a;",
+    to:   "  --pass-word: #15803d;",
+    why:  "#15803d clears the 9 surfaces but is 4.39:1 on the asset-history PASS badge's green tint \u2014 the tint check (56b)",
   },
 ];
 
