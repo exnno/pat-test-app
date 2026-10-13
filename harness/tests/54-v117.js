@@ -18,7 +18,7 @@
           settings exactly as saved.
      54d  words that pointed at "Report Settings" now name the right half; the
           Certificate Content row's summary line.
-     54e  release: V117, What's new, cache, changelog. */
+     (54e, V117's release lines, moved on to 55e at V118.) */
 
 'use strict';
 
@@ -132,20 +132,5 @@ module.exports = async function () {
     app.run(`state.reportTemplates = [{ id: 'a', name: 'A' }];`);
     t.eq(sub('settingsReportContent'), 'Certificate numbers on · 1 template', 'summary: one template');
   });
-
-  /* ------------------------------------------------------------------ 54e */
-  await t.group('54e — release: V117, What’s new, cache, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V117', 'APP_VERSION V117');
-    t.eq(app.run('WELCOME_VERSION'), 'V117', 'What’s new rolls for V117 (4B)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v117';", 'cache key pat-v117');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>Report Settings is now two pages.</strong>', 'What’s new: the split');
-    t.includes(core, '<li><strong>Nothing else changes.</strong>', 'What’s new: nothing else changes');
-    t.excludes(core, '<li><strong>Line icons are here to stay.</strong>', 'V116’s copy is gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V117</strong>'), b = help.indexOf('<p><strong>V116</strong>'), c = help.indexOf('<p><strong>V115</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V117, V116, V115');
-    t.excludes(help, '<p><strong>V114</strong>', 'V114 rolled off');
-  });
+  // 54e (V117's release lines) moved on to 55e at V118.
 };
