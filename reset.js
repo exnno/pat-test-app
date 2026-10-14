@@ -419,6 +419,7 @@ function resetOpen(level) {
     cleanup();
     resetPerform(level);
   });
+  if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);   // V123 (3A)
 }
 
 // ---- Settings → Data → Reset This Phone ------------------------------------------

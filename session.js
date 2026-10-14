@@ -2730,6 +2730,10 @@ function noteLastLog(sess, items, label) {
     sqp: !!state.sqpEnabled,          // recordSqpUsage() no-ops while it is off
     label: String(label || '')
   };
+  // V123 (2A): every log path comes through here (one item, Copy last, a tile,
+  // Multi Pick, Log again) — the redraw that follows puts VoiceOver on the
+  // screen heading, not on the button that logged (feedback.js).
+  if (typeof focusMarkLogged === 'function') focusMarkLogged();
 }
 
 function undoAvailable() {

@@ -588,7 +588,7 @@ function renderSettingsInstrument() {
     <div class="screen">
       <header class="header-row">
         <button class="icon-btn" data-action="instrument-editor-close" aria-label="Back">${icon('chevron-left')}</button>
-        <div class="site-name">Test instrument</div>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Test instrument</div>
         <span style="width:40px"></span>
       </header>
 

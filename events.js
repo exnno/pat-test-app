@@ -148,6 +148,7 @@ function bindFocusFields() {
       state.form.itemType = val;
       document.querySelectorAll('.quick-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.type === val);
+        b.setAttribute('aria-pressed', b.dataset.type === val ? 'true' : 'false');   // V123 (4A): follows the colour
       });
       state.suggestions = computeSuggestions(val);
       state.showSuggestions = state.suggestions.length > 0;

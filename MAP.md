@@ -1,4 +1,4 @@
-# PATGo — Code Map (V122)
+# PATGo — Code Map (V123)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -205,6 +205,18 @@ is discoverable from the file you happen to be editing.
     `data-action="edit-session"`, `#sessions-search`, sync `kind: 'session'`,
     the Supabase `sessions` table) — saved data and the cloud depend on them.
     Harness 60a sweeps every shipped script; history lines go in its ALLOW.
+
+24. **Focus after a redraw (V123).** Every screen title carries
+    `id="screen-title"` + `tabindex="-1"` (a `.site-name` div with
+    `role="heading" aria-level="1"`, the Jobs `<h1>`, the tour's `<h2>`);
+    `renderSettingsSubHeader()` gives one free. Harness 61a renders every view
+    and fails one with zero or two. A sheet appended to `<body>` (not drawn by
+    render) must call `focusSheetOpened(sheet)` once wired, and its own cleanup
+    `focusSheetClosed()` (`_openSheet`'s cleanup already does) — 61g sweeps it.
+    A new LOGGING action joins `FOCUS_LOG_ACTIONS` (feedback.js) or VoiceOver is
+    left on a button a scanner can press. Never call `.focus()` on a text field
+    from a redraw (keyboard). The decision runs in render()'s tail BEFORE
+    `focusAssetForScan()`, so paired scanner mode still wins.
 
 ---
 
@@ -544,8 +556,10 @@ unconditionally since v77 — see the session.js entry.
 **⚠ Not the same feature as "Log again ×N"** (session.js): Multi Pick fires a
 fixed MIXED list of types as passes; ×N repeats ONE item, whatever its result.
 
-### feedback.js (~490 ln) — screen-reader announcer, toast, dialogs, haptic / flash / sound
-`announce` (V120, rule 21), `showToast`, the shared `.bulk-sheet` dialog builders (`openConfirmSheet`,
+### feedback.js (~715 ln) — screen-reader announcer, focus after a redraw, toast, dialogs, haptic / flash / sound
+`announce` (V120, rule 21), the V123 focus pass (rule 24: `focusNoteTap`,
+`focusBeforeRender`, `focusAfterRender`, `focusSheetOpened/Closed`,
+`focusMarkLogged`), `showToast`, the shared `.bulk-sheet` dialog builders (`openConfirmSheet`,
 `openNameSheet`, `openInfoSheet`, v91 `openChoiceSheet` — two or more choices +
 Cancel), feedback channels.
 **Touch to:** change feedback channels, toasts, spoken messages, or the shared dialogs.
@@ -553,6 +567,9 @@ Cancel), feedback channels.
 state, no re-render. Loads before everything that toasts. Rule 21: `announce`
 writes `#sr-announcer` (index.html); session.js `loggedAnnouncement` supplies
 the line spoken after one item is logged (saveItem, copyLastResult).
+V123: called from render-core.js (render top + tail, refreshEntryAfterLog),
+dispatch.js (click + change), session.js `noteLastLog`, and the body sheets in
+reset.js, report.js, render-review.js, render-help.js, settings-actions.js.
 
 ### bugreport.js (~330 ln) — one-tap problem reporting
 Global error capture, device diagnostics, the mailto report builder.
@@ -954,7 +971,11 @@ client/site suggestion markup, tour route.
 emits. For Overview / Edit Session / Reports / Retest reminders, go to
 render-review.js.
 **Coupling:** `render()` calls `bindFocusFields()` (events.js) after setting
-`innerHTML`. Rules 2, 3 and 8 all bite here. `refreshEntryAfterLog` must set
+`innerHTML`. V123 (rule 24): `focusBeforeRender()` first thing, `focusAfterRender()`
+in the tail before `focusAssetForScan()` (also in the tour's early return and in
+`refreshEntryAfterLog`, as `'logged'`). The Quick Pick grid carries
+`aria-pressed`; its in-place repaints (dispatch 'quick-pick', events f-type,
+multipick tiles) keep it in step. Rules 2, 3 and 8 all bite here. `refreshEntryAfterLog` must set
 `_lastRenderHadModal` from live sheet state, not a constant. Sheets that hold
 inputs get targeted refresh helpers; read-only sheets may render.
 The **calibration banner is ONE banner** covering the worst instrument with

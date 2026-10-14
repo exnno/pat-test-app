@@ -1087,6 +1087,7 @@ function _reportCloudPhotoChoice(cloud, offline) {
     on('rcp-without', 'without');
     on('rcp-cancel', 'cancel');
     on('rcp-close', 'cancel');
+    if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);   // V123 (3A)
   });
 }
 
@@ -1250,6 +1251,7 @@ function openReportPreview(doc, session) {
     URL.revokeObjectURL(url);
     backdrop.remove();
     sheet.remove();
+    if (typeof focusSheetClosed === 'function') focusSheetClosed();   // V123 (3A)
   }
 
   // v35: rebuild the PDF after a quick-adjust change, keeping the modal open and
@@ -1319,6 +1321,7 @@ function openReportPreview(doc, session) {
   document.body.appendChild(sheet);
   wireSheet();
   renderPreviewView();
+  if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);   // V123 (3A)
 }
 
 function triggerDownload(blob, filename) {

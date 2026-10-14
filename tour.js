@@ -202,7 +202,7 @@ function renderTour() {
       </div>
 
       <div class="tour-caption">
-        <h2 class="tour-caption-title">${escapeHTML(slide.title)}</h2>
+        <h2 class="tour-caption-title" id="screen-title" tabindex="-1">${escapeHTML(slide.title)}</h2>
         <p class="tour-caption-text">${slide.caption}</p>
       </div>
 

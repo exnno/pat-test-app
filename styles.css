@@ -288,6 +288,10 @@ body {
 input, textarea, button, select { font-family: inherit; color: var(--text); }
 input, textarea, select { background: var(--input-bg); }
 input:focus, textarea:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+/* V123: screen titles and sheet titles take focus by script only (tabindex -1),
+   so VoiceOver lands on them after a redraw (feedback.js). Nobody can Tab to
+   them, so a ring there would only ever be a stray box round a heading. */
+[tabindex="-1"]:focus { outline: none; }
 button { cursor: pointer; }
 button:disabled { opacity: 0.4; cursor: not-allowed; }
 

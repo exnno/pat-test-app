@@ -257,7 +257,7 @@ function renderSettingsHub() {
     <div class="screen">
       <header class="header-row">
         <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">${icon('chevron-left')}</button>
-        <div class="site-name">Settings</div>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Settings</div>
         <span style="width:40px"></span>
       </header>
       ${searchBox}
@@ -308,7 +308,7 @@ function renderSettingsCategory() {
     <div class="screen">
       <header class="header-row">
         <button class="icon-btn" id="back-to-settings-btn" data-action="back-to-settings" aria-label="Back">${icon('chevron-left')}</button>
-        <div class="site-name">${escapeHTML(cat.title)}</div>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">${escapeHTML(cat.title)}</div>
         <span style="width:40px"></span>
       </header>
       <p class="settings-category-blurb">${escapeHTML(cat.blurb)}</p>
@@ -323,7 +323,7 @@ function renderSettingsSubHeader(title) {
   return `
     <header class="header-row">
       <button class="icon-btn" id="back-to-settings-btn" data-action="back-to-settings" aria-label="Back">${icon('chevron-left')}</button>
-      <div class="site-name">${escapeHTML(title)}</div>
+      <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">${escapeHTML(title)}</div>
       <span style="width:40px"></span>
     </header>
   `;

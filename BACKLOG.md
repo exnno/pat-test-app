@@ -8,6 +8,33 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V123
+V123 = VoiceOver keeps its place — focus after a redraw (V120 4A; Peter 14 Oct,
+1A 2A 3A 4A). Same screen → the tapped control; new screen → its title
+(#screen-title, MAP rule 24); sheet opens → its title; closes → its opener;
+anything that logs → the screen title, never the button (2A). Quick Pick and
+Multi Pick tiles carry aria-pressed (4A). Harness group 61 + M969–M992;
+60f → 61f. **Stage 12's accessibility work is complete.** Outstanding (Peter):
+Supabase Pro + production project, ICO fee, privacy + processor terms.
+
+### V123 residuals (known, accepted)
+- Not checked with VoiceOver on a real iPhone by Claude: the harness proves
+  where focus goes; headless Chromium proved no ring after a tap, a ring for a
+  keyboard Tab, no scroll jump, no console errors. Peter's checklist covers
+  VoiceOver itself. If iOS reads the title but not "Logged: …" after PASS, the
+  next step is a longer announcer delay (60ms now).
+- + New job opens the form in place and its button goes, so VoiceOver lands on
+  the Jobs title (control gone → heading), not on the form's "New job" heading.
+  One swipe down. Could special-case later.
+- The certificate preview's quick-adjust chips rebuild the preview in place
+  (report.js rebuild), outside render(): focus is not put back on the chip.
+- Other pick-one buttons (status filters, segment switches other than Text
+  size) still show their chosen state by colour only — 4B, not taken.
+- Android Chrome focuses a tapped button natively; a REFUSED PASS (no type or
+  location) leaves focus on PASS there, as before V123 (no redraw happens).
+- A redraw nobody tapped for, with nothing focused before it (a sync, a
+  timer), leaves VoiceOver where it is — deliberately.
+
 ### Next after V122
 V122 = Sessions are now called Jobs — the V114 4B rename (Peter 14 Oct,
 1A 2A 3A 4A 5A). Every visible word says job; list "Jobs", "+ New job",

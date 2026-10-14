@@ -165,8 +165,12 @@ function multiPickFire(idx) {
 
 function qpTileSyncDom() {
   if (typeof document === 'undefined') return;
-  document.querySelectorAll('.qp-tile').forEach(b =>
-    b.classList.toggle('active', Number(b.dataset.arg) === state.form.qpTile));
+  // V123 (4A): aria-pressed follows the colour, so VoiceOver says "selected".
+  document.querySelectorAll('.qp-tile').forEach(b => {
+    const on = Number(b.dataset.arg) === state.form.qpTile;
+    b.classList.toggle('active', on);
+    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+  });
   const fb = document.getElementById('fail-btn');
   const sess = activeSession();
   if (fb) fb.disabled = !!(sess && sess.locked) || !!state.form.qpTile;
@@ -182,7 +186,7 @@ function qpTileSelect(qp) {
   state.form.itemType = '';
   const inp = document.getElementById('f-type');
   if (inp) inp.value = '';
-  document.querySelectorAll('.quick-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.quick-btn').forEach(b => { b.classList.remove('active'); b.setAttribute('aria-pressed', 'false'); });   // V123 (4A)
   state.showSuggestions = false;
   if (typeof renderSuggestionsOnly === 'function') renderSuggestionsOnly();
   qpTileSyncDom();

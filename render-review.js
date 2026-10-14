@@ -142,7 +142,7 @@ function renderOverview() {
     header = `
       <header class="header-row header-sticky">
         <button class="icon-btn" id="cancel-selection-btn" data-action="cancel-selection" aria-label="Cancel selection">${icon('x')}</button>
-        <div class="site-name">${n} selected</div>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">${n} selected</div>
         <span style="width:40px"></span>
       </header>
     `;
@@ -150,7 +150,7 @@ function renderOverview() {
     header = `
       <header class="header-row header-sticky">
         <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">${icon('chevron-left')}</button>
-        <div class="site-name">Overview</div>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Overview</div>
         <div class="header-actions">
           ${state.reportSettings.enabled ? `<button class="icon-btn" id="produce-report-btn" data-action="produce-report" data-arg="${sess.id}" aria-label="Produce report" title="Produce report">${icon('file-text')}</button>` : ''}
           <button class="icon-btn" id="copy-btn" data-action="copy-current" aria-label="Copy CSV" title="Copy CSV">${icon('clipboard-list')}</button>
@@ -708,7 +708,7 @@ function renderEditSession() {
     <div class="screen">
       <header class="header-row">
         <button class="icon-btn" id="cancel-edit-btn" data-action="edit-back" aria-label="Back">${icon('chevron-left')}</button>
-        <div class="site-name">Job settings</div>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Job settings</div>
         <span style="width:40px"></span>
       </header>
       <div class="card">
@@ -923,7 +923,7 @@ function renderRetestReminders() {
     <div class="screen">
       <header class="header-row">
         <button class="icon-btn" id="retest-back-btn" data-action="go-sessions" aria-label="Back">${icon('chevron-left')}</button>
-        <div class="site-name">Retest reminders</div>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Retest reminders</div>
         <button class="icon-btn" id="retest-settings-btn" data-action="settings-page" data-arg="settingsRetest" data-page="settingsRetest" aria-label="Retest settings">${icon('settings')}</button>
       </header>
       <div class="settings-section" style="margin-top:4px">
@@ -978,7 +978,7 @@ function renderReports() {
     <div class="screen">
       <header class="header-row">
         <button class="icon-btn" id="reports-back-btn" data-action="go-sessions" aria-label="Back">${icon('chevron-left')}</button>
-        <div class="site-name">Reports</div>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Reports</div>
         <button class="icon-btn" id="reports-settings-btn" data-action="settings-page" data-arg="settingsReport" data-page="settingsReport" aria-label="Company and Branding">${icon('settings')}</button>
       </header>
       <div class="settings-section" style="margin-top:4px">
@@ -1184,7 +1184,7 @@ function renderPhotoManager() {
   const header = `
     <header class="header-row">
       <button class="icon-btn" data-action="pm-back" aria-label="Back">${icon('chevron-left')}</button>
-      <div class="site-name">Manage Photos</div>
+      <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Manage Photos</div>
       ${anything ? `<button class="pm-select-btn" data-action="pm-select-toggle" ${pm.busy ? 'disabled' : ''}>${pm.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
     </header>`;
 
@@ -1340,7 +1340,7 @@ function renderJobManager() {
   const header = `
     <header class="header-row">
       <button class="icon-btn" data-action="jm-back" aria-label="Back">${icon('chevron-left')}</button>
-      <div class="site-name">Jobs on This Phone</div>
+      <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Jobs on This Phone</div>
       ${m.active && m.counts.all ? `<button class="pm-select-btn" data-action="jm-select-toggle" ${jm.busy ? 'disabled' : ''}>${jm.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
     </header>`;
   if (!m.active) {
@@ -1588,6 +1588,7 @@ function openCloudDeleteSheet(o, onYes) {
     cleanup();   // first: the delete repaints the Jobs screen
     onYes(typed);
   });
+  if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);   // V123 (3A)
 }
 
 // The cloud search's partial refresh — the input itself is left alone.
@@ -1618,7 +1619,7 @@ function renderCloudStorage() {
   const header = `
     <header class="header-row">
       <button class="icon-btn" data-action="cs-back" aria-label="Back">${icon('chevron-left')}</button>
-      <div class="site-name">Cloud Storage</div>
+      <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Cloud Storage</div>
       ${cs.ok && m.selectable ? `<button class="pm-select-btn" data-action="cs-select-toggle" ${cs.busy ? 'disabled' : ''}>${cs.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
     </header>`;
   const busy = cs.busy ? `<p class="pm-busy" id="cs-busy" role="status">${escapeHTML(cs.busy)}</p>` : '';

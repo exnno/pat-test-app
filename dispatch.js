@@ -84,6 +84,9 @@ function handleDelegatedClick(e) {
   // Captured BEFORE the action so only a real screen change counts — tapping a
   // quick-pick button or a toggle is not navigation, and should not read.
   const viewBefore = state.view;
+  // V123: remember the tapped control, so the redraw its action causes can put
+  // VoiceOver back on it (feedback.js). Before the action — it may destroy it.
+  if (typeof focusNoteTap === 'function') { try { focusNoteTap(el); } catch (e4) {} }
   try {
     fn(arg, el, e);
     if (state.view !== viewBefore && typeof syncNoteNav === 'function') {
@@ -163,6 +166,7 @@ function handleDelegatedChange(e) {
   if (!el || el.nodeType !== 1 || !el.dataset || !el.dataset.changeAction) return;
   const fn = CHANGE_ACTIONS[el.dataset.changeAction];
   if (!fn) return;
+  if (typeof focusNoteTap === 'function') { try { focusNoteTap(el); } catch (e4) {} }   // V123: a switch or a list
   fn(_fieldValue(el), el, e);
 }
 
@@ -379,7 +383,8 @@ registerActions({
     state.form.itemType = arg;
     const inp = document.getElementById('f-type');
     if (inp) inp.value = arg;
-    document.querySelectorAll('.quick-btn').forEach(x => x.classList.toggle('active', x === el));
+    // V123 (4A): aria-pressed follows the colour, so VoiceOver says "selected".
+    document.querySelectorAll('.quick-btn').forEach(x => { x.classList.toggle('active', x === el); x.setAttribute('aria-pressed', x === el ? 'true' : 'false'); });
     state.showSuggestions = false;
     renderSuggestionsOnly();
   },

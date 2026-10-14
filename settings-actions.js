@@ -702,7 +702,10 @@ function startShareSetup() {
     <button class="btn-primary" id="setup-name-share" style="margin-top:12px">Share</button>
   `;
 
-  function cleanup() { backdrop.remove(); sheet.remove(); }
+  function cleanup() {
+    backdrop.remove(); sheet.remove();
+    if (typeof focusSheetClosed === 'function') focusSheetClosed();   // V123 (3A)
+  }
   backdrop.addEventListener('click', cleanup);
   document.getElementById && document.body.appendChild(backdrop);
   document.body.appendChild(sheet);
@@ -717,6 +720,7 @@ function startShareSetup() {
   });
   const nameInput = document.getElementById('setup-name-input');
   if (nameInput) { focusInSheet(nameInput); try { nameInput.select(); } catch (e) {} }
+  if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);   // V123 (3A) — the box keeps the cursor
 }
 
 function saveItemTypesSettings() {

@@ -58,6 +58,9 @@ function dismissWelcome(seenFlag, key) {
 }
 
 function render() {
+  // V123: note what holds focus BEFORE anything is torn down — the modal sweep
+  // below and the innerHTML rewrite both destroy it (feedback.js).
+  if (typeof focusBeforeRender === 'function') { try { focusBeforeRender(); } catch (e) {} }
   if (_lastRenderHadModal) {
     document.querySelectorAll(
       'body > .modal-backdrop, body > .fail-sheet, body > .bulk-sheet'
@@ -116,6 +119,7 @@ function render() {
     app.innerHTML = renderTour();
     _lastRenderHadModal = false;
     _lastRenderedView = v;   // v46: keep the view tracker honest across the early return
+    if (typeof focusAfterRender === 'function') { try { focusAfterRender(); } catch (e) {} }   // V123
     return;
   }
 
@@ -241,8 +245,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Sessions are now called Jobs.</strong> The main list is Jobs, you start one with + New job, and each job's own settings are under Job settings.</li>
-        <li><strong>Nothing else has changed.</strong> Your jobs, names, certificates, CSV files and backups are exactly as they were — only the words on screen are new.</li>
+        <li><strong>VoiceOver keeps your place.</strong> After a tap it stays on the button you pressed instead of jumping back to the top. A new screen or pop-up starts at its title.</li>
+        <li><strong>Quick Pick says what's chosen.</strong> VoiceOver now tells you which item type or Multi Pick tile is selected.</li>
+        <li><strong>Nothing changes on screen.</strong> Without VoiceOver, the app looks and works exactly as before.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -530,6 +535,11 @@ function render() {
   // V100: fire the 100 moment's sparks once (render-help.js). Cosmetic — never
   // allowed to break a render.
   if (typeof partyAfterRender === 'function') { try { partyAfterRender(); } catch (e) {} }
+  // V123 (1A 3A): put VoiceOver back where it was — the tapped control, the
+  // new screen's heading, or a sheet's title (feedback.js). After the scroll
+  // decision above (it never scrolls) and BEFORE focusAssetForScan() below, so
+  // paired scanner mode still ends with the cursor in the asset box.
+  if (typeof focusAfterRender === 'function') { try { focusAfterRender(); } catch (e) {} }
   // v67: paired mode puts the cursor in the asset box so a scan lands with no
   // tap. Last in the render tail on purpose — it must run after the scroll
   // restore above, or focusing would fight it. The function itself bails on
@@ -643,12 +653,16 @@ function refreshEntryAfterLog() {
   // overview selection bar (never relevant on the entry screen).
   document.body.classList.remove('has-selection-bar');
   document.body.classList.remove('view-entry');
+  if (typeof focusBeforeRender === 'function') { try { focusBeforeRender(); } catch (e) {} }   // V123
   app.innerHTML = renderEntry();
   // v24 (E4): the entry screen used to contain no modal/sheet at all, so this
   // was hard-coded false. v62 put the photo strip sheet on this screen, so the
   // flag must now tell the truth or a subsequent render() won't sweep it.
   _lastRenderHadModal = !!state.photoStripOpen;
   bindFocusFields();
+  // V123 (2A): an item was just logged — VoiceOver goes to the screen heading,
+  // never back onto PASS / FAIL / Copy last (feedback.js says why).
+  if (typeof focusAfterRender === 'function') { try { focusAfterRender('logged'); } catch (e) {} }
   // v67: this innerHTML rewrite is what dropped the cursor after every PASS or
   // FAIL, which presented as "the next scan goes nowhere". Paired mode puts it
   // back. typeof-guarded — scanner.js is an optional subsystem (rule 6) and a
@@ -913,7 +927,7 @@ function renderSessions() {
       </div>` : '';
   const header = `
       <header class="header">
-        <h1 class="h1">Jobs</h1>
+        <h1 class="h1" id="screen-title" tabindex="-1">Jobs</h1>
         ${state.reportSettings.enabled ? '<button class="icon-btn" id="reports-btn" data-action="open-reports" aria-label="Reports">' + icon('file-text') + '</button>' : ''}
         <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">${icon('settings')}</button>
       </header>`;
@@ -1560,10 +1574,14 @@ function renderEntry() {
   const tiles = (typeof qpTiles === 'function') ? qpTiles() : [];
   const shownTypes = tiles.length ? orderedTypes.slice(0, Math.max(0, 9 - tiles.length)) : orderedTypes;
   const tileOff = (!!sess.locked || isExisting) ? ' disabled' : '';
+  // V123 (4A): every button here carries aria-pressed, so VoiceOver says which
+  // type (or tile) is chosen — before, only the colour said so. The in-place
+  // repaints keep it in step: dispatch.js 'quick-pick', events.js f-type input,
+  // multipick.js qpTileSelect / qpTileSyncDom.
   const quickButtons = shownTypes.map(t => `
-    <button class="quick-btn ${state.form.itemType === t ? 'active' : ''}" data-action="quick-pick" data-arg="${escapeHTML(t)}" data-type="${escapeHTML(t)}">${escapeHTML(t)}</button>
+    <button class="quick-btn ${state.form.itemType === t ? 'active' : ''}" aria-pressed="${state.form.itemType === t ? 'true' : 'false'}" data-action="quick-pick" data-arg="${escapeHTML(t)}" data-type="${escapeHTML(t)}">${escapeHTML(t)}</button>
   `).join('') + tiles.map(tl => `
-    <button class="quick-btn qp-tile qp-tile-${tl.qp} ${state.form.qpTile === tl.qp ? 'active' : ''}" data-action="qp-tile" data-arg="${tl.qp}"${tileOff}><span class="qp-tile-plus">${icon('plus')}</span>${escapeHTML(qpTileLabel(tl.slot))}</button>
+    <button class="quick-btn qp-tile qp-tile-${tl.qp} ${state.form.qpTile === tl.qp ? 'active' : ''}" aria-pressed="${state.form.qpTile === tl.qp ? 'true' : 'false'}" data-action="qp-tile" data-arg="${tl.qp}"${tileOff}><span class="qp-tile-plus">${icon('plus')}</span>${escapeHTML(qpTileLabel(tl.slot))}</button>
   `).join('');
 
   const notesBlock = state.form.showNotes
@@ -1994,7 +2012,7 @@ function renderEntry() {
     <div class="screen">
       <header class="header-row">
         <button class="icon-btn" id="sessions-btn" data-action="go-sessions" aria-label="Back to jobs">${icon('chevron-left')}</button>
-        <div class="site-name">${escapeHTML(sess.site || sess.name)}</div>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">${escapeHTML(sess.site || sess.name)}</div>
         <button class="icon-btn" id="overview-btn" data-action="go-overview" aria-label="Overview">${icon('layout-grid')}</button>
       </header>
 
