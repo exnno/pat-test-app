@@ -21,7 +21,8 @@
           --accent / --pass-shadow is an icon or large display text; the
           scripts' coloured words use the word shades; no var(--muted).
      56d  the buttons and icons keep PATGo's colours (4C, 3A).
-     56e  release: V119, no What's new, cache, changelog. */
+     56e  release: V119, no What's new, cache, changelog. (Moved on to 58f
+          at V120, as 55e moved on to 56e.) */
 
 'use strict';
 
@@ -193,20 +194,5 @@ module.exports = async function () {
     }
   });
 
-  /* ------------------------------------------------------------------ 56e */
-  await t.group('56e — release: V119, no What’s new, cache, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V119', 'APP_VERSION V119');
-    // 6A: no welcome. The sheet stays V117's.
-    t.eq(app.run('WELCOME_VERSION'), 'V117', 'What’s new not rolled for V119 (6A)');
-    // V119.1: a hotfix suffix is still V119's key (57d pins the exact hotfix key).
-    t.ok(/const CACHE_VERSION = 'pat-v119(-\d+)?';/.test(read('sw.js')), 'cache key pat-v119 (or a V119 hotfix)');
-    t.includes(read('render-core.js'), '<li><strong>Report Settings is now two pages.</strong>', 'V117’s What’s new still in place');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V119</strong>'), b = help.indexOf('<p><strong>V118</strong>'), c = help.indexOf('<p><strong>V117</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V119, V118, V117');
-    t.excludes(help, '<p><strong>V116</strong>', 'V116 rolled off');
-    t.includes(help, 'Coloured words are easier to read', 'About: V119’s line');
-    t.includes(help, 'Grey text is easier to read: hints', 'About: V118’s line still there');
-  });
+  // 56e (V119's release lines) moved on to 58f at V120.
 };

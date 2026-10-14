@@ -18,7 +18,8 @@
           fit, and the totals line sits below a wrapped last row — measured with
           the REAL vendored jsPDF, not a stub.
      57c  certificate: ordinary-length details are drawn exactly as before.
-     57d  release: hotfix cache key, version and What's new unchanged.
+     57d  the PDF file name's {site} is unchanged (2B). Its release lines
+          (cache key, version, What's new) moved on to 58f at V120.
 
    ⚠ 57b/57c load the vendored jsPDF + autoTable into the sandbox. The stub
    environment deliberately has no PDF engine (see 04), so these two groups put
@@ -196,11 +197,9 @@ module.exports = async function run() {
   });
 
   /* ------------------------------------------------------------------ 57d */
-  await t.group('57d — release: hotfix V119.1 (cache key only)', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V119', 'APP_VERSION stays V119 (hotfix)');
-    t.eq(app.run('WELCOME_VERSION'), 'V117', 'What’s new not rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v119-1';", 'cache key pat-v119-1');
+  // V120: the hotfix's release lines (version, What's new, cache key) moved on
+  // to 58f; M916 retired with its key. The 2B check below is standing.
+  await t.group('57d — the PDF file name keeps the whole client and site (2B)', () => {
     // 2B: the file name's {site} is left alone — still the whole snapshot.
     t.includes(read('report.js'), "'{site}': session.site || session.name || '',", 'file name {site} unchanged (2B)');
   });
