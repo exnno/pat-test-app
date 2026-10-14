@@ -99,7 +99,17 @@ function onEntryScreen(opts = {}) {
   return app;
 }
 
+/* V125: the stub environment hands the vm the HOST's Date (stubs.js), so the
+   patch in withClock() replaced Date.now for every later group too — found in
+   V124, when group 62's "never touched" (0) read as 2 s ago. Kept here and put
+   back when this file finishes, pass or fail. */
+const REAL_DATE_NOW = Date.now;
+
 module.exports = async function run() {
+  try { await runScanner(); } finally { Date.now = REAL_DATE_NOW; }
+};
+
+async function runScanner() {
 
   /* ------------------------------------------------------------------
      The v67 repair itself
@@ -697,4 +707,4 @@ module.exports = async function run() {
       'which is above the gap limit, so a legitimate pause cannot split the burst');
   });
 
-};
+}

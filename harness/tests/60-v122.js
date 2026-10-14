@@ -48,9 +48,10 @@ const html = (app) => app.doc.getElementById('app').innerHTML;
 const text = (h) => h.replace(/<script[\s\S]*?<\/script>/g, ' ').replace(/<[^>]+>/g, ' ')
   .replace(/&amp;/g, '&').replace(/&#39;|&rsquo;|&#x27;/g, '’').replace(/&[a-z]+;/g, ' ').replace(/\s+/g, ' ');
 
-/* Phrases allowed to say session: the Glossary's explanation (5A) and the two
-   V122 history lines (the What's new sheet and the About changelog). */
-const ALLOW = ['called this a session', 'Sessions are now called Jobs'];
+/* Phrases allowed to say session: the Glossary's explanation (5A). (The two
+   V122 history lines — What's new and the About changelog — had rolled off by
+   V125, and their allowance went with them.) */
+const ALLOW = ['called this a session'];
 const WORD = /\bsessions?\b/i;
 
 function appScripts() {

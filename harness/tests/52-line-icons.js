@@ -220,6 +220,6 @@ module.exports = async function () {
     t.includes(read('sw.js'), "  './icons.js',", 'and is precached');
     t.includes(read('boot.js'), "    'icon'\n  ];", 'the boot guard probes for it');
     const scripts = (idx.match(/<script src="[^"]+\.js"><\/script>/g) || []).filter(s => !/min\.js|umd/.test(s)).length;
-    t.eq(scripts, 34, 'first-party scripts: 34 (33 + icons.js)');
+    t.eq(scripts, 35, 'first-party scripts: 35 (33 + icons.js, V125 + exportall.js)');
   });
 };

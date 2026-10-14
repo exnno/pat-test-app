@@ -30,7 +30,7 @@
           or the cursor (MAP rule 3).
      62e  v61.2 stands (source): the worker never skips waiting at install; the
           only ways to SKIP_WAITING are Refresh and the safe moment.
-     62f  release: V124, What’s new rolled, cache, changelog. (61f → 62f.)
+     62f  release: V124 … — moved to 63f in V125.
 
    ⚠ 62c's blocker list is the definition of "safe". A new thing that can be
    open on the Jobs list (a sheet drawn there, a select mode) must be added to
@@ -101,7 +101,9 @@ module.exports = async function run() {
     const got = [];
     sw.send({ type: 'GET_VERSION' }, [{ postMessage: (m) => got.push(m) }]);
     t.eq(got.length, 1, 'GET_VERSION: one answer, on the port sent');
-    t.eq(got[0] && got[0].version, 'pat-v124', '… carrying this worker’s cache key');
+    // V125: read the key from sw.js, so this stays true after the next release.
+    const key = (read('sw.js').match(/const CACHE_VERSION = '([^']+)'/) || [])[1];
+    t.eq(got[0] && got[0].version, key, '… carrying this worker’s cache key');
     t.doesNotThrow(() => sw.send({ type: 'GET_VERSION' }), 'no port sent: no answer, no throw');
     t.doesNotThrow(() => sw.send({ type: 'GET_VERSION' }, []), 'an empty port list: no throw');
     sw.send({ type: 'SKIP_WAITING' });
@@ -378,24 +380,5 @@ module.exports = async function run() {
     t.eq(bootTail.trim(), 'registerServiceWorker();', 'registerServiceWorker() is still the last line, outside every block');
   });
 
-  /* ------------------------------------------------------------------ 62f */
-  await t.group('62f — release: V124, What’s new rolled, cache, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V124', 'APP_VERSION V124');
-    t.eq(app.run('WELCOME_VERSION'), 'V124', 'What’s new rolled to V124');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v124';", 'cache key pat-v124');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>Updates find you.</strong>', 'V124’s What’s new: it looks');
-    t.includes(core, '<li><strong>No more closing and reopening.</strong>', 'V124’s What’s new: it goes in by itself');
-    t.includes(core, '<li><strong>The banner says which version.</strong>', 'V124’s What’s new: the banner');
-    t.excludes(core, '<li><strong>VoiceOver keeps your place.</strong>', 'V123’s sheet copy gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V124</strong>'), b = help.indexOf('<p><strong>V123</strong>'), c = help.indexOf('<p><strong>V122</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V124, V123, V122');
-    t.excludes(help, '<p><strong>V121</strong>', 'V121 rolled off');
-    t.excludes(help, 'Bigger text if you want it: Settings', 'V121’s line gone with it');
-    t.includes(help, 'Updates without the fuss: PATGo checks', 'About: V124’s line');
-    t.includes(help, 'VoiceOver keeps your place: after a tap', 'About: V123’s line still there');
-    t.includes(help, 'Sessions are now called Jobs everywhere in the app', 'About: V122’s line still there');
-  });
+  // 62f (release: V124) moved to 63f in V125 — the release lines follow the newest release.
 };

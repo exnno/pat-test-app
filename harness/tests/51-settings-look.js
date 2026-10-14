@@ -49,7 +49,7 @@ function page(app, id) {
 
 // V122 (4B done): no screen is called a session any more, so Settings may say
 // "session" only where it explains the old word (the Glossary, 5A) or in history.
-const EXPLAINS = ['called this a session', 'Sessions are now called Jobs'];   // the second is V122's About line (history; rolls off at V125)
+const EXPLAINS = ['called this a session'];   // V125: V122's About line rolled off, its allowance with it
 
 module.exports = async function () {
 
