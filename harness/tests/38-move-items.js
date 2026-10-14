@@ -319,7 +319,7 @@ module.exports = async function () {
     select(app, [0]);
     tap(app, 'move-job-open');
     t.eq(app.state().moveJob.step, 'blocked', 'a locked job: refused');
-    t.includes(app.html(), 'Unlock it in Session settings', '… and says how');
+    t.includes(app.html(), 'Unlock it in Job settings', '… and says how');
     t.eq(app.fn('activeSession')().items.length, 3, 'nothing moved');
     t.eq(app.state().sessions.length, 1, 'no job made');
   });

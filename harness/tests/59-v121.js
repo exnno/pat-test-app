@@ -27,7 +27,7 @@
           reloaded phone starts on it before the first screen is drawn.
      59e  the page, the Settings row, search, backup and setup files, the
           problem report.
-     59f  release: V121, What's new rolled, cache, changelog. (58f → 59f.)
+     59f  release: V121 … — moved to 60f in V122.
 
    ⚠ 59a IS A SWEEP. A new font-size in px (stylesheet or a style="" in a
    script) fails it: write it in rem (px ÷ 16), or — only for a symbol in a
@@ -223,22 +223,5 @@ module.exports = async function () {
     t.includes(app.fn('diagnosticsText')(), 'text=large', 'the problem report says which size');
   });
 
-  /* ------------------------------------------------------------------ 59f */
-  await t.group('59f — release: V121, What’s new rolled, cache, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V121', 'APP_VERSION V121');
-    t.eq(app.run('WELCOME_VERSION'), 'V121', 'What’s new rolled to V121');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v121';", 'cache key pat-v121');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>Bigger text if you want it.</strong>', 'V121’s What’s new: the setting');
-    t.includes(core, '<li><strong>Nothing changes unless you choose it.</strong>', 'V121’s What’s new: Standard is as before');
-    t.excludes(core, 'PATGo works better with VoiceOver.</strong>', 'V120’s sheet copy gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V121</strong>'), b = help.indexOf('<p><strong>V120</strong>'), c = help.indexOf('<p><strong>V119</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V121, V120, V119');
-    t.excludes(help, '<p><strong>V118</strong>', 'V118 rolled off');
-    t.includes(help, 'Bigger text if you want it: Settings', 'About: V121’s line');
-    t.includes(help, 'Works better with VoiceOver: it says when', 'About: V120’s line still there');
-    t.includes(help, 'Coloured words are easier to read', 'About: V119’s line still there');
-  });
+  // 59f (release: V121) moved to 60f in V122 — the release lines follow the newest release.
 };

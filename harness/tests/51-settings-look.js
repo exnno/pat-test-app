@@ -13,15 +13,16 @@
 
      51a  the reworded Settings text, page by page, drawn through render().
      51b  every screen name Settings quotes still exists on that screen — if a
-          later release renames "Session settings" or "PAT Sessions", this goes
-          red and Settings must follow (the instructions would be wrong).
+          later release renames "Job settings" or "Jobs", this goes red and
+          Settings must follow (the instructions would be wrong). V122 (4B
+          done): the names became Jobs / Job settings / New job.
      51c  sentence case: every static heading and switch title in
           render-settings.js, apart from names on an allow-list.
      51d  the Glossary: the job terms, the Barcode Scanner path, no version
           numbers in the copy.
      51e  sweep: no "session" in the visible text of ANY Settings page except
-          the named screens above (retest reminders on, so the Retest page draws
-          its how-to).
+          the Glossary's one "earlier versions" line (V122 5A) and history
+          (retest reminders on, so the Retest page draws its how-to).
      51f  messages Settings shows through confirm sheets (setup import, the
           certificate-number clash, reset descriptions) — source-guarded, as the
           sheets need a file or a typed clash to reach headlessly.
@@ -46,11 +47,9 @@ function page(app, id) {
   return text(html(app));
 }
 
-// Screen and button names Settings is allowed to quote with "session" in them,
-// because that is what the engineer sees on screen today (4A). 51b proves each
-// one is real. Plus the two places that explain the word itself, and history.
-const NAMED = ['PAT Sessions', 'Session settings', 'New session', 'Edit session'];
-const EXPLAINS = ['Jobs & sessions', 'call it a session', 'rather than sessions'];
+// V122 (4B done): no screen is called a session any more, so Settings may say
+// "session" only where it explains the old word (the Glossary, 5A) or in history.
+const EXPLAINS = ['called this a session', 'Sessions are now called Jobs'];   // the second is V122's About line (history; rolls off at V125)
 
 module.exports = async function () {
 
@@ -69,8 +68,8 @@ module.exports = async function () {
     t.includes(setup, 'jobs, clients and sites are never shared', 'Setup: jobs are never shared');
     t.includes(setup, 'Your jobs are not touched.', 'Setup: import leaves jobs alone');
     const retest = page(app, 'settingsRetest');
-    t.includes(retest, 'Open any job, tap Session settings', 'Retest Reminders: open a job, tap the button by its real name');
-    t.includes(retest, 'on your PAT Sessions screen', 'Retest Reminders: the list by its real name');
+    t.includes(retest, 'Open any job, tap Job settings', 'Retest Reminders: open a job, tap the button by its real name');
+    t.includes(retest, 'on your Jobs screen', 'Retest Reminders: the list by its real name');
     const logging = page(app, 'settingsLogging');
     t.includes(logging, 'in a job\'s Overview', 'Logging Options: a job\'s Overview');
     t.includes(logging, 'Settings → Reports & Exports → CSV Columns', 'Logging Options: the full path to CSV Columns');
@@ -82,14 +81,14 @@ module.exports = async function () {
   /* ------------------------------------------------------------------ 51b */
   await t.group('51b — every screen Settings names still exists by that name', () => {
     const core = read('render-core.js'), review = read('render-review.js');
-    t.includes(core, '<h1 class="h1">PAT Sessions</h1>', '"PAT Sessions" is the main list’s title');
-    t.includes(review, 'data-action="edit-session">Session settings</button>', '"Session settings" is the button on a job');
-    t.includes(core, '<h2 class="h2">New session</h2>', '"New session" is the new-job screen’s title');
-    t.ok(/>Edit session</.test(core + review), '"Edit session" is a screen title');
+    t.includes(core, '<h1 class="h1">Jobs</h1>', '"Jobs" is the main list’s title');
+    t.includes(review, 'data-action="edit-session">Job settings</button>', '"Job settings" is the button on a job');
+    t.includes(core, '<h2 class="h2">New job</h2>', '"New job" is the new-job screen’s title');
+    t.includes(review, '<div class="site-name">Job settings</div>', '"Job settings" is also that screen’s title (V122 3A)');
     // And Settings quotes them in exactly that spelling.
     const settings = read('render-settings.js');
-    t.includes(settings, 'tap <strong>Session settings</strong>', 'Retest Reminders quotes the button exactly');
-    t.includes(settings, 'on the New session screen', 'Clients quotes the screen exactly');
+    t.includes(settings, 'tap <strong>Job settings</strong>', 'Retest Reminders quotes the button exactly');
+    t.includes(settings, 'on the New job screen', 'Clients quotes the screen exactly');
   });
 
   /* ------------------------------------------------------------------ 51c */
@@ -139,7 +138,7 @@ module.exports = async function () {
     const stray = [];
     for (const id of ids) {
       let s = page(app, id);
-      for (const ok of NAMED.concat(EXPLAINS)) s = s.split(ok).join('');
+      for (const ok of EXPLAINS) s = s.split(ok).join('');
       s.replace(/.{0,30}session.{0,30}/gi, (hit) => { stray.push(`${id}: ${hit}`); return hit; });
     }
     t.ok(ids.length >= 25, `drew every Settings page (${ids.length})`);

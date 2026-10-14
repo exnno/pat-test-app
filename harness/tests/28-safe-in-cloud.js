@@ -475,7 +475,7 @@ module.exports = async function () {
     const real = out.sandbox.openConfirmSheet;
     out.sandbox.openConfirmSheet = (o) => { asked.push(String(o.title)); return real(o); };
     tap(out, 'delete-session', g);
-    t.eq(asked[0], 'Delete session?', 'signed out: the one confirm, unchanged');
+    t.eq(asked[0], 'Delete job?', 'signed out: the one confirm, unchanged');
   });
 
   /* ------------------------------------------------------------------ 28g */
