@@ -98,6 +98,11 @@
   <!-- v80: sync. v81: push and pull. Optional subsystem like cloud.js; right after it
        because it asks cloud.js who is signed in. boot wraps syncBoot(). -->
   <script src="sync.js"></script>
+  <!-- V127: the plan — trial end, grace, the lock. Optional subsystem: every
+       call into it is typeof-guarded and fails open; boot wraps planBoot().
+       After sync.js, which must follow cloud.js directly (16n);
+       plan.js only asks cloud.js who is signed in, at run time. -->
+  <script src="plan.js"></script>
   <!-- v65: HID barcode scanner. Placed with the other input-handling files and
        AFTER the render files, because a scan writes into fields those render —
        and before events.js/dispatch.js purely so the three document-level

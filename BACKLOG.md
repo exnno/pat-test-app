@@ -8,6 +8,46 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V127
+V127 = your plan: trial end, grace, the lock (Stage 12, R8 phone side; Peter
+14 Oct: 0A 2A 3A 4A 5B 6 8B 9A 10A 11A). New optional file plan.js; the gate
+on every way to start a job, log a test or make a certificate (MAP rule 26).
+Harness group 65 + M1073–M1108; 64f → 65f; M1030 (V124's About line) and
+M1071 (V126's welcome) retired.
+Decided for launch (Peter, 14 Oct — roadmap): the product site requires an
+account AND a subscription, through Cloudflare; the free GitHub site is
+removed or made private. Those close the two holes below.
+Next candidates: Renew to a payment page (Stage 13 — Stripe; set
+PLAN_RENEW_URL, and the webhook sets `active`/`lapsed`); server-side refusal of
+a lapsed account's uploads (RLS — with Stage 13); the account-required gate on
+the product site + sign-up (launch release); V123's VoiceOver leftovers;
+Tutorials (PN). Outstanding (Peter): Supabase Pro + production project, ICO
+fee, privacy + processor terms.
+
+### V127 residuals (known, accepted)
+- Signing out removes the lock (no account, no plan), and the free site needs
+  no account. Closed at launch, not before (Peter's launch plan above).
+- The phone enforces it; the database does not yet. A locked phone still syncs
+  (on purpose: nothing new can be logged, and the cloud copy stays current);
+  a modified copy of the app could log and upload. Stage 13 adds the server
+  side.
+- Locked also refuses EDITING an item through the entry screen (saveItem is
+  the backstop for both). Job settings edits, deletes, moves to an existing
+  job, CSV import and Restore are not refused — they are the engineer's own
+  records coming and going.
+- No sheet at the moment of locking: the Jobs list line says it, and any
+  refused tap explains. The logging screen itself shows no line — opening a
+  job looks normal until a button is tapped.
+- The start-up sheet waits for a quiet Jobs list: a phone with no jobs opens on
+  the New job form, so its sheet shows at the next return to the front.
+- Renewing lifts the lock at the next plan read: every start online, back to
+  the front after 6 hours, sign-in, or Settings → Cloud → Check connection.
+  Until Stripe, that is Peter setting the plan in Supabase.
+- A phone that has never read its plan (signed in on V126, offline since) has
+  no record and no lock until its first read online.
+- Not run on a real iPhone by Claude. Renew's email uses the same mailto
+  route as the problem report (proven on iOS).
+
 ### Next after V126
 V126 = a first visit never reloads itself (Stage 12; Peter 14 Oct, 0A 1A 2B).
 The V125 residual below, fixed: a service-worker takeover reloads only a page

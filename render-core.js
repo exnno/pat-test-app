@@ -252,7 +252,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>A smoother first start.</strong> On a new phone, PATGo no longer reloads itself a moment after it first opens, so the setup screens stay put. Updates still go in just as before.</li>
+        <li><strong>Your plan, clearly.</strong> A signed-in cloud account now sees when its free trial ends, a countdown afterwards, and a Renew now button. Nothing changes if you don't use a cloud account.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -922,6 +922,10 @@ function renderSessions() {
   const tidyBanner = renderTidyBanner();
   // V100 (Stage 8 part 3): the two in-app reminders — not exported, unlocked.
   const reminderBanners = renderReminderBanners();
+  // V127: the plan line — the trial ending (4A), the countdown, the lock (6b).
+  // Above the tabs, so it shows on both. plan.js is optional (MAP rule 6).
+  let planBanner = '';
+  try { planBanner = (typeof planBannerHTML === 'function') ? planBannerHTML() : ''; } catch (e) { planBanner = ''; }
 
   // V93 (4A — O9): signed in, the Jobs screen has two tabs. "In the cloud" is
   // how old jobs are reached once a phone only brings down recent ones (R21):
@@ -944,6 +948,7 @@ function renderSessions() {
     return `
     <div class="screen">
       ${header}
+      ${planBanner}
       ${tabs}
       ${renderCloudJobsHTML()}
     </div>
@@ -953,6 +958,7 @@ function renderSessions() {
   return `
     <div class="screen">
       ${header}
+      ${planBanner}
       ${tabs}
       ${storageBanner}
       ${tidyBanner}

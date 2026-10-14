@@ -63,7 +63,7 @@ is no toolchain to rot between releases.
 
 ```
 index.html            script tags, in a load order that matters
-config.js … boot.js   34 first-party modules (see below)
+config.js … boot.js   36 first-party modules (see below)
 styles.css            one stylesheet, ordered by release, banner-indexed
 sw.js                 service worker + the precache ASSETS list
 manifest.webmanifest  PWA manifest
@@ -80,21 +80,21 @@ harness/              the committed test harness — NOT shipped
 MAP.md  FEATURES.md  BACKLOG.md
 ```
 
-### Load order — 34 files, and it is not arbitrary
+### Load order — 36 files, and it is not arbitrary
 
 ```
 config → data → state → utils → icons → storage → clients → instruments → sqp
 → multipick → feedback → bugreport → photos → csv → backup → snapshots
 → reset → session → settings-actions → setup → tour → onboarding → report → pdfpreview
-→ render-core → render-review → render-settings → render-help
-→ cloud → sync → scanner → events → dispatch → boot
+→ exportall → render-core → render-review → render-settings → render-help
+→ cloud → sync → plan → scanner → events → dispatch → boot
 ```
 
 `data` → `state` is the one adjacency that is a hard dependency rather than a
 readability choice: `state.js` seeds itself from `data.js` constants in a
 top-level initialiser that runs at load. `boot.js` must be last — it runs on load.
 
-`sw.js` ASSETS lists **37** `.js` entries: these 34 plus the two jsPDF files and
+`sw.js` ASSETS lists **39** `.js` entries: these 36 plus the two jsPDF files and
 `supabase.umd.js`, which are precached but injected on demand rather than
 script-tagged.
 

@@ -191,6 +191,7 @@ registerActions({
   // Sessions screen header / new-session form (click parts only).
   'open-settings': () => { state.settingsCategory = null; state.settingsSearchQuery = ''; setView('settings'); },
   'new-session': () => {
+    if (typeof planGate === 'function' && !planGate()) return;   // V127: before the form, not after it
     state.newForm.show = true;
     state.newFormError = '';
     if (!state.newForm.engineer && state.engineer) state.newForm.engineer = state.engineer;
@@ -809,6 +810,8 @@ registerActions({
   'backup-export': () => downloadBackup(),
   // V125: Export everything (exportall.js, optional — MAP rule 6).
   'export-all': () => { if (typeof exportAllOpen === 'function') exportAllOpen(); },
+  // V127: Renew now (plan.js, optional — MAP rule 6).
+  'plan-renew': () => { if (typeof planRenew === 'function') planRenew(); },
   // V106: a level on Reset This Phone opens its confirm (reset.js, optional).
   'reset-open': (arg) => { if (typeof resetOpen === 'function') resetOpen(arg); },
   // V105 (S14, 5B): a snapshot's two buttons. Both typeof-guarded — snapshots.js

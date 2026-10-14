@@ -1,4 +1,4 @@
-# PATGo — Code Map (V126)
+# PATGo — Code Map (V127)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -48,7 +48,7 @@ is discoverable from the file you happen to be editing.
    dependents are orphaned.
 
 6. **Optional subsystems fail soft.** `photos.js`, `scanner.js`, `bugreport.js`,
-   `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106), `exportall.js` (V125) are `typeof`-guarded and try/catch-wrapped at their boot call sites. A missing
+   `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106), `exportall.js` (V125), `plan.js` (V127) are `typeof`-guarded and try/catch-wrapped at their boot call sites. A missing
    or broken one must never stop the app starting or break the fail flow.
 
 7. **Instrument fields on `state` are a MIRROR, not the truth.** Never read
@@ -233,22 +233,36 @@ is discoverable from the file you happen to be editing.
     visit is never reloaded by sw.js's `clients.claim()`; keep the claim (it is
     what makes a first visit work offline at once). Harness 64.
 
+26. **The plan gate (V127).** Anything that STARTS a job, LOGS a test or MAKES a
+    certificate asks `planGate()` (plan.js) first, as its first statement:
+    `if (typeof planGate === 'function' && !planGate()) return;`. Today:
+    session.js createSession, passClicked, failClicked, saveItem (the backstop),
+    copyLastResult, repeatLastResult, moveItemsToNewJob, openDupJob;
+    multipick.js multiPickFire, qpTileFire; report.js produceReport,
+    reopenReportPreview; dispatch.js `new-session` (before the form). A new door
+    in needs the line AND a 65b try, or a locked account walks straight through.
+    ⚠ Never gate the engineer's own records: opening, deleting, Export
+    everything (exportall.js builds certificates already made with
+    `buildReportDoc` directly — keep it that way), backup, CSV, sync. plan.js
+    fails OPEN everywhere (missing file, bad record, unknown plan = no lock).
+    Harness 65.
+
 ---
 
-## Load order (index.html) — 35 first-party files
+## Load order (index.html) — 36 first-party files
 
 `config` → `data` → `state` → `utils` → `icons` → `storage` → `clients` → `instruments` → `sqp`
 → `multipick` → `feedback` → `bugreport` → `photos` → `csv` → `backup`
 → `snapshots` → `reset` → `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
 → `pdfpreview` → `exportall` → `render-core` → `render-review` → `render-settings` → `render-help`
-→ `cloud` → `sync` → `scanner` → `events` → `dispatch` → `boot`
+→ `cloud` → `sync` → `plan` → `scanner` → `events` → `dispatch` → `boot`
 
 ⚠ `data` → `state` is the one adjacency in this chain that is NOT a readability
 choice. `state.js` seeds `itemTypes`/`failReasons` from `DEFAULT_ITEM_TYPES` /
 `DEFAULT_FAIL_REASONS` in its top-level initialiser, which runs at load, so
 `data.js` must precede it. Harness 09h/09i, mutation M61.
 
-`sw.js` ASSETS lists **38** `.js` entries: these 35 plus 3 lazy-loaded vendored
+`sw.js` ASSETS lists **39** `.js` entries: these 36 plus 3 lazy-loaded vendored
 files (precached, not `<script>` tags): the jsPDF pair (report.js injects them)
 and `supabase.umd.js` (cloud.js injects it, v79).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
@@ -266,7 +280,7 @@ DATA-ONLY file needs a CONSTANT probe instead — top-level `const` never attach
 to `window`, so the `requiredFns` loop cannot see it whatever name you use.
 Harness 09e/09f/09k/09l and mutations M54/M55/M64/M65 hold all of this.
 ⚠ EXCEPT an optional subsystem (rule 6): `photos.js`, `scanner.js`,
-`bugreport.js`, `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106), `exportall.js` (V125) are deliberately NOT probed — a probe would make a
+`bugreport.js`, `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106), `exportall.js` (V125), `plan.js` (V127) are deliberately NOT probed — a probe would make a
 missing optional file block boot, which is the opposite of the rule.
 
 ---
@@ -1190,6 +1204,8 @@ a cloud promise directly (rules 2/3). ⚠ Signed out = no library, no request;
 harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
+V127: `_cloudReadStoredSession()` also returns `issuedAt` (server time, plan.js);
+`cloudCheckConnection` hands the profile row to `planNote()` (typeof-guarded).
 
 ### sync.js (~4700 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read
 ⚠ V111: every table read names its owner — rule 18 (comment above
@@ -1398,6 +1414,29 @@ Server columns from **supabase/v108-storage.sql**; "column does not exist"
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
 19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q, 27a–27m, 28a–28i and
 29a–29i and 30a–30i, mutations M142–M295, M306–M325, M355–M395, M396–M418, M419–M434, M436–M451, M452–M474.
+
+### plan.js (~405 ln) — the plan: trial end, grace, the lock — NEW V127 — OPTIONAL SUBSYSTEM
+What the signed-in account's plan means on this phone: `planStatus()` (pure:
+none / paid / trial / ending / grace / locked), the record (PLAN_KEY, per
+account, never backed up), `planGate()` (rule 26), the Jobs list line and the
+Account page line (`planBannerHTML` / `planAccountHTML`), the two sheets
+(`planMaybePrompt`, once each per ending, Jobs list only), Renew now
+(`planRenew` → PLAN_RENEW_URL or the email), and `planRefresh()` (its own
+profiles row, `.eq('id', uid)`).
+**Touch to:** change grace/warning lengths (config.js constants), the words, what
+the lock blocks (rule 26), or wire payment (PLAN_RENEW_URL in config.js).
+**Coupling:** constants in **config.js** (`PLAN_*`); signed-in id and the stored
+sign-in's server issue time from **cloud.js** (`cloudUserId`,
+`_cloudReadStoredSession().issuedAt`); cloud.js `cloudCheckConnection` feeds
+`planNote()`; quiet-moment helpers `_updateSheetOpen` / `_updateFieldHeld` from
+**boot.js**; `openChoiceSheet` (feedback.js); `exportAllOpen` (exportall.js);
+banner placed by **render-core.js** `renderSessions`, account line by
+**render-help.js**; `plan-renew` in **dispatch.js**; `planBoot()` from boot.js
+after the first render, good load only. Reset: PLAN_KEY is 'account' (reset.js).
+⚠ Loads AFTER sync.js: sync.js must follow cloud.js directly (16n).
+⚠ Time = max(phone clock, server time seen); the phone clock never ratchets the
+record (65h). ⚠ The visibility hook only when signed in (16a counts listeners).
+Harness 65a–65i, 65f; mutations M1073–M1108.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

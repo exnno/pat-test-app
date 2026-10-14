@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V126: rolled forward — V126 on top, V123 dropped. -->
+      <!-- v8: rolling 3-version changelog. V127: rolled forward — V127 on top, V124 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V127</strong> &middot; October 2026</p>
+        <p class="muted">Your plan, clearly: a signed-in cloud account sees when its free trial ends, a 7-day countdown after it, and Renew now. After the countdown, logging, new jobs and new certificates pause until you renew &mdash; your jobs, exports and backups always stay available.</p>
         <p><strong>V126</strong> &middot; October 2026</p>
         <p class="muted">A smoother first start: on a new phone PATGo no longer reloads itself a moment after it first opens. Updates still go in just as before.</p>
         <p><strong>V125</strong> &middot; October 2026</p>
         <p class="muted">Export everything: one zip file of everything on this phone &mdash; the backup, a spreadsheet for every job, every certificate already made (same numbers) and your photos. Settings &rarr; Backup &amp; Restore.</p>
-        <p><strong>V124</strong> &middot; October 2026</p>
-        <p class="muted">Updates without the fuss: PATGo checks for a new version whenever you come back to it, and puts it in by itself while you're on the Jobs list with nothing open. Elsewhere the banner names the version and you tap Refresh.</p>
 
 
         </div>
@@ -344,6 +344,7 @@ function renderCloudAccount() {
         <h3>Signed in as</h3>
         <p id="cloud-signed-in-email"><strong>${escapeHTML(c.email || '(unknown)')}</strong></p>
         ${plan}
+        ${(typeof planAccountHTML === 'function') ? planAccountHTML() : ''}
         ${msg}
         <button class="backup-action-btn" id="cloud-check" data-action="cloud-check" ${dis} style="margin-top:8px">${busy ? 'Checking…' : 'Check connection'}</button>
         <button class="backup-action-btn" id="cloud-sign-out" data-action="cloud-sign-out" ${dis} style="margin-top:6px">Sign out</button>

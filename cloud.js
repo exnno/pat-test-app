@@ -50,7 +50,12 @@ function _cloudReadStoredSession() {
     if (!s || typeof s !== 'object' || !s.refresh_token) return null;
     const email = (s.user && typeof s.user.email === 'string') ? s.user.email : '';
     const id = (s.user && typeof s.user.id === 'string') ? s.user.id : '';
-    return { email, id };
+    // V127: when the server last issued this sign-in (its expiry less its life).
+    // Server time, not the phone's — plan.js uses it so winding the phone's clock
+    // back does not move the trial end. 0 when the stored session lacks either.
+    const exp = Number(s.expires_at), life = Number(s.expires_in);
+    const issuedAt = (isFinite(exp) && isFinite(life) && exp > 0 && life > 0) ? (exp - life) * 1000 : 0;
+    return { email, id, issuedAt };
   } catch {
     return null;   // unreadable = not signed in; the library will tidy it up
   }
@@ -287,6 +292,8 @@ function cloudCheckConnection() {
       }
       _cloudSet({ busy: false, plan: row.plan || null, trialEndsAt: row.trial_ends_at || null,
         checkedAt: new Date().toISOString(), message: '' });
+      // V127: the plan read here (sign-in, Check connection) is the plan.js record.
+      try { if (typeof planNote === 'function') planNote(row); } catch (e) { /* optional — rule 6 */ }
       return true;
     })
     .catch((e) => { _cloudSet({ busy: false, message: cloudErrorMessage(e, 'check') }); return false; })

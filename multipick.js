@@ -81,6 +81,7 @@ function activeMultiPickSlots() {
 // for all of them. Notes are left blank. Lands the cursor on a fresh new item
 // afterwards, buzzes the copy-last haptic, and shows an "Added N items" toast.
 function multiPickFire(idx) {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
   const sess = activeSession();
   if (!sess) return;
   if (sess.locked) return;                       // belt-and-braces; button is disabled too
@@ -211,6 +212,7 @@ function qpTileClear() {
 // Location is mandatory, as for every item. No readings sheet: a multi-pick
 // is a run of passes, exactly as the Multi Pick button logs them.
 function qpTileFire(qp) {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
   const sess = activeSession();
   if (!sess || sess.locked) return;
   if (state.cursor < sess.items.length) return;

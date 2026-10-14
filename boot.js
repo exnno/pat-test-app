@@ -665,6 +665,15 @@ try {
 } catch (e) {
   console.error('Daily snapshot failed to start (non-fatal).', e);
 }
+// V127: the plan (plan.js, optional — MAP rule 6). After the first render, on a
+// good load only: what the phone already knows about the account's plan applies
+// at once (offline too); then, signed in and online, a quiet fresh read. Fails
+// open — a missing or broken plan.js never locks anyone.
+try {
+  if (typeof planBoot === 'function') planBoot().catch(() => {});
+} catch (e) {
+  console.error('Plan check failed to start (non-fatal).', e);
+}
 }   // end if (_bootLoadOK)  — v61.2
 }   // end else (boot integrity OK)
 // registerServiceWorker() runs REGARDLESS of everything above, and MUST stay

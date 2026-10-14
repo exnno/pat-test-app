@@ -935,6 +935,7 @@ function reportFilename(session, patternOverride) {
 // preview can show them. ensureReportPhotos reuses the cache when this session's
 // photos were already collected, so the common case costs nothing.
 async function reopenReportPreview(sessionId) {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
   if (!sessionId) return;
   const session = state.sessions.find(s => s.id === sessionId);
   if (!session || !getJsPDF()) return;
@@ -978,6 +979,7 @@ function stampCertNumber(session) {
 }
 
 async function produceReport(sessionId) {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
   if (!state.reportSettings.enabled) { setView('settings'); return; }
   const session = state.sessions.find(s => s.id === sessionId);
   if (!session) { openInfoSheet({ title: 'Job not found', message: 'Couldn\u2019t find that job. Please try again.' }); return; }

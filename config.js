@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V126';
+const APP_VERSION = 'V127';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -133,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V126';
+const WELCOME_VERSION = 'V127';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -360,6 +360,27 @@ const REQUIRE_ACCOUNT = false;
 // not open the curtain. Factory reset (own spec, BACKLOG) must clear it.
 const CLOUD_UNLOCK_KEY = 'pat:cloudUnlocked';
 const CLOUD_ACCESS_CODE = '1111';
+
+// ---- V127: the plan — trial end, grace, the lock (plan.js) -------------------
+// PLAN_KEY: what this phone last learned about the signed-in account's plan, so
+// the lock holds offline. One account at a time; another login ignores it.
+// Shape (plan.js planNote): { uid, plan, trialEndsAt, lapsedSeenAt, maxNow,
+// checkedAt, shownEnded, shownLastDay }. Per device, NEVER in a backup or a
+// setup export (a restore must not carry one account's plan to another phone).
+// Reset this phone: 'account'.
+const PLAN_KEY = 'pat:plan';
+// 3A: the account keeps everything for this many days after the trial (or the
+// plan) ends. 4A: the Jobs list says when the trial ends from this many days out.
+const PLAN_GRACE_DAYS = 7;
+const PLAN_WARN_DAYS = 7;
+// How long a fresh read of the plan lasts before the app reads it again when it
+// comes back to the front (it is also read at every start, online).
+const PLAN_REFRESH_MS = 6 * 60 * 60 * 1000;
+// Renew now (10A). Until payment exists this is blank and Renew opens an email
+// to PLAN_RENEW_EMAIL. When there is a payment page, put its address here:
+// nothing else in the app changes. The account's email is added as ?email=…
+const PLAN_RENEW_URL = '';
+const PLAN_RENEW_EMAIL = 'hello@patgo.co.uk';
 
 // ---- v80/v81: sync (push and pull — see sync.js) ----------------------------
 // SYNC_STATE_KEY: which account the phone last sent to, a fingerprint of every
