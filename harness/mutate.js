@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V120';",
-    to:   "const APP_VERSION = 'V120';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V121';",
+    to:   "const APP_VERSION = 'V121';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V118</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V117</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V118</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 58f)',
+    from: '        <p><strong>V119</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V118</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V119</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 59f)',
   },
 
   {
@@ -2261,8 +2261,9 @@ const MUTATIONS = [
   {
     name: "M305 (V85) the unlock travels in a backup",
     file: "backup.js",
-    from: "    theme: state.theme,\n    hapticsEnabled: state.hapticsEnabled,",
-    to:   "    theme: state.theme,\n    cloudUnlocked: localStorage.getItem(CLOUD_UNLOCK_KEY),\n    hapticsEnabled: state.hapticsEnabled,",
+    // V121: re-anchored — textSize now sits between theme and hapticsEnabled.
+    from: "    textSize: state.textSize,                 // V121 (additive — no backupVersion bump)\n    hapticsEnabled: state.hapticsEnabled,",
+    to:   "    textSize: state.textSize,                 // V121 (additive — no backupVersion bump)\n    cloudUnlocked: localStorage.getItem(CLOUD_UNLOCK_KEY),\n    hapticsEnabled: state.hapticsEnabled,",
     why:  "restoring a backup onto a new phone would open the curtain there too (22h)",
   },
 
@@ -5545,7 +5546,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 58f)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 59f)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5996,7 +5997,7 @@ const MUTATIONS = [
     // each release's own group pins which welcome is current.
     from: "const WELCOME_VERSION = 'V",
     to:   "const WELCOME_VERSION = 'V0",
-    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (58f)",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (59f)",
   },
   {
     name: "M837 (V114) Engineer & Tester says sessions again",
@@ -6069,9 +6070,10 @@ const MUTATIONS = [
     // V118: no welcome (5A) — V117's sheet stays, so the anchor stays; 55e pins it.
     // V119: no welcome again (6A) — anchor unchanged; 56e pins it.
     // V120: welcome rolled — re-aimed at V120's first line; 58f pins it.
-    from: "<li><strong>PATGo works better with VoiceOver.</strong>",
+    // V121: welcome rolled — re-aimed at V121's first line; 59f pins it.
+    from: "<li><strong>Bigger text if you want it.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (58f)",
+    why:  "11A: the welcome says plainly what changed on screen (59f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6241,8 +6243,9 @@ const MUTATIONS = [
   {
     name: "M878 (V116) the search words still offer classic / emoji",
     file: "data.js",
-    from: "vibration sound appearance'",
-    to:   "vibration sound appearance icons emoji classic'",
+    // V121: re-anchored — the alias line now ends with the text-size words.
+    from: "appearance text size font bigger larger words zoom'",
+    to:   "appearance text size font bigger larger words zoom icons emoji classic'",
     why:  "a search for the retired switch must not land on a page without it (53a)",
   },
   // ---- V117 (1A): Report Settings split into Company & Branding + Certificate
@@ -6376,13 +6379,8 @@ const MUTATIONS = [
     to:   "  --accent-text: #93c5fd;",
     why:  "6A: the guard covers every text colour, not only the two greys this release changed (55d)",
   },
-  {
-    name: "M897 (V118) the About changelog loses V118's line",
-    file: "render-help.js",
-    from: "Grey text is easier to read: hints",
-    to:   "Hints",
-    why:  "the About page must say what changed in this version \u2014 V118's line stays until it rolls off (58f)",
-  },
+  // M897 (V118's About line) RETIRED V121: V118 rolled off the About page, so
+  // there is no line left to lose. 59f pins that it is gone.
   {
     name: "M898 (V119) light red words go back to the button red",
     file: "styles.css",
@@ -6451,7 +6449,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Coloured words are easier to read: green",
     to:   "Green",
-    why:  "the About page must say what changed in this version (58f)",
+    why:  "the About page must say what changed in this version (59f)",
   },
   {
     name: "M908 (V119) dark green words take the old darker green",
@@ -6509,7 +6507,7 @@ const MUTATIONS = [
     why:  "3A: the row stays one line tall however long the value (57b)",
   },
   // M916 (V119.1, the hotfix's own cache key) RETIRED V120: the key it broke is
-  // gone. M772 (stable prefix) + 58f pin each release's key.
+  // gone. M772 (stable prefix) + the newest release group (59f in V121) pin each release's key.
   // ---------------------------------------------------------------- V120
   {
     name: "M917 (V119.1; standing from V120) the PDF file name drops the client",
@@ -6650,6 +6648,140 @@ const MUTATIONS = [
     from: '<html lang="en-GB">',
     to:   '<html lang="en">',
     why:  "5A: en-GB gives a British voice and UK date reading (58e)",
+  },
+  // ---- V121 (1A–5A): text size. Group 59 + M937–M955. ----
+  {
+    name: "M937 (V121) a heading's text size goes back to px",
+    file: "styles.css",
+    from: ".h1 { font-size: 1.625rem;",
+    to:   ".h1 { font-size: 26px;",
+    why:  "3A: a px size ignores Text size — the heading would stay small at Larger (59a 59b)",
+  },
+  {
+    name: "M938 (V121) a script writes a px text size again",
+    file: "render-help.js",
+    from: '<p class="muted" id="sync-last" style="font-size:0.8125rem">',
+    to:   '<p class="muted" id="sync-last" style="font-size:13px">',
+    why:  "3A: inline sizes in scripts must scale too (59a)",
+  },
+  {
+    name: "M939 (V121) the wizard icon stays a fixed size",
+    file: "styles.css",
+    from: ".wizard-icon .ic { width: 3rem; height: 3rem;",
+    to:   ".wizard-icon .ic { width: 48px; height: 48px;",
+    why:  "3A: icons grow with the text (52f 59a)",
+  },
+  {
+    name: "M940 (V121) Standard is left to the browser's default size",
+    file: "styles.css",
+    from: "html { font-size: 16px; }",
+    to:   "html { font-size: 100%; }",
+    why:  "Standard must PIN 16px or a phone with a different default stops matching V120 (59b)",
+  },
+  {
+    name: "M941 (V121) Larger is not 130%",
+    file: "styles.css",
+    from: "html.ts-larger { font-size: 20.8px; }",
+    to:   "html.ts-larger { font-size: 18.4px; }",
+    why:  "2A: Larger = 130% (59b)",
+  },
+  {
+    name: "M942 (V121) changing size leaves the old class on",
+    file: "session.js",
+    from: "  html.classList.remove('ts-large', 'ts-larger');",
+    to:   "",
+    why:  "Large after Larger would keep both classes and the bigger one wins (59c)",
+  },
+  {
+    name: "M943 (V121) any stored value is taken as a size",
+    file: "session.js",
+    from: "  return TEXT_SIZES.includes(v) ? v : 'standard';",
+    to:   "  return v || 'standard';",
+    why:  "garbage must read as Standard, not invent a class (59c 59d)",
+  },
+  {
+    name: "M944 (V121) the size is not saved",
+    file: "storage.js",
+    from: "  localStorage.setItem(TEXT_SIZE_KEY, normaliseTextSize(state.textSize));\n",
+    to:   "",
+    why:  "the phone would forget the size on the next open (59d)",
+  },
+  {
+    name: "M945 (V121) boot does not apply the saved size",
+    file: "boot.js",
+    from: "applyTextSize(state.textSize);   // V121: before the first render, so nothing jumps\n",
+    to:   "",
+    why:  "a reopened phone would show Standard until the setting is touched (59d)",
+  },
+  {
+    name: "M946 (V121) the option is not wired",
+    file: "dispatch.js",
+    from: "  'set-text-size': (arg) => setTextSize(arg),   // V121",
+    to:   "  'set-text-size': (arg) => {},   // V121",
+    why:  "a tap on Large would do nothing — proved through #app, the way the browser delivers it (59d)",
+  },
+  {
+    name: "M947 (V121) the stored size is not read back",
+    file: "storage.js",
+    from: "  state.textSize = normaliseTextSize(localStorage.getItem(TEXT_SIZE_KEY));",
+    to:   "  state.textSize = 'standard';",
+    why:  "load() must bring the saved size back (59d)",
+  },
+  {
+    name: "M948 (V121) the chosen option is not marked pressed",
+    file: "render-settings.js",
+    from: "aria-pressed=\"${state.textSize === t.key ? 'true' : 'false'}\"",
+    to:   "aria-pressed=\"false\"",
+    why:  "VoiceOver must hear which size is chosen (59e)",
+  },
+  {
+    name: "M949 (V121) the Settings row hides the size",
+    file: "render-settings.js",
+    from: "if (state.textSize === 'large') extras.push('Large text');",
+    to:   "if (state.textSize === 'large') extras.push('Text');",
+    why:  "the Theme & Sound row says when a bigger size is on (59e)",
+  },
+  {
+    name: "M950 (V121) the backup leaves the size out",
+    file: "backup.js",
+    from: "    textSize: state.textSize,                 // V121 (additive — no backupVersion bump)\n",
+    to:   "",
+    why:  "a restored phone would lose its size (59e)",
+  },
+  {
+    name: "M951 (V121) a backup's garbage size is taken",
+    file: "backup.js",
+    from: "    if (TEXT_SIZES.includes(data.textSize)) {",
+    to:   "    if (data.textSize) {",
+    why:  "restore takes known values only (59e)",
+  },
+  {
+    name: "M952 (V121) a setup file leaves the size out",
+    file: "setup.js",
+    from: "      textSize: state.textSize,   // V121\n",
+    to:   "",
+    why:  "app preferences in a setup file include the size (59e)",
+  },
+  {
+    name: "M953 (V121) Settings search can't find text size",
+    file: "data.js",
+    from: "appearance text size font bigger",
+    to:   "appearance font bigger",
+    why:  "5A: searching \"text size\" must land on Theme & Sound (59e)",
+  },
+  {
+    name: "M954 (V121) the problem report leaves the size out",
+    file: "bugreport.js",
+    from: "    'text=' + normaliseTextSize(state.textSize)\n",
+    to:   "    'text=?'\n",
+    why:  "a report about cramped screens needs to say which size (59e)",
+  },
+  {
+    name: "M955 (V121) the About changelog loses V121's line",
+    file: "render-help.js",
+    from: "Bigger text if you want it: Settings",
+    to:   "Settings",
+    why:  "the About page must say what changed in this version (59f)",
   },
 ];
 
