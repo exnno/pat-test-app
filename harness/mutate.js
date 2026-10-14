@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V125';",
-    to:   "const APP_VERSION = 'V124';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V126';",
+    to:   "const APP_VERSION = 'V125';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V123</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V122</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V123</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 63f)',
+    from: '        <p><strong>V124</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V123</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V124</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 64f)',
   },
 
   {
@@ -5547,7 +5547,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 63f)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 64f)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5998,7 +5998,7 @@ const MUTATIONS = [
     // each release's own group pins which welcome is current.
     from: "const WELCOME_VERSION = 'V",
     to:   "const WELCOME_VERSION = 'V0",
-    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (63f)",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (64f)",
   },
   {
     name: "M837 (V114) Engineer & Tester says sessions again",
@@ -6078,10 +6078,11 @@ const MUTATIONS = [
     // V122: welcome rolled — re-aimed at V122's first line; 60f pinned it.
     // V123: welcome rolled — re-aimed at V123's first line; 61f pinned it.
     // V124: welcome rolled — re-aimed at V124's first line; 62f pinned it.
-    // V125: welcome rolled — re-aimed at V125's first line; 63f pins it.
-    from: "<li><strong>Export everything.</strong>",
+    // V125: welcome rolled — re-aimed at V125's first line; 63f pinned it.
+    // V126: welcome rolled (2B, one line) — re-aimed at it; 64f pins it.
+    from: "<li><strong>A smoother first start.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (63f)",
+    why:  "11A: the welcome says plainly what changed on screen (64f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6868,7 +6869,7 @@ const MUTATIONS = [
     why:  "1A: the file name is something the engineer reads (60e)",
   },
   // M968 (V122's About line) RETIRED V125: V122 rolled off the About page, so
-  // there is no line left to lose. 63f pins that it is gone.
+  // there is no line left to lose. 63f pinned that it is gone (now 64f).
   // ---- V123 (1A–4A): where VoiceOver lands after a redraw. Group 61 + M969–M991. ----
   {
     name: "M969 (V123) PASS is no longer a logging action",
@@ -7031,13 +7032,8 @@ const MUTATIONS = [
     to:   "[tabindex=\"-1\"]:focus { outline: 2px solid red; }",
     why:  "1A: invisible to sighted use (61g)",
   },
-  {
-    name: "M992 (V123) the About changelog loses V123's line",
-    file: "render-help.js",
-    from: "VoiceOver keeps your place: after a tap",
-    to:   "Better",
-    why:  "the About page must say what changed in this version (63f)",
-  },
+  // M992 (V123's About line) RETIRED V126: V123 rolled off the About page, so
+  // there is no line left to lose. 64f pins that it is gone.
   // ---- V124 (0A 1A 2A 3A 4A): friendlier updates. Group 62 + M993–M1031. ----
   {
     name: "M993 (V124) GET_VERSION answers nothing",
@@ -7303,7 +7299,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Updates without the fuss: PATGo checks",
     to:   "Better",
-    why:  "the About page must say what changed in this version (63f)",
+    why:  "the About page must say what changed in this version (64f)",
   },
   {
     name: "M1031 (V124) the room for the banner is a fixed 64px again",
@@ -7507,14 +7503,99 @@ const MUTATIONS = [
     file: "sw.js",
     from: "  './exportall.js',      // V125\n",
     to:   "",
-    why:  "works for whoever deployed it; offline installs lose the button (01c 63f)",
+    why:  "works for whoever deployed it; offline installs lose the button (01c 63g)",
   },
   {
     name: "M1060 (V125) the About changelog loses V125's line",
     file: "render-help.js",
     from: "Export everything: one zip file of everything on this phone",
     to:   "Better",
-    why:  "the About page must say what changed in this version (63f)",
+    why:  "the About page must say what changed in this version (64f)",
+  },
+  // ---- V126 (0A 1A 2B): a first visit never reloads itself. Group 64 + M1061–M1072. ----
+  {
+    name: "M1061 (V126) a takeover always reloads (the V125 behaviour)",
+    file: "boot.js",
+    from: "  return _updateHadController || _updateAsked;\n",
+    to:   "  return true;\n",
+    why:  "1A: the new worker's claim reloads a first visit under the setup wizard (64a 64c)",
+  },
+  {
+    name: "M1062 (V126) a takeover never reloads",
+    file: "boot.js",
+    from: "  return _updateHadController || _updateAsked;\n",
+    to:   "  return false;\n",
+    why:  "1A: an installed app keeps running the old code under the new worker (64b 64c)",
+  },
+  {
+    name: "M1063 (V126) asking for the update is forgotten",
+    file: "boot.js",
+    from: "    _updateAsked = true;   // V126: before the message",
+    to:   "    // V126: before the message",
+    why:  "1A: a first-visit page that takes an update by Refresh or the safe moment never reloads into it (64c 64d)",
+  },
+  {
+    name: "M1064 (V126) only asking counts — an installed page is ignored",
+    file: "boot.js",
+    from: "  return _updateHadController || _updateAsked;\n",
+    to:   "  return _updateAsked;\n",
+    why:  "1A: an update put in from another tab leaves this tab on the old version (64b)",
+  },
+  {
+    name: "M1065 (V126) only an installed page counts — asking is ignored",
+    file: "boot.js",
+    from: "  return _updateHadController || _updateAsked;\n",
+    to:   "  return _updateHadController;\n",
+    why:  "1A: Refresh on a first-visit page sends the worker in and never reloads (64c)",
+  },
+  {
+    name: "M1066 (V126) the controller is read at the takeover, not at boot",
+    file: "boot.js",
+    from: "  if (_updateReloading || !updateShouldReload()) return false;\n",
+    to:   "  try { _updateHadController = !!navigator.serviceWorker.controller; } catch (e) {}\n  if (_updateReloading || !updateShouldReload()) return false;\n",
+    why:  "1A: by then the claim has set a controller, so a first visit looks installed and reloads (64a 64c 64d)",
+  },
+  {
+    name: "M1067 (V126) the controller is never read",
+    file: "boot.js",
+    from: "  try { _updateHadController = !!navigator.serviceWorker.controller; } catch (e) { _updateHadController = false; }\n",
+    to:   "",
+    why:  "1A: an installed app stops reloading into updates from another tab (64b 64d)",
+  },
+  {
+    name: "M1068 (V126) the reload is not guarded against a second takeover",
+    file: "boot.js",
+    from: "  if (_updateReloading || !updateShouldReload()) return false;\n",
+    to:   "  if (!updateShouldReload()) return false;\n",
+    why:  "two takeover events in one page reload twice (64b 64c)",
+  },
+  {
+    name: "M1069 (V126) controllerchange is not listened for",
+    file: "boot.js",
+    from: "    navigator.serviceWorker.addEventListener('controllerchange', updateOnControllerChange);\n",
+    to:   "",
+    why:  "Refresh sends the worker in and the page never reloads into it (64a 64b 64c 64d)",
+  },
+  {
+    name: "M1070 (V126) the worker stops claiming pages",
+    file: "sw.js",
+    from: "    ).then(() => self.clients.claim())\n",
+    to:   "    )\n",
+    why:  "removing the claim also stops the reload, but a first visit then runs uncontrolled — not offline until reopened (64d)",
+  },
+  {
+    name: "M1071 (V126) the What's new sheet gains a second line",
+    file: "render-core.js",
+    from: "Updates still go in just as before.</li>\n",
+    to:   "Updates still go in just as before.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "2B: one line (64f)",
+  },
+  {
+    name: "M1072 (V126) the About changelog loses V126's line",
+    file: "render-help.js",
+    from: "A smoother first start: on a new phone PATGo no longer reloads",
+    to:   "Better",
+    why:  "the About page must say what changed in this version (64f)",
   },
 ];
 

@@ -474,11 +474,17 @@ function makeNavigator(opts = {}) {
       async readText() { return calls.clipboard[calls.clipboard.length - 1] || ''; },
     },
     vibrate(p) { calls.vibrate.push(p); return true; },
+    // V126: listeners are recorded and dispatchable, so a test can fire the
+    // real controllerchange the page listens for. opts.swController: the page
+    // loaded under a worker (an installed app) rather than a first visit.
     serviceWorker: {
-      controller: null,
+      controller: opts.swController || null,
       async register() { return { addEventListener() {}, installing: null, waiting: null, update() {} }; },
       async getRegistration() { return null; },
-      addEventListener() {},
+      _listeners: {},
+      addEventListener(t, fn) { (this._listeners[t] ||= []).push(fn); },
+      removeEventListener(t, fn) { const a = this._listeners[t]; if (a) this._listeners[t] = a.filter(f => f !== fn); },
+      dispatchEvent(ev) { (this._listeners[ev.type] || []).forEach(fn => fn.call(this, ev)); return true; },
     },
     // V87 (S12): persisted()/persist() — the real API's shape. opts.persisted is
     // the starting answer; opts.persistGrants is what persist() decides.
