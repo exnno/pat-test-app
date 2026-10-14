@@ -1,4 +1,4 @@
-# PATGo — Code Map (V124)
+# PATGo — Code Map (V125)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -48,7 +48,7 @@ is discoverable from the file you happen to be editing.
    dependents are orphaned.
 
 6. **Optional subsystems fail soft.** `photos.js`, `scanner.js`, `bugreport.js`,
-   `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106) are `typeof`-guarded and try/catch-wrapped at their boot call sites. A missing
+   `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106), `exportall.js` (V125) are `typeof`-guarded and try/catch-wrapped at their boot call sites. A missing
    or broken one must never stop the app starting or break the fail flow.
 
 7. **Instrument fields on `state` are a MIRROR, not the truth.** Never read
@@ -231,12 +231,12 @@ is discoverable from the file you happen to be editing.
 
 ---
 
-## Load order (index.html) — 34 first-party files
+## Load order (index.html) — 35 first-party files
 
 `config` → `data` → `state` → `utils` → `icons` → `storage` → `clients` → `instruments` → `sqp`
 → `multipick` → `feedback` → `bugreport` → `photos` → `csv` → `backup`
 → `snapshots` → `reset` → `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
-→ `pdfpreview` → `render-core` → `render-review` → `render-settings` → `render-help`
+→ `pdfpreview` → `exportall` → `render-core` → `render-review` → `render-settings` → `render-help`
 → `cloud` → `sync` → `scanner` → `events` → `dispatch` → `boot`
 
 ⚠ `data` → `state` is the one adjacency in this chain that is NOT a readability
@@ -244,7 +244,7 @@ choice. `state.js` seeds `itemTypes`/`failReasons` from `DEFAULT_ITEM_TYPES` /
 `DEFAULT_FAIL_REASONS` in its top-level initialiser, which runs at load, so
 `data.js` must precede it. Harness 09h/09i, mutation M61.
 
-`sw.js` ASSETS lists **37** `.js` entries: these 34 plus 3 lazy-loaded vendored
+`sw.js` ASSETS lists **38** `.js` entries: these 35 plus 3 lazy-loaded vendored
 files (precached, not `<script>` tags): the jsPDF pair (report.js injects them)
 and `supabase.umd.js` (cloud.js injects it, v79).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
@@ -262,7 +262,7 @@ DATA-ONLY file needs a CONSTANT probe instead — top-level `const` never attach
 to `window`, so the `requiredFns` loop cannot see it whatever name you use.
 Harness 09e/09f/09k/09l and mutations M54/M55/M64/M65 hold all of this.
 ⚠ EXCEPT an optional subsystem (rule 6): `photos.js`, `scanner.js`,
-`bugreport.js`, `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106) are deliberately NOT probed — a probe would make a
+`bugreport.js`, `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106), `exportall.js` (V125) are deliberately NOT probed — a probe would make a
 missing optional file block boot, which is the opposite of the rule.
 
 ---
@@ -353,6 +353,10 @@ runner does not refuse a repeat yet (DEFENCE 3, BACKLOG).
 See `harness/README.md`.
 
 ---
+⚠ V125: the stub environment hands the vm the HOST's `Date`, so a test that
+replaces `Date.now` changes it for every later group — group 08 now puts it back
+(try/finally). stubs.js gained `TextEncoder`/`TextDecoder`, and `StubBlob.size`
+counts bytes for byte parts.
 
 ## Files
 
@@ -764,6 +768,23 @@ Lazy-loads vendored PDF.js, renders each page to a stacked canvas, DPR-capped,
 sequential for iOS memory.
 **Touch to:** change preview rasterising, the lazy load, or the PDF.js version.
 **Coupling:** throws on parse failure so report.js falls back to its iframe view.
+
+### exportall.js (~480 ln) — Export everything (V125, Stage 12) — OPTIONAL SUBSYSTEM
+One zip of everything on THIS phone: backup, a CSV per job with items, the
+certificates already made, the photo file (tick), Read me. Own STORE-only zip
+writer (`exportAllZip`, `exportAllCrc32`). Base for lapse handling (R8).
+**Touch to:** change what goes in the zip, its names/folders, or its sheets.
+**Coupling:** reuses backup.js `buildBackup`, csv.js `buildCSV`/`csvFilename`,
+report.js `buildReportDoc`/`reportFilename`/`collectReportPhotos`/
+`_emptyPhotoData`/`loadReportEngine`/`triggerDownload`, photos.js
+`buildPhotoBundle`/`photoStatsSync`, feedback.js `_openSheet`. Backup & Restore
+(render-settings.js) draws the section only if this file loaded; dispatch.js
+`export-all` typeof-guarded. Search alias in data.js `settingsBackup`.
+⚠ NEVER `stampCertNumber` (3A — only jobs with `certNo`/`reportAt`, no number
+issued) and NEVER `markSessionExported` (5A); a completed save calls backup.js
+`markBackupExported` (the zip is a backup). ⚠ iOS: share only from the ready
+sheet's tap — after a long build the starting tap has expired (NotAllowedError).
+⚠ Cloud-only jobs/photos are never fetched (4A). Harness 63, M1032–M1060.
 
 ### session.js (~2560 ln) — sessions and items
 V121: `applyTextSize` / `normaliseTextSize` sit beside `applyTheme` (rule 22). Text size is per phone like the

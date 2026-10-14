@@ -8,6 +8,43 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V125
+V125 = Export everything (Stage 12; Peter 14 Oct, 0A 1A 2A 3A 4A 5A 6A).
+Settings → Backup & Restore, top: one zip of everything on THIS phone — backup,
+a CSV per job, the certificates already made (same numbers, none issued), the
+photo file (tick, on), Read me. Not "exported" (5A); a completed save resets
+the backup reminder. New file exportall.js (optional). Harness group 63 +
+M1032–M1060; 62f → 63f; M968 retired; group 08's clock leak fixed. **V125 is
+the first release delivered by V124's self-update** — the deploy step is "open
+the app on the Jobs list and leave it a few seconds". Next candidates: lapse
+handling (R8 — the warning and export offer; the deletion itself is the
+scheduled clean-up job, server code); V123's VoiceOver leftovers; Tutorials
+(PN). Outstanding (Peter): Supabase Pro + production project, ICO fee, privacy
++ processor terms.
+
+### V125 residuals (known, accepted)
+- Not run on a real iPhone by Claude. Headless Chromium made a real zip with
+  real jsPDF certificates (see the handoff); the Files app, the share sheet and
+  iPhone memory are Peter's checklist.
+- The photo file is built whole in memory, as Export photos always has been. A
+  phone with a very large photo store could run short: untick photos and use
+  Export photos on its own; a streamed photo folder could come later.
+- Certificates are rebuilt from the job and the report settings as they are
+  NOW. A job edited after its certificate went to the client comes out as it is
+  now, with its old number. Said in the Read me.
+- Certificates show only the photos on this phone (4A); cloud-only photos are
+  not fetched.
+- Store-only zip, no Zip64: past 4 GB or 65,535 files it refuses ("Couldn't
+  make the file") rather than writing a broken one. Far beyond any real phone.
+- A big file may be too large to email — the ready sheet says to save it to
+  Files or a cloud drive.
+- Found in the V125 browser check, PRE-EXISTING (not V125): on the very first
+  visit the new worker's `clients.claim()` fires `controllerchange`, and
+  boot.js reloads the page once (~1 s in, during the setup wizard). Harmless so
+  far — nothing is typed yet — but a fresh install shouldn't reload. Fix idea:
+  only reload on `controllerchange` when the page already had a controller
+  (or after a SKIP_WAITING we sent). Its own small release; needs a spec line.
+
 ### Next after V124
 V124 = friendlier updates (Stage 12; Peter 14 Oct, 0A 1A 2A 3A 4A). The app
 looks for a new version on launch, on every return to the front (once a minute
@@ -38,6 +75,7 @@ production project, ICO fee, privacy + processor terms.
   is never put back, so every later group runs on it — found when 62's "never
   touched" (0) read as 2 s ago. 62 and boot.js now treat 0 as never; group 08
   should restore the real clock (its own small harness fix, no app change).
+  **Fixed V125**: group 08 restores the real `Date.now` (try/finally); 63a checks.
 
 ### Next after V123
 V123 = VoiceOver keeps its place — focus after a redraw (V120 4A; Peter 14 Oct,

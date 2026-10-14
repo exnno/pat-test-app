@@ -149,7 +149,7 @@ const SETTINGS_PAGE_META = {
   // sync with the engineer settings, so they never belonged under "this phone".
   settingsLogging:     { icon: 'settings', title: 'Logging Options',       aliases: 'undo take back last item timestamps item times record time logged display settings map pin pins what3words w3w fail location where gps' },
   settingsCalculator:  { icon: 'calculator', title: 'Resistance Calculator', aliases: 'earth continuity resistance limit ohms calculator csa' },
-  settingsBackup:      { icon: 'save', title: 'Backup & Restore',      aliases: 'backup restore export import data save json photos file snapshot snapshots daily undo' },   // V105: snapshots
+  settingsBackup:      { icon: 'save', title: 'Backup & Restore',      aliases: 'backup restore export import data save json photos file snapshot snapshots daily undo everything zip certificates spreadsheets' },   // V105: snapshots; V125: export everything
   // V97 (1A, 2A): split out of Backup & Restore — everything about space.
   settingsStorage:     { icon: 'hard-drive', title: 'Phone Storage',         aliases: 'storage space full clear old jobs sessions prune protect keep data meter tidy free up delete photos age' },
   // V106 (Stage 10 part 2, 9A): the last row in Data. Hidden without reset.js.

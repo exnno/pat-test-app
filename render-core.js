@@ -252,9 +252,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Updates find you.</strong> PATGo now checks for a new version whenever you come back to it, not only when it starts.</li>
-        <li><strong>No more closing and reopening.</strong> When you're on the Jobs list with nothing open, the update goes in by itself in a second. It never happens in the middle of a job.</li>
-        <li><strong>The banner says which version.</strong> Anywhere else you'll see “PATGo V125 is ready” (or whichever it is) &mdash; tap Refresh when it suits you.</li>
+        <li><strong>Export everything.</strong> One zip file of everything on this phone: the backup, a spreadsheet for every job, every certificate already made, and your photos. Settings &rarr; Backup &amp; Restore.</li>
+        <li><strong>No new certificate numbers.</strong> Certificates go in with the numbers they already have, and jobs never certified aren't given one.</li>
+        <li><strong>Just this phone.</strong> Jobs and photos kept only in the cloud aren't in the file. Your &ldquo;not exported&rdquo; reminders stay as they are.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

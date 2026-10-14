@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V124: rolled forward — V124 on top, V121 dropped. -->
+      <!-- v8: rolling 3-version changelog. V125: rolled forward — V125 on top, V122 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V125</strong> &middot; October 2026</p>
+        <p class="muted">Export everything: one zip file of everything on this phone &mdash; the backup, a spreadsheet for every job, every certificate already made (same numbers) and your photos. Settings &rarr; Backup &amp; Restore.</p>
         <p><strong>V124</strong> &middot; October 2026</p>
         <p class="muted">Updates without the fuss: PATGo checks for a new version whenever you come back to it, and puts it in by itself while you're on the Jobs list with nothing open. Elsewhere the banner names the version and you tap Refresh.</p>
         <p><strong>V123</strong> &middot; October 2026</p>
         <p class="muted">VoiceOver keeps your place: after a tap it stays on the button you pressed, a new screen starts at its title, and Quick Pick says which type is selected. Nothing changes on screen.</p>
-        <p><strong>V122</strong> &middot; October 2026</p>
-        <p class="muted">Sessions are now called Jobs everywhere in the app: the Jobs list, + New job and Job settings. Your jobs and their names haven't changed.</p>
 
 
         </div>

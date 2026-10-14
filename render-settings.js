@@ -948,9 +948,19 @@ function renderSettingsBackup() {
         <div id="snapshots-block">${snapshotsSectionHTML()}</div>
       </div>
   ` : '';
+  // V125 (6A): Export everything — top of the page. exportall.js is optional
+  // (MAP rule 6): the section is left out if it didn't load.
+  const exportAllBlock = (typeof exportAllOpen === 'function') ? `
+      <div class="settings-section">
+        <h2 class="h2">Export everything</h2>
+        <p class="muted">One zip file of everything on <strong>this phone</strong>: the backup, a spreadsheet for every job, every certificate already made, and your photos if you want them.</p>
+        <button class="backup-action-btn primary" id="export-all-btn" data-action="export-all">${icon('upload')} Export everything (.zip)</button>
+      </div>
+  ` : '';
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Backup & Restore')}
+      ${exportAllBlock}
       <div class="settings-section">
         <h2 class="h2">Backup</h2>
         <p class="muted">Save a complete copy of all jobs and settings as a single JSON file. Keep it somewhere safe — it's the only safety net if the browser ever clears its data.</p>
