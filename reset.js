@@ -84,6 +84,7 @@ const RESET_KEY_PLAN = [
   ['DESCRIPTIONS_KEY', DESCRIPTIONS_KEY, 'settings'],
   ['SORT_KEY', SORT_KEY, 'settings'],
   ['THEME_KEY', THEME_KEY, 'settings'],
+  ['TEXT_SIZE_KEY', TEXT_SIZE_KEY, 'settings'],
   ['HAPTICS_KEY', HAPTICS_KEY, 'settings'],
   ['ITEM_PRESETS_KEY', ITEM_PRESETS_KEY, 'settings'],
   ['ACTIVE_PRESET_KEY', ACTIVE_PRESET_KEY, 'settings'],
@@ -437,7 +438,7 @@ function renderSettingsReset() {
         <h2 class="h2">Before you start</h2>
         <p class="muted">Resetting deletes things from this phone for good. No copy is kept &mdash; not even a daily snapshot. If there is anything you might want back, save a backup file first and keep it somewhere off this phone.</p>
         <button class="backup-action-btn primary" id="reset-backup-btn" data-action="backup-export">&#11015; Save a backup file first</button>
-        ${photos ? `<p class="muted" style="font-size:13px">Photos aren't in the backup file. To keep your ${_resetPlural(photos, 'photo', 'photos')}, save them from Backup &amp; Restore first.</p>
+        ${photos ? `<p class="muted" style="font-size:0.8125rem">Photos aren't in the backup file. To keep your ${_resetPlural(photos, 'photo', 'photos')}, save them from Backup &amp; Restore first.</p>
         <button class="backup-action-btn" id="reset-photos-btn" data-action="settings-page" data-arg="settingsBackup">Go to Backup &amp; Restore</button>` : ''}
       </div>
       <div class="settings-section">

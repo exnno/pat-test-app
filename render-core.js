@@ -199,15 +199,15 @@ function render() {
         <h3 class="bulk-sheet-title">Welcome to V9</h3>
         <span class="fail-close-spacer"></span>
       </div>
-      <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--text)">
+      <p style="margin:0 0 12px;font-size:0.875rem;line-height:1.5;color:var(--text)">
         You can now save multiple Quick Pick lists as <strong>presets</strong> and switch between them.
       </p>
-      <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--text)">
+      <p style="margin:0 0 12px;font-size:0.875rem;line-height:1.5;color:var(--text)">
         Your current Quick Pick items have become your first preset. What would you like to call it?
       </p>
       <label class="label">Preset name</label>
       <input aria-label="Preset name" class="input" id="migration-prompt-input" data-input-action="migration-name" value="${escapeHTML(state.migrationPrompt.name)}" placeholder="e.g. Default, My items, Office" autofocus>
-      <p class="muted" style="margin:8px 0 14px;font-size:12px">You can rename or add more presets later in Settings → Quick Pick Items.</p>
+      <p class="muted" style="margin:8px 0 14px;font-size:0.75rem">You can rename or add more presets later in Settings → Quick Pick Items.</p>
       <button class="btn-primary" id="migration-prompt-confirm" data-action="migration-confirm">Continue</button>
     </div>
   ` : '';
@@ -241,8 +241,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>PATGo works better with VoiceOver.</strong> If you use the iPhone's screen reader, it now tells you when an item is logged (&ldquo;Logged: Kettle, pass. Item 14&rdquo;), reads out the app's pop-up messages, and says the name of every box you type in.</li>
-        <li><strong>Nothing changes on screen.</strong> If you don't use VoiceOver, the app looks and works exactly as before, and your jobs and backups are untouched.</li>
+        <li><strong>Bigger text if you want it.</strong> Settings &rarr; Theme &amp; Sound &rarr; Text size now offers Standard, Large and Larger. The words on every screen grow to match.</li>
+        <li><strong>Nothing changes unless you choose it.</strong> The app starts on Standard, which looks exactly as before. Certificates, CSV files, your jobs and backups are untouched.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -368,7 +368,7 @@ function render() {
         <div class="wizard-icon">${icon('clipboard-list')}</div>
         <h3 class="bulk-sheet-title">Add an example job?</h3>
         <p class="wizard-lead">Want to see how it all hangs together first? We can drop in one example session with a few test results, so you can explore Sessions, the Overview and a report straight away. It's clearly labelled, and you can delete it whenever you like.</p>
-        <label class="label" style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;font-weight:600">
+        <label class="label" style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:0.9375rem;font-weight:600">
           <input type="checkbox" id="wizard-seed-demo" data-change-action="wizard-seed-demo" ${checked} style="width:auto">
           Add an example job
         </label>
@@ -429,7 +429,7 @@ function render() {
             <h3 class="bulk-sheet-title">Already exported</h3>
             <button class="fail-close-btn" id="reopen-warn-cancel" data-action="reopen-cancel" aria-label="Cancel">×</button>
           </div>
-          <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text)">${escapeHTML(line)}</p>
+          <p style="margin:0 0 16px;font-size:0.875rem;line-height:1.5;color:var(--text)">${escapeHTML(line)}</p>
           <div class="btn-row">
             <button class="btn-secondary" id="reopen-warn-cancel2" data-action="reopen-cancel">Cancel</button>
             <button class="btn-primary" id="reopen-warn-continue" data-action="reopen-continue">Open anyway</button>
@@ -455,7 +455,7 @@ function render() {
           <h3 class="bulk-sheet-title">Draw your signature</h3>
           <button class="fail-close-btn" data-action="signature-pad-cancel" aria-label="Cancel">×</button>
         </div>
-        <p style="margin:0 0 10px;font-size:13px;color:var(--neutral-text)">Sign in the box below with your finger or a stylus.</p>
+        <p style="margin:0 0 10px;font-size:0.8125rem;color:var(--neutral-text)">Sign in the box below with your finger or a stylus.</p>
         <div class="sig-pad-wrap">
           <canvas id="sig-pad-canvas" class="sig-pad-canvas"></canvas>
           <span class="sig-pad-baseline"></span>
@@ -1361,10 +1361,10 @@ function renderImportConflictModal() {
         <h3 class="bulk-sheet-title">Session already exists</h3>
         <button class="fail-close-btn" id="import-conflict-cancel" data-action="import-conflict-cancel" aria-label="Cancel">×</button>
       </div>
-      <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--text)">
+      <p style="margin:0 0 12px;font-size:0.875rem;line-height:1.5;color:var(--text)">
         A session for <strong>${escapeHTML(incoming.site)}</strong> on <strong>${escapeHTML(formatDate(incoming.date))}</strong> already exists with ${existingItemCount} item${existingItemCount === 1 ? '' : 's'}.
       </p>
-      <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--text)">
+      <p style="margin:0 0 12px;font-size:0.875rem;line-height:1.5;color:var(--text)">
         The imported file has ${incoming.items.length} item${incoming.items.length === 1 ? '' : 's'}. How would you like to import them?
       </p>
       <div class="import-conflict-actions">
@@ -1388,7 +1388,7 @@ function renderImportSummaryModal() {
         ? `Imported ${sum.itemCount} item${sum.itemCount === 1 ? '' : 's'} as a new duplicate of <strong>${escapeHTML(sum.sessionName)}</strong>.`
         : `Imported ${sum.itemCount} item${sum.itemCount === 1 ? '' : 's'} into new session <strong>${escapeHTML(sum.sessionName)}</strong>.`);
   const skippedBlock = (sum.skipped && sum.skipped.length > 0) ? `
-    <p style="margin:12px 0 4px;font-size:14px;font-weight:600;color:var(--text)">
+    <p style="margin:12px 0 4px;font-size:0.875rem;font-weight:600;color:var(--text)">
       ${sum.skipped.length} row${sum.skipped.length === 1 ? '' : 's'} skipped:
     </p>
     <div class="import-summary-list">
@@ -1406,7 +1406,7 @@ function renderImportSummaryModal() {
         <h3 class="bulk-sheet-title">Import complete</h3>
         <button class="fail-close-btn" id="import-summary-close" data-action="import-summary-done" aria-label="Close">×</button>
       </div>
-      <p style="margin:0;font-size:14px;line-height:1.5;color:var(--text)">${modeText}</p>
+      <p style="margin:0;font-size:0.875rem;line-height:1.5;color:var(--text)">${modeText}</p>
       ${skippedBlock}
       <button class="btn-primary" id="import-summary-done" data-action="import-summary-done" style="margin-top:14px">Done</button>
     </div>

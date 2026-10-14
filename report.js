@@ -1073,7 +1073,7 @@ function _reportCloudPhotoChoice(cloud, offline) {
         <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
         <button class="fail-close-btn" id="rcp-close" aria-label="Cancel">&times;</button>
       </div>
-      <p class="sheet-scroll" style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(msg)}</p>
+      <p class="sheet-scroll" style="margin:0 0 16px;font-size:0.875rem;line-height:1.5;color:var(--text-muted)">${escapeHTML(msg)}</p>
       <div class="sheet-pin" style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
         ${offline ? '' : '<button class="btn-primary" id="rcp-download">Download and continue</button>'}
         <button class="btn-secondary" id="rcp-without">Without ${n === 1 ? 'it' : 'them'}</button>

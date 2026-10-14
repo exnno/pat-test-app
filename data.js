@@ -112,7 +112,7 @@ const SETTINGS_CATEGORIES = [
     pages: ['settingsClients', 'settingsRetest'] },
   { id: 'catReports', icon: 'file-text', title: 'Reports & Exports', blurb: 'The PDF certificate and the CSV export',
     pages: ['settingsReport', 'settingsReportContent', 'settingsCsv'] },   // V117 (1A): Report Settings split in two
-  { id: 'catApp',     icon: 'palette', title: 'Phone & Display', blurb: 'Theme, sound, vibration and reminders on this phone',
+  { id: 'catApp',     icon: 'palette', title: 'Phone & Display', blurb: 'Theme, text size, sound, vibration and reminders on this phone',
     pages: ['settingsDisplay', 'settingsReminders'] },   // V100 (7A): + Reminders
   { id: 'catData',    icon: 'database', title: 'Data', blurb: 'Backups, space on this phone, photos, moving your setup, and resetting this phone',
     pages: ['settingsBackup', 'settingsStorage', 'cloudStorage', 'photoManager', 'jobManager', 'settingsSetup', 'settingsReset'] },   // V106: + Reset (last). V108: + Cloud Storage after Phone Storage (1A)
@@ -142,7 +142,7 @@ const SETTINGS_PAGE_META = {
   settingsRetest:      { icon: 'bell', title: 'Retest Reminders',       aliases: 'retest reminders rebook chase due overdue recall renewal commercial repeat business follow up contact customer' },
   // V100: the row is "Theme & Sound" now that the group holds two pages (a row
   // named the same as its group read oddly); the old name stays in search.
-  settingsDisplay:     { icon: 'palette', title: 'Theme & Sound',         aliases: 'phone and display settings theme dark light haptics vibration sound appearance' },
+  settingsDisplay:     { icon: 'palette', title: 'Theme & Sound',         aliases: 'phone and display settings theme dark light haptics vibration sound appearance text size font bigger larger words zoom' },
   // V100 (7A): the three in-app reminders — all per phone.
   settingsReminders:   { icon: 'alarm-clock', title: 'Reminders',             aliases: 'reminders reminder nag alert prompt not exported export locked lock unlocked end of day backup back up certificate notification remind me' },
   // V97 (3A): Undo and item times moved here from Phone & Display — item times

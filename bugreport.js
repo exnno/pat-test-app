@@ -246,7 +246,8 @@ function collectDiagnostics() {
     'timestamps=' + (state.timestampsEnabled ? 'on' : 'off'),
     'multipick=' + (state.multiPick && state.multiPick.enabled ? 'on' : 'off'),
     'haptics=' + (state.hapticsEnabled ? 'on' : 'off'),
-    'theme=' + (state.theme || 'system')
+    'theme=' + (state.theme || 'system'),
+    'text=' + normaliseTextSize(state.textSize)
   ].join(' ');
 
   const lists = [

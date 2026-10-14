@@ -8,6 +8,28 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V121
+V121 = the accessibility pass, part 4 of 4 — the last: text size (Peter 14 Oct,
+1A 2A 3A 4A 5A). Settings → Theme & Sound → Text size: Standard / Large /
+Larger (100/115/130%); Standard identical to V120 (px → rem proved
+byte-for-byte). Pinch-zoom left off (4A). Harness group 59 + M937–M955; 58f's
+release lines → 59f; M897 retired. **The accessibility pass is done.** Next
+candidates: the focus-after-redraw release (V120 4A) if wanted before launch;
+the Jobs rename (4B). Outstanding (Peter): Supabase Pro + production project,
+ICO fee, privacy + processor terms.
+
+### V121 residuals (known, accepted)
+- Not seen on a real iPhone by Claude: measured in a headless phone-sized
+  browser (see the handoff's entry-screen check). Peter's checklist covers it.
+- Five symbols stay fixed (the ticks on job/photo tiles, the photo ✕, the
+  polarity box) — they sit in fixed-size circles.
+- The iPhone's own Settings → Larger Text is not followed (1A chose the in-app
+  setting; 1C "Match my iPhone" was the offered alternative if wanted later).
+- Pinch-zoom still blocked (4A). If ever allowed: the notes box and two
+  other 15px fields must go to 16px first or iOS zooms on every tap into them.
+- Fixed-height boxes (date fields 44px, icon buttons 40–44px) don't grow; text
+  inside them grows. Measured fine at Larger on the screens checked.
+
 ### Next after V120
 V120 = the accessibility pass, part 3: screen readers (Peter 13 Oct, 1A 2A 3A
 4A 5A). Invisible to sighted use (Peter asked; confirmed). One announcer

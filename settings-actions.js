@@ -696,9 +696,9 @@ function startShareSetup() {
       <h3 class="bulk-sheet-title">Name this setup</h3>
       <button class="fail-close-btn" id="setup-name-cancel" aria-label="Cancel">×</button>
     </div>
-    <p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text-muted)">Give this setup a name so it's easy to recognise when importing it later.</p>
+    <p style="margin:0 0 12px;font-size:0.8125rem;line-height:1.5;color:var(--text-muted)">Give this setup a name so it's easy to recognise when importing it later.</p>
     <input aria-label="Setup name" class="input" id="setup-name-input" value="${escapeHTML(defaultName)}" autocapitalize="on" autocomplete="off" maxlength="60">
-    <p style="margin:12px 0 4px;font-size:12px;color:var(--text-muted)">Includes: ${escapeHTML(included.join(', '))}</p>
+    <p style="margin:12px 0 4px;font-size:0.75rem;color:var(--text-muted)">Includes: ${escapeHTML(included.join(', '))}</p>
     <button class="btn-primary" id="setup-name-share" style="margin-top:12px">Share</button>
   `;
 
@@ -935,6 +935,15 @@ function setTheme(theme) {
   applyTheme(theme);
   save();
   render();   // re-render to update radio button highlights
+}
+
+// V121: Settings → Theme & Sound → Text size. Same shape as setTheme: the page
+// has no open sheet, so a full render is safe (MAP rule 3).
+function setTextSize(size) {
+  state.textSize = normaliseTextSize(size);
+  applyTextSize(state.textSize);
+  save();
+  render();
 }
 
 function setHaptics(enabled) {

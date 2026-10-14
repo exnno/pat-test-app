@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V120';
+const APP_VERSION = 'V121';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -33,6 +33,8 @@ const ENGINEER_KEY = 'pat:engineer';
 const DESCRIPTIONS_KEY = 'pat:descriptions';
 const SORT_KEY = 'pat:sort';
 const THEME_KEY = 'pat:theme';            // v7: 'system' | 'light' | 'dark'
+const TEXT_SIZE_KEY = 'pat:textsize';     // V121: 'standard' | 'large' | 'larger' (per phone, like the theme)
+const TEXT_SIZES = ['standard', 'large', 'larger'];   // V121: anything else reads as 'standard'
 const HAPTICS_KEY = 'pat:haptics';        // v7: '1' | '0'
 const ITEM_PRESETS_KEY = 'pat:itempresets';     // v9: JSON [{id,name,items:[...]}]
 const ACTIVE_PRESET_KEY = 'pat:activepreset';   // v9: preset id
@@ -131,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V120';
+const WELCOME_VERSION = 'V121';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher

@@ -33,6 +33,7 @@ function buildBackup() {
     engineer: state.engineer,
     sort: state.sort,
     theme: state.theme,
+    textSize: state.textSize,                 // V121 (additive — no backupVersion bump)
     hapticsEnabled: state.hapticsEnabled,
     // v11
     csvColumns: state.csvColumns,
@@ -295,6 +296,11 @@ function applyBackupData(data, opts) {
     if (data.theme === 'light' || data.theme === 'dark' || data.theme === 'system') {
       state.theme = data.theme;
       applyTheme(state.theme);
+    }
+    // V121: only a known size is taken; older backups (no field) leave it alone.
+    if (TEXT_SIZES.includes(data.textSize)) {
+      state.textSize = data.textSize;
+      applyTextSize(state.textSize);
     }
     if (typeof data.hapticsEnabled === 'boolean') {
       state.hapticsEnabled = data.hapticsEnabled;

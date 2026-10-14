@@ -120,7 +120,7 @@ function openConfirmSheet(opts) {
       <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
       <button class="fail-close-btn" id="confirm-sheet-cancel" aria-label="Cancel">&times;</button>
     </div>
-    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
+    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:0.875rem;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
     <div class="sheet-pin" style="display:flex;gap:10px;margin-top:4px">
       <button class="btn-secondary" id="confirm-sheet-no">${escapeHTML(cancelLabel)}</button>
       <button class="${danger ? 'btn-danger' : 'btn-primary'}" id="confirm-sheet-yes" style="flex:1">${escapeHTML(confirmLabel)}</button>
@@ -157,7 +157,7 @@ function openChoiceSheet(opts) {
       <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
       <button class="fail-close-btn" id="choice-sheet-cancel" aria-label="Cancel">&times;</button>
     </div>
-    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
+    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:0.875rem;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
     <div class="sheet-pin" style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
       ${choices.map((c, i) => `<button class="${cls(c.style)}" id="choice-sheet-${i}" style="width:100%">${escapeHTML(c.label || '')}</button>`).join('')}
       <button class="btn-secondary" id="choice-sheet-no" style="width:100%">${escapeHTML(opts.cancelLabel || 'Cancel')}</button>
@@ -198,7 +198,7 @@ function openNameSheet(opts) {
       <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
       <button class="fail-close-btn" id="name-sheet-cancel" aria-label="Cancel">&times;</button>
     </div>
-    ${blurb ? `<p class="sheet-scroll" style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text-muted)">${escapeHTML(blurb)}</p>` : ''}
+    ${blurb ? `<p class="sheet-scroll" style="margin:0 0 12px;font-size:0.8125rem;line-height:1.5;color:var(--text-muted)">${escapeHTML(blurb)}</p>` : ''}
     <input aria-label="${escapeHTML(title)}" class="input sheet-pin" id="name-sheet-input" value="${escapeHTML(value)}" placeholder="${escapeHTML(placeholder)}" autocapitalize="on" autocomplete="off" maxlength="${maxlength}">
     <button class="btn-primary sheet-pin" id="name-sheet-save" style="margin-top:12px">${escapeHTML(confirmLabel)}</button>
     ${typeof opts.onDelete === 'function' ? `<button class="btn-secondary sheet-pin" id="name-sheet-delete" style="margin-top:10px;color:var(--fail-word)">${escapeHTML(opts.deleteLabel || 'Delete')}</button>` : ''}
@@ -255,7 +255,7 @@ function openInfoSheet(opts) {
       <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
       <button class="fail-close-btn" id="info-sheet-close" aria-label="Close">&times;</button>
     </div>
-    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
+    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:0.875rem;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
     <button class="btn-primary sheet-pin" id="info-sheet-ok">${escapeHTML(buttonLabel)}</button>
   `;
   document.body.appendChild(backdrop);

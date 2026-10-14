@@ -82,7 +82,7 @@ function bootIntegrityOK() {
   // uploaded, and without a probe that failure is silent until a user taps
   // something on a settings screen. Add a probe whenever a script file is added.
   const requiredFns = [
-    'load', 'save', 'render', 'applyTheme', 'initDelegation', 'loadFormForCursor',
+    'load', 'save', 'render', 'applyTheme', 'applyTextSize', 'initDelegation', 'loadFormForCursor',
     'loadMultiPickConfig', 'loadClients', 'loadSites', 'composeSiteSnapshot',
     'saveReportSettingsForm', 'wizardNextStep',
     // v72: sole probe for render-review.js (Overview / Edit Session / Retest
@@ -230,7 +230,7 @@ if (!_bootIntegrity) {
       '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;line-height:1.5">' +
       '<h2 style="margin:0 0 8px">Update needed</h2>' +
       '<p style="margin:0 0 16px">The app didn\'t load completely. Your saved data is safe and untouched. Tap Reload to finish updating.</p>' +
-      '<button onclick="location.reload()" style="padding:12px 18px;font-size:16px;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
+      '<button onclick="location.reload()" style="padding:12px 18px;font-size:1rem;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
       _crashReportLink('The app did not load completely (boot integrity check failed).') +
       '</div>';
   }
@@ -281,13 +281,14 @@ try {
       '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;line-height:1.5">' +
       '<h2 style="margin:0 0 8px">Update needed</h2>' +
       '<p style="margin:0 0 16px">The app didn\'t finish updating, so it couldn\'t start. <strong>Your saved data is safe and untouched</strong> — nothing has been changed or overwritten. Tap Reload to finish updating. If it keeps happening, fully close the app from the app switcher and open it again.</p>' +
-      '<button onclick="location.reload()" style="padding:12px 18px;font-size:16px;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
+      '<button onclick="location.reload()" style="padding:12px 18px;font-size:1rem;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
       _crashReportLink('load() threw during boot: ' + (e && e.message ? e.message : 'unknown')) +
       '</div>';
   }
 }
 if (_bootLoadOK) {
 applyTheme(state.theme);
+applyTextSize(state.textSize);   // V121: before the first render, so nothing jumps
 // v25 (E3): attach the single delegated click listener to #app once, before the
 // first render. It survives every innerHTML rewrite (it's on #app, not its
 // children), so clickable controls wired via data-action never need re-binding.
@@ -404,7 +405,7 @@ try {
         '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;line-height:1.5">' +
         '<h2 style="margin:0 0 8px">Something went wrong</h2>' +
         '<p style="margin:0 0 16px">The app hit an error while loading. Your saved data is safe. Tap Reload to try again.</p>' +
-        '<button onclick="location.reload()" style="padding:12px 18px;font-size:16px;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
+        '<button onclick="location.reload()" style="padding:12px 18px;font-size:1rem;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
         _crashReportLink('The app hit an error while loading: ' + ((e2 && e2.message) ? e2.message : 'unknown error')) +
         '</div>';
     }

@@ -798,6 +798,7 @@ registerActions({
 
   // Theme (data-set-theme carries the value)
   'set-theme': (arg) => setTheme(arg),
+  'set-text-size': (arg) => setTextSize(arg),   // V121
 
   // Backup & Restore + prune + about
   'backup-export': () => downloadBackup(),

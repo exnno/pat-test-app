@@ -362,6 +362,8 @@ function load() {
   // v7: theme + haptics
   const storedTheme = localStorage.getItem(THEME_KEY);
   state.theme = (storedTheme === 'light' || storedTheme === 'dark') ? storedTheme : 'system';
+  // V121: text size — garbage or nothing stored reads as Standard.
+  state.textSize = normaliseTextSize(localStorage.getItem(TEXT_SIZE_KEY));
   const storedHaptics = localStorage.getItem(HAPTICS_KEY);
   state.hapticsEnabled = storedHaptics !== '0';   // default true; only '0' disables
 
@@ -944,6 +946,7 @@ function _saveSettingsWrites() {
   // v56: retest reminders master switch.
   localStorage.setItem(RETEST_REMINDERS_KEY, state.retestRemindersEnabled ? '1' : '0');
   localStorage.setItem(THEME_KEY, state.theme);
+  localStorage.setItem(TEXT_SIZE_KEY, normaliseTextSize(state.textSize));
   localStorage.setItem(HAPTICS_KEY, state.hapticsEnabled ? '1' : '0');
   // v11
   localStorage.setItem(CSV_COLUMNS_KEY, JSON.stringify(state.csvColumns));

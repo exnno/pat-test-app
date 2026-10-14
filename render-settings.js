@@ -54,6 +54,8 @@ function settingsPageSubtitle(pageId) {
     case 'settingsDisplay': {
       const themeSummary = state.theme === 'system' ? 'System' : (state.theme === 'dark' ? 'Dark' : 'Light');
       const extras = [];
+      if (state.textSize === 'large') extras.push('Large text');        // V121
+      else if (state.textSize === 'larger') extras.push('Larger text');
       if (state.soundEnabled) extras.push('Sound on');
       return [themeSummary, state.hapticsEnabled ? 'Haptics on' : 'Haptics off', ...extras].join(' · ');
     }
@@ -438,7 +440,7 @@ function renderSettingsItems() {
             <span class="toggle-slider"></span>
           </label>
         </div>
-        <p class="muted" style="margin-top:12px;font-size:12px">${sqpHistoryNote}</p>
+        <p class="muted" style="margin-top:12px;font-size:0.75rem">${sqpHistoryNote}</p>
         <div class="preset-actions-row" style="margin-top:8px">
           <button class="preset-action-btn" id="sqp-rebuild-btn" data-action="sqp-rebuild">${icon('rotate-cw')} Rebuild from my data</button>
           <button class="preset-action-btn preset-action-danger" id="sqp-clear-btn" data-action="sqp-clear">${icon('trash-2')} Clear history</button>
@@ -773,6 +775,12 @@ function renderSettingsDisplay() {
     { key: 'light', label: 'Light', sub: '' },
     { key: 'dark', label: 'Dark', sub: '' }
   ];
+  // V121: each label is drawn at the size it gives (.text-size-sample-*, fixed px).
+  const textSizes = [
+    { key: 'standard', label: 'Standard' },
+    { key: 'large', label: 'Large' },
+    { key: 'larger', label: 'Larger' }
+  ];
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Theme & Sound')}
@@ -785,6 +793,19 @@ function renderSettingsDisplay() {
               <span class="theme-option-radio ${state.theme === t.key ? 'checked' : ''}"></span>
               <span class="theme-option-label">${escapeHTML(t.label)}</span>
               ${t.sub ? `<span class="theme-option-sub">${escapeHTML(t.sub)}</span>` : ''}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Text size</h2>
+        <p class="muted">Makes the words bigger on every screen of PATGo. Certificates and CSV files stay the same.</p>
+        <div class="theme-options">
+          ${textSizes.map(t => `
+            <button class="theme-option" data-action="set-text-size" data-arg="${t.key}" data-set-text-size="${t.key}" aria-pressed="${state.textSize === t.key ? 'true' : 'false'}">
+              <span class="theme-option-radio ${state.textSize === t.key ? 'checked' : ''}"></span>
+              <span class="theme-option-label text-size-sample-${t.key}">${escapeHTML(t.label)}</span>
             </button>
           `).join('')}
         </div>
@@ -949,7 +970,7 @@ function renderSettingsBackup() {
 
       ${renderPhotoBackupSection()}
 
-      <p class="muted" style="margin:4px 16px 16px;font-size:12px">Running out of space? See Settings → Data → Phone Storage.</p>
+      <p class="muted" style="margin:4px 16px 16px;font-size:0.75rem">Running out of space? See Settings → Data → Phone Storage.</p>
     </div>
   `;
 }
@@ -970,7 +991,7 @@ function renderSettingsStorage() {
   // STORAGE_BANNER_PCT (was 90) — the same point the Jobs-screen banner appears.
   const barClass = stats.pct >= STORAGE_BANNER_PCT ? 'danger' : (stats.pct >= STORAGE_WARN_PCT ? 'warn' : '');
   const fullNote = stats.pct >= STORAGE_WARN_PCT ? `
-          <p class="storage-full-note" style="margin-top:10px;font-size:13px;color:var(--warn-soft-text)"><strong>Getting full (${stats.pct}%).</strong> Export a backup, then clear old jobs below to make room. When it's full, new items can't be saved.</p>` : '';
+          <p class="storage-full-note" style="margin-top:10px;font-size:0.8125rem;color:var(--warn-soft-text)"><strong>Getting full (${stats.pct}%).</strong> Export a backup, then clear old jobs below to make room. When it's full, new items can't be saved.</p>` : '';
   // v14: prune suggestion — sessions exported AND older than the threshold.
   const prunable = prunableSessions();
   const ageMonths = state.pruneAgeMonths || PRUNE_AGE_DEFAULT;
@@ -979,7 +1000,7 @@ function renderSettingsStorage() {
   const cloudOn = (typeof syncActive === 'function' && syncActive() && typeof renderJobManager === 'function');
   const tidyM = cloudOn && typeof tidyModel === 'function' ? tidyModel(false) : null;
   const pruneBlock = cloudOn ? `
-          ${renderTidyBlock(tidyM, 'backup-tidy') || `<p class="muted" style="margin-top:10px;font-size:12px">Nothing older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} is ready to come off this phone right now.</p>`}
+          ${renderTidyBlock(tidyM, 'backup-tidy') || `<p class="muted" style="margin-top:10px;font-size:0.75rem">Nothing older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} is ready to come off this phone right now.</p>`}
           <button class="backup-action-btn" id="jobs-manage-btn" data-action="jm-open" style="margin-top:10px">${icon('shield-check')} Jobs on This Phone ${icon('chevron-right', 'ic-trail')}</button>
           ${typeof renderCloudStorage === 'function' ? `<button class="backup-action-btn" id="cloud-storage-btn" data-action="cs-open" style="margin-top:6px">${icon('cloud')} Cloud Storage ${icon('chevron-right', 'ic-trail')}</button>` : ''}
   ` : prunable.length > 0 ? `
@@ -987,7 +1008,7 @@ function renderSettingsStorage() {
             <p class="prune-suggestion-text">${prunable.length} exported job${prunable.length === 1 ? '' : 's'} older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} can be cleared to free space.</p>
             <button class="backup-action-btn" id="prune-review-btn" data-action="prune-review">Review &amp; clear…</button>
           </div>
-  ` : `<p class="muted" style="margin-top:10px;font-size:12px">No exported jobs older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} to clear right now.</p>`;
+  ` : `<p class="muted" style="margin-top:10px;font-size:0.75rem">No exported jobs older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} to clear right now.</p>`;
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Phone Storage')}
@@ -1007,7 +1028,7 @@ function renderSettingsStorage() {
           <div class="storage-stat"><span class="storage-stat-label">Photos</span><span class="storage-stat-value">${photoStats.count} · ${escapeHTML(formatBytes(photoStats.bytes))}</span></div>` : ''}
           <div class="storage-bar-wrap"><div class="storage-bar ${barClass}" style="width:${stats.pct}%"></div></div>
           ${fullNote}
-          <p class="muted" style="margin-top:10px;font-size:12px">Browsers cap local data at around 5 MB. Export a backup and clear old jobs before you get close to the limit.</p>
+          <p class="muted" style="margin-top:10px;font-size:0.75rem">Browsers cap local data at around 5 MB. Export a backup and clear old jobs before you get close to the limit.</p>
           ${pruneBlock}
         </div>
       </div>
@@ -1024,7 +1045,7 @@ function renderSettingsStorage() {
         </div>
         ${cloudOn ? `
         <label class="label" style="margin-top:14px">Photos older than (months)</label>
-        <p class="muted" style="font-size:12px;margin:0 0 6px">Photos in the cloud older than this are offered for removing from this phone. A tap brings any of them back.</p>
+        <p class="muted" style="font-size:0.75rem;margin:0 0 6px">Photos in the cloud older than this are offered for removing from this phone. A tap brings any of them back.</p>
         <input aria-label="Photos older than (months)" class="input" id="photo-age-input" type="number" inputmode="numeric" min="1" max="120" value="${state.photoAgeMonths || PHOTO_AGE_DEFAULT}">
         <div class="btn-row">
           <button class="btn-primary" id="photo-age-save" data-action="photo-age-save">Save</button>
@@ -1055,7 +1076,7 @@ function renderSetupSection() {
           </span>
         </label>`).join('');
   const errBlock = state.setupError
-    ? `<p class="muted" style="color:#c0392b;margin-top:8px;font-size:13px">${escapeHTML(state.setupError)}</p>` : '';
+    ? `<p class="muted" style="color:#c0392b;margin-top:8px;font-size:0.8125rem">${escapeHTML(state.setupError)}</p>` : '';
   return `
       <div class="settings-section">
         <h2 class="h2">Share setup</h2>
@@ -1419,7 +1440,7 @@ function renderSettingsClients() {
   const rebuildBlock = state.sessions.length ? `
     <div class="settings-section">
       <button class="preset-action-btn" id="clients-rebuild-btn" data-action="clients-rebuild">${icon('rotate-cw')} Rebuild from my jobs</button>
-      <p class="muted" style="margin:8px 0 0;font-size:12px">Scans every saved job and adds any client or site that isn't already listed. Useful after importing jobs. It only adds — it never changes or removes what's here.</p>
+      <p class="muted" style="margin:8px 0 0;font-size:0.75rem">Scans every saved job and adds any client or site that isn't already listed. Useful after importing jobs. It only adds — it never changes or removes what's here.</p>
     </div>
   ` : '';
 
@@ -1460,7 +1481,7 @@ function renderSettingsReport(part) {
        <button class="preset-action-btn preset-action-danger" id="report-logo-remove" data-action="report-logo-remove">${icon('trash-2')} Remove logo</button>`
     : `<button class="preset-action-btn" id="report-logo-pick-btn" data-action="report-logo-pick">${icon('upload')} Upload logo</button>`;
   const logoError = state.reportSettingsError
-    ? `<p class="muted" style="color:#c0392b;margin-top:8px;font-size:12px">${escapeHTML(state.reportSettingsError)}</p>`
+    ? `<p class="muted" style="color:#c0392b;margin-top:8px;font-size:0.75rem">${escapeHTML(state.reportSettingsError)}</p>`
     : '';
 
   // v36: live preview of the next certificate number from the current prefix +
@@ -1571,7 +1592,7 @@ function renderSettingsReport(part) {
               `<button type="button" class="filename-token-chip" data-action="report-filename-token" data-arg="${escapeHTML(t)}">${escapeHTML(t.replace(/[{}]/g, ''))}</button>`
             ).join('')}
           </div>
-          <p class="muted" style="font-size:12px;margin-top:6px">Underscores become spaces, characters a file name can't hold are left out, and the date is written day first &mdash; for example <code>PAT Report Office 28-09-2026.pdf</code>.</p>
+          <p class="muted" style="font-size:0.75rem;margin-top:6px">Underscores become spaces, characters a file name can't hold are left out, and the date is written day first &mdash; for example <code>PAT Report Office 28-09-2026.pdf</code>.</p>
         </div>
 
         <div class="settings-section">
@@ -1581,7 +1602,7 @@ function renderSettingsReport(part) {
           <div${rs.certEnabled ? '' : ' style="opacity:.5"'}>
             <label class="label" style="margin-top:12px">Prefix</label>
             <input aria-label="Certificate number prefix" class="input" id="report-cert-prefix" value="${escapeHTML(rs.certPrefix || '')}" placeholder="e.g. BPS- or BPS-{year}-" autocapitalize="characters" autocomplete="off" spellcheck="false"${rs.certEnabled ? '' : ' disabled'}>
-            <p class="muted" style="font-size:12px;margin-top:4px">Use <code>{year}</code> to insert the test year, e.g. <code>BPS-{year}-</code> → <code>BPS-2026-0001</code>.</p>
+            <p class="muted" style="font-size:0.75rem;margin-top:4px">Use <code>{year}</code> to insert the test year, e.g. <code>BPS-{year}-</code> → <code>BPS-2026-0001</code>.</p>
             <div class="cert-number-row">
               <div>
                 <label class="label">Digits</label>
@@ -1592,7 +1613,7 @@ function renderSettingsReport(part) {
                 <input aria-label="Next certificate number" class="input" id="report-cert-next" type="number" inputmode="numeric" min="1" value="${escapeHTML(String(rs.certNextNumber))}"${rs.certEnabled ? '' : ' disabled'}>
               </div>
             </div>
-            <p class="muted" style="font-size:12px;margin-top:8px">Next certificate will look like: <strong>${escapeHTML(certPreview)}</strong></p>
+            <p class="muted" style="font-size:0.75rem;margin-top:8px">Next certificate will look like: <strong>${escapeHTML(certPreview)}</strong></p>
           </div>
         </div>
 
@@ -1625,7 +1646,7 @@ function renderSettingsReport(part) {
         <label class="label">Address</label>
         <textarea aria-label="Company address" class="textarea" id="report-company-address" style="min-height:80px" placeholder="Optional — printed under the company name">${escapeHTML(rs.companyAddress)}</textarea>
         <label class="label">Logo</label>
-        <p class="muted" style="font-size:12px;margin-top:0">A PNG or JPEG. Large images are scaled down automatically.</p>
+        <p class="muted" style="font-size:0.75rem;margin-top:0">A PNG or JPEG. Large images are scaled down automatically.</p>
         ${logoBlock}
         ${logoError}
         <input type="file" id="report-logo-file" data-change-action="report-logo-file" accept="image/png,image/jpeg" style="display:none">
@@ -1748,8 +1769,8 @@ function renderPhotoBackupSection() {
 
   const exportBlock = stats.count
     ? `<button class="backup-action-btn primary" id="photo-export-btn" data-action="photo-export">${icon('upload')} Export photos (.json)</button>
-       <p class="muted" style="margin-top:8px;font-size:12px">${stats.count} photo${stats.count === 1 ? '' : 's'} on this device · about ${escapeHTML(formatBytes(Math.round(stats.bytes * 1.37)))} as a file.</p>`
-    : `<p class="muted" style="font-size:12px">No photos on this device yet. Photos are added from the FAIL screen.</p>`;
+       <p class="muted" style="margin-top:8px;font-size:0.75rem">${stats.count} photo${stats.count === 1 ? '' : 's'} on this device · about ${escapeHTML(formatBytes(Math.round(stats.bytes * 1.37)))} as a file.</p>`
+    : `<p class="muted" style="font-size:0.75rem">No photos on this device yet. Photos are added from the FAIL screen.</p>`;
 
   return `
       <div class="settings-section">
@@ -1758,7 +1779,7 @@ function renderPhotoBackupSection() {
         ${exportBlock}
         <input type="file" id="photo-import-file" data-change-action="photo-import-file" accept="application/json,.json" style="display:none">
         <button class="backup-action-btn" id="photo-import-btn" data-action="photo-import" style="margin-top:10px">${icon('download')} Import photos (.json)</button>
-        <p class="muted" style="margin-top:8px;font-size:12px">Importing adds to what's already here — it never replaces your jobs. Restore your backup first, then import photos.</p>
+        <p class="muted" style="margin-top:8px;font-size:0.75rem">Importing adds to what's already here — it never replaces your jobs. Restore your backup first, then import photos.</p>
       </div>
   `;
 }

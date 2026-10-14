@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V120: rolled forward — V120 on top, V117 dropped. -->
+      <!-- v8: rolling 3-version changelog. V121: rolled forward — V121 on top, V118 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V121</strong> &middot; October 2026</p>
+        <p class="muted">Bigger text if you want it: Settings &rarr; Theme &amp; Sound &rarr; Text size offers Standard, Large and Larger. Standard looks exactly as before.</p>
         <p><strong>V120</strong> &middot; October 2026</p>
         <p class="muted">Works better with VoiceOver: it says when an item is logged, reads out pop-up messages and names every box you type in. Nothing changes on screen.</p>
         <p><strong>V119</strong> &middot; October 2026</p>
         <p class="muted">Coloured words are easier to read: green pass, red fail and blue link text are a little stronger. The PASS and FAIL buttons look the same.</p>
-        <p><strong>V118</strong> &middot; October 2026</p>
-        <p class="muted">Grey text is easier to read: hints and secondary text are darker in the light theme and lighter in the dark theme.</p>
 
 
         </div>
@@ -221,7 +221,7 @@ function renderSettingsContact() {
         <h3>Report a problem</h3>
         <p>Found a bug, or got an idea? Tap below. The app fills in your version, phone and settings automatically — you just describe what happened.</p>
         <button class="bug-report-btn" id="bug-open" data-action="bug-open">${icon('bug')} Report a problem</button>
-        <p class="muted" style="font-size:12px;margin-top:10px">Your job data stays on your phone. Reports carry counts and settings only — never client names, sites or asset numbers.</p>
+        <p class="muted" style="font-size:0.75rem;margin-top:10px">Your job data stays on your phone. Reports carry counts and settings only — never client names, sites or asset numbers.</p>
       </div>
       ${renderBugSheet()}
     </div>
@@ -304,7 +304,7 @@ function renderBugSheet() {
         <details class="bug-diag">
           <summary>What gets sent with this (tap to check)</summary>
           <pre class="bug-diag-pre">${escapeHTML(diagnosticsText())}</pre>
-          <p class="muted" style="font-size:12px">Counts and settings only. No client names, sites, locations, asset numbers or notes.</p>
+          <p class="muted" style="font-size:0.75rem">Counts and settings only. No client names, sites, locations, asset numbers or notes.</p>
         </details>
       </div>
 
@@ -352,7 +352,7 @@ function renderCloudAccount() {
     body = `
       <div class="info-card">
         <h3>Enter your code</h3>
-        <p class="muted" style="font-size:13px">We emailed a code to <strong>${escapeHTML(c.email)}</strong>.</p>
+        <p class="muted" style="font-size:0.8125rem">We emailed a code to <strong>${escapeHTML(c.email)}</strong>.</p>
         <label class="label" for="cloud-code">Code</label>
         <input class="input cloud-code-input" id="cloud-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" ${dis}>
         ${msg}
@@ -364,7 +364,7 @@ function renderCloudAccount() {
     body = `
       <div class="info-card">
         <h3>Sign in</h3>
-        <p class="muted" style="font-size:13px">We'll email you a code. No password.</p>
+        <p class="muted" style="font-size:0.8125rem">We'll email you a code. No password.</p>
         <label class="label" for="cloud-email">Email</label>
         <input class="input" id="cloud-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" value="${escapeHTML(c.email || '')}" placeholder="you@example.com" ${dis}>
         ${msg}
@@ -377,7 +377,7 @@ function renderCloudAccount() {
       ${renderSettingsSubHeader('Account')}
       <div class="info-card">
         <h2>Cloud account (test)</h2>
-        <p class="muted" style="font-size:12px">While you're signed in, your jobs, clients and sites, testers, presets, report settings and most other settings are copied to the cloud test (see Sync). Theme, sound, haptics and the barcode scanner stay set on each phone, and the app works exactly the same signed in or not, signal or not.</p>
+        <p class="muted" style="font-size:0.75rem">While you're signed in, your jobs, clients and sites, testers, presets, report settings and most other settings are copied to the cloud test (see Sync). Theme, sound, haptics and the barcode scanner stay set on each phone, and the app works exactly the same signed in or not, signal or not.</p>
       </div>
       ${body}
     </div>
@@ -396,7 +396,7 @@ function renderCloudLocked() {
   const body = hasCloud ? `
       <div class="info-card" id="cloud-locked">
         <h3>Invite-only test</h3>
-        <p class="muted" style="font-size:13px">The cloud is being tested with a few engineers before it opens to everyone. Enter your access code to continue. You'll only be asked once on this phone.</p>
+        <p class="muted" style="font-size:0.8125rem">The cloud is being tested with a few engineers before it opens to everyone. Enter your access code to continue. You'll only be asked once on this phone.</p>
         <label class="label" for="cloud-access-code">Access code</label>
         <input class="input cloud-code-input" id="cloud-access-code" type="text" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="Code">
         ${msg}
@@ -452,14 +452,14 @@ function renderCloudSync() {
       <div class="info-card">
         <h3>Jobs</h3>
         <p id="sync-counts"><strong>${sum.upToDate}</strong> of ${sum.total} job${sum.total === 1 ? '' : 's'} in the cloud and up to date${sum.waiting ? ` &middot; <strong>${sum.waiting}</strong> waiting to send` : ''}</p>
-        ${sum.recTotal ? `<p id="sync-rec-counts" style="font-size:14px">Clients &amp; sites: <strong>${sum.recUpToDate}</strong> of ${sum.recTotal} up to date</p>` : ''}
-        ${sum.listTotal ? `<p id="sync-list-counts" style="font-size:14px">Instruments &amp; presets: <strong>${sum.listUpToDate}</strong> of ${sum.listTotal} up to date</p>` : ''}
-        ${sum.rpTotal ? `<p id="sync-rp-counts" style="font-size:14px">Report settings &amp; templates: <strong>${sum.rpUpToDate}</strong> of ${sum.rpTotal} up to date</p>` : ''}
-        ${sum.gsTotal ? `<p id="sync-gs-counts" style="font-size:14px">General settings: <strong>${sum.gsUpToDate}</strong> of ${sum.gsTotal} up to date</p>` : ''}
-        ${sum.phReady && (sum.phTotal || sum.phCloudOnly) ? `<p id="sync-ph-counts" style="font-size:14px">Photos: <strong>${sum.phUp}</strong> of ${sum.phTotal} on this phone in the cloud${sum.phTotal > sum.phUp ? ` &middot; <strong>${sum.phTotal - sum.phUp}</strong> waiting to send` : ''}${sum.phCloudOnly ? ` &middot; <strong>${sum.phCloudOnly}</strong> only in the cloud` : ''}</p>` : ''}
-        ${inUse ? `<p class="muted" id="sync-inuse" style="font-size:13px">Tester in use: <strong>${escapeHTML(inUse)}</strong> &mdash; the same on each of your devices</p>` : ''}
-        <p class="muted" id="sync-last" style="font-size:13px">Last sent: ${stamp(sum.lastPushAt)}</p>
-        <p class="muted" id="sync-last-pull" style="font-size:13px">Last checked: ${stamp(sum.lastPullAt)}</p>
+        ${sum.recTotal ? `<p id="sync-rec-counts" style="font-size:0.875rem">Clients &amp; sites: <strong>${sum.recUpToDate}</strong> of ${sum.recTotal} up to date</p>` : ''}
+        ${sum.listTotal ? `<p id="sync-list-counts" style="font-size:0.875rem">Instruments &amp; presets: <strong>${sum.listUpToDate}</strong> of ${sum.listTotal} up to date</p>` : ''}
+        ${sum.rpTotal ? `<p id="sync-rp-counts" style="font-size:0.875rem">Report settings &amp; templates: <strong>${sum.rpUpToDate}</strong> of ${sum.rpTotal} up to date</p>` : ''}
+        ${sum.gsTotal ? `<p id="sync-gs-counts" style="font-size:0.875rem">General settings: <strong>${sum.gsUpToDate}</strong> of ${sum.gsTotal} up to date</p>` : ''}
+        ${sum.phReady && (sum.phTotal || sum.phCloudOnly) ? `<p id="sync-ph-counts" style="font-size:0.875rem">Photos: <strong>${sum.phUp}</strong> of ${sum.phTotal} on this phone in the cloud${sum.phTotal > sum.phUp ? ` &middot; <strong>${sum.phTotal - sum.phUp}</strong> waiting to send` : ''}${sum.phCloudOnly ? ` &middot; <strong>${sum.phCloudOnly}</strong> only in the cloud` : ''}</p>` : ''}
+        ${inUse ? `<p class="muted" id="sync-inuse" style="font-size:0.8125rem">Tester in use: <strong>${escapeHTML(inUse)}</strong> &mdash; the same on each of your devices</p>` : ''}
+        <p class="muted" id="sync-last" style="font-size:0.8125rem">Last sent: ${stamp(sum.lastPushAt)}</p>
+        <p class="muted" id="sync-last-pull" style="font-size:0.8125rem">Last checked: ${stamp(sum.lastPullAt)}</p>
         ${msg}
         <button class="btn-primary" id="sync-push" data-action="sync-push" ${dis} style="margin-top:10px">${busy ? 'Working…' : 'Push now'}</button>
         <button class="backup-action-btn" id="sync-pull" data-action="sync-pull" ${dis} style="margin-top:8px">↓ Check for updates</button>
@@ -472,7 +472,7 @@ function renderCloudSync() {
       ${renderSettingsSubHeader('Sync')}
       <div class="info-card">
         <h2>Sync (test)</h2>
-        <p class="muted" style="font-size:12px">Jobs, your clients and sites, your test instruments and item presets, and which tester is in use are copied both ways between this phone and the cloud: sent a few seconds after you stop logging, and checked for whenever you sign in, reopen the app or get signal back. Which preset is in use stays separate on each device. The example job is never sent. Deleting a job, client, site, instrument or preset deletes it on your other device too; jobs that used a deleted instrument keep their own copy of its details. Clearing old jobs only removes them from this phone, and the cloud keeps them. Photos are copied up to the cloud while the app is open, after their job, with a small preview; deleting a photo, an item or a job on either device deletes its cloud photos too. Photos don't come down by themselves: a photo that's only in the cloud shows with a &#9729;, and comes down to this phone when you tap it. This phone is still the master copy &mdash; keep making backups as normal.</p>
+        <p class="muted" style="font-size:0.75rem">Jobs, your clients and sites, your test instruments and item presets, and which tester is in use are copied both ways between this phone and the cloud: sent a few seconds after you stop logging, and checked for whenever you sign in, reopen the app or get signal back. Which preset is in use stays separate on each device. The example job is never sent. Deleting a job, client, site, instrument or preset deletes it on your other device too; jobs that used a deleted instrument keep their own copy of its details. Clearing old jobs only removes them from this phone, and the cloud keeps them. Photos are copied up to the cloud while the app is open, after their job, with a small preview; deleting a photo, an item or a job on either device deletes its cloud photos too. Photos don't come down by themselves: a photo that's only in the cloud shows with a &#9729;, and comes down to this phone when you tap it. This phone is still the master copy &mdash; keep making backups as normal.</p>
       </div>
       ${body}
     </div>
@@ -534,7 +534,7 @@ function renderSyncHeld(sy) {
     return `
       <div class="info-card sync-held-row" data-held-id="${escapeHTML(key)}" style="margin-top:8px">
         <p><strong>${name}</strong></p>
-        <p class="muted" style="font-size:13px">${what}</p>
+        <p class="muted" style="font-size:0.8125rem">${what}</p>
         ${cmp}${btns(key, dis, phone, cloud)}
       </div>`;
   };
@@ -576,8 +576,8 @@ function renderSyncHeld(sy) {
     }
     return `
       <div class="info-card sync-held-row" data-held-id="${escapeHTML(key)}" style="margin-top:8px">
-        <p><span class="muted" style="font-size:12px">${tag}</span><br><strong>${title}</strong></p>
-        ${lines.map(l => `<p class="muted" style="font-size:13px">${l}</p>`).join('')}
+        <p><span class="muted" style="font-size:0.75rem">${tag}</span><br><strong>${title}</strong></p>
+        ${lines.map(l => `<p class="muted" style="font-size:0.8125rem">${l}</p>`).join('')}
         ${btns(key, dis, phone, cloud)}
       </div>`;
   };
@@ -627,8 +627,8 @@ function renderSyncHeld(sy) {
     }
     return `
       <div class="info-card sync-held-row" data-held-id="${escapeHTML(key)}" style="margin-top:8px">
-        <p><span class="muted" style="font-size:12px">${tag}</span>${title ? `<br><strong>${title}</strong>` : ''}</p>
-        ${lines.map(l => `<p class="muted" style="font-size:13px">${l}</p>`).join('')}
+        <p><span class="muted" style="font-size:0.75rem">${tag}</span>${title ? `<br><strong>${title}</strong>` : ''}</p>
+        ${lines.map(l => `<p class="muted" style="font-size:0.8125rem">${l}</p>`).join('')}
         ${btns(key, dis, phone, cloud)}
       </div>`;
   };
@@ -643,11 +643,11 @@ function renderSyncHeld(sy) {
   const gens = held.filter(isGs);
   const lists = held.filter(h => h.kind && h.kind !== 'session' && h.kind !== 'client' && h.kind !== 'site' && !isRp(h) && !isGs(h));
   const groups = (jobs.length ? 1 : 0) + (recs.length ? 1 : 0) + (lists.length ? 1 : 0) + (reps.length ? 1 : 0) + (gens.length ? 1 : 0);
-  const sub = (id, text) => `<h4 id="${id}" style="margin:14px 0 0;font-size:14px">${text}</h4>`;
+  const sub = (id, text) => `<h4 id="${id}" style="margin:14px 0 0;font-size:0.875rem">${text}</h4>`;
   return `
     <div class="info-card" id="sync-held" style="margin-top:12px">
       <h3>Needs a decision</h3>
-      <p class="muted" style="font-size:13px">Nothing has been changed on this phone. ${held.length === 1 ? 'This one' : 'These'} couldn\u2019t be settled automatically without the risk of losing work, so choose which copy to keep.</p>
+      <p class="muted" style="font-size:0.8125rem">Nothing has been changed on this phone. ${held.length === 1 ? 'This one' : 'These'} couldn\u2019t be settled automatically without the risk of losing work, so choose which copy to keep.</p>
     </div>
     ${jobs.length && groups > 1 ? sub('sync-held-jobs', 'Jobs') : ''}
     ${jobs.map(jobRow).join('')}
@@ -673,10 +673,10 @@ function openSyncDiffSheet(entry, diff) {
   const pair = (f) => (f.here == null && f.cloud == null)
     ? `${escapeHTML(f.label)} is different`
     : `${escapeHTML(f.label)} &mdash; this phone: ${val(f.here)} &middot; cloud: ${val(f.cloud)}`;
-  const row = (inner) => `<div style="padding:6px 0;border-top:1px solid var(--border);font-size:13px;line-height:1.45">${inner}</div>`;
-  const more = (total) => total > max ? `<p class="muted" style="font-size:12px;margin:6px 0 0">and ${total - max} more</p>` : '';
+  const row = (inner) => `<div style="padding:6px 0;border-top:1px solid var(--border);font-size:0.8125rem;line-height:1.45">${inner}</div>`;
+  const more = (total) => total > max ? `<p class="muted" style="font-size:0.75rem;margin:6px 0 0">and ${total - max} more</p>` : '';
   const section = (id, title, list, render) => list.length ? `
-      <h4 id="${id}" style="margin:14px 0 4px;font-size:14px">${title}</h4>
+      <h4 id="${id}" style="margin:14px 0 4px;font-size:0.875rem">${title}</h4>
       ${list.slice(0, max).map(x => row(render(x))).join('')}${more(list.length)}` : '';
 
   const summary = [];
@@ -693,10 +693,10 @@ function openSyncDiffSheet(entry, diff) {
 
   const name = entry && entry.name ? escapeHTML(entry.name) : 'Untitled job';
   const body = diff.none
-    ? `<p class="muted" id="sync-diff-none" style="font-size:13px">No differences found: the two copies hold the same details and items. Either answer leaves you with the same job.</p>`
+    ? `<p class="muted" id="sync-diff-none" style="font-size:0.8125rem">No differences found: the two copies hold the same details and items. Either answer leaves you with the same job.</p>`
     : `
-      <p class="muted" id="sync-diff-summary" style="font-size:13px;margin:0 0 6px">${summary.join(' &middot; ')}</p>
-      ${effects.map(e => `<p class="muted" style="font-size:13px;margin:0 0 6px">${e}</p>`).join('')}
+      <p class="muted" id="sync-diff-summary" style="font-size:0.8125rem;margin:0 0 6px">${summary.join(' &middot; ')}</p>
+      ${effects.map(e => `<p class="muted" style="font-size:0.8125rem;margin:0 0 6px">${e}</p>`).join('')}
       ${section('sync-diff-details', 'Job details', diff.details, pair)}
       ${section('sync-diff-here', 'Only on this phone', diff.onlyHere, (l) => escapeHTML(l))}
       ${section('sync-diff-cloud', 'Only in the cloud', diff.onlyCloud, (l) => escapeHTML(l))}

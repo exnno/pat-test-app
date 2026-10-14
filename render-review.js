@@ -700,7 +700,7 @@ function renderEditSession() {
         </div>
         <label class="label">Retest interval (months)</label>
         <input aria-label="Retest interval (months)" class="input" id="ef-retest-months" data-input-action="ef-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(String(months))}">
-        <p class="muted" style="margin:6px 0 0;font-size:12px">Captured from your default when you switched this on; change it here for this job only.</p>
+        <p class="muted" style="margin:6px 0 0;font-size:0.75rem">Captured from your default when you switched this on; change it here for this job only.</p>
       `;
     }
   }
@@ -714,7 +714,7 @@ function renderEditSession() {
       <div class="card">
         <label class="label">Site</label>
         <input aria-label="Site" class="input" id="ef-site" data-input-action="ef-site" value="${escapeHTML(state.editForm.site)}">
-        <p class="muted" style="margin:6px 0 0;font-size:12px">This is the site name saved on the session. Editing it here changes only this session, not your Clients list.</p>
+        <p class="muted" style="margin:6px 0 0;font-size:0.75rem">This is the site name saved on the session. Editing it here changes only this session, not your Clients list.</p>
         <label class="label">Engineer</label>
         <input aria-label="Engineer" class="input" id="ef-engineer" data-input-action="ef-engineer" value="${escapeHTML(state.editForm.engineer)}">
         <label class="label">Session name</label>
@@ -881,7 +881,7 @@ function renderRetestReminders() {
             <h3 class="bulk-sheet-title">${escapeHTML(name)}</h3>
             <button class="fail-close-btn" id="retest-action-close" data-action="retest-action-close" aria-label="Close">×</button>
           </div>
-          <p style="margin:0 0 14px;font-size:14px;line-height:1.5;color:var(--text)">Once you've contacted the customer, mark the outcome to clear this from your chase list.</p>
+          <p style="margin:0 0 14px;font-size:0.875rem;line-height:1.5;color:var(--text)">Once you've contacted the customer, mark the outcome to clear this from your chase list.</p>
           <button class="btn-primary" style="margin-bottom:8px" data-action="retest-mark-booked" data-arg="${s.id}">${icon('check')} Rebooked — job won</button>
           <button class="btn-secondary" style="margin-bottom:8px" data-action="retest-mark-declined" data-arg="${s.id}">Declined — lost the job</button>
           <button class="btn-tertiary" data-action="retest-untrack" data-arg="${s.id}">Stop reminding me about this job</button>

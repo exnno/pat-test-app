@@ -563,7 +563,7 @@ function renderInstrumentListHTML() {
   }).join('');
 
   const footer = list.length >= INSTRUMENTS_MAX
-    ? `<p class="muted" style="margin:10px 0 0;font-size:12px">That's the limit of ${INSTRUMENTS_MAX} instruments. Delete one to add another.</p>`
+    ? `<p class="muted" style="margin:10px 0 0;font-size:0.75rem">That's the limit of ${INSTRUMENTS_MAX} instruments. Delete one to add another.</p>`
     : `<button class="btn-secondary" data-action="instrument-add" style="margin-top:10px">+ Add instrument</button>`;
 
   return rows + footer;
@@ -618,12 +618,12 @@ function renderSettingsInstrument() {
       </div>
 
       ${isActive ? `
-      <p class="muted" style="margin:0 0 8px;font-size:13px">${icon('check')} This is the instrument new jobs are recorded against.</p>
+      <p class="muted" style="margin:0 0 8px;font-size:0.8125rem">${icon('check')} This is the instrument new jobs are recorded against.</p>
       ` : `
       <button class="btn-secondary" data-action="instrument-make-active" data-arg="${escapeHTML(inst.id)}" style="margin-bottom:8px">Use this instrument for new jobs</button>
       `}
 
-      ${used ? `<p class="muted" style="margin:0 0 8px;font-size:12px">Recorded on ${used} job${used === 1 ? '' : 's'}. Editing it here updates what those certificates show.</p>` : ''}
+      ${used ? `<p class="muted" style="margin:0 0 8px;font-size:0.75rem">Recorded on ${used} job${used === 1 ? '' : 's'}. Editing it here updates what those certificates show.</p>` : ''}
 
       <button class="btn-primary" data-action="instrument-save" style="margin-top:8px">Save</button>
       <button class="btn-danger" data-action="instrument-delete" data-arg="${escapeHTML(inst.id)}" style="margin-top:10px;width:100%">Delete instrument</button>
@@ -658,6 +658,6 @@ function renderEditSessionInstrumentBlock() {
   return `
     <label class="label">Test instrument</label>
     <select aria-label="Test instrument" class="input" id="ef-instrument" data-change-action="ef-instrument">${opts}</select>
-    <p class="muted" style="margin:6px 0 0;font-size:12px">Recorded on this job, so its certificate always names the tester you actually used — even after you recalibrate or change instrument.</p>
+    <p class="muted" style="margin:6px 0 0;font-size:0.75rem">Recorded on this job, so its certificate always names the tester you actually used — even after you recalibrate or change instrument.</p>
   `;
 }

@@ -65,6 +65,7 @@ function buildSetupBundle(label, include) {
   if (inc.prefs) {
     sections.prefs = {
       theme: state.theme,
+      textSize: state.textSize,   // V121
       hapticsEnabled: state.hapticsEnabled,
       soundEnabled: state.soundEnabled,
       timestampsEnabled: state.timestampsEnabled,
@@ -263,6 +264,10 @@ function applySetupBundle(data) {
     if (pr.theme === 'light' || pr.theme === 'dark' || pr.theme === 'system') {
       state.theme = pr.theme;
       applyTheme(state.theme);
+    }
+    if (TEXT_SIZES.includes(pr.textSize)) {   // V121
+      state.textSize = pr.textSize;
+      applyTextSize(state.textSize);
     }
     if (typeof pr.hapticsEnabled === 'boolean') state.hapticsEnabled = pr.hapticsEnabled;
     if (typeof pr.soundEnabled === 'boolean') state.soundEnabled = pr.soundEnabled;

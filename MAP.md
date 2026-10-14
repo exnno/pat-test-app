@@ -1,4 +1,4 @@
-# PATGo — Code Map (V120)
+# PATGo — Code Map (V121)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -185,6 +185,19 @@ is discoverable from the file you happen to be editing.
     or a wrapping `<label>`) — harness 58e sweeps every screen for one. A tick or
     icon that is the ONLY sign of a state is `role="img"` with a label, never
     `aria-hidden`. The harness boot stands up `#sr-announcer` like `#app`.
+
+22. **Text sizes are rem, never px (V121).** Settings → Theme & Sound → Text
+    size scales the whole app through ONE number: `html { font-size }` in
+    styles.css (Standard pinned 16px, `html.ts-large` 18.4px, `html.ts-larger`
+    20.8px), switched by `applyTextSize()` (session.js) as a class on `<html>`.
+    So every `font-size` — stylesheet AND inline `style=""` in scripts — is
+    rem (px ÷ 16), and fixed icon sizes (`.ic` width/height) are rem too.
+    Kept px on purpose, and listed in the comment above the html rule: five
+    symbols in fixed-size marks (`.reading-polarity-box`, `.photo-thumb-remove`,
+    `.pm-group-tick`, `.pm-tick`, `.jm-tick`) and the three `.text-size-sample-*`
+    previews. Harness 59a sweeps every file a phone runs; a new fixed one goes
+    in 59's FIXED list AND that comment. The PDF (jsPDF `fontSize`) and CSV are
+    untouched by it. Pinch-zoom stays off (viewport `user-scalable=no`, 4A).
 
 ---
 
@@ -718,6 +731,8 @@ sequential for iOS memory.
 **Coupling:** throws on parse failure so report.js falls back to its iframe view.
 
 ### session.js (~2560 ln) — sessions and items
+V121: `applyTextSize` / `normaliseTextSize` sit beside `applyTheme` (rule 22). Text size is per phone like the
+theme: storage (pat:textsize), backup, setup prefs, reset row, bug-report line — never synced.
 ⚠ V104 readings check: `readingsCarry` (a PASS sheet's readings across "Change to
 FAIL") is read-then-cleared ONLY in `openReadingsSheet` (rule 4); dropped by
 `closeReadingsSheetState` (so `readingsChangeToFail` sets it AFTER that call) and
@@ -1488,10 +1503,12 @@ another file having parsed. Don't "DRY" this.
   `--fail-word` / `--accent-word`; `--pass` / `--fail` / `--accent` are for
   buttons, icons, borders, fills. Harness 56c fails any `color:` rule on a
   button colour unless its selector is in 56's BRAND_KEPT (icons + 26px+
-  display text). New icon on a brand colour → add it there; new word → use a
+  display text — written 1.625rem+ since V121). New icon on a brand colour → add it there; new word → use a
   -word token. Same for inline `style="color:…"` in scripts (feedback.js,
   render-review.js, render-settings.js carry three).
-- `index.html` (~3KB) — the `<script>` chain, `#app`, and (V120) `#sr-announcer` + `lang="en-GB"`. Small enough to read whole.
+  ⚠ V121: every font-size is rem (MAP rule 22); the text-size scale is the
+  block just above `* { box-sizing }` near the top.
+- `index.html` (~3KB) — the `<script>` chain, `#app`, and (V120) `#sr-announcer` + `lang="en-GB"`. Small enough to read whole. Viewport keeps `user-scalable=no` (V121 4A).
 - `sw.js` (~3.5KB) — `CACHE_VERSION` + `ASSETS`. Read whole.
 - `supabase.umd.js` — vendored supabase-js (MIT). NEVER read or grep it (218 KB,
   one minified line — it floods context). Exclude it: `grep --exclude=supabase.umd.js`.

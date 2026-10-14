@@ -156,6 +156,7 @@ let state = {
   searchQuery: '',
   // v7
   theme: 'system',                  // 'system' | 'light' | 'dark'
+  textSize: 'standard',             // V121: 'standard' | 'large' | 'larger'
   hapticsEnabled: true,
   selectionMode: false,
   selectedIndices: [],              // absolute indices into sess.items

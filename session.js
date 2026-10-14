@@ -403,6 +403,20 @@ function applyTheme(theme) {
   }
   // 'system' or anything else: no class, prefers-color-scheme media query wins.
 }
+
+// V121: text size. Every text size in styles.css (and every inline one) is in
+// rem, so one class on <html> scales the whole app: none = Standard (the html
+// rule pins 16px), ts-large = 115%, ts-larger = 130%. A class, like the theme
+// above, not an inline font-size — the stylesheet owns the numbers.
+function normaliseTextSize(v) {
+  return TEXT_SIZES.includes(v) ? v : 'standard';
+}
+function applyTextSize(size) {
+  const html = document.documentElement;
+  html.classList.remove('ts-large', 'ts-larger');
+  const s = normaliseTextSize(size);
+  if (s !== 'standard') html.classList.add('ts-' + s);
+}
 // ---------- v14: Session export-state ----------
 // Each session can carry two optional fields:
 //   exportedAt   — ISO timestamp of the last successful CSV export of THIS
