@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V123';",
-    to:   "const APP_VERSION = 'V122';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V124';",
+    to:   "const APP_VERSION = 'V123';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V121</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V120</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V121</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 61f)',
+    from: '        <p><strong>V122</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V121</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V122</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 62f)',
   },
 
   {
@@ -5547,7 +5547,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 61f)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 62f)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5998,7 +5998,7 @@ const MUTATIONS = [
     // each release's own group pins which welcome is current.
     from: "const WELCOME_VERSION = 'V",
     to:   "const WELCOME_VERSION = 'V0",
-    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (61f)",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (62f)",
   },
   {
     name: "M837 (V114) Engineer & Tester says sessions again",
@@ -6076,10 +6076,11 @@ const MUTATIONS = [
     // V120: welcome rolled — re-aimed at V120's first line; 58f pins it.
     // V121: welcome rolled — re-aimed at V121's first line; 59f pinned it.
     // V122: welcome rolled — re-aimed at V122's first line; 60f pinned it.
-    // V123: welcome rolled — re-aimed at V123's first line; 61f pins it.
-    from: "<li><strong>VoiceOver keeps your place.</strong>",
+    // V123: welcome rolled — re-aimed at V123's first line; 61f pinned it.
+    // V124: welcome rolled — re-aimed at V124's first line; 62f pins it.
+    from: "<li><strong>Updates find you.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (61f)",
+    why:  "11A: the welcome says plainly what changed on screen (62f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6778,13 +6779,8 @@ const MUTATIONS = [
     to:   "    'text=?'\n",
     why:  "a report about cramped screens needs to say which size (59e)",
   },
-  {
-    name: "M955 (V121) the About changelog loses V121's line",
-    file: "render-help.js",
-    from: "Bigger text if you want it: Settings",
-    to:   "Settings",
-    why:  "the About page keeps the last three versions' lines (61f)",
-  },
+  // M955 (V121's About line) RETIRED V124: V121 rolled off the About page, so
+  // there is no line left to lose. 62f pins that it is gone.
   // ---- V122 (1A–5A): Sessions are now called Jobs. Group 60 + M956–M968. ----
   {
     name: "M956 (V122) the empty list says No sessions yet",
@@ -6875,7 +6871,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Sessions are now called Jobs everywhere in the app",
     to:   "Renamed",
-    why:  "the About page must say what changed in this version (61f)",
+    why:  "the About page must say what changed in this version (62f)",
   },
   // ---- V123 (1A–4A): where VoiceOver lands after a redraw. Group 61 + M969–M991. ----
   {
@@ -7044,7 +7040,281 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "VoiceOver keeps your place: after a tap",
     to:   "Better",
-    why:  "the About page must say what changed in this version (61f)",
+    why:  "the About page must say what changed in this version (62f)",
+  },
+  // ---- V124 (0A 1A 2A 3A 4A): friendlier updates. Group 62 + M993–M1031. ----
+  {
+    name: "M993 (V124) GET_VERSION answers nothing",
+    file: "sw.js",
+    from: "    event.ports[0].postMessage({ version: CACHE_VERSION });\n",
+    to:   "",
+    why:  "3A: the banner can never name the version (62a)",
+  },
+  {
+    name: "M994 (V124) asking the version activates the worker",
+    file: "sw.js",
+    from: "  if (event.data && event.data.type === 'GET_VERSION' && event.ports && event.ports[0]) {\n",
+    to:   "  if (event.data && event.data.type === 'GET_VERSION' && event.ports && event.ports[0]) {\n    self.skipWaiting();\n",
+    why:  "a question must never take over \u2014 v61.2 (62a 62e)",
+  },
+  {
+    name: "M995 (V124) a hotfix version loses its .1",
+    file: "boot.js",
+    from: "  return 'V' + m[1] + (m[2] ? '.' + m[2] : '');",
+    to:   "  return 'V' + m[1];",
+    why:  "3A: V124.1 would read as V124 (62a)",
+  },
+  {
+    name: "M996 (V124) anything the worker says is drawn",
+    file: "boot.js",
+    from: "  if (!m) return '';\n  return 'V'",
+    to:   "  if (!m) return String(key || '');\n  return 'V'",
+    why:  "only a well-formed key reaches the banner (62a)",
+  },
+  {
+    name: "M997 (V124) a worker no longer waiting is believed",
+    file: "boot.js",
+    from: "      if (!v || state.pendingWorker !== worker) return;",
+    to:   "      if (!v) return;",
+    why:  "the banner would name a version that is not the one waiting (62a)",
+  },
+  {
+    name: "M998 (V124) a found update never asks its version",
+    file: "boot.js",
+    from: "  updateAskVersion(worker);\n  updateRepaint();",
+    to:   "  updateRepaint();",
+    why:  "3A: plain words for ever (62d)",
+  },
+  {
+    name: "M999 (V124) coming back to the front is not hooked",
+    file: "boot.js",
+    from: "    document.addEventListener('visibilitychange', updateOnResume);\n",
+    to:   "",
+    why:  "1A: the whole point \u2014 a phone brought back from the background never looks (62b)",
+  },
+  {
+    name: "M1000 (V124) keys are not noted as use",
+    file: "boot.js",
+    from: "    document.addEventListener('keydown', updateNoteTouch, true);\n",
+    to:   "",
+    why:  "a scanner typing counts as someone using it (62b)",
+  },
+  {
+    name: "M1001 (V124) it looks while in the background",
+    file: "boot.js",
+    from: "  try { if (document.visibilityState === 'hidden') return; } catch (e) { /* treat as showing */ }",
+    to:   "",
+    why:  "1A: going away is not coming back (62b)",
+  },
+  {
+    name: "M1002 (V124) no once-a-minute limit on looking",
+    file: "boot.js",
+    from: "  if (!force && _updateLastCheck && now - _updateLastCheck < UPDATE_RESUME_GAP_MS) return false;   // 0 = never asked",
+    to:   "",
+    why:  "a quick switch away and back asks the server every time (62b)",
+  },
+  {
+    name: "M1003 (V124) the hourly look is gone",
+    file: "boot.js",
+    from: "  if (_updateLastCheck && now - _updateLastCheck >= UPDATE_CHECK_MS) updateCheckNow(true);\n",
+    to:   "",
+    why:  "1A: an app left open all day never looks (62b)",
+  },
+  {
+    name: "M1004 (V124) launch keeps no registration",
+    file: "boot.js",
+    from: "      _updateReg = reg;\n",
+    to:   "",
+    why:  "nothing to ask on return or hourly \u2014 1A silently off (62b)",
+  },
+  {
+    name: "M1005 (V124) a found update never looks for the safe moment",
+    file: "boot.js",
+    from: "  updateRepaint();\n  updateTryLater();\n}",
+    to:   "  updateRepaint();\n}",
+    why:  "2A: found at launch, never goes in by itself (62b)",
+  },
+  {
+    name: "M1006 (V124) it updates on any screen",
+    file: "boot.js",
+    from: "  if (state.view !== 'sessions') return false;                    // the Jobs list only",
+    to:   "",
+    why:  "2A: a reload mid-job \u2014 exactly what v61.2 forbade (62c)",
+  },
+  {
+    name: "M1007 (V124) a half-typed New job is lost",
+    file: "boot.js",
+    from: "  if (_updateNewFormTyped()) return false;                        // a New job half filled in",
+    to:   "",
+    why:  "2A: nothing typed is ever thrown away (62c)",
+  },
+  {
+    name: "M1008 (V124) the Engineer box is not read",
+    file: "boot.js",
+    from: "'nf-start': '1', 'nf-engineer': eng };",
+    to:   "'nf-start': '1' };",
+    why:  "Engineer is copied to state only on Create \u2014 its box is the only record (62c)",
+  },
+  {
+    name: "M1009 (V124) an open New job form blocks even when empty",
+    file: "boot.js",
+    from: "  if (!nf || !nf.show) return false;\n  const eng",
+    to:   "  if (!nf || !nf.show) return false;\n  return true;\n  const eng",
+    why:  "a phone with no jobs opens on the form \u2014 a new user would never update (62c)",
+  },
+  {
+    name: "M1010 (V124) it updates under the tour",
+    file: "boot.js",
+    from: "  if (state.tourOpen) return false;\n",
+    to:   "",
+    why:  "2A (62c)",
+  },
+  {
+    name: "M1011 (V124) it updates under the not-saved sheet",
+    file: "boot.js",
+    from: "  if (state.saveFailure && !state.saveFailureDismissed) return false;\n",
+    to:   "",
+    why:  "R16: the not-saved sheet offers a backup of what's on screen \u2014 a reload loses it (62c)",
+  },
+  {
+    name: "M1012 (V124) a typed search is thrown away",
+    file: "boot.js",
+    from: "  if (state.searchQuery) return false;                            // a search typed",
+    to:   "",
+    why:  "2A: nothing typed (62c)",
+  },
+  {
+    name: "M1013 (V124) ticking or deleting cloud jobs is interrupted",
+    file: "boot.js",
+    from: "  if (cj && (cj.selecting || cj.busy || cj.q)) return false;      // ticking, deleting, searching",
+    to:   "  if (cj && cj.selecting) return false;",
+    why:  "a cloud delete mid-way, or a cloud search, is cut off (62c)",
+  },
+  {
+    name: "M1014 (V124) it updates mid-push",
+    file: "boot.js",
+    from: "  if (typeof _syncRunning !== 'undefined' && _syncRunning) return false;  // a push in flight",
+    to:   "",
+    why:  "a push cut off half-way \u2014 late, never wrong, but needless (62c)",
+  },
+  {
+    name: "M1015 (V124) sheets and the cursor are ignored",
+    file: "boot.js",
+    from: "  if (_updateSheetOpen() || _updateFieldHeld()) return false;\n  if (_updateLastTouch",
+    to:   "  if (_updateLastTouch",
+    why:  "2A: a sheet or a box with the cursor in it (62c)",
+  },
+  {
+    name: "M1016 (V124) a backdrop does not count as open",
+    file: "boot.js",
+    from: "'.report-preview-sheet', '.modal-backdrop']) {\n    try { if (document.querySelector(sel)) return true; }",
+    to:   "'.report-preview-sheet']) {\n    try { if (document.querySelector(sel)) return true; }",
+    why:  "the welcome, setup and tour sit on a backdrop (62c)",
+  },
+  {
+    name: "M1017 (V124) a pick list with the cursor is not typing",
+    file: "boot.js",
+    from: "  if (tag === 'TEXTAREA' || tag === 'SELECT' || ae.isContentEditable === true) return true;",
+    to:   "  if (tag === 'TEXTAREA' || ae.isContentEditable === true) return true;",
+    why:  "a choice half made (62c)",
+  },
+  {
+    name: "M1018 (V124) it reloads under a tap",
+    file: "boot.js",
+    from: "  if (_updateLastTouch && Date.now() - _updateLastTouch < UPDATE_IDLE_MS) return false;   // 0 = never touched",
+    to:   "",
+    why:  "2A: someone is using it right now (62c)",
+  },
+  {
+    name: "M1019 (V124) it updates in the background",
+    file: "boot.js",
+    from: "  try { if (document.visibilityState === 'hidden') return false; } catch (e) { /* showing */ }",
+    to:   "",
+    why:  "2A: iOS may freeze it half-way; the engineer comes back to a surprise (62c)",
+  },
+  {
+    name: "M1020 (V124) the update is applied twice",
+    file: "boot.js",
+    from: "  if (_updateApplying || !updateSafeMoment()) return false;",
+    to:   "  if (!updateSafeMoment()) return false;",
+    why:  "one SKIP_WAITING per update (62c)",
+  },
+  {
+    name: "M1021 (V124) a tap does not arm the look",
+    file: "boot.js",
+    from: "  if (st && st.updateAvailable) updateTryLater();\n",
+    to:   "",
+    why:  "2A: after the last tap nothing looks again (62c)",
+  },
+  {
+    name: "M1022 (V124) the look never applies",
+    file: "boot.js",
+    from: "  _updateTimer = setTimeout(() => { _updateTimer = null; updateTryApply(); }, UPDATE_IDLE_MS);",
+    to:   "  _updateTimer = setTimeout(() => { _updateTimer = null; }, UPDATE_IDLE_MS);",
+    why:  "2A off in effect (62c)",
+  },
+  {
+    name: "M1023 (V124) a redraw does not arm the look",
+    file: "render-core.js",
+    from: "  if (state.updateAvailable && typeof updateTryLater === 'function') { try { updateTryLater(); } catch (e) {} }\n",
+    to:   "",
+    why:  "arriving on the Jobs list never puts the update in (62c)",
+  },
+  {
+    name: "M1024 (V124) the banner says Update available again",
+    file: "render-core.js",
+    from: "    ? `PATGo ${escapeHTML(state.updateVersion)} is ready`",
+    to:   "    ? 'Update available'",
+    why:  "3A (62a 62d)",
+  },
+  {
+    name: "M1025 (V124) \u00d7 hides nothing",
+    file: "render-core.js",
+    from: "  const banner = (state.updateAvailable && !state.updateDismissed) ? `",
+    to:   "  const banner = state.updateAvailable ? `",
+    why:  "\u00d7 (62d)",
+  },
+  {
+    name: "M1026 (V124) \u00d7 throws the update away",
+    file: "boot.js",
+    from: "function dismissUpdateBanner() {\n  state.updateDismissed = true;",
+    to:   "function dismissUpdateBanner() {\n  state.updateDismissed = true;\n  state.updateAvailable = false;",
+    why:  "before V124 \u00d7 did this \u2014 the update then waited for a cold launch (62d)",
+  },
+  {
+    name: "M1027 (V124) a found update redraws under the cursor",
+    file: "boot.js",
+    from: "  if (_updateSheetOpen() || _updateFieldHeld()) return false;\n  render();",
+    to:   "  render();",
+    why:  "MAP rule 3: 1A finds updates mid-job, a redraw drops the keyboard (62d)",
+  },
+  {
+    name: "M1028 (V124) a new update stays hidden",
+    file: "boot.js",
+    from: "  state.updateDismissed = false;\n  document.body.classList.add",
+    to:   "  document.body.classList.add",
+    why:  "a dismissed V125 must not hide V126 (62d)",
+  },
+  {
+    name: "M1029 (V124) the worker takes over at install again",
+    file: "sw.js",
+    from: "      cache.addAll(ASSETS.map(url => new Request(url, { cache: 'reload' }))))",
+    to:   "      cache.addAll(ASSETS.map(url => new Request(url, { cache: 'reload' })))).then(() => self.skipWaiting())",
+    why:  "v61.2: every update would reload under the engineer (62e)",
+  },
+  {
+    name: "M1030 (V124) the About changelog loses V124's line",
+    file: "render-help.js",
+    from: "Updates without the fuss: PATGo checks",
+    to:   "Better",
+    why:  "the About page must say what changed in this version (62f)",
+  },
+  {
+    name: "M1031 (V124) the room for the banner is a fixed 64px again",
+    file: "styles.css",
+    from: "body.has-update-banner .screen { padding-top: 4rem; }",
+    to:   "body.has-update-banner .screen { padding-top: 64px; }",
+    why:  "at Larger text the banner (68px) covers the top of the screen (62d)",
   },
 ];
 
