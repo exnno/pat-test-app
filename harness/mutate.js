@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V119';",
-    to:   "const APP_VERSION = 'V119';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V120';",
+    to:   "const APP_VERSION = 'V120';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V117</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V116</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V117</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 56e)',
+    from: '        <p><strong>V118</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V117</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V118</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 58f)',
   },
 
   {
@@ -5545,7 +5545,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 56e 57d)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 58f)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5996,7 +5996,7 @@ const MUTATIONS = [
     // each release's own group pins which welcome is current.
     from: "const WELCOME_VERSION = 'V",
     to:   "const WELCOME_VERSION = 'V0",
-    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (56e)",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (58f)",
   },
   {
     name: "M837 (V114) Engineer & Tester says sessions again",
@@ -6068,9 +6068,10 @@ const MUTATIONS = [
     // release's first line. Re-aim it at each welcome's copy, or retire it.
     // V118: no welcome (5A) — V117's sheet stays, so the anchor stays; 55e pins it.
     // V119: no welcome again (6A) — anchor unchanged; 56e pins it.
-    from: "<li><strong>Report Settings is now two pages.</strong>",
-    to:   "<li><strong>Two pages.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (56e)",
+    // V120: welcome rolled — re-aimed at V120's first line; 58f pins it.
+    from: "<li><strong>PATGo works better with VoiceOver.</strong>",
+    to:   "<li><strong>Better.</strong>",
+    why:  "11A: the welcome says plainly what changed on screen (58f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6380,7 +6381,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Grey text is easier to read: hints",
     to:   "Hints",
-    why:  "the About page must say what changed in this version \u2014 V118's line stays until it rolls off (56e)",
+    why:  "the About page must say what changed in this version \u2014 V118's line stays until it rolls off (58f)",
   },
   {
     name: "M898 (V119) light red words go back to the button red",
@@ -6450,7 +6451,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Coloured words are easier to read: green",
     to:   "Green",
-    why:  "the About page must say what changed in this version (56e)",
+    why:  "the About page must say what changed in this version (58f)",
   },
   {
     name: "M908 (V119) dark green words take the old darker green",
@@ -6507,12 +6508,148 @@ const MUTATIONS = [
     to:   "",
     why:  "3A: the row stays one line tall however long the value (57b)",
   },
+  // M916 (V119.1, the hotfix's own cache key) RETIRED V120: the key it broke is
+  // gone. M772 (stable prefix) + 58f pin each release's key.
+  // ---------------------------------------------------------------- V120
   {
-    name: "M916 (V119.1) the hotfix ships without its cache key",
-    file: "sw.js",
-    from: "const CACHE_VERSION = 'pat-v119-1';",
-    to:   "const CACHE_VERSION = 'pat-v119';",
-    why:  "a hotfix that keeps V119's key never reaches installed phones (57d)",
+    name: "M917 (V119.1; standing from V120) the PDF file name drops the client",
+    file: "report.js",
+    from: "'{site}': session.site || session.name || '',",
+    to:   "'{site}': session.name || '',",
+    why:  "2B: the file name keeps the whole client and site — its check outlived the hotfix's release lines (24a 57d)",
+  },
+  {
+    name: "M918 (V120) the announcer is switched off",
+    file: "index.html",
+    from: 'class="sr-only" aria-live="polite" aria-atomic="true"',
+    to:   'class="sr-only" aria-live="off" aria-atomic="true"',
+    why:  "1A: a live region set to off is never spoken (58a)",
+  },
+  {
+    name: "M919 (V120) the announcer is missing from index.html",
+    file: "index.html",
+    from: '  <div id="sr-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>\n',
+    to:   '',
+    why:  "1A: it must exist BEFORE its text changes, or VoiceOver often ignores it (58a)",
+  },
+  {
+    name: "M920 (V120) the hidden style hides it from VoiceOver too",
+    file: "styles.css",
+    from: "  clip: rect(0, 0, 0, 0);\n  clip-path: inset(50%);",
+    to:   "  display: none;",
+    why:  "1A: display:none hides text from screen readers as well as eyes (58a)",
+  },
+  {
+    name: "M921 (V120) announce() does not clear first",
+    file: "feedback.js",
+    from: "  el.textContent = '';\n  _announceTimer = setTimeout",
+    to:   "  _announceTimer = setTimeout",
+    why:  "1A: the same message twice in a row is only spoken once (58b)",
+  },
+  {
+    name: "M922 (V120) announce() speaks the oldest of two",
+    file: "feedback.js",
+    from: "  if (_announceTimer) { clearTimeout(_announceTimer); _announceTimer = null; }\n  el.textContent = '';",
+    to:   "  if (_announceTimer) return;\n  el.textContent = '';",
+    why:  "1A: newest wins — a stale message must not replace the current one (58b)",
+  },
+  {
+    name: "M923 (V120) a missing announcer is not built",
+    file: "feedback.js",
+    from: "      document.body.appendChild(el);\n    } catch { return; }",
+    to:   "      return;\n    } catch { return; }",
+    why:  "1A: an old cached index.html with new scripts must still speak (58b)",
+  },
+  {
+    name: "M924 (V120) pop-ups are not spoken",
+    file: "feedback.js",
+    from: "  announce(message);\n  el.textContent = message;",
+    to:   "  el.textContent = message;",
+    why:  "1A: every pop-up message goes through the announcer (58c)",
+  },
+  {
+    name: "M925 (V120) the pop-up is read twice",
+    file: "feedback.js",
+    from: "  el.setAttribute('aria-hidden', 'true');\n  announce(message);",
+    to:   "  el.setAttribute('role', 'status');\n  announce(message);",
+    why:  "1A: spoken by the announcer, so the toast itself is hidden from VoiceOver (58c)",
+  },
+  {
+    name: "M926 (V120) logging an item says nothing",
+    file: "session.js",
+    from: "  if (typeof announce === 'function') announce(loggedAnnouncement(item, spokenPos, spokenEdit));\n  // V99 (5A)",
+    to:   "  // V99 (5A)",
+    why:  "2A: PASS/FAIL give no pop-up, so VoiceOver is told in words (58d)",
+  },
+  {
+    name: "M927 (V120) an overwrite is announced as a new item",
+    file: "session.js",
+    from: "  const spokenEdit = state.cursor < sess.items.length;\n  if (state.cursor < sess.items.length) {\n    // v17: editing an existing item",
+    to:   "  const spokenEdit = false;\n  if (state.cursor < sess.items.length) {\n    // v17: editing an existing item",
+    why:  "2A: an edit says Updated, not Logged (58d)",
+  },
+  {
+    name: "M928 (V120) the spoken item number is one out",
+    file: "session.js",
+    from: "  const spokenPos = state.cursor + 1;\n  const spokenEdit = state.cursor < sess.items.length;\n  if (state.cursor < sess.items.length) {\n    // v17: editing an existing item",
+    to:   "  const spokenPos = state.cursor;\n  const spokenEdit = state.cursor < sess.items.length;\n  if (state.cursor < sess.items.length) {\n    // v17: editing an existing item",
+    why:  "2A: Item N is the item's number in the job, counting from 1 (58d)",
+  },
+  {
+    name: "M929 (V120) Copy last says nothing",
+    file: "session.js",
+    from: "  if (typeof announce === 'function') announce(loggedAnnouncement(item, spokenPos, spokenEdit));   // V120 (2A)\n",
+    to:   "",
+    why:  "2A: Copy last logs one item, so it speaks like PASS does (58d)",
+  },
+  {
+    name: "M930 (V120) a fail is spoken as a pass",
+    file: "session.js",
+    from: "item && item.result === 'fail' ? 'fail' :",
+    to:   "item && item.result === 'fail' ? 'pass' :",
+    why:  "2A: the spoken result must be the logged one (58d)",
+  },
+  {
+    name: "M931 (V120) the asset box has no spoken name",
+    file: "render-core.js",
+    from: '<input aria-label="Asset number" class="input-big" id="f-asset"',
+    to:   '<input class="input-big" id="f-asset"',
+    why:  "3A: VoiceOver would just say \"text field\" (58e)",
+  },
+  {
+    name: "M932 (V120) a fail-reason measure select loses its name",
+    file: "render-settings.js",
+    from: '<select aria-label="What ${escapeHTML(reason)} measures" class="sort-select reason-tag-select"',
+    to:   '<select class="sort-select reason-tag-select"',
+    why:  "3A: the sweep finds any field left unnamed, not only the asset box (58e)",
+  },
+  {
+    name: "M933 (V120) a reminder select is drawn without its heading",
+    file: "render-settings.js",
+    from: "REMINDER_BACKUP_CHOICES, 'Backup reminder')}",
+    to:   "REMINDER_BACKUP_CHOICES)}",
+    why:  "3A: the select carries its heading only if the caller passes it (58e)",
+  },
+  {
+    name: "M934 (V120) a cloud job's tick is hidden from VoiceOver again",
+    file: "render-review.js",
+    from: "const tick = cs.selecting && !j.onPhone ? `<span class=\"jm-tick${on ? ' is-on' : ''}\" role=\"img\" aria-label=\"${on ? 'Selected' : 'Not selected'}\">",
+    to:   "const tick = cs.selecting && !j.onPhone ? `<span class=\"jm-tick${on ? ' is-on' : ''}\" aria-hidden=\"true\">",
+    why:  "3A: the tick is the only sign a job is selected (58e)",
+  },
+  {
+    name: "M935 (V120) the tour's example screen reads as loose fields",
+    file: "tour.js",
+    from: '<div class="tour-mock" role="img" aria-label="Example screen: ${escapeHTML(slide.title)}">',
+    to:   '<div class="tour-mock">',
+    why:  "3A: the example screens are pictures; their pretend fields must not be read as real ones (58e)",
+  },
+  {
+    name: "M936 (V120) the language is back to plain English",
+    file: "index.html",
+    from: '<html lang="en-GB">',
+    to:   '<html lang="en">',
+    why:  "5A: en-GB gives a British voice and UK date reading (58e)",
   },
 ];
 

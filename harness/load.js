@@ -102,9 +102,12 @@ function bootApp(opts = {}) {
     if (sandbox[k] === undefined) sandbox[k] = winStub[k];
   }
 
-  // index.html provides exactly one element: #app. Everything else is created
-  // by render(). Tests that need a specific id register it themselves.
+  // index.html provides exactly two elements: #app and (V120) #sr-announcer,
+  // the screen-reader live region. Everything else is created by render().
+  // Tests that need a specific id register it themselves. 58a pins that
+  // index.html really has the announcer, so this stand-in cannot drift from it.
   sandbox.document.register('app');
+  sandbox.document.register('sr-announcer');
 
   const order  = scriptOrderFromIndex();
   const skip   = new Set(opts.skip || []);
