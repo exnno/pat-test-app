@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V121';",
-    to:   "const APP_VERSION = 'V121';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V122';",
+    to:   "const APP_VERSION = 'V122';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V119</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V118</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V119</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 59f)',
+    from: '        <p><strong>V120</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V119</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V120</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 60f)',
   },
 
   {
@@ -4198,7 +4198,8 @@ const MUTATIONS = [
     name: "M580 (V101) a locked job can be split",
     file: "session.js",
     // V110: re-anchored to one place in the file (it matched moveJobBlockReason and moveToBlockReason; moveJobBlockReason (V101) is meant).
-    from: "  if (sess.locked) return 'This job is locked. Unlock it in Session settings first, then move the items.';\n  const n = (ids || []).length;",
+    // V122: re-anchored — the message now says Job settings.
+    from: "  if (sess.locked) return 'This job is locked. Unlock it in Job settings first, then move the items.';\n  const n = (ids || []).length;",
     to:   "  const n = (ids || []).length;",
     why:  "a locked job is finished paperwork — splitting it changes what its certificate covers (38a, 4A)",
   },
@@ -5546,7 +5547,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 59f)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 60f)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5997,7 +5998,7 @@ const MUTATIONS = [
     // each release's own group pins which welcome is current.
     from: "const WELCOME_VERSION = 'V",
     to:   "const WELCOME_VERSION = 'V0",
-    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (59f)",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (60f)",
   },
   {
     name: "M837 (V114) Engineer & Tester says sessions again",
@@ -6051,14 +6052,16 @@ const MUTATIONS = [
   {
     name: "M844 (V114) the button Settings quotes is renamed and Settings is not",
     file: "render-review.js",
-    from: "data-action=\"edit-session\">Session settings</button>",
-    to:   "data-action=\"edit-session\">Job settings</button>",
+    // V122: re-pointed — the button IS Job settings now (4B done); renamed again, Settings must follow.
+    from: "data-action=\"edit-session\">Job settings</button>",
+    to:   "data-action=\"edit-session\">Edit job</button>",
     why:  "Retest Reminders would tell the engineer to tap a button that no longer exists (51b)",
   },
   {
     name: "M845 (V114) the main list is renamed and Settings is not",
     file: "render-core.js",
-    from: "<h1 class=\"h1\">PAT Sessions</h1>",
+    // V122: re-pointed — the list IS Jobs now (2A).
+    from: "<h1 class=\"h1\">Jobs</h1>",
     to:   "<h1 class=\"h1\">PAT Jobs</h1>",
     why:  "Settings would name a screen the engineer cannot find (51b)",
   },
@@ -6070,16 +6073,18 @@ const MUTATIONS = [
     // V118: no welcome (5A) — V117's sheet stays, so the anchor stays; 55e pins it.
     // V119: no welcome again (6A) — anchor unchanged; 56e pins it.
     // V120: welcome rolled — re-aimed at V120's first line; 58f pins it.
-    // V121: welcome rolled — re-aimed at V121's first line; 59f pins it.
-    from: "<li><strong>Bigger text if you want it.</strong>",
+    // V121: welcome rolled — re-aimed at V121's first line; 59f pinned it.
+    // V122: welcome rolled — re-aimed at V122's first line; 60f pins it.
+    from: "<li><strong>Sessions are now called Jobs.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (59f)",
+    why:  "11A: the welcome says plainly what changed on screen (60f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
     file: "render-settings.js",
-    from: "Open any job, tap <strong>Session settings</strong>",
-    to:   "Open any session, tap <strong>Session settings</strong>",
+    // V122: re-anchored — the button is Job settings now.
+    from: "Open any job, tap <strong>Job settings</strong>",
+    to:   "Open any session, tap <strong>Job settings</strong>",
     why:  "4A on the Retest Reminders page, which only draws its how-to while reminders are on (51a 51e)",
   },
   {
@@ -6444,13 +6449,8 @@ const MUTATIONS = [
     to:   ".settings-row-icon { color: var(--accent-word); }",
     why:  "3A: icons stay PATGo blue (3:1 is enough, and they pass) (52d 56d)",
   },
-  {
-    name: "M907 (V119) the About changelog loses V119's line",
-    file: "render-help.js",
-    from: "Coloured words are easier to read: green",
-    to:   "Green",
-    why:  "the About page must say what changed in this version (59f)",
-  },
+  // M907 (V119's About line) RETIRED V122: V119 rolled off the About page, so
+  // there is no line left to lose. 60f pins that it is gone.
   {
     name: "M908 (V119) dark green words take the old darker green",
     file: "styles.css",
@@ -6781,7 +6781,99 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Bigger text if you want it: Settings",
     to:   "Settings",
-    why:  "the About page must say what changed in this version (59f)",
+    why:  "the About page keeps the last three versions' lines (60f)",
+  },
+  // ---- V122 (1A–5A): Sessions are now called Jobs. Group 60 + M956–M968. ----
+  {
+    name: "M956 (V122) the empty list says No sessions yet",
+    file: "render-core.js",
+    from: "'No jobs yet'",
+    to:   "'No sessions yet'",
+    why:  "1A: every word the engineer reads says job (60a 60b)",
+  },
+  {
+    name: "M957 (V122) the Job settings screen is titled Edit session again",
+    file: "render-review.js",
+    from: '<div class="site-name">Job settings</div>',
+    to:   '<div class="site-name">Edit session</div>',
+    why:  "3A: the button and the screen it opens share one name (51b 60a 60b)",
+  },
+  {
+    name: "M958 (V122) a locked job's banner says Session locked",
+    file: "render-core.js",
+    from: "Job locked — no new entries",
+    to:   "Session locked — no new entries",
+    why:  "1A: the test screen of a locked job (60a 60b)",
+  },
+  {
+    name: "M959 (V122) the back button tells VoiceOver Back to sessions",
+    file: "render-core.js",
+    from: 'aria-label="Back to jobs"',
+    to:   'aria-label="Back to sessions"',
+    why:  "1A covers what VoiceOver reads, not only what shows (60a 60b)",
+  },
+  {
+    name: "M960 (V122) a confirm sheet nobody draws headlessly says sessions",
+    file: "session.js",
+    from: "title: 'Clear exported jobs?'",
+    to:   "title: 'Clear exported sessions?'",
+    why:  "the source sweep is what reaches pop-ups that need a real tidy-up to appear (60a)",
+  },
+  {
+    name: "M961 (V122) a nameless job is Session N again",
+    file: "session.js",
+    from: "    name: name.trim() || `Job ${state.sessions.length + 1}`,",
+    to:   "    name: name.trim() || `Session ${state.sessions.length + 1}`,",
+    why:  "4A: new nameless jobs are Job N (60c)",
+  },
+  {
+    name: "M962 (V122) loading quietly renames old Session N jobs",
+    file: "storage.js",
+    from: "  state.sessions = parseStoredSessions(localStorage.getItem(STORAGE_KEY));",
+    to:   "  state.sessions = parseStoredSessions(localStorage.getItem(STORAGE_KEY));\n  state.sessions.forEach(s => { if (/^Session \\d+$/.test(s.name || '')) s.name = s.name.replace('Session', 'Job'); });",
+    why:  "4A: a saved job's name is the engineer's data — never rewritten (60c)",
+  },
+  {
+    name: "M963 (V122) the Glossary drops the earlier-versions line",
+    file: "render-help.js",
+    from: " Earlier versions called this a session.'",
+    to:   "'",
+    why:  "5A: someone who learnt the old word can still find out what it means (60d)",
+  },
+  {
+    name: "M964 (V122) searching session no longer finds the Glossary",
+    file: "data.js",
+    from: "multi pick preset asset session client",
+    to:   "multi pick preset asset client",
+    why:  "5A: the old word stays a hidden search word (60d)",
+  },
+  {
+    name: "M965 (V122) the Glossary section is Jobs & sessions again",
+    file: "render-help.js",
+    from: "title: 'Jobs, clients & sites',",
+    to:   "title: 'Jobs & sessions',",
+    why:  "1A: the Glossary heading follows the rename (51e 60d)",
+  },
+  {
+    name: "M966 (V122) the tour shows + New session",
+    file: "tour.js",
+    from: '<button class="tour-cta tour-hl">+ New job</button>',
+    to:   '<button class="tour-cta tour-hl">+ New session</button>',
+    why:  "1A: the tour shows the button the engineer will actually tap (60a 60b)",
+  },
+  {
+    name: "M967 (V122) a CSV with no site or name is called PAT session",
+    file: "csv.js",
+    from: "|| 'job';",
+    to:   "|| 'session';",
+    why:  "1A: the file name is something the engineer reads (60e)",
+  },
+  {
+    name: "M968 (V122) the About changelog loses V122's line",
+    file: "render-help.js",
+    from: "Sessions are now called Jobs everywhere in the app",
+    to:   "Renamed",
+    why:  "the About page must say what changed in this version (60f)",
   },
 ];
 

@@ -30,7 +30,7 @@ module.exports = {
     'one of two fixed sentences and two buttons',
   'render-core.js · Draw signature':
     'one fixed line, a fixed-size signature box and two buttons',
-  'render-core.js · Session already exists':
+  'render-core.js · Job already exists':
     'two sentences whose only data is one site name, a date and two counts; three buttons',
   'render-core.js · Import summary':
     'a one-line result; the skipped-rows list scrolls inside its own 160 px box (.import-summary-list)',
