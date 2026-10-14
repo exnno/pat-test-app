@@ -1111,7 +1111,10 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
   line-height: 1;
 }
 /* Push the screen content down when banner is visible */
-body.has-update-banner .screen { padding-top: 64px; }
+/* V124: 4rem, not 64px — the room left for the banner grows with Text size
+   (V121). Standard is still exactly 64px; Large 73.6px, Larger 83.2px clear the
+   banner's measured 64 / 68px at 320px wide (it was 68px at Larger into 64). */
+body.has-update-banner .screen { padding-top: 4rem; }
 
 /* @@ banners: session lock */
 /* v8: Lock-session banner — sits inline at the top of the entry screen when

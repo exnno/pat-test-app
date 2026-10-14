@@ -8,6 +8,37 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V124
+V124 = friendlier updates (Stage 12; Peter 14 Oct, 0A 1A 2A 3A 4A). The app
+looks for a new version on launch, on every return to the front (once a minute
+at most) and hourly while in use (riding a touch — no timer); it puts the
+update in by itself only at the safe moment on the Jobs list (MAP rule 25),
+elsewhere the banner names the version and the engineer taps Refresh. No
+switch (4A). Harness group 62 + M993–M1030; 61f → 62f; M955 retired. **From
+V125 the deploy step is "open the app on the Jobs list and leave it a few
+seconds"** — V124 itself arrives the old way. Next candidates: "Export
+everything" (backup + every CSV + every certificate PDF — the base for lapse
+handling, R8); V123's VoiceOver leftovers. Outstanding (Peter): Supabase Pro +
+production project, ICO fee, privacy + processor terms.
+
+### V124 residuals (known, accepted)
+- Not seen on a real iPhone by Claude. The harness proves when it looks and
+  when it reloads; headless Chromium proved the real worker answers its version
+  and the banner names it (see the handoff). What iOS does on return from the
+  background is Peter's checklist from V125 on.
+- GitHub Pages' CDN keeps a file for ~10 minutes, so a look in the first
+  minutes after a commit can still be told "nothing new". The deploy wait stays.
+- × hides the banner until the next update is found or the app reloads; the
+  update itself still goes in at the safe moment (2A).
+- A search typed on the Jobs list blocks the self-update until it is cleared
+  (nothing typed is ever thrown away) — the banner still shows.
+- If SKIP_WAITING is sent and the reload never comes (the worker died), the
+  safe moment won't try again this app session; Refresh still works.
+- Harness: group 08's fake clock (`Date.now` replaced for the scanner tests)
+  is never put back, so every later group runs on it — found when 62's "never
+  touched" (0) read as 2 s ago. 62 and boot.js now treat 0 as never; group 08
+  should restore the real clock (its own small harness fix, no app change).
+
 ### Next after V123
 V123 = VoiceOver keeps its place — focus after a redraw (V120 4A; Peter 14 Oct,
 1A 2A 3A 4A). Same screen → the tapped control; new screen → its title

@@ -11,10 +11,44 @@
 // RUNS ON LOAD. Must be the LAST script in index.html.
 
 // ---------- Service worker + update detection (v7) ----------
+// V124 (1A 2A 3A 4A): friendlier updates. Before V124 the app looked for a new
+// version only on a cold launch. An iPhone home-screen app is mostly brought
+// back from the background, which never looked — hence "close it from the app
+// switcher and reopen twice" after every release. Now it looks:
+//   1A  on launch (register() does that), every time the app comes back to the
+//       front (at most once a minute), and at least hourly while it is in use —
+//       the hourly look rides the next touch, so an idle app runs no timer;
+//   2A  and puts the update in BY ITSELF only at a safe moment: the Jobs list,
+//       showing, nothing open, nothing typed, no push in flight, nobody touching
+//       the screen for UPDATE_IDLE_MS. Anywhere else the banner shows and the
+//       engineer chooses — v61.2's rule (never reload under someone mid-job,
+//       see sw.js install) stands. × hides the banner; the update still goes in
+//       at the next safe moment.
+//   3A  the banner names the version, asked of the waiting worker (sw.js
+//       GET_VERSION). An older worker never answers: the plain words stay.
+//   4A  no switch — an exception to R30, like Move and Delete.
+const UPDATE_CHECK_MS = 60 * 60 * 1000;   // 1A: at least hourly while in use
+const UPDATE_RESUME_GAP_MS = 60 * 1000;   // a quick look away and back doesn't re-ask
+const UPDATE_IDLE_MS = 3000;              // 2A: untouched this long before it reloads
+let _updateReg = null;                    // the registration, once register() resolves
+let _updateLastCheck = 0;                 // when the server was last asked
+let _updateLastTouch = 0;                 // the last tap or key, anywhere
+let _updateTimer = null;                  // the one pending safe-moment check
+let _updateApplying = false;              // SKIP_WAITING sent; the reload is coming
+
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
+  // V124: every tap or key counts as "someone is using it" (2A) and carries the
+  // hourly look (1A). Capture phase, passive: nothing here may stop a tap.
+  try {
+    document.addEventListener('pointerdown', updateNoteTouch, true);
+    document.addEventListener('keydown', updateNoteTouch, true);
+    document.addEventListener('visibilitychange', updateOnResume);
+  } catch (e) { /* no document events: launch still looks, the banner still works */ }
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').then(reg => {
+      _updateReg = reg;
+      _updateLastCheck = Date.now();   // register() has just looked
       // Check if a worker is already waiting from a previous tab/load.
       if (reg.waiting && navigator.serviceWorker.controller) {
         showUpdateBanner(reg.waiting);
@@ -42,11 +76,160 @@ function registerServiceWorker() {
   });
 }
 
+// 3A: 'pat-v124' → 'V124', a hotfix 'pat-v124-1' → 'V124.1', anything else → ''.
+function updateVersionLabel(key) {
+  const m = /^pat-v(\d+)(?:-(\d+))?$/.exec(String(key || ''));
+  if (!m) return '';
+  return 'V' + m[1] + (m[2] ? '.' + m[2] : '');
+}
+
+// Ask the server for a newer sw.js. force: skip the once-a-minute limit.
+// Offline, update() rejects — swallowed; the next look tries again.
+function updateCheckNow(force) {
+  const reg = _updateReg;
+  if (!reg || typeof reg.update !== 'function') return false;
+  const now = Date.now();
+  if (!force && _updateLastCheck && now - _updateLastCheck < UPDATE_RESUME_GAP_MS) return false;   // 0 = never asked
+  _updateLastCheck = now;
+  try {
+    const p = reg.update();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (e) { /* not fatal */ }
+  return true;
+}
+
+// state, or null. ⚠ MAP D1: when config.js fails to parse, even `typeof state`
+// throws (a TDZ binding) — these run from event listeners on a broken load too.
+function _updateState() {
+  try { return (typeof state === 'object' && state) ? state : null; } catch (e) { return null; }
+}
+
+// Every tap or key. The hourly look (1A) and the safe-moment wait (2A).
+function updateNoteTouch() {
+  const now = Date.now();
+  _updateLastTouch = now;
+  if (_updateLastCheck && now - _updateLastCheck >= UPDATE_CHECK_MS) updateCheckNow(true);
+  const st = _updateState();
+  if (st && st.updateAvailable) updateTryLater();
+}
+
+// The app comes back to the front (1A).
+function updateOnResume() {
+  try { if (document.visibilityState === 'hidden') return; } catch (e) { /* treat as showing */ }
+  updateCheckNow(false);
+  updateTryLater();
+}
+
+function _updateFieldHeld() {
+  const ae = document.activeElement;
+  if (!ae || ae === document.body || !ae.tagName) return false;
+  const tag = String(ae.tagName).toUpperCase();
+  if (tag === 'TEXTAREA' || tag === 'SELECT' || ae.isContentEditable === true) return true;
+  if (tag !== 'INPUT') return false;
+  const type = String((ae.getAttribute && ae.getAttribute('type')) || ae.type || 'text').toLowerCase();
+  return ['checkbox', 'radio', 'button', 'submit', 'reset', 'range'].indexOf(type) === -1;
+}
+
+// Anything open over the screen: a sheet, the fail sheet, the certificate
+// preview, the welcome / setup / tour backdrop. One selector per call (the
+// harness's stub DOM takes no selector lists).
+function _updateSheetOpen() {
+  for (const sel of ['.bulk-sheet', '.fail-sheet', '.report-preview-sheet', '.modal-backdrop']) {
+    try { if (document.querySelector(sel)) return true; } catch (e) { /* keep looking */ }
+  }
+  return false;
+}
+
+// The New job form is OPEN by default on a phone with no jobs (storage.js), so
+// "open" can't block — a brand-new user would never update. Typed-in can: any
+// box holding something other than what it starts with. Read from the boxes
+// (Engineer is only copied to state on Create) and from state (the rest is).
+function _updateNewFormTyped() {
+  const nf = state.newForm;
+  if (!nf || !nf.show) return false;
+  const eng = String(state.engineer || '').trim();
+  const start = { 'nf-client': '', 'nf-site': '', 'nf-name': '', 'nf-prefix': '', 'nf-start': '1', 'nf-engineer': eng };
+  for (const id of Object.keys(start)) {
+    const el = document.getElementById(id);
+    const v = el ? String(el.value == null ? '' : el.value).trim() : '';
+    if (v && v !== start[id]) return true;
+  }
+  if (nf.name || nf.site || nf.clientId || nf.siteId || nf.prefix) return true;
+  if (nf.startNo && String(nf.startNo).trim() !== '1') return true;
+  if (nf.engineer && String(nf.engineer).trim() !== eng) return true;
+  return false;
+}
+
+// 2A: the only moment the app reloads itself. Every condition is a reason a
+// reload would lose something or surprise someone.
+function updateSafeMoment() {
+  if (!_updateState()) return false;
+  if (!state.updateAvailable || !state.pendingWorker) return false;
+  try { if (document.visibilityState === 'hidden') return false; } catch (e) { /* showing */ }
+  if (state.view !== 'sessions') return false;                    // the Jobs list only
+  if (_updateNewFormTyped()) return false;                        // a New job half filled in
+  if (state.tourOpen) return false;
+  if (state.saveFailure && !state.saveFailureDismissed) return false;
+  if (state.searchQuery) return false;                            // a search typed
+  const cj = state.cloudJobs;
+  if (cj && (cj.selecting || cj.busy || cj.q)) return false;      // ticking, deleting, searching
+  if (typeof _syncRunning !== 'undefined' && _syncRunning) return false;  // a push in flight
+  if (_updateSheetOpen() || _updateFieldHeld()) return false;
+  if (_updateLastTouch && Date.now() - _updateLastTouch < UPDATE_IDLE_MS) return false;   // 0 = never touched
+  return true;
+}
+
+function updateTryApply() {
+  if (_updateApplying || !updateSafeMoment()) return false;
+  _updateApplying = true;
+  applyUpdate();
+  return true;
+}
+
+// Look again UPDATE_IDLE_MS after the latest touch, redraw or return to the
+// front — one timer, pushed back by each. Not safe then → nothing until the next
+// touch, redraw or return, so an idle app never polls.
+function updateTryLater() {
+  const st = _updateState();
+  if (!st || !st.updateAvailable || _updateApplying) return;
+  if (_updateTimer) clearTimeout(_updateTimer);
+  _updateTimer = setTimeout(() => { _updateTimer = null; updateTryApply(); }, UPDATE_IDLE_MS);
+}
+
+// 3A: ask the waiting worker its version on a private port.
+function updateAskVersion(worker) {
+  if (!worker || typeof worker.postMessage !== 'function' || typeof MessageChannel !== 'function') return false;
+  try {
+    const ch = new MessageChannel();
+    ch.port1.onmessage = (ev) => {
+      const v = updateVersionLabel(ev && ev.data && ev.data.version);
+      if (!v || state.pendingWorker !== worker) return;
+      state.updateVersion = v;
+      if (state.updateAvailable && !state.updateDismissed) updateRepaint();
+    };
+    worker.postMessage({ type: 'GET_VERSION' }, [ch.port2]);
+    return true;
+  } catch (e) { return false; }
+}
+
+// MAP rule 3: never redraw under a sheet or under the cursor — 1A now finds
+// updates mid-job, where a redraw would drop the keyboard. The next redraw that
+// happens anyway shows the banner.
+function updateRepaint() {
+  if (_updateSheetOpen() || _updateFieldHeld()) return false;
+  render();
+  return true;
+}
+
 function showUpdateBanner(worker) {
   state.updateAvailable = true;
   state.pendingWorker = worker;
+  state.updateVersion = '';
+  state.updateDismissed = false;
   document.body.classList.add('has-update-banner');
-  render();
+  updateAskVersion(worker);
+  updateRepaint();
+  updateTryLater();
 }
 
 function applyUpdate() {
@@ -58,8 +241,10 @@ function applyUpdate() {
   }
 }
 
+// V124: × hides the banner only. The update stays waiting and still goes in at
+// the next safe moment (2A); updateAvailable stays true for that.
 function dismissUpdateBanner() {
-  state.updateAvailable = false;
+  state.updateDismissed = true;
   document.body.classList.remove('has-update-banner');
   render();
 }

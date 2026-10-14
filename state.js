@@ -164,6 +164,8 @@ let state = {
   bulkLocationValue: '',
   updateAvailable: false,
   pendingWorker: null,              // SW that's installed and waiting
+  updateVersion: '',                // V124 (3A): 'V124' once the waiting worker says; '' = plain words
+  updateDismissed: false,           // V124: × hides the banner; the update still goes in (boot.js 2A)
   // v8
   calcCsa: '0.75',                  // matches pat-testing-training.net default
   calcLength: 0.75,

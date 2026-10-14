@@ -180,9 +180,16 @@ function render() {
   }
 
   // Update banner sits above the screen
-  const banner = state.updateAvailable ? `
+  // V124 (3A): the banner names the version the waiting worker reported
+  // (boot.js updateAskVersion); an older worker never says, so plain words.
+  // × hides it (updateDismissed) — the update still goes in at the next safe
+  // moment on the Jobs list (boot.js updateSafeMoment, 2A).
+  const updateWords = state.updateVersion
+    ? `PATGo ${escapeHTML(state.updateVersion)} is ready`
+    : 'New version ready';   // short: one line at 320px wide, Larger text
+  const banner = (state.updateAvailable && !state.updateDismissed) ? `
     <div class="update-banner" role="status">
-      <span class="update-banner-text">${icon('refresh-cw')} Update available</span>
+      <span class="update-banner-text">${icon('refresh-cw')} ${updateWords}</span>
       <div class="update-banner-actions">
         <button class="update-refresh-btn" id="update-refresh" data-action="update-refresh">Refresh</button>
         <button class="update-dismiss-btn" id="update-dismiss" data-action="update-dismiss" aria-label="Dismiss">×</button>
@@ -245,9 +252,9 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>VoiceOver keeps your place.</strong> After a tap it stays on the button you pressed instead of jumping back to the top. A new screen or pop-up starts at its title.</li>
-        <li><strong>Quick Pick says what's chosen.</strong> VoiceOver now tells you which item type or Multi Pick tile is selected.</li>
-        <li><strong>Nothing changes on screen.</strong> Without VoiceOver, the app looks and works exactly as before.</li>
+        <li><strong>Updates find you.</strong> PATGo now checks for a new version whenever you come back to it, not only when it starts.</li>
+        <li><strong>No more closing and reopening.</strong> When you're on the Jobs list with nothing open, the update goes in by itself in a second. It never happens in the middle of a job.</li>
+        <li><strong>The banner says which version.</strong> Anywhere else you'll see “PATGo V125 is ready” (or whichever it is) &mdash; tap Refresh when it suits you.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -546,6 +553,10 @@ function render() {
   // every view but 'entry', and on every state where a scan would be refused
   // anyway. typeof-guarded (rule 6).
   if (typeof focusAssetForScan === 'function') { try { focusAssetForScan(); } catch (e) {} }
+  // V124 (2A): with an update waiting, every redraw — arriving on the Jobs list,
+  // a sheet closing — looks for the safe moment again (boot.js; it waits for the
+  // screen to go untouched, so it never reloads under the tap that drew this).
+  if (state.updateAvailable && typeof updateTryLater === 'function') { try { updateTryLater(); } catch (e) {} }
 }
 
 // v34: attach pointer drawing to the live signature-pad canvas. Created fresh on

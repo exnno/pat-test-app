@@ -1,4 +1,4 @@
-# PATGo — Code Map (V123)
+# PATGo — Code Map (V124)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -217,6 +217,17 @@ is discoverable from the file you happen to be editing.
     left on a button a scanner can press. Never call `.focus()` on a text field
     from a redraw (keyboard). The decision runs in render()'s tail BEFORE
     `focusAssetForScan()`, so paired scanner mode still wins.
+
+25. **The app reloads itself at ONE moment only (V124).** `updateSafeMoment()`
+    (boot.js) is the definition: an update waiting, the page showing, the Jobs
+    list, no New job typed in, no tour, no not-saved sheet, no search, no cloud
+    select / delete / search, no push in flight, no sheet or backdrop in the
+    DOM, no text box / textarea / select holding the cursor, untouched for
+    `UPDATE_IDLE_MS`. ⚠ Anything new that can be OPEN or TYPED on the Jobs list
+    must be added there AND to harness 62c's blocker list, or the app can reload
+    under it. Everywhere else the banner, and the engineer taps Refresh (v61.2:
+    the worker never skips waiting at install — 62e). A found update must never
+    `render()` under a sheet or the cursor (`updateRepaint`, rule 3).
 
 ---
 
@@ -1472,11 +1483,17 @@ nothing. `handleDelegatedClick` returns early when no ancestor carries
 the post-boot half of the v16.1 net, which covers the FIRST render only. Assert
 this through `handleDelegatedClick`, never through `render()` directly.
 
-### boot.js (~300 ln) — startup, RUNS ON LOAD, must load LAST
+### boot.js (~670 ln) — startup, RUNS ON LOAD, must load LAST
 Service-worker registration and update banner, `bootIntegrityOK()`, the boot tail,
 the crash fallback screens, the v69 one-time data repair call.
+V124: update delivery — looks on launch / return to the front / hourly (riding
+a touch), the safe moment (rule 25), asking the waiting worker its version.
 **Touch to:** change the startup sequence, the SW update banner or the integrity
-guard. V99: `mapPinResume()` (session.js) runs before the first
+guard. **Coupling (V124):** render-core.js draws the banner
+(`state.updateVersion`, `updateDismissed`) and calls `updateTryLater()` in
+render()'s tail; sw.js answers `GET_VERSION`; dispatch.js `update-refresh` /
+`update-dismiss`. The update listeners read `state` through `_updateState()` —
+they run on a broken load too (D1). V99: `mapPinResume()` (session.js) runs before the first
 `loadFormForCursor()`/`render()` — it may set the active job, view and cursor.
 V105: `snapshotsBoot()` runs after the first render, inside the good-load block,
 typeof-guarded and NOT probed (snapshots.js is optional — rule 6).
@@ -1537,7 +1554,7 @@ another file having parsed. Don't "DRY" this.
   ⚠ V121: every font-size is rem (MAP rule 22); the text-size scale is the
   block just above `* { box-sizing }` near the top.
 - `index.html` (~3KB) — the `<script>` chain, `#app`, and (V120) `#sr-announcer` + `lang="en-GB"`. Small enough to read whole. Viewport keeps `user-scalable=no` (V121 4A).
-- `sw.js` (~3.5KB) — `CACHE_VERSION` + `ASSETS`. Read whole.
+- `sw.js` (~4KB) — `CACHE_VERSION` + `ASSETS`; V124: answers `GET_VERSION` on the port sent (the banner's version). Read whole.
 - `supabase.umd.js` — vendored supabase-js (MIT). NEVER read or grep it (218 KB,
   one minified line — it floods context). Exclude it: `grep --exclude=supabase.umd.js`.
 - `supabase/schema.sql`, `supabase/isolation-test.sql` — server side (v79). Pasted
