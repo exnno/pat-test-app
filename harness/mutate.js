@@ -517,7 +517,7 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V122';",
+    from: "const APP_VERSION = 'V123';",
     to:   "const APP_VERSION = 'V122';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V120</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V119</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V120</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 60f)',
+    from: '        <p><strong>V121</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V120</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V121</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 61f)',
   },
 
   {
@@ -5547,7 +5547,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 60f)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 61f)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5998,7 +5998,7 @@ const MUTATIONS = [
     // each release's own group pins which welcome is current.
     from: "const WELCOME_VERSION = 'V",
     to:   "const WELCOME_VERSION = 'V0",
-    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (60f)",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (61f)",
   },
   {
     name: "M837 (V114) Engineer & Tester says sessions again",
@@ -6060,9 +6060,10 @@ const MUTATIONS = [
   {
     name: "M845 (V114) the main list is renamed and Settings is not",
     file: "render-core.js",
-    // V122: re-pointed — the list IS Jobs now (2A).
-    from: "<h1 class=\"h1\">Jobs</h1>",
-    to:   "<h1 class=\"h1\">PAT Jobs</h1>",
+    // V122: re-pointed — the list IS Jobs now (2A). V123: re-anchored on the
+    // heading's new id + tabindex.
+    from: "<h1 class=\"h1\" id=\"screen-title\" tabindex=\"-1\">Jobs</h1>",
+    to:   "<h1 class=\"h1\" id=\"screen-title\" tabindex=\"-1\">PAT Jobs</h1>",
     why:  "Settings would name a screen the engineer cannot find (51b)",
   },
   {
@@ -6074,10 +6075,11 @@ const MUTATIONS = [
     // V119: no welcome again (6A) — anchor unchanged; 56e pins it.
     // V120: welcome rolled — re-aimed at V120's first line; 58f pins it.
     // V121: welcome rolled — re-aimed at V121's first line; 59f pinned it.
-    // V122: welcome rolled — re-aimed at V122's first line; 60f pins it.
-    from: "<li><strong>Sessions are now called Jobs.</strong>",
+    // V122: welcome rolled — re-aimed at V122's first line; 60f pinned it.
+    // V123: welcome rolled — re-aimed at V123's first line; 61f pins it.
+    from: "<li><strong>VoiceOver keeps your place.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (60f)",
+    why:  "11A: the welcome says plainly what changed on screen (61f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6450,7 +6452,7 @@ const MUTATIONS = [
     why:  "3A: icons stay PATGo blue (3:1 is enough, and they pass) (52d 56d)",
   },
   // M907 (V119's About line) RETIRED V122: V119 rolled off the About page, so
-  // there is no line left to lose. 60f pins that it is gone.
+  // there is no line left to lose. 60f pinned that it was gone.
   {
     name: "M908 (V119) dark green words take the old darker green",
     file: "styles.css",
@@ -6781,7 +6783,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Bigger text if you want it: Settings",
     to:   "Settings",
-    why:  "the About page keeps the last three versions' lines (60f)",
+    why:  "the About page keeps the last three versions' lines (61f)",
   },
   // ---- V122 (1A–5A): Sessions are now called Jobs. Group 60 + M956–M968. ----
   {
@@ -6794,8 +6796,8 @@ const MUTATIONS = [
   {
     name: "M957 (V122) the Job settings screen is titled Edit session again",
     file: "render-review.js",
-    from: '<div class="site-name">Job settings</div>',
-    to:   '<div class="site-name">Edit session</div>',
+    from: '<div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Job settings</div>',
+    to:   '<div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Edit session</div>',
     why:  "3A: the button and the screen it opens share one name (51b 60a 60b)",
   },
   {
@@ -6873,7 +6875,176 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Sessions are now called Jobs everywhere in the app",
     to:   "Renamed",
-    why:  "the About page must say what changed in this version (60f)",
+    why:  "the About page must say what changed in this version (61f)",
+  },
+  // ---- V123 (1A–4A): where VoiceOver lands after a redraw. Group 61 + M969–M991. ----
+  {
+    name: "M969 (V123) PASS is no longer a logging action",
+    file: "feedback.js",
+    from: "const FOCUS_LOG_ACTIONS = ['log-pass', 'log-fail', 'copy-last', 'multipick-fire'];",
+    to:   "const FOCUS_LOG_ACTIONS = ['log-fail', 'copy-last', 'multipick-fire'];",
+    why:  "2A: focus left on PASS is pressed again by a scanner's Enter or a space in a barcode (61c)",
+  },
+  {
+    name: "M970 (V123) refreshEntryAfterLog's 'logged' is ignored",
+    file: "feedback.js",
+    from: "  const logged = _focusLogged || mode === 'logged';",
+    to:   "  const logged = _focusLogged;",
+    why:  "2A: an overwrite logs through refreshEntryAfterLog alone and must end on the heading (61c)",
+  },
+  {
+    name: "M971 (V123) noteLastLog stops marking a log",
+    file: "session.js",
+    from: "  if (typeof focusMarkLogged === 'function') focusMarkLogged();",
+    to:   "",
+    why:  "2A: Multi Pick and Log again redraw through render(), and only this mark sends them to the heading (61c 61g)",
+  },
+  {
+    name: "M972 (V123) render() never decides where focus goes",
+    file: "render-core.js",
+    from: "  if (typeof focusAfterRender === 'function') { try { focusAfterRender(); } catch (e) {} }\n  // v67: paired mode",
+    to:   "  // v67: paired mode",
+    why:  "1A: without it every redraw leaves VoiceOver at the top of the page (61a 61c 61g)",
+  },
+  {
+    name: "M973 (V123) refreshEntryAfterLog decides AFTER the scanner's focus",
+    file: "render-core.js",
+    from: "  if (typeof focusAssetForScan === 'function') { try { focusAssetForScan(); } catch (e) {} }\n}\n// v20:",
+    to:   "  if (typeof focusAssetForScan === 'function') { try { focusAssetForScan(); } catch (e) {} }\n  if (typeof focusAfterRender === 'function') { try { focusAfterRender('logged'); } catch (e) {} }\n}\n// v20:",
+    why:  "paired scanner mode must still end with the cursor in the asset box (61c)",
+  },
+  {
+    name: "M974 (V123) a tap is not noted before its action",
+    file: "dispatch.js",
+    from: "  if (typeof focusNoteTap === 'function') { try { focusNoteTap(el); } catch (e4) {} }\n  try {",
+    to:   "  try {",
+    why:  "1A: the redraw cannot find the control it does not know was tapped (61e 61g)",
+  },
+  {
+    name: "M975 (V123) a change is not noted",
+    file: "dispatch.js",
+    from: "  if (typeof focusNoteTap === 'function') { try { focusNoteTap(el); } catch (e4) {} }   // V123: a switch or a list\n",
+    to:   "",
+    why:  "1A: a switch or list that redraws loses its place (61e 61g)",
+  },
+  {
+    name: "M976 (V123) a text box counts as a focus target",
+    file: "feedback.js",
+    from: "  if (tag === 'TEXTAREA') return true;\n  if (el.isContentEditable === true) return true;\n  if (tag !== 'INPUT') return false;",
+    to:   "  return false;",
+    why:  "focusing a text box raises the keyboard on every redraw (61b)",
+  },
+  {
+    name: "M977 (V123) focus scrolls the page",
+    file: "feedback.js",
+    from: "  try { el.focus({ preventScroll: true }); } catch (e) { try { el.focus(); } catch (e2) { return false; } }",
+    to:   "  try { el.focus(); } catch (e) { return false; }",
+    why:  "1A: invisible to sighted use — a redraw keeps its place; render() decides scroll (61g)",
+  },
+  {
+    name: "M978 (V123) _openSheet's cleanup does not report the close",
+    file: "feedback.js",
+    from: "    focusSheetClosed();   // V123 (3A): back to the control that opened it\n",
+    to:   "",
+    why:  "3A: closing a confirm or info sheet returns to the control that opened it (61d 61g)",
+  },
+  {
+    name: "M979 (V123) the confirm sheet does not report opening",
+    file: "feedback.js",
+    from: "    if (typeof opts.onConfirm === 'function') opts.onConfirm();\n  });\n  focusSheetOpened(sheet);   // V123 (3A)\n}",
+    to:   "    if (typeof opts.onConfirm === 'function') opts.onConfirm();\n  });\n}",
+    why:  "3A: an unreported sheet has no opener to go back to, and its title never takes focus (61d 61g)",
+  },
+  {
+    name: "M980 (V123) Reset this phone's sheet does not report opening",
+    file: "reset.js",
+    from: "  if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);   // V123 (3A)\n",
+    to:   "",
+    why:  "3A: every sheet appended to the page reports itself (61g sweep)",
+  },
+  {
+    name: "M981 (V123) a field the sheet focused loses the cursor to the title",
+    file: "feedback.js",
+    from: "  _focusSheetWasOpen = true;\n  if (_focusFieldHeld()) return 'kept';\n  return _focusSheetTitle(sheet) ? 'sheet' : 'none';",
+    to:   "  _focusSheetWasOpen = true;\n  return _focusSheetTitle(sheet) ? 'sheet' : 'none';",
+    why:  "3A: the name sheet and Other fail reason keep their cursor (61d)",
+  },
+  {
+    name: "M982 (V123) a sheet drawn by render() forgets its opener",
+    file: "feedback.js",
+    from: "      _focusOpener = tap || before;",
+    to:   "      _focusOpener = null;",
+    why:  "3A: closing returns to the opener, also for the sheets render() draws (61d)",
+  },
+  {
+    name: "M983 (V123) a log button is a target after a sheet closes",
+    file: "feedback.js",
+    from: "  if (!isLog(want) && want.view === view && _focusEl(focusFind(want))) return 'control';",
+    to:   "  if (want.view === view && _focusEl(focusFind(want))) return 'control';",
+    why:  "2A: a cancelled fail sheet must not leave focus on FAIL (61c)",
+  },
+  {
+    name: "M984 (V123) a move to another screen does not go to its heading",
+    file: "feedback.js",
+    from: "  if (logged || viewChanged) return focusScreenHeading() ? 'heading' : 'none';",
+    to:   "  if (logged) return focusScreenHeading() ? 'heading' : 'none';",
+    why:  "1A: a new screen starts at its title (61a)",
+  },
+  {
+    name: "M985 (V123) an old tap steers a later redraw",
+    file: "feedback.js",
+    from: "  const tap = (_focusTap && !(Date.now() - (_focusTap.at || 0) > FOCUS_TAP_MS)) ? _focusTap : null;\n  const before = _focusBefore;",
+    to:   "  const tap = _focusTap;\n  const before = _focusBefore;",
+    why:  "a Quick Pick tap (no redraw) must not drag VoiceOver back seconds later (61b)",
+  },
+  {
+    name: "M986 (V123) the Settings sub-pages lose their heading",
+    file: "render-settings.js",
+    from: "      <div class=\"site-name\" id=\"screen-title\" role=\"heading\" aria-level=\"1\" tabindex=\"-1\">${escapeHTML(title)}</div>",
+    to:   "      <div class=\"site-name\">${escapeHTML(title)}</div>",
+    why:  "every screen needs one heading to land on (61a sweep)",
+  },
+  {
+    name: "M987 (V123) the drawn Quick Pick grid loses aria-pressed",
+    file: "render-core.js",
+    from: " aria-pressed=\"${state.form.itemType === t ? 'true' : 'false'}\"",
+    to:   "",
+    why:  "4A: VoiceOver says which type is chosen (61e)",
+  },
+  {
+    name: "M988 (V123) a Quick Pick tap repaints the colour only",
+    file: "dispatch.js",
+    from: " x.setAttribute('aria-pressed', x === el ? 'true' : 'false');",
+    to:   "",
+    why:  "4A: the in-place repaint keeps aria-pressed in step (61e)",
+  },
+  {
+    name: "M989 (V123) typing a type repaints the colour only",
+    file: "events.js",
+    from: "        b.setAttribute('aria-pressed', b.dataset.type === val ? 'true' : 'false');   // V123 (4A): follows the colour\n",
+    to:   "",
+    why:  "4A: typing Kettle presses Kettle for VoiceOver too (61e)",
+  },
+  {
+    name: "M990 (V123) a tile repaints the colour only",
+    file: "multipick.js",
+    from: "    b.setAttribute('aria-pressed', on ? 'true' : 'false');\n",
+    to:   "",
+    why:  "4A: a chosen Multi Pick tile says selected (61e)",
+  },
+  {
+    name: "M991 (V123) a heading gets a focus ring",
+    file: "styles.css",
+    from: "[tabindex=\"-1\"]:focus { outline: none; }",
+    to:   "[tabindex=\"-1\"]:focus { outline: 2px solid red; }",
+    why:  "1A: invisible to sighted use (61g)",
+  },
+  {
+    name: "M992 (V123) the About changelog loses V123's line",
+    file: "render-help.js",
+    from: "VoiceOver keeps your place: after a tap",
+    to:   "Better",
+    why:  "the About page must say what changed in this version (61f)",
   },
 ];
 
