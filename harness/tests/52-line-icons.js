@@ -205,7 +205,8 @@ module.exports = async function () {
     const css = strip(read('styles.css'));
     t.ok(/\.empty-state-icon \{ color: var\(--text-hint\); \}/.test(css), '2A: empty states soft grey');
     t.ok(/\.wizard-icon \{ color: var\(--accent\); \}/.test(css), '3A: wizard icons PATGo blue');
-    t.ok(/\.empty-state-icon \.ic \{ width: 44px; height: 44px;/.test(css) && /\.wizard-icon \.ic \{ width: 48px; height: 48px;/.test(css), '…both large');
+    // V121: icon sizes are rem now (44px = 2.75rem, 48px = 3rem at Standard).
+    t.ok(/\.empty-state-icon \.ic \{ width: 2\.75rem; height: 2\.75rem;/.test(css) && /\.wizard-icon \.ic \{ width: 3rem; height: 3rem;/.test(css), '…both large');
   });
 
   /* 52g — RETIRED V116 (1A): the Classic emoji switch it tested is gone. Its

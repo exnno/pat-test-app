@@ -28,7 +28,7 @@
      58e  every field in every screen has a spoken name (sweep, comments
           stripped), the reminder selects carry their headings when drawn,
           the ticks and tour, and en-GB.
-     58f  release: V120, What's new rolled, cache, changelog. (55e → 56e → 58f.)
+     58f  release: V120 … — moved to 59f in V121.
 
    ⚠ 58e IS A SWEEP, LIKE 52c. A new <input>/<select>/<textarea> without a
    spoken name fails it: give it aria-label (what the visible label says), or
@@ -214,23 +214,5 @@ module.exports = async function run() {
 
     t.ok(/^<html lang="en-GB">$/m.test(read('index.html')), 'language is en-GB (British voice, UK dates)');
   });
-
-  /* ------------------------------------------------------------------ 58f */
-  await t.group('58f — release: V120, What’s new rolled, cache, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V120', 'APP_VERSION V120');
-    t.eq(app.run('WELCOME_VERSION'), 'V120', 'What’s new rolled to V120');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v120';", 'cache key pat-v120');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>PATGo works better with VoiceOver.</strong>', 'V120’s What’s new: VoiceOver line');
-    t.includes(core, '<li><strong>Nothing changes on screen.</strong>', 'V120’s What’s new: nothing visible changes');
-    t.excludes(core, 'Report Settings is now two pages', 'V117’s sheet copy gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V120</strong>'), b = help.indexOf('<p><strong>V119</strong>'), c = help.indexOf('<p><strong>V118</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V120, V119, V118');
-    t.excludes(help, '<p><strong>V117</strong>', 'V117 rolled off');
-    t.includes(help, 'Works better with VoiceOver: it says when', 'About: V120’s line');
-    t.includes(help, 'Coloured words are easier to read', 'About: V119’s line still there');
-    t.includes(help, 'Grey text is easier to read: hints', 'About: V118’s line still there');
-  });
+  // 58f (release: V120) moved to 59f in V121 — the release lines follow the newest release.
 };
