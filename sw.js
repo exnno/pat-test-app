@@ -10,7 +10,7 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v125';
+const CACHE_VERSION = 'pat-v126';
 const ASSETS = [
   './',
   './index.html',
@@ -97,6 +97,10 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_VERSION).map(k => caches.delete(k)))
+    // claim() takes over a first-visit page too, so it works offline at once.
+    // That fires controllerchange there as well; boot.js reloads only a page
+    // that loaded under a worker or asked for the update (V126,
+    // updateOnControllerChange) — a first visit is never reloaded.
     ).then(() => self.clients.claim())
   );
 });
