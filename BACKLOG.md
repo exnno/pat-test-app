@@ -8,6 +8,29 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V126
+V126 = a first visit never reloads itself (Stage 12; Peter 14 Oct, 0A 1A 2B).
+The V125 residual below, fixed: a service-worker takeover reloads only a page
+that loaded under a worker or asked for the update (boot.js
+`updateShouldReload`); sw.js still claims. One-line What's new (2B). Harness
+group 64 + M1061–M1072; 63f → 64f (exportall's standing checks kept as 63g);
+M992 retired; the service-worker stub now records and dispatches listeners
+(`opts.navigator.swController` = loaded under a worker). Next candidates
+(unchanged): lapse handling (R8 — needs an SQL decision on what "lapsed" means
+before Stripe: the app only reads `plan` / `trial_ends_at`); V123's VoiceOver
+leftovers; Tutorials (PN). Outstanding (Peter): Supabase Pro + production
+project, ICO fee, privacy + processor terms.
+
+### V126 residuals (known, accepted)
+- Not run on a real iPhone by Claude. Headless Chromium with a real service
+  worker: V125 navigated twice on a first visit, V126 once (controlled, no
+  console errors); Refresh after an update on a first-visit page reloaded into
+  it; an update put in from a second tab reloaded both tabs.
+- A first-visit page left open while ANOTHER tab puts an update in is not
+  reloaded (it never loaded under a worker and never asked). It keeps running
+  the page it fetched from the network; its next open is on the new version.
+  Two tabs of a brand-new install, one updating within the same visit — rare.
+
 ### Next after V125
 V125 = Export everything (Stage 12; Peter 14 Oct, 0A 1A 2A 3A 4A 5A 6A).
 Settings → Backup & Restore, top: one zip of everything on THIS phone — backup,
@@ -38,7 +61,7 @@ scheduled clean-up job, server code); V123's VoiceOver leftovers; Tutorials
   make the file") rather than writing a broken one. Far beyond any real phone.
 - A big file may be too large to email — the ready sheet says to save it to
   Files or a cloud drive.
-- Found in the V125 browser check, PRE-EXISTING (not V125): on the very first
+- ✅ FIXED V126. Found in the V125 browser check, PRE-EXISTING (not V125): on the very first
   visit the new worker's `clients.claim()` fires `controllerchange`, and
   boot.js reloads the page once (~1 s in, during the setup wizard). Harmless so
   far — nothing is typed yet — but a fresh install shouldn't reload. Fix idea:

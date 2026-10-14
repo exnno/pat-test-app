@@ -35,9 +35,15 @@ let _updateLastCheck = 0;                 // when the server was last asked
 let _updateLastTouch = 0;                 // the last tap or key, anywhere
 let _updateTimer = null;                  // the one pending safe-moment check
 let _updateApplying = false;              // SKIP_WAITING sent; the reload is coming
+let _updateHadController = false;         // V126: the page loaded under a worker (not a first visit)
+let _updateAsked = false;                 // V126: we sent SKIP_WAITING (Refresh or the safe moment)
+let _updateReloading = false;             // V126: the one reload is under way
 
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
+  // V126 (1A): read once, now — whether this page loaded under a worker. A
+  // first visit has none until the new worker's clients.claim() (sw.js).
+  try { _updateHadController = !!navigator.serviceWorker.controller; } catch (e) { _updateHadController = false; }
   // V124: every tap or key counts as "someone is using it" (2A) and carries the
   // hourly look (1A). Capture phase, passive: nothing here may stop a tap.
   try {
@@ -66,14 +72,28 @@ function registerServiceWorker() {
       });
     }).catch(err => console.log('SW reg failed:', err));
 
-    // When the active SW changes (after we tell it to skipWaiting), reload to use it.
-    let reloading = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (reloading) return;
-      reloading = true;
-      window.location.reload();
-    });
+    // When the active SW changes, reload to use it — only when it REPLACED one
+    // (V126 1A, updateOnControllerChange).
+    navigator.serviceWorker.addEventListener('controllerchange', updateOnControllerChange);
   });
+}
+
+// V126 (1A): a worker taking over reloads the page only when it replaces one —
+// the page loaded under a worker, or we asked for the update (SKIP_WAITING).
+// On a first visit there is no worker; the new one's clients.claim() (sw.js
+// activate) fires controllerchange as well, and reloading then threw away the
+// setup wizard about a second in. Nothing is stale on a first visit: the page
+// came from the network. An update put in from ANOTHER tab still reloads this
+// one (it loaded under the old worker), so two tabs never run two versions.
+function updateShouldReload() {
+  return _updateHadController || _updateAsked;
+}
+
+function updateOnControllerChange() {
+  if (_updateReloading || !updateShouldReload()) return false;
+  _updateReloading = true;
+  window.location.reload();
+  return true;
 }
 
 // 3A: 'pat-v124' → 'V124', a hotfix 'pat-v124-1' → 'V124.1', anything else → ''.
@@ -234,8 +254,9 @@ function showUpdateBanner(worker) {
 
 function applyUpdate() {
   if (state.pendingWorker) {
+    _updateAsked = true;   // V126: before the message — the takeover may follow at once
     state.pendingWorker.postMessage({ type: 'SKIP_WAITING' });
-    // Page will reload via controllerchange listener.
+    // Page will reload via controllerchange listener (updateOnControllerChange).
   } else {
     window.location.reload();
   }

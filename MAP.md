@@ -1,4 +1,4 @@
-# PATGo — Code Map (V125)
+# PATGo — Code Map (V126)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -228,6 +228,10 @@ is discoverable from the file you happen to be editing.
     under it. Everywhere else the banner, and the engineer taps Refresh (v61.2:
     the worker never skips waiting at install — 62e). A found update must never
     `render()` under a sheet or the cursor (`updateRepaint`, rule 3).
+    V126: a worker taking over (`controllerchange`) reloads only a page that
+    LOADED under a worker or ASKED for the update (`updateShouldReload`). A first
+    visit is never reloaded by sw.js's `clients.claim()`; keep the claim (it is
+    what makes a first visit work offline at once). Harness 64.
 
 ---
 
@@ -1509,6 +1513,9 @@ Service-worker registration and update banner, `bootIntegrityOK()`, the boot tai
 the crash fallback screens, the v69 one-time data repair call.
 V124: update delivery — looks on launch / return to the front / hourly (riding
 a touch), the safe moment (rule 25), asking the waiting worker its version.
+V126: `updateOnControllerChange` / `updateShouldReload` — reload only a page
+that loaded under a worker (`_updateHadController`, read once at boot) or sent
+SKIP_WAITING (`_updateAsked`, set in `applyUpdate`). sw.js activate claims.
 **Touch to:** change the startup sequence, the SW update banner or the integrity
 guard. **Coupling (V124):** render-core.js draws the banner
 (`state.updateVersion`, `updateDismissed`) and calls `updateTryLater()` in
