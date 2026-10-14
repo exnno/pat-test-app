@@ -10,7 +10,7 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v123';
+const CACHE_VERSION = 'pat-v124';
 const ASSETS = [
   './',
   './index.html',
@@ -105,6 +105,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  // V124 (3A): the page asks a WAITING worker which version it is, so the banner
+  // can say "PATGo V124 is ready". The answer goes back on the port the page
+  // sent; a page that sent none (or an older worker that never answers) just
+  // shows the plain wording. The key is the one this worker was built with.
+  if (event.data && event.data.type === 'GET_VERSION' && event.ports && event.ports[0]) {
+    event.ports[0].postMessage({ version: CACHE_VERSION });
   }
 });
 
