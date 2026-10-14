@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V121: rolled forward — V121 on top, V118 dropped. -->
+      <!-- v8: rolling 3-version changelog. V122: rolled forward — V122 on top, V119 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V122</strong> &middot; October 2026</p>
+        <p class="muted">Sessions are now called Jobs everywhere in the app: the Jobs list, + New job and Job settings. Your jobs and their names haven't changed.</p>
         <p><strong>V121</strong> &middot; October 2026</p>
         <p class="muted">Bigger text if you want it: Settings &rarr; Theme &amp; Sound &rarr; Text size offers Standard, Large and Larger. Standard looks exactly as before.</p>
         <p><strong>V120</strong> &middot; October 2026</p>
         <p class="muted">Works better with VoiceOver: it says when an item is logged, reads out pop-up messages and names every box you type in. Nothing changes on screen.</p>
-        <p><strong>V119</strong> &middot; October 2026</p>
-        <p class="muted">Coloured words are easier to read: green pass, red fail and blue link text are a little stronger. The PASS and FAIL buttons look the same.</p>
 
 
         </div>
@@ -130,7 +130,7 @@ const GLOSSARY_GROUPS = [
       ['Location', 'Where in the building the item is. It sticks between items, so you set it once per room and it carries down the list.'],
       ['Asset number', 'The number identifying the item. The app fills in the next one automatically, and you can set a prefix so they come out as OFF-001, OFF-002 and so on.'],
       ['Copy last', 'Repeats the item you just logged — same type, same location — so a run of identical items is one tap each.'],
-      ['Barcode scanner', 'A Bluetooth scanner that pairs with your phone as a keyboard — often sold as a "wedge" or HID scanner. Scan an asset label on the test screen and the number goes into the asset box without you touching the phone; scan on the PAT Sessions screen and it searches for that asset. There is no button to press: it works because the scanner types. See Settings → Logging → Barcode Scanner.'],
+      ['Barcode scanner', 'A Bluetooth scanner that pairs with your phone as a keyboard — often sold as a "wedge" or HID scanner. Scan an asset label on the test screen and the number goes into the asset box without you touching the phone; scan on the Jobs screen and it searches for that asset. There is no button to press: it works because the scanner types. See Settings → Logging → Barcode Scanner.'],
       ['Fail reason', 'The reason an item failed, chosen from your own list when you tap FAIL.'],
       ['Fail tag', 'Only relevant when Test Readings is on. Each fail reason is tagged with the kind of test it relates to, so failing an item shows you the one measurement box that matters instead of all of them.']
     ]
@@ -147,16 +147,16 @@ const GLOSSARY_GROUPS = [
     ]
   },
   {
-    title: 'Jobs & sessions',
+    title: 'Jobs, clients & sites',
     terms: [
-      ['Job', 'One visit to one site. Everything you test on that visit sits inside it. A job is the thing you export, report on and back up. Some screens still call it a session: the main list is PAT Sessions, and a job\'s own settings are under Session settings.'],
+      ['Job', 'One visit to one site. Everything you test on that visit sits inside it. A job is the thing you export, report on and back up. Its own settings are under Job settings. Earlier versions called this a session.'],
       ['Client', 'The company you are working for. One client can have several sites.'],
       ['Site', 'The building or address you are testing at. A site can sit under a client, or stand on its own if you have not assigned it to one.'],
       ['Overview', 'The list of everything logged in the current job, where you can review, edit, select and bulk-edit items.'],
       ['Locked job', 'A finished job. It is read-only so you cannot change it by accident. Unlock it if you genuinely need to edit it.'],
       ['Retest reminder', 'An optional feature, off by default. Flags a job for a retest a set number of months out, and lists the ones coming due so you can chase the repeat work.'],
       ['Calibration', 'Your tester\'s calibration due date. Set it and the app warns you when it is close or overdue. The warning covers every instrument you have saved, and names the one that is due.'],
-      ['Test instrument', 'The PAT tester itself. You can save up to five under Settings → Engineer & Tester, each with its own calibration details, and mark one as In use. Every job you start is recorded against the instrument in use at that moment, so its certificate keeps naming that tester even after you recalibrate or switch to another one. Change it for a single job under Session settings.']
+      ['Test instrument', 'The PAT tester itself. You can save up to five under Settings → Engineer & Tester, each with its own calibration details, and mark one as In use. Every job you start is recorded against the instrument in use at that moment, so its certificate keeps naming that tester even after you recalibrate or switch to another one. Change it for a single job under Job settings.']
     ]
   },
   {

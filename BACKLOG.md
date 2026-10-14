@@ -8,6 +8,25 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V122
+V122 = Sessions are now called Jobs — the V114 4B rename (Peter 14 Oct,
+1A 2A 3A 4A 5A). Every visible word says job; list "Jobs", "+ New job",
+"Job settings" (button and screen); nameless jobs "Job N", saved names left
+alone; "session" kept as a hidden search word + one Glossary line. Code names,
+storage keys and the cloud table unchanged (MAP rule 23). Harness group 60 +
+M956–M968; M907 retired. **Next: V123 focus after redraw** (V120 4A — agreed
+14 Oct to follow straight on; the screen headings it lands on are now final).
+Outstanding (Peter): Supabase Pro + production project, ICO fee, privacy +
+processor terms.
+
+### V122 residuals (known, accepted)
+- Jobs already saved as "Session N" keep that name (4A) — it shows on the
+  list, the certificate and the CSV file name. Rename by hand in Job settings.
+- Code comments still say session in many places (not visible; left alone).
+- The About changelog's V122 line and the What's new sheet say "Sessions are
+  now called Jobs" — allowed history (60a ALLOW, 51e EXPLAINS); the About line
+  rolls off at V125, and 51e's allowance should go with it.
+
 ### Next after V121
 V121 = the accessibility pass, part 4 of 4 — the last: text size (Peter 14 Oct,
 1A 2A 3A 4A 5A). Settings → Theme & Sound → Text size: Standard / Large /
@@ -222,10 +241,8 @@ next — V117 (Peter, V116 3A), before launch. 5A: Smart Quick Pick's switch sta
 Items whatever the split.
 
 ### V114 residuals (known, accepted)
-- The app outside Settings still says session in places: the PAT Sessions title,
-  Session settings button, New session screen, Edit session, the tour, the
-  example job's note. Renaming those screens is its own release (4B, backlogged
-  at V114) — Settings, the Glossary and 51b must follow it.
+- ~~The app outside Settings still says session in places~~ — DONE V122 (every
+  visible word says job; Settings, the Glossary and 51b followed).
 - About → Privacy still says the app makes no network calls after install; wrong
   while signed in to the cloud test. Rewritten with the privacy + processor terms
   (Stage 12), not before.

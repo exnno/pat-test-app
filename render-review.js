@@ -52,11 +52,11 @@ function renderOverviewBodyHTML(sess) {
   const visible = computeVisibleOverviewItems(sess);
   if (visible.length === 0) {
     if (state.searchQuery.trim()) return `<p class="muted">No items match your search.</p>`;
-    if (state.showFailsOnly) return `<p class="muted">No fails in this session.</p>`;
+    if (state.showFailsOnly) return `<p class="muted">No fails in this job.</p>`;
     // Genuinely empty session → rich empty state. No action button: the entry
     // controls to log the first item are right there on the screen.
     return emptyStateHTML('zap', 'No items logged yet',
-      'Use the item buttons to log your first test for this session.');
+      'Use the item buttons to log your first test for this job.');
   }
   const sel = state.selectionMode;
   const checkColHead = sel ? `<th class="th"></th>` : '';
@@ -167,7 +167,7 @@ function renderOverview() {
   const actionRow = (!state.selectionMode) ? `
     <div class="overview-action-row">
       ${sess.items.length > 0 ? `<button class="overview-action-btn" id="select-mode-btn" data-action="enter-selection">Select items</button>` : ''}
-      <button class="overview-action-btn" id="edit-session-btn" data-action="edit-session">Session settings</button>
+      <button class="overview-action-btn" id="edit-session-btn" data-action="edit-session">Job settings</button>
     </div>
   ` : '';
 
@@ -708,17 +708,17 @@ function renderEditSession() {
     <div class="screen">
       <header class="header-row">
         <button class="icon-btn" id="cancel-edit-btn" data-action="edit-back" aria-label="Back">${icon('chevron-left')}</button>
-        <div class="site-name">Edit session</div>
+        <div class="site-name">Job settings</div>
         <span style="width:40px"></span>
       </header>
       <div class="card">
         <label class="label">Site</label>
         <input aria-label="Site" class="input" id="ef-site" data-input-action="ef-site" value="${escapeHTML(state.editForm.site)}">
-        <p class="muted" style="margin:6px 0 0;font-size:0.75rem">This is the site name saved on the session. Editing it here changes only this session, not your Clients list.</p>
+        <p class="muted" style="margin:6px 0 0;font-size:0.75rem">This is the site name saved on the job. Editing it here changes only this job, not your Clients list.</p>
         <label class="label">Engineer</label>
         <input aria-label="Engineer" class="input" id="ef-engineer" data-input-action="ef-engineer" value="${escapeHTML(state.editForm.engineer)}">
-        <label class="label">Session name</label>
-        <input aria-label="Session name" class="input" id="ef-name" data-input-action="ef-name" value="${escapeHTML(state.editForm.name)}">
+        <label class="label">Job name</label>
+        <input aria-label="Job name" class="input" id="ef-name" data-input-action="ef-name" value="${escapeHTML(state.editForm.name)}">
         <label class="label">Date</label>
         <input aria-label="Date" class="input input-date" id="ef-date" data-input-action="ef-date" type="date" value="${escapeHTML(state.editForm.date)}">
         <label class="label">Asset number prefix</label>
@@ -729,7 +729,7 @@ function renderEditSession() {
              corrected without unlocking the whole session. -->
         <div class="lock-toggle-row">
           <div class="lock-toggle-text">
-            <div class="lock-toggle-title">${icon('lock')} Lock session</div>
+            <div class="lock-toggle-title">${icon('lock')} Lock job</div>
             <div class="lock-toggle-sub">Prevents new entries from the test screen. Edits via the overview still work.</div>
           </div>
           <label class="toggle-switch">
@@ -893,7 +893,7 @@ function renderRetestReminders() {
   let list;
   if (due.length === 0) {
     list = emptyStateHTML('bell', 'No retests due',
-      'When a job you\'ve flagged comes due, it\'ll appear here so you can ring the customer and rebook. Flag a job under its Session settings.');
+      'When a job you\'ve flagged comes due, it\'ll appear here so you can ring the customer and rebook. Flag a job under its Job settings.');
   } else {
     list = due.map(s => {
       const st = retestStatus(s);
@@ -902,7 +902,7 @@ function renderRetestReminders() {
         : (st === 'duesoon' ? 'retest-chip-soon' : 'retest-chip-upcoming');
       const chipLabel = retestChipLabel(st);
       const client = clientNameForSession(s);
-      const titleLine = escapeHTML(s.site || s.name || 'Untitled session');
+      const titleLine = escapeHTML(s.site || s.name || 'Untitled job');
       const clientLine = (client && client !== (s.site || s.name)) ? `<div class="retest-row-client">${escapeHTML(client)}</div>` : '';
       const itemCount = Array.isArray(s.items) ? s.items.length : 0;
       return `
@@ -956,7 +956,7 @@ function renderReports() {
   let list;
   if (sorted.length === 0) {
     list = emptyStateHTML('file-text', 'Nothing to report yet',
-      'Once you\'ve logged a session, you can turn it into a PDF report here.');
+      'Once you\'ve logged a job, you can turn it into a PDF report here.');
   } else {
     list = sorted.map(s => {
       const passes = s.items.filter(i => i.result === 'pass').length;
@@ -982,7 +982,7 @@ function renderReports() {
         <button class="icon-btn" id="reports-settings-btn" data-action="settings-page" data-arg="settingsReport" data-page="settingsReport" aria-label="Company and Branding">${icon('settings')}</button>
       </header>
       <div class="settings-section" style="margin-top:4px">
-        <p class="muted" style="margin-top:0">Choose a session to produce a PDF Portable Appliance Test Report. You can preview it before sharing or saving.</p>
+        <p class="muted" style="margin-top:0">Choose a job to produce a PDF Portable Appliance Test Report. You can preview it before sharing or saving.</p>
       </div>
       ${needsCompany}
       <div class="sessions-list">${list}</div>

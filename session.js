@@ -860,9 +860,9 @@ function pruneOldSessions() {
   }
   const itemTotal = targets.reduce((n, s) => n + (s.items ? s.items.length : 0), 0);
   openConfirmSheet({
-    title: 'Clear exported sessions?',
+    title: 'Clear exported jobs?',
     message:
-      `Clear ${targets.length} exported session${targets.length === 1 ? '' : 's'} ` +
+      `Clear ${targets.length} exported job${targets.length === 1 ? '' : 's'} ` +
       `(${itemTotal} item${itemTotal === 1 ? '' : 's'} in total)? ` +
       `These have all been exported to CSV and are older than ${state.pruneAgeMonths} month${state.pruneAgeMonths === 1 ? '' : 's'}. ` +
       (keptForCloud
@@ -888,7 +888,7 @@ function pruneOldSessions() {
       state.sessions = state.sessions.filter(s => !ids.has(s.id));
       save();
       render();
-      showToast(`Cleared ${targets.length} session${targets.length === 1 ? '' : 's'}`);
+      showToast(`Cleared ${targets.length} job${targets.length === 1 ? '' : 's'}`);
     }
   });
 }
@@ -932,7 +932,7 @@ function deleteSessionAsk(id) {
   const signedIn = typeof syncActive === 'function' && syncActive() && !s[DEMO_SESSION_FLAG];
   if (!signedIn) {
     openConfirmSheet({
-      title: 'Delete session?',
+      title: 'Delete job?',
       message: `Delete "${title}"? This cannot be undone.`,
       confirmLabel: 'Delete',
       onConfirm: () => deleteSession(id)
@@ -1022,7 +1022,7 @@ function loadFormForCursor() {
 // ---------- Validation ----------
 function validateBeforeSave(opts = {}) {
   const sess = activeSession();
-  if (!sess) return 'No active session.';
+  if (!sess) return 'No active job.';
   // v13: location is now mandatory. Same skip pattern as item type for the
   // copy-last-result path (opts.skipLocation), since that flow copies the
   // location from the previous item before this check runs.
@@ -1058,7 +1058,7 @@ function createSession() {
   // Site was mandatory). Neither → block with a gentle inline message rather
   // than a silent return, so the user knows why nothing happened.
   if (!clientName && !siteName) {
-    state.newFormError = 'Enter a client or a site to start the session.';
+    state.newFormError = 'Enter a client or a site to start the job.';
     render();
     return;
   }
@@ -1085,7 +1085,7 @@ function createSession() {
   const now = new Date().toISOString();
   const s = {
     id: newId(),
-    name: name.trim() || `Session ${state.sessions.length + 1}`,
+    name: name.trim() || `Job ${state.sessions.length + 1}`,
     site: snapshot,                              // combined text snapshot (back-compat)
     clientId: clientRec ? clientRec.id : '',     // v19: structured refs (convenience)
     siteId: siteRec ? siteRec.id : '',
@@ -3180,11 +3180,11 @@ function applyBulkDelete() {
 
 function moveJobBlockReason(sess, ids) {
   if (!sess) return 'This job is no longer on this phone.';
-  if (sess.locked) return 'This job is locked. Unlock it in Session settings first, then move the items.';
+  if (sess.locked) return 'This job is locked. Unlock it in Job settings first, then move the items.';
   const n = (ids || []).length;
   if (!n) return 'Select the items to move first.';
   if (n >= (sess.items || []).length) {
-    return 'At least one item must stay in this job. To change the client or site of the whole job, use Session settings.';
+    return 'At least one item must stay in this job. To change the client or site of the whole job, use Job settings.';
   }
   return '';
 }
@@ -3302,7 +3302,7 @@ function moveItemsToNewJob() {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(m.date || '')) ? m.date : (sess.date || todayISO());
   const job = {
     id: newId(),
-    name: String(m.name || '').trim() || `Session ${state.sessions.length + 1}`,
+    name: String(m.name || '').trim() || `Job ${state.sessions.length + 1}`,
     site: moveJobTitle(clientName, siteName),
     clientId: clientRec ? clientRec.id : '',
     siteId: siteRec ? siteRec.id : '',
@@ -3448,7 +3448,7 @@ function moveToHay(s) {
 
 function moveToBlockReason(sess, ids) {
   if (!sess) return 'This job is no longer on this phone.';
-  if (sess.locked) return 'This job is locked. Unlock it in Session settings first, then move the items.';
+  if (sess.locked) return 'This job is locked. Unlock it in Job settings first, then move the items.';
   if (!(ids || []).length) return 'Select the items to move first.';
   if (!moveToTargets(sess).length) return 'There are no other jobs on this phone. Use \u201cMove to a new job\u201d instead.';
   return '';
@@ -3643,7 +3643,7 @@ function moveItemsToExistingJob() {
   // since the choices were made. Anything other than what was reviewed → stop.
   if (sess.locked) return blocked(moveToBlockReason(sess, m.ids));
   if (!target) return blocked('The job you chose is no longer on this phone.');
-  if (target.locked) return blocked(`${moveToTitle(target)} has been locked. Unlock it in Session settings first, then move the items.`);
+  if (target.locked) return blocked(`${moveToTitle(target)} has been locked. Unlock it in Job settings first, then move the items.`);
   const changed = 'One of the jobs changed while you were choosing. Check the items and try again.';
   if (_moveJobItems(sess, m.ids).length !== m.ids.length) return blocked(changed);
   const now0 = moveToClashes(sess, target, m.ids).map(c => c.id + '>' + c.with).join(',');
@@ -3956,7 +3956,7 @@ function _dupJobBuild(m, src, jobId, items) {
   const date = /^\d{4}-\d{2}-\d{2}$/.test(String(m.date || '')) ? m.date : (src.date || todayISO());
   const job = {
     id: jobId,
-    name: String(m.name || '').trim() || `Session ${state.sessions.length + 1}`,
+    name: String(m.name || '').trim() || `Job ${state.sessions.length + 1}`,
     site,
     clientId,
     siteId,

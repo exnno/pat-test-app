@@ -232,7 +232,7 @@ function seedDemoSession() {
       mk('005', 'Office', 'Desk lamp', 'pass')
     ],
     locked: false,
-    notes: 'This is an example session to show how the app works. Delete it any time.',
+    notes: 'This is an example job to show how the app works. Delete it any time.',
     certNo: '',
     [DEMO_SESSION_FLAG]: true,
     // v43: sync metadata for demo session

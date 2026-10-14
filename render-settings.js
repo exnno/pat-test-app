@@ -593,7 +593,7 @@ function renderSettingsScanner() {
       ${renderSettingsSubHeader('Barcode Scanner')}
       <div class="settings-section">
         <h2 class="h2">Scan asset labels</h2>
-        <p class="muted">If you have a Bluetooth barcode scanner that pairs with your phone as a keyboard — sometimes called a "wedge" or HID scanner — the app will pick up what it sends. On the entry screen a scan fills in the asset number; on the PAT Sessions screen it searches for that asset, so you can see where it was last tested.</p>
+        <p class="muted">If you have a Bluetooth barcode scanner that pairs with your phone as a keyboard — sometimes called a "wedge" or HID scanner — the app will pick up what it sends. On the entry screen a scan fills in the asset number; on the Jobs screen it searches for that asset, so you can see where it was last tested.</p>
         <p class="muted">Leave this on even if you don't own a scanner — it does nothing at all until one is paired. Typing a number by hand is unaffected: the app tells a scanner apart from a person by how fast the characters arrive, so nothing you type can be mistaken for a scan.</p>
         <div class="toggle-row">
           <div class="toggle-row-text">
@@ -1203,9 +1203,9 @@ function renderSettingsRetest() {
       ${on ? `
       <div class="settings-section">
         <h2 class="h2">How it works</h2>
-        <p class="muted">Open any job, tap <strong>Session settings</strong>, and switch on <strong>Remind me to chase this for retest</strong>. Only the jobs you flag appear on your chase list — so subcontract work and one-offs never clutter it.</p>
+        <p class="muted">Open any job, tap <strong>Job settings</strong>, and switch on <strong>Remind me to chase this for retest</strong>. Only the jobs you flag appear on your chase list — so subcontract work and one-offs never clutter it.</p>
         <p class="muted" style="margin-top:8px">A retest is due for a whole month: a job tested on 30 September with a 12-month interval is due <strong>September</strong> the following year. The interval is taken from your Certificate Content default (currently <strong>${defMonths} month${defMonths === 1 ? '' : 's'}</strong>) at the moment you flag it, and you can change it per job.</p>
-        <p class="muted" style="margin-top:8px">The job joins your chase list on the <strong>1st of the month before</strong> it's due, so you have a full month to ring the customer. A banner appears on your PAT Sessions screen and the job shows a ${icon('bell')} chip: <em>due next month</em>, <em>due this month</em>, then <em>overdue</em> from the 1st of the month after.</p>
+        <p class="muted" style="margin-top:8px">The job joins your chase list on the <strong>1st of the month before</strong> it's due, so you have a full month to ring the customer. A banner appears on your Jobs screen and the job shows a ${icon('bell')} chip: <em>due next month</em>, <em>due this month</em>, then <em>overdue</em> from the 1st of the month after.</p>
         <p class="muted" style="margin-top:8px">When you've contacted the customer, mark the job <strong>Rebooked</strong> or <strong>Declined</strong> to clear it from the list.</p>
       </div>
       <div class="settings-section">
@@ -1448,7 +1448,7 @@ function renderSettingsClients() {
     <div class="screen">
       ${renderSettingsSubHeader('Clients')}
       <div class="settings-section">
-        <p class="muted" style="margin-top:0">Your clients and the sites you test at. These appear as quick picks on the New session screen. Editing or deleting here never changes jobs you've already saved.</p>
+        <p class="muted" style="margin-top:0">Your clients and the sites you test at. These appear as quick picks on the New job screen. Editing or deleting here never changes jobs you've already saved.</p>
         <button class="btn-primary" id="client-add-btn" data-action="client-add" style="margin-top:4px">+ Add client</button>
       </div>
       ${emptyState}

@@ -980,7 +980,7 @@ function stampCertNumber(session) {
 async function produceReport(sessionId) {
   if (!state.reportSettings.enabled) { setView('settings'); return; }
   const session = state.sessions.find(s => s.id === sessionId);
-  if (!session) { openInfoSheet({ title: 'Session not found', message: 'Couldn\u2019t find that session. Please try again.' }); return; }
+  if (!session) { openInfoSheet({ title: 'Job not found', message: 'Couldn\u2019t find that job. Please try again.' }); return; }
 
   // v51: the PDF engine is loaded lazily on first report rather than at startup.
   // Show a brief "preparing" toast while it loads (near-instant once it's cached,

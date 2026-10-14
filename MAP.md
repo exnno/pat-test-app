@@ -1,4 +1,4 @@
-# PATGo — Code Map (V121)
+# PATGo — Code Map (V122)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -198,6 +198,13 @@ is discoverable from the file you happen to be editing.
     previews. Harness 59a sweeps every file a phone runs; a new fixed one goes
     in 59's FIXED list AND that comment. The PDF (jsPDF `fontSize`) and CSV are
     untouched by it. Pinch-zoom stays off (viewport `user-scalable=no`, 4A).
+
+23. **Visible text says job, never session (V122).** Every word a phone can
+    show — strings, markup, aria-labels, toasts, the tour, file names. Code
+    names stay as they are (`state.sessions`, `'sessions'` view, `pat:sessions`,
+    `data-action="edit-session"`, `#sessions-search`, sync `kind: 'session'`,
+    the Supabase `sessions` table) — saved data and the cloud depend on them.
+    Harness 60a sweeps every shipped script; history lines go in its ALLOW.
 
 ---
 
@@ -1043,10 +1050,10 @@ UNSAVED_PAGES (settings-actions.js) has both views. Scanner test-log markup live
 (it repaints without a render). Bug sheet logic lives in **bugreport.js**.
 Instrument settings live in **instruments.js**. The stats footer reads
 `computeAppStats()` (session.js) and returns `''` when null.
-⚠ V114: Settings text says "jobs" but quotes screens by their on-screen names —
-"PAT Sessions" (render-core.js h1), "Session settings" (render-review.js button),
-"New session" (render-core.js h2). Renaming any of those = update the text here
-and in render-help.js's Glossary too; 51b goes red until you do.
+⚠ V114/V122: Settings quotes screens by their on-screen names — "Jobs"
+(render-core.js h1), "Job settings" (render-review.js button AND the screen it
+opens), "New job" (render-core.js h2). Renaming any of those = update the text
+here and in render-help.js's Glossary too; 51b goes red until you do.
 ⚠ v73: About, Glossary, Contact, the bug-sheet markup and the cloud stubs left
 for **render-help.js**, and those pages still call `renderSettingsSubHeader()`
 from here. The About changelog is no longer in this file.

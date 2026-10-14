@@ -151,7 +151,7 @@ function importSetupFromFile(file) {
     // applied as a setup.
     if (!data || data.kind !== SETUP_KIND || typeof data.sections !== 'object' || !data.sections) {
       if (data && Array.isArray(data.sessions)) {
-        openInfoSheet({ title: 'That\u2019s a backup, not a setup', message: 'To restore a backup, use Restore (it replaces sessions too). Import setup only changes your configuration.' });
+        openInfoSheet({ title: 'That\u2019s a backup, not a setup', message: 'To restore a backup, use Restore (it replaces jobs too). Import setup only changes your configuration.' });
       } else {
         openInfoSheet({ title: 'Not a recognised setup', message: 'That file isn\u2019t a recognised PAT setup. Make sure you picked a setup file exported from this app.' });
       }

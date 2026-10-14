@@ -241,8 +241,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Bigger text if you want it.</strong> Settings &rarr; Theme &amp; Sound &rarr; Text size now offers Standard, Large and Larger. The words on every screen grow to match.</li>
-        <li><strong>Nothing changes unless you choose it.</strong> The app starts on Standard, which looks exactly as before. Certificates, CSV files, your jobs and backups are untouched.</li>
+        <li><strong>Sessions are now called Jobs.</strong> The main list is Jobs, you start one with + New job, and each job's own settings are under Job settings.</li>
+        <li><strong>Nothing else has changed.</strong> Your jobs, names, certificates, CSV files and backups are exactly as they were — only the words on screen are new.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -367,7 +367,7 @@ function render() {
       bodyHTML = `
         <div class="wizard-icon">${icon('clipboard-list')}</div>
         <h3 class="bulk-sheet-title">Add an example job?</h3>
-        <p class="wizard-lead">Want to see how it all hangs together first? We can drop in one example session with a few test results, so you can explore Sessions, the Overview and a report straight away. It's clearly labelled, and you can delete it whenever you like.</p>
+        <p class="wizard-lead">Want to see how it all hangs together first? We can drop in one example job with a few test results, so you can explore Jobs, the Overview and a report straight away. It's clearly labelled, and you can delete it whenever you like.</p>
         <label class="label" style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:0.9375rem;font-weight:600">
           <input type="checkbox" id="wizard-seed-demo" data-change-action="wizard-seed-demo" ${checked} style="width:auto">
           Add an example job
@@ -385,10 +385,10 @@ function render() {
       bodyHTML = `
         <div class="wizard-icon">${icon('party-popper')}</div>
         <h3 class="bulk-sheet-title">You're all set</h3>
-        <p class="wizard-lead">Your phone's ready to go. Start a new session whenever you're on a job — pick a location, tap an item type, then tap PASS or FAIL.</p>
+        <p class="wizard-lead">Your phone's ready to go. Start a new job whenever you're on site — pick a location, tap an item type, then tap PASS or FAIL.</p>
         <div class="wizard-finish-tour">
           <p class="wizard-finish-tour-title">New here? Take the 30-second tour.</p>
-          <p class="wizard-finish-tour-sub">A quick look at Sessions, logging, the Overview, reports and backups.</p>
+          <p class="wizard-finish-tour-sub">A quick look at Jobs, logging, the Overview, reports and backups.</p>
           <button class="btn-primary" data-action="wizard-finish-tour">Show me around</button>
         </div>
       `;
@@ -418,8 +418,8 @@ function render() {
     if (ws) {
       const wasModified = exportStatus(ws) === 'modified';
       const line = wasModified
-        ? "You've already exported this session, and it's been edited since. If you make further changes you'll need to export it again."
-        : "You've already exported this session. If you make changes you'll need to export it again.";
+        ? "You've already exported this job, and it's been edited since. If you make further changes you'll need to export it again."
+        : "You've already exported this job. If you make changes you'll need to export it again.";
       reopenWarnModal = `
         <div class="modal-backdrop" data-action="reopen-cancel" style="z-index:300"></div>
         <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Already exported">
@@ -812,7 +812,7 @@ function renderSessions() {
   ` : '';
   const newForm = state.newForm.show ? `
     <div class="card">
-      <h2 class="h2">New session</h2>
+      <h2 class="h2">New job</h2>
       <label class="label">Client <span class="hint">(optional)</span></label>
       <div class="nf-input-wrap" id="nf-client-wrap">
         <input aria-label="Client (optional)" class="input" id="nf-client" value="${escapeHTML(state.newForm.clientId)}" placeholder="e.g. Acme Ltd" autocomplete="off">
@@ -828,8 +828,8 @@ function renderSessions() {
       ${nfError}
       <label class="label">Engineer</label>
       <input aria-label="Engineer" class="input" id="nf-engineer" value="${escapeHTML(state.newForm.engineer || state.engineer)}" placeholder="Your name">
-      <label class="label">Session name <span class="hint">(optional)</span></label>
-      <input aria-label="Session name (optional)" class="input" id="nf-name" data-input-action="nf-name" value="${escapeHTML(state.newForm.name)}" placeholder="e.g. Annual test 2026">
+      <label class="label">Job name <span class="hint">(optional)</span></label>
+      <input aria-label="Job name (optional)" class="input" id="nf-name" data-input-action="nf-name" value="${escapeHTML(state.newForm.name)}" placeholder="e.g. Annual test 2026">
       <label class="label">Asset number prefix <span class="hint">(optional, e.g. BT)</span></label>
       <input aria-label="Asset number prefix (optional)" class="input" id="nf-prefix" data-input-action="nf-prefix" value="${escapeHTML(state.newForm.prefix)}" placeholder="Leave blank for none">
       <label class="label">Starting asset number <span class="hint">(type 001 to keep leading zeros)</span></label>
@@ -846,7 +846,7 @@ function renderSessions() {
     </div>
   ` : `
     <div class="sessions-actions-row">
-      <button class="btn-primary" id="new-session-btn" data-action="new-session">+ New session</button>
+      <button class="btn-primary" id="new-session-btn" data-action="new-session">+ New job</button>
       <button class="btn-secondary" id="import-session-btn" data-action="import-session">${icon('download')} Import (.csv)</button>
     </div>
     <input type="file" id="import-session-file" data-change-action="import-file" accept=".csv,text/csv" style="display:none">
@@ -864,7 +864,7 @@ function renderSessions() {
   const showSearch = hasSessions && !state.newForm.show;
   const searchRow = showSearch ? `
     <div class="sessions-search-row">
-      <input aria-label="Search jobs and items" type="search" class="search-input" id="sessions-search" data-input-action="sessions-search" placeholder="Search sessions and items…" value="${escapeHTML(state.sessionsSearchQuery)}" autocomplete="off">
+      <input aria-label="Search jobs and items" type="search" class="search-input" id="sessions-search" data-input-action="sessions-search" placeholder="Search jobs and items…" value="${escapeHTML(state.sessionsSearchQuery)}" autocomplete="off">
     </div>
   ` : '';
   const sessionsListArea = `<div id="sessions-list-area">${renderSessionsListAreaHTML()}</div>`;
@@ -913,7 +913,7 @@ function renderSessions() {
       </div>` : '';
   const header = `
       <header class="header">
-        <h1 class="h1">PAT Sessions</h1>
+        <h1 class="h1">Jobs</h1>
         ${state.reportSettings.enabled ? '<button class="icon-btn" id="reports-btn" data-action="open-reports" aria-label="Reports">' + icon('file-text') + '</button>' : ''}
         <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">${icon('settings')}</button>
       </header>`;
@@ -1134,7 +1134,7 @@ function renderReminderBanners() {
   }
   if (unl.length) {
     const n = unl.length;
-    out += one('reminder-unlocked', `${n} job${n === 1 ? ' is' : 's are'} still unlocked. Finished? Lock ${n === 1 ? 'it' : 'them'} in Session settings.`, 'remind-unlocked-review', 'remind-unlocked-dismiss');
+    out += one('reminder-unlocked', `${n} job${n === 1 ? ' is' : 's are'} still unlocked. Finished? Lock ${n === 1 ? 'it' : 'them'} in Job settings.`, 'remind-unlocked-review', 'remind-unlocked-dismiss');
   }
   return out;
 }
@@ -1180,7 +1180,7 @@ function renderSessionsListAreaHTML() {
   const filtered = filteredSessions(controlFiltered, state.sessionsSearchQuery);
 
   const countHTML = queryTrimmed
-    ? `<span class="sessions-search-count">${filtered.length} of ${sortedAll.length} session${sortedAll.length === 1 ? '' : 's'} match</span>`
+    ? `<span class="sessions-search-count">${filtered.length} of ${sortedAll.length} job${sortedAll.length === 1 ? '' : 's'} match</span>`
     : '';
 
   // v61: cross-session asset history offer. Appears ONLY when what was typed is
@@ -1201,7 +1201,7 @@ function renderSessionsListAreaHTML() {
   // v15: when a control filter is narrowing the list (and we're not searching),
   // show an "X of Y shown" line so a filtered list never looks like data loss.
   const filterCountHTML = (filtersActive && sortedAll.length > 0)
-    ? `<span class="sessions-search-count">${controlFiltered.length} of ${sortedAll.length} session${sortedAll.length === 1 ? '' : 's'} shown</span>`
+    ? `<span class="sessions-search-count">${controlFiltered.length} of ${sortedAll.length} job${sortedAll.length === 1 ? '' : 's'} shown</span>`
     : '';
 
   // v14/v15: "N sessions not yet exported" nudge — now a tappable control that
@@ -1211,8 +1211,8 @@ function renderSessionsListAreaHTML() {
   // searching (the search count takes the slot).
   const unexported = unexportedSessionCount();
   const nudgeHTML = (!queryTrimmed && sortedAll.length > 0 && unexported > 0)
-    ? `<button type="button" class="export-nudge" id="bulk-export-btn" data-action="bulk-export-unexported" aria-label="Export ${unexported} not-yet-exported session${unexported === 1 ? '' : 's'}">
-        <span class="export-nudge-text">${unexported} session${unexported === 1 ? '' : 's'} not yet exported</span>
+    ? `<button type="button" class="export-nudge" id="bulk-export-btn" data-action="bulk-export-unexported" aria-label="Export ${unexported} not-yet-exported job${unexported === 1 ? '' : 's'}">
+        <span class="export-nudge-text">${unexported} job${unexported === 1 ? '' : 's'} not yet exported</span>
         <span class="export-nudge-cta">${icon('share', 'share-icon')} Export all</span>
       </button>`
     : '';
@@ -1254,15 +1254,15 @@ function renderSessionsListAreaHTML() {
 
   let list;
   if (sortedAll.length === 0 && !state.newForm.show) {
-    list = emptyStateHTML('clipboard-list', 'No sessions yet',
+    list = emptyStateHTML('clipboard-list', 'No jobs yet',
       'Start logging appliance tests and they\'ll appear here.',
-      'Start your first session', 'new-session');
+      'Start your first job', 'new-session');
   } else if (queryTrimmed && filtered.length === 0) {
-    list = `<p class="muted">No sessions or items match "${escapeHTML(queryTrimmed)}".</p>`;
+    list = `<p class="muted">No jobs or items match "${escapeHTML(queryTrimmed)}".</p>`;
   } else if (!queryTrimmed && sortedAll.length > 0 && filtered.length === 0) {
     // v15: there ARE sessions, but the active filters hid them all.
-    list = `<p class="muted">No sessions match the current filters.</p>
-      <button type="button" class="btn-tertiary" id="clear-filters-btn" data-action="clear-session-filters">Show all sessions</button>`;
+    list = `<p class="muted">No jobs match the current filters.</p>
+      <button type="button" class="btn-tertiary" id="clear-filters-btn" data-action="clear-session-filters">Show all jobs</button>`;
   } else {
     // V91 (Stage 4, 4A): 🛡 on jobs safe in the cloud, signed in only. Display
     // check (fingerprints reused while storage.js reuses the saved encoding).
@@ -1354,22 +1354,22 @@ function renderImportConflictModal() {
   const existingItemCount = existing && Array.isArray(existing.items) ? existing.items.length : 0;
   return `
     <div class="modal-backdrop" id="import-conflict-backdrop" data-action="import-conflict-cancel" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Session already exists">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Job already exists">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">Session already exists</h3>
+        <h3 class="bulk-sheet-title">Job already exists</h3>
         <button class="fail-close-btn" id="import-conflict-cancel" data-action="import-conflict-cancel" aria-label="Cancel">×</button>
       </div>
       <p style="margin:0 0 12px;font-size:0.875rem;line-height:1.5;color:var(--text)">
-        A session for <strong>${escapeHTML(incoming.site)}</strong> on <strong>${escapeHTML(formatDate(incoming.date))}</strong> already exists with ${existingItemCount} item${existingItemCount === 1 ? '' : 's'}.
+        A job for <strong>${escapeHTML(incoming.site)}</strong> on <strong>${escapeHTML(formatDate(incoming.date))}</strong> already exists with ${existingItemCount} item${existingItemCount === 1 ? '' : 's'}.
       </p>
       <p style="margin:0 0 12px;font-size:0.875rem;line-height:1.5;color:var(--text)">
         The imported file has ${incoming.items.length} item${incoming.items.length === 1 ? '' : 's'}. How would you like to import them?
       </p>
       <div class="import-conflict-actions">
-        <button class="btn-primary" id="import-conflict-duplicate" data-action="import-conflict-duplicate">Import as duplicate (new session)</button>
-        <button class="btn-secondary" id="import-conflict-merge" data-action="import-conflict-merge">Merge into existing session</button>
+        <button class="btn-primary" id="import-conflict-duplicate" data-action="import-conflict-duplicate">Import as duplicate (new job)</button>
+        <button class="btn-secondary" id="import-conflict-merge" data-action="import-conflict-merge">Merge into existing job</button>
         <button class="btn-tertiary" id="import-conflict-cancel2" data-action="import-conflict-cancel">Cancel import</button>
       </div>
     </div>
@@ -1386,7 +1386,7 @@ function renderImportSummaryModal() {
     ? `Merged ${sum.itemCount} item${sum.itemCount === 1 ? '' : 's'} into <strong>${escapeHTML(sum.sessionName)}</strong>.`
     : (sum.mode === 'duplicate'
         ? `Imported ${sum.itemCount} item${sum.itemCount === 1 ? '' : 's'} as a new duplicate of <strong>${escapeHTML(sum.sessionName)}</strong>.`
-        : `Imported ${sum.itemCount} item${sum.itemCount === 1 ? '' : 's'} into new session <strong>${escapeHTML(sum.sessionName)}</strong>.`);
+        : `Imported ${sum.itemCount} item${sum.itemCount === 1 ? '' : 's'} into new job <strong>${escapeHTML(sum.sessionName)}</strong>.`);
   const skippedBlock = (sum.skipped && sum.skipped.length > 0) ? `
     <p style="margin:12px 0 4px;font-size:0.875rem;font-weight:600;color:var(--text)">
       ${sum.skipped.length} row${sum.skipped.length === 1 ? '' : 's'} skipped:
@@ -1707,7 +1707,7 @@ function renderEntry() {
   const isLocked = !!sess.locked;
   const lockBanner = isLocked ? `
     <div class="lock-banner" role="status">
-      <span class="lock-banner-text">${icon('lock')} Session locked — no new entries</span>
+      <span class="lock-banner-text">${icon('lock')} Job locked — no new entries</span>
       <button class="lock-banner-action" id="lock-unlock-btn" data-action="unlock-session">Unlock</button>
     </div>
   ` : '';
@@ -1993,7 +1993,7 @@ function renderEntry() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="sessions-btn" data-action="go-sessions" aria-label="Back to sessions">${icon('chevron-left')}</button>
+        <button class="icon-btn" id="sessions-btn" data-action="go-sessions" aria-label="Back to jobs">${icon('chevron-left')}</button>
         <div class="site-name">${escapeHTML(sess.site || sess.name)}</div>
         <button class="icon-btn" id="overview-btn" data-action="go-overview" aria-label="Overview">${icon('layout-grid')}</button>
       </header>

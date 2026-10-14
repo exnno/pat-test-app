@@ -29,12 +29,12 @@
 const TOUR_SLIDES = [
   {
     key: 'sessions',
-    title: 'Sessions',
-    caption: 'Every job is a “session”. Tap <strong>New session</strong> to start one — give it a client or a site and you’re testing.',
+    title: 'Jobs',
+    caption: 'Tap <strong>New job</strong> to start one — give it a client or a site and you’re testing.',
     mock: () => `
       <div class="tour-screen">
         <div class="tour-bar">PATGo</div>
-        <button class="tour-cta tour-hl">+ New session</button>
+        <button class="tour-cta tour-hl">+ New job</button>
         <div class="tour-row">
           <div>
             <div class="tour-row-title">Riverside Café</div>
@@ -87,7 +87,7 @@ const TOUR_SLIDES = [
         <div class="tour-ov-summary">25 items · <span class="tour-ov-pass">21 pass</span> · <span class="tour-ov-fail">4 fail</span> · Riverside Café</div>
         <div class="tour-ov-btnrow">
           <button class="tour-ov-btn">Select items</button>
-          <button class="tour-ov-btn">Session settings</button>
+          <button class="tour-ov-btn">Job settings</button>
         </div>
         <input class="tour-input" value="" placeholder="Search asset, location, item…" readonly>
         <div class="tour-ov-table tour-hl">

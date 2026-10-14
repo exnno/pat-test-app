@@ -218,7 +218,7 @@ function restoreBackupFromFile(file) {
     openConfirmSheet({
       title: 'Restore from backup?',
       message:
-        `This file contains ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'} ` +
+        `This file contains ${data.sessions.length} job${data.sessions.length === 1 ? '' : 's'} ` +
         `and ${itemCount} item${itemCount === 1 ? '' : 's'} in total` +
         (data.exportedAt ? `, exported ${new Date(data.exportedAt).toLocaleString('en-GB')}` : '') +
         `. This will REPLACE all current data on this device. A copy of what's here now is kept first, so you can undo it from Daily snapshots on the Backup page.`,
@@ -506,7 +506,7 @@ function applyBackupData(data, opts) {
     // nothing about whether a copy exists anywhere else.
     if (opts.markExported !== false) markBackupExported();
     render();
-    showToast(`Restored ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'} (${itemCount} item${itemCount === 1 ? '' : 's'})`);
+    showToast(`Restored ${data.sessions.length} job${data.sessions.length === 1 ? '' : 's'} (${itemCount} item${itemCount === 1 ? '' : 's'})`);
     // v62: if this backup was taken on a device that had photos, say so — the
     // photos are NOT in this file and the user needs to import them separately.
     // Only shown when the photos aren't already here, so a same-device restore

@@ -332,8 +332,8 @@ function deleteClient(clientId) {
   if (!client) return;
   const childSites = sitesForClient(clientId);
   const msg = childSites.length
-    ? `Delete "${client.name}" and its ${childSites.length} site${childSites.length === 1 ? '' : 's'}? This only removes them from your client list — sessions you've already created keep their site name.`
-    : `Delete "${client.name}"? This only removes it from your client list — sessions you've already created keep their site name.`;
+    ? `Delete "${client.name}" and its ${childSites.length} site${childSites.length === 1 ? '' : 's'}? This only removes them from your client list — jobs you've already created keep their site name.`
+    : `Delete "${client.name}"? This only removes it from your client list — jobs you've already created keep their site name.`;
   openConfirmSheet({
     title: 'Delete client?',
     message: msg,
@@ -395,7 +395,7 @@ function deleteSite(siteId) {
   if (!site) return;
   openConfirmSheet({
     title: 'Delete site?',
-    message: `Delete site "${site.name}"? This only removes it from your client list — sessions already created keep their site name.`,
+    message: `Delete site "${site.name}"? This only removes it from your client list — jobs already created keep their site name.`,
     confirmLabel: 'Delete',
     onConfirm: () => {
       recordTombstone('site', siteId);   // v78: before the filter

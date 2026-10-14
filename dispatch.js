@@ -757,7 +757,7 @@ registerActions({
   // Smart Quick Pick buttons (confirm before acting)
   'sqp-rebuild': () => openConfirmSheet({
     title: 'Rebuild history?',
-    message: 'Rebuild Smart Quick Pick history from all your current sessions? This replaces the learned history with a fresh scan of your data.',
+    message: 'Rebuild Smart Quick Pick history from all your current jobs? This replaces the learned history with a fresh scan of your data.',
     confirmLabel: 'Rebuild',
     danger: false,
     onConfirm: () => rebuildSqpHistory()
@@ -957,8 +957,8 @@ registerActions({
     render();
   },
   'clients-rebuild': () => openConfirmSheet({
-    title: 'Add from sessions?',
-    message: 'Scan all your sessions and add any clients and sites that aren\'t already listed? Nothing already here will be changed or removed.',
+    title: 'Add from jobs?',
+    message: 'Scan all your jobs and add any clients and sites that aren\'t already listed? Nothing already here will be changed or removed.',
     confirmLabel: 'Scan & add',
     danger: false,
     onConfirm: () => {

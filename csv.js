@@ -93,7 +93,7 @@ function defaultHeaderFor(id) {
 // V87: one name builder for all three CSV paths (was three copies of the same
 // underscore template). "PAT Office Block 28-09-2026.csv" — spaces, UK date.
 function csvFilename(session) {
-  const site = fileSafe(session.site || session.name || '') || 'session';
+  const site = fileSafe(session.site || session.name || '') || 'job';
   const when = fileDateUK(session.date);
   return `PAT ${site}${when ? ' ' + when : ''}.csv`;
 }
@@ -489,8 +489,8 @@ function parseImportCSV(text) {
     return {
       ok: false,
       error:
-        'This file contains rows from more than one session (different Client/Site or Date values).\n\n' +
-        'Importing combined CSVs isn\'t supported yet — please export each session separately and import them one at a time.'
+        'This file contains rows from more than one job (different Client/Site or Date values).\n\n' +
+        'Importing combined CSVs isn\'t supported yet — please export each job separately and import them one at a time.'
     };
   }
 
