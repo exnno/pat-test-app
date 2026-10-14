@@ -10,7 +10,7 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v126';
+const CACHE_VERSION = 'pat-v127';
 const ASSETS = [
   './',
   './index.html',
@@ -55,6 +55,7 @@ const ASSETS = [
   // phone keeps working offline after an update, same reasoning as jsPDF.
   './supabase.umd.js',
   './sync.js',           // v80
+  './plan.js',           // V127
   './scanner.js',
   './events.js',
   './dispatch.js',
