@@ -32,7 +32,9 @@
      63e  the run (iOS): nothing shared until the Save or share TAP; the File;
           backup reminder reset, no job exported; a cancelled share keeps the
           sheet; Cancel mid-build builds nothing more.
-     63f  release: V125, What’s new rolled, cache, changelog. (62f → 63f.)
+     63f  release: V125 … — moved to 64f in V126.
+     63g  exportall.js is precached and loads after the report files (kept
+          from 63f — standing, not a release line).
 
    ⚠ buildReportDoc cannot run headlessly (jsPDF is injected on demand). The
    certificate builder is replaced in the vm with a spy that returns a few PDF
@@ -343,28 +345,14 @@ module.exports = async function run() {
     t.excludes(src, 'syncPhotoDownload', 'never fetches from the cloud (4A)');
   });
 
-  /* ------------------------------------------------------------------ 63f */
-  await t.group('63f — release: V125, What’s new rolled, cache, changelog', () => {
+  // 63f (release: V125) moved to 64f in V126 — the release lines follow the newest release.
+
+  /* ------------------------------------------------------------------ 63g */
+  await t.group('63g — exportall.js is precached and loads in its place', () => {
     const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V125', 'APP_VERSION V125');
-    t.eq(app.run('WELCOME_VERSION'), 'V125', 'What’s new rolled to V125');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v125';", 'cache key pat-v125');
     t.includes(read('sw.js'), "  './exportall.js',", 'exportall.js precached');
     const idx = read('index.html');
     t.ok(idx.indexOf('src="pdfpreview.js"') < idx.indexOf('src="exportall.js"') && idx.indexOf('src="exportall.js"') < idx.indexOf('src="render-core.js"'), 'exportall.js loads after the report files, before the screens');
     t.eq(typeof app.fn('exportAllOpen'), 'function', 'and loads');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>Export everything.</strong>', 'V125’s What’s new: the file');
-    t.includes(core, '<li><strong>No new certificate numbers.</strong>', 'V125’s What’s new: numbers');
-    t.includes(core, '<li><strong>Just this phone.</strong>', 'V125’s What’s new: this phone');
-    t.excludes(core, '<li><strong>Updates find you.</strong>', 'V124’s sheet copy gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V125</strong>'), b = help.indexOf('<p><strong>V124</strong>'), c = help.indexOf('<p><strong>V123</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V125, V124, V123');
-    t.excludes(help, '<p><strong>V122</strong>', 'V122 rolled off');
-    t.excludes(help, 'Sessions are now called Jobs everywhere in the app', 'V122’s line gone with it');
-    t.includes(help, 'Export everything: one zip file of everything on this phone', 'About: V125’s line');
-    t.includes(help, 'Updates without the fuss: PATGo checks', 'About: V124’s line still there');
-    t.includes(help, 'VoiceOver keeps your place: after a tap', 'About: V123’s line still there');
   });
 };
