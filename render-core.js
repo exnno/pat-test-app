@@ -206,7 +206,7 @@ function render() {
         Your current Quick Pick items have become your first preset. What would you like to call it?
       </p>
       <label class="label">Preset name</label>
-      <input class="input" id="migration-prompt-input" data-input-action="migration-name" value="${escapeHTML(state.migrationPrompt.name)}" placeholder="e.g. Default, My items, Office" autofocus>
+      <input aria-label="Preset name" class="input" id="migration-prompt-input" data-input-action="migration-name" value="${escapeHTML(state.migrationPrompt.name)}" placeholder="e.g. Default, My items, Office" autofocus>
       <p class="muted" style="margin:8px 0 14px;font-size:12px">You can rename or add more presets later in Settings → Quick Pick Items.</p>
       <button class="btn-primary" id="migration-prompt-confirm" data-action="migration-confirm">Continue</button>
     </div>
@@ -241,8 +241,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Report Settings is now two pages.</strong> In Settings → Reports &amp; Exports, <strong>Company &amp; Branding</strong> holds your company details, logo, colours and signature, and <strong>Certificate Content</strong> holds what the certificate includes, the declaration, file name, certificate numbers and templates.</li>
-        <li><strong>Nothing else changes.</strong> Every setting is just where it was on the old page, and your jobs and backups are untouched.</li>
+        <li><strong>PATGo works better with VoiceOver.</strong> If you use the iPhone's screen reader, it now tells you when an item is logged (&ldquo;Logged: Kettle, pass. Item 14&rdquo;), reads out the app's pop-up messages, and says the name of every box you type in.</li>
+        <li><strong>Nothing changes on screen.</strong> If you don't use VoiceOver, the app looks and works exactly as before, and your jobs and backups are untouched.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -312,9 +312,9 @@ function render() {
         <h3 class="bulk-sheet-title">Your details</h3>
         <p class="wizard-lead">These show up on your reports. Both are optional, and you can add or change them any time in Settings.</p>
         <label class="label">Your name (the engineer)</label>
-        <input class="input" id="wizard-engineer" type="text" value="${escapeHTML(state.engineer || '')}" placeholder="e.g. Sam Taylor" autocomplete="name">
+        <input aria-label="Your name (the engineer)" class="input" id="wizard-engineer" type="text" value="${escapeHTML(state.engineer || '')}" placeholder="e.g. Sam Taylor" autocomplete="name">
         <label class="label" style="margin-top:12px">Calibration date of your tester</label>
-        <input class="input" id="wizard-caldate" type="date" value="${escapeHTML(state.calDate || '')}">
+        <input aria-label="Calibration date of your tester" class="input" id="wizard-caldate" type="date" value="${escapeHTML(state.calDate || '')}">
       `;
       footHTML = `
         <button class="btn-primary" data-action="wizard-next">Continue</button>
@@ -338,7 +338,7 @@ function render() {
         <h3 class="bulk-sheet-title">Your report branding</h3>
         <p class="wizard-lead">This is what your clients see on every PDF report. All optional — leave it for now and set it up later if you'd rather.</p>
         <label class="label">Company name</label>
-        <input class="input" id="wizard-company" type="text" value="${escapeHTML(rs.companyName || '')}" placeholder="e.g. Birchley PAT Services">
+        <input aria-label="Company name" class="input" id="wizard-company" type="text" value="${escapeHTML(rs.companyName || '')}" placeholder="e.g. Birchley PAT Services">
         <input type="file" id="report-logo-file" data-change-action="report-logo-file" accept="image/png,image/jpeg" style="display:none">
         <label class="label" style="margin-top:12px">Logo</label>
         ${logoPreview}
@@ -815,30 +815,30 @@ function renderSessions() {
       <h2 class="h2">New session</h2>
       <label class="label">Client <span class="hint">(optional)</span></label>
       <div class="nf-input-wrap" id="nf-client-wrap">
-        <input class="input" id="nf-client" value="${escapeHTML(state.newForm.clientId)}" placeholder="e.g. Acme Ltd" autocomplete="off">
+        <input aria-label="Client (optional)" class="input" id="nf-client" value="${escapeHTML(state.newForm.clientId)}" placeholder="e.g. Acme Ltd" autocomplete="off">
         ${nfSuggestionsHTML('client')}
       </div>
       <label class="label">Site <span class="hint">(optional)</span></label>
       <div class="nf-input-wrap" id="nf-site-wrap">
-        <input class="input" id="nf-site" value="${escapeHTML(state.newForm.site)}" placeholder="e.g. Unit 4, Head Office" autocomplete="off">
+        <input aria-label="Site (optional)" class="input" id="nf-site" value="${escapeHTML(state.newForm.site)}" placeholder="e.g. Unit 4, Head Office" autocomplete="off">
         ${nfSuggestionsHTML('site')}
       </div>
       <div id="nf-site-notes">${nfSiteNotesHTML()}</div>
       <p class="muted nf-hint">Enter a client, a site, or both — at least one. Type new ones to save them for next time, or pick from your saved list. Manage them under Settings → Clients.</p>
       ${nfError}
       <label class="label">Engineer</label>
-      <input class="input" id="nf-engineer" value="${escapeHTML(state.newForm.engineer || state.engineer)}" placeholder="Your name">
+      <input aria-label="Engineer" class="input" id="nf-engineer" value="${escapeHTML(state.newForm.engineer || state.engineer)}" placeholder="Your name">
       <label class="label">Session name <span class="hint">(optional)</span></label>
-      <input class="input" id="nf-name" data-input-action="nf-name" value="${escapeHTML(state.newForm.name)}" placeholder="e.g. Annual test 2026">
+      <input aria-label="Session name (optional)" class="input" id="nf-name" data-input-action="nf-name" value="${escapeHTML(state.newForm.name)}" placeholder="e.g. Annual test 2026">
       <label class="label">Asset number prefix <span class="hint">(optional, e.g. BT)</span></label>
-      <input class="input" id="nf-prefix" data-input-action="nf-prefix" value="${escapeHTML(state.newForm.prefix)}" placeholder="Leave blank for none">
+      <input aria-label="Asset number prefix (optional)" class="input" id="nf-prefix" data-input-action="nf-prefix" value="${escapeHTML(state.newForm.prefix)}" placeholder="Leave blank for none">
       <label class="label">Starting asset number <span class="hint">(type 001 to keep leading zeros)</span></label>
       <!-- v60: type="number" REMOVED. A numeric input normalises its own value,
            so '001' was silently rewritten to '1' before the app ever saw it —
            leading zeros could not survive no matter what the code did with them.
            text + inputmode="numeric" keeps the numeric keypad on mobile while
            leaving the typed string intact; pattern="[0-9]*" keeps it numeric. -->
-      <input class="input" id="nf-start" data-input-action="nf-start" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${escapeHTML(state.newForm.startNo)}">
+      <input aria-label="Starting asset number" class="input" id="nf-start" data-input-action="nf-start" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${escapeHTML(state.newForm.startNo)}">
       <div class="btn-row">
         <button class="btn-secondary" id="nf-cancel" data-action="nf-cancel">Cancel</button>
         <button class="btn-primary" id="nf-submit" data-action="nf-submit">Start</button>
@@ -864,7 +864,7 @@ function renderSessions() {
   const showSearch = hasSessions && !state.newForm.show;
   const searchRow = showSearch ? `
     <div class="sessions-search-row">
-      <input type="search" class="search-input" id="sessions-search" data-input-action="sessions-search" placeholder="Search sessions and items…" value="${escapeHTML(state.sessionsSearchQuery)}" autocomplete="off">
+      <input aria-label="Search jobs and items" type="search" class="search-input" id="sessions-search" data-input-action="sessions-search" placeholder="Search sessions and items…" value="${escapeHTML(state.sessionsSearchQuery)}" autocomplete="off">
     </div>
   ` : '';
   const sessionsListArea = `<div id="sessions-list-area">${renderSessionsListAreaHTML()}</div>`;
@@ -1441,7 +1441,7 @@ function renderImportSummaryModal() {
 // engineer the app is broken rather than the platform is.
 function assetFieldHTML() {
   const paired = !!(state.scannerEnabled && state.scannerPaired);
-  return `<input class="input-big" id="f-asset" data-input-action="f-asset"` +
+  return `<input aria-label="Asset number" class="input-big" id="f-asset" data-input-action="f-asset"` +
     ` value="${escapeHTML(state.form.assetNo)}"` +
     `${state.scannerEnabled ? ' placeholder="Scan or type"' : ''}` +
     `${paired ? ' inputmode="none"' : ''}>`;
@@ -1568,7 +1568,7 @@ function renderEntry() {
 
   const notesBlock = state.form.showNotes
     ? `<label class="label">Notes</label>
-       <textarea class="textarea" id="f-notes" data-input-action="f-notes" rows="2" placeholder="Optional">${escapeHTML(state.form.notes)}</textarea>`
+       <textarea aria-label="Notes" class="textarea" id="f-notes" data-input-action="f-notes" rows="2" placeholder="Optional">${escapeHTML(state.form.notes)}</textarea>`
     : `<button class="notes-toggle" id="show-notes-btn" data-action="show-notes">${icon('pencil')} Add note</button>`;
 
   const resultBadge = isExisting && existing.result
@@ -1654,7 +1654,7 @@ function renderEntry() {
   } else {
     failSheetInner = `
       <button class="fail-other-back" id="fail-other-back" data-action="fail-other-back">${icon('chevron-left')} Back to reasons</button>
-      <textarea class="fail-other-input" id="fail-other-input" data-input-action="fail-other" placeholder="Type reason…" rows="3">${escapeHTML(state.failOtherText)}</textarea>
+      <textarea aria-label="Fail reason, in your own words" class="fail-other-input" id="fail-other-input" data-input-action="fail-other" placeholder="Type reason…" rows="3">${escapeHTML(state.failOtherText)}</textarea>
       <button class="fail-other-save" id="fail-other-save" data-action="fail-other-save">Save fail</button>
     `;
   }
@@ -1925,7 +1925,7 @@ function renderEntry() {
       // in place — refreshReadingNote.
       return `
         <label class="reading-field-label">${escapeHTML(meta.label)} <span class="reading-unit">(${escapeHTML(meta.unit)})</span></label>
-        <input class="input reading-input" id="f-reading-${k}" data-input-action="f-reading-${k}" value="${escapeHTML(val)}" inputmode="text" autocomplete="off" placeholder="${escapeHTML(meta.passPlaceholder)}">
+        <input aria-label="${escapeHTML(meta.label)} (${escapeHTML(meta.unit)})" class="input reading-input" id="f-reading-${k}" data-input-action="f-reading-${k}" value="${escapeHTML(val)}" inputmode="text" autocomplete="off" placeholder="${escapeHTML(meta.passPlaceholder)}">
         <div class="reading-limit-note" id="reading-note-${k}" role="status"${over ? '' : ' hidden'}>${over ? escapeHTML(readingLimitNoteText(over)) : ''}</div>
       `;
     }).join('');
@@ -2007,14 +2007,14 @@ function renderEntry() {
 
       <label class="label">Location ${carriedHint}</label>
       <div class="location-input-wrap">
-        <input class="input-big" id="f-location" value="${escapeHTML(state.form.location)}" placeholder="e.g. Office 1">
+        <input aria-label="Location" class="input-big" id="f-location" value="${escapeHTML(state.form.location)}" placeholder="e.g. Office 1">
         ${locationSuggestionsBlock}
       </div>
 
       <label class="label">Item type</label>
       <div class="quick-grid" id="quick-grid">${quickButtons}</div>
       <div class="custom-type-wrap">
-        <input class="input" id="f-type" value="${escapeHTML(state.form.itemType)}" placeholder="…or type custom" autocomplete="off" style="margin-top:8px">
+        <input aria-label="Item type, or type your own" class="input" id="f-type" value="${escapeHTML(state.form.itemType)}" placeholder="…or type custom" autocomplete="off" style="margin-top:8px">
         ${suggestionsBlock}
       </div>
 
@@ -2078,7 +2078,7 @@ function renderMapPinSheet() {
         <button class="btn-secondary map-pin-w3w" id="map-pin-w3w" data-action="map-pin-w3w">Open the what3words app</button>
         <div id="map-pin-noapp">${sh.noApp ? mapPinNoAppHTML() : ''}</div>
         <div class="map-pin-input-row">
-          <input class="input map-pin-input" id="map-pin-input" data-input-action="map-pin-text" value="${escapeHTML(sh.text || '')}" placeholder="///filled.count.soap" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="200">
+          <input aria-label="what3words address" class="input map-pin-input" id="map-pin-input" data-input-action="map-pin-text" value="${escapeHTML(sh.text || '')}" placeholder="///filled.count.soap" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="200">
           <button class="btn-secondary map-pin-paste" id="map-pin-paste" data-action="map-pin-paste">Paste</button>
         </div>
         <div class="map-pin-error" id="map-pin-error" role="alert"></div>

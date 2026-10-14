@@ -9,13 +9,47 @@
 // ============== PATGo PWA — v22 — Feedback ==============
 // Toast + haptic / visual flash / sound feedback. Self-contained.
 
+// ---------- V120: screen-reader announcements (1A) ----------
+// One permanent live region, #sr-announcer in index.html, outside #app so
+// render() never rebuilds it. ⚠ WHY NOT role="status" ON EACH TOAST (the
+// pre-V120 way): a live region created at the same moment as its text is
+// often not read by VoiceOver on iPhone — it has to exist BEFORE the text
+// changes. So every spoken message comes through here instead.
+// The text is cleared, then set a moment later, so the same message twice in a
+// row ("Up to 4 photos per item") is still spoken the second time. Newest wins:
+// a pending message is dropped if another arrives first.
+// Invisible: the element is .sr-only, so nothing changes for sighted use.
+// Built here if missing (an old cached index.html with new scripts) — fail soft.
+let _announceTimer = null;
+function announce(message) {
+  const text = String(message ?? '').trim();
+  if (!text) return;
+  let el = document.getElementById('sr-announcer');
+  if (!el) {
+    try {
+      el = document.createElement('div');
+      el.id = 'sr-announcer';
+      el.className = 'sr-only';
+      el.setAttribute('aria-live', 'polite');
+      el.setAttribute('aria-atomic', 'true');
+      document.body.appendChild(el);
+    } catch { return; }
+  }
+  if (_announceTimer) { clearTimeout(_announceTimer); _announceTimer = null; }
+  el.textContent = '';
+  _announceTimer = setTimeout(() => { el.textContent = text; _announceTimer = null; }, 60);
+}
+
 let _toastTimer = null;
 function showToast(message) {
   document.querySelectorAll('body > .toast').forEach(el => el.remove());
   if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
   const el = document.createElement('div');
   el.className = 'toast';
-  el.setAttribute('role', 'status');
+  // V120: spoken through the announcer, so the visible pop-up is hidden from
+  // VoiceOver — otherwise a phone that DID catch it would say it twice.
+  el.setAttribute('aria-hidden', 'true');
+  announce(message);
   el.textContent = message;
   document.body.appendChild(el);
   // Force a reflow so the transition runs, then reveal.
@@ -165,7 +199,7 @@ function openNameSheet(opts) {
       <button class="fail-close-btn" id="name-sheet-cancel" aria-label="Cancel">&times;</button>
     </div>
     ${blurb ? `<p class="sheet-scroll" style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text-muted)">${escapeHTML(blurb)}</p>` : ''}
-    <input class="input sheet-pin" id="name-sheet-input" value="${escapeHTML(value)}" placeholder="${escapeHTML(placeholder)}" autocapitalize="on" autocomplete="off" maxlength="${maxlength}">
+    <input aria-label="${escapeHTML(title)}" class="input sheet-pin" id="name-sheet-input" value="${escapeHTML(value)}" placeholder="${escapeHTML(placeholder)}" autocapitalize="on" autocomplete="off" maxlength="${maxlength}">
     <button class="btn-primary sheet-pin" id="name-sheet-save" style="margin-top:12px">${escapeHTML(confirmLabel)}</button>
     ${typeof opts.onDelete === 'function' ? `<button class="btn-secondary sheet-pin" id="name-sheet-delete" style="margin-top:10px;color:var(--fail-word)">${escapeHTML(opts.deleteLabel || 'Delete')}</button>` : ''}
   `;

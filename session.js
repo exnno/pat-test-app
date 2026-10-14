@@ -1550,6 +1550,10 @@ function saveItem(result, readings) {
   // clears state in between. Revoking the object URLs does not invalidate the
   // Blobs, so the captured entries stay usable.
   const stagedPhotos = (state.pendingPhotos || []).slice();
+  // V120 (2A): what VoiceOver says once the save lands. Taken now — the cursor
+  // moves below. Position = the item's number in the job, edit or append.
+  const spokenPos = state.cursor + 1;
+  const spokenEdit = state.cursor < sess.items.length;
   if (state.cursor < sess.items.length) {
     // v17: editing an existing item must NOT change its original timestamp —
     // ts records when the item was FIRST logged, not last touched. We spread
@@ -1605,6 +1609,9 @@ function saveItem(result, readings) {
   // item that has already been saved.
   commitPendingPhotos(sess.id, savedItemId, result, stagedPhotos);
   refreshEntryAfterLog();
+  // V120 (2A): no pop-up says an item was logged — only the flash and sound —
+  // so a VoiceOver user is told in words. Spoken only; nothing on screen.
+  if (typeof announce === 'function') announce(loggedAnnouncement(item, spokenPos, spokenEdit));
   // V99 (5A): offer a map pin for a fail that has none — after the repaint
   // above, which would otherwise wipe it. Switch off → mapPinOfferShow says no.
   if (result === 'fail' && savedItemId) {
@@ -2540,6 +2547,9 @@ function copyLastResult() {
     notes: '',
     result: last.result
   };
+  // V120 (2A): spoken after the save, as in saveItem — taken before the cursor moves.
+  const spokenPos = state.cursor + 1;
+  const spokenEdit = state.cursor < sess.items.length;
   if (state.cursor < sess.items.length) {
     // v17: overwrite keeps the existing item's original ts (item has no ts key).
     // V99: the overwrite clears the notes, so it clears the map pin too.
@@ -2570,6 +2580,18 @@ function copyLastResult() {
   // (it reuses the previous item's type), so descriptions can't change here.
   saveSessions(); saveSqpHistory();
   refreshEntryAfterLog();
+  if (typeof announce === 'function') announce(loggedAnnouncement(item, spokenPos, spokenEdit));   // V120 (2A)
+}
+
+// V120 (2A): the line VoiceOver speaks after a single item is logged or
+// overwritten — "Logged: Kettle, pass. Item 14." Pure, so the harness can pin
+// the wording. Batches (Multi Pick, a tile, Log again ×N) already pop up
+// "Added N items", which the announcer now speaks — they don't call this.
+function loggedAnnouncement(item, position, edited) {
+  const type = String((item && item.itemType) || '').trim();
+  const res = item && item.result === 'fail' ? 'fail' : (item && item.result === 'pass' ? 'pass' : '');
+  const what = [type, res].filter(Boolean).join(', ');
+  return `${edited ? 'Updated' : 'Logged'}${what ? ': ' + what : ''}. Item ${position}.`;
 }
 
 // ---------- v77: "Log again ×N" ----------

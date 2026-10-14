@@ -246,7 +246,7 @@ function renderSettingsHubBodyHTML() {
 function renderSettingsHub() {
   const searchBox = `
     <div class="settings-search">
-      <input type="search" id="settings-search-input" class="input settings-search-input"
+      <input aria-label="Search settings" type="search" id="settings-search-input" class="input settings-search-input"
         placeholder="Search settings" value="${escapeHTML(state.settingsSearchQuery)}"
         data-input-action="settings-search" autocapitalize="off" autocomplete="off" spellcheck="false">
     </div>`;
@@ -343,7 +343,7 @@ function renderSettingsUser() {
       <div class="settings-section">
         <h2 class="h2">Engineer name</h2>
         <p class="muted">Used as the default for new jobs and shown on exported CSVs.</p>
-        <input class="input" id="settings-engineer" value="${escapeHTML(state.engineer)}" placeholder="Your name">
+        <input aria-label="Engineer name" class="input" id="settings-engineer" value="${escapeHTML(state.engineer)}" placeholder="Your name">
       </div>
 
       <div class="settings-section">
@@ -388,7 +388,7 @@ function renderSettingsItems() {
         <button class="fail-close-btn" id="preset-dialog-cancel" data-action="preset-dialog-cancel" aria-label="Cancel">×</button>
       </div>
       <label class="label">Name</label>
-      <input class="input" id="preset-dialog-input" data-input-action="preset-name" value="${escapeHTML(dialog.name)}" placeholder="e.g. Workshop, Office, Site visit" autofocus>
+      <input aria-label="Preset name" class="input" id="preset-dialog-input" data-input-action="preset-name" value="${escapeHTML(dialog.name)}" placeholder="e.g. Workshop, Office, Site visit" autofocus>
       <button class="btn-primary" id="preset-dialog-confirm" data-action="preset-dialog-confirm" style="margin-top:14px">${dialog.mode === 'new' ? 'Create' : 'Save'}</button>
     </div>
   ` : '';
@@ -403,7 +403,7 @@ function renderSettingsItems() {
       <div class="settings-section">
         <h2 class="h2">Preset</h2>
         <p class="muted">${escapeHTML(presetSummary)}. The selected preset is what shows on the entry screen.</p>
-        <select class="input" id="settings-preset-select" data-change-action="preset-switch">${presetOptions}</select>
+        <select aria-label="Preset" class="input" id="settings-preset-select" data-change-action="preset-switch">${presetOptions}</select>
         <div class="preset-actions-row">
           <button class="preset-action-btn" id="preset-new-btn" data-action="preset-new">+ New</button>
           <button class="preset-action-btn" id="preset-rename-btn" data-action="preset-rename">Rename</button>
@@ -417,7 +417,7 @@ function renderSettingsItems() {
       <div class="settings-section">
         <h2 class="h2">Items in "${escapeHTML(active ? active.name : '')}"</h2>
         <p class="muted">One per line. Up to 9. Appear as quick-tap buttons on the entry screen.</p>
-        <textarea class="textarea" id="settings-types" style="min-height:240px">${escapeHTML((active ? active.items : []).join('\n'))}</textarea>
+        <textarea aria-label="Item types, one per line" class="textarea" id="settings-types" style="min-height:240px">${escapeHTML((active ? active.items : []).join('\n'))}</textarea>
       </div>
 
       <!-- v18: Smart Quick Pick. Reorders the quick-pick buttons on the entry
@@ -475,7 +475,7 @@ function renderSettingsFails() {
       return `
         <div class="reason-tag-row">
           <span class="reason-tag-name">${escapeHTML(reason)}</span>
-          <select class="sort-select reason-tag-select" data-change-action="fail-reason-tag" data-reason="${escapeHTML(reason)}">${opts}</select>
+          <select aria-label="What ${escapeHTML(reason)} measures" class="sort-select reason-tag-select" data-change-action="fail-reason-tag" data-reason="${escapeHTML(reason)}">${opts}</select>
         </div>
       `;
     }).join('');
@@ -493,7 +493,7 @@ function renderSettingsFails() {
       <div class="settings-section">
         <h2 class="h2">Fail reasons</h2>
         <p class="muted">One per line. Up to 6. Shown when you tap FAIL.</p>
-        <textarea class="textarea" id="settings-reasons" style="min-height:200px">${escapeHTML(state.failReasons.join('\n'))}</textarea>
+        <textarea aria-label="Fail reasons, one per line" class="textarea" id="settings-reasons" style="min-height:200px">${escapeHTML(state.failReasons.join('\n'))}</textarea>
       </div>
       <div class="btn-row" style="margin-top:24px">
         <button class="btn-secondary" id="settings-fails-reset" data-action="settings-fails-reset">${icon('rotate-ccw')} Reset to defaults</button>
@@ -626,14 +626,14 @@ function renderSettingsScanner() {
       <div class="settings-section">
         <h2 class="h2">Test your scanner</h2>
         <p class="muted">Scan any barcode while this page is open. Every burst appears below — including ones the app decided were <em>not</em> a scan, with the reason. That's the quickest way to tell a scanner that isn't connected from one that's sending too slowly.</p>
-        <input class="input-big" id="scanner-test" placeholder="Scan a label…" autocomplete="off" inputmode="none">
+        <input aria-label="Scanner test box" class="input-big" id="scanner-test" placeholder="Scan a label…" autocomplete="off" inputmode="none">
         <div class="scanner-log" id="scanner-test-log">${renderScannerTestLogHTML()}</div>
       </div>
 
       <div class="settings-section">
         <h2 class="h2">Scan speed</h2>
         <p class="muted">The app spots a scanner by how quickly the characters arrive. If the test above says "too slow", move this one notch down the list and scan again.</p>
-        <select class="input" id="scan-speed" data-change-action="scan-speed">
+        <select aria-label="Scan speed" class="input" id="scan-speed" data-change-action="scan-speed">
           ${speedOptions.map(o => `<option value="${o[0]}"${o[0] === speed ? ' selected' : ''}>${escapeHTML(o[1])} — ${SCAN_GAP_PRESETS[o[0]]}ms</option>`).join('')}
         </select>
         <p class="muted" style="margin-top:8px">${escapeHTML(speedNote)}</p>
@@ -674,8 +674,8 @@ function renderSettingsMultiPick() {
     slotRows.push(`
       <div class="mp-slot">
         <div class="mp-slot-head">Multi-pick ${i + 1}</div>
-        <input class="input mp-slot-name" value="${escapeHTML(s.name || '')}" placeholder="Name (optional) — e.g. Desk PC setup">
-        <input class="input mp-slot-seq" value="${escapeHTML(seqValue)}" placeholder="Lead, AC Adapter, Lead, PC, Lead, Monitor">
+        <input aria-label="Multi-pick ${i + 1} name" class="input mp-slot-name" value="${escapeHTML(s.name || '')}" placeholder="Name (optional) — e.g. Desk PC setup">
+        <input aria-label="Multi-pick ${i + 1} items, separated by commas" class="input mp-slot-seq" value="${escapeHTML(seqValue)}" placeholder="Lead, AC Adapter, Lead, PC, Lead, Monitor">
         <label class="mp-slot-qp-label">Quick Pick tile
           <select class="input mp-slot-qp" data-change-action="mp-qp">${qpOpts}</select>
         </label>
@@ -736,7 +736,7 @@ function renderSettingsDescriptions() {
       <div class="settings-section">
         <h2 class="h2">Edit as text</h2>
         <p class="muted">One description per line. Add lines to seed autocomplete, or delete lines you don't want. To fix a spelling on items you've already logged, use the list instead.</p>
-        <textarea class="textarea" id="settings-descriptions" style="min-height:280px">${escapeHTML(state.descriptions.join('\n'))}</textarea>
+        <textarea aria-label="Descriptions, one per line" class="textarea" id="settings-descriptions" style="min-height:280px">${escapeHTML(state.descriptions.join('\n'))}</textarea>
       </div>
       <div class="btn-row" style="margin-top:24px">
         <button class="btn-secondary" data-action="desc-list-mode">Back to list</button>
@@ -757,7 +757,7 @@ function renderSettingsDescriptions() {
       <div class="settings-section">
         <h2 class="h2">Saved descriptions</h2>
         <p class="muted">Item types you've typed into the custom field. Tap one to fix its spelling — you can also fix it on items already logged in unlocked jobs.</p>
-        ${state.descriptions.length > 12 ? `<input class="input" id="desc-filter" data-input-action="desc-filter" placeholder="Find a description" autocomplete="off" style="margin-bottom:10px">` : ''}
+        ${state.descriptions.length > 12 ? `<input aria-label="Find a description" class="input" id="desc-filter" data-input-action="desc-filter" placeholder="Find a description" autocomplete="off" style="margin-bottom:10px">` : ''}
         <div class="desc-list">${rows || '<p class="muted">No saved descriptions yet.</p>'}</div>
       </div>
       <div class="btn-row" style="margin-top:24px">
@@ -1018,14 +1018,14 @@ function renderSettingsStorage() {
           ? 'When a job is safe in the cloud and older than this, it\'ll be offered for removing from this phone. The cloud keeps it. Nothing is ever removed without your confirmation.'
           : 'When a job has been exported and is older than this, it\'ll be offered for clearing above. Nothing is ever deleted without your confirmation.'}</p>
         <label class="label">Age in months</label>
-        <input class="input" id="prune-age-input" type="number" inputmode="numeric" min="1" max="120" value="${ageMonths}">
+        <input aria-label="Clear old jobs after, age in months" class="input" id="prune-age-input" type="number" inputmode="numeric" min="1" max="120" value="${ageMonths}">
         <div class="btn-row">
           <button class="btn-primary" id="prune-age-save" data-action="prune-age-save">Save</button>
         </div>
         ${cloudOn ? `
         <label class="label" style="margin-top:14px">Photos older than (months)</label>
         <p class="muted" style="font-size:12px;margin:0 0 6px">Photos in the cloud older than this are offered for removing from this phone. A tap brings any of them back.</p>
-        <input class="input" id="photo-age-input" type="number" inputmode="numeric" min="1" max="120" value="${state.photoAgeMonths || PHOTO_AGE_DEFAULT}">
+        <input aria-label="Photos older than (months)" class="input" id="photo-age-input" type="number" inputmode="numeric" min="1" max="120" value="${state.photoAgeMonths || PHOTO_AGE_DEFAULT}">
         <div class="btn-row">
           <button class="btn-primary" id="photo-age-save" data-action="photo-age-save">Save</button>
         </div>` : ''}
@@ -1126,7 +1126,7 @@ function renderSettingsCsv() {
           </label>
         </div>
         <label class="label csv-col-header-label">Header text</label>
-        <input class="input csv-col-header" value="${escapeHTML(c.header || def)}" placeholder="${escapeHTML(def)}">
+        <input aria-label="Header text for ${escapeHTML(def)}" class="input csv-col-header" value="${escapeHTML(c.header || def)}" placeholder="${escapeHTML(def)}">
         ${hint}
       </div>
     `;
@@ -1212,10 +1212,11 @@ function reminderSettingsSummary() {
   const backup = r.backupDays === 'off' ? 'Backups off' : `Backups every ${r.backupDays} days`;
   return (on.length ? on.join(' · ') + ' · ' : '') + backup;
 }
-function _reminderSelect(id, field, action, list) {
+function _reminderSelect(id, field, action, list, label) {
   const r = normaliseReminders(state.reminders);
   const opts = list.map(v => `<option value="${v}"${r[field] === v ? ' selected' : ''}>${escapeHTML(REMINDER_LABELS[field][v])}</option>`).join('');
-  return `<select class="input" id="${id}" data-change-action="${action}">${opts}</select>`;
+  // V120: the heading above is not a <label>, so the select carries its own spoken name.
+  return `<select class="input" id="${id}" aria-label="${escapeHTML(label || '')}" data-change-action="${action}">${opts}</select>`;
 }
 function renderSettingsReminders() {
   return `
@@ -1224,17 +1225,17 @@ function renderSettingsReminders() {
       <div class="settings-section">
         <h2 class="h2">Locked but not exported</h2>
         <p class="muted">A reminder on the Jobs screen when a job you've locked still has no certificate and no CSV export. Making the certificate (Download or Share from the preview) or exporting the CSV clears it. Jobs locked before this version don't count.</p>
-        ${_reminderSelect('remind-export', 'exportAfter', 'remind-export', REMINDER_EXPORT_CHOICES)}
+        ${_reminderSelect('remind-export', 'exportAfter', 'remind-export', REMINDER_EXPORT_CHOICES, 'Locked but not exported')}
       </div>
       <div class="settings-section">
         <h2 class="h2">Jobs still unlocked</h2>
         <p class="muted">From this time each day, a reminder on the Jobs screen if any job on this phone is still unlocked &mdash; a nudge to finish and lock the day's work.</p>
-        ${_reminderSelect('remind-unlocked', 'unlockedAt', 'remind-unlocked', REMINDER_UNLOCKED_CHOICES)}
+        ${_reminderSelect('remind-unlocked', 'unlockedAt', 'remind-unlocked', REMINDER_UNLOCKED_CHOICES, 'Jobs still unlocked')}
       </div>
       <div class="settings-section">
         <h2 class="h2">Backup reminder</h2>
         <p class="muted">How often the Jobs screen reminds you to export a backup file.</p>
-        ${_reminderSelect('remind-backup', 'backupDays', 'remind-backup', REMINDER_BACKUP_CHOICES)}
+        ${_reminderSelect('remind-backup', 'backupDays', 'remind-backup', REMINDER_BACKUP_CHOICES, 'Backup reminder')}
       </div>
       <div class="settings-section">
         <p class="muted" style="margin:0 0 10px">Reminders show inside the app when you open it &mdash; they aren't notifications on your phone. Each one's &times; hides it for the rest of the day. These settings are for this phone only.</p>
@@ -1342,7 +1343,7 @@ function renderSettingsClients() {
           <button class="fail-close-btn" id="client-dialog-cancel" data-action="client-dialog-cancel" aria-label="Cancel">×</button>
         </div>
         <label class="label">Client name</label>
-        <input class="input" id="client-dialog-input" data-input-action="client-name" value="${escapeHTML(cd.name)}" placeholder="e.g. Acme Ltd" autofocus>
+        <input aria-label="Client name" class="input" id="client-dialog-input" data-input-action="client-name" value="${escapeHTML(cd.name)}" placeholder="e.g. Acme Ltd" autofocus>
         <button class="btn-primary" id="client-dialog-confirm" data-action="client-dialog-confirm" style="margin-top:14px">${cd.mode === 'add' ? 'Add' : 'Save'}</button>
       </div>
     `;
@@ -1361,9 +1362,9 @@ function renderSettingsClients() {
         </div>
         ${parentLine}
         <label class="label">Site name</label>
-        <input class="input" id="site-dialog-input" data-input-action="site-name" value="${escapeHTML(sd.name)}" placeholder="e.g. Unit 4, Head Office" autofocus>
+        <input aria-label="Site name" class="input" id="site-dialog-input" data-input-action="site-name" value="${escapeHTML(sd.name)}" placeholder="e.g. Unit 4, Head Office" autofocus>
         <label class="label" style="margin-top:12px">Site notes <span class="hint">(optional &mdash; only for you, never printed)</span></label>
-        <textarea class="textarea" id="site-dialog-notes" data-input-action="site-dialog-notes" maxlength="${SITE_NOTES_MAX}" rows="4" placeholder="Door codes, difficult locations, reminders">${escapeHTML(sd.notes || '')}</textarea>
+        <textarea aria-label="Site notes (optional)" class="textarea" id="site-dialog-notes" data-input-action="site-dialog-notes" maxlength="${SITE_NOTES_MAX}" rows="4" placeholder="Door codes, difficult locations, reminders">${escapeHTML(sd.notes || '')}</textarea>
         <button class="btn-primary" id="site-dialog-confirm" data-action="site-dialog-confirm" style="margin-top:14px">${sd.mode === 'add' ? 'Add' : 'Save'}</button>
       </div>
     `;
@@ -1402,7 +1403,7 @@ function renderSettingsClients() {
             <button class="fail-close-btn" data-action="site-assign-cancel" aria-label="Cancel">×</button>
           </div>
           <label class="label">Client</label>
-          <input class="input" id="assign-dialog-input" value="${escapeHTML(ad.name)}" placeholder="Type or pick a client" list="assign-client-list" autofocus>
+          <input aria-label="Client" class="input" id="assign-dialog-input" value="${escapeHTML(ad.name)}" placeholder="Type or pick a client" list="assign-client-list" autofocus>
           <datalist id="assign-client-list">
             ${sortedClients().map(c => `<option value="${escapeHTML(c.name)}"></option>`).join('')}
           </datalist>
@@ -1538,7 +1539,7 @@ function renderSettingsReport(part) {
           ${rs.showRemedial ? `<div style="margin-left:16px">
             <p class="muted">A section at the end listing every failed item with its reason. Fails with a photo are shown with it when Photos is on (the photos then appear here, not on separate photo pages); the rest are listed together. Nothing is added to a job with no fails.</p>
             ${toggle('report-remedial-action', 'Action line', rs.remedialActionOn !== false, rs.remedialActionOn !== false ? 'Printed under the heading' : 'Hidden')}
-            ${rs.remedialActionOn !== false ? `<textarea class="textarea" id="report-remedial-text" style="min-height:70px">${escapeHTML(rs.remedialActionText || '')}</textarea>` : ''}
+            ${rs.remedialActionOn !== false ? `<textarea aria-label="Remedial action line" class="textarea" id="report-remedial-text" style="min-height:70px">${escapeHTML(rs.remedialActionText || '')}</textarea>` : ''}
           </div>` : ''}
           ${toggle('report-declaration', 'Declaration line', rs.declaration)}
           ${toggle('report-show-appcredit', 'PATGo credit line', rs.showAppCredit, rs.showAppCredit ? 'Shown at the foot of the report' : 'Hidden')}
@@ -1552,19 +1553,19 @@ function renderSettingsReport(part) {
           <p class="muted">Optional. When on, the report shows the month the retest is due (the month of the test plus the months below &mdash; for example <strong>September 2027</strong>). This is a guidance figure for your client — the IET Code of Practice sets no fixed interval and recommends a risk-based assessment.</p>
           ${toggle('report-retest-enabled', 'Show recommended retest', rs.retestEnabled)}
           <label class="label" style="margin-top:12px">Retest period (months)</label>
-          <input class="input" id="report-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(retestMonthsVal)}" placeholder="e.g. 12"${rs.retestEnabled ? '' : ' disabled style="opacity:.5"'}>
+          <input aria-label="Retest period (months)" class="input" id="report-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(retestMonthsVal)}" placeholder="e.g. 12"${rs.retestEnabled ? '' : ' disabled style="opacity:.5"'}>
         </div>
 
         <div class="settings-section">
           <h2 class="h2">Declaration text</h2>
           <p class="muted">Printed above the signature line when the declaration is on. Edit to your own wording.</p>
-          <textarea class="textarea" id="report-declaration-text" style="min-height:90px">${escapeHTML(rs.declarationText)}</textarea>
+          <textarea aria-label="Declaration text" class="textarea" id="report-declaration-text" style="min-height:90px">${escapeHTML(rs.declarationText)}</textarea>
         </div>
 
         <div class="settings-section">
           <h2 class="h2">PDF file name</h2>
           <p class="muted">Sets the name each report file is saved with. Tap a chip to insert a detail that fills in automatically for each job. You can still rename any single report just before sharing it.</p>
-          <input class="input" id="report-filename-pattern" value="${escapeHTML(rs.reportFilenamePattern || REPORT_FILENAME_DEFAULT)}" placeholder="${escapeHTML(REPORT_FILENAME_DEFAULT)}" autocapitalize="off" autocomplete="off" spellcheck="false">
+          <input aria-label="PDF file name" class="input" id="report-filename-pattern" value="${escapeHTML(rs.reportFilenamePattern || REPORT_FILENAME_DEFAULT)}" placeholder="${escapeHTML(REPORT_FILENAME_DEFAULT)}" autocapitalize="off" autocomplete="off" spellcheck="false">
           <div class="filename-token-chips">
             ${REPORT_FILENAME_TOKENS.map(t =>
               `<button type="button" class="filename-token-chip" data-action="report-filename-token" data-arg="${escapeHTML(t)}">${escapeHTML(t.replace(/[{}]/g, ''))}</button>`
@@ -1579,16 +1580,16 @@ function renderSettingsReport(part) {
           ${toggle('report-cert-enabled', 'Use certificate numbers', rs.certEnabled)}
           <div${rs.certEnabled ? '' : ' style="opacity:.5"'}>
             <label class="label" style="margin-top:12px">Prefix</label>
-            <input class="input" id="report-cert-prefix" value="${escapeHTML(rs.certPrefix || '')}" placeholder="e.g. BPS- or BPS-{year}-" autocapitalize="characters" autocomplete="off" spellcheck="false"${rs.certEnabled ? '' : ' disabled'}>
+            <input aria-label="Certificate number prefix" class="input" id="report-cert-prefix" value="${escapeHTML(rs.certPrefix || '')}" placeholder="e.g. BPS- or BPS-{year}-" autocapitalize="characters" autocomplete="off" spellcheck="false"${rs.certEnabled ? '' : ' disabled'}>
             <p class="muted" style="font-size:12px;margin-top:4px">Use <code>{year}</code> to insert the test year, e.g. <code>BPS-{year}-</code> → <code>BPS-2026-0001</code>.</p>
             <div class="cert-number-row">
               <div>
                 <label class="label">Digits</label>
-                <input class="input" id="report-cert-padding" type="number" inputmode="numeric" min="0" max="10" value="${escapeHTML(String(rs.certPadding))}"${rs.certEnabled ? '' : ' disabled'}>
+                <input aria-label="Certificate number digits" class="input" id="report-cert-padding" type="number" inputmode="numeric" min="0" max="10" value="${escapeHTML(String(rs.certPadding))}"${rs.certEnabled ? '' : ' disabled'}>
               </div>
               <div>
                 <label class="label">Next number</label>
-                <input class="input" id="report-cert-next" type="number" inputmode="numeric" min="1" value="${escapeHTML(String(rs.certNextNumber))}"${rs.certEnabled ? '' : ' disabled'}>
+                <input aria-label="Next certificate number" class="input" id="report-cert-next" type="number" inputmode="numeric" min="1" value="${escapeHTML(String(rs.certNextNumber))}"${rs.certEnabled ? '' : ' disabled'}>
               </div>
             </div>
             <p class="muted" style="font-size:12px;margin-top:8px">Next certificate will look like: <strong>${escapeHTML(certPreview)}</strong></p>
@@ -1620,9 +1621,9 @@ function renderSettingsReport(part) {
         <h2 class="h2">Company details</h2>
         <p class="muted">Printed in the report header. All optional.</p>
         <label class="label">Company name</label>
-        <input class="input" id="report-company-name" value="${escapeHTML(rs.companyName)}" placeholder="e.g. Birchley PAT Services">
+        <input aria-label="Company name" class="input" id="report-company-name" value="${escapeHTML(rs.companyName)}" placeholder="e.g. Birchley PAT Services">
         <label class="label">Address</label>
-        <textarea class="textarea" id="report-company-address" style="min-height:80px" placeholder="Optional — printed under the company name">${escapeHTML(rs.companyAddress)}</textarea>
+        <textarea aria-label="Company address" class="textarea" id="report-company-address" style="min-height:80px" placeholder="Optional — printed under the company name">${escapeHTML(rs.companyAddress)}</textarea>
         <label class="label">Logo</label>
         <p class="muted" style="font-size:12px;margin-top:0">A PNG or JPEG. Large images are scaled down automatically.</p>
         ${logoBlock}
@@ -1632,7 +1633,7 @@ function renderSettingsReport(part) {
 
       <div class="settings-section">
         <h2 class="h2">Report title</h2>
-        <input class="input" id="report-title" value="${escapeHTML(rs.reportTitle)}" placeholder="Portable Appliance Test Report">
+        <input aria-label="Report title" class="input" id="report-title" value="${escapeHTML(rs.reportTitle)}" placeholder="Portable Appliance Test Report">
       </div>
 
       <div class="settings-section">
@@ -1712,10 +1713,10 @@ function renderSettingsCalculator() {
         <p class="muted">For a Class I appliance, the earth continuity limit is (0.1 + R) Ω, where R is the resistance of the protective conductor in the supply cable. Values from IET Code of Practice Table V1.1.</p>
 
         <label class="label">CSA (cable cross-section)</label>
-        <select class="input" id="calc-csa" data-change-action="calc-csa">${csaOptions}</select>
+        <select aria-label="Cable cross-section (CSA)" class="input" id="calc-csa" data-change-action="calc-csa">${csaOptions}</select>
 
         <label class="label">Length</label>
-        <select class="input" id="calc-length" data-change-action="calc-length">${lengthOptions}</select>
+        <select aria-label="Cable length" class="input" id="calc-length" data-change-action="calc-length">${lengthOptions}</select>
 
         <div class="calc-result-card">
           <div class="calc-result-label">Earth limit</div>

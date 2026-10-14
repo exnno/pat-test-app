@@ -1,4 +1,4 @@
-# PATGo — Code Map (V119.1)
+# PATGo — Code Map (V120)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -174,6 +174,17 @@ is discoverable from the file you happen to be editing.
     CSV, copied text, confirm-sheet messages) keep plain characters. A new name
     must be added to `ICON_PATHS` (52a fails otherwise). Settings tables
     (data.js) hold Lucide NAMES, not emoji. Button rule: BACKLOG "V115".
+
+21. **Screen readers (V120).** Anything VoiceOver should SAY goes through
+    `announce(text)` (feedback.js), which writes into `#sr-announcer` — the one
+    live region, in index.html OUTSIDE `#app` so `render()` never rebuilds it.
+    `showToast()` already calls it; never put `role="status"` on a freshly
+    created element (VoiceOver often ignores a region born with its text).
+    Every `<input>` / `<select>` / `<textarea>` needs a spoken name
+    (`aria-label` matching its visible label, `aria-labelledby`, `<label for>`
+    or a wrapping `<label>`) — harness 58e sweeps every screen for one. A tick or
+    icon that is the ONLY sign of a state is `role="img"` with a label, never
+    `aria-hidden`. The harness boot stands up `#sr-announcer` like `#app`.
 
 ---
 
@@ -513,13 +524,15 @@ unconditionally since v77 — see the session.js entry.
 **⚠ Not the same feature as "Log again ×N"** (session.js): Multi Pick fires a
 fixed MIXED list of types as passes; ×N repeats ONE item, whatever its result.
 
-### feedback.js (~460 ln) — toast, dialogs, haptic / flash / sound
-`showToast`, the shared `.bulk-sheet` dialog builders (`openConfirmSheet`,
+### feedback.js (~490 ln) — screen-reader announcer, toast, dialogs, haptic / flash / sound
+`announce` (V120, rule 21), `showToast`, the shared `.bulk-sheet` dialog builders (`openConfirmSheet`,
 `openNameSheet`, `openInfoSheet`, v91 `openChoiceSheet` — two or more choices +
 Cancel), feedback channels.
-**Touch to:** change feedback channels, toasts, or the shared dialogs.
+**Touch to:** change feedback channels, toasts, spoken messages, or the shared dialogs.
 **Coupling:** rule 11 — every destructive confirm in the app routes here. No
-state, no re-render. Loads before everything that toasts.
+state, no re-render. Loads before everything that toasts. Rule 21: `announce`
+writes `#sr-announcer` (index.html); session.js `loggedAnnouncement` supplies
+the line spoken after one item is logged (saveItem, copyLastResult).
 
 ### bugreport.js (~330 ln) — one-tap problem reporting
 Global error capture, device diagnostics, the mailto report builder.
@@ -1478,7 +1491,7 @@ another file having parsed. Don't "DRY" this.
   display text). New icon on a brand colour → add it there; new word → use a
   -word token. Same for inline `style="color:…"` in scripts (feedback.js,
   render-review.js, render-settings.js carry three).
-- `index.html` (~3KB) — the `<script>` chain. Small enough to read whole.
+- `index.html` (~3KB) — the `<script>` chain, `#app`, and (V120) `#sr-announcer` + `lang="en-GB"`. Small enough to read whole.
 - `sw.js` (~3.5KB) — `CACHE_VERSION` + `ASSETS`. Read whole.
 - `supabase.umd.js` — vendored supabase-js (MIT). NEVER read or grep it (218 KB,
   one minified line — it floods context). Exclude it: `grep --exclude=supabase.umd.js`.

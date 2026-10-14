@@ -198,7 +198,7 @@ function renderTour() {
       </div>
 
       <div class="tour-stage">
-        <div class="tour-mock">${slide.mock()}</div>
+        <div class="tour-mock" role="img" aria-label="Example screen: ${escapeHTML(slide.title)}">${slide.mock()}</div>
       </div>
 
       <div class="tour-caption">

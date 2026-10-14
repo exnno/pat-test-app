@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V118: rolled forward — V118 on top, V115 dropped. -->
+      <!-- v8: rolling 3-version changelog. V120: rolled forward — V120 on top, V117 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V120</strong> &middot; October 2026</p>
+        <p class="muted">Works better with VoiceOver: it says when an item is logged, reads out pop-up messages and names every box you type in. Nothing changes on screen.</p>
         <p><strong>V119</strong> &middot; October 2026</p>
         <p class="muted">Coloured words are easier to read: green pass, red fail and blue link text are a little stronger. The PASS and FAIL buttons look the same.</p>
         <p><strong>V118</strong> &middot; October 2026</p>
         <p class="muted">Grey text is easier to read: hints and secondary text are darker in the light theme and lighter in the dark theme.</p>
-        <p><strong>V117</strong> &middot; October 2026</p>
-        <p class="muted">Report Settings is now two shorter pages: Company &amp; Branding, and Certificate Content.</p>
 
 
         </div>
@@ -296,10 +296,10 @@ function renderBugSheet() {
         ${reproRow}
 
         <label class="label"><span id="bug-q1">${q1}</span></label>
-        <textarea class="input bug-textarea" id="bug-desc" data-input-action="bug-desc" rows="3" placeholder="Describe it in your own words">${escapeHTML(d.description)}</textarea>
+        <textarea aria-labelledby="bug-q1" class="input bug-textarea" id="bug-desc" data-input-action="bug-desc" rows="3" placeholder="Describe it in your own words">${escapeHTML(d.description)}</textarea>
 
         <label class="label"><span id="bug-q2">${q2}</span> <span class="hint">(optional)</span></label>
-        <textarea class="input bug-textarea" id="bug-context" data-input-action="bug-context" rows="2" placeholder="e.g. logging item 14 on a big job">${escapeHTML(d.context)}</textarea>
+        <textarea aria-labelledby="bug-q2" class="input bug-textarea" id="bug-context" data-input-action="bug-context" rows="2" placeholder="e.g. logging item 14 on a big job">${escapeHTML(d.context)}</textarea>
 
         <details class="bug-diag">
           <summary>What gets sent with this (tap to check)</summary>

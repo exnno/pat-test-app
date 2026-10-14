@@ -70,7 +70,7 @@ function renderOverviewBodyHTML(sess) {
         ${visible.map(({ it, i }) => {
           const checked = sel && state.selectedIndices.includes(i);
           const checkCol = sel
-            ? `<td class="td td-check"><input type="checkbox" data-change-action="row-select" data-arg="${i}" ${checked ? 'checked' : ''}></td>`
+            ? `<td class="td td-check"><input aria-label="Select item ${escapeHTML(String(it.assetNo))}" type="checkbox" data-change-action="row-select" data-arg="${i}" ${checked ? 'checked' : ''}></td>`
             : '';
           const actionCol = sel
             ? `<td class="td td-action"></td>`
@@ -127,7 +127,7 @@ function renderOverview() {
 
   const filterRow = sess.items.length > 0 ? `
     <div class="overview-filters">
-      <input type="search" class="search-input" id="overview-search" data-input-action="overview-search" placeholder="Search asset, location, item, notes…" value="${escapeHTML(state.searchQuery)}" autocomplete="off">
+      <input aria-label="Search items" type="search" class="search-input" id="overview-search" data-input-action="overview-search" placeholder="Search asset, location, item, notes…" value="${escapeHTML(state.searchQuery)}" autocomplete="off">
       <label class="filter-toggle">
         <input type="checkbox" id="fails-only-toggle" data-change-action="fails-only" ${state.showFailsOnly ? 'checked' : ''}>
         <span>Show fails only</span>
@@ -224,7 +224,7 @@ function renderOverview() {
         <h3 class="bulk-sheet-title">Change location for ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</h3>
         <button class="fail-close-btn" id="bulk-cancel-btn" data-action="bulk-cancel" aria-label="Cancel">×</button>
       </div>
-      <input class="input-big" id="bulk-location-input" data-input-action="bulk-location" value="${escapeHTML(state.bulkLocationValue)}" placeholder="New location" autofocus style="margin-bottom:14px">
+      <input aria-label="New location" class="input-big" id="bulk-location-input" data-input-action="bulk-location" value="${escapeHTML(state.bulkLocationValue)}" placeholder="New location" autofocus style="margin-bottom:14px">
       <button class="btn-primary" id="bulk-apply-btn" data-action="bulk-location-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
     </div>
   ` : '';
@@ -252,7 +252,7 @@ function renderOverview() {
         <button class="fail-close-btn" id="bulk-type-cancel" data-action="bulk-cancel" aria-label="Cancel">×</button>
       </div>
       <div class="quick-grid sheet-scroll" style="margin-bottom:10px">${typeQuickButtons}</div>
-      <input class="input-big sheet-pin" id="bulk-type-input" data-input-action="bulk-type" value="${escapeHTML(state.bulkEdit.typeValue)}" placeholder="…or type custom" autocomplete="off" style="margin-bottom:14px">
+      <input aria-label="New item type" class="input-big sheet-pin" id="bulk-type-input" data-input-action="bulk-type" value="${escapeHTML(state.bulkEdit.typeValue)}" placeholder="…or type custom" autocomplete="off" style="margin-bottom:14px">
       <button class="btn-primary sheet-pin" id="bulk-type-apply" data-action="bulk-type-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
     </div>
   ` : '';
@@ -279,7 +279,7 @@ function renderOverview() {
           <span><strong>Append</strong> — add to existing notes (separated by " ; ")</span>
         </label>
       </div>
-      <textarea class="input" id="bulk-notes-input" data-input-action="bulk-notes" rows="3" placeholder="${state.bulkEdit.notesMode === 'append' ? 'Text to append' : 'New notes (leave empty to clear)'}" style="margin-bottom:14px">${escapeHTML(state.bulkEdit.notesValue)}</textarea>
+      <textarea aria-label="Notes" class="input" id="bulk-notes-input" data-input-action="bulk-notes" rows="3" placeholder="${state.bulkEdit.notesMode === 'append' ? 'Text to append' : 'New notes (leave empty to clear)'}" style="margin-bottom:14px">${escapeHTML(state.bulkEdit.notesValue)}</textarea>
       <button class="btn-primary" id="bulk-notes-apply" data-action="bulk-notes-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
     </div>
   ` : '';
@@ -326,7 +326,7 @@ function renderOverview() {
           <button class="fail-close-btn" id="site-notes-cancel" data-action="site-notes-cancel" aria-label="Cancel">×</button>
         </div>
         <p class="muted" style="margin:0 0 10px">${escapeHTML(snSite ? snSite.name : 'This site')} &middot; shown in every job here. Only for you &mdash; never printed on a report.</p>
-        <textarea class="textarea site-notes-input" id="site-notes-input" data-input-action="site-notes-text" maxlength="${SITE_NOTES_MAX}" rows="8" placeholder="e.g. Door code 1234. Keys from reception. Server room on the 2nd floor &mdash; ask for Dave.">${escapeHTML(sn.text || '')}</textarea>
+        <textarea aria-label="Site notes" class="textarea site-notes-input" id="site-notes-input" data-input-action="site-notes-text" maxlength="${SITE_NOTES_MAX}" rows="8" placeholder="e.g. Door code 1234. Keys from reception. Server room on the 2nd floor &mdash; ask for Dave.">${escapeHTML(sn.text || '')}</textarea>
         <button class="btn-primary" id="site-notes-save" data-action="site-notes-save" style="margin-top:12px">Save</button>
       </div>` : '';
 
@@ -488,7 +488,7 @@ function renderMoveToSheet(sess) {
             </button></li>`;
     }).join('');
     const filter = jobs.length > MOVE_TO_FILTER_AT ? `
-          <input class="input move-to-filter" id="move-to-filter" type="search" data-input-action="move-to-filter" value="${escapeHTML(m.filter || '')}" placeholder="Find a job" autocomplete="off">` : '';
+          <input aria-label="Find a job" class="input move-to-filter" id="move-to-filter" type="search" data-input-action="move-to-filter" value="${escapeHTML(m.filter || '')}" placeholder="Find a job" autocomplete="off">` : '';
     return head(`Move ${plural(sum.n, 'item')} to\u2026`) + `
         <div class="sheet-scroll move-job-scroll">${filter}
           <ul class="move-to-list">${rows}</ul>
@@ -699,7 +699,7 @@ function renderEditSession() {
           </label>
         </div>
         <label class="label">Retest interval (months)</label>
-        <input class="input" id="ef-retest-months" data-input-action="ef-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(String(months))}">
+        <input aria-label="Retest interval (months)" class="input" id="ef-retest-months" data-input-action="ef-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(String(months))}">
         <p class="muted" style="margin:6px 0 0;font-size:12px">Captured from your default when you switched this on; change it here for this job only.</p>
       `;
     }
@@ -713,16 +713,16 @@ function renderEditSession() {
       </header>
       <div class="card">
         <label class="label">Site</label>
-        <input class="input" id="ef-site" data-input-action="ef-site" value="${escapeHTML(state.editForm.site)}">
+        <input aria-label="Site" class="input" id="ef-site" data-input-action="ef-site" value="${escapeHTML(state.editForm.site)}">
         <p class="muted" style="margin:6px 0 0;font-size:12px">This is the site name saved on the session. Editing it here changes only this session, not your Clients list.</p>
         <label class="label">Engineer</label>
-        <input class="input" id="ef-engineer" data-input-action="ef-engineer" value="${escapeHTML(state.editForm.engineer)}">
+        <input aria-label="Engineer" class="input" id="ef-engineer" data-input-action="ef-engineer" value="${escapeHTML(state.editForm.engineer)}">
         <label class="label">Session name</label>
-        <input class="input" id="ef-name" data-input-action="ef-name" value="${escapeHTML(state.editForm.name)}">
+        <input aria-label="Session name" class="input" id="ef-name" data-input-action="ef-name" value="${escapeHTML(state.editForm.name)}">
         <label class="label">Date</label>
-        <input class="input input-date" id="ef-date" data-input-action="ef-date" type="date" value="${escapeHTML(state.editForm.date)}">
+        <input aria-label="Date" class="input input-date" id="ef-date" data-input-action="ef-date" type="date" value="${escapeHTML(state.editForm.date)}">
         <label class="label">Asset number prefix</label>
-        <input class="input" id="ef-prefix" data-input-action="ef-prefix" value="${escapeHTML(state.editForm.prefix)}">
+        <input aria-label="Asset number prefix" class="input" id="ef-prefix" data-input-action="ef-prefix" value="${escapeHTML(state.editForm.prefix)}">
 
         <!-- v8: lock toggle. When on, Pass/Fail/Copy on the entry screen are disabled.
              Bulk edit and item delete from the overview still work, so mistakes can be
@@ -1387,7 +1387,7 @@ function renderJobManager() {
         ? `<span class="jm-status is-safe">${icon('shield-check')} ${escapeHTML(syncSafetyText(x.r))}</span>`
         : `<span class="jm-status">${escapeHTML(syncSafetyText(x.r))}</span>`;
       const tick = jm.selecting
-        ? `<span class="jm-tick${sel ? ' is-on' : ''}${x.removable ? '' : ' is-off'}" aria-hidden="true">${sel ? icon('check') : ''}</span>`
+        ? `<span class="jm-tick${sel ? ' is-on' : ''}${x.removable ? '' : ' is-off'}" role="img" aria-label="${sel ? 'Selected' : (x.removable ? 'Not selected' : 'Can\u2019t be selected')}">${sel ? icon('check') : ''}</span>`
         : '';
       return `
         <div class="jm-row${sel ? ' is-selected' : ''}${jm.selecting && !x.removable ? ' is-dim' : ''}" data-action="jm-tap" data-arg="${escapeHTML(x.id)}">
@@ -1459,7 +1459,7 @@ function renderCloudJobsHTML() {
   const m = cloudJobsModel();
   const search = m.total ? `
     <div class="sessions-search-row">
-      <input type="search" class="search-input" id="cloud-search" data-input-action="cloud-search" placeholder="Search client, site or certificate\u2026" value="${escapeHTML(cj.q || '')}" autocomplete="off">
+      <input aria-label="Search jobs in the cloud" type="search" class="search-input" id="cloud-search" data-input-action="cloud-search" placeholder="Search client, site or certificate\u2026" value="${escapeHTML(cj.q || '')}" autocomplete="off">
     </div>` : '';
   const selectBtn = m.total ? `<button class="pm-select-btn cloud-select-btn" data-action="cloud-select-toggle" ${cj.busy ? 'disabled' : ''}>${cj.selecting ? 'Done' : 'Select'}</button>` : '';
   let bar = '';
@@ -1503,7 +1503,8 @@ function renderCloudListAreaHTML(model) {
       if (j.fails) counts.push(`<span class="fail-text">${j.fails} fail</span>`);
       if (j.photos) counts.push(`<span class="photo-text">${icon('camera')} ${j.photos}</span>`);
       const meta = [j.client ? escapeHTML(j.client) : '', escapeHTML(formatDate(j.date))].concat(counts).filter(Boolean).join(' \u00b7 ');
-      const tick = cj.selecting ? `<span class="jm-tick${on ? ' is-on' : ''}" aria-hidden="true">${on ? icon('check') : ''}</span>` : '';
+      // V120: the tick is the only sign of selection, so VoiceOver reads it (it was aria-hidden).
+      const tick = cj.selecting ? `<span class="jm-tick${on ? ' is-on' : ''}" role="img" aria-label="${on ? 'Selected' : 'Not selected'}">${on ? icon('check') : ''}</span>` : '';
       return `
         <div class="session-card cloud-card${on ? ' is-selected' : ''}${j.locked ? ' locked' : ''}">
           <div class="session-info" data-action="cloud-tap" data-arg="${escapeHTML(j.id)}">
@@ -1653,7 +1654,7 @@ function renderCloudStorage() {
     const where = j.onPhone
       ? `<span class="cs-where">on this phone</span>`
       : `<span class="session-cloud" title="Only in the cloud" aria-label="Only in the cloud">${icon('cloud')}</span>`;
-    const tick = cs.selecting && !j.onPhone ? `<span class="jm-tick${on ? ' is-on' : ''}" aria-hidden="true">${on ? icon('check') : ''}</span>` : '';
+    const tick = cs.selecting && !j.onPhone ? `<span class="jm-tick${on ? ' is-on' : ''}" role="img" aria-label="${on ? 'Selected' : 'Not selected'}">${on ? icon('check') : ''}</span>` : '';
     const parts = j.photoBytes ? ` <span class="muted">(job ${escapeHTML(cloudBytesText(j.bytes))} + photos ${escapeHTML(cloudBytesText(j.photoBytes))})</span>` : '';
     return `
         <div class="session-card cloud-card cs-card${on ? ' is-selected' : ''}${j.locked ? ' locked' : ''}${j.onPhone ? ' cs-on-phone' : ''}" data-id="${escapeHTML(j.id)}">

@@ -697,7 +697,7 @@ function startShareSetup() {
       <button class="fail-close-btn" id="setup-name-cancel" aria-label="Cancel">×</button>
     </div>
     <p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text-muted)">Give this setup a name so it's easy to recognise when importing it later.</p>
-    <input class="input" id="setup-name-input" value="${escapeHTML(defaultName)}" autocapitalize="on" autocomplete="off" maxlength="60">
+    <input aria-label="Setup name" class="input" id="setup-name-input" value="${escapeHTML(defaultName)}" autocapitalize="on" autocomplete="off" maxlength="60">
     <p style="margin:12px 0 4px;font-size:12px;color:var(--text-muted)">Includes: ${escapeHTML(included.join(', '))}</p>
     <button class="btn-primary" id="setup-name-share" style="margin-top:12px">Share</button>
   `;

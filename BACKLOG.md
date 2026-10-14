@@ -8,6 +8,38 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V120
+V120 = the accessibility pass, part 3: screen readers (Peter 13 Oct, 1A 2A 3A
+4A 5A). Invisible to sighted use (Peter asked; confirmed). One announcer
+(#sr-announcer) speaks every pop-up; one item logged speaks "Logged: Kettle,
+pass. Item 14."; 74 unnamed fields named; the job-select ticks read; en-GB.
+Harness group 58 + M917–M936; 56e and 57d's release lines → 58f; M916
+retired. **Next: V121 text size and zoom** (fixed px + `user-scalable=no`), the
+last of the pass. Outstanding (Peter): Supabase Pro + production project, ICO
+fee, privacy + processor terms.
+
+### V120 residuals (known, accepted)
+- **Focus after a redraw (4A, backlogged):** most taps rebuild #app, so
+  VoiceOver's cursor goes back to the top of the screen. Fixing it means
+  putting focus back on the tapped control or the screen heading on every
+  render — touches nearly every screen; its own release, after V121.
+- Not checked with VoiceOver on a real iPhone by Claude — the harness proves
+  the markup and the announcer's timing, not what iOS reads. Peter's checklist
+  covers it; if the polite announcer is not read on logging, the next step is
+  a longer delay before the text lands (60ms now), not role="alert".
+- The 21 role="status" banners rendered inside #app (backup, reminders, lock,
+  calibration…) are unchanged. They are rebuilt with the screen, so VoiceOver
+  may read them on arrival or not at all; they were not reported.
+- The 143 existing aria-labels were not re-audited one by one — the V120 sweep
+  (58e) checks every FIELD has a name, not that every existing label is apt.
+- Batches speak only the existing pop-up ("Added 5 items — Desk PC setup",
+  "Added 3 more") — no type or result detail (2A covered single items).
+- The Quick Pick buttons' selected state (which type is chosen) is shown by
+  colour only; not in 3A's scope (fields + ticks). Candidate for the focus
+  release.
+- Tour example screens: role="img" with "Example screen: <slide title>"; their
+  pretend fields are excluded from 58e by class (tour-input).
+
 ### V119.1 hotfix (13 Oct, Peter 1B 2B 3A 4B)
 CSV Site column always just the site (1B); certificate details wrap in their
 column (3A); file name {site} unchanged (2B). Cache pat-v119-1 only. Harness

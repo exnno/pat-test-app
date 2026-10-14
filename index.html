@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- PATGo PWA — (c) 2026 Peter Birchley. All rights reserved. -->
-<html lang="en">
+<html lang="en-GB">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
@@ -20,6 +20,9 @@
 </head>
 <body>
   <div id="app"></div>
+  <!-- V120: the one screen-reader announcer. OUTSIDE #app on purpose: render() rebuilds #app
+       wholesale, and a live region only speaks reliably if it already exists when its text changes. -->
+  <div id="sr-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   <!-- v22: app.js fully split into single-concern modules. ORDER MATTERS —
        load top to bottom; later files may call functions defined earlier.
        data/state/utils/storage → feature files → render → events → boot.

@@ -597,10 +597,10 @@ function renderSettingsInstrument() {
         <p class="muted">The make and model of this PAT tester. Shown on certificates and on the CSV export when the "Test Instrument" column is switched on.</p>
 
         <label class="label">Manufacturer</label>
-        <input class="input" id="inst-make" value="${escapeHTML(inst.make)}" placeholder="e.g. Megger, Seaward, Kewtech">
+        <input aria-label="Manufacturer" class="input" id="inst-make" value="${escapeHTML(inst.make)}" placeholder="e.g. Megger, Seaward, Kewtech">
 
         <label class="label">Model</label>
-        <input class="input" id="inst-model" value="${escapeHTML(inst.model)}" placeholder="e.g. PAT250, Apollo 600, KT77">
+        <input aria-label="Model" class="input" id="inst-model" value="${escapeHTML(inst.model)}" placeholder="e.g. PAT250, Apollo 600, KT77">
       </div>
 
       <div class="settings-section">
@@ -608,13 +608,13 @@ function renderSettingsInstrument() {
         <p class="muted">All optional. Tap Clear to empty a date you no longer want recorded.</p>
 
         <label class="label">Last calibration date ${clearBtn('date', !!inst.calDate)}</label>
-        <input class="input input-date" id="inst-cal-date" type="date" value="${escapeHTML(inst.calDate)}">
+        <input aria-label="Last calibration date" class="input input-date" id="inst-cal-date" type="date" value="${escapeHTML(inst.calDate)}">
 
         <label class="label">Certificate number</label>
-        <input class="input" id="inst-cal-cert" value="${escapeHTML(inst.calCertNo)}" placeholder="e.g. CAL-2026-0142">
+        <input aria-label="Calibration certificate number" class="input" id="inst-cal-cert" value="${escapeHTML(inst.calCertNo)}" placeholder="e.g. CAL-2026-0142">
 
         <label class="label">Next calibration due ${clearBtn('due', !!inst.calDue)}${chip}</label>
-        <input class="input input-date" id="inst-cal-due" type="date" value="${escapeHTML(inst.calDue)}">
+        <input aria-label="Next calibration due" class="input input-date" id="inst-cal-due" type="date" value="${escapeHTML(inst.calDue)}">
       </div>
 
       ${isActive ? `
@@ -657,7 +657,7 @@ function renderEditSessionInstrumentBlock() {
 
   return `
     <label class="label">Test instrument</label>
-    <select class="input" id="ef-instrument" data-change-action="ef-instrument">${opts}</select>
+    <select aria-label="Test instrument" class="input" id="ef-instrument" data-change-action="ef-instrument">${opts}</select>
     <p class="muted" style="margin:6px 0 0;font-size:12px">Recorded on this job, so its certificate always names the tester you actually used — even after you recalibrate or change instrument.</p>
   `;
 }
