@@ -10,7 +10,7 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v124';
+const CACHE_VERSION = 'pat-v125';
 const ASSETS = [
   './',
   './index.html',
@@ -44,6 +44,7 @@ const ASSETS = [
   './jspdf.plugin.autotable.min.js',
   './report.js',
   './pdfpreview.js',
+  './exportall.js',      // V125
   './render-core.js',
   './render-review.js',
   './render-settings.js',
