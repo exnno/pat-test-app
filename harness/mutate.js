@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V126';",
-    to:   "const APP_VERSION = 'V125';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V127';",
+    to:   "const APP_VERSION = 'V126';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V124</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V123</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V124</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 64f)',
+    from: '        <p><strong>V125</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V124</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V125</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 65f)',
   },
 
   {
@@ -5547,7 +5547,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 64f)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 65f)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5998,7 +5998,7 @@ const MUTATIONS = [
     // each release's own group pins which welcome is current.
     from: "const WELCOME_VERSION = 'V",
     to:   "const WELCOME_VERSION = 'V0",
-    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (64f)",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (65f)",
   },
   {
     name: "M837 (V114) Engineer & Tester says sessions again",
@@ -6079,10 +6079,11 @@ const MUTATIONS = [
     // V123: welcome rolled — re-aimed at V123's first line; 61f pinned it.
     // V124: welcome rolled — re-aimed at V124's first line; 62f pinned it.
     // V125: welcome rolled — re-aimed at V125's first line; 63f pinned it.
-    // V126: welcome rolled (2B, one line) — re-aimed at it; 64f pins it.
-    from: "<li><strong>A smoother first start.</strong>",
+    // V126: welcome rolled (2B, one line) — re-aimed at it; 64f pinned it.
+    // V127: welcome rolled — re-aimed at V127's line; 65f pins it.
+    from: "<li><strong>Your plan, clearly.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (64f)",
+    why:  "11A: the welcome says plainly what changed on screen (65f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -7033,7 +7034,7 @@ const MUTATIONS = [
     why:  "1A: invisible to sighted use (61g)",
   },
   // M992 (V123's About line) RETIRED V126: V123 rolled off the About page, so
-  // there is no line left to lose. 64f pins that it is gone.
+  // there is no line left to lose. 64f pinned that it is gone (now 65f).
   // ---- V124 (0A 1A 2A 3A 4A): friendlier updates. Group 62 + M993–M1031. ----
   {
     name: "M993 (V124) GET_VERSION answers nothing",
@@ -7294,13 +7295,8 @@ const MUTATIONS = [
     to:   "      cache.addAll(ASSETS.map(url => new Request(url, { cache: 'reload' })))).then(() => self.skipWaiting())",
     why:  "v61.2: every update would reload under the engineer (62e)",
   },
-  {
-    name: "M1030 (V124) the About changelog loses V124's line",
-    file: "render-help.js",
-    from: "Updates without the fuss: PATGo checks",
-    to:   "Better",
-    why:  "the About page must say what changed in this version (64f)",
-  },
+  // M1030 (V124's About line) RETIRED V127: V124 rolled off the About page, so
+  // there is no line left to lose. 65f pins that it is gone.
   {
     name: "M1031 (V124) the room for the banner is a fixed 64px again",
     file: "styles.css",
@@ -7510,7 +7506,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Export everything: one zip file of everything on this phone",
     to:   "Better",
-    why:  "the About page must say what changed in this version (64f)",
+    why:  "the About page must say what changed in this version (65f)",
   },
   // ---- V126 (0A 1A 2B): a first visit never reloads itself. Group 64 + M1061–M1072. ----
   {
@@ -7583,19 +7579,267 @@ const MUTATIONS = [
     to:   "    )\n",
     why:  "removing the claim also stops the reload, but a first visit then runs uncontrolled — not offline until reopened (64d)",
   },
-  {
-    name: "M1071 (V126) the What's new sheet gains a second line",
-    file: "render-core.js",
-    from: "Updates still go in just as before.</li>\n",
-    to:   "Updates still go in just as before.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "2B: one line (64f)",
-  },
+  // M1071 (V126's one-line What's new) RETIRED V127: that sheet's copy is gone.
+  // V127's sheet is one line too; 65f pins it (M1106).
   {
     name: "M1072 (V126) the About changelog loses V126's line",
     file: "render-help.js",
     from: "A smoother first start: on a new phone PATGo no longer reloads",
     to:   "Better",
-    why:  "the About page must say what changed in this version (64f)",
+    why:  "the About page must say what changed in this version (65f)",
+  },
+  // ---- V127 (0A 2A 3A 4A 5B 6 8B 9A 10A 11A): the plan. Group 65 + M1073–M1108. ----
+  {
+    name: "M1073 (V127) no grace: the lock lands the moment the trial ends",
+    file: "plan.js",
+    from: "  const lockAt = start + PLAN_GRACE_DAYS * PLAN_DAY_MS;",
+    to:   "  const lockAt = start;",
+    why:  "3A: seven days' grace after the end (65a)",
+  },
+  {
+    name: "M1074 (V127) no warning: a trial ending in 3 days says nothing",
+    file: "plan.js",
+    from: "phase: now >= start - PLAN_WARN_DAYS * PLAN_DAY_MS ? 'ending' : 'trial'",
+    to:   "phase: 'trial'",
+    why:  "4A: the line from seven days out (65a 65e)",
+  },
+  {
+    name: "M1075 (V127) a plan this version does not know locks the account",
+    file: "plan.js",
+    from: "    return { phase: 'none' };                                 // unknown: fail open",
+    to:   "    return { phase: 'locked' };",
+    why:  "fail open: a new plan name from the server must never lock a paying engineer out (65a)",
+  },
+  {
+    name: "M1076 (V127) a lapsed plan after a trial is counted from when the phone heard",
+    file: "plan.js",
+    from: "    start = (isFinite(te) && te <= seen) ? te : seen;",
+    to:   "    start = seen;",
+    why:  "a lapse after a trial long gone gets no fresh grace (65a)",
+  },
+  {
+    name: "M1077 (V127) the last day counts as none",
+    file: "plan.js",
+    from: "daysLeft: Math.max(1, Math.ceil((lockAt - now) / PLAN_DAY_MS))",
+    to:   "daysLeft: Math.floor((lockAt - now) / PLAN_DAY_MS)",
+    why:  "the countdown rounds up: half a day left is 1 (65a)",
+  },
+  {
+    name: "M1078 (V127) PASS is not gated",
+    file: "session.js",
+    from: "function passClicked() {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    to:   "function passClicked() {\n",
+    why:  "the old FAIL's 'Change to PASS?' asks first, then the save refuses (65b)",
+  },
+  {
+    name: "M1079 (V127) FAIL is not gated",
+    file: "session.js",
+    from: "function failClicked() {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    to:   "function failClicked() {\n",
+    why:  "FAIL's reasons sheet would open on a locked account (65b)",
+  },
+  {
+    name: "M1080 (V127) the save backstop is not gated",
+    file: "session.js",
+    from: "function saveItem(result, readings) {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    to:   "function saveItem(result, readings) {\n",
+    why:  "every other logging path ends in saveItem (65b)",
+  },
+  {
+    name: "M1081 (V127) copy last is not gated",
+    file: "session.js",
+    from: "function copyLastResult() {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    to:   "function copyLastResult() {\n",
+    why:  "copy last writes its own item (65b)",
+  },
+  {
+    name: "M1082 (V127) Log again \u00d7N is not gated",
+    file: "session.js",
+    from: "function repeatLastResult(n) {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    to:   "function repeatLastResult(n) {\n",
+    why:  "Log again writes its own items (65b)",
+  },
+  {
+    name: "M1083 (V127) createSession is not gated",
+    file: "session.js",
+    from: "function createSession() {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    to:   "function createSession() {\n",
+    why:  "the backstop for a new job (65b)",
+  },
+  {
+    name: "M1084 (V127) Duplicate job is not gated",
+    file: "session.js",
+    from: "function openDupJob() {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    to:   "function openDupJob() {\n",
+    why:  "a duplicate is a new job (65b)",
+  },
+  {
+    name: "M1085 (V127) Move items to a new job is not gated",
+    file: "session.js",
+    from: "function moveItemsToNewJob() {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    to:   "function moveItemsToNewJob() {\n",
+    why:  "a new job by another door (65b)",
+  },
+  {
+    name: "M1086 (V127) Multi Pick is not gated",
+    file: "multipick.js",
+    from: "function multiPickFire(idx) {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    to:   "function multiPickFire(idx) {\n",
+    why:  "Multi Pick writes its own items (65b)",
+  },
+  {
+    name: "M1087 (V127) a Quick Pick tile is not gated",
+    file: "multipick.js",
+    from: "function qpTileFire(qp) {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    to:   "function qpTileFire(qp) {\n",
+    why:  "a tile writes its own items (65b)",
+  },
+  {
+    name: "M1088 (V127) a certificate is not gated",
+    file: "report.js",
+    from: "async function produceReport(sessionId) {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    to:   "async function produceReport(sessionId) {\n",
+    why:  "8B: no new certificates (65b)",
+  },
+  {
+    name: "M1089 (V127) the rebuilt preview is not gated",
+    file: "report.js",
+    from: "async function reopenReportPreview(sessionId) {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    to:   "async function reopenReportPreview(sessionId) {\n",
+    why:  "8B: the preview rebuilt from Report settings is a new certificate too (65b)",
+  },
+  {
+    name: "M1090 (V127) New job opens its form on a locked account",
+    file: "dispatch.js",
+    from: "    if (typeof planGate === 'function' && !planGate()) return;   // V127: before the form, not after it\n",
+    to:   "",
+    why:  "refuse before the typing, not after it (65b)",
+  },
+  {
+    name: "M1091 (V127) the Jobs list loses the plan line",
+    file: "render-core.js",
+    from: "      ${header}\n      ${planBanner}\n      ${tabs}\n      ${storageBanner}",
+    to:   "      ${header}\n      ${tabs}\n      ${storageBanner}",
+    why:  "4A 6b: the countdown is on the Jobs list (65e)",
+  },
+  {
+    name: "M1092 (V127) the Account page loses Renew now",
+    file: "render-help.js",
+    from: "        ${(typeof planAccountHTML === 'function') ? planAccountHTML() : ''}\n",
+    to:   "",
+    why:  "Settings \u2192 Cloud says where the account stands (65e)",
+  },
+  {
+    name: "M1093 (V127) Renew now does nothing",
+    file: "dispatch.js",
+    from: "  'plan-renew': () => { if (typeof planRenew === 'function') planRenew(); },",
+    to:   "  'plan-renew': () => {},",
+    why:  "10A: seamless renewing starts with a button that works (65e)",
+  },
+  {
+    name: "M1094 (V127) the renewal email does not say which account",
+    file: "plan.js",
+    from: "Please renew my PATGo account.\\n\\nAccount: ${email || '(not shown)'}",
+    to:   "Please renew my PATGo account.",
+    why:  "we could not tell whose account to renew (65e)",
+  },
+  {
+    name: "M1095 (V127) the ended sheet is never remembered",
+    file: "plan.js",
+    from: "    if (rec.shownEnded !== key) {\n      rec.shownEnded = key;\n",
+    to:   "    if (rec.shownEnded !== key) {\n",
+    why:  "6a: one sheet, once \u2014 not every return to the front (65g)",
+  },
+  {
+    name: "M1096 (V127) no last-day sheet",
+    file: "plan.js",
+    from: "    if (st.daysLeft <= 1 && rec.shownLastDay !== key) {",
+    to:   "    if (false) {",
+    why:  "6: the fourth touch (65g)",
+  },
+  {
+    name: "M1097 (V127) the sheets interrupt the logging screen",
+    file: "plan.js",
+    from: "  if (state.view !== 'sessions') return false;\n  try { if (document.visibilityState === 'hidden') return false; }",
+    to:   "  try { if (document.visibilityState === 'hidden') return false; }",
+    why:  "nothing interrupts a job (65g)",
+  },
+  {
+    name: "M1098 (V127) the phone's clock is the only clock",
+    file: "plan.js",
+    from: "  const seen = Math.max(Number(rec && rec.serverAt) || 0, _planServerSeen());",
+    to:   "  const seen = 0;",
+    why:  "winding the clock back buys the trial back (65h)",
+  },
+  {
+    name: "M1099 (V127) the phone's clock ratchets the record",
+    file: "plan.js",
+    from: "    serverAt: Math.max(Number(old.serverAt) || 0, _planServerSeen()),",
+    to:   "    serverAt: Math.max(Number(old.serverAt) || 0, _planServerSeen(), Date.now()),",
+    why:  "a clock once wrong in the future would lock a phone for good (65h)",
+  },
+  {
+    name: "M1100 (V127) the sign-in's issue time is lost",
+    file: "cloud.js",
+    from: "    const issuedAt = (isFinite(exp) && isFinite(life) && exp > 0 && life > 0) ? (exp - life) * 1000 : 0;",
+    to:   "    const issuedAt = 0;",
+    why:  "the only server time the phone has offline (65h)",
+  },
+  {
+    name: "M1101 (V127) the plan read stops naming its own row",
+    file: "plan.js",
+    from: ".select('plan, trial_ends_at').eq('id', uid).maybeSingle()",
+    to:   ".select('plan, trial_ends_at').maybeSingle()",
+    why:  "an Owner can read other members' profiles: maybeSingle would fail, or read someone else's plan (65i)",
+  },
+  {
+    name: "M1102 (V127) the sign-in check stops feeding the plan",
+    file: "cloud.js",
+    from: "      try { if (typeof planNote === 'function') planNote(row); } catch (e) { /* optional \u2014 rule 6 */ }\n",
+    to:   "",
+    why:  "a renewal seen at Check connection must lift the lock (65i)",
+  },
+  {
+    name: "M1103 (V127) planBoot hooks the front even when signed out",
+    file: "plan.js",
+    from: "function planBoot() {\n  if (!_planUid()) return Promise.resolve(false);\n  _planHook();\n",
+    to:   "function planBoot() {\n  _planHook();\n  if (!_planUid()) return Promise.resolve(false);\n",
+    why:  "signed out: nothing at all (16a 65i)",
+  },
+  {
+    name: "M1104 (V127) another account's record applies",
+    file: "plan.js",
+    from: "  return (r && r.uid === uid) ? r : null;",
+    to:   "  return r;",
+    why:  "a plan belongs to one account (65d)",
+  },
+  {
+    name: "M1105 (V127) boot never starts the plan",
+    file: "boot.js",
+    from: "  if (typeof planBoot === 'function') planBoot().catch(() => {});",
+    to:   "  if (false) planBoot();",
+    why:  "what the phone knows applies at start-up, and the return-to-front hook with it (65i)",
+  },
+  {
+    name: "M1106 (V127) the What's new sheet gains a second line",
+    file: "render-core.js",
+    from: "Nothing changes if you don't use a cloud account.</li>\n",
+    to:   "Nothing changes if you don't use a cloud account.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (65f)",
+  },
+  {
+    name: "M1107 (V127) the About changelog loses V127's line",
+    file: "render-help.js",
+    from: "Your plan, clearly: a signed-in cloud account sees",
+    to:   "Better",
+    why:  "the About page must say what changed in this version (65f)",
+  },
+  {
+    name: "M1108 (V127) database dates are not cut for Safari",
+    file: "plan.js",
+    from: "  return String(s || '').replace(/(\\.\\d{3})\\d+/, '$1');",
+    to:   "  return String(s || '');",
+    why:  "an iPhone that cannot read the end date treats the trial as never ending (65a)",
   },
 ];
 
