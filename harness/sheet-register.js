@@ -65,6 +65,10 @@ module.exports = {
   'render-settings.js · Assign site to client':
     'one input (its client list is a native picker, not part of the sheet) and Assign',
 
+  // exportall.js (V125)
+  'exportall.js · _exportAllProgress()':
+    'one status line of a few words ("Certificate 12 of 48"), changed in place, and Cancel',
+
   // settings-actions.js
   'settings-actions.js · Name this setup':
     'fixed wording, one name input, a line listing what is included (at most five sections, data.js SETUP_SECTIONS) and Share',

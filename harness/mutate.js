@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V124';",
-    to:   "const APP_VERSION = 'V123';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V125';",
+    to:   "const APP_VERSION = 'V124';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V122</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V121</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V122</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 62f)',
+    from: '        <p><strong>V123</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V122</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V123</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 63f)',
   },
 
   {
@@ -5547,7 +5547,7 @@ const MUTATIONS = [
     // needs re-pointing (it would otherwise have been a third M66/M82).
     from: "const CACHE_VERSION = 'pat-v",
     to:   "const CACHE_VERSION = 'pat-v0",
-    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 62f)",
+    why:  "the cache key is not this release's, so installed phones keep the old build \u2014 the classic deploy miss (01d 63f)",
   },
   {
     name: "M773 (V109) setupLongPress comes back",
@@ -5998,7 +5998,7 @@ const MUTATIONS = [
     // each release's own group pins which welcome is current.
     from: "const WELCOME_VERSION = 'V",
     to:   "const WELCOME_VERSION = 'V0",
-    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (62f)",
+    why:  "the wrong What's new: a sheet for a release that is not this one, or none for one that should have it (63f)",
   },
   {
     name: "M837 (V114) Engineer & Tester says sessions again",
@@ -6077,10 +6077,11 @@ const MUTATIONS = [
     // V121: welcome rolled — re-aimed at V121's first line; 59f pinned it.
     // V122: welcome rolled — re-aimed at V122's first line; 60f pinned it.
     // V123: welcome rolled — re-aimed at V123's first line; 61f pinned it.
-    // V124: welcome rolled — re-aimed at V124's first line; 62f pins it.
-    from: "<li><strong>Updates find you.</strong>",
+    // V124: welcome rolled — re-aimed at V124's first line; 62f pinned it.
+    // V125: welcome rolled — re-aimed at V125's first line; 63f pins it.
+    from: "<li><strong>Export everything.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (62f)",
+    why:  "11A: the welcome says plainly what changed on screen (63f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6866,13 +6867,8 @@ const MUTATIONS = [
     to:   "|| 'session';",
     why:  "1A: the file name is something the engineer reads (60e)",
   },
-  {
-    name: "M968 (V122) the About changelog loses V122's line",
-    file: "render-help.js",
-    from: "Sessions are now called Jobs everywhere in the app",
-    to:   "Renamed",
-    why:  "the About page must say what changed in this version (62f)",
-  },
+  // M968 (V122's About line) RETIRED V125: V122 rolled off the About page, so
+  // there is no line left to lose. 63f pins that it is gone.
   // ---- V123 (1A–4A): where VoiceOver lands after a redraw. Group 61 + M969–M991. ----
   {
     name: "M969 (V123) PASS is no longer a logging action",
@@ -7040,7 +7036,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "VoiceOver keeps your place: after a tap",
     to:   "Better",
-    why:  "the About page must say what changed in this version (62f)",
+    why:  "the About page must say what changed in this version (63f)",
   },
   // ---- V124 (0A 1A 2A 3A 4A): friendlier updates. Group 62 + M993–M1031. ----
   {
@@ -7307,7 +7303,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Updates without the fuss: PATGo checks",
     to:   "Better",
-    why:  "the About page must say what changed in this version (62f)",
+    why:  "the About page must say what changed in this version (63f)",
   },
   {
     name: "M1031 (V124) the room for the banner is a fixed 64px again",
@@ -7315,6 +7311,210 @@ const MUTATIONS = [
     from: "body.has-update-banner .screen { padding-top: 4rem; }",
     to:   "body.has-update-banner .screen { padding-top: 64px; }",
     why:  "at Larger text the banner (68px) covers the top of the screen (62d)",
+  },
+  // ---- V125 (0A 1A 2A 3A 4A 5A 6A): Export everything. Group 63 + M1032–M1060. ----
+  {
+    name: "M1032 (V125) the CRC table uses the wrong polynomial",
+    file: "exportall.js",
+    from: "c = (c & 1) ? (0xEDB88320 ^ (c >>> 1)) : (c >>> 1);",
+    to:   "c = (c & 1) ? (0xEDB88321 ^ (c >>> 1)) : (c >>> 1);",
+    why:  "1A: every file in the zip fails its check and the Files app refuses it (63a)",
+  },
+  {
+    name: "M1033 (V125) local headers lose the UTF-8 flag",
+    file: "exportall.js",
+    from: "    lv.setUint16(6, 0x0800, true);       // UTF-8 names\n",
+    to:   "    lv.setUint16(6, 0, true);       // UTF-8 names\n",
+    why:  "1A: \"Bob's Caf\u00e9\" arrives as gibberish (63a)",
+  },
+  {
+    name: "M1034 (V125) the central directory points every file at the start",
+    file: "exportall.js",
+    from: "    cv.setUint32(42, offset, true);",
+    to:   "    cv.setUint32(42, 0, true);",
+    why:  "1A: every file but the first opens as the first (63a)",
+  },
+  {
+    name: "M1035 (V125) the end record loses where the directory starts",
+    file: "exportall.js",
+    from: "  ev.setUint32(16, cdStart, true);",
+    to:   "  ev.setUint32(16, 0, true);",
+    why:  "1A: the zip cannot be opened at all (63a)",
+  },
+  {
+    name: "M1036 (V125) the DOS date month is a month early",
+    file: "exportall.js",
+    from: "((d.getMonth() + 1) << 5)",
+    to:   "(d.getMonth() << 5)",
+    why:  "1A: Files shows the wrong date (63a)",
+  },
+  {
+    name: "M1037 (V125) duplicate names are compared case-sensitively",
+    file: "exportall.js",
+    from: "  for (let n = 2; used.has(candidate.toLowerCase()); n++)",
+    to:   "  for (let n = 2; used.has(candidate); n++)",
+    why:  "1A: two files differing only by case overwrite each other when unzipped (63a)",
+  },
+  {
+    name: "M1038 (V125) a repeated name is numbered (1)",
+    file: "exportall.js",
+    from: "  for (let n = 2; used.has(",
+    to:   "  for (let n = 1; used.has(",
+    why:  "1A: the second file of a pair reads \"(1)\" \u2014 the Finder/Files convention is (2) (63a)",
+  },
+  {
+    name: "M1039 (V125) every job with items gets a certificate",
+    file: "exportall.js",
+    from: "const certJobs = withItems.filter(s => !!(s.certNo || s.reportAt));",
+    to:   "const certJobs = withItems;",
+    why:  "3A: certificates the client never had, for jobs never finished (63b)",
+  },
+  {
+    name: "M1040 (V125) a certificate made with numbering off is left out",
+    file: "exportall.js",
+    from: "withItems.filter(s => !!(s.certNo || s.reportAt))",
+    to:   "withItems.filter(s => !!s.certNo)",
+    why:  "3A: an engineer with numbering off loses every certificate from the file (63b)",
+  },
+  {
+    name: "M1041 (V125) a certificate number is issued while exporting",
+    file: "exportall.js",
+    from: "        let photoData = _emptyPhotoData(s.id);\n          if (rs.showPhotos",
+    to:   "        stampCertNumber(s);\n          let photoData = _emptyPhotoData(s.id);\n          if (rs.showPhotos",
+    why:  "3A: an export would use up certificate numbers (63b)",
+  },
+  {
+    name: "M1042 (V125) the CSVs lose the BOM",
+    file: "exportall.js",
+    from: "enc.encode('\\uFEFF' + buildCSV(",
+    to:   "enc.encode(buildCSV(",
+    why:  "Excel shows accented names as gibberish, unlike every other CSV export (63b)",
+  },
+  {
+    name: "M1043 (V125) files go loose, not in one folder",
+    file: "exportall.js",
+    from: "exportAllUniqueName(used, `${base}/${path}`)",
+    to:   "exportAllUniqueName(used, path)",
+    why:  "1A: unzipping scatters files wherever Files puts them (63b)",
+  },
+  {
+    name: "M1044 (V125) the file name has underscores and an ISO date",
+    file: "exportall.js",
+    from: "  return `PATGo everything ${fileDateUK(todayISO())}`;",
+    to:   "  return `PATGo_everything_${todayISO()}`;",
+    why:  "UK dates and no underscores in file names, everywhere (63b 63e)",
+  },
+  {
+    name: "M1045 (V125) ticked photos are left out",
+    file: "exportall.js",
+    from: "  if (withPhotos && plan.photoCount > 0 && typeof buildPhotoBundle",
+    to:   "  if (false && withPhotos && plan.photoCount > 0 && typeof buildPhotoBundle",
+    why:  "2A: the tick does nothing (63c)",
+  },
+  {
+    name: "M1046 (V125) unticked photos go in anyway",
+    file: "exportall.js",
+    from: "  if (withPhotos && plan.photoCount > 0 &&",
+    to:   "  if (plan.photoCount > 0 &&",
+    why:  "2A: a file too big to keep, against the engineer's choice (63c)",
+  },
+  {
+    name: "M1047 (V125) the photo tick starts off",
+    file: "exportall.js",
+    from: "aria-label=\"Include photos\" checked>",
+    to:   "aria-label=\"Include photos\">",
+    why:  "2A: ticked by default (63c)",
+  },
+  {
+    name: "M1048 (V125) the sheet ignores the tick",
+    file: "exportall.js",
+    from: "    const withPhotos = !!(box && box.checked);",
+    to:   "    const withPhotos = true;",
+    why:  "2A: unticking does nothing (63d)",
+  },
+  {
+    name: "M1049 (V125) the sheet no longer says this phone only",
+    file: "exportall.js",
+    from: "<strong>From this phone only.</strong> One zip file",
+    to:   "One zip file",
+    why:  "4A: Peter: make it clear it's just this phone (63d)",
+  },
+  {
+    name: "M1050 (V125) the cloud line shows when signed out",
+    file: "exportall.js",
+    from: "${signedIn ? '<p id=\"export-all-cloud\"",
+    to:   "${true ? '<p id=\"export-all-cloud\"",
+    why:  "4A: a cloud warning to someone with no cloud (63d)",
+  },
+  {
+    name: "M1051 (V125) the Settings button goes nowhere",
+    file: "dispatch.js",
+    from: "  'export-all': () => { if (typeof exportAllOpen === 'function') exportAllOpen(); },",
+    to:   "  'export-all': () => {},",
+    why:  "6A: the tap does nothing (63d)",
+  },
+  {
+    name: "M1052 (V125) the Settings section is not drawn",
+    file: "render-settings.js",
+    from: "      ${exportAllBlock}\n",
+    to:   "",
+    why:  "6A: the feature cannot be reached (63d)",
+  },
+  {
+    name: "M1053 (V125) the zip is shared straight after building",
+    file: "exportall.js",
+    from: "  _exportAllReady(blob, built.counts, built.notes);",
+    to:   "  exportAllShare(blob, `${exportAllBaseName()}.zip`);",
+    why:  "iOS: the tap has expired by then, so the share fails with NotAllowedError (63e)",
+  },
+  {
+    name: "M1054 (V125) a cancelled share closes the ready sheet",
+    file: "exportall.js",
+    from: "    if (!ok) return;   // share sheet cancelled: stay open, try again",
+    to:   "    if (!ok) { cleanup(); return; }",
+    why:  "a cancelled share would throw away the built file (63e)",
+  },
+  {
+    name: "M1055 (V125) a cancelled share still resets the backup reminder",
+    file: "exportall.js",
+    from: "    if (!ok) return;   // share sheet cancelled: stay open, try again",
+    to:   "    if (typeof markBackupExported === 'function') markBackupExported();\n    if (!ok) return;",
+    why:  "the reminder would say a backup was kept when none was (63e)",
+  },
+  {
+    name: "M1056 (V125) a saved file no longer resets the backup reminder",
+    file: "exportall.js",
+    from: "    if (typeof markBackupExported === 'function') markBackupExported();\n    cleanup();",
+    to:   "    cleanup();",
+    why:  "the zip holds a full backup; the reminder would nag after one (63e)",
+  },
+  {
+    name: "M1057 (V125) saving marks every job exported",
+    file: "exportall.js",
+    from: "    cleanup();\n    showToast('Saved');",
+    to:   "    state.sessions.forEach(s => { s.exportedAt = new Date().toISOString(); });\n    cleanup();\n    showToast('Saved');",
+    why:  "5A: the not-exported reminders would clear for jobs never sent to a client (63e)",
+  },
+  {
+    name: "M1058 (V125) Cancel is not checked between certificates",
+    file: "exportall.js",
+    from: "        await _exportAllYield();\n        // Checked AFTER the pause: a Cancel tap lands during it.\n        if (stopped()) return null;\n",
+    to:   "        await _exportAllYield();\n",
+    why:  "6A: Cancel would carry on building every certificate unseen (63e)",
+  },
+  {
+    name: "M1059 (V125) exportall.js drops out of the precache",
+    file: "sw.js",
+    from: "  './exportall.js',      // V125\n",
+    to:   "",
+    why:  "works for whoever deployed it; offline installs lose the button (01c 63f)",
+  },
+  {
+    name: "M1060 (V125) the About changelog loses V125's line",
+    file: "render-help.js",
+    from: "Export everything: one zip file of everything on this phone",
+    to:   "Better",
+    why:  "the About page must say what changed in this version (63f)",
   },
 ];
 

@@ -498,7 +498,9 @@ class StubBlob {
   constructor(parts = [], opts = {}) {
     this._parts = parts;
     this.type = opts.type || '';
-    this.size = parts.reduce((n, p) => n + String(p).length, 0);
+    // V125: byte parts (a zip's Uint8Arrays) count their bytes, not the length
+    // of their String() form.
+    this.size = parts.reduce((n, p) => n + (p && typeof p.byteLength === 'number' ? p.byteLength : String(p).length), 0);
   }
   async text() { return this._parts.map(String).join(''); }
   slice() { return new StubBlob(this._parts, { type: this.type }); }
@@ -635,6 +637,9 @@ function makeEnvironment(opts = {}) {
     RegExp, Error, TypeError, RangeError, Map, Set, WeakMap, WeakSet, Symbol,
     parseInt, parseFloat, isNaN, isFinite, encodeURIComponent, decodeURIComponent,
     Intl, Buffer, structuredClone,
+    // V125: exportall.js encodes file contents to bytes for the zip. Node's own,
+    // as in every browser PATGo runs in.
+    TextEncoder, TextDecoder,
 
     // bugreport.js reads screen.width/height for the SCREEN diagnostic line.
     // typeof-guarded there, so omitting it would silently take the 'unknown'
