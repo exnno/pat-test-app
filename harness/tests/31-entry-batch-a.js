@@ -136,7 +136,7 @@ module.exports = async function run() {
     const h = html(app);
     t.eq((h.match(/data-action="quick-pick"/g) || []).length, 7, 'two tiles: seven types');
     t.excludes(h, 'data-arg="Radio"', 'the preset\u2019s last types are the ones that drop off');
-    t.includes(h, 'class="quick-btn qp-tile qp-tile-1 " data-action="qp-tile" data-arg="1">', 'slot 1 tile, enabled on a new item');
+    t.includes(h, 'class="quick-btn qp-tile qp-tile-1 " aria-pressed="false" data-action="qp-tile" data-arg="1">', 'slot 1 tile, enabled on a new item');
     t.includes(h, 'qp-tile-3', 'slot 3 tile');
     t.includes(h, app.fn('icon')('plus') + '</span>Desk PC', 'the tile shows the multi-pick\u2019s name with +');
 

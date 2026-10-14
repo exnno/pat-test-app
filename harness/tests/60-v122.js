@@ -29,7 +29,7 @@
      60d  5A: the Glossary line and section title; Settings search "session"
           still finds the Glossary and Phone Storage.
      60e  the CSV file name with no site or name says job.
-     60f  release: V122, What's new rolled, cache, changelog. (59f → 60f.)
+     60f  release: V122 … — moved to 61f in V123.
 
    ⚠ 60a IS A SWEEP. New visible text that says "session" fails it: write job.
    If a line genuinely must say session (history), add its exact phrase to
@@ -147,7 +147,7 @@ module.exports = async function () {
     withSession(app);
     withItem(app);
     const list = draw(app, 'sessions');
-    t.includes(list, '<h1 class="h1">Jobs</h1>', 'the main list is titled Jobs (2A)');
+    t.includes(list, '<h1 class="h1" id="screen-title" tabindex="-1">Jobs</h1>', 'the main list is titled Jobs (2A)');
     t.includes(list, '+ New job</button>', '+ New job');
     t.includes(list, 'placeholder="Search jobs and items…', 'search says jobs');
     stray.push(...strayIn('jobs list', list));
@@ -159,7 +159,7 @@ module.exports = async function () {
     app.fn('startEditSession')();
     app.fn('render')();
     const edit = html(app);
-    t.includes(edit, '<div class="site-name">Job settings</div>', 'the screen it opens is Job settings too (3A)');
+    t.includes(edit, '<div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Job settings</div>', 'the screen it opens is Job settings too (3A)');
     t.includes(edit, '<label class="label">Job name</label>', '… with Job name');
     t.includes(edit, 'Lock job</div>', '… and Lock job');
     stray.push(...strayIn('job settings', edit));
@@ -227,22 +227,5 @@ module.exports = async function () {
     t.eq(name, 'PAT job.csv', 'the fallback file name says job');
   });
 
-  /* ------------------------------------------------------------------ 60f */
-  await t.group('60f — release: V122, What’s new rolled, cache, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V122', 'APP_VERSION V122');
-    t.eq(app.run('WELCOME_VERSION'), 'V122', 'What’s new rolled to V122');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v122';", 'cache key pat-v122');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>Sessions are now called Jobs.</strong>', 'V122’s What’s new: the rename');
-    t.includes(core, '<li><strong>Nothing else has changed.</strong>', 'V122’s What’s new: data untouched');
-    t.excludes(core, 'Bigger text if you want it.</strong>', 'V121’s sheet copy gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V122</strong>'), b = help.indexOf('<p><strong>V121</strong>'), c = help.indexOf('<p><strong>V120</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V122, V121, V120');
-    t.excludes(help, '<p><strong>V119</strong>', 'V119 rolled off');
-    t.includes(help, 'Sessions are now called Jobs everywhere in the app', 'About: V122’s line');
-    t.includes(help, 'Bigger text if you want it: Settings', 'About: V121’s line still there');
-    t.includes(help, 'Works better with VoiceOver: it says when', 'About: V120’s line still there');
-  });
+  // 60f (release: V122) moved to 61f in V123 — the release lines follow the newest release.
 };

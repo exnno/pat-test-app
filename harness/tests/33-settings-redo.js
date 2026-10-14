@@ -116,10 +116,10 @@ module.exports = function () {
     t.includes(list, 'data-page="settingsCalculator"', 'calculator row is in Logging');
 
     tap(app, 'settings-page', 'settingsFails');
-    t.includes(app.html(), '<div class="site-name">Fail Reasons</div>', 'page header: Fail Reasons');
+    t.includes(app.html(), '<div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Fail Reasons</div>', 'page header: Fail Reasons');
     tap(app, 'back-to-settings');
     tap(app, 'settings-page', 'settingsDescriptions');
-    t.includes(app.html(), '<div class="site-name">Descriptions</div>', 'page header: Descriptions');
+    t.includes(app.html(), '<div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Descriptions</div>', 'page header: Descriptions');
 
     t.includes(search(app, 'quick pick fail'), 'data-page="settingsFails"', 'search: "quick pick fail" finds Fail Reasons');
     t.includes(search(app, 'item description list'), 'data-page="settingsDescriptions"', 'search: the old description page name');
@@ -134,7 +134,7 @@ module.exports = function () {
     openHub(app);
     tap(app, 'settings-category', 'catUser');
     t.eq(app.state().view, 'settingsUser', 'Engineer & Tester opens the page straight away');
-    t.includes(app.html(), '<div class="site-name">Engineer &amp; Tester</div>', 'page header: Engineer & Tester');
+    t.includes(app.html(), '<div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Engineer &amp; Tester</div>', 'page header: Engineer & Tester');
     tap(app, 'back-to-settings');
     t.eq(app.state().view, 'settings', 'Back goes to the hub, where the user was');
 
@@ -174,7 +174,7 @@ module.exports = function () {
     tap(app, 'settings-category', 'catData');
     tap(app, 'pm-open');
     t.eq(app.state().view, 'photoManager', 'the row opened the manager');
-    t.includes(app.html(), '<div class="site-name">Manage Photos</div>', 'header in the same case as the row');
+    t.includes(app.html(), '<div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Manage Photos</div>', 'header in the same case as the row');
     tap(app, 'pm-back');
     t.eq(app.state().view, 'settingsCategory', 'opened from Data: Back to Data');
     t.eq(app.state().settingsCategory, 'catData', '… the Data group specifically');

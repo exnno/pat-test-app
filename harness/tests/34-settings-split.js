@@ -73,7 +73,7 @@ module.exports = async function () {
     t.excludes(bk, 'data-action="pm-open"', 'Backup: no Manage Photos button');
 
     const st = view(app, 'settingsStorage');
-    t.includes(st, '<div class="site-name">Phone Storage</div>', 'the page is called Phone Storage (2A)');
+    t.includes(st, '<div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Phone Storage</div>', 'the page is called Phone Storage (2A)');
     t.includes(st, 'id="storage-protect"', 'Storage: keep this app\u2019s data');
     t.includes(st, 'storage-bar', 'Storage: the meter');
     t.includes(st, 'prune-age-input', 'Storage: the clear-old age');
@@ -107,7 +107,7 @@ module.exports = async function () {
     const cats = app.val('SETTINGS_CATEGORIES');
     t.ok(cats.find(c => c.id === 'catTesting').pages.includes('settingsLogging'), 'Logging Options is under Logging');
     const lo = view(app, 'settingsLogging');
-    t.includes(lo, '<div class="site-name">Logging Options</div>', 'header');
+    t.includes(lo, '<div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Logging Options</div>', 'header');
     t.includes(lo, 'data-change-action="undo"', 'Show Undo is here');
     t.includes(lo, 'data-change-action="timestamps"', 'Record item times is here');
     const di = view(app, 'settingsDisplay');

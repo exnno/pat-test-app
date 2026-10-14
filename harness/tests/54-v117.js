@@ -50,12 +50,12 @@ module.exports = async function () {
 
     app.state().reportSettings.enabled = true;
     const b = draw(app, 'settingsReport');
-    t.includes(b, '<div class="site-name">Company &amp; Branding</div>', 'Company & Branding: its own title');
+    t.includes(b, '<div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Company &amp; Branding</div>', 'Company & Branding: its own title');
     t.deepEq(heads(b), BRAND, 'Company & Branding draws exactly its five sections, in order');
     t.eq((b.match(/data-action="settings-report-save"/g) || []).length, 1, '…and one Save');
     const c = draw(app, 'settingsReportContent');
-    t.includes(c, '<div class="site-name">Certificate Content</div>', 'Certificate Content: its own title');
-    t.excludes(c, '<div class="site-name">Company &amp; Branding</div>', '…not the first half’s');
+    t.includes(c, '<div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Certificate Content</div>', 'Certificate Content: its own title');
+    t.excludes(c, '<div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Company &amp; Branding</div>', '…not the first half’s');
     t.deepEq(heads(c), CONTENT, 'Certificate Content draws exactly its six sections, in order');
     t.eq((c.match(/data-action="settings-report-save"/g) || []).length, 1, '…and one Save');
 
