@@ -32,7 +32,7 @@
           buttons and through a render-drawn sheet coming and going.
      61e  4A: aria-pressed in the drawn grid and in every in-place repaint
           (quick-pick through handleDelegatedClick, f-type typing, tiles).
-     61f  release: V123, What’s new rolled, cache, changelog. (60f → 61f.)
+     61f  release: V123 … — moved to 62f in V124.
      61g  wiring (source): the calls sit where they must — render() notes focus
           before its sweep and decides before focusAssetForScan(); dispatch
           notes taps and changes; EVERY sheet appended to <body> reports itself
@@ -372,25 +372,7 @@ module.exports = async function run() {
     t.eq(app.run('_focusTap && _focusTap.id'), 'sort-select', 'a change is noted for the redraw too');
   });
 
-  /* ------------------------------------------------------------------ 61f */
-  await t.group('61f — release: V123, What’s new rolled, cache, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V123', 'APP_VERSION V123');
-    t.eq(app.run('WELCOME_VERSION'), 'V123', 'What’s new rolled to V123');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v123';", 'cache key pat-v123');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>VoiceOver keeps your place.</strong>', 'V123’s What’s new: the focus');
-    t.includes(core, "<li><strong>Quick Pick says what's chosen.</strong>", 'V123’s What’s new: selected state');
-    t.includes(core, '<li><strong>Nothing changes on screen.</strong>', 'V123’s What’s new: invisible');
-    t.excludes(core, '<li><strong>Sessions are now called Jobs.</strong>', 'V122’s sheet copy gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V123</strong>'), b = help.indexOf('<p><strong>V122</strong>'), c = help.indexOf('<p><strong>V121</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V123, V122, V121');
-    t.excludes(help, '<p><strong>V120</strong>', 'V120 rolled off');
-    t.includes(help, 'VoiceOver keeps your place: after a tap', 'About: V123’s line');
-    t.includes(help, 'Sessions are now called Jobs everywhere in the app', 'About: V122’s line still there');
-    t.includes(help, 'Bigger text if you want it: Settings', 'About: V121’s line still there');
-  });
+  // 61f (release: V123) moved to 62f in V124 — the release lines follow the newest release.
 
   /* ------------------------------------------------------------------ 61g */
   await t.group('61g — wiring: every call where it must be (source)', () => {

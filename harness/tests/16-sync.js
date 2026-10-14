@@ -131,8 +131,11 @@ module.exports = async function () {
     // The reopen/back-online triggers exist on a cloud host and not elsewhere.
     // V105: snapshots.js hooks the same event (today's snapshot on reopen) on
     // every host; it is counted separately so this still pins sync's own.
+    // V124: boot.js hooks it too (look for an update on reopen) — excluded the
+    // same way; 62b pins that one.
     const snapHook = (a) => a.run('_snapOnVisible');
-    const vis = (a) => ((a.doc._listeners || {}).visibilitychange || []).filter(fn => fn !== snapHook(a)).length;
+    const updHook = (a) => a.run('updateOnResume');
+    const vis = (a) => ((a.doc._listeners || {}).visibilitychange || []).filter(fn => fn !== snapHook(a) && fn !== updHook(a)).length;
     t.eq(((app.doc._listeners || {}).visibilitychange || []).filter(fn => fn === snapHook(app)).length, 1,
       'snapshots registered its reopen hook once (V105)');
     t.eq(vis(app), 1, 'test host: syncBoot registered the app-reopen trigger');
