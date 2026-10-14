@@ -184,24 +184,6 @@ module.exports = async function run() {
     t.ok(apply.indexOf('_updateAsked = true') > -1 && apply.indexOf('_updateAsked = true') < apply.indexOf("postMessage({ type: 'SKIP_WAITING' })"), 'asking is remembered BEFORE the message (the takeover may follow at once)');
   });
 
-  /* ------------------------------------------------------------------ 64f */
-  await t.group('64f — release: V126, What’s new rolled, cache, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V126', 'APP_VERSION V126');
-    t.eq(app.run('WELCOME_VERSION'), 'V126', 'What’s new rolled to V126 (2B)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v126';", 'cache key pat-v126');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>A smoother first start.</strong>', 'V126’s What’s new: one line');
-    const sheet = core.slice(core.indexOf('<ul class="welcome-list sheet-scroll">'), core.indexOf('</ul>', core.indexOf('<ul class="welcome-list sheet-scroll">')));
-    t.eq((sheet.match(/<li>/g) || []).length, 1, '… and only one (2B)');
-    t.excludes(core, '<li><strong>Export everything.</strong>', 'V125’s sheet copy gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V126</strong>'), b = help.indexOf('<p><strong>V125</strong>'), c = help.indexOf('<p><strong>V124</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V126, V125, V124');
-    t.excludes(help, '<p><strong>V123</strong>', 'V123 rolled off');
-    t.excludes(help, 'VoiceOver keeps your place: after a tap', 'V123’s line gone with it');
-    t.includes(help, 'A smoother first start: on a new phone PATGo no longer reloads', 'About: V126’s line');
-    t.includes(help, 'Export everything: one zip file of everything on this phone', 'About: V125’s line still there');
-    t.includes(help, 'Updates without the fuss: PATGo checks', 'About: V124’s line still there');
-  });
+  // 64f (V126's release checks) moved to 65f at V127 — V126's About line is
+  // still pinned there while it rolls.
 };
