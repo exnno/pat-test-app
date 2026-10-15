@@ -65,12 +65,12 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V128</strong> &middot; October 2026</p>
+        <p class="muted">Safer after a long time away: a phone that hasn't synced for over nine months checks everything against the cloud before it sends anything, so jobs, clients and sites deleted on another phone stay deleted. A copy of the phone is kept first in Settings &rarr; Backup &amp; Restore.</p>
         <p><strong>V127</strong> &middot; October 2026</p>
         <p class="muted">Your plan, clearly: a signed-in cloud account sees when its free trial ends, a 7-day countdown after it, and Renew now. After the countdown, logging, new jobs and new certificates pause until you renew &mdash; your jobs, exports and backups always stay available.</p>
         <p><strong>V126</strong> &middot; October 2026</p>
         <p class="muted">A smoother first start: on a new phone PATGo no longer reloads itself a moment after it first opens. Updates still go in just as before.</p>
-        <p><strong>V125</strong> &middot; October 2026</p>
-        <p class="muted">Export everything: one zip file of everything on this phone &mdash; the backup, a spreadsheet for every job, every certificate already made (same numbers) and your photos. Settings &rarr; Backup &amp; Restore.</p>
 
 
         </div>

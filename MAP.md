@@ -1,4 +1,4 @@
-# PATGo — Code Map (V127)
+# PATGo — Code Map (V128)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -246,6 +246,18 @@ is discoverable from the file you happen to be editing.
     `buildReportDoc` directly — keep it that way), backup, CSV, sync. plan.js
     fails OPEN everywhere (missing file, bad record, unknown plan = no lock).
     Harness 65.
+
+27. **The stale-phone check (V128).** A phone learns of a delete made elsewhere
+    only from its marker (`deleted = true` row). The server's clean-up job may
+    clear markers older than `SYNC_MARKER_DAYS` (config.js) — never younger; the
+    phone lists a table's ids in full when it has not seen it whole for
+    `SYNC_STALE_DAYS` (keep it well below). Known-in-cloud and absent = deleted,
+    fed to the pulls as a marker would be. ⚠ A NEW UPLOAD PATH (any upsert) must
+    call `_syncNoteUploaded(table, ids)`, or a remembered check (one hour) can
+    remove what was just sent back. ⚠ A NEW DELETABLE RECORD KIND goes in
+    `_SYNC_DELETABLE_KINDS`. ⚠ A run while due always READS first (`reads`),
+    whatever triggered it. Snapshot copy first (snapshots.js
+    `snapshotBeforeCloudCheck`); no copy → ask. Harness 66.
 
 ---
 
@@ -690,7 +702,10 @@ backup interval comes from `backupReminderDays()` ('off' silences even
 "never backed up"); `BACKUP_REMINDER_DAYS` is only the default. ⚠ Instruments restore **after** the flat fields. Boolean flags restore
 only when the backup actually holds a boolean (absence ≠ off).
 
-### snapshots.js (~390 ln) — daily snapshots (V105, S14) — OPTIONAL SUBSYSTEM
+### snapshots.js (~410 ln) — daily snapshots (V105, S14) — OPTIONAL SUBSYSTEM
+V128: `snapshotBeforeCloudCheck` — slot `before-cloud-check` (kind 'before',
+label "Before the cloud check"), called by sync.js before the stale-phone check
+removes anything; resolves 'saved' / 'unsupported', rejects on a refused write.
 Once a day (first open, or the app coming back to the front) keeps exactly what a
 backup file holds in its own IndexedDB database `patgo-snapshots` (store
 `snapshots`), only when the work changed since the newest copy; keeps 7 plus one
@@ -1207,7 +1222,17 @@ Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M14
 V127: `_cloudReadStoredSession()` also returns `issuedAt` (server time, plan.js);
 `cloudCheckConnection` hands the profile row to `planNote()` (typeof-guarded).
 
-### sync.js (~4700 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read
+### sync.js (~4950 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check
+⚠ V128 (rule 27): section "the stale-phone check" before the push.
+`syncCheckDue` (per table: jobs / rec / ph; `seenAllAt` = when a pull last
+decided every row, cursor as stand-in) → `_syncCheckRun` (memo 1 h) →
+`_syncStaleCheck` (keyset id lists, paged to an EMPTY page; empty list = failed
+read) → `_syncCheckGone` → `_syncCheckSafetyCopy` (snapshots.js). `_syncRun`
+passes `chk` {jobs, rec, ph, ask, at} to `_syncPull`, `_syncRecordsHalf` →
+`_syncPullRecords`, `_syncPhotosHalf` → `_syncPhotoRowsPull`; each records its
+table's `seenAllAt` only when unblocked. `_syncStateFor` starts a NEW account's
+state seen-whole. Held "deleted-elsewhere" with no row at all → "use the cloud"
+deletes (syncHeldResolve, `_syncHeldResolveRecord`).
 ⚠ V111: every table read names its owner — rule 18 (comment above
 `_syncCurrentUserId`; harness 48).
 V104: the settings_work row also carries `readingsCheck` (default ON — read

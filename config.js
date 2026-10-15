@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V127';
+const APP_VERSION = 'V128';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -133,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V127';
+const WELCOME_VERSION = 'V128';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -546,6 +546,20 @@ const SYNC_IDLE_CHECK_MS = 20000;     // how often that is checked (no network u
 // has no cursor, so its first pull reads the whole account — every job it
 // pushed comes back, matches its own fingerprint, and resolves as no work.
 const SYNC_PULL_EPOCH = '1970-01-01T00:00:00.000Z';
+// V128 (Stage 12, clean-up job — phone side; 1A 2A 3A 4A 5A). A phone learns of a
+// delete made elsewhere only from the small "deleted" row (marker) it leaves. The
+// scheduled clean-up job will remove markers older than SYNC_MARKER_DAYS, so a
+// phone that has not seen every row of a table for SYNC_STALE_DAYS first lists
+// that table's ids in full: anything it knows was in the cloud and is now not
+// there at all was deleted, and is treated exactly as a marker would be (3A).
+// ⚠ SYNC_MARKER_DAYS IS THE SERVER'S RULE, written here so the two sit side by
+// side: the clean-up job must never remove a marker younger than it, and
+// SYNC_STALE_DAYS must stay well below it — the gap is the margin for clocks.
+const SYNC_MARKER_DAYS = 365;
+const SYNC_STALE_DAYS = 274;          // ≈ 9 months (2A)
+const SYNC_CHECK_PAGE = 500;          // ids per request — under the server's 1000-row cap
+const SYNC_CHECK_MEMO_MS = 3600000;   // a finished check is reused for an hour (runs held open by a question)
+const SYNC_DAY_MS = 86400000;
 // v33: First-run wizard "seen" flag. Set once the wizard is completed OR skipped,
 // so it never reappears. Distinct from the welcome modal key: a genuinely-new
 // install gets the WIZARD (gated by this key + an empty-install test); an

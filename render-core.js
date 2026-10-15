@@ -252,7 +252,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Your plan, clearly.</strong> A signed-in cloud account now sees when its free trial ends, a countdown afterwards, and a Renew now button. Nothing changes if you don't use a cloud account.</li>
+        <li><strong>Safer after a long time away.</strong> A phone that hasn't synced for many months now checks its work against the cloud before sending anything, so jobs deleted elsewhere stay deleted. A copy is kept in Backup &amp; Restore first.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

@@ -33,6 +33,7 @@ const SNAPSHOT_DB_VERSION = 1;
 const SNAPSHOT_STORE = 'snapshots';
 const SNAPSHOT_KEEP = 7;                       // 1B: daily copies kept
 const SNAPSHOT_BEFORE_ID = 'before-restore';   // 6A: one slot, replaced each restore
+const SNAPSHOT_CHECK_ID = 'before-cloud-check';  // V128 (4A): one slot, replaced each time
 
 let _snapDbPromise = null;
 // Full records, json included, newest first. Held in memory so "Save as file"
@@ -241,6 +242,26 @@ async function snapshotBeforeRestore() {
   return 'saved';
 }
 
+// V128 (4A): a copy of what is on the phone now, taken by sync.js before the
+// stale-phone check removes anything the cloud no longer has. Its own slot, so it
+// never replaces the copy taken before a restore (that one is the restore's undo).
+// Taken whatever the daily switch says, like the restore's copy — it is a safety
+// net, not a daily snapshot. Resolves 'saved', or 'unsupported' where there is no
+// database at all; REJECTS on a refused write. Either of the last two and sync
+// asks about each removal instead of making it.
+async function snapshotBeforeCloudCheck() {
+  if (!_snapSupported()) return 'unsupported';
+  const p = _snapPayload();
+  const rec = {
+    id: SNAPSHOT_CHECK_ID, kind: 'before', day: todayISO(), takenAt: p.takenAt, sig: p.sig,
+    sessions: p.sessions, items: p.items, bytes: p.bytes, json: p.json,
+  };
+  await _snapTx('readwrite', store => store.put(rec));
+  _snapPublish(_snapCache.filter(r => r.id !== SNAPSHOT_CHECK_ID).concat([rec]));
+  snapshotsRepaint();
+  return 'saved';
+}
+
 function _snapFind(id) {
   return _snapCache.find(r => r.id === id) || null;
 }
@@ -257,6 +278,7 @@ function snapshotLabel(meta) {
       when = `${wd} ${when} · ${hm}`;
     }
   } catch (e) {}
+  if (meta.id === SNAPSHOT_CHECK_ID) return `Before the cloud check · ${when}`;   // V128
   return meta.kind === 'before' ? `Before your last restore · ${when}` : when;
 }
 

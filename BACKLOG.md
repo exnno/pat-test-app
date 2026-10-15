@@ -8,6 +8,47 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V128
+V128 = the stale-phone check (Stage 12, the clean-up job's phone side; Peter
+14 Oct: 0A 1A 2A 3A 4A 5A). sync.js section "the stale-phone check" (MAP rule
+27); snapshots.js `snapshotBeforeCloudCheck`. Harness group 66 +
+M1109–M1154; 65f split (release checks → 66f); M1060, M1106 retired; nine
+anchors re-aimed (M149 M164 M205 M207 M208 M265 M266 M376 M463); fixtures in
+17 18 19 20 21 23 38 write up-to-date states (fixture.js `syncCurrent`).
+Next candidates: the clean-up job itself (server — an Edge Function on a
+schedule; own spec round, with the questions below); Stage 13 Stripe (needs a
+Stripe account and a price from Peter); V123's VoiceOver leftovers; Tutorials
+(PN); About/Privacy once the terms exist.
+For the clean-up job's spec round (raised by V128):
+- It must never clear a marker younger than SYNC_MARKER_DAYS (365) — the
+  phone's 274-day check depends on it. Keep the number in config.js and the
+  server job together.
+- R7 (7-year retention): to a stale phone, a row removed for age looks
+  deleted, so an unchanged job that old would be removed from the phone too.
+  Decide whether retention should reach phones (probably yes — 7 years) or
+  leave a marker instead of removing the row.
+- A phone that knows nothing in the cloud (a restored backup on a new sign-in,
+  a reset sync state) re-sends every job it holds; after markers are cleared,
+  a deleted job comes back without a question (today its marker asks). Options:
+  keep job markers for good (they are ~200 bytes), or refuse such uploads
+  server-side.
+
+### V128 residuals (known, accepted)
+- An account whose EVERY row was deleted elsewhere over a year ago reads as an
+  empty list, which the check treats as a failed read: that phone's sync waits
+  with "That check couldn't finish". Way out: Reset this phone (sync starts
+  fresh). Rare by construction; safer than believing an empty answer.
+- A photo still on this phone whose cloud row is gone stays noted as in the
+  cloud (1A: nothing removed from the phone, never re-sent). It shows as safe.
+- A job gone from the cloud while open on screen waits until it is left, like
+  any delete arriving (7A).
+- A run held open by a question uses the check it made up to an hour earlier.
+- The server job does not exist yet, so on today's servers the check only
+  ever finds rows missing for some other reason (none expected). Proven
+  against the fake server and in a browser, not on a real iPhone or real
+  Supabase — the keyset paging relies on Postgres ordering text the same way
+  for ORDER BY and `>` (it does, by one collation).
+
 ### Next after V127
 V127 = your plan: trial end, grace, the lock (Stage 12, R8 phone side; Peter
 14 Oct: 0A 2A 3A 4A 5B 6 8B 9A 10A 11A). New optional file plan.js; the gate
