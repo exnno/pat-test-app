@@ -156,4 +156,15 @@ async function restoreFile(app, file, ms = 2000) {
   return false;
 }
 
-module.exports = { RECENT_DATE, recentDate, CANARY, freshApp, withInstrument, addInstrument, withSession, withItem, populated, confirmSheet, tick, restoreFile };
+// V128: a sync state a fixture writes describes a phone that is up to date
+// with the cloud — it has seen every row lately — so the stale-phone check is
+// not due. Group 66 writes stale states on purpose, without this.
+function syncCurrent(st) {
+  const now = new Date().toISOString();
+  st.seenAllAt = now;
+  if (st.rec) st.rec.seenAllAt = now;
+  if (st.ph) st.ph.seenAllAt = now;
+  return st;
+}
+
+module.exports = { syncCurrent, RECENT_DATE, recentDate, CANARY, freshApp, withInstrument, addInstrument, withSession, withItem, populated, confirmSheet, tick, restoreFile };

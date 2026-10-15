@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V127';",
-    to:   "const APP_VERSION = 'V126';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V128';",
+    to:   "const APP_VERSION = 'V127';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V125</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V124</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V125</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 65f)',
+    from: '        <p><strong>V126</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V125</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V126</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 66f)',
   },
 
   {
@@ -1123,7 +1123,8 @@ const MUTATIONS = [
   {
     name: 'M149 (V80) sync state is used whoever it belongs to',
     file: 'sync.js',
-    from: '  return (userId && st.userId === userId) ? st : _syncEmpty(userId);',
+    // V128: re-aimed — _syncStateFor now marks a new account's state seen-whole.
+    from: '  if (userId && st.userId === userId) return st;',
     to:   '  st.userId = userId; return st;',
     why:  'a second account on the same phone would believe the first account\u2019s jobs were already in ITS cloud (17w)',
   },
@@ -1235,8 +1236,9 @@ const MUTATIONS = [
   {
     name: 'M164 (V81) the cursor advances even when a row was left undecided',
     file: 'sync.js',
-    from: "    if (!blocked) st.pulledAt = high;",
-    to:   "    st.pulledAt = high;",
+    // V128: re-aimed — the block now also records seen-whole (M1120 is its own).
+    from: "    if (!blocked) {\n      st.pulledAt = high;\n",
+    to:   "    st.pulledAt = high;\n    if (!blocked) {\n",
     why:  'the mark steps over a row nobody looked at, so the change it carried is never offered again. Everything on screen looks correct \u2014 this is a silent permanent gap, not a visible failure (17b)',
   },
   {
@@ -1543,8 +1545,9 @@ const MUTATIONS = [
   {
     name: 'M205 (V82) orphaned sites are tidied on a run that held something',
     file: 'sync.js',
-    from: "    if (!blocked) {\n      const moved = _syncTidyOrphanSites();\n      if (moved) { out.unassigned += moved; changed = true; }\n      rs.pulledAt = high;\n    }",
-    to:   "    { const moved = _syncTidyOrphanSites(); if (moved) { out.unassigned += moved; changed = true; } }\n    if (!blocked) rs.pulledAt = high;",
+    // V128: re-aimed — seen-whole sits in the same block.
+    from: "    if (!blocked) {\n      const moved = _syncTidyOrphanSites();\n      if (moved) { out.unassigned += moved; changed = true; }\n      rs.pulledAt = high;\n      if (chk && chk.at) rs.seenAllAt = chk.at;   // V128 (2A)\n    }",
+    to:   "    { const moved = _syncTidyOrphanSites(); if (moved) { out.unassigned += moved; changed = true; } }\n    if (!blocked) { rs.pulledAt = high; if (chk && chk.at) rs.seenAllAt = chk.at; }",
     why:  'the missing client may be the very record waiting on a decision; answering \"bring it back\" would then find its sites already moved away (18f)',
   },
   {
@@ -1557,15 +1560,17 @@ const MUTATIONS = [
   {
     name: 'M207 (V82) records are pushed after their read failed',
     file: 'sync.js',
-    from: "  return _syncPullRecords(c, uid, st, out)\n    .then(() => _syncPushRecords(c, uid, st, out))",
-    to:   "  return _syncPullRecords(c, uid, st, out).catch(() => {})\n    .then(() => _syncPushRecords(c, uid, st, out))",
+    // V128: re-aimed — the pull takes the check (chk).
+    from: "  return _syncPullRecords(c, uid, st, out, chk)\n    .then(() => _syncPushRecords(c, uid, st, out))",
+    to:   "  return _syncPullRecords(c, uid, st, out, chk).catch(() => {})\n    .then(() => _syncPushRecords(c, uid, st, out))",
     why:  'rule 4: a push may only ever follow a pull. Without the look first, the push overwrites work it never saw (18j)',
   },
   {
     name: 'M208 (V82) "Re-send all jobs" sends records without reading',
     file: 'sync.js',
-    from: "const recs = opts.pull ? _syncRecordsHalf(c, uid, st) : Promise.resolve(null);",
-    to:   "const recs = _syncRecordsHalf(c, uid, st);",
+    // V128: re-aimed — "reads" is opts.pull, or a check due (66d).
+    from: "const recs = reads ? _syncRecordsHalf(c, uid, st, chk) : Promise.resolve(null);",
+    to:   "const recs = _syncRecordsHalf(c, uid, st, chk);",
     why:  'the button is jobs only, and its run does not read first (16c)',
   },
   {
@@ -1972,15 +1977,17 @@ const MUTATIONS = [
   {
     name: 'M265 (V83.1) the jobs guard lets the cursor move past a page it could not finish',
     file: 'sync.js',
-    from: "          if (high === from) { blocked = true; return; }\n          return page(high);\n        });\n      });\n  }\n\n  return page(since).then(() => {\n    // Recomputed every run",
-    to:   "          if (high === from) { return; }\n          return page(high);\n        });\n      });\n  }\n\n  return page(since).then(() => {\n    // Recomputed every run",
+    // V128: re-aimed — the check's jobs are decided between the pager and its start.
+    from: "          if (high === from) { blocked = true; return; }\n          return page(high);\n        });\n      });\n  }\n\n  // V128 (3A). A job this phone knows",
+    to:   "          if (high === from) { return; }\n          return page(high);\n        });\n      });\n  }\n\n  // V128 (3A). A job this phone knows",
     why:  'more rows on one timestamp than a page holds: the rest are stepped over instead of the run stopping (20f)',
   },
   {
     name: 'M266 (V83.1) the records guard lets the cursor move past a page it could not finish',
     file: 'sync.js',
-    from: "        if (high === from) { blocked = true; return; }\n        return page(high);\n      });\n  }\n\n  return page(since).then(() => {\n    // v83, in this order",
-    to:   "        if (high === from) { return; }\n        return page(high);\n      });\n  }\n\n  return page(since).then(() => {\n    // v83, in this order",
+    // V128: re-aimed — as M265.
+    from: "        if (high === from) { blocked = true; return; }\n        return page(high);\n      });\n  }\n\n  // V128 (3A). A client",
+    to:   "        if (high === from) { return; }\n        return page(high);\n      });\n  }\n\n  // V128 (3A). A client",
     why:  'the same, for records (20f2)',
   },
   {
@@ -2762,7 +2769,8 @@ const MUTATIONS = [
   {
     name: "M376 (V88) photos upload on the non-reading run",
     file: "sync.js",
-    from: "          if (!opts.pull) return base;\n          return _syncPhotosHalf(",
+    // V128: re-aimed — "reads", as M208.
+    from: "          if (!reads) return base;\n          return _syncPhotosHalf(",
     to:   "          return _syncPhotosHalf(",
     why:  "rule 4 shape: nothing goes up on a run that didn't read first (25d)",
   },  {
@@ -3377,8 +3385,9 @@ const MUTATIONS = [
   {
     name: "M463 (V93) the retest look is never run",
     file: "sync.js",
-    from: "const first = opts.pull ? _syncPull(c, uid, st, pulled).then(look) : Promise.resolve();",
-    to:   "const first = opts.pull ? _syncPull(c, uid, st, pulled) : Promise.resolve();",
+    // V128: re-aimed — "reads", and the check (chk).
+    from: "const first = reads ? _syncPull(c, uid, st, pulled, chk).then(look) : Promise.resolve();",
+    to:   "const first = reads ? _syncPull(c, uid, st, pulled, chk) : Promise.resolve();",
     why:  "2A: reminders for old jobs never reach a fresh phone (30c)",
   },
   {
@@ -6080,10 +6089,11 @@ const MUTATIONS = [
     // V124: welcome rolled — re-aimed at V124's first line; 62f pinned it.
     // V125: welcome rolled — re-aimed at V125's first line; 63f pinned it.
     // V126: welcome rolled (2B, one line) — re-aimed at it; 64f pinned it.
-    // V127: welcome rolled — re-aimed at V127's line; 65f pins it.
-    from: "<li><strong>Your plan, clearly.</strong>",
+    // V127: welcome rolled — re-aimed at V127's line; 65f pinned it.
+    // V128: welcome rolled — re-aimed at V128's line; 66f pins it.
+    from: "<li><strong>Safer after a long time away.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (65f)",
+    why:  "11A: the welcome says plainly what changed on screen (66f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -7501,13 +7511,8 @@ const MUTATIONS = [
     to:   "",
     why:  "works for whoever deployed it; offline installs lose the button (01c 63g)",
   },
-  {
-    name: "M1060 (V125) the About changelog loses V125's line",
-    file: "render-help.js",
-    from: "Export everything: one zip file of everything on this phone",
-    to:   "Better",
-    why:  "the About page must say what changed in this version (65f)",
-  },
+  // M1060 (V125's About line) RETIRED V128: V125 rolled off the About page, so
+  // its text is gone (66f checks it is).
   // ---- V126 (0A 1A 2B): a first visit never reloads itself. Group 64 + M1061–M1072. ----
   {
     name: "M1061 (V126) a takeover always reloads (the V125 behaviour)",
@@ -7586,7 +7591,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "A smoother first start: on a new phone PATGo no longer reloads",
     to:   "Better",
-    why:  "the About page must say what changed in this version (65f)",
+    why:  "the About page must say what changed in this version (66f)",
   },
   // ---- V127 (0A 2A 3A 4A 5B 6 8B 9A 10A 11A): the plan. Group 65 + M1073–M1108. ----
   {
@@ -7820,19 +7825,14 @@ const MUTATIONS = [
     to:   "  if (false) planBoot();",
     why:  "what the phone knows applies at start-up, and the return-to-front hook with it (65i)",
   },
-  {
-    name: "M1106 (V127) the What's new sheet gains a second line",
-    file: "render-core.js",
-    from: "Nothing changes if you don't use a cloud account.</li>\n",
-    to:   "Nothing changes if you don't use a cloud account.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (65f)",
-  },
+  // M1106 (V127's one-line What's new) RETIRED V128: that sheet's copy is gone.
+  // V128's sheet is one line too; 66f pins it (M1137).
   {
     name: "M1107 (V127) the About changelog loses V127's line",
     file: "render-help.js",
     from: "Your plan, clearly: a signed-in cloud account sees",
     to:   "Better",
-    why:  "the About page must say what changed in this version (65f)",
+    why:  "the About page must say what changed in this version (66f)",
   },
   {
     name: "M1108 (V127) database dates are not cut for Safari",
@@ -7840,6 +7840,336 @@ const MUTATIONS = [
     from: "  return String(s || '').replace(/(\\.\\d{3})\\d+/, '$1');",
     to:   "  return String(s || '');",
     why:  "an iPhone that cannot read the end date treats the trial as never ending (65a)",
+  },
+  // ---- V128 (0A 1A 2A 3A 4A 5A): the stale-phone check. Group 66 + M1109–M1155. ----
+  {
+    name: "M1109 (V128) the check is never due",
+    file: "sync.js",
+    from: "  const old = (k, cursor, at) => now - _syncSeenAllMs(cursor, at) > limit && _syncKnownIds(st, k).length > 0;",
+    to:   "  const old = () => false;",
+    why:  "2A: a phone away past the clean-up job keeps deleted jobs and sends them back (66a 66b)",
+  },
+  {
+    name: "M1110 (V128) due even when nothing is known in the cloud",
+    file: "sync.js",
+    from: "  const old = (k, cursor, at) => now - _syncSeenAllMs(cursor, at) > limit && _syncKnownIds(st, k).length > 0;",
+    to:   "  const old = (k, cursor, at) => now - _syncSeenAllMs(cursor, at) > limit;",
+    why:  "a table with nothing to put back is listed for nothing (66a)",
+  },
+  {
+    name: "M1111 (V128) the cursor no longer stands in for seen-whole",
+    file: "sync.js",
+    from: "  return Math.max(isFinite(a) ? a : 0, isFinite(c) ? c : 0);",
+    to:   "  return isFinite(a) ? a : 0;",
+    why:  "every V127 phone lists every table on its first V128 run, and a phone whose cursor moved last month is called stale (66a 66b)",
+  },
+  {
+    name: "M1112 (V128) seen-whole is ignored (the cursor alone)",
+    file: "sync.js",
+    from: "  return Math.max(isFinite(a) ? a : 0, isFinite(c) ? c : 0);",
+    to:   "  return isFinite(c) ? c : 0;",
+    why:  "a quiet account's old cursor makes a phone that syncs daily list everything on every run (66a)",
+  },
+  {
+    name: "M1113 (V128) the phone's clock alone decides when the check is due",
+    file: "sync.js",
+    from: "    const due = syncCheckDue(st, Math.max(Date.now(), serverAt));",
+    to:   "    const due = syncCheckDue(st, Date.now());",
+    why:  "2A: a clock wound back puts the check off past the clean-up job (66j)",
+  },
+  {
+    name: "M1114 (V128) seen-whole is recorded at the later of the two times",
+    file: "sync.js",
+    from: "    const at = new Date(serverAt ? Math.min(Date.now(), serverAt) : Date.now()).toISOString();",
+    to:   "    const at = new Date(serverAt ? Math.max(Date.now(), serverAt) : Date.now()).toISOString();",
+    why:  "a time in the future recorded as seen-whole puts the next check off (66j)",
+  },
+  {
+    name: "M1115 (V128) a send-only run does not read when the check is due",
+    file: "sync.js",
+    from: "    const reads = !!opts.pull || checking;",
+    to:   "    const reads = !!opts.pull;",
+    why:  "5A: a save's quick send on a stale phone goes before the deletes are decided (66d)",
+  },
+  {
+    name: "M1116 (V128) the check never runs",
+    file: "sync.js",
+    from: "    const found = checking ? _syncCheckRun(c, uid, st, due) :",
+    to:   "    const found = false ? _syncCheckRun(c, uid, st, due) :",
+    why:  "3A: the job deleted elsewhere stays here and goes back up at its next edit (66b 66d)",
+  },
+  {
+    name: "M1117 (V128) the jobs gone from the cloud are not decided",
+    file: "sync.js",
+    from: "  for (const id of ((chk && chk.jobs) || [])) decide({ id, deleted: true, ask: !!chk.ask });",
+    to:   "",
+    why:  "3A: the check finds them and nothing happens (66b)",
+  },
+  {
+    name: "M1118 (V128) a job is removed with no safety copy",
+    file: "sync.js",
+    from: "      if (!row.ask && st.sent[id] === syncHash(_syncCanonical(local))) {",
+    to:   "      if (st.sent[id] === syncHash(_syncCanonical(local))) {",
+    why:  "4A: nothing goes without the copy or the engineer's say (66e)",
+  },
+  {
+    name: "M1119 (V128) the jobs table is never recorded as seen whole",
+    file: "sync.js",
+    from: "      if (chk && chk.at) st.seenAllAt = chk.at;\n",
+    to:   "",
+    why:  "2A: the phone lists every job on every run, for ever (66b)",
+  },
+  {
+    name: "M1120 (V128) seen-whole recorded while a question stands",
+    file: "sync.js",
+    from: "    if (!blocked) {\n      st.pulledAt = high;\n      // V128 (2A): every row of the table has now been read and decided.\n      if (chk && chk.at) st.seenAllAt = chk.at;\n    }",
+    to:   "    if (chk && chk.at) st.seenAllAt = chk.at;\n    if (!blocked) {\n      st.pulledAt = high;\n    }",
+    why:  "a run that left a row undecided is not a phone that has seen everything (66c)",
+  },
+  {
+    name: "M1121 (V128) the id list stops at a short page",
+    file: "sync.js",
+    from: "      if (!last || last === after) throw new Error('the cloud list did not move on');",
+    to:   "      if (rows.length < SYNC_CHECK_PAGE) return ids;\n      if (!last || last === after) throw new Error('the cloud list did not move on');",
+    why:  "a server capping pages below SYNC_CHECK_PAGE makes every job past the first page look deleted (66d)",
+  },
+  {
+    name: "M1122 (V128) the id list is not limited to this account",
+    file: "sync.js",
+    from: "    let q = c.from(table).select('id').eq('user_id', uid);   // V111: this account's own rows",
+    to:   "    let q = c.from(table).select('id');",
+    why:  "V111: an Owner can read other people's rows; their ids hide this account's deletes (66b)",
+  },
+  {
+    name: "M1123 (V128) an empty list is believed",
+    file: "sync.js",
+    from: "      if (!ids.size) throw new Error('the cloud list came back empty');\n",
+    to:   "",
+    why:  "a read gone wrong removes every clean job on the phone (66d)",
+  },
+  {
+    name: "M1124 (V128) a failed check does not stop the run",
+    file: "sync.js",
+    from: "  return chain.then(() => lists, (e) => {\n    const err = e || new Error('check');",
+    to:   "  return chain.then(() => lists, () => lists).then(() => lists, (e) => {\n    const err = e || new Error('check');",
+    why:  "5A: a stale phone sends without having checked (66d)",
+  },
+  {
+    name: "M1125 (V128) the check's failure is not explained",
+    file: "sync.js",
+    from: "  if (err && err.syncStage === 'check') {",
+    to:   "  if (false) {",
+    why:  "5A: the Sync page says the send failed with a raw error instead of why nothing went (66d)",
+  },
+  {
+    name: "M1126 (V128) a failed list read is not marked as the check",
+    file: "sync.js",
+    from: "    if (!err.syncStage) { try { err.syncStage = 'check'; } catch (x) { /* frozen: the generic text */ } }\n",
+    to:   "",
+    why:  "the plain message never reaches the Sync page (66d)",
+  },
+  {
+    name: "M1127 (V128) no safety copy is ever taken",
+    file: "sync.js",
+    from: "  if (!holds) return Promise.resolve(false);\n",
+    to:   "  return Promise.resolve(false);\n",
+    why:  "4A: removals go ahead with no copy to restore (66e)",
+  },
+  {
+    name: "M1128 (V128) a safety copy is taken on every check",
+    file: "sync.js",
+    from: "  if (!holds) return Promise.resolve(false);\n",
+    to:   "",
+    why:  "4A: the copy only when something on the phone is in question (66e)",
+  },
+  {
+    name: "M1129 (V128) a refused safety copy goes ahead anyway",
+    file: "sync.js",
+    from: "    console.error('Sync: no safety copy before the cloud check — asking instead (non-fatal).', e);\n    return true;",
+    to:   "    console.error('Sync: no safety copy before the cloud check — asking instead (non-fatal).', e);\n    return false;",
+    why:  "4A: a full phone removes jobs with no copy kept (66e)",
+  },
+  {
+    name: "M1130 (V128) no snapshots on the phone counts as a copy kept",
+    file: "sync.js",
+    from: "  return Promise.resolve(p).then((r) => r !== 'saved', (e) => {",
+    to:   "  return Promise.resolve(p).then((r) => false, (e) => {",
+    why:  "4A: a phone with no snapshot database removes with no copy (66e)",
+  },
+  {
+    name: "M1131 (V128) the safety copy takes the restore's slot",
+    file: "snapshots.js",
+    from: "    id: SNAPSHOT_CHECK_ID, kind: 'before', day: todayISO(), takenAt: p.takenAt, sig: p.sig,",
+    to:   "    id: SNAPSHOT_BEFORE_ID, kind: 'before', day: todayISO(), takenAt: p.takenAt, sig: p.sig,",
+    why:  "the undo of the last restore is lost to the check's copy (66e)",
+  },
+  {
+    name: "M1132 (V128) the safety copy has no name of its own",
+    file: "snapshots.js",
+    from: "  if (meta.id === SNAPSHOT_CHECK_ID) return `Before the cloud check · ${when}`;   // V128\n",
+    to:   "",
+    why:  "Backup & Restore calls it the copy before a restore (66e)",
+  },
+  {
+    name: "M1133 (V128) “use the cloud” on a job gone for good keeps it",
+    file: "sync.js",
+    from: "        const goneForGood = !row && entry.reason === 'deleted-elsewhere';",
+    to:   "        const goneForGood = false;",
+    why:  "3A: the engineer chose the delete, and the job goes straight back up (66c)",
+  },
+  {
+    name: "M1134 (V128) “use the cloud” on a record gone for good keeps it",
+    file: "sync.js",
+    from: "        const goneForGood = !row && reason === 'deleted-elsewhere';",
+    to:   "        const goneForGood = false;",
+    why:  "3A: as for jobs (66g2)",
+  },
+  {
+    name: "M1135 (V128) the remembered answer forgets what was uploaded since",
+    file: "sync.js",
+    from: "      if (due[k] && mm.gone[k]) out[k] = mm.gone[k].filter(id => !mm.sent[k].has(String(id)));",
+    to:   "      if (due[k] && mm.gone[k]) out[k] = mm.gone[k];",
+    why:  "“keep this phone's copy” sends it back, then the next run removes it on the older answer (66c)",
+  },
+  {
+    name: "M1136 (V128) uploaded jobs are not noted for the remembered answer",
+    file: "sync.js",
+    from: "          _syncNoteUploaded('jobs', batch.map(w => w.id));   // V128: rows exist again\n",
+    to:   "",
+    why:  "as M1135, from the other end (66c)",
+  },
+  {
+    name: "M1137 (V128) the What's new sheet gains a second line",
+    file: "render-core.js",
+    from: "A copy is kept in Backup &amp; Restore first.</li>\n",
+    to:   "A copy is kept in Backup &amp; Restore first.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (66f)",
+  },
+  {
+    name: "M1138 (V128) the check is never remembered",
+    file: "sync.js",
+    from: "  const fresh = m && m.uid === uid && age >= 0 && age < SYNC_CHECK_MEMO_MS",
+    to:   "  const fresh = false && m && m.uid === uid && age >= 0 && age < SYNC_CHECK_MEMO_MS",
+    why:  "a phone with a question pending lists every table on every save (66i)",
+  },
+  {
+    name: "M1139 (V128) the check is remembered for ever",
+    file: "sync.js",
+    from: "  const fresh = m && m.uid === uid && age >= 0 && age < SYNC_CHECK_MEMO_MS",
+    to:   "  const fresh = m && m.uid === uid && age >= 0",
+    why:  "an answer an hour old stands in for the cloud indefinitely (66i)",
+  },
+  {
+    name: "M1140 (V128) the records gone from the cloud are not decided",
+    file: "sync.js",
+    from: "    if (kind) decide({ id, kind, deleted: true, ask: !!chk.ask });",
+    to:   "    if (false) decide({ id, kind, deleted: true, ask: !!chk.ask });",
+    why:  "3A: a client deleted elsewhere stays here and goes back up (66g 66g2)",
+  },
+  {
+    name: "M1141 (V128) a record only in the bookkeeping is left there",
+    file: "sync.js",
+    from: "    else { delete rs.sent[id]; rs.gone[id] = true; }",
+    to:   "    else { }",
+    why:  "the bookkeeping keeps claiming the cloud has it (66g)",
+  },
+  {
+    name: "M1142 (V128) settings rows are put in question",
+    file: "sync.js",
+    from: "  if (k === 'rec') return Object.keys(st.rec.sent).filter(id => SYNC_SETTINGS_IDS.indexOf(id) === -1);",
+    to:   "  if (k === 'rec') return Object.keys(st.rec.sent);",
+    why:  "no version deletes a settings row; one missing is not a delete (66a 66g)",
+  },
+  {
+    name: "M1143 (V128) a photo still on the phone loses its note",
+    file: "sync.js",
+    from: "    if (meta[id]) continue;\n    if (ph.sent[id]) { delete ph.sent[id]; known = true; }",
+    to:   "    if (ph.sent[id]) { delete ph.sent[id]; known = true; }",
+    why:  "1A: it is uploaded again to a cloud that deleted it on purpose (66h)",
+  },
+  {
+    name: "M1144 (V128) the photo note is never tidied",
+    file: "sync.js",
+    from: "    if (meta[id]) continue;\n    if (ph.sent[id]) { delete ph.sent[id]; known = true; }",
+    to:   "    if (meta[id]) continue;",
+    why:  "1A: the phone keeps counting photos the cloud no longer has (66h)",
+  },
+  {
+    name: "M1145 (V128) photos are never recorded as seen whole",
+    file: "sync.js",
+    from: "      if (chk && chk.at) ph.seenAllAt = chk.at;   // V128 (2A)\n",
+    to:   "",
+    why:  "2A: the photos table is listed on every run (66h)",
+  },
+  {
+    name: "M1146 (V128) records are never recorded as seen whole",
+    file: "sync.js",
+    from: "      if (chk && chk.at) rs.seenAllAt = chk.at;   // V128 (2A)\n",
+    to:   "",
+    why:  "2A: the records table is listed on every run (66g2)",
+  },
+  {
+    name: "M1147 (V128) a new account's state starts as never seen whole",
+    file: "sync.js",
+    from: "  fresh.seenAllAt = now; fresh.rec.seenAllAt = now; fresh.ph.seenAllAt = now;\n",
+    to:   "",
+    why:  "a new phone's every send after its first lists the tables (66a)",
+  },
+  {
+    name: "M1148 (V128) a saved seen-whole is dropped on reload",
+    file: "sync.js",
+    from: "  if (_syncIsoOk(raw.seenAllAt)) out.seenAllAt = raw.seenAllAt;\n",
+    to:   "",
+    why:  "2A: the check repeats on every app start (66a)",
+  },
+  {
+    name: "M1149 (V128) records' seen-whole dropped on reload",
+    file: "sync.js",
+    from: "    if (_syncIsoOk(rr.seenAllAt)) r.seenAllAt = rr.seenAllAt;   // V128\n",
+    to:   "",
+    why:  "as M1148 (66a)",
+  },
+  {
+    name: "M1150 (V128) photos' seen-whole dropped on reload",
+    file: "sync.js",
+    from: "  if (rp && typeof rp === 'object' && _syncIsoOk(rp.seenAllAt)) out.ph.seenAllAt = rp.seenAllAt;   // V128\n",
+    to:   "",
+    why:  "as M1148 (66a)",
+  },
+  {
+    name: "M1151 (V128) an unreadable seen-whole is trusted",
+    file: "sync.js",
+    from: "  return typeof v === 'string' && !isNaN(Date.parse(v));",
+    to:   "  return v != null;",
+    why:  "garbage reads as a time and puts the check off (66a)",
+  },
+  {
+    name: "M1152 (V128) the stale limit creeps up to the marker age",
+    file: "config.js",
+    from: "const SYNC_STALE_DAYS = 274;",
+    to:   "const SYNC_STALE_DAYS = 360;",
+    why:  "2A: no margin left for clocks between the phone's check and the server's clean-up (66a)",
+  },
+  {
+    name: "M1153 (V128) a record is removed with no safety copy",
+    file: "sync.js",
+    from: "      if (!row.ask && (rs.sent[id] === _syncRecordHash(kind, local)",
+    to:   "      if ((rs.sent[id] === _syncRecordHash(kind, local)",
+    why:  "4A: as for jobs (66g2)",
+  },
+  {
+    name: "M1155 (V128) the Sync line opens “removed …” in lower case",
+    file: "sync.js",
+    from: "  if (p.removed) bits.push((bits.length ? 'removed ' : 'Removed ') + plural(",
+    to:   "  if (p.removed) bits.push('removed ' + plural(",
+    why:  "the first words the engineer reads after a stale phone's check (66b)",
+  },
+  {
+    name: "M1154 (V128) the About changelog loses V128's line",
+    file: "render-help.js",
+    from: "Safer after a long time away: a phone that hasn",
+    to:   "Better",
+    why:  "the About page must say what changed in this version (66f)",
   },
 ];
 
