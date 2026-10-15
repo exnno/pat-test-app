@@ -23,7 +23,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, withSession, withItem, CANARY, RECENT_DATE } = require('../fixture');
+const { tick, withSession, withItem, CANARY, RECENT_DATE, syncCurrent } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID_A = '11111111-1111-1111-1111-111111111111';
@@ -148,7 +148,7 @@ function local(app, { clients = [], sites = [], sent = [] } = {}) {
     const kind = c ? 'client' : 'site';
     st.rec.sent[id] = app.fn('_syncRecordHash')(kind, c || s);
   }
-  app.storage.setItem('pat:syncState', JSON.stringify(st));
+  app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
 }
 
 function rename(app, kind, id, name) {
@@ -199,7 +199,7 @@ function sentJob(app, site) {
   st.userId = UID_A; st.hashV = 2;
   st.sent = st.sent || {};
   st.sent[String(sess.id)] = app.fn('syncHash')(app.fn('_syncCanonical')(sess));
-  app.storage.setItem('pat:syncState', JSON.stringify(st));
+  app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
   return sess;
 }
 
@@ -271,8 +271,8 @@ module.exports = async function () {
       records: [recRow('client', 'client_ZZPOLD', { id: 'client_ZZPOLD', name: 'ZZ Stepped Over' }, T1)],
     } });
     // A V83 phone whose cursors are PAST rows it never read (T2 > T1).
-    app.storage.setItem('pat:syncState', JSON.stringify({ userId: UID_A, hashV: 2, sent: {}, gone: {}, resend: {},
-      pulledAt: T2, rec: { sent: {}, gone: {}, resend: {}, pulledAt: T2, kinds: app.fn('_syncRecordKindsTag')() } }));
+    app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent({ userId: UID_A, hashV: 2, sent: {}, gone: {}, resend: {},
+      pulledAt: T2, rec: { sent: {}, gone: {}, resend: {}, pulledAt: T2, kinds: app.fn('_syncRecordKindsTag')() } })));
     await run(app);
     t.ok(jobById(app, 'ZZJOLD'), 'the job it had stepped over arrives');
     t.ok(client(app, 'client_ZZPOLD'), 'and the client');

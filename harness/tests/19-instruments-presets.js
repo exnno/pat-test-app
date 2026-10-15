@@ -28,7 +28,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, freshApp, withInstrument, addInstrument, withSession, withItem, confirmSheet, RECENT_DATE } = require('../fixture');
+const { tick, freshApp, withInstrument, addInstrument, withSession, withItem, confirmSheet, RECENT_DATE, syncCurrent } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID_A = '11111111-1111-1111-1111-111111111111';
@@ -169,7 +169,7 @@ function markSent(app, o = {}) {
   for (const id of (o.sentJobs || [])) {
     st.sent[id] = app.fn('syncHash')(app.fn('_syncCanonical')(findS(app, id)));
   }
-  app.storage.setItem('pat:syncState', JSON.stringify(st));
+  app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
 }
 
 /* A job on the phone, stamped with a given instrument, not the open one. */
@@ -286,7 +286,7 @@ module.exports = async function () {
     const st = syncState(app);
     st.rec.freeze = { ZZEGONE: { make: 'ZZ Owed', model: '', calDate: '', calCertNo: 'ZZ-OWED', calDue: '' },
                       ZZEK: { make: 'ZZ Back Again', model: '', calDate: '', calCertNo: 'ZZ-BACK', calDue: '' } };
-    app.storage.setItem('pat:syncState', JSON.stringify(st));
+    app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
     app.fn('syncBoot')();
     app.stopTimer();
     t.eq(findS(app, 'ZZEJ').instrumentSnapshot && findS(app, 'ZZEJ').instrumentSnapshot.calCertNo, 'ZZ-OWED', 'the owed copy is written at boot');

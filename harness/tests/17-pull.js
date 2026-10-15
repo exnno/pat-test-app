@@ -27,7 +27,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, CANARY, withSession, withItem, RECENT_DATE } = require('../fixture');
+const { tick, CANARY, withSession, withItem, RECENT_DATE, syncCurrent } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID_A = '11111111-1111-1111-1111-111111111111';
@@ -183,7 +183,7 @@ function sentJob(app, site) {
   // "clean local copy" fixture would silently become a dirty one.
   st.hashV = 2;
   st.sent[String(sess.id)] = app.fn('syncHash')(app.fn('_syncCanonical')(sess));
-  app.storage.setItem('pat:syncState', JSON.stringify(st));
+  app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
   return sess;
 }
 
@@ -357,7 +357,7 @@ module.exports = async function () {
     const sess = jobById(app, local.id);
     const st = syncState(app);
     st.sent[String(local.id)] = app.fn('syncHash')(app.fn('_syncCanonical')(sess));
-    app.storage.setItem('pat:syncState', JSON.stringify(st));
+    app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
 
     app.srv.cloud.push(cloudJob(String(local.id), 'ZZSHRINK', ['ONLY-1'], T2));
     await app.fn('syncPull')();
@@ -404,7 +404,7 @@ module.exports = async function () {
     const st = syncState(app);
     delete st.sent[id];
     st.gone[id] = true;
-    app.storage.setItem('pat:syncState', JSON.stringify(st));
+    app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
     app.run(`state.sessions = state.sessions.filter(s => String(s.id) !== ${JSON.stringify(id)});
              recordTombstone('session', ${JSON.stringify(id)});`);
 
@@ -880,7 +880,7 @@ module.exports = async function () {
     delete st.hashV;
     st.sent[id] = 'pre-canonical-hash';
     st.gone['ZZALREADYDELETED'] = true;
-    app.storage.setItem('pat:syncState', JSON.stringify(st));
+    app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
 
     await app.fn('syncPull')();
     await tick(5);

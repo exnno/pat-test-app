@@ -26,8 +26,8 @@
           phone's own clock never ratchets the record.
      65i  reading the plan: planRefresh reads its own profile by id; the sign-in
           check feeds the record too; the return-to-front hook only when signed in.
-     65f  release: V127, What's new, cache, changelog, plan.js placed, key kept
-          out of backups. (64f → 65f.)
+     65f  plan.js placed and started, its key kept out of backups. (The release
+          checks moved to 66f at V128.)
 
    ⚠ Signed in = supabase-js's own stored session under the test key, exactly as
    the cloud tests seed it. Booted offline, so no library load is attempted. */
@@ -422,24 +422,9 @@ module.exports = async function run() {
   });
 
   /* ------------------------------------------------------------------ 65f */
-  await t.group('65f — release: V127, What’s new, cache, changelog, plan.js placed', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V127', 'APP_VERSION V127');
-    t.eq(app.run('WELCOME_VERSION'), 'V127', 'What’s new rolled to V127');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v127';", 'cache key pat-v127');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>Your plan, clearly.</strong>', 'V127’s What’s new');
-    const sheet = core.slice(core.indexOf('<ul class="welcome-list sheet-scroll">'), core.indexOf('</ul>', core.indexOf('<ul class="welcome-list sheet-scroll">')));
-    t.eq((sheet.match(/<li>/g) || []).length, 1, '… one line');
-    t.excludes(core, '<li><strong>A smoother first start.</strong>', 'V126’s sheet copy gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V127</strong>'), b = help.indexOf('<p><strong>V126</strong>'), c = help.indexOf('<p><strong>V125</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V127, V126, V125');
-    t.excludes(help, '<p><strong>V124</strong>', 'V124 rolled off');
-    t.excludes(help, 'Updates without the fuss: PATGo checks', 'V124’s line gone with it');
-    t.includes(help, 'Your plan, clearly: a signed-in cloud account sees', 'About: V127’s line');
-    t.includes(help, 'A smoother first start: on a new phone PATGo no longer reloads', 'About: V126’s line still there');
-    t.includes(help, 'Export everything: one zip file of everything on this phone', 'About: V125’s line still there');
+  // V128: the release checks (version, What's new, cache, About) moved to 66f;
+  // what stays here is V127's lasting placement and the backup rule.
+  await t.group('65f — plan.js placed, started after the first render, kept out of backups', () => {
     const idx = read('index.html');
     t.ok(idx.indexOf('src="sync.js"') < idx.indexOf('src="plan.js"') && idx.indexOf('src="plan.js"') < idx.indexOf('src="scanner.js"'), 'plan.js loads after sync.js (which stays straight after cloud.js), before scanner.js');
     t.includes(read('sw.js'), "  './plan.js',", 'and is precached');

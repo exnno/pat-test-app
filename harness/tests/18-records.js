@@ -21,7 +21,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, withSession, withItem, CANARY } = require('../fixture');
+const { tick, withSession, withItem, CANARY, syncCurrent } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID_A = '11111111-1111-1111-1111-111111111111';
@@ -146,7 +146,7 @@ function local(app, { clients = [], sites = [], sent = [] } = {}) {
     const kind = c ? 'client' : 'site';
     st.rec.sent[id] = app.fn('_syncRecordHash')(kind, c || s);
   }
-  app.storage.setItem('pat:syncState', JSON.stringify(st));
+  app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
 }
 
 function rename(app, kind, id, name) {
@@ -304,7 +304,7 @@ module.exports = async function () {
     app.stopTimer();
     const st = { userId: UID_A, hashV: 2, sent: {}, gone: {}, resend: {},
       rec: { sent: {}, gone: { client_ZZG: true }, resend: {}, pulledAt: null, kinds: '' } };
-    app.storage.setItem('pat:syncState', JSON.stringify(st));
+    app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
     await app.fn('syncPull')();
     await tick(5);
     t.eq((held(app)[0] || {}).reason, 'deleted-here', 'held as deleted on this phone');
@@ -392,8 +392,8 @@ module.exports = async function () {
     // v83.1: pagerV is current in both fixtures, so it is the KINDS tag that
     // resets here, not the one-off pager re-read (that is 20c's subject).
     const pagerV = app.run('SYNC_PAGER_V');
-    app.storage.setItem('pat:syncState', JSON.stringify({ userId: UID_A, hashV: 2, pagerV, sent: {}, gone: {}, resend: {},
-      rec: { sent: {}, gone: {}, resend: {}, pulledAt: T2, kinds: 'client' } }));
+    app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent({ userId: UID_A, hashV: 2, pagerV, sent: {}, gone: {}, resend: {},
+      rec: { sent: {}, gone: {}, resend: {}, pulledAt: T2, kinds: 'client' } })));
     await app.fn('syncPull')();
     await tick(5);
     t.includes(app.srv.gets('records')[0].url, 'updated_at=gte.1970', 'a list that grew resets the cursor');
@@ -401,8 +401,8 @@ module.exports = async function () {
     // v83: the tag is kinds AND settings ids (_syncRecordKindsTag), so the
     // "same list" case reads the current tag rather than a hard-coded V82 one.
     const app2 = signedIn();
-    app2.storage.setItem('pat:syncState', JSON.stringify({ userId: UID_A, hashV: 2, pagerV, sent: {}, gone: {}, resend: {},
-      rec: { sent: {}, gone: {}, resend: {}, pulledAt: T2, kinds: app2.fn('_syncRecordKindsTag')() } }));
+    app2.storage.setItem('pat:syncState', JSON.stringify(syncCurrent({ userId: UID_A, hashV: 2, pagerV, sent: {}, gone: {}, resend: {},
+      rec: { sent: {}, gone: {}, resend: {}, pulledAt: T2, kinds: app2.fn('_syncRecordKindsTag')() } })));
     await app2.fn('syncPull')();
     await tick(5);
     t.includes(decodeURIComponent(app2.srv.gets('records')[0].url), 'updated_at=gte.' + T2, 'the same list carries on from its cursor');

@@ -27,7 +27,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, freshApp, withSession, withItem, confirmSheet } = require('../fixture');
+const { tick, freshApp, withSession, withItem, confirmSheet, syncCurrent } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID_A = '11111111-1111-1111-1111-111111111111';
@@ -171,7 +171,7 @@ function markSent(app, ids) {
     else if (id === CERT) st.rec.sent[id] = h('settings', { id: CERT, next: rs(app).certNextNumber, setAt: rs(app).certSetAt });
     else st.rec.sent[id] = h('template', tpl(app, id));
   }
-  app.storage.setItem('pat:syncState', JSON.stringify(st));
+  app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
 }
 
 const sentIds = (app) => app.srv.rows('records').map(r => r.id);

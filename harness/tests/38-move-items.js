@@ -22,7 +22,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, withSession, withItem, recentDate } = require('../fixture');
+const { tick, withSession, withItem, recentDate, syncCurrent } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID = '11111111-1111-1111-1111-111111111111';
@@ -530,7 +530,7 @@ module.exports = async function () {
     await run(app);
     const st = syncState(app);
     st.ph.sent.ZZPH9 = { s: String(r.sess.id), i: String(r.b.id) };   // a cloud photo of B this phone knows
-    app.storage.setItem('pat:syncState', J(st));
+    app.storage.setItem('pat:syncState', J(syncCurrent(st)));
     const docK = { id: 'ZZK1', site: 'ZZMOVEDTO', date: '2025-01-10', items: [r.b, r.c].map(x => JSON.parse(J(x))) };
     const docJ = Object.assign(JSON.parse(J(r.sess)), { items: [JSON.parse(J(r.a))], movedOut: { [r.b.id]: 'ZZK1', [r.c.id]: 'ZZK1' } });
     return { app, r, docK, docJ };
