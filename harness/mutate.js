@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V128';",
-    to:   "const APP_VERSION = 'V127';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V129';",
+    to:   "const APP_VERSION = 'V128';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,9 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V126</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V125</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V126</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 66f)',
+    from: '        <p><strong>V127</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V126</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V127</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 67f)',
   },
 
   {
@@ -6090,10 +6090,11 @@ const MUTATIONS = [
     // V125: welcome rolled — re-aimed at V125's first line; 63f pinned it.
     // V126: welcome rolled (2B, one line) — re-aimed at it; 64f pinned it.
     // V127: welcome rolled — re-aimed at V127's line; 65f pinned it.
-    // V128: welcome rolled — re-aimed at V128's line; 66f pins it.
-    from: "<li><strong>Safer after a long time away.</strong>",
+    // V128: welcome rolled — re-aimed at V128's line; 66f pinned it.
+    // V129: welcome rolled — re-aimed at V129's line; 67f pins it.
+    from: "<li><strong>Easier with VoiceOver.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (66f)",
+    why:  "11A: the welcome says plainly what changed on screen (67f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -7586,13 +7587,9 @@ const MUTATIONS = [
   },
   // M1071 (V126's one-line What's new) RETIRED V127: that sheet's copy is gone.
   // V127's sheet is one line too; 65f pins it (M1106).
-  {
-    name: "M1072 (V126) the About changelog loses V126's line",
-    file: "render-help.js",
-    from: "A smoother first start: on a new phone PATGo no longer reloads",
-    to:   "Better",
-    why:  "the About page must say what changed in this version (66f)",
-  },
+  // M1072 (V126's About line) RETIRED V129: V126 rolled off the About page, so
+  // its text is gone (67f checks it is).
+
   // ---- V127 (0A 2A 3A 4A 5B 6 8B 9A 10A 11A): the plan. Group 65 + M1073–M1108. ----
   {
     name: "M1073 (V127) no grace: the lock lands the moment the trial ends",
@@ -7832,7 +7829,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Your plan, clearly: a signed-in cloud account sees",
     to:   "Better",
-    why:  "the About page must say what changed in this version (66f)",
+    why:  "the About page must say what changed in this version (67f)",
   },
   {
     name: "M1108 (V127) database dates are not cut for Safari",
@@ -8038,13 +8035,9 @@ const MUTATIONS = [
     to:   "",
     why:  "as M1135, from the other end (66c)",
   },
-  {
-    name: "M1137 (V128) the What's new sheet gains a second line",
-    file: "render-core.js",
-    from: "A copy is kept in Backup &amp; Restore first.</li>\n",
-    to:   "A copy is kept in Backup &amp; Restore first.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (66f)",
-  },
+  // M1137 (V128's one-line What's new) RETIRED V129: that sheet's copy is gone.
+  // V129's sheet is one line too; 67f pins it (M1175).
+
   {
     name: "M1138 (V128) the check is never remembered",
     file: "sync.js",
@@ -8169,7 +8162,155 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Safer after a long time away: a phone that hasn",
     to:   "Better",
-    why:  "the About page must say what changed in this version (66f)",
+    why:  "the About page must say what changed in this version (67f)",
+  },
+  // ---- V129 (1A 2A 3A 4A): VoiceOver's leftovers from V123. Group 67 + M1156–M1176. ----
+  {
+    name: "M1156 (V129) + New job falls back to the Jobs title",
+    file: "feedback.js",
+    from: "  if (!isLog(want) && want.view === view && _focusEl(focusStandIn(want))) return 'stand-in';\n",
+    to:   "",
+    why:  "1A: the form's own heading, one swipe nearer than the screen title (67a)",
+  },
+  {
+    name: "M1157 (V129) Cancel on the New job form loses its stand-in",
+    file: "feedback.js",
+    from: "const FOCUS_STAND_INS = { 'new-session': 'nf-title', 'nf-cancel': 'new-session-btn' };",
+    to:   "const FOCUS_STAND_INS = { 'new-session': 'nf-title' };",
+    why:  "Cancel puts + New job back; focus belongs on it (67a)",
+  },
+  {
+    name: "M1158 (V129) a stand-in may be a text box",
+    file: "feedback.js",
+    from: "  const el = document.getElementById(FOCUS_STAND_INS[d.action]);\n  if (!el || _focusIsTextField(el)) return null;",
+    to:   "  const el = document.getElementById(FOCUS_STAND_INS[d.action]);\n  if (!el) return null;",
+    why:  "focusing a text field from a redraw raises the keyboard (67a 67d)",
+  },
+  {
+    name: "M1159 (V129) the New job heading has no id",
+    file: "render-core.js",
+    from: '<h2 class="h2" id="nf-title" tabindex="-1">New job</h2>',
+    to:   '<h2 class="h2">New job</h2>',
+    why:  "nothing for + New job to land on (67a)",
+  },
+  {
+    name: "M1160 (V129) the stand-in is tried before the control",
+    file: "feedback.js",
+    from: "  if (!isLog(want) && want.view === view && _focusEl(focusFind(want))) return 'control';\n  // V129 (1A): gone because it was swapped for something — land on that.\n  if (!isLog(want) && want.view === view && _focusEl(focusStandIn(want))) return 'stand-in';\n",
+    to:   "  if (!isLog(want) && want.view === view && _focusEl(focusStandIn(want))) return 'stand-in';\n  if (!isLog(want) && want.view === view && _focusEl(focusFind(want))) return 'control';\n",
+    why:  "a stand-in is only for a control that has GONE (67a)",
+  },
+  {
+    name: "M1161 (V129) a quick-adjust tap rebuilds without naming its chip",
+    file: "report.js",
+    from: "    rebuild(action);\n  }",
+    to:   "    rebuild();\n  }",
+    why:  "2A: VoiceOver goes back on the chip tapped (67b 67d)",
+  },
+  {
+    name: "M1162 (V129) the rebuilt preview puts focus nowhere",
+    file: "report.js",
+    from: "      try { focusControl(document.getElementById('qa-chip-' + qaAction)); } catch (e) {}",
+    to:   "      try { void qaAction; } catch (e) {}",
+    why:  "2A (67b)",
+  },
+  {
+    name: "M1163 (V129) a quick-adjust chip says nothing of on/off",
+    file: "report.js",
+    from: " id=\"qa-chip-${action}\" aria-pressed=\"${on ? 'true' : 'false'}\" data-qa=\"${action}\">",
+    to:   " id=\"qa-chip-${action}\" data-qa=\"${action}\">",
+    why:  "2A: the tick is hidden from VoiceOver; aria-pressed is how it hears on/off (67b)",
+  },
+  {
+    name: "M1164 (V129) the quick-adjust chips are never wired",
+    file: "report.js",
+    from: "      if (btn) btn.addEventListener('click', () => { onQuickAdjust(qa).catch(() => {}); });",
+    to:   "      void btn;",
+    why:  "the chips are wired by the ids the markup drew (67b)",
+  },
+  {
+    name: "M1165 (V129) the Theme options say nothing of the choice",
+    file: "render-settings.js",
+    from: " data-set-theme=\"${t.key}\" aria-pressed=\"${state.theme === t.key ? 'true' : 'false'}\">",
+    to:   " data-set-theme=\"${t.key}\">",
+    why:  "3A (67c)",
+  },
+  {
+    name: "M1166 (V129) every preset in the switcher reads as chosen",
+    file: "render-core.js",
+    from: "aria-pressed=\"${isActive ? 'true' : 'false'}\" data-action=\"preset-sheet-pick\"",
+    to:   "aria-pressed=\"true\" data-action=\"preset-sheet-pick\"",
+    why:  "3A: exactly one, the preset in use (67c)",
+  },
+  {
+    name: "M1167 (V129) Class I / II say nothing of the choice",
+    file: "render-core.js",
+    from: " aria-pressed=\"${c === cls ? 'true' : 'false'}\" data-action=\"readings-set-class\"",
+    to:   " data-action=\"readings-set-class\"",
+    why:  "3A (67c)",
+  },
+  {
+    name: "M1168 (V129) signature Right reads the Left test",
+    file: "render-settings.js",
+    from: " aria-pressed=\"${rs.signaturePosition === 'right' ? 'true' : 'false'}\" data-action=\"signature-position\" data-arg=\"right\"",
+    to:   " aria-pressed=\"${rs.signaturePosition !== 'right' ? 'true' : 'false'}\" data-action=\"signature-position\" data-arg=\"right\"",
+    why:  "3A: the side chosen, and only it (67c)",
+  },
+  {
+    name: "M1169 (V129) the certificate colour themes say nothing of the choice",
+    file: "render-settings.js",
+    from: " aria-pressed=\"${active ? 'true' : 'false'}\" data-action=\"report-theme\"",
+    to:   " data-action=\"report-theme\"",
+    why:  "3A (67c)",
+  },
+  {
+    name: "M1170 (V129) the problem report's type chips say nothing of the choice",
+    file: "render-help.js",
+    from: " aria-pressed=\"${t.id === d.type ? 'true' : 'false'}\" data-action=\"bug-set-type\"",
+    to:   " data-action=\"bug-set-type\"",
+    why:  "3A (67c)",
+  },
+  {
+    name: "M1171 (V129) the severity rows say nothing of the choice",
+    file: "render-help.js",
+    from: " aria-pressed=\"${s.id === d.severity ? 'true' : 'false'}\" data-action=\"bug-set-severity\"",
+    to:   " data-action=\"bug-set-severity\"",
+    why:  "3A (67c)",
+  },
+  {
+    name: "M1172 (V129) the make-it-happen-again chips say nothing of the choice",
+    file: "render-help.js",
+    from: " aria-pressed=\"${r.id === d.repro ? 'true' : 'false'}\" data-action=\"bug-set-repro\"",
+    to:   " data-action=\"bug-set-repro\"",
+    why:  "3A (67c)",
+  },
+  {
+    name: "M1173 (V129) a tap in the bug sheet repaints the colour only",
+    file: "bugreport.js",
+    from: "        el.setAttribute('aria-pressed', on ? 'true' : 'false');\n",
+    to:   "",
+    why:  "the bug sheet never redraws (MAP rule 3) — the in-place repaint must carry aria-pressed too (67c)",
+  },
+  {
+    name: "M1174 (V129) VoiceOver reads the severity glyph as well",
+    file: "render-help.js",
+    from: '<span class="bug-option-dot" aria-hidden="true">',
+    to:   '<span class="bug-option-dot">',
+    why:  "“black circle” on top of “selected” is noise (67c)",
+  },
+  {
+    name: "M1175 (V129) the What's new sheet gains a second line",
+    file: "render-core.js",
+    from: "wherever a choice was only shown by colour.</li>\n",
+    to:   "wherever a choice was only shown by colour.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (67f)",
+  },
+  {
+    name: "M1176 (V129) the About changelog loses V129's line",
+    file: "render-help.js",
+    from: "Easier with VoiceOver: + New job lands on the new job form",
+    to:   "Better",
+    why:  "the About page must say what changed in this version (67f)",
   },
 ];
 
