@@ -8,6 +8,31 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V129
+V129 = VoiceOver's leftovers from V123 (Peter 15 Oct: 0B, then 1A 2A 3A 4A —
+"finish off the straggly bits so we are tidy before server code and stripe").
+feedback.js `FOCUS_STAND_INS` / `focusStandIn` / `focusControl` (MAP rule 24);
+report.js quick-adjust chips wired by id, focus back after `rebuild(qaAction)`;
+aria-pressed on six pick-one groups (+ `_applyBugSheetDOM` in place). Harness
+group 67 + M1156–M1176; 66f split (release checks → 67f); M1072, M1137 retired.
+Next (Peter, 15 Oct): a STRAGGLERS round — gather the small open items from the
+residual lists below into one short queue and let Peter pick which are worth a
+release, before the clean-up job (server) and Stage 13 Stripe. V123's
+VoiceOver leftovers are closed by V129 (its residuals list below is history).
+
+### V129 residuals (known, accepted)
+- Not yet heard with VoiceOver on a real iPhone by Claude: the harness proves
+  where focus goes and what is pressed; headless Chromium proved the chips and
+  the form heading take focus with no scroll and no console errors. Peter's
+  run-through (4A) covers V123 and V129 together.
+- Stand-ins exist for + New job and its Cancel only. Any other control that
+  swaps itself for something else on the same screen still lands on the screen
+  title; add it to `FOCUS_STAND_INS` when found.
+- The sort / status / lock filters are native lists (select) — VoiceOver reads
+  their value already; untouched.
+- Own certificate colours (no theme matching): no theme chip pressed — correct,
+  none is chosen.
+
 ### Next after V128
 V128 = the stale-phone check (Stage 12, the clean-up job's phone side; Peter
 14 Oct: 0A 1A 2A 3A 4A 5A). sync.js section "the stale-phone check" (MAP rule

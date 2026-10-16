@@ -789,7 +789,7 @@ function renderSettingsDisplay() {
         <p class="muted">Choose how the app looks.</p>
         <div class="theme-options">
           ${themes.map(t => `
-            <button class="theme-option" data-action="set-theme" data-arg="${t.key}" data-set-theme="${t.key}">
+            <button class="theme-option" data-action="set-theme" data-arg="${t.key}" data-set-theme="${t.key}" aria-pressed="${state.theme === t.key ? 'true' : 'false'}">
               <span class="theme-option-radio ${state.theme === t.key ? 'checked' : ''}"></span>
               <span class="theme-option-label">${escapeHTML(t.label)}</span>
               ${t.sub ? `<span class="theme-option-sub">${escapeHTML(t.sub)}</span>` : ''}
@@ -1537,8 +1537,8 @@ function renderSettingsReport(part) {
   const sigPositionControl = rs.signature
     ? `<label class="label" style="margin-top:12px">Position on the report</label>
        <div class="sig-position-row">
-         <button class="sig-position-btn ${rs.signaturePosition !== 'right' ? 'active' : ''}" data-action="signature-position" data-arg="left">Left</button>
-         <button class="sig-position-btn ${rs.signaturePosition === 'right' ? 'active' : ''}" data-action="signature-position" data-arg="right">Right</button>
+         <button class="sig-position-btn ${rs.signaturePosition !== 'right' ? 'active' : ''}" aria-pressed="${rs.signaturePosition !== 'right' ? 'true' : 'false'}" data-action="signature-position" data-arg="left">Left</button>
+         <button class="sig-position-btn ${rs.signaturePosition === 'right' ? 'active' : ''}" aria-pressed="${rs.signaturePosition === 'right' ? 'true' : 'false'}" data-action="signature-position" data-arg="right">Right</button>
        </div>`
     : '';
 
@@ -1673,7 +1673,7 @@ function renderSettingsReport(part) {
         <div class="report-theme-row">
           ${REPORT_COLOR_THEMES.map(t => {
             const active = (rs.headerColor === t.header && rs.accentColor === t.accent);
-            return `<button type="button" class="report-theme-chip ${active ? 'active' : ''}" data-action="report-theme" data-arg="${t.id}">
+            return `<button type="button" class="report-theme-chip ${active ? 'active' : ''}" aria-pressed="${active ? 'true' : 'false'}" data-action="report-theme" data-arg="${t.id}">
               <span class="report-theme-swatch" style="background:${t.header}"></span>
               <span class="report-theme-swatch" style="background:${t.accent}"></span>
               <span class="report-theme-label">${escapeHTML(t.label)}</span>

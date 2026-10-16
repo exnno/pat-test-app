@@ -1,4 +1,4 @@
-# PATGo — Code Map (V128)
+# PATGo — Code Map (V129)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -213,6 +213,13 @@ is discoverable from the file you happen to be editing.
     and fails one with zero or two. A sheet appended to `<body>` (not drawn by
     render) must call `focusSheetOpened(sheet)` once wired, and its own cleanup
     `focusSheetClosed()` (`_openSheet`'s cleanup already does) — 61g sweeps it.
+    V129: a control whose own action swaps it for something else (+ New job →
+    the form; Cancel → the button) names what took its place in
+    `FOCUS_STAND_INS` (feedback.js), used only when the tapped control is gone.
+    Markup rebuilt OUTSIDE render() puts focus back itself with `focusControl(el)`
+    (report.js `rebuild(qaAction)`). A pick-one button group carries
+    `aria-pressed` on every option — colour alone says nothing to VoiceOver — and
+    an in-place repaint (`_applyBugSheetDOM`, `qpTileSyncDom`) must set it too.
     A new LOGGING action joins `FOCUS_LOG_ACTIONS` (feedback.js) or VoiceOver is
     left on a button a scanner can press. Never call `.focus()` on a text field
     from a redraw (keyboard). The decision runs in render()'s tail BEFORE
@@ -604,7 +611,7 @@ fixed MIXED list of types as passes; ×N repeats ONE item, whatever its result.
 ### feedback.js (~715 ln) — screen-reader announcer, focus after a redraw, toast, dialogs, haptic / flash / sound
 `announce` (V120, rule 21), the V123 focus pass (rule 24: `focusNoteTap`,
 `focusBeforeRender`, `focusAfterRender`, `focusSheetOpened/Closed`,
-`focusMarkLogged`), `showToast`, the shared `.bulk-sheet` dialog builders (`openConfirmSheet`,
+`focusMarkLogged`; V129 `FOCUS_STAND_INS`, `focusStandIn`, `focusControl`), `showToast`, the shared `.bulk-sheet` dialog builders (`openConfirmSheet`,
 `openNameSheet`, `openInfoSheet`, v91 `openChoiceSheet` — two or more choices +
 Cancel), feedback channels.
 **Touch to:** change feedback channels, toasts, spoken messages, or the shared dialogs.
@@ -769,7 +776,9 @@ wizard finish step and About.
 
 ### report.js (~1190 ln) — PDF certificates
 Lazy-loads the vendored jsPDF + AutoTable, builds the document, the preview
-modal, filename tokens, share/download.
+modal, filename tokens, share/download. The preview's quick-adjust chips are
+wired by their ids (`qa-chip-<action>`, read from the markup — V129) and put
+focus back on the chip after a rebuild (rule 24).
 **Touch to:** change report layout/content, reading columns, orientation, or how
 the PDF is previewed, shared, named or coloured.
 **⚠ THE ASYNC BOUNDARY.** `buildReportDoc` is **synchronous** and has three call

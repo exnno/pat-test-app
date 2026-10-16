@@ -1141,7 +1141,7 @@ function openReportPreview(doc, session) {
   function quickAdjustHTML() {
     const hasSig = !!(rs.signature && rs.signature);
     const chip = (action, on, label) =>
-      `<button class="qa-chip ${on ? 'on' : ''}" data-qa="${action}">${on ? icon('check') + ' ' : ''}${label}</button>`;
+      `<button class="qa-chip ${on ? 'on' : ''}" id="qa-chip-${action}" aria-pressed="${on ? 'true' : 'false'}" data-qa="${action}">${on ? icon('check') + ' ' : ''}${label}</button>`;
     return `
       <div class="report-qa-row">
         ${chip('fails', rs.showFails, 'List all items')}
@@ -1258,7 +1258,9 @@ function openReportPreview(doc, session) {
 
   // v35: rebuild the PDF after a quick-adjust change, keeping the modal open and
   // the typed filename. Revokes the old blob URL first to avoid leaks.
-  function rebuild() {
+  // V129 (2A): qaAction = the chip tapped. The rebuild replaces the sheet's
+  // markup, so VoiceOver would drop to the top; it goes back on that chip.
+  function rebuild(qaAction) {
     const keepName = currentBaseName();
     URL.revokeObjectURL(url);
     let d;
@@ -1270,6 +1272,9 @@ function openReportPreview(doc, session) {
     if (inp) inp.value = keepName;
     wireSheet();
     renderPreviewView();
+    if (qaAction && typeof focusControl === 'function') {
+      try { focusControl(document.getElementById('qa-chip-' + qaAction)); } catch (e) {}
+    }
   }
 
   // v35: quick-adjust handler — flip the field, persist, rebuild.
@@ -1289,7 +1294,7 @@ function openReportPreview(doc, session) {
       try { _setReportPhotoCache(await ensureReportPhotos(session)); }
       catch (e) { console.error('Photo collection failed (non-fatal).', e); }
     }
-    rebuild();
+    rebuild(action);
   }
 
   // Wire all the sheet's controls (called on open and after each rebuild).
@@ -1306,9 +1311,14 @@ function openReportPreview(doc, session) {
     document.getElementById('report-preview-share').addEventListener('click', async () => {
       if (await shareOrDownloadReport(blob, currentFilename())) made();
     });
-    sheet.querySelectorAll('[data-qa]').forEach(btn => {
-      btn.addEventListener('click', () => { onQuickAdjust(btn.getAttribute('data-qa')).catch(() => {}); });
-    });
+    // V129: wired by the ids the markup drew (qa-chip-<action>), read from the
+    // markup itself so a new chip needs no list kept beside it — and so the
+    // harness can press the same buttons the phone does.
+    for (const m of String(sheet.innerHTML).matchAll(/id="qa-chip-([a-z]+)"/g)) {
+      const qa = m[1];
+      const btn = document.getElementById('qa-chip-' + qa);
+      if (btn) btn.addEventListener('click', () => { onQuickAdjust(qa).catch(() => {}); });
+    }
     // Deep-link to Report Settings, returning to a fresh preview afterwards.
     const editBtn = document.getElementById('report-edit-settings');
     if (editBtn) editBtn.addEventListener('click', () => {

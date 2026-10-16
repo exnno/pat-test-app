@@ -72,6 +72,13 @@ const FOCUS_LOG_ACTIONS = ['log-pass', 'log-fail', 'copy-last', 'multipick-fire'
 // A tap whose action did not redraw (Quick Pick repaints in place) must not
 // steer a LATER redraw it had nothing to do with (a sync, a photo landing).
 const FOCUS_TAP_MS = 2000;
+// V129 (1A): a control whose own action swaps it for something else. + New job
+// opens the form in its place, and the form's Cancel puts the button back; the
+// tapped control has gone, so focus would fall to the screen heading and leave
+// VoiceOver one swipe away. Tapped action → the id of what took its place.
+// Only when the tapped control is truly gone, on the same screen, never a log
+// action, never a text field (a heading or a button: no keyboard).
+const FOCUS_STAND_INS = { 'new-session': 'nf-title', 'nf-cancel': 'new-session-btn' };
 let _focusTap = null;            // the control the last tap / change landed on
 let _focusBefore = null;         // what held focus when the current redraw began
 let _focusOpener = null;         // what opened the sheet now showing
@@ -145,6 +152,22 @@ function focusScreenHeading() {
   return _focusEl(document.getElementById('screen-title'));
 }
 
+// V129 (1A): what took the tapped control's place (FOCUS_STAND_INS), or null.
+function focusStandIn(d) {
+  if (!d || d.kind !== 'data-action' || !Object.prototype.hasOwnProperty.call(FOCUS_STAND_INS, d.action)) return null;
+  const el = document.getElementById(FOCUS_STAND_INS[d.action]);
+  if (!el || _focusIsTextField(el)) return null;
+  return el;
+}
+
+// V129 (2A): for markup rebuilt OUTSIDE render() — the certificate preview's
+// quick-adjust chips (report.js rebuild). Puts focus back on the control just
+// redrawn. Same rules as a redraw: no scroll, never a text field.
+function focusControl(el) {
+  if (!el || _focusIsTextField(el)) return false;
+  return _focusEl(el);
+}
+
 // The sheet on top. A .bulk-sheet beats a .fail-sheet: the only time both show,
 // the bulk one (a confirm, a photo strip) was opened over the fail sheet. The
 // certificate preview (report.js) is full-screen but counts as a sheet here.
@@ -188,7 +211,7 @@ function focusBeforeRender() {
 }
 
 // The decision, after the new markup is in. mode 'logged' = refreshEntryAfterLog.
-// Returns what it did, for the harness: 'kept' | 'sheet' | 'control' | 'heading' | 'none'.
+// Returns what it did, for the harness: 'kept' | 'sheet' | 'control' | 'stand-in' | 'heading' | 'none'.
 function focusAfterRender(mode) {
   const tap = (_focusTap && !(Date.now() - (_focusTap.at || 0) > FOCUS_TAP_MS)) ? _focusTap : null;
   const before = _focusBefore;
@@ -227,6 +250,8 @@ function focusAfterRender(mode) {
     return closed && focusScreenHeading() ? 'heading' : 'none';
   }
   if (!isLog(want) && want.view === view && _focusEl(focusFind(want))) return 'control';
+  // V129 (1A): gone because it was swapped for something — land on that.
+  if (!isLog(want) && want.view === view && _focusEl(focusStandIn(want))) return 'stand-in';
   return focusScreenHeading() ? 'heading' : 'none';
 }
 

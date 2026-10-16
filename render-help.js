@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V127: rolled forward — V127 on top, V124 dropped. -->
+      <!-- v8: rolling 3-version changelog. V129: rolled forward — V129 on top, V126 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V129</strong> &middot; October 2026</p>
+        <p class="muted">Easier with VoiceOver: + New job lands on the new job form, the certificate preview's quick-adjust buttons keep your place and say whether they're on, and every pick-one choice &mdash; theme, presets, Class I/II, signature side, certificate colours, bug report options &mdash; says which is chosen.</p>
         <p><strong>V128</strong> &middot; October 2026</p>
         <p class="muted">Safer after a long time away: a phone that hasn't synced for over nine months checks everything against the cloud before it sends anything, so jobs, clients and sites deleted on another phone stay deleted. A copy of the phone is kept first in Settings &rarr; Backup &amp; Restore.</p>
         <p><strong>V127</strong> &middot; October 2026</p>
         <p class="muted">Your plan, clearly: a signed-in cloud account sees when its free trial ends, a 7-day countdown after it, and Renew now. After the countdown, logging, new jobs and new certificates pause until you renew &mdash; your jobs, exports and backups always stay available.</p>
-        <p><strong>V126</strong> &middot; October 2026</p>
-        <p class="muted">A smoother first start: on a new phone PATGo no longer reloads itself a moment after it first opens. Updates still go in just as before.</p>
 
 
         </div>
@@ -246,12 +246,12 @@ function renderBugSheet() {
   const isBug = d.type === 'bug';
 
   const typeRow = BUG_REPORT_TYPES.map(t => `
-    <button class="bug-chip ${t.id === d.type ? 'active' : ''}" data-action="bug-set-type" data-arg="${t.id}">${escapeHTML(t.label)}</button>
+    <button class="bug-chip ${t.id === d.type ? 'active' : ''}" aria-pressed="${t.id === d.type ? 'true' : 'false'}" data-action="bug-set-type" data-arg="${t.id}">${escapeHTML(t.label)}</button>
   `).join('');
 
   const severityRows = BUG_REPORT_SEVERITIES.map(s => `
-    <button class="bug-option ${s.id === d.severity ? 'active' : ''}" data-action="bug-set-severity" data-arg="${s.id}">
-      <span class="bug-option-dot">${s.id === d.severity ? '●' : '○'}</span>
+    <button class="bug-option ${s.id === d.severity ? 'active' : ''}" aria-pressed="${s.id === d.severity ? 'true' : 'false'}" data-action="bug-set-severity" data-arg="${s.id}">
+      <span class="bug-option-dot" aria-hidden="true">${s.id === d.severity ? '●' : '○'}</span>
       <span class="bug-option-label">${escapeHTML(s.label)}</span>
     </button>
   `).join('');
@@ -261,7 +261,7 @@ function renderBugSheet() {
       <label class="label">Can you make it happen again?</label>
       <div class="bug-chip-row">
         ${BUG_REPORT_REPRO.map(r => `
-          <button class="bug-chip ${r.id === d.repro ? 'active' : ''}" data-action="bug-set-repro" data-arg="${r.id}">${escapeHTML(r.label)}</button>
+          <button class="bug-chip ${r.id === d.repro ? 'active' : ''}" aria-pressed="${r.id === d.repro ? 'true' : 'false'}" data-action="bug-set-repro" data-arg="${r.id}">${escapeHTML(r.label)}</button>
         `).join('')}
       </div>
     </div>

@@ -252,7 +252,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Safer after a long time away.</strong> A phone that hasn't synced for many months now checks its work against the cloud before sending anything, so jobs deleted elsewhere stay deleted. A copy is kept in Backup &amp; Restore first.</li>
+        <li><strong>Easier with VoiceOver.</strong> VoiceOver now keeps its place in the certificate preview and on + New job, and says which option is chosen wherever a choice was only shown by colour.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -835,7 +835,7 @@ function renderSessions() {
   ` : '';
   const newForm = state.newForm.show ? `
     <div class="card">
-      <h2 class="h2">New job</h2>
+      <h2 class="h2" id="nf-title" tabindex="-1">New job</h2>
       <label class="label">Client <span class="hint">(optional)</span></label>
       <div class="nf-input-wrap" id="nf-client-wrap">
         <input aria-label="Client (optional)" class="input" id="nf-client" value="${escapeHTML(state.newForm.clientId)}" placeholder="e.g. Acme Ltd" autocomplete="off">
@@ -1838,7 +1838,7 @@ function renderEntry() {
             ? `${preview}${more}`
             : 'No items yet';
           return `
-            <button class="preset-switch-option${isActive ? ' active' : ''}" data-action="preset-sheet-pick" data-arg="${escapeHTML(p.id)}">
+            <button class="preset-switch-option${isActive ? ' active' : ''}" aria-pressed="${isActive ? 'true' : 'false'}" data-action="preset-sheet-pick" data-arg="${escapeHTML(p.id)}">
               <span class="preset-switch-tick">${isActive ? icon('check') : ''}</span>
               <span class="preset-switch-text">
                 <span class="preset-switch-name">${escapeHTML(p.name || 'Untitled preset')}</span>
@@ -1944,7 +1944,7 @@ function renderEntry() {
     }
 
     const classButtons = READING_CLASSES.map(c => `
-      <button class="reading-class-btn ${c === cls ? 'active' : ''}" data-action="readings-set-class" data-arg="${c}">Class ${c}</button>
+      <button class="reading-class-btn ${c === cls ? 'active' : ''}" aria-pressed="${c === cls ? 'true' : 'false'}" data-action="readings-set-class" data-arg="${c}">Class ${c}</button>
     `).join('');
 
     // V104 (S10): readings definitely outside their usual limit (PASS only).

@@ -348,6 +348,8 @@ function _applyBugSheetDOM() {
         const el = nodes[i];
         const on = el.getAttribute('data-arg') === activeId;
         el.classList.toggle('active', on);
+        // V129 (3A): VoiceOver hears the choice too — the colour alone said it.
+        el.setAttribute('aria-pressed', on ? 'true' : 'false');
         // The severity rows show a radio glyph rather than a fill.
         const dot = el.querySelector ? el.querySelector('.bug-option-dot') : null;
         if (dot) dot.textContent = on ? '●' : '○';
