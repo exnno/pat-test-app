@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V130';",
-    to:   "const APP_VERSION = 'V129';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V131';",
+    to:   "const APP_VERSION = 'V130';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 68f see it.
-    from: '        <p><strong>V128</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V127</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V128</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 68f)',
+    // oldest, so 15j's check still matches; 09w and 69f see it.
+    from: '        <p><strong>V129</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V128</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V129</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 69f)',
   },
 
   {
@@ -6089,10 +6089,11 @@ const MUTATIONS = [
     // V127: welcome rolled — re-aimed at V127's line; 65f pinned it.
     // V128: welcome rolled — re-aimed at V128's line; 66f pinned it.
     // V129: welcome rolled — re-aimed at V129's line; 67f pinned it.
-    // V130: no welcome (5A) — V129's sheet stays, so the anchor stays; 68f pins it.
-    from: "<li><strong>Easier with VoiceOver.</strong>",
+    // V130: no welcome (5A) — V129's sheet stays, so the anchor stays; 68f pinned it.
+    // V131: welcome rolled — re-aimed at V131's first line; 69f pins it.
+    from: "<li><strong>Certificates count as exported.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (68f)",
+    why:  "11A: the welcome says plainly what changed on screen (69f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8145,13 +8146,8 @@ const MUTATIONS = [
     to:   "  if (p.removed) bits.push('removed ' + plural(",
     why:  "the first words the engineer reads after a stale phone's check (66b)",
   },
-  {
-    name: "M1154 (V128) the About changelog loses V128's line",
-    file: "render-help.js",
-    from: "Safer after a long time away: a phone that hasn",
-    to:   "Better",
-    why:  "the About page must say what changed in this version (68f)",
-  },
+  // M1154 (V128's About line) RETIRED V131: V128 rolled off the About page (69f
+  // checks it is gone).
   // ---- V129 (1A 2A 3A 4A): VoiceOver's leftovers from V123. Group 67 + M1156–M1176. ----
   {
     name: "M1156 (V129) + New job falls back to the Jobs title",
@@ -8286,19 +8282,14 @@ const MUTATIONS = [
     to:   '<span class="bug-option-dot">',
     why:  "“black circle” on top of “selected” is noise (67c)",
   },
-  {
-    name: "M1175 (V129) the What's new sheet gains a second line",
-    file: "render-core.js",
-    from: "wherever a choice was only shown by colour.</li>\n",
-    to:   "wherever a choice was only shown by colour.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (68f)",
-  },
+  // M1175 (V129's one-line What's new) RETIRED V131: that sheet's copy is gone.
+  // V131's sheet is two lines; 69f pins it (M1213).
   {
     name: "M1176 (V129) the About changelog loses V129's line",
     file: "render-help.js",
     from: "Easier with VoiceOver: + New job lands on the new job form",
     to:   "Better",
-    why:  "the About page must say what changed in this version (68f)",
+    why:  "the About page must say what changed in this version (69f)",
   },
 
   // ---- V130 (1B 2A 3A 4A 5A): housekeeping + the Privacy note. Group 68, 01l, 01m + M1177–M1190. ----
@@ -8391,15 +8382,181 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Tidying up behind the scenes, and the Privacy note brought up to date.",
     to:   "Better.",
-    why:  "the About page must say what changed in this version (68f)",
+    why:  "the About page must say what changed in this version (69f)",
+  },
+  // M1190 (V130: What's new NOT rolled) RETIRED V131: V131 rolls it (M1212).
+  // ---- V131 (1A 2A 3A 4A 5A · 6B 7A 8A 9A): certificates count as exported; Mark as not exported. Group 69 + M1191–M1214. ----
+  {
+    name: "M1191 (V131) a certificate after locking does not count on the Jobs list",
+    file: "session.js",
+    from: "  if (jobPaperworkDone(sess)) return 'certificate';\n",
+    to:   "",
+    why:  "1A: Peter works by PDF — a certificate is his export (69a 69b 69c)",
   },
   {
-    name: "M1190 (V130) What's new rolled for a housekeeping release",
-    file: "config.js",
-    from: "const WELCOME_VERSION = 'V129';",
-    to:   "const WELCOME_VERSION = 'V130';",
-    why:  "5A: no pop-up for a release with nothing to see (68f)",
+    name: "M1192 (V131) an edited CSV outranks a counting certificate",
+    file: "session.js",
+    from: "  if (jobPaperworkDone(sess)) return 'certificate';\n  if (x === 'modified') return 'modified';\n",
+    to:   "  if (x === 'modified') return 'modified';\n  if (jobPaperworkDone(sess)) return 'certificate';\n",
+    why:  "the certificate is the later paperwork — the job is done (69a)",
   },
+  {
+    name: "M1193 (V131) a stale certificate shows nothing",
+    file: "session.js",
+    from: "  if (reportAtMs(sess) != null) return 'reopened';\n",
+    to:   "",
+    why:  "4A: a certificate, then the job reopened, says so (69a 69b)",
+  },
+  {
+    name: "M1194 (V131) the nudge counts CSV exports only",
+    file: "session.js",
+    from: "  return state.sessions.filter(s => !jobIsDone(s)).length;",
+    to:   "  return state.sessions.filter(s => exportStatus(s) !== 'exported').length;",
+    why:  "1A: the count is the reason for the release (69b)",
+  },
+  {
+    name: "M1195 (V131) the nudge's list keeps the lock filter",
+    file: "session.js",
+    from: "  state.sessionFilter = 'notdone';\n  state.lockFilter = 'all';\n",
+    to:   "  state.sessionFilter = 'notdone';\n",
+    why:  "2A: a lock filter left on hides jobs the nudge counted (69c)",
+  },
+  {
+    name: "M1196 (V131) the nudge's list filters nothing",
+    file: "session.js",
+    from: "    } else if (state.sessionFilter === 'notdone') {\n      if (jobIsDone(s)) return false;\n",
+    to:   "    } else if (state.sessionFilter === 'notdone') {\n",
+    why:  "2A: it shows the jobs still to export, not all of them (69c)",
+  },
+  {
+    name: "M1197 (V131) \"Exported\" leaves out certificate jobs",
+    file: "session.js",
+    from: "st !== 'exported' && st !== 'certificate') return false;",
+    to:   "st !== 'exported') return false;",
+    why:  "1A: the saved filters follow the same rule as the badges (69c)",
+  },
+  {
+    name: "M1198 (V131) \"Modified since\" leaves out reopened jobs",
+    file: "session.js",
+    from: "st !== 'modified' && st !== 'reopened') return false;",
+    to:   "st !== 'modified') return false;",
+    why:  "4A: reopened since a certificate is the PDF's 'modified since' (69c)",
+  },
+  {
+    name: "M1199 (V131) the nudge stays up over its own list",
+    file: "render-core.js",
+    from: " && unexported > 0 && state.sessionFilter !== 'notdone')",
+    to:   " && unexported > 0)",
+    why:  "a button that shows what is already showing (69c)",
+  },
+  {
+    name: "M1200 (V131) tapping the nudge does nothing",
+    file: "dispatch.js",
+    from: "  'review-unexported': () => { reviewUnexported(); save(); render(); }",
+    to:   "  'review-unexported': () => { render(); }",
+    why:  "2A, through the real dispatcher (69c)",
+  },
+  {
+    name: "M1201 (V131) a certificate job says Exported",
+    file: "render-core.js",
+    from: "icon('check') + ' Certificate</span>'",
+    to:   "icon('check') + ' Exported</span>'",
+    why:  "3A: the badge says which paperwork was done (69b)",
+  },
+  {
+    name: "M1202 (V131) the Reopened badge is never drawn",
+    file: "render-core.js",
+    from: "            : xStatus === 'reopened'\n",
+    to:   "            : xStatus === 'never'\n",
+    why:  "4A (69b)",
+  },
+  {
+    name: "M1203 (V131) Mark as not exported clears the certificate too",
+    file: "session.js",
+    from: "  delete sess.exportDirty;\n  if (typeof _invalidateSessionEncoding",
+    to:   "  delete sess.exportDirty;\n  delete sess.reportAt;\n  if (typeof _invalidateSessionEncoding",
+    why:  "7A: the CSV mark only — a certificate isn't made by a stray tap (69d)",
+  },
+  {
+    // First aim (the explicit save) SURVIVED — openSession() saves anyway, so
+    // that line decided nothing; it was removed and this re-aimed.
+    name: "M1204 (V131) Mark as not exported only clears an edited export",
+    file: "session.js",
+    from: "  if (!sess.exportedAt && !sess.exportDirty) return false;",
+    to:   "  if (!sess.exportDirty) return false;",
+    why:  "a stray Copy leaves a CLEAN export — that is the case it is for (69d)",
+  },
+  {
+    name: "M1205 (V131) Mark as not exported leaves the job closed",
+    file: "session.js",
+    from: "  if (s) openSession(id, opts);\n",
+    to:   "  render();\n",
+    why:  "8A: one tap ends the nagging and opens the job (69d)",
+  },
+  {
+    name: "M1206 (V131) Mark as not exported says nothing",
+    file: "session.js",
+    from: " showToast('Marked as not exported');",
+    to:   "",
+    why:  "8A: no confirm, so it says what it did (69d)",
+  },
+  {
+    name: "M1207 (V131) the pop-up has no Mark as not exported",
+    file: "render-core.js",
+    from: "data-action=\"reopen-unmark\">Mark as not exported</button>",
+    to:   "data-action=\"reopen-unmark\" hidden></button>",
+    why:  "6B (69d)",
+  },
+  {
+    name: "M1208 (V131) Mark as not exported is not wired",
+    file: "dispatch.js",
+    from: "  'reopen-unmark': () => unmarkFromReopenWarning(),",
+    to:   "  'reopen-unmark': () => cancelReopenWarning(),",
+    why:  "6B, through the real dispatcher (69d)",
+  },
+  {
+    name: "M1209 (V131) pruning trusts a certificate",
+    file: "session.js",
+    from: "    .filter(s => exportStatus(s) === 'exported' && (s.date || '') !== '' && s.date < cutoffISO)",
+    to:   "    .filter(s => jobIsDone(s) && (s.date || '') !== '' && s.date < cutoffISO)",
+    why:  "pruning deletes jobs — only a CSV can be imported back (69e)",
+  },
+  {
+    name: "M1210 (V131) a certificate alone brings up Already exported",
+    file: "session.js",
+    from: "  const warrantsWarning = !s.locked && exportStatus(s) !== 'none';",
+    to:   "  const warrantsWarning = !s.locked && jobDoneStatus(s) !== 'none';",
+    why:  "the pop-up and its button are about a CSV (69e)",
+  },
+  {
+    name: "M1211 (V131) Copy no longer counts as an export",
+    file: "csv.js",
+    from: "    showToast('CSV copied to clipboard');\n    markSessionExported(session);\n",
+    to:   "    showToast('CSV copied to clipboard');\n",
+    why:  "9A: copy-paste is a real way of sending the data (69e)",
+  },
+  {
+    name: "M1212 (V131) What's new not rolled",
+    file: "config.js",
+    from: "const WELCOME_VERSION = 'V131';",
+    to:   "const WELCOME_VERSION = 'V130';",
+    why:  "5A: a feature release says what's new (69f)",
+  },
+  {
+    name: "M1213 (V131) the What's new sheet gains a third line",
+    file: "render-core.js",
+    from: "so it stops asking.</li>\n",
+    to:   "so it stops asking.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "two lines (69f)",
+  },
+  {
+    name: "M1214 (V131) the About changelog loses V131's line",
+    file: "render-help.js",
+    from: "Certificates count as exported: a job whose certificate was made after locking",
+    to:   "Better",
+    why:  "the About page must say what changed in this version (69f)",
+  },
+
 ];
 
 
