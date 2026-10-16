@@ -69,7 +69,10 @@ Adding coverage for a release:
    break is an assertion nobody knows works. **End its `why` with the group that
    catches it**, e.g. `"(47b)"` — the runner runs that one file first, and 01k
    fails any mutation without one. Its `from` must occur exactly once in the
-   file (check the count; the runner breaks the FIRST match).
+   file — since V130 the runner ABORTS one that doesn't (DEFENCE 3) and 01l
+   fails it in the normal run, so you find out in 30 seconds, not overnight.
+   A mutation aimed at `harness/mutate.js` itself starts its `from` with "\n",
+   or its own definition counts as a second copy.
 3. Run both. Green suite *and* zero survivors, or it isn't done.
 4. **Zero ABORTS too.** An abort means the mutation's anchor text no longer
    exists, so nothing was broken and nothing was proved — it is not a pass, and
@@ -181,6 +184,10 @@ bug; leaving it red trains everyone to ignore the suite.
   `"10 failed"` scored as a pass; and a mutation that failed to apply also
   scored as a pass. Both are fixed permanently in `mutate.js` — the anchor is
   checked before every run, and the summary is matched as a whole phrase.
+  V130 added DEFENCE 3: an anchor found MORE than once aborts too (`anchorCount`).
+  Under a mutation run, 01l counts anchors on the clean tree the runner names in
+  `PATGO_PRISTINE` — counted on the mutated copy, every mutation would break its
+  own anchor and 01l would "catch" all of them.
 - **A hung group used to hang everything (fixed V82).** An async group that
   awaits a promise that never settles gave no report and no exit, and the
   mutation runner waited on it for ever (M132, present since V79). `assert.js`

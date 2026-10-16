@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V129';",
-    to:   "const APP_VERSION = 'V128';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V130';",
+    to:   "const APP_VERSION = 'V129';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -638,9 +638,11 @@ const MUTATIONS = [
     file: 'render-help.js',
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
-    from: '        <p><strong>V127</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V126</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V127</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 15j 67f)',
+    // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
+    // oldest, so 15j's check still matches; 09w and 68f see it.
+    from: '        <p><strong>V128</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V127</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V128</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 68f)',
   },
 
   {
@@ -1017,13 +1019,8 @@ const MUTATIONS = [
     to:   '    // gone — restore ignores it in old backups (see restoreBackupFromFile).\n    authUser: { session: localStorage.getItem(CLOUD_AUTH_STORAGE_KEY) },\n',
     why:  'a backup is a file engineers email around; a refresh token in it is a working login for anyone who reads it (15d)',
   },
-  {
-    name: 'M135 (V79) load() stops clearing the V43 mock key',
-    file: 'storage.js',
-    from: '  try { localStorage.removeItem(PAT_AUTH_KEY); } catch {}\n',
-    to:   '',
-    why:  'the leftover mock user/token must not linger where anything could mistake it for a sign-in (15e)',
-  },
+  // M135 (V79, load() clears the mock key) RETIRED V130 (2A): the clean-up and the
+  // key's name are gone; 15e now pins that nothing names it (M1179).
   {
     name: 'M136 (V79) async cloud results render over a focused field',
     file: 'cloud.js',
@@ -6091,10 +6088,11 @@ const MUTATIONS = [
     // V126: welcome rolled (2B, one line) — re-aimed at it; 64f pinned it.
     // V127: welcome rolled — re-aimed at V127's line; 65f pinned it.
     // V128: welcome rolled — re-aimed at V128's line; 66f pinned it.
-    // V129: welcome rolled — re-aimed at V129's line; 67f pins it.
+    // V129: welcome rolled — re-aimed at V129's line; 67f pinned it.
+    // V130: no welcome (5A) — V129's sheet stays, so the anchor stays; 68f pins it.
     from: "<li><strong>Easier with VoiceOver.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (67f)",
+    why:  "11A: the welcome says plainly what changed on screen (68f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6227,13 +6225,8 @@ const MUTATIONS = [
     to:   "  ];",
     why:  "one probe per script file: a deploy missing icons.js must stop at boot (52h)",
   },
-  {
-    name: "M873 (V116) the retired switch's stored choice is left on the phone",
-    file: "storage.js",
-    from: "  try { localStorage.removeItem(ICONS_CLASSIC_KEY); } catch {}\n",
-    to:   "",
-    why:  "2A: a phone that had Classic emoji on must keep nothing of it behind (53b)",
-  },
+  // M873 (V116, the start-up clean-up of the emoji switch) RETIRED V130 (2A): the
+  // clean-up and the key's name are gone; 53b pins that nothing names it (M1180).
   {
     name: "M874 (V116) a V115 backup brings the retired switch back",
     file: "backup.js",
@@ -7824,13 +7817,8 @@ const MUTATIONS = [
   },
   // M1106 (V127's one-line What's new) RETIRED V128: that sheet's copy is gone.
   // V128's sheet is one line too; 66f pins it (M1137).
-  {
-    name: "M1107 (V127) the About changelog loses V127's line",
-    file: "render-help.js",
-    from: "Your plan, clearly: a signed-in cloud account sees",
-    to:   "Better",
-    why:  "the About page must say what changed in this version (67f)",
-  },
+  // M1107 (V127's About line) RETIRED V130: V127 rolled off the About page (68f
+  // checks it is gone).
   {
     name: "M1108 (V127) database dates are not cut for Safari",
     file: "plan.js",
@@ -8036,7 +8024,7 @@ const MUTATIONS = [
     why:  "as M1135, from the other end (66c)",
   },
   // M1137 (V128's one-line What's new) RETIRED V129: that sheet's copy is gone.
-  // V129's sheet is one line too; 67f pins it (M1175).
+  // V129's sheet is one line too; 67f pinned it, 68f from V130 (M1175).
 
   {
     name: "M1138 (V128) the check is never remembered",
@@ -8162,7 +8150,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Safer after a long time away: a phone that hasn",
     to:   "Better",
-    why:  "the About page must say what changed in this version (67f)",
+    why:  "the About page must say what changed in this version (68f)",
   },
   // ---- V129 (1A 2A 3A 4A): VoiceOver's leftovers from V123. Group 67 + M1156–M1176. ----
   {
@@ -8303,14 +8291,114 @@ const MUTATIONS = [
     file: "render-core.js",
     from: "wherever a choice was only shown by colour.</li>\n",
     to:   "wherever a choice was only shown by colour.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (67f)",
+    why:  "one line (68f)",
   },
   {
     name: "M1176 (V129) the About changelog loses V129's line",
     file: "render-help.js",
     from: "Easier with VoiceOver: + New job lands on the new job form",
     to:   "Better",
-    why:  "the About page must say what changed in this version (67f)",
+    why:  "the About page must say what changed in this version (68f)",
+  },
+
+  // ---- V130 (1B 2A 3A 4A 5A): housekeeping + the Privacy note. Group 68, 01l, 01m + M1177–M1190. ----
+  {
+    name: "M1177 (V130) the anchor counter counts a repeat as one",
+    file: "harness/mutate.js",
+    from: "\n  return from ? String(src).split(from).length - 1 : 0;",
+    to:   "\n  return from ? Math.min(1, String(src).split(from).length - 1) : 0;",
+    why:  "1B: a doubled anchor would pass both the runner and the 30-second check (01l)",
+  },
+  {
+    name: "M1178 (V130) the runner runs a mutation whose anchor is repeated",
+    file: "harness/mutate.js",
+    from: "\n    if (copies !== 1) {",
+    to:   "\n    if (copies === 0) {",
+    why:  "DEFENCE 3: replace() breaks only the first copy — the mutation survives or is caught for the wrong reason (01m)",
+  },
+  {
+    name: "M1179 (V130) test runs under mutation count anchors on the mutated files",
+    file: "harness/mutate.js",
+    from: "\n      env: Object.assign({}, process.env, { PATGO_BAIL: bail ? '1' : '', PATGO_PRISTINE: APP_DIR }),",
+    to:   "\n      env: Object.assign({}, process.env, { PATGO_BAIL: bail ? '1' : '' }),",
+    why:  "every mutation breaks its own anchor, so 01l would catch every one — a sweep of hollow passes (01m)",
+  },
+  {
+    name: "M1180 (V130) load() names the retired mock sign-in key again",
+    file: "storage.js",
+    from: "  // supabase-js's own storage, never from here.\n",
+    to:   "  // supabase-js's own storage, never from here.\n  try { localStorage.removeItem('pat:authUser'); } catch {}\n",
+    why:  "2A: the key is retired — nothing in the app may name it (15e)",
+  },
+  {
+    name: "M1181 (V130) load() names the retired emoji switch key again",
+    file: "storage.js",
+    from: "  // supabase-js's own storage, never from here.\n",
+    to:   "  // supabase-js's own storage, never from here.\n  try { localStorage.removeItem('pat:iconsclassic'); } catch {}\n",
+    why:  "2A: the key is retired — nothing in the app may name it (53b)",
+  },
+  {
+    name: "M1182 (V130) About → Privacy says no network calls again",
+    file: "render-help.js",
+    from: "The app goes online to check for updates.",
+    to:   "The app makes no network calls after the initial install.",
+    why:  "4A: wrong for anyone signed in to the cloud, and the update check goes online (68a)",
+  },
+  {
+    name: "M1183 (V130) the Backup page is back in the Back-returns-here list",
+    file: "settings-actions.js",
+    from: "const _MGR_RETURN_VIEWS = ['settingsStorage', 'settingsCategory',",
+    to:   "const _MGR_RETURN_VIEWS = ['settingsStorage', 'settingsBackup', 'settingsCategory',",
+    why:  "3A: the Backup page opens none of the managers; Back from one opened there goes to Phone Storage (68b)",
+  },
+  {
+    name: "M1184 (V130) the Photos sheet scrolls its shell again",
+    file: "render-review.js",
+    from: "<div class=\"bulk-sheet\" role=\"dialog\" aria-label=\"Photos on this item\">",
+    to:   "<div class=\"bulk-sheet sheet-scroll\" role=\"dialog\" aria-label=\"Photos on this item\">",
+    why:  "MAP rule 14: the shell never scrolls — its header scrolled away, correct only by stylesheet order (68c)",
+  },
+  {
+    name: "M1185 (V130) the Photos sheet's buttons are not pinned",
+    file: "render-review.js",
+    from: "<div class=\"sheet-pin\">${downloadAll}${addControl}</div>",
+    to:   "${downloadAll}${addControl}",
+    why:  "a sibling below the scroller is squeezed — and it is always the button you need (68c)",
+  },
+  {
+    name: "M1186 (V130) the preview time-out waits ten minutes",
+    file: "sync.js",
+    from: "timer = setTimeout(() => res(null), 10000);",
+    to:   "timer = setTimeout(() => res(null), 600000);",
+    why:  "a picture that never decodes would hold the photo itself up for ten minutes (68d)",
+  },
+  {
+    name: "M1187 (V130) a timed-out preview is uploaded anyway",
+    file: "sync.js",
+    from: "    if (!tb) return false;\n    return c.storage.from('photos').upload(_syncThumbPath",
+    to:   "    return c.storage.from('photos').upload(_syncThumbPath",
+    why:  "no preview means nothing to upload — an empty file would sit in the cloud as the preview (68d)",
+  },
+  {
+    name: "M1188 (V130) the preview time-out is left running",
+    file: "sync.js",
+    from: "]).then((v) => { if (timer) clearTimeout(timer); return v; });",
+    to:   "]).then((v) => v);",
+    why:  "a timer per photo left to fire for nothing, ten seconds after every upload (68d)",
+  },
+  {
+    name: "M1189 (V130) the About changelog loses V130's line",
+    file: "render-help.js",
+    from: "Tidying up behind the scenes, and the Privacy note brought up to date.",
+    to:   "Better.",
+    why:  "the About page must say what changed in this version (68f)",
+  },
+  {
+    name: "M1190 (V130) What's new rolled for a housekeeping release",
+    file: "config.js",
+    from: "const WELCOME_VERSION = 'V129';",
+    to:   "const WELCOME_VERSION = 'V130';",
+    why:  "5A: no pop-up for a release with nothing to see (68f)",
   },
 ];
 
@@ -8329,6 +8417,14 @@ const MUTATIONS = [
    use it when you want every failing group listed, as the probe does). */
 const FULL = process.argv.includes('--full');
 const TEST_FILES = fs.readdirSync(path.join(APP_DIR, 'harness', 'tests')).filter(f => f.endsWith('.js')).sort();
+
+// V130 (1B): how many times a mutation's anchor occurs in a file's text. The
+// runner aborts unless it is exactly once (DEFENCE 2 for none, DEFENCE 3 for
+// more), and run.js checks every mutation the same way in its 30-second run
+// (group 01l), so a moved or doubled anchor shows before the overnight sweep.
+function anchorCount(src, from) {
+  return from ? String(src).split(from).length - 1 : 0;
+}
 
 function hintFiles(m) {
   const out = [];
@@ -8370,9 +8466,15 @@ function main() {
 
     // DEFENCE 2: a mutation that does not apply proves nothing and must never
     // be scored as a pass.
-    if (!original.includes(m.from)) {
+    // DEFENCE 3 (V130, 1B): nor does one whose anchor is repeated — replace()
+    // breaks only the FIRST copy, which may not be the one the test watches,
+    // so it survives (or is caught) for the wrong reason. Exactly once, or abort.
+    const copies = anchorCount(original, m.from);
+    if (copies !== 1) {
       aborted.push(m);
-      console.log(`  ⛔ ${m.name}\n       ANCHOR NOT FOUND in ${m.file} — the code moved. Update the mutation.`);
+      console.log(copies
+        ? `  ⛔ ${m.name}\n       ANCHOR FOUND ${copies} TIMES in ${m.file} — only the first would break. Add a line of context to make it unique.`
+        : `  ⛔ ${m.name}\n       ANCHOR NOT FOUND in ${m.file} — the code moved. Update the mutation.`);
       continue;
     }
 
@@ -8414,7 +8516,9 @@ function runSuiteExpectingFailure(dir, bail, only) {
     // never reported green.
     out = execFileSync(process.execPath, [path.join(dir, 'harness', 'run.js')].concat(only || []), {
       cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], timeout: 180000,
-      env: Object.assign({}, process.env, { PATGO_BAIL: bail ? '1' : '' }),
+      // V130: PATGO_PRISTINE — 01l checks anchors against the UNMUTATED files, or
+      // every mutation would "break" its own anchor and be caught by 01l.
+      env: Object.assign({}, process.env, { PATGO_BAIL: bail ? '1' : '', PATGO_PRISTINE: APP_DIR }),
     });
   } catch (e) {
     // Non-zero exit is the normal "caught it" path.
