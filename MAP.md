@@ -1,4 +1,4 @@
-# PATGo — Code Map (V130)
+# PATGo — Code Map (V131)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -896,7 +896,17 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   V99.1: `mapPinOpenW3w` opens the APP (`W3W_APP_URL`, location.href — never
   window.open, which leaves a blank panel); `_mapPinWatchLeave` offers the
   website (`mapPinOpenW3wWeb`) only if the page never hid or lost focus.
-- V100 reminders (block after `unexportedSessions`): `normaliseReminders` (the one
+- V131 the Jobs list's export state (block after `markSessionDirty`):
+  `jobDoneStatus` / `jobIsDone` — a clean CSV OR a certificate after locking
+  (`jobPaperworkDone`, below) — drive the nudge (`unexportedSessionCount`), the
+  badges (**render-core.js**) and the Status filter (`sessionMatchesControlFilters`).
+  `exportStatus` stays CSV-only for pruning (`prunableSessions`) and the
+  "Already exported" pop-up (`requestOpenSession`) — a PDF can't be imported
+  back. `reviewUnexported` sets the transient 'notdone' filter (storage load
+  drops it, as `remindexport`). `markSessionNotExported` (CSV mark only) via
+  `unmarkFromReopenWarning`, which relies on `openSession`'s save().
+  `bulkExportUnexported` (csv.js) retired V131.
+- V100 reminders (block after `reviewUnexported`): `normaliseReminders` (the one
   normaliser — storage, backup, setup, settings-actions), `backupReminderDays`
   (**backup.js** `shouldShowBackupReminder`), `isExportReminderJob` /
   `exportReminderDue` / `unlockedReminderDue` (**render-core.js**
@@ -906,7 +916,7 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   same. `noteReportMade` (called by **report.js** preview Download/Share) stamps
   `reportAt` by id. Both fields are in `_sessionSig` (**storage.js**). Read
   `lockedAt` only through `lockedAtMs` (ignores it on an unlocked job). The
-  `remindexport` list filter is transient (storage load drops it).
+  `remindexport` and V131 `notdone` list filters are transient (storage load drops them).
   `setView` clears `state.partyOpen` / `state.egg` (**render-help.js**).
 - V102 duplicate (block after the move, before "Edit-session flow"): `state.dupJob`
   (cleared by `setView`; a copy under way still finishes). `openDupJob` refuses

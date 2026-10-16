@@ -8,6 +8,9 @@ Every capability and release entry, one `##` section each.
 
 ---
 
+## Certificates count as exported (V131)
+The stragglers round, part 2 — the V100 residual (Peter works by PDF). Spec 1A 2A 3A 4A 5A, then 6B 7A 8A 9A. **The Jobs list** now counts a job as done on a clean CSV export **or a certificate made after the job was locked** — the same rule the not-exported reminder has used since V100. A certificate made before locking doesn't count (the job could change between the two); unlocking drops the lock time, so a certificate stops counting the moment the job is reopened. **Badges** (3A 4A): ✓ Exported (CSV), ✓ Certificate, ✓✎ Modified since export, ✓✎ Reopened since certificate. The Status filter follows the same rule ("Exported" includes certificate jobs; "Modified since" includes reopened ones). **The "N jobs not yet exported" line** (2A) now shows those jobs — "Still to export" in the Status filter, not saved, so a reload returns to All — instead of bulk-exporting CSVs (the bulk CSV share is retired; single-job export and Export everything remain). **Mark as not exported** (6B 7A 8A): a third button on the "Already exported" message (an unlocked job with a CSV export) clears the CSV mark — a stray Copy — says "Marked as not exported" and opens the job; a certificate is left alone; no confirm. Copy still counts as an export (9A). **Still CSV-only** (Claude's call): pruning old jobs (it deletes them — a PDF can't be imported back), the "Already exported" message, and Export everything (V125 5A). session.js `jobDoneStatus`, `jobIsDone`, `reviewUnexported`, `markSessionNotExported`, `unmarkFromReopenWarning`. No new files or storage keys; `backupVersion` stays 5. Welcome rolled (two lines); About changelog V131 / V130 / V129. Harness group 69 + M1191–M1214; 68f → 69f; M1154, M1175, M1190 retired; 24a's bulk-share check retired.
+
 ## Tidying up, and an honest Privacy note (V130)
 Housekeeping before the server code (the stragglers round, part 1). Spec 1B 2A 3A 4A 5A. **About → Privacy** no longer says the app makes no network calls: it says records are kept on this phone, a signed-in cloud account keeps a copy there, the app goes online to check for updates, and backups are saved where you choose (a stopgap until the privacy terms). Behind the scenes: two retired storage keys (the old mock sign-in, the V115 emoji switch) are gone from the code; Back from Manage Photos / Jobs on This Phone no longer lists the Backup page (it has opened neither since V97); the item Photos sheet keeps its header still and its buttons pinned while the photos scroll. Harness: the mutation runner refuses a repeated anchor and the normal run checks every anchor. About changelog only — no What's new.
 
@@ -395,7 +398,7 @@ a session can be tied to a client, a site, or both (at least one). Sites can exi
 
 ## Sessions
 
-search, filter, lock, bulk edit/export, duplicate-protection on import.
+search, filter, lock, bulk edit, duplicate-protection on import. V131: a certificate made after locking counts as exported; the "not yet exported" line shows those jobs; "Mark as not exported" undoes a stray export.
 
 ## CSV export/import
 

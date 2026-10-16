@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V130: rolled forward — V130 on top, V127 dropped. -->
+      <!-- v8: rolling 3-version changelog. V131: rolled forward — V131 on top, V128 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V131</strong> &middot; October 2026</p>
+        <p class="muted">Certificates count as exported: a job whose certificate was made after locking shows &ldquo;Certificate&rdquo; on the Jobs list, and the &ldquo;not yet exported&rdquo; line now shows those jobs. &ldquo;Mark as not exported&rdquo; on the &ldquo;Already exported&rdquo; message undoes an export made by mistake.</p>
         <p><strong>V130</strong> &middot; October 2026</p>
         <p class="muted">Tidying up behind the scenes, and the Privacy note brought up to date.</p>
         <p><strong>V129</strong> &middot; October 2026</p>
         <p class="muted">Easier with VoiceOver: + New job lands on the new job form, the certificate preview's quick-adjust buttons keep your place and say whether they're on, and every pick-one choice &mdash; theme, presets, Class I/II, signature side, certificate colours, bug report options &mdash; says which is chosen.</p>
-        <p><strong>V128</strong> &middot; October 2026</p>
-        <p class="muted">Safer after a long time away: a phone that hasn't synced for over nine months checks everything against the cloud before it sends anything, so jobs, clients and sites deleted on another phone stay deleted. A copy of the phone is kept first in Settings &rarr; Backup &amp; Restore.</p>
 
 
         </div>

@@ -205,59 +205,11 @@ async function copyCSV(session) {
     showToast('Could not copy — try Share instead');
   }
 }
-//
-// Strategy mirrors shareOrDownloadCSV but for many files:
-//   • Preferred path: a single navigator.share with ALL CSVs attached as files.
-//     iOS Safari and modern Android Chrome accept multi-file shares; the user
-//     picks one destination (Mail, Files, AirDrop…) for the whole batch.
-//   • If the platform can't share files (desktop, older mobile) or the file set
-//     is rejected by canShare, fall back to sequential downloads with a small
-//     stagger (some browsers collapse rapid programmatic downloads).
-//
-// Export-mark rule matches single export: on a COMPLETED share or the download
-// fallback, every batched session is marked exported (clears the nudge). On a
-// cancelled share sheet (AbortError / NotAllowedError) NOTHING is marked — the
-// user backed out, so the nudge stays exactly as it was.
-//
-// Per-session CSVs (one file each) are used deliberately rather than one
-// concatenated file: the importer refuses multi-session CSVs, so one-file-per
-// keeps every export round-trippable back through Import.
-async function bulkExportUnexported() {
-  const targets = unexportedSessions();
-  if (targets.length === 0) return;
-  const BOM = '\uFEFF';
 
-  if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && typeof File === 'function') {
-    try {
-      const files = targets.map(s => {
-        return new File([BOM + buildCSV(s)], csvFilename(s), { type: 'text/csv' });
-      });
-      if (navigator.canShare({ files })) {
-        // v26: share ONLY the CSV files (no `title`/`text` — see single-export
-        // note above).
-        await navigator.share({ files });
-        // Share completed → mark all batched sessions exported.
-        targets.forEach(markSessionExported);
-        save();
-        render();
-        return;
-      }
-    } catch (err) {
-      // Cancelled share sheet — respect it, mark nothing.
-      if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return;
-      // Anything else → fall through to sequential downloads.
-    }
-  }
-
-  // Fallback: download each CSV in turn, lightly staggered.
-  for (const s of targets) {
-    downloadCSV(s);
-    await new Promise(r => setTimeout(r, 300));
-  }
-  targets.forEach(markSessionExported);
-  save();
-  render();
-}
+// V131 (2A): bulkExportUnexported (v15 — one share of every not-yet-exported
+// job's CSV) is retired: the Jobs list's nudge now shows those jobs instead,
+// since a certificate also counts and certificates are made one at a time.
+// Single-job export (above) and Export everything (exportall.js) remain.
 
 // ---------- v10: CSV Import ----------
 // v11 update: header-name-based matching. Columns may appear in any order;

@@ -305,10 +305,11 @@ function sortedSessions() {
 
 // v15: predicate for the Sessions-list control filters (Status + Lock). The two
 // filters combine with AND. 'all' on either axis matches everything on that
-// axis. Status maps to exportStatus():
-//   'unexported' → status 'none'  (never exported — distinct from 'modified')
-//   'exported'   → status 'exported'
-//   'modified'   → status 'modified'
+// axis. V131: Status maps to jobDoneStatus() (certificates count):
+//   'unexported' → 'none'  (neither — distinct from 'modified')
+//   'exported'   → 'exported' or 'certificate'
+//   'modified'   → 'modified' or 'reopened' (4A)
+//   'notdone'    → anything not done — the nudge's own list (2A), not saved
 // Applied only when not searching (see renderSessionsListAreaHTML).
 function sessionMatchesControlFilters(s) {
   if (state.sessionFilter !== 'all') {
@@ -320,11 +321,13 @@ function sessionMatchesControlFilters(s) {
     } else if (state.sessionFilter === 'remindexport') {
       // V100: the not-exported reminder's jobs (Review on its banner).
       if (!isExportReminderJob(s)) return false;
+    } else if (state.sessionFilter === 'notdone') {
+      if (jobIsDone(s)) return false;
     } else {
-      const st = exportStatus(s);
+      const st = jobDoneStatus(s);
       if (state.sessionFilter === 'unexported' && st !== 'none') return false;
-      if (state.sessionFilter === 'exported' && st !== 'exported') return false;
-      if (state.sessionFilter === 'modified' && st !== 'modified') return false;
+      if (state.sessionFilter === 'exported' && st !== 'exported' && st !== 'certificate') return false;
+      if (state.sessionFilter === 'modified' && st !== 'modified' && st !== 'reopened') return false;
     }
   }
   if (state.lockFilter === 'unlocked' && s.locked) return false;
@@ -457,17 +460,61 @@ function markSessionDirty(sess) {
   return true;
 }
 
-// Count sessions not in a clean 'exported' state (i.e. 'none' or 'modified').
-// Drives the "N sessions not yet exported" nudge on the Sessions list.
-function unexportedSessionCount() {
-  return state.sessions.filter(s => exportStatus(s) !== 'exported').length;
+// V131 (7A): undo a CSV export — a stray tap on Copy marks a job exported, and
+// then every open asks "Already exported". Clears the CSV mark only; a
+// certificate that counts (jobDoneStatus) is left alone. No save()/render() —
+// the caller decides. Encoding dropped as noteReportMade does (the signature
+// covers exportedAt too; belt and braces).
+function markSessionNotExported(sess) {
+  if (!sess) return false;
+  if (!sess.exportedAt && !sess.exportDirty) return false;
+  delete sess.exportedAt;
+  delete sess.exportDirty;
+  if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(sess);
+  return true;
 }
 
-// v15: the actual session objects behind that count (status 'none' or
-// 'modified'), in the current display order so a batch export produces files
-// in a sensible sequence. Drives the tappable bulk-export nudge.
-function unexportedSessions() {
-  return sortedSessions().filter(s => exportStatus(s) !== 'exported');
+// V131: the Jobs list's view of a job's paperwork — a CSV export OR a
+// certificate (1A: the same rule as the not-exported reminder, jobPaperworkDone
+// below). One of:
+//   'exported'    — a CSV it hasn't changed since (✓ Exported)
+//   'certificate' — a certificate made after the job was locked (✓ Certificate)
+//   'modified'    — a CSV, then edited (✓✎ Modified since export)
+//   'reopened'    — a certificate, but the job was unlocked (or locked again)
+//                   since — unlocking drops lockedAt (✓✎ Reopened since certificate)
+//   'none'        — neither
+// ORDER MATTERS: a clean CSV wins; a counting certificate beats an edited CSV
+// (the certificate is the later paperwork); an edited CSV beats a stale
+// certificate (one badge, the CSV's). exportStatus() stays CSV-only for the
+// things that must not trust a PDF: pruning (deletes jobs — a PDF can't be
+// imported back) and the "Already exported" warning.
+function jobDoneStatus(sess) {
+  const x = exportStatus(sess);
+  if (x === 'exported') return 'exported';
+  if (jobPaperworkDone(sess)) return 'certificate';
+  if (x === 'modified') return 'modified';
+  if (reportAtMs(sess) != null) return 'reopened';
+  return 'none';
+}
+function jobIsDone(sess) {
+  const st = jobDoneStatus(sess);
+  return st === 'exported' || st === 'certificate';
+}
+
+// Count jobs whose paperwork isn't done (V131: a counting certificate is done).
+// Drives the "N jobs not yet exported" nudge on the Jobs list.
+function unexportedSessionCount() {
+  return state.sessions.filter(s => !jobIsDone(s)).length;
+}
+
+// V131 (2A): tapping the nudge shows those jobs — the list, filtered — instead
+// of bulk-exporting CSVs (retired with bulkExportUnexported). Like Review on a
+// reminder banner: 'notdone' is not one of the saved filter choices, so a
+// reload returns to All.
+function reviewUnexported() {
+  state.sessionsSearchQuery = '';
+  state.sessionFilter = 'notdone';
+  state.lockFilter = 'all';
 }
 
 // ===== V100: in-app reminders (roadmap Stage 8 part 3) =====
@@ -1192,6 +1239,21 @@ function confirmReopenWarning() {
   state.exportWarnSessionId = null;
   pendingOpenOpts = null;
   if (id) openSession(id, opts);
+  else render();
+}
+
+// V131 (6B 8A): "Mark as not exported" on the reopen warning — clears the CSV
+// mark (7A), says so, and opens the job as Open anyway would. No confirm: an
+// export sets it back. Read the id and opts BEFORE clearing them (MAP rule 4).
+// No save() here: openSession() saves, and that is what keeps the change.
+function unmarkFromReopenWarning() {
+  const id = state.exportWarnSessionId;
+  const opts = pendingOpenOpts;
+  state.exportWarnSessionId = null;
+  pendingOpenOpts = null;
+  const s = id ? state.sessions.find(x => x.id === id) : null;
+  if (s && markSessionNotExported(s)) showToast('Marked as not exported');
+  if (s) openSession(id, opts);
   else render();
 }
 

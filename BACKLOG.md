@@ -8,6 +8,38 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V131
+V131 = A — certificates count as exported (Peter 16 Oct: 1A 2A 3A 4A 5A, plus
+the undo he asked for in the same round: 6B 7A 8A 9A). session.js
+`jobDoneStatus` / `jobIsDone` (clean CSV OR certificate after locking — the
+reminder's `jobPaperworkDone`) drive the nudge, badges and Status filter; the
+nudge shows the jobs ('notdone', transient) — `bulkExportUnexported` retired;
+"Mark as not exported" on the "Already exported" pop-up (CSV mark only).
+Pruning and the pop-up stay CSV-only. Harness group 69 + M1191–M1214; 68f →
+69f; M1154, M1175, M1190 retired. Welcome rolled.
+**Next: C** — a long company name / address on the certificate's top-right
+block (V119.1 residual): check first, fix only if it overflows. Parked
+(Peter, 16 Oct): D (more focus stand-ins) and E (the 21 status banners) —
+wait for Peter's real-iPhone VoiceOver run-through. Then the clean-up job
+(server) and Stage 13 Stripe.
+
+### V131 residuals (known, accepted)
+- A certificate made BEFORE locking still doesn't count (1A — the reminder's
+  rule). Lock, then make the certificate. An unlocked job with a certificate
+  shows "Reopened since certificate" even if it was never locked — the phone
+  can't tell the two apart (unlocking drops the lock time).
+- A job locked before V100 has no lock time, so its certificate never counts:
+  export its CSV, or unlock and lock it again and remake the certificate.
+- "Mark as not exported" is only on the "Already exported" message (6B), which
+  shows for an UNLOCKED job with a CSV export. A locked job exported by mistake
+  shows ✓ Exported until it is unlocked and opened.
+- The export mark, lock time and certificate time ride the job to the cloud
+  (the whole job is sent), so a job's ✓ follows it to another phone — and
+  "Mark as not exported" is a change to the job: signed in, the next sync sends
+  it, as an export does.
+- "Still to export" is a transient filter, like "Locked, not exported": a
+  reload returns to All.
+
 ### Next after V130
 V130 = housekeeping + an honest Privacy note — the stragglers round, part 1
 (Peter 16 Oct: order "housekeeping + B, then A, then C; leave D and E";
@@ -786,10 +818,8 @@ instead of trusting its fingerprints. Not a version of its own.
 - Reminders are worked out when the Jobs screen is drawn. A phone left open on
   the Jobs screen past the time shows the banner at the next repaint, not on the
   minute. Notifications while closed are Stage 14.
-- The existing "N jobs not yet exported" line and the ✓ badges still mean CSV
-  only; only the new reminder counts a certificate (2B scope). Peter works by
-  PDF — a candidate follow-up: let the line/badges count certificates too.
-  → QUEUED as V131 (Peter, 16 Oct — stragglers round "A").
+- (Closed V131: the "not yet exported" line, badges and Status filter now
+  count a certificate made after locking, as the reminder does.)
 - A V99 phone that RE-locks a job doesn't stamp a new lock time (it keeps an old
   one left from an earlier lock, or none). Test phones only, upgraded together.
 - A certificate made BEFORE locking doesn't count (a job could change in between)

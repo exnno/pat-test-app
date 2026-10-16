@@ -1776,10 +1776,10 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 
 /* v14: "N sessions not yet exported" nudge above the sessions list. */
-/* v14/v15: the "N not yet exported" nudge is now a tappable button that
-   bulk-exports every not-yet-cleanly-exported session. Keeps the amber
+/* v14/v15: the "N not yet exported" nudge is a tappable button. V131: it
+   shows those jobs (it bulk-exported CSVs until V130). Keeps the amber
    informational look but reads as a control: full width, text on the left,
-   a share-style CTA on the right. */
+   a "Show ›" CTA on the right. */
 .export-nudge {
   display: flex;
   align-items: center;
@@ -1808,6 +1808,8 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   font-weight: 700;
 }
 .export-nudge-cta .share-icon { width: 15px; height: 15px; }
+/* V131 (6B): "Mark as not exported" under the reopen warning's two buttons. */
+.reopen-unmark { display: block; width: 100%; margin-top: 10px; }
 
 /* v15: standalone tertiary button (used by the "Show all sessions" reset in the
    filtered-empty state). A more specific rule inside .import-conflict-actions

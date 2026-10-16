@@ -345,7 +345,9 @@ registerActions({
     save();
     refreshSessionsListAreaOnly();
   },
-  'bulk-export-unexported': () => bulkExportUnexported()
+  // V131 (2A): the "N jobs not yet exported" line shows those jobs (it bulk-
+  // exported CSVs until V130 — retired with bulkExportUnexported).
+  'review-unexported': () => { reviewUnexported(); save(); render(); }
 });
 
 // ---------------------------------------------------------------------------
@@ -941,6 +943,7 @@ registerActions({
   'bug-copy': () => copyBugReport(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
+  'reopen-unmark': () => unmarkFromReopenWarning(),   // V131 (6B)
 
   // Import conflict / summary dialogs
   'import-conflict-cancel': () => cancelImportConflict(),

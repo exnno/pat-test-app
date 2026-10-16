@@ -252,7 +252,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Easier with VoiceOver.</strong> VoiceOver now keeps its place in the certificate preview and on + New job, and says which option is chosen wherever a choice was only shown by colour.</li>
+        <li><strong>Certificates count as exported.</strong> A job whose certificate you made after locking it now shows &ldquo;Certificate&rdquo; on the Jobs list. Tap &ldquo;not yet exported&rdquo; to see the jobs still to do.</li>
+        <li><strong>Exported by mistake?</strong> The &ldquo;Already exported&rdquo; message now has &ldquo;Mark as not exported&rdquo;, so it stops asking.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -444,6 +445,8 @@ function render() {
             <button class="btn-secondary" id="reopen-warn-cancel2" data-action="reopen-cancel">Cancel</button>
             <button class="btn-primary" id="reopen-warn-continue" data-action="reopen-continue">Open anyway</button>
           </div>
+          <!-- V131 (6B): exported by mistake (a stray Copy) — clear the mark and open. -->
+          <button class="btn-secondary reopen-unmark" id="reopen-warn-unmark" data-action="reopen-unmark">Mark as not exported</button>
         </div>
       `;
     }
@@ -1233,16 +1236,16 @@ function renderSessionsListAreaHTML() {
     ? `<span class="sessions-search-count">${controlFiltered.length} of ${sortedAll.length} job${sortedAll.length === 1 ? '' : 's'} shown</span>`
     : '';
 
-  // v14/v15: "N sessions not yet exported" nudge — now a tappable control that
-  // bulk-exports every not-yet-cleanly-exported session (status 'none' or
-  // 'modified') in one action. Count is global (independent of the active
-  // filter view). Hidden when there are none, the list is empty, or while
-  // searching (the search count takes the slot).
+  // v14/v15: "N jobs not yet exported" nudge. V131: a certificate counts
+  // (jobIsDone — 1A), and tapping it shows those jobs (2A) — it no longer
+  // bulk-exports CSVs. Count is global (independent of the active filter
+  // view). Hidden when there are none, the list is empty, while searching (the
+  // search count takes the slot), or while it is already the list shown.
   const unexported = unexportedSessionCount();
-  const nudgeHTML = (!queryTrimmed && sortedAll.length > 0 && unexported > 0)
-    ? `<button type="button" class="export-nudge" id="bulk-export-btn" data-action="bulk-export-unexported" aria-label="Export ${unexported} not-yet-exported job${unexported === 1 ? '' : 's'}">
+  const nudgeHTML = (!queryTrimmed && sortedAll.length > 0 && unexported > 0 && state.sessionFilter !== 'notdone')
+    ? `<button type="button" class="export-nudge" id="review-unexported-btn" data-action="review-unexported" aria-label="Show the ${unexported} job${unexported === 1 ? '' : 's'} not yet exported">
         <span class="export-nudge-text">${unexported} job${unexported === 1 ? '' : 's'} not yet exported</span>
-        <span class="export-nudge-cta">${icon('share', 'share-icon')} Export all</span>
+        <span class="export-nudge-cta">Show ${icon('chevron-right', 'share-icon')}</span>
       </button>`
     : '';
 
@@ -1266,6 +1269,7 @@ function renderSessionsListAreaHTML() {
           <option value="unexported"${state.sessionFilter === 'unexported' ? ' selected' : ''}>Not exported</option>
           <option value="exported"${state.sessionFilter === 'exported' ? ' selected' : ''}>Exported</option>
           <option value="modified"${state.sessionFilter === 'modified' ? ' selected' : ''}>Modified since</option>
+          ${state.sessionFilter === 'notdone' ? `<option value="notdone" selected>Still to export</option>` : ''}
           ${state.retestRemindersEnabled ? `<option value="retestdue"${state.sessionFilter === 'retestdue' ? ' selected' : ''}>Retest due</option>` : ''}
           ${(state.sessionFilter === 'remindexport' || (state.reminders && state.reminders.exportAfter && state.reminders.exportAfter !== 'off')) ? `<option value="remindexport"${state.sessionFilter === 'remindexport' ? ' selected' : ''}>Locked, not exported</option>` : ''}
         </select>
@@ -1311,14 +1315,20 @@ function renderSessionsListAreaHTML() {
       const lockMark = s.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : '';
       const safeR = safety ? safety.map.get(String(s.id)) : null;
       const safeMark = (safeR && safeR.safe) ? '<span class="session-safe" title="Safe in the cloud" aria-label="Safe in the cloud">' + icon('shield-check') + '</span>' : '';
-      // v14: export-status badge in the meta row. 'exported' → ✓ Exported;
-      // 'modified' → ✓✎ Modified since export; 'none' → no badge.
-      const xStatus = exportStatus(s);
+      // v14: export-status badge in the meta row. V131 (3A 4A): certificates
+      // count — jobDoneStatus(). 'exported' → ✓ Exported; 'certificate' →
+      // ✓ Certificate; 'modified' → ✓✎ Modified since export; 'reopened' →
+      // ✓✎ Reopened since certificate; 'none' → no badge.
+      const xStatus = jobDoneStatus(s);
       const exportBadge = xStatus === 'exported'
         ? '<span class="export-badge exported" title="Exported">' + icon('check') + ' Exported</span>'
-        : (xStatus === 'modified'
+        : xStatus === 'certificate'
+          ? '<span class="export-badge exported" title="Certificate made">' + icon('check') + ' Certificate</span>'
+          : xStatus === 'modified'
             ? '<span class="export-badge modified" title="Edited since last export">' + icon('check') + icon('pencil') + ' Modified since export</span>'
-            : '');
+            : xStatus === 'reopened'
+              ? '<span class="export-badge modified" title="Unlocked since the certificate was made">' + icon('check') + icon('pencil') + ' Reopened since certificate</span>'
+              : '';
       // v10: when the query only hit item-level fields, show how many items matched
       // and (via data-open-at) jump straight to the first match.
       const itemBadge = matchedItemIndex !== -1
