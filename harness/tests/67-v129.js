@@ -27,7 +27,7 @@
           groups repainted in place.
      67d  wiring (source): rebuild(action); chips wired from the markup; the
           severity dot hidden from VoiceOver.
-     67f  release: V129, What's new, cache, changelog. (66f → 67f.) */
+     67f  (release checks — moved to 68f at V130.) */
 
 'use strict';
 
@@ -255,24 +255,7 @@ module.exports = async function run() {
     t.includes(si, 'if (!el || _focusIsTextField(el)) return null;', 'focusStandIn refuses a text field');
   });
 
-  /* ------------------------------------------------------------------ 67f */
-  await t.group('67f — release: V129, What’s new, cache, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V129', 'APP_VERSION V129');
-    t.eq(app.run('WELCOME_VERSION'), 'V129', 'What’s new rolled to V129');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v129';", 'cache key pat-v129');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>Easier with VoiceOver.</strong>', 'V129’s What’s new');
-    const sheet = core.slice(core.indexOf('<ul class="welcome-list sheet-scroll">'), core.indexOf('</ul>', core.indexOf('<ul class="welcome-list sheet-scroll">')));
-    t.eq((sheet.match(/<li>/g) || []).length, 1, '… one line');
-    t.excludes(core, '<li><strong>Safer after a long time away.</strong>', 'V128’s sheet copy gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V129</strong>'), b = help.indexOf('<p><strong>V128</strong>'), c = help.indexOf('<p><strong>V127</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V129, V128, V127');
-    t.excludes(help, '<p><strong>V126</strong>', 'V126 rolled off');
-    t.excludes(help, 'A smoother first start: on a new phone PATGo no longer reloads', 'V126’s line gone with it');
-    t.includes(help, 'Easier with VoiceOver: + New job lands on the new job form', 'About: V129’s line');
-    t.includes(help, 'Safer after a long time away: a phone that hasn', 'About: V128’s line still there');
-    t.includes(help, 'Your plan, clearly: a signed-in cloud account sees', 'About: V127’s line still there');
-  });
+  // 67f (V129's release checks: version, What's new, cache, About) moved to
+  // 68f at V130 — V130 is housekeeping, so What's new still carries V129's
+  // one line and 68f pins it. Nothing of V129's release is left to keep here.
 };

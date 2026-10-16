@@ -193,10 +193,15 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 15e */
-  t.group('15e — the V43 mock key is deleted at load', () => {
+  // V130 (2A): the clean-up that deleted the key at load (V79) is retired with
+  // the key's name. What lasts: nothing in the app names it, so a leftover is
+  // inert — it can never be read as a sign-in.
+  t.group('15e — the V43 mock key is retired: nothing reads it, a leftover signs no one in', () => {
     const app = boot({ localStorage: { 'pat:authUser': JSON.stringify({ userId: 'ZZMOCK', authToken: 'ZZTOK' }) } });
-    t.eq(app.storage.getItem('pat:authUser'), null, 'pat:authUser removed on boot');
-    t.eq(app.state().cloud.status, 'signed-out', 'and it did not sign anyone in');
+    t.eq(app.state().cloud.status, 'signed-out', 'a leftover mock key did not sign anyone in');
+    const named = fs.readdirSync(APP_DIR).filter(f => f.endsWith('.js') || f === 'index.html')
+      .filter(f => { const s = fs.readFileSync(path.join(APP_DIR, f), 'utf8'); return s.includes('pat:authUser') || s.includes('PAT_AUTH_KEY'); });
+    t.deepEq(named, [], 'no app file names the retired key');
   });
 
   /* ------------------------------------------------------------------ 15f */

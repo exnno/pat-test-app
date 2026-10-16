@@ -387,13 +387,21 @@ module.exports = async function () {
     t.ok(app.state().jobMgr.selected[a], 'a safe job can');
     // V92: the removal also reads the job's contents (3B) — a jobs request too,
     // so "synced first" is proved by the PULL's page request, not any request.
-    const pages = () => sessGets(app).filter(c => c.url.includes('updated_at=')).length;
-    const getsBefore = pages();
+    // V130: "first" is proved by ORDER — the pull's page request before the
+    // read that checks the job (select=id,doc,deleted). A count alone passed
+    // with the sync-first line broken: a background sync started by the edit
+    // above lands a page request during the wait anyway (M433 survived on
+    // V129 and V130 until this).
+    const callsBefore = sessGets(app).length;
     const tombs = ledger(app).length;
     tap(app, 'jm-remove');
     await until(() => app.asked.some(x => x.startsWith('Remove 1 job from this phone?')));
     app.stopTimer();
-    t.ok(pages() > getsBefore, 'it synced first (3A)');
+    const after = sessGets(app).slice(callsBefore);
+    const iPull = after.findIndex(c => c.url.includes('updated_at='));
+    const iCheck = after.findIndex(c => c.url.includes('select=id%2Cdoc%2Cdeleted'));
+    t.ok(iCheck > -1, 'the job was read to check it (3B)');
+    t.ok(iPull > -1 && iPull < iCheck, 'it synced first, before that check (3A)');
     const msg = app.asked.find(x => x.startsWith('Remove 1 job'));
     t.includes(msg, 'stays in the cloud and on your other phones', 'the confirm says the cloud keeps it');
     t.includes(msg, 'bring it back', '…and that it can come back');

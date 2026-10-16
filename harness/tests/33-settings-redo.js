@@ -179,10 +179,11 @@ module.exports = function () {
     t.eq(app.state().view, 'settingsCategory', 'opened from Data: Back to Data');
     t.eq(app.state().settingsCategory, 'catData', '… the Data group specifically');
 
-    tap(app, 'settings-page', 'settingsBackup');
+    // V130 (3A): the button lives on Phone Storage (since V97), not Backup.
+    tap(app, 'settings-page', 'settingsStorage');
     tap(app, 'pm-open');
     tap(app, 'pm-back');
-    t.eq(app.state().view, 'settingsBackup', 'opened from the Backup page: Back to Backup (as before)');
+    t.eq(app.state().view, 'settingsStorage', 'opened from Phone Storage: Back to Phone Storage');
 
     tap(app, 'open-settings');
     tap(app, 'pm-open');

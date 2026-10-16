@@ -10,8 +10,8 @@
      53a  the switch is gone: not on Theme & Sound, not in its summary or the
           search words, not wired; icon() always draws a line icon, even when
           something sets the old flag.
-     53b  2A: a phone that had the switch on or off keeps nothing behind after
-          startup; the factory reset still classifies the name (43a rule).
+     53b  the key is retired (V130 2A — was: deleted at startup, V116 2A): no
+          app file names it, a save never writes it, a leftover changes nothing.
      53c  backups: a new backup has no iconsClassic; a V115 backup that carries
           it still restores, and the value is ignored.
      (53d, V116's release lines, moved on to 54e at V117.) */
@@ -63,15 +63,18 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 53b */
-  await t.group('53b — 2A: the old stored choice is deleted at startup', () => {
-    for (const v of ['1', '0', 'garbage']) {
-      const app = freshApp({ localStorage: { 'pat:iconsclassic': v } });
-      t.eq(app.storage.getItem('pat:iconsclassic'), null, `a phone that had '${v}' keeps nothing after startup`);
-    }
-    const app = freshApp({ localStorage: { 'pat:iconsclassic': '1' } });
+  // V130 (2A): the start-up clean-up (V116 2A) and the key's name are retired.
+  // What lasts: nothing in the app names it, nothing writes it, and a leftover
+  // changes nothing (icon() still draws line icons — 53a).
+  await t.group('53b — the retired switch key: named nowhere, never written', () => {
+    const named = fs.readdirSync(APP_DIR).filter(f => f.endsWith('.js') || f === 'index.html')
+      .filter(f => { const s = read(f); return s.includes('pat:iconsclassic') || s.includes('ICONS_CLASSIC_KEY'); });
+    t.deepEq(named, [], 'no app file names the retired key');
+    const app = freshApp();
     app.fn('save')();
-    t.eq(app.storage.getItem('pat:iconsclassic'), null, 'and a save does not write it back');
-    t.includes(read('reset.js'), "['ICONS_CLASSIC_KEY', ICONS_CLASSIC_KEY, 'settings'],", 'the factory reset still classifies the name (43a)');
+    t.eq(app.storage.getItem('pat:iconsclassic'), null, 'a save never writes it');
+    const old = freshApp({ localStorage: { 'pat:iconsclassic': '1' } });
+    t.ok(old.fn('icon')('trash-2').startsWith('<svg class="ic ic-trash-2"'), 'a leftover from V115 changes nothing — line icons');
   });
 
   /* ------------------------------------------------------------------ 53c */
