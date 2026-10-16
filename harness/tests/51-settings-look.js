@@ -83,7 +83,7 @@ module.exports = async function () {
     const core = read('render-core.js'), review = read('render-review.js');
     t.includes(core, '<h1 class="h1" id="screen-title" tabindex="-1">Jobs</h1>', '"Jobs" is the main list’s title');
     t.includes(review, 'data-action="edit-session">Job settings</button>', '"Job settings" is the button on a job');
-    t.includes(core, '<h2 class="h2">New job</h2>', '"New job" is the new-job screen’s title');
+    t.includes(core, '<h2 class="h2" id="nf-title" tabindex="-1">New job</h2>', '"New job" is the new-job screen’s title');
     t.includes(review, '<div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Job settings</div>', '"Job settings" is also that screen’s title (V122 3A)');
     // And Settings quotes them in exactly that spelling.
     const settings = read('render-settings.js');

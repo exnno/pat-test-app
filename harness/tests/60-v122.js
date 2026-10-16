@@ -140,7 +140,7 @@ module.exports = async function () {
     app.state().newForm.show = true;
     app.fn('render')();
     const form = html(app);
-    t.includes(form, '<h2 class="h2">New job</h2>', 'the New job form');
+    t.includes(form, '<h2 class="h2" id="nf-title" tabindex="-1">New job</h2>', 'the New job form');
     t.includes(form, 'Job name <span class="hint">(optional)</span>', '… with Job name');
     stray.push(...strayIn('new form', form));
     app.state().newForm.show = false;

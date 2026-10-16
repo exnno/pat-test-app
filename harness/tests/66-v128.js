@@ -30,7 +30,7 @@
      66h  photos: the note of a photo no longer here is dropped; one still here
           stays noted, so it is never sent back up.
      66i  a run held open by a question reuses the check for an hour.
-     66f  release: V128, What's new, cache, changelog. (65f → 66f.)
+     66f  the marker age written down. (Release checks: 66f → 67f in V129.)
 
    Fake server: 44's (filters eq/gt/gte/in, order, limit, select), with a page
    cap (srv.cap) and a failure switch for the id list (srv.failList). */
@@ -581,25 +581,11 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 66f */
-  await t.group('66f — release: V128, What’s new, cache, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V128', 'APP_VERSION V128');
-    t.eq(app.run('WELCOME_VERSION'), 'V128', 'What’s new rolled to V128');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v128';", 'cache key pat-v128');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>Safer after a long time away.</strong>', 'V128’s What’s new');
-    const sheet = core.slice(core.indexOf('<ul class="welcome-list sheet-scroll">'), core.indexOf('</ul>', core.indexOf('<ul class="welcome-list sheet-scroll">')));
-    t.eq((sheet.match(/<li>/g) || []).length, 1, '… one line');
-    t.excludes(core, '<li><strong>Your plan, clearly.</strong>', 'V127’s sheet copy gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V128</strong>'), b = help.indexOf('<p><strong>V127</strong>'), c = help.indexOf('<p><strong>V126</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V128, V127, V126');
-    t.excludes(help, '<p><strong>V125</strong>', 'V125 rolled off');
-    t.excludes(help, 'Export everything: one zip file of everything on this phone', 'V125’s line gone with it');
-    t.includes(help, 'Safer after a long time away: a phone that hasn', 'About: V128’s line');
-    t.includes(help, 'Your plan, clearly: a signed-in cloud account sees', 'About: V127’s line still there');
-    t.includes(help, 'A smoother first start: on a new phone PATGo no longer reloads', 'About: V126’s line still there');
-    // The server's rule sits beside the phone's.
-    t.includes(read('config.js'), 'const SYNC_MARKER_DAYS = 365;', 'the marker age the clean-up job must respect is written down');
+  // V129: the release checks (version, What's new, cache, About) moved to 67f;
+  // what stays here is V128's lasting rule — the server's marker age, written
+  // beside the phone's.
+  await t.group('66f — the marker age the clean-up job must respect is written down', () => {
+    t.includes(read('config.js'), 'const SYNC_MARKER_DAYS = 365;', 'SYNC_MARKER_DAYS 365 sits in config.js');
+    t.includes(read('config.js'), 'const SYNC_STALE_DAYS = 274;', '… beside the phone\u2019s 274 days');
   });
 };
