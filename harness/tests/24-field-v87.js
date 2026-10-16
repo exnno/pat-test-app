@@ -88,7 +88,8 @@ module.exports = async function run() {
     t.includes(src('backup.js'), 'a.download = `PAT backup ${fileDateUK(todayISO())}.json`', 'backup file name: UK date, spaces');
     t.includes(src('photos.js'), 'a.download = `PATGo photos ${fileDateUK(todayISO())}.json`', 'photo export name: UK date, spaces');
     t.includes(src('csv.js'), 'const filename = csvFilename(session);', 'CSV share path uses the one name builder');
-    t.includes(src('csv.js'), "new File([BOM + buildCSV(s)], csvFilename(s)", 'CSV bulk share uses it too');
+    // V131: the bulk CSV share is retired (bulkExportUnexported) — no second builder to check.
+    t.excludes(src('csv.js'), 'function bulkExportUnexported', 'the bulk CSV share is gone (V131 2A)');
   });
 
   /* ------------------------------------------------------------------ 24b */

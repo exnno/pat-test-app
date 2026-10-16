@@ -29,7 +29,7 @@
      68d  the preview time-out: a picture that never decodes gives no preview
           after 10 s and uploads nothing; one that does is uploaded and the
           timer is cleared.
-     68f  release: V130, cache, What's new stays V129 (5A), changelog. */
+     68f  (retired V131 → 69f) release: V130, cache, What's new stays V129. */
 
 'use strict';
 
@@ -175,25 +175,5 @@ module.exports = async function () {
     timers.restore();
   });
 
-  /* ------------------------------------------------------------------ 68f */
-  // (67f → 68f: V129's release checks are V130's now.)
-  await t.group('68f — release: V130, cache, What’s new stays V129, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V130', 'APP_VERSION V130');
-    t.eq(app.run('WELCOME_VERSION'), 'V129', 'What’s new NOT rolled — a housekeeping release (5A)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v130';", 'cache key pat-v130');
-    const core = read('render-core.js');
-    t.includes(core, '<li><strong>Easier with VoiceOver.</strong>', 'V129’s What’s new stays');
-    const open = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheet = core.slice(open, core.indexOf('</ul>', open));
-    t.eq((sheet.match(/<li>/g) || []).length, 1, '… one line');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V130</strong>'), b = help.indexOf('<p><strong>V129</strong>'), c = help.indexOf('<p><strong>V128</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V130, V129, V128');
-    t.excludes(help, '<p><strong>V127</strong>', 'V127 rolled off');
-    t.excludes(help, 'Your plan, clearly: a signed-in cloud account sees', 'V127’s line gone with it');
-    t.includes(help, 'Tidying up behind the scenes, and the Privacy note brought up to date.', 'About: V130’s line');
-    t.includes(help, 'Easier with VoiceOver: + New job lands on the new job form', 'About: V129’s line still there');
-    t.includes(help, 'Safer after a long time away: a phone that hasn', 'About: V128’s line still there');
-  });
+  // 68f retired V131 (→ 69f): the release checks move with each release.
 };
