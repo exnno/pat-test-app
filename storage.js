@@ -520,14 +520,10 @@ function loadV11Settings() {
   // install and every existing upgrading user start with the feature invisible.
   state.retestRemindersEnabled = localStorage.getItem(RETEST_REMINDERS_KEY) === '1';
 
-  // v79: the V43 MOCK sign-in is retired. An older version may have left its
-  // key behind (holding a made-up user id and token) — delete it so nothing
-  // ever mistakes it for a real sign-in. Real sign-in state is derived in
-  // cloudBoot() (cloud.js) from supabase-js's own storage, never from here.
-  try { localStorage.removeItem(PAT_AUTH_KEY); } catch {}
-  // V116 (2A): the V115 Classic emoji switch is retired — delete its stored
-  // choice so a phone that had it on keeps nothing behind. Line icons always.
-  try { localStorage.removeItem(ICONS_CLASSIC_KEY); } catch {}
+  // V130 (2A): the clean-ups of two retired keys (the V43 mock sign-in, V79;
+  // the V115 Classic emoji switch, V116) are gone — every phone in use has run
+  // them. Real sign-in state is derived in cloudBoot() (cloud.js) from
+  // supabase-js's own storage, never from here.
 
   // v33: first-run wizard gate. onboardedV33Seen is set true once the wizard is
   // completed OR skipped. We treat the install as "already onboarded" (so the

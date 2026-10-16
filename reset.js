@@ -75,7 +75,6 @@ const RESET_KEY_PLAN = [
   ['REPAIR_UNDO_KEY', REPAIR_UNDO_KEY, 'work'],       // old item text from the V69 repair
   ['SESSION_FILTER_KEY', SESSION_FILTER_KEY, 'work'],
   ['LOCK_FILTER_KEY', LOCK_FILTER_KEY, 'work'],
-  ['PAT_AUTH_KEY', PAT_AUTH_KEY, 'work'],             // retired mock sign-in; load() deletes it anyway
   // ---- settings ----
   ['ITEMS_KEY', ITEMS_KEY, 'settings'],
   ['FAIL_REASONS_KEY', FAIL_REASONS_KEY, 'settings'],
@@ -110,7 +109,6 @@ const RESET_KEY_PLAN = [
   ['SCAN_SPEED_KEY', SCAN_SPEED_KEY, 'settings'],
   ['REPAIR_DONE_KEY', REPAIR_DONE_KEY, 'settings'],
   ['SOUNDFX_KEY', SOUNDFX_KEY, 'settings'],
-  ['ICONS_CLASSIC_KEY', ICONS_CLASSIC_KEY, 'settings'],   // retired V116 switch; load() deletes it anyway
   ['TIMESTAMPS_KEY', TIMESTAMPS_KEY, 'settings'],
   ['UNDO_KEY', UNDO_KEY, 'settings'],
   ['MAP_PIN_KEY', MAP_PIN_KEY, 'settings'],

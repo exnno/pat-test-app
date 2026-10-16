@@ -1080,16 +1080,19 @@ function renderPhotoStripSheet() {
 
   return `
     <div class="modal-backdrop" id="photo-strip-backdrop" data-action="photo-strip-close"></div>
-    <div class="bulk-sheet sheet-scroll" role="dialog" aria-label="Photos on this item">
+    <!-- V130 (I): the scroller is the body, not the shell (MAP rule 14) — the
+         header stays put and the buttons below are pinned, like every other
+         sheet. Before, it worked only because .sheet-scroll sits later in the
+         stylesheet than the shell's overflow:hidden. -->
+    <div class="bulk-sheet" role="dialog" aria-label="Photos on this item">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
         <h3 class="bulk-sheet-title">Photos${count ? ` (${count})` : ''}</h3>
         <button class="fail-close-btn" id="photo-strip-close" data-action="photo-strip-close" aria-label="Close">×</button>
       </div>
-      ${body}
-      ${downloadAll}
-      ${addControl}
+      <div class="sheet-scroll">${body}</div>
+      <div class="sheet-pin">${downloadAll}${addControl}</div>
       <input type="file" id="photo-strip-file" data-change-action="photo-strip-file" accept="image/*" style="display:none">
     </div>
   `;

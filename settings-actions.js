@@ -1071,8 +1071,9 @@ function settingsOpenCategory(id) {
 // from their own rows in Data, from search, and (jobs) from the Jobs screen's
 // tidy offer. Back used to go to the Backup page from all of them. Now each
 // opener notes where it was, and Back goes there. V97: their buttons moved to
-// Phone Storage, which is also the fallback.
-const _MGR_RETURN_VIEWS = ['settingsStorage', 'settingsBackup', 'settingsCategory', 'settings', 'sessions', 'cloudStorage'];   // V108: + Cloud Storage
+// Phone Storage, which is also the fallback. V130 (3A): the Backup page left
+// the list — it has opened none of them since V97.
+const _MGR_RETURN_VIEWS = ['settingsStorage', 'settingsCategory', 'settings', 'sessions', 'cloudStorage'];   // V108: + Cloud Storage
 function mgrNoteReturn() {
   state.mgrReturnView = _MGR_RETURN_VIEWS.indexOf(state.view) !== -1 ? state.view : 'settingsStorage';
 }

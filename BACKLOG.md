@@ -8,6 +8,42 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V130
+V130 = housekeeping + an honest Privacy note — the stragglers round, part 1
+(Peter 16 Oct: order "housekeeping + B, then A, then C; leave D and E";
+spec 1B 2A 3A 4A 5A). DEFENCE 3: mutate.js `anchorCount` — the runner aborts
+an anchor found other than exactly once; 01l checks every anchor in the
+normal run (on the clean tree via `PATGO_PRISTINE`), 01m guards the runner.
+PAT_AUTH_KEY and ICONS_CLASSIC_KEY gone (config, load(), reset rows); 15e and
+53b pin that nothing names them. `_MGR_RETURN_VIEWS` without settingsBackup.
+About → Privacy rewritten (4A). Photos sheet: scroller on its body, buttons
+pinned. Harness group 68 + M1177–M1190; M135, M873, M1107 retired; 67f → 68f;
+M82 drops 15j. No welcome (5A).
+**Next: V131 = A — certificates count as exported** for the Jobs list's
+"N jobs not yet exported" line and the ✓ badges (V100 residual; Peter works by
+PDF). Own spec round — the main question is what tapping the nudge does now
+(today it bulk-exports CSVs). **Then C** — a long company name / address on
+the certificate's top-right block (V119.1 residual): check first, fix only if
+it overflows. Parked (Peter, 16 Oct): D (more focus stand-ins) and E (the 21
+status banners) — wait for Peter's real-iPhone VoiceOver run-through.
+Then the clean-up job (server) and Stage 13 Stripe.
+
+### V130 residuals (known, accepted)
+- The Privacy note is a stopgap (4A): it says nothing about where the cloud
+  is held or for how long — the privacy + processor terms replace it.
+- A phone that somehow skipped V79–V129 keeps its old mock-key or emoji-switch
+  entry in storage for good. Inert: nothing names them; Factory reset removes
+  every key regardless. No real phone is in that state.
+- A mutation aimed at harness/mutate.js must start its `from` with "\n" (MAP
+  harness note) — its own definition is otherwise a second copy and it aborts.
+- The Photos sheet change is visible only with enough photos to scroll: the
+  title now stays put and the two buttons stay below the photos.
+- Found in V130's per-file run, PRE-EXISTING (survives on V129 too): M433
+  (removal does not sync first) SURVIVED — 28d counted pull page requests, and
+  a background sync started by the test's own edit lands one during the wait.
+  28d now proves ORDER (the pull's page before the job's check read); M433
+  caught. If Peter's V128/V129 sweeps showed it, this is why.
+
 ### Next after V129
 V129 = VoiceOver's leftovers from V123 (Peter 15 Oct: 0B, then 1A 2A 3A 4A —
 "finish off the straggly bits so we are tidy before server code and stripe").
@@ -337,7 +373,7 @@ privacy + processor terms.
   (fine). Dark red and blue are tightest on the grey note box / blue tint, 4.63.
 - The PASS button itself (V118 4C) is unchanged: dark 2.28:1, accepted.
 - Text size (fixed px, user-scalable=no) — V121, last of the pass.
-- M82's 15j tag (V118 residual) still stands — tag left.
+- ~~M82's 15j tag (V118 residual) still stands~~ — dropped V130.
 
 ### Next after V118
 V118 = the accessibility pass, part 1: contrast (Peter 13 Oct, 1A 2A 3A 4C 5A
@@ -360,9 +396,8 @@ project, ICO fee, privacy + processor terms.
   has `user-scalable=no`, so neither the iPhone's Larger Text nor pinch-zoom
   works. That is the last release of the pass (the entry screen's room is the
   risk).
-- M82's tags say 15j, but 15j cannot see its break (the inserted older entry
-  sits ABOVE the real oldest, so 15j's oldest-entry check still matches). Same
-  on V117 — pre-existing, caught by 09w and 55e. Tag left for now.
+- ~~M82's tags say 15j, but 15j cannot see its break~~ — TAG DROPPED V130 (09w and
+  the release group catch it).
 
 ### Next after V117
 V117 = the Settings page split (Peter 12 Oct, 1A 2A 3A 4B 5B): Report Settings
@@ -384,9 +419,8 @@ wording from them).
   49a counts it twice on purpose.
 
 ### V116 residuals (known, accepted)
-- `ICONS_CLASSIC_KEY` stays in config.js (and its factory-reset row) only so
-  load() can delete what V115 left behind — same pattern as PAT_AUTH_KEY. Can
-  go after a few releases, with its reset row and 53b's reset line.
+- ~~`ICONS_CLASSIC_KEY` stays in config.js only for load()'s delete~~ — REMOVED V130
+  (2A), with PAT_AUTH_KEY, both reset rows and both clean-ups; 53b / 15e pin it.
 - 52c's "the sweep can see an emoji" control now swaps icon() for a stand-in
   (it used the switch). Same proof, no app code needed for it.
 
@@ -468,9 +502,8 @@ Items whatever the split.
 ### V114 residuals (known, accepted)
 - ~~The app outside Settings still says session in places~~ — DONE V122 (every
   visible word says job; Settings, the Glossary and 51b followed).
-- About → Privacy still says the app makes no network calls after install; wrong
-  while signed in to the cloud test. Rewritten with the privacy + processor terms
-  (Stage 12), not before.
+- ~~About → Privacy still says the app makes no network calls~~ — STOPGAP V130 (4A):
+  honest about the cloud copy and the update check; the terms still replace it.
 - The About changelog's V112 line says "Edit session" — history, left as written;
   it rolls off at V115.
 - Data defaults (item types, fail reasons, CSV column headers) keep their Title
@@ -582,8 +615,8 @@ Items whatever the split.
   used to break are now broken by nothing: `syncVerifyJobs`' error check
   (sync.js) and `settingsCategoryBlurb`'s locked line (render-settings.js);
   the records pager's dedupe is still M264's.
-- DEFENCE 3 (the runner refusing a repeated anchor) is still not built — the
-  anchor scan runs by hand. All 0 repeats at V110.
+- ~~DEFENCE 3 (the runner refusing a repeated anchor) is still not built~~ — BUILT
+  V130 (1B): runner aborts, 01l checks every anchor in the normal run.
 
 ### V109 residuals (known, accepted)
 - The tab icon is checked by eye only (46c proves the file holds 16/32/48 and is
@@ -647,10 +680,10 @@ instead of trusting its fingerprints. Not a version of its own.
 
 ### From the V106 harness amendment (8 Oct) — carried in at V107
 - ~~11 mutations anchor on text that occurs more than once~~ — RE-ANCHORED IN
-  V110 (5B). Still open: make the runner abort on a non-unique anchor
-  (DEFENCE 3), as it already aborts on a missing one; the anchor scan is the only
-  guard until then.
-- The 10 s preview guard in _syncThumbUpload (sync.js) has no test of its own.
+  V110 (5B). ~~Still open: make the runner abort on a non-unique anchor
+  (DEFENCE 3)~~ — BUILT V130 (1B).
+- ~~The 10 s preview guard in _syncThumbUpload (sync.js) has no test of its own~~ —
+  TESTED V130 (68d, M1186–M1188).
 - ~~Option: mutate.js stops each suite at the first failure~~ — DONE as the V108
   harness amendment (10 Oct): bail after the first failing test file, plus the
   mutation's own test file run first. Measured: V108's 24 mutations ~20 min → 28 s;
@@ -756,6 +789,7 @@ instead of trusting its fingerprints. Not a version of its own.
 - The existing "N jobs not yet exported" line and the ✓ badges still mean CSV
   only; only the new reminder counts a certificate (2B scope). Peter works by
   PDF — a candidate follow-up: let the line/badges count certificates too.
+  → QUEUED as V131 (Peter, 16 Oct — stragglers round "A").
 - A V99 phone that RE-locks a job doesn't stamp a new lock time (it keeps an old
   one left from an earlier lock, or none). Test phones only, upgraded together.
 - A certificate made BEFORE locking doesn't count (a job could change in between)
@@ -815,8 +849,8 @@ Other crowded pages seen, not split: Report Settings (long), Quick Pick Items
 ### V97 residuals (known, accepted)
 - Phone Storage's row subtitle reads getStorageStats() each time the Data list or
   search draws it — same figure the Jobs banner reads; cheap at today's sizes.
-- 33f still opens the photo manager from Backup & Restore (no button there now; the
-  action still works and settingsBackup stays in the return list).
+- ~~33f still opens the photo manager from Backup & Restore~~ — FIXED V130 (3A): 33f
+  opens from Phone Storage; settingsBackup left `_MGR_RETURN_VIEWS` (68b).
 
 ### Visual inspection tick (PN) — postponed at V94 (11D)
 Peter worried it would harm the entry screen. Placements offered at the V94 round:
@@ -1128,6 +1162,7 @@ on the SHELL rather than a body child — it works only because that rule sits l
 in the stylesheet than the shell's `overflow: hidden`, and its header scrolls away
 with the content. Correct by coincidence. Photo count is capped so it cannot grow
 unboundedly; tidy it if that sheet is ever touched for another reason.
+→ TIDIED V130: the scroller is the body, the buttons are pinned (68c, M1184–M1185).
 
 ### ~~General sheet-markup guard — the part of the audit not built~~ — SHIPPED IN V110
 Built as harness 47 + `harness/sheets.js` + `harness/sheet-register.js`. 44

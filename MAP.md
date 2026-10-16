@@ -1,4 +1,4 @@
-# PATGo — Code Map (V129)
+# PATGo — Code Map (V130)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -385,8 +385,13 @@ group listed). Guarded by 01i, M761–M763.
 01j fails on a group that does not exist, 01k on any mutation without one (all
 783 had one proved at V110 — the old 376 by running the named file alone with
 the break in place). Every mutation's `from` is unique in its file (the 11
-repeats were re-anchored in V110); the anchor scan still runs by hand — the
-runner does not refuse a repeat yet (DEFENCE 3, BACKLOG).
+repeats were re-anchored in V110).
+⚠ V130 DEFENCE 3: the runner aborts a mutation whose `from` occurs anything but
+exactly once (`anchorCount`, mutate.js), and 01l checks every anchor the same
+way in the normal run — no hand scan. Under a mutation run 01l counts on the
+CLEAN tree (`PATGO_PRISTINE`, set by the runner), never the mutated copy. A
+mutation that targets harness/mutate.js itself must start its `from` with
+"\n" (the definition's own text would otherwise be a second copy). 01m, M1177–M1179.
 See `harness/README.md`.
 
 ---
@@ -454,8 +459,8 @@ flat fields) are never saved, backed up or validated. Rule 7 applies.
 `ICON_PATHS` (Lucide SVG children, only those used) and `icon(name, cls)`.
 Lucide ISC notice in its header; full notices in THIRD-PARTY-LICENSES.txt.
 **Touch to:** add or swap an icon (rule 20).
-**Coupling:** none at call time (V116: Classic emoji switch 14B retired; its
-key ICONS_CLASSIC_KEY stays in config.js only for load()'s delete + reset row).
+**Coupling:** none at call time (V116: Classic emoji switch 14B retired; V130
+removed its key name, load()'s delete and the reset row — named nowhere, 53b).
 Probed in boot.js (`'icon'`). Sizes and colours per context in styles.css (`@@ icons`).
 
 ### utils.js (~265 ln) — pure helpers, no state access

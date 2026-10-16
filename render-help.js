@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V129: rolled forward — V129 on top, V126 dropped. -->
+      <!-- v8: rolling 3-version changelog. V130: rolled forward — V130 on top, V127 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V130</strong> &middot; October 2026</p>
+        <p class="muted">Tidying up behind the scenes, and the Privacy note brought up to date.</p>
         <p><strong>V129</strong> &middot; October 2026</p>
         <p class="muted">Easier with VoiceOver: + New job lands on the new job form, the certificate preview's quick-adjust buttons keep your place and say whether they're on, and every pick-one choice &mdash; theme, presets, Class I/II, signature side, certificate colours, bug report options &mdash; says which is chosen.</p>
         <p><strong>V128</strong> &middot; October 2026</p>
         <p class="muted">Safer after a long time away: a phone that hasn't synced for over nine months checks everything against the cloud before it sends anything, so jobs, clients and sites deleted on another phone stay deleted. A copy of the phone is kept first in Settings &rarr; Backup &amp; Restore.</p>
-        <p><strong>V127</strong> &middot; October 2026</p>
-        <p class="muted">Your plan, clearly: a signed-in cloud account sees when its free trial ends, a 7-day countdown after it, and Renew now. After the countdown, logging, new jobs and new certificates pause until you renew &mdash; your jobs, exports and backups always stay available.</p>
 
 
         </div>
@@ -89,7 +89,8 @@ function renderSettingsAbout() {
 
       <div class="info-card">
         <h3>Privacy</h3>
-        <p class="muted">All test records, settings, and saved descriptions live in your phone or browser's local storage. The app makes no network calls after the initial install. Backups are stored only where you choose to save them.</p>
+        <!-- V130 (4A): honest until the privacy terms replace it (Stage 12). -->
+        <p class="muted">Your test records, settings and saved descriptions are kept on this phone. If you sign in to a cloud account, a copy is also kept there so you can get it back on another phone. The app goes online to check for updates. Backups are saved only where you choose to save them.</p>
       </div>
 
       <!-- v8: emergency reload — for the rare case where the app stops responding to

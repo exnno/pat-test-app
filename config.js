@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V129';
+const APP_VERSION = 'V130';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -306,12 +306,11 @@ const DURATION_MIN_MS = 60 * 1000;
 // session in every other respect (rides through the codec, CSV, reports and
 // backups unchanged — the flag is just an extra passthrough field).
 const DEMO_SESSION_FLAG = 'isExample';
-// v43: the MOCK sign-in's storage key. ⚠ V79 retired the mock: nothing writes
-// this key any more, load() deletes it if an older version left one behind, and
-// backups no longer carry sign-in details at all (a backup is a file people
-// email around — it must never hold a credential). Kept only so load() can
-// clear it. Real sign-in state is owned by cloud.js; see CLOUD_* below.
-const PAT_AUTH_KEY = 'pat:authUser';
+// V130 (2A): the v43 MOCK sign-in key is gone from the code (named nowhere).
+// V79 retired the mock and load() deleted any leftover for 50 releases; nothing
+// has ever read it since. Backups still carry no sign-in details at all (a
+// backup is a file people email around — it must never hold a credential).
+// Real sign-in state is owned by cloud.js; see CLOUD_* below.
 
 // ---- v79: cloud environment -------------------------------------------------
 // Which Supabase project this copy of the app talks to is decided by the HOST
@@ -1115,10 +1114,8 @@ const SQP_STAPLE_DEFENCE = 2;     // v27: preset button at/above this score is p
 // channel for those devices, but it's off until the user turns it on.
 const SOUNDFX_KEY = 'pat:soundfx';          // v17: '1' | '0', default '0'
 
-// V115 (14B) "Classic emoji icons" switch — RETIRED V116 (1A). The name stays
-// only so load() can delete what V115 left on the phone (2A) and the factory
-// reset can classify it, the same as PAT_AUTH_KEY. Nothing reads it.
-const ICONS_CLASSIC_KEY = 'pat:iconsclassic';
+// V115 (14B) "Classic emoji icons" switch — retired V116; its key name and
+// load()'s clean-up of it removed V130 (2A). Nothing names it any more.
 
 // v17: Item timestamps. Stored as '1'|'0', default OFF ('0'). When ON, each
 // item gets a `ts` (ISO string) stamped the moment it's first saved, shown in
