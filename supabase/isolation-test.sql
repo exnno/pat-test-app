@@ -11,6 +11,8 @@
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
+-- V133: CHECKS 17a–17g NEED supabase/v133-cleanup.sql RUN FIRST (17a names it
+-- if not). Test phone rows are removed afterwards.
 -- V113: CHECKS 9–16 NEED supabase/v113-organisations.sql RUN FIRST (9a names it
 -- if not). 10d–12d need one SYNCED photo from account A (as for 4c); without one
 -- they say INCONCLUSIVE. B is put into A's business as Engineer, Office and Team
@@ -560,6 +562,78 @@ begin
                           else 'INCONCLUSIVE|' || msg end];
     select count(*) into n from public.sessions where id = 'iso-test-BinA' and user_id = b and org_id = org_a;
     res := res || array['16b|the job B did for A''s business is still there|' || case when n = 1 then 'PASS|' else 'FAIL|gone' end];
+  end if;
+
+
+  -- V133: the phones table (4A) and the clean-up job's own tables.
+  if to_regclass('public.phones') is null then
+    res := res || array['17a|phones|FAIL|run supabase/v133-cleanup.sql first'];
+  else
+    delete from public.phones where phone_id like 'iso-test-%';
+    insert into public.phones (user_id, phone_id, app_version) values (a, 'iso-test-phone-A', 'V133');
+    select mode into g from public.cleanup_settings where id = 1;
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    -- 17a control: B can report B's own phone.
+    begin
+      insert into public.phones (user_id, phone_id, app_version) values (b, 'iso-test-phone-B', 'V133');
+      update public.phones set app_version = 'V134' where user_id = b and phone_id = 'iso-test-phone-B';
+      select count(*) into n from public.phones where phone_id = 'iso-test-phone-B';
+      res := res || array['17a|control: B can report and read B''s own phone|' || case when n = 1 then 'PASS|' else 'FAIL|saw ' || n end];
+    exception when others then
+      res := res || array['17a|control: B can report and read B''s own phone|FAIL|' || sqlerrm];
+    end;
+    -- 17b: B cannot see A's phones.
+    select count(*) into n from public.phones where user_id = a;
+    res := res || array['17b|B cannot see A''s phones|' || case when n = 0 then 'PASS|' else 'FAIL|saw ' || n end];
+    -- 17c: B cannot report a phone as A.
+    begin
+      insert into public.phones (user_id, phone_id, app_version) values (a, 'iso-test-forged', 'V999');
+      res := res || array['17c|B cannot report a phone as A|FAIL|insert was accepted'];
+    exception when others then
+      res := res || array['17c|B cannot report a phone as A|PASS|rejected'];
+    end;
+    -- 17d: B cannot change or remove A's phone (or even B's own: no delete route).
+    begin
+      update public.phones set app_version = 'V999' where user_id = a;
+      get diagnostics n = row_count;
+      delete from public.phones where phone_id like 'iso-test-phone-%';
+      get diagnostics k = row_count;
+      res := res || array['17d|B cannot change A''s phone; nobody deletes phones from the app|'
+                    || case when n = 0 and k = 0 then 'PASS|0 rows affected' else 'FAIL|' || n || ' changed, ' || k || ' deleted' end];
+    exception when others then
+      res := res || array['17d|B cannot change A''s phone; nobody deletes phones from the app|PASS|rejected: ' || sqlerrm];
+    end;
+    -- 17e: the job's settings and its run log are closed to the app.
+    begin
+      select count(*) into n from public.cleanup_runs;
+      msg := 'read ' || n || ' line(s)';
+      ok := false;
+    exception when others then
+      ok := true; msg := 'rejected';
+    end;
+    begin
+      update public.cleanup_settings set mode = 'clear';
+      get diagnostics n = row_count;
+      ok := ok and n = 0;
+    exception when others then
+      null;
+    end;
+    res := res || array['17e|the clean-up job''s settings and log are closed to the app|' || case when ok then 'PASS|' || msg else 'FAIL|' || msg end];
+    -- 17f: nobody can start the job from the app.
+    begin
+      perform public.run_cleanup(true);
+      res := res || array['17f|B cannot start the clean-up job|FAIL|it ran'];
+    exception when others then
+      res := res || array['17f|B cannot start the clean-up job|PASS|refused'];
+    end;
+    execute 'reset role';
+    perform set_config('request.jwt.claims', '', true);
+    select count(*) into n from public.cleanup_settings where id = 1 and mode is not distinct from g;
+    select count(*) into k from public.phones where user_id = a and phone_id = 'iso-test-phone-A' and app_version = 'V133';
+    res := res || array['17g|A''s phone and the job''s mode are unchanged|'
+                  || case when k = 1 and n = 1 then 'PASS|mode: ' || coalesce(g, '?') else 'FAIL|' || case when k <> 1 then 'A''s phone changed' else 'the mode changed' end end];
+    delete from public.phones where phone_id like 'iso-test-%';
   end if;
 
   delete from public.sessions where id like 'iso-test-%';

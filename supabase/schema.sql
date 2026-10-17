@@ -508,4 +508,226 @@ grant execute on function public.my_role(uuid), public.can_read_org(uuid), publi
                           public.can_read_photo_file(text), public.can_wipe_photo_file(text)
   to authenticated;
 
+
+
+-- ================================================================ V133
+-- The clean-up job, part 1 (old delete markers, report-only to begin with)
+-- and the phones table. Existing projects: supabase/v133-cleanup.sql (plus
+-- self-checks C1–C7). Kept in step with it by harness group 71.
+
+-- ------------------------------------------------------------ the scheduler
+-- Supabase Cron (pg_cron). Same as Dashboard → Integrations → Cron → Enable.
+create extension if not exists pg_cron with schema pg_catalog;
+grant usage on schema cron to postgres;
+grant all privileges on all tables in schema cron to postgres;
+
+
+-- ------------------------------------------------------------ phones (4A)
+-- One row per phone per account. The phone sends user_id, phone_id and
+-- app_version only; the database fills the rest, so a phone can't claim a time,
+-- a sign-in or a version number it didn't report.
+create table if not exists public.phones (
+  user_id       uuid not null references auth.users(id) on delete cascade,
+  phone_id      text not null check (char_length(phone_id) between 8 and 64),
+  app_version   text not null check (char_length(app_version) <= 16),
+  version_num   integer,
+  auth_session  uuid,
+  first_seen    timestamptz not null default now(),
+  seen_at       timestamptz not null default now(),
+  primary key (user_id, phone_id)
+);
+create index if not exists phones_session on public.phones (auth_session);
+
+-- 'V133' → 133, 'V133.1' → 133; anything else → null (treated as too old).
+create or replace function public.app_version_num(v text)
+returns integer language sql immutable set search_path = '' as $$
+  select nullif(substring(coalesce(v, '') from '^[Vv]([0-9]{1,6})'), '')::integer
+$$;
+
+create or replace function public.phones_stamp()
+returns trigger language plpgsql set search_path = '' as $$
+declare
+  sid text := nullif(coalesce(current_setting('request.jwt.claims', true), ''), '')::jsonb ->> 'session_id';
+begin
+  new.version_num := public.app_version_num(new.app_version);
+  new.seen_at := now();
+  if tg_op = 'INSERT' then
+    new.first_seen := now();
+  else
+    new.first_seen := old.first_seen;
+  end if;
+  -- The sign-in this report arrived on. Kept from before when a request carries
+  -- none (the dashboard), never taken from what the phone sent.
+  if sid ~ '^[0-9a-fA-F-]{36}$' then
+    new.auth_session := sid::uuid;
+  elsif tg_op = 'UPDATE' then
+    new.auth_session := old.auth_session;
+  else
+    new.auth_session := null;
+  end if;
+  return new;
+end $$;
+
+drop trigger if exists phones_stamp on public.phones;
+create trigger phones_stamp before insert or update on public.phones
+  for each row execute function public.phones_stamp();
+
+alter table public.phones enable row level security;
+drop policy if exists "read own phones" on public.phones;
+drop policy if exists "add own phones" on public.phones;
+drop policy if exists "change own phones" on public.phones;
+create policy "read own phones" on public.phones
+  for select to authenticated using (user_id = (select auth.uid()));
+create policy "add own phones" on public.phones
+  for insert to authenticated with check (user_id = (select auth.uid()));
+create policy "change own phones" on public.phones
+  for update to authenticated
+  using (user_id = (select auth.uid())) with check (user_id = (select auth.uid()));
+revoke all on public.phones from anon;
+revoke delete, truncate, references, trigger on public.phones from authenticated;
+grant select, insert, update on public.phones to authenticated;
+
+
+-- ------------------------------------------------------------ the job's settings
+-- One row. Not reachable from the app at all (no rules = no rows for anyone).
+create table if not exists public.cleanup_settings (
+  id           integer primary key default 1 check (id = 1),
+  mode         text not null default 'report' check (mode in ('report','clear')),
+  marker_days  integer not null default 365 check (marker_days >= 365),
+  phone_days   integer not null default 730 check (phone_days >= 365),
+  min_version  integer not null default 133 check (min_version >= 133),
+  updated_at   timestamptz not null default now()
+);
+insert into public.cleanup_settings (id) values (1) on conflict (id) do nothing;
+alter table public.cleanup_settings enable row level security;
+revoke all on public.cleanup_settings from anon, authenticated;
+
+-- One line per run (6A). Table Editor → cleanup_runs.
+create table if not exists public.cleanup_runs (
+  id                     bigint generated always as identity primary key,
+  ran_at                 timestamptz not null default now(),
+  mode                   text not null,
+  cutoff                 timestamptz not null,
+  accounts               integer not null default 0,
+  accounts_held          integer not null default 0,
+  job_markers_kept       integer not null default 0,
+  record_markers         integer not null default 0,
+  photo_markers          integer not null default 0,
+  photo_markers_file_left integer not null default 0,
+  markers_held           integer not null default 0,
+  records_cleared        integer not null default 0,
+  photos_cleared         integer not null default 0,
+  held                   jsonb not null default '[]'::jsonb,
+  note                   text not null default ''
+);
+alter table public.cleanup_runs enable row level security;
+revoke all on public.cleanup_runs from anon, authenticated;
+
+
+-- ------------------------------------------------------------ the job
+-- check_only = true: a report whatever the mode (the self-check below uses it).
+-- ⚠ JOB MARKERS ARE NEVER DELETED HERE (3A). There is deliberately no
+-- statement that removes rows from public.sessions; the self-check and the
+-- app's harness (group 71) both fail if one appears.
+create or replace function public.run_cleanup(check_only boolean default false)
+returns bigint language plpgsql security definer set search_path = '' as $$
+declare
+  s public.cleanup_settings%rowtype;
+  cut timestamptz;
+  win timestamptz;
+  clearing boolean;
+  n_acc int; n_held int; n_jobs int; n_rec int; n_ph int; n_left int; n_mheld int;
+  n_rc int := 0; n_pc int := 0;
+  held_list jsonb;
+  run_id bigint;
+begin
+  select * into s from public.cleanup_settings where id = 1;
+  if not found then
+    insert into public.cleanup_settings (id) values (1) returning * into s;
+  end if;
+  cut := now() - make_interval(days => greatest(s.marker_days, 365));
+  win := now() - make_interval(days => s.phone_days);
+  clearing := (s.mode = 'clear') and not check_only;
+
+  -- Who is held back (4A): an account with a sign-in used inside the window
+  -- whose phone has not reported min_version or later on THAT sign-in. Then
+  -- every business such an account belongs to, so a teammate's rows wait too.
+  drop table if exists pg_temp._cl_held_users;
+  create temp table pg_temp._cl_held_users on commit drop as
+  select ses.user_id,
+         count(*) filter (where p.user_id is null)::int as not_reported,
+         count(*) filter (where p.user_id is not null)::int as older
+  from auth.sessions ses
+  left join public.phones p on p.user_id = ses.user_id and p.auth_session = ses.id
+  where greatest(ses.created_at, ses.updated_at, ses.refreshed_at at time zone 'UTC') > win
+    and (p.user_id is null or coalesce(p.version_num, 0) < s.min_version)
+  group by ses.user_id;
+
+  drop table if exists pg_temp._cl_held_orgs;
+  create temp table pg_temp._cl_held_orgs on commit drop as
+  select distinct m.org_id from public.memberships m join pg_temp._cl_held_users h on h.user_id = m.user_id;
+
+  select count(*) into n_acc from auth.users;
+  select count(*) into n_held from pg_temp._cl_held_users;
+  select count(*) into n_jobs from public.sessions where deleted and updated_at < cut;
+
+  select count(*) filter (where not hold), count(*) filter (where hold)
+    into n_rec, n_mheld
+  from (select (r.user_id in (select user_id from pg_temp._cl_held_users)
+                or r.org_id in (select org_id from pg_temp._cl_held_orgs)) as hold
+        from public.records r where r.deleted and r.updated_at < cut) x;
+
+  select count(*) filter (where not hold and not file_left),
+         count(*) filter (where not hold and file_left),
+         n_mheld + count(*) filter (where hold)
+    into n_ph, n_left, n_mheld
+  from (select (p.user_id in (select user_id from pg_temp._cl_held_users)
+                or p.org_id in (select org_id from pg_temp._cl_held_orgs)) as hold,
+               exists (select 1 from storage.objects o
+                       where o.bucket_id = 'photos'
+                         and o.name in (p.storage_path, regexp_replace(p.storage_path, '\.jpg$', '_t.jpg'))) as file_left
+        from public.photos p where p.deleted and p.updated_at < cut) x;
+
+  select coalesce(jsonb_agg(jsonb_build_object(
+           'email', coalesce(u.email, h.user_id::text),
+           'phones_not_reported', h.not_reported,
+           'phones_older', h.older) order by u.email), '[]'::jsonb)
+    into held_list
+  from pg_temp._cl_held_users h left join auth.users u on u.id = h.user_id;
+
+  if clearing then
+    delete from public.records r
+    where r.deleted and r.updated_at < cut
+      and r.user_id not in (select user_id from pg_temp._cl_held_users)
+      and r.org_id not in (select org_id from pg_temp._cl_held_orgs);
+    get diagnostics n_rc = row_count;
+
+    delete from public.photos p
+    where p.deleted and p.updated_at < cut
+      and p.user_id not in (select user_id from pg_temp._cl_held_users)
+      and p.org_id not in (select org_id from pg_temp._cl_held_orgs)
+      and not exists (select 1 from storage.objects o
+                      where o.bucket_id = 'photos'
+                        and o.name in (p.storage_path, regexp_replace(p.storage_path, '\.jpg$', '_t.jpg')));
+    get diagnostics n_pc = row_count;
+  end if;
+
+  insert into public.cleanup_runs (mode, cutoff, accounts, accounts_held, job_markers_kept,
+                                   record_markers, photo_markers, photo_markers_file_left,
+                                   markers_held, records_cleared, photos_cleared, held, note)
+  values (case when check_only then 'check' else s.mode end, cut, n_acc, n_held, n_jobs,
+          n_rec, n_ph, n_left, n_mheld, n_rc, n_pc, held_list,
+          case when clearing then 'cleared' else 'report only — nothing cleared' end)
+  returning id into run_id;
+  return run_id;
+end $$;
+
+revoke all on function public.run_cleanup(boolean) from public, anon, authenticated;
+revoke all on function public.phones_stamp() from public, anon, authenticated;
+
+
+-- ------------------------------------------------------------ the schedule (5A)
+-- Sunday 02:17 UTC. Scheduling the same name again replaces it.
+select cron.schedule('patgo-cleanup', '17 2 * * 0', 'select public.run_cleanup()');
+
 -- Done. Next: run supabase/isolation-test.sql and check all rows say PASS.
