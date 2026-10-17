@@ -21,7 +21,7 @@
      70c  an ordinary header is drawn exactly as before — one call per line,
           same x, same y, same text — with a logo and without.
      70d  one over-long word (a web address) is broken, not left running off.
-     70f  release: V132, cache, What's new V132 (one line), changelog.
+     70f  (retired V133 → 71f) release: V132, cache, What's new V132 (one line), changelog.
 
    ⚠ Like 57b/57c, 70a–70d load the REAL vendored jsPDF into the sandbox. A
    stub that "measures" text would let a wrong width pass. */
@@ -195,26 +195,5 @@ module.exports = async function run() {
     t.ok(h.addr.every(c => c.x - h.width(c) >= 40 + 120 + 12 - 0.01), 'every piece clears the logo');
   });
 
-  /* ------------------------------------------------------------------ 70f */
-  // (69f → 70f: V131's release checks are V132's now.)
-  await t.group('70f — release: V132, cache, What’s new V132, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V132', 'APP_VERSION V132');
-    t.eq(app.run('WELCOME_VERSION'), 'V132', 'What’s new rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v132';", 'cache key pat-v132');
-    const core = read('render-core.js');
-    const open = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheet = core.slice(open, core.indexOf('</ul>', open));
-    t.eq((sheet.match(/<li>/g) || []).length, 1, 'one line');
-    t.includes(sheet, '<li><strong>Long company names fit.</strong>', 'the line: long company names');
-    t.excludes(sheet, 'Certificates count as exported', 'V131’s copy gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V132</strong>'), b = help.indexOf('<p><strong>V131</strong>'), c = help.indexOf('<p><strong>V130</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V132, V131, V130');
-    t.excludes(help, '<p><strong>V129</strong>', 'V129 rolled off');
-    t.excludes(help, 'Easier with VoiceOver: + New job lands on the new job form', 'V129’s line gone with it');
-    t.includes(help, 'A long company name or address line now wraps neatly at the top of the certificate', 'About: V132’s line');
-    t.includes(help, 'Certificates count as exported: a job whose certificate was made after locking', 'About: V131’s line still there');
-    t.includes(help, 'Tidying up behind the scenes, and the Privacy note brought up to date.', 'About: V130’s line still there');
-  });
+  // 70f retired V133 (→ 71f): the release checks move with each release.
 };
