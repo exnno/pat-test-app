@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V132';",
-    to:   "const APP_VERSION = 'V131';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V133';",
+    to:   "const APP_VERSION = 'V132';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 70f see it.
-    from: '        <p><strong>V130</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V129</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V130</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 70f)',
+    // oldest, so 15j's check still matches; 09w and 71f see it.
+    from: '        <p><strong>V131</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V130</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V131</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 71f)',
   },
 
   {
@@ -6091,10 +6091,11 @@ const MUTATIONS = [
     // V129: welcome rolled — re-aimed at V129's line; 67f pinned it.
     // V130: no welcome (5A) — V129's sheet stays, so the anchor stays; 68f pinned it.
     // V131: welcome rolled — re-aimed at V131's first line; 69f pinned it.
-    // V132: welcome rolled (one line) — re-aimed at it; 70f pins it.
+    // V132: welcome rolled (one line) — re-aimed at it; 70f pinned it.
+    // V133: no What's new (6A) — V132's sheet stays, so the anchor stays; 71f pins it.
     from: "<li><strong>Long company names fit.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (70f)",
+    why:  "11A: the welcome says plainly what changed on screen (71f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8374,13 +8375,8 @@ const MUTATIONS = [
     to:   "]).then((v) => v);",
     why:  "a timer per photo left to fire for nothing, ten seconds after every upload (68d)",
   },
-  {
-    name: "M1189 (V130) the About changelog loses V130's line",
-    file: "render-help.js",
-    from: "Tidying up behind the scenes, and the Privacy note brought up to date.",
-    to:   "Better.",
-    why:  "the About page must say what changed in this version (70f)",
-  },
+  // M1189 (V130's About line) RETIRED V133: V130 rolled off the About page (71f
+  // checks it is gone).
   // M1190 (V130: What's new NOT rolled) RETIRED V131: V131 rolls it (M1212).
   // ---- V131 (1A 2A 3A 4A 5A · 6B 7A 8A 9A): certificates count as exported; Mark as not exported. Group 69 + M1191–M1214. ----
   {
@@ -8541,7 +8537,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Certificates count as exported: a job whose certificate was made after locking",
     to:   "Better",
-    why:  "the About page must say what changed in this version (70f)",
+    why:  "the About page must say what changed in this version (71f)",
   },
 
   // ---- V132 (1A 2A): a long company name / address on the certificate wraps. Group 70 + M1215–M1223. ----
@@ -8590,23 +8586,138 @@ const MUTATIONS = [
   {
     name: "M1221 (V132) What's new not rolled",
     file: "config.js",
+    // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     from: "const WELCOME_VERSION = 'V132';",
     to:   "const WELCOME_VERSION = 'V131';",
-    why:  "a behaviour release says what's new (70f)",
+    why:  "a behaviour release says what's new — and V133 keeps V132's (71f)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
     file: "render-core.js",
     from: "instead of running into your logo.</li>\n",
     to:   "instead of running into your logo.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (70f)",
+    why:  "one line (71f)",
   },
   {
     name: "M1223 (V132) the About changelog loses V132's line",
     file: "render-help.js",
     from: "A long company name or address line now wraps neatly at the top of the certificate",
     to:   "Better",
-    why:  "the About page must say what changed in this version (70f)",
+    why:  "the About page must say what changed in this version (71f)",
+  },
+
+  // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
+  {
+    name: "M1224 (V133) a reading run never reports the phone",
+    file: "sync.js",
+    from: "        .then((out) => (reads ? _syncPhoneReport(c, uid).then(() => out) : out));",
+    to:   "        .then((out) => out);",
+    why:  "4A: no phone ever reports, so the job holds every account back for ever (71b)",
+  },
+  {
+    name: "M1225 (V133) \"Re-send all jobs\" reports too",
+    file: "sync.js",
+    from: "        .then((out) => (reads ? _syncPhoneReport(c, uid).then(() => out) : out));",
+    to:   "        .then((out) => (true ? _syncPhoneReport(c, uid).then(() => out) : out));",
+    why:  "the report rides reading runs only, like photos (71d)",
+  },
+  {
+    name: "M1226 (V133) a phone reports on every run",
+    file: "sync.js",
+    from: "  if (fresh) return false;\n",
+    to:   "",
+    why:  "a request every run for nothing — daily is enough (71a 71b)",
+  },
+  {
+    name: "M1227 (V133) a failed report is tried on every run",
+    file: "sync.js",
+    from: "  return !failedLately;\n",
+    to:   "  return true;\n",
+    why:  "before Peter runs the SQL every reading run would make a failing request (71a 71c)",
+  },
+  {
+    name: "M1228 (V133) a failed report fails the run",
+    file: "sync.js",
+    from: "    console.error('Sync: phone version not reported this time (non-fatal).', e);\n    return false;\n",
+    to:   "    throw e;\n",
+    why:  "fail-soft: a report that can't go must never stop or change a sync (71c)",
+  },
+  {
+    name: "M1229 (V133) a new phone id every time",
+    file: "sync.js",
+    from: "  if (typeof p.id === 'string' && /^[0-9a-f-]{16,64}$/i.test(p.id)) return p.id;\n",
+    to:   "",
+    why:  "one phone would look like a new phone every day, and its old rows would never update (71b)",
+  },
+  {
+    name: "M1230 (V133) the report is keyed on the phone id alone",
+    file: "sync.js",
+    from: "{ user_id: uid, phone_id: id, app_version: APP_VERSION }, { onConflict: 'user_id,phone_id' })",
+    to:   "{ user_id: uid, phone_id: id, app_version: APP_VERSION }, { onConflict: 'phone_id' })",
+    why:  "the table's key is (user_id, phone_id) — one phone may carry two accounts (71b)",
+  },
+  {
+    name: "M1231 (V133) the report claims another version",
+    file: "sync.js",
+    from: "{ user_id: uid, phone_id: id, app_version: APP_VERSION }, { onConflict: 'user_id,phone_id' })",
+    to:   "{ user_id: uid, phone_id: id, app_version: 'V132' }, { onConflict: 'user_id,phone_id' })",
+    why:  "the job decides on the version reported (71b)",
+  },
+  {
+    name: "M1232 (V133) another account on the phone is not noticed",
+    file: "sync.js",
+    from: "p.v === APP_VERSION && p.u === uid && at > 0",
+    to:   "p.v === APP_VERSION && at > 0",
+    why:  "the second account's phone row would wait a day — held back meanwhile (71a 71b)",
+  },
+  {
+    name: "M1233 (V133) a successful report is still counted as a failure",
+    file: "sync.js",
+    from: "        delete q.tried;   // only a FAILED try makes the next one wait\n",
+    to:   "",
+    why:  "harmless today (a success's try is older than its time) — so this one is caught by a test that moves the time back (71b)",
+  },
+  {
+    name: "M1234 (V133) the phone id goes at every reset level",
+    file: "reset.js",
+    from: "  ['PHONE_KEY', PHONE_KEY, 'account'],",
+    to:   "  ['PHONE_KEY', PHONE_KEY, 'work'],",
+    why:  "it goes with the sign-in, like the plan (71e)",
+  },
+  {
+    name: "M1235 (V133) the job starts in clear mode",
+    file: "supabase/v133-cleanup.sql",
+    from: "mode         text not null default 'report' check (mode in ('report','clear'))",
+    to:   "mode         text not null default 'clear' check (mode in ('report','clear'))",
+    why:  "2A: report-only to begin with (71g)",
+  },
+  {
+    name: "M1236 (V133) markers younger than 12 months may go",
+    file: "supabase/v133-cleanup.sql",
+    from: "marker_days  integer not null default 365 check (marker_days >= 365)",
+    to:   "marker_days  integer not null default 365 check (marker_days >= 30)",
+    why:  "3A and V128: a phone away 9 months must still find its markers (71g; self-check C4)",
+  },
+  {
+    name: "M1237 (V133) schema.sql forgets the schedule",
+    file: "supabase/schema.sql",
+    from: "select cron.schedule('patgo-cleanup', '17 2 * * 0', 'select public.run_cleanup()');",
+    to:   "",
+    why:  "a new project would never run the job (71g)",
+  },
+  {
+    name: "M1238 (V133) the About changelog loses V133's line",
+    file: "render-help.js",
+    from: "Behind the scenes: a signed-in phone now tells the cloud which version of PATGo it is running",
+    to:   "Better",
+    why:  "the About page must say what changed in this version (71f)",
+  },
+  {
+    name: "M1239 (V133) Privacy doesn't mention the version report",
+    file: "render-help.js",
+    from: "A signed-in phone also tells the cloud which version of the app it is running. ",
+    to:   "",
+    why:  "V130's honest Privacy note stays honest (71f)",
   },
 
 ];

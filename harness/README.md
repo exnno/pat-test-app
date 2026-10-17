@@ -226,3 +226,8 @@ bug; leaving it red trains everyone to ignore the suite.
   twelve broken copies of the migration were each caught by them. The stand-in
   is not committed: it is a test aid, not the real Supabase, and a pass there
   does not replace Peter's run on the test project.
+  V133 did the same for `supabase/v133-cleanup.sql` (self-checks C1–C7) and
+  isolation 17a–17g, with a pg_cron stand-in (a `cron.job` table and
+  `cron.schedule`), a seeded scenario (reported / unreported / older phones, a
+  teammate held, a photo whose file is still there) run in report and clear
+  mode, and ten broken copies each caught. Group 71g pins the SQL's text.
