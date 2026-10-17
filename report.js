@@ -548,6 +548,7 @@ function buildReportDoc(session, photoData) {
 
   // ----- Header band: logo (left) + company (right) -----
   let headerBottom = y;
+  let logoRight = 0;   // V132: right edge of the drawn logo (0 = no logo drawn)
   if (rs.logo) {
     try {
       // Logo is a PNG data URL, downscaled on upload. Render at up to 120x60pt,
@@ -560,17 +561,33 @@ function buildReportDoc(session, photoData) {
         else { h = 60; w = 60 * ratio; }
       }
       doc.addImage(rs.logo, 'PNG', margin, y, w, h);
+      logoRight = margin + w;
       headerBottom = Math.max(headerBottom, y + h);
     } catch (e) { /* a bad logo never blocks the report */ }
   }
   if (rs.companyName || rs.companyAddress) {
+    // V132 (1A 2A): a name or address line too long for the room beside the
+    // logo wraps onto further right-aligned lines; it used to run into the logo,
+    // or off the left of the page with no logo. The room is measured against the
+    // logo actually drawn (2A) — a square logo is narrower, so text gets more.
+    // jsPDF's splitTextToSize returns a line that fits exactly as given (checked
+    // V132: spaces, tabs, Unicode), and breaks a single over-long word (a web
+    // address) too — so an ordinary header is drawn exactly as before (70c).
+    // ⚠ Set the font BEFORE fitLines: splitTextToSize measures in the current
+    // font, and the name (13pt bold) and address (9pt) differ.
+    const room = (pageW - margin) - (logoRight ? logoRight + 12 : margin);
+    const fitLines = (s) => doc.splitTextToSize(s, room);
     doc.setFontSize(13); doc.setFont(undefined, 'bold');
     let ty = y + 12;
-    if (rs.companyName) { doc.text(String(rs.companyName), pageW - margin, ty, { align: 'right' }); ty += 16; }
+    if (rs.companyName) {
+      fitLines(String(rs.companyName)).forEach(l => { doc.text(l, pageW - margin, ty, { align: 'right' }); ty += 16; });
+    }
     doc.setFontSize(9); doc.setFont(undefined, 'normal');
     if (rs.companyAddress) {
       String(rs.companyAddress).split('\n').forEach(line => {
-        if (line.trim()) { doc.text(line.trim(), pageW - margin, ty, { align: 'right' }); ty += 12; }
+        if (line.trim()) {
+          fitLines(line.trim()).forEach(l => { doc.text(l, pageW - margin, ty, { align: 'right' }); ty += 12; });
+        }
       });
     }
     headerBottom = Math.max(headerBottom, ty);

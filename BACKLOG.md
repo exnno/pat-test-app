@@ -8,6 +8,24 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V132
+V132 = C — a long company name / address on the certificate's top-right
+block (V119.1 residual). Checked first: it overflowed (wide logo: name past
+~53 chars hit the logo; no logo: past ~72 ran off the page). Peter 16 Oct:
+1A wrap onto right-aligned lines, title moves down; 2A room measured against
+the logo actually drawn. report.js header band only. Harness group 70 (real
+jsPDF) + M1215–M1223; 69f → 70f; M1176, M1212, M1213 retired. Welcome rolled.
+**Next:** D (more focus stand-ins) and E (the 21 status banners) stay parked
+for Peter's real-iPhone VoiceOver run-through. Then the clean-up job (server)
+and Stage 13 Stripe.
+
+### V132 residuals (known, accepted)
+- A very long name AND address make the header taller, so the title and the
+  details move down the page (1A — nothing is shrunk). Ordinary headers are
+  unchanged.
+- The company name / address fields still have no length limit; with wrapping
+  none is needed.
+
 ### Next after V131
 V131 = A — certificates count as exported (Peter 16 Oct: 1A 2A 3A 4A 5A, plus
 the undo he asked for in the same round: 6B 7A 8A 9A). session.js
@@ -17,11 +35,7 @@ nudge shows the jobs ('notdone', transient) — `bulkExportUnexported` retired;
 "Mark as not exported" on the "Already exported" pop-up (CSV mark only).
 Pruning and the pop-up stay CSV-only. Harness group 69 + M1191–M1214; 68f →
 69f; M1154, M1175, M1190 retired. Welcome rolled.
-**Next: C** — a long company name / address on the certificate's top-right
-block (V119.1 residual): check first, fix only if it overflows. Parked
-(Peter, 16 Oct): D (more focus stand-ins) and E (the 21 status banners) —
-wait for Peter's real-iPhone VoiceOver run-through. Then the clean-up job
-(server) and Stage 13 Stripe.
+C shipped V132 (above).
 
 ### V131 residuals (known, accepted)
 - A certificate made BEFORE locking still doesn't count (1A — the reminder's

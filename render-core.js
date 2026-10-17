@@ -252,8 +252,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Certificates count as exported.</strong> A job whose certificate you made after locking it now shows &ldquo;Certificate&rdquo; on the Jobs list. Tap &ldquo;not yet exported&rdquo; to see the jobs still to do.</li>
-        <li><strong>Exported by mistake?</strong> The &ldquo;Already exported&rdquo; message now has &ldquo;Mark as not exported&rdquo;, so it stops asking.</li>
+        <li><strong>Long company names fit.</strong> A long company name or address line now wraps neatly at the top of your certificate, instead of running into your logo.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
