@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V131';",
-    to:   "const APP_VERSION = 'V130';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V132';",
+    to:   "const APP_VERSION = 'V131';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 69f see it.
-    from: '        <p><strong>V129</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V128</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V129</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 69f)',
+    // oldest, so 15j's check still matches; 09w and 70f see it.
+    from: '        <p><strong>V130</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V129</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V130</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 70f)',
   },
 
   {
@@ -6090,10 +6090,11 @@ const MUTATIONS = [
     // V128: welcome rolled — re-aimed at V128's line; 66f pinned it.
     // V129: welcome rolled — re-aimed at V129's line; 67f pinned it.
     // V130: no welcome (5A) — V129's sheet stays, so the anchor stays; 68f pinned it.
-    // V131: welcome rolled — re-aimed at V131's first line; 69f pins it.
-    from: "<li><strong>Certificates count as exported.</strong>",
+    // V131: welcome rolled — re-aimed at V131's first line; 69f pinned it.
+    // V132: welcome rolled (one line) — re-aimed at it; 70f pins it.
+    from: "<li><strong>Long company names fit.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (69f)",
+    why:  "11A: the welcome says plainly what changed on screen (70f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8284,13 +8285,9 @@ const MUTATIONS = [
   },
   // M1175 (V129's one-line What's new) RETIRED V131: that sheet's copy is gone.
   // V131's sheet is two lines; 69f pins it (M1213).
-  {
-    name: "M1176 (V129) the About changelog loses V129's line",
-    file: "render-help.js",
-    from: "Easier with VoiceOver: + New job lands on the new job form",
-    to:   "Better",
-    why:  "the About page must say what changed in this version (69f)",
-  },
+  // M1176 (V129's About line) RETIRED V132: V129 rolled off the About page (70f
+  // checks it is gone).
+
 
   // ---- V130 (1B 2A 3A 4A 5A): housekeeping + the Privacy note. Group 68, 01l, 01m + M1177–M1190. ----
   {
@@ -8382,7 +8379,7 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Tidying up behind the scenes, and the Privacy note brought up to date.",
     to:   "Better.",
-    why:  "the About page must say what changed in this version (69f)",
+    why:  "the About page must say what changed in this version (70f)",
   },
   // M1190 (V130: What's new NOT rolled) RETIRED V131: V131 rolls it (M1212).
   // ---- V131 (1A 2A 3A 4A 5A · 6B 7A 8A 9A): certificates count as exported; Mark as not exported. Group 69 + M1191–M1214. ----
@@ -8535,30 +8532,84 @@ const MUTATIONS = [
     to:   "    showToast('CSV copied to clipboard');\n",
     why:  "9A: copy-paste is a real way of sending the data (69e)",
   },
-  {
-    name: "M1212 (V131) What's new not rolled",
-    file: "config.js",
-    from: "const WELCOME_VERSION = 'V131';",
-    to:   "const WELCOME_VERSION = 'V130';",
-    why:  "5A: a feature release says what's new (69f)",
-  },
-  {
-    name: "M1213 (V131) the What's new sheet gains a third line",
-    file: "render-core.js",
-    from: "so it stops asking.</li>\n",
-    to:   "so it stops asking.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "two lines (69f)",
-  },
+  // M1212 (V131: What's new not rolled, anchored on 'V131') RETIRED V132: V132 rolls it (M1221).
+
+  // M1213 (V131's two-line sheet) RETIRED V132: that copy is gone; V132's one line is M1222.
+
   {
     name: "M1214 (V131) the About changelog loses V131's line",
     file: "render-help.js",
     from: "Certificates count as exported: a job whose certificate was made after locking",
     to:   "Better",
-    why:  "the About page must say what changed in this version (69f)",
+    why:  "the About page must say what changed in this version (70f)",
+  },
+
+  // ---- V132 (1A 2A): a long company name / address on the certificate wraps. Group 70 + M1215–M1223. ----
+  {
+    name: "M1215 (V132) the header text is never wrapped",
+    file: "report.js",
+    from: "    const fitLines = (s) => doc.splitTextToSize(s, room);",
+    to:   "    const fitLines = (s) => [s];",
+    why:  "1A: a long name runs into the logo or off the page — the V119.1 residual itself (70a)",
+  },
+  {
+    name: "M1216 (V132) the room ignores the logo",
+    file: "report.js",
+    from: "    const room = (pageW - margin) - (logoRight ? logoRight + 12 : margin);",
+    to:   "    const room = (pageW - margin) - margin;",
+    why:  "1A: text wraps at the page edge but still runs into the logo (70b)",
+  },
+  {
+    name: "M1217 (V132) the drawn logo's edge is never recorded",
+    file: "report.js",
+    from: "      logoRight = margin + w;\n",
+    to:   "",
+    why:  "the room is measured as if there were no logo — same symptom as M1216, through the other line (70b)",
+  },
+  {
+    name: "M1218 (V132) the room assumes the widest logo",
+    file: "report.js",
+    from: "      logoRight = margin + w;\n",
+    to:   "      logoRight = margin + 120;\n",
+    why:  "2A: a square logo is narrower, so its text gets more room before it wraps (70b)",
+  },
+  {
+    name: "M1219 (V132) an address line is never wrapped",
+    file: "report.js",
+    from: "          fitLines(line.trim()).forEach(l => {",
+    to:   "          [line.trim()].forEach(l => {",
+    why:  "1A covers the address as well as the name (70a)",
+  },
+  {
+    name: "M1220 (V132) a wrapped name's lines all print on one line",
+    file: "report.js",
+    from: "      fitLines(String(rs.companyName)).forEach(l => { doc.text(l, pageW - margin, ty, { align: 'right' }); ty += 16; });",
+    to:   "      fitLines(String(rs.companyName)).forEach(l => { doc.text(l, pageW - margin, ty, { align: 'right' }); }); ty += 16;",
+    why:  "the wrapped lines would print on top of each other, and the address over them (70a)",
+  },
+  {
+    name: "M1221 (V132) What's new not rolled",
+    file: "config.js",
+    from: "const WELCOME_VERSION = 'V132';",
+    to:   "const WELCOME_VERSION = 'V131';",
+    why:  "a behaviour release says what's new (70f)",
+  },
+  {
+    name: "M1222 (V132) the What's new sheet gains a second line",
+    file: "render-core.js",
+    from: "instead of running into your logo.</li>\n",
+    to:   "instead of running into your logo.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (70f)",
+  },
+  {
+    name: "M1223 (V132) the About changelog loses V132's line",
+    file: "render-help.js",
+    from: "A long company name or address line now wraps neatly at the top of the certificate",
+    to:   "Better",
+    why:  "the About page must say what changed in this version (70f)",
   },
 
 ];
-
 
 /* SPEED (V109 harness): two shortcuts, neither of which can turn a survivor
    into a "caught".
