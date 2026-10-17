@@ -29,7 +29,7 @@
      69d  6B 7A 8A: Mark as not exported — clears the CSV mark, keeps the
           certificate, says so, opens the job; next open asks nothing.
      69e  what stays CSV-only: pruning, the pop-up, Copy (9A).
-     69f  release: V131, cache, What's new V131 (two lines), changelog. */
+     69f  (retired V132 → 70f) release: V131, cache, What's new V131 (two lines), changelog. */
 
 'use strict';
 
@@ -239,27 +239,5 @@ module.exports = async function () {
     t.includes(read('csv.js'), "    showToast('CSV copied to clipboard');\n    markSessionExported(session);", 'Copy still counts as an export (9A)');
   });
 
-  /* ------------------------------------------------------------------ 69f */
-  // (68f → 69f: V130's release checks are V131's now.)
-  await t.group('69f — release: V131, cache, What’s new V131, changelog', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V131', 'APP_VERSION V131');
-    t.eq(app.run('WELCOME_VERSION'), 'V131', 'What’s new rolled (5A)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v131';", 'cache key pat-v131');
-    const core = read('render-core.js');
-    const open = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheet = core.slice(open, core.indexOf('</ul>', open));
-    t.eq((sheet.match(/<li>/g) || []).length, 2, 'two lines');
-    t.includes(sheet, '<li><strong>Certificates count as exported.</strong>', 'line 1: certificates');
-    t.includes(sheet, '<li><strong>Exported by mistake?</strong>', 'line 2: the undo');
-    t.excludes(sheet, 'Easier with VoiceOver', 'V129’s copy gone');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V131</strong>'), b = help.indexOf('<p><strong>V130</strong>'), c = help.indexOf('<p><strong>V129</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V131, V130, V129');
-    t.excludes(help, '<p><strong>V128</strong>', 'V128 rolled off');
-    t.excludes(help, 'Safer after a long time away: a phone that hasn', 'V128’s line gone with it');
-    t.includes(help, 'Certificates count as exported: a job whose certificate was made after locking', 'About: V131’s line');
-    t.includes(help, 'Tidying up behind the scenes, and the Privacy note brought up to date.', 'About: V130’s line still there');
-    t.includes(help, 'Easier with VoiceOver: + New job lands on the new job form', 'About: V129’s line still there');
-  });
+  // 69f retired V132 (→ 70f): the release checks move with each release.
 };
