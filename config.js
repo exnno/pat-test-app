@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V132';
+const APP_VERSION = 'V133';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -558,6 +558,16 @@ const SYNC_MARKER_DAYS = 365;
 const SYNC_STALE_DAYS = 274;          // ≈ 9 months (2A)
 const SYNC_CHECK_PAGE = 500;          // ids per request — under the server's 1000-row cap
 const SYNC_CHECK_MEMO_MS = 3600000;   // a finished check is reused for an hour (runs held open by a question)
+// V133 (Stage 12, the clean-up job part 1 — 4A). PHONE_KEY: this phone's private
+// id and when it last told the cloud which version it runs — shape
+// { id, v, u, at, tried } (sync.js _syncPhoneReport). The clean-up job
+// (supabase/v133-cleanup.sql) holds back an account's old markers while any
+// phone signed in to it has not reported V133 or later. Per device, NEVER in a
+// backup or a setup export (a restore onto another phone would make two phones
+// one). Reset this phone: 'account' — it goes with the sign-in.
+const PHONE_KEY = 'pat:phone';
+const PHONE_REPORT_MS = 86400000;     // same version and account: at most daily
+const PHONE_RETRY_MS = 3600000;       // a report that failed: again after an hour
 const SYNC_DAY_MS = 86400000;
 // v33: First-run wizard "seen" flag. Set once the wizard is completed OR skipped,
 // so it never reappears. Distinct from the welcome modal key: a genuinely-new

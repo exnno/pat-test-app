@@ -1912,10 +1912,77 @@ function _syncRun(o) {
               console.error('Sync: photos not sent this time (non-fatal).', e);
               return Object.assign(base, { photos: { error: true } });
             });
-        });
+        })
+        // V133 (4A): which phone, which version — LAST, on reading runs only,
+        // and it never rejects, so it can never fail or delay a run's result.
+        .then((out) => (reads ? _syncPhoneReport(c, uid).then(() => out) : out));
     });
     });   // V128: found.then
   }));
+}
+
+// ---- V133: which phone, which version (Stage 12, the clean-up job — 4A) ------
+// The clean-up job (supabase/v133-cleanup.sql) clears no account's old markers
+// while any phone signed in to it has not reported V133 or later. So a phone
+// reports, at the end of a reading run: its private id (PHONE_KEY — made here
+// once, never in a backup) and APP_VERSION. Nothing else: the DATABASE adds the
+// time, the version number and which sign-in the report came on, so the job can
+// tell a signed-in phone that never reported from one that did.
+// At most daily for the same version and account (PHONE_REPORT_MS); straight
+// away after an update or a new sign-in; a failed report waits an hour
+// (PHONE_RETRY_MS) — the SQL may not have been run yet, and a run should not
+// try every time. Fail-soft throughout: it resolves false, it never rejects.
+function _syncPhoneLoad() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PHONE_KEY) || 'null');
+    return (p && typeof p === 'object' && !Array.isArray(p)) ? p : {};
+  } catch (e) { return {}; }
+}
+function _syncPhoneSave(p) {
+  try { localStorage.setItem(PHONE_KEY, JSON.stringify(p)); } catch (e) { /* full phone: try next time */ }
+}
+function _syncPhoneNewId() {
+  try { if (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID(); } catch (e) { /* fall through */ }
+  let s = '';
+  for (let i = 0; i < 32; i++) s += Math.floor(Math.random() * 16).toString(16);
+  return s;
+}
+function syncPhoneId() {
+  const p = _syncPhoneLoad();
+  if (typeof p.id === 'string' && /^[0-9a-f-]{16,64}$/i.test(p.id)) return p.id;
+  p.id = _syncPhoneNewId();
+  _syncPhoneSave(p);
+  return p.id;
+}
+// Pure. A clock wound back makes a report due rather than never.
+function syncPhoneDue(p, uid, now) {
+  const at = (typeof p.at === 'number') ? p.at : 0;
+  const fresh = p.v === APP_VERSION && p.u === uid && at > 0 && now >= at && now - at < PHONE_REPORT_MS;
+  if (fresh) return false;
+  const failedLately = typeof p.tried === 'number' && p.tried > at && now >= p.tried && now - p.tried < PHONE_RETRY_MS;
+  return !failedLately;
+}
+function _syncPhoneReport(c, uid) {
+  return Promise.resolve().then(() => {
+    const id = syncPhoneId();
+    const p = _syncPhoneLoad();
+    if (!syncPhoneDue(p, uid, Date.now())) return false;
+    p.tried = Date.now();
+    _syncPhoneSave(p);
+    return c.from('phones')
+      .upsert({ user_id: uid, phone_id: id, app_version: APP_VERSION }, { onConflict: 'user_id,phone_id' })
+      .then((r) => {
+        if (r && r.error) throw r.error;
+        const q = _syncPhoneLoad();
+        q.v = APP_VERSION; q.u = uid; q.at = Date.now();
+        delete q.tried;   // only a FAILED try makes the next one wait
+        _syncPhoneSave(q);
+        return true;
+      });
+  }).catch((e) => {
+    console.error('Sync: phone version not reported this time (non-fatal).', e);
+    return false;
+  });
 }
 
 function _syncPushHalf(c, uid, st, force) {

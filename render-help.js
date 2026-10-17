@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V132: rolled forward — V132 on top, V129 dropped. -->
+      <!-- v8: rolling 3-version changelog. V133: rolled forward — V133 on top, V130 dropped. No What's new (6A). -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V133</strong> &middot; October 2026</p>
+        <p class="muted">Behind the scenes: a signed-in phone now tells the cloud which version of PATGo it is running, ready for the cloud&rsquo;s own tidying-up.</p>
         <p><strong>V132</strong> &middot; October 2026</p>
         <p class="muted">A long company name or address line now wraps neatly at the top of the certificate, instead of running into the logo or off the page.</p>
         <p><strong>V131</strong> &middot; October 2026</p>
         <p class="muted">Certificates count as exported: a job whose certificate was made after locking shows &ldquo;Certificate&rdquo; on the Jobs list, and the &ldquo;not yet exported&rdquo; line now shows those jobs. &ldquo;Mark as not exported&rdquo; on the &ldquo;Already exported&rdquo; message undoes an export made by mistake.</p>
-        <p><strong>V130</strong> &middot; October 2026</p>
-        <p class="muted">Tidying up behind the scenes, and the Privacy note brought up to date.</p>
 
 
         </div>
@@ -90,7 +90,7 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h3>Privacy</h3>
         <!-- V130 (4A): honest until the privacy terms replace it (Stage 12). -->
-        <p class="muted">Your test records, settings and saved descriptions are kept on this phone. If you sign in to a cloud account, a copy is also kept there so you can get it back on another phone. The app goes online to check for updates. Backups are saved only where you choose to save them.</p>
+        <p class="muted">Your test records, settings and saved descriptions are kept on this phone. If you sign in to a cloud account, a copy is also kept there so you can get it back on another phone. A signed-in phone also tells the cloud which version of the app it is running. The app goes online to check for updates. Backups are saved only where you choose to save them.</p>
       </div>
 
       <!-- v8: emergency reload — for the rare case where the app stops responding to

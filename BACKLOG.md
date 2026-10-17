@@ -8,6 +8,37 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V133
+V133 = the clean-up job, part 1 (Stage 12; Peter 17 Oct: 1A 2A 3A 4A 5A 6A).
+supabase/v133-cleanup.sql: `phones` table (own rows only), `cleanup_settings`
+(mode report|clear, marker_days ≥ 365, phone_days 730, min_version 133),
+`cleanup_runs` (one line per run), `run_cleanup(check_only)` (security
+definer, never deletes from sessions), pg_cron "patgo-cleanup" Sun 02:17 UTC.
+Phone: sync.js `_syncPhoneReport` (PHONE_KEY). Harness 71 + M1224–M1239.
+**D and E dropped for good** (Peter 17 Oct: "done enough … a fringe
+feature") — not offered again unless he asks.
+**Next:** Peter opens the cloud to a few testers (week of 19 Oct) while other
+bits are built. Still to come for the clean-up job: R8 lapsed-account deletion
+(after billing) and R7 7-year retention (nothing until 2033) — both need photo
+FILES removed, which SQL can't do (Supabase blocks storage deletes from SQL):
+that part is a server function. Then Stage 13 Stripe (pricing, Stripe account
+first).
+
+### V133 residuals (known, accepted)
+- Held-back rule is by sign-in: a phone OLDER than V128 that was signed OUT
+  when markers were cleared, and signs back in later, could send a deleted
+  client/site/photo row back once. Nobody runs pre-V128 now; testers start on
+  V133+. Job markers are never cleared, so jobs are not affected.
+- A sign-in idle for more than 2 years (phone_days) no longer holds its
+  account. V128+ phones protect themselves (the stale-phone check) anyway.
+- Peter's own old browser sign-ins (Mac tests, Guest windows) hold his account
+  until they report V133 or are signed out — the cleanup_runs line names the
+  account. Harmless in report mode.
+- Stage 16 carry: the minimum-version check before the first invite can now
+  read `phones` (V133+ phones report; older ones show as "not reported").
+- The job's notice "schema pg_temp does not exist, skipping" on a fresh
+  connection is cosmetic.
+
 ### Next after V132
 V132 = C — a long company name / address on the certificate's top-right
 block (V119.1 residual). Checked first: it overflowed (wide logo: name past

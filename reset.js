@@ -125,6 +125,8 @@ const RESET_KEY_PLAN = [
   ['CLOUD_AUTH_STORAGE_KEY', CLOUD_AUTH_STORAGE_KEY, 'account'],   // a PREFIX: supabase-js keeps several keys under it
   // V127: the plan record goes with the sign-in it belongs to.
   ['PLAN_KEY', PLAN_KEY, 'account'],
+  // V133: this phone's private id for the version report goes with the sign-in.
+  ['PHONE_KEY', PHONE_KEY, 'account'],
 ];
 
 // The certificate numbering kept at the settings level (8B). The number alone
