@@ -116,8 +116,8 @@ const SETTINGS_CATEGORIES = [
     pages: ['settingsDisplay', 'settingsReminders'] },   // V100 (7A): + Reminders
   { id: 'catData',    icon: 'database', title: 'Data', blurb: 'Backups, space on this phone, photos, moving your setup, and resetting this phone',
     pages: ['settingsBackup', 'settingsStorage', 'cloudStorage', 'photoManager', 'jobManager', 'settingsSetup', 'settingsReset'] },   // V106: + Reset (last). V108: + Cloud Storage after Phone Storage (1A)
-  { id: 'catHelp',    icon: 'info', title: 'Help', blurb: 'About this app, what the terms mean, and how to get in touch',
-    pages: ['settingsAbout', 'settingsGlossary', 'settingsContact'] }
+  { id: 'catHelp',    icon: 'info', title: 'Help', blurb: 'Tutorials, about this app, what the terms mean, and how to get in touch',
+    pages: ['settingsTutorials', 'settingsAbout', 'settingsGlossary', 'settingsContact'] }   // V134 (6A): + Tutorials, first
 ];
 
 // V115: every `icon` in SETTINGS_CATEGORIES and SETTINGS_PAGE_META is a Lucide
@@ -165,6 +165,7 @@ const SETTINGS_PAGE_META = {
   // only (render-settings.js settingsPageVisible); opened by its own function.
   cloudStorage:        { icon: 'cloud', title: 'Cloud Storage',          aliases: 'cloud storage space used size sizes biggest largest jobs photos total account megabytes mb gb delete free up', action: 'cs-open' },
   settingsSetup:       { icon: 'arrow-left-right', title: 'Export / Import Setup', aliases: 'setup share configuration new device employee copy presets transfer' },
+  settingsTutorials:   { icon: 'compass', title: 'Tutorials',             aliases: 'tutorial tutorials practice practise job learn how to use show me around tour walkthrough guide getting started new here help training' },   // V134 (6A)
   settingsAbout:       { icon: 'info', title: 'About',                 aliases: 'about version changelog whats new' },
   settingsGlossary:    { icon: 'book-open', title: 'Glossary',              aliases: 'glossary terms jargon what does mean definitions help explain quick pick smart multi pick preset asset session client site overview readings class earth insulation leakage polarity fail reason tag retest certificate template csv backup setup calibration pruning job locked setup file clearing old jobs' },
   settingsContact:     { icon: 'mail', title: 'Contact',              aliases: 'contact support email help feedback website' },

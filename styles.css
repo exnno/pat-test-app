@@ -120,6 +120,7 @@
   --pass-word: #15783a;   /* a touch darker than --pass-shadow, so it also clears the pale green asset-history badge */
   --fail-word: #b91c1c;
   --accent-word: #2563eb;
+  --tut-dim: rgba(15, 23, 42, 0.55);   /* V134: the practice job's dimmed surround */
   --fail-soft-bg: #fef2f2;
   --fail-soft-text: #991b1b;
   --fail-soft-border: #fecaca;
@@ -173,6 +174,7 @@
     --pass-word: #22c55e;
     --fail-word: #fa8f8f;
     --accent-word: #72b1fb;
+    --tut-dim: rgba(0, 0, 0, 0.62);
     --fail-soft-bg: #2d0a0a;
     --fail-soft-text: #fca5a5;
     --fail-soft-border: #7f1d1d;
@@ -220,6 +222,7 @@
   --pass-word: #22c55e;   /* V119: same as the media block above (55a) */
   --fail-word: #fa8f8f;
   --accent-word: #72b1fb;
+  --tut-dim: rgba(0, 0, 0, 0.62);
   --fail-soft-bg: #2d0a0a;
   --fail-soft-text: #fca5a5;
   --fail-soft-border: #7f1d1d;
@@ -2241,258 +2244,105 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 
 /* @@ tour */
-/* v42: full-screen feature walkthrough (decision 6-i). Its own view, NOT a modal
-   over the live app — it owns #app for its duration. Each slide shows a static
-   MOCK of a screen (the .tour-mock block) with one control highlighted, plus a
-   caption. The mocks reuse the app's colour variables so they read as the app. */
-.tour-wrap {
+/* V134: the practice job (tour.js). The screen underneath is the app's REAL
+   screen markup, drawn from the practice's own data, so it needs no styles of
+   its own — only these: the box that glides round the control being taught
+   (one node on <body> that stays put, so its position can transition), the
+   card that says what to do, and the rule that only the highlighted control
+   can be touched. Blue box (3B): PATGo's --accent in both themes. */
+.tut-wrap { position: relative; }
+.tut-practice {
+  pointer-events: none;
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-touch-callout: none;
+  /* Room below the screen, so any control can scroll up clear of the card. */
+  padding-bottom: 62vh;
+}
+.tut-still .fail-sheet,
+.tut-still .modal-backdrop { animation: none; }
+.tut-practice .tut-live,
+.tut-practice .tut-live * { pointer-events: auto; cursor: pointer; }
+
+.tut-ring {
+  position: fixed;
+  z-index: 900;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border: 3px solid var(--accent);
+  border-radius: 14px;
+  box-shadow: 0 0 0 9999px var(--tut-dim);
+  pointer-events: none;
+  box-sizing: border-box;
+  transition: top 350ms ease, left 350ms ease, width 350ms ease, height 350ms ease, border-color 200ms ease;
+}
+.tut-ring.tut-ring-snap { transition: none; }
+.tut-ring.tut-ring-none { border-color: transparent; }
+@media (prefers-reduced-motion: reduce) {
+  .tut-ring { transition: none; }
+}
+
+.tut-card {
+  position: fixed;
+  z-index: 901;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 24px);
+  max-width: 536px;
+  box-sizing: border-box;
+  padding: 16px 16px 14px;
+  background: var(--card-bg);
+  border: 1px solid var(--border-strong);
+  border-radius: 18px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.35);
+}
+.tut-card-bottom { bottom: calc(12px + env(safe-area-inset-bottom, 0px)); }
+.tut-card-top { top: calc(12px + env(safe-area-inset-top, 0px)); }
+.tut-count {
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--accent-word);
+  margin: 0 0 6px;
+}
+.tut-text {
+  font-size: 1.0625rem;
+  font-weight: 500;
+  line-height: 1.45;
+  color: var(--text);
+  margin: 0 0 14px;
+  outline: none;
+}
+.tut-btns { display: flex; gap: 10px; }
+.tut-btns .btn-secondary,
+.tut-btns .btn-primary { flex: 1; margin: 0; }
+
+/* The sample certificate: a sheet over the Overview, its pages drawn by the
+   app's own PDF preview code (pdfpreview.js). */
+.tut-cert {
+  position: fixed;
+  z-index: 300;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 560px;
+  height: 64vh;
+  box-sizing: border-box;
+  padding: 12px 12px 0;
+  background: var(--card-bg);
+  border-radius: 18px 18px 0 0;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  min-height: 100%;
-  padding: 12px 16px 24px;
-  box-sizing: border-box;
 }
-.tour-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 8px;
-}
-.tour-counter {
-  font-size: 0.75rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-}
-.tour-x {
-  background: none;
-  border: none;
-  font-size: 1.125rem;
-  line-height: 1;
-  color: var(--text-muted);
-  padding: 6px 8px;
-}
-.tour-stage {
-  display: flex;
-  justify-content: center;
-  align-items: flex-start;
-  padding: 8px 0 4px;
-  /* v45.1: the v45 min-height (360px) was shorter than the tallest mock (Quick
-     Pick), so that slide grew the stage and shifted everything below it — the jump
-     persisted. Size the stage to the TALLEST mock and top-align the mock, so every
-     slide reserves the same space and the caption/dots/nav never move. */
-  min-height: 440px;
-}
-/* The mock "phone screen" — a soft framed card the mock content sits inside. */
-.tour-mock {
-  width: 100%;
-  max-width: 320px;
-  background: var(--bg);
-  border: 1px solid var(--border-strong);
-  border-radius: 16px;
-  padding: 14px;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.12);
-}
-.tour-screen { display: flex; flex-direction: column; gap: 10px; }
-.tour-bar {
-  font-size: 0.8125rem;
-  font-weight: 700;
-  color: var(--text);
-  padding-bottom: 8px;
-  border-bottom: 1px solid var(--border);
-}
-.tour-cta {
-  width: 100%;
-  padding: 12px;
-  font-size: 0.875rem;
-  font-weight: 700;
-  border: none;
-  border-radius: 10px;
-  background: var(--accent);
-  color: #fff;
-}
-.tour-cta-ghost {
-  background: var(--card-bg);
-  color: var(--neutral-text);
-  border: 1px solid var(--border-strong);
-}
-.tour-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 8px;
-  background: var(--card-bg);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-}
-.tour-row-title { font-size: 0.8125rem; font-weight: 700; color: var(--text); }
-.tour-row-sub { font-size: 0.6875rem; color: var(--text-muted); margin-top: 2px; }
-.tour-chip {
-  font-size: 0.6875rem;
-  font-weight: 700;
-  padding: 4px 8px;
-  border-radius: 999px;
-  white-space: nowrap;
-}
-.tour-chip-ok   { background: var(--accent-soft); color: var(--pass-word); }
-.tour-chip-warn { background: var(--fail-soft-bg); color: var(--fail-soft-text); }
-.tour-input {
-  width: 100%;
-  padding: 10px 12px;
-  font-size: 0.875rem;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  background: var(--input-bg);
-  color: var(--text);
-  box-sizing: border-box;
-}
-.tour-input-strong { font-weight: 700; font-size: 0.9375rem; }
-.tour-field-label {
-  font-size: 0.625rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  margin-top: 2px;
-}
-.tour-field-hint { font-weight: 600; text-transform: none; color: var(--text-hint); letter-spacing: 0; }
-.tour-qp-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 8px;
-}
-/* Real item-type tiles are plain white cards (not green) — matched here. */
-.tour-qp {
-  padding: 14px 4px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  border-radius: 10px;
-  border: 1px solid var(--border-strong);
-  background: var(--card-bg);
-  color: var(--text);
-}
-/* The real PASS / FAIL bar at the bottom of the entry screen. */
-.tour-passfail { display: flex; gap: 8px; margin-top: 2px; }
-.tour-pf {
-  flex: 1;
-  padding: 16px 4px;
-  font-size: 0.9375rem;
-  font-weight: 800;
-  border: none;
-  border-radius: 12px;
-  color: #fff;
-}
-.tour-pf-pass { flex: 2; background: var(--pass); }
-.tour-pf-fail { background: var(--fail); }
-
-/* Overview slide — matches the real header line, button row, search and the
-   #/ITEM/RESULT table. */
-.tour-ov-summary { font-size: 0.75rem; color: var(--text); }
-.tour-ov-pass { color: var(--pass-word); font-weight: 700; }
-.tour-ov-fail { color: var(--fail-word); font-weight: 700; }
-.tour-ov-btnrow { display: flex; gap: 8px; }
-.tour-ov-btn {
-  flex: 1;
-  padding: 12px 4px;
-  font-size: 0.75rem;
-  font-weight: 700;
-  border-radius: 10px;
-  border: 1px solid var(--border-strong);
-  background: var(--card-bg);
-  color: var(--text);
-}
-.tour-ov-table {
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  overflow: hidden;
-  background: var(--card-bg);
-}
-.tour-ov-head, .tour-ov-trow {
-  display: grid;
-  grid-template-columns: 28px 1fr 56px;
-  gap: 8px;
-  align-items: center;
-  padding: 9px 12px;
-  font-size: 0.75rem;
-}
-.tour-ov-head {
-  font-weight: 700;
-  font-size: 0.625rem;
-  letter-spacing: 0.04em;
-  color: var(--text-muted);
-  border-bottom: 1px solid var(--border);
-}
-.tour-ov-trow { border-bottom: 1px solid var(--border); color: var(--text); }
-.tour-ov-trow:last-child { border-bottom: none; }
-.tour-ov-rpass { color: var(--pass-word); font-weight: 700; }
-.tour-ov-rfail { color: var(--fail-word); font-weight: 700; }
-.tour-doc {
-  background: #fff;
-  border: 1px solid var(--border-strong);
-  border-radius: 8px;
-  padding: 14px;
-}
-.tour-doc-head { font-size: 0.75rem; font-weight: 800; color: #1f3a5f; text-align: right; }
-.tour-doc-title { font-size: 0.8125rem; font-weight: 700; color: #111; margin: 8px 0; }
-.tour-doc-line { height: 8px; background: #e5e7eb; border-radius: 3px; margin: 6px 0; }
-.tour-doc-line.short { width: 60%; }
-.tour-note { font-size: 0.75rem; color: var(--text-muted); text-align: center; }
-
-/* The highlight — a glowing ring + gentle pulse on the one control each slide
-   teaches. Uses box-shadow (cheap, no layout) so it is safe on any node. */
-.tour-hl {
-  position: relative;
-  box-shadow: 0 0 0 3px var(--accent), 0 0 0 7px var(--accent-hover);
-  animation: tourPulse 1.6s ease-in-out infinite;
-}
-@keyframes tourPulse {
-  0%, 100% { box-shadow: 0 0 0 3px var(--accent), 0 0 0 7px var(--accent-hover); }
-  50%      { box-shadow: 0 0 0 3px var(--accent), 0 0 0 11px transparent; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .tour-hl { animation: none; }
-}
-
-/* v45.1: reserve space for up to ~3 caption lines so a 1-line caption doesn't let
-   the dots/nav ride up while a 3-line one pushes them down. */
-.tour-caption { padding: 16px 4px 4px; text-align: center; min-height: 92px; }
-.tour-caption-title { font-size: 1.25rem; font-weight: 800; color: var(--text); margin: 0 0 6px; }
-.tour-caption-text { font-size: 0.9375rem; line-height: 1.5; color: var(--text-muted); margin: 0; }
-
-.tour-dots {
-  display: flex;
-  justify-content: center;
-  gap: 8px;
-  margin: 16px 0 8px;
-}
-.tour-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 999px;
-  border: none;
-  padding: 0;
-  background: var(--border-strong);
-}
-.tour-dot-on { background: var(--accent); }
-
-.tour-nav {
-  margin-top: auto;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding-top: 12px;
-}
-.tour-prev {
-  flex: 0 0 auto;
-  padding: 14px 16px;
-  font-size: 0.9375rem;
-  font-weight: 600;
-  background: none;
-  border: none;
-  color: var(--neutral-text);
-}
-.tour-next { flex: 1; }
+.tut-cert-title { font-size: 0.875rem; font-weight: 700; color: var(--text); text-align: center; margin: 0 0 8px; }
+.tut-cert-box { flex: 1; overflow: hidden; }
+.tut-cert-pages { padding: 0; }
+.tut-cert-pages .pdf-page-canvas { display: block; margin: 0 auto 8px; box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25); }
 
 /* @@ overview: bulk edit */
 /* v11: Bulk-edit menu sheet — vertical stack of options inside a bottom sheet,

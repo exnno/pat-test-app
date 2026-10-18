@@ -114,6 +114,7 @@ function settingsPageSubtitle(pageId) {
       return `${n} terms explained`;
     }
     case 'settingsContact': return 'Get in touch';
+    case 'settingsTutorials': return 'Practise a job, step by step';   // V134 (6A)
     // v85: the Cloud group's rows. Only ever painted once unlocked, so cloud.js
     // is present — still guarded, it is an optional subsystem (MAP rule 6).
     case 'cloudAccount': {

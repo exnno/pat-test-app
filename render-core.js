@@ -115,11 +115,14 @@ function render() {
 
   // v42: the feature walkthrough is a full-screen view that owns #app entirely —
   // no banner, no stacked modals. Short-circuit before the normal screen build.
+  // V134: it is the practice job now (tour.js), drawn with the real screens.
   if (v === 'tour' && state.tourOpen) {
     app.innerHTML = renderTour();
     _lastRenderHadModal = false;
     _lastRenderedView = v;   // v46: keep the view tracker honest across the early return
     if (typeof focusAfterRender === 'function') { try { focusAfterRender(); } catch (e) {} }   // V123
+    // V134: the moving box and the card, placed on the new markup (tour.js).
+    if (typeof tutAfterRender === 'function') { try { tutAfterRender(); } catch (e) { console.error('tutAfterRender failed (non-fatal).', e); } }
     return;
   }
 
@@ -165,6 +168,7 @@ function render() {
   else if (v === 'settingsCalculator') html = renderSettingsCalculator();
   else if (v === 'settingsAbout') html = renderSettingsAbout();
   else if (v === 'settingsGlossary') html = renderSettingsGlossary();   // v58
+  else if (v === 'settingsTutorials') html = renderSettingsTutorials();   // V134 (6A)
   else if (v === 'settingsContact') html = renderSettingsContact();
   // v85: the cloud pages live in Settings → Cloud. While this phone is not
   // unlocked they are never painted — any route in (a stale view) gets the
@@ -252,7 +256,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Long company names fit.</strong> A long company name or address line now wraps neatly at the top of your certificate, instead of running into your logo.</li>
+        <li><strong>Try the practice job.</strong> A step-by-step practice on the real testing screen, with a box that shows what to tap. Find it in Settings → Help → Tutorials. Nothing you do in it is saved.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -397,14 +401,14 @@ function render() {
         <h3 class="bulk-sheet-title">You're all set</h3>
         <p class="wizard-lead">Your phone's ready to go. Start a new job whenever you're on site — pick a location, tap an item type, then tap PASS or FAIL.</p>
         <div class="wizard-finish-tour">
-          <p class="wizard-finish-tour-title">New here? Take the 30-second tour.</p>
-          <p class="wizard-finish-tour-sub">A quick look at Jobs, logging, the Overview, reports and backups.</p>
-          <button class="btn-primary" data-action="wizard-finish-tour">Show me around</button>
+          <p class="wizard-finish-tour-title">New here? Try the practice job.</p>
+          <p class="wizard-finish-tour-sub">A few minutes on the real testing screen, step by step. Nothing you do in it is saved.</p>
+          <button class="btn-primary" data-action="wizard-finish-tour">Start the practice job</button>
         </div>
       `;
       footHTML = `
         <button class="btn-secondary" data-action="wizard-finish">Go straight to the app</button>
-        <p class="wizard-replay-note">You can run this tour again any time from Settings → About.</p>
+        <p class="wizard-replay-note">You can do it again any time from Settings → Help → Tutorials.</p>
         ${backBtn}
       `;
     }

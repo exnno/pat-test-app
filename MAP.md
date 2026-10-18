@@ -1,4 +1,4 @@
-# PATGo — Code Map (V132)
+# PATGo — Code Map (V134)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -772,12 +772,23 @@ tester & calibration / app preferences.
 **Coupling:** applies sections through the same validators as backup restore.
 File-kind guard rejects a backup imported as a setup and vice versa.
 
-### tour.js (~217 ln) — guided walkthrough
-Five self-contained slides, each a static HTML/CSS mock (no live-element
-coachmarks — the fragile iOS path). Transient state, never persisted.
-**Touch to:** change the walkthrough slides, mocks or paging.
-**Coupling:** routed as a full-screen view early in `render()`. Entry points: the
-wizard finish step and About.
+### tour.js (~470 ln) — the practice job (tutorials) — V134
+`TUT_STEPS` (19), the practice state (`TUT_FRESH` = a new phone's state taken at
+load, + `TUT_FROM_PHONE` for the sample certificate), `_tutDraw()` (swaps the
+practice into `state`, draws, puts the real values back in `finally`; storage
+writes refused meanwhile), `_tutInert()` (practice markup can't reach ACTIONS or
+the keyboard), the practice's own log / copy / fail actions, the sample
+certificate (`buildReportDoc` + pdfpreview, never `stampCertNumber`), the box
+(`#tut-ring` on `<body>`, `tutPlace`) and the card. Transient, never persisted.
+**Touch to:** change a step, its words or its target; how the box moves.
+**Coupling:** ⚠ draws the REAL `renderSessions` / `renderEntry` /
+`renderOverview` (render-core.js, render-review.js) — a renamed id or class used
+as a step `target` breaks the step (harness 72d). Routed by `render()`'s tour
+branch, which then calls `tutAfterRender()`. Actions `tut-*`, `open-practice`,
+`open-tour` (dispatch.js). Entry points: setup's finish (onboarding.js
+`openTour()`), Settings → Help → Tutorials (render-help.js). `state.tourOpen`
+is read by boot.js (update safe moment) and plan.js (prompts). Styles:
+styles.css `@@ tour` (`--tut-dim` in the three theme blocks).
 
 ### report.js (~1190 ln) — PDF certificates
 Lazy-loads the vendored jsPDF + AutoTable, builds the document, the preview
@@ -1195,7 +1206,8 @@ join both lists. Ways in: `storage-banner-open`, `save-fail-clear` (dispatch.js)
 manager Back `_MGR_RETURN_VIEWS` (settings-actions.js).
 
 ### render-help.js (~633 ln) — help, about & cloud pages — NEW v73
-About (+ the rolling 3-version changelog), Glossary (page + the
+About (+ the rolling 3-version changelog), Tutorials (V134 — starts tour.js's
+practice job), Glossary (page + the
 `GLOSSARY_GROUPS` data array), Contact, `renderBugSheet()` markup, and the three
 cloud pages, reached from Settings → Cloud (v85; the About long-press is gone)
 plus `renderCloudLocked()`, the access-code box shown until the phone is

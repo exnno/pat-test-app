@@ -882,12 +882,15 @@ registerActions({
   'wizard-finish-tour': () => wizardFinishFresh(true),
   'restart-onboarding': () => restartOnboarding(),
 
-  // v42: feature walkthrough (full-screen tour)
-  'tour-next': () => tourNext(),
-  'tour-prev': () => tourPrev(),
-  'tour-goto': (arg) => tourGoTo(arg),
-  'tour-skip': () => closeTour(),
+  // v42: feature walkthrough (full-screen tour). V134: the practice job (tour.js) —
+  // Next on a "look" step, Skip on a "do" step, Quit, and a tap inside the
+  // practice screen (only the highlighted control counts).
+  'tut-next': () => tourNext(),
+  'tut-skip': () => tourSkip(),
+  'tut-quit': () => closeTour(),
+  'tut-tap': (arg, el, e) => tutTap(arg, el, e),
   'open-tour': () => openTour(),
+  'open-practice': () => openPractice(state.view),
 
   // v85: the cloud pages are ordinary Settings rows now (Settings → Cloud), so
   // the V43 'open-cloud-page' action is gone. The access-code box's one button:

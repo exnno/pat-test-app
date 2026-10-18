@@ -8,6 +8,41 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V134
+V134 = Tutorials, part 1 — the practice job (Stage 12; Peter 18 Oct: 1A 2A 3B
+4A 5A 6A 7A). tour.js rewritten: the practice draws the REAL renderSessions /
+renderEntry / renderOverview from its own state (`_tutDraw`, storage refused
+meanwhile, everything put back in `finally`); a blue box (`#tut-ring`) glides
+between targets; 19 steps; sample certificate from `buildReportDoc` (no
+`stampCertNumber`). Settings → Help → Tutorials (render-help.js), setup's
+finish offers it, About points to it. The V42 picture slides retired. Harness
+72 + M1240–M1261; 71f → 72f; M935, M966, M1214 retired.
+**Next (1A):** V135 — the Settings tutorials (own spec round: which pages —
+likely Engineer & Tester, Company & Branding, Certificate Content, Quick Pick
+Items, Backup & Restore). Reuse the engine: `_tutDraw` with the real
+renderSettings* functions. ⚠ Settings pages hold typing and Save guards (R37) —
+the practice must never call a real save handler; their inputs are readonly in
+the practice, so "do" steps there are taps only. Then V136 — the rest a
+newcomer needs (Jobs list tabs, cloud tab, sync, Export everything) and the
+Tutorials page grows to list them. The online tutorial / demo video (landing
+page) is Peter's, non-code.
+
+### V134 residuals (known, accepted)
+- Not yet seen on a real iPhone: the glide, the card at the far end, the flash
+  and sound after PASS / Copy, VoiceOver reading the card (the practice screen
+  itself is hidden from VoiceOver; Skip does any tap). In the checklist.
+- The practice uses a new phone's settings (the starting Quick Pick items,
+  readings / Smart Quick Pick / Multi Pick / Undo off) so every step works the
+  same for everyone — not the engineer's own presets. By design (2A: identical
+  screens, predictable steps).
+- A signed-in phone may show its own cloud tabs or plan line on the practice
+  Jobs list — whatever its real Jobs list shows (those read the sign-in, not the
+  practice). Harmless; nothing in the practice reaches the cloud.
+- The sample certificate needs the report files, which the app keeps after its
+  first online start; if they can't load, step 18 says so and moves on.
+- The "hold Quick Pick for presets" step only shows the grid — holding it in
+  the practice does nothing.
+
 ### Next after V133
 V133 = the clean-up job, part 1 (Stage 12; Peter 17 Oct: 1A 2A 3A 4A 5A 6A).
 supabase/v133-cleanup.sql: `phones` table (own rows only), `cleanup_settings`

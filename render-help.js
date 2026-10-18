@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V133: rolled forward — V133 on top, V130 dropped. No What's new (6A). -->
+      <!-- v8: rolling 3-version changelog. V134: rolled forward — V134 on top, V131 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V134</strong> &middot; October 2026</p>
+        <p class="muted">The practice job: a step-by-step practice on the real testing screen, with a box showing what to tap. Settings &rarr; Help &rarr; Tutorials. Nothing you do in it is saved.</p>
         <p><strong>V133</strong> &middot; October 2026</p>
         <p class="muted">Behind the scenes: a signed-in phone now tells the cloud which version of PATGo it is running, ready for the cloud&rsquo;s own tidying-up.</p>
         <p><strong>V132</strong> &middot; October 2026</p>
         <p class="muted">A long company name or address line now wraps neatly at the top of the certificate, instead of running into the logo or off the page.</p>
-        <p><strong>V131</strong> &middot; October 2026</p>
-        <p class="muted">Certificates count as exported: a job whose certificate was made after locking shows &ldquo;Certificate&rdquo; on the Jobs list, and the &ldquo;not yet exported&rdquo; line now shows those jobs. &ldquo;Mark as not exported&rdquo; on the &ldquo;Already exported&rdquo; message undoes an export made by mistake.</p>
 
 
         </div>
@@ -81,10 +81,11 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-restart-onboarding" data-action="restart-onboarding" style="margin-top:8px">${icon('rotate-cw')} Run first-time setup again</button>
       </div>
 
+      <!-- V134 (7A): the old picture tour is retired; the practice job lives on Tutorials. -->
       <div class="info-card">
-        <h3>Show me around</h3>
-        <p class="muted">A quick guided tour of the basics — jobs, Quick Pick, the Overview, reports and backups. Handy if you're getting started or showing someone else the ropes.</p>
-        <button class="backup-action-btn" id="about-open-tour" data-action="open-tour" style="margin-top:8px">${icon('compass')} Show me around the app again</button>
+        <h3>Tutorials</h3>
+        <p class="muted">Practise a job on the real testing screen, step by step — handy when you're getting started or showing someone else the ropes.</p>
+        <button class="backup-action-btn" id="about-open-tutorials" data-action="settings-page" data-arg="settingsTutorials" style="margin-top:8px">${icon('compass')} Tutorials ${icon('chevron-right')}</button>
       </div>
 
       <div class="info-card">
@@ -200,6 +201,23 @@ function renderSettingsGlossary() {
         <p class="muted">Plain-English explanations of the words used around the app.</p>
       </div>
       ${groups}
+    </div>
+  `;
+}
+
+// V134 (6A): Settings → Help → Tutorials. One tutorial today — the practice
+// job (tour.js); the Settings and getting-around tutorials join it here (V135,
+// V136). Opening one remembers this page, so Quit and Finish come back to it.
+function renderSettingsTutorials() {
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Tutorials')}
+      <div class="info-card">
+        <h2>The practice job</h2>
+        <p class="muted">A job from start to finish on the real testing screen: start a job, log a pass, copy it, log a fail with its reason, check the Overview and see a sample of your certificate. A box shows what to look at and what to tap. About three minutes.</p>
+        <p class="muted">Nothing you do in it is saved — no job, no items, no certificate number.</p>
+        <button class="btn-primary" id="tutorials-practice-btn" data-action="open-practice" style="margin-top:8px">${icon('compass')} Start the practice job</button>
+      </div>
     </div>
   `;
 }
