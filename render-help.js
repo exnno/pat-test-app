@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V135: rolled forward — V135 on top, V132 dropped. -->
+      <!-- v8: rolling 3-version changelog. V136: rolled forward — V136 on top, V133 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V136</strong> &middot; October 2026</p>
+        <p class="muted">Your jobs &amp; the cloud tutorials: the Jobs list, finding and bringing back a job kept in the cloud, and Sync, on a pretend account. Settings &rarr; Help &rarr; Tutorials. Nothing you do in them is saved or sent.</p>
         <p><strong>V135</strong> &middot; October 2026</p>
         <p class="muted">Settings tutorials: short walk-throughs of Engineer &amp; Tester, Company &amp; Branding, Certificate Content, Quick Pick Items and Backup &amp; Restore, on the real pages. Settings &rarr; Help &rarr; Tutorials. Nothing you do in them is saved.</p>
         <p><strong>V134</strong> &middot; October 2026</p>
         <p class="muted">The practice job: a step-by-step practice on the real testing screen, with a box showing what to tap. Settings &rarr; Help &rarr; Tutorials. Nothing you do in it is saved.</p>
-        <p><strong>V133</strong> &middot; October 2026</p>
-        <p class="muted">Behind the scenes: a signed-in phone now tells the cloud which version of PATGo it is running, ready for the cloud&rsquo;s own tidying-up.</p>
 
 
         </div>
@@ -84,7 +84,7 @@ function renderSettingsAbout() {
       <!-- V134 (7A): the old picture tour is retired; the practice job lives on Tutorials. -->
       <div class="info-card">
         <h3>Tutorials</h3>
-        <p class="muted">Practise a job on the real testing screen, step by step — handy when you're getting started or showing someone else the ropes.</p>
+        <p class="muted">Practise a job on the real testing screen, set up your Settings, and find your way round your jobs and the cloud, step by step — handy when you're getting started or showing someone else the ropes.</p>
         <button class="backup-action-btn" id="about-open-tutorials" data-action="settings-page" data-arg="settingsTutorials" style="margin-top:8px">${icon('compass')} Tutorials ${icon('chevron-right')}</button>
       </div>
 
@@ -207,16 +207,18 @@ function renderSettingsGlossary() {
 
 // V134 (6A): Settings → Help → Tutorials. The practice job (tour.js), then
 // (V135, 2A) one short tutorial per Settings page, listed from tour.js
-// TUTORIALS so the list and the tutorials can't disagree; the getting-around
-// tutorials join them in V136. Opening one remembers this page, so Quit and
+// TUTORIALS so the list and the tutorials can't disagree; V136 adds the
+// getting-around ones under a heading of their own. Opening one remembers this page, so Quit and
 // Finish come back to it.
 function renderSettingsTutorials() {
-  const settingsOnes = (typeof TUTORIALS !== 'undefined' ? TUTORIALS : []).filter((d) => d.settings);
-  const rows = settingsOnes.map((d) => {
+  const all = (typeof TUTORIALS !== 'undefined' ? TUTORIALS : []);
+  // V136 (2A): two headings — "Setting up" (the Settings ones) and "Your jobs
+  // & the cloud" (group 'cloud'). Each row's icon is its page's, or its own.
+  const rowsFor = (list) => list.map((d) => {
     const meta = SETTINGS_PAGE_META[d.page] || {};
     return `
       <button class="settings-row" data-action="open-tutorial" data-arg="${escapeHTML(d.id)}">
-        <span class="settings-row-icon">${icon(meta.icon || 'compass')}</span>
+        <span class="settings-row-icon">${icon(d.icon || meta.icon || 'compass')}</span>
         <div class="settings-row-text">
           <div class="settings-row-title">${escapeHTML(d.title)}</div>
           <div class="settings-row-sub">${escapeHTML(d.blurb || '')}</div>
@@ -224,6 +226,8 @@ function renderSettingsTutorials() {
         <span class="settings-row-chevron">${icon('chevron-right')}</span>
       </button>`;
   }).join('');
+  const rows = rowsFor(all.filter((d) => d.settings));
+  const cloudRows = rowsFor(all.filter((d) => d.group === 'cloud'));
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Tutorials')}
@@ -239,6 +243,12 @@ function renderSettingsTutorials() {
         <p class="muted">The Settings you’ll want first, on the real pages. About a minute each. Nothing you do in them is saved — your own settings aren’t touched.</p>
       </div>
       <div class="settings-list" id="tutorials-settings-list">${rows}</div>` : ''}
+      ${cloudRows ? `
+      <div class="settings-section">
+        <h2 class="h2">Your jobs &amp; the cloud</h2>
+        <p class="muted">Getting around your Jobs list, finding jobs kept in the cloud, and how your phones keep in step — on a pretend account, so you can try them before you sign in. Nothing is sent and your own jobs aren’t touched.</p>
+      </div>
+      <div class="settings-list" id="tutorials-cloud-list">${cloudRows}</div>` : ''}
     </div>
   `;
 }

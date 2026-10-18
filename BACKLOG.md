@@ -8,6 +8,30 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V136
+V136 = Tutorials, part 3 — your jobs & the cloud (Stage 12; Peter 18 Oct: all
+defaults 1A–9A). tour.js: three tutorials (`jobs`, `cloud`, `sync`; `group:
+'cloud'`, `cloud: true`) on a pretend signed-in phone (`_tutCloudState`: three
+sample jobs, five cloud-only); `_tutDraw` swaps `TUT_CLOUD_STUBS` in for the
+draw so the phone's own sync records are never read; Push / Check / Bring are
+the practice's own. Tutorials page: second heading (render-help.js). Backup's
+Export everything card fuller. Harness 75 + M1297–M1318; 74f retired → 75f.
+**Next:** Stage 12's remainder — maybe the "Show me how ›" link on each covered
+Settings page (V135 10A, V136 9A deferred); About/Privacy from the privacy
+terms. Testers this week: the tutorials are their first stop.
+
+### V136 residuals (known, accepted)
+- Not yet seen on a real iPhone: the asset history sheet in the practice, the
+  cloud tab's selection bar at the bottom, the Sync page's long scroll to the
+  held job.
+- What's different? and the two answers on the held job are look-only (6A) —
+  the comparison sheet needs the cloud copy, which the practice doesn't have.
+- The Jobs list tutorial's reminder steps show only where the banners show
+  (they always do on the practice phone; a `when` guard keeps the step honest
+  if a reminder's rules change).
+- A new read of the phone's sync records in the Jobs list / cloud tab / Sync
+  page must join `TUT_CLOUD_STUBS` (MAP tour.js ⚠), or the practice shows it.
+
 ### Next after V135
 V135 = Tutorials, part 2 — the Settings tutorials (Stage 12; Peter 18 Oct: all
 defaults 1A–10A). tour.js: `TUTORIALS` (practice + engineer, branding, content,

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V135)
+# PATGo — Code Map (V136)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -772,7 +772,7 @@ tester & calibration / app preferences.
 **Coupling:** applies sections through the same validators as backup restore.
 File-kind guard rejects a backup imported as a setup and vice versa.
 
-### tour.js (~1280 ln) — the tutorials: the practice job + the Settings tutorials — V134, V134.1, V135
+### tour.js (~1620 ln) — the tutorials: the practice job, the Settings tutorials, your jobs & the cloud — V134, V134.1, V135, V136
 `TUTORIALS` (V135 — the list: `practice` + five Settings ones, each with its own
 steps array; `_tutSteps()` / `_tutDef()` = the open one's), `TUT_STEPS` (the practice
 job's 21), the practice state (`TUT_FRESH` = a new phone's state taken at
@@ -791,13 +791,28 @@ Settings pages (`TUT_SETTINGS_VIEWS`), fill examples on tap, pick logo / signatu
 into the practice only (`_tutPickImage`, `_tutAddPicture`), save through the
 practice's own functions (never the page's save handler), end on the result
 (`_tutSampleJob` + the sample certificate, or the testing screen); `box: 'row' |
-'section'` frames a toggle row / page section. Transient, never persisted.
+'section'` frames a toggle row / page section. V136: three cloud tutorials
+(`cloud: true`, `group: 'cloud'`) start from `_tutCloudState` — a pretend
+signed-in phone with sample jobs (`_tutPhoneJobs`) and cloud-only jobs
+(`_tutCloudOnlyJobs`); `_tutDraw` also swaps `TUT_CLOUD_STUBS` in for the draw
+(cloudAvailable, cloudPagesUnlocked, syncStatusSummary, syncHeldList,
+syncJobsSafety, planBannerHTML) and puts the real ones back in `finally`; the
+practice's sync records live on `_tut.sync` / `_tut.held`. `_tutNextDef` stays
+within a heading (`_tutGroup`); `box: 'card'` frames a job card. Transient,
+never persisted.
 **Touch to:** change a step, its words or its target; how the box moves.
 **Coupling:** ⚠ draws the REAL `renderSessions` / `renderEntry` /
 `renderOverview` (render-core.js, render-review.js) and, V135, the real Settings
 pages (render-settings.js, instruments.js `renderSettingsInstrument`) — a renamed id
 or class used as a step `target` breaks the step (harness 72d, 74d). ⚠ A Settings
 tutorial must never call a page's real save / add / export handler (74c).
+⚠ V136: the Jobs list, cloud tab and Sync page read the PHONE's sync records
+through sync.js / cloud.js / plan.js functions, not `state` — a new such read
+in those screens must join `TUT_CLOUD_STUBS`, or the practice shows this
+phone's own numbers or held jobs (75b, 75c). Draws the real `renderCloudSync`
+(render-help.js) and `renderCloudJobsHTML` (render-review.js); cloud-tab
+targets: `.jobs-tab`, `.cloud-card`, `#cloud-search`, `.cloud-select-btn`,
+`.sync-held-row` (75d).
 ⚠ `_tutInert` renames `snapshots-block` — snapshots.js paints live Restore buttons
 into that id later. Routed by `render()`'s tour
 branch, which then calls `tutAfterRender()`. Actions `tut-*`, `open-practice`,

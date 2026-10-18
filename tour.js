@@ -1,5 +1,6 @@
 // tour.js — V134 tutorials: the practice job (V134.1: photos, presets, a still
 // screen, a clean finish and free practice). V135: the Settings tutorials.
+// V136: your jobs & the cloud — the Jobs list, the "In the cloud" tab, Sync.
 // (c) 2026 Peter Birchley. All rights reserved.
 //
 // The practice job walks a new engineer through a job on the REAL screens:
@@ -144,8 +145,10 @@ function _tutSettingsState(def) {
 
 function _tutBlank(from, id) {
   const def = _tutDef(id);
-  const st = (def && def.settings) ? _tutSettingsState(def) : _tutNewState();
-  return { id: def ? def.id : 'practice', st, from: from || 'sessions', cert: null, certNodes: null, said: null, sheet: '', screen: '', free: false, photoUrls: [] };
+  const st = (def && def.cloud) ? _tutCloudState(def)   // V136
+    : ((def && def.settings) ? _tutSettingsState(def) : _tutNewState());
+  return { id: def ? def.id : 'practice', st, from: from || 'sessions', cert: null, certNodes: null, said: null, sheet: '', screen: '', free: false, photoUrls: [],
+    sync: (def && def.cloud) ? _tutSyncBlank() : null, held: [] };
 }
 
 // Where storage writes are refused: the object that really holds setItem — the
@@ -173,7 +176,17 @@ function _tutDraw(fn) {
     holder.clear = function () { _tutRefused++; };
   }
   let out;
+  // V136: the cloud tutorials' stand-ins for what the phone's own sync records
+  // say (TUT_CLOUD_STUBS). [name, was it there, the real one].
+  const swapped = [];
   try {
+    const stubs = _tutStubs();
+    if (stubs) {
+      Object.keys(stubs).forEach((n) => {
+        swapped.push([n, Object.prototype.hasOwnProperty.call(globalThis, n), globalThis[n]]);
+        globalThis[n] = stubs[n];
+      });
+    }
     realKeys.forEach((k) => { if (!(k in _tut.st)) delete state[k]; });
     Object.keys(_tut.st).forEach((k) => { state[k] = _tut.st[k]; });
     out = fn();
@@ -189,6 +202,7 @@ function _tutDraw(fn) {
       holder.removeItem = kept.removeItem;
       holder.clear = kept.clear;
     }
+    swapped.forEach(([n, had, fn]) => { if (had) globalThis[n] = fn; else delete globalThis[n]; });
   }
   return out;
 }
@@ -221,7 +235,8 @@ const TUT_SETTINGS_VIEWS = {
   settingsItems: () => renderSettingsItems(),
   settingsReport: () => renderSettingsReport(),
   settingsReportContent: () => renderSettingsReportContent(),
-  settingsBackup: () => renderSettingsBackup()
+  settingsBackup: () => renderSettingsBackup(),
+  cloudSync: () => renderCloudSync()   // V136
 };
 
 // One screen of the practice, drawn by the app's own render function.
@@ -790,14 +805,335 @@ const TUT_STEPS_BACKUP = [
     run: () => _tutOpenPage('settingsBackup') },
   { key: 'backup', target: '#backup-export-btn',
     text: 'A backup is one file holding all your jobs and settings. On iPhone choose <strong>Save to Files</strong> and pick iCloud Drive — or email it to yourself. Make one at the end of every testing day.' },
+  // V136 (1A): Export everything is taught here, with a fuller card, rather
+  // than as a tutorial of its own.
   { key: 'everything', target: '#export-all-btn', when: true,
-    text: '<strong>Export everything</strong> makes one zip: the backup, a spreadsheet for every job, the certificates you’ve made, and your photos if you want them.' },
+    text: '<strong>Export everything</strong> makes one zip of everything on this phone: the backup, a spreadsheet for every job, every certificate you’ve made (no new numbers used), and your photos if you tick them. Handy for keeping your records, or moving to a new phone. Jobs kept only in the cloud aren’t in it.' },
   { key: 'restore', target: '#backup-import-btn',
     text: '<strong>Restore</strong> puts a backup back — on a new phone, or if this one’s been cleared. It replaces everything on the phone, so you’re asked first.' },
   { key: 'snapshots', target: '#tut-snapshots-block', box: 'section', when: true,
     text: 'PATGo also keeps a copy on this phone each day you change something, so you can step back a day. It’s not a backup — if the phone is lost, these go with it.' },
   { key: 'done', target: '',
     text: 'That’s Backup &amp; Restore — try it for real in Settings → Data → Backup &amp; Restore. Nothing in this tutorial made a file.' }
+];
+
+// ---------- V136: your jobs & the cloud ----------
+// Three tutorials on the Jobs list, the "In the cloud" tab and the Sync page
+// (1A), for everyone, signed in or not (3A): the practice is a PRETEND
+// signed-in phone with sample jobs on it and a few more only in the cloud
+// (4A). Nothing reaches the internet and the phone's own account is never
+// read or changed.
+//
+// ⚠ Those screens don't read everything from `state`. Whether the cloud is
+// there, the Sync page's counts, the jobs waiting for an answer and the shield
+// on a job card come from the PHONE's own sync records (localStorage, through
+// sync.js / cloud.js / plan.js) — so the practice would show this phone's real
+// numbers and real held jobs. For these three tutorials _tutDraw also swaps
+// those few functions for the practice's own (TUT_CLOUD_STUBS), inside the
+// same synchronous run, and puts the real ones back in its `finally`.
+
+const TUT_ACCOUNT = 'alex@example.com';
+
+// yyyy-mm-dd, `months` back and `days` back from today (the phone's own day).
+function _tutAgo(months, days) {
+  const d = new Date();
+  d.setHours(12, 0, 0, 0);
+  if (months) d.setMonth(d.getMonth() - months);
+  if (days) d.setDate(d.getDate() - days);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+const TUT_SAMPLE_TYPES = ['Monitor', 'PC', 'Kettle', 'Lead', 'Extension', 'Printer', 'Laptop Charger', 'Desk Fan', 'Microwave', 'Heater'];
+
+// `n` sample items numbered from `first`, the `fails` ones failed.
+function _tutItems(first, n, fails, date) {
+  const ts = date + 'T10:00:00.000Z';
+  const out = [];
+  for (let i = 0; i < n; i++) {
+    const fail = i >= n - fails;
+    out.push({ id: 'tutorial-' + newId(), assetNo: String(first + i), location: i < n / 2 ? 'Office' : 'Kitchen',
+      // The type follows the asset number, so one asset is the same item every
+      // year (found in the browser check: 1042's history said Kettle, then Extension).
+      itemType: TUT_SAMPLE_TYPES[(first + i) % TUT_SAMPLE_TYPES.length], notes: fail ? 'Damaged Cable' : '',
+      result: fail ? 'fail' : 'pass', ts });
+  }
+  return out;
+}
+
+// A sample job in the shape createSession() makes (as _tutStartJob).
+// done: locked, with a certificate made after (it counts as done — V131).
+function _tutJob(id, site, date, items, extra) {
+  const at = date + 'T16:00:00.000Z';
+  return Object.assign({
+    id, name: '', site, clientId: '', siteId: '', engineer: 'Alex Smith', prefix: '', date,
+    startNumber: 1, startPad: 0, instrumentId: '', items, locked: false, notes: '', certNo: '',
+    userId: null, lastModified: at, syncedAt: null
+  }, extra || {});
+}
+function _tutDone(certNo, date) {
+  return { locked: true, lockedAt: date + 'T16:00:00.000Z', reportAt: date + 'T16:05:00.000Z', certNo };
+}
+
+// Three jobs on the phone. Asset 1042 is in two of them (the asset history);
+// last year's is due for its retest this month (the retest banner); the newest
+// isn't in the cloud yet (no shield — "waiting" on the Sync page).
+function _tutPhoneJobs() {
+  const y = (d) => d.slice(0, 4);
+  const a = _tutAgo(0, 2), b = _tutAgo(0, 9), c = _tutAgo(12, 0);
+  return [
+    _tutJob('tutorial-job-new', 'Riverside Dental — Main Surgery', a, _tutItems(1101, 8, 1, a)),
+    _tutJob('tutorial-job-office', 'Practice Ltd — Head Office', b, _tutItems(1040, 12, 1, b), _tutDone('PAT-' + y(b) + '-0057', b)),
+    _tutJob('tutorial-job-last-year', 'Practice Ltd — Head Office', c, _tutItems(1038, 10, 0, c),
+      Object.assign(_tutDone('PAT-' + y(c) + '-0012', c), { retestTrack: true, retestMonths: 12, retestContact: null }))
+  ];
+}
+
+// Five jobs only in the cloud, newest first (as the cloud list comes), in the
+// shape syncCloudList() gives the "In the cloud" tab.
+function _tutCloudOnlyJobs() {
+  const row = (n, site, months, items, fails, cert, photos) => {
+    const date = _tutAgo(months, 0);
+    return { id: 'tutorial-cloud-' + n, site, name: '', clientId: '', date, items, fails, photos: photos || 0,
+      certNo: cert ? 'PAT-' + date.slice(0, 4) + '-' + cert : '', locked: !!cert };
+  };
+  return [
+    row(1, 'Riverside Dental — Branch Surgery', 13, 18, 1, '0031'),
+    row(2, 'Riverside Dental — Main Surgery', 14, 41, 2, '0024'),
+    row(3, 'Oak Tree Nursery', 16, 25, 0, '0011'),
+    row(4, 'Practice Ltd — Warehouse', 20, 60, 3, '0040', 4),
+    row(5, 'Hilltop Café', 23, 14, 1, '')
+  ];
+}
+
+// The practice phone for the three: a new phone's settings (nothing copied
+// from this phone, as V135 4A), signed in to a pretend account.
+function _tutCloudState(def) {
+  let st;
+  try { st = JSON.parse(TUT_FRESH); } catch (e) { st = {}; }
+  st.sessions = _tutPhoneJobs();
+  st.activeId = null;
+  st.cursor = 0;
+  st.view = (def && def.start) || 'sessions';
+  st.settingsCategory = null;
+  st.settingsSearchQuery = '';
+  st.welcomeSeen = true;
+  st.onboardedV33Seen = true;
+  st.tourOpen = false;
+  st.pendingPhotos = [];
+  st.engineer = 'Alex Smith';
+  st.instruments = [];
+  st.activeInstrumentId = '';
+  st.itemPresets = [{ id: 'tutorial-default', name: 'Default', items: DEFAULT_ITEM_TYPES.slice() }];
+  st.activePresetId = 'tutorial-default';
+  st.itemTypes = DEFAULT_ITEM_TYPES.slice();
+  st.newForm = Object.assign({}, st.newForm || {}, { show: false, clientId: '', site: '', name: '', prefix: '', startNo: '1' });
+  st.sessionsSearchQuery = '';
+  st.sessionFilter = 'all';
+  st.lockFilter = 'all';
+  st.sort = 'date_desc';
+  st.assetHistorySheetOpen = false;
+  st.assetHistoryAsset = '';
+  // The reminders a phone like this would show: a backup 12 days ago (the
+  // starting reminder is every 7 days) and retests switched on.
+  st.lastBackupAt = new Date(Date.now() - 12 * 86400000).toISOString();
+  st.backupSnoozedUntil = null;
+  st.reminders = { exportAfter: 'off', unlockedAt: 'off', backupDays: '7' };
+  st.retestRemindersEnabled = true;
+  st.cloud = { status: 'signed-in', busy: false, email: TUT_ACCOUNT, plan: null, trialEndsAt: null, checkedAt: null, message: '' };
+  st.sync = { busy: false, message: '', resolving: null, waiting: null, diffing: null };
+  st.jobsTab = 'phone';
+  st.cloudJobs = { loading: false, ok: false, error: '', at: '', uid: 'tutorial', jobs: [], capped: false, photos: false,
+    stale: false, q: '', selecting: false, selected: {}, busy: '' };
+  return st;
+}
+
+// What the practice's sync records say (on _tut, never in storage).
+function _tutSyncBlank() {
+  const hourAgo = new Date(Date.now() - 3600000).toISOString();
+  return { lastPushAt: hourAgo, lastPullAt: hourAgo, sent: { 'tutorial-job-office': true, 'tutorial-job-last-year': true } };
+}
+
+// The practice's versions of what the phone's sync records would say.
+function _tutSyncSummary() {
+  const sy = (_tut && _tut.sync) || _tutSyncBlank();
+  const jobs = (_tut && _tut.st.sessions) || [];
+  const up = jobs.filter((s) => sy.sent[String(s.id)]).length;
+  return {
+    total: jobs.length, upToDate: up, waiting: jobs.length - up,
+    recTotal: 0, recUpToDate: 0, listTotal: 1, listUpToDate: 1, rpTotal: 1, rpUpToDate: 1, gsTotal: 0, gsUpToDate: 0,
+    phReady: false, phTotal: 0, phUp: 0, phCloudOnly: 0,
+    lastPushAt: sy.lastPushAt, lastPullAt: sy.lastPullAt,
+    held: ((_tut && _tut.held) || []).length
+  };
+}
+function _tutSafety() {
+  const sy = (_tut && _tut.sync) || _tutSyncBlank();
+  const map = new Map();
+  let safe = 0;
+  ((_tut && _tut.st.sessions) || []).forEach((s) => {
+    const ok = !!sy.sent[String(s.id)];
+    if (ok) safe++;
+    map.set(String(s.id), ok ? { safe: true, why: 'safe' } : { safe: false, why: 'unsent' });
+  });
+  return { map, safe, total: map.size };
+}
+
+// Swapped in by _tutDraw for the cloud tutorials only (def.cloud).
+const TUT_CLOUD_STUBS = {
+  cloudAvailable: () => true,
+  cloudPagesUnlocked: () => true,
+  syncStatusSummary: () => _tutSyncSummary(),
+  syncHeldList: () => ((_tut && _tut.held) || []).slice(),
+  syncJobsSafety: () => _tutSafety(),
+  planBannerHTML: () => ''
+};
+function _tutStubs() {
+  const d = _tut ? _tutDef() : null;
+  return (d && d.cloud) ? TUT_CLOUD_STUBS : null;
+}
+
+// The real sync's own wording for a result (sync.js _syncOutcome), or ours.
+function _tutOutcome(r, fallback) {
+  try { if (typeof _syncOutcome === 'function') return _syncOutcome(r) || fallback; } catch (e) {}
+  return fallback;
+}
+
+// Jobs list
+function _tutSearch(q) { _tut.st.sessionsSearchQuery = q; }
+function _tutOpenHistory(asset) { _tut.st.assetHistorySheetOpen = true; _tut.st.assetHistoryAsset = asset; }
+function _tutCloseHistory() { _tut.st.assetHistorySheetOpen = false; _tut.st.assetHistoryAsset = ''; _tut.st.sessionsSearchQuery = ''; }
+function _tutJobsTab(tab) { _tut.st.jobsTab = tab; }
+
+// In the cloud — the practice's cloudJobsLoad / select / tick / bring.
+function _tutCloudShow() {
+  Object.assign(_tut.st.cloudJobs, { ok: true, loading: false, error: '', at: new Date().toISOString(), jobs: _tutCloudOnlyJobs() });
+}
+function _tutCloudSearch(q) { _tut.st.cloudJobs.q = q; }
+function _tutCloudSelect() { const cj = _tut.st.cloudJobs; cj.selecting = true; cj.selected = {}; }
+function _tutCloudTickFirst() {
+  const m = _tutDraw(() => cloudJobsModel());
+  const first = m && m.groups && m.groups[0] && m.groups[0].rows[0];
+  if (first) _tut.st.cloudJobs.selected[first.id] = true;
+}
+// The ticked jobs come down as whole jobs (their items made up here — the
+// list only knows the counts), then the phone tab shows them (5A).
+function _tutCloudBring() {
+  const st = _tut.st, cj = st.cloudJobs;
+  const ids = Object.keys(cj.selected || {});
+  const have = new Set(st.sessions.map((s) => String(s.id)));
+  ids.forEach((id) => {
+    const j = (cj.jobs || []).find((x) => x.id === id);
+    if (!j || have.has(id)) return;
+    st.sessions.push(_tutJob(j.id, j.site, j.date, _tutItems(2001, j.items || 1, j.fails || 0, j.date),
+      j.certNo ? _tutDone(j.certNo, j.date) : {}));
+    if (_tut.sync) _tut.sync.sent[j.id] = true;   // it came from the cloud: safe there already
+  });
+  Object.assign(cj, { selecting: false, selected: {}, q: '' });
+  st.jobsTab = 'phone';
+}
+
+// Sync
+function _tutSyncPush() {
+  const sy = _tut.sync;
+  const waiting = _tut.st.sessions.filter((s) => !sy.sent[String(s.id)]);
+  waiting.forEach((s) => { sy.sent[String(s.id)] = true; });
+  sy.lastPushAt = new Date().toISOString();
+  _tut.st.sync.message = _tutOutcome({ sent: waiting.length, pulled: { applied: 0, added: 0, removed: 0, held: 0 }, records: null },
+    'Sent ' + waiting.length + ' job' + (waiting.length === 1 ? '' : 's') + '.');
+}
+// A check that finds a job changed on both phones — held, as the real pull
+// holds one (sync.js), so the question is seen before it happens for real (6A).
+function _tutSyncPull() {
+  const sy = _tut.sync;
+  sy.lastPullAt = new Date().toISOString();
+  const job = _tut.st.sessions.find((s) => s.id === 'tutorial-job-office');
+  _tut.held = job ? [{ kind: 'session', id: job.id, name: job.site, reason: 'both-changed',
+    localItems: job.items.length, cloudItems: job.items.length + 1, at: sy.lastPullAt }] : [];
+  _tut.st.sync.message = _tutOutcome({ pulled: { applied: 0, added: 0, removed: 0, held: _tut.held.length }, records: null },
+    'One job needs your answer — see below.');
+}
+
+const TUT_STEPS_JOBS = [
+  { key: 'list', target: '.session-card',
+    text: 'This is your Jobs list — every job on this phone, newest first. Tap one to open it. A <strong>shield</strong> by the name means that job is safe in the cloud.' },
+  { key: 'backup', target: '.backup-banner', when: true,
+    text: 'Reminders sit at the top. This one says it’s time for a backup — <strong>Export now</strong> makes one. Choose how often in Settings → Phone &amp; Display → Reminders.' },
+  { key: 'retests', target: '.cal-banner', when: true,
+    text: 'A job done a year ago is due for its retest. <strong>View</strong> lists the clients to rebook. Switch these on in Settings → Clients &amp; Retests.' },
+  { key: 'search', target: '#sessions-search', go: true, pause: true,
+    text: 'Search finds jobs and items — a client, a site, an item or an asset number. Tap the box — we’ll search for asset 1042.',
+    run: () => _tutSearch('1042') },
+  { key: 'history', target: '.asset-history-card', go: true,
+    text: 'Asset 1042 was tested in two jobs. Tap the card to see its history.',
+    run: () => _tutOpenHistory('1042') },
+  { key: 'history-sheet', target: '.asset-history-sheet',
+    text: 'Every time that asset was tested, newest first, with its result. Tap one to open that job.',
+    run: () => _tutCloseHistory() },
+  { key: 'import', target: '#import-session-btn',
+    text: '<strong>Import (.csv)</strong> brings in a job from a PATGo spreadsheet — one you exported earlier, or sent from another phone.' },
+  { key: 'tabs', target: '.jobs-tabs',
+    text: 'Signed in to your account, the Jobs list has two tabs. <strong>On this phone</strong> is what’s here now.' },
+  { key: 'cloud-tab', target: '.jobs-tab[data-arg="cloud"]', go: true,
+    text: 'Jobs you clear off this phone are still kept in the cloud. Tap <strong>In the cloud</strong>.',
+    run: () => _tutJobsTab('cloud') },
+  { key: 'done', target: '',
+    text: 'That’s the Jobs list. Next up: finding a job in the cloud and bringing it back.' }
+];
+
+const TUT_STEPS_CLOUD = [
+  { key: 'tab', target: '.jobs-tab[data-arg="cloud"]', go: true,
+    text: 'This is your Jobs list. Every job you’ve saved is kept in the cloud too — even ones cleared off this phone. Tap <strong>In the cloud</strong>.',
+    run: () => _tutJobsTab('cloud') },
+  { key: 'show', target: '.cloud-tab .pm-note [data-tut-action="cloud-refresh"]', go: true,
+    text: 'Old jobs aren’t downloaded until you ask, so a phone isn’t filled up with them. Tap <strong>Show them</strong>.',
+    run: () => _tutCloudShow() },
+  { key: 'list', target: '.cloud-card',
+    text: 'The jobs only in the cloud, by month: the client and site, the date, items, fails and the certificate number. They take no space on your phone.' },
+  { key: 'storage', target: '.cloud-storage-link', when: true,
+    text: '<strong>Cloud Storage</strong> shows how much room your jobs and photos take in the cloud.' },
+  { key: 'search', target: '#cloud-search', go: true, pause: true,
+    text: 'Looking for one? Search by client, site or certificate number. Tap the box — we’ll search for Riverside.',
+    run: () => _tutCloudSearch('Riverside') },
+  { key: 'select', target: '.cloud-select-btn', go: true,
+    text: 'To bring a job back onto this phone, tap <strong>Select</strong>.',
+    run: () => _tutCloudSelect() },
+  { key: 'tick', target: '.cloud-card .session-info', go: true,
+    text: 'Tap the first job to tick it.',
+    run: () => _tutCloudTickFirst() },
+  { key: 'delete', target: '[data-tut-action="cloud-delete"]',
+    text: '<strong>Delete…</strong> removes jobs from the cloud for good, from every phone. You’re shown exactly what goes and asked first — it’s not in the practice.' },
+  { key: 'bring', target: '[data-tut-action="cloud-bring"]', go: true,
+    text: 'Tap <strong>Bring onto this phone</strong>.',
+    run: () => _tutCloudBring() },
+  { key: 'arrived', target: '.session-info[data-arg="tutorial-cloud-1"]', box: 'card',
+    text: 'It’s on this phone now, with its items and certificate. Open it, add to it or make its certificate again. Clear it off later in Settings → Data → Jobs on This Phone — the cloud keeps it.' },
+  { key: 'done', target: '',
+    text: 'That’s jobs in the cloud. Next up: how your phones keep in step.' }
+];
+
+const TUT_STEPS_SYNC = [
+  { key: 'group', target: '.settings-row[data-arg="catCloud"]', go: true,
+    text: 'This is Settings. Your account and syncing are under <strong>Account &amp; Sync</strong>. Tap it.',
+    run: () => _tutOpenGroup('catCloud') },
+  { key: 'page', target: '.settings-row[data-page="cloudSync"]', go: true,
+    text: 'Tap <strong>Sync</strong>.',
+    run: () => _tutOpenPage('cloudSync') },
+  { key: 'counts', target: '#sync-counts',
+    text: 'Sync copies your jobs, clients, testers and presets between your phones and the cloud — by itself, a few seconds after you stop logging and whenever you open the app or get signal back. This line says how many jobs are up to date.' },
+  { key: 'push', target: '#sync-push', go: true, pause: true,
+    text: 'One job is still waiting to go. You don’t have to wait — tap <strong>Push now</strong>.',
+    run: () => _tutSyncPush() },
+  { key: 'pull', target: '#sync-pull', go: true, pause: true,
+    text: 'Working on two phones? <strong>Check for updates</strong> brings in what you did on the other one. Tap it.',
+    run: () => _tutSyncPull() },
+  { key: 'held', target: '.sync-held-row',
+    text: 'Now and then the same job changes on both phones. PATGo never guesses which is right — it holds that job and asks you. Nothing is overwritten until you answer.' },
+  { key: 'diff', target: '[data-tut-action="sync-held-diff"]',
+    text: '<strong>What’s different?</strong> shows the two copies side by side, so you can see what changed before you choose.' },
+  { key: 'answer', target: '[data-tut-action="sync-keep-phone"]',
+    text: 'Then keep this phone’s copy, or use the cloud copy. Until you choose, both are kept.' },
+  { key: 'done', target: '',
+    text: 'That’s Sync — find it for real in Settings → Account &amp; Sync → Sync. Nothing in this tutorial was sent, checked or changed.' }
 ];
 
 // The tutorials, in the order the Tutorials page lists them and "Next
@@ -816,19 +1152,34 @@ const TUTORIALS = [
   { id: 'items', title: 'Quick Pick Items', page: 'settingsItems', settings: true, steps: TUT_STEPS_ITEMS,
     blurb: 'Your item buttons and presets' },
   { id: 'backup', title: 'Backup & Restore', page: 'settingsBackup', settings: true, steps: TUT_STEPS_BACKUP,
-    blurb: 'Keeping your work safe' }
+    blurb: 'Keeping your work safe' },
+  // V136 (2A): the second heading on the Tutorials page. `cloud` — a pretend
+  // signed-in phone (_tutCloudState, TUT_CLOUD_STUBS); `icon` — its row's icon.
+  { id: 'jobs', title: 'Your Jobs list', group: 'cloud', cloud: true, icon: 'clipboard-list', steps: TUT_STEPS_JOBS,
+    blurb: 'Tabs, search, reminders' },
+  { id: 'cloud', title: 'Jobs in the cloud', group: 'cloud', cloud: true, icon: 'cloud', steps: TUT_STEPS_CLOUD,
+    blurb: 'Find a job, bring it back' },
+  { id: 'sync', title: 'Syncing between phones', group: 'cloud', cloud: true, icon: 'refresh-cw', start: 'settings', steps: TUT_STEPS_SYNC,
+    blurb: 'Push, check, and jobs held for you' }
 ];
+
+// Which heading a tutorial sits under on the Tutorials page (V136 2A):
+// 'setup' — the Settings ones (V135); 'cloud' — your jobs & the cloud.
+function _tutGroup(d) { return d ? (d.group || (d.settings ? 'setup' : '')) : ''; }
 
 function _tutDef(id) {
   const want = id || (_tut && _tut.id) || 'practice';
   return TUTORIALS.find((d) => d.id === want) || null;
 }
 function _tutSteps() { const d = _tutDef(); return d ? d.steps : TUT_STEPS; }
-// The next Settings tutorial after this one, or null (8A).
+// The next tutorial under the same heading, or null (8A) — so Backup &
+// Restore, the last of "Setting up", still ends with Finish alone, and so does
+// Sync, the last of "Your jobs & the cloud" (V136). The practice job has none.
 function _tutNextDef() {
   const i = TUTORIALS.findIndex((d) => d.id === (_tut && _tut.id));
   const next = (i >= 0) ? TUTORIALS[i + 1] : null;
-  return (next && next.settings && _tutDef() && _tutDef().settings) ? next : null;
+  const g = _tutGroup(_tutDef());
+  return (next && g && _tutGroup(next) === g) ? next : null;
 }
 
 function _tutStepText(s) { return (typeof s.text === 'function') ? s.text() : s.text; }
@@ -1059,7 +1410,8 @@ function renderTour() {
   // sheet must not slide it in again under the box.
   const pd = _tut.st.presetDialog;
   const sheet = _tut.st.failModalOpen ? 'fail' : (_tut.st.presetSheetOpen ? 'preset'
-    : ((pd && (pd.mode === 'new' || pd.mode === 'rename')) ? 'preset-dialog' : ''));   // V135
+    : ((pd && (pd.mode === 'new' || pd.mode === 'rename')) ? 'preset-dialog'   // V135
+      : (_tut.st.assetHistorySheetOpen ? 'history' : '')));   // V136
   const still = !!(sheet && sheet === _tut.sheet);
   _tut.sheet = sheet;
   const screen = _tutInert(_tutScreenHTML());
@@ -1164,6 +1516,7 @@ function _tutTarget(s) {
   // control inside it.
   if (el && s.box === 'row') el = el.closest('.toggle-row') || el;
   else if (el && s.box === 'section') el = el.closest('.settings-section') || el;
+  else if (el && s.box === 'card') el = el.closest('.session-card') || el;   // V136
   return el;
 }
 

@@ -883,6 +883,9 @@ button:disabled { opacity: 0.4; cursor: not-allowed; }
 /* @@ settings: shared */
 /* Settings sections spacing (used inside individual settings sub-pages) */
 .settings-section + .settings-section { margin-top: 28px; }
+/* V136: the Tutorials page's second heading sits clear of the list above it
+   (found in the browser check: it ran into the Backup & Restore row). */
+#tutorials-settings-list + .settings-section { margin-top: 28px; }
 .settings-section h2 { margin-top: 0; }
 
 /* v9: preset action row on Quick Pick Items page — three small buttons under
