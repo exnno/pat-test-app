@@ -228,6 +228,15 @@ bug; leaving it red trains everyone to ignore the suite.
   by standing in a `#tut-practice` whose `querySelector` returns a node with
   its own `closest()`. 74c wraps the pages' real save / add / export handlers
   with counters before the runs — every one must stay at zero.
+  V136 (group 75): the cloud tutorials. The harness HAS a cloud (the stub host
+  maps to the test environment, status 'signed-out') — so 75c first replaces
+  `cloudAvailable` with `() => false`, a copy with no cloud, or a missing
+  stand-in would pass unnoticed. 75b seeds real `SYNC_HELD_KEY` / `SYNC_STATE_KEY`
+  records ('ZZ Real Held Job') that must never reach a practice screen. 75a
+  draws the "real" screen in a second app with `_tut` set and
+  `TUT_CLOUD_STUBS` assigned onto its global — the practice's data, the real
+  render function. 75's `stepOn` runs every step's `run` (look steps too —
+  the history sheet's Next closes it), as Next and Skip do.
 
 ---
 

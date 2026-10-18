@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V135';",
-    to:   "const APP_VERSION = 'V134';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V136';",
+    to:   "const APP_VERSION = 'V135';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 74f see it.
-    from: '        <p><strong>V133</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V132</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V133</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 74f)',
+    // oldest, so 15j's check still matches; 09w and 75f see it.
+    from: '        <p><strong>V134</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V133</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V134</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 75f)',
   },
 
   {
@@ -6094,10 +6094,11 @@ const MUTATIONS = [
     // V132: welcome rolled (one line) — re-aimed at it; 70f pinned it.
     // V133: no What's new (6A) — V132's sheet stays, so the anchor stays; 71f pinned it.
     // V134: welcome rolled (one line) — re-aimed at it; 72f pinned it.
-    // V135: welcome rolled (one line) — re-aimed at it; 74f pins it.
-    from: "<li><strong>Settings tutorials.</strong>",
+    // V135: welcome rolled (one line) — re-aimed at it; 74f pinned it.
+    // V136: welcome rolled (one line) — re-aimed at it; 75f pins it.
+    from: "<li><strong>Your jobs &amp; the cloud tutorials.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (74f)",
+    why:  "11A: the welcome says plainly what changed on screen (75f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8574,26 +8575,26 @@ const MUTATIONS = [
     name: "M1221 (V132) What's new not rolled",
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
-    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed.
-    from: "const WELCOME_VERSION = 'V135';",
-    to:   "const WELCOME_VERSION = 'V134';",
-    why:  "a behaviour release says what's new (74f)",
+    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed.
+    from: "const WELCOME_VERSION = 'V136';",
+    to:   "const WELCOME_VERSION = 'V135';",
+    why:  "a behaviour release says what's new (75f)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
     file: "render-core.js",
-    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line.
-    from: "Find them in Settings → Help → Tutorials. Nothing you do in them is saved.</li>\n",
-    to:   "Find them in Settings → Help → Tutorials. Nothing you do in them is saved.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (74f)",
+    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's.
+    from: "Settings → Help → Tutorials. Nothing you do in them is saved or sent.</li>\n",
+    to:   "Settings → Help → Tutorials. Nothing you do in them is saved or sent.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (75f)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
     file: "render-help.js",
-    // V135: V132's line rolled off — re-aimed at V135's.
-    from: "Settings tutorials: short walk-throughs of Engineer &amp; Tester",
+    // V135: V132's line rolled off — re-aimed at V135's. V136: at V136's.
+    from: "Your jobs &amp; the cloud tutorials: the Jobs list, finding and bringing back a job",
     to:   "Better",
-    why:  "the About page must say what changed in this version (74f)",
+    why:  "the About page must say what changed in this version (75f)",
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8696,18 +8697,19 @@ const MUTATIONS = [
     why:  "a new project would never run the job (71g)",
   },
   {
-    name: "M1238 (V133) the About changelog loses V133's line",
+    name: "M1238 (V133; re-aimed V136) the About changelog loses an older line",
     file: "render-help.js",
-    from: "Behind the scenes: a signed-in phone now tells the cloud which version of PATGo it is running",
+    // V136: V133's line rolled off — re-aimed at V135's, still in the window.
+    from: "Settings tutorials: short walk-throughs of Engineer &amp; Tester",
     to:   "Better",
-    why:  "the About page must say what changed in this version (74f)",
+    why:  "the About page keeps the last three versions' lines (75f)",
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
     file: "render-help.js",
     from: "A signed-in phone also tells the cloud which version of the app it is running. ",
     to:   "",
-    why:  "V130's honest Privacy note stays honest (74f)",
+    why:  "V130's honest Privacy note stays honest (75f)",
   },
 
 
@@ -8837,28 +8839,28 @@ const MUTATIONS = [
     file: "data.js",
     from: "pages: ['settingsTutorials', 'settingsAbout',",
     to:   "pages: ['settingsAbout',",
-    why:  "6A: Settings → Help → Tutorials (74f)",
+    why:  "6A: Settings → Help → Tutorials (75f)",
   },
   {
     name: "M1258 (V134) search can't find the tutorials",
     file: "data.js",
     from: "aliases: 'tutorial tutorials practice practise job learn",
     to:   "aliases: 'learn",
-    why:  "6A: findable in Settings search (74f)",
+    why:  "6A: findable in Settings search (75f)",
   },
   {
     name: "M1259 (V134) the About changelog loses V134's line",
     file: "render-help.js",
     from: "The practice job: a step-by-step practice on the real testing screen",
     to:   "Better",
-    why:  "the About page must say what changed in this version (74f)",
+    why:  "the About page must say what changed in this version (75f)",
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
     file: "render-core.js",
     from: "New here? Try the practice job.",
     to:   "New here? Take the 30-second tour.",
-    why:  "6A: setup offers the practice job (74f)",
+    why:  "6A: setup offers the practice job (75f)",
   },
   {
     name: "M1261 (V134) Quit always lands on the Jobs list",
@@ -8977,17 +8979,18 @@ const MUTATIONS = [
   {
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
-    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f).
-    from: "const CACHE_VERSION = 'pat-v135';",
-    to:   "const CACHE_VERSION = 'pat-v134-1';",
-    why:  "a release needs its cache bump or phones never get it (74f)",
+    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f).
+    from: "const CACHE_VERSION = 'pat-v136';",
+    to:   "const CACHE_VERSION = 'pat-v135';",
+    why:  "a release needs its cache bump or phones never get it (75f)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
     name: "M1278 (V135) a Settings tutorial starts from this phone's data, not a new phone",
     file: "tour.js",
-    from: "const st = (def && def.settings) ? _tutSettingsState(def) : _tutNewState();",
-    to:   "const st = _tutNewState();",
+    // V136: the line gained the cloud tutorials' state — re-aimed.
+    from: ": ((def && def.settings) ? _tutSettingsState(def) : _tutNewState());",
+    to:   ": _tutNewState();",
     why:  "4A: a new phone's blank pages, the same for everyone (74b)",
   },
   {
@@ -9035,7 +9038,8 @@ const MUTATIONS = [
   {
     name: "M1285 (V135) no Next tutorial",
     file: "tour.js",
-    from: "return (next && next.settings && _tutDef() && _tutDef().settings) ? next : null;",
+    // V136: Next stays under the same heading (_tutGroup) — re-aimed.
+    from: "return (next && g && _tutGroup(next) === g) ? next : null;",
     to:   "return null;",
     why:  "8A: Finish + Next tutorial (74d)",
   },
@@ -9049,9 +9053,10 @@ const MUTATIONS = [
   {
     name: "M1287 (V135) the Tutorials page lists no Settings tutorials",
     file: "render-help.js",
-    from: "TUTORIALS : []).filter((d) => d.settings);",
-    to:   "TUTORIALS : []).filter((d) => false);",
-    why:  "2A: listed on the Tutorials page (74f)",
+    // V136: the page lists two headings (rowsFor) — re-aimed.
+    from: "const rows = rowsFor(all.filter((d) => d.settings));",
+    to:   "const rows = rowsFor(all.filter((d) => false));",
+    why:  "2A: listed on the Tutorials page (75f)",
   },
   {
     name: "M1288 (V135) the Tutorials rows aren't wired",
@@ -9098,15 +9103,17 @@ const MUTATIONS = [
   {
     name: "M1294 (V135) the open New preset sheet slides in again every step",
     file: "tour.js",
-    from: "    : ((pd && (pd.mode === 'new' || pd.mode === 'rename')) ? 'preset-dialog' : ''));   // V135",
-    to:   "    : '');   // V135",
+    // V136: the line gained the asset history sheet — re-aimed.
+    from: "    : ((pd && (pd.mode === 'new' || pd.mode === 'rename')) ? 'preset-dialog'   // V135\n",
+    to:   "    : ((false) ? 'preset-dialog'   // V135\n",
     why:  "an open sheet must not slide up again under the box (74d)",
   },
   {
     name: "M1295 (V135) the Settings practice has no starting preset",
     file: "tour.js",
-    from: "  st.activePresetId = 'tutorial-default';\n",
-    to:   "",
+    // V136: the cloud tutorials' state has the same line — anchored on the comment above it.
+    from: "'Items in \"\"').\n  st.itemPresets = [{ id: 'tutorial-default', name: 'Default', items: DEFAULT_ITEM_TYPES.slice() }];\n  st.activePresetId = 'tutorial-default';\n",
+    to:   "'Items in \"\"').\n  st.itemPresets = [{ id: 'tutorial-default', name: 'Default', items: DEFAULT_ITEM_TYPES.slice() }];\n",
     why:  "found in the browser check: an empty preset box (74b)",
   },
   {
@@ -9115,6 +9122,161 @@ const MUTATIONS = [
     from: "  // browser check: one opened low on the Tutorials list started scrolled).\n  try { window.scrollTo(0, 0); } catch (e) {}\n",
     to:   "  // browser check: one opened low on the Tutorials list started scrolled).\n",
     why:  "found in the browser check (74d)",
+  },
+  // ---- V136 (1A–9A, all defaults): Tutorials, part 3 — your jobs & the cloud. Group 75 + M1297–M1315. ----
+  {
+    name: "M1297 (V136) a cloud tutorial starts as a signed-out Settings practice",
+    file: "tour.js",
+    from: "const st = (def && def.cloud) ? _tutCloudState(def)   // V136",
+    to:   "const st = false ? _tutCloudState(def)   // V136",
+    why:  "3A 4A: the pretend signed-in phone with its sample jobs (75b 75d)",
+  },
+  {
+    name: "M1298 (V136) the stand-ins are never swapped in",
+    file: "tour.js",
+    from: "    const stubs = _tutStubs();\n    if (stubs) {",
+    to:   "    const stubs = _tutStubs();\n    if (false) {",
+    why:  "the practice would show this phone's own sync records — its held jobs, its counts (75b 75c)",
+  },
+  {
+    name: "M1299 (V136) the real functions aren't put back after a draw",
+    file: "tour.js",
+    from: "    swapped.forEach(([n, had, fn]) => { if (had) globalThis[n] = fn; else delete globalThis[n]; });\n",
+    to:   "",
+    why:  "the phone would think it had a cloud, was signed in, and had no held jobs — for good (75c)",
+  },
+  {
+    name: "M1300 (V136) the stand-ins are swapped in for every tutorial",
+    file: "tour.js",
+    from: "  return (d && d.cloud) ? TUT_CLOUD_STUBS : null;",
+    to:   "  return TUT_CLOUD_STUBS;",
+    why:  "the practice job and the Settings tutorials would see a pretend account (75c)",
+  },
+  {
+    name: "M1301 (V136) the Sync page counts from this phone's own sync records",
+    file: "tour.js",
+    from: "  syncStatusSummary: () => _tutSyncSummary(),\n",
+    to:   "",
+    why:  "Push now would never show the practice up to date (75d)",
+  },
+  {
+    name: "M1302 (V136) the practice shows this phone's held jobs",
+    file: "tour.js",
+    from: "  syncHeldList: () => ((_tut && _tut.held) || []).slice(),\n",
+    to:   "",
+    why:  "a real job's question on a practice screen (75b 75c)",
+  },
+  {
+    name: "M1303 (V136) the practice's job cards read this phone's sync records",
+    file: "tour.js",
+    from: "  syncJobsSafety: () => _tutSafety(),\n",
+    to:   "",
+    why:  "no shield on the sample jobs (75d)",
+  },
+  {
+    name: "M1304 (V136) a copy with no cloud has no cloud in the practice either",
+    file: "tour.js",
+    from: "  cloudAvailable: () => true,\n",
+    to:   "",
+    why:  "3A: everyone sees them, signed in or not — even on a copy with no cloud (75c)",
+  },
+  {
+    name: "M1305 (V136) Next tutorial runs on into the next heading",
+    file: "tour.js",
+    from: "return (next && g && _tutGroup(next) === g) ? next : null;",
+    to:   "return (next && g) ? next : null;",
+    why:  "8A: Backup & Restore ends on Finish alone (75d)",
+  },
+  {
+    name: "M1306 (V136) the Tutorials page has no cloud heading",
+    file: "render-help.js",
+    from: "const cloudRows = rowsFor(all.filter((d) => d.group === 'cloud'));",
+    to:   "const cloudRows = rowsFor(all.filter((d) => false));",
+    why:  "2A: a second heading on the Tutorials page (75e)",
+  },
+  {
+    name: "M1307 (V136) Bring onto this phone stays on the cloud tab",
+    file: "tour.js",
+    from: "  Object.assign(cj, { selecting: false, selected: {}, q: '' });\n  st.jobsTab = 'phone';\n",
+    to:   "  Object.assign(cj, { selecting: false, selected: {}, q: '' });\n",
+    why:  "5A: the job then shows on the phone tab (75d)",
+  },
+  {
+    name: "M1308 (V136) a brought-back job isn't safe in the cloud",
+    file: "tour.js",
+    from: "    if (_tut.sync) _tut.sync.sent[j.id] = true;",
+    to:   "    if (_tut.sync) _tut.sync.sent.none = true;",
+    why:  "it came from the cloud — its shield (75d)",
+  },
+  {
+    name: "M1309 (V136) Show them reads nothing",
+    file: "tour.js",
+    from: "  Object.assign(_tut.st.cloudJobs, { ok: true, loading: false, error: '', at: new Date().toISOString(), jobs: _tutCloudOnlyJobs() });",
+    to:   "  Object.assign(_tut.st.cloudJobs, { ok: true, loading: false, error: '', at: new Date().toISOString(), jobs: [] });",
+    why:  "4A: five sample jobs only in the cloud (75d)",
+  },
+  {
+    name: "M1310 (V136) the box can't frame a job card",
+    file: "tour.js",
+    from: "  else if (el && s.box === 'card') el = el.closest('.session-card') || el;   // V136\n",
+    to:   "",
+    why:  "the brought-back job, boxed whole (75e)",
+  },
+  {
+    name: "M1311 (V136) the open asset history sheet slides in again every step",
+    file: "tour.js",
+    from: "      : (_tut.st.assetHistorySheetOpen ? 'history' : '')));   // V136",
+    to:   "      : ''));   // V136",
+    why:  "an open sheet must not slide up again under the box (75d)",
+  },
+  {
+    name: "M1312 (V136) the Sync page isn't drawn by its own render function",
+    file: "tour.js",
+    from: "  cloudSync: () => renderCloudSync()   // V136\n",
+    to:   "",
+    why:  "1A: the real screens (75a)",
+  },
+  {
+    name: "M1313 (V136) Check for updates holds nothing",
+    file: "tour.js",
+    from: "  _tut.held = job ? [{ kind: 'session',",
+    to:   "  _tut.held = false ? [{ kind: 'session',",
+    why:  "6A: it ends on one held job (75d)",
+  },
+  {
+    name: "M1314 (V136) the practice carries this phone's jobs",
+    file: "tour.js",
+    from: "  st.sessions = _tutPhoneJobs();\n",
+    to:   "  st.sessions = (state.sessions || []).slice();\n",
+    why:  "4A: the sample jobs, never this phone's (75b)",
+  },
+  {
+    name: "M1315 (V136) Next on the history sheet leaves it open",
+    file: "tour.js",
+    from: "    run: () => _tutCloseHistory() },",
+    to:   "    run: () => {} },",
+    why:  "the search and sheet are tidied before the next step (75d)",
+  },
+  {
+    name: "M1316 (V136) Export everything's card loses what it leaves out",
+    file: "tour.js",
+    from: " Jobs kept only in the cloud aren’t in it.' },",
+    to:   "' },",
+    why:  "1A: the fuller card (75e)",
+  },
+  {
+    name: "M1317 (V136) a sample asset is a different item each year",
+    file: "tour.js",
+    from: "itemType: TUT_SAMPLE_TYPES[(first + i) % TUT_SAMPLE_TYPES.length],",
+    to:   "itemType: TUT_SAMPLE_TYPES[i % TUT_SAMPLE_TYPES.length],",
+    why:  "found in the browser check: 1042's history said Kettle, then Extension (75d)",
+  },
+  {
+    name: "M1318 (V136) the second Tutorials heading runs into the list above",
+    file: "styles.css",
+    from: "#tutorials-settings-list + .settings-section { margin-top: 28px; }",
+    to:   "",
+    why:  "found in the browser check (75e)",
   },
 ];
 
