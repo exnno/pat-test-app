@@ -209,8 +209,10 @@ module.exports = async function run() {
     t.notOk(/class="jm-tick[^"]*"[^>]*aria-hidden="true"/.test(rev), 'no job-select tick is hidden from VoiceOver');
     t.eq((rev.match(/class="jm-tick[^`]*role="img" aria-label="\$\{(sel|on) \? 'Selected'/g) || []).length, 3, 'all three tick sites say Selected / Not selected');
 
-    // The tour's example screens are pictures, not fields.
-    t.includes(read('tour.js'), '<div class="tour-mock" role="img" aria-label="Example screen: ${escapeHTML(slide.title)}">', 'tour example screen reads as one picture');
+    // The tour's example screens are pictures, not fields. V134: the practice
+    // job draws the REAL screens, so they are hidden from VoiceOver whole —
+    // the card's words say each step, and Skip does any tap (72d).
+    t.includes(read('tour.js'), 'id="tut-practice" data-action="tut-tap" aria-hidden="true"', 'the practice screen is hidden from VoiceOver; the card reads each step');
 
     t.ok(/^<html lang="en-GB">$/m.test(read('index.html')), 'language is en-GB (British voice, UK dates)');
   });

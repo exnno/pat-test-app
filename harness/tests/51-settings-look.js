@@ -75,7 +75,8 @@ module.exports = async function () {
     t.includes(logging, 'Settings → Reports & Exports → CSV Columns', 'Logging Options: the full path to CSV Columns');
     const about = page(app, 'settingsAbout');
     t.includes(about, 'Your jobs and settings are not affected', 'About: reload leaves jobs alone');
-    t.includes(about, 'the basics — jobs, Quick Pick', 'About: the tour covers jobs');
+    // V134 (7A): the picture tour is retired; About points at Tutorials, which says job.
+    t.includes(about, 'Practise a job on the real testing screen', 'About: the Tutorials card says job');
   });
 
   /* ------------------------------------------------------------------ 51b */

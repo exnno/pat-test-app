@@ -75,7 +75,8 @@ module.exports = async function () {
     t.deepEq(stray, [], `no stylesheet text size in px outside the fixed list${stray.length ? ' — found: ' + stray.slice(0, 5).join(' | ') : ''}`);
 
     const rems = [...stripCss(read('styles.css')).matchAll(/font-size:\s*([\d.]+)rem/g)].map(m => Number(m[1]));
-    t.ok(rems.length >= 290, `the stylesheet's text sizes are rem (${rems.length})`);
+    // V134: the picture tour's 24 sizes went with it (7A) — was 290.
+    t.ok(rems.length >= 270, `the stylesheet's text sizes are rem (${rems.length})`);
     const odd = rems.filter(v => v * 16 !== Math.round(v * 16));
     t.deepEq(odd, [], 'every rem is a whole px at Standard (converted, not re-chosen)');
 

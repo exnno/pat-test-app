@@ -176,13 +176,12 @@ module.exports = async function () {
     stray.push(...strayIn('retest', draw(app, 'retestReminders')));
 
     app.fn('setView')('sessions');
-    const slideCount = app.run('TOUR_SLIDES.length');
+    // V134: the practice job — every step, every screen it draws.
     app.fn('openTour')();
-    let tour = '';
-    for (let i = 0; i < slideCount; i++) {
-      app.fn('tourGoTo')(i);
-      app.fn('render')();
-      tour += html(app);
+    let tour = html(app);
+    for (let i = 0; i < 40 && app.run('state.tourOpen'); i++) {
+      app.run('(() => { const s = TUT_STEPS[state.tourStep]; if (s.go && s.run) s.run(); _tutAdvance(); })()');
+      if (app.run('state.tourOpen')) tour += html(app);
     }
     t.includes(tour, '+ New job</button>', 'the tour shows + New job');
     t.includes(tour, 'Job settings</button>', 'the tour shows Job settings');

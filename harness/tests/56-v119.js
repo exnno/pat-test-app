@@ -160,7 +160,7 @@ module.exports = async function () {
     t.includes(body('.fail-text'), 'color: var(--fail-word)', '.fail-text: red FAIL words');
     t.includes(body('.td-result.pass'), 'color: var(--pass-word)', '.td-result.pass: PASS in lists');
     t.includes(body('.btn-tertiary'), 'color: var(--accent-word)', '.btn-tertiary: blue words on cards');
-    t.includes(body('.tour-ov-pass'), 'color: var(--pass-word)', '.tour-ov-pass: was the darker green');
+    // .tour-ov-pass retired V134 (7A): the picture tour's styles went with it.
     // 5A: the three words written into the scripts.
     t.includes(read('feedback.js'), 'id="name-sheet-delete" style="margin-top:10px;color:var(--fail-word)"', 'name sheet Delete: red word shade');
     const rv = read('render-review.js');

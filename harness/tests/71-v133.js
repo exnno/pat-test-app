@@ -25,7 +25,7 @@
      71g  the SQL: report-only, the 12-month floor, job markers kept, the
           schedule, nobody but the job's owner can run it; schema.sql carries
           every V133 line; the isolation test has 17a–17g.
-     71f  release: V133, cache, What's new stays V132, About, Privacy.
+     71f  (retired V134 → 72f) release: V133, cache, What's new stays V132, About, Privacy.
 
    Whether the SQL WORKS is proved by the file's own checks (C1–C7) and
    isolation 17a–17g, run in the Supabase SQL editor — at V133 also against a
@@ -148,11 +148,11 @@ module.exports = async function () {
     const row = Array.isArray(reps[0].body) ? reps[0].body[0] : reps[0].body;
     t.eq(Object.keys(row).sort().join(','), 'app_version,phone_id,user_id', 'exactly three fields — the database adds the rest');
     t.eq(row.user_id, UID, 'names the account');
-    t.eq(row.app_version, 'V133', 'this version');
+    t.eq(row.app_version, app.run('APP_VERSION'), 'this version');   // V134: was 'V133'
     const p = phone(app);
     t.eq(row.phone_id, p.id, 'the stored private id');
     t.ok(/^[0-9a-f-]{16,64}$/i.test(p.id), 'an id the database accepts (8–64 characters)');
-    t.eq(p.v, 'V133', 'remembers the version reported');
+    t.eq(p.v, app.run('APP_VERSION'), 'remembers the version reported');
     t.eq(p.u, UID, '…and the account');
     t.ok(typeof p.at === 'number' && Math.abs(Date.now() - p.at) < 60000, '…and when');
 
@@ -199,7 +199,7 @@ module.exports = async function () {
     setPhone(app, Object.assign(p, { tried: Date.now() - HOUR - 1000 }));
     await run(app);
     t.eq(app.srv.reports().length, 2, 'after the hour: tried again');
-    t.eq(phone(app).v, 'V133', '…and this time it went');
+    t.eq(phone(app).v, app.run('APP_VERSION'), '…and this time it went');
   });
 
   /* ------------------------------------------------------------------ 71d */
@@ -259,26 +259,7 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 71f */
-  await t.group('71f — release: V133, cache, What’s new stays V132, About, Privacy', () => {
-    const app = app0();
-    t.eq(app.run('APP_VERSION'), 'V133', 'APP_VERSION V133');
-    t.eq(app.run('WELCOME_VERSION'), 'V132', 'What’s new not rolled (6A)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v133';", 'cache key pat-v133');
-    const core = read('render-core.js');
-    const open = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheet = core.slice(open, core.indexOf('</ul>', open));
-    t.eq((sheet.match(/<li>/g) || []).length, 1, 'V132’s one line still');
-    t.includes(sheet, '<li><strong>Long company names fit.</strong>', '…long company names');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V133</strong>'), b = help.indexOf('<p><strong>V132</strong>'), c = help.indexOf('<p><strong>V131</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V133, V132, V131');
-    t.excludes(help, '<p><strong>V130</strong>', 'V130 rolled off');
-    t.excludes(help, 'Tidying up behind the scenes, and the Privacy note brought up to date.', 'V130’s line gone with it');
-    t.includes(help, 'Behind the scenes: a signed-in phone now tells the cloud which version of PATGo it is running', 'About: V133’s line');
-    t.includes(help, 'A long company name or address line now wraps neatly at the top of the certificate', 'About: V132’s line still there');
-    t.includes(help, 'Certificates count as exported: a job whose certificate was made after locking', 'About: V131’s line still there');
-    t.includes(help, 'A signed-in phone also tells the cloud which version of the app it is running.', 'Privacy says so');
-  });
+  // 71f retired V134 (→ 72f): the release checks move with each release.
 };
 
 let _app0 = null;
