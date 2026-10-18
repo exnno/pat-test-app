@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V133';",
-    to:   "const APP_VERSION = 'V132';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V134';",
+    to:   "const APP_VERSION = 'V133';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 71f see it.
-    from: '        <p><strong>V131</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V130</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V131</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 71f)',
+    // oldest, so 15j's check still matches; 09w and 72f see it.
+    from: '        <p><strong>V132</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V131</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V132</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 72f)',
   },
 
   {
@@ -6092,10 +6092,11 @@ const MUTATIONS = [
     // V130: no welcome (5A) — V129's sheet stays, so the anchor stays; 68f pinned it.
     // V131: welcome rolled — re-aimed at V131's first line; 69f pinned it.
     // V132: welcome rolled (one line) — re-aimed at it; 70f pinned it.
-    // V133: no What's new (6A) — V132's sheet stays, so the anchor stays; 71f pins it.
-    from: "<li><strong>Long company names fit.</strong>",
+    // V133: no What's new (6A) — V132's sheet stays, so the anchor stays; 71f pinned it.
+    // V134: welcome rolled (one line) — re-aimed at it; 72f pins it.
+    from: "<li><strong>Try the practice job.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (71f)",
+    why:  "11A: the welcome says plainly what changed on screen (72f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6648,13 +6649,8 @@ const MUTATIONS = [
     to:   "const tick = cs.selecting && !j.onPhone ? `<span class=\"jm-tick${on ? ' is-on' : ''}\" aria-hidden=\"true\">",
     why:  "3A: the tick is the only sign a job is selected (58e)",
   },
-  {
-    name: "M935 (V120) the tour's example screen reads as loose fields",
-    file: "tour.js",
-    from: '<div class="tour-mock" role="img" aria-label="Example screen: ${escapeHTML(slide.title)}">',
-    to:   '<div class="tour-mock">',
-    why:  "3A: the example screens are pictures; their pretend fields must not be read as real ones (58e)",
-  },
+  // M935 (V120: the tour's example screen read as one picture) RETIRED V134:
+  // the picture slides are gone (7A); the practice screen is aria-hidden (58e).
   {
     name: "M936 (V120) the language is back to plain English",
     file: "index.html",
@@ -6862,13 +6858,8 @@ const MUTATIONS = [
     to:   "title: 'Jobs & sessions',",
     why:  "1A: the Glossary heading follows the rename (51e 60d)",
   },
-  {
-    name: "M966 (V122) the tour shows + New session",
-    file: "tour.js",
-    from: '<button class="tour-cta tour-hl">+ New job</button>',
-    to:   '<button class="tour-cta tour-hl">+ New session</button>',
-    why:  "1A: the tour shows the button the engineer will actually tap (60a 60b)",
-  },
+  // M966 (V122: the tour showed + New job) RETIRED V134: the practice job draws
+  // the real Jobs list, which 60b and 72a cover.
   {
     name: "M967 (V122) a CSV with no site or name is called PAT session",
     file: "csv.js",
@@ -8376,7 +8367,7 @@ const MUTATIONS = [
     why:  "a timer per photo left to fire for nothing, ten seconds after every upload (68d)",
   },
   // M1189 (V130's About line) RETIRED V133: V130 rolled off the About page (71f
-  // checks it is gone).
+  // checked it was gone).
   // M1190 (V130: What's new NOT rolled) RETIRED V131: V131 rolls it (M1212).
   // ---- V131 (1A 2A 3A 4A 5A · 6B 7A 8A 9A): certificates count as exported; Mark as not exported. Group 69 + M1191–M1214. ----
   {
@@ -8532,13 +8523,8 @@ const MUTATIONS = [
 
   // M1213 (V131's two-line sheet) RETIRED V132: that copy is gone; V132's one line is M1222.
 
-  {
-    name: "M1214 (V131) the About changelog loses V131's line",
-    file: "render-help.js",
-    from: "Certificates count as exported: a job whose certificate was made after locking",
-    to:   "Better",
-    why:  "the About page must say what changed in this version (71f)",
-  },
+  // M1214 (V131's About line) RETIRED V134: V131 rolled off the About page (72f
+  // checks it is gone).
 
   // ---- V132 (1A 2A): a long company name / address on the certificate wraps. Group 70 + M1215–M1223. ----
   {
@@ -8587,23 +8573,25 @@ const MUTATIONS = [
     name: "M1221 (V132) What's new not rolled",
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
-    from: "const WELCOME_VERSION = 'V132';",
-    to:   "const WELCOME_VERSION = 'V131';",
-    why:  "a behaviour release says what's new — and V133 keeps V132's (71f)",
+    // V134: rolled to V134 — re-aimed.
+    from: "const WELCOME_VERSION = 'V134';",
+    to:   "const WELCOME_VERSION = 'V133';",
+    why:  "a behaviour release says what's new (72f)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
     file: "render-core.js",
-    from: "instead of running into your logo.</li>\n",
-    to:   "instead of running into your logo.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (71f)",
+    // V134: re-aimed at V134's one line.
+    from: "Find it in Settings → Help → Tutorials. Nothing you do in it is saved.</li>\n",
+    to:   "Find it in Settings → Help → Tutorials. Nothing you do in it is saved.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (72f)",
   },
   {
     name: "M1223 (V132) the About changelog loses V132's line",
     file: "render-help.js",
     from: "A long company name or address line now wraps neatly at the top of the certificate",
     to:   "Better",
-    why:  "the About page must say what changed in this version (71f)",
+    why:  "the About page must say what changed in this version (72f)",
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8710,16 +8698,172 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Behind the scenes: a signed-in phone now tells the cloud which version of PATGo it is running",
     to:   "Better",
-    why:  "the About page must say what changed in this version (71f)",
+    why:  "the About page must say what changed in this version (72f)",
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
     file: "render-help.js",
     from: "A signed-in phone also tells the cloud which version of the app it is running. ",
     to:   "",
-    why:  "V130's honest Privacy note stays honest (71f)",
+    why:  "V130's honest Privacy note stays honest (72f)",
   },
 
+
+  // ---- V134 (1A 2A 3B 4A 5A 6A 7A): Tutorials, part 1 — the practice job. Group 72 + M1240–M1261. ----
+  {
+    name: "M1240 (V134) the testing screen is a hand-made copy",
+    file: "tour.js",
+    from: "    if (v === 'entry') return renderEntry();",
+    to:   "    if (v === 'entry') return renderEntry().replace('PASS</button>', 'PASS </button>');",
+    why:  "2A: identical to the real testing screen — the practice must draw renderEntry() itself, not a look-alike (72a)",
+  },
+  {
+    name: "M1241 (V134) the Overview is a hand-made copy",
+    file: "tour.js",
+    from: "    if (v === 'overview') return renderOverview();",
+    to:   "    if (v === 'overview') return renderOverview().replace('Select items', 'Select');",
+    why:  "2A, for every screen the practice shows (72a)",
+  },
+  {
+    name: "M1242 (V134) the real data is not put back after a practice draw",
+    file: "tour.js",
+    from: "    realKeys.forEach((k) => { state[k] = real[k]; });\n",
+    to:   "",
+    why:  "the practice's job would stand in for the phone's real work (72b 72a 72c)",
+  },
+  {
+    name: "M1243 (V134) a write during a practice draw goes to the phone",
+    file: "tour.js",
+    from: "    holder.setItem = function () { _tutRefused++; };\n",
+    to:   "",
+    why:  "the belt and braces: a render that records something must not write it (72b)",
+  },
+  {
+    name: "M1244 (V134) a removal during a practice draw goes to the phone",
+    file: "tour.js",
+    from: "    holder.removeItem = function () { _tutRefused++; };\n",
+    to:   "",
+    why:  "as M1243, for removals (72b)",
+  },
+  {
+    name: "M1245 (V134) a practice draw that throws leaves the practice in place",
+    file: "tour.js",
+    from: "  } finally {\n    // Put back even when the render throws (72c)",
+    to:   "  } catch (e) { throw e; }\n  {\n    // Put back even when the render throws (72c)",
+    why:  "a half-drawn screen must never leave the practice's data standing in for real work (72c)",
+  },
+  {
+    name: "M1246 (V134) a step's target is renamed on the real screen",
+    file: "tour.js",
+    from: "  { key: 'pass', target: '#pass-btn',",
+    to:   "  { key: 'pass', target: '#pass-button',",
+    why:  "a button renamed on the real screen must fail the harness, not leave the box pointing at nothing on a phone (72d)",
+  },
+  {
+    name: "M1247 (V134) the practice screen keeps the app's live actions",
+    file: "tour.js",
+    from: "    .replace(/\\sdata-action=\"/g, ' data-tut-action=\"')\n",
+    to:   "",
+    why:  "a practice tap would run the real action on the real job (72e 72a)",
+  },
+  {
+    name: "M1248 (V134) a practice box can take the keyboard",
+    file: "tour.js",
+    from: "    .replace(/<(input|textarea|select)\\b/g, '<$1 readonly tabindex=\"-1\"')\n",
+    to:   "",
+    why:  "no keyboard ever comes up in the practice (72e)",
+  },
+  {
+    name: "M1249 (V134) a tap anywhere does the step",
+    file: "tour.js",
+    from: "  if (!hit || !want || !(want === hit || want.contains(hit))) return;\n",
+    to:   "  if (!hit) return;\n",
+    why:  "4A: only the highlighted control works (72e)",
+  },
+  {
+    name: "M1250 (V134) Next passes a do-step",
+    file: "tour.js",
+    from: "  if (s && s.go) return;   // a \"do\" step moves on only by its tap or Skip\n",
+    to:   "",
+    why:  "4A: a do-step moves on by its tap or Skip only (72e)",
+  },
+  {
+    name: "M1251 (V134) the box is green",
+    file: "styles.css",
+    from: "  border: 3px solid var(--accent);\n  border-radius: 14px;\n  box-shadow: 0 0 0 9999px var(--tut-dim);",
+    to:   "  border: 3px solid var(--pass);\n  border-radius: 14px;\n  box-shadow: 0 0 0 9999px var(--tut-dim);",
+    why:  "3B: PATGo blue (72g)",
+  },
+  {
+    name: "M1252 (V134) the box glides with reduced motion on",
+    file: "styles.css",
+    from: "@media (prefers-reduced-motion: reduce) {\n  .tut-ring { transition: none; }\n}",
+    to:   "",
+    why:  "3A/3B: a phone set to reduce motion gets a jump, not a glide (72g)",
+  },
+  {
+    name: "M1253 (V134) anything in the practice screen can be touched",
+    file: "styles.css",
+    from: ".tut-practice {\n  pointer-events: none;",
+    to:   ".tut-practice {\n  pointer-events: auto;",
+    why:  "4A: only the highlighted control (72g)",
+  },
+  {
+    name: "M1254 (V134) the glide time drifts from the stylesheet",
+    file: "tour.js",
+    from: "const TUT_GLIDE_MS = 350;",
+    to:   "const TUT_GLIDE_MS = 600;",
+    why:  "the scroll and the box must arrive together (72g)",
+  },
+  {
+    name: "M1255 (V134) a sliding sheet is measured before it arrives",
+    file: "tour.js",
+    from: "? sheet.getAnimations().filter((a) => a.playState === 'running') : [];",
+    to:   "? [] : [];",
+    why:  "found in the browser check: the box sat below the screen on the fail sheet (72g)",
+  },
+  {
+    name: "M1256 (V134) the open fail sheet slides in again every step",
+    file: "styles.css",
+    from: ".tut-still .fail-sheet,\n.tut-still .modal-backdrop { animation: none; }\n",
+    to:   "",
+    why:  "found in the browser check (72g)",
+  },
+  {
+    name: "M1257 (V134) Tutorials is not in Help",
+    file: "data.js",
+    from: "pages: ['settingsTutorials', 'settingsAbout',",
+    to:   "pages: ['settingsAbout',",
+    why:  "6A: Settings → Help → Tutorials (72f)",
+  },
+  {
+    name: "M1258 (V134) search can't find the tutorials",
+    file: "data.js",
+    from: "aliases: 'tutorial tutorials practice practise job learn",
+    to:   "aliases: 'learn",
+    why:  "6A: findable in Settings search (72f)",
+  },
+  {
+    name: "M1259 (V134) the About changelog loses V134's line",
+    file: "render-help.js",
+    from: "The practice job: a step-by-step practice on the real testing screen",
+    to:   "Better",
+    why:  "the About page must say what changed in this version (72f)",
+  },
+  {
+    name: "M1260 (V134) setup still offers the 30-second tour",
+    file: "render-core.js",
+    from: "New here? Try the practice job.",
+    to:   "New here? Take the 30-second tour.",
+    why:  "6A: setup offers the practice job (72f)",
+  },
+  {
+    name: "M1261 (V134) Quit always lands on the Jobs list",
+    file: "tour.js",
+    from: "  setView(from);\n",
+    to:   "  setView('sessions');\n",
+    why:  "6A: back to where it was opened — Tutorials (72b)",
+  },
 ];
 
 /* SPEED (V109 harness): two shortcuts, neither of which can turn a survivor

@@ -205,6 +205,16 @@ bug; leaving it red trains everyone to ignore the suite.
   and a test that reads a missing saved blob as `null` fails by a group throw,
   not by its assertion (M811) — default to `{}` so the assertion is what fails.
 
+- **The practice job swaps `state` (V134).** tour.js `_tutDraw()` puts the
+  practice's values into the real `state` object for one synchronous draw and
+  puts them back in `finally`. A test that reads `state` INSIDE a draw sees the
+  practice; outside, the phone. Group 72b compares a whole practice run with
+  `realOf()`, which leaves out `photoMgr.gen` / `jobMgr.gen` — every `setView`
+  bumps them on the way out (Quit is a setView), so they are navigation, not the
+  practice. `stepOn()` advances without the 650 ms pause a real log waits.
+  The stub DOM has no tree: a test that taps the practice gives the registered
+  `#tut-practice` its own `querySelector` and the target its own `contains`.
+
 ---
 
 ## What is deliberately not covered
@@ -213,6 +223,10 @@ bug; leaving it red trains everyone to ignore the suite.
   the stub environment. `report.js` is covered by source guards only.
 - **Real rendering.** `innerHTML` is stored as a string, not parsed. `render()`
   is tested for "does it throw" and "did it produce markup".
+- **The practice job's box (V134).** Where `#tut-ring` lands, its glide, the
+  card's end of the screen and the sheet wait need real layout. Group 72g pins
+  the CSS and the source; the run itself was checked in Chromium at 390×844
+  and 375×667, light and dark (a Playwright script, not committed).
 - **Touch interaction.** Stubbed DOM cannot reproduce pointer-then-click
   sequencing. Long-press, Quick Pick timing and scroll-drag need a real device.
 - **Service worker behaviour.** Cache-first update semantics need a real browser.
