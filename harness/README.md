@@ -220,6 +220,14 @@ bug; leaving it red trains everyone to ignore the suite.
   stand-in target whose `closest()` answers the action (`freeTap`). 73's
   `stepOn` runs a look step's `run` as Next does (the asset step types the
   location); 72's runs do-steps only, as before.
+  V135 (group 74): the Settings tutorials. `when` steps (Backup's Export
+  everything and snapshots) pass themselves in the stub for the same reason —
+  74e checks their targets are on the drawn page instead. The stub page can't
+  find a node by an id set as a property: 74e catches the practice's file box
+  as it is appended to `<body>`. `_tutTarget`'s row / section framing is tested
+  by standing in a `#tut-practice` whose `querySelector` returns a node with
+  its own `closest()`. 74c wraps the pages' real save / add / export handlers
+  with counters before the runs — every one must stay at zero.
 
 ---
 

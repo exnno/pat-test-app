@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V134';",
-    to:   "const APP_VERSION = 'V133';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V135';",
+    to:   "const APP_VERSION = 'V134';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 72f see it.
-    from: '        <p><strong>V132</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V131</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V132</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 72f)',
+    // oldest, so 15j's check still matches; 09w and 74f see it.
+    from: '        <p><strong>V133</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V132</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V133</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 74f)',
   },
 
   {
@@ -6093,10 +6093,11 @@ const MUTATIONS = [
     // V131: welcome rolled — re-aimed at V131's first line; 69f pinned it.
     // V132: welcome rolled (one line) — re-aimed at it; 70f pinned it.
     // V133: no What's new (6A) — V132's sheet stays, so the anchor stays; 71f pinned it.
-    // V134: welcome rolled (one line) — re-aimed at it; 72f pins it.
-    from: "<li><strong>Try the practice job.</strong>",
+    // V134: welcome rolled (one line) — re-aimed at it; 72f pinned it.
+    // V135: welcome rolled (one line) — re-aimed at it; 74f pins it.
+    from: "<li><strong>Settings tutorials.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (72f)",
+    why:  "11A: the welcome says plainly what changed on screen (74f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8573,25 +8574,26 @@ const MUTATIONS = [
     name: "M1221 (V132) What's new not rolled",
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
-    // V134: rolled to V134 — re-aimed.
-    from: "const WELCOME_VERSION = 'V134';",
-    to:   "const WELCOME_VERSION = 'V133';",
-    why:  "a behaviour release says what's new (72f)",
+    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed.
+    from: "const WELCOME_VERSION = 'V135';",
+    to:   "const WELCOME_VERSION = 'V134';",
+    why:  "a behaviour release says what's new (74f)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
     file: "render-core.js",
-    // V134: re-aimed at V134's one line.
-    from: "Find it in Settings → Help → Tutorials. Nothing you do in it is saved.</li>\n",
-    to:   "Find it in Settings → Help → Tutorials. Nothing you do in it is saved.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (72f)",
+    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line.
+    from: "Find them in Settings → Help → Tutorials. Nothing you do in them is saved.</li>\n",
+    to:   "Find them in Settings → Help → Tutorials. Nothing you do in them is saved.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (74f)",
   },
   {
-    name: "M1223 (V132) the About changelog loses V132's line",
+    name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
     file: "render-help.js",
-    from: "A long company name or address line now wraps neatly at the top of the certificate",
+    // V135: V132's line rolled off — re-aimed at V135's.
+    from: "Settings tutorials: short walk-throughs of Engineer &amp; Tester",
     to:   "Better",
-    why:  "the About page must say what changed in this version (72f)",
+    why:  "the About page must say what changed in this version (74f)",
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8698,14 +8700,14 @@ const MUTATIONS = [
     file: "render-help.js",
     from: "Behind the scenes: a signed-in phone now tells the cloud which version of PATGo it is running",
     to:   "Better",
-    why:  "the About page must say what changed in this version (72f)",
+    why:  "the About page must say what changed in this version (74f)",
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
     file: "render-help.js",
     from: "A signed-in phone also tells the cloud which version of the app it is running. ",
     to:   "",
-    why:  "V130's honest Privacy note stays honest (72f)",
+    why:  "V130's honest Privacy note stays honest (74f)",
   },
 
 
@@ -8825,7 +8827,8 @@ const MUTATIONS = [
   {
     name: "M1256 (V134) the open fail sheet slides in again every step",
     file: "styles.css",
-    from: ".tut-still .fail-sheet,\n.tut-still .modal-backdrop { animation: none; }\n",
+    // V135: the rule gained the New preset sheet (.bulk-sheet) — re-aimed.
+    from: ".tut-still .fail-sheet,\n.tut-still .bulk-sheet,   /* V135: the New preset sheet */\n.tut-still .modal-backdrop { animation: none; }\n",
     to:   "",
     why:  "found in the browser check (72g)",
   },
@@ -8834,28 +8837,28 @@ const MUTATIONS = [
     file: "data.js",
     from: "pages: ['settingsTutorials', 'settingsAbout',",
     to:   "pages: ['settingsAbout',",
-    why:  "6A: Settings → Help → Tutorials (72f)",
+    why:  "6A: Settings → Help → Tutorials (74f)",
   },
   {
     name: "M1258 (V134) search can't find the tutorials",
     file: "data.js",
     from: "aliases: 'tutorial tutorials practice practise job learn",
     to:   "aliases: 'learn",
-    why:  "6A: findable in Settings search (72f)",
+    why:  "6A: findable in Settings search (74f)",
   },
   {
     name: "M1259 (V134) the About changelog loses V134's line",
     file: "render-help.js",
     from: "The practice job: a step-by-step practice on the real testing screen",
     to:   "Better",
-    why:  "the About page must say what changed in this version (72f)",
+    why:  "the About page must say what changed in this version (74f)",
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
     file: "render-core.js",
     from: "New here? Try the practice job.",
     to:   "New here? Take the 30-second tour.",
-    why:  "6A: setup offers the practice job (72f)",
+    why:  "6A: setup offers the practice job (74f)",
   },
   {
     name: "M1261 (V134) Quit always lands on the Jobs list",
@@ -8972,11 +8975,146 @@ const MUTATIONS = [
     why:  "no typing in the practice — a blank location would block every PASS (73e)",
   },
   {
-    name: "M1277 (V134.1) the cache key isn't bumped",
+    name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
-    from: "const CACHE_VERSION = 'pat-v134-1';",
-    to:   "const CACHE_VERSION = 'pat-v134';",
-    why:  "a hotfix still needs its cache bump or phones never get it (73f)",
+    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f).
+    from: "const CACHE_VERSION = 'pat-v135';",
+    to:   "const CACHE_VERSION = 'pat-v134-1';",
+    why:  "a release needs its cache bump or phones never get it (74f)",
+  },
+  // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
+  {
+    name: "M1278 (V135) a Settings tutorial starts from this phone's data, not a new phone",
+    file: "tour.js",
+    from: "const st = (def && def.settings) ? _tutSettingsState(def) : _tutNewState();",
+    to:   "const st = _tutNewState();",
+    why:  "4A: a new phone's blank pages, the same for everyone (74b)",
+  },
+  {
+    name: "M1279 (V135) the Settings screens aren't drawn by their own render functions",
+    file: "tour.js",
+    from: "    if (Object.prototype.hasOwnProperty.call(TUT_SETTINGS_VIEWS, v)) return TUT_SETTINGS_VIEWS[v]();\n",
+    to:   "",
+    why:  "2A: the real pages, identical by construction (74a)",
+  },
+  {
+    name: "M1280 (V135) Certificate Content is drawn as Company & Branding",
+    file: "tour.js",
+    from: "settingsReportContent: () => renderSettingsReportContent(),",
+    to:   "settingsReportContent: () => renderSettingsReport(),",
+    why:  "each page from its own render function (74a)",
+  },
+  {
+    name: "M1281 (V135) the phone's snapshot list can be painted into the practice",
+    file: "tour.js",
+    from: "    .replace(/\\sid=\"snapshots-block\"/g, ' id=\"tut-snapshots-block\"')\n",
+    to:   "",
+    why:  "its live Restore buttons must never land in the practice (74e)",
+  },
+  {
+    name: "M1282 (V135) the practice's instrument Save runs the real one",
+    file: "tour.js",
+    from: "function _tutCloseInstrument() {\n",
+    to:   "function _tutCloseInstrument() {\n  if (typeof saveInstrumentFromEditor === 'function') saveInstrumentFromEditor();\n",
+    why:  "R37: the practice never reaches a real save (74c)",
+  },
+  {
+    name: "M1283 (V135) a guided tap does the browser's own thing",
+    file: "tour.js",
+    from: "  if (e && typeof e.preventDefault === 'function') { try { e.preventDefault(); } catch (e2) {} }\n",
+    to:   "",
+    why:  "a switch would flip by itself under the box (74c)",
+  },
+  {
+    name: "M1284 (V135) the box can't frame a whole toggle row",
+    file: "tour.js",
+    from: "  if (el && s.box === 'row') el = el.closest('.toggle-row') || el;\n  else if",
+    to:   "  if",
+    why:  "the switch's row is what's tapped (74e)",
+  },
+  {
+    name: "M1285 (V135) no Next tutorial",
+    file: "tour.js",
+    from: "return (next && next.settings && _tutDef() && _tutDef().settings) ? next : null;",
+    to:   "return null;",
+    why:  "8A: Finish + Next tutorial (74d)",
+  },
+  {
+    name: "M1286 (V135) Next tutorial forgets where it was opened from",
+    file: "tour.js",
+    from: "  openTutorial(next.id, _tut.from);",
+    to:   "  openTutorial(next.id, 'sessions');",
+    why:  "Quit still lands on Tutorials (74d)",
+  },
+  {
+    name: "M1287 (V135) the Tutorials page lists no Settings tutorials",
+    file: "render-help.js",
+    from: "TUTORIALS : []).filter((d) => d.settings);",
+    to:   "TUTORIALS : []).filter((d) => false);",
+    why:  "2A: listed on the Tutorials page (74f)",
+  },
+  {
+    name: "M1288 (V135) the Tutorials rows aren't wired",
+    file: "dispatch.js",
+    from: "  'open-tutorial': (arg) => openTutorial(arg, state.view),",
+    to:   "",
+    why:  "a row must open its tutorial (74d)",
+  },
+  {
+    name: "M1289 (V135) the new Kitchen items never reach the buttons",
+    file: "tour.js",
+    from: "the Kitchen list\n  st.itemTypes = p.items.slice();",
+    to:   "the Kitchen list",
+    why:  "7A: ends on the testing screen with the new buttons (74d)",
+  },
+  {
+    name: "M1290 (V135) the sample certificate isn't numbered",
+    file: "tour.js",
+    from: "  if (st.reportSettings && st.reportSettings.certEnabled) sess.certNo = _tutCertPreview();\n",
+    to:   "",
+    why:  "7A: Certificate Content ends on a numbered sample (74d)",
+  },
+  {
+    name: "M1291 (V135) any picture moves the logo step on",
+    file: "tour.js",
+    from: "const wants = s ? (s.pick || (s.key === 'photo' ? 'photo' : '')) : '';",
+    to:   "const wants = kind;",
+    why:  "5A: the step waits for its own picture (74e)",
+  },
+  {
+    name: "M1292 (V135) the logo picker takes any picture",
+    file: "tour.js",
+    from: "inp.accept = (kind === 'photo') ? 'image/*' : 'image/png,image/jpeg';",
+    to:   "inp.accept = 'image/*';",
+    why:  "5A: PNG or JPEG, as the real picker (74e)",
+  },
+  {
+    name: "M1293 (V135) Backup & Restore makes a practice backup",
+    file: "tour.js",
+    from: "  { key: 'backup', target: '#backup-export-btn',\n",
+    to:   "  { key: 'backup', target: '#backup-export-btn', go: true, run: () => {},\n",
+    why:  "6A: look-only — a practice backup could be restored over real work (74e)",
+  },
+  {
+    name: "M1294 (V135) the open New preset sheet slides in again every step",
+    file: "tour.js",
+    from: "    : ((pd && (pd.mode === 'new' || pd.mode === 'rename')) ? 'preset-dialog' : ''));   // V135",
+    to:   "    : '');   // V135",
+    why:  "an open sheet must not slide up again under the box (74d)",
+  },
+  {
+    name: "M1295 (V135) the Settings practice has no starting preset",
+    file: "tour.js",
+    from: "  st.activePresetId = 'tutorial-default';\n",
+    to:   "",
+    why:  "found in the browser check: an empty preset box (74b)",
+  },
+  {
+    name: "M1296 (V135) a tutorial opens wherever the list was scrolled to",
+    file: "tour.js",
+    from: "  // browser check: one opened low on the Tutorials list started scrolled).\n  try { window.scrollTo(0, 0); } catch (e) {}\n",
+    to:   "  // browser check: one opened low on the Tutorials list started scrolled).\n",
+    why:  "found in the browser check (74d)",
   },
 ];
 
