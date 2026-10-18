@@ -214,6 +214,12 @@ bug; leaving it red trains everyone to ignore the suite.
   practice. `stepOn()` advances without the 650 ms pause a real log waits.
   The stub DOM has no tree: a test that taps the practice gives the registered
   `#tut-practice` its own `querySelector` and the target its own `contains`.
+  V134.1 (group 73): the photo step shows only when its button is found, which
+  the stub never does, so it passes itself on a render — 73a puts the practice
+  on it directly (`toPhoto`). Free-practice taps go through `tutTap` with a
+  stand-in target whose `closest()` answers the action (`freeTap`). 73's
+  `stepOn` runs a look step's `run` as Next does (the asset step types the
+  location); 72's runs do-steps only, as before.
 
 ---
 
