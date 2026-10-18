@@ -161,8 +161,8 @@ module.exports = async function () {
   /* ------------------------------------------------------------------ 72d */
   await t.group('72d — the steps: every target is on the screen it teaches (4A, 5A)', () => {
     const app = populated();
-    const steps = app.run('TUT_STEPS.map(s => ({ key: s.key, target: s.target, go: !!s.go, run: typeof s.run === "function", when: !!s.when }))');
-    t.eq(steps.length, 19, '19 steps');
+    const steps = app.run('TUT_STEPS.map(s => ({ key: s.key, target: s.target, go: !!s.go, run: typeof s.run === "function" || typeof s.tap === "function", when: !!s.when }))');
+    t.eq(steps.length, 21, '21 steps (V134.1: + the preset sheet and Kitchen)');
     t.eq(steps[0].key, 'jobs', 'starts on the Jobs list');
     t.eq(steps[steps.length - 1].key, 'done', 'ends on Done');
     t.eq(steps[steps.length - 1].target, '', '…with the whole screen dimmed');
@@ -173,8 +173,9 @@ module.exports = async function () {
       const s = app.run('TUT_STEPS[state.tourStep]');
       const shown = html(app);
       if (s.target && !inMarkup(shown, s.target)) missing.push(s.key + ' ' + s.target);
-      t.includes(shown, s.go ? 'data-action="tut-skip">Skip</button>' : 'data-action="tut-next">', `${s.key}: ${s.go ? 'Skip' : 'Next'}`);
-      t.includes(shown, `Step ${app.run('state.tourStep') + 1} of 19`, `${s.key}: says which step`);
+      const last = s.key === 'done';
+      t.includes(shown, last ? 'data-action="tut-free">Free practice</button>' : (s.go ? 'data-action="tut-skip">Skip</button>' : 'data-action="tut-next">'), `${s.key}: ${last ? 'Free practice' : (s.go ? 'Skip' : 'Next')}`);
+      t.includes(shown, `Step ${app.run('state.tourStep') + 1} of 21`, `${s.key}: says which step`);
       stepOn(app);
     }
     t.deepEq(missing, [], 'every step\'s target is on its screen');
@@ -248,7 +249,7 @@ module.exports = async function () {
     const app = freshApp();
     t.eq(app.run('APP_VERSION'), 'V134', 'APP_VERSION V134');
     t.eq(app.run('WELCOME_VERSION'), 'V134', 'What’s new rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v134';", 'cache key pat-v134');
+    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v134", 'cache key pat-v134 (V134.1: -1 — 73f)');
     const core = read('render-core.js');
     const open = core.indexOf('<ul class="welcome-list sheet-scroll">');
     const sheet = core.slice(open, core.indexOf('</ul>', open));
