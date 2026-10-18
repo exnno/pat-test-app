@@ -889,6 +889,7 @@ registerActions({
   'tut-skip': () => tourSkip(),
   'tut-quit': () => closeTour(),
   'tut-tap': (arg, el, e) => tutTap(arg, el, e),
+  'tut-free': () => tutFree(),   // V134.1 (4A): free practice after the last step
   'open-tour': () => openTour(),
   'open-practice': () => openPractice(state.view),
 

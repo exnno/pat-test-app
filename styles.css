@@ -2256,9 +2256,16 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   -webkit-user-select: none;
   user-select: none;
   -webkit-touch-callout: none;
-  /* Room below the screen, so any control can scroll up clear of the card. */
-  padding-bottom: 62vh;
+  /* V134.1 (3A): no extra room below — the page stays still, as the real
+     testing screen does, and the card moves to the clear end instead. */
 }
+/* V134.1 (4A): free practice — the whole screen can be touched, bar the
+   boxes (no keyboard in the practice); room at the foot for the bar. */
+.tut-practice.tut-free { pointer-events: auto; padding-bottom: 76px; }
+.tut-practice.tut-free * { pointer-events: auto; }
+.tut-practice.tut-free input,
+.tut-practice.tut-free textarea,
+.tut-practice.tut-free select { pointer-events: none; }
 .tut-still .fail-sheet,
 .tut-still .modal-backdrop { animation: none; }
 .tut-practice .tut-live,
@@ -2279,7 +2286,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   transition: top 350ms ease, left 350ms ease, width 350ms ease, height 350ms ease, border-color 200ms ease;
 }
 .tut-ring.tut-ring-snap { transition: none; }
-.tut-ring.tut-ring-none { border-color: transparent; }
+.tut-ring.tut-ring-off { display: none; }   /* V134.1: no box, no dim, no dot */
 @media (prefers-reduced-motion: reduce) {
   .tut-ring { transition: none; }
 }
@@ -2317,6 +2324,27 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   outline: none;
 }
 .tut-btns { display: flex; gap: 10px; }
+/* V134.1 (4A): the free-practice bar. */
+.tut-bar {
+  position: fixed;
+  z-index: 901;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  width: calc(100% - 24px);
+  max-width: 536px;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 10px 10px 16px;
+  background: var(--card-bg);
+  border: 1px solid var(--accent);
+  border-radius: 16px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+.tut-bar-text { flex: 1; margin: 0; font-size: 0.9375rem; font-weight: 600; color: var(--text); outline: none; }
+.tut-bar .tut-bar-done { flex: 0 0 auto; width: auto; margin: 0; padding: 10px 18px; }
 .tut-btns .btn-secondary,
 .tut-btns .btn-primary { flex: 1; margin: 0; }
 

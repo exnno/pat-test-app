@@ -772,20 +772,26 @@ tester & calibration / app preferences.
 **Coupling:** applies sections through the same validators as backup restore.
 File-kind guard rejects a backup imported as a setup and vice versa.
 
-### tour.js (~470 ln) — the practice job (tutorials) — V134
+### tour.js (~690 ln) — the practice job (tutorials) — V134, V134.1
 `TUT_STEPS` (19), the practice state (`TUT_FRESH` = a new phone's state taken at
 load, + `TUT_FROM_PHONE` for the sample certificate), `_tutDraw()` (swaps the
 practice into `state`, draws, puts the real values back in `finally`; storage
 writes refused meanwhile), `_tutInert()` (practice markup can't reach ACTIONS or
 the keyboard), the practice's own log / copy / fail actions, the sample
 certificate (`buildReportDoc` + pdfpreview, never `stampCertNumber`), the box
-(`#tut-ring` on `<body>`, `tutPlace`) and the card. Transient, never persisted.
+(`#tut-ring` on `<body>`, `tutPlace`; `tutCardEnd` picks the card's end — the page
+stays still, V134.1) and the card; V134.1: practice photos (`_tutPhotoPick`, a file
+box on `<body>`, object URLs only), three example presets + the hold (events.js
+`attachHoldGesture`), free practice (`tutFree`, `tutFreeTap` — the practice's own
+versions of the everyday taps). Transient, never persisted.
 **Touch to:** change a step, its words or its target; how the box moves.
 **Coupling:** ⚠ draws the REAL `renderSessions` / `renderEntry` /
 `renderOverview` (render-core.js, render-review.js) — a renamed id or class used
 as a step `target` breaks the step (harness 72d). Routed by `render()`'s tour
 branch, which then calls `tutAfterRender()`. Actions `tut-*`, `open-practice`,
-`open-tour` (dispatch.js). Entry points: setup's finish (onboarding.js
+`open-tour`, `tut-free` (dispatch.js). ⚠ Practice photos must be cleared from the
+practice form BEFORE `loadFormForCursor()` — its `discardPendingPhotos()` calls
+photos.js `photoReleaseObjectUrls()`, which lets go of the PHONE's photo previews. Entry points: setup's finish (onboarding.js
 `openTour()`), Settings → Help → Tutorials (render-help.js). `state.tourOpen`
 is read by boot.js (update safe moment) and plan.js (prompts). Styles:
 styles.css `@@ tour` (`--tut-dim` in the three theme blocks).

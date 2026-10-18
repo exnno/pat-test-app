@@ -27,6 +27,21 @@ newcomer needs (Jobs list tabs, cloud tab, sync, Export everything) and the
 Tutorials page grows to list them. The online tutorial / demo video (landing
 page) is Peter's, non-code.
 
+### V134.1 (hotfix, 18 Oct — Peter: 0A 1A 2A 3A 4A)
+Peter's iPhone run of V134: the photo and presets steps did nothing when
+tried, the page jumped at every step, and the end left a dot. Fixed in
+tour.js / styles.css (dispatch.js `tut-free`): practice photos (camera, object
+URLs, never stored); three example presets + a hold step (the app's own
+`attachHoldGesture`) + Tap Kitchen → 21 steps; the page stays still
+(`tutCardEnd` — the card moves; scroll only for a control off the screen, e.g.
+PASS on an SE); no box or dim on the last step; free practice. Harness 73 +
+M1262–M1277. Cache pat-v134-1; APP_VERSION / What's new unchanged.
+Residuals: free practice has no typing (asset, location, notes, Other…) — a
+blank location is filled with the practice's; on iPhone a home-screen app can
+occasionally restart while the camera is open (as in the real app) — the
+practice simply starts again; free practice's Jobs list shows only the
+practice job.
+
 ### V134 residuals (known, accepted)
 - Not yet seen on a real iPhone: the glide, the card at the far end, the flash
   and sound after PASS / Copy, VoiceOver reading the card (the practice screen
@@ -40,8 +55,8 @@ page) is Peter's, non-code.
   practice). Harmless; nothing in the practice reaches the cloud.
 - The sample certificate needs the report files, which the app keeps after its
   first online start; if they can't load, step 18 says so and moves on.
-- The "hold Quick Pick for presets" step only shows the grid — holding it in
-  the practice does nothing.
+- ~~The "hold Quick Pick for presets" step only shows the grid~~ — V134.1: it
+  takes the hold and opens the real preset sheet.
 
 ### Next after V133
 V133 = the clean-up job, part 1 (Stage 12; Peter 17 Oct: 1A 2A 3A 4A 5A 6A).
