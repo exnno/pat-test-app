@@ -30,9 +30,9 @@
           frame a whole row or section; the logo / signature pickers take PNG
           or JPEG and the step moves on only for its own picture; Backup is
           look-only; the snapshot list can't be painted into the practice.
-     74f  release: V135, cache, What's new (one line), About V135 / V134 / V133,
-          Tutorials page lists the five, Help → Tutorials, search, setup's offer,
-          Privacy (72f's and 73f's lasting checks, moved here).
+     74f  (retired V136 → 75f) release: V135, cache, What's new (one line),
+          About V135 / V134 / V133, Tutorials page lists the five, Help →
+          Tutorials, search, setup's offer, Privacy.
 
    How it LOOKS — the box on every target, the card clear of it, the sample
    certificates, the logo and signature pickers — was checked in Chromium at
@@ -190,7 +190,8 @@ module.exports = async function () {
   /* ------------------------------------------------------------------ 74d */
   await t.group('74d — the steps, the results, Next tutorial (3A, 7A, 8A)', () => {
     const app = populated();
-    t.deepEq(app.run('TUTORIALS.map(d => d.id)'), ['practice'].concat(IDS), 'the practice job, then the five, in order');
+    // V136: three more follow under their own heading (75d) — these six still lead.
+    t.deepEq(app.run('TUTORIALS.map(d => d.id).slice(0, 6)'), ['practice'].concat(IDS), 'the practice job, then the five, in order');
     // Each starts at the top of the screen, wherever the Tutorials list was
     // scrolled to (found in the browser check).
     app.run('globalThis.__v135top = 0; globalThis.__v135st = window.scrollTo; window.scrollTo = function (x, y) { if (!x && !y) __v135top++; };');
@@ -326,41 +327,9 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 74f */
-  await t.group('74f — release: V135, cache, What’s new, About, Tutorials', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V135', 'APP_VERSION V135');
-    t.eq(app.run('WELCOME_VERSION'), 'V135', 'What’s new rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v135';", 'cache key pat-v135');
-    const core = read('render-core.js');
-    const open = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheet = core.slice(open, core.indexOf('</ul>', open));
-    t.eq((sheet.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheet, '<li><strong>Settings tutorials.</strong>', '…the Settings tutorials');
-    t.includes(core, 'New here? Try the practice job.', 'setup offers the practice job');
-    t.includes(core, 'You can do it again any time from Settings → Help → Tutorials.', '…and says where it lives');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V135</strong>'), b = help.indexOf('<p><strong>V134</strong>'), c = help.indexOf('<p><strong>V133</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V135, V134, V133');
-    t.excludes(help, '<p><strong>V132</strong>', 'V132 rolled off');
-    t.includes(help, 'Settings tutorials: short walk-throughs of Engineer &amp; Tester', 'About: V135’s line');
-    t.includes(help, 'The practice job: a step-by-step practice on the real testing screen', 'About: V134’s line still there');
-    t.includes(help, 'Behind the scenes: a signed-in phone now tells the cloud which version of PATGo it is running', 'About: V133’s line still there');
-    t.includes(help, 'A signed-in phone also tells the cloud which version of the app it is running.', 'Privacy unchanged');
-    t.includes(help, 'data-action="settings-page" data-arg="settingsTutorials"', 'About points at Tutorials');
-    const help0 = app.run("SETTINGS_CATEGORIES.find(c => c.id === 'catHelp').pages[0]");
-    t.eq(help0, 'settingsTutorials', 'Tutorials heads the Help group');
-    const meta = app.run('SETTINGS_PAGE_META.settingsTutorials');
-    const al = ' ' + (meta && meta.aliases) + ' ';
-    t.ok(/ tutorial /.test(al) && / practice /.test(al), 'search finds it by tutorial or practice');
-    t.ok(/ settings /.test(al) && / instrument /.test(al) && / backup /.test(al), '…and by settings, instrument or backup (V135)');
-    app.fn('setView')('settingsTutorials');
-    const page = html(app);
-    t.includes(page, 'data-action="open-practice"', 'the page starts the practice job');
-    t.includes(page, 'Nothing you do in it is saved', '…and says nothing is kept');
-    const rows = [...page.matchAll(/data-action="open-tutorial" data-arg="([^"]+)"/g)].map(m => m[1]);
-    t.deepEq(rows, IDS, 'the page lists the five Settings tutorials (2A)');
-    t.includes(page, 'Nothing you do in them is saved', '…and says nothing is kept');
-    t.eq(app.run('typeof TOUR_SLIDES'), 'undefined', 'the five picture slides stay retired');
-    t.eq(app.run('TUT_STEPS.length'), 21, 'the practice job: 21 steps (V134.1, unchanged)');
-  });
+  // 74f retired V136 (→ 75f): the release checks move with each release. Its
+  // lasting checks (setup's offer, Tutorials first in Help and found by
+  // search, the page starting the practice job and listing the five, the
+  // slides gone, About pointing at Tutorials, Privacy, the practice job's 21
+  // steps) moved to 75f with it.
 };
