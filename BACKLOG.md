@@ -8,6 +8,33 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V135
+V135 = Tutorials, part 2 — the Settings tutorials (Stage 12; Peter 18 Oct: all
+defaults 1A–10A). tour.js: `TUTORIALS` (practice + engineer, branding, content,
+items, backup), each its own steps; Settings ones start from
+`_tutSettingsState` (a new phone), draw the real Settings pages
+(`TUT_SETTINGS_VIEWS`), fill examples on tap, logo / signature pickers into the
+practice only, practice-only saves, end on the result, Finish / Next tutorial.
+Tutorials page lists them (render-help.js). Harness 74 + M1278–M1296; 72f, 73f
+retired → 74f.
+**Next (1A):** V136 — the rest a newcomer needs (own spec round): Jobs list
+tabs, the cloud tab, sync, Export everything; the Tutorials page lists them.
+Maybe then (10A deferred): a "Show me how ›" link on each covered Settings page.
+
+### V135 residuals (known, accepted)
+- Not yet seen on a real iPhone: the logo / signature pickers in the practice,
+  the box on long Settings pages (Company & Branding and Certificate Content
+  scroll to reach Save), the New preset sheet.
+- Drawing a signature isn't in the tutorial (the draw pad is a separate sheet
+  the practice doesn't draw) — the card says you can draw it; the step offers
+  Upload image.
+- Engineer & Tester ends on the sample certificate, not the New job form (the
+  form shows your name but not the instrument — the certificate shows both).
+- Backup & Restore's Export everything and snapshot steps show only where the
+  app has them (both optional files); the step is passed otherwise.
+- Settings tutorials start as a new phone, so they never show your own
+  settings (4A, by design).
+
 ### Next after V134
 V134 = Tutorials, part 1 — the practice job (Stage 12; Peter 18 Oct: 1A 2A 3B
 4A 5A 6A 7A). tour.js rewritten: the practice draws the REAL renderSessions /

@@ -2267,6 +2267,7 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 .tut-practice.tut-free textarea,
 .tut-practice.tut-free select { pointer-events: none; }
 .tut-still .fail-sheet,
+.tut-still .bulk-sheet,   /* V135: the New preset sheet */
 .tut-still .modal-backdrop { animation: none; }
 .tut-practice .tut-live,
 .tut-practice .tut-live * { pointer-events: auto; cursor: pointer; }

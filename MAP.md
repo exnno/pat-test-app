@@ -1,4 +1,4 @@
-# PATGo — Code Map (V134)
+# PATGo — Code Map (V135)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -772,8 +772,10 @@ tester & calibration / app preferences.
 **Coupling:** applies sections through the same validators as backup restore.
 File-kind guard rejects a backup imported as a setup and vice versa.
 
-### tour.js (~690 ln) — the practice job (tutorials) — V134, V134.1
-`TUT_STEPS` (19), the practice state (`TUT_FRESH` = a new phone's state taken at
+### tour.js (~1280 ln) — the tutorials: the practice job + the Settings tutorials — V134, V134.1, V135
+`TUTORIALS` (V135 — the list: `practice` + five Settings ones, each with its own
+steps array; `_tutSteps()` / `_tutDef()` = the open one's), `TUT_STEPS` (the practice
+job's 21), the practice state (`TUT_FRESH` = a new phone's state taken at
 load, + `TUT_FROM_PHONE` for the sample certificate), `_tutDraw()` (swaps the
 practice into `state`, draws, puts the real values back in `finally`; storage
 writes refused meanwhile), `_tutInert()` (practice markup can't reach ACTIONS or
@@ -783,13 +785,23 @@ certificate (`buildReportDoc` + pdfpreview, never `stampCertNumber`), the box
 stays still, V134.1) and the card; V134.1: practice photos (`_tutPhotoPick`, a file
 box on `<body>`, object URLs only), three example presets + the hold (events.js
 `attachHoldGesture`), free practice (`tutFree`, `tutFreeTap` — the practice's own
-versions of the everyday taps). Transient, never persisted.
+versions of the everyday taps). V135: Settings tutorials start from
+`_tutSettingsState` (a new phone — nothing copied from this one), draw the real
+Settings pages (`TUT_SETTINGS_VIEWS`), fill examples on tap, pick logo / signature
+into the practice only (`_tutPickImage`, `_tutAddPicture`), save through the
+practice's own functions (never the page's save handler), end on the result
+(`_tutSampleJob` + the sample certificate, or the testing screen); `box: 'row' |
+'section'` frames a toggle row / page section. Transient, never persisted.
 **Touch to:** change a step, its words or its target; how the box moves.
 **Coupling:** ⚠ draws the REAL `renderSessions` / `renderEntry` /
-`renderOverview` (render-core.js, render-review.js) — a renamed id or class used
-as a step `target` breaks the step (harness 72d). Routed by `render()`'s tour
+`renderOverview` (render-core.js, render-review.js) and, V135, the real Settings
+pages (render-settings.js, instruments.js `renderSettingsInstrument`) — a renamed id
+or class used as a step `target` breaks the step (harness 72d, 74d). ⚠ A Settings
+tutorial must never call a page's real save / add / export handler (74c).
+⚠ `_tutInert` renames `snapshots-block` — snapshots.js paints live Restore buttons
+into that id later. Routed by `render()`'s tour
 branch, which then calls `tutAfterRender()`. Actions `tut-*`, `open-practice`,
-`open-tour`, `tut-free` (dispatch.js). ⚠ Practice photos must be cleared from the
+`open-tour`, `tut-free`, V135 `open-tutorial`, `tut-next-tutorial` (dispatch.js). ⚠ Practice photos must be cleared from the
 practice form BEFORE `loadFormForCursor()` — its `discardPendingPhotos()` calls
 photos.js `photoReleaseObjectUrls()`, which lets go of the PHONE's photo previews. Entry points: setup's finish (onboarding.js
 `openTour()`), Settings → Help → Tutorials (render-help.js). `state.tourOpen`
@@ -1213,7 +1225,7 @@ manager Back `_MGR_RETURN_VIEWS` (settings-actions.js).
 
 ### render-help.js (~633 ln) — help, about & cloud pages — NEW v73
 About (+ the rolling 3-version changelog), Tutorials (V134 — starts tour.js's
-practice job), Glossary (page + the
+practice job; V135 lists tour.js `TUTORIALS`' Settings ones), Glossary (page + the
 `GLOSSARY_GROUPS` data array), Contact, `renderBugSheet()` markup, and the three
 cloud pages, reached from Settings → Cloud (v85; the About long-press is gone)
 plus `renderCloudLocked()`, the access-code box shown until the phone is

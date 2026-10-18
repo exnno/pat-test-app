@@ -892,6 +892,8 @@ registerActions({
   'tut-free': () => tutFree(),   // V134.1 (4A): free practice after the last step
   'open-tour': () => openTour(),
   'open-practice': () => openPractice(state.view),
+  'open-tutorial': (arg) => openTutorial(arg, state.view),   // V135: a Settings tutorial, by its id
+  'tut-next-tutorial': () => tutNextTutorial(),   // V135 (8A): the last step's Next tutorial
 
   // v85: the cloud pages are ordinary Settings rows now (Settings → Cloud), so
   // the V43 'open-cloud-page' action is gone. The access-code box's one button:

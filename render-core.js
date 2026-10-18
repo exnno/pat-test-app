@@ -256,7 +256,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Try the practice job.</strong> A step-by-step practice on the real testing screen, with a box that shows what to tap. Find it in Settings → Help → Tutorials. Nothing you do in it is saved.</li>
+        <li><strong>Settings tutorials.</strong> Five short walk-throughs on the real Settings pages: Engineer &amp; Tester, Company &amp; Branding, Certificate Content, Quick Pick Items, and Backup &amp; Restore. Find them in Settings → Help → Tutorials. Nothing you do in them is saved.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

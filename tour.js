@@ -1,5 +1,5 @@
 // tour.js — V134 tutorials: the practice job (V134.1: photos, presets, a still
-// screen, a clean finish and free practice)
+// screen, a clean finish and free practice). V135: the Settings tutorials.
 // (c) 2026 Peter Birchley. All rights reserved.
 //
 // The practice job walks a new engineer through a job on the REAL screens:
@@ -27,6 +27,18 @@
 // saves, syncs, learns and stamps photos. Nothing from the practice is kept: no
 // job, no item, no client, no learning, no photo, no certificate number (the
 // sample certificate is built without stamping).
+//
+// V135: the same engine runs five SETTINGS tutorials (TUTORIALS below) on the
+// real Settings pages — renderSettingsHub, renderSettingsUser, the instrument
+// editor, Company & Branding, Certificate Content, Quick Pick Items, Backup &
+// Restore — drawn from a practice that starts as a new phone (4A). There is
+// no typing: tapping a box fills in an example (4A); the logo and signature
+// pickers open for real and the picture stays in the practice (5A); Backup &
+// Restore is look-only — a practice backup file could one day be restored by
+// mistake over real work (6A). Every Save is the practice's: it never calls
+// the page's real save handler (those write storage and sync — R37). Each one
+// ends on what the change does — the testing screen's new buttons, or the
+// sample certificate (7A) — then Finish or the next tutorial (8A).
 //
 // The old five picture slides (V42) are retired (7A); `openTour()` and
 // state.tourOpen / state.tourStep keep their names — setup, the update's safe
@@ -65,7 +77,7 @@ const TUT_PRESETS = [
 const TUT_GLIDE_MS = 350;
 const TUT_PAUSE_MS = 650;
 
-// _tut while open: { st, from, cert, certNodes, said, sheet, screen, free, photoUrls }
+// _tut while open: { id, st, from, cert, certNodes, said, sheet, screen, free, photoUrls }
 let _tut = null;
 let _tutRefused = 0;      // storage writes refused during a practice draw (harness reads it)
 let _tutScrolling = 0;    // a smooth scroll in flight — the ring is already heading there
@@ -95,8 +107,45 @@ function _tutNewState() {
   return st;
 }
 
-function _tutBlank(from) {
-  return { st: _tutNewState(), from: from || 'sessions', cert: null, certNodes: null, said: null, sheet: '', screen: '', free: false, photoUrls: [] };
+// V135 (4A): a Settings tutorial starts as a NEW phone — blank name, no
+// instruments, no company, the starting Quick Pick list — so the examples it
+// fills in are the only values on the page, and every engineer sees the same.
+// Nothing is copied from this phone. `init` (per tutorial) adds what that
+// tutorial's result needs and isn't its subject (a company name on the sample
+// certificate of the Engineer tutorial, say).
+function _tutSettingsState(def) {
+  let st;
+  try { st = JSON.parse(TUT_FRESH); } catch (e) { st = {}; }
+  st.sessions = [];
+  st.activeId = null;
+  st.cursor = 0;
+  st.view = 'settings';
+  st.settingsCategory = null;
+  st.settingsSearchQuery = '';
+  st.welcomeSeen = true;
+  st.onboardedV33Seen = true;
+  st.tourOpen = false;
+  st.pendingPhotos = [];
+  st.instruments = [];
+  st.activeInstrumentId = '';
+  st.instrumentEditorId = '';
+  st.presetDialog = { mode: null, name: '', editingId: null };
+  st.reportSettingsError = '';
+  st.reportPreviewReturnSessionId = null;
+  // A new phone's one starting preset — load() makes it on a real phone, and
+  // the state taken before load() has none (found in the browser check: the
+  // Quick Pick page showed an empty preset box and 'Items in ""').
+  st.itemPresets = [{ id: 'tutorial-default', name: 'Default', items: DEFAULT_ITEM_TYPES.slice() }];
+  st.activePresetId = 'tutorial-default';
+  st.itemTypes = DEFAULT_ITEM_TYPES.slice();
+  if (def && typeof def.init === 'function') def.init(st);
+  return st;
+}
+
+function _tutBlank(from, id) {
+  const def = _tutDef(id);
+  const st = (def && def.settings) ? _tutSettingsState(def) : _tutNewState();
+  return { id: def ? def.id : 'practice', st, from: from || 'sessions', cert: null, certNodes: null, said: null, sheet: '', screen: '', free: false, photoUrls: [] };
 }
 
 // Where storage writes are refused: the object that really holds setItem — the
@@ -153,10 +202,27 @@ function _tutInert(html) {
     .replace(/\sdata-input-action="/g, ' data-tut-input="')
     .replace(/\sdata-change-action="/g, ' data-tut-change="')
     .replace(/\sid="screen-title"/g, ' id="tut-screen-title"')
+    // V135: Backup & Restore's snapshot list is painted in later, by id, from
+    // the phone's own database (snapshots.js) — with live Restore buttons. The
+    // practice's copy of the box has another id, so nothing is painted into it.
+    .replace(/\sid="snapshots-block"/g, ' id="tut-snapshots-block"')
     .replace(/\sautofocus\b/g, '')
     .replace(/<(input|textarea|select)\b/g, '<$1 readonly tabindex="-1"')
     .replace(/<button\b/g, '<button tabindex="-1"');
 }
+
+// V135: the Settings screens a tutorial can show, each drawn by its own real
+// render function (render-core.js routes the same views to the same functions).
+const TUT_SETTINGS_VIEWS = {
+  settings: () => renderSettingsHub(),
+  settingsCategory: () => renderSettingsCategory(),
+  settingsUser: () => renderSettingsUser(),
+  settingsInstrument: () => renderSettingsInstrument(),
+  settingsItems: () => renderSettingsItems(),
+  settingsReport: () => renderSettingsReport(),
+  settingsReportContent: () => renderSettingsReportContent(),
+  settingsBackup: () => renderSettingsBackup()
+};
 
 // One screen of the practice, drawn by the app's own render function.
 function _tutScreenHTML() {
@@ -164,6 +230,7 @@ function _tutScreenHTML() {
     const v = state.view;
     if (v === 'entry') return renderEntry();
     if (v === 'overview') return renderOverview();
+    if (Object.prototype.hasOwnProperty.call(TUT_SETTINGS_VIEWS, v)) return TUT_SETTINGS_VIEWS[v]();
     return renderSessions();
   });
 }
@@ -270,25 +337,78 @@ function _tutGoOverview() { _tut.st.view = 'overview'; }
 // open can't lose it). The picture is shown from an object URL in the fail
 // sheet — the real strip, drawn from the practice's pendingPhotos — and is
 // never stored: the URLs are kept in _tut.photoUrls and let go at the end.
-function _tutPhotoPick() {
+function _tutPhotoPick() { _tutPickImage('photo'); }
+
+// V135 (5A): the same file box serves the logo and the signature on Company &
+// Branding — PNG or JPEG, as the real pickers take. Whatever is chosen goes to
+// the practice only (_tutAddPhoto / _tutAddPicture).
+function _tutPickImage(kind) {
   if (!_tut || typeof document === 'undefined') return;
   let inp = document.getElementById('tut-photo-file');
   if (!inp) {
     inp = document.createElement('input');
     inp.type = 'file';
     inp.id = 'tut-photo-file';
-    inp.accept = 'image/*';
     inp.style.display = 'none';
     inp.setAttribute('aria-hidden', 'true');
     document.body.appendChild(inp);
   }
+  inp.accept = (kind === 'photo') ? 'image/*' : 'image/png,image/jpeg';
   inp.value = '';
   inp.onchange = () => {
     const f = inp.files && inp.files[0];
     if (!f || !_tut || !state.tourOpen) return;
-    _tutAddPhoto(f);
+    if (kind === 'photo') _tutAddPhoto(f); else _tutAddPicture(kind, f);
   };
   inp.click();
+}
+
+// The guided step that asked for this picture moves on once it is in.
+function _tutPicked(kind) {
+  const s = _tutSteps()[state.tourStep];
+  const wants = s ? (s.pick || (s.key === 'photo' ? 'photo' : '')) : '';
+  if (!_tut.free && wants === kind && !_tutTimer) {
+    _tutTimer = setTimeout(() => { _tutTimer = null; _tutAdvance(); }, TUT_PAUSE_MS);
+  }
+}
+
+// V135 (5A): a logo or signature for the practice — scaled down and turned into
+// a PNG data URL exactly as the real pickers do (settings-actions.js
+// handleReportLogoFile, storeSignatureFromSource), because the sample
+// certificate's PDF code needs a data URL, not a link. It lives only in the
+// practice's reportSettings — gone with the practice; never saved.
+function _tutAddPicture(kind, file) {
+  if (!/^image\/(png|jpeg)$/.test(file.type || '')) {
+    if (typeof showToast === 'function') showToast('Please choose a PNG or JPEG image.');
+    return;
+  }
+  const maxPx = (kind === 'signature')
+    ? ((typeof REPORT_SIGNATURE_MAX_PX === 'number') ? REPORT_SIGNATURE_MAX_PX : 400)
+    : ((typeof REPORT_LOGO_MAX_PX === 'number') ? REPORT_LOGO_MAX_PX : 600);
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      if (!_tut || !state.tourOpen) return;
+      try {
+        let { width, height } = img;
+        if (width > maxPx || height > maxPx) {
+          const scale = maxPx / Math.max(width, height);
+          width = Math.round(width * scale);
+          height = Math.round(height * scale);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = width; canvas.height = height;
+        canvas.getContext('2d').drawImage(img, 0, 0, width, height);
+        _tut.st.reportSettings[kind] = canvas.toDataURL('image/png');
+      } catch (err) { if (typeof showToast === 'function') showToast('Could not use that picture.'); return; }
+      render();
+      _tutPicked(kind);
+    };
+    img.onerror = () => { if (typeof showToast === 'function') showToast('Could not read that picture.'); };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 function _tutAddPhoto(file) {
@@ -301,10 +421,7 @@ function _tutAddPhoto(file) {
   st.pendingPhotos = (st.pendingPhotos || []).concat([{ url, tutorial: true }]);
   render();
   // The guided photo step moves on once the photo is in, after a moment.
-  const s = TUT_STEPS[state.tourStep];
-  if (!_tut.free && s && s.key === 'photo' && !_tutTimer) {
-    _tutTimer = setTimeout(() => { _tutTimer = null; _tutAdvance(); }, TUT_PAUSE_MS);
-  }
+  _tutPicked('photo');
 }
 
 // ⚠ Empty the practice's staged photos BEFORE anything calls loadFormForCursor:
@@ -421,7 +538,7 @@ const TUT_STEPS = [
   { key: 'report', target: '#produce-report-btn', go: true,
     text: 'Job done? Make the certificate. Tap the <strong>report</strong> button.',
     run: () => _tutMakeCert() },
-  { key: 'cert', target: '.tut-cert',
+  { key: 'cert', target: '.tut-cert', cert: true,
     text: () => (_tut && _tut.cert === 'failed')
       ? 'The sample certificate couldn’t be drawn just now — it needs the report files, which come down the first time the app is online. Your real certificates aren’t affected.'
       : 'Your certificate, with your company details. On a real job you share or save it from here. This is only a sample — no certificate number was used.' },
@@ -429,19 +546,322 @@ const TUT_STEPS = [
     text: 'That’s the practice job — nothing from it was saved. Have a go on your own in <strong>free practice</strong>, or finish. It’s in Settings → Help → Tutorials any time.' }
 ];
 
+// ---------- V135: the Settings tutorials ----------
+// The practice's own versions of what each page's controls do — on the
+// practice state only. A Save here is never the page's real save handler.
+
+// Settings hub → a group. A group with one page opens that page straight away,
+// as the real hub does (settings-actions.js settingsOpenCategory).
+function _tutOpenGroup(id) {
+  const st = _tut.st;
+  const cat = SETTINGS_CATEGORIES.find((c) => c.id === id);
+  const pages = (cat && typeof settingsCategoryPages === 'function') ? _tutDraw(() => settingsCategoryPages(cat)) : [];
+  if (pages && pages.length === 1) { st.settingsCategory = null; st.view = pages[0]; return; }
+  st.settingsCategory = id;
+  st.view = 'settingsCategory';
+}
+function _tutOpenPage(id) { _tut.st.view = id; }
+
+function _tutIsoDay(offsetDays) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// Engineer & Tester
+function _tutAddInstrument() {
+  const st = _tut.st;
+  const inst = makeInstrument({ id: 'tutorial-' + newId() });
+  st.instruments = (st.instruments || []).concat([inst]);
+  if (!st.activeInstrumentId) st.activeInstrumentId = inst.id;
+  st.instrumentEditorId = inst.id;
+  st.view = 'settingsInstrument';
+}
+function _tutInstrument() {
+  const st = _tut.st;
+  return (st.instruments || []).find((x) => x.id === st.instrumentEditorId) || (st.instruments || [])[0] || null;
+}
+function _tutFillInstrument() {
+  const inst = _tutInstrument();
+  if (inst) { inst.make = 'Seaward'; inst.model = 'PrimeTest 250+'; }
+}
+function _tutFillCalibration() {
+  const inst = _tutInstrument();
+  if (!inst) return;
+  inst.calDate = _tutIsoDay(-30);
+  inst.calDue = _tutIsoDay(335);
+  inst.calCertNo = 'CAL-' + new Date().getFullYear() + '-0142';
+}
+function _tutCloseInstrument() {
+  _tut.st.instrumentEditorId = '';
+  _tut.st.view = 'settingsUser';
+}
+
+// Company & Branding / Certificate Content
+function _tutRs() { return _tut.st.reportSettings; }
+function _tutTheme(id) {
+  const t = (typeof REPORT_COLOR_THEMES !== 'undefined' ? REPORT_COLOR_THEMES : []).find((x) => x.id === id);
+  if (t) { _tutRs().headerColor = t.header; _tutRs().accentColor = t.accent; }
+}
+// What the page's "Next certificate will look like" line shows (render-settings.js).
+function _tutCertPreview() {
+  const rs = _tutRs();
+  const year = String(new Date().getFullYear());
+  const prefix = String(rs.certPrefix || '').replace(/\{year\}/gi, year);
+  const pad = Number.isFinite(rs.certPadding) ? rs.certPadding : 4;
+  const n = Number.isFinite(rs.certNextNumber) ? rs.certNextNumber : 1;
+  return prefix + String(n).padStart(pad, '0');
+}
+
+// A small finished job — two passes and a fail — for the sample certificate,
+// made the practice job's way (_tutStartJob). The screen stays where it was:
+// the certificate slides up over the page that was just saved. The number is
+// only the practice's — the phone's counter is never touched (stampCertNumber
+// is never called).
+function _tutSampleJob() {
+  const st = _tut.st;
+  const view = st.view;
+  _tutStartJob();
+  const sess = _tutSession();
+  const ts = new Date().toISOString();
+  [['1', 'Monitor', 'pass', ''], ['2', 'Kettle', 'pass', ''], ['3', 'Lead', 'fail', 'Damaged Plug']].forEach(([a, type, result, notes]) => {
+    sess.items.push({ id: 'tutorial-' + newId(), assetNo: a, location: TUT_LOCATION, itemType: type, notes, result, ts });
+  });
+  if (st.reportSettings && st.reportSettings.certEnabled) sess.certNo = _tutCertPreview();
+  st.view = view;
+}
+function _tutSaveToCert() { _tutSampleJob(); _tutMakeCert(); }
+
+// Quick Pick Items — the practice's createPreset (session.js), unsaved.
+function _tutNewPreset() { _tut.st.presetDialog = { mode: 'new', name: '', editingId: null }; }
+function _tutCreatePreset() {
+  const st = _tut.st;
+  const name = String(st.presetDialog.name || '').trim() || 'Kitchen';
+  const p = { id: 'tutorial-' + newId(), name, items: DEFAULT_ITEM_TYPES.slice() };
+  st.itemPresets = (st.itemPresets || []).concat([p]);
+  st.activePresetId = p.id;
+  st.itemTypes = p.items.slice();
+  st.presetDialog = { mode: null, name: '', editingId: null };
+}
+function _tutFillItems() {
+  const st = _tut.st;
+  const p = (st.itemPresets || []).find((x) => x.id === st.activePresetId);
+  if (!p) return;
+  p.items = TUT_PRESETS[1].items.slice();   // the Kitchen list
+  st.itemTypes = p.items.slice();
+}
+
+const TUT_CERT_FAILED = 'The sample certificate couldn’t be drawn just now — it needs the report files, which come down the first time the app is online. Your real certificates aren’t affected.';
+function _tutCertSays(ok) { return () => (_tut && _tut.cert === 'failed') ? TUT_CERT_FAILED : ok; }
+
+// Each starts on the real Settings list (3A): the box goes to the group, then
+// the page. Targets are simple selectors on the practice markup (data-action
+// is data-tut-action there). `box: 'row'` / `'section'` puts the box round the
+// target's toggle row or page section instead (a tap anywhere in it counts);
+// `pick` — a step that moves on when that picture arrives (5A).
+const TUT_STEPS_ENGINEER = [
+  { key: 'group', target: '.settings-row[data-arg="catUser"]', go: true,
+    text: 'This is Settings. Your name and your PAT testers are under <strong>Engineer &amp; Tester</strong>. Tap it.',
+    run: () => _tutOpenGroup('catUser') },
+  { key: 'name', target: '#settings-engineer', go: true, pause: true,
+    text: 'Your name goes on every new job and certificate. Tap the box — we’ll type an example.',
+    run: () => { _tut.st.engineer = 'Alex Smith'; } },
+  { key: 'add', target: '[data-tut-action="instrument-add"]', go: true,
+    text: 'Now your PAT tester. Tap <strong>+ Add instrument</strong>.',
+    run: () => _tutAddInstrument() },
+  { key: 'make', target: '#inst-make', go: true, pause: true,
+    text: 'The make and model, as on its label. Tap the box — we’ll fill in an example.',
+    run: () => _tutFillInstrument() },
+  { key: 'calibration', target: '#inst-cal-cert', go: true, pause: true,
+    text: 'From the tester’s calibration certificate: the date, the certificate number and when it’s next due. Tap the box to fill them in.',
+    run: () => _tutFillCalibration() },
+  { key: 'inst-save', target: '[data-tut-action="instrument-save"]', go: true,
+    text: 'Tap <strong>Save</strong>.',
+    run: () => _tutCloseInstrument() },
+  { key: 'in-use', target: '.instrument-card',
+    text: 'Your tester, marked <strong>In use</strong> — it’s recorded against every new job. PATGo warns you when its calibration is nearly due. Got more than one? Add them all and pick the one you’re using.' },
+  { key: 'save', target: '#settings-user-save', go: true,
+    text: 'Tap <strong>Save</strong>.',
+    run: () => _tutSaveToCert() },
+  { key: 'cert', target: '.tut-cert', cert: true,
+    text: _tutCertSays('Your name, your tester and its calibration, on the certificate. This is only a sample — nothing was saved.') },
+  { key: 'done', target: '',
+    text: 'That’s Engineer &amp; Tester. To set yours for real: Settings → Engineer &amp; Tester. Next up: your company and logo.' }
+];
+
+const TUT_STEPS_BRANDING = [
+  { key: 'group', target: '.settings-row[data-arg="catReports"]', go: true,
+    text: 'This is Settings. How your certificate looks is under <strong>Reports &amp; Exports</strong>. Tap it.',
+    run: () => _tutOpenGroup('catReports') },
+  { key: 'page', target: '.settings-row[data-page="settingsReport"]', go: true,
+    text: 'Tap <strong>Company &amp; Branding</strong>.',
+    run: () => _tutOpenPage('settingsReport') },
+  { key: 'enable', target: '#report-enabled', box: 'row', go: true, pause: true,
+    text: 'Certificates are off on a new phone, so nobody makes one before it’s set up. Tap <strong>Enable reports</strong> to switch them on.',
+    run: () => { _tutRs().enabled = true; } },
+  { key: 'company', target: '#report-company-name', go: true, pause: true,
+    text: 'Your company name and address go at the top of every certificate. Tap the box — we’ll fill in an example.',
+    run: () => { _tutRs().companyName = 'Practice PAT Services'; _tutRs().companyAddress = '1 High Street\nAnytown\nAB1 2CD'; } },
+  { key: 'logo', target: '#report-logo-pick-btn', go: true, pick: 'logo',
+    tap: () => _tutPickImage('logo'),
+    text: 'Add your logo. Tap <strong>Upload logo</strong> and choose a picture to see it on the sample — it stays in the practice. Or Skip.' },
+  { key: 'colours', target: '.report-theme-chip[data-arg="navy"]', go: true, pause: true,
+    text: 'The colour of the certificate’s headings. Tap <strong>Navy</strong>.',
+    run: () => _tutTheme('navy') },
+  { key: 'signature', target: '[data-tut-action="signature-upload"]', go: true, pick: 'signature',
+    tap: () => _tutPickImage('signature'),
+    text: 'Your signature prints on the declaration. On the real page you can draw it with your finger, or upload a picture. Tap <strong>Upload image</strong> to try one — or Skip.' },
+  { key: 'save', target: '#settings-report-save', go: true,
+    text: 'Tap <strong>Save</strong>.',
+    run: () => _tutSaveToCert() },
+  { key: 'cert', target: '.tut-cert', cert: true,
+    text: _tutCertSays('Your company, logo, colours and signature on the certificate. This is only a sample — nothing was saved.') },
+  { key: 'done', target: '',
+    text: 'That’s Company &amp; Branding. To set yours for real: Settings → Reports &amp; Exports → Company &amp; Branding. Next up: what the certificate includes.' }
+];
+
+const TUT_STEPS_CONTENT = [
+  { key: 'group', target: '.settings-row[data-arg="catReports"]', go: true,
+    text: 'This is Settings. What goes on the certificate is under <strong>Reports &amp; Exports</strong>. Tap it.',
+    run: () => _tutOpenGroup('catReports') },
+  { key: 'page', target: '.settings-row[data-page="settingsReportContent"]', go: true,
+    text: 'Tap <strong>Certificate Content</strong>.',
+    run: () => _tutOpenPage('settingsReportContent') },
+  { key: 'include', target: '#report-show-engineer', box: 'row',
+    text: 'Each switch here puts a part of the certificate on or off — your name, the tester, calibration, the failed items, photos, remedial actions and more.' },
+  { key: 'declaration', target: '#report-declaration-text',
+    text: 'The declaration printed above the signature line. Change it to your own wording if you like.' },
+  { key: 'numbers', target: '#report-cert-enabled', box: 'row', go: true, pause: true,
+    text: 'Want each certificate numbered? Tap <strong>Use certificate numbers</strong>.',
+    run: () => { _tutRs().certEnabled = true; } },
+  { key: 'prefix', target: '#report-cert-prefix', go: true, pause: true,
+    text: 'The number starts with your prefix. Tap the box — we’ll use one with the year in it.',
+    run: () => { _tutRs().certPrefix = 'PAT-{year}-'; } },
+  { key: 'preview', target: '#report-cert-prefix', box: 'section',
+    text: 'Then a counter that goes up by one for each job. The line at the bottom shows what your next number will be.' },
+  { key: 'save', target: '#settings-report-save', go: true,
+    text: 'Tap <strong>Save</strong>.',
+    run: () => _tutSaveToCert() },
+  { key: 'cert', target: '.tut-cert', cert: true,
+    text: _tutCertSays('The certificate with its number. A real number is only used when you make a real certificate — this sample used none.') },
+  { key: 'done', target: '',
+    text: 'That’s Certificate Content. To set yours for real: Settings → Reports &amp; Exports → Certificate Content. Next up: your Quick Pick buttons.' }
+];
+
+const TUT_STEPS_ITEMS = [
+  { key: 'group', target: '.settings-row[data-arg="catTesting"]', go: true,
+    text: 'This is Settings. The item buttons on the testing screen are under <strong>Logging</strong>. Tap it.',
+    run: () => _tutOpenGroup('catTesting') },
+  { key: 'page', target: '.settings-row[data-page="settingsItems"]', go: true,
+    text: 'Tap <strong>Quick Pick Items</strong>.',
+    run: () => _tutOpenPage('settingsItems') },
+  { key: 'preset', target: '#settings-preset-select',
+    text: 'A <strong>preset</strong> is a set of up to nine item buttons. Make one for each kind of site — office, kitchen, workshop — and switch between them on a job.' },
+  { key: 'new', target: '#preset-new-btn', go: true,
+    text: 'Tap <strong>+ New</strong> to make one.',
+    run: () => _tutNewPreset() },
+  { key: 'name', target: '#preset-dialog-input', go: true, pause: true,
+    text: 'Give it a name. Tap the box — we’ll call it Kitchen.',
+    run: () => { _tut.st.presetDialog.name = 'Kitchen'; } },
+  { key: 'create', target: '#preset-dialog-confirm', go: true,
+    text: 'Tap <strong>Create</strong>.',
+    run: () => _tutCreatePreset() },
+  { key: 'items', target: '#settings-types', go: true, pause: true,
+    text: 'The buttons, one per line, in the order they show. Tap the box — we’ll fill in kitchen items.',
+    run: () => _tutFillItems() },
+  { key: 'smart', target: '#sqp-toggle', box: 'row',
+    text: '<strong>Smart Quick Pick</strong> swaps in the items you most often test at each location. It’s off until you want it.' },
+  { key: 'save', target: '#settings-items-save', go: true,
+    text: 'Tap <strong>Save</strong>.',
+    run: () => _tutStartJob() },
+  { key: 'result', target: '#quick-grid',
+    text: 'Your Kitchen buttons on the testing screen. On a job, press and hold the buttons to switch preset.' },
+  { key: 'done', target: '',
+    text: 'That’s Quick Pick Items. To make yours for real: Settings → Logging → Quick Pick Items. Next up: keeping your work safe.' }
+];
+
+// Look-only (6A): no practice backup file is ever made.
+const TUT_STEPS_BACKUP = [
+  { key: 'group', target: '.settings-row[data-arg="catData"]', go: true,
+    text: 'This is Settings. Backups are under <strong>Data</strong>. Tap it.',
+    run: () => _tutOpenGroup('catData') },
+  { key: 'page', target: '.settings-row[data-page="settingsBackup"]', go: true,
+    text: 'Tap <strong>Backup &amp; Restore</strong>.',
+    run: () => _tutOpenPage('settingsBackup') },
+  { key: 'backup', target: '#backup-export-btn',
+    text: 'A backup is one file holding all your jobs and settings. On iPhone choose <strong>Save to Files</strong> and pick iCloud Drive — or email it to yourself. Make one at the end of every testing day.' },
+  { key: 'everything', target: '#export-all-btn', when: true,
+    text: '<strong>Export everything</strong> makes one zip: the backup, a spreadsheet for every job, the certificates you’ve made, and your photos if you want them.' },
+  { key: 'restore', target: '#backup-import-btn',
+    text: '<strong>Restore</strong> puts a backup back — on a new phone, or if this one’s been cleared. It replaces everything on the phone, so you’re asked first.' },
+  { key: 'snapshots', target: '#tut-snapshots-block', box: 'section', when: true,
+    text: 'PATGo also keeps a copy on this phone each day you change something, so you can step back a day. It’s not a backup — if the phone is lost, these go with it.' },
+  { key: 'done', target: '',
+    text: 'That’s Backup &amp; Restore — try it for real in Settings → Data → Backup &amp; Restore. Nothing in this tutorial made a file.' }
+];
+
+// The tutorials, in the order the Tutorials page lists them and "Next
+// tutorial" walks them (8A). `page` — the Settings page each one teaches (its
+// icon on the Tutorials page). The practice job keeps its free practice.
+const TUTORIALS = [
+  { id: 'practice', title: 'Practice job', steps: TUT_STEPS, free: true },
+  { id: 'engineer', title: 'Engineer & Tester', page: 'settingsUser', settings: true, steps: TUT_STEPS_ENGINEER,
+    blurb: 'Your name and your PAT tester',
+    init: (st) => { st.reportSettings.companyName = 'Practice PAT Services'; } },
+  { id: 'branding', title: 'Company & Branding', page: 'settingsReport', settings: true, steps: TUT_STEPS_BRANDING,
+    blurb: 'Company, logo, colours, signature' },
+  { id: 'content', title: 'Certificate Content', page: 'settingsReportContent', settings: true, steps: TUT_STEPS_CONTENT,
+    blurb: 'What it shows, and its numbers',
+    init: (st) => { st.reportSettings.companyName = 'Practice PAT Services'; } },
+  { id: 'items', title: 'Quick Pick Items', page: 'settingsItems', settings: true, steps: TUT_STEPS_ITEMS,
+    blurb: 'Your item buttons and presets' },
+  { id: 'backup', title: 'Backup & Restore', page: 'settingsBackup', settings: true, steps: TUT_STEPS_BACKUP,
+    blurb: 'Keeping your work safe' }
+];
+
+function _tutDef(id) {
+  const want = id || (_tut && _tut.id) || 'practice';
+  return TUTORIALS.find((d) => d.id === want) || null;
+}
+function _tutSteps() { const d = _tutDef(); return d ? d.steps : TUT_STEPS; }
+// The next Settings tutorial after this one, or null (8A).
+function _tutNextDef() {
+  const i = TUTORIALS.findIndex((d) => d.id === (_tut && _tut.id));
+  const next = (i >= 0) ? TUTORIALS[i + 1] : null;
+  return (next && next.settings && _tutDef() && _tutDef().settings) ? next : null;
+}
+
 function _tutStepText(s) { return (typeof s.text === 'function') ? s.text() : s.text; }
 
 // ---------- control ----------
 
-// Open the practice job. `from` is the screen Quit and Finish return to.
-function openPractice(from) {
+// Open a tutorial (V135: by its TUTORIALS id). `from` is the screen Quit and
+// Finish return to. An unknown id opens nothing.
+function openTutorial(id, from) {
+  if (!_tutDef(id || 'practice')) return;
   if (_tutTimer) { clearTimeout(_tutTimer); _tutTimer = null; }
   if (_tut) _tutLetGoPhotos(_tut);
-  _tut = _tutBlank(from);
+  _tut = _tutBlank(from, id || 'practice');
   state.tourOpen = true;
   state.tourStep = 0;
   state.view = 'tour';
+  // A tutorial starts at the top, as a newly opened page does (found in the
+  // browser check: one opened low on the Tutorials list started scrolled).
+  try { window.scrollTo(0, 0); } catch (e) {}
   render();
+}
+
+// Open the practice job.
+function openPractice(from) { openTutorial('practice', from); }
+
+// The last step's "Next tutorial" (8A): straight into the next one, which
+// starts fresh and still returns to where the first was opened from.
+function tutNextTutorial() {
+  if (!state.tourOpen || !_tut) return;
+  const next = _tutNextDef();
+  if (!next) { closeTour(); return; }
+  _tutRingRemove();
+  openTutorial(next.id, _tut.from);
 }
 
 // Kept for setup's "Show me around" hand-off (onboarding.js) and any old link.
@@ -450,7 +870,7 @@ function openTour() { openPractice('sessions'); }
 function _tutAdvance() {
   if (!_tut) return;
   if (_tutTimer) { clearTimeout(_tutTimer); _tutTimer = null; }
-  if (state.tourStep >= TUT_STEPS.length - 1) { closeTour(); return; }
+  if (state.tourStep >= _tutSteps().length - 1) { closeTour(); return; }
   state.tourStep += 1;
   render();
 }
@@ -460,7 +880,7 @@ function _tutAdvance() {
 // A log pauses first so its flash is seen in the box; then the box moves on.
 function _tutDo(viaSkip) {
   if (!_tut || _tutTimer) return;
-  const s = TUT_STEPS[state.tourStep];
+  const s = _tutSteps()[state.tourStep];
   if (!s) return;
   if (!viaSkip && typeof s.tap === 'function') { s.tap(); return; }
   if (typeof s.run === 'function') s.run();
@@ -475,7 +895,7 @@ function _tutDo(viaSkip) {
 
 function tourNext() {   // Next on a "look" step
   if (!state.tourOpen || !_tut || _tut.free) return;
-  const s = TUT_STEPS[state.tourStep];
+  const s = _tutSteps()[state.tourStep];
   if (s && s.go) return;   // a "do" step moves on only by its tap or Skip
   if (s && typeof s.run === 'function') s.run();
   _tutAdvance();
@@ -483,7 +903,7 @@ function tourNext() {   // Next on a "look" step
 
 function tourSkip() {   // Skip on a "do" step: does it for you
   if (!state.tourOpen || !_tut || _tut.free) return;
-  const s = TUT_STEPS[state.tourStep];
+  const s = _tutSteps()[state.tourStep];
   if (s && s.go) _tutDo(true);
 }
 
@@ -493,11 +913,14 @@ function tourSkip() {   // Skip on a "do" step: does it for you
 function tutTap(arg, el, e) {
   if (!state.tourOpen || !_tut) return;
   if (_tut.free) { tutFreeTap(e); return; }
-  const s = TUT_STEPS[state.tourStep];
+  // V135: no tap in the guided practice does what the browser would do with
+  // it — a switch must not flip by itself, a box must not take the keyboard.
+  // The step's own run changes the practice, and the redraw shows it.
+  if (e && typeof e.preventDefault === 'function') { try { e.preventDefault(); } catch (e2) {} }
+  const s = _tutSteps()[state.tourStep];
   if (!s || !s.go || !s.target || s.hold) return;
   const hit = e && e.target && typeof e.target.closest === 'function' ? e.target : null;
-  const root = document.getElementById('tut-practice');
-  const want = root ? root.querySelector(s.target) : null;
+  const want = _tutTarget(s);
   if (!hit || !want || !(want === hit || want.contains(hit))) return;
   _tutDo(false);
 }
@@ -513,7 +936,7 @@ function _tutHold() {
     render();
     return;
   }
-  const s = TUT_STEPS[state.tourStep];
+  const s = _tutSteps()[state.tourStep];
   if (s && s.hold) _tutDo(false);
 }
 
@@ -617,14 +1040,15 @@ function closeTour() {
 
 function renderTour() {
   if (!_tut) _tut = _tutBlank('sessions');
-  const total = TUT_STEPS.length;
+  const total = _tutSteps().length;
   let step = state.tourStep || 0;
   if (step < 0) step = 0;
   if (step > total - 1) step = total - 1;
-  const s = TUT_STEPS[step];
+  const s = _tutSteps()[step];
   const isLast = step === total - 1;
   const free = !!_tut.free;
-  const cert = (!free && s.key === 'cert')
+  const def = _tutDef() || TUTORIALS[0];
+  const cert = (!free && s.cert)
     ? `<div class="tut-cert" role="img" aria-label="Sample certificate">
          <div class="tut-cert-title">Sample certificate</div>
          <div class="tut-cert-box" id="tut-cert-box">${_tut.cert === 'failed'
@@ -633,7 +1057,9 @@ function renderTour() {
        </div>` : '';
   // A sheet slides up when it opens — once. A later redraw of the same open
   // sheet must not slide it in again under the box.
-  const sheet = _tut.st.failModalOpen ? 'fail' : (_tut.st.presetSheetOpen ? 'preset' : '');
+  const pd = _tut.st.presetDialog;
+  const sheet = _tut.st.failModalOpen ? 'fail' : (_tut.st.presetSheetOpen ? 'preset'
+    : ((pd && (pd.mode === 'new' || pd.mode === 'rename')) ? 'preset-dialog' : ''));   // V135
   const still = !!(sheet && sheet === _tut.sheet);
   _tut.sheet = sheet;
   const screen = _tutInert(_tutScreenHTML());
@@ -651,15 +1077,23 @@ function renderTour() {
     </div>
   `;
   }
+  // The last step: the practice job offers free practice; a Settings tutorial
+  // offers the next one, or Finish alone after the last (V135 8A).
+  const next = isLast ? _tutNextDef() : null;
   const btns = isLast
-    ? `<button class="btn-secondary tut-quit" data-action="tut-quit">Finish</button>
+    ? (def.free
+      ? `<button class="btn-secondary tut-quit" data-action="tut-quit">Finish</button>
           <button class="btn-primary tut-go" data-action="tut-free">Free practice</button>`
+      : (next
+        ? `<button class="btn-secondary tut-quit" data-action="tut-quit">Finish</button>
+          <button class="btn-primary tut-go" data-action="tut-next-tutorial">Next tutorial</button>`
+        : `<button class="btn-primary tut-go" data-action="tut-quit">Finish</button>`))
     : `<button class="btn-secondary tut-quit" data-action="tut-quit">Quit</button>
           ${s.go
             ? `<button class="btn-primary tut-go" data-action="tut-skip">Skip</button>`
             : `<button class="btn-primary tut-go" data-action="tut-next">Next</button>`}`;
   return `
-    <div class="tut-wrap" role="dialog" aria-label="Practice job">
+    <div class="tut-wrap" role="dialog" aria-label="${def.free ? 'Practice job' : escapeHTML(def.title + ' tutorial')}">
       <div class="tut-practice${still ? ' tut-still' : ''}" id="tut-practice" data-action="tut-tap" aria-hidden="true">
         ${screen}
         ${cert}
@@ -724,7 +1158,13 @@ function _tutReducedMotion() {
 function _tutTarget(s) {
   const root = document.getElementById('tut-practice');
   if (!root || !s || !s.target) return null;
-  try { return root.querySelector(s.target); } catch (e) { return null; }
+  let el = null;
+  try { el = root.querySelector(s.target); } catch (e) { return null; }
+  // V135: the box round a whole toggle row or page section, not just the
+  // control inside it.
+  if (el && s.box === 'row') el = el.closest('.toggle-row') || el;
+  else if (el && s.box === 'section') el = el.closest('.settings-section') || el;
+  return el;
 }
 
 // Which end the card goes to (V134.1 3A — the screen stays still, like the real
@@ -759,7 +1199,7 @@ function tutPlace(snap) {
   const root = document.getElementById('tut-practice');
   if (root) root.querySelectorAll('.tut-live').forEach((x) => x.classList.remove('tut-live'));
   const vw = window.innerWidth || 390, vh = window.innerHeight || 844;
-  const s = TUT_STEPS[state.tourStep];
+  const s = _tutSteps()[state.tourStep];
   // Free practice and the last step: no box and no dim at all (V134.1 4A —
   // a box shrunk to nothing left a dot in the middle of the screen).
   const el = _tut.free ? null : _tutTarget(s);
@@ -772,7 +1212,7 @@ function tutPlace(snap) {
   el.classList.add('tut-live');
   // A sheet slides up as it opens: measured now, its controls are still below
   // the screen (found in the browser check). Wait for it to arrive, then glide.
-  const sheet = el.closest('.fail-sheet, .tut-cert');
+  const sheet = el.closest('.fail-sheet, .tut-cert, .bulk-sheet');   // V135: + the New preset sheet
   const moving = (sheet && typeof sheet.getAnimations === 'function')
     ? sheet.getAnimations().filter((a) => a.playState === 'running') : [];
   if (moving.length) {
@@ -813,7 +1253,7 @@ function tutPlace(snap) {
 // hold on the item buttons; place the ring; hand VoiceOver the card's words.
 function tutAfterRender() {
   if (!state.tourOpen || !_tut) return;
-  const s = TUT_STEPS[state.tourStep];
+  const s = _tutSteps()[state.tourStep];
   if (!_tut.free && s && s.when && !_tutTarget(s)) { state.tourStep += 1; render(); return; }
   const screen = _tut.st.view;
   if (_tut.screen && _tut.screen !== screen) { try { window.scrollTo(0, 0); } catch (e) {} }

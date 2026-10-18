@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V134: rolled forward — V134 on top, V131 dropped. -->
+      <!-- v8: rolling 3-version changelog. V135: rolled forward — V135 on top, V132 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V135</strong> &middot; October 2026</p>
+        <p class="muted">Settings tutorials: short walk-throughs of Engineer &amp; Tester, Company &amp; Branding, Certificate Content, Quick Pick Items and Backup &amp; Restore, on the real pages. Settings &rarr; Help &rarr; Tutorials. Nothing you do in them is saved.</p>
         <p><strong>V134</strong> &middot; October 2026</p>
         <p class="muted">The practice job: a step-by-step practice on the real testing screen, with a box showing what to tap. Settings &rarr; Help &rarr; Tutorials. Nothing you do in it is saved.</p>
         <p><strong>V133</strong> &middot; October 2026</p>
         <p class="muted">Behind the scenes: a signed-in phone now tells the cloud which version of PATGo it is running, ready for the cloud&rsquo;s own tidying-up.</p>
-        <p><strong>V132</strong> &middot; October 2026</p>
-        <p class="muted">A long company name or address line now wraps neatly at the top of the certificate, instead of running into the logo or off the page.</p>
 
 
         </div>
@@ -205,10 +205,25 @@ function renderSettingsGlossary() {
   `;
 }
 
-// V134 (6A): Settings → Help → Tutorials. One tutorial today — the practice
-// job (tour.js); the Settings and getting-around tutorials join it here (V135,
-// V136). Opening one remembers this page, so Quit and Finish come back to it.
+// V134 (6A): Settings → Help → Tutorials. The practice job (tour.js), then
+// (V135, 2A) one short tutorial per Settings page, listed from tour.js
+// TUTORIALS so the list and the tutorials can't disagree; the getting-around
+// tutorials join them in V136. Opening one remembers this page, so Quit and
+// Finish come back to it.
 function renderSettingsTutorials() {
+  const settingsOnes = (typeof TUTORIALS !== 'undefined' ? TUTORIALS : []).filter((d) => d.settings);
+  const rows = settingsOnes.map((d) => {
+    const meta = SETTINGS_PAGE_META[d.page] || {};
+    return `
+      <button class="settings-row" data-action="open-tutorial" data-arg="${escapeHTML(d.id)}">
+        <span class="settings-row-icon">${icon(meta.icon || 'compass')}</span>
+        <div class="settings-row-text">
+          <div class="settings-row-title">${escapeHTML(d.title)}</div>
+          <div class="settings-row-sub">${escapeHTML(d.blurb || '')}</div>
+        </div>
+        <span class="settings-row-chevron">${icon('chevron-right')}</span>
+      </button>`;
+  }).join('');
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Tutorials')}
@@ -218,6 +233,12 @@ function renderSettingsTutorials() {
         <p class="muted">Nothing you do in it is saved — no job, no items, no certificate number.</p>
         <button class="btn-primary" id="tutorials-practice-btn" data-action="open-practice" style="margin-top:8px">${icon('compass')} Start the practice job</button>
       </div>
+      ${rows ? `
+      <div class="settings-section">
+        <h2 class="h2">Setting up</h2>
+        <p class="muted">The Settings you’ll want first, on the real pages. About a minute each. Nothing you do in them is saved — your own settings aren’t touched.</p>
+      </div>
+      <div class="settings-list" id="tutorials-settings-list">${rows}</div>` : ''}
     </div>
   `;
 }
