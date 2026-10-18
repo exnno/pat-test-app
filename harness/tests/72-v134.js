@@ -28,7 +28,7 @@
      72g  the box and the card: blue, glides as long as TUT_GLIDE_MS, no glide
           with reduced motion, only the highlighted control can be touched, a
           sheet is waited for, an open sheet doesn't slide in again.
-     72f  release: V134, cache, What's new rolled (one line), About V134 / V133
+     72f  (retired V135 → 74f) release: V134, cache, What's new rolled (one line), About V134 / V133
           / V132, Help → Tutorials, search words, setup's offer, old slides gone.
 
    How it LOOKS and FEELS (the glide, the card at the far end, the real
@@ -240,42 +240,13 @@ module.exports = async function () {
     const dims = (css.match(/--tut-dim: /g) || []).length;
     t.eq(dims, 3, 'the dimmed surround in light, dark and forced dark');
     t.includes(tour, "sheet.getAnimations().filter((a) => a.playState === 'running')", 'a sliding sheet is waited for (browser check)');
-    t.includes(css, '.tut-still .fail-sheet,\n.tut-still .modal-backdrop { animation: none; }', 'an open sheet doesn\'t slide in again');
+    t.includes(css, '.tut-still .fail-sheet,\n.tut-still .bulk-sheet,   /* V135: the New preset sheet */\n.tut-still .modal-backdrop { animation: none; }', 'an open sheet doesn\'t slide in again (V135: + the New preset sheet)');
     t.excludes(tour, 'stampCertNumber(', 'the sample certificate uses no number');
   });
 
   /* ------------------------------------------------------------------ 72f */
-  await t.group('72f — release: V134, cache, What’s new, About, Tutorials', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V134', 'APP_VERSION V134');
-    t.eq(app.run('WELCOME_VERSION'), 'V134', 'What’s new rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v134", 'cache key pat-v134 (V134.1: -1 — 73f)');
-    const core = read('render-core.js');
-    const open = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheet = core.slice(open, core.indexOf('</ul>', open));
-    t.eq((sheet.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheet, '<li><strong>Try the practice job.</strong>', '…the practice job');
-    t.includes(core, 'New here? Try the practice job.', 'setup offers the practice job');
-    t.includes(core, 'You can do it again any time from Settings → Help → Tutorials.', '…and says where it lives');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V134</strong>'), b = help.indexOf('<p><strong>V133</strong>'), c = help.indexOf('<p><strong>V132</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V134, V133, V132');
-    t.excludes(help, '<p><strong>V131</strong>', 'V131 rolled off');
-    t.includes(help, 'The practice job: a step-by-step practice on the real testing screen', 'About: V134’s line');
-    t.includes(help, 'Behind the scenes: a signed-in phone now tells the cloud which version of PATGo it is running', 'About: V133’s line still there');
-    t.includes(help, 'A long company name or address line now wraps neatly at the top of the certificate', 'About: V132’s line still there');
-    t.includes(help, 'A signed-in phone also tells the cloud which version of the app it is running.', 'Privacy unchanged');
-    t.includes(help, 'data-action="settings-page" data-arg="settingsTutorials"', 'About points at Tutorials');
-    // 6A: Help → Tutorials, first; found by search.
-    const help0 = app.run("SETTINGS_CATEGORIES.find(c => c.id === 'catHelp').pages[0]");
-    t.eq(help0, 'settingsTutorials', 'Tutorials heads the Help group');
-    const meta = app.run('SETTINGS_PAGE_META.settingsTutorials');
-    t.ok(meta && / tutorial /.test(' ' + meta.aliases + ' ') && / practice /.test(' ' + meta.aliases + ' '), 'search finds it by tutorial or practice');
-    app.fn('setView')('settingsTutorials');
-    t.includes(html(app), 'data-action="open-practice"', 'the page starts the practice job');
-    t.includes(html(app), 'Nothing you do in it is saved', '…and says nothing is kept');
-    // 7A: the slides are gone, and with them their untrue "no cloud" line.
-    t.eq(app.run('typeof TOUR_SLIDES'), 'undefined', 'the five picture slides are retired');
-    t.excludes(read('tour.js'), 'there’s no cloud', 'no "there’s no cloud"');
-  });
+  // 72f retired V135 (→ 74f): the release checks move with each release. Its
+  // lasting checks (setup's offer, Tutorials first in Help and found by
+  // search, the page starting the practice job, the slides gone, About
+  // pointing at Tutorials, Privacy) moved to 74f with it.
 };

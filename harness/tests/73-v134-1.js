@@ -27,7 +27,7 @@
      73d  the finish: no box at all on the last step; Finish and Free practice.
      73e  free practice: the everyday taps work on the practice only; anything
           else just says so; storage and the phone's data untouched.
-     73f  release: cache pat-v134-1; APP_VERSION and What's new unchanged.
+     73f  (retired V135 → 74f) release: cache pat-v134-1; APP_VERSION and What's new unchanged.
 
    How it looks — the box on every target with the page at scroll 0 on every
    step, the camera, the hold, free practice — was checked in Chromium at
@@ -227,11 +227,6 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 73f */
-  await t.group('73f — release: V134.1 is a hotfix (0A)', () => {
-    const app = populated();
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v134-1';", 'cache key pat-v134-1');
-    t.eq(app.run('APP_VERSION'), 'V134', 'APP_VERSION unchanged');
-    t.eq(app.run('WELCOME_VERSION'), 'V134', 'What’s new unchanged');
-    t.eq(app.run('TUT_STEPS.length'), 21, '21 steps');
-  });
+  // 73f retired V135 (→ 74f): the release checks move with each release
+  // (cache key, APP_VERSION, What's new). The 21 practice steps are pinned by 72d.
 };
