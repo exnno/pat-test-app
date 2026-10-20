@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V137: rolled forward — V137 on top, V134 dropped. -->
+      <!-- v8: rolling 3-version changelog. V138: rolled forward — V138 on top, V135 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V138</strong> &middot; October 2026</p>
+        <p class="muted">Show me how now starts on the page you opened it from, not the Settings list, and its last step says Finish brings you back there.</p>
         <p><strong>V137</strong> &middot; October 2026</p>
         <p class="muted">Show me how: a link under the title of each Settings page a tutorial covers, and on Sync. It opens that page's tutorial and brings you back to the page. Nothing you do in it is saved.</p>
         <p><strong>V136</strong> &middot; October 2026</p>
         <p class="muted">Your jobs &amp; the cloud tutorials: the Jobs list, finding and bringing back a job kept in the cloud, and Sync, on a pretend account. Settings &rarr; Help &rarr; Tutorials. Nothing you do in them is saved or sent.</p>
-        <p><strong>V135</strong> &middot; October 2026</p>
-        <p class="muted">Settings tutorials: short walk-throughs of Engineer &amp; Tester, Company &amp; Branding, Certificate Content, Quick Pick Items and Backup &amp; Restore, on the real pages. Settings &rarr; Help &rarr; Tutorials. Nothing you do in them is saved.</p>
 
 
         </div>

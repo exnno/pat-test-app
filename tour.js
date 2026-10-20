@@ -670,7 +670,8 @@ const TUT_CERT_FAILED = 'The sample certificate couldn’t be drawn just now —
 function _tutCertSays(ok) { return () => (_tut && _tut.cert === 'failed') ? TUT_CERT_FAILED : ok; }
 
 // Each starts on the real Settings list (3A): the box goes to the group, then
-// the page. Targets are simple selectors on the practice markup (data-action
+// the page — from Tutorials. From its own page it starts there (V138 1A:
+// TUT_WALK_KEYS), and its last card uses `fromPage` words (2A). Targets are simple selectors on the practice markup (data-action
 // is data-tut-action there). `box: 'row'` / `'section'` puts the box round the
 // target's toggle row or page section instead (a tap anywhere in it counts);
 // `pick` — a step that moves on when that picture arrives (5A).
@@ -701,7 +702,8 @@ const TUT_STEPS_ENGINEER = [
   { key: 'cert', target: '.tut-cert', cert: true,
     text: _tutCertSays('Your name, your tester and its calibration, on the certificate. This is only a sample — nothing was saved.') },
   { key: 'done', target: '',
-    text: 'That’s Engineer &amp; Tester. To set yours for real: Settings → Engineer &amp; Tester. Next up: your company and logo.' }
+    text: 'That’s Engineer &amp; Tester. To set yours for real: Settings → Engineer &amp; Tester. Next up: your company and logo.',
+    fromPage: 'That’s Engineer &amp; Tester. To set yours for real, tap <strong>Finish</strong> — it brings you back to this page.' }
 ];
 
 const TUT_STEPS_BRANDING = [
@@ -732,7 +734,8 @@ const TUT_STEPS_BRANDING = [
   { key: 'cert', target: '.tut-cert', cert: true,
     text: _tutCertSays('Your company, logo, colours and signature on the certificate. This is only a sample — nothing was saved.') },
   { key: 'done', target: '',
-    text: 'That’s Company &amp; Branding. To set yours for real: Settings → Reports &amp; Exports → Company &amp; Branding. Next up: what the certificate includes.' }
+    text: 'That’s Company &amp; Branding. To set yours for real: Settings → Reports &amp; Exports → Company &amp; Branding. Next up: what the certificate includes.',
+    fromPage: 'That’s Company &amp; Branding. To set yours for real, tap <strong>Finish</strong> — it brings you back to this page.' }
 ];
 
 const TUT_STEPS_CONTENT = [
@@ -760,7 +763,8 @@ const TUT_STEPS_CONTENT = [
   { key: 'cert', target: '.tut-cert', cert: true,
     text: _tutCertSays('The certificate with its number. A real number is only used when you make a real certificate — this sample used none.') },
   { key: 'done', target: '',
-    text: 'That’s Certificate Content. To set yours for real: Settings → Reports &amp; Exports → Certificate Content. Next up: your Quick Pick buttons.' }
+    text: 'That’s Certificate Content. To set yours for real: Settings → Reports &amp; Exports → Certificate Content. Next up: your Quick Pick buttons.',
+    fromPage: 'That’s Certificate Content. To set yours for real, tap <strong>Finish</strong> — it brings you back to this page.' }
 ];
 
 const TUT_STEPS_ITEMS = [
@@ -792,7 +796,8 @@ const TUT_STEPS_ITEMS = [
   { key: 'result', target: '#quick-grid',
     text: 'Your Kitchen buttons on the testing screen. On a job, press and hold the buttons to switch preset.' },
   { key: 'done', target: '',
-    text: 'That’s Quick Pick Items. To make yours for real: Settings → Logging → Quick Pick Items. Next up: keeping your work safe.' }
+    text: 'That’s Quick Pick Items. To make yours for real: Settings → Logging → Quick Pick Items. Next up: keeping your work safe.',
+    fromPage: 'That’s Quick Pick Items. To make yours for real, tap <strong>Finish</strong> — it brings you back to this page.' }
 ];
 
 // Look-only (6A): no practice backup file is ever made.
@@ -814,7 +819,8 @@ const TUT_STEPS_BACKUP = [
   { key: 'snapshots', target: '#tut-snapshots-block', box: 'section', when: true,
     text: 'PATGo also keeps a copy on this phone each day you change something, so you can step back a day. It’s not a backup — if the phone is lost, these go with it.' },
   { key: 'done', target: '',
-    text: 'That’s Backup &amp; Restore — try it for real in Settings → Data → Backup &amp; Restore. Nothing in this tutorial made a file.' }
+    text: 'That’s Backup &amp; Restore — try it for real in Settings → Data → Backup &amp; Restore. Nothing in this tutorial made a file.',
+    fromPage: 'That’s Backup &amp; Restore. To try it for real, tap <strong>Finish</strong> — it brings you back to this page. Nothing in this tutorial made a file.' }
 ];
 
 // ---------- V136: your jobs & the cloud ----------
@@ -1133,7 +1139,8 @@ const TUT_STEPS_SYNC = [
   { key: 'answer', target: '[data-tut-action="sync-keep-phone"]',
     text: 'Then keep this phone’s copy, or use the cloud copy. Until you choose, both are kept.' },
   { key: 'done', target: '',
-    text: 'That’s Sync — find it for real in Settings → Account &amp; Sync → Sync. Nothing in this tutorial was sent, checked or changed.' }
+    text: 'That’s Sync — find it for real in Settings → Account &amp; Sync → Sync. Nothing in this tutorial was sent, checked or changed.',
+    fromPage: 'That’s Sync. To use it for real, tap <strong>Finish</strong> — it brings you back to this page. Nothing in this tutorial was sent, checked or changed.' }
 ];
 
 // The tutorials, in the order the Tutorials page lists them and "Next
@@ -1171,7 +1178,18 @@ function _tutDef(id) {
   const want = id || (_tut && _tut.id) || 'practice';
   return TUTORIALS.find((d) => d.id === want) || null;
 }
-function _tutSteps() { const d = _tutDef(); return d ? d.steps : TUT_STEPS; }
+// V138 (1A): opened from its own page ("Show me how ›"), a tutorial starts on
+// that page — the steps that walk there from the Settings list (TUT_WALK_KEYS)
+// are left out; openTutorial has already taken the practice there by running
+// them. From Settings → Help → Tutorials it still walks there (the walk is part
+// of what it teaches). Every reader of the steps goes through here, so the step
+// count, the box and Next all agree.
+const TUT_WALK_KEYS = ['group', 'page'];
+function _tutSteps() {
+  const d = _tutDef();
+  const steps = d ? d.steps : TUT_STEPS;
+  return (_tut && _tut.fromPage) ? steps.filter((s) => TUT_WALK_KEYS.indexOf(s.key) < 0) : steps;
+}
 // The next tutorial under the same heading, or null (8A) — so Backup &
 // Restore, the last of "Setting up", still ends with Finish alone, and so does
 // Sync, the last of "Your jobs & the cloud" (V136). The practice job has none.
@@ -1183,19 +1201,35 @@ function _tutNextDef() {
   return (next && g && _tutGroup(next) === g) ? next : null;
 }
 
-function _tutStepText(s) { return (typeof s.text === 'function') ? s.text() : s.text; }
+// V138 (2A): a step's `fromPage` words replace its own when the tutorial was
+// opened from its page — the last card there has Finish alone, so it must not
+// promise "Next up…", and Finish brings you back to the page itself.
+function _tutStepText(s) {
+  if (_tut && _tut.fromPage && s.fromPage) return s.fromPage;
+  return (typeof s.text === 'function') ? s.text() : s.text;
+}
 
 // ---------- control ----------
 
 // Open a tutorial (V135: by its TUTORIALS id). `from` is the screen Quit and
 // Finish return to. An unknown id opens nothing. V137: `fromPage` — opened by
-// the page's own "Show me how ›", so it ends with Finish alone (4A).
+// the page's own "Show me how ›", so it ends with Finish alone (4A); V138 —
+// and starts on that page (1A).
 function openTutorial(id, from, fromPage) {
   if (!_tutDef(id || 'practice')) return;
   if (_tutTimer) { clearTimeout(_tutTimer); _tutTimer = null; }
   if (_tut) _tutLetGoPhotos(_tut);
   _tut = _tutBlank(from, id || 'practice');
   _tut.fromPage = !!fromPage;
+  // V138 (1A): from its page, start where the walk would have left the
+  // practice — by running the walk's own steps, so the practice is in exactly
+  // the state the Settings list → group → page taps leave it (category and all).
+  if (_tut.fromPage) {
+    const d = _tutDef();
+    ((d && d.steps) || []).forEach((s) => {
+      if (TUT_WALK_KEYS.indexOf(s.key) >= 0 && typeof s.run === 'function') s.run();
+    });
+  }
   state.tourOpen = true;
   state.tourStep = 0;
   state.view = 'tour';

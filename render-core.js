@@ -256,7 +256,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Show me how on Settings pages.</strong> Engineer &amp; Tester, Company &amp; Branding, Certificate Content, Quick Pick Items, Backup &amp; Restore and Sync now have a <strong>Show me how</strong> link under their title. It opens that page's tutorial and brings you back to the page when you finish. Nothing you do in it is saved.</li>
+        <li><strong>Show me how starts on the page.</strong> A tutorial opened from a Settings page's <strong>Show me how</strong> now starts on that page, not the Settings list, and its last step tells you Finish brings you back there.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

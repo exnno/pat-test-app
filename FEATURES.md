@@ -8,6 +8,9 @@ Every capability and release entry, one `##` section each.
 
 ---
 
+## Show me how starts on the page (V138)
+V137's leftovers (Peter 20 Oct: 1A 2A 3A, all defaults). A tutorial opened from a page's **Show me how ›** now **starts on that page** — the "this is Settings, tap the group, tap the page" steps are left out, so Engineer & Tester runs 9 steps (10 from Tutorials), Company & Branding 8, Certificate Content 8, Quick Pick Items 9, Backup & Restore 5, Sync 7 (1A). From **Settings → Help → Tutorials** nothing changed: it still walks there. Its **last card** no longer says "Next up…" (there's only Finish): it says Finish brings you back to this page (2A). The page still comes back at the top — the link sits there, so nothing to restore (3A). What's new: one line. No SQL, no sync change, no storage key. Harness group 77 + M1336–M1343; 76f retired (→ 77e).
+
 ## Show me how on Settings pages (V137)
 Stage 12 continues (Peter 18 Oct: 0A, all defaults 1A–6A). A **Show me how ›** line under the title of **Engineer & Tester, Company & Branding, Certificate Content, Quick Pick Items, Backup & Restore** and **Sync** (1A 2A) opens that page's own tutorial (V135 / V136). Not on the Jobs list or the cloud tab (no spare room). If the page holds typing not yet saved, it asks first — **Save / Discard changes / Keep editing**, the same question as Back, only when something changed; Save saves and then opens the tutorial (3A). **Quit and Finish come back to the page**, and Back from it still goes where it did — the certificate preview's Edit settings, the testing screen's Edit presets (4A). Opened this way a tutorial ends with **Finish** only; from Settings → Help → Tutorials, Next tutorial is unchanged. Never drawn inside a tutorial. No switch (5A). What's new: one line (6A). No SQL, no sync change, no storage key. Harness group 76 + M1319–M1335; 75f retired (→ 76f).
 

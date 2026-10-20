@@ -8,6 +8,28 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V138
+V138 = Show me how starts on the page (V137's residuals; Peter 20 Oct: 1A 2A
+3A, all defaults). tour.js: opened `fromPage`, `_tutSteps()` leaves out the walk
+steps (`TUT_WALK_KEYS` = step keys `group`, `page`) and `openTutorial` runs
+their `run`s first, so the practice stands exactly where the walk leaves it
+(1A); a done step's `fromPage` words replace "Next up…" — Finish brings you
+back to this page (2A, the six page tutorials). From Tutorials unchanged.
+Scroll left alone (3A — the link is at the top). Harness 77 + M1336–M1343;
+76f retired → 77e.
+**Next (Peter's order, 20 Oct): A password sign-in (with Forgot password;
+Google later) → B Google sign-in → C About/Privacy from the privacy terms
+(waits on the policy) → D Stage 13 pricing round + Stripe account.**
+
+### V138 residuals (known, accepted)
+- Not yet seen on a real iPhone: a tutorial opening straight onto the page
+  (the first box on the page's own control), and the new last card.
+- V137's "a Settings tutorial starts on the Settings list from its page" — fixed
+  (1A). V137's "the page comes back at the top" — closed, nothing to restore
+  (3A: the link is at the top).
+- A walk step added later to a page tutorial must use the key `group` or
+  `page`, or it shows from the page too (MAP tour.js ⚠, 77a catches it).
+
 ### Next after V137
 V137 = Show me how on Settings pages (Stage 12; Peter 18 Oct: 0A, all defaults
 1A–6A). tour.js `tutShowMeHowHTML` / `tutShowMeHow` (a TUTORIALS entry's `page`

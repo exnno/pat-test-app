@@ -1,4 +1,4 @@
-# PATGo — Code Map (V137)
+# PATGo — Code Map (V138)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -772,7 +772,7 @@ tester & calibration / app preferences.
 **Coupling:** applies sections through the same validators as backup restore.
 File-kind guard rejects a backup imported as a setup and vice versa.
 
-### tour.js (~1650 ln) — the tutorials: the practice job, the Settings tutorials, your jobs & the cloud, Show me how — V134, V134.1, V135, V136, V137
+### tour.js (~1650 ln) — the tutorials: the practice job, the Settings tutorials, your jobs & the cloud, Show me how — V134, V134.1, V135, V136, V137, V138
 `TUTORIALS` (V135 — the list: `practice` + five Settings ones, each with its own
 steps array; `_tutSteps()` / `_tutDef()` = the open one's), `TUT_STEPS` (the practice
 job's 21), the practice state (`TUT_FRESH` = a new phone's state taken at
@@ -804,7 +804,12 @@ TUTORIALS entry's `page` is the page it teaches; that page draws
 on Engineer & Tester, Quick Pick Items, Backup & Restore, both Report halves;
 render-help.js on Sync); `tutShowMeHow` opens it with `fromPage` (Finish only —
 `_tutNextDef` null) through settings-actions.js `unsavedLeave(go, go)`. Never
-drawn while a tutorial is open. Transient, never persisted.
+drawn while a tutorial is open. V138: opened `fromPage`, `_tutSteps()` leaves out
+the walk steps (`TUT_WALK_KEYS` — step keys `group` / `page`) and `openTutorial`
+runs them first so the practice starts on the page; a step's `fromPage` text
+replaces its own (`_tutStepText`) — the six done steps. ⚠ A new walk step in a
+page tutorial must use one of those keys, or it shows from the page too (77a).
+Transient, never persisted.
 **Touch to:** change a step, its words or its target; how the box moves.
 **Coupling:** ⚠ draws the REAL `renderSessions` / `renderEntry` /
 `renderOverview` (render-core.js, render-review.js) and, V135, the real Settings
