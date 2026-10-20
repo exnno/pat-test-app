@@ -31,8 +31,7 @@
           (the hook unused) keeps the marker and is not left armed.
      76e  nothing kept: a page's tutorial run start to finish leaves storage
           and every real value as they were.
-     76f  release: V137, cache, What's new (one line), About V137 / V136 /
-          V135, plus 75f's lasting checks.
+     76f  release: V137 … — retired at V138; its lasting checks are 77e.
 
    How it LOOKS — the line under each title, the gap, a tap height, both
    themes — was checked in Chromium at 390×844 dark and 375×667 light
@@ -392,43 +391,5 @@ module.exports = async function () {
     }
   });
 
-  /* ------------------------------------------------------------------ 76f */
-  await t.group('76f — release: V137, cache, What’s new, About, Tutorials', () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V137', 'APP_VERSION V137');
-    t.eq(app.run('WELCOME_VERSION'), 'V137', 'What’s new rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v137';", 'cache key pat-v137');
-    const core = read('render-core.js');
-    const open = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(open, core.indexOf('</ul>', open));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line (6A)');
-    t.includes(sheetCopy, '<li><strong>Show me how on Settings pages.</strong>', '…Show me how');
-    t.includes(core, 'New here? Try the practice job.', 'setup offers the practice job');
-    t.includes(core, 'You can do it again any time from Settings → Help → Tutorials.', '…and says where it lives');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V137</strong>'), b = help.indexOf('<p><strong>V136</strong>'), c = help.indexOf('<p><strong>V135</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V137, V136, V135');
-    t.excludes(help, '<p><strong>V134</strong>', 'V134 rolled off');
-    t.includes(help, 'Show me how: a link under the title of each Settings page a tutorial covers', 'About: V137’s line');
-    t.includes(help, 'Your jobs &amp; the cloud tutorials: the Jobs list, finding and bringing back a job', 'About: V136’s line still there');
-    t.includes(help, 'Settings tutorials: short walk-throughs of Engineer &amp; Tester', 'About: V135’s line still there');
-    t.includes(help, 'A signed-in phone also tells the cloud which version of the app it is running.', 'Privacy unchanged');
-    t.includes(help, 'data-action="settings-page" data-arg="settingsTutorials"', 'About points at Tutorials');
-    t.eq(app.run("SETTINGS_CATEGORIES.find(c => c.id === 'catHelp').pages[0]"), 'settingsTutorials', 'Tutorials heads the Help group');
-    const al = ' ' + app.run('SETTINGS_PAGE_META.settingsTutorials.aliases') + ' ';
-    t.ok(/ tutorial /.test(al) && / practice /.test(al), 'search finds it by tutorial or practice');
-    t.ok(/ settings /.test(al) && / instrument /.test(al) && / backup /.test(al), '…and by settings, instrument or backup (V135)');
-    app.fn('setView')('settingsTutorials');
-    const page = html(app);
-    t.includes(page, 'data-action="open-practice"', 'the page starts the practice job');
-    t.includes(page, 'Nothing you do in it is saved', '…and says nothing is kept');
-    const rows = [...page.slice(0, page.indexOf('id="tutorials-cloud-list"')).matchAll(/data-action="open-tutorial" data-arg="([^"]+)"/g)].map(m => m[1]);
-    t.deepEq(rows, ['engineer', 'branding', 'content', 'items', 'backup'], 'the page lists the five Settings tutorials under Setting up');
-    t.includes(page, 'Nothing you do in them is saved', '…and says nothing is kept');
-    t.excludes(page, LINK, 'the Tutorials page itself has no Show me how');
-    t.eq(app.run('typeof TOUR_SLIDES'), 'undefined', 'the five picture slides stay retired');
-    t.eq(app.run('TUT_STEPS.length'), 21, 'the practice job: 21 steps (V134.1, unchanged)');
-    t.includes(read('styles.css'), '.tut-howto-row {', 'the line has its own style');
-    t.includes(read('dispatch.js'), "'tut-show-me-how': (arg) => tutShowMeHow(arg),", 'the tap is wired');
-  });
+  // 76f retired at V138 → 77e (the release checks move with each release).
 };
