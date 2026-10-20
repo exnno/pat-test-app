@@ -245,6 +245,13 @@ bug; leaving it red trains everyone to ignore the suite.
   so 76 checks Sync's own `renderCloudSync()` markup. 74a's second app now
   sets `_tut` too: the link is never drawn inside a tutorial, the one line in
   which a practice page differs from the real one (76a pins it).
+  V138 (group 77): Show me how starts on the page. 77b checks the from-page
+  start against a real walk from Tutorials (open, step through the `group` /
+  `page` steps, compare `_tut.st.view` + `settingsCategory`) rather than a
+  hard-coded page, so a walk that leaves the practice somewhere subtly
+  different fails. 77d's run-through stops at `done` rather than counting: the
+  Backup tutorial's `when` steps are skipped in the harness (no Export
+  everything / snapshots block), as 74d allows.
 
 ---
 
