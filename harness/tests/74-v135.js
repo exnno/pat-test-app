@@ -111,7 +111,10 @@ module.exports = async function () {
           const practice = app.run('_tutInert(_tutScreenHTML())');
           const st = app.run('JSON.stringify(_tut.st)');
           const other = freshApp();
-          other.run(`Object.assign(state, ${st}); state.tourOpen = false;`);
+          // V137: a tutorial is open on this phone too (as 75a does) — the page's
+          // own "Show me how ›" is never drawn inside one; 76a holds the
+          // difference to that one line.
+          other.run(`_tut = { id: ${JSON.stringify(id)} }; Object.assign(state, ${st}); state.tourOpen = false;`);
           const real = other.run(`_tutInert(${fns[view]}())`);
           if (!seen.has(id + view)) t.eq(practice, real, `${id}: "${view}" is ${fns[view]}()'s own markup`);
           seen.add(id + view);
