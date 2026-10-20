@@ -1159,7 +1159,7 @@ const TUTORIALS = [
     blurb: 'Tabs, search, reminders' },
   { id: 'cloud', title: 'Jobs in the cloud', group: 'cloud', cloud: true, icon: 'cloud', steps: TUT_STEPS_CLOUD,
     blurb: 'Find a job, bring it back' },
-  { id: 'sync', title: 'Syncing between phones', group: 'cloud', cloud: true, icon: 'refresh-cw', start: 'settings', steps: TUT_STEPS_SYNC,
+  { id: 'sync', title: 'Syncing between phones', group: 'cloud', cloud: true, icon: 'refresh-cw', start: 'settings', page: 'cloudSync', steps: TUT_STEPS_SYNC,
     blurb: 'Push, check, and jobs held for you' }
 ];
 
@@ -1176,6 +1176,7 @@ function _tutSteps() { const d = _tutDef(); return d ? d.steps : TUT_STEPS; }
 // Restore, the last of "Setting up", still ends with Finish alone, and so does
 // Sync, the last of "Your jobs & the cloud" (V136). The practice job has none.
 function _tutNextDef() {
+  if (_tut && _tut.fromPage) return null;   // V137 (4A): opened from its page — Finish only
   const i = TUTORIALS.findIndex((d) => d.id === (_tut && _tut.id));
   const next = (i >= 0) ? TUTORIALS[i + 1] : null;
   const g = _tutGroup(_tutDef());
@@ -1187,12 +1188,14 @@ function _tutStepText(s) { return (typeof s.text === 'function') ? s.text() : s.
 // ---------- control ----------
 
 // Open a tutorial (V135: by its TUTORIALS id). `from` is the screen Quit and
-// Finish return to. An unknown id opens nothing.
-function openTutorial(id, from) {
+// Finish return to. An unknown id opens nothing. V137: `fromPage` — opened by
+// the page's own "Show me how ›", so it ends with Finish alone (4A).
+function openTutorial(id, from, fromPage) {
   if (!_tutDef(id || 'practice')) return;
   if (_tutTimer) { clearTimeout(_tutTimer); _tutTimer = null; }
   if (_tut) _tutLetGoPhotos(_tut);
   _tut = _tutBlank(from, id || 'practice');
+  _tut.fromPage = !!fromPage;
   state.tourOpen = true;
   state.tourStep = 0;
   state.view = 'tour';
@@ -1213,6 +1216,37 @@ function tutNextTutorial() {
   if (!next) { closeTour(); return; }
   _tutRingRemove();
   openTutorial(next.id, _tut.from);
+}
+
+// ---------- V137: "Show me how ›" on the pages the tutorials cover ----------
+// `page` on a TUTORIALS entry is the page that tutorial teaches; that page draws
+// tutShowMeHowHTML(its view) under its title (1A 2A). No switch (5A) — it does
+// nothing until tapped.
+function tutorialForPage(view) {
+  return TUTORIALS.find((d) => d.page && d.page === view) || null;
+}
+// Never drawn while a tutorial is open: a tutorial draws these same pages from
+// its practice copy (_tutDraw), and a link to itself inside it would only
+// confuse — the one way a practice page differs from the real one (76a).
+function tutShowMeHowHTML(view) {
+  if (_tut || state.tourOpen) return '';
+  const d = tutorialForPage(view);
+  if (!d) return '';
+  return `<div class="tut-howto-row"><button class="link-btn tut-howto" id="tut-howto" data-action="tut-show-me-how" data-arg="${escapeHTML(d.id)}">${icon('compass')} Show me how ${icon('chevron-right', 'ic-trail')}</button></div>`;
+}
+// The tap. Only from the page the tutorial covers (a stale tap elsewhere does
+// nothing). Typing the page still holds goes through the same question as Back
+// (3A, settings-actions.js unsavedLeave): Save then the tutorial, Discard then
+// the tutorial, or Keep editing. Quit and Finish come back to this page; its
+// return markers (the certificate preview, Edit presets) are left alone, so
+// Back from it still goes where it did (4A).
+function tutShowMeHow(id) {
+  const d = _tutDef(id);
+  if (!d || !id || d.page !== state.view || state.tourOpen) return;
+  const from = state.view;
+  const go = () => openTutorial(d.id, from, true);
+  if (typeof unsavedLeave === 'function') unsavedLeave(go, go);
+  else go();
 }
 
 // Kept for setup's "Show me around" hand-off (onboarding.js) and any old link.

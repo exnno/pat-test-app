@@ -8,6 +8,28 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V137
+V137 = Show me how on Settings pages (Stage 12; Peter 18 Oct: 0A, all defaults
+1A–6A). tour.js `tutShowMeHowHTML` / `tutShowMeHow` (a TUTORIALS entry's `page`
+is the page it teaches; the Sync tutorial gained `page: 'cloudSync'`); drawn by
+render-settings.js `settingsHowToHTML` on five pages and render-help.js on Sync.
+Opened with `fromPage` → Finish only. Typing goes through settings-actions.js
+`unsavedLeave(go, go)`; Save then the tutorial through `unsavedSaveThen` /
+`_unsavedThen` (settingsBackNav takes it first). Return markers untouched.
+Harness 76 + M1319–M1335; 75f retired → 76f; 74a now compares with a tutorial
+open (the link is never drawn inside one).
+**Next:** Stage 12's last code item is About/Privacy from the privacy terms —
+waits on Peter's privacy policy. Then Stage 13 (pricing + Stripe account first;
+password + Google sign-in could come forward). Testers this week.
+
+### V137 residuals (known, accepted)
+- Not yet seen on a real iPhone: the line under each title at Larger text, and
+  the Save / Discard question opening the tutorial straight after.
+- A Settings tutorial still starts on the Settings list even when opened from
+  its page (as from Tutorials) — the walk there is part of what it teaches.
+- The page comes back scrolled to the top after a tutorial (a tutorial starts
+  at the top; the link is at the top too).
+
 ### Next after V136
 V136 = Tutorials, part 3 — your jobs & the cloud (Stage 12; Peter 18 Oct: all
 defaults 1A–9A). tour.js: three tutorials (`jobs`, `cloud`, `sync`; `group:

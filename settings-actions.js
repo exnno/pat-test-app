@@ -173,7 +173,10 @@ function unsavedRevert() {
 }
 
 // Every guarded Back goes through here. `nav` is what Back did before V112.
-function unsavedLeave(nav) {
+// V137 (3A): `then`, when given, is where Save leads instead of where Back
+// would — "Show me how ›" saves and then opens the page's tutorial, through the
+// same question as Back. Without it, Save behaves exactly as before.
+function unsavedLeave(nav, then) {
   let changed;
   try { changed = unsavedChanges(); } catch (e) { changed = true; }
   if (!changed) { nav(); return; }
@@ -182,16 +185,39 @@ function unsavedLeave(nav) {
     title: 'Save your changes?',
     message: 'You changed something on this page and haven’t saved it yet.',
     choices: [
-      { label: 'Save', style: 'primary', onPick: () => page.save() },
+      { label: 'Save', style: 'primary', onPick: () => (then ? unsavedSaveThen(page, then) : page.save()) },
       { label: 'Discard changes', style: 'danger', onPick: () => { unsavedRevert(); nav(); } },
     ],
     cancelLabel: 'Keep editing',
   });
 }
 
+// V137 (3A): run a page's own Save, then `then` in place of where Save would
+// land. Every guarded Save ends in settingsBackNav(), which takes `_unsavedThen`
+// first. Report Settings' Save leaves for the certificate preview before it
+// reaches settingsBackNav when it was opened from the preview, so that marker is
+// held back for the save and put back after (4A: Back from the page still
+// returns to the preview). A save that stops early (nothing navigated) leaves
+// the marker as it was and the page where it is.
+let _unsavedThen = null;
+function unsavedSaveThen(page, then) {
+  const rp = state.reportPreviewReturnSessionId;
+  state.reportPreviewReturnSessionId = null;
+  let went = false;
+  _unsavedThen = () => { went = true; state.reportPreviewReturnSessionId = rp; then(); };
+  try { page.save(); }
+  finally {
+    _unsavedThen = null;
+    if (!went) state.reportPreviewReturnSessionId = rp;
+  }
+}
+
 // What a Settings page's Back arrow does (moved here from dispatch.js in V112 so
 // the Save handlers can land in the same place — 3A). Unchanged behaviour.
 function settingsBackNav() {
+  // V137: a Save asked for by "Show me how ›" goes on into the tutorial, the
+  // page's return markers untouched (unsavedSaveThen).
+  if (_unsavedThen) { const go = _unsavedThen; _unsavedThen = null; go(); return; }
   // v35: if we arrived at Report Settings via the preview's "Edit settings"
   // deep-link, going back returns straight to a freshly-rebuilt preview.
   if (state.reportPreviewReturnSessionId && state.view === 'settingsReport') {

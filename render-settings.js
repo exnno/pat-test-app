@@ -320,6 +320,12 @@ function renderSettingsCategory() {
   `;
 }
 
+// V137 (1A 2A): the "Show me how ›" line under a page's title, on the pages a
+// tutorial covers (tour.js tutShowMeHowHTML decides; '' everywhere else).
+function settingsHowToHTML(view) {
+  return (typeof tutShowMeHowHTML === 'function') ? tutShowMeHowHTML(view) : '';
+}
+
 function renderSettingsSubHeader(title) {
   return `
     <header class="header-row">
@@ -343,6 +349,7 @@ function renderSettingsUser() {
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Engineer & Tester')}
+      ${settingsHowToHTML('settingsUser')}
       <div class="settings-section">
         <h2 class="h2">Engineer name</h2>
         <p class="muted">Used as the default for new jobs and shown on exported CSVs.</p>
@@ -399,6 +406,7 @@ function renderSettingsItems() {
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Quick Pick Items')}
+      ${settingsHowToHTML('settingsItems')}
 
       <!-- v9: Presets picker. Switching here changes which list is edited below
            and which 9 items appear on the entry screen. Selection sticks
@@ -961,6 +969,7 @@ function renderSettingsBackup() {
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Backup & Restore')}
+      ${settingsHowToHTML('settingsBackup')}
       ${exportAllBlock}
       <div class="settings-section">
         <h2 class="h2">Backup</h2>
@@ -1556,6 +1565,7 @@ function renderSettingsReport(part) {
     return `
       <div class="screen">
         ${renderSettingsSubHeader('Certificate Content')}
+      ${settingsHowToHTML('settingsReportContent')}
 
         <div class="settings-section">
           <h2 class="h2">What to include</h2>
@@ -1642,6 +1652,7 @@ function renderSettingsReport(part) {
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Company & Branding')}
+      ${settingsHowToHTML('settingsReport')}
 
       <div class="settings-section">
         <h2 class="h2">Reports</h2>

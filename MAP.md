@@ -1,4 +1,4 @@
-# PATGo — Code Map (V136)
+# PATGo — Code Map (V137)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -772,7 +772,7 @@ tester & calibration / app preferences.
 **Coupling:** applies sections through the same validators as backup restore.
 File-kind guard rejects a backup imported as a setup and vice versa.
 
-### tour.js (~1620 ln) — the tutorials: the practice job, the Settings tutorials, your jobs & the cloud — V134, V134.1, V135, V136
+### tour.js (~1650 ln) — the tutorials: the practice job, the Settings tutorials, your jobs & the cloud, Show me how — V134, V134.1, V135, V136, V137
 `TUTORIALS` (V135 — the list: `practice` + five Settings ones, each with its own
 steps array; `_tutSteps()` / `_tutDef()` = the open one's), `TUT_STEPS` (the practice
 job's 21), the practice state (`TUT_FRESH` = a new phone's state taken at
@@ -798,8 +798,13 @@ signed-in phone with sample jobs (`_tutPhoneJobs`) and cloud-only jobs
 (cloudAvailable, cloudPagesUnlocked, syncStatusSummary, syncHeldList,
 syncJobsSafety, planBannerHTML) and puts the real ones back in `finally`; the
 practice's sync records live on `_tut.sync` / `_tut.held`. `_tutNextDef` stays
-within a heading (`_tutGroup`); `box: 'card'` frames a job card. Transient,
-never persisted.
+within a heading (`_tutGroup`); `box: 'card'` frames a job card. V137: a
+TUTORIALS entry's `page` is the page it teaches; that page draws
+`tutShowMeHowHTML(view)` under its title (render-settings.js `settingsHowToHTML`
+on Engineer & Tester, Quick Pick Items, Backup & Restore, both Report halves;
+render-help.js on Sync); `tutShowMeHow` opens it with `fromPage` (Finish only —
+`_tutNextDef` null) through settings-actions.js `unsavedLeave(go, go)`. Never
+drawn while a tutorial is open. Transient, never persisted.
 **Touch to:** change a step, its words or its target; how the box moves.
 **Coupling:** ⚠ draws the REAL `renderSessions` / `renderEntry` /
 `renderOverview` (render-core.js, render-review.js) and, V135, the real Settings
@@ -815,7 +820,7 @@ targets: `.jobs-tab`, `.cloud-card`, `#cloud-search`, `.cloud-select-btn`,
 `.sync-held-row` (75d).
 ⚠ `_tutInert` renames `snapshots-block` — snapshots.js paints live Restore buttons
 into that id later. Routed by `render()`'s tour
-branch, which then calls `tutAfterRender()`. Actions `tut-*`, `open-practice`,
+branch, which then calls `tutAfterRender()`. Actions `tut-*` (V137 `tut-show-me-how`), `open-practice`,
 `open-tour`, `tut-free`, V135 `open-tutorial`, `tut-next-tutorial` (dispatch.js). ⚠ Practice photos must be cleared from the
 practice form BEFORE `loadFormForCursor()` — its `discardPendingPhotos()` calls
 photos.js `photoReleaseObjectUrls()`, which lets go of the PHONE's photo previews. Entry points: setup's finish (onboarding.js
@@ -1013,7 +1018,10 @@ go to render-settings.js; to change a default, config.js.
 ⚠ V112: the unsaved-changes guard (`UNSAVED_PAGES`, `unsavedAfterRender` — called
 from render()'s tail in render-core.js — `unsavedLeave`, `unsavedRevert`) and
 `settingsBackNav()` (Back's navigation, moved from dispatch.js; every page Save
-ends with it). Rule 19.
+ends with it). Rule 19. V137: `unsavedLeave(nav, then)` — `then` is where Save
+leads instead (tour.js Show me how); `unsavedSaveThen` arms `_unsavedThen`, which
+`settingsBackNav()` takes FIRST. ⚠ A new guarded page's Save must still end in
+`settingsBackNav()`, or Show me how's Save never opens the tutorial (76c).
 **Coupling:** `saveReportSettingsForm()` reads the DOM, so any re-render must
 call `captureReportTextInputs()` first or unsaved text is lost (dispatch.js
 depends on this). `setTheme` delegates to `applyTheme` (session.js). Extracted

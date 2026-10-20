@@ -2247,6 +2247,10 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 
 /* @@ tour */
+/* V137 (2A): "Show me how ›" under a covered page's title — one line, centred,
+   a 44px tap height, before the page's first section. */
+.tut-howto-row { display: flex; justify-content: center; margin: -4px 0 8px; }
+.tut-howto { display: inline-flex; align-items: center; gap: 6px; min-height: 2.75rem; padding: 0 12px; font-size: 0.875rem; }
 /* V134: the practice job (tour.js). The screen underneath is the app's REAL
    screen markup, drawn from the practice's own data, so it needs no styles of
    its own — only these: the box that glides round the control being taught

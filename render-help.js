@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V136: rolled forward — V136 on top, V133 dropped. -->
+      <!-- v8: rolling 3-version changelog. V137: rolled forward — V137 on top, V134 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V137</strong> &middot; October 2026</p>
+        <p class="muted">Show me how: a link under the title of each Settings page a tutorial covers, and on Sync. It opens that page's tutorial and brings you back to the page. Nothing you do in it is saved.</p>
         <p><strong>V136</strong> &middot; October 2026</p>
         <p class="muted">Your jobs &amp; the cloud tutorials: the Jobs list, finding and bringing back a job kept in the cloud, and Sync, on a pretend account. Settings &rarr; Help &rarr; Tutorials. Nothing you do in them is saved or sent.</p>
         <p><strong>V135</strong> &middot; October 2026</p>
         <p class="muted">Settings tutorials: short walk-throughs of Engineer &amp; Tester, Company &amp; Branding, Certificate Content, Quick Pick Items and Backup &amp; Restore, on the real pages. Settings &rarr; Help &rarr; Tutorials. Nothing you do in them is saved.</p>
-        <p><strong>V134</strong> &middot; October 2026</p>
-        <p class="muted">The practice job: a step-by-step practice on the real testing screen, with a box showing what to tap. Settings &rarr; Help &rarr; Tutorials. Nothing you do in it is saved.</p>
 
 
         </div>
@@ -521,6 +521,7 @@ function renderCloudSync() {
   return `
     <div class="screen" id="cloud-sync-page">
       ${renderSettingsSubHeader('Sync')}
+      ${settingsHowToHTML('cloudSync')}
       <div class="info-card">
         <h2>Sync (test)</h2>
         <p class="muted" style="font-size:0.75rem">Jobs, your clients and sites, your test instruments and item presets, and which tester is in use are copied both ways between this phone and the cloud: sent a few seconds after you stop logging, and checked for whenever you sign in, reopen the app or get signal back. Which preset is in use stays separate on each device. The example job is never sent. Deleting a job, client, site, instrument or preset deletes it on your other device too; jobs that used a deleted instrument keep their own copy of its details. Clearing old jobs only removes them from this phone, and the cloud keeps them. Photos are copied up to the cloud while the app is open, after their job, with a small preview; deleting a photo, an item or a job on either device deletes its cloud photos too. Photos don't come down by themselves: a photo that's only in the cloud shows with a &#9729;, and comes down to this phone when you tap it. This phone is still the master copy &mdash; keep making backups as normal.</p>
