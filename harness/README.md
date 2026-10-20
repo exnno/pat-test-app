@@ -237,6 +237,14 @@ bug; leaving it red trains everyone to ignore the suite.
   `TUT_CLOUD_STUBS` assigned onto its global — the practice's data, the real
   render function. 75's `stepOn` runs every step's `run` (look steps too —
   the history sheet's Next closes it), as Next and Skip do.
+  V137 (group 76): Show me how. The guard (V112) reads the page's inputs, and
+  the stub page keeps no `value="…"` from the markup — 76's `paint` fills every
+  guarded input from state (as 49's `paint`), or Certificate Content's
+  certificate-number boxes read empty and every tap "asks". The Sync page
+  draws through the cloud lock at `render()` (the harness has no access code),
+  so 76 checks Sync's own `renderCloudSync()` markup. 74a's second app now
+  sets `_tut` too: the link is never drawn inside a tutorial, the one line in
+  which a practice page differs from the real one (76a pins it).
 
 ---
 

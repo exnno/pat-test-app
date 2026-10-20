@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V136';",
-    to:   "const APP_VERSION = 'V135';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V137';",
+    to:   "const APP_VERSION = 'V136';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 75f see it.
-    from: '        <p><strong>V134</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V133</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V134</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 75f)',
+    // oldest, so 15j's check still matches; 09w and 76f see it.
+    from: '        <p><strong>V135</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V134</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V135</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 76f)',
   },
 
   {
@@ -6095,10 +6095,11 @@ const MUTATIONS = [
     // V133: no What's new (6A) — V132's sheet stays, so the anchor stays; 71f pinned it.
     // V134: welcome rolled (one line) — re-aimed at it; 72f pinned it.
     // V135: welcome rolled (one line) — re-aimed at it; 74f pinned it.
-    // V136: welcome rolled (one line) — re-aimed at it; 75f pins it.
-    from: "<li><strong>Your jobs &amp; the cloud tutorials.</strong>",
+    // V136: welcome rolled (one line) — re-aimed at it; 75f pinned it.
+    // V137: welcome rolled (one line) — re-aimed at it; 76f pins it.
+    from: "<li><strong>Show me how on Settings pages.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (75f)",
+    why:  "11A: the welcome says plainly what changed on screen (76f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8575,18 +8576,18 @@ const MUTATIONS = [
     name: "M1221 (V132) What's new not rolled",
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
-    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed.
-    from: "const WELCOME_VERSION = 'V136';",
-    to:   "const WELCOME_VERSION = 'V135';",
-    why:  "a behaviour release says what's new (75f)",
+    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed.
+    from: "const WELCOME_VERSION = 'V137';",
+    to:   "const WELCOME_VERSION = 'V136';",
+    why:  "a behaviour release says what's new (76f)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
     file: "render-core.js",
-    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's.
-    from: "Settings → Help → Tutorials. Nothing you do in them is saved or sent.</li>\n",
-    to:   "Settings → Help → Tutorials. Nothing you do in them is saved or sent.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (75f)",
+    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's.
+    from: "brings you back to the page when you finish. Nothing you do in it is saved.</li>\n",
+    to:   "brings you back to the page when you finish. Nothing you do in it is saved.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (76f)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8594,7 +8595,7 @@ const MUTATIONS = [
     // V135: V132's line rolled off — re-aimed at V135's. V136: at V136's.
     from: "Your jobs &amp; the cloud tutorials: the Jobs list, finding and bringing back a job",
     to:   "Better",
-    why:  "the About page must say what changed in this version (75f)",
+    why:  "the About page must say what changed in this version (76f)",
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8702,14 +8703,14 @@ const MUTATIONS = [
     // V136: V133's line rolled off — re-aimed at V135's, still in the window.
     from: "Settings tutorials: short walk-throughs of Engineer &amp; Tester",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (75f)",
+    why:  "the About page keeps the last three versions' lines (76f)",
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
     file: "render-help.js",
     from: "A signed-in phone also tells the cloud which version of the app it is running. ",
     to:   "",
-    why:  "V130's honest Privacy note stays honest (75f)",
+    why:  "V130's honest Privacy note stays honest (76f)",
   },
 
 
@@ -8839,28 +8840,29 @@ const MUTATIONS = [
     file: "data.js",
     from: "pages: ['settingsTutorials', 'settingsAbout',",
     to:   "pages: ['settingsAbout',",
-    why:  "6A: Settings → Help → Tutorials (75f)",
+    why:  "6A: Settings → Help → Tutorials (76f)",
   },
   {
     name: "M1258 (V134) search can't find the tutorials",
     file: "data.js",
     from: "aliases: 'tutorial tutorials practice practise job learn",
     to:   "aliases: 'learn",
-    why:  "6A: findable in Settings search (75f)",
+    why:  "6A: findable in Settings search (76f)",
   },
   {
-    name: "M1259 (V134) the About changelog loses V134's line",
+    name: "M1259 (V134; re-aimed V137) the About changelog loses this version's line",
     file: "render-help.js",
-    from: "The practice job: a step-by-step practice on the real testing screen",
+    // V137: V134's line rolled off — re-aimed at V137's own.
+    from: "Show me how: a link under the title of each Settings page a tutorial covers",
     to:   "Better",
-    why:  "the About page must say what changed in this version (75f)",
+    why:  "the About page must say what changed in this version (76f)",
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
     file: "render-core.js",
     from: "New here? Try the practice job.",
     to:   "New here? Take the 30-second tour.",
-    why:  "6A: setup offers the practice job (75f)",
+    why:  "6A: setup offers the practice job (76f)",
   },
   {
     name: "M1261 (V134) Quit always lands on the Jobs list",
@@ -8979,10 +8981,10 @@ const MUTATIONS = [
   {
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
-    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f).
-    from: "const CACHE_VERSION = 'pat-v136';",
-    to:   "const CACHE_VERSION = 'pat-v135';",
-    why:  "a release needs its cache bump or phones never get it (75f)",
+    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f).
+    from: "const CACHE_VERSION = 'pat-v137';",
+    to:   "const CACHE_VERSION = 'pat-v136';",
+    why:  "a release needs its cache bump or phones never get it (76f)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -9056,7 +9058,7 @@ const MUTATIONS = [
     // V136: the page lists two headings (rowsFor) — re-aimed.
     from: "const rows = rowsFor(all.filter((d) => d.settings));",
     to:   "const rows = rowsFor(all.filter((d) => false));",
-    why:  "2A: listed on the Tutorials page (75f)",
+    why:  "2A: listed on the Tutorials page (76f)",
   },
   {
     name: "M1288 (V135) the Tutorials rows aren't wired",
@@ -9277,6 +9279,126 @@ const MUTATIONS = [
     from: "#tutorials-settings-list + .settings-section { margin-top: 28px; }",
     to:   "",
     why:  "found in the browser check (75e)",
+  },
+  // ---- V137 (0A, 1A–6A, all defaults): "Show me how ›" on the pages the tutorials cover. Group 76 + M1319–M1335. ----
+  {
+    name: "M1319 (V137) Engineer & Tester loses its Show me how",
+    file: "render-settings.js",
+    from: "${settingsHowToHTML('settingsUser')}",
+    to:   "",
+    why:  "1A: on each page a tutorial covers (76a)",
+  },
+  {
+    name: "M1320 (V137) the Sync page loses its Show me how",
+    file: "render-help.js",
+    from: "${settingsHowToHTML('cloudSync')}",
+    to:   "",
+    why:  "1A: Sync too (76a)",
+  },
+  {
+    name: "M1321 (V137) Show me how drawn inside a tutorial",
+    file: "tour.js",
+    from: "  if (_tut || state.tourOpen) return '';\n  const d = tutorialForPage(view);",
+    to:   "  const d = tutorialForPage(view);",
+    why:  "never inside a tutorial — the practice draws these pages (76a)",
+  },
+  {
+    name: "M1322 (V137) any tutorial with a page answers for every page",
+    file: "tour.js",
+    from: "return TUTORIALS.find((d) => d.page && d.page === view) || null;",
+    to:   "return TUTORIALS.find((d) => d.page) || null;",
+    why:  "each page opens its own tutorial (76a)",
+  },
+  {
+    name: "M1323 (V137) a tutorial opened from its page offers Next tutorial",
+    file: "tour.js",
+    from: "  if (_tut && _tut.fromPage) return null;   // V137 (4A): opened from its page — Finish only\n",
+    to:   "",
+    why:  "4A: Finish only (76b)",
+  },
+  {
+    name: "M1324 (V137) the tap doesn't mark the tutorial as opened from the page",
+    file: "tour.js",
+    from: "_tut.fromPage = !!fromPage;",
+    to:   "_tut.fromPage = false;",
+    why:  "4A: Finish only (76b)",
+  },
+  {
+    name: "M1325 (V137) Show me how skips the Save / Discard question",
+    file: "tour.js",
+    from: "if (typeof unsavedLeave === 'function') unsavedLeave(go, go);",
+    to:   "if (false) unsavedLeave(go, go);",
+    why:  "3A: typing still held asks first (76c)",
+  },
+  {
+    name: "M1326 (V137) Save from Show me how lands where Back would",
+    file: "settings-actions.js",
+    from: "onPick: () => (then ? unsavedSaveThen(page, then) : page.save()) },",
+    to:   "onPick: () => page.save() },",
+    why:  "3A: Save then the tutorial (76c)",
+  },
+  {
+    name: "M1327 (V137) the Save hook is never taken",
+    file: "settings-actions.js",
+    from: "  if (_unsavedThen) { const go = _unsavedThen; _unsavedThen = null; go(); return; }\n",
+    to:   "",
+    why:  "3A: Save then the tutorial (76c)",
+  },
+  {
+    name: "M1328 (V137) Save from the preview's Edit settings leaves for the preview",
+    file: "settings-actions.js",
+    from: "  state.reportPreviewReturnSessionId = null;\n  let went = false;",
+    to:   "  let went = false;",
+    why:  "4A: Save goes on to the tutorial, the preview kept for Back (76d)",
+  },
+  {
+    name: "M1329 (V137) the preview marker isn't put back after Save",
+    file: "settings-actions.js",
+    from: "_unsavedThen = () => { went = true; state.reportPreviewReturnSessionId = rp; then(); };",
+    to:   "_unsavedThen = () => { went = true; then(); };",
+    why:  "4A: Back still returns to the preview (76d)",
+  },
+  {
+    name: "M1330 (V137) the Save hook is left armed after a save that stays",
+    file: "settings-actions.js",
+    from: "    _unsavedThen = null;\n    if (!went) state.reportPreviewReturnSessionId = rp;",
+    to:   "    if (!went) state.reportPreviewReturnSessionId = rp;",
+    why:  "a later Back must not open a tutorial (76d)",
+  },
+  {
+    name: "M1331 (V137) a stale Show me how opens from any page",
+    file: "tour.js",
+    from: "if (!d || !id || d.page !== state.view || state.tourOpen) return;",
+    to:   "if (!d) return;",
+    why:  "only from the page it covers (76b)",
+  },
+  {
+    name: "M1332 (V137) Finish returns to Tutorials, not the page",
+    file: "tour.js",
+    from: "const go = () => openTutorial(d.id, from, true);",
+    to:   "const go = () => openTutorial(d.id, 'settingsTutorials', true);",
+    why:  "4A: back to the page (76b)",
+  },
+  {
+    name: "M1333 (V137) the tap isn't wired",
+    file: "dispatch.js",
+    from: "  'tut-show-me-how': (arg) => tutShowMeHow(arg),",
+    to:   "",
+    why:  "the link must do something (76b)",
+  },
+  {
+    name: "M1334 (V137) the Sync tutorial names no page",
+    file: "tour.js",
+    from: "start: 'settings', page: 'cloudSync',",
+    to:   "start: 'settings',",
+    why:  "1A: Sync's own link (76a)",
+  },
+  {
+    name: "M1335 (V137) the line loses its style",
+    file: "styles.css",
+    from: ".tut-howto-row { display: flex; justify-content: center; margin: -4px 0 8px; }",
+    to:   "",
+    why:  "2A: one centred line under the title (76f)",
   },
 ];
 
