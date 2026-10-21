@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V142';",
-    to:   "const APP_VERSION = 'V141';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V143';",
+    to:   "const APP_VERSION = 'V142';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142).
-    from: '        <p><strong>V140</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V138</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V139</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 81e)',
+    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143).
+    from: '        <p><strong>V141</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V139</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V140</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 82e)',
   },
 
   {
@@ -1558,17 +1558,17 @@ const MUTATIONS = [
   {
     name: 'M207 (V82) records are pushed after their read failed',
     file: 'sync.js',
-    // V128: re-aimed — the pull takes the check (chk).
-    from: "  return _syncPullRecords(c, uid, st, out, chk)\n    .then(() => _syncPushRecords(c, uid, st, out))",
-    to:   "  return _syncPullRecords(c, uid, st, out, chk).catch(() => {})\n    .then(() => _syncPushRecords(c, uid, st, out))",
+    // V128: re-aimed — the pull takes the check (chk). V143: re-aimed — the push is skipped while paused.
+    from: "  return _syncPullRecords(c, uid, st, out, chk)\n    .then(() => (paused ? null : _syncPushRecords(c, uid, st, out)))",
+    to:   "  return _syncPullRecords(c, uid, st, out, chk).catch(() => {})\n    .then(() => (paused ? null : _syncPushRecords(c, uid, st, out)))",
     why:  'rule 4: a push may only ever follow a pull. Without the look first, the push overwrites work it never saw (18j)',
   },
   {
     name: 'M208 (V82) "Re-send all jobs" sends records without reading',
     file: 'sync.js',
-    // V128: re-aimed — "reads" is opts.pull, or a check due (66d).
-    from: "const recs = reads ? _syncRecordsHalf(c, uid, st, chk) : Promise.resolve(null);",
-    to:   "const recs = _syncRecordsHalf(c, uid, st, chk);",
+    // V128: re-aimed — "reads" is opts.pull, or a check due (66d). V143: + paused.
+    from: "const recs = reads ? _syncRecordsHalf(c, uid, st, chk, paused) : Promise.resolve(null);",
+    to:   "const recs = _syncRecordsHalf(c, uid, st, chk, paused);",
     why:  'the button is jobs only, and its run does not read first (16c)',
   },
   {
@@ -2635,8 +2635,9 @@ const MUTATIONS = [
   {
     name: "M357 (V88) photos go before the jobs push",
     file: "sync.js",
-    from: "        .then(() => _syncPushHalf(c, uid, st, !!opts.force))\n        .then((r) => {\n          const base = { sent: r.sent, deleted: r.deleted, pulled, records };",
-    to:   "        .then(() => opts.pull ? _syncPhotosHalf(c, uid, st) : null)\n        .then(() => _syncPushHalf(c, uid, st, !!opts.force))\n        .then((r) => {\n          const base = { sent: r.sent, deleted: r.deleted, pulled, records }; if (opts.pull) return base;",
+    // V143: re-aimed — the push half is skipped while paused.
+    from: "        .then(() => (paused ? { sent: 0, deleted: 0 } : _syncPushHalf(c, uid, st, !!opts.force)))\n        .then((r) => {\n          const base = { sent: r.sent, deleted: r.deleted, pulled, records };",
+    to:   "        .then(() => opts.pull ? _syncPhotosHalf(c, uid, st) : null)\n        .then(() => (paused ? { sent: 0, deleted: 0 } : _syncPushHalf(c, uid, st, !!opts.force)))\n        .then((r) => {\n          const base = { sent: r.sent, deleted: r.deleted, pulled, records }; if (opts.pull) return base;",
     why:  "photos run AFTER the jobs push in the same run: before it, a new job's photos always wait a whole extra run (20a)",
   },
   {
@@ -2754,7 +2755,8 @@ const MUTATIONS = [
   {
     name: "M374 (V88) a photo failure fails the whole run",
     file: "sync.js",
-    from: "            (e) => {\n              console.error('Sync: photos not sent this time (non-fatal).', e);\n              return Object.assign(base, { photos: { error: true } });\n            });",
+    // V143: re-aimed — the refusal is noted on the way.
+    from: "            (e) => {\n              console.error('Sync: photos not sent this time (non-fatal).', e);\n              _syncNotePlanRefusal(e);   // V143\n              return Object.assign(base, { photos: { error: true } });\n            });",
     to:   "            (e) => { throw e; });",
     why:  "photos are fail-soft: jobs must still be reported as sent (20a)",
   },
@@ -6104,9 +6106,10 @@ const MUTATIONS = [
     // V140: welcome rolled (one line) — re-aimed at it; 79e pins it.
     // V141: welcome rolled (one line) — re-aimed at it; 80e pins it.
     // V142: welcome rolled (one line) — re-aimed at it; 81e pins it.
-    from: "<li><strong>Subscriptions.</strong>",
+    // V143: welcome rolled (one line) — re-aimed at it; 82e pins it.
+    from: "<li><strong>Plan checks.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (81e)",
+    why:  "11A: the welcome says plainly what changed on screen (82e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -7787,8 +7790,9 @@ const MUTATIONS = [
   {
     name: "M1101 (V127) the plan read stops naming its own row",
     file: "plan.js",
-    from: ".select('plan, trial_ends_at').eq('id', uid).maybeSingle()",
-    to:   ".select('plan, trial_ends_at').maybeSingle()",
+    // V143: re-aimed — the read is select('*') (lapsed_at when the database has it).
+    from: ".select('*').eq('id', uid).maybeSingle()",
+    to:   ".select('*').maybeSingle()",
     why:  "an Owner can read other members' profiles: maybeSingle would fail, or read someone else's plan (65i)",
   },
   {
@@ -8583,18 +8587,18 @@ const MUTATIONS = [
     name: "M1221 (V132) What's new not rolled",
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
-    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed.
-    from: "const WELCOME_VERSION = 'V142';",
-    to:   "const WELCOME_VERSION = 'V141';",
-    why:  "a behaviour release says what's new (81e)",
+    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed.
+    from: "const WELCOME_VERSION = 'V143';",
+    to:   "const WELCOME_VERSION = 'V142';",
+    why:  "a behaviour release says what's new (82e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
     file: "render-core.js",
-    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's. V138: at V138's. V139: at V139's. V140: at V140's. V141: at V141's. V142: at V142's.
-    from: "you keep the rest of it.</li>\n",
-    to:   "you keep the rest of it.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (81e)",
+    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's. V138: at V138's. V139: at V139's. V140: at V140's. V141: at V141's. V142: at V142's. V143: at V143's.
+    from: "everything uploads as soon as you renew.</li>\n",
+    to:   "everything uploads as soon as you renew.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (82e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8604,9 +8608,10 @@ const MUTATIONS = [
     // V140: re-aimed at V140's own (V139's moves to M1259).
     // V141: re-aimed at V141's own (V140's moves to M1259, V139's to M1238).
     // V142: re-aimed at V142's own (V141's moves to M1259, V140's to M1238).
-    from: "Cloud accounts can subscribe from Settings, paying securely through Stripe",
+    // V143: re-aimed at V143's own (V142's moves to M1259, V141's to M1238).
+    from: "PATGo confirms your plan online at least once every 30 days. When a subscription ends",
     to:   "Better",
-    why:  "the About page must say what changed in this version (81e)",
+    why:  "the About page must say what changed in this version (82e)",
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8717,9 +8722,10 @@ const MUTATIONS = [
     // V140: V137's line rolled off — re-aimed at V138's, the oldest now.
     // V141: V138's line rolled off — re-aimed at V139's, the oldest now.
     // V142: V139's line rolled off — re-aimed at V140's, the oldest now.
-    from: "Cloud accounts can sign in with Google. Connect your Google account once",
+    // V143: V140's line rolled off — re-aimed at V141's, the oldest now.
+    from: "PATGo has a full privacy policy. About now sums up",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (81e)",
+    why:  "the About page keeps the last three versions' lines (82e)",
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8857,14 +8863,14 @@ const MUTATIONS = [
     file: "data.js",
     from: "pages: ['settingsTutorials', 'settingsAbout',",
     to:   "pages: ['settingsAbout',",
-    why:  "6A: Settings → Help → Tutorials (81e)",
+    why:  "6A: Settings → Help → Tutorials (82e)",
   },
   {
     name: "M1258 (V134) search can't find the tutorials",
     file: "data.js",
     from: "aliases: 'tutorial tutorials practice practise job learn",
     to:   "aliases: 'learn",
-    why:  "6A: findable in Settings search (81e)",
+    why:  "6A: findable in Settings search (82e)",
   },
   {
     name: "M1259 (V134; re-aimed V137) the About changelog loses this version's line",
@@ -8875,16 +8881,17 @@ const MUTATIONS = [
     // V140: V138's line is the oldest now (M1238) — re-aimed at V139's, still in the window.
     // V141: V139's line is the oldest now (M1238) — re-aimed at V140's, still in the window.
     // V142: V140's line is the oldest now (M1238) — re-aimed at V141's, still in the window.
-    from: "PATGo has a full privacy policy. About now sums up",
+    // V143: V141's line is the oldest now (M1238) — re-aimed at V142's, still in the window.
+    from: "Cloud accounts can subscribe from Settings, paying securely through Stripe",
     to:   "Better",
-    why:  "the About page must say what changed in this version (81e)",
+    why:  "the About page must say what changed in this version (82e)",
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
     file: "render-core.js",
     from: "New here? Try the practice job.",
     to:   "New here? Take the 30-second tour.",
-    why:  "6A: setup offers the practice job (81e)",
+    why:  "6A: setup offers the practice job (82e)",
   },
   {
     name: "M1261 (V134) Quit always lands on the Jobs list",
@@ -9003,10 +9010,10 @@ const MUTATIONS = [
   {
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
-    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e).
-    from: "const CACHE_VERSION = 'pat-v142';",
-    to:   "const CACHE_VERSION = 'pat-v141';",
-    why:  "a release needs its cache bump or phones never get it (81e)",
+    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e).
+    from: "const CACHE_VERSION = 'pat-v143';",
+    to:   "const CACHE_VERSION = 'pat-v142';",
+    why:  "a release needs its cache bump or phones never get it (82e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -9080,7 +9087,7 @@ const MUTATIONS = [
     // V136: the page lists two headings (rowsFor) — re-aimed.
     from: "const rows = rowsFor(all.filter((d) => d.settings));",
     to:   "const rows = rowsFor(all.filter((d) => false));",
-    why:  "2A: listed on the Tutorials page (81e)",
+    why:  "2A: listed on the Tutorials page (82e)",
   },
   {
     name: "M1288 (V135) the Tutorials rows aren't wired",
@@ -9420,7 +9427,7 @@ const MUTATIONS = [
     file: "styles.css",
     from: ".tut-howto-row { display: flex; justify-content: center; margin: -4px 0 8px; }",
     to:   "",
-    why:  "2A: one centred line under the title (81e)",
+    why:  "2A: one centred line under the title (82e)",
   },
   // ---- V138 (1A 2A 3A, all defaults): Show me how starts on the page. Group 77 + M1336–M1343. ----
   {
@@ -9526,14 +9533,14 @@ const MUTATIONS = [
     file: "dispatch.js",
     from: "  if (e && typeof e.preventDefault === 'function') e.preventDefault();\n",
     to:   "",
-    why:  "Sign in / Go would submit the form and reload the app mid sign-in (81e)",
+    why:  "Sign in / Go would submit the form and reload the app mid sign-in (82e)",
   },
   {
     name: "M1351 (V139) the password sign-in tap loses its typeof guard",
     file: "dispatch.js",
     from: "'cloud-password-sign-in': () => { if (typeof cloudPasswordSignIn === 'function') cloudPasswordSignIn(); },",
     to:   "'cloud-password-sign-in': () => { cloudPasswordSignIn(); },",
-    why:  "MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (81e)",
+    why:  "MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (82e)",
   },
   {
     name: "M1352 (V139) the password box is not marked current-password",
@@ -9884,7 +9891,8 @@ const MUTATIONS = [
   {
     name: "M1401 (V142) reading the plan doesn't refresh the plan record",
     file: "plan.js",
-    from: "      try { planNote({ plan: info.plan, trial_ends_at: info.trial_ends_at }); } catch (e) { /* record only */ }",
+    // V143: re-aimed — + lapsed_at.
+    from: "      try { planNote({ plan: info.plan, trial_ends_at: info.trial_ends_at, lapsed_at: info.lapsed_at }); } catch (e) { /* record only */ }",
     to:   "",
     why:  "paying must lift a lock at once, no restart (81c)",
   },
@@ -9991,7 +9999,7 @@ const MUTATIONS = [
     file: "dispatch.js",
     from: "  'billing-subscribe':   () => { if (typeof billingSubscribe === 'function') billingSubscribe(); },",
     to:   "  'billing-subscribe':   () => billingSubscribe(),",
-    why:  "MAP rule 6 — with plan.js missing a tap must be a no-op, not a ReferenceError (81e)",
+    why:  "MAP rule 6 — with plan.js missing a tap must be a no-op, not a ReferenceError (82e)",
   },
   {
     name: "M1417 (V142) the Subscription row never says the plan",
@@ -10005,7 +10013,7 @@ const MUTATIONS = [
     file: "config.js",
     from: "const PLAN_PRICES = { year: '£60 a year', month: '£6 a month' };",
     to:   "const PLAN_PRICES = { year: '£80 a year', month: '£6 a month' };",
-    why:  "1B: £6 / £60 — the words must match what Stripe charges (81a 81b 81e)",
+    why:  "1B: £6 / £60 — the words must match what Stripe charges (81a 81b 82e)",
   },
   {
     name: "M1419 (V142) billing-done.html passes any result through",
@@ -10153,6 +10161,329 @@ const MUTATIONS = [
     from: "    res := res || array['18e|B cannot reach",
     to:   "    res := res || array['18x|B cannot reach",
     why:  "every V142 isolation check stays in the test (81g)",
+  },
+  // ---- V143 (1A 2A 3A 4A 5A): enforcement. Group 82 + M1440–M1485. ----
+  {
+    name: "M1440 (V143) planNote drops the server’s lapse date",
+    file: "plan.js",
+    from: "    lapsedAt: typeof row.lapsed_at === 'string' ? row.lapsed_at : null,     // V143 (3A): the server's date",
+    to:   "    lapsedAt: null,",
+    why:  "3A: every read must keep lapsed_at, or a cancelled plan locks at once (82b)",
+  },
+  {
+    name: "M1441 (V143) the grace ignores the server’s date",
+    file: "plan.js",
+    from: "    if (isFinite(la)) {\n      start = la;",
+    to:   "    if (false) {\n      start = la;",
+    why:  "3A: a paid plan that stopped counts from lapsed_at, not the trial end (82a 82b)",
+  },
+  {
+    name: "M1442 (V143) the 30-day hold never applies",
+    file: "plan.js",
+    from: "    if (checked > 0 && now >= checked + PLAN_CHECK_DAYS * PLAN_DAY_MS) st.unchecked = true;",
+    to:   "    if (false) st.unchecked = true;",
+    why:  "4A: airplane mode would be a way to keep logging (82a 82b)",
+  },
+  {
+    name: "M1443 (V143) a comped account is held too",
+    file: "plan.js",
+    from: "  if (st.phase !== 'locked' && st.phase !== 'none' && rec.plan !== 'comped') {",
+    to:   "  if (st.phase !== 'locked' && st.phase !== 'none') {",
+    why:  "4A: comped is never asked (82a)",
+  },
+  {
+    name: "M1444 (V143) a locked account is also marked held",
+    file: "plan.js",
+    from: "  if (st.phase !== 'locked' && st.phase !== 'none' && rec.plan !== 'comped') {",
+    to:   "  if (st.phase !== 'none' && rec.plan !== 'comped') {",
+    why:  "locked says Renew, not Check now (82a)",
+  },
+  {
+    name: "M1445 (V143) the hold starts a moment late",
+    file: "plan.js",
+    from: "now >= checked + PLAN_CHECK_DAYS * PLAN_DAY_MS",
+    to:   "now > checked + PLAN_CHECK_DAYS * PLAN_DAY_MS",
+    why:  "4A: thirty days means thirty days (82a)",
+  },
+  {
+    name: "M1446 (V143) planLocked ignores the hold",
+    file: "plan.js",
+    from: "  return st.phase === 'locked' || !!st.unchecked;",
+    to:   "  return st.phase === 'locked';",
+    why:  "4A: a held phone is locked for every gate (82b)",
+  },
+  {
+    name: "M1447 (V143) the gate lets a held phone through",
+    file: "plan.js",
+    from: "  if (!st || (st.phase !== 'locked' && !st.unchecked)) return true;",
+    to:   "  if (!st || st.phase !== 'locked') return true;",
+    why:  "4A: a held phone must not start a job (82b)",
+  },
+  {
+    name: "M1448 (V143) a held phone is shown the Renew sheet",
+    file: "plan.js",
+    from: "  try { if (st.phase === 'locked') planShowLocked(); else planShowUnchecked(); }",
+    to:   "  try { planShowLocked(); }",
+    why:  "4A: nothing is owed — it needs Check now, not Renew (82b)",
+  },
+  {
+    name: "M1449 (V143) the Jobs list keeps Renew now while held",
+    file: "plan.js",
+    from: "  return (st && st.unchecked && st.phase !== 'locked')\n    ? `<button",
+    to:   "  return (false)\n    ? `<button",
+    why:  "4A: the line's button is Check now (82b)",
+  },
+  {
+    name: "M1450 (V143) the Account page keeps Renew now while held",
+    file: "plan.js",
+    from: "  const check = st.unchecked && st.phase !== 'locked';",
+    to:   "  const check = false;",
+    why:  "4A: the Account page's button is Check now (82b)",
+  },
+  {
+    name: "M1451 (V143) the Settings row doesn’t say Check needed",
+    file: "plan.js",
+    from: "    if (st.unchecked) return 'Check needed';     // V143 (4A)\n",
+    to:   "",
+    why:  "4A: the Subscription row says what's wrong (82b)",
+  },
+  {
+    name: "M1452 (V143) Check now offline tries anyway",
+    file: "plan.js",
+    from: "  try { if (navigator.onLine === false) { showToast('No internet connection. Connect and try again.'); return Promise.resolve(false); } } catch (e) { /* assume online */ }",
+    to:   "",
+    why:  "4A: offline, say so plainly (82b)",
+  },
+  {
+    name: "M1453 (V143) the plan read names its columns again",
+    file: "plan.js",
+    from: "    .then((c) => c.from('profiles').select('*').eq('id', uid).maybeSingle())",
+    to:   "    .then((c) => c.from('profiles').select('plan, trial_ends_at').eq('id', uid).maybeSingle())",
+    why:  "3A: lapsed_at never reaches the phone (82b)",
+  },
+  {
+    name: "M1454 (V143) the sign-in check names its columns again",
+    file: "cloud.js",
+    from: "    .then((c) => c.from('profiles').select('*').maybeSingle())",
+    to:   "    .then((c) => c.from('profiles').select('plan, trial_ends_at').maybeSingle())",
+    why:  "3A: the sign-in / Check connection read must carry lapsed_at (82b)",
+  },
+  {
+    name: "M1455 (V143) the Subscription page’s read drops lapsed_at",
+    file: "plan.js",
+    from: "trial_ends_at: info.trial_ends_at, lapsed_at: info.lapsed_at }); } catch",
+    to:   "trial_ends_at: info.trial_ends_at }); } catch",
+    why:  "3A: my_billing's read overwrites the record without the date (82b)",
+  },
+  {
+    name: "M1456 (V143) the held line is never shown",
+    file: "plan.js",
+    from: "  if (st.unchecked) return `PATGo hasn’t been able to confirm your plan",
+    to:   "  if (false) return `PATGo hasn’t been able to confirm your plan",
+    why:  "4A: the Jobs list says why logging is paused (82b)",
+  },
+  {
+    name: "M1457 (V143) a plan read never resumes the cloud",
+    file: "plan.js",
+    from: "  try { if (typeof syncPlanChecked === 'function') syncPlanChecked(!planLocked()); } catch (e) { /* optional — rule 6 */ }",
+    to:   "",
+    why:  "5A: paying must restart sending without a restart (82c)",
+  },
+  {
+    name: "M1458 (V143) any plan read resumes the cloud, locked or not",
+    file: "plan.js",
+    from: "syncPlanChecked(!planLocked());",
+    to:   "syncPlanChecked(true);",
+    why:  "5A: a read that still says locked would only be refused again (82c)",
+  },
+  {
+    name: "M1459 (V143) the refusal is not noted",
+    file: "sync.js",
+    from: "      _syncNotePlanRefusal(e);\n      state.sync.message = syncErrorMessage(e);",
+    to:   "      state.sync.message = syncErrorMessage(e);",
+    why:  "5A: the phone would keep sending into a refusal (82c)",
+  },
+  {
+    name: "M1460 (V143) the database’s own words are shown",
+    file: "sync.js",
+    from: "  if (_syncIsPlanRefusal(err)) return SYNC_PLAN_PAUSED_WORDS;\n",
+    to:   "",
+    why:  "5A: our professional line, not the database's (82c)",
+  },
+  {
+    name: "M1461 (V143) a paused account still sends",
+    file: "sync.js",
+    from: "    const paused = syncPlanRefused() && !opts.manual;",
+    to:   "    const paused = false;",
+    why:  "5A: no more sending until the plan changes (82c)",
+  },
+  {
+    name: "M1462 (V143) Sync now doesn’t try",
+    file: "sync.js",
+    from: "    const paused = syncPlanRefused() && !opts.manual;",
+    to:   "    const paused = syncPlanRefused();",
+    why:  "a tap on Sync now tries once anyway (82c)",
+  },
+  {
+    name: "M1463 (V143) settings still go up while paused",
+    file: "sync.js",
+    from: "    .then(() => (paused ? null : _syncPushRecords(c, uid, st, out)))   // V143: paused — read only",
+    to:   "    .then(() => _syncPushRecords(c, uid, st, out))   // V143: paused — read only",
+    why:  "5A: a paused run only reads (82c)",
+  },
+  {
+    name: "M1464 (V143) jobs still go up while paused",
+    file: "sync.js",
+    from: "        .then(() => (paused ? { sent: 0, deleted: 0 } : _syncPushHalf(c, uid, st, !!opts.force)))",
+    to:   "        .then(() => _syncPushHalf(c, uid, st, !!opts.force))",
+    why:  "5A: a paused run only reads (82c)",
+  },
+  {
+    name: "M1465 (V143) photos still go up while paused",
+    file: "sync.js",
+    from: "          if (paused) { base.paused = true; return base; }   // V143: no photos up either",
+    to:   "          if (paused) { base.paused = true; }",
+    why:  "5A: the photo step uploads; it must not run while paused (82c)",
+  },
+  {
+    name: "M1466 (V143) a refusal of settings is not noted",
+    file: "sync.js",
+    from: "      if (records && records.error) _syncNotePlanRefusal(records.error);   // V143: fail-soft, but heard\n",
+    to:   "",
+    why:  "records are fail-soft: their refusal must still pause (82c)",
+  },
+  {
+    name: "M1467 (V143) a refusal of a photo is not noted",
+    file: "sync.js",
+    from: "              _syncNotePlanRefusal(e);   // V143\n",
+    to:   "",
+    why:  "photos are fail-soft: their refusal must still pause (82c)",
+  },
+  {
+    name: "M1468 (V143) the pause belongs to no one account",
+    file: "sync.js",
+    from: "  return !!uid && uid === _syncPlanRefusedUid;",
+    to:   "  return !!_syncPlanRefusedUid;",
+    why:  "another login on this phone is not paused (82c)",
+  },
+  {
+    name: "M1469 (V143) any row-level refusal counts as the plan",
+    file: "sync.js",
+    from: "    try { return typeof planLocked === 'function' && planLocked(); } catch (e) { return false; }",
+    to:   "    try { return true; } catch (e) { return false; }",
+    why:  "a bare refusal is the plan only when this phone knows it is locked (82c)",
+  },
+  {
+    name: "M1470 (V143) the word is looked for in the message only",
+    file: "sync.js",
+    from: "  const text = [err.message, err.hint, err.details, err.error].map((x) => String(x || '')).join(' ');",
+    to:   "  const text = String(err.message || '');",
+    why:  "the word may come in any part of the error (82c)",
+  },
+  {
+    name: "M1471 (V143) resuming doesn’t send what was waiting",
+    file: "sync.js",
+    from: "  try { syncPushSoon(1000, { pull: true }); } catch (e) { /* the next trigger sends it */ }\n",
+    to:   "",
+    why:  "5A: renewing sends straight away (82c)",
+  },
+  {
+    name: "M1472 (V143) resuming keeps the paused line",
+    file: "sync.js",
+    from: "  if (state.sync && state.sync.message === SYNC_PLAN_PAUSED_WORDS) state.sync.message = '';\n",
+    to:   "",
+    why:  "the line would claim paused after paying (82c)",
+  },
+  {
+    name: "M1473 (V143) a paused run reports an ordinary result",
+    file: "sync.js",
+    from: "      state.sync.message = (r && r.paused) ? SYNC_PLAN_PAUSED_WORDS : _syncOutcome(r);",
+    to:   "      state.sync.message = _syncOutcome(r);",
+    why:  "5A: the Sync page keeps saying why nothing went (82c)",
+  },
+  {
+    name: "M1474 (V143) the Jobs list never says syncing is paused",
+    file: "plan.js",
+    from: "  const paused = _planCloudPaused();",
+    to:   "  const paused = false;",
+    why:  "5A: the Jobs list says it too (82c)",
+  },
+  {
+    name: "M1475 (V143) the Jobs list isn’t redrawn when the cloud refuses",
+    file: "sync.js",
+    from: "  try { if (typeof _planRepaint === 'function') _planRepaint(); } catch (e) { /* the Jobs list line waits for the next paint */ }\n",
+    to:   "",
+    why:  "5A: the line shows at once, not at the next tap (82c)",
+  },
+  {
+    name: "M1476 (V143) Check now does nothing",
+    file: "dispatch.js",
+    from: "  'plan-check': () => { if (typeof planCheckNow === 'function') planCheckNow(); },   // V143 (4A)",
+    to:   "  'plan-check': () => {},   // V143 (4A)",
+    why:  "4A: the button must read the plan (82b 82e)",
+  },
+  {
+    name: "M1477 (V143) the hold waits 60 days",
+    file: "config.js",
+    from: "const PLAN_CHECK_DAYS = 30;",
+    to:   "const PLAN_CHECK_DAYS = 60;",
+    why:  "4A: 30 days (82a)",
+  },
+  {
+    name: "M1478 (V143 SQL) a trial is refused a week early",
+    file: "supabase/v143-enforcement.sql",
+    from: "then x.trial_ends_at is null or now() < x.trial_ends_at + interval '14 days'",
+    to:   "then x.trial_ends_at is null or now() < x.trial_ends_at + interval '7 days'",
+    why:  "2A: the server's line = the phone's grace + 7 days' catch-up (82g)",
+  },
+  {
+    name: "M1479 (V143 SQL) photo rows are not guarded",
+    file: "supabase/v143-enforcement.sql",
+    from: "  foreach t in array array['sessions','records','photos'] loop\n    execute format('drop trigger if exists plan_guard",
+    to:   "  foreach t in array array['sessions','records'] loop\n    execute format('drop trigger if exists plan_guard",
+    why:  "1A: photos are uploads too (82g)",
+  },
+  {
+    name: "M1480 (V143 SQL) the photo-file helper is closed to phones",
+    file: "supabase/v143-enforcement.sql",
+    from: "grant execute on function public.can_upload_files() to authenticated;\n",
+    to:   "",
+    why:  "a policy calling a closed function refuses EVERY photo upload, paid or not (82g)",
+  },
+  {
+    name: "M1481 (V143 SQL) schema.sql misses a V143 line",
+    file: "supabase/schema.sql",
+    from: "grant select (lapsed_at) on public.organisations to authenticated;\n",
+    to:   "",
+    why:  "a new project must match an upgraded one (82g)",
+  },
+  {
+    name: "M1482 (V143 SQL) the isolation test leaves B lapsed",
+    file: "supabase/isolation-test.sql",
+    from: "    update public.organisations set plan = g, lapsed_at = lap_b where id = org_b;\n",
+    to:   "",
+    why:  "the test must put account B back exactly as it was (82g)",
+  },
+  {
+    name: "M1483 (V143 SQL) the copies drop the date",
+    file: "supabase/v143-enforcement.sql",
+    from: "  set plan = new.plan, trial_ends_at = new.trial_ends_at, lapsed_at = new.lapsed_at\n",
+    to:   "  set plan = new.plan, trial_ends_at = new.trial_ends_at\n",
+    why:  "3A: phones read the profile copy (82g)",
+  },
+  {
+    name: "M1484 (V143 SQL) the refusal is a server error, not a refusal",
+    file: "supabase/v143-enforcement.sql",
+    from: "      using errcode = '42501', hint",
+    to:   "      using errcode = 'P0001', hint",
+    why:  "a refusal is a 403 the phone recognises, not a 400 server fault (82g)",
+  },
+  {
+    name: "M1485 (V143 SQL) my_billing doesn’t send the date",
+    file: "supabase/v143-enforcement.sql",
+    from: "    'lapsed_at', o.lapsed_at,\n",
+    to:   "",
+    why:  "3A: the Subscription page's read must carry it (82g)",
   },
 ];
 

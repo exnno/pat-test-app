@@ -298,6 +298,19 @@ bug; leaving it red trains everyone to ignore the suite.
   'visible' — the stub leaves it undefined, so set it on `app.doc`. The SQL's
   real behaviour (copies, comped, trial, old subscriptions, isolation 18a–18f)
   was proved against a local Postgres 16 stand-in, not here; 81g pins the text.
+  V143 (group 82): enforcement. (1) A function declaration is a writable
+  global in the vm, so 82c SPIES on a step by reassigning it
+  (`_syncPhotosHalf = function () { __ph++; … }`) — and proves the spy counts by
+  seeing it rise once the pause lifts (an always-0 counter proves nothing).
+  (2) sync.js's `_syncSafetyRepaint` redraws the Jobs list whenever the cloud
+  picture CHANGES — so a test of "the list redraws by itself" must settle that
+  picture first (82c sends once and fails before the real test), or the safety
+  repaint does the job and the line under test survives (M1475 did, until then).
+  (3) The SQL was proved on a local Postgres 16 stand-in (an upgraded V142
+  project and a fresh schema.sql; isolation 82 PASS + 7 INCONCLUSIVE for want of
+  photos; ten broken copies each caught). It caught a real defect before ship:
+  the photo-file policy called `default_org` / `can_upload`, both closed to
+  `authenticated`, which refuses EVERY photo upload — hence `can_upload_files()`.
 
 ---
 
