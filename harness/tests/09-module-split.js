@@ -103,7 +103,7 @@ const MOVED_TO_RENDER_HELP = [
   { name: 'renderBugSheet',         view: null,                 marker: null                     },
   { name: 'renderCloudAccount',     view: 'cloudAccount',       marker: 'id="cloud-account-page"'},
   { name: 'renderCloudSync',        view: 'cloudSync',          marker: 'id="cloud-sync-page"'       },   // v80: real page
-  { name: 'renderCloudSubscription',view: 'cloudSubscription',  marker: 'id="cloud-subscription-placeholder"'},
+  { name: 'renderCloudSubscription',view: 'cloudSubscription',  marker: 'id="cloud-subscription-page"'},   // V142: real page
 ];
 
 /* The V71 extraction manifest: every top-level const that left config.js for

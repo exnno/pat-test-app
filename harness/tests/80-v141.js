@@ -23,8 +23,7 @@
           without an underline.
      80c  Contact no longer says job data stays on the phone; Settings search
           finds About by "privacy".
-     80e  release: V141, cache, What's new (one line), About V141 / V140 /
-          V139; plus 79e's lasting checks (79e retired).
+     80e  release: V141 … — retired at V142; its lasting checks are 81e.
 
    How it LOOKS — the link as a button, light and dark — was checked in
    Chromium at 390×844 dark and 375×667 light (Playwright, not committed). */
@@ -133,72 +132,5 @@ module.exports = async function () {
     app.state().settingsSearchQuery = '';
   });
 
-  /* ------------------------------------------------------------------ 80e */
-  await t.group('80e — release: V141, cache, What’s new, About; wiring; Tutorials (79e’s lasting checks)', async () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V141', 'APP_VERSION V141');
-    t.eq(app.run('WELCOME_VERSION'), 'V141', 'What’s new rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v141';", 'cache key pat-v141');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>Privacy policy.</strong>', '…Privacy policy');
-    t.includes(sheetCopy, 'Settings &rarr; Help &rarr; About sums it up, with a link to read it all.', '…and says where to find it');
-    t.includes(core, 'New here? Try the practice job.', 'setup offers the practice job');
-    t.includes(core, 'You can do it again any time from Settings → Help → Tutorials.', '…and says where it lives');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V141</strong>'), b = help.indexOf('<p><strong>V140</strong>'), c = help.indexOf('<p><strong>V139</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V141, V140, V139');
-    t.excludes(help, '<p><strong>V138</strong>', 'V138 rolled off');
-    t.includes(help, 'PATGo has a full privacy policy. About now sums up', 'About: V141’s line');
-    t.includes(help, 'Cloud accounts can sign in with Google. Connect your Google account once', 'About: V140’s line still there');
-    t.includes(help, 'Cloud accounts can sign in with an email and password, set or change it on the Account page', 'About: V139’s line still there');
-    t.includes(help, 'data-action="settings-page" data-arg="settingsTutorials"', 'About points at Tutorials');
-    t.notOk(/accounts\.google\.com\/gsi|<script[^>]+google/i.test(read('index.html') + read('cloud.js') + read('signin-done.html')),
-      'V140 1A: no Google script anywhere in the app');
-    t.notOk(new RegExp(String.raw`\bconfirm\(|\balert\(|\bprompt\(`).test(read('cloud.js')), 'Disconnect asks in place — no browser dialogs');
-
-    // Every cloud tap from V139 and V140 is wired, guarded, and harmless with
-    // cloud.js missing (rule 6).
-    const NEW = ['cloud-google', 'cloud-google-connect', 'cloud-google-cancel', 'cloud-google-off',
-                 'cloud-google-keep', 'cloud-google-disconnect',
-                 'cloud-password-sign-in', 'cloud-forgot', 'cloud-use-code', 'cloud-use-password',
-                 'cloud-password-open', 'cloud-password-cancel', 'cloud-password-save', 'cloud-password-toggle'];
-    const disp = read('dispatch.js');
-    for (const n of NEW) t.ok(new RegExp(`'${n}':\\s*\\([^)]*\\) => \\{ if \\(typeof cloud\\w+ === 'function'\\)`).test(disp), `${n} wired, typeof-guarded`);
-    const bare = boot({ skip: ['cloud.js'] });
-    const actions = bare.run('ACTIONS');
-    for (const n of NEW) t.doesNotThrow(() => actions[n]('', bare.doc.createElement('button')), `${n} harmless without cloud.js`);
-    bare.state().view = 'cloudAccount';
-    t.doesNotThrow(() => bare.fn('render')(), 'Account page renders without cloud.js');
-
-    // A form never navigates: the submit that follows Sign in / Go is cancelled at #app.
-    const f = boot();
-    account(f);
-    const ev = { type: 'submit', target: f.doc.createElement('form'), defaultPrevented: false,
-                 preventDefault() { this.defaultPrevented = true; }, stopPropagation() {} };
-    f.doc.getElementById('app').dispatchEvent(ev);
-    t.ok(ev.defaultPrevented, 'a submit on the Account page is cancelled (the app does not reload)');
-    t.eq(f.state().cloud.busy, false, '…and runs nothing itself (the click did)');
-
-    // 77e's lasting checks (carried by 78e, 79e).
-    t.eq(app.run("SETTINGS_CATEGORIES.find(c => c.id === 'catHelp').pages[0]"), 'settingsTutorials', 'Tutorials heads the Help group');
-    const al = ' ' + app.run('SETTINGS_PAGE_META.settingsTutorials.aliases') + ' ';
-    t.ok(/ tutorial /.test(al) && / practice /.test(al), 'search finds it by tutorial or practice');
-    t.ok(/ settings /.test(al) && / instrument /.test(al) && / backup /.test(al), '…and by settings, instrument or backup (V135)');
-    app.fn('setView')('settingsTutorials');
-    const page = html(app);
-    t.includes(page, 'data-action="open-practice"', 'the page starts the practice job');
-    t.includes(page, 'Nothing you do in it is saved', '…and says nothing is kept');
-    const rows = [...page.slice(0, page.indexOf('id="tutorials-cloud-list"')).matchAll(/data-action="open-tutorial" data-arg="([^"]+)"/g)].map(m => m[1]);
-    t.deepEq(rows, ['engineer', 'branding', 'content', 'items', 'backup'], 'the page lists the five Settings tutorials under Setting up');
-    t.includes(page, 'Nothing you do in them is saved', '…and says nothing is kept');
-    t.excludes(page, 'data-action="tut-show-me-how"', 'the Tutorials page itself has no Show me how');
-    t.eq(app.run('typeof TOUR_SLIDES'), 'undefined', 'the five picture slides stay retired');
-    t.eq(app.run('TUT_STEPS.length'), 21, 'the practice job: 21 steps (V134.1, unchanged)');
-    t.includes(read('styles.css'), '.tut-howto-row {', 'the Show me how line has its own style (V137)');
-    t.includes(disp, "'tut-show-me-how': (arg) => tutShowMeHow(arg),", 'the tap is wired (V137)');
-    t.includes(read('tour.js'), "const TUT_WALK_KEYS = ['group', 'page'];", 'a page tutorial skips the walk (V138)');
-  });
+  // 80e retired at V142 → 81e (the release checks move with each release).
 };

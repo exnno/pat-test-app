@@ -295,13 +295,15 @@ module.exports = async function run() {
     t.includes(a, 'id="cloud-plan-status"', 'Account page: the same line');
     t.includes(a, 'id="cloud-plan-renew"', '… and Renew now');
 
-    // Renew now (10A): no payment page yet → an email to us, with the account.
+    // Renew now (10A). V142: with paying on (signed in, a cloud) it is the
+    // Subscribe choice — 81b. Where paying isn't on, still an email to us.
+    acc.run('billingAvailable = function () { return false; }');
     const before = acc.sandbox.location.href;
     act(acc, 'plan-renew');
     const href = acc.sandbox.location.href;
     t.ok(href !== before && href.indexOf('mailto:hello@patgo.co.uk?subject=') === 0, 'Renew now opens an email to hello@patgo.co.uk');
     t.includes(href, encodeURIComponent('renew@example.com'), '… naming the account');
-    t.eq(acc.run('PLAN_RENEW_URL'), '', 'no payment page yet (half built, Peter 7)');
+    t.eq(acc.run('PLAN_RENEW_URL'), '', 'no payment address in config.js — paying is Stripe\u2019s pages (V142)');
     const src = read('plan.js');
     t.includes(src, "PLAN_RENEW_URL + (PLAN_RENEW_URL.indexOf('?') === -1 ? '?' : '&') + 'email='", 'with one, Renew opens it with the email (the swap is one line in config.js)');
   });

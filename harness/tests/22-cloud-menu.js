@@ -150,7 +150,7 @@ module.exports = function run() {
     t.includes(app.html(), 'data-page="cloudAccount"', 'next launch: straight to the rows, no code');
     t.includes(app.html(), 'Not signed in', 'Account row says not signed in');
     t.includes(app.html(), 'Sign in first', 'Sync row says sign in first');
-    t.includes(app.html(), 'Not built yet', 'Subscription row says not built yet');
+    t.ok(/data-page="cloudSubscription"[\s\S]*?Sign in first/.test(app.html()), 'Subscription row says sign in first (V142)');
 
     tap(app, 'settings-page', 'cloudAccount');
     t.eq(app.state().view, 'cloudAccount', 'row opens the Account page');
