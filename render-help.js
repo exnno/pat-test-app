@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V142: rolled forward — V142 on top, V139 dropped. -->
+      <!-- v8: rolling 3-version changelog. V143: rolled forward — V143 on top, V140 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V143</strong> &middot; October 2026</p>
+        <p class="muted">PATGo confirms your plan online at least once every 30 days. When a subscription ends there are 7 days&rsquo; grace from that date, and cloud syncing pauses a week after the account locks &mdash; your work stays safe on the phone and uploads once you renew.</p>
         <p><strong>V142</strong> &middot; October 2026</p>
         <p class="muted">Cloud accounts can subscribe from Settings, paying securely through Stripe, and manage or cancel their plan there too. Subscribing during the free trial keeps the rest of it.</p>
         <p><strong>V141</strong> &middot; October 2026</p>
         <p class="muted">PATGo has a full privacy policy. About now sums up what's kept on your phone and what goes to the cloud if you sign in, with a link to read the whole policy.</p>
-        <p><strong>V140</strong> &middot; October 2026</p>
-        <p class="muted">Cloud accounts can sign in with Google. Connect your Google account once on the Account page, then Continue with Google signs you in. Disconnect it there any time.</p>
 
 
 

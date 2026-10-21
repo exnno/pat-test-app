@@ -256,7 +256,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Subscriptions.</strong> Cloud accounts can now subscribe from Settings &rarr; Account &amp; Sync &rarr; Subscription: &pound;60 a year or &pound;6 a month, paid securely through Stripe. Subscribe during your free trial and you keep the rest of it.</li>
+        <li><strong>Plan checks.</strong> PATGo now confirms your plan online at least once every 30 days &mdash; it does this by itself whenever you have signal. If a subscription ends, you have 7 days&rsquo; grace from that date, and cloud syncing pauses a week after the account locks. Nothing on your phone is ever deleted, and everything uploads as soon as you renew.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

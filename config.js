@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V142';
+const APP_VERSION = 'V143';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -133,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V142';
+const WELCOME_VERSION = 'V143';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -363,15 +363,20 @@ const CLOUD_ACCESS_CODE = '1111';
 // ---- V127: the plan — trial end, grace, the lock (plan.js) -------------------
 // PLAN_KEY: what this phone last learned about the signed-in account's plan, so
 // the lock holds offline. One account at a time; another login ignores it.
-// Shape (plan.js planNote): { uid, plan, trialEndsAt, lapsedSeenAt, maxNow,
-// checkedAt, shownEnded, shownLastDay }. Per device, NEVER in a backup or a
+// Shape (plan.js planNote): { uid, plan, trialEndsAt, lapsedAt (V143), lapsedSeenAt,
+// serverAt, checkedAt, shownEnded, shownLastDay }. Per device, NEVER in a backup or a
 // setup export (a restore must not carry one account's plan to another phone).
 // Reset this phone: 'account'.
 const PLAN_KEY = 'pat:plan';
 // 3A: the account keeps everything for this many days after the trial (or the
 // plan) ends. 4A: the Jobs list says when the trial ends from this many days out.
+// ⚠ The SERVER's refusal (supabase/v143-enforcement.sql, can_upload) is set at
+// 14 days = this grace + 7 days' catch-up (V143 2A): change them together.
 const PLAN_GRACE_DAYS = 7;
 const PLAN_WARN_DAYS = 7;
+// V143 (4A): a phone that hasn't read its plan for this many days is held as if
+// locked until it reads it once (comped never). Every start online reads it.
+const PLAN_CHECK_DAYS = 30;
 // How long a fresh read of the plan lasts before the app reads it again when it
 // comes back to the front (it is also read at every start, online).
 const PLAN_REFRESH_MS = 6 * 60 * 60 * 1000;

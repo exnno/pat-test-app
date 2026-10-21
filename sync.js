@@ -1724,11 +1724,12 @@ function syncPush(opts) {
   state.sync.busy = true;
   state.sync.message = '';
   _syncRepaint();
-  _syncRunning = _syncRun({ force: !!o.force, pull: !!o.pull })
+  _syncRunning = _syncRun({ force: !!o.force, pull: !!o.pull, manual: !!o.manual })
     .then((r) => {
-      state.sync.message = _syncOutcome(r);
+      state.sync.message = (r && r.paused) ? SYNC_PLAN_PAUSED_WORDS : _syncOutcome(r);
       return true;
     }, (e) => {
+      _syncNotePlanRefusal(e);
       state.sync.message = syncErrorMessage(e);
       return false;
     })
@@ -1867,6 +1868,10 @@ function _syncRun(o) {
     if (!uid) { const e = new Error('not signed in'); e.syncStage = 'auth'; throw e; }
     const st = _syncStateFor(uid);
     const pulled = { applied: 0, added: 0, removed: 0, held: 0, waiting: null };
+    // V143 (5A): the cloud refused this account's changes, and no plan read
+    // since says it may work again — this run only READS. A tap on Sync now
+    // tries once anyway (the person asked; it costs one refusal).
+    const paused = syncPlanRefused() && !opts.manual;
     // V128 (2A, 5A). A phone that may have slept through the clean-up job lists
     // the due tables first, and every run it makes READS — so a save's quick
     // send, or "Re-send all jobs", cannot put back something deleted elsewhere.
@@ -1884,8 +1889,9 @@ function _syncRun(o) {
     // v82: clients and sites go FIRST, so a job that arrives in this run finds
     // its client already here. Only on a run that reads (rule 4) — so never on
     // "Re-send all jobs", which is jobs only. Fail-soft: see _syncRecordsHalf.
-    const recs = reads ? _syncRecordsHalf(c, uid, st, chk) : Promise.resolve(null);
+    const recs = reads ? _syncRecordsHalf(c, uid, st, chk, paused) : Promise.resolve(null);
     return recs.then((records) => {
+      if (records && records.error) _syncNotePlanRefusal(records.error);   // V143: fail-soft, but heard
       // V93 (2A): the retest look straight after the jobs pull, once a month —
       // fail-soft (a failure never stops the run; the month isn't stamped).
       const look = () => _syncRetestLook(c, uid, st, pulled)
@@ -1898,9 +1904,10 @@ function _syncRun(o) {
       const freeze = () => { _syncFreezePending(st); };
       return first
         .then(freeze, (e) => { freeze(); throw e; })
-        .then(() => _syncPushHalf(c, uid, st, !!opts.force))
+        .then(() => (paused ? { sent: 0, deleted: 0 } : _syncPushHalf(c, uid, st, !!opts.force)))
         .then((r) => {
           const base = { sent: r.sent, deleted: r.deleted, pulled, records };
+          if (paused) { base.paused = true; return base; }   // V143: no photos up either
           // v88: photos LAST — after the jobs push, so a photo's job is in the
           // cloud before the photo is. Reading runs only (never "Re-send all
           // jobs"). Fail-soft on their own, like records: a photo that will
@@ -1910,6 +1917,7 @@ function _syncRun(o) {
             (ph) => Object.assign(base, { photos: ph }),
             (e) => {
               console.error('Sync: photos not sent this time (non-fatal).', e);
+              _syncNotePlanRefusal(e);   // V143
               return Object.assign(base, { photos: { error: true } });
             });
         })
@@ -3509,7 +3517,7 @@ function _syncPushRecords(c, uid, st, out) {
 // clients are a convenience list. The error is reported on the Sync page and
 // the next run tries again. ⚠ The push is chained AFTER the pull, so a failed
 // pull means no push (rule 4).
-function _syncRecordsHalf(c, uid, st, chk) {
+function _syncRecordsHalf(c, uid, st, chk, paused) {
   // v83: `cs` / `ip` split the same counts by Sync-page heading; `skip` is what
   // the pull deferred this run; `inUseNow` names a tester taken from the cloud.
   const out = { applied: 0, added: 0, removed: 0, held: 0, unassigned: 0, sent: 0, deleted: 0, error: null,
@@ -3517,7 +3525,7 @@ function _syncRecordsHalf(c, uid, st, chk) {
     gs: { in: 0, out: 0, held: 0 },   // v86: general settings
     skip: {}, inUseNow: null };
   return _syncPullRecords(c, uid, st, out, chk)
-    .then(() => _syncPushRecords(c, uid, st, out))
+    .then(() => (paused ? null : _syncPushRecords(c, uid, st, out)))   // V143: paused — read only
     .then(() => out, (e) => { out.error = e || new Error('records'); return out; });
 }
 
@@ -3875,6 +3883,53 @@ function syncHeldDiff(id) {
     });
 }
 
+// ---- V143: the server refusing a locked business's changes (1A, 5A) -------------
+// supabase/v143-enforcement.sql refuses a business's uploads once its plan has
+// been locked for 7 days. The refusal carries the word patgo_plan_locked; this
+// phone then stops sending (runs only READ — reading is never refused) until a
+// fresh plan read says the account may work again (plan.js planNote →
+// syncPlanChecked). Per account: another login on this phone is not paused.
+// In memory only — every start online reads the plan anyway.
+const SYNC_PLAN_PAUSED_WORDS = 'Cloud syncing is paused because your PATGo subscription has ended. Your work remains safe on this phone and will upload automatically once you renew.';
+let _syncPlanRefusedUid = '';
+
+function _syncUid() {
+  try { return (typeof cloudUserId === 'function') ? (cloudUserId() || '') : ''; } catch (e) { return ''; }
+}
+
+function _syncIsPlanRefusal(err) {
+  if (!err) return false;
+  const text = [err.message, err.hint, err.details, err.error].map((x) => String(x || '')).join(' ');
+  if (/patgo_plan_locked/i.test(text)) return true;
+  // A photo FILE refused by storage's own rule carries no word of ours. It is
+  // the plan only when this phone already knows the account is locked.
+  if (/row-level security/i.test(text)) {
+    try { return typeof planLocked === 'function' && planLocked(); } catch (e) { return false; }
+  }
+  return false;
+}
+
+function _syncNotePlanRefusal(err) {
+  if (!_syncIsPlanRefusal(err)) return false;
+  _syncPlanRefusedUid = _syncUid();
+  try { if (typeof _planRepaint === 'function') _planRepaint(); } catch (e) { /* the Jobs list line waits for the next paint */ }
+  return true;
+}
+
+function syncPlanRefused() {
+  const uid = _syncUid();
+  return !!uid && uid === _syncPlanRefusedUid;
+}
+
+// plan.js, after every fresh read: canUpload = not locked (nor held unchecked).
+function syncPlanChecked(canUpload) {
+  if (!canUpload || !_syncPlanRefusedUid) return false;
+  _syncPlanRefusedUid = '';
+  if (state.sync && state.sync.message === SYNC_PLAN_PAUSED_WORDS) state.sync.message = '';
+  try { syncPushSoon(1000, { pull: true }); } catch (e) { /* the next trigger sends it */ }
+  return true;
+}
+
 function syncErrorMessage(err) {
   const status = err && err.status;
   const code = String(err && (err.code || '') || '');
@@ -3886,6 +3941,8 @@ function syncErrorMessage(err) {
   if (status === 401 || /jwt|PGRST30/i.test(code + ' ' + msg)) {
     return 'Your sign-in has lapsed. Sign out and back in on the Account page.';
   }
+  // V143 (5A): the cloud refused this business's changes — its plan has ended.
+  if (_syncIsPlanRefusal(err)) return SYNC_PLAN_PAUSED_WORDS;
   // V128 (5A): after the network and sign-in cases, which say what to do.
   if (err && err.syncStage === 'check') {
     return 'Before sending anything, this phone checks its work against the cloud (it does this after a long time away). ' +

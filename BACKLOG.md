@@ -8,6 +8,34 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V143
+V143 = enforcement (Stage 13; Peter 21 Oct: 1A 2A 3A 4A 5A). supabase/v143-enforcement.sql
+(lapsed_at on the business + profile copies; can_upload / plan_guard on sessions, records,
+photos; photo-file policies via can_upload_files); plan.js (lapsedAt, the 30-day hold,
+Check now); sync.js (the refusal → paused, reads only); cloud.js (select('*')). Harness 82
++ M1440–M1485; 81e retired → 82e.
+**Next:** sign-up + the launch switch (REQUIRE_ACCOUNT, shouldCreateUser, access code off,
+free site retired — roadmap Stage 13); live Stripe keys / prices / webhook on the production
+project; R8 90-day deletion (before any paying account is 90 days lapsed).
+
+### V143 residuals (known, accepted)
+- No trusted clock offline: winding the phone's clock back can stretch the 30-day check, as
+  it can a trial's end (the floor is the server time last seen — V127's rule).
+- No warning before the 30-day hold (Claude's call — it lifts the moment the phone reads its
+  plan, and every start online reads it). A job in progress is held too, as with the lock (9A).
+- A paused phone hears it may send again only at a plan read: every start online, back to
+  the front after 6 hours, sign-in, Check connection, opening Subscription, or paying.
+- A photo FILE refused by storage carries no word of ours: counted as the plan only when the
+  phone already knows the account is locked; otherwise the generic line.
+- V142 and older phones show the generic "Couldn't send your jobs: …" line with the
+  database's words when refused (locked accounts only).
+- A delete made on a locked phone after the line waits on the phone (the cloud keeps the
+  job) until renewal — the customer-first way round.
+- Re-running v142-billing.sql after V143 puts back V142's copy triggers and my_billing (no
+  date): run v143-enforcement.sql again after it.
+- Still open from V127: signing out removes the lock and the free site needs no account —
+  closed at launch.
+
 ### Next after V142
 V142 = paying (Stage 13; pricing 1B 2 3A 4A 5A 6A 7A 8; build 0A 1A 2A 3A 4A 5A
 6A 7A). plan.js billing* (the choice, the window, the return, the page's words);

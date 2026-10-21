@@ -1,4 +1,4 @@
-// ============== PATGo PWA — V127 — The plan: trial end, grace, the lock (V142: + paying) ==============
+// ============== PATGo PWA — V127 — The plan: trial end, grace, the lock (V142: + paying; V143: + enforcement) ==============
 // (c) 2026 Peter Birchley. All rights reserved.
 //
 // WHAT THIS FILE OWNS. What the signed-in account's plan means on this phone:
@@ -39,6 +39,22 @@
 // winding the phone's clock back does not move the end. The phone's own clock
 // never ratchets the record forward: a phone whose clock was once wrong in the
 // future must not stay locked after it is put right.
+//
+// V143 — ENFORCEMENT (Peter, 21 Oct: 1A 2A 3A 4A 5A).
+//   3A  A paid plan that stops counts its grace from the date the SERVER says it
+//       lapsed (lapsed_at, kept on the business and copied to each profile), so
+//       every phone and the server agree. Without it (a database before V143)
+//       the old rule stands. ⚠ The old rule counted from the trial's end when
+//       that was earlier — weeks earlier for a plan that had been paid — so a
+//       cancelled subscription locked at once with no grace. lapsed_at wins.
+//   4A  A phone that hasn't read its plan for PLAN_CHECK_DAYS is held as if
+//       locked ("unchecked"), until it reads it once — airplane mode is not a
+//       way to keep logging. Comped never. A phone that has never read a plan
+//       has no record and so no hold (V127, unchanged).
+//   1A/2A  The SERVER refuses a locked business's uploads from 7 days after the
+//       phone lock (supabase/v143-enforcement.sql). The phone hears it from
+//       sync.js (5A: its own line, no more tries until the plan changes — see
+//       syncPlanChecked, called from planNote below).
 
 const PLAN_DAY_MS = 24 * 60 * 60 * 1000;
 let _planRefreshing = false;
@@ -96,6 +112,7 @@ function planNote(row) {
     uid,
     plan,
     trialEndsAt: typeof row.trial_ends_at === 'string' ? row.trial_ends_at : null,
+    lapsedAt: typeof row.lapsed_at === 'string' ? row.lapsed_at : null,     // V143 (3A): the server's date
     lapsedSeenAt: null,
     serverAt: Math.max(Number(old.serverAt) || 0, _planServerSeen()),
     checkedAt: Date.now(),
@@ -108,6 +125,10 @@ function planNote(row) {
   if (plan === 'lapsed') rec.lapsedSeenAt = Number(old.lapsedSeenAt) || planNow(rec);
   _planWrite(rec);
   _planHook();
+  // V143 (5A): a fresh read that says this business may work again lets the
+  // cloud try again (sync.js stopped after the server refused). Still locked:
+  // it stays stopped — trying again would only be refused again.
+  try { if (typeof syncPlanChecked === 'function') syncPlanChecked(!planLocked()); } catch (e) { /* optional — rule 6 */ }
   return rec;
 }
 
@@ -129,8 +150,19 @@ function _planTime(s) {
 //   ending  a trial within PLAN_WARN_DAYS of its end              (4A)
 //   grace   ended, inside PLAN_GRACE_DAYS — everything still works (3A)
 //   locked  after the grace                                         (5B)
+// V143 (4A): any phase but locked (and never comped) also carries
+// unchecked: true once the plan was last read PLAN_CHECK_DAYS ago or more.
 function planStatus(rec, now) {
   if (!rec || typeof rec !== 'object') return { phase: 'none' };
+  const st = _planPhase(rec, now);
+  if (st.phase !== 'locked' && st.phase !== 'none' && rec.plan !== 'comped') {
+    const checked = Number(rec.checkedAt) || 0;
+    if (checked > 0 && now >= checked + PLAN_CHECK_DAYS * PLAN_DAY_MS) st.unchecked = true;
+  }
+  return st;
+}
+
+function _planPhase(rec, now) {
   const p = rec.plan;
   if (p === 'active' || p === 'comped') return { phase: 'paid' };
   const lapsed = p === 'lapsed';
@@ -139,9 +171,14 @@ function planStatus(rec, now) {
     start = _planTime(rec.trialEndsAt);
     if (!isFinite(start)) return { phase: 'trial' };          // no end date: never ends
   } else if (lapsed) {
-    const te = _planTime(rec.trialEndsAt);
-    const seen = Number(rec.lapsedSeenAt) || now;
-    start = (isFinite(te) && te <= seen) ? te : seen;
+    const la = _planTime(rec.lapsedAt);
+    if (isFinite(la)) {
+      start = la;                                             // V143 (3A): the server's date
+    } else {
+      const te = _planTime(rec.trialEndsAt);
+      const seen = Number(rec.lapsedSeenAt) || now;
+      start = (isFinite(te) && te <= seen) ? te : seen;
+    }
   } else {
     return { phase: 'none' };                                 // unknown: fail open
   }
@@ -163,18 +200,20 @@ function planCurrent() {
   } catch (e) { return { phase: 'none' }; }
 }
 
+// V143 (4A): held until the plan is checked counts as locked for every gate.
 function planLocked() {
-  return planCurrent().phase === 'locked';
+  const st = planCurrent();
+  return st.phase === 'locked' || !!st.unchecked;
 }
 
 // The one gate. Every place that starts a job, logs a test or makes a
 // certificate asks this first: true = carry on; false = locked, and the Renew
-// sheet is already up. Fails open.
+// (or V143: Check now) sheet is already up. Fails open.
 function planGate() {
-  let locked = false;
-  try { locked = planLocked(); } catch (e) { locked = false; }
-  if (!locked) return true;
-  try { planShowLocked(); } catch (e) { /* the refusal stands without its sheet */ }
+  let st = null;
+  try { st = planCurrent(); } catch (e) { st = null; }
+  if (!st || (st.phase !== 'locked' && !st.unchecked)) return true;
+  try { if (st.phase === 'locked') planShowLocked(); else planShowUnchecked(); } catch (e) { /* the refusal stands without its sheet */ }
   return false;
 }
 
@@ -198,13 +237,32 @@ function _planCountdownWords(st) {
 const PLAN_LOCKED_WORDS = 'logging tests, starting jobs and making certificates';
 const PLAN_SAFE_WORDS = 'Nothing is deleted: your jobs stay safe on this phone and in the cloud, and you can export everything at any time.';
 
+// V143 (5A): the cloud has refused this business's changes (sync.js).
+function _planCloudPaused() {
+  try { return typeof syncPlanRefused === 'function' && syncPlanRefused(); } catch (e) { return false; }
+}
+
 // The line itself, or '' — shared by the Jobs list and the Account page.
 function planLineText(st) {
   if (!st) return '';
+  const paused = _planCloudPaused();
+  if (st.phase === 'locked') {
+    return paused
+      ? `Your account is locked and cloud syncing is paused. Renew to carry on ${PLAN_LOCKED_WORDS}.`
+      : `Your account is locked. Renew to carry on ${PLAN_LOCKED_WORDS}.`;
+  }
+  if (st.unchecked) return `PATGo hasn’t been able to confirm your plan for ${PLAN_CHECK_DAYS} days. Connect to the internet to carry on ${PLAN_LOCKED_WORDS}.`;
+  if (paused) return 'Cloud syncing is paused because your PATGo subscription has ended. Renew to resume — your work remains safe on this phone.';
   if (st.phase === 'ending') return `Your free trial ends on ${_planDate(st.endsAt)}.`;
   if (st.phase === 'grace') return `${_planEndedWords(st)} ${_planCountdownWords(st)}`;
-  if (st.phase === 'locked') return `Your account is locked. Renew to carry on ${PLAN_LOCKED_WORDS}.`;
   return '';
+}
+
+// V143 (4A): the button beside the line — Check now while held, else Renew now.
+function _planLineButton(st, id) {
+  return (st && st.unchecked && st.phase !== 'locked')
+    ? `<button class="backup-banner-action primary" id="${id}" data-action="plan-check">Check now</button>`
+    : `<button class="backup-banner-action primary" id="${id}" data-action="plan-renew">Renew now</button>`;
 }
 
 // The Jobs list line (4A, 6b). Not dismissible — it is the countdown.
@@ -212,13 +270,13 @@ function planBannerHTML() {
   const st = planCurrent();
   const text = planLineText(st);
   if (!text) return '';
-  const cls = st.phase === 'locked' ? ' plan-banner-locked' : '';
+  const cls = (st.phase === 'locked' || st.unchecked) ? ' plan-banner-locked' : '';
   return `
     <div class="backup-banner plan-banner${cls}" id="plan-banner">
       <div class="backup-banner-body">
         <div class="backup-banner-text" id="plan-banner-text">${escapeHTML(text)}</div>
         <div class="backup-banner-actions">
-          <button class="backup-banner-action primary" id="plan-banner-renew" data-action="plan-renew">Renew now</button>
+          ${_planLineButton(st, 'plan-banner-renew')}
         </div>
       </div>
     </div>
@@ -230,9 +288,10 @@ function planAccountHTML() {
   const st = planCurrent();
   const text = planLineText(st);
   if (!text) return '';
+  const check = st.unchecked && st.phase !== 'locked';
   return `
         <p class="muted" id="cloud-plan-status">${escapeHTML(text)}</p>
-        <button class="btn-primary" id="cloud-plan-renew" data-action="plan-renew" style="margin-top:6px">Renew now</button>`;
+        <button class="btn-primary" id="cloud-plan-renew" data-action="${check ? 'plan-check' : 'plan-renew'}" style="margin-top:6px">${check ? 'Check now' : 'Renew now'}</button>`;
 }
 
 // ---- Renew now (10A) -------------------------------------------------------
@@ -285,6 +344,30 @@ function planShowLocked() {
     message: `Your PATGo account is locked, so ${PLAN_LOCKED_WORDS} are paused until you renew. ${PLAN_SAFE_WORDS}`,
     choices: _planChoices(),
     cancelLabel: 'Close',
+  });
+}
+
+// V143 (4A): held because the plan hasn't been read for PLAN_CHECK_DAYS.
+function planShowUnchecked() {
+  const out = [{ label: 'Check now', style: 'primary', onPick: () => planCheckNow() }];
+  if (typeof exportAllOpen === 'function') out.push({ label: 'Export everything', style: 'secondary', onPick: () => exportAllOpen() });
+  openChoiceSheet({
+    title: 'Plan check needed',
+    message: `This phone hasn’t been able to confirm your PATGo plan for ${PLAN_CHECK_DAYS} days, so ${PLAN_LOCKED_WORDS} are paused. Connect to the internet and tap Check now — it only takes a moment. ${PLAN_SAFE_WORDS}`,
+    choices: out,
+    cancelLabel: 'Close',
+  });
+}
+
+// V143 (4A): Check now — read the plan, and say what came of it.
+function planCheckNow() {
+  try { if (navigator.onLine === false) { showToast('No internet connection. Connect and try again.'); return Promise.resolve(false); } } catch (e) { /* assume online */ }
+  if (!_planUid()) { showToast('Sign in to check your plan.'); return Promise.resolve(false); }
+  showToast('Checking your plan…');
+  return planRefresh().then((ok) => {
+    if (!ok) { showToast('Couldn’t reach PATGo. Check your connection and try again.'); return false; }
+    showToast(planLocked() ? 'Plan checked — your account needs renewing.' : 'Plan confirmed. You can carry on.');
+    return true;
   });
 }
 
@@ -367,7 +450,7 @@ function planRefresh() {
   try { if (navigator.onLine === false) return Promise.resolve(false); } catch (e) { /* assume online */ }
   _planRefreshing = true;
   return cloudClient()
-    .then((c) => c.from('profiles').select('plan, trial_ends_at').eq('id', uid).maybeSingle())
+    .then((c) => c.from('profiles').select('*').eq('id', uid).maybeSingle())   // V143: * — lapsed_at when the database has it, nothing breaks when it doesn't
     .then((res) => {
       const row = res && !res.error ? res.data : null;
       if (!row || _planUid() !== uid) return false;   // signed out (or switched) meanwhile
@@ -485,7 +568,7 @@ function billingRead() {
       const info = res && !res.error ? res.data : null;
       if (!info || typeof info !== 'object') { b.error = 'read'; return false; }
       b.info = info; b.readAt = Date.now();
-      try { planNote({ plan: info.plan, trial_ends_at: info.trial_ends_at }); } catch (e) { /* record only */ }
+      try { planNote({ plan: info.plan, trial_ends_at: info.trial_ends_at, lapsed_at: info.lapsed_at }); } catch (e) { /* record only */ }
       if (state.cloud) { state.cloud.plan = info.plan || null; state.cloud.trialEndsAt = info.trial_ends_at || null; }
       return true;
     })
@@ -762,6 +845,7 @@ function billingRowStatus() {
     const st = planCurrent();
     const b = _bill();
     if (st.phase === 'locked') return 'Locked — renew';
+    if (st.unchecked) return 'Check needed';     // V143 (4A)
     if (st.phase === 'grace') return 'Ended — renew';
     const rec = planRecord();
     if (rec && rec.plan === 'comped') return 'Free';

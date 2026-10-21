@@ -713,7 +713,7 @@ function cloudCheckConnection() {
   _cloudSet({ busy: true, message: '' });
   _cloudRepaint();
   return cloudClient()
-    .then((c) => c.from('profiles').select('plan, trial_ends_at').maybeSingle())
+    .then((c) => c.from('profiles').select('*').maybeSingle())   // V143: * — carries lapsed_at once the database has it
     .then((res) => {
       if (res && res.error) {
         _cloudSet({ busy: false, message: cloudErrorMessage(res.error, 'check') });

@@ -824,6 +824,7 @@ registerActions({
   'export-all': () => { if (typeof exportAllOpen === 'function') exportAllOpen(); },
   // V127: Renew now (plan.js, optional — MAP rule 6).
   'plan-renew': () => { if (typeof planRenew === 'function') planRenew(); },
+  'plan-check': () => { if (typeof planCheckNow === 'function') planCheckNow(); },   // V143 (4A)
   // V142: paying (plan.js, optional). Each opens Stripe's window inside the tap.
   'billing-subscribe':   () => { if (typeof billingSubscribe === 'function') billingSubscribe(); },
   'billing-manage':      () => { if (typeof billingManage === 'function') billingManage(''); },

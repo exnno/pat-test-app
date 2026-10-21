@@ -1,4 +1,4 @@
-# PATGo — Code Map (V142)
+# PATGo — Code Map (V143)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -252,7 +252,17 @@ is discoverable from the file you happen to be editing.
     everything (exportall.js builds certificates already made with
     `buildReportDoc` directly — keep it that way), backup, CSV, sync. plan.js
     fails OPEN everywhere (missing file, bad record, unknown plan = no lock).
-    Harness 65.
+    Harness 65. V143: `planLocked()` = locked OR held (`unchecked`, 4A: no plan
+    read for PLAN_CHECK_DAYS) — the same doors, sheet "Plan check needed" (82b).
+
+28. **The server's line (V143).** supabase/v143-enforcement.sql `can_upload()`
+    refuses a business's uploads 14 days after its plan ended = PLAN_GRACE_DAYS
+    (config.js) + 7 days' catch-up. ⚠ Change one, change both (82g checks the
+    sum). The refusal says `patgo_plan_locked` (errcode 42501); sync.js
+    `_syncIsPlanRefusal` keys on that word. A NEW UPLOAD PATH: its table needs
+    `plan_guard` (or a storage policy calling `can_upload_files()` — a policy may
+    not call a function closed to `authenticated`, or EVERY upload is refused),
+    and its errors must reach `_syncNotePlanRefusal`.
 
 27. **The stale-phone check (V128).** A phone learns of a delete made elsewhere
     only from its marker (`deleted = true` row). The server's clean-up job may
@@ -1348,6 +1358,13 @@ passes `chk` {jobs, rec, ph, ask, at} to `_syncPull`, `_syncRecordsHalf` →
 table's `seenAllAt` only when unblocked. `_syncStateFor` starts a NEW account's
 state seen-whole. Held "deleted-elsewhere" with no row at all → "use the cloud"
 deletes (syncHeldResolve, `_syncHeldResolveRecord`).
+⚠ V143 (rule 28): section "the server refusing a locked business's changes" before
+`syncErrorMessage`. A refusal (`_syncIsPlanRefusal`: the word, or a bare row-level
+refusal while plan.js says locked) → `_syncNotePlanRefusal` → `_syncPlanRefusedUid`
+(per account, memory only). Noted from the jobs push (syncPush), records
+(`records.error`) and photos (fail-soft catch). While `syncPlanRefused()`: `_syncRun`'s
+`paused` — reads only (no records/jobs/photos up); Sync now (`manual`) tries once.
+Cleared by plan.js `planNote` → `syncPlanChecked(true)` → `syncPushSoon`. Harness 82c.
 ⚠ V111: every table read names its owner — rule 18 (comment above
 `_syncCurrentUserId`; harness 48).
 V104: the settings_work row also carries `readingsCheck` (default ON — read
@@ -1590,6 +1607,13 @@ when past_due) while `billingAvailable()`; the email only where there is no clou
 = the Settings row (render-settings.js). Opened → `setView` (session.js) calls `billingRead`.
 Actions in **dispatch.js**: billing-subscribe / -manage / -card / -cancel-wait (guarded).
 Server: **supabase/functions/** (below). Harness 81a–81c, 81e; M1393–M1420.
+V143: ENFORCEMENT. Record keeps `lapsedAt` (server's lapsed_at — all three reads: planRefresh /
+cloud.js `cloudCheckConnection` read `profiles` with `select('*')`; `billingRead` passes it);
+`planStatus` = `_planPhase` + `unchecked` (PLAN_CHECK_DAYS, never comped/locked). Held →
+`planShowUnchecked` / Check now (`planCheckNow`, `plan-check` in **dispatch.js**). ⚠ Mutual
+coupling with **sync.js** (rule 28): `planNote` → `syncPlanChecked(!planLocked())`;
+`planLineText` reads `syncPlanRefused()`; sync.js calls `_planRepaint`. Each typeof-guarded.
+Harness 82a–82c; M1440–M1477.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This
@@ -1804,6 +1828,16 @@ another file having parsed. Don't "DRY" this.
   NOT granted to `authenticated` (column grants): never `grant select on organisations`
   whole again. `billing_apply` = Stripe's word → plan (comped kept; a trial never cut
   short; an old subscription never ends a live one). Isolation 18a–18f.
+  V143: `supabase/v143-enforcement.sql` (self-checks C1–C6 + C3b; schema.sql carries every
+  line between "when a paid plan lapsed" and "self-check" — 82g). `organisations.lapsed_at`
+  stamped by trigger `org_lapsed_at` (entering lapsed; cleared otherwise), copied to
+  `profiles.lapsed_at` by V142's copy triggers (now with the date), in `my_billing`.
+  `can_upload(org)` (rule 28) → `plan_guard` BEFORE INSERT/UPDATE on sessions / records /
+  photos (⚠ name sorts after `org_stamp`); storage add/change policies → `can_upload_files()`
+  (security definer; the only one granted to `authenticated`). Dashboard / server (no
+  auth.uid()) never refused. Isolation 19a–19h (B lapsed for the test, put back).
+  ⚠ Re-running v142-billing.sql AFTER V143 puts back V142's copy triggers and my_billing
+  (no date) — run v143-enforcement.sql again after it.
   `supabase/close-account.sql` (V142 round) — the account-closure procedure; refuses
   team accounts. ⚠ From V142: cancel the Stripe subscription first (step 2).
 - `supabase/functions/` (V142) — the three Edge Functions (Deno, plain JS, no packages):
