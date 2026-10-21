@@ -731,3 +731,271 @@ revoke all on function public.phones_stamp() from public, anon, authenticated;
 select cron.schedule('patgo-cleanup', '17 2 * * 0', 'select public.run_cleanup()');
 
 -- Done. Next: run supabase/isolation-test.sql and check all rows say PASS.
+
+
+-- ================================================================ V142
+-- Paying: the plan belongs to the business; Stripe's side. Existing projects:
+-- supabase/v142-billing.sql (plus self-checks B1–B6). Kept in step with it by
+-- harness group 81.
+
+-- ------------------------------------------------------------ the business's plan
+alter table public.organisations add column if not exists plan text not null default 'trial';
+alter table public.organisations add column if not exists trial_ends_at timestamptz;
+alter table public.organisations add column if not exists stripe_customer text;
+alter table public.organisations add column if not exists stripe_subscription text;
+alter table public.organisations add column if not exists billing_status text;
+alter table public.organisations add column if not exists billing_interval text;
+alter table public.organisations add column if not exists period_end timestamptz;
+alter table public.organisations add column if not exists cancel_at_period_end boolean not null default false;
+alter table public.organisations add column if not exists billing_at timestamptz;
+
+do $$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'organisations_plan_check') then
+    alter table public.organisations add constraint organisations_plan_check
+      check (plan in ('trial','active','lapsed','comped'));
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'organisations_interval_check') then
+    alter table public.organisations add constraint organisations_interval_check
+      check (billing_interval is null or billing_interval in ('month','year'));
+  end if;
+end $$;
+create unique index if not exists organisations_stripe_customer on public.organisations (stripe_customer)
+  where stripe_customer is not null;
+create index if not exists organisations_stripe_subscription on public.organisations (stripe_subscription)
+  where stripe_subscription is not null;
+
+-- Once: each business takes its plan from its owner. Run again, it copies the
+-- same values back (the profiles are copies of the business by then).
+update public.organisations o
+set plan = p.plan, trial_ends_at = p.trial_ends_at
+from public.memberships m
+join public.profiles p on p.id = m.user_id
+where m.org_id = o.id and m.role = 'owner'
+  and (o.plan is distinct from p.plan or o.trial_ends_at is distinct from p.trial_ends_at);
+
+
+-- ------------------------------------------------------------ the copies on profiles
+-- The business → every member whose default it is. A copy that already matches
+-- is left alone, so this never loops with the trigger below.
+create or replace function public.org_plan_to_members()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  update public.profiles p
+  set plan = new.plan, trial_ends_at = new.trial_ends_at
+  where p.id in (select m.user_id from public.memberships m where m.org_id = new.id and m.is_default)
+    and (p.plan is distinct from new.plan or p.trial_ends_at is distinct from new.trial_ends_at);
+  return null;
+end;
+$$;
+drop trigger if exists org_plan_to_members on public.organisations;
+create trigger org_plan_to_members
+  after update of plan, trial_ends_at on public.organisations
+  for each row execute function public.org_plan_to_members();
+
+-- Joining a business, or changing which one is the default: the profile copies it.
+create or replace function public.member_plan_copy()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if new.is_default then
+    update public.profiles p
+    set plan = o.plan, trial_ends_at = o.trial_ends_at
+    from public.organisations o
+    where p.id = new.user_id and o.id = new.org_id
+      and (p.plan is distinct from o.plan or p.trial_ends_at is distinct from o.trial_ends_at);
+  end if;
+  return null;
+end;
+$$;
+drop trigger if exists member_plan_copy on public.memberships;
+create trigger member_plan_copy
+  after insert or update of is_default, org_id on public.memberships
+  for each row execute function public.member_plan_copy();
+
+-- A plan set by hand on a profile (the old way) goes up to the person's default
+-- business, and from there to every member. A copy the triggers above write
+-- already matches its business, so it goes no further (no loop).
+create or replace function public.profile_plan_up()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if new.plan is distinct from old.plan or new.trial_ends_at is distinct from old.trial_ends_at then
+    update public.organisations o
+    set plan = new.plan, trial_ends_at = new.trial_ends_at
+    where o.id = public.default_org(new.id)
+      and (o.plan is distinct from new.plan or o.trial_ends_at is distinct from new.trial_ends_at);
+  end if;
+  return null;
+end;
+$$;
+drop trigger if exists profile_plan_up on public.profiles;
+create trigger profile_plan_up
+  after update of plan, trial_ends_at on public.profiles
+  for each row execute function public.profile_plan_up();
+
+-- A new login: its business starts the 30-day trial (V113's sign-up, plus the
+-- business's own plan). The profile copies it when the membership is made.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer set search_path = ''
+as $$
+declare o uuid; ends timestamptz := now() + interval '30 days';
+begin
+  insert into public.profiles (id, email, plan, trial_ends_at)
+  values (new.id, new.email, 'trial', ends)
+  on conflict (id) do nothing;
+  if not exists (select 1 from public.memberships m where m.user_id = new.id) then
+    insert into public.organisations (plan, trial_ends_at) values ('trial', ends) returning id into o;
+    insert into public.memberships (org_id, user_id, role, is_default) values (o, new.id, 'owner', true);
+  end if;
+  return new;
+end;
+$$;
+
+
+-- ------------------------------------------------------------ who sees what
+-- Members read their business's plan and Stripe status; the Stripe ids only the
+-- server functions (secret key) ever see.
+revoke select on public.organisations from authenticated;
+grant select (id, name, created_at, updated_at, plan, trial_ends_at, billing_status,
+              billing_interval, period_end, cancel_at_period_end, billing_at)
+  on public.organisations to authenticated;
+
+-- The Subscription page's one read: the signed-in person's default business.
+-- can_manage: only its Owner subscribes or opens the billing page.
+create or replace function public.my_billing()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object(
+    'plan', o.plan,
+    'trial_ends_at', o.trial_ends_at,
+    'status', o.billing_status,
+    'interval', o.billing_interval,
+    'period_end', o.period_end,
+    'cancel_at_period_end', o.cancel_at_period_end,
+    'has_customer', o.stripe_customer is not null,
+    'has_subscription', o.stripe_subscription is not null,
+    'role', m.role,
+    'can_manage', m.role = 'owner')
+  from public.memberships m
+  join public.organisations o on o.id = m.org_id
+  where m.user_id = auth.uid() and m.is_default
+  limit 1
+$$;
+revoke all on function public.my_billing() from public, anon;
+grant execute on function public.my_billing() to authenticated;
+
+
+-- ------------------------------------------------------------ the server's side
+-- Called only by the server functions (Edge Functions, secret key = service_role).
+
+-- Everything the checkout and billing-page functions need about a login.
+create or replace function public.billing_context(u uuid)
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object(
+    'org_id', o.id,
+    'role', m.role,
+    'plan', o.plan,
+    'trial_ends_at', o.trial_ends_at,
+    'stripe_customer', o.stripe_customer,
+    'stripe_subscription', o.stripe_subscription,
+    'status', o.billing_status)
+  from public.memberships m
+  join public.organisations o on o.id = m.org_id
+  where m.user_id = u and m.is_default
+  limit 1
+$$;
+
+-- Keeps the first Stripe customer made for a business (two taps at once both
+-- making one: the second is told the first, and its own is never used).
+create or replace function public.billing_set_customer(o uuid, cus text)
+returns text language sql security definer set search_path = '' as $$
+  update public.organisations
+  set stripe_customer = coalesce(stripe_customer, cus)
+  where id = o
+  returning stripe_customer
+$$;
+
+-- What Stripe says about a subscription → the business's plan. The server
+-- function always re-reads the subscription from Stripe first, so this is
+-- always Stripe's latest word, whatever order its messages arrive in.
+--   trialing / active / past_due          → active (still paying, or retrying)
+--   canceled / unpaid / incomplete_expired / paused → lapsed, if it WAS paying;
+--                                            a trial runs to its own end instead
+--   incomplete                            → no change (checkout not finished)
+-- A comped business keeps its plan; only Stripe's details are recorded.
+-- A message about an OLD subscription never ends a newer, live one.
+create or replace function public.billing_apply(
+  o uuid, cus text, sub text, status text, every text,
+  ends timestamptz, cancelling boolean)
+returns text language plpgsql security definer set search_path = '' as $$
+declare
+  r public.organisations%rowtype;
+  live boolean := status in ('trialing','active','past_due');
+  over boolean := status in ('canceled','unpaid','incomplete_expired','paused');
+  next_plan text;
+begin
+  if o is not null then
+    select * into r from public.organisations where id = o for update;
+  end if;
+  if r.id is null and cus is not null then
+    select * into r from public.organisations where stripe_customer = cus for update;
+  end if;
+  if r.id is null then return 'no business'; end if;
+  if r.stripe_customer is not null and cus is not null and r.stripe_customer <> cus then
+    return 'another customer';
+  end if;
+  if r.stripe_subscription is not null and sub is distinct from r.stripe_subscription
+     and not live and r.billing_status in ('trialing','active','past_due') then
+    return 'old subscription';
+  end if;
+
+  next_plan := r.plan;
+  if r.plan <> 'comped' then
+    if live then next_plan := 'active';
+    elsif over and r.plan = 'active' then next_plan := 'lapsed';
+    end if;
+  end if;
+
+  update public.organisations set
+    stripe_customer      = coalesce(r.stripe_customer, cus),
+    stripe_subscription  = coalesce(sub, r.stripe_subscription),
+    billing_status       = status,
+    billing_interval     = case when every in ('month','year') then every else r.billing_interval end,
+    period_end           = ends,
+    cancel_at_period_end = coalesce(cancelling, false),
+    billing_at           = now(),
+    plan                 = next_plan
+  where id = r.id;
+  return 'plan ' || next_plan;
+end;
+$$;
+
+-- One line per message from Stripe. Table Editor → billing_events.
+create table if not exists public.billing_events (
+  id           text primary key,          -- Stripe's event id (evt_…)
+  type         text not null,
+  org_id       uuid,
+  result       text,
+  received_at  timestamptz not null default now()
+);
+alter table public.billing_events enable row level security;
+revoke all on public.billing_events from anon, authenticated;
+
+-- Written AFTER the change is made, so a message that failed half-way is simply
+-- handled again when Stripe retries it (handling one twice changes nothing: the
+-- subscription is always re-read from Stripe).
+create or replace function public.billing_event_log(eid text, etype text, o uuid, outcome text)
+returns void language sql security definer set search_path = '' as $$
+  insert into public.billing_events (id, type, org_id, result) values (eid, etype, o, outcome)
+  on conflict (id) do update set org_id = excluded.org_id, result = excluded.result, received_at = now()
+$$;
+
+revoke all on function public.billing_context(uuid), public.billing_set_customer(uuid, text),
+                       public.billing_apply(uuid, text, text, text, text, timestamptz, boolean),
+                       public.billing_event_log(text, text, uuid, text)
+  from public, anon, authenticated;
+grant execute on function public.billing_context(uuid), public.billing_set_customer(uuid, text),
+                          public.billing_apply(uuid, text, text, text, text, timestamptz, boolean),
+                          public.billing_event_log(text, text, uuid, text)
+  to service_role;
+grant select, insert, update on public.billing_events to service_role;

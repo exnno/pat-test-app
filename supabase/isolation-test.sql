@@ -11,6 +11,8 @@
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
+-- V142: CHECKS 18a–18f NEED supabase/v142-billing.sql RUN FIRST (18a names it
+-- if not). Nothing is changed: B only tries.
 -- V133: CHECKS 17a–17g NEED supabase/v133-cleanup.sql RUN FIRST (17a names it
 -- if not). Test phone rows are removed afterwards.
 -- V113: CHECKS 9–16 NEED supabase/v113-organisations.sql RUN FIRST (9a names it
@@ -634,6 +636,68 @@ begin
     res := res || array['17g|A''s phone and the job''s mode are unchanged|'
                   || case when k = 1 and n = 1 then 'PASS|mode: ' || coalesce(g, '?') else 'FAIL|' || case when k <> 1 then 'A''s phone changed' else 'the mode changed' end end];
     delete from public.phones where phone_id like 'iso-test-%';
+  end if;
+
+  -- ================================================================ V142
+  -- Paying: the plan on the business, Stripe's side closed to the app.
+  if to_regprocedure('public.my_billing()') is null then
+    res := res || array['18a|billing|FAIL|run supabase/v142-billing.sql first'];
+  else
+    org_a := public.default_org(a);
+    org_b := public.default_org(b);
+    select plan into g from public.organisations where id = org_a;
+    select plan into rn from public.organisations where id = org_b;
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    -- 18a control: B reads B's own plan.
+    begin
+      r := public.my_billing()->>'plan';
+      res := res || array['18a|control: B reads B''s own plan|' || case when r is not distinct from rn then 'PASS|' || coalesce(r, '?') else 'FAIL|read ' || coalesce(r, 'nothing') end];
+    exception when others then
+      res := res || array['18a|control: B reads B''s own plan|FAIL|' || sqlerrm];
+    end;
+    -- 18b: the Stripe ids are never readable from the app, even B's own.
+    begin
+      select count(stripe_customer) into n from public.organisations where id = org_b;
+      res := res || array['18b|B cannot read the Stripe ids|FAIL|read them'];
+    exception when others then
+      res := res || array['18b|B cannot read the Stripe ids|PASS|rejected'];
+    end;
+    -- 18c: B cannot see A's business or its plan.
+    begin
+      select count(*) into n from public.organisations where id = org_a;
+      res := res || array['18c|B cannot see A''s business|' || case when n = 0 then 'PASS|' else 'FAIL|saw it' end];
+    exception when others then
+      res := res || array['18c|B cannot see A''s business|PASS|rejected'];
+    end;
+    -- 18d: B cannot change a plan — the business's or the profile's copy.
+    k := 0;
+    begin
+      update public.organisations set plan = 'comped' where id in (org_a, org_b);
+      get diagnostics n = row_count; k := k + n;
+    exception when others then null;
+    end;
+    begin
+      update public.profiles set plan = 'comped' where id in (a, b);
+      get diagnostics n = row_count; k := k + n;
+    exception when others then null;
+    end;
+    res := res || array['18d|B cannot change any plan|' || case when k = 0 then 'PASS|' else 'FAIL|' || k || ' changed' end];
+    -- 18e: the server's side (secret key only) is closed to the app.
+    k := 0;
+    begin perform public.billing_apply(org_b, 'cus_iso', 'sub_iso', 'active', 'year', now(), false); k := k + 1; exception when others then null; end;
+    begin perform public.billing_context(a); k := k + 1; exception when others then null; end;
+    begin perform public.billing_set_customer(org_b, 'cus_iso'); k := k + 1; exception when others then null; end;
+    begin perform public.billing_event_log('evt_iso', 'iso', org_b, 'iso'); k := k + 1; exception when others then null; end;
+    begin select count(*) into n from public.billing_events; k := k + 1; exception when others then null; end;
+    res := res || array['18e|B cannot reach the server''s billing side|' || case when k = 0 then 'PASS|5 refused' else 'FAIL|' || k || ' of 5 allowed' end];
+    execute 'reset role';
+    perform set_config('request.jwt.claims', '', true);
+    -- 18f: nothing changed.
+    select count(*) into n from public.organisations where (id = org_a and plan is not distinct from g)
+                                                       or (id = org_b and plan is not distinct from rn);
+    select count(*) into k from public.organisations where id in (org_a, org_b) and stripe_customer = 'cus_iso';
+    res := res || array['18f|A''s and B''s plans are unchanged|' || case when n = 2 and k = 0 then 'PASS|' else 'FAIL|' || n || ' of 2 unchanged' end];
   end if;
 
   delete from public.sessions where id like 'iso-test-%';
