@@ -261,6 +261,24 @@ bug; leaving it red trains everyone to ignore the suite.
   it in state to prove the search looks. The stub has no form submission:
   78e fires `submit` at #app directly; the Go key → click → submit path was
   seen in Chromium (Playwright, not committed).
+  V140 (group 79): Google sign-in. Three traps, all met building it:
+  1. A fake access token must be real base64url — a 5-character signature
+     (length ≡ 1 mod 4) makes the library refuse it ("JWT not in base64url
+     format"), which reads exactly like the hand-over being dropped.
+  2. Build the fake server's request record from the raw header object, not
+     `new Headers(init.headers)`: if that throws, fetch rejects, the library
+     retries as if the signal dropped, and the test times out with no clue.
+  3. The real library takes longer than a few ms (locks, the session check):
+     wait with `until(cond)`, never a fixed `tick(15)`. An "ignored" check
+     instead asserts `busy` stayed false AT ONCE (an accepted hand-over sets
+     it synchronously) and then waits the full SETTLE — a short wait alone
+     would pass on broken code.
+  `installWindow` records each `window.open` so 79b/79d can prove the window
+  opened INSIDE the tap (checked before any await). The landing page's own
+  script is run in a vm of its own (`landing()`), its timers held until its
+  first message has been read. The real pop-up → landing page → hand-over
+  round trip was run in Chromium against a stand-in Supabase (Playwright, not
+  committed): 26/26, both themes.
 
 ---
 

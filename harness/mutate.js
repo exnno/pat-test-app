@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V139';",
-    to:   "const APP_VERSION = 'V138';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V140';",
+    to:   "const APP_VERSION = 'V139';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 78e see it.
-    from: '        <p><strong>V137</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V135</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V136</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 78e)',
+    // oldest, so 15j's check still matches; 09w and 79e see it.
+    from: '        <p><strong>V138</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V136</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V137</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 79e)',
   },
 
   {
@@ -6101,9 +6101,10 @@ const MUTATIONS = [
     // V137: welcome rolled (one line) — re-aimed at it; 76f pinned it.
     // V138: welcome rolled (one line) — re-aimed at it; 77e pinned it.
     // V139: welcome rolled (one line) — re-aimed at it; 78e pins it.
-    from: "<li><strong>Sign in with a password.</strong>",
+    // V140: welcome rolled (one line) — re-aimed at it; 79e pins it.
+    from: "<li><strong>Sign in with Google.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (78e)",
+    why:  "11A: the welcome says plainly what changed on screen (79e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8580,27 +8581,28 @@ const MUTATIONS = [
     name: "M1221 (V132) What's new not rolled",
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
-    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed.
-    from: "const WELCOME_VERSION = 'V139';",
-    to:   "const WELCOME_VERSION = 'V138';",
-    why:  "a behaviour release says what's new (78e)",
+    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed.
+    from: "const WELCOME_VERSION = 'V140';",
+    to:   "const WELCOME_VERSION = 'V139';",
+    why:  "a behaviour release says what's new (79e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
     file: "render-core.js",
-    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's. V138: at V138's. V139: at V139's.
-    from: "Signing in with a code still works too.</li>\n",
-    to:   "Signing in with a code still works too.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (78e)",
+    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's. V138: at V138's. V139: at V139's. V140: at V140's.
+    from: "different from your PATGo one.</li>\n",
+    to:   "different from your PATGo one.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (79e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
     file: "render-help.js",
     // V135: V132's line rolled off — re-aimed at V135's. V136: at V136's.
     // V139: V136's line rolled off — re-aimed at V139's own.
-    from: "Cloud accounts can sign in with an email and password, set or change it on the Account page",
+    // V140: re-aimed at V140's own (V139's moves to M1259).
+    from: "Cloud accounts can sign in with Google. Connect your Google account once",
     to:   "Better",
-    why:  "the About page must say what changed in this version (78e)",
+    why:  "the About page must say what changed in this version (79e)",
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8708,16 +8710,17 @@ const MUTATIONS = [
     // V136: V133's line rolled off — re-aimed at V135's, still in the window.
     // V138: V135's line rolled off — re-aimed at V136's, the oldest now.
     // V139: V136's line rolled off — re-aimed at V137's, the oldest now.
-    from: "Show me how: a link under the title of each Settings page a tutorial covers",
+    // V140: V137's line rolled off — re-aimed at V138's, the oldest now.
+    from: "Show me how now starts on the page you opened it from",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (78e)",
+    why:  "the About page keeps the last three versions' lines (79e)",
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
     file: "render-help.js",
     from: "A signed-in phone also tells the cloud which version of the app it is running. ",
     to:   "",
-    why:  "V130's honest Privacy note stays honest (78e)",
+    why:  "V130's honest Privacy note stays honest (79e)",
   },
 
 
@@ -8847,14 +8850,14 @@ const MUTATIONS = [
     file: "data.js",
     from: "pages: ['settingsTutorials', 'settingsAbout',",
     to:   "pages: ['settingsAbout',",
-    why:  "6A: Settings → Help → Tutorials (78e)",
+    why:  "6A: Settings → Help → Tutorials (79e)",
   },
   {
     name: "M1258 (V134) search can't find the tutorials",
     file: "data.js",
     from: "aliases: 'tutorial tutorials practice practise job learn",
     to:   "aliases: 'learn",
-    why:  "6A: findable in Settings search (78e)",
+    why:  "6A: findable in Settings search (79e)",
   },
   {
     name: "M1259 (V134; re-aimed V137) the About changelog loses this version's line",
@@ -8862,16 +8865,17 @@ const MUTATIONS = [
     // V137: V134's line rolled off — re-aimed at V137's own.
     // V138: re-aimed at V138's own (V137's is still pinned by 77e).
     // V139: V138's line stays (still in the window); M1223 holds V139's own.
-    from: "Show me how now starts on the page you opened it from",
+    // V140: V138's line is the oldest now (M1238) — re-aimed at V139's, still in the window.
+    from: "Cloud accounts can sign in with an email and password, set or change it on the Account page",
     to:   "Better",
-    why:  "the About page must say what changed in this version (78e)",
+    why:  "the About page must say what changed in this version (79e)",
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
     file: "render-core.js",
     from: "New here? Try the practice job.",
     to:   "New here? Take the 30-second tour.",
-    why:  "6A: setup offers the practice job (78e)",
+    why:  "6A: setup offers the practice job (79e)",
   },
   {
     name: "M1261 (V134) Quit always lands on the Jobs list",
@@ -8990,10 +8994,10 @@ const MUTATIONS = [
   {
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
-    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e).
-    from: "const CACHE_VERSION = 'pat-v139';",
-    to:   "const CACHE_VERSION = 'pat-v138';",
-    why:  "a release needs its cache bump or phones never get it (78e)",
+    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e).
+    from: "const CACHE_VERSION = 'pat-v140';",
+    to:   "const CACHE_VERSION = 'pat-v139';",
+    why:  "a release needs its cache bump or phones never get it (79e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -9067,7 +9071,7 @@ const MUTATIONS = [
     // V136: the page lists two headings (rowsFor) — re-aimed.
     from: "const rows = rowsFor(all.filter((d) => d.settings));",
     to:   "const rows = rowsFor(all.filter((d) => false));",
-    why:  "2A: listed on the Tutorials page (78e)",
+    why:  "2A: listed on the Tutorials page (79e)",
   },
   {
     name: "M1288 (V135) the Tutorials rows aren't wired",
@@ -9407,7 +9411,7 @@ const MUTATIONS = [
     file: "styles.css",
     from: ".tut-howto-row { display: flex; justify-content: center; margin: -4px 0 8px; }",
     to:   "",
-    why:  "2A: one centred line under the title (78e)",
+    why:  "2A: one centred line under the title (79e)",
   },
   // ---- V138 (1A 2A 3A, all defaults): Show me how starts on the page. Group 77 + M1336–M1343. ----
   {
@@ -9513,14 +9517,14 @@ const MUTATIONS = [
     file: "dispatch.js",
     from: "  if (e && typeof e.preventDefault === 'function') e.preventDefault();\n",
     to:   "",
-    why:  "Sign in / Go would submit the form and reload the app mid sign-in (78e)",
+    why:  "Sign in / Go would submit the form and reload the app mid sign-in (79e)",
   },
   {
     name: "M1351 (V139) the password sign-in tap loses its typeof guard",
     file: "dispatch.js",
     from: "'cloud-password-sign-in': () => { if (typeof cloudPasswordSignIn === 'function') cloudPasswordSignIn(); },",
     to:   "'cloud-password-sign-in': () => { cloudPasswordSignIn(); },",
-    why:  "MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (78e)",
+    why:  "MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (79e)",
   },
   {
     name: "M1352 (V139) the password box is not marked current-password",
@@ -9560,9 +9564,164 @@ const MUTATIONS = [
   {
     name: "M1357 (V139) too many password tries says codes",
     file: "cloud.js",
-    from: "    if (stage === 'password' || stage === 'new-password') return 'Too many tries. Wait a few minutes, then try again.';\n",
+    // V140: the line gained 'google' — re-aimed; still 78b's (and 79c's).
+    from: "    if (stage === 'password' || stage === 'new-password' || stage === 'google') return 'Too many tries. Wait a few minutes, then try again.';\n",
     to:   "",
     why:  "no code was asked for — the line must say tries (78b)",
+  },  // ---- V140 (1A 2A 3A, 4→A): Google sign-in, Connect / Disconnect Google. Group 79 + M1358–M1379. ----
+  {
+    name: "M1358 (V140) the Google window is opened after the wait, not inside the tap",
+    file: "cloud.js",
+    from: "  const w = _cloudGoogleOpenWindow();   // ⚠ synchronously, inside the tap\n",
+    to:   "  const w = { closed: false, location: {}, close() {} };\n",
+    why:  "iOS blocks a window opened after any wait — it must open inside the tap (79b)",
+  },
+  {
+    name: "M1359 (V140) a hand-over from any origin is accepted",
+    file: "cloud.js",
+    from: "  try { if (e.origin !== location.origin) return; } catch { return; }\n",
+    to:   "",
+    why:  "only our own landing page may hand a session to the app (79c)",
+  },
+  {
+    name: "M1360 (V140) a hand-over is taken up with no Google tap waiting",
+    file: "cloud.js",
+    from: "  if (!cloudAvailable() || !kind || state.cloud.busy) return Promise.resolve(false);\n  _cloudGoogleCloseWindow();",
+    to:   "  if (!cloudAvailable() || state.cloud.busy) return Promise.resolve(false);\n  _cloudGoogleCloseWindow();",
+    why:  "nothing asked for, or Cancelled: a hand-over must sign nobody in (79c)",
+  },
+  {
+    name: "M1361 (V140) the second copy of the hand-over is taken up too",
+    file: "cloud.js",
+    from: "  if (!cloudAvailable() || !kind || state.cloud.busy) return Promise.resolve(false);\n  _cloudGoogleCloseWindow();",
+    to:   "  if (!cloudAvailable() || !kind) return Promise.resolve(false);\n  _cloudGoogleCloseWindow();",
+    why:  "postMessage AND the channel both deliver — one sign-in, not two (79b)",
+  },
+  {
+    name: "M1362 (V140) Google comes back to the app page, not the landing page",
+    file: "cloud.js",
+    from: "const CLOUD_GOOGLE_RETURN_PAGE = 'signin-done.html';",
+    to:   "const CLOUD_GOOGLE_RETURN_PAGE = 'index.html';",
+    why:  "the landing page is what hands the session back and closes the window (79b 79d)",
+  },
+  {
+    name: "M1363 (V140) Google picks the last account without asking",
+    file: "cloud.js",
+    from: "                    queryParams: { prompt: 'select_account' } };   // always let them pick the account",
+    to:   "                    queryParams: {} };",
+    why:  "an engineer with a personal and a work Google account must be able to choose (79b)",
+  },
+  {
+    name: "M1364 (V140) the landing page skips the channel",
+    file: "signin-done.html",
+    from: "        ch.postMessage(msg);",
+    to:   "",
+    why:  "the second route in, for when iOS gives the window no opener (79b)",
+  },
+  {
+    name: "M1365 (V140) Connect Google signs in instead of linking",
+    file: "cloud.js",
+    from: "      ? c.auth.linkIdentity({ provider: 'google', options })",
+    to:   "      ? c.auth.signInWithOAuth({ provider: 'google', options })",
+    why:  "4→A: connecting must link the Google login to THIS account (79d)",
+  },
+  {
+    name: "M1366 (V140) signing in through Google doesn't show Google as connected",
+    file: "cloud.js",
+    from: "    google: _cloudGoogleEmail(user), googlePending: '', googleOff: false });   // V140",
+    to:   "    google: '', googlePending: '', googleOff: false });   // V140",
+    why:  "the Account page must say which Google login is connected (79b)",
+  },
+  {
+    name: "M1367 (V140) boot forgets the connected Google address",
+    file: "cloud.js",
+    from: "  state.cloud.google = stored.google;   // V140: the connected Google address, or ''\n",
+    to:   "",
+    why:  "offline, the Account page still shows Google from the stored session (79a)",
+  },
+  {
+    name: "M1368 (V140) a connected Google login isn't shown after Connect",
+    file: "cloud.js",
+    from: "        const google = _cloudGoogleEmail(user);",
+    to:   "        const google = '';",
+    why:  "4→A: after Connect the address must show, with Disconnect (79d)",
+  },
+  {
+    name: "M1369 (V140) Disconnect doesn't refresh the stored session",
+    file: "cloud.js",
+    from: "        return c.auth.refreshSession().catch(() => null);",
+    to:   "        return null;",
+    why:  "the next boot reads Google from the stored session — it must agree (79d)",
+  },
+  {
+    name: "M1370 (V140) Disconnect runs without asking first",
+    file: "cloud.js",
+    from: "  if (!cloudAvailable() || state.cloud.busy || state.cloud.status !== 'signed-in' || !state.cloud.googleOff) {",
+    to:   "  if (!cloudAvailable() || state.cloud.busy || state.cloud.status !== 'signed-in') {",
+    why:  "Disconnect is asked in place first (79d)",
+  },
+  {
+    name: "M1371 (V140) Cancel leaves the app waiting for Google",
+    file: "cloud.js",
+    from: "  _cloudGoogleCloseWindow();\n  _cloudSet({ googlePending: '', message: '' });\n  render();",
+    to:   "  _cloudGoogleCloseWindow();\n  _cloudSet({ message: '' });\n  render();",
+    why:  "after Cancel a late hand-over must be ignored (79c)",
+  },
+  {
+    name: "M1372 (V140) no account for that Google login reads as a generic error",
+    file: "cloud.js",
+    from: "    if (/signup_disabled|signups? not allowed/i.test(both)) {",
+    to:   "    if (false) {",
+    why:  "3A: say plainly there is no PATGo account, and how to connect Google (79c)",
+  },
+  {
+    name: "M1373 (V140) a Google login connected elsewhere reads as a generic error",
+    file: "cloud.js",
+    from: "    if (/identity_already_exists|already linked|already.*another user/i.test(both)) {",
+    to:   "    if (false) {",
+    why:  "4→A: a Gmail already on another account must say so (79c)",
+  },
+  {
+    name: "M1374 (V140) Google works with no signal",
+    file: "cloud.js",
+    from: "  if (_cloudOffline()) {\n    _cloudSet({ message: 'You need a signal to use Google.",
+    to:   "  if (false) {\n    _cloudSet({ message: 'You need a signal to use Google.",
+    why:  "offline: say so, and open no window (79c)",
+  },
+  {
+    name: "M1375 (V140) signing out keeps the Google address on screen",
+    file: "cloud.js",
+    from: "      google: '', googlePending: '', googleOff: false });             // V140",
+    to:   "      googlePending: '', googleOff: false });             // V140",
+    why:  "a signed-out phone must not show someone's Google address (79d)",
+  },
+  {
+    name: "M1376 (V140) Continue with Google becomes the form's submit",
+    file: "render-help.js",
+    from: "<button type=\"button\" class=\"backup-action-btn cloud-google-btn\" id=\"cloud-google\"",
+    to:   "<button type=\"submit\" class=\"backup-action-btn cloud-google-btn\" id=\"cloud-google\"",
+    why:  "Go on the keyboard after typing a password must sign in, not open Google (79a)",
+  },
+  {
+    name: "M1377 (V140) the landing page passes on everything in the address",
+    file: "signin-done.html",
+    from: "          if (KEYS.indexOf(k) !== -1 && !(k in params)) params[k] = v;",
+    to:   "          if (!(k in params)) params[k] = v;",
+    why:  "only the sign-in keys — never Google's own tokens (79b)",
+  },
+  {
+    name: "M1378 (V140) the landing page posts to any origin",
+    file: "signin-done.html",
+    from: "window.opener.postMessage(msg, location.origin);",
+    to:   "window.opener.postMessage(msg, '*');",
+    why:  "a session handed to '*' could be read by whatever page is the opener (79b)",
+  },
+  {
+    name: "M1379 (V140) the landing page leaves the tokens in the address",
+    file: "signin-done.html",
+    from: "    try { history.replaceState(null, '', location.pathname); } catch (e) {}   // wipe the tokens from the address",
+    to:   "",
+    why:  "the session must not sit in the window's address or history (79b)",
   },
 ];
 
