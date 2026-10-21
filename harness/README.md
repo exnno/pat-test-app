@@ -252,6 +252,15 @@ bug; leaving it red trains everyone to ignore the suite.
   different fails. 77d's run-through stops at `done` rather than counting: the
   Backup tutorial's `when` steps are skipped in the harness (no Export
   everything / snapshots block), as 74d allows.
+  V139 (group 78): password sign-in. 78b–78d drive the REAL supabase.umd.js
+  against a fake fetch (as 15f): the password grant, the `PUT /auth/v1/user`.
+  The library adds empty PKCE fields (`code_challenge: null`) to that PUT on
+  its own, so 78d checks that only the password carries a VALUE, not the key
+  list. "The password is kept nowhere" (`kept()`) is state + every storage key
+  + a backup, searched for a canary — a test of where it isn't, so M1349 puts
+  it in state to prove the search looks. The stub has no form submission:
+  78e fires `submit` at #app directly; the Go key → click → submit path was
+  seen in Chromium (Playwright, not committed).
 
 ---
 

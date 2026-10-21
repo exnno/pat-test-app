@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V138';",
-    to:   "const APP_VERSION = 'V137';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V139';",
+    to:   "const APP_VERSION = 'V138';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 77e see it.
-    from: '        <p><strong>V136</strong> &middot; October 2026</p>',
+    // oldest, so 15j's check still matches; 09w and 78e see it.
+    from: '        <p><strong>V137</strong> &middot; October 2026</p>',
     to:   '        <p><strong>V135</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V136</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 77e)',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 78e)',
   },
 
   {
@@ -1169,7 +1169,8 @@ const MUTATIONS = [
   {
     name: 'M155 (V80) sign-in is not followed by a push',
     file: 'cloud.js',
-    from: "          if (typeof syncPushSoon === 'function') { try { syncPushSoon(0, { pull: true }); } catch (e) { console.error(e); } }\n",
+    // V139: re-aimed — the tail moved into _cloudAfterSignIn (shared by code and password).
+    from: "      if (typeof syncPushSoon === 'function') { try { syncPushSoon(0, { pull: true }); } catch (e) { console.error(e); } }\n",
     to:   '',
     why:  'first sign-in on a phone would send nothing until the engineer happened to save or reopen (17p)',
   },
@@ -2250,7 +2251,8 @@ const MUTATIONS = [
   {
     name: "M303 (V85) signing in does not remember the unlock",
     file: "cloud.js",
-    from: "      _cloudRememberUnlock();   // v85 2A\n",
+    // V139: re-aimed — now in _cloudSignedIn (shared by code and password).
+    from: "  _cloudRememberUnlock();   // v85 2A\n",
     to:   "",
     why:  "a phone let in by signing in is locked out again after signing out (2A) (15f)",
   },
@@ -6097,10 +6099,11 @@ const MUTATIONS = [
     // V135: welcome rolled (one line) — re-aimed at it; 74f pinned it.
     // V136: welcome rolled (one line) — re-aimed at it; 75f pinned it.
     // V137: welcome rolled (one line) — re-aimed at it; 76f pinned it.
-    // V138: welcome rolled (one line) — re-aimed at it; 77e pins it.
-    from: "<li><strong>Show me how starts on the page.</strong>",
+    // V138: welcome rolled (one line) — re-aimed at it; 77e pinned it.
+    // V139: welcome rolled (one line) — re-aimed at it; 78e pins it.
+    from: "<li><strong>Sign in with a password.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (77e)",
+    why:  "11A: the welcome says plainly what changed on screen (78e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8577,26 +8580,27 @@ const MUTATIONS = [
     name: "M1221 (V132) What's new not rolled",
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
-    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed.
-    from: "const WELCOME_VERSION = 'V138';",
-    to:   "const WELCOME_VERSION = 'V137';",
-    why:  "a behaviour release says what's new (77e)",
+    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed.
+    from: "const WELCOME_VERSION = 'V139';",
+    to:   "const WELCOME_VERSION = 'V138';",
+    why:  "a behaviour release says what's new (78e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
     file: "render-core.js",
-    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's. V138: at V138's.
-    from: "and its last step tells you Finish brings you back there.</li>\n",
-    to:   "and its last step tells you Finish brings you back there.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (77e)",
+    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's. V138: at V138's. V139: at V139's.
+    from: "Signing in with a code still works too.</li>\n",
+    to:   "Signing in with a code still works too.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (78e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
     file: "render-help.js",
     // V135: V132's line rolled off — re-aimed at V135's. V136: at V136's.
-    from: "Your jobs &amp; the cloud tutorials: the Jobs list, finding and bringing back a job",
+    // V139: V136's line rolled off — re-aimed at V139's own.
+    from: "Cloud accounts can sign in with an email and password, set or change it on the Account page",
     to:   "Better",
-    why:  "the About page must say what changed in this version (77e)",
+    why:  "the About page must say what changed in this version (78e)",
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8703,16 +8707,17 @@ const MUTATIONS = [
     file: "render-help.js",
     // V136: V133's line rolled off — re-aimed at V135's, still in the window.
     // V138: V135's line rolled off — re-aimed at V136's, the oldest now.
-    from: "Your jobs &amp; the cloud tutorials: the Jobs list, finding and bringing back a job",
+    // V139: V136's line rolled off — re-aimed at V137's, the oldest now.
+    from: "Show me how: a link under the title of each Settings page a tutorial covers",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (77e)",
+    why:  "the About page keeps the last three versions' lines (78e)",
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
     file: "render-help.js",
     from: "A signed-in phone also tells the cloud which version of the app it is running. ",
     to:   "",
-    why:  "V130's honest Privacy note stays honest (77e)",
+    why:  "V130's honest Privacy note stays honest (78e)",
   },
 
 
@@ -8842,30 +8847,31 @@ const MUTATIONS = [
     file: "data.js",
     from: "pages: ['settingsTutorials', 'settingsAbout',",
     to:   "pages: ['settingsAbout',",
-    why:  "6A: Settings → Help → Tutorials (77e)",
+    why:  "6A: Settings → Help → Tutorials (78e)",
   },
   {
     name: "M1258 (V134) search can't find the tutorials",
     file: "data.js",
     from: "aliases: 'tutorial tutorials practice practise job learn",
     to:   "aliases: 'learn",
-    why:  "6A: findable in Settings search (77e)",
+    why:  "6A: findable in Settings search (78e)",
   },
   {
     name: "M1259 (V134; re-aimed V137) the About changelog loses this version's line",
     file: "render-help.js",
     // V137: V134's line rolled off — re-aimed at V137's own.
     // V138: re-aimed at V138's own (V137's is still pinned by 77e).
+    // V139: V138's line stays (still in the window); M1223 holds V139's own.
     from: "Show me how now starts on the page you opened it from",
     to:   "Better",
-    why:  "the About page must say what changed in this version (77e)",
+    why:  "the About page must say what changed in this version (78e)",
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
     file: "render-core.js",
     from: "New here? Try the practice job.",
     to:   "New here? Take the 30-second tour.",
-    why:  "6A: setup offers the practice job (77e)",
+    why:  "6A: setup offers the practice job (78e)",
   },
   {
     name: "M1261 (V134) Quit always lands on the Jobs list",
@@ -8984,10 +8990,10 @@ const MUTATIONS = [
   {
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
-    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e).
-    from: "const CACHE_VERSION = 'pat-v138';",
-    to:   "const CACHE_VERSION = 'pat-v137';",
-    why:  "a release needs its cache bump or phones never get it (77e)",
+    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e).
+    from: "const CACHE_VERSION = 'pat-v139';",
+    to:   "const CACHE_VERSION = 'pat-v138';",
+    why:  "a release needs its cache bump or phones never get it (78e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -9061,7 +9067,7 @@ const MUTATIONS = [
     // V136: the page lists two headings (rowsFor) — re-aimed.
     from: "const rows = rowsFor(all.filter((d) => d.settings));",
     to:   "const rows = rowsFor(all.filter((d) => false));",
-    why:  "2A: listed on the Tutorials page (77e)",
+    why:  "2A: listed on the Tutorials page (78e)",
   },
   {
     name: "M1288 (V135) the Tutorials rows aren't wired",
@@ -9401,7 +9407,7 @@ const MUTATIONS = [
     file: "styles.css",
     from: ".tut-howto-row { display: flex; justify-content: center; margin: -4px 0 8px; }",
     to:   "",
-    why:  "2A: one centred line under the title (77e)",
+    why:  "2A: one centred line under the title (78e)",
   },
   // ---- V138 (1A 2A 3A, all defaults): Show me how starts on the page. Group 77 + M1336–M1343. ----
   {
@@ -9459,6 +9465,104 @@ const MUTATIONS = [
     from: ",\n    fromPage: 'That’s Engineer &amp; Tester. To set yours for real, tap <strong>Finish</strong> — it brings you back to this page.' }",
     to:   " }",
     why:  "2A: each of the six says Finish brings you back (77c)",
+  },  // ---- V139 (1A 2A 3A 4B 5A): password sign-in. Group 78 + M1344–M1357. ----
+  {
+    name: "M1344 (V139) the typed password is trimmed before it is sent",
+    file: "cloud.js",
+    from: "  const password = _cloudInputValue('cloud-password');   // never trimmed, never kept",
+    to:   "  const password = _cloudInputValue('cloud-password').trim();   // never trimmed, never kept",
+    why:  "a password with a space at either end could never sign in (78b)",
+  },
+  {
+    name: "M1345 (V139) Forgot asks Supabase for a reset link",
+    file: "cloud.js",
+    from: "  _cloudSet({ forgot: true });\n  return cloudSendCode();",
+    to:   "  _cloudSet({ forgot: true });\n  return cloudClient().then((c) => c.auth.resetPasswordForEmail(_cloudInputValue('cloud-email').trim().toLowerCase())).then(() => true);",
+    why:  "2A: a link opens in Safari, not the installed app — the reset would sign Safari in (78c)",
+  },
+  {
+    name: "M1346 (V139) a Forgot sign-in does not open Choose a new password",
+    file: "cloud.js",
+    from: "      if (forgot) _cloudSet({ pwOpen: true, pwReset: true });\n",
+    to:   "",
+    why:  "2A: signed in by the code, then left to find the password card alone (78c)",
+  },
+  {
+    name: "M1347 (V139) the rule stops asking for a number",
+    file: "cloud.js",
+    from: "  if (!/[0-9]/.test(p)) return 'Add at least one number.';\n",
+    to:   "",
+    why:  "4B: the server (letters and digits) refuses what the app let through (78d)",
+  },
+  {
+    name: "M1348 (V139) the two password boxes need not match",
+    file: "cloud.js",
+    from: "(pw !== again ? 'The two passwords don",
+    to:   "(false ? 'The two passwords don",
+    why:  "a typo in the new password locks the engineer out (78d)",
+  },
+  {
+    name: "M1349 (V139) the password is kept in state",
+    file: "cloud.js",
+    from: "  _cloudSet({ email, forgot: false, busy: true, message: '' });",
+    to:   "  _cloudSet({ email, password, forgot: false, busy: true, message: '' });",
+    why:  "a password must never be kept anywhere it could be painted, stored or backed up (78b)",
+  },
+  {
+    name: "M1350 (V139) a form submit is not cancelled",
+    file: "dispatch.js",
+    from: "  if (e && typeof e.preventDefault === 'function') e.preventDefault();\n",
+    to:   "",
+    why:  "Sign in / Go would submit the form and reload the app mid sign-in (78e)",
+  },
+  {
+    name: "M1351 (V139) the password sign-in tap loses its typeof guard",
+    file: "dispatch.js",
+    from: "'cloud-password-sign-in': () => { if (typeof cloudPasswordSignIn === 'function') cloudPasswordSignIn(); },",
+    to:   "'cloud-password-sign-in': () => { cloudPasswordSignIn(); },",
+    why:  "MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (78e)",
+  },
+  {
+    name: "M1352 (V139) the password box is not marked current-password",
+    file: "render-help.js",
+    from: "autocomplete=\"current-password\"",
+    to:   "autocomplete=\"off\"",
+    why:  "the iPhone would not offer the saved password (78a)",
+  },
+  {
+    name: "M1353 (V139) Sign in is not the form's submit button",
+    file: "render-help.js",
+    from: "<button type=\"submit\" class=\"btn-primary\" id=\"cloud-password-sign-in\"",
+    to:   "<button type=\"button\" class=\"btn-primary\" id=\"cloud-password-sign-in\"",
+    why:  "Go on the keyboard would do nothing, and the iPhone sees no sign-in (78a)",
+  },
+  {
+    name: "M1354 (V139) a wrong password reads as Something went wrong",
+    file: "cloud.js",
+    from: "  if (stage === 'password' && (code === 'invalid_credentials'",
+    to:   "  if (stage === 'nope' && (code === 'invalid_credentials'",
+    why:  "a wrong password (or none set yet) must say so and point at Forgot (78b)",
+  },
+  {
+    name: "M1355 (V139) a password sign-in skips what a sign-in does",
+    file: "cloud.js",
+    from: "      _cloudSignedIn(res && res.data && res.data.user, email);\n      return true;",
+    to:   "      _cloudSet({ busy: false, status: 'signed-in', email });\n      return true;",
+    why:  "both routes must land the same: the Cloud unlock, the round trip (78b)",
+  },
+  {
+    name: "M1356 (V139) the code card is the first one shown",
+    file: "state.js",
+    from: "    useCode: false, forgot: false, pwOpen: false, pwReset: false,",
+    to:   "    useCode: true, forgot: false, pwOpen: false, pwReset: false,",
+    why:  "1A: email + password is the everyday card (78a)",
+  },
+  {
+    name: "M1357 (V139) too many password tries says codes",
+    file: "cloud.js",
+    from: "    if (stage === 'password' || stage === 'new-password') return 'Too many tries. Wait a few minutes, then try again.';\n",
+    to:   "",
+    why:  "no code was asked for — the line must say tries (78b)",
   },
 ];
 
