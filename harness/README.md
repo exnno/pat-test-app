@@ -311,6 +311,18 @@ bug; leaving it red trains everyone to ignore the suite.
   photos; ten broken copies each caught). It caught a real defect before ship:
   the photo-file policy called `default_org` / `can_upload`, both closed to
   `authenticated`, which refuses EVERY photo upload — hence `can_upload_files()`.
+  V144 (group 83): sign-up. (1) Node's `Date.parse` reads Postgres's
+  microseconds; older Safari doesn't. 83c swaps the vm's `Date.parse` for a
+  Safari-like one (NaN on 4+ fraction digits) for one assertion and puts it
+  back — without that, M1495 (the Safari cut removed) survives in Node.
+  (2) A fake server whose trial end is TODAY + 30 can't tell the server's date
+  from the app's own fallback (also +30): 83's fake ends at +28 days so the
+  welcome's words prove where the date came from (M1517). (3) A fresh app on an
+  empty phone opens the New Job form, which `_planCanPrompt` counts as busy —
+  a Jobs-list prompt test must close it first (`state.newForm.show = false`).
+  (4) `cloudCheckConnection` clears the message line, so anything said at a
+  sign-in must be said AFTER it (83b caught the "you already had an account"
+  line vanishing).
 
 ---
 

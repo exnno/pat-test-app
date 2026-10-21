@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V143';",
-    to:   "const APP_VERSION = 'V142';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V144';",
+    to:   "const APP_VERSION = 'V143';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -640,9 +640,9 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143).
-    from: '        <p><strong>V141</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V139</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V140</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 82e)',
+    from: '        <p><strong>V142</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V140</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V141</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 83e)',
   },
 
   {
@@ -994,8 +994,8 @@ const MUTATIONS = [
   {
     name: 'M131 (V79) sign-in is allowed to create accounts',
     file: 'cloud.js',
-    from: 'options: { shouldCreateUser: false }',
-    to:   'options: { shouldCreateUser: true }',
+    from: "  if (!create) return { shouldCreateUser: false };",
+    to:   "  if (!create) return { shouldCreateUser: true };",   // V144: re-aimed (cloudCodeOptions)
     why:  'the test deploy is the public URL free users already have; anyone could create an account in the test project (15f)',
   },
   {
@@ -6107,9 +6107,10 @@ const MUTATIONS = [
     // V141: welcome rolled (one line) — re-aimed at it; 80e pins it.
     // V142: welcome rolled (one line) — re-aimed at it; 81e pins it.
     // V143: welcome rolled (one line) — re-aimed at it; 82e pins it.
-    from: "<li><strong>Plan checks.</strong>",
+    // V144: welcome rolled (two lines) — re-aimed at the first; 83e pins it.
+    from: "<li><strong>Create an account.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (82e)",
+    why:  "11A: the welcome says plainly what changed on screen (83e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8587,18 +8588,19 @@ const MUTATIONS = [
     name: "M1221 (V132) What's new not rolled",
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
-    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed.
-    from: "const WELCOME_VERSION = 'V143';",
-    to:   "const WELCOME_VERSION = 'V142';",
-    why:  "a behaviour release says what's new (82e)",
+    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
+    from: "const WELCOME_VERSION = 'V144';",
+    to:   "const WELCOME_VERSION = 'V143';",
+    why:  "a behaviour release says what's new (83e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
     file: "render-core.js",
     // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's. V138: at V138's. V139: at V139's. V140: at V140's. V141: at V141's. V142: at V142's. V143: at V143's.
-    from: "everything uploads as soon as you renew.</li>\n",
-    to:   "everything uploads as soon as you renew.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (82e)",
+    // V144: two lines — re-aimed at the second's end; still caught by the count.
+    from: "subscribing ends with a proper thank-you.</li>\n",
+    to:   "subscribing ends with a proper thank-you.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "two lines (83e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8609,9 +8611,9 @@ const MUTATIONS = [
     // V141: re-aimed at V141's own (V140's moves to M1259, V139's to M1238).
     // V142: re-aimed at V142's own (V141's moves to M1259, V140's to M1238).
     // V143: re-aimed at V143's own (V142's moves to M1259, V141's to M1238).
-    from: "PATGo confirms your plan online at least once every 30 days. When a subscription ends",
+    from: "You can create your own cloud account from Settings, by email or with Google",
     to:   "Better",
-    why:  "the About page must say what changed in this version (82e)",
+    why:  "the About page must say what changed in this version (83e)",   // V144: re-aimed at V144's line
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8723,9 +8725,9 @@ const MUTATIONS = [
     // V141: V138's line rolled off — re-aimed at V139's, the oldest now.
     // V142: V139's line rolled off — re-aimed at V140's, the oldest now.
     // V143: V140's line rolled off — re-aimed at V141's, the oldest now.
-    from: "PATGo has a full privacy policy. About now sums up",
+    from: "Cloud accounts can subscribe from Settings, paying securely through Stripe",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (82e)",
+    why:  "the About page keeps the last three versions' lines (83e)",   // V144: re-aimed at V142's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8863,14 +8865,14 @@ const MUTATIONS = [
     file: "data.js",
     from: "pages: ['settingsTutorials', 'settingsAbout',",
     to:   "pages: ['settingsAbout',",
-    why:  "6A: Settings → Help → Tutorials (82e)",
+    why:  "6A: Settings → Help → Tutorials (83e)",
   },
   {
     name: "M1258 (V134) search can't find the tutorials",
     file: "data.js",
     from: "aliases: 'tutorial tutorials practice practise job learn",
     to:   "aliases: 'learn",
-    why:  "6A: findable in Settings search (82e)",
+    why:  "6A: findable in Settings search (83e)",
   },
   {
     name: "M1259 (V134; re-aimed V137) the About changelog loses this version's line",
@@ -8882,16 +8884,16 @@ const MUTATIONS = [
     // V141: V139's line is the oldest now (M1238) — re-aimed at V140's, still in the window.
     // V142: V140's line is the oldest now (M1238) — re-aimed at V141's, still in the window.
     // V143: V141's line is the oldest now (M1238) — re-aimed at V142's, still in the window.
-    from: "Cloud accounts can subscribe from Settings, paying securely through Stripe",
+    from: "PATGo confirms your plan online at least once every 30 days. When a subscription ends",
     to:   "Better",
-    why:  "the About page must say what changed in this version (82e)",
+    why:  "the About page keeps the last three versions' lines (83e)",   // V144: re-aimed at V143's
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
     file: "render-core.js",
     from: "New here? Try the practice job.",
     to:   "New here? Take the 30-second tour.",
-    why:  "6A: setup offers the practice job (82e)",
+    why:  "6A: setup offers the practice job (83e)",
   },
   {
     name: "M1261 (V134) Quit always lands on the Jobs list",
@@ -9010,10 +9012,10 @@ const MUTATIONS = [
   {
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
-    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e).
-    from: "const CACHE_VERSION = 'pat-v143';",
-    to:   "const CACHE_VERSION = 'pat-v142';",
-    why:  "a release needs its cache bump or phones never get it (82e)",
+    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 83e).
+    from: "const CACHE_VERSION = 'pat-v144';",
+    to:   "const CACHE_VERSION = 'pat-v143';",
+    why:  "a release needs its cache bump or phones never get it (83e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -9087,7 +9089,7 @@ const MUTATIONS = [
     // V136: the page lists two headings (rowsFor) — re-aimed.
     from: "const rows = rowsFor(all.filter((d) => d.settings));",
     to:   "const rows = rowsFor(all.filter((d) => false));",
-    why:  "2A: listed on the Tutorials page (82e)",
+    why:  "2A: listed on the Tutorials page (83e)",
   },
   {
     name: "M1288 (V135) the Tutorials rows aren't wired",
@@ -9427,7 +9429,7 @@ const MUTATIONS = [
     file: "styles.css",
     from: ".tut-howto-row { display: flex; justify-content: center; margin: -4px 0 8px; }",
     to:   "",
-    why:  "2A: one centred line under the title (82e)",
+    why:  "2A: one centred line under the title (83e)",
   },
   // ---- V138 (1A 2A 3A, all defaults): Show me how starts on the page. Group 77 + M1336–M1343. ----
   {
@@ -9533,14 +9535,14 @@ const MUTATIONS = [
     file: "dispatch.js",
     from: "  if (e && typeof e.preventDefault === 'function') e.preventDefault();\n",
     to:   "",
-    why:  "Sign in / Go would submit the form and reload the app mid sign-in (82e)",
+    why:  "Sign in / Go would submit the form and reload the app mid sign-in (83e)",
   },
   {
     name: "M1351 (V139) the password sign-in tap loses its typeof guard",
     file: "dispatch.js",
     from: "'cloud-password-sign-in': () => { if (typeof cloudPasswordSignIn === 'function') cloudPasswordSignIn(); },",
     to:   "'cloud-password-sign-in': () => { cloudPasswordSignIn(); },",
-    why:  "MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (82e)",
+    why:  "MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (83e)",
   },
   {
     name: "M1352 (V139) the password box is not marked current-password",
@@ -9644,8 +9646,8 @@ const MUTATIONS = [
   {
     name: "M1366 (V140) signing in through Google doesn't show Google as connected",
     file: "cloud.js",
-    from: "    google: _cloudGoogleEmail(user), googlePending: '', googleOff: false });   // V140",
-    to:   "    google: '', googlePending: '', googleOff: false });   // V140",
+    from: "    google: _cloudGoogleEmail(user), googlePending: '', googleOff: false,   // V140",
+    to:   "    google: '', googlePending: '', googleOff: false,   // V140",   // V144: re-aimed
     why:  "the Account page must say which Google login is connected (79b)",
   },
   {
@@ -9707,8 +9709,8 @@ const MUTATIONS = [
   {
     name: "M1375 (V140) signing out keeps the Google address on screen",
     file: "cloud.js",
-    from: "      google: '', googlePending: '', googleOff: false });             // V140",
-    to:   "      googlePending: '', googleOff: false });             // V140",
+    from: "      google: '', googlePending: '', googleOff: false,                // V140",
+    to:   "      googlePending: '', googleOff: false,                // V140",   // V144: re-aimed
     why:  "a signed-out phone must not show someone's Google address (79d)",
   },
   {
@@ -9999,7 +10001,7 @@ const MUTATIONS = [
     file: "dispatch.js",
     from: "  'billing-subscribe':   () => { if (typeof billingSubscribe === 'function') billingSubscribe(); },",
     to:   "  'billing-subscribe':   () => billingSubscribe(),",
-    why:  "MAP rule 6 — with plan.js missing a tap must be a no-op, not a ReferenceError (82e)",
+    why:  "MAP rule 6 — with plan.js missing a tap must be a no-op, not a ReferenceError (83e)",
   },
   {
     name: "M1417 (V142) the Subscription row never says the plan",
@@ -10013,7 +10015,7 @@ const MUTATIONS = [
     file: "config.js",
     from: "const PLAN_PRICES = { year: '£60 a year', month: '£6 a month' };",
     to:   "const PLAN_PRICES = { year: '£80 a year', month: '£6 a month' };",
-    why:  "1B: £6 / £60 — the words must match what Stripe charges (81a 81b 82e)",
+    why:  "1B: £6 / £60 — the words must match what Stripe charges (81a 81b 83e)",
   },
   {
     name: "M1419 (V142) billing-done.html passes any result through",
@@ -10420,7 +10422,7 @@ const MUTATIONS = [
     file: "dispatch.js",
     from: "  'plan-check': () => { if (typeof planCheckNow === 'function') planCheckNow(); },   // V143 (4A)",
     to:   "  'plan-check': () => {},   // V143 (4A)",
-    why:  "4A: the button must read the plan (82b 82e)",
+    why:  "4A: the button must read the plan (82b 83e)",
   },
   {
     name: "M1477 (V143) the hold waits 60 days",
@@ -10484,6 +10486,322 @@ const MUTATIONS = [
     from: "    'lapsed_at', o.lapsed_at,\n",
     to:   "",
     why:  "3A: the Subscription page's read must carry it (82g)",
+  },
+  // ---- V144 (0A 1A 2A 3A 4A 5A 6A 7A 8A): sign-up. Group 83 + M1486–M1530. ----
+  {
+    name: "M1486 (V144) Create card's request doesn't make the account",
+    file: "cloud.js",
+    from: "  return { shouldCreateUser: true, data: { terms_accepted_at: new Date().toISOString() } };",
+    to:   "  return { shouldCreateUser: false, data: { terms_accepted_at: new Date().toISOString() } };",
+    why:  "1A: Create an account must be allowed to create (83b)",
+  },
+  {
+    name: "M1487 (V144) the Terms date isn't sent",
+    file: "cloud.js",
+    from: "  return { shouldCreateUser: true, data: { terms_accepted_at: new Date().toISOString() } };",
+    to:   "  return { shouldCreateUser: true };",
+    why:  "4A: the date the Terms were agreed is kept on the account (83b)",
+  },
+  {
+    name: "M1488 (V144) the Create card is ignored by the code request",
+    file: "cloud.js",
+    from: "  const create = !!state.cloud.signup;   // V144: only the Create card makes an account",
+    to:   "  const create = false;",
+    why:  "1A: only the Create card makes an account (83b)",
+  },
+  {
+    name: "M1489 (V144) every code request makes an account",
+    file: "cloud.js",
+    from: "  const create = !!state.cloud.signup;   // V144: only the Create card makes an account",
+    to:   "  const create = true;",
+    why:  "1A: a mistyped address at sign-in must never become an account (83b)",
+  },
+  {
+    name: "M1490 (V144) a new account isn't asked for a password",
+    file: "cloud.js",
+    from: "        if (cloudIsNewAccount(user)) _cloudSet({ pwOpen: true, pwReset: false, pwNew: true, welcome: 'due' });",
+    to:   "        if (cloudIsNewAccount(user)) _cloudSet({ welcome: 'due' });",
+    why:  "2A: a new account isn't finished until it has a password (83b)",
+  },
+  {
+    name: "M1491 (V144) an account that already existed is made to choose a new password",
+    file: "cloud.js",
+    from: "        else _cloudSet({ welcome: 'had' });   // said after the plan read (it clears the line)",
+    to:   "        else _cloudSet({ pwOpen: true, pwNew: true, welcome: 'had' });",
+    why:  "1A: nobody's password is replaced from the Create card (83b)",
+  },
+  {
+    name: "M1492 (V144) a new account's password can be skipped",
+    file: "cloud.js",
+    from: "  if (state.cloud.pwNew) return;   // V144 (2A): a new account's password can't be skipped",
+    to:   "  if (false) return;",
+    why:  "2A: no way out of the password card for a new account (83b)",
+  },
+  {
+    name: "M1493 (V144) every sign-in counts as a new account",
+    file: "cloud.js",
+    from: "  return Math.abs(last - conf) <= CLOUD_NEW_ACCOUNT_MS;",
+    to:   "  return true;",
+    why:  "only an account made just now gets the welcome (83c)",
+  },
+  {
+    name: "M1494 (V144) a new account is judged by when it was made, not confirmed",
+    file: "cloud.js",
+    from: "  const conf = cut(user.email_confirmed_at || user.confirmed_at);",
+    to:   "  const conf = cut(user.created_at);",
+    why:  "an account started but never finished is new; the confirmation time decides (83c)",
+  },
+  {
+    name: "M1495 (V144) the database's microseconds go unread on Safari",
+    file: "cloud.js",
+    from: "  const cut = (v) => Date.parse(String(v || '').replace(/(\\.\\d{3})\\d+/, '$1'));   // Safari: ms only",
+    to:   "  const cut = (v) => Date.parse(String(v || ''));",
+    why:  "older Safari refuses long fractions — no welcome for anyone on an iPhone (83c)",
+  },
+  {
+    name: "M1496 (V144) the new-account window is an hour",
+    file: "config.js",
+    from: "const CLOUD_NEW_ACCOUNT_MS = 5 * 60 * 1000;",
+    to:   "const CLOUD_NEW_ACCOUNT_MS = 60 * 60 * 1000;",
+    why:  "five minutes between two server times (83c)",
+  },
+  {
+    name: "M1497 (V144) a Google-made account gets no welcome",
+    file: "cloud.js",
+    from: "      if (cloudIsNewAccount(user)) _cloudSet({ welcome: 'due' });\n",
+    to:   "\n",
+    why:  "3A 6A: Google makes accounts too, and they are welcomed (83c)",
+  },
+  {
+    name: "M1498 (V144) the welcome shows over the password card",
+    file: "cloud.js",
+    from: "  if (c.welcome !== 'due' || c.status !== 'signed-in' || c.pwOpen || c.busy) return false;",
+    to:   "  if (c.welcome !== 'due' || c.status !== 'signed-in' || c.busy) return false;",
+    why:  "6A: the welcome waits for the password (83b)",
+  },
+  {
+    name: "M1499 (V144) the welcome can show twice",
+    file: "cloud.js",
+    from: "  _cloudSet({ welcome: 'shown' });",
+    to:   "  _cloudSet({});",
+    why:  "6A: once (83b)",
+  },
+  {
+    name: "M1500 (V144) saving the password doesn't welcome",
+    file: "cloud.js",
+    from: "    .then((ok) => { _cloudRepaint(); if (ok) cloudMaybeWelcome(); return ok; });",
+    to:   "    .then((ok) => { _cloudRepaint(); return ok; });",
+    why:  "6A: straight after the password is saved (83b)",
+  },
+  {
+    name: "M1501 (V144) an existing account isn't told it already had one",
+    file: "cloud.js",
+    from: "    _cloudSet({ welcome: '', message: 'You already had a PATGo account with that email \\u2014 you\\u2019re signed in.' });",
+    to:   "    _cloudSet({ welcome: '' });",
+    why:  "1A: say why there was no password step (83b)",
+  },
+  {
+    name: "M1502 (V144) signing in leaves the Create card open",
+    file: "cloud.js",
+    from: "    signup: false, pwNew: false, welcome: '' });                          // V144",
+    to:   "    pwNew: false, welcome: '' });                          // V144",
+    why:  "the next code request after signing in would create (83b)",
+  },
+  {
+    name: "M1503 (V144) signing out keeps the half-made sign-up",
+    file: "cloud.js",
+    from: "      signup: false, pwNew: false, welcome: '' });                    // V144",
+    to:   "      welcome: '' });                    // V144",
+    why:  "a signed-out phone must not carry a password card or a welcome (83b)",
+  },
+  {
+    name: "M1504 (V144) sign-in's no-account line doesn't point at Create",
+    file: "cloud.js",
+    from: "    return 'There\\u2019s no PATGo account for that email. Check the spelling, or tap Create an account.';",
+    to:   "    return 'That email isn\\u2019t set up for the cloud test. Accounts are added by hand for now.';",
+    why:  "1A: an unknown email at sign-in is pointed at Create (15g 83b)",
+  },
+  {
+    name: "M1505 (V144) sign-ups switched off reads as an error",
+    file: "cloud.js",
+    from: "      return 'New accounts can\\u2019t be made just yet. Please try again later.';",
+    to:   "      return 'Something went wrong.';",
+    why:  "plain words when the dashboard has sign-ups off (83b)",
+  },
+  {
+    name: "M1506 (V144) the Create card's refusals read as sign-in's",
+    file: "cloud.js",
+    from: "        _cloudSet({ busy: false, message: cloudErrorMessage(res.error, create ? 'signup' : 'send') });",
+    to:   "        _cloudSet({ busy: false, message: cloudErrorMessage(res.error, 'send') });",
+    why:  "a refused address is said in the Create card's words (83b)",
+  },
+  {
+    name: "M1507 (V144) opening the Create card loses the typed email",
+    file: "cloud.js",
+    from: "  _cloudSet({ signup: true, useCode: false, forgot: false, message: '', email: typed || state.cloud.email || '' });",
+    to:   "  _cloudSet({ signup: true, useCode: false, forgot: false, message: '', email: state.cloud.email || '' });",
+    why:  "whatever is typed carries over (83a)",
+  },
+  {
+    name: "M1508 (V144) Create an account goes nowhere",
+    file: "render-help.js",
+    from: "data-action=\"cloud-signup-open\" ${dis} style=\"margin-top:8px\">Create an account</button>",
+    to:   "data-action=\"cloud-use-code\" ${dis} style=\"margin-top:8px\">Create an account</button>",
+    why:  "the sign-in page offers an account (83a)",
+  },
+  {
+    name: "M1509 (V144) the agreement line is missing",
+    file: "render-help.js",
+    from: "        <p class=\"muted\" style=\"font-size:0.75rem;margin-top:8px\" id=\"cloud-signup-terms\">By creating an account you agree to PATGo&rsquo;s ${termsLink} and ${privacyLink}.</p>\n",
+    to:   "",
+    why:  "4A: the Terms and Privacy Policy line above Create (83a)",
+  },
+  {
+    name: "M1510 (V144) the Terms address is written in by hand",
+    file: "render-help.js",
+    from: "    const termsAt = typeof TERMS_URL === 'string' ? escapeHTML(TERMS_URL) : '';",
+    to:   "    const termsAt = typeof TERMS_URL === 'string' ? 'https://www.patgo.co.uk/terms' : '';",
+    why:  "one address, in config.js (83a)",
+  },
+  {
+    name: "M1511 (V144) a new account's password card has Cancel",
+    file: "render-help.js",
+    from: "        ${c.pwNew ? '' : `<button type=\"button\" class=\"backup-action-btn\" id=\"cloud-password-cancel\"",
+    to:   "        ${false ? '' : `<button type=\"button\" class=\"backup-action-btn\" id=\"cloud-password-cancel\"",
+    why:  "2A: no way out (83b)",
+  },
+  {
+    name: "M1512 (V144) the Account page doesn't count the days",
+    file: "render-help.js",
+    from: "      ? (typeof planTrialWords === 'function' ? planTrialWords(c.trialEndsAt)",
+    to:   "      ? (false ? planTrialWords(c.trialEndsAt)",
+    why:  "7A: days left from day one (81a 83d)",
+  },
+  {
+    name: "M1513 (V144) the code step says Sign in while creating",
+    file: "render-help.js",
+    from: "(c.forgot || c.signup ? 'Continue' : 'Sign in')",
+    to:   "(c.forgot ? 'Continue' : 'Sign in')",
+    why:  "the code makes the account; it doesn't sign one in (83a)",
+  },
+  {
+    name: "M1514 (V144) the Create card's Google button connects instead",
+    file: "render-help.js",
+    from: "id=\"cloud-signup-google\" data-action=\"cloud-google\"",
+    to:   "id=\"cloud-signup-google\" data-action=\"cloud-google-connect\"",
+    why:  "3A: Continue with Google makes the account (83a)",
+  },
+  {
+    name: "M1515 (V144) days left rounds down",
+    file: "plan.js",
+    from: "  return Math.max(0, Math.ceil((t - now) / PLAN_DAY_MS));",
+    to:   "  return Math.max(0, Math.floor((t - now) / PLAN_DAY_MS));",
+    why:  "a part day counts as a day, as the countdown (83d)",
+  },
+  {
+    name: "M1516 (V144) an ended trial shows 0 days left",
+    file: "plan.js",
+    from: "  if (n === 0) return `ended ${d}`;\n",
+    to:   "",
+    why:  "7A: after the end, it says ended (83d)",
+  },
+  {
+    name: "M1517 (V144) the welcome ignores the server's date",
+    file: "plan.js",
+    from: "  let end = _planTime(rec && rec.trialEndsAt);",
+    to:   "  let end = NaN; state.cloud.trialEndsAt = null;",
+    why:  "6A: the end date is the one the server gave the account (83b)",
+  },
+  {
+    name: "M1518 (V144) a paid return owes no thank-you",
+    file: "plan.js",
+    from: "    _planOweThanks(true);   // V144 (8A): shown once the plan reads as paid",
+    to:   "",
+    why:  "8A: owed from the paid return (83d)",
+  },
+  {
+    name: "M1519 (V144) a plan read forgets the owed thank-you",
+    file: "plan.js",
+    from: "  if (old.thanksDue) rec.thanksDue = true;   // V144 (8A): a thank-you still owed survives a re-read",
+    to:   "",
+    why:  "8A: kept until the plan reads paid (83d)",
+  },
+  {
+    name: "M1520 (V144) the thank-you shows while unpaid",
+    file: "plan.js",
+    from: "    if (rec.plan !== 'active' && rec.plan !== 'comped') return '';",
+    to:   "",
+    why:  "8A: only once the plan reads paid (83d)",
+  },
+  {
+    name: "M1521 (V144) the thank-you is never settled",
+    file: "plan.js",
+    from: "    _planOweThanks(false);\n    const info",
+    to:   "    const info",
+    why:  "8A: once (83d)",
+  },
+  {
+    name: "M1522 (V144) the Jobs list never thanks",
+    file: "plan.js",
+    from: "  if (planMaybeThank(false)) return 'thanks';   // V144 (8A): owed from a payment",
+    to:   "",
+    why:  "8A: a thank-you missed on the page shows later (83d)",
+  },
+  {
+    name: "M1523 (V144) the confirm loop doesn't thank",
+    file: "plan.js",
+    from: "      planMaybeThank(true);   // V144 (8A): the sheet, here on the Subscription page",
+    to:   "",
+    why:  "8A: the sheet once Stripe confirms (83d)",
+  },
+  {
+    name: "M1524 (V144) the Subscription page's read doesn't thank",
+    file: "plan.js",
+    from: "      if (ok && state.view === 'cloudSubscription') planMaybeThank(true);   // V144 (8A): owed, and now paid",
+    to:   "",
+    why:  "8A: the page's own read (83d)",
+  },
+  {
+    name: "M1525 (V144) monthly and yearly swapped in the thank-you",
+    file: "plan.js",
+    from: "  const which = interval === 'month' ? `PATGo monthly",
+    to:   "  const which = interval === 'year' ? `PATGo monthly",
+    why:  "8A: the plan named rightly (83d)",
+  },
+  {
+    name: "M1526 (V144) the welcome loses its style",
+    file: "styles.css",
+    from: ".plan-happy-body { margin: 0 0 16px; }",
+    to:   ".plan-happy { margin: 0 0 16px; }",
+    why:  "6A 8A: the sheets' paragraphs (83e)",
+  },
+  {
+    name: "M1527 (V144) the trial is 14 days in the words",
+    file: "config.js",
+    from: "const PLAN_TRIAL_DAYS = 30;",
+    to:   "const PLAN_TRIAL_DAYS = 14;",
+    why:  "the words must match the 30 days handle_new_user gives (83a 83e)",
+  },
+  {
+    name: "M1528 (V144) the Create card is open by default",
+    file: "state.js",
+    from: "    signup: false, pwNew: false, welcome: '',",
+    to:   "    signup: true, pwNew: false, welcome: '',",
+    why:  "a fresh phone shows Sign in, offering Create (83a)",
+  },
+  {
+    name: "M1529 (V144) Create account is unwired",
+    file: "dispatch.js",
+    from: "  'cloud-signup-send':  () => { if (typeof cloudSignupSend === 'function') cloudSignupSend(); },",
+    to:   "  'cloud-signup-send':  () => {},",
+    why:  "the tap must send the code (83a 83b)",
+  },
+  {
+    name: "M1530 (V144) I already have an account is unwired",
+    file: "dispatch.js",
+    from: "  'cloud-signup-close': () => { if (typeof cloudSignupClose === 'function') cloudSignupClose(); },",
+    to:   "  'cloud-signup-close': () => {},",
+    why:  "back to Sign in (83a)",
   },
 ];
 
