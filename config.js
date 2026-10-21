@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V143';
+const APP_VERSION = 'V144';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -133,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V143';
+const WELCOME_VERSION = 'V144';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -359,6 +359,9 @@ const REQUIRE_ACCOUNT = false;
 // not open the curtain. Factory reset (own spec, BACKLOG) must clear it.
 const CLOUD_UNLOCK_KEY = 'pat:cloudUnlocked';
 const CLOUD_ACCESS_CODE = '1111';
+// V144: an account counts as made just now when its address was confirmed within
+// this long of the sign-in (cloud.js cloudIsNewAccount — two server times).
+const CLOUD_NEW_ACCOUNT_MS = 5 * 60 * 1000;
 
 // ---- V127: the plan — trial end, grace, the lock (plan.js) -------------------
 // PLAN_KEY: what this phone last learned about the signed-in account's plan, so
@@ -373,6 +376,11 @@ const PLAN_KEY = 'pat:plan';
 // ⚠ The SERVER's refusal (supabase/v143-enforcement.sql, can_upload) is set at
 // 14 days = this grace + 7 days' catch-up (V143 2A): change them together.
 const PLAN_GRACE_DAYS = 7;
+// V144: the trial a new account starts with, for the welcome's words only — the
+// real end date is the server's (trial_ends_at), read before the welcome shows.
+// ⚠ The server sets it in supabase/schema.sql handle_new_user (interval '30
+// days'): change them together.
+const PLAN_TRIAL_DAYS = 30;
 const PLAN_WARN_DAYS = 7;
 // V143 (4A): a phone that hasn't read its plan for this many days is held as if
 // locked until it reads it once (comped never). Every start online reads it.

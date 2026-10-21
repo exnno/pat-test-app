@@ -8,6 +8,34 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V144
+V144 = sign-up (Stage 13; Peter 21 Oct: 0A 1A 2A 3A 4A 5A 6A 7A 8A). cloud.js (the
+Create card's code request — cloudCodeOptions; cloudIsNewAccount; pwNew; the welcome
+hand-off), render-help.js (the Create card, the offer, the password step, days left),
+plan.js (planShowWelcome, planShowThanks / planMaybeThank, thanksDue in the plan record,
+planTrialDaysLeft / planTrialWords), state.js, config.js (CLOUD_NEW_ACCOUNT_MS,
+PLAN_TRIAL_DAYS), dispatch.js, styles.css. Harness 83 + M1486–M1530; 82e retired → 83e.
+**Next (V145, the launch switch — 0A):** an account required to use the app
+(REQUIRE_ACCOUNT — a sign-in / create wall, what a free user's local jobs do), the
+access code out, the free site retired; then the production project + live Stripe (a
+guided dashboard session + a small config release); R8 90-day deletion.
+
+### V144 residuals (known, accepted)
+- Google can't carry the Terms date (no `data` on that route): a Google-made account
+  has the line on the card, not the date on the account. Its created_at is the record.
+- A new account closed before its password is chosen (app quit, phone off) has no
+  password; next time it signs in by emailed code and can set one from Account. The
+  "no Cancel" holds only while the app is open.
+- A new account is told apart from an old one by two server times (confirmed vs last
+  sign-in, 5 minutes). An account started on the Create card and never finished, then
+  finished days later, counts as new — rightly: it has no password yet.
+- The Terms date is the phone's clock (the account's created_at is the server's).
+- One trial per email address: a new address gets a new 30-day trial (no card), as any
+  free trial. Accepted at £6.
+- Resend: 100 emails a day on the current plan — re-check before V145 opens sign-up to
+  everyone.
+- The welcome shows once, to the phone that made the account (memory only).
+
 ### Next after V143
 V143 = enforcement (Stage 13; Peter 21 Oct: 1A 2A 3A 4A 5A). supabase/v143-enforcement.sql
 (lapsed_at on the business + profile copies; can_upload / plan_guard on sessions, records,

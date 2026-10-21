@@ -941,6 +941,10 @@ registerActions({
   'cloud-google-off':      () => { if (typeof cloudGoogleDisconnectAsk === 'function') cloudGoogleDisconnectAsk(); },
   'cloud-google-keep':     () => { if (typeof cloudGoogleDisconnectKeep === 'function') cloudGoogleDisconnectKeep(); },
   'cloud-google-disconnect':() => { if (typeof cloudGoogleDisconnect === 'function') cloudGoogleDisconnect(); },
+  // V144: Create an account (cloud.js), same guarding.
+  'cloud-signup-open':  () => { if (typeof cloudSignupOpen === 'function') cloudSignupOpen(); },
+  'cloud-signup-close': () => { if (typeof cloudSignupClose === 'function') cloudSignupClose(); },
+  'cloud-signup-send':  () => { if (typeof cloudSignupSend === 'function') cloudSignupSend(); },
   'cloud-check':      () => { if (typeof cloudCheckConnection === 'function') cloudCheckConnection(); },
   'cloud-sign-out':   () => { if (typeof cloudSignOut === 'function') cloudSignOut(); },
   // v80: sync (sync.js), same guarding. "Re-send all" ignores the fingerprints

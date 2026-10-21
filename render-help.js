@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V143: rolled forward — V143 on top, V140 dropped. -->
+      <!-- v8: rolling 3-version changelog. V144: rolled forward — V144 on top, V141 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V144</strong> &middot; October 2026</p>
+        <p class="muted">You can create your own cloud account from Settings, by email or with Google, with a 30-day free trial and no card needed. The Account page shows how many days of the trial are left.</p>
         <p><strong>V143</strong> &middot; October 2026</p>
         <p class="muted">PATGo confirms your plan online at least once every 30 days. When a subscription ends there are 7 days&rsquo; grace from that date, and cloud syncing pauses a week after the account locks &mdash; your work stays safe on the phone and uploads once you renew.</p>
         <p><strong>V142</strong> &middot; October 2026</p>
         <p class="muted">Cloud accounts can subscribe from Settings, paying securely through Stripe, and manage or cancel their plan there too. Subscribing during the free trial keeps the rest of it.</p>
-        <p><strong>V141</strong> &middot; October 2026</p>
-        <p class="muted">PATGo has a full privacy policy. About now sums up what's kept on your phone and what goes to the cloud if you sign in, with a link to read the whole policy.</p>
 
 
 
@@ -393,12 +393,14 @@ function renderCloudAccount() {
   } else if (c.status === 'signed-in') {
     // V142: the plan in words, and the way to the Subscription page.
     const planWords = { trial: 'Free trial', active: 'Paid', lapsed: 'Ended', comped: 'Free' }[c.plan] || c.plan;
+    // V144 (7A): a trial says how many days are left, from day one.
     const trialEnd = (c.plan === 'trial' && c.trialEndsAt)
-      ? (typeof _planDate === 'function' && typeof _planTime === 'function' && isFinite(_planTime(c.trialEndsAt))
-          ? _planDate(_planTime(c.trialEndsAt)) : new Date(c.trialEndsAt).toLocaleDateString('en-GB'))
+      ? (typeof planTrialWords === 'function' ? planTrialWords(c.trialEndsAt)
+         : (typeof _planDate === 'function' && typeof _planTime === 'function' && isFinite(_planTime(c.trialEndsAt))
+            ? 'ends ' + _planDate(_planTime(c.trialEndsAt)) : 'ends ' + new Date(c.trialEndsAt).toLocaleDateString('en-GB')))
       : '';
     const plan = c.plan
-      ? `<p class="muted" id="cloud-plan">Plan: <strong>${escapeHTML(planWords)}</strong>${trialEnd ? ` &middot; ends ${escapeHTML(trialEnd)}` : ''}</p>
+      ? `<p class="muted" id="cloud-plan">Plan: <strong>${escapeHTML(planWords)}</strong>${trialEnd ? ` &middot; <span id="cloud-trial-left">${escapeHTML(trialEnd)}</span>` : ''}</p>
         <button class="backup-action-btn" id="cloud-plan-open" data-action="settings-page" data-arg="cloudSubscription" ${dis} style="margin-top:4px">Subscription ›</button>`
       : '';
     // V139 (3A): "Set or change password" opens the card below in place of the
@@ -422,8 +424,9 @@ function renderCloudAccount() {
         <button class="backup-action-btn" id="cloud-google-connect" data-action="cloud-google-connect" ${dis} style="margin-top:6px">Connect Google</button>`;
     const pwCard = c.pwOpen ? `
         <form class="cloud-form" id="cloud-new-password-form" autocomplete="on" novalidate>
-        <h3 style="margin-top:14px">${c.pwReset ? 'Choose a new password' : 'Set or change password'}</h3>
-        ${c.pwReset ? `<p class="muted" style="font-size:0.8125rem" id="cloud-pw-reset-note">You’re signed in with the code. Choose a new password to use next time.</p>` : ''}
+        <h3 style="margin-top:14px">${c.pwNew ? 'Choose a password' : c.pwReset ? 'Choose a new password' : 'Set or change password'}</h3>
+        ${c.pwNew ? `<p class="muted" style="font-size:0.8125rem" id="cloud-pw-new-note">One last step: choose a password to sign in with next time.</p>`
+          : c.pwReset ? `<p class="muted" style="font-size:0.8125rem" id="cloud-pw-reset-note">You’re signed in with the code. Choose a new password to use next time.</p>` : ''}
         <input type="email" autocomplete="username" aria-label="Email" value="${escapeHTML(c.email || '')}" hidden tabindex="-1">
         <label class="label" for="cloud-new-password">New password</label>
         <div class="cloud-pw-row">
@@ -434,8 +437,8 @@ function renderCloudAccount() {
         <input class="input" id="cloud-new-password2" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="72" ${dis}>
         <p class="muted" style="font-size:0.75rem;margin-top:6px" id="cloud-pw-hint">${escapeHTML(typeof CLOUD_PASSWORD_HINT === 'string' ? CLOUD_PASSWORD_HINT : '')}</p>
         ${msg}
-        <button type="submit" class="btn-primary" id="cloud-password-save" data-action="cloud-password-save" ${dis} style="margin-top:10px">${busy ? 'Saving…' : 'Save password'}</button>
-        <button type="button" class="backup-action-btn" id="cloud-password-cancel" data-action="cloud-password-cancel" ${dis} style="margin-top:6px">${c.pwReset ? 'Not now' : 'Cancel'}</button>
+        <button type="submit" class="btn-primary" id="cloud-password-save" data-action="cloud-password-save" ${dis} style="margin-top:10px">${busy ? 'Saving…' : (c.pwNew ? 'Save and finish' : 'Save password')}</button>
+        ${c.pwNew ? '' : `<button type="button" class="backup-action-btn" id="cloud-password-cancel" data-action="cloud-password-cancel" ${dis} style="margin-top:6px">${c.pwReset ? 'Not now' : 'Cancel'}</button>`}
         </form>` : `
         ${msg}
         <button class="backup-action-btn" id="cloud-check" data-action="cloud-check" ${dis} style="margin-top:8px">${busy ? 'Checking…' : 'Check connection'}</button>
@@ -463,14 +466,42 @@ function renderCloudAccount() {
     // V139 (2A): the same code step serves "Forgot password?" — it says so.
     body = `
       <div class="info-card">
-        <h3>${c.forgot ? 'Reset your password' : 'Enter your code'}</h3>
-        <p class="muted" style="font-size:0.8125rem">We emailed a code to <strong>${escapeHTML(c.email)}</strong>.${c.forgot ? ' Enter it, then choose a new password.' : ''}</p>
+        <h3>${c.forgot ? 'Reset your password' : c.signup ? 'Check your email' : 'Enter your code'}</h3>
+        <p class="muted" style="font-size:0.8125rem">We emailed a code to <strong>${escapeHTML(c.email)}</strong>.${c.forgot ? ' Enter it, then choose a new password.' : c.signup ? ' Enter it to make your account.' : ''}</p>
         <label class="label" for="cloud-code">Code</label>
         <input class="input cloud-code-input" id="cloud-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" ${dis}>
         ${msg}
-        <button class="btn-primary" id="cloud-verify-code" data-action="cloud-verify-code" ${dis} style="margin-top:10px">${busy ? 'Checking…' : (c.forgot ? 'Continue' : 'Sign in')}</button>
+        <button class="btn-primary" id="cloud-verify-code" data-action="cloud-verify-code" ${dis} style="margin-top:10px">${busy ? 'Checking…' : (c.forgot || c.signup ? 'Continue' : 'Sign in')}</button>
         <button class="backup-action-btn" id="cloud-resend" data-action="cloud-send-code" ${dis} style="margin-top:8px">Send a new code</button>
         <button class="backup-action-btn" id="cloud-change-email" data-action="cloud-change-email" ${dis} style="margin-top:6px">${c.forgot ? 'Back to sign in' : 'Use a different email'}</button>
+      </div>`;
+  } else if (c.signup) {
+    // V144 (1A 3A 4A): the Create card. Google heads it as on Sign in (with
+    // sign-ups on, Continue with Google makes an account for a new Google login).
+    // The email route emails a code (cloudSignupSend → cloudSendCode, creating),
+    // then asks for a password. A real <form>: Go sends the code.
+    const termsAt = typeof TERMS_URL === 'string' ? escapeHTML(TERMS_URL) : '';
+    const privacyAt = typeof PRIVACY_URL === 'string' ? escapeHTML(PRIVACY_URL) : '';
+    const termsLink = termsAt
+      ? `<a href="${termsAt}" id="cloud-signup-terms-link" target="_blank" rel="noopener noreferrer">Terms of Service</a>` : 'Terms of Service';
+    const privacyLink = privacyAt
+      ? `<a href="${privacyAt}" id="cloud-signup-privacy-link" target="_blank" rel="noopener noreferrer">Privacy Policy</a>` : 'Privacy Policy';
+    const trialDays = typeof PLAN_TRIAL_DAYS === 'number' ? PLAN_TRIAL_DAYS : 30;
+    body = `
+      <div class="info-card" id="cloud-signup-card">
+        <form class="cloud-form" id="cloud-signup-form" autocomplete="on" novalidate>
+        <h3>Create your account</h3>
+        <p class="muted" style="font-size:0.8125rem" id="cloud-signup-trial">Free for ${trialDays} days &mdash; no card needed.</p>
+        <button type="button" class="backup-action-btn cloud-google-btn" id="cloud-signup-google" data-action="cloud-google" ${dis}>Continue with Google</button>
+        <p class="cloud-or" aria-hidden="true"><span>or</span></p>
+        <label class="label" for="cloud-email">Email</label>
+        <input class="input" id="cloud-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" value="${escapeHTML(c.email || '')}" placeholder="you@example.com" ${dis}>
+        <p class="muted" style="font-size:0.75rem;margin-top:8px" id="cloud-signup-terms">By creating an account you agree to PATGo&rsquo;s ${termsLink} and ${privacyLink}.</p>
+        ${msg}
+        <button type="submit" class="btn-primary" id="cloud-signup-send" data-action="cloud-signup-send" ${dis} style="margin-top:10px">${busy ? 'Sending…' : 'Create account'}</button>
+        <p class="muted" style="font-size:0.75rem;margin-top:6px">We&rsquo;ll email you a code to confirm it&rsquo;s your address.</p>
+        <button type="button" class="backup-action-btn" id="cloud-signup-close" data-action="cloud-signup-close" ${dis} style="margin-top:8px">I already have an account</button>
+        </form>
       </div>`;
   } else if (c.useCode) {
     body = `
@@ -505,6 +536,11 @@ function renderCloudAccount() {
         <button type="button" class="backup-action-btn" id="cloud-forgot" data-action="cloud-forgot" ${dis} style="margin-top:8px">Forgot password?</button>
         <button type="button" class="backup-action-btn" id="cloud-use-code" data-action="cloud-use-code" ${dis} style="margin-top:6px">Email me a code instead</button>
         </form>
+      </div>
+      <div class="info-card" id="cloud-signup-offer">
+        <h3>New to PATGo?</h3>
+        <p class="muted" style="font-size:0.8125rem">Create an account and try everything free for ${typeof PLAN_TRIAL_DAYS === 'number' ? PLAN_TRIAL_DAYS : 30} days &mdash; no card needed.</p>
+        <button type="button" class="btn-primary" id="cloud-signup-open" data-action="cloud-signup-open" ${dis} style="margin-top:8px">Create an account</button>
       </div>`;
   }
 

@@ -119,6 +119,7 @@ function planNote(row) {
     shownEnded: old.shownEnded || '',
     shownLastDay: old.shownLastDay || '',
   };
+  if (old.thanksDue) rec.thanksDue = true;   // V144 (8A): a thank-you still owed survives a re-read
   // A `lapsed` with no trial end behind it (a paid plan that stopped) counts its
   // grace from the first time this phone heard about it. Back to anything else
   // and that is forgotten.
@@ -222,6 +223,122 @@ function _planDate(ms) {
   const d = new Date(ms);
   const iso = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   return (typeof formatDate === 'function') ? formatDate(iso) : iso;
+}
+
+// V144 (7A): whole days left of a trial — 0 once it has ended, null when there
+// is no date. Pure. "26 days left" counts a part day as a day (as the countdown).
+function planTrialDaysLeft(endsIso, now) {
+  const t = _planTime(endsIso);
+  if (!isFinite(t)) return null;
+  return Math.max(0, Math.ceil((t - now) / PLAN_DAY_MS));
+}
+
+// The Account page's words after "Plan: Free trial" — "26 days left (ends
+// 20/11/2026)", or "ended 20/11/2026". '' with no date.
+function planTrialWords(endsIso) {
+  const rec = planRecord();
+  const n = planTrialDaysLeft(endsIso, planNow(rec));
+  if (n === null) return '';
+  const d = _planDate(_planTime(endsIso));
+  if (n === 0) return `ended ${d}`;
+  return `${n} day${n === 1 ? '' : 's'} left (ends ${d})`;
+}
+
+// ---- V144: the welcome (6A) and the thank-you (8A) --------------------------
+// A sheet of a few short paragraphs (HTML the caller has escaped) and one or two
+// buttons — the bulk-sheet pattern, as every sheet (no dialogs).
+function _planHappySheet(opts) {
+  if (typeof _openSheet !== 'function') return null;
+  const { sheet, backdrop, cleanup } = _openSheet(opts.title);
+  sheet.id = opts.id;
+  sheet.innerHTML = `
+    <div class="bulk-sheet-handle"></div>
+    <div class="bulk-sheet-header">
+      <span class="fail-close-spacer"></span>
+      <h3 class="bulk-sheet-title">${escapeHTML(opts.title)}</h3>
+      <button class="fail-close-btn" id="${opts.id}-x" aria-label="Close">&times;</button>
+    </div>
+    <div class="sheet-scroll plan-happy-body">
+      ${opts.paras.map((p) => `<p>${p}</p>`).join('')}
+    </div>
+    <div class="sheet-pin" style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+      <button class="btn-primary" id="${opts.id}-ok" style="width:100%">${escapeHTML(opts.okLabel)}</button>
+      ${opts.second ? `<button class="btn-secondary" id="${opts.id}-second" style="width:100%">${escapeHTML(opts.second.label)}</button>` : ''}
+    </div>`;
+  document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+  const x = document.getElementById(opts.id + '-x');
+  const ok = document.getElementById(opts.id + '-ok');
+  const two = document.getElementById(opts.id + '-second');
+  if (x) x.addEventListener('click', cleanup);
+  if (ok) ok.addEventListener('click', cleanup);
+  if (two) two.addEventListener('click', () => { cleanup(); opts.second.onPick(); });
+  if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);
+  return sheet;
+}
+
+// 6A: straight after an account is made (cloud.js cloudMaybeWelcome). The end
+// date is the server's, read at sign-in; PLAN_TRIAL_DAYS from now only if that
+// read failed (offline at the very moment — rare).
+function planShowWelcome() {
+  const rec = planRecord();
+  let end = _planTime(rec && rec.trialEndsAt);
+  if (!isFinite(end) && state.cloud && state.cloud.trialEndsAt) end = _planTime(state.cloud.trialEndsAt);
+  if (!isFinite(end)) end = Date.now() + PLAN_TRIAL_DAYS * PLAN_DAY_MS;
+  const days = Math.max(1, Math.round((end - planNow(rec)) / PLAN_DAY_MS));
+  return _planHappySheet({
+    id: 'plan-welcome',
+    title: 'Welcome to PATGo',
+    paras: [
+      '<strong>Thanks for joining!</strong>',
+      `Your free trial runs for <strong>${days} days, until ${escapeHTML(_planDate(end))}</strong>. Everything works during the trial, and no card is needed.`,
+      `Subscribe any time from Settings \u2192 Account &amp; Sync \u2192 Subscription (${escapeHTML(PLAN_PRICES.month)} or ${escapeHTML(PLAN_PRICES.year)}). Subscribing early keeps the rest of your trial.`,
+    ],
+    okLabel: 'Start using PATGo',
+    second: { label: 'See plans', onPick: () => { if (typeof setView === 'function') setView('cloudSubscription'); } },
+  });
+}
+
+// 8A: once Stripe confirms the payment. interval: 'month' | 'year' | other.
+function planShowThanks(interval) {
+  const which = interval === 'month' ? `PATGo monthly \u2014 ${escapeHTML(PLAN_PRICES.month)}`
+    : interval === 'year' ? `PATGo yearly \u2014 ${escapeHTML(PLAN_PRICES.year)}` : '';
+  return _planHappySheet({
+    id: 'plan-thanks',
+    title: 'Thank you for subscribing!',
+    paras: [
+      which ? `You\u2019re on <strong>${which}</strong>.` : 'You\u2019re subscribed to PATGo.',
+      'Everything carries on as before \u2014 your jobs, certificates and cloud backup.',
+      'Manage your plan, card and invoices any time from Settings \u2192 Account &amp; Sync \u2192 Subscription.',
+    ],
+    okLabel: 'Done',
+  });
+}
+
+// 8A: a thank-you is owed from the moment Stripe sends the person back paid
+// (billingReturned) until this phone sees the plan as paid — on the Subscription
+// page then and there, or (if Stripe took longer than the wait) the next time a
+// read says paid, on the Jobs list. Kept in the plan record, so closing the app
+// in between doesn't lose it; once shown, never again.
+function _planOweThanks(owed) {
+  const rec = planRecord();
+  if (!rec) return;
+  if (owed) rec.thanksDue = true; else delete rec.thanksDue;
+  _planWrite(rec);
+}
+function planMaybeThank(here) {
+  try {
+    const rec = planRecord();
+    if (!rec || !rec.thanksDue) return '';
+    if (rec.plan !== 'active' && rec.plan !== 'comped') return '';
+    if (here) {
+      if (document.querySelector('body > .bulk-sheet, body > .fail-sheet, body > .modal-backdrop')) return '';
+    } else if (!_planCanPrompt()) return '';
+    _planOweThanks(false);
+    const info = (typeof _bill === 'function' && _bill().info) || null;
+    planShowThanks(info && info.interval);
+    return 'thanks';
+  } catch (e) { return ''; }
 }
 
 function _planEndedWords(st) {
@@ -406,6 +523,7 @@ function _planCanPrompt() {
 // 6a and the last-day sheet: each once per ending (keyed by the lock time, so
 // a new trial or a later lapse asks again). Returns which sheet it showed.
 function planMaybePrompt() {
+  if (planMaybeThank(false)) return 'thanks';   // V144 (8A): owed from a payment
   try {
     const rec = planRecord();
     const st = planStatus(rec, planNow(rec));
@@ -573,7 +691,11 @@ function billingRead() {
       return true;
     })
     .catch(() => { b.error = 'read'; return false; })
-    .then((ok) => { b.reading = false; _billRepaint(); return ok; });
+    .then((ok) => {
+      b.reading = false; _billRepaint();
+      if (ok && state.view === 'cloudSubscription') planMaybeThank(true);   // V144 (8A): owed, and now paid
+      return ok;
+    });
 }
 
 // 1A: the choice. £60 a year first (two months free), then £6 a month.
@@ -733,6 +855,7 @@ function billingReturned(result) {
   _billCloseWindow();
   b.pending = '';
   if (result === 'paid' && kind === 'checkout') {
+    _planOweThanks(true);   // V144 (8A): shown once the plan reads as paid
     b.message = 'Payment done — confirming with Stripe…';
     b.confirming = true;
     _billRepaint();
@@ -756,6 +879,7 @@ function _billConfirm(i) {
       b.confirming = false;
       b.message = 'You’re subscribed. Thank you!';
       _billRepaint();
+      planMaybeThank(true);   // V144 (8A): the sheet, here on the Subscription page
       return;
     }
     if (i + 1 >= BILLING_CONFIRM_DELAYS.length) {

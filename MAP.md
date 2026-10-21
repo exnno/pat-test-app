@@ -1,4 +1,4 @@
-# PATGo — Code Map (V143)
+# PATGo — Code Map (V144)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1268,7 +1268,7 @@ sync (settings_work), so the view is in `SYNC_GENERAL_VIEWS` and
 join both lists. Ways in: `storage-banner-open`, `save-fail-clear` (dispatch.js);
 manager Back `_MGR_RETURN_VIEWS` (settings-actions.js).
 
-### render-help.js (~1080 ln) — help, about & cloud pages — NEW v73 (V139: Account's password cards; V140: Google)
+### render-help.js (~1110 ln) — help, about & cloud pages — NEW v73 (V139: Account's password cards; V140: Google; V144: the Create card)
 About (+ the rolling 3-version changelog), Tutorials (V134 — starts tour.js's
 practice job; V135 lists tour.js `TUTORIALS`' Settings ones), Glossary (page + the
 `GLOSSARY_GROUPS` data array), Contact, `renderBugSheet()` markup, and the three
@@ -1303,7 +1303,7 @@ V141: About → Privacy is a SUMMARY of the website's privacy policy plus a plai
 opens it). ⚠ Keep the summary and the policy saying the same thing: change one,
 change the other. Harness 80a–80e, M1380–M1392.
 
-### cloud.js (~800 ln) — cloud sign-in — NEW v79, password V139, Google V140
+### cloud.js (~900 ln) — cloud sign-in — NEW v79, password V139, Google V140, sign-up V144
 Sign-in (Supabase): email + password (V139) or an emailed code (v79); session state in `state.cloud`, the TEST strip
 and version tag, lazy load of `supabase.umd.js`. v85: the Cloud access code —
 `cloudPagesUnlocked()`, `cloudUnlock()`, `CLOUD_UNLOCK_KEY` (config.js; per
@@ -1346,6 +1346,16 @@ Disconnect (asked in place: `googleOff`) unlinks then refreshes the session, bec
 boot reads the connected address from the stored session (`_cloudGoogleEmail`).
 Dashboard: Google provider ON, "Allow manual linking" ON, sign-ups OFF (3A).
 Harness 79a–79e, M1358–M1379.
+V144: SIGN-UP. `state.cloud.signup` = the Create card (and its code step) is showing;
+`cloudCodeOptions(create)` is the one place the code request is built — ⚠ sign-in is
+`shouldCreateUser: false`, ONLY the Create card creates (+ `data.terms_accepted_at`).
+`cloudVerifyCode` while creating: `cloudIsNewAccount(user)` (two SERVER times:
+confirmed vs last sign-in, within CLOUD_NEW_ACCOUNT_MS) → password card with `pwNew`
+(no Cancel) + `welcome: 'due'`; an old account → `welcome: 'had'` (a line said after
+the plan read, which clears the message). Google: a new account → `welcome: 'due'`.
+`cloudMaybeWelcome()` (after the password save, and at the end of `_cloudAfterSignIn`)
+calls plan.js `planShowWelcome` (guarded). Dashboard: "Allow new users to sign up" ON;
+"Confirm signup" email template shows `{{ .Token }}`. Harness 83a–83c, M1486–M1514.
 
 ### sync.js (~4950 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check
 ⚠ V128 (rule 27): section "the stale-phone check" before the push.
@@ -1572,7 +1582,7 @@ Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r
 19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q, 27a–27m, 28a–28i and
 29a–29i and 30a–30i, mutations M142–M295, M306–M325, M355–M395, M396–M418, M419–M434, M436–M451, M452–M474.
 
-### plan.js (~405 ln) — the plan: trial end, grace, the lock — NEW V127 — OPTIONAL SUBSYSTEM
+### plan.js (~1000 ln) — the plan: trial end, grace, the lock, paying — NEW V127 — OPTIONAL SUBSYSTEM
 What the signed-in account's plan means on this phone: `planStatus()` (pure:
 none / paid / trial / ending / grace / locked), the record (PLAN_KEY, per
 account, never backed up), `planGate()` (rule 26), the Jobs list line and the
@@ -1614,6 +1624,14 @@ cloud.js `cloudCheckConnection` read `profiles` with `select('*')`; `billingRead
 coupling with **sync.js** (rule 28): `planNote` → `syncPlanChecked(!planLocked())`;
 `planLineText` reads `syncPlanRefused()`; sync.js calls `_planRepaint`. Each typeof-guarded.
 Harness 82a–82c; M1440–M1477.
+V144: the welcome (`planShowWelcome`, called by **cloud.js** `cloudMaybeWelcome`) and the
+thank-you (`planShowThanks`), both `_planHappySheet` (feedback.js `_openSheet`; style
+`.plan-happy-body` in styles.css). Thank-you OWED = `thanksDue` in the PLAN_KEY record
+(set by `billingReturned('paid')`, carried by `planNote`), shown by `planMaybeThank` once
+the record reads paid: `_billConfirm` / `billingRead` on the Subscription page, else
+`planMaybePrompt` on the Jobs list. `planTrialDaysLeft` / `planTrialWords` = the Account
+line (render-help.js). ⚠ PLAN_TRIAL_DAYS (config.js) must match handle_new_user's 30 days
+(83e). Harness 83b–83d, M1515–M1525.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

@@ -26,10 +26,14 @@
  * Account page is showing, nothing is focused and no sheet is open. Anything
  * skipped simply shows on the next render.
  *
- * WHY shouldCreateUser: false. The test deploy is the public GitHub Pages URL
- * that free users already have. Only accounts created by hand in the Supabase
- * dashboard can sign in; nobody can create one from the app. Flip this when
- * sign-up is meant to be open (commercial launch, REQUIRE_ACCOUNT).
+ * WHY shouldCreateUser IS false ON SIGN-IN AND true ONLY ON "CREATE AN ACCOUNT"
+ * (V144, 1A). Signing in never makes an account, so a mistyped address at sign-in
+ * is told "no account" rather than quietly becoming a second, empty account.
+ * Only the Create card (state.cloud.signup) asks for one. The dashboard's "Allow
+ * new users to sign up" must be ON for that — and with it on, Continue with
+ * Google makes an account for a Google login nobody knows (3A, accepted: the app
+ * cannot stop that by itself). The access-code curtain still stands on the test
+ * site until the launch switch (5A).
  *
  * ⚠ V139: WHY "FORGOT PASSWORD?" SENDS A CODE, NOT SUPABASE'S RESET LINK (2A).
  * A link in an email opens in Safari, and on an iPhone Safari and the installed
@@ -245,7 +249,17 @@ function cloudErrorMessage(err, stage) {
     if (err && err.name === 'AuthSessionMissingError') return 'You\u2019ve been signed out. Sign in again, then try Google.';
   }
   if (stage === 'send' && (code === 'otp_disabled' || /signups? not allowed/i.test(msg))) {
-    return 'That email isn\u2019t set up for the cloud test. Accounts are added by hand for now.';
+    // V144: sign-in never makes an account (1A) — point at the Create card.
+    return 'There\u2019s no PATGo account for that email. Check the spelling, or tap Create an account.';
+  }
+  if (stage === 'signup') {
+    // V144: the dashboard's "Allow new users to sign up" is off.
+    if (code === 'signup_disabled' || code === 'otp_disabled' || /signups? not allowed/i.test(msg)) {
+      return 'New accounts can\u2019t be made just yet. Please try again later.';
+    }
+    if (code === 'email_address_invalid' || /email address.*invalid|invalid.*email/i.test(msg)) {
+      return 'That email address wasn\u2019t accepted. Check it and try again.';
+    }
   }
   if (stage === 'verify' && (code === 'otp_expired' || /expired|invalid/i.test(msg))) {
     return 'That code didn\u2019t work \u2014 it may have expired. Use the newest email, or send a new code.';
@@ -258,8 +272,9 @@ function cloudSendCode() {
   if (!cloudAvailable() || state.cloud.busy) return Promise.resolve(false);
   const typed = _cloudInputValue('cloud-email').trim().toLowerCase();
   const email = typed || state.cloud.email || '';
+  const create = !!state.cloud.signup;   // V144: only the Create card makes an account
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-    _cloudSet({ email, message: 'Enter the email address your account was set up with.' });
+    _cloudSet({ email, message: create ? 'Enter your email address.' : 'Enter the email address your account was set up with.' });
     render();
     return Promise.resolve(false);
   }
@@ -271,18 +286,44 @@ function cloudSendCode() {
   _cloudSet({ email, busy: true, message: '' });
   render();
   return cloudClient()
-    .then((c) => c.auth.signInWithOtp({ email, options: { shouldCreateUser: false } }))
+    .then((c) => c.auth.signInWithOtp({ email, options: cloudCodeOptions(create) }))
     .then((res) => {
       if (res && res.error) {
-        _cloudSet({ busy: false, message: cloudErrorMessage(res.error, 'send') });
+        _cloudSet({ busy: false, message: cloudErrorMessage(res.error, create ? 'signup' : 'send') });
         return false;
       }
       _cloudSet({ busy: false, status: 'code-sent',
         message: 'Code sent to ' + email + '. It can take a minute to arrive.' });
       return true;
     })
-    .catch((e) => { _cloudSet({ busy: false, message: cloudErrorMessage(e, 'send') }); return false; })
+    .catch((e) => { _cloudSet({ busy: false, message: cloudErrorMessage(e, create ? 'signup' : 'send') }); return false; })
     .then((ok) => { _cloudRepaint(); return ok; });
+}
+
+// V144: what the emailed-code request asks for. Signing in: never make an
+// account. Creating (1A): make one, and (4A) record when the Terms and Privacy
+// Policy were agreed — Supabase keeps `data` on the account it MAKES (user
+// metadata) and ignores it for an address that already has one. The phone's
+// clock, so a date, not proof of time; the account's own created_at is the
+// server's. Google can't carry it (no `data` on that route) — residual.
+function cloudCodeOptions(create) {
+  if (!create) return { shouldCreateUser: false };
+  return { shouldCreateUser: true, data: { terms_accepted_at: new Date().toISOString() } };
+}
+
+// V144: was this account made just now? Both times are the SERVER's, so the
+// phone's clock can't fool it: an address confirmed within moments of this
+// sign-in is a new account (an emailed code confirms a new address as it signs
+// it in; Google confirms it as it makes it). An account that already existed was
+// confirmed long before. One that was started and never finished (code never
+// entered) is confirmed now — and rightly counts as new: it has no password yet.
+function cloudIsNewAccount(user) {
+  if (!user || typeof user !== 'object') return false;
+  const cut = (v) => Date.parse(String(v || '').replace(/(\.\d{3})\d+/, '$1'));   // Safari: ms only
+  const conf = cut(user.email_confirmed_at || user.confirmed_at);
+  const last = cut(user.last_sign_in_at);
+  if (!isFinite(conf) || !isFinite(last)) return false;
+  return Math.abs(last - conf) <= CLOUD_NEW_ACCOUNT_MS;
 }
 
 function cloudVerifyCode() {
@@ -309,9 +350,18 @@ function cloudVerifyCode() {
         return false;
       }
       const forgot = !!state.cloud.forgot;
-      _cloudSignedIn(res && res.data && res.data.user, email);
+      const creating = !!state.cloud.signup;   // V144
+      const user = res && res.data && res.data.user;
+      _cloudSignedIn(user, email);
       // V139 (2A): signed in by "Forgot password?" — straight to choosing a new one.
       if (forgot) _cloudSet({ pwOpen: true, pwReset: true });
+      // V144 (2A): a NEW account isn't finished until it has a password — the
+      // card has no Cancel. An address that already had an account just signs
+      // in: nobody's password is replaced from the Create card.
+      if (creating) {
+        if (cloudIsNewAccount(user)) _cloudSet({ pwOpen: true, pwReset: false, pwNew: true, welcome: 'due' });
+        else _cloudSet({ welcome: 'had' });   // said after the plan read (it clears the line)
+      }
       return true;
     })
     .catch((e) => { _cloudSet({ busy: false, message: cloudErrorMessage(e, 'verify') }); return false; })
@@ -325,7 +375,8 @@ function cloudVerifyCode() {
 function _cloudSignedIn(user, email) {
   _cloudSet({ busy: false, status: 'signed-in', email: (user && user.email) || email,
     message: '', plan: null, trialEndsAt: null, checkedAt: null, forgot: false, useCode: false,
-    google: _cloudGoogleEmail(user), googlePending: '', googleOff: false });   // V140
+    google: _cloudGoogleEmail(user), googlePending: '', googleOff: false,   // V140
+    signup: false, pwNew: false, welcome: '' });                          // V144
   _cloudRememberUnlock();   // v85 2A
 }
 
@@ -338,10 +389,57 @@ function _cloudAfterSignIn(ok) {
   if (ok) {
     return cloudCheckConnection().then(() => {
       if (typeof syncPushSoon === 'function') { try { syncPushSoon(0, { pull: true }); } catch (e) { console.error(e); } }
+      cloudMaybeWelcome();   // V144 (6A): a Google-made account — the plan has just been read (or 'had': the line)
       return ok;
     });
   }
   return ok;
+}
+
+// ---- V144: Create an account (spec 1A 2A 3A 4A 5A) ------------------------------
+// The Create card is the sign-in card's twin: the same email box (whatever is
+// typed carries over), the same code step, the same landing. state.cloud.signup
+// is what makes the code request create (cloudCodeOptions) and the code step
+// finish with "Choose a password".
+function cloudSignupOpen() {
+  if (state.cloud.busy) return;
+  const typed = _cloudInputValue('cloud-email').trim().toLowerCase();
+  _cloudSet({ signup: true, useCode: false, forgot: false, message: '', email: typed || state.cloud.email || '' });
+  render();
+}
+function cloudSignupClose() {
+  if (state.cloud.busy) return;
+  const typed = _cloudInputValue('cloud-email').trim().toLowerCase();
+  _cloudSet({ signup: false, forgot: false, message: '', status: state.cloud.status === 'code-sent' ? 'signed-out' : state.cloud.status,
+    email: typed || state.cloud.email || '' });
+  render();
+}
+function cloudSignupSend() {
+  if (!state.cloud.signup) return Promise.resolve(false);
+  _cloudSet({ forgot: false });
+  return cloudSendCode();
+}
+
+// 6A: the welcome, once, to an account made just now — after its password is
+// saved (email) or once its plan has been read (Google). The sheet and its words
+// are plan.js's (planShowWelcome); optional, so guarded (MAP rule 6). Never over
+// another sheet or with the password card still to finish.
+function cloudMaybeWelcome() {
+  const c = state.cloud;
+  // An address that already had an account (Create card): one line, no sheet.
+  // Said here, after the plan read — cloudCheckConnection clears the line.
+  if (c.welcome === 'had' && c.status === 'signed-in' && !c.busy) {
+    _cloudSet({ welcome: '', message: 'You already had a PATGo account with that email \u2014 you\u2019re signed in.' });
+    _cloudRepaint();
+    return false;
+  }
+  if (c.welcome !== 'due' || c.status !== 'signed-in' || c.pwOpen || c.busy) return false;
+  if (typeof planShowWelcome !== 'function') return false;
+  try { if (document.querySelector('body > .bulk-sheet, body > .fail-sheet, body > .modal-backdrop')) return false; } catch (e) { /* no DOM */ }
+  _cloudSet({ welcome: 'shown' });
+  try { const a = document.activeElement; if (a && typeof a.blur === 'function') a.blur(); } catch (e) { /* nothing focused */ }
+  try { planShowWelcome(); } catch (e) { console.error(e); }
+  return true;
 }
 
 // ---- V139: password sign-in (spec 1A–5A, 4B) ------------------------------------
@@ -421,6 +519,7 @@ function cloudPasswordOpen() {
   render();
 }
 function cloudPasswordCancel() {
+  if (state.cloud.pwNew) return;   // V144 (2A): a new account's password can't be skipped
   _cloudSet({ pwOpen: false, pwReset: false, message: '' });
   render();
 }
@@ -451,12 +550,14 @@ function cloudPasswordSave() {
         _cloudSet({ busy: false, message: cloudErrorMessage(res.error, 'new-password') });
         return false;
       }
-      _cloudSet({ busy: false, pwOpen: false, pwReset: false,
-        message: 'Password saved. Next time, sign in with your email and this password.' });
+      const isNew = !!state.cloud.pwNew;
+      _cloudSet({ busy: false, pwOpen: false, pwReset: false, pwNew: false,
+        message: isNew ? 'Your account is ready. Next time, sign in with your email and this password.'
+                       : 'Password saved. Next time, sign in with your email and this password.' });
       return true;
     })
     .catch((e) => { _cloudSet({ busy: false, message: cloudErrorMessage(e, 'new-password') }); return false; })
-    .then((ok) => { _cloudRepaint(); return ok; });
+    .then((ok) => { _cloudRepaint(); if (ok) cloudMaybeWelcome(); return ok; });
 }
 
 // Show / Hide. Flips the boxes in place — a render() would empty them, and a
@@ -641,6 +742,9 @@ function cloudGoogleReturn(params) {
         return 'linked';
       }
       _cloudSignedIn(user, user.email || '');   // the same landing as a code or password
+      // V144 (3A): with sign-ups on, a Google login nobody knew has just been
+      // made an account. No password is asked for — Google is its way in.
+      if (cloudIsNewAccount(user)) _cloudSet({ welcome: 'due' });
       return true;
     })
     .catch((e) => { _cloudSet({ busy: false, googlePending: '', message: cloudErrorMessage(e, 'google') }); return false; })
@@ -696,6 +800,8 @@ function cloudGoogleDisconnect() {
 }
 
 function cloudChangeEmail() {
+  // V144: from the Create card's code step this goes back to the Create card
+  // (state.cloud.signup is left as it is).
   _cloudSet({ status: 'signed-out', busy: false, message: '', forgot: false });
   render();
 }
@@ -749,7 +855,8 @@ function cloudSignOut() {
     _cloudSet({ status: cloudAvailable() ? 'signed-out' : 'off', busy: false, message: 'Signed out.',
       plan: null, trialEndsAt: null, checkedAt: null,
       useCode: false, forgot: false, pwOpen: false, pwReset: false,   // V139
-      google: '', googlePending: '', googleOff: false });             // V140
+      google: '', googlePending: '', googleOff: false,                // V140
+      signup: false, pwNew: false, welcome: '' });                    // V144
     _cloudGoogleCloseWindow();
     render();
   };

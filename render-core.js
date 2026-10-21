@@ -256,7 +256,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Plan checks.</strong> PATGo now confirms your plan online at least once every 30 days &mdash; it does this by itself whenever you have signal. If a subscription ends, you have 7 days&rsquo; grace from that date, and cloud syncing pauses a week after the account locks. Nothing on your phone is ever deleted, and everything uploads as soon as you renew.</li>
+        <li><strong>Create an account.</strong> New to PATGo? You can now make your own cloud account from Settings &rarr; Account &amp; Sync, by email or with Google, and try everything free for 30 days &mdash; no card needed.</li>
+        <li><strong>Your trial at a glance.</strong> The Account page shows how many days of your free trial are left, and subscribing ends with a proper thank-you.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

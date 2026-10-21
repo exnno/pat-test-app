@@ -324,12 +324,18 @@ let state = {
   //   V140 (Google): google — the connected Google address ('' = none; read
   //   from the stored session at boot); googlePending — 'signin' | 'link' while
   //   the Google window is open; googleOff — "Disconnect Google?" is showing.
+  //   V144 (sign-up): signup — the Create an account card (and its code step)
+  //   is showing, so the code request makes an account; pwNew — the password
+  //   card is finishing a NEW account (no Cancel); welcome — 'due' once an
+  //   account was made just now, 'shown' after the welcome sheet; 'had' when
+  //   the Create card signed in an account that already existed (a line).
   // Replaces the V43 mock's userId/authToken/authStatus.
   cloud: {
     status: 'off', busy: false, email: '',
     plan: null, trialEndsAt: null, checkedAt: null, message: '',
     useCode: false, forgot: false, pwOpen: false, pwReset: false,
     google: '', googlePending: '', googleOff: false,
+    signup: false, pwNew: false, welcome: '',
   },
   // v80: sync (sync.js). TRANSIENT, like `cloud` — the durable part (what was
   // sent, what was read, and when) lives in SYNC_STATE_KEY, owned by sync.js.
