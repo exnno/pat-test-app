@@ -10,7 +10,7 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v88';
+const CACHE_VERSION = 'pat-v141';
 const ASSETS = [
   './',
   './index.html',
@@ -19,6 +19,7 @@ const ASSETS = [
   './data.js',          // v71 — must stay directly after config.js, before state.js
   './state.js',
   './utils.js',
+  './icons.js',             // V115
   './storage.js',
   './clients.js',
   './instruments.js',   // v66
@@ -29,6 +30,8 @@ const ASSETS = [
   './photos.js',
   './csv.js',
   './backup.js',
+  './snapshots.js',     // V105
+  './reset.js',         // V106
   './session.js',
   './settings-actions.js',   // v70
   './setup.js',
@@ -41,6 +44,7 @@ const ASSETS = [
   './jspdf.plugin.autotable.min.js',
   './report.js',
   './pdfpreview.js',
+  './exportall.js',      // V125
   './render-core.js',
   './render-review.js',
   './render-settings.js',
@@ -51,18 +55,31 @@ const ASSETS = [
   // phone keeps working offline after an update, same reasoning as jsPDF.
   './supabase.umd.js',
   './sync.js',           // v80
+  './plan.js',           // V127
   './scanner.js',
   './events.js',
   './dispatch.js',
   './boot.js',
   './manifest.webmanifest',
   './icon-192.png',
-  './icon-512.png'
+  './icon-512.png',
+  // V109: the browser-tab icon (the plug on its own, 16/32/48 px) and the
+  // 180 px home-screen icon. Both live at the site root; precached so the tab
+  // icon still shows offline.
+  './favicon.ico',
+  './apple-touch-icon.png'
 ];
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_VERSION).then(cache => cache.addAll(ASSETS))
+    // V91.1: every file is fetched with cache: 'reload' — straight from the
+    // server, never from the browser's own HTTP cache. ⚠ GitHub Pages lets
+    // files be cached for ~10 minutes, so a phone that picked up a new sw.js
+    // soon after a release could fill the NEW cache with the OLD files and stay
+    // on the old version however often the key was bumped (found at V91: phone
+    // on V90, incognito on V91).
+    caches.open(CACHE_VERSION).then(cache =>
+      cache.addAll(ASSETS.map(url => new Request(url, { cache: 'reload' }))))
     // v61.2: the temporary install-time skipWaiting() used to recover from the
     // v61 deadlock has been REMOVED, deliberately. It has to go: with it in
     // place, every future update activates immediately, and the controllerchange
@@ -81,6 +98,10 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then(keys =>
       Promise.all(keys.filter(k => k !== CACHE_VERSION).map(k => caches.delete(k)))
+    // claim() takes over a first-visit page too, so it works offline at once.
+    // That fires controllerchange there as well; boot.js reloads only a page
+    // that loaded under a worker or asked for the update (V126,
+    // updateOnControllerChange) — a first visit is never reloaded.
     ).then(() => self.clients.claim())
   );
 });
@@ -90,6 +111,13 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('message', (event) => {
   if (event.data && event.data.type === 'SKIP_WAITING') {
     self.skipWaiting();
+  }
+  // V124 (3A): the page asks a WAITING worker which version it is, so the banner
+  // can say "PATGo V124 is ready". The answer goes back on the port the page
+  // sent; a page that sent none (or an older worker that never answers) just
+  // shows the plain wording. The key is the one this worker was built with.
+  if (event.data && event.data.type === 'GET_VERSION' && event.ports && event.ports[0]) {
+    event.ports[0].postMessage({ version: CACHE_VERSION });
   }
 });
 

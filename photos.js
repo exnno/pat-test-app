@@ -6,7 +6,7 @@
  * See LICENSE.txt for full terms.
  */
 
-// ============== PATGo PWA — v62 — Photo evidence store (v88: cloud upload hooks) ==============
+// ============== PATGo PWA — v62 — Photo evidence store (v88: cloud upload hooks; v89: photos down on request) ==============
 //
 // The app's FIRST use of any persistence mechanism other than localStorage.
 // Everything that touches IndexedDB lives in this file and nowhere else, so the
@@ -207,10 +207,12 @@ function _photoMetaPut(r) {
   if (!r || !r.id) return;
   if (!state.photoMeta) state.photoMeta = {};
   state.photoMeta[r.id] = _photoMetaOf(r);
+  state.photoMetaV = (state.photoMetaV || 0) + 1;   // v89: the cloud-only memo
 }
 
 function _photoMetaDrop(id) {
   if (state.photoMeta) delete state.photoMeta[id];
+  state.photoMetaV = (state.photoMetaV || 0) + 1;
 }
 
 // Synchronous count for an item — the ONLY thing render() may call.
@@ -301,7 +303,9 @@ function processPhotoFile(file) {
 function photoAdd(sessionId, itemId, processed) {
   if (!itemId || !processed || !processed.blob) return Promise.resolve(null);
   const cap = (typeof PHOTO_MAX_PER_ITEM === 'number') ? PHOTO_MAX_PER_ITEM : 3;
-  if (photoCountForItem(itemId) >= cap) return Promise.resolve(null);
+  // v89: the cap is the item's photos wherever they are — a cloud-only photo
+  // still counts, or a second phone could take an item past the maximum.
+  if (photoCountForItemAll(itemId) >= cap) return Promise.resolve(null);
 
   const record = {
     id: (typeof newId === 'function') ? newId() : String(Date.now()) + Math.random().toString(36).slice(2),
@@ -541,6 +545,304 @@ function photosClearUploaded(isUploaded) {
       return { removed: going.length, kept: all.length - going.length };
     });
   });
+}
+
+// ---------- v89: photos in the cloud, not on this phone ----------
+//
+// sync.js keeps state.photoCloud = the photos this phone KNOWS are in the cloud
+// (its own uploads, and rows read from the photos table for jobs on this phone).
+// A photo is CLOUD-ONLY when it is known there, is not in this phone's store,
+// and has not been deleted here (a 'photo' ledger entry waiting to be sent).
+// Everything below is synchronous — render() reads it (MAP rule 2) — and is
+// memoised on the change counters, so an Overview of 200 rows costs one pass.
+//
+// ⚠ Shown only while signed in to the account the list belongs to. Signed out,
+// or another account signed in before its first run, it is empty: a tile nobody
+// can download is worse than no tile.
+
+let _photoCloudMemo = null;
+
+function _photoCloudVisible() {
+  if (typeof syncActive !== 'function' || !syncActive()) return false;
+  if (!state.photoCloudUser) return false;
+  return (typeof cloudUserId === 'function') && cloudUserId() === state.photoCloudUser;
+}
+
+function _photoCloudOnlyIndex() {
+  const tombs = state.tombstones || [];
+  const vis = _photoCloudVisible();
+  const key = [state.photoMeta, state.photoMetaV, state.photoCloud, state.photoCloudV, tombs, tombs.length, vis];
+  const m = _photoCloudMemo;
+  if (m && m.key.length === key.length && m.key.every((k, i) => k === key[i])) return m.byItem;
+  const byItem = new Map();
+  if (vis) {
+    const meta = state.photoMeta || {};
+    const cloud = state.photoCloud || {};
+    const gone = new Set();
+    for (const t of tombs) if (t && t.kind === 'photo') gone.add(String(t.id));
+    for (const id of Object.keys(cloud)) {
+      if (meta[id] || gone.has(id)) continue;
+      const e = cloud[id];
+      if (!e || !e.i) continue;
+      const list = byItem.get(e.i) || [];
+      list.push({ id, s: e.s, i: e.i, b: e.b || 0, t: !!e.t, a: e.a || '' });
+      byItem.set(e.i, list);
+    }
+    for (const list of byItem.values()) list.sort((a, b) => String(a.a).localeCompare(String(b.a)) || a.id.localeCompare(b.id));
+  }
+  _photoCloudMemo = { key, byItem };
+  return byItem;
+}
+
+// Cloud-only photos of one item, oldest first: [{id, s, i, b, t, a}].
+function photoCloudOnlyForItem(itemId) {
+  if (!itemId) return [];
+  return (_photoCloudOnlyIndex().get(String(itemId)) || []).slice();
+}
+
+// On the phone + only in the cloud. What the badges show (3A) and what the
+// per-item cap counts.
+function photoCountForItemAll(itemId) {
+  if (!itemId) return 0;
+  const cloud = _photoCloudOnlyIndex().get(String(itemId));
+  return photoCountForItem(itemId) + (cloud ? cloud.length : 0);
+}
+
+function photoCloudOnlyCountForItem(itemId) {
+  if (!itemId) return 0;
+  const cloud = _photoCloudOnlyIndex().get(String(itemId));
+  return cloud ? cloud.length : 0;
+}
+
+// For the jobs list (Peter, V89 round): a job's photos, and how many of those
+// are only in the cloud. By ITEM, like the badges, so the two always agree.
+function photoCountsForSession(sess) {
+  const out = { total: 0, cloud: 0, cloudBytes: 0 };
+  if (!sess || !Array.isArray(sess.items)) return out;
+  const idx = _photoCloudOnlyIndex();
+  for (const it of sess.items) {
+    if (!it || it.id == null) continue;
+    out.total += photoCountForItem(it.id);
+    const c = idx.get(String(it.id));
+    if (c) { out.total += c.length; out.cloud += c.length; for (const e of c) out.cloudBytes += e.b || 0; }
+  }
+  return out;
+}
+
+// Every cloud-only photo of one job, in item order: for "Download all" and the
+// certificate prompt (4A).
+function photoCloudOnlyForSession(sess) {
+  const out = [];
+  if (!sess || !Array.isArray(sess.items)) return out;
+  const idx = _photoCloudOnlyIndex();
+  for (const it of sess.items) {
+    const c = it && it.id != null ? idx.get(String(it.id)) : null;
+    if (c) out.push(...c);
+  }
+  return out;
+}
+
+// A downloaded photo joins the store exactly like one taken here, with the SAME
+// id — so it is still the one cloud photo, known as uploaded, and never goes up
+// again. Nothing is noted for sync: there is nothing to send. Resolves true/false.
+function photoAddFromCloud(e, blob) {
+  if (!e || !e.id || !e.i || !blob) return Promise.resolve(false);
+  if (state.photoMeta && state.photoMeta[e.id]) return Promise.resolve(true);   // already here
+  const record = {
+    id: String(e.id),
+    itemId: String(e.i),
+    sessionId: String(e.s || ''),
+    blob,
+    w: e.w || 0,
+    h: e.h || 0,
+    bytes: e.b || blob.size || 0,
+    at: (typeof e.a === 'string' && e.a) ? e.a : new Date().toISOString()
+  };
+  return _photoTx('readwrite', (store) => store.put(record)).then(({ ok }) => {
+    if (!ok) return false;
+    _photoIndexAdd(record.itemId, record.bytes);
+    _photoMetaPut(record);
+    return true;
+  }).catch(() => false);
+}
+
+// A photo deleted on the other phone: this phone's copy goes, and NOTHING is
+// noted — the delete is already in the cloud (it is how we heard of it).
+// Resolves the number removed, or -1 if the store refused (the caller retries).
+// V90: also the photo manager's "Remove from phone" (a selection of photos KNOWN
+// to be in the cloud — the caller checks). Same meaning: this phone's copy goes,
+// nothing is noted, the cloud keeps it. `keepPreview` keeps its preview for the
+// session, since the photo is still there to see.
+function photosRemoveQuiet(ids, keepPreview) {
+  const want = (ids || []).map(String).filter((id) => state.photoMeta && state.photoMeta[id]);
+  if (!want.length) return Promise.resolve(0);
+  return _photoTx('readwrite', (store) => {
+    want.forEach((id) => { try { store.delete(id); } catch {} });
+  }).then(({ ok }) => {
+    if (!ok) return -1;
+    want.forEach((id) => {
+      const m = state.photoMeta[id];
+      if (m) _photoIndexRemove(m.i, m.b);
+      _photoMetaDrop(id);
+      if (!keepPreview) photoThumbForget(id);
+    });
+    return want.length;
+  }).catch(() => -1);
+}
+
+// V101 (Stage 9, split). A photo belongs to the ONE job holding its item. Items
+// can now move between jobs (session.js moveItemsToNewJob, or a moved-out job
+// arriving from the other phone), but every record here also carries its job —
+// `sessionId`, which photosDeleteForSessions() sweeps by. Left stale, deleting or
+// clearing the job the items LEFT would delete the photos of the job they moved
+// to. itemId → jobId for items in exactly one job; an id held by two jobs is
+// ambiguous and maps to null (never guessed).
+function photoItemJobs(sessions) {
+  const out = new Map();
+  for (const s of (sessions || [])) {
+    if (!s || !Array.isArray(s.items)) continue;
+    const sid = String(s.id);
+    for (const it of s.items) {
+      if (!it || it.id == null) continue;
+      const k = String(it.id);
+      if (!out.has(k)) out.set(k, sid);
+      else if (out.get(k) !== sid) out.set(k, null);
+    }
+  }
+  return out;
+}
+
+// Re-label this phone's photos whose item now lives in a different job. The
+// mirror first (synchronous — sync.js and the prune guard read it), then the
+// store. Called after a move, after a pull that changed jobs (sync.js), and at
+// boot once the mirror is read — so a store write that failed heals itself.
+// Resolves the number re-labelled in the store (-1 if the store refused).
+function photosSettleJobs() {
+  const meta = state.photoMeta;
+  if (!meta || !state.photoMetaReady) return Promise.resolve(0);
+  const holders = photoItemJobs(state.sessions);
+  const fix = new Map();
+  for (const id of Object.keys(meta)) {
+    const m = meta[id];
+    const job = holders.get(String(m.i));
+    if (job && job !== m.s) fix.set(id, job);
+  }
+  if (!fix.size) return Promise.resolve(0);
+  for (const [id, job] of fix) meta[id].s = job;
+  state.photoMetaV = (state.photoMetaV || 0) + 1;
+  return _photoTx('readwrite', (store) => {
+    for (const [id, job] of fix) {
+      const req = store.get(id);
+      req.onsuccess = () => {
+        const r = req.result;
+        if (r && r.sessionId !== job) { r.sessionId = job; store.put(r); }
+      };
+    }
+  }).then(({ ok }) => (ok ? fix.size : -1)).catch(() => -1);
+}
+
+// V102 (Stage 9, duplicate — 12A). Copy every photo of some items onto their
+// copies: `itemMap` is Map(oldItemId → newItemId), `sessionId` the copy's job.
+// Each copy is a NEW photo — its own id, so it is uploaded as a photo of its
+// own and deleting either job never touches the other's (photos are swept by
+// item and by job, photosDeleteForItem / photosDeleteForSessions).
+//
+// ⚠ ONE TRANSACTION, so it is all or nothing: a phone that runs out of space
+// part-way copies NO photos, and the caller then makes no job — there is never
+// a copy missing some of its photos, or photos left with no job. The reads and
+// the writes share the transaction; each copy is put from its read's onsuccess,
+// while the transaction is still active. Only items the mirror says have photos
+// are read. Resolves { ok, n }; no photo store at all is ok with nothing copied.
+function photosCopyForItems(itemMap, sessionId) {
+  if (!photosSupported()) return Promise.resolve({ ok: true, n: 0 });
+  const want = [];
+  for (const [from, to] of (itemMap || new Map())) {
+    if (from && to && photoCountForItem(from) > 0) want.push([String(from), String(to)]);
+  }
+  if (!want.length) return Promise.resolve({ ok: true, n: 0 });
+  const copies = [];
+  return _photoTx('readwrite', (store) => {
+    const idx = store.index('itemId');
+    for (const [from, to] of want) {
+      const req = idx.getAll(from);
+      req.onsuccess = () => {
+        for (const r of (req.result || [])) {
+          if (!r || !r.blob) continue;
+          const c = {
+            id: (typeof newId === 'function') ? newId() : String(Date.now()) + Math.random().toString(36).slice(2),
+            itemId: to,
+            sessionId: String(sessionId || ''),
+            blob: r.blob,
+            w: r.w || 0,
+            h: r.h || 0,
+            bytes: (typeof r.bytes === 'number' && r.bytes > 0) ? r.bytes : 0,
+            at: (typeof r.at === 'string' && r.at) ? r.at : new Date().toISOString()
+          };
+          store.put(c);
+          copies.push(c);
+        }
+      };
+    }
+  }).then(({ ok }) => {
+    if (!ok) return { ok: false, n: 0 };
+    for (const c of copies) { _photoIndexAdd(c.itemId, c.bytes); _photoMetaPut(c); }
+    return { ok: true, n: copies.length };
+  }).catch(() => ({ ok: false, n: 0 }));
+}
+
+// The engineer deletes a photo that is only in the cloud (5A: any phone that can
+// see it). The ledger carries it; sync.js deletes the row and file.
+function photoDeleteCloudOnly(photoId) {
+  if (!photoId) return false;
+  _photoNoteGone([String(photoId)], []);
+  photoThumbForget(photoId);
+  return true;
+}
+
+// A small preview of a photo, for the cloud (1A). Same canvas recipe as
+// photoPrintDataUrl; output a Blob. Null on any failure — a photo without a
+// preview still uploads.
+function photoThumbBlob(blob) {
+  const px = (typeof SYNC_THUMB_PX === 'number') ? SYNC_THUMB_PX : 240;
+  const q = (typeof SYNC_THUMB_QUALITY === 'number') ? SYNC_THUMB_QUALITY : 0.6;
+  return photoPrintDataUrl(blob, px, q).then((r) => {
+    if (!r || !r.dataUrl) return null;
+    const b64 = String(r.dataUrl).split(',')[1] || '';
+    if (!b64) return null;
+    try { return _photoBase64ToBlob(b64, 'image/jpeg'); } catch { return null; }
+  }).catch(() => null);
+}
+
+// Previews fetched this session, kept so reopening a strip costs nothing (R17).
+// Separate from the strip's tracked URLs, which are revoked when it closes.
+const _photoThumbUrls = new Map();
+
+function photoThumbCached(id) {
+  return _photoThumbUrls.get(String(id)) || '';
+}
+
+function photoThumbRemember(id, blob) {
+  if (!id || !blob) return '';
+  const key = String(id);
+  if (_photoThumbUrls.has(key)) return _photoThumbUrls.get(key);
+  let url = '';
+  try { url = URL.createObjectURL(blob); } catch { return ''; }
+  _photoThumbUrls.set(key, url);
+  const cap = 300;
+  while (_photoThumbUrls.size > cap) {
+    const first = _photoThumbUrls.keys().next().value;
+    try { URL.revokeObjectURL(_photoThumbUrls.get(first)); } catch {}
+    _photoThumbUrls.delete(first);
+  }
+  return url;
+}
+
+function photoThumbForget(id) {
+  const key = String(id);
+  const url = _photoThumbUrls.get(key);
+  if (!url) return;
+  try { URL.revokeObjectURL(url); } catch {}
+  _photoThumbUrls.delete(key);
 }
 
 // ---------- object URL lifecycle ----------

@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V88';
+const APP_VERSION = 'V141';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -33,6 +33,8 @@ const ENGINEER_KEY = 'pat:engineer';
 const DESCRIPTIONS_KEY = 'pat:descriptions';
 const SORT_KEY = 'pat:sort';
 const THEME_KEY = 'pat:theme';            // v7: 'system' | 'light' | 'dark'
+const TEXT_SIZE_KEY = 'pat:textsize';     // V121: 'standard' | 'large' | 'larger' (per phone, like the theme)
+const TEXT_SIZES = ['standard', 'large', 'larger'];   // V121: anything else reads as 'standard'
 const HAPTICS_KEY = 'pat:haptics';        // v7: '1' | '0'
 const ITEM_PRESETS_KEY = 'pat:itempresets';     // v9: JSON [{id,name,items:[...]}]
 const ACTIVE_PRESET_KEY = 'pat:activepreset';   // v9: preset id
@@ -131,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V87';
+const WELCOME_VERSION = 'V141';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -304,12 +306,11 @@ const DURATION_MIN_MS = 60 * 1000;
 // session in every other respect (rides through the codec, CSV, reports and
 // backups unchanged — the flag is just an extra passthrough field).
 const DEMO_SESSION_FLAG = 'isExample';
-// v43: the MOCK sign-in's storage key. ⚠ V79 retired the mock: nothing writes
-// this key any more, load() deletes it if an older version left one behind, and
-// backups no longer carry sign-in details at all (a backup is a file people
-// email around — it must never hold a credential). Kept only so load() can
-// clear it. Real sign-in state is owned by cloud.js; see CLOUD_* below.
-const PAT_AUTH_KEY = 'pat:authUser';
+// V130 (2A): the v43 MOCK sign-in key is gone from the code (named nowhere).
+// V79 retired the mock and load() deleted any leftover for 50 releases; nothing
+// has ever read it since. Backups still carry no sign-in details at all (a
+// backup is a file people email around — it must never hold a credential).
+// Real sign-in state is owned by cloud.js; see CLOUD_* below.
 
 // ---- v79: cloud environment -------------------------------------------------
 // Which Supabase project this copy of the app talks to is decided by the HOST
@@ -358,6 +359,35 @@ const REQUIRE_ACCOUNT = false;
 // not open the curtain. Factory reset (own spec, BACKLOG) must clear it.
 const CLOUD_UNLOCK_KEY = 'pat:cloudUnlocked';
 const CLOUD_ACCESS_CODE = '1111';
+
+// ---- V127: the plan — trial end, grace, the lock (plan.js) -------------------
+// PLAN_KEY: what this phone last learned about the signed-in account's plan, so
+// the lock holds offline. One account at a time; another login ignores it.
+// Shape (plan.js planNote): { uid, plan, trialEndsAt, lapsedSeenAt, maxNow,
+// checkedAt, shownEnded, shownLastDay }. Per device, NEVER in a backup or a
+// setup export (a restore must not carry one account's plan to another phone).
+// Reset this phone: 'account'.
+const PLAN_KEY = 'pat:plan';
+// 3A: the account keeps everything for this many days after the trial (or the
+// plan) ends. 4A: the Jobs list says when the trial ends from this many days out.
+const PLAN_GRACE_DAYS = 7;
+const PLAN_WARN_DAYS = 7;
+// How long a fresh read of the plan lasts before the app reads it again when it
+// comes back to the front (it is also read at every start, online).
+const PLAN_REFRESH_MS = 6 * 60 * 60 * 1000;
+// Renew now (10A). Until payment exists this is blank and Renew opens an email
+// to PLAN_RENEW_EMAIL. When there is a payment page, put its address here:
+// nothing else in the app changes. The account's email is added as ?email=…
+const PLAN_RENEW_URL = '';
+const PLAN_RENEW_EMAIL = 'hello@patgo.co.uk';
+
+// ---- V141: the privacy policy (Stage 12, C) ---------------------------------
+// The full policy lives on the website (patgo.co.uk, DreamHost), not in this
+// repo: Google's Branding page needs it at the homepage's own domain, and the
+// website form is covered by the same page. About → Privacy shows a short
+// summary and opens this in the browser (3A). The www form matches Contact's
+// link, which is known to work. Change it here only — nothing else names it.
+const PRIVACY_URL = 'https://www.patgo.co.uk/privacy.html';
 
 // ---- v80/v81: sync (push and pull — see sync.js) ----------------------------
 // SYNC_STATE_KEY: which account the phone last sent to, a fingerprint of every
@@ -421,7 +451,8 @@ const SYNC_GENERAL_IDS = [SYNC_WORK_ID, SYNC_FAILS_ID, SYNC_DESC_ID, SYNC_CSV_ID
 // it until the screen is left (the V84 Report-settings rule). Each of these
 // either holds unsaved typing or writes every field back on Save.
 const SYNC_GENERAL_VIEWS = {
-  settings_work: ['settingsUser', 'settingsDisplay', 'settingsReadings', 'settingsItems', 'settingsRetest'],
+  // V97 (3A): item times moved from settingsDisplay to settingsLogging.
+  settings_work: ['settingsUser', 'settingsLogging', 'settingsReadings', 'settingsItems', 'settingsRetest'],
   settings_fails: ['settingsFails'],
   settings_descriptions: ['settingsDescriptions'],
   settings_csv: ['settingsCsv'],
@@ -437,9 +468,12 @@ const SQP_RESET_KEY = 'pat:sqpResetAt';
 // fields that need not be focused (see _syncSafeToRepaint in sync.js).
 // v84: + Report settings, whose toggles change state before Save is tapped.
 // v86: + the general-settings pages (SYNC_GENERAL_VIEWS).
-const SYNC_NO_REPAINT_VIEWS = ['settingsInstrument', 'settingsItems', 'settingsUser', 'settingsReport',
+// V117 (1A): Report Settings is two pages now. Either one open = report settings
+// open (unsaved toggles in state). Used by sync.js and the list below.
+const REPORT_SETTINGS_VIEWS = ['settingsReport', 'settingsReportContent'];
+const SYNC_NO_REPAINT_VIEWS = ['settingsInstrument', 'settingsItems', 'settingsUser', ...REPORT_SETTINGS_VIEWS,
   'settingsFails', 'settingsDescriptions', 'settingsCsv', 'settingsMultiPick', 'settingsDisplay',
-  'settingsReadings', 'settingsRetest'];
+  'settingsReadings', 'settingsRetest', 'settingsLogging', 'settingsStorage'];   // V97
 // v82 (decision 6A): the "What's different?" sheet lists at most this many
 // items per section, then says how many more there are.
 const SYNC_DIFF_LIST_MAX = 20;
@@ -456,10 +490,56 @@ const SYNC_HASH_V = 2;
 // backstop and every save/navigation bring one round. Deletes go in batches.
 const SYNC_PHOTOS_PER_RUN = 25;
 const SYNC_PHOTO_DELETE_BATCH = 50;
+// V89 (10A, R17): photos come DOWN on request only. The phone learns which photos
+// are in the cloud from their small rows (read by cursor, like jobs); an image
+// comes down only on a tap (strip, "Download all", or the certificate prompt).
+// A preview (1A) is a small JPEG uploaded beside each photo at
+// {user_id}/{photo_id}_t.jpg — about 1/25th of the photo — so a cloud-only photo
+// can be SEEN without downloading it. Opening the strip is the request for its
+// previews. Previews made per run (backfill of photos already up): SYNC_THUMBS_PER_RUN.
+const SYNC_THUMB_PX = 240;
+const SYNC_THUMB_QUALITY = 0.6;
+const SYNC_THUMBS_PER_RUN = 50;
+// Photo rows for jobs that arrived after the photo cursor passed them (a job
+// brought in later): fetched by job id, this many ids per request.
+const SYNC_PHOTO_NEED_BATCH = 50;
+// V90 (R18): the photo manager (Settings → Data → Manage Photos).
+// PHOTO_MGR_PAGE tiles are shown at a time; "Show more" at the bottom
+// adds another page — a grid of hundreds never builds, reads or fetches at once.
+// "Look in the cloud" (3A) reads the photos table — rows only, never images —
+// SYNC_BROWSE_PAGE rows per request, up to SYNC_BROWSE_MAX, then the names of
+// the jobs not on this phone, SYNC_PHOTO_NEED_BATCH ids per request.
+const PHOTO_MGR_PAGE = 48;
+const SYNC_BROWSE_PAGE = 1000;
+const SYNC_BROWSE_MAX = 20000;
 const SYNC_PULL_PAGE = 200;         // v81: rows per pull request, then page again
 // v83.1: the pager's version. A cursor saved under an older one is cleared once
 // (sync.js _syncLoad), because V81–V83 could step over rows at a page edge.
 const SYNC_PAGER_V = 2;
+// V91 (Stage 4, 1A/2A): "safe in the cloud". st.conf[jobId] = the fingerprint of
+// the job's cloud copy as the pull last READ it. A job is safe when that equals
+// the phone's copy and every photo is known in the cloud. SYNC_CONF_V marks the
+// bookkeeping version: a stored state without it has never recorded a read, so
+// its jobs cursor is cleared ONCE (2A) and every job is read back — rows this
+// phone already has resolve as no work (the V83.1 re-read, jobs only).
+const SYNC_CONF_V = 1;
+// V93 (Stage 5 part 2, R21/R22 — 1A). Which jobs come down to a phone that does
+// not hold them: a job dated within the last SYNC_WINDOW_DAYS days, or one whose
+// retest chase has started (2A). A FIXED rule, applied every time the pull meets
+// a job this phone hasn't got — not only on a fresh phone. Everything else stays
+// in the cloud and is one tap away on the Jobs screen's "In the cloud" tab.
+const SYNC_WINDOW_DAYS = 30;
+// V93 (8A): the cloud list read for the Jobs screen's "In the cloud" tab — rows
+// per request, and the most it will read (said on screen if reached).
+const SYNC_CLOUD_PAGE = 1000;
+const SYNC_CLOUD_MAX = 20000;
+// V107 (Stage 5 part 3, 4B): deleting jobs from the cloud tab asks for the word
+// typed when this many or more are chosen, or when any has a certificate.
+const CLOUD_DELETE_WORD = 'DELETE';
+const CLOUD_DELETE_TYPE_AT = 5;
+// V108 (Stage 5 part 3, 3A): Settings → Data → Cloud Storage lists this many of
+// the account's biggest jobs (the job plus its photos).
+const CLOUD_STORAGE_TOP = 10;
 // v81.2 (decision 2D). Reading is driven by what the engineer DOES — every
 // screen change is a moment they might be expecting the other phone's work —
 // with a slow backstop for standing still. The interval matters far more than
@@ -473,6 +553,30 @@ const SYNC_IDLE_CHECK_MS = 20000;     // how often that is checked (no network u
 // has no cursor, so its first pull reads the whole account — every job it
 // pushed comes back, matches its own fingerprint, and resolves as no work.
 const SYNC_PULL_EPOCH = '1970-01-01T00:00:00.000Z';
+// V128 (Stage 12, clean-up job — phone side; 1A 2A 3A 4A 5A). A phone learns of a
+// delete made elsewhere only from the small "deleted" row (marker) it leaves. The
+// scheduled clean-up job will remove markers older than SYNC_MARKER_DAYS, so a
+// phone that has not seen every row of a table for SYNC_STALE_DAYS first lists
+// that table's ids in full: anything it knows was in the cloud and is now not
+// there at all was deleted, and is treated exactly as a marker would be (3A).
+// ⚠ SYNC_MARKER_DAYS IS THE SERVER'S RULE, written here so the two sit side by
+// side: the clean-up job must never remove a marker younger than it, and
+// SYNC_STALE_DAYS must stay well below it — the gap is the margin for clocks.
+const SYNC_MARKER_DAYS = 365;
+const SYNC_STALE_DAYS = 274;          // ≈ 9 months (2A)
+const SYNC_CHECK_PAGE = 500;          // ids per request — under the server's 1000-row cap
+const SYNC_CHECK_MEMO_MS = 3600000;   // a finished check is reused for an hour (runs held open by a question)
+// V133 (Stage 12, the clean-up job part 1 — 4A). PHONE_KEY: this phone's private
+// id and when it last told the cloud which version it runs — shape
+// { id, v, u, at, tried } (sync.js _syncPhoneReport). The clean-up job
+// (supabase/v133-cleanup.sql) holds back an account's old markers while any
+// phone signed in to it has not reported V133 or later. Per device, NEVER in a
+// backup or a setup export (a restore onto another phone would make two phones
+// one). Reset this phone: 'account' — it goes with the sign-in.
+const PHONE_KEY = 'pat:phone';
+const PHONE_REPORT_MS = 86400000;     // same version and account: at most daily
+const PHONE_RETRY_MS = 3600000;       // a report that failed: again after an hour
+const SYNC_DAY_MS = 86400000;
 // v33: First-run wizard "seen" flag. Set once the wizard is completed OR skipped,
 // so it never reappears. Distinct from the welcome modal key: a genuinely-new
 // install gets the WIZARD (gated by this key + an empty-install test); an
@@ -549,6 +653,10 @@ const REPORT_COLOR_THEMES = [
 // Factory (not a shared object) so callers always get an independent copy —
 // mirrors the DEFAULT_CSV_COLUMNS.map(...) deep-copy pattern used elsewhere
 // (that table is in data.js since v71).
+// V95: the remedial section's action line, editable in Report settings.
+const REPORT_REMEDIAL_ACTION_DEFAULT =
+  'Failed items have been withdrawn from use and labelled as failed. Repair or replace before further use.';
+
 function makeDefaultReportSettings() {
   return {
     enabled:          false,   // master switch — OFF for everyone (see note above)
@@ -599,6 +707,18 @@ function makeDefaultReportSettings() {
     // welcome modal tells them the switch exists. Read with `=== true`
     // (storage.js) so a pre-v64 settings blob backfills to OFF, not ON.
     showPhotos:       false,
+    // V95 (S7, 5B 6A): the remedial actions section at the END of the report —
+    // every fail with its reason; with photos on, it is also where a fail's
+    // photos print (6A: each fail once). OFF by default, `=== true` in
+    // storage.js, same posture as showDuration/showPhotos. The action line is
+    // its own switch (5B "optional like everything else"), on by default but
+    // only drawn while the section is. ⚠ Sync rule 36: _syncReportProjection
+    // drops these three while they hold their defaults, so an untouched V95
+    // phone's report row hashes exactly as on V94 (nothing re-sent, no holds,
+    // V84 5A "nothing made" still true).
+    showRemedial:     false,
+    remedialActionOn: true,
+    remedialActionText: REPORT_REMEDIAL_ACTION_DEFAULT,
     declaration:      true,    // print the declaration/signature line
     declarationText:  REPORT_DECLARATION_DEFAULT,
     // v34: optional signature image (base64 PNG data URL, downscaled <=400px on
@@ -775,6 +895,13 @@ const SETUP_BUNDLE_VERSION = 1;
 const CLIENTS_KEY = 'pat:clients';          // v19: JSON [{id,name}]
 const SITES_KEY = 'pat:sites';              // v19: JSON [{id,clientId,name}]
 
+// V98 (Stage 8): site notes — door codes, difficult locations, reminders. A
+// site MAY carry `notes` (plain text, at most SITE_NOTES_MAX characters). The key
+// is ABSENT when there are none, so a site without notes keeps its V97 shape in
+// storage, in backups and in the synced row (sync rule 36). Private to the
+// engineer: never on a certificate or a CSV (4A).
+const SITE_NOTES_MAX = 1000;
+
 // v78: sync prep. THE DELETION LEDGER — a record of what the engineer has
 // deleted, kept after the record itself is gone.
 //
@@ -822,6 +949,15 @@ const SQP_HISTORY_KEY = 'pat:sqphistory';   // v18: JSON { loc: { type: count } 
 // item.readings, which is why it's a clean self-contained object of as-typed
 // text values, not parsed numbers.
 const READINGS_KEY = 'pat:readingsenabled';   // v53: '1' | '0', default '0'
+// V104 (S10): the readings check. ⚠ DEFAULTS ON (7A) — only an explicit '0'
+// turns it off, the same absent-means-on reading as SCANNER_KEY. save() always
+// writes '1'/'0', so switching it off persists. It only does anything while
+// READINGS_KEY is on.
+const READINGS_CHECK_KEY = 'pat:readingscheck';
+// V104 (S10, 2A): the engineer's earth-continuity ceiling in ohms, stored as a
+// string. Unreadable or out of range reads back as READING_EARTH_LIMIT_DEFAULT
+// (data.js) through normaliseEarthLimit (utils.js).
+const READINGS_EARTH_LIMIT_KEY = 'pat:readingsearthlimit';
 
 // ---------------------------------------------------------------------------
 // v65: HID barcode scanner ("keyboard wedge").
@@ -996,6 +1132,9 @@ const SQP_STAPLE_DEFENCE = 2;     // v27: preset button at/above this score is p
 // channel for those devices, but it's off until the user turns it on.
 const SOUNDFX_KEY = 'pat:soundfx';          // v17: '1' | '0', default '0'
 
+// V115 (14B) "Classic emoji icons" switch — retired V116; its key name and
+// load()'s clean-up of it removed V130 (2A). Nothing names it any more.
+
 // v17: Item timestamps. Stored as '1'|'0', default OFF ('0'). When ON, each
 // item gets a `ts` (ISO string) stamped the moment it's first saved, shown in
 // the Overview (HH:MM beneath the item type) and available as a CSV column.
@@ -1003,6 +1142,97 @@ const SOUNDFX_KEY = 'pat:soundfx';          // v17: '1' | '0', default '0'
 // Timestamps were deliberately dropped back in v15; this is an opt-in revival,
 // so existing users see no change unless they enable it.
 const TIMESTAMPS_KEY = 'pat:timestamps';    // v17: '1' | '0', default '0'
+
+// V94 (15A, 16B): the ↶ Undo button beside Copy last. PER PHONE (a personal
+// habit — and keeping it out of the synced settings_work row means no row
+// changes shape). '1' | '0', default OFF: only an explicit '1' turns it on.
+// Not synced; in backups and setup exports like Sound. Factory reset (Stage 10)
+// must clear it.
+const UNDO_KEY = 'pat:undo';
+
+// V99 (Stage 8 part 2): MAP PIN — a fail's what3words address (1A: pasted, never
+// worked out by the app; that needs what3words' paid service with a key in
+// public source). Stored on the ITEM as `pin` = 'word.word.word' (no slashes,
+// lower case), ABSENT when none (3A, sync rule 36). Never in notes.
+// MAP_PIN_KEY: the switch, PER PHONE (8A), '1' | '0', default OFF — only an
+// explicit '1' turns it on. It hides only the ways of ADDING a pin (the 📍
+// button and the offer after a fail); pins already on items always show,
+// export and print (9A). In backups and setup exports like Undo. Factory reset
+// (Stage 10) must clear it at the settings level.
+const MAP_PIN_KEY = 'pat:mapPin';
+// MAP_PIN_OPEN_KEY: { s: sessionId, i: itemId, at: ms } written the moment the
+// engineer taps "Open what3words" — iOS may reload a home-screen app while it is
+// in the background, and boot (mapPinResume) reopens the pin sheet on that item.
+// Cleared whenever the sheet closes. Older than MAP_PIN_OPEN_MAX_MS = ignored.
+// Per phone, never in backups. Factory reset must clear it (data level).
+const MAP_PIN_OPEN_KEY = 'pat:mapPinOpen';
+const MAP_PIN_OPEN_MAX_MS = 2 * 60 * 60 * 1000;
+// The offer after a fail is logged (5A): how long the "📍 Add map pin" pill stays.
+const MAP_PIN_OFFER_MS = 4000;
+// V101 (Stage 9, split): the "Moved 12 items to … · Open" pill after a move (11A).
+const MOVE_OFFER_MS = 6000;
+// V101 (8A): a job remembers which items moved out of it, and to which job
+// (`movedOut`, {itemId: jobId}), so another phone can take the smaller job without
+// the "fewer items" question. Bounded; the oldest entries go first.
+const MOVED_OUT_MAX = 5000;
+// V103 (Stage 9B, 2A): the job picker shows a filter box above this many jobs.
+const MOVE_TO_FILTER_AT = 8;
+const W3W_HOME_URL = 'https://what3words.com/';
+// V99.1: open the what3words APP straight away — its own documented link
+// (developer.what3words.com, "Mobile linking to the what3words app"), at the
+// phone's current position. V99 opened the website with window.open: from a
+// home-screen app iOS shows that in a browser panel, the site hands over to the
+// app, and coming back left a BLANK panel to close first (Peter, 5 Oct).
+const W3W_APP_URL = 'w3w://show?currentlocation';
+// No sign of leaving the app this long after the tap → what3words is not on
+// this phone (or iOS's "Open in what3words?" was cancelled): offer the website.
+const W3W_APP_WAIT_MS = 2500;
+
+// V100 (Stage 8 part 3): IN-APP REMINDERS — banners on the Jobs screen, never
+// notifications (Stage 14 adds those, server-side). All three timings are PER
+// PHONE (8A) in one JSON object under REMINDERS_KEY, every value a string:
+//   exportAfter — 'off' | '1h' | '4h' | 'morning': how long after a job is
+//                 LOCKED before "not exported" shows (3A: off by default).
+//   unlockedAt  — 'off' | '16'…'20': the hour of the day after which "jobs still
+//                 unlocked" shows (4A: off by default).
+//   backupDays  — 'off' | '3' | '7' | '14' | '30': the backup reminder (5A). '7'
+//                 is what the app always did, so nothing changes until changed.
+// In backups and setup exports like Undo (normaliseReminders on the way in).
+// Factory reset (Stage 10) must clear it at the settings level.
+const REMINDERS_KEY = 'pat:reminders';
+const REMINDER_EXPORT_CHOICES = ['off', '1h', '4h', 'morning'];
+const REMINDER_UNLOCKED_CHOICES = ['off', '16', '17', '18', '19', '20'];
+const REMINDER_BACKUP_CHOICES = ['off', '3', '7', '14', '30'];
+// 'morning' = this hour on the calendar day after the lock, phone's own clock.
+const REMINDER_MORNING_HOUR = 8;
+// REMINDER_QUIET_KEY: { exp: 'yyyy-mm-dd', unl: 'yyyy-mm-dd' } — the LOCAL day a
+// banner's × was tapped; it stays away for the rest of that day (6A). A nag timer:
+// per phone, NOT in backups or setup exports. Factory reset must clear it.
+const REMINDER_QUIET_KEY = 'pat:reminderQuiet';
+// The job's own lock time is `lockedAt` (ISO), written by saveSessionEdits when a
+// job becomes locked and removed when it is unlocked — ABSENT otherwise (sync rule
+// 36), so no job's fingerprint moves on upgrade (1A: jobs locked before V100 have
+// none and never remind). `reportAt` (ISO) is stamped when a certificate PDF is
+// downloaded or shared from the preview (2B: a certificate made after locking
+// counts as exported). Both in the job document, which Stage 14's server reads.
+
+// V100: the 100th version. The welcome opens with a one-off "100" moment, About
+// can replay it, and seven taps on About's title run "PATGo tests itself" (9A,
+// 10A). Both write NOTHING, anywhere (11A), and skip the animation when iPhone's
+// Reduce Motion is on. Taps more than this far apart start the count again.
+const EGG_TAPS = 7;
+const EGG_TAP_GAP_MS = 1500;
+// The self-test's readings, in order, and its steps: 0…3 that reading is being
+// taken; 4 all done; EGG_STICKER_STEP the PASS sticker; EGG_FINAL the certificate.
+const EGG_ROWS = [
+  ['Visual inspection', 'No damage'],
+  ['Earth continuity', '0.01 \u03a9'],
+  ['Insulation resistance', '>299 M\u03a9'],
+  ['Polarity', 'Correct'],
+];
+const EGG_STICKER_STEP = EGG_ROWS.length + 1;
+const EGG_FINAL = EGG_ROWS.length + 2;
+const PARTY_SPARKS = 14;
 
 // v16: Multi Pick. A single GLOBAL set of up to 6 named, ordered item-type
 // sequences, plus a show/hide toggle for the entry-screen button. Stored as one
@@ -1015,6 +1245,13 @@ const TIMESTAMPS_KEY = 'pat:timestamps';    // v17: '1' | '0', default '0'
 // Slots with no items are dropped on save and never shown in the sheet.
 const MULTIPICK_KEY = 'pat:multipick';
 const MULTIPICK_MAX_SLOTS = 6;
+// V94 (7, 13A): a multi-pick may also sit in the Quick Pick grid as a tile —
+// `qp` on the slot (1 | 2 | 3; absent = not on the grid). Slot 1 is the bottom
+// row's RIGHT cell, 2 the middle, 3 the left. Stored on the multi-pick itself so
+// it syncs with it (13A); a slot without `qp` is byte-identical to V93's shape.
+// ⚠ Mixed versions: a V93 phone that SAVES Multi Pick settings sends the row
+// without `qp`, and every V94 phone takes that (one-sided change) — tiles gone.
+const QP_TILE_SLOTS = 3;
 
 // v15: Sessions-list filter persistence. Two independent filters that combine
 // (AND) and sit beside the Sort control. Both default to 'all'.
@@ -1050,6 +1287,34 @@ const STORAGE_BANNER_PCT = 80;
 // ISO day (yyyy-mm-dd) the Jobs-screen storage banner was last dismissed. Per
 // device, a nag timer — NOT in backups or setup exports. Factory reset must clear it.
 const STORAGE_BANNER_KEY = 'pat:storageBannerDay';
+
+// V105 (S14, 7A): daily snapshots (snapshots.js). ⚠ DEFAULTS ON — only an
+// explicit '0' turns them off, the same absent-means-on reading as SCANNER_KEY
+// (MAP rule 9). Backed up; NOT synced (it is about this phone's storage).
+const SNAPSHOTS_KEY = 'pat:snapshots';
+// ISO day the last daily snapshot was refused (usually a full phone); removed
+// on the next success. Per device, a status note only — NOT in backups or setup
+// exports. Factory reset must clear it.
+const SNAPSHOT_FAIL_KEY = 'pat:snapshotFailDay';
+
+// V106 (Stage 10 part 2): Reset this phone (reset.js). Present only between the
+// confirm tap and the next boot finishing the job: JSON {level, cert, at}. Read
+// by reset.js resetRunPending() BEFORE load(), then removed. Never backed up,
+// never synced. Every other key's fate on a reset is in reset.js RESET_KEY_PLAN
+// — a new storage key added here must be classified there too (harness 43a).
+const RESET_PENDING_KEY = 'pat:resetPending';
+
+// V91 (Stage 4, O4 — 8A/9A): the tidy-up offer. Signed in only.
+// PHOTO_AGE_KEY — photos taken more than this many months ago, known to be in
+//   the cloud, are offered for removal from THIS phone (they come back with a
+//   tap). Per device, like PRUNE_AGE_KEY; 1–120, default 3.
+// TIDY_OFFER_KEY — ISO day the Jobs-screen offer was last shown-and-answered.
+//   It comes back TIDY_OFFER_DAYS later. Per device, a nag timer — NOT in
+//   backups or setup exports. Factory reset must clear it.
+const PHOTO_AGE_KEY = 'pat:photoAgeMonths';
+const PHOTO_AGE_DEFAULT = 3;
+const TIDY_OFFER_KEY = 'pat:tidyOfferDay';
+const TIDY_OFFER_DAYS = 30;
 const BACKUP_SNOOZE_HOURS = 24;
 
 // v56: Retest reminders — the commercial "chase the customer to rebook" tool.

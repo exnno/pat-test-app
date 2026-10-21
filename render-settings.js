@@ -54,8 +54,9 @@ function settingsPageSubtitle(pageId) {
     case 'settingsDisplay': {
       const themeSummary = state.theme === 'system' ? 'System' : (state.theme === 'dark' ? 'Dark' : 'Light');
       const extras = [];
+      if (state.textSize === 'large') extras.push('Large text');        // V121
+      else if (state.textSize === 'larger') extras.push('Larger text');
       if (state.soundEnabled) extras.push('Sound on');
-      if (state.timestampsEnabled) extras.push('Times on');
       return [themeSummary, state.hapticsEnabled ? 'Haptics on' : 'Haptics off', ...extras].join(' · ');
     }
     case 'settingsCsv': {
@@ -77,13 +78,34 @@ function settingsPageSubtitle(pageId) {
       const rs = state.reportSettings;
       return !rs.enabled ? 'Off' : (rs.companyName ? `On · ${rs.companyName}` : 'On · no company name set');
     }
+    case 'settingsReportContent': {   // V117 (1A)
+      const rs = state.reportSettings;
+      const nt = (state.reportTemplates || []).length;
+      return `Certificate numbers ${rs.certEnabled ? 'on' : 'off'} · ${nt === 0 ? 'no templates' : `${nt} template${nt === 1 ? '' : 's'}`}`;
+    }
     case 'settingsRetest': {
       if (!state.retestRemindersEnabled) return 'Off';
       const n = activeRetestCount();
       return n === 0 ? 'On · nothing due' : `On · ${n} due`;
     }
-    case 'settingsBackup':  return 'Back up and restore your data';
+    case 'settingsBackup':  return 'Back up and restore your jobs, settings and photos';
+    // V97 (1A): the storage page's row says how full this phone is.
+    case 'settingsStorage': {
+      try {
+        const st = getStorageStats();
+        return `${st.pct}% full`;
+      } catch (e) { return 'Space used on this phone'; }
+    }
+    case 'settingsLogging':
+      return `Undo ${state.undoEnabled ? 'on' : 'off'} · Map pins ${state.mapPinEnabled ? 'on' : 'off'} · Item times ${state.timestampsEnabled ? 'on' : 'off'}`;
+    case 'settingsReminders': return reminderSettingsSummary();   // V100
     case 'settingsSetup':   return 'Share your setup to another device';
+    case 'cloudStorage': {   // V108: the last figures read this app session, if any
+      const cs = state.cloudStore;
+      if (cs && cs.ok && typeof cloudBytesText === 'function') return `About ${cloudBytesText((cs.jobs.bytes || 0) + (cs.photos.bytes || 0))} in the cloud`;
+      return 'Space your jobs and photos take in the cloud';
+    }
+    case 'settingsReset':   return 'Clear this phone, or start again as new';   // V106
     case 'settingsCalculator': return 'Earth continuity limit';
     case 'settingsAbout':   return `PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}`;
     case 'settingsGlossary': {
@@ -92,6 +114,7 @@ function settingsPageSubtitle(pageId) {
       return `${n} terms explained`;
     }
     case 'settingsContact': return 'Get in touch';
+    case 'settingsTutorials': return 'A practice job, setting up, and the cloud';   // V134 (6A); V135; V136
     // v85: the Cloud group's rows. Only ever painted once unlocked, so cloud.js
     // is present — still guarded, it is an optional subsystem (MAP rule 6).
     case 'cloudAccount': {
@@ -120,17 +143,17 @@ function settingsPageSubtitle(pageId) {
 // A single settings row button (used by category sub-lists and search results).
 // `context` is an optional muted suffix (e.g. the category name in search results).
 function settingsPageRowHTML(pageId, context) {
-  const meta = SETTINGS_PAGE_META[pageId] || { icon: '•', title: pageId };
+  const meta = SETTINGS_PAGE_META[pageId] || { icon: '', title: pageId };
   const sub = settingsPageSubtitle(pageId);
   const ctx = context ? `<span class="settings-row-context">${escapeHTML(context)}</span>` : '';
   return `
-    <button class="settings-row" data-action="settings-page" data-arg="${pageId}" data-page="${pageId}">
-      <span class="settings-row-icon">${meta.icon}</span>
+    <button class="settings-row" data-action="${meta.action || 'settings-page'}" data-arg="${pageId}" data-page="${pageId}">
+      <span class="settings-row-icon">${icon(meta.icon)}</span>
       <div class="settings-row-text">
         <div class="settings-row-title">${escapeHTML(meta.title)}${ctx}</div>
         ${sub ? `<div class="settings-row-sub">${escapeHTML(sub)}</div>` : ''}
       </div>
-      <span class="settings-row-chevron">›</span>
+      <span class="settings-row-chevron">${icon('chevron-right')}</span>
     </button>`;
 }
 
@@ -148,6 +171,47 @@ function settingsPageSearchable(cat) {
   return typeof cloudPagesUnlocked === 'function' && cloudPagesUnlocked();
 }
 
+// V96 (4A): the hub's order. Account & Sync is first in SETTINGS_CATEGORIES and
+// is drawn first only once this phone is unlocked; locked, it goes to the end so
+// a free user on the test host meets their own settings first, not a code box.
+function settingsCategoriesInOrder() {
+  const shown = SETTINGS_CATEGORIES.filter(settingsCategoryVisible);
+  const unlocked = typeof cloudPagesUnlocked === 'function' && cloudPagesUnlocked();
+  if (unlocked) return shown;
+  return shown.filter(c => c.id !== 'catCloud').concat(shown.filter(c => c.id === 'catCloud'));
+}
+
+// V96 (3A): a page row that only makes sense in some states. Jobs on this phone
+// is a cloud screen (V91 5A) — the Backup page shows its button only while
+// syncing, and so does the row. Manage photos is there whenever photos.js is.
+function settingsPageVisible(pageId) {
+  if (pageId === 'jobManager') {
+    return typeof syncActive === 'function' && syncActive() && typeof renderJobManager === 'function';
+  }
+  if (pageId === 'photoManager') return typeof renderPhotoManager === 'function';
+  // V108 (1A): Cloud Storage, like Jobs on this phone, only while syncing.
+  if (pageId === 'cloudStorage') {
+    return typeof syncActive === 'function' && syncActive() && typeof renderCloudStorage === 'function';
+  }
+  // V106: Reset This Phone lives in reset.js, an optional subsystem (MAP rule 6).
+  if (pageId === 'settingsReset') return typeof renderSettingsReset === 'function';
+  return !!SETTINGS_PAGE_META[pageId];
+}
+
+// V96: while locked, the Account & Sync row keeps saying what it is today —
+// an invite-only test — so nobody expects to sign up from it.
+function settingsCategoryBlurb(cat) {
+  if (cat.id === 'catCloud' && !(typeof cloudPagesUnlocked === 'function' && cloudPagesUnlocked())) {
+    return 'Invite-only test: your account, sync and subscription';
+  }
+  return cat.blurb;
+}
+
+// The pages of a group that are drawn right now, in order.
+function settingsCategoryPages(cat) {
+  return cat ? cat.pages.filter(settingsPageVisible) : [];
+}
+
 // v32: the hub body (search results OR category list). Separated so the live
 // search filter can re-render just this region, preserving focus on the search
 // input (a full render() would blur it on every keystroke — the same reason
@@ -158,7 +222,7 @@ function renderSettingsHubBodyHTML() {
     const results = [];
     SETTINGS_CATEGORIES.forEach(cat => {
       if (!settingsPageSearchable(cat)) return;   // v85
-      cat.pages.forEach(pageId => {
+      settingsCategoryPages(cat).forEach(pageId => {   // V96
         const meta = SETTINGS_PAGE_META[pageId];
         if (!meta) return;
         const hay = `${meta.title} ${meta.aliases || ''}`.toLowerCase();
@@ -169,14 +233,14 @@ function renderSettingsHubBodyHTML() {
       ? `<div class="settings-list">${results.map(r => settingsPageRowHTML(r.pageId, r.cat.title)).join('')}</div>`
       : `<p class="muted settings-empty-search">No settings match "${escapeHTML(state.settingsSearchQuery.trim())}".</p>`;
   }
-  return `<div class="settings-list">${SETTINGS_CATEGORIES.filter(settingsCategoryVisible).map(cat => `
+  return `<div class="settings-list">${settingsCategoriesInOrder().map(cat => `
       <button class="settings-row" data-action="settings-category" data-arg="${cat.id}">
-        <span class="settings-row-icon">${cat.icon}</span>
+        <span class="settings-row-icon">${icon(cat.icon)}</span>
         <div class="settings-row-text">
           <div class="settings-row-title">${escapeHTML(cat.title)}</div>
-          <div class="settings-row-sub">${escapeHTML(cat.blurb)}</div>
+          <div class="settings-row-sub">${escapeHTML(settingsCategoryBlurb(cat))}</div>
         </div>
-        <span class="settings-row-chevron">›</span>
+        <span class="settings-row-chevron">${icon('chevron-right')}</span>
       </button>`).join('')}</div>`;
 }
 
@@ -185,7 +249,7 @@ function renderSettingsHubBodyHTML() {
 function renderSettingsHub() {
   const searchBox = `
     <div class="settings-search">
-      <input type="search" id="settings-search-input" class="input settings-search-input"
+      <input aria-label="Search settings" type="search" id="settings-search-input" class="input settings-search-input"
         placeholder="Search settings" value="${escapeHTML(state.settingsSearchQuery)}"
         data-input-action="settings-search" autocapitalize="off" autocomplete="off" spellcheck="false">
     </div>`;
@@ -193,16 +257,23 @@ function renderSettingsHub() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">‹</button>
-        <div class="site-name">Settings</div>
+        <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">${icon('chevron-left')}</button>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Settings</div>
         <span style="width:40px"></span>
       </header>
       ${searchBox}
       <div id="settings-hub-body">${renderSettingsHubBodyHTML()}</div>
-      <p class="settings-footer">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''} · © 2026 Peter Birchley<br>Data stored on this device only</p>
+      <p class="settings-footer">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''} · © 2026 Peter Birchley<br>${settingsWhereDataLives()}</p>
       ${renderStatsFooterHTML()}
     </div>
   `;
+}
+
+// V96: the footer said "Data stored on this device only" even while signed in
+// and syncing — wrong, and the first thing a paying customer would notice.
+function settingsWhereDataLives() {
+  const syncing = typeof syncActive === 'function' && syncActive();
+  return syncing ? 'Saved on this phone and in your cloud account' : 'Saved on this phone only';
 }
 
 // v59: the lifetime stats line, under the existing footer in the same muted
@@ -237,23 +308,29 @@ function renderSettingsCategory() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="back-to-settings-btn" data-action="back-to-settings" aria-label="Back">‹</button>
-        <div class="site-name">${escapeHTML(cat.title)}</div>
+        <button class="icon-btn" id="back-to-settings-btn" data-action="back-to-settings" aria-label="Back">${icon('chevron-left')}</button>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">${escapeHTML(cat.title)}</div>
         <span style="width:40px"></span>
       </header>
       <p class="settings-category-blurb">${escapeHTML(cat.blurb)}</p>
       <div class="settings-list">
-        ${cat.pages.map(pageId => settingsPageRowHTML(pageId)).join('')}
+        ${settingsCategoryPages(cat).map(pageId => settingsPageRowHTML(pageId)).join('')}
       </div>
     </div>
   `;
 }
 
+// V137 (1A 2A): the "Show me how ›" line under a page's title, on the pages a
+// tutorial covers (tour.js tutShowMeHowHTML decides; '' everywhere else).
+function settingsHowToHTML(view) {
+  return (typeof tutShowMeHowHTML === 'function') ? tutShowMeHowHTML(view) : '';
+}
+
 function renderSettingsSubHeader(title) {
   return `
     <header class="header-row">
-      <button class="icon-btn" id="back-to-settings-btn" data-action="back-to-settings" aria-label="Back">‹</button>
-      <div class="site-name">${escapeHTML(title)}</div>
+      <button class="icon-btn" id="back-to-settings-btn" data-action="back-to-settings" aria-label="Back">${icon('chevron-left')}</button>
+      <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">${escapeHTML(title)}</div>
       <span style="width:40px"></span>
     </header>
   `;
@@ -271,11 +348,12 @@ function renderSettingsUser() {
   // global chip would be meaningless.
   return `
     <div class="screen">
-      ${renderSettingsSubHeader('User Settings')}
+      ${renderSettingsSubHeader('Engineer & Tester')}
+      ${settingsHowToHTML('settingsUser')}
       <div class="settings-section">
         <h2 class="h2">Engineer name</h2>
-        <p class="muted">Used as the default for new sessions and shown on exported CSVs.</p>
-        <input class="input" id="settings-engineer" value="${escapeHTML(state.engineer)}" placeholder="Your name">
+        <p class="muted">Used as the default for new jobs and shown on exported CSVs.</p>
+        <input aria-label="Engineer name" class="input" id="settings-engineer" value="${escapeHTML(state.engineer)}" placeholder="Your name">
       </div>
 
       <div class="settings-section">
@@ -303,8 +381,8 @@ function renderSettingsItems() {
   // Clear buttons have context. Counts the learned locations.
   const sqpLocCount = Object.keys(state.sqpHistory || {}).length;
   const sqpHistoryNote = sqpLocCount === 0
-    ? 'No history learned yet. Turning this on builds it from your existing sessions; it then keeps learning as you log items.'
-    : `Learned from ${sqpLocCount} location${sqpLocCount === 1 ? '' : 's'}. Rebuild re-scans all your sessions; Clear empties it (re-enabling rebuilds it).`;
+    ? 'No history learned yet. Turning this on builds it from your existing jobs; it then keeps learning as you log items.'
+    : `Learned from ${sqpLocCount} location${sqpLocCount === 1 ? '' : 's'}. Rebuild re-scans all your jobs; Clear empties it (re-enabling rebuilds it).`;
 
   // v9: presets dialog (rename / new) — uses the existing bulk-sheet bottom-sheet
   // pattern so it visually matches the bulk-edit-location dialog and the fail
@@ -320,7 +398,7 @@ function renderSettingsItems() {
         <button class="fail-close-btn" id="preset-dialog-cancel" data-action="preset-dialog-cancel" aria-label="Cancel">×</button>
       </div>
       <label class="label">Name</label>
-      <input class="input" id="preset-dialog-input" data-input-action="preset-name" value="${escapeHTML(dialog.name)}" placeholder="e.g. Workshop, Office, Site visit" autofocus>
+      <input aria-label="Preset name" class="input" id="preset-dialog-input" data-input-action="preset-name" value="${escapeHTML(dialog.name)}" placeholder="e.g. Workshop, Office, Site visit" autofocus>
       <button class="btn-primary" id="preset-dialog-confirm" data-action="preset-dialog-confirm" style="margin-top:14px">${dialog.mode === 'new' ? 'Create' : 'Save'}</button>
     </div>
   ` : '';
@@ -328,6 +406,7 @@ function renderSettingsItems() {
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Quick Pick Items')}
+      ${settingsHowToHTML('settingsItems')}
 
       <!-- v9: Presets picker. Switching here changes which list is edited below
            and which 9 items appear on the entry screen. Selection sticks
@@ -335,21 +414,21 @@ function renderSettingsItems() {
       <div class="settings-section">
         <h2 class="h2">Preset</h2>
         <p class="muted">${escapeHTML(presetSummary)}. The selected preset is what shows on the entry screen.</p>
-        <select class="input" id="settings-preset-select" data-change-action="preset-switch">${presetOptions}</select>
+        <select aria-label="Preset" class="input" id="settings-preset-select" data-change-action="preset-switch">${presetOptions}</select>
         <div class="preset-actions-row">
-          <button class="preset-action-btn" id="preset-new-btn" data-action="preset-new">＋ New</button>
-          <button class="preset-action-btn" id="preset-rename-btn" data-action="preset-rename">✎ Rename</button>
-          <button class="preset-action-btn preset-action-danger" id="preset-delete-btn" data-action="preset-delete"${canDelete ? '' : ' disabled'}>🗑 Delete</button>
+          <button class="preset-action-btn" id="preset-new-btn" data-action="preset-new">+ New</button>
+          <button class="preset-action-btn" id="preset-rename-btn" data-action="preset-rename">Rename</button>
+          <button class="preset-action-btn preset-action-danger" id="preset-delete-btn" data-action="preset-delete"${canDelete ? '' : ' disabled'}>${icon('trash-2')} Delete</button>
         </div>
         <!-- v47: long-press shortcut tip. Tells the user about the hidden
              entry-screen gesture (there is no on-screen hint there by design). -->
-        <p class="settings-tip">💡 <strong>Quick tip:</strong> on the test screen, press and hold the row of quick-pick buttons for a couple of seconds to switch presets without coming back here. It only changes the buttons — it never logs anything.</p>
+        <p class="settings-tip">${icon('lightbulb')} <strong>Quick tip:</strong> on the test screen, press and hold the row of quick-pick buttons for a couple of seconds to switch presets without coming back here. It only changes the buttons — it never logs anything.</p>
       </div>
 
       <div class="settings-section">
         <h2 class="h2">Items in "${escapeHTML(active ? active.name : '')}"</h2>
         <p class="muted">One per line. Up to 9. Appear as quick-tap buttons on the entry screen.</p>
-        <textarea class="textarea" id="settings-types" style="min-height:240px">${escapeHTML((active ? active.items : []).join('\n'))}</textarea>
+        <textarea aria-label="Item types, one per line" class="textarea" id="settings-types" style="min-height:240px">${escapeHTML((active ? active.items : []).join('\n'))}</textarea>
       </div>
 
       <!-- v18: Smart Quick Pick. Reorders the quick-pick buttons on the entry
@@ -370,15 +449,15 @@ function renderSettingsItems() {
             <span class="toggle-slider"></span>
           </label>
         </div>
-        <p class="muted" style="margin-top:12px;font-size:12px">${sqpHistoryNote}</p>
+        <p class="muted" style="margin-top:12px;font-size:0.75rem">${sqpHistoryNote}</p>
         <div class="preset-actions-row" style="margin-top:8px">
-          <button class="preset-action-btn" id="sqp-rebuild-btn" data-action="sqp-rebuild">↻ Rebuild from my data</button>
-          <button class="preset-action-btn preset-action-danger" id="sqp-clear-btn" data-action="sqp-clear">🗑 Clear history</button>
+          <button class="preset-action-btn" id="sqp-rebuild-btn" data-action="sqp-rebuild">${icon('rotate-cw')} Rebuild from my data</button>
+          <button class="preset-action-btn preset-action-danger" id="sqp-clear-btn" data-action="sqp-clear">${icon('trash-2')} Clear history</button>
         </div>
       </div>
 
       <div class="btn-row" style="margin-top:24px">
-        <button class="btn-secondary" id="settings-items-reset" data-action="settings-items-reset">↺ Reset to defaults</button>
+        <button class="btn-secondary" id="settings-items-reset" data-action="settings-items-reset">${icon('rotate-ccw')} Reset to defaults</button>
         <button class="btn-primary" id="settings-items-save" data-action="settings-items-save">Save</button>
       </div>
 
@@ -407,7 +486,7 @@ function renderSettingsFails() {
       return `
         <div class="reason-tag-row">
           <span class="reason-tag-name">${escapeHTML(reason)}</span>
-          <select class="sort-select reason-tag-select" data-change-action="fail-reason-tag" data-reason="${escapeHTML(reason)}">${opts}</select>
+          <select aria-label="What ${escapeHTML(reason)} measures" class="sort-select reason-tag-select" data-change-action="fail-reason-tag" data-reason="${escapeHTML(reason)}">${opts}</select>
         </div>
       `;
     }).join('');
@@ -421,19 +500,48 @@ function renderSettingsFails() {
   }
   return `
     <div class="screen">
-      ${renderSettingsSubHeader('Quick Pick Fail')}
+      ${renderSettingsSubHeader('Fail Reasons')}
       <div class="settings-section">
         <h2 class="h2">Fail reasons</h2>
         <p class="muted">One per line. Up to 6. Shown when you tap FAIL.</p>
-        <textarea class="textarea" id="settings-reasons" style="min-height:200px">${escapeHTML(state.failReasons.join('\n'))}</textarea>
+        <textarea aria-label="Fail reasons, one per line" class="textarea" id="settings-reasons" style="min-height:200px">${escapeHTML(state.failReasons.join('\n'))}</textarea>
       </div>
       <div class="btn-row" style="margin-top:24px">
-        <button class="btn-secondary" id="settings-fails-reset" data-action="settings-fails-reset">↺ Reset to defaults</button>
+        <button class="btn-secondary" id="settings-fails-reset" data-action="settings-fails-reset">${icon('rotate-ccw')} Reset to defaults</button>
         <button class="btn-primary" id="settings-fails-save" data-action="settings-fails-save">Save</button>
       </div>
       ${tagsSection}
     </div>
   `;
+}
+
+// V104 (S10): the readings check — shown on the Test Readings page only while
+// readings are on. A switch (default ON, 7A) and, while it's on, the earth
+// ceiling (2A). The limits themselves are READING_LIMITS (data.js) and are not
+// editable — they're the CoP's, not a preference.
+function renderSettingsReadingsCheck() {
+  const on = state.readingsCheckEnabled !== false;
+  const earth = normaliseEarthLimit(state.readingsEarthLimit).toFixed(2);
+  return `
+      <div class="settings-section">
+        <h2 class="h2">Check readings</h2>
+        <p class="muted">When a PASS reading is outside the usual limit, a note appears under the box and you're asked once before it saves as a pass. It never fails anything for you. A reading typed as "&lt;5" or "≥19.99" is only flagged when it's definitely outside.</p>
+        <p class="muted">Usual limits (IET Code of Practice, 5th edition): insulation at least 1.0 MΩ for Class I and 2.0 MΩ for Class II; leakage at most 5 mA. Class III isn't checked.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Check against usual limits</div>
+            <div class="toggle-row-sub">${on ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="readings-check-toggle" data-change-action="readings-check-toggle" ${on ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        ${on ? `
+        <label class="reading-field-label" for="readings-earth-limit">Earth continuity limit (Ω)</label>
+        <input class="input" id="readings-earth-limit" data-change-action="readings-earth-limit" value="${earth}" inputmode="decimal" autocomplete="off">
+        <p class="muted">The real limit is 0.1 Ω plus the lead's own resistance, which depends on the lead. Set the highest reading you'd pass without checking — 0.15 suits a typical 2 m lead. Between 0.10 and 0.50.</p>` : ''}
+      </div>`;
 }
 
 // v53: Test Readings settings page. A single master toggle (default OFF) plus a
@@ -463,8 +571,9 @@ function renderSettingsReadings() {
       <div class="settings-section">
         <h2 class="h2">A few things to know</h2>
         <p class="muted">The equipment class decides which boxes appear — Class II has no earth continuity, Class III is insulation only. You can tag each fail reason (on the Quick Pick Fail page) so the right box shows when something fails. Readings are optional even when this is on — an empty box just records no value.</p>
-        <p class="muted">To include readings in your CSV export, turn the reading columns on under Settings → Reports & Output → CSV Columns. Readings will appear on the PDF certificate in a future update.</p>
-      </div>` : ''}
+        <p class="muted">To include readings in your CSV export, turn the reading columns on under Settings → Reports &amp; Exports → CSV Columns. Readings show on the PDF certificate too — switch them on or off under Certificate Content → What to include.</p>
+      </div>
+      ${renderSettingsReadingsCheck()}` : ''}
     </div>
   `;
 }
@@ -493,7 +602,7 @@ function renderSettingsScanner() {
       ${renderSettingsSubHeader('Barcode Scanner')}
       <div class="settings-section">
         <h2 class="h2">Scan asset labels</h2>
-        <p class="muted">If you have a Bluetooth barcode scanner that pairs with your phone as a keyboard — sometimes called a "wedge" or HID scanner — the app will pick up what it sends. On the entry screen a scan fills in the asset number; on the Sessions list it searches for that asset, so you can see where it was last tested.</p>
+        <p class="muted">If you have a Bluetooth barcode scanner that pairs with your phone as a keyboard — sometimes called a "wedge" or HID scanner — the app will pick up what it sends. On the entry screen a scan fills in the asset number; on the Jobs screen it searches for that asset, so you can see where it was last tested.</p>
         <p class="muted">Leave this on even if you don't own a scanner — it does nothing at all until one is paired. Typing a number by hand is unaffected: the app tells a scanner apart from a person by how fast the characters arrive, so nothing you type can be mistaken for a scan.</p>
         <div class="toggle-row">
           <div class="toggle-row-text">
@@ -528,14 +637,14 @@ function renderSettingsScanner() {
       <div class="settings-section">
         <h2 class="h2">Test your scanner</h2>
         <p class="muted">Scan any barcode while this page is open. Every burst appears below — including ones the app decided were <em>not</em> a scan, with the reason. That's the quickest way to tell a scanner that isn't connected from one that's sending too slowly.</p>
-        <input class="input-big" id="scanner-test" placeholder="Scan a label…" autocomplete="off" inputmode="none">
+        <input aria-label="Scanner test box" class="input-big" id="scanner-test" placeholder="Scan a label…" autocomplete="off" inputmode="none">
         <div class="scanner-log" id="scanner-test-log">${renderScannerTestLogHTML()}</div>
       </div>
 
       <div class="settings-section">
         <h2 class="h2">Scan speed</h2>
         <p class="muted">The app spots a scanner by how quickly the characters arrive. If the test above says "too slow", move this one notch down the list and scan again.</p>
-        <select class="input" id="scan-speed" data-change-action="scan-speed">
+        <select aria-label="Scan speed" class="input" id="scan-speed" data-change-action="scan-speed">
           ${speedOptions.map(o => `<option value="${o[0]}"${o[0] === speed ? ' selected' : ''}>${escapeHTML(o[1])} — ${SCAN_GAP_PRESETS[o[0]]}ms</option>`).join('')}
         </select>
         <p class="muted" style="margin-top:8px">${escapeHTML(speedNote)}</p>
@@ -569,11 +678,18 @@ function renderSettingsMultiPick() {
   for (let i = 0; i < MULTIPICK_MAX_SLOTS; i++) {
     const s = slots[i] || { name: '', items: [] };
     const seqValue = (s.items || []).join(', ');
+    // V94 (7): which Quick Pick tile, if any. A plain <select> (fine on iOS);
+    // choosing a slot here clears it from any other row (mp-qp → mpQpPicked).
+    const qpOpts = [['', 'Not on Quick Pick'], ['1', 'Slot 1 — bottom right'], ['2', 'Slot 2 — bottom middle'], ['3', 'Slot 3 — bottom left']]
+      .map(([v, label]) => `<option value="${v}"${String(s.qp || '') === v ? ' selected' : ''}>${label}</option>`).join('');
     slotRows.push(`
       <div class="mp-slot">
         <div class="mp-slot-head">Multi-pick ${i + 1}</div>
-        <input class="input mp-slot-name" value="${escapeHTML(s.name || '')}" placeholder="Name (optional) — e.g. Desk PC setup">
-        <input class="input mp-slot-seq" value="${escapeHTML(seqValue)}" placeholder="Lead, AC Adapter, Lead, PC, Lead, Monitor">
+        <input aria-label="Multi-pick ${i + 1} name" class="input mp-slot-name" value="${escapeHTML(s.name || '')}" placeholder="Name (optional) — e.g. Desk PC setup">
+        <input aria-label="Multi-pick ${i + 1} items, separated by commas" class="input mp-slot-seq" value="${escapeHTML(seqValue)}" placeholder="Lead, AC Adapter, Lead, PC, Lead, Monitor">
+        <label class="mp-slot-qp-label">Quick Pick tile
+          <select class="input mp-slot-qp" data-change-action="mp-qp">${qpOpts}</select>
+        </label>
       </div>
     `);
   }
@@ -584,7 +700,7 @@ function renderSettingsMultiPick() {
 
       <div class="settings-section">
         <h2 class="h2">Multi Pick button</h2>
-        <p class="muted">Multi Pick logs a fixed list of items as PASS, in order, with a single tap — handy on jobs with lots of identical setups, and easy to leave off when you don't need it.</p>
+        <p class="muted">Multi Pick logs a fixed list of items as PASS, in order, with a single tap — handy on jobs with lots of identical setups, and easy to leave off when you don't need it. This switch shows or hides the Multi Pick button at the bottom of the test screen; Quick Pick tiles (below) work either way.</p>
         <div class="toggle-row">
           <div class="toggle-row-text">
             <div class="toggle-row-title">Show on entry screen</div>
@@ -602,6 +718,7 @@ function renderSettingsMultiPick() {
         <p class="muted">For each one, type the item types you want logged, <strong>separated by commas</strong>, in the order they should be added. Add a name to label the button, or leave it blank to show the list itself. Leave a multi-pick's items blank to hide it. Up to ${MULTIPICK_MAX_SLOTS}.</p>
         <div class="mp-example">Example — items <strong>Lead, AC Adapter, Lead, PC, Lead, Monitor</strong> log six passes in that order, each on whatever location is in the entry screen's Location field.</div>
         ${slotRows.join('')}
+        <p class="muted">${icon('lightbulb')} <strong>Quick Pick tile</strong> (optional): puts that multi-pick on the bottom row of the Quick Pick buttons. Tap the tile, then <strong>PASS</strong> — the whole list is logged, the first item taking the asset number on screen. Each tile takes one button's place, so your preset shows one fewer item type per tile.</p>
       </div>
 
       <!-- v77: discoverability for the "Log again ×N" hold. Placed here, on the
@@ -612,7 +729,7 @@ function renderSettingsMultiPick() {
            already dismissed. Multi Pick is for a fixed MIXED list; this is for a
            run of the SAME item, which is why they are different features and why
            saying so here is useful rather than noise. -->
-      <p class="settings-tip">💡 <strong>Quick tip:</strong> for a run of the <em>same</em> item — ten identical desk lamps, say — you don't need a multi-pick. Log the first one, then press and hold <strong>Copy last result</strong> on the test screen and choose how many more to add.</p>
+      <p class="settings-tip">${icon('lightbulb')} <strong>Quick tip:</strong> for a run of the <em>same</em> item — ten identical desk lamps, say — you don't need a multi-pick. Log the first one, then press and hold <strong>Copy last result</strong> on the test screen and choose how many more to add.</p>
 
       <button class="btn-primary" id="settings-multipick-save" data-action="settings-multipick-save" style="margin-top:24px">Save</button>
     </div>
@@ -620,17 +737,42 @@ function renderSettingsMultiPick() {
 }
 
 function renderSettingsDescriptions() {
-  return `
+  // V95 (3A): a tappable list — tap a description to fix its spelling, and the
+  // fix can carry into logged items (descRenameAsk). The old text box stays as
+  // "Edit as text" for adding, deleting and pasting in bulk.
+  if (state.descTextMode) {
+    return `
     <div class="screen">
-      ${renderSettingsSubHeader('Item Description List')}
+      ${renderSettingsSubHeader('Descriptions')}
       <div class="settings-section">
-        <h2 class="h2">Saved descriptions</h2>
-        <p class="muted">Item types you've typed into the custom field. Edit to fix typos for future autocomplete (won't change items already saved). Add new lines to seed autocomplete with common items.</p>
-        <textarea class="textarea" id="settings-descriptions" style="min-height:280px">${escapeHTML(state.descriptions.join('\n'))}</textarea>
+        <h2 class="h2">Edit as text</h2>
+        <p class="muted">One description per line. Add lines to seed autocomplete, or delete lines you don't want. To fix a spelling on items you've already logged, use the list instead.</p>
+        <textarea aria-label="Descriptions, one per line" class="textarea" id="settings-descriptions" style="min-height:280px">${escapeHTML(state.descriptions.join('\n'))}</textarea>
       </div>
       <div class="btn-row" style="margin-top:24px">
-        <button class="btn-secondary" id="settings-descriptions-reset" data-action="settings-descriptions-reset">↺ Reset to defaults</button>
+        <button class="btn-secondary" data-action="desc-list-mode">Back to list</button>
         <button class="btn-primary" id="settings-descriptions-save" data-action="settings-descriptions-save">Save</button>
+      </div>
+      <div class="btn-row" style="margin-top:12px">
+        <button class="btn-secondary" id="settings-descriptions-reset" data-action="settings-descriptions-reset">${icon('rotate-ccw')} Reset to defaults</button>
+      </div>
+    </div>
+  `;
+  }
+  const rows = state.descriptions.map((d, i) =>
+    `<button class="desc-row" data-action="desc-edit" data-arg="${i}" data-desc="${escapeHTML(d.toLowerCase())}"><span class="desc-row-text">${escapeHTML(d)}</span><span class="desc-row-edit">${icon('pencil')}</span></button>`
+  ).join('');
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Descriptions')}
+      <div class="settings-section">
+        <h2 class="h2">Saved descriptions</h2>
+        <p class="muted">Item types you've typed into the custom field. Tap one to fix its spelling — you can also fix it on items already logged in unlocked jobs.</p>
+        ${state.descriptions.length > 12 ? `<input aria-label="Find a description" class="input" id="desc-filter" data-input-action="desc-filter" placeholder="Find a description" autocomplete="off" style="margin-bottom:10px">` : ''}
+        <div class="desc-list">${rows || '<p class="muted">No saved descriptions yet.</p>'}</div>
+      </div>
+      <div class="btn-row" style="margin-top:24px">
+        <button class="btn-secondary" data-action="desc-text-mode">Edit as text</button>
       </div>
     </div>
   `;
@@ -642,18 +784,37 @@ function renderSettingsDisplay() {
     { key: 'light', label: 'Light', sub: '' },
     { key: 'dark', label: 'Dark', sub: '' }
   ];
+  // V121: each label is drawn at the size it gives (.text-size-sample-*, fixed px).
+  const textSizes = [
+    { key: 'standard', label: 'Standard' },
+    { key: 'large', label: 'Large' },
+    { key: 'larger', label: 'Larger' }
+  ];
   return `
     <div class="screen">
-      ${renderSettingsSubHeader('Display Settings')}
+      ${renderSettingsSubHeader('Theme & Sound')}
       <div class="settings-section">
         <h2 class="h2">Theme</h2>
         <p class="muted">Choose how the app looks.</p>
         <div class="theme-options">
           ${themes.map(t => `
-            <button class="theme-option" data-action="set-theme" data-arg="${t.key}" data-set-theme="${t.key}">
+            <button class="theme-option" data-action="set-theme" data-arg="${t.key}" data-set-theme="${t.key}" aria-pressed="${state.theme === t.key ? 'true' : 'false'}">
               <span class="theme-option-radio ${state.theme === t.key ? 'checked' : ''}"></span>
               <span class="theme-option-label">${escapeHTML(t.label)}</span>
               ${t.sub ? `<span class="theme-option-sub">${escapeHTML(t.sub)}</span>` : ''}
+            </button>
+          `).join('')}
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Text size</h2>
+        <p class="muted">Makes the words bigger on every screen of PATGo. Certificates and CSV files stay the same.</p>
+        <div class="theme-options">
+          ${textSizes.map(t => `
+            <button class="theme-option" data-action="set-text-size" data-arg="${t.key}" data-set-text-size="${t.key}" aria-pressed="${state.textSize === t.key ? 'true' : 'false'}">
+              <span class="theme-option-radio ${state.textSize === t.key ? 'checked' : ''}"></span>
+              <span class="theme-option-label text-size-sample-${t.key}">${escapeHTML(t.label)}</span>
             </button>
           `).join('')}
         </div>
@@ -690,9 +851,52 @@ function renderSettingsDisplay() {
         </div>
       </div>
 
+    </div>
+  `;
+}
+
+// V97 (3A): Logging Options — Undo (a logging habit, per phone) and item times
+// (synced in settings_work), moved out of Phone & Display, which is now only
+// what is genuinely this phone's: theme, haptics, sound. The view is in
+// SYNC_GENERAL_VIEWS settings_work and SYNC_NO_REPAINT_VIEWS (config.js): a pull
+// must not apply or repaint item times while this page is open.
+function renderSettingsLogging() {
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Logging Options')}
+      <div class="settings-section">
+        <h2 class="h2">Undo button</h2>
+        <p class="muted">Puts <strong>${icon('undo-2')} Undo</strong> beside Copy last on the test screen. It takes back the last item you logged — or the whole batch from Log again or Multi Pick — after asking. Only the most recent, and only while those items are untouched. This phone only.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Show Undo</div>
+            <div class="toggle-row-sub">${state.undoEnabled ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="undo-toggle" data-change-action="undo" ${state.undoEnabled ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <h2 class="h2">Map pins for fails</h2>
+        <p class="muted">Puts <strong>${icon('map-pin')} Add map pin</strong> on a failed item, and offers it for a few seconds after you log a fail. Open what3words, copy the three words for where the item is, come back and paste them. Pins show on the Overview, print with each fail under Remedial actions on the report, and can go in a Map pin column (Settings &rarr; CSV Columns). Turning this off only hides the button &mdash; pins already added still show and print. This phone only.</p>
+        <div class="toggle-row">
+          <div class="toggle-row-text">
+            <div class="toggle-row-title">Map pins</div>
+            <div class="toggle-row-sub">${state.mapPinEnabled ? 'On' : 'Off'}</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="map-pin-toggle" data-change-action="map-pin-enabled" ${state.mapPinEnabled ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+      </div>
+
       <div class="settings-section">
         <h2 class="h2">Item timestamps</h2>
-        <p class="muted">Shows the time each item was first logged. When on, the time appears beneath the item in a session's overview and a Time column becomes available for CSV export (switch it on under Settings → CSV Columns). Since V61 the app records item times on every job whether this is on or not, so switching it on will show times for everything logged from V61 onwards — not only from the moment you switch it. This setting decides what you see and export, nothing else.</p>
+        <p class="muted">Shows the time each item was first logged. When on, the time appears beneath the item in a job's Overview and a Time column becomes available for CSV export (switch it on under Settings → Reports &amp; Exports → CSV Columns). Since V61 the app records item times on every job whether this is on or not, so switching it on will show times for everything logged from V61 onwards — not only from the moment you switch it. This setting decides what you see and export, nothing else.</p>
         <div class="toggle-row">
           <div class="toggle-row-text">
             <div class="toggle-row-title">Record item times</div>
@@ -714,7 +918,7 @@ function renderSettingsDisplay() {
 function storageProtectionHTML() {
   const v = state.storageProtection;
   if (v === 'protected') {
-    return `<p class="muted"><strong style="color:var(--pass)">✓ Protected.</strong> This phone won't clear PATGo's data to free up space. Keep exporting backups &mdash; protection doesn't cover a lost or broken phone.</p>`;
+    return `<p class="muted"><strong style="color:var(--pass-word)">${icon('check')} Protected.</strong> This phone won't clear PATGo's data to free up space. Keep exporting backups &mdash; protection doesn't cover a lost or broken phone.</p>`;
   }
   if (v === 'not') {
     return `<p class="muted"><strong>Not protected.</strong> If this phone runs short of space, it may clear PATGo's data. Using the app from its home-screen icon helps the phone decide to keep it. Until then, export backups regularly.</p>
@@ -726,22 +930,11 @@ function storageProtectionHTML() {
   return `<p class="muted">Checking&hellip;</p>`;
 }
 
+// V97 (1A): Backup & Restore holds COPIES only — the backup file, restore, the
+// photo files, and the v69 apostrophe undo. Everything about SPACE (protection,
+// the meter, clearing old jobs, the ages, clearing photos) is Phone Storage,
+// renderSettingsStorage below.
 function renderSettingsBackup() {
-  const stats = getStorageStats();
-  // v62: photos live in IndexedDB, NOT in the ~5MB localStorage budget the bar
-  // above measures, so they are reported as their own line and deliberately do
-  // NOT feed the percentage bar. Rolling them in would make the bar lie in both
-  // directions — it would show 400% for a normal photo user, and it would imply
-  // deleting photos frees the space the sessions blob is running out of.
-  const photoStats = (typeof photoStatsSync === 'function') ? photoStatsSync() : { count: 0, bytes: 0 };
-  // V87 (S13, 3A): amber from STORAGE_WARN_PCT (was 70), red from
-  // STORAGE_BANNER_PCT (was 90) — the same point the Jobs-screen banner appears.
-  const barClass = stats.pct >= STORAGE_BANNER_PCT ? 'danger' : (stats.pct >= STORAGE_WARN_PCT ? 'warn' : '');
-  const fullNote = stats.pct >= STORAGE_WARN_PCT ? `
-          <p class="storage-full-note" style="margin-top:10px;font-size:13px;color:var(--warn-soft-text)"><strong>Getting full (${stats.pct}%).</strong> Export a backup, then clear old sessions below to make room. When it's full, new items can't be saved.</p>` : '';
-  // v14: prune suggestion — sessions exported AND older than the threshold.
-  const prunable = prunableSessions();
-  const ageMonths = state.pruneAgeMonths || PRUNE_AGE_DEFAULT;
   // v69 (D5, Q4-A'): the apostrophe repair's undo. Shown only while a snapshot
   // exists, so the page is unchanged for anyone whose data needed no repair and
   // for everyone once they've moved on. Deliberately placed directly under
@@ -754,19 +947,34 @@ function renderSettingsBackup() {
         <button class="backup-action-btn" id="repair-undo-btn" data-action="repair-undo">Undo the correction</button>
       </div>
   ` : '';
-  const pruneBlock = prunable.length > 0 ? `
-          <div class="prune-suggestion">
-            <p class="prune-suggestion-text">${prunable.length} exported session${prunable.length === 1 ? '' : 's'} older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} can be cleared to free space.</p>
-            <button class="backup-action-btn" id="prune-review-btn" data-action="prune-review">Review &amp; clear…</button>
-          </div>
-  ` : `<p class="muted" style="margin-top:10px;font-size:12px">No exported sessions older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} to clear right now.</p>`;
+  // V105 (S14): Daily snapshots. The inner part is snapshotsSectionHTML()
+  // (snapshots.js), painted IN PLACE into #snapshots-block when the database
+  // answers. Left out entirely if snapshots.js is missing (MAP rule 6).
+  const snapshotsBlock = (typeof snapshotsSectionHTML === 'function') ? `
+      <div class="settings-section">
+        <h2 class="h2">Daily snapshots</h2>
+        <p class="muted">Once a day, PATGo quietly keeps a copy of your jobs and settings on this phone &mdash; the last ${typeof SNAPSHOT_KEEP === 'number' ? SNAPSHOT_KEEP : 7} days you changed something. You don't need to do anything. They're for undoing a mistake, not for a lost phone: they live inside the app, so keep exporting backups too. Photos aren't included.</p>
+        <div id="snapshots-block">${snapshotsSectionHTML()}</div>
+      </div>
+  ` : '';
+  // V125 (6A): Export everything — top of the page. exportall.js is optional
+  // (MAP rule 6): the section is left out if it didn't load.
+  const exportAllBlock = (typeof exportAllOpen === 'function') ? `
+      <div class="settings-section">
+        <h2 class="h2">Export everything</h2>
+        <p class="muted">One zip file of everything on <strong>this phone</strong>: the backup, a spreadsheet for every job, every certificate already made, and your photos if you want them.</p>
+        <button class="backup-action-btn primary" id="export-all-btn" data-action="export-all">${icon('upload')} Export everything (.zip)</button>
+      </div>
+  ` : '';
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Backup & Restore')}
+      ${settingsHowToHTML('settingsBackup')}
+      ${exportAllBlock}
       <div class="settings-section">
         <h2 class="h2">Backup</h2>
-        <p class="muted">Save a complete copy of all sessions and settings as a single JSON file. Keep it somewhere safe — it's the only safety net if the browser ever clears its data.</p>
-        <button class="backup-action-btn primary" id="backup-export-btn" data-action="backup-export">⬇ Export backup (.json)</button>
+        <p class="muted">Save a complete copy of all jobs and settings as a single JSON file. Keep it somewhere safe — it's the only safety net if the browser ever clears its data.</p>
+        <button class="backup-action-btn primary" id="backup-export-btn" data-action="backup-export">${icon('upload')} Export backup (.json)</button>
       </div>
 
       ${undoRepairBlock}
@@ -775,20 +983,64 @@ function renderSettingsBackup() {
         <h2 class="h2">Restore</h2>
         <p class="muted">Import a previously exported backup file. <strong>This will replace all current data on this device.</strong> You'll be asked to confirm before anything is overwritten.</p>
         <input type="file" id="backup-import-file" data-change-action="backup-import-file" accept="application/json,.json" style="display:none">
-        <button class="backup-action-btn danger" id="backup-import-btn" data-action="backup-import">⬆ Import backup (.json)</button>
+        <button class="backup-action-btn danger" id="backup-import-btn" data-action="backup-import">${icon('download')} Import backup (.json)</button>
       </div>
+
+      ${snapshotsBlock}
 
       ${renderPhotoBackupSection()}
 
+      <p class="muted" style="margin:4px 16px 16px;font-size:0.75rem">Running out of space? See Settings → Data → Phone Storage.</p>
+    </div>
+  `;
+}
+
+// V97 (1A, 2A): Phone Storage — space on this phone. Split out of Backup &
+// Restore. The storage banner and the "not saved" sheet's Clear old jobs land
+// here (dispatch.js), and Manage Photos / Jobs on This Phone return here when
+// opened from it (settings-actions.js _MGR_RETURN_VIEWS).
+function renderSettingsStorage() {
+  const stats = getStorageStats();
+  // v62: photos live in IndexedDB, NOT in the ~5MB localStorage budget the bar
+  // above measures, so they are reported as their own line and deliberately do
+  // NOT feed the percentage bar. Rolling them in would make the bar lie in both
+  // directions — it would show 400% for a normal photo user, and it would imply
+  // deleting photos frees the space the sessions blob is running out of.
+  const photoStats = (typeof photoStatsSync === 'function') ? photoStatsSync() : { count: 0, bytes: 0 };
+  // V87 (S13, 3A): amber from STORAGE_WARN_PCT (was 70), red from
+  // STORAGE_BANNER_PCT (was 90) — the same point the Jobs-screen banner appears.
+  const barClass = stats.pct >= STORAGE_BANNER_PCT ? 'danger' : (stats.pct >= STORAGE_WARN_PCT ? 'warn' : '');
+  const fullNote = stats.pct >= STORAGE_WARN_PCT ? `
+          <p class="storage-full-note" style="margin-top:10px;font-size:0.8125rem;color:var(--warn-soft-text)"><strong>Getting full (${stats.pct}%).</strong> Export a backup, then clear old jobs below to make room. When it's full, new items can't be saved.</p>` : '';
+  // v14: prune suggestion — sessions exported AND older than the threshold.
+  const prunable = prunableSessions();
+  const ageMonths = state.pruneAgeMonths || PRUNE_AGE_DEFAULT;
+  // V91 (Stage 4, 7A): signed in, old jobs are cleared when they're safe in the
+  // cloud (exported or not), from Jobs on this phone — plus old photos (9A).
+  const cloudOn = (typeof syncActive === 'function' && syncActive() && typeof renderJobManager === 'function');
+  const tidyM = cloudOn && typeof tidyModel === 'function' ? tidyModel(false) : null;
+  const pruneBlock = cloudOn ? `
+          ${renderTidyBlock(tidyM, 'backup-tidy') || `<p class="muted" style="margin-top:10px;font-size:0.75rem">Nothing older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} is ready to come off this phone right now.</p>`}
+          <button class="backup-action-btn" id="jobs-manage-btn" data-action="jm-open" style="margin-top:10px">${icon('shield-check')} Jobs on This Phone ${icon('chevron-right', 'ic-trail')}</button>
+          ${typeof renderCloudStorage === 'function' ? `<button class="backup-action-btn" id="cloud-storage-btn" data-action="cs-open" style="margin-top:6px">${icon('cloud')} Cloud Storage ${icon('chevron-right', 'ic-trail')}</button>` : ''}
+  ` : prunable.length > 0 ? `
+          <div class="prune-suggestion">
+            <p class="prune-suggestion-text">${prunable.length} exported job${prunable.length === 1 ? '' : 's'} older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} can be cleared to free space.</p>
+            <button class="backup-action-btn" id="prune-review-btn" data-action="prune-review">Review &amp; clear…</button>
+          </div>
+  ` : `<p class="muted" style="margin-top:10px;font-size:0.75rem">No exported jobs older than ${ageMonths} month${ageMonths === 1 ? '' : 's'} to clear right now.</p>`;
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Phone Storage')}
       <div class="settings-section">
         <h2 class="h2">Keep this app's data</h2>
         <div id="storage-protect">${storageProtectionHTML()}</div>
       </div>
 
       <div class="settings-section">
-        <h2 class="h2">Storage usage</h2>
+        <h2 class="h2">Space used</h2>
         <div class="storage-card">
-          <div class="storage-stat"><span class="storage-stat-label">Sessions</span><span class="storage-stat-value">${stats.sessions}</span></div>
+          <div class="storage-stat"><span class="storage-stat-label">Jobs</span><span class="storage-stat-value">${stats.sessions}</span></div>
           <div class="storage-stat"><span class="storage-stat-label">Items recorded</span><span class="storage-stat-value">${stats.items.toLocaleString()}</span></div>
           <div class="storage-stat"><span class="storage-stat-label">Storage used</span><span class="storage-stat-value">${formatBytes(stats.bytes)}</span></div>
           <div class="storage-stat"><span class="storage-stat-label">Approx. limit</span><span class="storage-stat-value">~5 MB</span></div>
@@ -796,20 +1048,31 @@ function renderSettingsBackup() {
           <div class="storage-stat"><span class="storage-stat-label">Photos</span><span class="storage-stat-value">${photoStats.count} · ${escapeHTML(formatBytes(photoStats.bytes))}</span></div>` : ''}
           <div class="storage-bar-wrap"><div class="storage-bar ${barClass}" style="width:${stats.pct}%"></div></div>
           ${fullNote}
-          <p class="muted" style="margin-top:10px;font-size:12px">Browsers cap local data at around 5 MB. Export a backup and clear old sessions before you get close to the limit.</p>
+          <p class="muted" style="margin-top:10px;font-size:0.75rem">Browsers cap local data at around 5 MB. Export a backup and clear old jobs before you get close to the limit.</p>
           ${pruneBlock}
         </div>
       </div>
 
       <div class="settings-section">
-        <h2 class="h2">Clear-old-sessions age</h2>
-        <p class="muted">When a session has been exported and is older than this, it'll be offered for clearing above. Nothing is ever deleted without your confirmation.</p>
+        <h2 class="h2">Clear old jobs after</h2>
+        <p class="muted">${cloudOn
+          ? 'When a job is safe in the cloud and older than this, it\'ll be offered for removing from this phone. The cloud keeps it. Nothing is ever removed without your confirmation.'
+          : 'When a job has been exported and is older than this, it\'ll be offered for clearing above. Nothing is ever deleted without your confirmation.'}</p>
         <label class="label">Age in months</label>
-        <input class="input" id="prune-age-input" type="number" inputmode="numeric" min="1" max="120" value="${ageMonths}">
+        <input aria-label="Clear old jobs after, age in months" class="input" id="prune-age-input" type="number" inputmode="numeric" min="1" max="120" value="${ageMonths}">
         <div class="btn-row">
           <button class="btn-primary" id="prune-age-save" data-action="prune-age-save">Save</button>
         </div>
+        ${cloudOn ? `
+        <label class="label" style="margin-top:14px">Photos older than (months)</label>
+        <p class="muted" style="font-size:0.75rem;margin:0 0 6px">Photos in the cloud older than this are offered for removing from this phone. A tap brings any of them back.</p>
+        <input aria-label="Photos older than (months)" class="input" id="photo-age-input" type="number" inputmode="numeric" min="1" max="120" value="${state.photoAgeMonths || PHOTO_AGE_DEFAULT}">
+        <div class="btn-row">
+          <button class="btn-primary" id="photo-age-save" data-action="photo-age-save">Save</button>
+        </div>` : ''}
       </div>
+
+      ${renderPhotoStorageSection()}
     </div>
   `;
 }
@@ -833,14 +1096,14 @@ function renderSetupSection() {
           </span>
         </label>`).join('');
   const errBlock = state.setupError
-    ? `<p class="muted" style="color:#c0392b;margin-top:8px;font-size:13px">${escapeHTML(state.setupError)}</p>` : '';
+    ? `<p class="muted" style="color:#c0392b;margin-top:8px;font-size:0.8125rem">${escapeHTML(state.setupError)}</p>` : '';
   return `
       <div class="settings-section">
         <h2 class="h2">Share setup</h2>
-        <p class="muted">Send your configuration to another phone or a new engineer so it's set up just like this one. This shares <strong>settings only</strong> — your sessions, clients and sites are never included.</p>
-        <button class="backup-action-btn primary" id="setup-share-btn" data-action="setup-share">⬆ Share setup…</button>
+        <p class="muted">Send your configuration to another phone or a new engineer so it's set up just like this one. This shares <strong>settings only</strong> — your jobs, clients and sites are never included.</p>
+        <button class="backup-action-btn primary" id="setup-share-btn" data-action="setup-share">${icon('upload')} Share setup…</button>
         <button class="setup-disclose" data-action="setup-include-toggle-open" aria-expanded="${open ? 'true' : 'false'}">
-          ${open ? '▾' : '▸'} Choose what to include
+          ${icon(open ? 'chevron-down' : 'chevron-right')} Choose what to include
         </button>
         ${open ? `<div class="setup-include-list">${rows}</div>` : ''}
         ${errBlock}
@@ -848,9 +1111,9 @@ function renderSetupSection() {
 
       <div class="settings-section">
         <h2 class="h2">Import setup</h2>
-        <p class="muted">Load a setup file from another device. This replaces the matching settings on this phone (you'll see exactly what before it's applied). <strong>Your sessions are not touched.</strong></p>
+        <p class="muted">Load a setup file from another device. This replaces the matching settings on this phone (you'll see exactly what before it's applied). <strong>Your jobs are not touched.</strong></p>
         <input type="file" id="setup-import-file" data-change-action="setup-import-file" accept="application/json,.json" style="display:none">
-        <button class="backup-action-btn" id="setup-import-btn" data-action="setup-import">⬇ Import setup (.json)</button>
+        <button class="backup-action-btn" id="setup-import-btn" data-action="setup-import">${icon('download')} Import setup (.json)</button>
       </div>
   `;
 }
@@ -862,7 +1125,7 @@ function renderSettingsSetup() {
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Export / Import Setup')}
-      <p class="muted" style="margin:0 16px 4px">Copy this device's configuration to another phone or a new engineer. <strong>Settings only</strong> — sessions, clients and sites are never shared.</p>
+      <p class="muted" style="margin:0 16px 4px">Copy this device's configuration to another phone or a new engineer. <strong>Settings only</strong> — jobs, clients and sites are never shared.</p>
       ${renderSetupSection()}
     </div>
   `;
@@ -895,8 +1158,8 @@ function renderSettingsCsv() {
       <div class="csv-col-row" data-col-id="${escapeHTML(c.id)}">
         <div class="csv-col-row-top">
           <div class="csv-col-arrows">
-            <button class="csv-col-arrow" data-action="csv-up" data-arg="${escapeHTML(c.id)}" data-csv-up="${escapeHTML(c.id)}" ${isFirst ? 'disabled' : ''} aria-label="Move up">▲</button>
-            <button class="csv-col-arrow" data-action="csv-down" data-arg="${escapeHTML(c.id)}" data-csv-down="${escapeHTML(c.id)}" ${isLast ? 'disabled' : ''} aria-label="Move down">▼</button>
+            <button class="csv-col-arrow" data-action="csv-up" data-arg="${escapeHTML(c.id)}" data-csv-up="${escapeHTML(c.id)}" ${isFirst ? 'disabled' : ''} aria-label="Move up">${icon('chevron-up')}</button>
+            <button class="csv-col-arrow" data-action="csv-down" data-arg="${escapeHTML(c.id)}" data-csv-down="${escapeHTML(c.id)}" ${isLast ? 'disabled' : ''} aria-label="Move down">${icon('chevron-down')}</button>
           </div>
           <label class="csv-col-vis-label">
             <input type="checkbox" class="csv-col-visible" ${c.visible ? 'checked' : ''}>
@@ -904,7 +1167,7 @@ function renderSettingsCsv() {
           </label>
         </div>
         <label class="label csv-col-header-label">Header text</label>
-        <input class="input csv-col-header" value="${escapeHTML(c.header || def)}" placeholder="${escapeHTML(def)}">
+        <input aria-label="Header text for ${escapeHTML(def)}" class="input csv-col-header" value="${escapeHTML(c.header || def)}" placeholder="${escapeHTML(def)}">
         ${hint}
       </div>
     `;
@@ -919,7 +1182,7 @@ function renderSettingsCsv() {
       </div>
 
       <button class="btn-primary" id="settings-csv-save" data-action="settings-csv-save" style="margin-top:8px">Save</button>
-      <button class="btn-secondary" id="settings-csv-reset" data-action="settings-csv-reset" style="margin-top:8px;width:100%">Reset to defaults</button>
+      <button class="btn-secondary" id="settings-csv-reset" data-action="settings-csv-reset" style="margin-top:8px;width:100%">${icon('rotate-ccw')} Reset to defaults</button>
     </div>
   `;
 }
@@ -960,9 +1223,9 @@ function renderSettingsRetest() {
       ${on ? `
       <div class="settings-section">
         <h2 class="h2">How it works</h2>
-        <p class="muted">Open any session, tap <strong>Session settings</strong>, and switch on <strong>Remind me to chase this for retest</strong>. Only the jobs you flag appear on your chase list — so subcontract work and one-offs never clutter it.</p>
-        <p class="muted" style="margin-top:8px">A retest is due for a whole month: a job tested on 30 September with a 12-month interval is due <strong>September</strong> the following year. The interval is taken from your Report Settings default (currently <strong>${defMonths} month${defMonths === 1 ? '' : 's'}</strong>) at the moment you flag it, and you can change it per job.</p>
-        <p class="muted" style="margin-top:8px">The job joins your chase list on the <strong>1st of the month before</strong> it's due, so you have a full month to ring the customer. A banner appears on your Sessions screen and the job shows a 🔔 chip: <em>due next month</em>, <em>due this month</em>, then <em>overdue</em> from the 1st of the month after.</p>
+        <p class="muted">Open any job, tap <strong>Job settings</strong>, and switch on <strong>Remind me to chase this for retest</strong>. Only the jobs you flag appear on your chase list — so subcontract work and one-offs never clutter it.</p>
+        <p class="muted" style="margin-top:8px">A retest is due for a whole month: a job tested on 30 September with a 12-month interval is due <strong>September</strong> the following year. The interval is taken from your Certificate Content default (currently <strong>${defMonths} month${defMonths === 1 ? '' : 's'}</strong>) at the moment you flag it, and you can change it per job.</p>
+        <p class="muted" style="margin-top:8px">The job joins your chase list on the <strong>1st of the month before</strong> it's due, so you have a full month to ring the customer. A banner appears on your Jobs screen and the job shows a ${icon('bell')} chip: <em>due next month</em>, <em>due this month</em>, then <em>overdue</em> from the 1st of the month after.</p>
         <p class="muted" style="margin-top:8px">When you've contacted the customer, mark the job <strong>Rebooked</strong> or <strong>Declined</strong> to clear it from the list.</p>
       </div>
       <div class="settings-section">
@@ -973,6 +1236,56 @@ function renderSettingsRetest() {
     </div>
   `;
 }
+// ---------- V100: Reminders (Phone & Display — 7A) ----------
+// Three per-phone choices, each a plain <select> that saves on change. Words
+// shared by the page and the row summary live in REMINDER_LABELS so the two
+// can't disagree.
+const REMINDER_LABELS = {
+  exportAfter: { off: 'Off', '1h': '1 hour after locking', '4h': '4 hours after locking', morning: 'The next morning (8am)' },
+  unlockedAt: { off: 'Off', '16': 'From 4pm', '17': 'From 5pm', '18': 'From 6pm', '19': 'From 7pm', '20': 'From 8pm' },
+  backupDays: { off: 'Off', '3': 'Every 3 days', '7': 'Every 7 days', '14': 'Every 14 days', '30': 'Every 30 days' },
+};
+function reminderSettingsSummary() {
+  const r = normaliseReminders(state.reminders);
+  const on = [];
+  if (r.exportAfter !== 'off') on.push('Not exported');
+  if (r.unlockedAt !== 'off') on.push('Unlocked jobs');
+  const backup = r.backupDays === 'off' ? 'Backups off' : `Backups every ${r.backupDays} days`;
+  return (on.length ? on.join(' · ') + ' · ' : '') + backup;
+}
+function _reminderSelect(id, field, action, list, label) {
+  const r = normaliseReminders(state.reminders);
+  const opts = list.map(v => `<option value="${v}"${r[field] === v ? ' selected' : ''}>${escapeHTML(REMINDER_LABELS[field][v])}</option>`).join('');
+  // V120: the heading above is not a <label>, so the select carries its own spoken name.
+  return `<select class="input" id="${id}" aria-label="${escapeHTML(label || '')}" data-change-action="${action}">${opts}</select>`;
+}
+function renderSettingsReminders() {
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Reminders')}
+      <div class="settings-section">
+        <h2 class="h2">Locked but not exported</h2>
+        <p class="muted">A reminder on the Jobs screen when a job you've locked still has no certificate and no CSV export. Making the certificate (Download or Share from the preview) or exporting the CSV clears it. Jobs locked before this version don't count.</p>
+        ${_reminderSelect('remind-export', 'exportAfter', 'remind-export', REMINDER_EXPORT_CHOICES, 'Locked but not exported')}
+      </div>
+      <div class="settings-section">
+        <h2 class="h2">Jobs still unlocked</h2>
+        <p class="muted">From this time each day, a reminder on the Jobs screen if any job on this phone is still unlocked &mdash; a nudge to finish and lock the day's work.</p>
+        ${_reminderSelect('remind-unlocked', 'unlockedAt', 'remind-unlocked', REMINDER_UNLOCKED_CHOICES, 'Jobs still unlocked')}
+      </div>
+      <div class="settings-section">
+        <h2 class="h2">Backup reminder</h2>
+        <p class="muted">How often the Jobs screen reminds you to export a backup file.</p>
+        ${_reminderSelect('remind-backup', 'backupDays', 'remind-backup', REMINDER_BACKUP_CHOICES, 'Backup reminder')}
+      </div>
+      <div class="settings-section">
+        <p class="muted" style="margin:0 0 10px">Reminders show inside the app when you open it &mdash; they aren't notifications on your phone. Each one's &times; hides it for the rest of the day. These settings are for this phone only.</p>
+        <button class="btn-secondary" style="width:100%" data-action="settings-page" data-arg="settingsRetest">${icon('bell')} Retest reminders ${icon('chevron-right', 'ic-trail')}</button>
+      </div>
+    </div>
+  `;
+}
+
 // Lists clients; tapping a client expands it to show its sites with add /
 // rename / delete. Add / rename use a bottom-sheet (the same .bulk-sheet
 // pattern used elsewhere) so the flow matches the rest of the app and works
@@ -982,8 +1295,8 @@ function renderSettingsClients() {
   const clients = sortedClients();
 
   const emptyState = clients.length === 0
-    ? emptyStateHTML('🏢', 'No clients yet',
-        'Add a client below, then add the sites you test at — they\'ll appear as quick picks when you start a new session.')
+    ? emptyStateHTML('building-2', 'No clients yet',
+        'Add a client below, then add the sites you test at — they\'ll appear as quick picks when you start a new job.')
     : '';
 
   const listHtml = clients.map(c => {
@@ -992,15 +1305,17 @@ function renderSettingsClients() {
     const siteCount = sites.length;
     const sub = siteCount === 0 ? 'No sites' : `${siteCount} site${siteCount === 1 ? '' : 's'}`;
 
+    // V98.1: the 📝 goes BEFORE the name — .client-site-name ends in an ellipsis,
+    // so a marker after a long name was cut off (found by Peter on a real phone).
     const sitesBlock = expanded ? `
       <div class="client-sites">
         ${sites.length ? sites.map(s => `
           <div class="client-site-row">
-            <span class="client-site-name">${escapeHTML(s.name)}</span>
+            <span class="client-site-name">${siteNotesOf(s) ? `<span class="site-notes-mark" title="Has site notes">${icon('list')}</span> ` : ''}${escapeHTML(s.name)}</span>
             <div class="client-site-actions">
               <button class="link-btn" data-action="site-assign" data-arg="${escapeHTML(s.id)}">Move</button>
-              <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Rename</button>
-              <button class="link-btn danger" data-action="site-delete" data-arg="${escapeHTML(s.id)}" data-site-delete="${escapeHTML(s.id)}">Delete</button>
+              <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Edit</button>
+              <button class="link-btn danger" data-action="site-delete" data-arg="${escapeHTML(s.id)}" data-site-delete="${escapeHTML(s.id)}">${icon('trash-2')} Delete</button>
             </div>
           </div>
         `).join('') : `<p class="muted" style="margin:4px 0 8px">No sites for this client yet.</p>`}
@@ -1015,11 +1330,11 @@ function renderSettingsClients() {
             <span class="client-head-name">${escapeHTML(c.name)}</span>
             <span class="client-head-sub">${escapeHTML(sub)}</span>
           </span>
-          <span class="client-head-chevron">${expanded ? '⌄' : '›'}</span>
+          <span class="client-head-chevron">${icon(expanded ? 'chevron-down' : 'chevron-right')}</span>
         </button>
         <div class="client-head-actions">
           <button class="link-btn" data-action="client-rename" data-arg="${escapeHTML(c.id)}" data-client-rename="${escapeHTML(c.id)}">Rename</button>
-          <button class="link-btn danger" data-action="client-delete" data-arg="${escapeHTML(c.id)}" data-client-delete="${escapeHTML(c.id)}">Delete</button>
+          <button class="link-btn danger" data-action="client-delete" data-arg="${escapeHTML(c.id)}" data-client-delete="${escapeHTML(c.id)}">${icon('trash-2')} Delete</button>
         </div>
         ${sitesBlock}
       </div>
@@ -1040,11 +1355,11 @@ function renderSettingsClients() {
       <div class="client-sites">
         ${orphans.map(s => `
           <div class="client-site-row">
-            <span class="client-site-name">${escapeHTML(s.name)}</span>
+            <span class="client-site-name">${siteNotesOf(s) ? `<span class="site-notes-mark" title="Has site notes">${icon('list')}</span> ` : ''}${escapeHTML(s.name)}</span>
             <div class="client-site-actions">
               <button class="link-btn" data-action="site-assign" data-arg="${escapeHTML(s.id)}">Assign to client…</button>
-              <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Rename</button>
-              <button class="link-btn danger" data-action="site-delete" data-arg="${escapeHTML(s.id)}" data-site-delete="${escapeHTML(s.id)}">Delete</button>
+              <button class="link-btn" data-action="site-rename" data-arg="${escapeHTML(s.id)}" data-site-rename="${escapeHTML(s.id)}">Edit</button>
+              <button class="link-btn danger" data-action="site-delete" data-arg="${escapeHTML(s.id)}" data-site-delete="${escapeHTML(s.id)}">${icon('trash-2')} Delete</button>
             </div>
           </div>
         `).join('')}
@@ -1069,12 +1384,12 @@ function renderSettingsClients() {
           <button class="fail-close-btn" id="client-dialog-cancel" data-action="client-dialog-cancel" aria-label="Cancel">×</button>
         </div>
         <label class="label">Client name</label>
-        <input class="input" id="client-dialog-input" data-input-action="client-name" value="${escapeHTML(cd.name)}" placeholder="e.g. Acme Ltd" autofocus>
+        <input aria-label="Client name" class="input" id="client-dialog-input" data-input-action="client-name" value="${escapeHTML(cd.name)}" placeholder="e.g. Acme Ltd" autofocus>
         <button class="btn-primary" id="client-dialog-confirm" data-action="client-dialog-confirm" style="margin-top:14px">${cd.mode === 'add' ? 'Add' : 'Save'}</button>
       </div>
     `;
   } else if (sd.mode) {
-    const title = sd.mode === 'add' ? 'Add site' : 'Rename site';
+    const title = sd.mode === 'add' ? 'Add site' : 'Edit site';   // V98: name + notes
     const parent = sd.mode === 'add' ? clientById(sd.clientId) : (siteById(sd.editingId) ? clientById(siteById(sd.editingId).clientId) : null);
     const parentLine = parent ? `<p class="muted" style="margin:0 0 12px">Client: ${escapeHTML(parent.name)}</p>` : '';
     dialog = `
@@ -1088,7 +1403,9 @@ function renderSettingsClients() {
         </div>
         ${parentLine}
         <label class="label">Site name</label>
-        <input class="input" id="site-dialog-input" data-input-action="site-name" value="${escapeHTML(sd.name)}" placeholder="e.g. Unit 4, Head Office" autofocus>
+        <input aria-label="Site name" class="input" id="site-dialog-input" data-input-action="site-name" value="${escapeHTML(sd.name)}" placeholder="e.g. Unit 4, Head Office" autofocus>
+        <label class="label" style="margin-top:12px">Site notes <span class="hint">(optional &mdash; only for you, never printed)</span></label>
+        <textarea aria-label="Site notes (optional)" class="textarea" id="site-dialog-notes" data-input-action="site-dialog-notes" maxlength="${SITE_NOTES_MAX}" rows="4" placeholder="Door codes, difficult locations, reminders">${escapeHTML(sd.notes || '')}</textarea>
         <button class="btn-primary" id="site-dialog-confirm" data-action="site-dialog-confirm" style="margin-top:14px">${sd.mode === 'add' ? 'Add' : 'Save'}</button>
       </div>
     `;
@@ -1127,7 +1444,7 @@ function renderSettingsClients() {
             <button class="fail-close-btn" data-action="site-assign-cancel" aria-label="Cancel">×</button>
           </div>
           <label class="label">Client</label>
-          <input class="input" id="assign-dialog-input" value="${escapeHTML(ad.name)}" placeholder="Type or pick a client" list="assign-client-list" autofocus>
+          <input aria-label="Client" class="input" id="assign-dialog-input" value="${escapeHTML(ad.name)}" placeholder="Type or pick a client" list="assign-client-list" autofocus>
           <datalist id="assign-client-list">
             ${sortedClients().map(c => `<option value="${escapeHTML(c.name)}"></option>`).join('')}
           </datalist>
@@ -1142,8 +1459,8 @@ function renderSettingsClients() {
   // or removes existing ones), so safe to offer alongside the manual list.
   const rebuildBlock = state.sessions.length ? `
     <div class="settings-section">
-      <button class="preset-action-btn" id="clients-rebuild-btn" data-action="clients-rebuild">↻ Rebuild from my sessions</button>
-      <p class="muted" style="margin:8px 0 0;font-size:12px">Scans every saved session and adds any client or site that isn't already listed. Useful after importing sessions. It only adds — it never changes or removes what's here.</p>
+      <button class="preset-action-btn" id="clients-rebuild-btn" data-action="clients-rebuild">${icon('rotate-cw')} Rebuild from my jobs</button>
+      <p class="muted" style="margin:8px 0 0;font-size:0.75rem">Scans every saved job and adds any client or site that isn't already listed. Useful after importing jobs. It only adds — it never changes or removes what's here.</p>
     </div>
   ` : '';
 
@@ -1151,7 +1468,7 @@ function renderSettingsClients() {
     <div class="screen">
       ${renderSettingsSubHeader('Clients')}
       <div class="settings-section">
-        <p class="muted" style="margin-top:0">Your clients and the sites you test at. These appear as quick picks on the New Session screen. Editing or deleting here never changes sessions you've already saved.</p>
+        <p class="muted" style="margin-top:0">Your clients and the sites you test at. These appear as quick picks on the New job screen. Editing or deleting here never changes jobs you've already saved.</p>
         <button class="btn-primary" id="client-add-btn" data-action="client-add" style="margin-top:4px">+ Add client</button>
       </div>
       ${emptyState}
@@ -1162,7 +1479,7 @@ function renderSettingsClients() {
   `;
 }
 
-function renderSettingsReport() {
+function renderSettingsReport(part) {
   const rs = state.reportSettings;
   // Reusable toggle-row builder matching the SQP / Multi Pick markup. `id` is the
   // checkbox id (and its data-change-action). `on` is current state.
@@ -1181,10 +1498,10 @@ function renderSettingsReport() {
   // Logo preview (if set) with a Remove button; otherwise a file picker.
   const logoBlock = rs.logo
     ? `<div class="report-logo-preview"><img src="${rs.logo}" alt="Company logo" style="max-width:160px;max-height:80px;display:block;margin:8px 0;border-radius:6px"></div>
-       <button class="preset-action-btn preset-action-danger" id="report-logo-remove" data-action="report-logo-remove">🗑 Remove logo</button>`
-    : `<button class="preset-action-btn" id="report-logo-pick-btn" data-action="report-logo-pick">⬆ Upload logo</button>`;
+       <button class="preset-action-btn preset-action-danger" id="report-logo-remove" data-action="report-logo-remove">${icon('trash-2')} Remove logo</button>`
+    : `<button class="preset-action-btn" id="report-logo-pick-btn" data-action="report-logo-pick">${icon('upload')} Upload logo</button>`;
   const logoError = state.reportSettingsError
-    ? `<p class="muted" style="color:#c0392b;margin-top:8px;font-size:12px">${escapeHTML(state.reportSettingsError)}</p>`
+    ? `<p class="muted" style="color:#c0392b;margin-top:8px;font-size:0.75rem">${escapeHTML(state.reportSettingsError)}</p>`
     : '';
 
   // v36: live preview of the next certificate number from the current prefix +
@@ -1206,7 +1523,7 @@ function renderSettingsReport() {
           <span class="template-actions">
             <button class="preset-action-btn" data-action="report-template-apply" data-arg="${escapeHTML(t.id)}">Apply</button>
             <button class="preset-action-btn" data-action="report-template-rename" data-arg="${escapeHTML(t.id)}">Rename</button>
-            <button class="preset-action-btn preset-action-danger" data-action="report-template-delete" data-arg="${escapeHTML(t.id)}">Delete</button>
+            <button class="preset-action-btn preset-action-danger" data-action="report-template-delete" data-arg="${escapeHTML(t.id)}">${icon('trash-2')} Delete</button>
           </span>
         </div>`).join('')}</div>`
     : `<p class="muted" style="font-style:italic">No templates yet.</p>`;
@@ -1219,29 +1536,127 @@ function renderSettingsReport() {
   const sigBlock = rs.signature
     ? `<div class="report-sig-preview"><img src="${rs.signature}" alt="Signature" style="max-width:200px;max-height:70px;display:block;margin:8px 0;border-radius:6px;background:#fff;padding:4px"></div>
        <div class="btn-row">
-         <button class="preset-action-btn" data-action="signature-draw">✍ Draw again</button>
-         <button class="preset-action-btn" data-action="signature-upload">⬆ Upload</button>
+         <button class="preset-action-btn" data-action="signature-draw">${icon('signature')} Draw again</button>
+         <button class="preset-action-btn" data-action="signature-upload">${icon('upload')} Upload</button>
        </div>
-       <button class="preset-action-btn preset-action-danger" data-action="signature-remove" style="margin-top:8px">🗑 Remove signature</button>`
+       <button class="preset-action-btn preset-action-danger" data-action="signature-remove" style="margin-top:8px">${icon('trash-2')} Remove signature</button>`
     : `<div class="btn-row">
-         <button class="preset-action-btn" data-action="signature-draw">✍ Draw signature</button>
-         <button class="preset-action-btn" data-action="signature-upload">⬆ Upload image</button>
+         <button class="preset-action-btn" data-action="signature-draw">${icon('signature')} Draw signature</button>
+         <button class="preset-action-btn" data-action="signature-upload">${icon('upload')} Upload image</button>
        </div>`;
   const sigPositionControl = rs.signature
     ? `<label class="label" style="margin-top:12px">Position on the report</label>
        <div class="sig-position-row">
-         <button class="sig-position-btn ${rs.signaturePosition !== 'right' ? 'active' : ''}" data-action="signature-position" data-arg="left">Left</button>
-         <button class="sig-position-btn ${rs.signaturePosition === 'right' ? 'active' : ''}" data-action="signature-position" data-arg="right">Right</button>
+         <button class="sig-position-btn ${rs.signaturePosition !== 'right' ? 'active' : ''}" aria-pressed="${rs.signaturePosition !== 'right' ? 'true' : 'false'}" data-action="signature-position" data-arg="left">Left</button>
+         <button class="sig-position-btn ${rs.signaturePosition === 'right' ? 'active' : ''}" aria-pressed="${rs.signaturePosition === 'right' ? 'true' : 'false'}" data-action="signature-position" data-arg="right">Right</button>
        </div>`
     : '';
 
+  // V117 (1A): the one long page is now two — Company & Branding (this view,
+  // 'settingsReport', kept so the preview's deep-link and Back are unchanged, 3A)
+  // and Certificate Content ('settingsReportContent'). Every section is moved
+  // byte-for-byte from the V116 page. Both halves edit the same
+  // state.reportSettings and share one Save (saveReportSettingsForm), which saves
+  // the WHOLE object; the other half's fields are just not on screen, so
+  // captureReportTextInputs leaves them alone (it guards every lookup).
+  // ⚠ "A report settings page is open" = REPORT_SETTINGS_VIEWS (config.js), never
+  // the 'settingsReport' view alone — sync must hold off on BOTH halves.
+  if (part === 'content') {
+    return `
+      <div class="screen">
+        ${renderSettingsSubHeader('Certificate Content')}
+      ${settingsHowToHTML('settingsReportContent')}
+
+        <div class="settings-section">
+          <h2 class="h2">What to include</h2>
+          ${toggle('report-show-engineer', 'Engineer name', rs.showEngineer)}
+          ${toggle('report-show-instrument', 'Test instrument', rs.showInstrument)}
+          ${toggle('report-show-calibration', 'Calibration details', rs.showCalibration)}
+          ${toggle('report-show-fails', 'List failed items', rs.showFails, rs.showFails ? 'All items listed' : 'Passes only')}
+          ${state.readingsEnabled ? toggle('report-show-readings', 'Test readings', rs.showReadings, rs.showReadings ? 'Readings columns shown when recorded' : 'Readings kept off the certificate') : ''}
+          ${toggle('report-show-duration', 'Testing time', rs.showDuration, rs.showDuration ? 'Prints how long the job took' : 'Kept off the certificate')}
+          ${toggle('report-show-photos', 'Photos', rs.showPhotos, rs.showPhotos ? 'Photo pages added after the declaration' : 'Kept off the certificate')}
+          ${rs.showPhotos ? `<p class="muted" style="margin-left:16px">Any photos you've taken are added at the end of the report, under the asset they belong to. The certificate itself doesn't change. Photos are made smaller for printing so the file stays small enough to send — on a very big job they're made smaller still, and past 150 photos the report says clearly that not all of them are shown.</p>` : ''}
+          ${toggle('report-show-remedial', 'Remedial actions', rs.showRemedial, rs.showRemedial ? 'Every fail listed at the end of the report' : 'Kept off the certificate')}
+          ${rs.showRemedial ? `<div style="margin-left:16px">
+            <p class="muted">A section at the end listing every failed item with its reason. Fails with a photo are shown with it when Photos is on (the photos then appear here, not on separate photo pages); the rest are listed together. Nothing is added to a job with no fails.</p>
+            ${toggle('report-remedial-action', 'Action line', rs.remedialActionOn !== false, rs.remedialActionOn !== false ? 'Printed under the heading' : 'Hidden')}
+            ${rs.remedialActionOn !== false ? `<textarea aria-label="Remedial action line" class="textarea" id="report-remedial-text" style="min-height:70px">${escapeHTML(rs.remedialActionText || '')}</textarea>` : ''}
+          </div>` : ''}
+          ${toggle('report-declaration', 'Declaration line', rs.declaration)}
+          ${toggle('report-show-appcredit', 'PATGo credit line', rs.showAppCredit, rs.showAppCredit ? 'Shown at the foot of the report' : 'Hidden')}
+          <div style="margin-left:16px${rs.showAppCredit ? '' : ';opacity:.5'}">
+            ${toggle('report-show-footerlogo', 'Show PATGo logo', rs.showFooterLogo, rs.showFooterLogo ? 'Small logo beside the credit line' : 'Text only')}
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 class="h2">Recommended retest</h2>
+          <p class="muted">Optional. When on, the report shows the month the retest is due (the month of the test plus the months below &mdash; for example <strong>September 2027</strong>). This is a guidance figure for your client — the IET Code of Practice sets no fixed interval and recommends a risk-based assessment.</p>
+          ${toggle('report-retest-enabled', 'Show recommended retest', rs.retestEnabled)}
+          <label class="label" style="margin-top:12px">Retest period (months)</label>
+          <input aria-label="Retest period (months)" class="input" id="report-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(retestMonthsVal)}" placeholder="e.g. 12"${rs.retestEnabled ? '' : ' disabled style="opacity:.5"'}>
+        </div>
+
+        <div class="settings-section">
+          <h2 class="h2">Declaration text</h2>
+          <p class="muted">Printed above the signature line when the declaration is on. Edit to your own wording.</p>
+          <textarea aria-label="Declaration text" class="textarea" id="report-declaration-text" style="min-height:90px">${escapeHTML(rs.declarationText)}</textarea>
+        </div>
+
+        <div class="settings-section">
+          <h2 class="h2">PDF file name</h2>
+          <p class="muted">Sets the name each report file is saved with. Tap a chip to insert a detail that fills in automatically for each job. You can still rename any single report just before sharing it.</p>
+          <input aria-label="PDF file name" class="input" id="report-filename-pattern" value="${escapeHTML(rs.reportFilenamePattern || REPORT_FILENAME_DEFAULT)}" placeholder="${escapeHTML(REPORT_FILENAME_DEFAULT)}" autocapitalize="off" autocomplete="off" spellcheck="false">
+          <div class="filename-token-chips">
+            ${REPORT_FILENAME_TOKENS.map(t =>
+              `<button type="button" class="filename-token-chip" data-action="report-filename-token" data-arg="${escapeHTML(t)}">${escapeHTML(t.replace(/[{}]/g, ''))}</button>`
+            ).join('')}
+          </div>
+          <p class="muted" style="font-size:0.75rem;margin-top:6px">Underscores become spaces, characters a file name can't hold are left out, and the date is written day first &mdash; for example <code>PAT Report Office 28-09-2026.pdf</code>.</p>
+        </div>
+
+        <div class="settings-section">
+          <h2 class="h2">Certificate numbers</h2>
+          <p class="muted">Optional. When on, each job gets a unique certificate number the first time you produce its report — built from your prefix and a counter. The number is kept with that job, so re-generating the report always shows the same number.</p>
+          ${toggle('report-cert-enabled', 'Use certificate numbers', rs.certEnabled)}
+          <div${rs.certEnabled ? '' : ' style="opacity:.5"'}>
+            <label class="label" style="margin-top:12px">Prefix</label>
+            <input aria-label="Certificate number prefix" class="input" id="report-cert-prefix" value="${escapeHTML(rs.certPrefix || '')}" placeholder="e.g. BPS- or BPS-{year}-" autocapitalize="characters" autocomplete="off" spellcheck="false"${rs.certEnabled ? '' : ' disabled'}>
+            <p class="muted" style="font-size:0.75rem;margin-top:4px">Use <code>{year}</code> to insert the test year, e.g. <code>BPS-{year}-</code> → <code>BPS-2026-0001</code>.</p>
+            <div class="cert-number-row">
+              <div>
+                <label class="label">Digits</label>
+                <input aria-label="Certificate number digits" class="input" id="report-cert-padding" type="number" inputmode="numeric" min="0" max="10" value="${escapeHTML(String(rs.certPadding))}"${rs.certEnabled ? '' : ' disabled'}>
+              </div>
+              <div>
+                <label class="label">Next number</label>
+                <input aria-label="Next certificate number" class="input" id="report-cert-next" type="number" inputmode="numeric" min="1" value="${escapeHTML(String(rs.certNextNumber))}"${rs.certEnabled ? '' : ' disabled'}>
+              </div>
+            </div>
+            <p class="muted" style="font-size:0.75rem;margin-top:8px">Next certificate will look like: <strong>${escapeHTML(certPreview)}</strong></p>
+          </div>
+        </div>
+
+        <div class="settings-section">
+          <h2 class="h2">Templates</h2>
+          <p class="muted">Save your current report settings as a named template, then switch between them. Applying a template replaces all your report settings on both pages — including the logo, signature and colours on Company &amp; Branding.</p>
+          ${templatesBlock}
+          <button class="preset-action-btn" data-action="report-template-save-new" style="margin-top:10px">Save current settings as template…</button>
+        </div>
+
+        <button class="btn-primary" id="settings-report-save" data-action="settings-report-save" style="margin-top:8px">Save</button>
+      </div>
+    `;
+}
   return `
     <div class="screen">
-      ${renderSettingsSubHeader('Report Settings')}
+      ${renderSettingsSubHeader('Company & Branding')}
+      ${settingsHowToHTML('settingsReport')}
 
       <div class="settings-section">
         <h2 class="h2">Reports</h2>
-        <p class="muted">Turn on to produce PDF reports from your sessions. While off, the Reports button is hidden everywhere — so a freshly set-up device won't generate a report until you've configured it here and switched this on.</p>
+        <p class="muted">Turn on to produce PDF reports from your jobs. While off, the Reports button is hidden everywhere — so a freshly set-up device won't generate a report until you've configured it here and switched this on.</p>
         ${toggle('report-enabled', 'Enable reports', rs.enabled)}
       </div>
 
@@ -1249,11 +1664,11 @@ function renderSettingsReport() {
         <h2 class="h2">Company details</h2>
         <p class="muted">Printed in the report header. All optional.</p>
         <label class="label">Company name</label>
-        <input class="input" id="report-company-name" value="${escapeHTML(rs.companyName)}" placeholder="e.g. Birchley PAT Services">
+        <input aria-label="Company name" class="input" id="report-company-name" value="${escapeHTML(rs.companyName)}" placeholder="e.g. Birchley PAT Services">
         <label class="label">Address</label>
-        <textarea class="textarea" id="report-company-address" style="min-height:80px" placeholder="Optional — printed under the company name">${escapeHTML(rs.companyAddress)}</textarea>
+        <textarea aria-label="Company address" class="textarea" id="report-company-address" style="min-height:80px" placeholder="Optional — printed under the company name">${escapeHTML(rs.companyAddress)}</textarea>
         <label class="label">Logo</label>
-        <p class="muted" style="font-size:12px;margin-top:0">A PNG or JPEG. Large images are scaled down automatically.</p>
+        <p class="muted" style="font-size:0.75rem;margin-top:0">A PNG or JPEG. Large images are scaled down automatically.</p>
         ${logoBlock}
         ${logoError}
         <input type="file" id="report-logo-file" data-change-action="report-logo-file" accept="image/png,image/jpeg" style="display:none">
@@ -1261,7 +1676,7 @@ function renderSettingsReport() {
 
       <div class="settings-section">
         <h2 class="h2">Report title</h2>
-        <input class="input" id="report-title" value="${escapeHTML(rs.reportTitle)}" placeholder="Portable Appliance Test Report">
+        <input aria-label="Report title" class="input" id="report-title" value="${escapeHTML(rs.reportTitle)}" placeholder="Portable Appliance Test Report">
       </div>
 
       <div class="settings-section">
@@ -1270,7 +1685,7 @@ function renderSettingsReport() {
         <div class="report-theme-row">
           ${REPORT_COLOR_THEMES.map(t => {
             const active = (rs.headerColor === t.header && rs.accentColor === t.accent);
-            return `<button type="button" class="report-theme-chip ${active ? 'active' : ''}" data-action="report-theme" data-arg="${t.id}">
+            return `<button type="button" class="report-theme-chip ${active ? 'active' : ''}" aria-pressed="${active ? 'true' : 'false'}" data-action="report-theme" data-arg="${t.id}">
               <span class="report-theme-swatch" style="background:${t.header}"></span>
               <span class="report-theme-swatch" style="background:${t.accent}"></span>
               <span class="report-theme-label">${escapeHTML(t.label)}</span>
@@ -1290,78 +1705,6 @@ function renderSettingsReport() {
       </div>
 
       <div class="settings-section">
-        <h2 class="h2">PDF file name</h2>
-        <p class="muted">Sets the name each report file is saved with. Tap a chip to insert a detail that fills in automatically for each session. You can still rename any single report just before sharing it.</p>
-        <input class="input" id="report-filename-pattern" value="${escapeHTML(rs.reportFilenamePattern || REPORT_FILENAME_DEFAULT)}" placeholder="${escapeHTML(REPORT_FILENAME_DEFAULT)}" autocapitalize="off" autocomplete="off" spellcheck="false">
-        <div class="filename-token-chips">
-          ${REPORT_FILENAME_TOKENS.map(t =>
-            `<button type="button" class="filename-token-chip" data-action="report-filename-token" data-arg="${escapeHTML(t)}">${escapeHTML(t.replace(/[{}]/g, ''))}</button>`
-          ).join('')}
-        </div>
-        <p class="muted" style="font-size:12px;margin-top:6px">Underscores become spaces, characters a file name can't hold are left out, and the date is written day first &mdash; for example <code>PAT Report Office 28-09-2026.pdf</code>.</p>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="h2">Certificate numbers</h2>
-        <p class="muted">Optional. When on, each session gets a unique certificate number the first time you produce its report — built from your prefix and a counter. The number is kept with that session, so re-generating the report always shows the same number.</p>
-        ${toggle('report-cert-enabled', 'Use certificate numbers', rs.certEnabled)}
-        <div${rs.certEnabled ? '' : ' style="opacity:.5"'}>
-          <label class="label" style="margin-top:12px">Prefix</label>
-          <input class="input" id="report-cert-prefix" value="${escapeHTML(rs.certPrefix || '')}" placeholder="e.g. BPS- or BPS-{year}-" autocapitalize="characters" autocomplete="off" spellcheck="false"${rs.certEnabled ? '' : ' disabled'}>
-          <p class="muted" style="font-size:12px;margin-top:4px">Use <code>{year}</code> to insert the test year, e.g. <code>BPS-{year}-</code> → <code>BPS-2026-0001</code>.</p>
-          <div class="cert-number-row">
-            <div>
-              <label class="label">Digits</label>
-              <input class="input" id="report-cert-padding" type="number" inputmode="numeric" min="0" max="10" value="${escapeHTML(String(rs.certPadding))}"${rs.certEnabled ? '' : ' disabled'}>
-            </div>
-            <div>
-              <label class="label">Next number</label>
-              <input class="input" id="report-cert-next" type="number" inputmode="numeric" min="1" value="${escapeHTML(String(rs.certNextNumber))}"${rs.certEnabled ? '' : ' disabled'}>
-            </div>
-          </div>
-          <p class="muted" style="font-size:12px;margin-top:8px">Next certificate will look like: <strong>${escapeHTML(certPreview)}</strong></p>
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="h2">Templates</h2>
-        <p class="muted">Save your current report settings as a named template, then switch between them. Applying a template replaces all your report settings — including logo, signature and colours.</p>
-        ${templatesBlock}
-        <button class="preset-action-btn" data-action="report-template-save-new" style="margin-top:10px">💾 Save current settings as template…</button>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="h2">What to include</h2>
-        ${toggle('report-show-engineer', 'Engineer name', rs.showEngineer)}
-        ${toggle('report-show-instrument', 'Test instrument', rs.showInstrument)}
-        ${toggle('report-show-calibration', 'Calibration details', rs.showCalibration)}
-        ${toggle('report-show-fails', 'List failed items', rs.showFails, rs.showFails ? 'All items listed' : 'Passes only')}
-        ${state.readingsEnabled ? toggle('report-show-readings', 'Test readings', rs.showReadings, rs.showReadings ? 'Readings columns shown when recorded' : 'Readings kept off the certificate') : ''}
-        ${toggle('report-show-duration', 'Testing time', rs.showDuration, rs.showDuration ? 'Prints how long the job took' : 'Kept off the certificate')}
-        ${toggle('report-show-photos', 'Photos', rs.showPhotos, rs.showPhotos ? 'Photo pages added after the declaration' : 'Kept off the certificate')}
-        ${rs.showPhotos ? `<p class="muted" style="margin-left:16px">Any photos you've taken are added at the end of the report, under the asset they belong to. The certificate itself doesn't change. Photos are made smaller for printing so the file stays small enough to send — on a very big job they're made smaller still, and past 150 photos the report says clearly that not all of them are shown.</p>` : ''}
-        ${toggle('report-declaration', 'Declaration line', rs.declaration)}
-        ${toggle('report-show-appcredit', 'PATGo credit line', rs.showAppCredit, rs.showAppCredit ? 'Shown at the foot of the report' : 'Hidden')}
-        <div style="margin-left:16px${rs.showAppCredit ? '' : ';opacity:.5'}">
-          ${toggle('report-show-footerlogo', 'Show PATGo logo', rs.showFooterLogo, rs.showFooterLogo ? 'Small logo beside the credit line' : 'Text only')}
-        </div>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="h2">Recommended retest</h2>
-        <p class="muted">Optional. When on, the report shows the month the retest is due (the month of the test plus the months below &mdash; for example <strong>September 2027</strong>). This is a guidance figure for your client — the IET Code of Practice sets no fixed interval and recommends a risk-based assessment.</p>
-        ${toggle('report-retest-enabled', 'Show recommended retest', rs.retestEnabled)}
-        <label class="label" style="margin-top:12px">Retest period (months)</label>
-        <input class="input" id="report-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(retestMonthsVal)}" placeholder="e.g. 12"${rs.retestEnabled ? '' : ' disabled style="opacity:.5"'}>
-      </div>
-
-      <div class="settings-section">
-        <h2 class="h2">Declaration text</h2>
-        <p class="muted">Printed above the signature line when the declaration is on. Edit to your own wording.</p>
-        <textarea class="textarea" id="report-declaration-text" style="min-height:90px">${escapeHTML(rs.declarationText)}</textarea>
-      </div>
-
-      <div class="settings-section">
         <h2 class="h2">Signature</h2>
         <p class="muted">Optional. Add your signature and it prints on the declaration line of every report. Draw it on screen, or upload a PNG/JPEG image. The blank signing line is used if you don't add one.</p>
         ${sigBlock}
@@ -1373,6 +1716,9 @@ function renderSettingsReport() {
     </div>
   `;
 }
+
+// V117 (1A): the second half of the old Report Settings page.
+function renderSettingsReportContent() { return renderSettingsReport('content'); }
 
 function computeEarthLimit(csaKey, lengthM) {
   const r = CSA_RESISTANCE[csaKey];
@@ -1406,14 +1752,14 @@ function renderSettingsCalculator() {
       ${renderSettingsSubHeader('Resistance Calculator')}
 
       <div class="settings-section">
-        <h2 class="h2">Earth Continuity Limit</h2>
+        <h2 class="h2">Earth continuity limit</h2>
         <p class="muted">For a Class I appliance, the earth continuity limit is (0.1 + R) Ω, where R is the resistance of the protective conductor in the supply cable. Values from IET Code of Practice Table V1.1.</p>
 
         <label class="label">CSA (cable cross-section)</label>
-        <select class="input" id="calc-csa" data-change-action="calc-csa">${csaOptions}</select>
+        <select aria-label="Cable cross-section (CSA)" class="input" id="calc-csa" data-change-action="calc-csa">${csaOptions}</select>
 
         <label class="label">Length</label>
-        <select class="input" id="calc-length" data-change-action="calc-length">${lengthOptions}</select>
+        <select aria-label="Cable length" class="input" id="calc-length" data-change-action="calc-length">${lengthOptions}</select>
 
         <div class="calc-result-card">
           <div class="calc-result-label">Earth limit</div>
@@ -1438,18 +1784,15 @@ function renderSettingsCalculator() {
 //
 // The section hides itself entirely when the device can't store photos, rather
 // than offering buttons that can't work.
+// V97 (1A): the photo FILES (export / import) — Backup & Restore.
 function renderPhotoBackupSection() {
   if (typeof photosSupported === 'function' && !photosSupported()) return '';
   const stats = (typeof photoStatsSync === 'function') ? photoStatsSync() : { count: 0, bytes: 0 };
 
   const exportBlock = stats.count
-    ? `<button class="backup-action-btn primary" id="photo-export-btn" data-action="photo-export">⬇ Export photos (.json)</button>
-       <p class="muted" style="margin-top:8px;font-size:12px">${stats.count} photo${stats.count === 1 ? '' : 's'} on this device · about ${escapeHTML(formatBytes(Math.round(stats.bytes * 1.37)))} as a file.</p>`
-    : `<p class="muted" style="font-size:12px">No photos on this device yet. Photos are added from the FAIL screen.</p>`;
-
-  const wipeBlock = stats.count
-    ? `<button class="backup-action-btn danger" id="photo-wipe-btn" data-action="photo-wipe" style="margin-top:10px">🗑 Delete all photos</button>`
-    : '';
+    ? `<button class="backup-action-btn primary" id="photo-export-btn" data-action="photo-export">${icon('upload')} Export photos (.json)</button>
+       <p class="muted" style="margin-top:8px;font-size:0.75rem">${stats.count} photo${stats.count === 1 ? '' : 's'} on this device · about ${escapeHTML(formatBytes(Math.round(stats.bytes * 1.37)))} as a file.</p>`
+    : `<p class="muted" style="font-size:0.75rem">No photos on this device yet. Photos are added from the FAIL screen.</p>`;
 
   return `
       <div class="settings-section">
@@ -1457,8 +1800,34 @@ function renderPhotoBackupSection() {
         <p class="muted"><strong>Photos are not included in your backup.</strong> They're far too large for it — putting them in would risk the backup itself failing to save. Export them separately and keep both files together.</p>
         ${exportBlock}
         <input type="file" id="photo-import-file" data-change-action="photo-import-file" accept="application/json,.json" style="display:none">
-        <button class="backup-action-btn" id="photo-import-btn" data-action="photo-import" style="margin-top:10px">⬆ Import photos (.json)</button>
-        <p class="muted" style="margin-top:8px;font-size:12px">Importing adds to what's already here — it never replaces your jobs. Restore your backup first, then import photos.</p>
+        <button class="backup-action-btn" id="photo-import-btn" data-action="photo-import" style="margin-top:10px">${icon('download')} Import photos (.json)</button>
+        <p class="muted" style="margin-top:8px;font-size:0.75rem">Importing adds to what's already here — it never replaces your jobs. Restore your backup first, then import photos.</p>
+      </div>
+  `;
+}
+
+// V97 (1A): photos as SPACE — the manager and clearing them. Phone Storage.
+function renderPhotoStorageSection() {
+  if (typeof photosSupported === 'function' && !photosSupported()) return '';
+  const stats = (typeof photoStatsSync === 'function') ? photoStatsSync() : { count: 0, bytes: 0 };
+  // V90 (Peter, V90 round): the label says what the button does. Signed in it
+  // only clears photos already in the cloud (V88 5A — the cloud keeps them);
+  // signed out it really deletes, so it keeps the word "Delete". Same condition
+  // as the photo-wipe action in dispatch.js.
+  const clears = (typeof syncActive === 'function' && syncActive());
+  const wipeBlock = stats.count
+    ? `<button class="backup-action-btn danger" id="photo-wipe-btn" data-action="photo-wipe" style="margin-top:10px">${icon('trash-2')} ${clears ? 'Clear photos from this phone' : 'Delete all photos'}</button>`
+    : '';
+  // V90 (R18): the photo manager. Signed out it shows this phone's photos.
+  const manageBlock = (typeof renderPhotoManager === 'function')
+    ? `<button class="backup-action-btn primary" id="photo-manage-btn" data-action="pm-open">${icon('images')} Manage Photos ${icon('chevron-right', 'ic-trail')}</button>`
+    : '';
+  if (!manageBlock && !wipeBlock) return '';
+  return `
+      <div class="settings-section">
+        <h2 class="h2">Photos</h2>
+        <p class="muted">${stats.count ? `${stats.count} photo${stats.count === 1 ? '' : 's'} on this phone · ${escapeHTML(formatBytes(stats.bytes))}.` : 'No photos on this phone.'} Photos are kept apart from the space above, so clearing them doesn't make room for jobs.</p>
+        ${manageBlock}
         ${wipeBlock}
       </div>
   `;

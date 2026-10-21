@@ -187,7 +187,28 @@ function _syncEmpty(userId) {
            // cloud; removed when this phone deletes the cloud copy. The job and
            // item are kept so a deleted job or item can take its cloud photos
            // with it even after they were cleared from this phone (5A).
-           ph: { sent: {} } };
+           // v89: `sent` now means KNOWN to be in the cloud — this phone's own
+           // uploads AND rows read from the photos table for jobs on this phone
+           // (decision 5A: any phone that can see a cloud photo can delete it).
+           // Entries may also carry b (bytes), t (1 = a preview exists, 1A) and
+           // a (taken at). `pulledAt` is the photo rows' own cursor; `need` lists
+           // jobs that arrived after that cursor passed their rows.
+           // V101 (Stage 9): `mv` = {photoId: jobId} — known photos whose item
+           // moved to another job; their cloud rows' session_id still to be
+           // re-pointed (_syncPhotoMoves). Cleared once the update lands.
+           ph: { sent: {}, pulledAt: null, need: [], mv: {}, seenAllAt: null },
+           // V91 (Stage 4, 1A): {jobId: fingerprint of the cloud copy as the pull
+           // last READ it}. Not what was sent — what was SEEN. A job is safe in
+           // the cloud when this equals the phone's copy (syncJobsSafety).
+           conf: {}, confV: SYNC_CONF_V,
+           // V93 (2A): the month (year*12 + month0) the retest look last ran
+           // in full for this account. null = never: it runs on the next sync.
+           rtMonth: null,
+           // V128 (2A): when this phone last saw EVERY row of the jobs table — set
+           // by a pull that finished with nothing left undecided. Older than
+           // SYNC_STALE_DAYS (or never) = list the table in full before sending.
+           // rec and ph keep their own.
+           seenAllAt: null };
 }
 
 // v83: two more fields.
@@ -204,7 +225,12 @@ function _syncRecEmpty() {
   // v86: descBase — the descriptions both phones last agreed on (lower-cased),
   // or null. Like inUse, a value both sides AGREED, so it is set only when the
   // cloud is seen to equal this phone, or after this phone's copy is sent.
-  return { sent: {}, gone: {}, resend: {}, pulledAt: null, kinds: '', freeze: {}, inUse: null, descBase: null };
+  return { sent: {}, gone: {}, resend: {}, pulledAt: null, kinds: '', freeze: {}, inUse: null, descBase: null, seenAllAt: null };
+}
+
+// V128: a stored time this file can trust — a string Date.parse reads.
+function _syncIsoOk(v) {
+  return typeof v === 'string' && !isNaN(Date.parse(v));
 }
 
 function _syncLoad() {
@@ -227,6 +253,9 @@ function _syncLoad() {
   // "send it again". A phone upgrading from V80 lands here on its first run.
   if (typeof raw.pulledAt === 'string' && !isNaN(Date.parse(raw.pulledAt))) out.pulledAt = raw.pulledAt;
   if (typeof raw.lastPullAt === 'string' && !isNaN(Date.parse(raw.lastPullAt))) out.lastPullAt = raw.lastPullAt;
+  // V128. Missing or unreadable = never: the table is listed in full on the next
+  // run — the safe direction (one extra read), as a missing cursor is.
+  if (_syncIsoOk(raw.seenAllAt)) out.seenAllAt = raw.seenAllAt;
   // v81.2: fingerprints written before canonical hashing mean nothing now, so
   // they are dropped rather than left to mismatch for ever. Costs one re-send of
   // every job, once. `gone` survives — a delete already sent is still sent.
@@ -255,6 +284,7 @@ function _syncLoad() {
     }
     if (typeof rr.inUse === 'string') r.inUse = rr.inUse;
     if (Array.isArray(rr.descBase)) r.descBase = rr.descBase.filter(x => typeof x === 'string');   // v86
+    if (_syncIsoOk(rr.seenAllAt)) r.seenAllAt = rr.seenAllAt;   // V128
   }
   // v88. Not a fingerprint, so hashV never clears it. Malformed entries are
   // dropped, which only ever means "upload that photo again" — an upsert of an
@@ -263,10 +293,38 @@ function _syncLoad() {
   if (rp && typeof rp === 'object' && !Array.isArray(rp) && rp.sent && typeof rp.sent === 'object' && !Array.isArray(rp.sent)) {
     for (const k of Object.keys(rp.sent)) {
       const e = rp.sent[k];
-      if (e && typeof e === 'object' && typeof e.s === 'string' && typeof e.i === 'string') out.ph.sent[k] = { s: e.s, i: e.i };
+      if (!(e && typeof e === 'object' && typeof e.s === 'string' && typeof e.i === 'string')) continue;
+      // v89: the optional extras. Anything odd is dropped, never the entry.
+      const o = { s: e.s, i: e.i };
+      if (typeof e.b === 'number' && e.b > 0 && isFinite(e.b)) o.b = Math.round(e.b);
+      if (e.t === 1 || e.t === true) o.t = 1;
+      if (typeof e.a === 'string' && !isNaN(Date.parse(e.a))) o.a = e.a;
+      out.ph.sent[k] = o;
     }
   }
-  if (raw.hashV !== SYNC_HASH_V) { out.sent = {}; out.rec.sent = {}; }
+  // v89. A missing cursor means "read every photo row" — rows only, and only
+  // kept for jobs on this phone: the safe direction, and cheap.
+  if (rp && typeof rp === 'object' && typeof rp.pulledAt === 'string' && !isNaN(Date.parse(rp.pulledAt))) out.ph.pulledAt = rp.pulledAt;
+  if (rp && typeof rp === 'object' && _syncIsoOk(rp.seenAllAt)) out.ph.seenAllAt = rp.seenAllAt;   // V128
+  if (rp && typeof rp === 'object' && Array.isArray(rp.need)) {
+    out.ph.need = rp.need.filter(x => typeof x === 'string' && x).slice(0, 2000);
+  }
+  // V101: moves still to reach the cloud. Not a fingerprint — hashV keeps it.
+  // Malformed entries dropped: the cost is a cloud row left pointing at the old
+  // job, which syncNoteMoved / the pull's moved-out path would queue again.
+  if (rp && typeof rp === 'object' && rp.mv && typeof rp.mv === 'object' && !Array.isArray(rp.mv)) {
+    let n = 0;
+    for (const k of Object.keys(rp.mv)) {
+      if (typeof rp.mv[k] === 'string' && rp.mv[k] && n < MOVED_OUT_MAX) { out.ph.mv[k] = rp.mv[k]; n++; }
+    }
+  }
+  // V91: a fingerprint, so hashV drops it with the rest (a read under the old
+  // hashing can't vouch for anything).
+  if (raw.conf && typeof raw.conf === 'object' && !Array.isArray(raw.conf)) {
+    for (const k of Object.keys(raw.conf)) if (typeof raw.conf[k] === 'string') out.conf[k] = raw.conf[k];
+  }
+  if (Number.isInteger(raw.rtMonth)) out.rtMonth = raw.rtMonth;   // V93: garbage → look again
+  if (raw.hashV !== SYNC_HASH_V) { out.sent = {}; out.rec.sent = {}; out.conf = {}; }
   else out.hashV = SYNC_HASH_V;
   // v83.1 (decision 3A). Cursors written by a pager that could step over rows
   // are not trusted: both are cleared once, so the next run reads jobs and
@@ -274,6 +332,12 @@ function _syncLoad() {
   // phone already has resolve as no work. Saved with the new pagerV by the
   // first run, so it happens once per phone (per account).
   if (raw.pagerV !== SYNC_PAGER_V) { out.pulledAt = null; out.rec.pulledAt = null; }
+  // V91 (decision 2A). A state saved before V91 has never recorded what the pull
+  // read, and its jobs cursor is already past the rows that would tell it. The
+  // jobs cursor (only) is cleared once, so the next run reads every job back and
+  // records it; rows this phone already has resolve as no work. Saved with the
+  // new confV by that run, so it happens once per phone (per account).
+  if (raw.confV !== SYNC_CONF_V) { out.pulledAt = null; out.conf = {}; }
   return out;
 }
 
@@ -281,17 +345,52 @@ function _syncSave(st) {
   try { localStorage.setItem(SYNC_STATE_KEY, JSON.stringify(st)); } catch (e) {
     console.error('Sync state could not be saved (non-fatal).', e);
   }
+  _syncPhotoCloudPoint(st);
+}
+
+// v89: the UI's view of the photos known in the cloud (photos.js reads it
+// synchronously for badges and the strip). Pointed at the state just saved —
+// the same object, so it is never a stale copy — with a counter so photos.js
+// knows to rebuild its lookup.
+function _syncPhotoCloudPoint(st) {
+  try {
+    if (!st || !st.ph) return;
+    state.photoCloud = st.ph.sent;
+    state.photoCloudUser = st.userId || '';
+    state.photoCloudV = (state.photoCloudV || 0) + 1;
+  } catch { /* the badges simply show this phone's photos */ }
 }
 
 // The state for THIS account, or a fresh one if the stored state is someone else's.
 function _syncStateFor(userId) {
   const st = _syncLoad();
-  return (userId && st.userId === userId) ? st : _syncEmpty(userId);
+  if (userId && st.userId === userId) return st;
+  // V128 (2A). A state made new for this account knows of nothing in the cloud,
+  // so it has, trivially, seen every row it knows: anything it learns from here
+  // on is learned after now, and that row's delete — and its marker — come after
+  // that. So "seen whole" starts now, not at never. (Only HERE: a state LOADED
+  // without the field is an older version's, and falls back to its cursor.)
+  const fresh = _syncEmpty(userId);
+  const now = new Date().toISOString();
+  fresh.seenAllAt = now; fresh.rec.seenAllAt = now; fresh.ph.seenAllAt = now;
+  return fresh;
 }
 
 function _syncCurrentUserId() {
   return (typeof cloudUserId === 'function') ? cloudUserId() : '';
 }
+
+// V111 (Stage 11, 1A) — EVERY read of sessions / records / photos /
+// session_photo_counts names its owner: .eq('user_id', uid). Never leave it
+// to the database rules. Today the rules return only your own rows, so the
+// filter changes nothing; from Stage 11's business rules (V112) an Owner, Team
+// leader or Office login may READ other members' rows, and a read without the
+// filter would pull a teammate's jobs onto this phone as if they were its own,
+// then push them back under this account. Worse, ids are unique only per
+// account (primary key user_id + id — utils.js), so a teammate's job could
+// land on top of one of yours with the same id. Harness 48 fails any read of
+// these tables without the filter (48a) and proves each one against a server
+// that returns everyone's rows (48b–48e).
 
 // ---- status (Sync page, prune guard) ---------------------------------------------
 // Synchronous: hashes every job, so call it only where that's affordable (the
@@ -331,12 +430,16 @@ function syncStatusSummary() {
   // still in it), and how many of those are in the cloud. null until the photo
   // mirror is loaded — the page then says nothing rather than a wrong number.
   const phJobs = _syncPhotoJobs();
-  let phTotal = 0, phUp = 0;
+  let phTotal = 0, phUp = 0, phCloudOnly = 0;
   if (phJobs) for (const id of phJobs.keys()) { phTotal++; if (st.ph.sent[id]) phUp++; }
+  // v89: photos of jobs on this phone that are only in the cloud.
+  if (phJobs && typeof photoCountsForSession === 'function') {
+    for (const s of jobs) phCloudOnly += photoCountsForSession(s).cloud;
+  }
   return {
     total: jobs.length, upToDate, waiting: jobs.length - upToDate,
     recTotal, recUpToDate, listTotal, listUpToDate, rpTotal, rpUpToDate, gsTotal, gsUpToDate,
-    phReady: !!phJobs, phTotal, phUp,
+    phReady: !!phJobs, phTotal, phUp, phCloudOnly,
     lastPushAt: st.lastPushAt,
     // v81
     lastPullAt: st.lastPullAt,
@@ -344,27 +447,167 @@ function syncStatusSummary() {
   };
 }
 
-// V80 decision 5A. Clearing old jobs is local housekeeping and the cloud keeps
-// them — but only a job whose LATEST version is in the cloud may be cleared
-// while signed in, or the clear would take the only copy of an edit with it.
+// ---- V91 (roadmap Stage 4): safe in the cloud ---------------------------------
+//
+// A job is SAFE IN THE CLOUD when the cloud's copy has been SEEN to match the
+// phone's (1A: st.conf, recorded by the pull's read-back of this phone's own
+// push) and every photo of it on this phone is known in the cloud. That, and
+// only that, lets it come off this phone (R6).
+//
+// Why not "the push succeeded": the fingerprint of what was SENT (st.sent) says
+// what this phone tried to put there. The read-back says what is there. Today
+// every pull already downloads back each job this phone pushed (the waste
+// Stage 5's lighter pull removes), so the proof costs nothing extra; when the
+// fingerprint column lands, conf is filled from that column instead.
+//
+// Reasons, in the order they are judged (the first one that applies is the one
+// the engineer is told):
+//   held            waiting for an answer on the Sync page
+//   unsent          changes on this phone not sent yet
+//   photos-unknown  the photo list hasn't been read yet (nothing is assumed)
+//   photos          n photos still to upload
+//   checking        sent, but the cloud copy not read back yet (next sync)
+//   safe
+// The example job never syncs and is left out altogether.
+//
+// fresh = false (display: job cards, counts, the offer) reuses a job's
+// fingerprint while storage.js reuses its saved encoding — the same proof that
+// nothing in it changed. fresh = true (every REMOVAL) hashes every job again.
+// Returns null when not signed in: there is nothing to be safe in.
+const _syncJobHashMemo = new WeakMap();
+
+function _syncJobHash(s, fresh) {
+  const cache = (typeof _encodedSessionCache !== 'undefined') ? _encodedSessionCache : null;
+  if (!fresh && cache && s.id !== state.activeId) {
+    const enc = cache.get(s);
+    const m = _syncJobHashMemo.get(s);
+    // ⚠ storage.js's own reuse test, plus identity of its cache entry: any
+    // invalidation (_invalidateSessionEncoding) or re-encode makes a new entry.
+    if (enc && m && m.enc === enc && enc.itemsRef === s.items && enc.sig === _sessionSig(s)) return m.hash;
+    const hash = syncHash(_syncCanonical(s));
+    if (enc && enc.itemsRef === s.items && enc.sig === _sessionSig(s)) _syncJobHashMemo.set(s, { enc, hash });
+    return hash;
+  }
+  return syncHash(_syncCanonical(s));
+}
+
+function syncJobsSafety(fresh) {
+  if (!syncActive()) return null;
+  const uid = _syncCurrentUserId();
+  const st = _syncStateFor(uid);
+  const pending = (uid && st.userId === uid) ? _syncPhotosPendingByJob(st) : null;
+  const held = new Set(_syncHeldLoad().filter(e => e.kind === 'session').map(e => e.id));
+  const map = new Map();
+  let safe = 0;
+  for (const s of _syncSessions()) {
+    const id = String(s.id);
+    const h = _syncJobHash(s, !!fresh);
+    let r;
+    if (held.has(id)) r = { safe: false, why: 'held' };
+    else if (st.sent[id] !== h) r = { safe: false, why: 'unsent' };
+    else if (!pending) r = { safe: false, why: 'photos-unknown' };
+    else if (pending.get(id)) r = { safe: false, why: 'photos', n: pending.get(id) };
+    else if (st.conf[id] !== h) r = { safe: false, why: 'checking' };
+    else { r = { safe: true, why: 'safe' }; safe++; }
+    map.set(id, r);
+  }
+  return { map, safe, total: map.size };
+}
+
+// One plain line for a reason. Never shown signed out.
+function syncSafetyText(r) {
+  if (!r) return '';
+  switch (r.why) {
+    case 'safe':           return 'Safe in the cloud';
+    case 'held':           return 'Waiting for your answer on the Sync page';
+    case 'unsent':         return 'Latest changes not sent yet';
+    case 'photos-unknown': return 'Checking its photos\u2026';
+    case 'photos':         return `${r.n} photo${r.n === 1 ? '' : 's'} still to upload`;
+    case 'checking':       return 'Sent \u2014 confirmed on the next sync';
+    default:               return '';
+  }
+}
+
+// V80 decision 5A, V91 (Stage 4): clearing jobs while signed in is local
+// housekeeping and the cloud keeps them — so only a job SAFE IN THE CLOUD may
+// go. Always fresh (every job hashed again): this is the check AT the moment of
+// clearing. `kept` carries each refused job's reason.
 // Signed out: unchanged pre-V80 behaviour, every target is clearable.
-function syncPruneFilter(targets) {
+//
+// V92 (3B): `verified` (from syncVerifyJobs) is what the cloud's REAL contents
+// hash to, per job. Given, a safe job may go only if that equals its fresh hash
+// — the fingerprint says the cloud has it; the contents prove it, at the one
+// moment data leaves the phone. Not given (no signal), the last read stands.
+function syncPruneFilter(targets, verified) {
   const list = Array.isArray(targets) ? targets : [];
   if (!syncActive()) return { clear: list.slice(), kept: [], active: false };
-  const uid = _syncCurrentUserId();
-  const st = _syncLoad();
-  const mine = !!uid && st.userId === uid;
-  // v88 (decision 6A): and every photo of it uploaded, or clearing would take
-  // the only copy of a photo with it. Photo mirror not loaded (or unreadable):
-  // nothing is known, so nothing is cleared.
-  const pending = mine ? _syncPhotosPendingByJob(st) : null;
+  const safety = syncJobsSafety(true);
   const clear = [], kept = [];
   for (const s of list) {
-    const ok = mine && !!pending && s && st.sent[String(s.id)] === syncHash(_syncCanonical(s))
-      && !pending.has(String(s.id));
-    (ok ? clear : kept).push(s);
+    let r = (s && safety) ? safety.map.get(String(s.id)) : null;
+    if (r && r.safe && verified instanceof Map && verified.get(String(s.id)) !== syncHash(_syncCanonical(s))) {
+      r = { safe: false, why: 'checking' };
+    }
+    if (r && r.safe) clear.push(s);
+    else kept.push({ s, why: r ? r.why : 'unsent', r });
   }
   return { clear, kept, active: true };
+}
+
+// V92 (3B). Read the real contents of these jobs from the cloud and hash them
+// — the check made before a job comes off the phone, now that the pull no
+// longer downloads what it sent. Memory only: nothing is written (a run may be
+// going). Resolves a Map id → hash (null: deleted, missing or unreadable), or
+// null with no signal / signed out. Rejects if the cloud can't be read.
+function syncVerifyJobs(ids) {
+  const want = Array.from(new Set((ids || []).map(String).filter(Boolean)));
+  if (!syncActive() || _syncOffline()) return Promise.resolve(null);
+  const uid = _syncCurrentUserId();
+  if (!uid) return Promise.resolve(null);
+  const out = new Map(want.map(id => [id, null]));
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  return cloudClient().then((c) => {
+    let chain = Promise.resolve();
+    for (let k = 0; k < want.length; k += batch) {
+      const chunk = want.slice(k, k + batch);
+      chain = chain.then(() => c.from('sessions').select('id,doc,deleted').eq('user_id', uid).in('id', chunk))
+        .then((r) => {
+          if (r && r.error) throw r.error;
+          for (const row of ((r && r.data) || [])) {
+            const id = String(row && row.id != null ? row.id : '');
+            if (!out.has(id) || row.deleted === true || !_syncValidDoc(row.doc, id)) continue;
+            out.set(id, syncHash(_syncCanonical(row.doc)));
+          }
+        });
+    }
+    return chain;
+  }).then(() => out);
+}
+
+// V91: a job turns safe on a run that changed nothing on screen — the read-back
+// only records a fingerprint, and the last photo can go up after the jobs half.
+// So after every run the set of safe jobs is compared with the last one seen,
+// and the screens that show it (Jobs list, Jobs on this phone) repaint when it
+// moved. Display check only (memoised fingerprints); never on another screen.
+let _syncLastSafeSig = null;
+function _syncSafetyRepaint() {
+  try {
+    const safety = syncJobsSafety(false);
+    const sig = safety ? Array.from(safety.map.entries()).map(([id, r]) => id + ':' + r.why).sort().join('|') : '';
+    if (sig === _syncLastSafeSig) return;
+    _syncLastSafeSig = sig;
+    if (state.view === 'sessions' || state.view === 'jobManager') _syncRepaintApp();
+  } catch (e) { /* display only */ }
+}
+
+// Run fn once no sync run is going, in one synchronous step (a run holds its
+// own copy of the sync state and the job list; see syncPhotoKnowForDelete).
+function syncWhenIdle(fn) {
+  const go = () => {
+    if (_syncRunning) return _syncRunning.then(go, go);
+    return fn();
+  };
+  return Promise.resolve().then(go);
 }
 
 // ---- cleared-jobs list (SYNC_PRUNED_KEY) ---------------------------------------
@@ -408,7 +651,11 @@ function syncNotePruned(ids) {
   for (const raw of (ids || [])) {
     const id = String(raw);
     if (!st.sent[id]) continue;                       // never sent: nothing to remember
-    if (list.some(e => e.id === id)) continue;
+    // V92.1: cleared again → the date moves on. The push weighs a tombstone
+    // against it (a delete older than the clearing is stale), so an old date
+    // left by a restore must not make an older delete look newer.
+    const had = list.find(e => e.id === id);
+    if (had) { if (had.at !== now) { had.at = now; changed = true; } continue; }
     list.push({ id, at: now });
     changed = true;
   }
@@ -615,6 +862,76 @@ function _syncValidDoc(doc, id) {
   return true;
 }
 
+// ---- the fingerprint column (V92, Stage 5 12A) ----------------------------------
+// sessions.fp = syncHash(_syncCanonical(doc)), sent by the phone in the same
+// write as the doc (2A). The database blanks it when a doc changes without one
+// (a V91 phone) — supabase/schema.sql sessions_fp_guard — so a blank means
+// "unknown: download it", which is exactly the pre-V92 behaviour. A stale hash
+// version (SYNC_HASH_V) simply never matches and falls back the same way.
+// V93 (1A, 2A): the list also carries the few fields that decide whether a job
+// this phone hasn't got comes down — its date and its retest reminder — picked
+// out of the doc by the database (~40 bytes), never the doc itself.
+const _SYNC_JOB_PICKS = 'date:doc->>date,rt:doc->>retestTrack,rm:doc->>retestMonths,rc:doc->retestContact->>status';
+const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,' + _SYNC_JOB_PICKS;
+const _SYNC_JOB_DOC_COLS = 'id,doc,fp,deleted,updated_at';
+
+// ---- V93: which jobs belong on this phone (1A, 2A — R21, R22) -------------------
+// The deciding fields of a row: from its doc when it has one (a fetched row),
+// else from the list's picks (text, as Postgres returns ->> values).
+function _syncPicks(row) {
+  const str = (v) => (typeof v === 'string') ? v : '';
+  const d = (row && row.doc && typeof row.doc === 'object' && !Array.isArray(row.doc)) ? row.doc : null;
+  if (d) {
+    const rc = (d.retestContact && typeof d.retestContact === 'object') ? str(d.retestContact.status) : '';
+    return { date: str(d.date), rt: d.retestTrack === true, rm: Number(d.retestMonths), rc };
+  }
+  const r = row || {};
+  return { date: str(r.date), rt: r.rt === true || r.rt === 'true', rm: Number(r.rm), rc: str(r.rc) };
+}
+
+// The first date (YYYY-MM-DD, this phone's calendar) inside the window.
+function _syncWindowStart(now) {
+  const d = (now instanceof Date) ? new Date(now.getTime()) : new Date();
+  d.setDate(d.getDate() - SYNC_WINDOW_DAYS);
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+}
+
+// 2A: a tracked job whose chase has started (due next month, this month, or
+// overdue) and that nobody has booked or declined. retestStatus (session.js)
+// is the one rule, so the banner and the cloud never disagree (R15).
+function _syncRetestDue(p, now) {
+  if (!p || p.rt !== true || typeof retestStatus !== 'function') return false;
+  const st = retestStatus({ retestTrack: true, retestMonths: p.rm, date: p.date,
+    retestContact: p.rc ? { status: p.rc } : null }, now);
+  return st === 'upcoming' || st === 'duesoon' || st === 'overdue';
+}
+
+// 1A: dated within the window, or a retest being chased. A date that can't be
+// read comes down — when in doubt, the job is the engineer's to see.
+function _syncJobBelongs(p, now) {
+  if (!p) return true;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(p.date)) return true;
+  if (p.date >= _syncWindowStart(now)) return true;
+  return _syncRetestDue(p, now);
+}
+
+// A job arriving from the cloud by request (the "In the cloud" tab, the retest
+// look) is added exactly as the pull adds one — plus st.conf, because it was
+// just read: it is safe in the cloud the moment it lands. Caller saves.
+function _syncTakeJob(st, doc) {
+  const id = String(doc.id);
+  const hash = syncHash(_syncCanonical(doc));
+  state.sessions.unshift(doc);
+  st.sent[id] = hash;
+  st.conf[id] = hash;
+  delete st.gone[id];
+  st.ph.need.push(id);   // rule 24: its photo rows come with it
+  _syncHeldClear(id);
+}
+function _syncFp(row) {
+  return (row && typeof row.fp === 'string' && row.fp) ? row.fp : null;
+}
+
 // ---- triggers ------------------------------------------------------------------
 // Called from saveSessions() on the logging hot path: a status check and a
 // timer reset, nothing more. Rapid logging keeps pushing the timer back, so a
@@ -679,6 +996,8 @@ function syncBoot() {
   // v83: copies owed by a run that never finished (app closed between reading
   // the records and reading the jobs). Late is better than a wrong certificate.
   try { _syncFreezePending(_syncLoad()); } catch (e) { console.error('Sync: pending instrument copies not written (non-fatal).', e); }
+  // v89: badges and the strip can show cloud photos from the first paint.
+  try { _syncPhotoCloudPoint(_syncLoad()); } catch { /* next save does it */ }
   try {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') return;
@@ -729,17 +1048,133 @@ function _syncApplyRemoteDelete(id) {
   return true;
 }
 
+// ---- V101 (Stage 9, split): items moved to another job ---------------------------
+// A job a phone split carries `movedOut` = {itemId: jobId}. Pure: which of THIS
+// phone's items the cloud copy lacks, whether every one is listed as moved, and
+// to which jobs.
+function _syncMovedOut(local, doc) {
+  const res = { missing: [], dests: [], to: {}, covered: false };
+  if (!local || !doc || !Array.isArray(local.items) || !Array.isArray(doc.items)) return res;
+  const have = new Set(doc.items.map(it => String(it && it.id)));
+  const mo = (doc.movedOut && typeof doc.movedOut === 'object' && !Array.isArray(doc.movedOut)) ? doc.movedOut : {};
+  for (const it of local.items) {
+    const k = String(it && it.id);
+    if (!have.has(k)) res.missing.push(k);
+  }
+  if (!res.missing.length) return res;
+  for (const k of res.missing) {
+    const d = mo[k];
+    if (typeof d !== 'string' || !d || d === String(doc.id)) return res;   // not (validly) moved
+    res.to[k] = d;
+    if (res.dests.indexOf(d) === -1) res.dests.push(d);
+  }
+  res.covered = true;
+  return res;
+}
+function _syncHasJob(id) {
+  return (state.sessions || []).some(s => s && String(s.id) === String(id));
+}
+// A job items moved to is safe to rely on when it is on this phone, cleared from
+// it (the cloud keeps it — V80 C), or was just read live from the cloud. Deleted
+// here, or not in the cloud (yet), is not: the items would be on no job here.
+//
+// V103: ON THIS PHONE IS NOT ENOUGH. Items can now move into a job that already
+// existed, and this phone's copy of it may predate the move — then applying the
+// smaller job first would leave the items on no job here, and a "keep this
+// phone's copy" on that job would push it to the cloud without them. So a job
+// here counts only once it HOLDS each item sent to it — or records it moved on
+// again (`movedOut`, V101's one-hop trust). Until then the smaller job waits;
+// that job's own row lands, and the next run settles it by itself. `to` is
+// _syncMovedOut's {itemId: jobId}.
+function _syncDestHolds(d, to) {
+  const s = (state.sessions || []).find(x => x && String(x.id) === String(d));
+  if (!s || !Array.isArray(s.items)) return false;
+  const have = new Set(s.items.map(it => String(it && it.id)));
+  const mo = (s.movedOut && typeof s.movedOut === 'object' && !Array.isArray(s.movedOut)) ? s.movedOut : {};
+  return Object.keys(to || {}).filter(k => to[k] === String(d)).every(k =>
+    have.has(k) || (typeof mo[k] === 'string' && mo[k] !== '' && mo[k] !== String(d)));
+}
+function _syncMoveDestReady(d, pruned, destRows, to) {
+  if (_syncHasJob(d)) return _syncDestHolds(d, to);
+  if (pruned.has(d)) return true;
+  if ((state.tombstones || []).some(t => t && t.kind === 'session' && String(t.id) === d)) return false;
+  const row = destRows.get(d);
+  return !!(row && row.deleted !== true && _syncValidDoc(row.doc, d));
+}
+// The jobs fetched docs moved items to, when not on this phone: one read by id.
+function _syncFetchMoveDests(c, uid, got, pruned) {
+  const want = [];
+  for (const row of got.values()) {
+    if (!row || row.deleted === true || !_syncValidDoc(row.doc, row.id)) continue;
+    const local = (state.sessions || []).find(s => s && String(s.id) === String(row.id));
+    if (!local) continue;
+    const m = _syncMovedOut(local, row.doc);
+    if (!m.covered) continue;
+    for (const d of m.dests) if (!_syncHasJob(d) && !pruned.has(d) && want.indexOf(d) === -1) want.push(d);
+  }
+  const dest = new Map();
+  if (!want.length) return Promise.resolve(dest);
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  let chain = Promise.resolve();
+  for (let k = 0; k < want.length; k += batch) {
+    const chunk = want.slice(k, k + batch);
+    chain = chain.then(() => c.from('sessions').select(_SYNC_JOB_DOC_COLS).eq('user_id', uid).in('id', chunk))
+      .then((r) => {
+        if (r && r.error) throw r.error;
+        for (const d of ((r && r.data) || [])) {
+          const id = String(d && d.id != null ? d.id : '');
+          if (id && chunk.indexOf(id) !== -1) dest.set(id, d);
+        }
+      });
+  }
+  return chain.then(() => dest);
+}
+// Known cloud photos of moved items now belong to the job they moved to — so a
+// deleted original never takes them (photos half: st.gone[e.s]) — and their
+// rows are queued to be re-pointed. `to` = {itemId: jobId}. Mutates st.
+function _syncNoteMovedInState(st, to) {
+  let n = 0;
+  for (const id of Object.keys(st.ph.sent)) {
+    const e = st.ph.sent[id];
+    const d = to[e.i];
+    if (d && e.s !== d) { e.s = d; st.ph.mv[id] = d; n++; }
+  }
+  return n;
+}
+// session.js moveItemsToNewJob → here, with {itemId: newJobId}. The stored sync
+// state is written whoever is signed in (or nobody): its known photos belong to
+// whichever account they were read for, and a stale job label there is what a
+// later delete would sweep by. Waits for a run (V90: a run holds its own st).
+function syncNoteMoved(to) {
+  if (!to || typeof to !== 'object') return Promise.resolve(0);
+  return syncWhenIdle(() => {
+    let raw = null;
+    try { raw = localStorage.getItem(SYNC_STATE_KEY); } catch { raw = null; }
+    if (!raw) return 0;                     // never synced: nothing known in the cloud
+    const st = _syncLoad();
+    const n = _syncNoteMovedInState(st, to);
+    if (n) { _syncSave(st); try { syncPushSoon(SYNC_RESUME_DELAY_MS); } catch { /* next trigger */ } }
+    return n;
+  });
+}
+
 // ---- the pull ----------------------------------------------------------------------
 // Reads rows changed since the cursor and decides each one. Mutates `st` (the
 // caller saves it) and counts its work into `out`. Resolves to nothing: the
 // caller's push half runs immediately after, on the same state object, so a job
 // applied here is already fingerprinted and is not sent straight back.
-function _syncPull(c, uid, st, out) {
+// V128: `chk` is this run's stale-phone check (_syncCheckRun) — `jobs`, the ids
+// this phone knows were in the cloud that are not there at all now (null when
+// not checked), `ask`, and `at`, the moment to record once the pull finishes.
+function _syncPull(c, uid, st, out, chk) {
   const since = st.pulledAt || SYNC_PULL_EPOCH;
   const pruned = new Set(_syncPrunedLoad().map(e => e.id));
   let changed = false;   // a local job was added, replaced or removed
   let blocked = false;   // something was left undecided → the cursor stays put
   let high = since;
+  // V101 (8A): the jobs items moved TO, fetched for this page by docsFor (id →
+  // row with doc), so a moved-out job never leaves its items on no job here.
+  let destRows = new Map();
 
   function decide(row) {
     const id = String(row && row.id != null ? row.id : '');
@@ -791,6 +1226,7 @@ function _syncPull(c, uid, st, out) {
     };
 
     if (row.deleted === true) {
+      delete st.conf[id];   // V91: nothing in the cloud to vouch for it
       if (!local) {
         // Already gone here. Record that the cloud knows, so the push does not
         // send our own tombstone for it a second time.
@@ -798,7 +1234,9 @@ function _syncPull(c, uid, st, out) {
         _syncHeldClear(id);
         return;
       }
-      if (st.sent[id] === syncHash(_syncCanonical(local))) {
+      // V128 (4A): `ask` — the check found this job gone from the cloud but no
+      // safety copy could be kept, so even a clean copy is asked about, not removed.
+      if (!row.ask && st.sent[id] === syncHash(_syncCanonical(local))) {
         if (defer('delete')) return;
         _syncApplyRemoteDelete(id);
         delete st.sent[id];
@@ -815,23 +1253,51 @@ function _syncPull(c, uid, st, out) {
       return;
     }
 
+    // V92 (Stage 5, 12A). A row the fingerprint settles arrives WITHOUT its doc
+    // (see needsDoc below): its `fp` stands in for the hash. Every branch below
+    // that reads the doc is one needsDoc sends for it; the `!doc` guards are the
+    // belt to that — a light row that got here by mistake waits, never guesses.
+    // V93 (1A — R21, R22). A job this phone has never held (or cleared, above)
+    // comes down only if it belongs here: dated in the last SYNC_WINDOW_DAYS,
+    // or a retest being chased. Anything else stays in the cloud: RESOLVED, not
+    // held — the cursor moves on, and the "In the cloud" tab is how it's reached.
+    // Checked before the fingerprint, so an old job from an older phone (blank
+    // fp) is never downloaded to be thrown away. ⚠ Nothing is recorded: the
+    // cloud itself is the list of what isn't here (3A). A job deleted HERE
+    // (tomb) is not this rule's business — the branches below decide it.
+    if (!local && !tomb && !_syncJobBelongs(_syncPicks(row))) return;
+
+    const light = (row.doc === undefined);
+    if (light && !_syncFp(row)) { blocked = true; return; }
+
     // Decision 8A: anything unreadable is held, not dropped. A dropped row is a
     // row the cursor moves past and nobody ever sees again.
-    if (!_syncValidDoc(row.doc, id)) {
+    if (!light && !_syncValidDoc(row.doc, id)) {
+      delete st.conf[id];   // V91: an unreadable cloud copy vouches for nothing
       _syncHeldNote({ id, reason: 'unreadable', name,
         localItems: (local && Array.isArray(local.items)) ? local.items.length : null, cloudItems: null });
       blocked = true; out.held++;
       return;
     }
 
-    const doc = row.doc;
-    const hash = syncHash(_syncCanonical(doc));
+    const doc = light ? null : row.doc;
+    const hash = light ? _syncFp(row) : syncHash(_syncCanonical(doc));
+    // V91 (Stage 4, 1A). What the cloud was SEEN to hold, whatever is decided
+    // below. After a push, the next pull reads the row again (the push never
+    // moves the cursor), and if it matches the phone's copy the cloud has it.
+    // Held rows record it too — the phone's copy then differs, so not safe.
+    // V92 (2A, 3B): a light row's `fp` was written by the phone that wrote the
+    // doc, in the same row write, and a doc changed without it is blanked by the
+    // database (sessions_fp_guard) — so reading it is reading what the cloud
+    // holds. Removal still checks the real contents (syncVerifyJobs).
+    st.conf[id] = hash;
 
     if (!local) {
       if (tomb) {
         // Deleted here. If that delete has not reached the cloud yet, the push
         // half of this very run carries it — nothing to decide.
         if (!st.gone[id]) return;
+        if (!doc) { blocked = true; return; }   // V92: needsDoc sends for it
         // It HAS reached the cloud, and the row is live again: the other phone
         // has it back. Deleting someone's work twice over is not a default.
         _syncHeldNote({ id, reason: 'deleted-here', name,
@@ -839,9 +1305,12 @@ function _syncPull(c, uid, st, out) {
         blocked = true; out.held++;
         return;
       }
+      if (!doc) { blocked = true; return; }   // V92: needsDoc sends for it
       // A job from the other phone. Newest-first, like createSession().
       state.sessions.unshift(doc);
       st.sent[id] = hash;
+      // v89: its photo rows may be behind the photo cursor already.
+      st.ph.need.push(id);
       out.added++; changed = true;
       _syncHeldClear(id);
       return;
@@ -861,6 +1330,8 @@ function _syncPull(c, uid, st, out) {
     // re-reads the boundary rows every run, which would make that routine.
     if (hash === st.sent[id]) { _syncHeldClear(id); return; }
 
+    if (!doc) { blocked = true; return; }   // V92: needsDoc sends for it
+
     // Decision 1A. The local copy no longer matches what was last sent, so this
     // phone has changes of its own. Both sides moved; neither wins by default.
     if (st.sent[id] !== localHash) {
@@ -873,7 +1344,15 @@ function _syncPull(c, uid, st, out) {
     // Decision 3A. The local copy is clean, so by 1A the cloud row would apply —
     // but it has fewer items than the phone holds. Applying it would be the one
     // failure this app cannot have, whatever the cause, so it is asked about.
-    if (doc.items.length < local.items.length) {
+    //
+    // V101 (8A). Unless the items it lacks were MOVED: the other phone split
+    // them into another job and recorded where (`movedOut`). Taken without the
+    // question only when every missing item is listed as moved AND each job they
+    // went to is here already, cleared here (so in the cloud), or fetched in this
+    // very page — it comes down first. Anything short of that asks, as before.
+    const moves = _syncMovedOut(local, doc);
+    const ready = moves.covered && moves.dests.every(d => _syncMoveDestReady(d, pruned, destRows, moves.to));
+    if (doc.items.length < local.items.length && !ready) {
       _syncHeldNote({ id, reason: 'fewer-items', name,
         localItems: local.items.length, cloudItems: doc.items.length });
       blocked = true; out.held++;
@@ -881,6 +1360,14 @@ function _syncPull(c, uid, st, out) {
     }
 
     if (defer('update')) return;
+    if (ready) {
+      for (const d of moves.dests) {
+        if (_syncHasJob(d) || pruned.has(d)) continue;
+        _syncTakeJob(st, destRows.get(d).doc);
+        out.added++;
+      }
+      _syncNoteMovedInState(st, moves.to);
+    }
     _syncReplaceSession(id, local, doc);
     st.sent[id] = hash;
     out.applied++; changed = true;
@@ -899,27 +1386,94 @@ function _syncPull(c, uid, st, out) {
   // guard below is now real: a full page all on one timestamp cannot move, so
   // the run stops and leaves the mark where it was. Needs more rows in one
   // transaction than SYNC_PULL_PAGE — impossible while batches are smaller.
+  //
+  // V92 (Stage 5, 12A — R17). Each page is a LIST: id, fingerprint, deleted,
+  // updated_at — about 100 bytes a job. Before V92 every page carried every
+  // doc, so each push came straight back down in full on the next pull (a
+  // 300-item job after every pause in logging). needsDoc() says which rows the
+  // fingerprint cannot settle; only those docs are fetched, by id, before the
+  // page is decided. The rows are decided in list order either way.
+  function needsDoc(row) {
+    const id = String(row && row.id != null ? row.id : '');
+    if (!id || pruned.has(id) || st.resend[id] || row.deleted === true) return false;
+    const local = (state.sessions || []).find(s => s && String(s.id) === id);
+    const tomb = !local && (state.tombstones || []).some(t => t && t.kind === 'session' && String(t.id) === id);
+    // V93 (1A): a job this phone hasn't got and doesn't belong here stays in
+    // the cloud — its doc is never fetched, fingerprint or not.
+    if (!local && !tomb && !_syncJobBelongs(_syncPicks(row))) return false;
+    const fp = _syncFp(row);
+    if (!fp) return true;                      // written by an older phone, or blanked
+    if (!local) return !(tomb && !st.gone[id]);   // only "our delete is on its way" needs nothing
+    if (fp === st.sent[id]) return false;      // only this phone moved (v83.1)
+    return fp !== syncHash(_syncCanonical(local));   // identical needs nothing
+  }
+  function docsFor(rows) {
+    const want = [];
+    for (const row of rows) {
+      const id = String(row && row.id != null ? row.id : '');
+      if (needsDoc(row) && want.indexOf(id) === -1) want.push(id);
+    }
+    const got = new Map();
+    const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+    let chain = Promise.resolve();
+    for (let k = 0; k < want.length; k += batch) {
+      const chunk = want.slice(k, k + batch);
+      chain = chain.then(() => c.from('sessions').select(_SYNC_JOB_DOC_COLS).eq('user_id', uid).in('id', chunk))
+        .then((r) => {
+          if (r && r.error) throw r.error;
+          for (const d of ((r && r.data) || [])) {
+            const id = String(d && d.id != null ? d.id : '');
+            if (id && chunk.indexOf(id) !== -1) got.set(id, d);
+          }
+        });
+    }
+    return chain.then(() => _syncFetchMoveDests(c, uid, got, pruned))
+      .then((dest) => ({ want: new Set(want), got, dest }));
+  }
   const seen = new Set();
   function page(from) {
     return c.from('sessions')
-      .select('id,doc,deleted,last_modified,updated_at')
+      .select(_SYNC_JOB_LIST_COLS)
+      .eq('user_id', uid)   // V111: this account's jobs only — never the rules alone
       .gte('updated_at', from)
       .order('updated_at', { ascending: true })
       .limit(SYNC_PULL_PAGE)
       .then((r) => {
         if (r && r.error) throw r.error;
         const rows = (r && r.data) || [];
-        for (const row of rows) {
-          const u = row && row.updated_at;
-          const key = String(row && row.id) + '|' + String(u);
-          if (!seen.has(key)) { seen.add(key); decide(row); }
-          if (typeof u === 'string' && u > high) high = u;
-        }
-        if (rows.length < SYNC_PULL_PAGE) return;
-        if (high === from) { blocked = true; return; }
-        return page(high);
+        const fresh = rows.filter((row) => !seen.has(String(row && row.id) + '|' + String(row && row.updated_at)));
+        return docsFor(fresh).then((d) => {
+          destRows = d.dest;   // V101
+          for (const row of rows) {
+            const u = row && row.updated_at;
+            const key = String(row && row.id) + '|' + String(u);
+            if (!seen.has(key)) {
+              seen.add(key);
+              const id = String(row && row.id != null ? row.id : '');
+              // The row as fetched may be NEWER than the listed one (or deleted
+              // since): it is what the cloud holds now, so it is what is decided.
+              // A doc asked for and not returned waits (blocked) for next time.
+              if (d.want.has(id)) { if (d.got.has(id)) decide(d.got.get(id)); else blocked = true; }
+              // V93: a light row keeps the list's picks (date, retest) — decide's
+              // window check reads them (harness 30a found them dropped here).
+              else decide({ id: row.id, fp: row.fp, deleted: row.deleted, updated_at: row.updated_at,
+                date: row.date, rt: row.rt, rm: row.rm, rc: row.rc });
+            }
+            if (typeof u === 'string' && u > high) high = u;
+          }
+          if (rows.length < SYNC_PULL_PAGE) return;
+          if (high === from) { blocked = true; return; }
+          return page(high);
+        });
       });
   }
+
+  // V128 (3A). A job this phone knows was in the cloud and that is not there at
+  // all — not even as a "deleted" row — was deleted, and its marker has since
+  // been cleared away. Decided exactly as that marker would have been: clean
+  // here → removed here; edited here → held, and the Sync page asks. Before the
+  // pages, so nothing read below is mistaken for it.
+  for (const id of ((chk && chk.jobs) || [])) decide({ id, deleted: true, ask: !!chk.ask });
 
   return page(since).then(() => {
     // Recomputed every run, never accumulated: if the job was closed, or the
@@ -928,7 +1482,16 @@ function _syncPull(c, uid, st, out) {
     state.sync.waiting = out.waiting || null;
     const waitingMoved = JSON.stringify(state.sync.waiting || null) !== waitingBefore;
     st.lastPullAt = new Date().toISOString();
-    if (!blocked) st.pulledAt = high;
+    if (!blocked) {
+      st.pulledAt = high;
+      // V128 (2A): every row of the table has now been read and decided.
+      if (chk && chk.at) st.seenAllAt = chk.at;
+    }
+    st.confV = SYNC_CONF_V;
+    // V91: only jobs on this phone need vouching for. A cleared job's entry
+    // would never be read again (the pull skips it) — dropped, not kept stale.
+    const onPhone = new Set((state.sessions || []).map(s => String(s && s.id)));
+    for (const k of Object.keys(st.conf)) if (!onPhone.has(k)) delete st.conf[k];
     _syncSave(st);
     if (changed) {
       // A new array reference busts activeSession()'s memo (session.js), which
@@ -936,11 +1499,204 @@ function _syncPull(c, uid, st, out) {
       // cached encodings, so this costs one allocation, not a re-encode.
       state.sessions = state.sessions.slice();
       saveSessions();
+      // V101: an applied moved-out job (or anything else that moved an item to
+      // another job) re-labels this phone's photo copies to match.
+      if (typeof photosSettleJobs === 'function') { try { photosSettleJobs(); } catch (e) { /* next boot heals */ } }
     }
     // v81.2: the screen, not just the Sync page. Done here rather than at the
     // end of the whole run because the push half never changes local data —
     // waiting until then would only delay what is already true.
     if (changed || waitingMoved) _syncRepaintApp();
+  });
+}
+
+// ---- V128: the stale-phone check (Stage 12's clean-up job, phone side) ---------
+// Locked 14 Oct (Peter): 1A jobs, records and the photo note · 2A when a table was
+// last seen whole more than SYNC_STALE_DAYS ago · 3A gone = deleted, decided as
+// its marker would have been · 4A a safety copy first · 5A a run that cannot
+// finish the check sends nothing.
+//
+// WHY. A phone learns of a delete made elsewhere only from the "deleted" row it
+// leaves (the marker). The clean-up job will clear markers older than
+// SYNC_MARKER_DAYS, so a phone away longer than that would never hear of the
+// delete: it would keep the job, and its next push — an upsert — would put the
+// job straight back in the cloud. A phone that may have slept through a clean-
+// up therefore lists the table's ids in full before anything else: what it
+// knows was in the cloud and is not there at all was deleted.
+//
+// ⚠ "SEEN WHOLE" IS NOT THE CURSOR. The cursor is the newest row read, and a
+// quiet account's cursor stays old on a phone that syncs every day. What
+// matters is when a pull last read every row after the cursor and decided all
+// of them: from then on, any marker it missed is younger than that moment.
+// That moment is `seenAllAt` (per table), recorded by the pull itself.
+
+// Server time (ms) from the run's own sign-in — getSession() has just renewed an
+// expired one — or 0. Its expiry less its life: when the server issued it.
+function _syncSessionServerAt(session) {
+  const exp = Number(session && session.expires_at), life = Number(session && session.expires_in);
+  return (isFinite(exp) && isFinite(life) && exp > 0 && life > 0) ? (exp - life) * 1000 : 0;
+}
+
+// When a table was last seen whole (ms), 0 for never. The later of the recorded
+// moment and the cursor: a cursor only moves on a pull that decided everything
+// after it, so it is never later than such a moment — a safe stand-in for a
+// phone upgrading from V127, which has recorded nothing yet.
+function _syncSeenAllMs(cursor, at) {
+  const a = at ? Date.parse(at) : NaN;
+  const c = cursor ? Date.parse(cursor) : NaN;
+  return Math.max(isFinite(a) ? a : 0, isFinite(c) ? c : 0);
+}
+
+// 2A. Which tables must be listed before this run sends anything. `now` is the
+// LATER of the phone's clock and the server's time seen, so a clock wound back
+// cannot put the check off.
+// A table this phone knows nothing in is never due: nothing can have been
+// deleted from under it, and nothing it sends can put a deleted row back.
+function syncCheckDue(st, now) {
+  const limit = SYNC_STALE_DAYS * SYNC_DAY_MS;
+  const old = (k, cursor, at) => now - _syncSeenAllMs(cursor, at) > limit && _syncKnownIds(st, k).length > 0;
+  return {
+    jobs: old('jobs', st.pulledAt, st.seenAllAt),
+    rec: old('rec', st.rec.pulledAt, st.rec.seenAllAt),
+    ph: old('ph', st.ph.pulledAt, st.ph.seenAllAt),
+  };
+}
+
+const _SYNC_CHECK_TABLES = { jobs: 'sessions', rec: 'records', ph: 'photos' };
+const _SYNC_DELETABLE_KINDS = ['client', 'site', 'instrument', 'preset', 'template'];
+
+// What this phone holds as known in the cloud, per table. Settings rows are
+// never deleted by any version, so they are never in question.
+function _syncKnownIds(st, k) {
+  if (k === 'jobs') return Object.keys(st.sent);
+  if (k === 'rec') return Object.keys(st.rec.sent).filter(id => SYNC_SETTINGS_IDS.indexOf(id) === -1);
+  return Object.keys(st.ph.sent);
+}
+
+// The kind of a record this phone holds — on a list, or deleted here (its
+// tombstone) — among the kinds anyone can delete. '' when neither.
+function _syncRecordKindOf(id) {
+  const sid = String(id);
+  for (const k of _SYNC_DELETABLE_KINDS) {
+    if (_syncRecordList(k).some(r => r && String(r.id) === sid)) return k;
+  }
+  const t = (state.tombstones || []).find(x => x && _SYNC_DELETABLE_KINDS.indexOf(x.kind) !== -1 && String(x.id) === sid);
+  return t ? t.kind : '';
+}
+
+// Every id in one table for this account, live or deleted. Keyset paging on id,
+// in the server's own order (the next page starts after the last id it RETURNED,
+// never one this file sorted — Postgres and JavaScript can order text
+// differently).
+// ⚠ PAGED UNTIL A PAGE COMES BACK EMPTY, not merely short. A server that caps a
+// page below SYNC_CHECK_PAGE must not end the list early: every id missing from
+// it would read as deleted.
+function _syncListIds(c, uid, table) {
+  const ids = new Set();
+  function page(after) {
+    let q = c.from(table).select('id').eq('user_id', uid);   // V111: this account's own rows
+    if (after !== null) q = q.gt('id', after);
+    return q.order('id', { ascending: true }).limit(SYNC_CHECK_PAGE).then((r) => {
+      if (r && r.error) throw r.error;
+      const rows = (r && r.data) || [];
+      if (!rows.length) return ids;
+      const last = String(rows[rows.length - 1] && rows[rows.length - 1].id != null ? rows[rows.length - 1].id : '');
+      for (const row of rows) {
+        const id = String(row && row.id != null ? row.id : '');
+        if (id) ids.add(id);
+      }
+      if (!last || last === after) throw new Error('the cloud list did not move on');
+      return page(last);
+    });
+  }
+  return page(null);
+}
+
+// Reads each due table's ids (a due table always holds something this phone
+// knows — syncCheckDue). REJECTS — the whole run waits,
+// 5A — on any failed read, and on a table that comes back EMPTY while this phone
+// knows of rows in it: an empty answer is far likelier a read gone wrong (a
+// rule, the wrong account) than an account whose every row was deleted over a
+// year ago, and acting on it would remove everything.
+function _syncStaleCheck(c, uid, st, due) {
+  const lists = { jobs: null, rec: null, ph: null };
+  let chain = Promise.resolve();
+  for (const k of Object.keys(_SYNC_CHECK_TABLES)) {
+    if (!due[k]) continue;
+    chain = chain.then(() => _syncListIds(c, uid, _SYNC_CHECK_TABLES[k])).then((ids) => {
+      if (!ids.size) throw new Error('the cloud list came back empty');
+      lists[k] = ids;
+    });
+  }
+  return chain.then(() => lists, (e) => {
+    const err = e || new Error('check');
+    if (!err.syncStage) { try { err.syncStage = 'check'; } catch (x) { /* frozen: the generic text */ } }
+    throw err;
+  });
+}
+
+// The ids this phone knows were in the cloud and are not there at all.
+function _syncCheckGone(st, lists) {
+  const out = { jobs: null, rec: null, ph: null };
+  for (const k of Object.keys(_SYNC_CHECK_TABLES)) {
+    if (lists[k]) out[k] = _syncKnownIds(st, k).filter(id => !lists[k].has(id));
+  }
+  return out;
+}
+
+// 4A. A copy of the phone as it stands, in Backup & Restore, before anything the
+// check found is removed — taken only when the phone still HOLDS one of them (a
+// job, or a client, site, tester, preset or template). Resolves `ask`: true when
+// no copy could be kept (a refused write, no snapshots on this phone, or no
+// snapshots.js), and then removal is asked about instead of done. So nothing
+// goes without either the copy or the engineer's say — and a full phone never
+// stops sync altogether.
+function _syncCheckSafetyCopy(gone) {
+  const holds = (gone.jobs || []).some(id => _syncHasJob(id))
+    || (gone.rec || []).some(id => _SYNC_DELETABLE_KINDS.some(k => _syncRecordList(k).some(r => r && String(r.id) === String(id))));
+  if (!holds) return Promise.resolve(false);
+  if (typeof snapshotBeforeCloudCheck !== 'function') return Promise.resolve(true);
+  let p;
+  try { p = snapshotBeforeCloudCheck(); } catch (e) { p = Promise.reject(e); }
+  return Promise.resolve(p).then((r) => r !== 'saved', (e) => {
+    console.error('Sync: no safety copy before the cloud check — asking instead (non-fatal).', e);
+    return true;
+  });
+}
+
+// The last finished check, for this page load only: { uid, ms, due, gone, ask,
+// sent }. A run held open by an unanswered question repeats the check on every
+// run (its pull never finishes clean, so `seenAllAt` stays old); within
+// SYNC_CHECK_MEMO_MS the answer is reused rather than listing every table
+// again. `sent` — ids this phone has UPLOADED since (_syncNoteUploaded): their
+// rows exist again, so they are never treated as gone on the strength of the
+// older answer ("keep this phone's copy" is exactly that).
+let _syncCheckMemo = null;
+
+function _syncNoteUploaded(k, ids) {
+  const m = _syncCheckMemo;
+  if (!m) return;
+  for (const id of (ids || [])) m.sent[k].add(String(id));
+}
+
+function _syncCheckRun(c, uid, st, due) {
+  const m = _syncCheckMemo;
+  const age = m ? Date.now() - m.ms : Infinity;
+  const fresh = m && m.uid === uid && age >= 0 && age < SYNC_CHECK_MEMO_MS
+    && Object.keys(_SYNC_CHECK_TABLES).every(k => !due[k] || m.due[k]);
+  const got = fresh ? Promise.resolve(m) : _syncStaleCheck(c, uid, st, due).then((lists) => {
+    const gone = _syncCheckGone(st, lists);
+    return _syncCheckSafetyCopy(gone).then((ask) => {
+      _syncCheckMemo = { uid, ms: Date.now(), due, gone, ask, sent: { jobs: new Set(), rec: new Set(), ph: new Set() } };
+      return _syncCheckMemo;
+    });
+  });
+  return got.then((mm) => {
+    const out = { jobs: null, rec: null, ph: null, ask: mm.ask };
+    for (const k of Object.keys(_SYNC_CHECK_TABLES)) {
+      if (due[k] && mm.gone[k]) out[k] = mm.gone[k].filter(id => !mm.sent[k].has(String(id)));
+    }
+    return out;
   });
 }
 
@@ -981,6 +1737,7 @@ function syncPush(opts) {
       _syncRunning = null;
       _syncLastRunAt = Date.now();
       _syncRepaint();
+      _syncSafetyRepaint();
       if (_syncAgain) {
         const force = _syncAgainForce;
         const pull = _syncAgainPull;
@@ -1010,7 +1767,9 @@ function _syncOutcome(r) {
   const plural = (n, one, many) => n + ' ' + (n === 1 ? one : many);
   const got = p.added + p.applied;
   if (got) bits.push('Brought in ' + plural(got, 'job', 'jobs'));
-  if (p.removed) bits.push('removed ' + plural(p.removed, 'job deleted on your other device', 'jobs deleted on your other device'));
+  // V128: capital R when it opens the line — a stale phone's check often removes
+  // without bringing anything in, and the line used to start "removed …".
+  if (p.removed) bits.push((bits.length ? 'removed ' : 'Removed ') + plural(p.removed, 'job deleted on your other device', 'jobs deleted on your other device'));
   if (r.sent) bits.push((bits.length ? 'sent ' : 'Sent ') + plural(r.sent, 'job', 'jobs'));
   if (r.deleted) bits.push((bits.length ? 'sent ' : 'Sent ') + plural(r.deleted, 'deletion', 'deletions'));
 
@@ -1060,6 +1819,7 @@ function _syncOutcome(r) {
     if (ph.up) pbits.push(plural(ph.up, 'photo', 'photos') + ' sent');
     if (ph.gone) pbits.push(plural(ph.gone, 'photo deletion', 'photo deletions') + ' sent');
     if (ph.more) pbits.push(ph.more + ' more to send next time');
+    if (ph.removed) pbits.push(plural(ph.removed, 'photo', 'photos') + ' removed here (deleted on your other device)');
     if (pbits.length) msg += (msg ? ' ' : '') + 'Photos: ' + pbits.join(', ') + '.';
   }
   if (!msg) msg = 'Everything was already up to date.';
@@ -1107,12 +1867,30 @@ function _syncRun(o) {
     if (!uid) { const e = new Error('not signed in'); e.syncStage = 'auth'; throw e; }
     const st = _syncStateFor(uid);
     const pulled = { applied: 0, added: 0, removed: 0, held: 0, waiting: null };
+    // V128 (2A, 5A). A phone that may have slept through the clean-up job lists
+    // the due tables first, and every run it makes READS — so a save's quick
+    // send, or "Re-send all jobs", cannot put back something deleted elsewhere.
+    // A check that cannot finish rejects here, before anything is read or sent.
+    // `at` is what the pulls record as seen-whole: the EARLIER of the phone's
+    // clock and the server's time, taken before anything is read.
+    const serverAt = _syncSessionServerAt(session);
+    const due = syncCheckDue(st, Math.max(Date.now(), serverAt));
+    const checking = due.jobs || due.rec || due.ph;
+    const reads = !!opts.pull || checking;
+    const at = new Date(serverAt ? Math.min(Date.now(), serverAt) : Date.now()).toISOString();
+    const found = checking ? _syncCheckRun(c, uid, st, due) : Promise.resolve({ jobs: null, rec: null, ph: null, ask: false });
+    return found.then((f) => {
+    const chk = Object.assign({ at }, f);
     // v82: clients and sites go FIRST, so a job that arrives in this run finds
     // its client already here. Only on a run that reads (rule 4) — so never on
     // "Re-send all jobs", which is jobs only. Fail-soft: see _syncRecordsHalf.
-    const recs = opts.pull ? _syncRecordsHalf(c, uid, st) : Promise.resolve(null);
+    const recs = reads ? _syncRecordsHalf(c, uid, st, chk) : Promise.resolve(null);
     return recs.then((records) => {
-      const first = opts.pull ? _syncPull(c, uid, st, pulled) : Promise.resolve();
+      // V93 (2A): the retest look straight after the jobs pull, once a month —
+      // fail-soft (a failure never stops the run; the month isn't stamped).
+      const look = () => _syncRetestLook(c, uid, st, pulled)
+        .catch((e) => { console.error('Sync: retest look not done this time (non-fatal).', e); });
+      const first = reads ? _syncPull(c, uid, st, pulled, chk).then(look) : Promise.resolve();
       // v83: instruments deleted on the other phone are frozen onto this phone's
       // jobs HERE — after the jobs were read, before they are sent. See the v83
       // note on records. Failed read or not, the copies are written: a job left
@@ -1127,16 +1905,84 @@ function _syncRun(o) {
           // cloud before the photo is. Reading runs only (never "Re-send all
           // jobs"). Fail-soft on their own, like records: a photo that will
           // not go never stops jobs, and the run still reports what it did.
-          if (!opts.pull) return base;
-          return _syncPhotosHalf(c, uid, st).then(
+          if (!reads) return base;
+          return _syncPhotosHalf(c, uid, st, chk).then(
             (ph) => Object.assign(base, { photos: ph }),
             (e) => {
               console.error('Sync: photos not sent this time (non-fatal).', e);
               return Object.assign(base, { photos: { error: true } });
             });
-        });
+        })
+        // V133 (4A): which phone, which version — LAST, on reading runs only,
+        // and it never rejects, so it can never fail or delay a run's result.
+        .then((out) => (reads ? _syncPhoneReport(c, uid).then(() => out) : out));
     });
+    });   // V128: found.then
   }));
+}
+
+// ---- V133: which phone, which version (Stage 12, the clean-up job — 4A) ------
+// The clean-up job (supabase/v133-cleanup.sql) clears no account's old markers
+// while any phone signed in to it has not reported V133 or later. So a phone
+// reports, at the end of a reading run: its private id (PHONE_KEY — made here
+// once, never in a backup) and APP_VERSION. Nothing else: the DATABASE adds the
+// time, the version number and which sign-in the report came on, so the job can
+// tell a signed-in phone that never reported from one that did.
+// At most daily for the same version and account (PHONE_REPORT_MS); straight
+// away after an update or a new sign-in; a failed report waits an hour
+// (PHONE_RETRY_MS) — the SQL may not have been run yet, and a run should not
+// try every time. Fail-soft throughout: it resolves false, it never rejects.
+function _syncPhoneLoad() {
+  try {
+    const p = JSON.parse(localStorage.getItem(PHONE_KEY) || 'null');
+    return (p && typeof p === 'object' && !Array.isArray(p)) ? p : {};
+  } catch (e) { return {}; }
+}
+function _syncPhoneSave(p) {
+  try { localStorage.setItem(PHONE_KEY, JSON.stringify(p)); } catch (e) { /* full phone: try next time */ }
+}
+function _syncPhoneNewId() {
+  try { if (typeof crypto !== 'undefined' && crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID(); } catch (e) { /* fall through */ }
+  let s = '';
+  for (let i = 0; i < 32; i++) s += Math.floor(Math.random() * 16).toString(16);
+  return s;
+}
+function syncPhoneId() {
+  const p = _syncPhoneLoad();
+  if (typeof p.id === 'string' && /^[0-9a-f-]{16,64}$/i.test(p.id)) return p.id;
+  p.id = _syncPhoneNewId();
+  _syncPhoneSave(p);
+  return p.id;
+}
+// Pure. A clock wound back makes a report due rather than never.
+function syncPhoneDue(p, uid, now) {
+  const at = (typeof p.at === 'number') ? p.at : 0;
+  const fresh = p.v === APP_VERSION && p.u === uid && at > 0 && now >= at && now - at < PHONE_REPORT_MS;
+  if (fresh) return false;
+  const failedLately = typeof p.tried === 'number' && p.tried > at && now >= p.tried && now - p.tried < PHONE_RETRY_MS;
+  return !failedLately;
+}
+function _syncPhoneReport(c, uid) {
+  return Promise.resolve().then(() => {
+    const id = syncPhoneId();
+    const p = _syncPhoneLoad();
+    if (!syncPhoneDue(p, uid, Date.now())) return false;
+    p.tried = Date.now();
+    _syncPhoneSave(p);
+    return c.from('phones')
+      .upsert({ user_id: uid, phone_id: id, app_version: APP_VERSION }, { onConflict: 'user_id,phone_id' })
+      .then((r) => {
+        if (r && r.error) throw r.error;
+        const q = _syncPhoneLoad();
+        q.v = APP_VERSION; q.u = uid; q.at = Date.now();
+        delete q.tried;   // only a FAILED try makes the next one wait
+        _syncPhoneSave(q);
+        return true;
+      });
+  }).catch((e) => {
+    console.error('Sync: phone version not reported this time (non-fatal).', e);
+    return false;
+  });
 }
 
 function _syncPushHalf(c, uid, st, force) {
@@ -1169,22 +2015,41 @@ function _syncPushHalf(c, uid, st, force) {
       // changed since the last push.
       if (!force && !st.resend[id] && st.sent[id] === hash) continue;
       work.push({ id, hash, gone: false, bytes: json.length,
-        row: { id, user_id: uid, doc: JSON.parse(json), deleted: false, last_modified: now } });
+        row: { id, user_id: uid, doc: JSON.parse(json), fp: hash, deleted: false, last_modified: now } });
     }
 
     // Deletions (decision 4A): the cloud copy is emptied, and the row kept as a
     // marker so other devices learn of the delete. Only for jobs this phone has
     // sent — a delete of something the server never had is not sent at all.
+    //
+    // ⚠ V92.1. A job that came BACK after being deleted here (the Sync page's
+    // "deleted here, live again" → use the cloud's copy; a restore) kept its
+    // tombstone, and "live" was the only thing stopping it. Since V91, Remove
+    // from phone takes a job off without a delete — the stale tombstone then
+    // fired and emptied a job shown 🛡 (found by Peter on real phones). A
+    // tombstone is a delete only while it is the NEWEST thing that happened to
+    // the job, so two rules, both forgetting the stale entry for good:
+    //   • the job is live on this phone → the delete was undone;
+    //   • the job was cleared from this phone AFTER the delete (its cleared-list
+    //     entry is newer) → it came back and left again, kept in the cloud.
+    const clearedAt = new Map(_syncPrunedLoad().map(e => [e.id, e.at]));
+    const stale = new Set();
     for (const t of (state.tombstones || [])) {
       if (!t || t.kind !== 'session') continue;
       const id = String(t.id);
+      if (live.has(id)) { stale.add(t); continue; }   // restored since: it's live
+      const cAt = clearedAt.get(id);
+      if (typeof cAt === 'string' && (typeof t.at !== 'string' || cAt >= t.at)) { stale.add(t); continue; }
       if (heldIds.has(id)) continue;                 // awaiting a decision
-      if (live.has(id)) continue;                    // restored since: it's live
       if (!st.sent[id] && !st.gone[id] && !st.resend[id]) continue;  // server never had it
       if (st.gone[id] && !force && !st.resend[id]) continue;          // already sent
       const at = (typeof t.at === 'string' && !isNaN(Date.parse(t.at))) ? t.at : now;
       work.push({ id, hash: null, gone: true, bytes: 64,
-        row: { id, user_id: uid, doc: {}, deleted: true, last_modified: at } });
+        row: { id, user_id: uid, doc: {}, fp: null, deleted: true, last_modified: at } });
+    }
+    if (stale.size) {
+      state.tombstones = state.tombstones.filter(t => !stale.has(t));
+      if (typeof saveTombstones === 'function') saveTombstones();
     }
 
     // Batches by size as well as count: one long job can be hundreds of KB.
@@ -1207,6 +2072,7 @@ function _syncPushHalf(c, uid, st, force) {
           if (r && r.error) throw r.error;
           // Record each batch as it lands, so a failure part-way loses nothing
           // already sent and the retry sends only what's left.
+          _syncNoteUploaded('jobs', batch.map(w => w.id));   // V128: rows exist again
           for (const w of batch) {
             delete st.resend[w.id];
             if (w.gone) { delete st.sent[w.id]; st.gone[w.id] = true; deleted++; }
@@ -1218,9 +2084,37 @@ function _syncPushHalf(c, uid, st, force) {
     return chain.then(() => {
       st.lastPushAt = now;
       _syncSave(st);
-      return { sent, deleted };
-    });
+      return _syncConfirmPushed(c, uid, st, work.filter(w => !w.gone).map(w => w.id));
+    }).then(() => ({ sent, deleted }));
   });
+}
+
+// V92 (4A). Straight after a push, read back the fingerprint of just the jobs
+// sent (id + fp, a few bytes each) so 🛡 comes in the same sync, not the next
+// one. Rule 26 holds: `conf` is set only from what was READ, and only where the
+// cloud row still carries exactly what this phone sent — another phone's write
+// in between, or a write that never landed, leaves the job "checking" for the
+// next pull to settle. Fail-soft: a failed read costs nothing but the wait.
+function _syncConfirmPushed(c, uid, st, ids) {
+  if (!ids.length) return Promise.resolve();
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  let n = 0;
+  let chain = Promise.resolve();
+  for (let k = 0; k < ids.length; k += batch) {
+    const chunk = ids.slice(k, k + batch);
+    chain = chain.then(() => c.from('sessions').select('id,fp,deleted').eq('user_id', uid).in('id', chunk))
+      .then((r) => {
+        if (r && r.error) throw r.error;
+        for (const row of ((r && r.data) || [])) {
+          const id = String(row && row.id != null ? row.id : '');
+          const fp = _syncFp(row);
+          if (!id || chunk.indexOf(id) === -1 || row.deleted === true || !fp) continue;
+          if (fp === st.sent[id]) { st.conf[id] = fp; n++; }
+        }
+      });
+  }
+  return chain.then(() => { if (n) _syncSave(st); },
+    (e) => { console.error('Sync: sent, confirmed on the next sync (non-fatal).', e); });
 }
 
 // ---- records: clients and sites (V82) ------------------------------------------------
@@ -1317,6 +2211,12 @@ function _syncReportProjection(settings) {
     : Object.assign({}, (settings && typeof settings === 'object') ? settings : {});
   delete n.certNextNumber;
   delete n.certSetAt;
+  // V95 rule 36: the S7 fields leave the projection while at their defaults, so
+  // a phone that never touched them hashes as it did on V94 (and a V94 row,
+  // which lacks them, equals an untouched V95 one).
+  if (n.showRemedial !== true) delete n.showRemedial;
+  if (n.remedialActionOn !== false) delete n.remedialActionOn;
+  if (typeof REPORT_REMEDIAL_ACTION_DEFAULT === 'string' && n.remedialActionText === REPORT_REMEDIAL_ACTION_DEFAULT) delete n.remedialActionText;
   return n;
 }
 
@@ -1399,6 +2299,9 @@ function _syncFailTagDefault(reason) {
   return (typeof d === 'string') ? d : 'visual';
 }
 
+// V99: CSV columns added since V98 → their default header (see the CSV branch below).
+const _SYNC_CSV_LATE_COLUMNS = { mapPin: 'Map pin' };
+
 // One shape for both ends. Anything malformed collapses to a safe value, as the
 // app's own loaders do on reload.
 function _syncGeneralNormalise(id, raw) {
@@ -1407,8 +2310,12 @@ function _syncGeneralNormalise(id, raw) {
   const str = (v) => typeof v === 'string' ? v.trim() : '';
   const strList = (v) => Array.isArray(v) ? v.map(x => str(x == null ? '' : String(x))).filter(Boolean) : [];
   if (sid === SYNC_WORK_ID) {
+    // V104 (S10): readingsCheck DEFAULTS ON (!== false) and earthLimit is
+    // normalised — so a row from a V103 phone, which has neither, reads as the
+    // defaults rather than switching the check off.
     return { id: sid, engineer: str(r.engineer), timestamps: r.timestamps === true, readings: r.readings === true,
-             sqp: r.sqp === true, retest: r.retest === true };
+             sqp: r.sqp === true, retest: r.retest === true,
+             readingsCheck: r.readingsCheck !== false, earthLimit: normaliseEarthLimit(r.earthLimit) };
   }
   if (sid === SYNC_FAILS_ID) {
     const reasons = strList(r.reasons);
@@ -1432,12 +2339,27 @@ function _syncGeneralNormalise(id, raw) {
   if (sid === SYNC_CSV_ID) {
     const columns = (Array.isArray(r.columns) ? r.columns : [])
       .filter(c => c && typeof c === 'object' && typeof c.id === 'string' && c.id)
-      .map(c => ({ id: c.id, header: typeof c.header === 'string' ? c.header : '', visible: c.visible !== false }));
+      .map(c => ({ id: c.id, header: typeof c.header === 'string' ? c.header : '', visible: c.visible !== false }))
+      // V99 (rule 36, by projection as V95 did for the report row): a column
+      // added after V98 is left out while it is still as ensureAllCsvColumns()
+      // appended it — hidden, default header. Every upgraded phone then hashes
+      // this row exactly as on V98: nothing re-sent, nothing held. Its position
+      // while hidden does not travel (a hidden column is never exported), and
+      // the receiving phone's ensureAllCsvColumns() puts it back at the end.
+      .filter(c => !(_SYNC_CSV_LATE_COLUMNS[c.id] === c.header && !c.visible));
     return { id: sid, columns };
   }
   if (sid === SYNC_MULTIPICK_ID) {
     const m = (typeof normaliseMultiPickConfig === 'function') ? normaliseMultiPickConfig(r) : { enabled: false, slots: [] };
-    return { id: sid, enabled: !!m.enabled, slots: (m.slots || []).map(s => ({ name: String(s.name || ''), items: (s.items || []).map(String) })) };
+    // V94 (13A): `qp` (the Quick Pick tile) travels with its multi-pick — only
+    // when set, so a config with no tiles hashes exactly as on V93 and nobody's
+    // row looks changed by the upgrade. The normaliser above already dropped an
+    // invalid or clashing value.
+    return { id: sid, enabled: !!m.enabled, slots: (m.slots || []).map(s => {
+      const o = { name: String(s.name || ''), items: (s.items || []).map(String) };
+      if (s.qp) o.qp = s.qp;
+      return o;
+    }) };
   }
   if (sid === SYNC_SQP_ID) {
     const history = (typeof normaliseSqpHistory === 'function') ? normaliseSqpHistory(r.history) : {};
@@ -1452,7 +2374,8 @@ function _syncGeneralRecord(id) {
   const sid = String(id);
   if (sid === SYNC_WORK_ID) {
     return _syncGeneralNormalise(sid, { engineer: state.engineer, timestamps: !!state.timestampsEnabled,
-      readings: !!state.readingsEnabled, sqp: !!state.sqpEnabled, retest: !!state.retestRemindersEnabled });
+      readings: !!state.readingsEnabled, sqp: !!state.sqpEnabled, retest: !!state.retestRemindersEnabled,
+      readingsCheck: state.readingsCheckEnabled !== false, earthLimit: state.readingsEarthLimit });
   }
   if (sid === SYNC_FAILS_ID) {
     const reasons = Array.isArray(state.failReasons) ? state.failReasons : [];
@@ -1506,7 +2429,8 @@ function _syncGeneralValid(id, doc) {
   const obj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
   if (sid === SYNC_WORK_ID) {
     return (doc.engineer === undefined || typeof doc.engineer === 'string')
-      && ['timestamps', 'readings', 'sqp', 'retest'].every(k => bool(doc[k]));
+      && ['timestamps', 'readings', 'sqp', 'retest', 'readingsCheck'].every(k => bool(doc[k]))
+      && (doc.earthLimit === undefined || typeof doc.earthLimit === 'number');
   }
   // There must always be at least one fail reason (saveFailsSettings refuses none).
   if (sid === SYNC_FAILS_ID) return arr(doc.reasons) && doc.reasons.some(x => typeof x === 'string' && x.trim()) && (doc.tags === undefined || obj(doc.tags));
@@ -1527,6 +2451,8 @@ function _syncApplyGeneral(id, doc) {
     state.engineer = d.engineer;
     state.timestampsEnabled = d.timestamps;
     state.readingsEnabled = d.readings;
+    state.readingsCheckEnabled = d.readingsCheck;   // V104
+    state.readingsEarthLimit = d.earthLimit;        // V104
     state.retestRemindersEnabled = d.retest;
     state.sqpEnabled = d.sqp;
     // setSqp()'s side effects, without its save()/render(): switching on with no
@@ -1551,7 +2477,7 @@ function _syncApplyGeneral(id, doc) {
     if (typeof ensureAllCsvColumns === 'function') ensureAllCsvColumns();   // a column this version has and the sender didn't
     return true;
   }
-  if (sid === SYNC_MULTIPICK_ID) { state.multiPick = { enabled: d.enabled, slots: d.slots.map(s => ({ name: s.name, items: s.items.slice() })) }; return true; }
+  if (sid === SYNC_MULTIPICK_ID) { state.multiPick = { enabled: d.enabled, slots: d.slots.map(s => (s.qp ? { name: s.name, items: s.items.slice(), qp: s.qp } : { name: s.name, items: s.items.slice() })) }; return true; }
   if (sid === SYNC_SQP_ID) {
     state.sqpHistory = d.history;
     try { if (d.resetAt) localStorage.setItem(SQP_RESET_KEY, d.resetAt); } catch { /* ignore */ }
@@ -1614,6 +2540,8 @@ function _syncGeneralDiffs(id, local, doc) {
     add('Engineer name', L.engineer, C.engineer);
     add('Item times', onOff(L.timestamps), onOff(C.timestamps));
     add('Test readings', onOff(L.readings), onOff(C.readings));
+    add('Readings check', onOff(L.readingsCheck), onOff(C.readingsCheck));
+    add('Earth limit', L.earthLimit.toFixed(2) + ' \u03A9', C.earthLimit.toFixed(2) + ' \u03A9');
     add('Smart Quick Pick', onOff(L.sqp), onOff(C.sqp));
     add('Retest reminders', onOff(L.retest), onOff(C.retest));
   } else if (sid === SYNC_FAILS_ID) {
@@ -1626,7 +2554,8 @@ function _syncGeneralDiffs(id, local, doc) {
     if (!out.length) out.push({ label: 'Column order or names', here: 'Different', cloud: 'Different' });
   } else if (sid === SYNC_MULTIPICK_ID) {
     add('Multi Pick', onOff(L.enabled), onOff(C.enabled));
-    const slots = (x) => x.slots.map(s => s.name + ' (' + s.items.join(', ') + ')').join('; ');
+    // V94: a tile-only difference must still show as a difference.
+    const slots = (x) => x.slots.map(s => s.name + ' (' + s.items.join(', ') + ')' + (s.qp ? ' [Quick Pick ' + s.qp + ']' : '')).join('; ');
     add('Multi Picks', slots(L), slots(C));
   }
   return out;
@@ -1691,7 +2620,18 @@ function _syncRecordDoc(kind, rec) {
   const r = rec || {};
   const t = (v) => typeof v === 'string' ? v.trim() : '';
   if (kind === 'client') return { id: String(r.id), name: String(r.name || '').trim() };
-  if (kind === 'site') return { id: String(r.id), clientId: String(r.clientId || ''), name: String(r.name || '').trim() };
+  // V98: a site's notes travel with it, but ONLY when it has some (rule 36): a
+  // site without notes projects — and hashes — exactly as on V97, so the upgrade
+  // makes no site look edited and nothing is re-sent. One normaliser both ends.
+  // ⚠ Mixed versions (5A): a V97 phone that edits a site sends it back without
+  // notes, and V98 phones take it (only the cloud moved). Accepted: test phones
+  // only, upgraded together. A V97 phone that merely receives notes is unaffected.
+  if (kind === 'site') {
+    const d = { id: String(r.id), clientId: String(r.clientId || ''), name: String(r.name || '').trim() };
+    const n = normaliseSiteNotes(r.notes);
+    if (n) d.notes = n;
+    return d;
+  }
   // v83. Exactly what makeInstrument() stores, so a stored instrument hashes the
   // same as its own projection and a reload is never a change (the 18b rule).
   if (kind === 'instrument') {
@@ -1819,6 +2759,12 @@ function _syncRecordHeldEntry(kind, id, reason, local, doc) {
   if (kind === 'site') {
     e.localParent = local ? _syncClientNameOf(local.clientId) : null;
     e.cloudParent = (doc && typeof doc.name === 'string') ? _syncClientNameOf(doc.clientId) : null;
+    // V98: notes that differ are NAMED, never copied — they hold door codes, and
+    // a held entry never stores the cloud document (rule 7).
+    if (reason === 'both-changed' && local && doc) {
+      const ln = normaliseSiteNotes(local.notes), cn = normaliseSiteNotes(doc.notes);
+      if (ln !== cn) e.diffs = [{ label: 'Notes', here: ln ? 'Written' : 'None', cloud: cn ? (ln ? 'Different' : 'Written') : 'None' }];
+    }
   }
   return e;
 }
@@ -1860,9 +2806,15 @@ function _syncReportDiffs(a, b, clip) {
     ['showEngineer', 'Show engineer'], ['showInstrument', 'Show instrument'], ['showCalibration', 'Show calibration'],
     ['showFails', 'Show fails'], ['showReadings', 'Show readings'], ['showDuration', 'Show testing time'],
     ['showPhotos', 'Show photos'], ['showAppCredit', 'App credit'], ['showFooterLogo', 'Footer logo'],
+    ['showRemedial', 'Remedial actions'], ['remedialActionOn', 'Remedial action line'], ['remedialActionText', 'Remedial action wording'],
     ['reportFilenamePattern', 'File name'],
   ];
   const known = new Set(labels.map(x => x[0]));
+  // V95: the projection drops the S7 fields at their defaults (rule 36) — put
+  // the defaults back so a held card says "Off"/"On", not a blank.
+  const s7 = { showRemedial: false, remedialActionOn: true,
+    remedialActionText: (typeof REPORT_REMEDIAL_ACTION_DEFAULT === 'string') ? REPORT_REMEDIAL_ACTION_DEFAULT : '' };
+  a = Object.assign({}, s7, a || {}); b = Object.assign({}, s7, b || {});
   const same = (x, y) => syncHash(_syncCanonical(x === undefined ? null : x)) === syncHash(_syncCanonical(y === undefined ? null : y));
   const show = (k, v, other) => {
     if (k === 'logo' || k === 'signature') return v ? (other ? 'An image' : 'Image') : '';
@@ -2075,7 +3027,8 @@ function _syncTidyOrphanSites() {
   return moved;
 }
 
-function _syncPullRecords(c, uid, st, out) {
+// V128: `chk` as for _syncPull — `rec` lists the record ids gone from the cloud.
+function _syncPullRecords(c, uid, st, out, chk) {
   const rs = st.rec;
   // A new kind means a new version is reading for the first time: start from
   // the beginning, or every row of that kind already behind the cursor would
@@ -2093,7 +3046,7 @@ function _syncPullRecords(c, uid, st, out) {
   const presetBefore = _syncActivePresetSig();
   const editing = String(state.instrumentEditorId || '');
   // v84: Report settings open — its toggles are already in state, unsaved.
-  const reportOpen = state.view === 'settingsReport';
+  const reportOpen = REPORT_SETTINGS_VIEWS.indexOf(state.view) !== -1;   // V117: either half
 
   function decide(row) {
     const id = String(row && row.id != null ? row.id : '');
@@ -2138,8 +3091,9 @@ function _syncPullRecords(c, uid, st, out) {
         return;
       }
       // v84 5A: an untouched starter template this phone never sent goes quietly.
-      if (rs.sent[id] === _syncRecordHash(kind, local)
-          || (kind === 'template' && !rs.sent[id] && _syncIsStarterTemplate(local))) {
+      // V128 (4A): not when `ask` — no safety copy was kept, so it is asked about.
+      if (!row.ask && (rs.sent[id] === _syncRecordHash(kind, local)
+          || (kind === 'template' && !rs.sent[id] && _syncIsStarterTemplate(local)))) {
         // v83 decision 2A: the tester this phone is using is not deleted from
         // under it on the strength of the other phone, clean copy or not.
         if (inUse) { hold('deleted-elsewhere', null, inUse); return; }
@@ -2398,6 +3352,7 @@ function _syncPullRecords(c, uid, st, out) {
   function page(from) {
     return c.from('records')
       .select('id,kind,doc,deleted,last_modified,updated_at')
+      .eq('user_id', uid)   // V111: this account's records only
       .in('kind', SYNC_RECORD_KINDS)
       .gte('updated_at', from)
       .order('updated_at', { ascending: true })
@@ -2415,6 +3370,16 @@ function _syncPullRecords(c, uid, st, out) {
         if (high === from) { blocked = true; return; }
         return page(high);
       });
+  }
+
+  // V128 (3A). A client, site, tester, preset or template this phone knows was
+  // in the cloud and that is not there at all: decided as its "deleted" row
+  // would have been (the tester in use and the last preset are still asked
+  // about). One this phone no longer holds needs only its bookkeeping put right.
+  for (const id of ((chk && chk.rec) || [])) {
+    const kind = _syncRecordKindOf(id);
+    if (kind) decide({ id, kind, deleted: true, ask: !!chk.ask });
+    else { delete rs.sent[id]; rs.gone[id] = true; }
   }
 
   return page(since).then(() => {
@@ -2436,6 +3401,7 @@ function _syncPullRecords(c, uid, st, out) {
       const moved = _syncTidyOrphanSites();
       if (moved) { out.unassigned += moved; changed = true; }
       rs.pulledAt = high;
+      if (chk && chk.at) rs.seenAllAt = chk.at;   // V128 (2A)
     }
     _syncSave(st);
     if (changed) {
@@ -2458,7 +3424,7 @@ function _syncPushRecords(c, uid, st, out) {
   const held = new Set(_syncHeldLoad().filter(e => e.kind !== 'session').map(e => e.id));
 
   const skip = out.skip || {};
-  const reportOpen = state.view === 'settingsReport';   // v84: unsaved toggles
+  const reportOpen = REPORT_SETTINGS_VIEWS.indexOf(state.view) !== -1;   // v84: unsaved toggles; V117: either half
   for (const kind of SYNC_RECORD_KINDS) {
     const live = new Set();
     for (const r of _syncRecordList(kind)) {
@@ -2523,6 +3489,7 @@ function _syncPushRecords(c, uid, st, out) {
       .then(() => c.from('records').upsert(batch.map(w => w.row), { onConflict: 'user_id,id' }))
       .then((r) => {
         if (r && r.error) throw r.error;
+        _syncNoteUploaded('rec', batch.map(w => w.id));   // V128: rows exist again
         for (const w of batch) {
           delete rs.resend[w.id];
           if (w.gone) { delete rs.sent[w.id]; rs.gone[w.id] = true; out.deleted++; }
@@ -2542,14 +3509,14 @@ function _syncPushRecords(c, uid, st, out) {
 // clients are a convenience list. The error is reported on the Sync page and
 // the next run tries again. ⚠ The push is chained AFTER the pull, so a failed
 // pull means no push (rule 4).
-function _syncRecordsHalf(c, uid, st) {
+function _syncRecordsHalf(c, uid, st, chk) {
   // v83: `cs` / `ip` split the same counts by Sync-page heading; `skip` is what
   // the pull deferred this run; `inUseNow` names a tester taken from the cloud.
   const out = { applied: 0, added: 0, removed: 0, held: 0, unassigned: 0, sent: 0, deleted: 0, error: null,
     cs: { in: 0, out: 0, held: 0 }, ip: { in: 0, out: 0, held: 0 }, rp: { in: 0, out: 0, held: 0 },
     gs: { in: 0, out: 0, held: 0 },   // v86: general settings
     skip: {}, inUseNow: null };
-  return _syncPullRecords(c, uid, st, out)
+  return _syncPullRecords(c, uid, st, out, chk)
     .then(() => _syncPushRecords(c, uid, st, out))
     .then(() => out, (e) => { out.error = e || new Error('records'); return out; });
 }
@@ -2595,7 +3562,7 @@ function syncHeldResolve(id, choice) {
   const entry = _syncHeldLoad().find(e => e.id === sid && e.kind === parsed.kind);
   if (!entry) return Promise.resolve(false);
   if (choice !== 'phone' && choice !== 'cloud') return Promise.resolve(false);
-  if (parsed.kind !== 'session') return _syncHeldResolveRecord(parsed.kind, sid, choice, String(id));
+  if (parsed.kind !== 'session') return _syncHeldResolveRecord(parsed.kind, sid, choice, String(id), entry.reason);
 
   state.sync.resolving = sid;
   state.sync.message = '';
@@ -2620,13 +3587,18 @@ function syncHeldResolve(id, choice) {
 
   return cloudClient()
     .then((c) => c.from('sessions').select('id,doc,deleted,last_modified,updated_at')
-      .eq('id', sid).limit(1)
+      .eq('user_id', _syncCurrentUserId()).eq('id', sid).limit(1)   // V111: ids are unique per account only
       .then((r) => {
         if (r && r.error) throw r.error;
         const row = (r && r.data && r.data[0]) || null;
         const uid = _syncCurrentUserId();
         const st = _syncStateFor(uid);
-        if (!row) {
+        // V128 (3A). No row at all, for a job the question was ALREADY about
+        // being deleted elsewhere: its marker has been cleared away since (the
+        // stale-phone check asks exactly this). The delete is what was chosen,
+        // so it is done — keeping the copy here would send it straight back.
+        const goneForGood = !row && entry.reason === 'deleted-elsewhere';
+        if (!row && !goneForGood) {
           // Gone from the server between the question and the answer. Nothing
           // to apply; the phone's copy simply stands.
           _syncHeldClear(sid);
@@ -2635,13 +3607,13 @@ function syncHeldResolve(id, choice) {
           return true;
         }
         const local = (state.sessions || []).find(s => s && String(s.id) === sid);
-        if (row.deleted === true) {
+        if (goneForGood || row.deleted === true) {
           if (local) _syncApplyRemoteDelete(sid);
           delete st.sent[sid];
           st.gone[sid] = true;
         } else if (_syncValidDoc(row.doc, sid)) {
           if (local) _syncReplaceSession(sid, local, row.doc);
-          else state.sessions.unshift(row.doc);
+          else { state.sessions.unshift(row.doc); st.ph.need.push(sid); }   // v89: its photo rows
           st.sent[sid] = syncHash(_syncCanonical(row.doc));
         } else {
           done('That cloud copy still can\u2019t be read, so nothing has been changed. Choose this phone\u2019s copy to replace it.');
@@ -2664,7 +3636,7 @@ function syncHeldResolve(id, choice) {
 //   'phone' — nothing local changes; the record (or its delete) is re-sent.
 //   'cloud' — the row is re-read NOW and applied as it stands. The names on the
 //             card were for reading; they are never what gets applied.
-function _syncHeldResolveRecord(kind, sid, choice, key) {
+function _syncHeldResolveRecord(kind, sid, choice, key, reason) {
   state.sync.resolving = key;
   state.sync.message = '';
   _syncRepaint();
@@ -2691,13 +3663,16 @@ function _syncHeldResolveRecord(kind, sid, choice, key) {
 
   return cloudClient()
     .then((c) => c.from('records').select('id,kind,doc,deleted,last_modified,updated_at')
-      .eq('id', sid).limit(1)
+      .eq('user_id', _syncCurrentUserId()).eq('id', sid).limit(1)   // V111: this account's copy of the record
       .then((r) => {
         if (r && r.error) throw r.error;
         const row = (r && r.data && r.data[0]) || null;
         const st = _syncStateFor(_syncCurrentUserId());
         const rs = st.rec;
-        if (!row || String(row.kind || '') !== kind) {
+        // V128 (3A): as for jobs — no row at all for a record already asked about
+        // as deleted elsewhere is that delete, its marker since cleared away.
+        const goneForGood = !row && reason === 'deleted-elsewhere';
+        if (!goneForGood && (!row || String(row.kind || '') !== kind)) {
           _syncHeldClear(sid, kind);
           _syncSave(st);
           done('That ' + what + ' is no longer in the cloud, so this phone\u2019s copy has been kept.');
@@ -2705,7 +3680,7 @@ function _syncHeldResolveRecord(kind, sid, choice, key) {
         }
         const local = _syncRecordList(kind).find(x => x && String(x.id) === sid) || null;
         const presetBefore = _syncActivePresetSig();
-        if (row.deleted === true) {
+        if (goneForGood || row.deleted === true) {
           // v83: a phone's last preset stays — there must always be one.
           if (local && !_syncApplyRecordDelete(kind, sid, rs)) {
             done('That\u2019s the only preset on this phone, so it has been kept. Add another preset first if you want this one gone.');
@@ -2778,7 +3753,9 @@ function syncJobDiff(local, cloud) {
     prefix: 'Asset prefix', startNumber: 'Start number', startPad: 'Number padding',
     locked: 'Locked', instrumentId: 'Instrument', instrumentSnapshot: 'Instrument details',
     clientId: 'Client in your list', siteId: 'Site in your list' };
-  const SKIP = { id: 1, items: 1, exportedAt: 1, exportDirty: 1 };
+  // V100: the lock time is shown by Locked; the certificate time by Export.
+  // V101: movedOut is bookkeeping — the items' own differences say what moved.
+  const SKIP = { id: 1, items: 1, exportedAt: 1, exportDirty: 1, lockedAt: 1, reportAt: 1, movedOut: 1 };
   const jobVal = (key, v) => {
     if (key === 'instrumentId') {
       if (blankish(v)) return '(none)';
@@ -2803,7 +3780,8 @@ function syncJobDiff(local, cloud) {
     if (JOB[key] || SKIP[key]) continue;
     if (!same(L[key], C[key])) otherJob = true;
   }
-  const exp = (s) => s.exportedAt ? ('Exported' + (s.exportDirty ? ', changed since' : '')) : 'Not exported';
+  const exp = (s) => (s.exportedAt ? ('Exported' + (s.exportDirty ? ', changed since' : '')) : 'Not exported')
+    + (s.reportAt ? ' \u00b7 certificate made' : '');   // V100
   if (exp(L) !== exp(C)) details.push({ label: 'Export', here: exp(L), cloud: exp(C) });
   if (otherJob) details.push({ label: 'Other job details', here: null, cloud: null });
 
@@ -2877,7 +3855,8 @@ function syncHeldDiff(id) {
     _syncRepaint();
   };
   return cloudClient()
-    .then((c) => c.from('sessions').select('id,doc,deleted,updated_at').eq('id', sid).limit(1))
+    .then((c) => c.from('sessions').select('id,doc,deleted,updated_at')
+      .eq('user_id', _syncCurrentUserId()).eq('id', sid).limit(1))   // V111: compare with this account's copy
     .then((r) => {
       if (r && r.error) throw r.error;
       const row = (r && r.data && r.data[0]) || null;
@@ -2907,6 +3886,11 @@ function syncErrorMessage(err) {
   if (status === 401 || /jwt|PGRST30/i.test(code + ' ' + msg)) {
     return 'Your sign-in has lapsed. Sign out and back in on the Account page.';
   }
+  // V128 (5A): after the network and sign-in cases, which say what to do.
+  if (err && err.syncStage === 'check') {
+    return 'Before sending anything, this phone checks its work against the cloud (it does this after a long time away). ' +
+      'That check couldn\u2019t finish this time, so nothing has been sent. Your work is safe on this phone and it will try again.';
+  }
   return 'Couldn\u2019t send your jobs' + (msg ? ': ' + msg : '.') + ' They\u2019re safe on this phone.';
 }
 
@@ -2920,6 +3904,9 @@ function _syncSafeToRepaint() {
   // instrument list a pull can now change). Repainting them would throw that
   // typing away (MAP rule 3), so the repaint is owed until the engineer leaves.
   if (SYNC_NO_REPAINT_VIEWS.indexOf(state.view) !== -1) return false;
+  if (state.moveJob) return false;   // V101: the Move sheet holds a selection and typing
+  if (state.moveTo) return false;    // V103: the Move to another job sheet — choices and typing
+  if (state.dupJob) return false;    // V102: the Duplicate sheet holds typing, or a copy under way
   try {
     const a = document.activeElement;
     if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA')) return false;
@@ -2987,9 +3974,33 @@ function _syncFlushRepaint() {
 // ⚠ Nothing here renders or writes app data. It reads state.photoMeta (the
 // in-memory mirror photos.js keeps) and state.tombstones, and writes only
 // st.ph — saved after every photo, so a run cut short loses nothing it did.
+//
+// V89 (photos DOWN, on request only — 10A, R17). What changed:
+//   • Rows come down, images don't. The photos table is read by its own cursor
+//     (st.ph.pulledAt; rules 10 and 14 — the jobs pager's shape). A live row for
+//     a job on this phone is remembered in st.ph.sent, which now means KNOWN to
+//     be in the cloud, whoever uploaded it. Rows for jobs not on this phone are
+//     not kept (R17); when such a job arrives later, st.ph.need fetches its rows.
+//   • A deleted row takes this phone's copy (photos.js photosRemoveQuiet — no
+//     ledger entry: the delete is already in the cloud).
+//   • ⚠ Rule 21 becomes "a phone deletes only what it KNOWS is in the cloud"
+//     (decision 5A: any phone that can see a cloud photo can delete it).
+//   • Previews (1A): {user_id}/{photo_id}_t.jpg, made on the phone. For a new
+//     photo: file, then preview, then the row with thumb = true — a row that
+//     says thumb means both files are there (2A extended). Photos already up
+//     get one later (backfill, a few per run) while their image is on a phone.
+//     A photo that never gets a preview is still a photo: nothing waits on it.
+//   • Images come down only through syncPhotoDownload() (a tap), previews only
+//     through syncPhotoThumb() (the strip being opened).
 
 function _syncPhotoPath(uid, id) {
   return uid + '/' + id + '.jpg';
+}
+
+// v89 (1A): the preview sits beside the photo, in the same folder, so the same
+// storage policy (and the same isolation check) covers it.
+function _syncThumbPath(uid, id) {
+  return uid + '/' + id + '_t.jpg';
 }
 
 // photoId → sessionId for every photo on this phone that is eligible to be in
@@ -3048,88 +4059,998 @@ function syncPhotosUploadedIds() {
   return st.userId === uid ? new Set(Object.keys(st.ph.sent)) : new Set();
 }
 
-function _syncPhotosHalf(c, uid, st) {
-  const out = { up: 0, gone: 0, more: 0 };
-  return Promise.resolve().then(() => {
-    // The mirror isn't loaded yet (boot) — nothing is known. Next run.
-    if (!state.photoMetaReady) { out.skipped = true; return out; }
-    const meta = state.photoMeta || {};
-    const now = new Date().toISOString();
+// v89: read the photos table — ROWS only (R17). Remembers live rows for jobs on
+// this phone; a deleted row forgets the photo and removes this phone's copy.
+// Mutates st.ph and counts into `out`; the caller saves.
+const _SYNC_PHOTO_COLS = 'id,session_id,item_id,bytes,thumb,taken_at,deleted,updated_at';
 
-    // 1. Deletes first: they are small, and they free space before uploads use it.
-    const del = [];
-    const seen = new Set();
-    for (const t of (state.tombstones || [])) {
-      if (!t || t.kind !== 'photo') continue;
-      const id = String(t.id);
-      if (seen.has(id)) continue;
-      if (meta[id]) continue;                    // on this phone again (restored): live
-      if (!st.ph.sent[id]) continue;             // the cloud never had it from here
-      seen.add(id); del.push(id);
+function _syncPhotoRowsPull(c, uid, st, out, chk) {
+  const ph = st.ph;
+  const local = new Set(_syncSessions().map(s => String(s.id)));
+  const meta = state.photoMeta || {};
+  const drop = [];
+  let known = false;       // what this phone knows changed → the badges repaint
+  let blocked = false;
+
+  // V128 (1A): photos the cloud no longer has at all. Only the note of what is in
+  // the cloud is put right, and only for a photo no longer on this phone. One
+  // still here stays noted as known: dropping it would send it straight back up
+  // to a cloud that deleted it on purpose, and nothing is removed from the phone.
+  for (const id of ((chk && chk.ph) || [])) {
+    if (meta[id]) continue;
+    if (ph.sent[id]) { delete ph.sent[id]; known = true; }
+    delete ph.mv[id];
+  }
+
+  function decide(row) {
+    const id = String(row && row.id != null ? row.id : '');
+    if (!id) return;
+    if (row.deleted === true) {
+      if (ph.sent[id]) { delete ph.sent[id]; known = true; }
+      delete ph.mv[id];   // V101: nothing left to re-point
+      if (meta[id] && drop.indexOf(id) === -1) drop.push(id);
+      return;
     }
-    for (const id of Object.keys(st.ph.sent)) {
-      if (seen.has(id)) continue;
-      if (st.gone[st.ph.sent[id].s]) { seen.add(id); del.push(id); }
+    // V101: a move this phone has still to send wins over the row, which is the
+    // OLD job until the update lands — reading it back must not undo the move.
+    const job = String(ph.mv[id] || (row.session_id != null ? row.session_id : ''));
+    const item = String(row.item_id != null ? row.item_id : '');
+    if (!job || !item) return;
+    const had = ph.sent[id];
+    // R17: a job not on this phone keeps its rows in the cloud. (A photo this
+    // phone uploaded stays known even if its job was cleared here — V88 5A.)
+    if (!had && !local.has(job)) return;
+    const e = { s: job, i: item };
+    const b = Number(row.bytes);
+    if (b > 0 && isFinite(b)) e.b = Math.round(b);
+    if (row.thumb === true || (had && had.t)) e.t = 1;
+    if (typeof row.taken_at === 'string' && !isNaN(Date.parse(row.taken_at))) e.a = row.taken_at;
+    else if (had && had.a) e.a = had.a;
+    if (!had || had.s !== e.s || had.i !== e.i || had.b !== e.b || had.t !== e.t || had.a !== e.a) known = true;
+    ph.sent[id] = e;
+  }
+
+  // 1. Jobs that arrived after the cursor passed their rows. Skipped on a phone
+  //    that has never read the table: the full read below covers them.
+  const need = ph.pulledAt ? Array.from(new Set(ph.need)).filter(id => local.has(id)) : [];
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  let chain = Promise.resolve();
+  for (let i = 0; i < need.length; i += batch) {
+    const chunk = need.slice(i, i + batch);
+    chain = chain.then(() => c.from('photos').select(_SYNC_PHOTO_COLS).eq('user_id', uid).in('session_id', chunk).eq('deleted', false))
+      .then((r) => {
+        if (r && r.error) throw r.error;
+        for (const row of ((r && r.data) || [])) decide(row);
+      });
+  }
+
+  // 2. Everything changed since the cursor. The V83.1 pager: each page starts AT
+  //    the last stamp, rows already seen this run are skipped (rules 10, 14).
+  const since = ph.pulledAt || SYNC_PULL_EPOCH;
+  let high = since;
+  const seen = new Set();
+  function page(from) {
+    return c.from('photos')
+      .select(_SYNC_PHOTO_COLS)
+      .eq('user_id', uid)   // V111: this account's photo rows only
+      .gte('updated_at', from)
+      .order('updated_at', { ascending: true })
+      .limit(SYNC_PULL_PAGE)
+      .then((r) => {
+        if (r && r.error) throw r.error;
+        const rows = (r && r.data) || [];
+        for (const row of rows) {
+          const u = row && row.updated_at;
+          const key = String(row && row.id) + '|' + String(u);
+          if (!seen.has(key)) { seen.add(key); decide(row); }
+          if (typeof u === 'string' && u > high) high = u;
+        }
+        if (rows.length < SYNC_PULL_PAGE) return;
+        if (high === from) { blocked = true; return; }
+        return page(high);
+      });
+  }
+
+  return chain.then(() => page(since)).then(() => {
+    ph.need = [];
+    if (!drop.length) return;
+    return photosRemoveQuiet(drop).then((n) => {
+      if (n < 0) { blocked = true; return; }     // store refused: read these again next run
+      out.removed += n;
+      if (n) known = true;
+      // The strip may be showing one of them. It is buttons only, so a repaint
+      // is allowed (MAP rule 3); the tile simply goes.
+      if (state.photoStripOpen && Array.isArray(state.photoStripPhotos)) {
+        const gone = new Set(drop);
+        state.photoStripPhotos = state.photoStripPhotos.filter((p) => !gone.has(p.id));
+      }
+    });
+  }).then(() => {
+    if (!blocked) {
+      ph.pulledAt = high;
+      if (chk && chk.at) ph.seenAllAt = chk.at;   // V128 (2A)
     }
-    let chain = Promise.resolve();
-    for (let i = 0; i < del.length; i += SYNC_PHOTO_DELETE_BATCH) {
-      const chunk = del.slice(i, i + SYNC_PHOTO_DELETE_BATCH);
+    _syncSave(st);
+    if (known) _syncRepaintApp();
+  });
+}
+
+// v89 (1A). Upload one preview. Resolves true only if it is in the cloud.
+function _syncThumbUpload(c, uid, id, blob) {
+  if (typeof photoThumbBlob !== 'function' || !blob) return Promise.resolve(false);
+  // A picture that never finishes decoding must not hold up the photo itself:
+  // after 10 seconds there is simply no preview (the photo's row says so).
+  let timer = null;
+  const made = Promise.race([
+    photoThumbBlob(blob),
+    new Promise((res) => { timer = setTimeout(() => res(null), 10000); }),
+  ]).then((v) => { if (timer) clearTimeout(timer); return v; });
+  return made.then((tb) => {
+    if (!tb) return false;
+    return c.storage.from('photos').upload(_syncThumbPath(uid, id), tb, { contentType: 'image/jpeg', upsert: true })
+      .then((r) => !(r && r.error), () => false);
+  }).catch(() => false);
+}
+
+// V101 (Stage 9, split): re-point the cloud rows of known photos whose item moved
+// to another job (st.ph.mv, written by syncNoteMoved and the pull's moved-out
+// path). Rows only — the file is named by the photo's own id ({uid}/{id}.jpg), so
+// nothing is copied or uploaded. One update per destination job. Runs BEFORE the
+// deletes, though st.ph.sent already names the new job, so the order is belt and
+// braces. An entry clears only when its update landed and still says the same
+// job; a failure throws to the photos half, which is fail-soft (tried next run).
+function _syncPhotoMoves(c, uid, st, out) {
+  const byJob = new Map();
+  for (const id of Object.keys(st.ph.mv)) {
+    if (!st.ph.sent[id]) { delete st.ph.mv[id]; continue; }   // no longer known in the cloud
+    const job = st.ph.mv[id];
+    if (!byJob.has(job)) byJob.set(job, []);
+    byJob.get(job).push(id);
+  }
+  out.moved = 0;
+  let chain = Promise.resolve();
+  for (const [job, ids] of byJob) {
+    for (let i = 0; i < ids.length; i += SYNC_PHOTO_DELETE_BATCH) {
+      const chunk = ids.slice(i, i + SYNC_PHOTO_DELETE_BATCH);
       chain = chain
-        .then(() => c.from('photos').update({ deleted: true, last_modified: now })
+        .then(() => c.from('photos').update({ session_id: job, last_modified: new Date().toISOString() })
           .eq('user_id', uid).in('id', chunk))
-        .then((r) => { if (r && r.error) throw r.error; })
-        .then(() => c.storage.from('photos').remove(chunk.map(id => _syncPhotoPath(uid, id))))
         .then((r) => {
           if (r && r.error) throw r.error;
-          for (const id of chunk) { delete st.ph.sent[id]; out.gone++; }
+          for (const id of chunk) if (st.ph.mv[id] === job) { delete st.ph.mv[id]; out.moved++; }
           _syncSave(st);
         });
     }
+  }
+  return chain;
+}
 
-    // 2. Uploads, oldest first, a few per run (SYNC_PHOTOS_PER_RUN).
-    return chain.then(() => {
-      const jobs = _syncPhotoJobs() || new Map();
-      const cands = [];
-      for (const [id, job] of jobs) {
-        if (st.ph.sent[id]) continue;
-        if (!st.sent[job] || st.gone[job]) continue;   // job not in the cloud (yet)
-        cands.push({ id, job, m: meta[id] });
+function _syncPhotosHalf(c, uid, st, chk) {
+  const out = { up: 0, gone: 0, more: 0, removed: 0, thumbs: 0 };
+  return Promise.resolve().then(() => {
+    // The mirror isn't loaded yet (boot) — nothing is known. Next run.
+    if (!state.photoMetaReady) { out.skipped = true; return out; }
+
+    // 0. v89: rows down first, so deletes made elsewhere are known before this
+    //    phone decides what to send.
+    return _syncPhotoRowsPull(c, uid, st, out, chk).then(() => _syncPhotoMoves(c, uid, st, out)).then(() => {
+      const meta = state.photoMeta || {};
+      const now = new Date().toISOString();
+
+      // 1. Deletes: they are small, and they free space before uploads use it.
+      //    v89: anything KNOWN to be in the cloud (5A), not only this phone's own.
+      const del = [];
+      const seen = new Set();
+      for (const t of (state.tombstones || [])) {
+        if (!t || t.kind !== 'photo') continue;
+        const id = String(t.id);
+        if (seen.has(id)) continue;
+        if (meta[id]) continue;                    // on this phone again (restored): live
+        if (!st.ph.sent[id]) continue;             // not known to be in the cloud
+        seen.add(id); del.push(id);
       }
-      cands.sort((a, b) => String(a.m.at).localeCompare(String(b.m.at)) || a.id.localeCompare(b.id));
-      const take = cands.slice(0, SYNC_PHOTOS_PER_RUN);
-      out.more = cands.length - take.length;
-      let up = Promise.resolve();
-      for (const cand of take) {
-        up = up.then(() => photoBlob(cand.id)).then((blob) => {
-          // Deleted while the run was going, or unreadable: skip, don't fail.
-          if (!blob || !(state.photoMeta || {})[cand.id]) return null;
-          const path = _syncPhotoPath(uid, cand.id);
-          const m = cand.m;
-          const at = (m.at && !isNaN(Date.parse(m.at))) ? m.at : null;
-          return c.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true })
-            .then((r) => {
-              if (r && r.error) throw r.error;
-              return c.from('photos').upsert({
+      for (const id of Object.keys(st.ph.sent)) {
+        if (seen.has(id)) continue;
+        if (st.gone[st.ph.sent[id].s]) { seen.add(id); del.push(id); }
+      }
+      let chain = Promise.resolve();
+      for (let i = 0; i < del.length; i += SYNC_PHOTO_DELETE_BATCH) {
+        const chunk = del.slice(i, i + SYNC_PHOTO_DELETE_BATCH);
+        chain = chain
+          .then(() => c.from('photos').update({ deleted: true, last_modified: now })
+            .eq('user_id', uid).in('id', chunk))
+          .then((r) => { if (r && r.error) throw r.error; })
+          // v89: the preview goes with the photo. Removing one that was never
+          // made is not an error.
+          .then(() => c.storage.from('photos').remove(
+            chunk.map(id => _syncPhotoPath(uid, id)).concat(chunk.map(id => _syncThumbPath(uid, id)))))
+          .then((r) => {
+            if (r && r.error) throw r.error;
+            for (const id of chunk) { delete st.ph.sent[id]; delete st.ph.mv[id]; out.gone++; }
+            _syncSave(st);
+          });
+      }
+
+      // 2. Uploads, oldest first, a few per run (SYNC_PHOTOS_PER_RUN).
+      return chain.then(() => {
+        const jobs = _syncPhotoJobs() || new Map();
+        const cands = [];
+        for (const [id, job] of jobs) {
+          if (st.ph.sent[id]) continue;
+          if (!st.sent[job] || st.gone[job]) continue;   // job not in the cloud (yet)
+          cands.push({ id, job, m: meta[id] });
+        }
+        cands.sort((a, b) => String(a.m.at).localeCompare(String(b.m.at)) || a.id.localeCompare(b.id));
+        const take = cands.slice(0, SYNC_PHOTOS_PER_RUN);
+        out.more = cands.length - take.length;
+        let up = Promise.resolve();
+        for (const cand of take) {
+          up = up.then(() => photoBlob(cand.id)).then((blob) => {
+            // Deleted while the run was going, or unreadable: skip, don't fail.
+            if (!blob || !(state.photoMeta || {})[cand.id]) return null;
+            const path = _syncPhotoPath(uid, cand.id);
+            const m = cand.m;
+            const at = (m.at && !isNaN(Date.parse(m.at))) ? m.at : null;
+            let thumb = false;
+            return c.storage.from('photos').upload(path, blob, { contentType: 'image/jpeg', upsert: true })
+              .then((r) => {
+                if (r && r.error) throw r.error;
+                // v89 (1A): the preview after the photo, before the row.
+                return _syncThumbUpload(c, uid, cand.id, blob).then((ok) => { thumb = ok; });
+              })
+              .then(() => c.from('photos').upsert({
                 id: cand.id, user_id: uid, session_id: cand.job, item_id: m.i,
                 storage_path: path, bytes: m.b || (blob.size || 0),
-                w: m.w || null, h: m.h || null, taken_at: at,
+                w: m.w || null, h: m.h || null, taken_at: at, thumb,
                 deleted: false, last_modified: new Date().toISOString(),
-              }, { onConflict: 'user_id,id' });
-            })
-            .then((r) => {
-              if (r && r.error) throw r.error;
-              st.ph.sent[cand.id] = { s: cand.job, i: m.i };
-              out.up++;
-              _syncSave(st);
-            });
-        });
-      }
-      // More waiting (a backlog, or the first run after V88): take the next
-      // round shortly rather than waiting for the two-minute backstop.
-      return up.then(() => {
-        if (out.more > 0) { try { syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true }); } catch { /* next trigger will do */ } }
+              }, { onConflict: 'user_id,id' }))
+              .then((r) => {
+                if (r && r.error) throw r.error;
+                _syncNoteUploaded('ph', [cand.id]);   // V128
+                const e = { s: cand.job, i: m.i };
+                const b = m.b || blob.size || 0;
+                if (b > 0) e.b = b;
+                if (thumb) e.t = 1;
+                if (at) e.a = at;
+                st.ph.sent[cand.id] = e;
+                out.up++;
+                _syncSave(st);
+              });
+          });
+        }
+        return up;
+      }).then(() => _syncThumbBackfill(c, uid, st, out)).then(() => {
+        // More waiting (a backlog, or the first run after an update): take the
+        // next round shortly rather than waiting for the two-minute backstop.
+        if (out.more > 0 || out.thumbsMore > 0) { try { syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true }); } catch { /* next trigger will do */ } }
         return out;
       });
     });
+  });
+}
+
+// v89 (1A): previews for photos already in the cloud without one, while the
+// image is on this phone (uploaded before V89, or downloaded here). Best effort:
+// a failure stops the round quietly and is tried next run — a preview is a
+// convenience, never a reason to report photos as not sent.
+const _syncThumbGaveUp = new Set();   // images that will not decode, this session
+
+function _syncThumbBackfill(c, uid, st, out) {
+  const meta = state.photoMeta || {};
+  const gone = new Set();
+  for (const t of (state.tombstones || [])) if (t && t.kind === 'photo') gone.add(String(t.id));
+  const cands = Object.keys(st.ph.sent).filter((id) =>
+    !st.ph.sent[id].t && meta[id] && !gone.has(id) && !_syncThumbGaveUp.has(id) && !st.gone[st.ph.sent[id].s]);
+  const cap = (typeof SYNC_THUMBS_PER_RUN === 'number') ? SYNC_THUMBS_PER_RUN : 50;
+  const take = cands.slice(0, cap);
+  out.thumbsMore = cands.length - take.length;
+  let stop = false;
+  let chain = Promise.resolve();
+  for (const id of take) {
+    chain = chain.then(() => {
+      if (stop) return null;
+      return photoBlob(id).then((blob) => {
+        if (!blob) return null;
+        return _syncThumbUpload(c, uid, id, blob).then((ok) => {
+          if (!ok) { _syncThumbGaveUp.add(id); return null; }
+          return c.from('photos').update({ thumb: true, last_modified: new Date().toISOString() })
+            .eq('user_id', uid).eq('id', id)
+            .then((r) => {
+              if (r && r.error) { stop = true; return; }
+              if (st.ph.sent[id]) { st.ph.sent[id].t = 1; out.thumbs++; _syncSave(st); }
+            });
+        });
+      }).catch(() => { stop = true; });
+    });
+  }
+  return chain.then(() => { if (stop) out.thumbsMore = 0; });
+}
+
+// ---- v89: on request (10A) ------------------------------------------------------------
+// The only two ways an image comes down. Both read state.photoCloud — the list
+// the pull keeps — and never the table itself.
+
+// A preview, for the strip. Null when there isn't one, or no signal, or signed
+// out: the tile then shows a plain cloud.
+// V90: `hint` is a row the photo manager read with "Look in the cloud" — a photo
+// of a job not on this phone, so not known here (rule 24). Its own `t` says
+// whether a preview exists; nothing about it is remembered.
+function syncPhotoThumb(photoId, hint) {
+  const id = String(photoId || '');
+  const e = (state.photoCloud || {})[id] || ((hint && hint.t) ? hint : null);
+  if (!id || !e || !e.t || !syncActive() || _syncOffline()) return Promise.resolve(null);
+  const uid = _syncCurrentUserId();
+  if (!uid || state.photoCloudUser !== uid) return Promise.resolve(null);
+  return cloudClient()
+    .then((c) => c.storage.from('photos').download(_syncThumbPath(uid, id)))
+    .then((r) => (r && !r.error && r.data) ? r.data : null)
+    .catch(() => null);
+}
+
+// Full photos onto this phone. One at a time (a phone, a canvas each, mobile
+// data). `onStep(done, total)` after each. Resolves {got, failed, offline,
+// notReady}; a failure never stops the rest.
+function syncPhotoDownload(ids, onStep) {
+  const list = Array.from(new Set((ids || []).map(String).filter(Boolean)));
+  const res = { got: 0, failed: 0, offline: false, notReady: false };
+  if (!list.length) return Promise.resolve(res);
+  if (!syncActive() || _syncOffline()) { res.offline = true; res.failed = list.length; return Promise.resolve(res); }
+  // Until the store has been read, "not on this phone" isn't known yet.
+  if (!state.photoMetaReady) { res.notReady = true; res.failed = list.length; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid || state.photoCloudUser !== uid) { res.offline = true; res.failed = list.length; return Promise.resolve(res); }
+  let done = 0;
+  const step = () => { done++; if (typeof onStep === 'function') { try { onStep(done, list.length); } catch { /* progress only */ } } };
+  return cloudClient().then((c) => {
+    let chain = Promise.resolve();
+    for (const id of list) {
+      chain = chain.then(() => {
+        const e = (state.photoCloud || {})[id];
+        if (state.photoMeta && state.photoMeta[id]) { step(); return null; }   // already here
+        if (!e) { res.failed++; step(); return null; }
+        return c.storage.from('photos').download(_syncPhotoPath(uid, id))
+          .then((r) => {
+            if (!r || r.error || !r.data) { res.failed++; return null; }
+            return photoAddFromCloud({ id, s: e.s, i: e.i, b: e.b, a: e.a }, r.data)
+              .then((ok) => { if (ok) res.got++; else res.failed++; });
+          }, () => { res.failed++; })
+          .then(step);
+      });
+    }
+    return chain;
+  }).then(() => {
+    // A photo downloaded without a preview in the cloud gets one on the next
+    // run (the backfill) — "made the first time one is downloaded" (1A).
+    if (res.got) { try { syncNoteSave(); } catch { /* next trigger */ } }
+    return res;
+  }, () => { res.failed = list.length - res.got; return res; });
+}
+
+// ---- V90: the photo manager's cloud read (R18) -------------------------------
+//
+// "Look in the cloud" (3A). The first read of what the cloud holds for jobs NOT
+// on this phone: the photos table, ROWS only — never an image (R17) — and, for
+// the jobs those rows belong to, five fields picked out of the job row
+// (doc->>…), never the job itself. Roughly 200 bytes a photo.
+//
+// ⚠ Nothing read here is remembered. It is not added to st.ph.sent (rule 24:
+// knowing is scoped to what the phone holds) and never saved — the manager keeps
+// it in memory until it closes, and the next look reads again. The one exception
+// is a photo the engineer chooses to delete: see syncPhotoKnowForDelete.
+//
+// Keyset paging by id (gt + order + limit): stable while rows are added, and no
+// offsets. Resolves { ok, offline, error, rows: [{id,s,i,b,t,a}], jobs, asked, capped }.
+const _SYNC_BROWSE_COLS = 'id,session_id,item_id,bytes,thumb,taken_at';
+const _SYNC_BROWSE_JOB_COLS = 'id,deleted,site:doc->>site,name:doc->>name,date:doc->>date,clientId:doc->>clientId,locked:doc->>locked';
+
+function syncPhotoBrowse() {
+  const res = { ok: false, offline: false, error: '', rows: [], jobs: {}, asked: [], capped: false };
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  const size = (typeof SYNC_BROWSE_PAGE === 'number') ? SYNC_BROWSE_PAGE : 1000;
+  const max = (typeof SYNC_BROWSE_MAX === 'number') ? SYNC_BROWSE_MAX : 20000;
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  return cloudClient().then((c) => {
+    function page(after) {
+      let q = c.from('photos').select(_SYNC_BROWSE_COLS).eq('user_id', uid).eq('deleted', false);
+      if (after) q = q.gt('id', after);
+      return q.order('id', { ascending: true }).limit(size).then((r) => {
+        if (r && r.error) throw r.error;
+        const got = (r && r.data) || [];
+        for (const row of got) {
+          const id = String(row && row.id != null ? row.id : '');
+          const s = String(row && row.session_id != null ? row.session_id : '');
+          const i = String(row && row.item_id != null ? row.item_id : '');
+          if (!id || !s || !i) continue;
+          const e = { id, s, i, b: 0, t: row.thumb === true, a: '' };
+          const b = Number(row.bytes);
+          if (b > 0 && isFinite(b)) e.b = Math.round(b);
+          if (typeof row.taken_at === 'string' && !isNaN(Date.parse(row.taken_at))) e.a = row.taken_at;
+          res.rows.push(e);
+        }
+        if (got.length < size) return;
+        if (res.rows.length >= max) { res.capped = true; return; }
+        const last = got[got.length - 1];
+        return page(String(last && last.id != null ? last.id : ''));
+      });
+    }
+    return page('').then(() => {
+      // The names of the jobs NOT on this phone (the manager names the rest from
+      // the phone). A job missing from the answer, or deleted, leaves its photos
+      // with no job (5A) — the manager says so; nothing is decided here.
+      const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+      const want = Array.from(new Set(res.rows.map(e => e.s))).filter(id => !local.has(id));
+      res.asked = want;   // a job asked about and not answered has no job (5A)
+      let chain = Promise.resolve();
+      for (let k = 0; k < want.length; k += batch) {
+        const chunk = want.slice(k, k + batch);
+        chain = chain.then(() => c.from('sessions').select(_SYNC_BROWSE_JOB_COLS).eq('user_id', uid).in('id', chunk))
+          .then((r) => {
+            if (r && r.error) throw r.error;
+            for (const j of ((r && r.data) || [])) {
+              const id = String(j && j.id != null ? j.id : '');
+              if (!id) continue;
+              const str = (v) => (typeof v === 'string') ? v : '';
+              res.jobs[id] = {
+                deleted: j.deleted === true,
+                site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
+                locked: j.locked === true || j.locked === 'true',
+              };
+            }
+          });
+      }
+      return chain;
+    }).then(() => { res.ok = true; return res; });
+  }).catch((e) => {
+    res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn\u2019t reach the cloud.';
+    res.rows = []; res.jobs = {}; res.asked = [];
+    return res;
+  });
+}
+
+// V90: a photo the manager found with "Look in the cloud" and the engineer
+// chose to delete everywhere. It becomes KNOWN first, then goes through the one
+// delete path V89 built (a 'photo' ledger entry; the next run marks the row,
+// removes both files, then forgets it) — so it retries like any other delete and
+// survives the app closing or losing signal.
+//
+// ⚠ Written only while no run is going: a run holds its own copy of the sync
+// state and saves it, which would overwrite this. Waits, then writes in one
+// synchronous step (nothing can start a run in between). Resolves the number
+// added. `list` = [{id, s, i, b?, t?, a?}].
+function syncPhotoKnowForDelete(list) {
+  const uid = _syncCurrentUserId();
+  const want = (list || []).filter(e => e && e.id && e.s && e.i);
+  if (!uid || !want.length) return Promise.resolve(0);
+  const go = () => {
+    if (_syncRunning) return _syncRunning.then(go, go);
+    const st = _syncLoad();
+    if (st.userId !== uid) return 0;
+    let n = 0;
+    for (const e of want) {
+      const id = String(e.id);
+      if (st.ph.sent[id]) continue;
+      const o = { s: String(e.s), i: String(e.i) };
+      if (typeof e.b === 'number' && e.b > 0 && isFinite(e.b)) o.b = Math.round(e.b);
+      if (e.t) o.t = 1;
+      if (typeof e.a === 'string' && e.a && !isNaN(Date.parse(e.a))) o.a = e.a;
+      st.ph.sent[id] = o;
+      n++;
+    }
+    if (n) _syncSave(st);
+    return n;
+  };
+  return Promise.resolve(go());
+}
+
+// ---- V93 (Stage 5 part 2): the "In the cloud" tab, and bringing jobs down ----
+// The Jobs screen's cloud tab (4A) lists every live job the account holds, as a
+// LIST: id plus a few fields picked out of each job row (doc->>…), and the item
+// and fail counts the database works out itself (n_items, n_fails —
+// supabase/v93-archive.sql, 6B). Never a doc (R17): about 200 bytes a job. Photo
+// counts come from the read-only view session_photo_counts (security_invoker —
+// the photos table's own rule decides what it counts; isolation 8a–8c). That
+// read is fail-soft: without it the cards just show no 📷.
+// Memory only (rule 25): nothing is written. The screen keeps the result for
+// the app session (8A) and hides jobs that are on this phone when it draws, so
+// a job brought down or arriving by the pull simply drops out of the list.
+// Keyset paged by id, SYNC_CLOUD_PAGE a request, at most SYNC_CLOUD_MAX (said
+// on screen — `capped`). Replaces V91's cleared look: cleared jobs are cloud
+// jobs like any other (3A, 7A).
+// Resolves { ok, offline, error, uid, capped, photos, jobs: [{id, site, name,
+//   date, clientId, locked, certNo, items, fails, photos}] }.
+const _SYNC_CLOUD_JOB_COLS = 'id,site:doc->>site,name:doc->>name,date:doc->>date,clientId:doc->>clientId,locked:doc->>locked,certNo:doc->>certNo,n_items,n_fails';
+function syncCloudList() {
+  const res = { ok: false, offline: false, error: '', uid: '', capped: false, photos: false, jobs: [] };
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  res.uid = uid;
+  const str = (v) => (typeof v === 'string') ? v : '';
+  const num = (v) => (typeof v === 'number' && isFinite(v) && v >= 0) ? Math.round(v) : null;
+  const counts = new Map();
+  let client = null;
+  function jobsPage(after) {
+    let q = client.from('sessions').select(_SYNC_CLOUD_JOB_COLS).eq('user_id', uid).eq('deleted', false);
+    if (after) q = q.gt('id', after);
+    return q.order('id', { ascending: true }).limit(SYNC_CLOUD_PAGE).then((r) => {
+      if (r && r.error) throw r.error;
+      const rows = (r && r.data) || [];
+      for (const j of rows) {
+        const id = String(j && j.id != null ? j.id : '');
+        if (!id) continue;
+        res.jobs.push({ id, site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
+          locked: j.locked === true || j.locked === 'true', certNo: str(j.certNo),
+          items: num(j.n_items), fails: num(j.n_fails), photos: 0 });
+      }
+      if (rows.length < SYNC_CLOUD_PAGE) return;
+      if (res.jobs.length >= SYNC_CLOUD_MAX) { res.capped = true; return; }
+      return jobsPage(String(rows[rows.length - 1].id));
+    });
+  }
+  function photoPage(after, n) {
+    let q = client.from('session_photo_counts').select('session_id,n').eq('user_id', uid);
+    if (after) q = q.gt('session_id', after);
+    return q.order('session_id', { ascending: true }).limit(SYNC_CLOUD_PAGE).then((r) => {
+      if (r && r.error) throw r.error;
+      const rows = (r && r.data) || [];
+      for (const x of rows) {
+        const sid = String(x && x.session_id != null ? x.session_id : '');
+        const c = num(x && x.n);
+        if (sid && c) counts.set(sid, c);
+      }
+      if (rows.length < SYNC_CLOUD_PAGE || n > SYNC_CLOUD_MAX / SYNC_CLOUD_PAGE) return;
+      return photoPage(String(rows[rows.length - 1].session_id), n + 1);
+    });
+  }
+  return cloudClient().then((c) => { client = c; return jobsPage(''); })
+    .then(() => photoPage('', 0).then(() => { res.photos = true; },
+      (e) => { console.error('Cloud list: photo counts not read (non-fatal).', e); }))
+    .then(() => {
+      for (const j of res.jobs) j.photos = counts.get(j.id) || 0;
+      res.jobs.sort((a, b) => (b.date || '').localeCompare(a.date || '') || a.id.localeCompare(b.id));
+      res.ok = true;
+      return res;
+    }).catch((e) => {
+      res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn\u2019t reach the cloud.';
+      res.jobs = [];
+      return res;
+    });
+}
+
+// V108 (Stage 5 part 3, second half): Settings → Data → Cloud Storage. How much
+// the account holds in the cloud — the jobs, the photos, the total — and its
+// biggest jobs (CLOUD_STORAGE_TOP, 3A: the job plus its photos, jobs on this
+// phone included — they take cloud space too).
+//
+// Three reads, all LISTS (R17 — never a job's contents, never a photo):
+//   1. every live job's id and doc_bytes (a column the DATABASE works out from
+//      the job — supabase/v108-storage.sql), ≈ 50 bytes a job;
+//   2. the photo-count view with b, the bytes of each job's photos (same SQL);
+//   3. names and counts (the cloud tab's columns) for the biggest jobs only.
+// Photos whose job is gone or deleted still count in the photo total — they
+// take space — but belong to no job in the list.
+// Keyset paged, SYNC_CLOUD_PAGE a request, at most SYNC_CLOUD_MAX jobs (capped:
+// the totals are then "at least" — said on screen).
+// ⚠ Memory only (rule 25): nothing is written or remembered here.
+// Without the V108 SQL the database answers "column does not exist": the result
+// says so (needsUpdate) instead of a raw error, and the page names the fix.
+// Resolves { ok, offline, error, needsUpdate, uid, capped,
+//   jobs: { n, bytes }, photos: { n, bytes }, top: [{ id, site, name, date,
+//   clientId, locked, certNo, items, fails, photos, bytes, photoBytes, total }] }.
+function syncCloudStorage() {
+  const res = { ok: false, offline: false, error: '', needsUpdate: false, uid: '', capped: false,
+    jobs: { n: 0, bytes: 0 }, photos: { n: 0, bytes: 0 }, top: [] };
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  res.uid = uid;
+  const num = (v) => { const x = Number(v); return (isFinite(x) && x > 0) ? Math.round(x) : 0; };
+  const str = (v) => (typeof v === 'string') ? v : '';
+  const sizes = new Map();    // job id → its doc bytes
+  const photos = new Map();   // job id → { n, b }
+  let client = null;
+  function sizePage(after) {
+    let q = client.from('sessions').select('id,doc_bytes').eq('user_id', uid).eq('deleted', false);
+    if (after) q = q.gt('id', after);
+    return q.order('id', { ascending: true }).limit(SYNC_CLOUD_PAGE).then((r) => {
+      if (r && r.error) throw r.error;
+      const rows = (r && r.data) || [];
+      for (const j of rows) {
+        const id = String(j && j.id != null ? j.id : '');
+        if (id) sizes.set(id, num(j.doc_bytes));
+      }
+      if (rows.length < SYNC_CLOUD_PAGE) return;
+      if (sizes.size >= SYNC_CLOUD_MAX) { res.capped = true; return; }
+      return sizePage(String(rows[rows.length - 1].id));
+    });
+  }
+  function bytesPage(after, k) {
+    let q = client.from('session_photo_counts').select('session_id,n,b').eq('user_id', uid);
+    if (after) q = q.gt('session_id', after);
+    return q.order('session_id', { ascending: true }).limit(SYNC_CLOUD_PAGE).then((r) => {
+      if (r && r.error) throw r.error;
+      const rows = (r && r.data) || [];
+      for (const x of rows) {
+        const sid = String(x && x.session_id != null ? x.session_id : '');
+        if (!sid) continue;
+        const n = num(x.n), b = num(x.b);
+        photos.set(sid, { n, b });
+        res.photos.n += n;
+        res.photos.bytes += b;
+      }
+      if (rows.length < SYNC_CLOUD_PAGE) return;
+      if (k >= SYNC_CLOUD_MAX / SYNC_CLOUD_PAGE) { res.capped = true; return; }
+      return bytesPage(String(rows[rows.length - 1].session_id), k + 1);
+    });
+  }
+  return cloudClient().then((c) => { client = c; return sizePage(''); })
+    .then(() => bytesPage('', 1))
+    .then(() => {
+      const all = [];
+      for (const [id, bytes] of sizes) {
+        const p = photos.get(id) || { n: 0, b: 0 };
+        res.jobs.n += 1;
+        res.jobs.bytes += bytes;
+        all.push({ id, bytes, photos: p.n, photoBytes: p.b, total: bytes + p.b });
+      }
+      // Biggest first; equal sizes by id, so the list never shuffles between reads.
+      all.sort((a, b) => (b.total - a.total) || (a.id < b.id ? -1 : (a.id > b.id ? 1 : 0)));
+      const top = all.slice(0, (typeof CLOUD_STORAGE_TOP === 'number' && CLOUD_STORAGE_TOP > 0) ? CLOUD_STORAGE_TOP : 10);
+      if (!top.length) return;
+      return client.from('sessions')
+        .select(_SYNC_CLOUD_JOB_COLS).eq('user_id', uid).eq('deleted', false)
+        .in('id', top.map(t => t.id)).then((r) => {
+          if (r && r.error) { throw r.error; }
+          const picks = new Map();
+          for (const j of ((r && r.data) || [])) {
+            const id = String(j && j.id != null ? j.id : '');
+            if (id) picks.set(id, j);
+          }
+          // A job deleted between the reads is simply left out.
+          for (const t of top) {
+            const j = picks.get(t.id);
+            if (!j) continue;
+            res.top.push(Object.assign({ site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
+              locked: j.locked === true || j.locked === 'true', certNo: str(j.certNo),
+              items: (typeof j.n_items === 'number' && j.n_items >= 0) ? j.n_items : null,
+              fails: num(j.n_fails) }, t));
+          }
+        });
+    })
+    .then(() => { res.ok = true; return res; })
+    .catch((e) => {
+      const msg = String((e && e.message) || '');
+      if (e && (e.code === '42703' || /doc_bytes|session_photo_counts\.b\b/.test(msg))) {
+        res.needsUpdate = true;
+        res.error = 'The cloud needs a small update before it can show sizes.';
+      } else {
+        res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
+      }
+      res.jobs = { n: 0, bytes: 0 }; res.photos = { n: 0, bytes: 0 }; res.top = [];
+      return res;
+    });
+}
+
+// Bring jobs from the cloud onto this phone: each job's row is read (the one
+// download a job on request needs), checked like any pulled job, and added
+// through _syncTakeJob — exactly as the pull adds one, plus st.conf (safe the
+// moment it lands) and st.ph.need (its photo rows come too, rule 24). Then:
+//   • it leaves the cleared list, if it was on it, so the pull treats it as an
+//     ordinary job from now on;
+//   • ⚠ V93: ONLY a job that was cleared has its tallies taken back out of the
+//     archived stats (unarchiveSessionStats). A job that never came down to
+//     this phone was never counted here — subtracting it would undercount.
+// ⚠ The write waits for any run and happens in one synchronous step
+// (syncWhenIdle): a run holds the job list and the sync state. A job already
+// on the phone by then is only taken off the cleared list. A job deleted HERE
+// (a session tombstone) that is live in the cloud again comes back like any
+// other — the push then forgets the stale tombstone (rule 32).
+// Resolves { ok, offline, error, got, missing }.
+function syncBringBack(ids) {
+  const want = Array.from(new Set((ids || []).map(String).filter(Boolean)));
+  const res = { ok: false, offline: false, error: '', got: 0, missing: 0 };
+  if (!want.length) { res.ok = true; return Promise.resolve(res); }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  const rows = [];
+  return cloudClient().then((c) => {
+    let chain = Promise.resolve();
+    for (let k = 0; k < want.length; k += batch) {
+      const chunk = want.slice(k, k + batch);
+      chain = chain.then(() => c.from('sessions').select('id,doc,deleted').eq('user_id', uid).in('id', chunk))
+        .then((r) => { if (r && r.error) throw r.error; for (const row of ((r && r.data) || [])) rows.push(row); });
+    }
+    return chain;
+  }).then(() => syncWhenIdle(() => {
+    const st = _syncLoad();
+    if (st.userId !== uid) { res.error = 'Signed in as someone else now.'; return res; }
+    const out = _syncTakeRows(st, rows, want);
+    res.missing = want.length - out.back.size;
+    if (out.added.length) {
+      _syncSave(st);
+      // A new array reference busts activeSession()'s memo, as in the pull.
+      state.sessions = state.sessions.slice();
+      saveSessions();
+      if (typeof saveSettings === 'function') { try { saveSettings(); } catch (e) { console.error(e); } }
+    }
+    res.got = out.added.length;
+    res.ok = true;
+    return res;
+  })).catch((e) => {
+    res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn\u2019t reach the cloud.';
+    return res;
+  });
+}
+
+// ---- V107 (Stage 5 part 3): delete jobs from the cloud that are NOT on this phone ----
+// The cloud tab's Select → Delete… (2A). Only for jobs this phone does not hold:
+// a job on the phone is deleted with its own 🗑 → Delete everywhere, which runs
+// deleteSession()'s sweeps. One that has arrived on the phone since the list was
+// read is skipped (`skipped`), never deleted from here.
+//
+// In this order, holding the run lock (_syncRunning) so no pull or push starts
+// in between — a run holds its own copy of the sync state and would overwrite
+// what this writes (the reason syncWhenIdle exists):
+//   1. reads the jobs' photo ROWS (never an image — R17): id, job, item, size;
+//   2. empties and marks deleted each job's row — the same row a delete
+//      everywhere sends (doc {}, fp null, deleted true) — with an UPDATE, so only
+//      rows still live are touched and the answer says which were. Other phones
+//      learn of it as they learn of any delete: an unchanged copy goes, a changed
+//      copy asks first ("deleted on another phone") — never lost silently;
+//   3. only for the jobs the cloud took: forgets them here (sent, conf, resend,
+//      held, and the cleared list — left there, the pull would skip their row for
+//      ever: the V80 backlog note), makes their photos KNOWN (st.ph.sent) and
+//      records a 'photo' tombstone for each, so the next run's photo half marks
+//      the rows deleted and removes both files — the V89 ledger path, which
+//      retries until it lands;
+//   4. sweeps any copy of those photos still on this phone (cleared-job
+//      leftovers). A copy on the phone reads as "live" and would stop the delete.
+// Then the lock is released and a READING run starts (the photo half runs only
+// in those): it carries the photo deletes, and any trigger that arrived meanwhile
+// (syncPush saw the lock) runs with it.
+//
+// ⚠ ORDER. The job rows go BEFORE any photo is marked. A failure or a closed app
+// between 2 and 3 leaves photos with no job in the cloud (the photo manager's
+// "Photos with no job" lists them); the other order could delete the photos of
+// a job that was never deleted.
+// ⚠ No session tombstone and no st.gone. The push sends a tombstone only for a
+// job it sent (rule 32's guards), and st.gone[id] would make the photo half
+// delete the job's photos again if it ever came back live (a phone that changed
+// it and chose to keep its copy). Forgetting the job is enough: a deleted row
+// for an id this phone doesn't know changes nothing here.
+// Lifetime stats are untouched: a cleared job's tallies stay archived (no delete
+// lowers the counter, v59), and a job never on this phone was never counted.
+// Resolves { ok, offline, error, deleted, photos, skipped, missing, ids } —
+// `ids` the jobs the cloud took (the tab drops them without reading again).
+function syncCloudDelete(ids) {
+  const want = Array.from(new Set((ids || []).map(String).filter(Boolean)));
+  const res = { ok: false, offline: false, error: '', deleted: 0, photos: 0, skipped: 0, missing: 0, ids: [] };
+  if (!want.length) { res.ok = true; return Promise.resolve(res); }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  return syncWhenIdle(() => {
+    let release;
+    const lock = new Promise((r) => { release = r; });
+    _syncRunning = lock;
+    return _syncCloudDeleteRun(uid, want, res).catch((e) => {
+      res.ok = false;
+      res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
+      return res;
+    }).then(() => {
+      if (_syncRunning === lock) _syncRunning = null;
+      release();
+      const again = _syncAgain, force = _syncAgainForce, pull = _syncAgainPull;
+      _syncAgain = false; _syncAgainForce = false; _syncAgainPull = false;
+      // ⚠ A READING run (pull): the photo half — which carries the deletes —
+      // runs only in those (v88).
+      if (res.deleted || again) { try { syncPush({ force, pull: pull || !!res.deleted }); } catch (e) { /* the next trigger runs it */ } }
+      return res;
+    });
+  });
+}
+
+function _syncCloudDeleteRun(uid, want, res) {
+  const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+  const ids = want.filter(id => !local.has(id));
+  res.skipped = want.length - ids.length;
+  if (!ids.length) { res.ok = true; return Promise.resolve(res); }
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  const size = (typeof SYNC_BROWSE_PAGE === 'number') ? SYNC_BROWSE_PAGE : 1000;
+  const photos = [];
+  const done = [];
+  let c = null, failed = null;
+  return cloudClient().then((cl) => {
+    c = cl;
+    // 1. The photo rows, keyset paged within each batch of jobs.
+    let chain = Promise.resolve();
+    for (let k = 0; k < ids.length; k += batch) {
+      const chunk = ids.slice(k, k + batch);
+      const page = (after) => {
+        let q = c.from('photos').select('id,session_id,item_id,bytes').eq('user_id', uid).eq('deleted', false).in('session_id', chunk);
+        if (after) { q = q.gt('id', after); }
+        return q.order('id', { ascending: true }).limit(size).then((r) => {
+          if (r && r.error) { throw r.error; }
+          const got = (r && r.data) || [];
+          for (const row of got) {
+            const id = String(row && row.id != null ? row.id : '');
+            const s = String(row && row.session_id != null ? row.session_id : '');
+            const i = String(row && row.item_id != null ? row.item_id : '');
+            if (!id || !s || !i) continue;
+            const e = { id, s, i };
+            const b = Number(row.bytes);
+            if (b > 0 && isFinite(b)) e.b = Math.round(b);
+            photos.push(e);
+          }
+          if (got.length < size) return;
+          return page(String(got[got.length - 1].id));
+        });
+      };
+      chain = chain.then(() => page(''));
+    }
+    return chain;
+  }).then(() => {
+    const su = _syncLoad().userId;
+    if (su && su !== uid) { res.error = 'Signed in as someone else now.'; return; }
+    // 2. The job rows. A batch that fails stops the rest; those already taken
+    //    are still settled below.
+    const now = new Date().toISOString();
+    const rowsAt = (typeof SYNC_BATCH_ROWS === 'number') ? SYNC_BATCH_ROWS : 25;
+    let chain = Promise.resolve();
+    for (let k = 0; k < ids.length; k += rowsAt) {
+      const chunk = ids.slice(k, k + rowsAt);
+      chain = chain.then(() => c.from('sessions')
+        .update({ doc: {}, fp: null, deleted: true, last_modified: now })
+        .eq('user_id', uid).eq('deleted', false).in('id', chunk).select('id'))
+        .then((r) => {
+          if (r && r.error) { throw r.error; }
+          for (const row of ((r && r.data) || [])) {
+            const id = String(row && row.id != null ? row.id : '');
+            if (id && chunk.indexOf(id) !== -1 && done.indexOf(id) === -1) done.push(id);
+          }
+        });
+    }
+    return chain.catch((e) => { failed = e; });
+  }).then(() => {
+    if (res.error) return;
+    // 3. Settle what the cloud took, in one synchronous step (the lock is held).
+    const gone = new Set(done);
+    const mine = photos.filter(p => gone.has(p.s));
+    if (gone.size) {
+      const st = _syncStateFor(uid);
+      if (st.userId === uid) {
+        for (const id of gone) {
+          delete st.sent[id]; delete st.resend[id];
+          if (st.conf) delete st.conf[id];
+        }
+        for (const p of mine) {
+          if (st.ph.sent[p.id]) continue;
+          const o = { s: p.s, i: p.i };
+          if (p.b) o.b = p.b;
+          st.ph.sent[p.id] = o;
+        }
+        _syncSave(st);
+      }
+      for (const id of gone) _syncHeldClear(id);
+      const list = _syncPrunedLoad();
+      const kept = list.filter(e => !gone.has(e.id));
+      if (kept.length !== list.length) _syncPrunedSave(kept);
+      for (const p of mine) {
+        if (typeof recordTombstone === 'function') recordTombstone('photo', p.id);
+        if (typeof photoThumbForget === 'function') { try { photoThumbForget(p.id); } catch (e) { /* display only */ } }
+      }
+      if (mine.length && typeof saveTombstones === 'function') saveTombstones();
+    }
+    res.deleted = done.length;
+    res.ids = done.slice();
+    res.photos = mine.length;
+    res.missing = failed ? 0 : ids.length - done.length;
+    // 4. This phone's copies of those photos — awaited, so the run that follows
+    //    sees them gone; done for the jobs taken even when a later batch failed.
+    let sweep = Promise.resolve();
+    if (gone.size && typeof photosDeleteForSessions === 'function') {
+      try { sweep = Promise.resolve(photosDeleteForSessions(Array.from(gone))); } catch (e) { sweep = Promise.reject(e); }
+      sweep = sweep.catch((e) => { console.error('Cloud delete: photos left on this phone (non-fatal).', e); });
+    }
+    return sweep.then(() => {
+      if (failed) throw failed;
+      res.ok = true;
+    });
+  }).then(() => res);
+}
+
+// The shared half of syncBringBack and the retest look: add each valid live row
+// asked for that isn't on the phone, take every one now here off the cleared
+// list, and un-archive the stats of those that WERE cleared (and only those).
+// Synchronous; the caller saves st and the job list.
+function _syncTakeRows(st, rows, want) {
+  const wanted = new Set((want || []).map(String));
+  const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+  const cleared = new Set(_syncPrunedLoad().map(e => e.id));
+  const back = new Set();
+  const added = [];
+  for (const row of (rows || [])) {
+    const id = String(row && row.id != null ? row.id : '');
+    if (!id || !wanted.has(id) || back.has(id)) continue;
+    if (local.has(id)) { back.add(id); continue; }
+    if (row.deleted === true || !_syncValidDoc(row.doc, id)) continue;
+    _syncTakeJob(st, row.doc);
+    added.push(row.doc);
+    back.add(id);
+  }
+  if (Array.from(back).some(id => cleared.has(id))) _syncPrunedSave(_syncPrunedLoad().filter(e => !back.has(e.id)));
+  const wasCleared = added.filter(d => cleared.has(String(d.id)));
+  if (wasCleared.length) {
+    if (typeof unarchiveSessionStats === 'function') { try { unarchiveSessionStats(wasCleared); } catch (e) { console.error('Stats not adjusted (non-fatal).', e); } }
+  }
+  return { back, added };
+}
+
+// ---- V93 (2A): the retest look ------------------------------------------------
+// The window (1A) keeps old jobs in the cloud — and retest reminders are FOR old
+// jobs (tested 11–12 months ago). The pull brings a chased one down when it
+// meets its row, but an untouched row is never met again. So once a calendar
+// month (the chase moves only at a month boundary, R15), in a reading run,
+// straight after the jobs pull: tracked jobs not on this phone are LISTED (a
+// filter on the server, the same picks as the pull — no docs), and those whose
+// chase has started and that nobody has booked or declined come down. That
+// includes jobs cleared from this phone (tidy-up or by hand): the reminder is
+// the point of tracking (Peter, V93 round). A job deleted here never does.
+// Fail-soft: an error is logged and the month is not stamped, so the next run
+// tries again. Adds through _syncTakeRows (shared with Bring back).
+const _SYNC_RETEST_COLS = 'id,' + _SYNC_JOB_PICKS;
+function _syncRetestLook(c, uid, st, out) {
+  if (typeof currentMonthIndex !== 'function') return Promise.resolve();
+  const now = new Date();
+  const month = currentMonthIndex(now);
+  if (st.rtMonth === month) return Promise.resolve();
+  const rows = [];
+  function page(after) {
+    let q = c.from('sessions').select(_SYNC_RETEST_COLS).eq('user_id', uid).eq('deleted', false).eq('doc->>retestTrack', 'true');
+    if (after) q = q.gt('id', after);
+    return q.order('id', { ascending: true }).limit(SYNC_CLOUD_PAGE).then((r) => {
+      if (r && r.error) throw r.error;
+      const got = (r && r.data) || [];
+      for (const x of got) rows.push(x);
+      if (got.length < SYNC_CLOUD_PAGE || rows.length >= SYNC_CLOUD_MAX) return;
+      return page(String(got[got.length - 1].id));
+    });
+  }
+  return page('').then(() => {
+    const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+    const deletedHere = new Set((state.tombstones || []).filter(t => t && t.kind === 'session').map(t => String(t.id)));
+    const want = [];
+    for (const r of rows) {
+      const id = String(r && r.id != null ? r.id : '');
+      if (!id || local.has(id) || deletedHere.has(id) || st.resend[id]) continue;
+      if (_syncRetestDue(_syncPicks(r), now)) want.push(id);
+    }
+    if (!want.length) return [];
+    const got = [];
+    const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+    let chain = Promise.resolve();
+    for (let k = 0; k < want.length; k += batch) {
+      const chunk = want.slice(k, k + batch);
+      chain = chain.then(() => c.from('sessions').select('id,doc,deleted').eq('user_id', uid).in('id', chunk))
+        .then((r) => { if (r && r.error) throw r.error; for (const row of ((r && r.data) || [])) got.push(row); });
+    }
+    return chain.then(() => ({ want, got }));
+  }).then((x) => {
+    if (x && x.want && x.want.length) {
+      const res = _syncTakeRows(st, x.got, x.want);
+      if (res.added.length) {
+        out.added += res.added.length;
+        state.sessions = state.sessions.slice();
+        saveSessions();
+        if (typeof saveSettings === 'function') { try { saveSettings(); } catch (e) { console.error(e); } }
+        _syncRepaintApp();
+      }
+    }
+    st.rtMonth = month;
+    _syncSave(st);
   });
 }

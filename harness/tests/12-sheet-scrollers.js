@@ -165,13 +165,15 @@ module.exports = async function () {
     t.includes(coreSrc, 'class="preset-switch-edit sheet-pin"', 'the Edit presets button is pinned');
   });
 
-  await t.group('12f — the three caller-supplied sheets scroll their message', () => {
+  await t.group('12f — the four caller-supplied sheets scroll their message', () => {
     // None of these overflows today. The message is passed IN, so its length is
     // not a property of feedback.js and cannot be checked there — and the info
     // sheet is the app's error reporter, where long text is the normal case.
     // Two pins per sheet where there are two things below the message.
     const scrollMarks = (feedSrc.match(/<p class="sheet-scroll"/g) || []).length;
-    t.eq(scrollMarks, 3, 'all three message paragraphs are scrollers');
+    // V91: the choice sheet (openChoiceSheet) is the fourth.
+    t.eq(scrollMarks, 4, 'all four message paragraphs are scrollers');
+    t.includes(feedSrc, '<div class="sheet-pin" style="display:flex;flex-direction:column', 'the choice sheet buttons are pinned');
 
     t.includes(feedSrc, '<div class="sheet-pin" style="display:flex', 'the confirm button row is pinned');
     t.includes(feedSrc, 'class="input sheet-pin" id="name-sheet-input"', 'the name sheet input is pinned');

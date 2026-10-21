@@ -8,6 +8,274 @@
 
 // ============== PATGo PWA — v22 — Feedback ==============
 // Toast + haptic / visual flash / sound feedback. Self-contained.
+// V120: the screen-reader announcer. V123: where focus lands after a redraw.
+
+// ---------- V120: screen-reader announcements (1A) ----------
+// One permanent live region, #sr-announcer in index.html, outside #app so
+// render() never rebuilds it. ⚠ WHY NOT role="status" ON EACH TOAST (the
+// pre-V120 way): a live region created at the same moment as its text is
+// often not read by VoiceOver on iPhone — it has to exist BEFORE the text
+// changes. So every spoken message comes through here instead.
+// The text is cleared, then set a moment later, so the same message twice in a
+// row ("Up to 4 photos per item") is still spoken the second time. Newest wins:
+// a pending message is dropped if another arrives first.
+// Invisible: the element is .sr-only, so nothing changes for sighted use.
+// Built here if missing (an old cached index.html with new scripts) — fail soft.
+let _announceTimer = null;
+function announce(message) {
+  const text = String(message ?? '').trim();
+  if (!text) return;
+  let el = document.getElementById('sr-announcer');
+  if (!el) {
+    try {
+      el = document.createElement('div');
+      el.id = 'sr-announcer';
+      el.className = 'sr-only';
+      el.setAttribute('aria-live', 'polite');
+      el.setAttribute('aria-atomic', 'true');
+      document.body.appendChild(el);
+    } catch { return; }
+  }
+  if (_announceTimer) { clearTimeout(_announceTimer); _announceTimer = null; }
+  el.textContent = '';
+  _announceTimer = setTimeout(() => { el.textContent = text; _announceTimer = null; }, 60);
+}
+
+// ---------- V123: where VoiceOver lands after a redraw (1A 2A 3A) ----------
+// render() rebuilds #app wholesale (MAP rule 2), so whatever VoiceOver was on is
+// destroyed by nearly every tap and its cursor falls back to the top of the
+// page. This puts it somewhere sensible again, at the end of every redraw:
+//   • a tap that redraws the same screen  → back on the control that was tapped
+//     (found again by id, else by data-action + data-arg + position);
+//   • a move to another screen            → that screen's heading (#screen-title);
+//   • a sheet that has just opened        → the sheet's title;
+//   • a sheet that has just closed        → the control that opened it (3A);
+//   • anything that LOGGED an item        → the screen heading (2A), never the
+//     button — see FOCUS_LOG_ACTIONS;
+//   • a control that has gone             → the screen heading.
+// 1A: on for everyone. It is invisible because nothing scrolls (preventScroll)
+// and a heading shows no ring ([tabindex="-1"]:focus in styles.css); a button
+// focused after a TAP gets no ring either (that is :focus-visible's job).
+//
+// ⚠ NEVER A TEXT FIELD. Focusing one raises the keyboard. _focusIsTextField()
+// refuses them as targets; a field that already holds the cursor (paired
+// scanner mode, the name sheet, Other fail reason) is left alone.
+// ⚠ WHY LOGGING BUTTONS NEVER HOLD FOCUS (2A): a hardware scanner in keyboard
+// mode types into whatever has focus. Its Enter is swallowed only when the burst
+// passes as a scan, and a SPACE inside a barcode is never swallowed (scanner.js:
+// character keys are never preventDefaulted) — either one on a focused PASS
+// button presses it, and logs a second item nobody tested. A heading cannot be
+// pressed. This holds for the FAIL button after a cancelled fail sheet too.
+// ⚠ ORDER at the end of render(): this runs BEFORE focusAssetForScan(), so
+// paired scanner mode still wins and puts the cursor in the asset box.
+const FOCUS_LOG_ACTIONS = ['log-pass', 'log-fail', 'copy-last', 'multipick-fire'];
+// A tap whose action did not redraw (Quick Pick repaints in place) must not
+// steer a LATER redraw it had nothing to do with (a sync, a photo landing).
+const FOCUS_TAP_MS = 2000;
+// V129 (1A): a control whose own action swaps it for something else. + New job
+// opens the form in its place, and the form's Cancel puts the button back; the
+// tapped control has gone, so focus would fall to the screen heading and leave
+// VoiceOver one swipe away. Tapped action → the id of what took its place.
+// Only when the tapped control is truly gone, on the same screen, never a log
+// action, never a text field (a heading or a button: no keyboard).
+const FOCUS_STAND_INS = { 'new-session': 'nf-title', 'nf-cancel': 'new-session-btn' };
+let _focusTap = null;            // the control the last tap / change landed on
+let _focusBefore = null;         // what held focus when the current redraw began
+let _focusOpener = null;         // what opened the sheet now showing
+let _focusSheetWasOpen = false;  // a sheet was showing at the end of the last pass
+let _focusLastView = null;
+let _focusLogged = false;        // an item was logged since the last pass (2A)
+
+function _focusIsTextField(el) {
+  if (!el || !el.tagName) return false;
+  const tag = String(el.tagName).toUpperCase();
+  if (tag === 'TEXTAREA') return true;
+  if (el.isContentEditable === true) return true;
+  if (tag !== 'INPUT') return false;
+  const type = String((el.getAttribute && el.getAttribute('type')) || el.type || 'text').toLowerCase();
+  return ['checkbox', 'radio', 'button', 'submit', 'reset', 'range'].indexOf(type) === -1;
+}
+
+function _focusInSheet(el) {
+  // One selector per call: the harness's stub DOM does not take selector lists.
+  return !!(el && typeof el.closest === 'function' && (el.closest('.bulk-sheet') || el.closest('.fail-sheet')));
+}
+
+// What a control IS, in terms that survive the redraw. null for nothing useful.
+function focusDescribe(el) {
+  if (!el || el === document.body || el.nodeType !== 1) return null;
+  const get = (k) => (el.getAttribute ? el.getAttribute(k) : null);
+  const id = el.id || '';
+  let kind = '', action = '';
+  if (get('data-action')) { kind = 'data-action'; action = get('data-action'); }
+  else if (get('data-change-action')) { kind = 'data-change-action'; action = get('data-change-action'); }
+  if (!id && !kind) return null;
+  const arg = get('data-arg') || '';
+  let index = 0;
+  if (!id && kind) {
+    const same = _focusAll(kind).filter(x => x.getAttribute(kind) === action && (x.getAttribute('data-arg') || '') === arg);
+    index = Math.max(0, same.indexOf(el));
+  }
+  return { id, kind, action, arg, index, inSheet: _focusInSheet(el), view: (typeof state === 'object' && state) ? state.view : '' };
+}
+
+function _focusAll(kind) {
+  try { return Array.from(document.querySelectorAll('[' + kind + ']')); } catch (e) { return []; }
+}
+
+// Find a described control in the NEW markup. Never a text field (keyboard).
+function focusFind(d) {
+  if (!d) return null;
+  let el = null;
+  if (d.id) el = document.getElementById(d.id);
+  if (!el && d.kind) {
+    const same = _focusAll(d.kind).filter(x => x.getAttribute(d.kind) === d.action && (x.getAttribute('data-arg') || '') === d.arg);
+    el = same[d.index] || null;
+  }
+  if (!el || _focusIsTextField(el)) return null;
+  return el;
+}
+
+// Focus without scrolling (rule: a redraw keeps its place — render() decides
+// scroll). A heading is not focusable until it has tabindex="-1"; the screen
+// titles carry it in their markup, a sheet title gets it here. True if it took.
+function _focusEl(el) {
+  if (!el || typeof el.focus !== 'function' || el.disabled) return false;
+  // Not natively focusable (a heading, a title span) → tabindex="-1": focusable
+  // by script, never by Tab. styles.css drops the ring for exactly that.
+  if (!el.hasAttribute('tabindex') && !/^(BUTTON|A|INPUT|SELECT|TEXTAREA)$/i.test(String(el.tagName || ''))) el.setAttribute('tabindex', '-1');
+  try { el.focus({ preventScroll: true }); } catch (e) { try { el.focus(); } catch (e2) { return false; } }
+  return document.activeElement === el;
+}
+
+function focusScreenHeading() {
+  return _focusEl(document.getElementById('screen-title'));
+}
+
+// V129 (1A): what took the tapped control's place (FOCUS_STAND_INS), or null.
+function focusStandIn(d) {
+  if (!d || d.kind !== 'data-action' || !Object.prototype.hasOwnProperty.call(FOCUS_STAND_INS, d.action)) return null;
+  const el = document.getElementById(FOCUS_STAND_INS[d.action]);
+  if (!el || _focusIsTextField(el)) return null;
+  return el;
+}
+
+// V129 (2A): for markup rebuilt OUTSIDE render() — the certificate preview's
+// quick-adjust chips (report.js rebuild). Puts focus back on the control just
+// redrawn. Same rules as a redraw: no scroll, never a text field.
+function focusControl(el) {
+  if (!el || _focusIsTextField(el)) return false;
+  return _focusEl(el);
+}
+
+// The sheet on top. A .bulk-sheet beats a .fail-sheet: the only time both show,
+// the bulk one (a confirm, a photo strip) was opened over the fail sheet. The
+// certificate preview (report.js) is full-screen but counts as a sheet here.
+function _focusOpenSheet() {
+  for (const cls of ['.bulk-sheet', '.fail-sheet', '.report-preview-sheet']) {
+    let all = [];
+    try { all = Array.from(document.querySelectorAll(cls)); } catch (e) {}
+    if (all.length) return all[all.length - 1];
+  }
+  return null;
+}
+
+function _focusSheetTitle(sheet) {
+  if (!sheet || typeof sheet.querySelector !== 'function') return false;
+  for (const sel of ['.bulk-sheet-title', '.fail-sheet-title', '.report-preview-title', 'h3', 'h2']) {
+    const t = sheet.querySelector(sel);
+    if (t) return _focusEl(t);
+  }
+  return false;
+}
+
+// A field that already holds the cursor, and is still on the page, keeps it.
+function _focusFieldHeld() {
+  const ae = document.activeElement;
+  if (!ae || ae === document.body || !_focusIsTextField(ae)) return false;
+  if (ae.isConnected === false) return false;
+  if (ae.id && document.getElementById(ae.id) !== ae) return false;
+  return true;
+}
+
+// dispatch.js: the control a tap (or a change) landed on, before its action runs.
+function focusNoteTap(el) { _focusTap = focusDescribe(el); if (_focusTap) _focusTap.at = Date.now(); }
+// session.js noteLastLog(): every path that logs one item or a batch (2A).
+function focusMarkLogged() { _focusLogged = true; }
+// render() / refreshEntryAfterLog(): BEFORE #app is replaced, while the old
+// control still exists. Lets a redraw nobody tapped for (sync, a timer, a body
+// sheet's own button) put VoiceOver back where it was.
+function focusBeforeRender() {
+  const ae = document.activeElement;
+  _focusBefore = (ae && ae !== document.body && !_focusIsTextField(ae)) ? focusDescribe(ae) : null;
+}
+
+// The decision, after the new markup is in. mode 'logged' = refreshEntryAfterLog.
+// Returns what it did, for the harness: 'kept' | 'sheet' | 'control' | 'stand-in' | 'heading' | 'none'.
+function focusAfterRender(mode) {
+  const tap = (_focusTap && !(Date.now() - (_focusTap.at || 0) > FOCUS_TAP_MS)) ? _focusTap : null;
+  const before = _focusBefore;
+  const logged = _focusLogged || mode === 'logged';
+  _focusTap = null; _focusBefore = null; _focusLogged = false;
+  const view = (typeof state === 'object' && state) ? state.view : '';
+  const viewChanged = _focusLastView !== null && view !== _focusLastView;
+  _focusLastView = view;
+  const isLog = (d) => !!(d && FOCUS_LOG_ACTIONS.indexOf(d.action) !== -1);
+
+  const sheet = _focusOpenSheet();
+  if (sheet) {
+    const wasOpen = _focusSheetWasOpen;
+    _focusSheetWasOpen = true;
+    if (_focusFieldHeld()) return 'kept';
+    if (!wasOpen) {
+      _focusOpener = tap || before;
+      return _focusSheetTitle(sheet) ? 'sheet' : 'none';
+    }
+    // The same sheet, repainted (a read-only sheet may render — MAP rule 3).
+    const want = tap || before;
+    if (want && want.inSheet && !isLog(want) && _focusEl(focusFind(want))) return 'control';
+    return _focusSheetTitle(sheet) ? 'sheet' : 'none';
+  }
+
+  const closed = _focusSheetWasOpen;
+  _focusSheetWasOpen = false;
+  const opener = _focusOpener;
+  if (closed) _focusOpener = null;
+  if (_focusFieldHeld()) return 'kept';
+  if (logged || viewChanged) return focusScreenHeading() ? 'heading' : 'none';
+  const want = closed ? (opener || tap) : (tap || before);
+  if (!want) {
+    // A redraw nobody asked for, with nothing focused before it: leave
+    // VoiceOver alone unless a sheet just went (its focus went with it).
+    return closed && focusScreenHeading() ? 'heading' : 'none';
+  }
+  if (!isLog(want) && want.view === view && _focusEl(focusFind(want))) return 'control';
+  // V129 (1A): gone because it was swapped for something — land on that.
+  if (!isLog(want) && want.view === view && _focusEl(focusStandIn(want))) return 'stand-in';
+  return focusScreenHeading() ? 'heading' : 'none';
+}
+
+// The sheets built OUTSIDE render() (this file's four, and a few elsewhere) are
+// appended to <body> and removed by their own cleanup, so no redraw sees them
+// come or go. Their builders call these two. Opened: after the caller's own
+// focusInSheet(), so a sheet that put the cursor in a box keeps it.
+function focusSheetOpened(sheet) {
+  const tap = (_focusTap && !(Date.now() - (_focusTap.at || 0) > FOCUS_TAP_MS)) ? _focusTap : null;
+  if (!_focusSheetWasOpen) _focusOpener = tap || focusDescribe(document.activeElement);
+  _focusTap = null;
+  _focusSheetWasOpen = true;
+  if (_focusFieldHeld()) return 'kept';
+  return _focusSheetTitle(sheet) ? 'sheet' : 'none';
+}
+function focusSheetClosed() {
+  const next = _focusOpenSheet();
+  if (next) return _focusSheetTitle(next) ? 'sheet' : 'none';
+  _focusSheetWasOpen = false;
+  const opener = _focusOpener;
+  _focusOpener = null;
+  if (opener && opener.view === ((typeof state === 'object' && state) ? state.view : '') && FOCUS_LOG_ACTIONS.indexOf(opener.action) === -1 && _focusEl(focusFind(opener))) return 'control';
+  return focusScreenHeading() ? 'heading' : 'none';
+}
 
 let _toastTimer = null;
 function showToast(message) {
@@ -15,7 +283,10 @@ function showToast(message) {
   if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
   const el = document.createElement('div');
   el.className = 'toast';
-  el.setAttribute('role', 'status');
+  // V120: spoken through the announcer, so the visible pop-up is hidden from
+  // VoiceOver — otherwise a phone that DID catch it would say it twice.
+  el.setAttribute('aria-hidden', 'true');
+  announce(message);
   el.textContent = message;
   document.body.appendChild(el);
   // Force a reflow so the transition runs, then reveal.
@@ -63,6 +334,7 @@ function _openSheet(ariaLabel) {
     done = true;
     backdrop.remove();
     sheet.remove();
+    focusSheetClosed();   // V123 (3A): back to the control that opened it
   }
   backdrop.addEventListener('click', cleanup);
   return { sheet, backdrop, cleanup };
@@ -86,7 +358,7 @@ function openConfirmSheet(opts) {
       <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
       <button class="fail-close-btn" id="confirm-sheet-cancel" aria-label="Cancel">&times;</button>
     </div>
-    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
+    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:0.875rem;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
     <div class="sheet-pin" style="display:flex;gap:10px;margin-top:4px">
       <button class="btn-secondary" id="confirm-sheet-no">${escapeHTML(cancelLabel)}</button>
       <button class="${danger ? 'btn-danger' : 'btn-primary'}" id="confirm-sheet-yes" style="flex:1">${escapeHTML(confirmLabel)}</button>
@@ -103,6 +375,47 @@ function openConfirmSheet(opts) {
     cleanup();
     if (typeof opts.onConfirm === 'function') opts.onConfirm();
   });
+  focusSheetOpened(sheet);   // V123 (3A)
+}
+
+// V91: a sheet of two or more choices plus Cancel — the confirm sheet's shape
+// with a button per choice, stacked full width. opts: { title, message,
+// choices: [{ label, style: 'primary'|'secondary'|'danger', onPick }],
+// cancelLabel='Cancel' }. A pick closes the sheet first, then runs its onPick.
+function openChoiceSheet(opts) {
+  opts = opts || {};
+  const title = opts.title || 'Choose';
+  const message = opts.message || '';
+  const choices = Array.isArray(opts.choices) ? opts.choices : [];
+  const cls = (st) => st === 'danger' ? 'btn-danger' : (st === 'primary' ? 'btn-primary' : 'btn-secondary');
+  const { sheet, backdrop, cleanup } = _openSheet(title);
+  sheet.innerHTML = `
+    <div class="bulk-sheet-handle"></div>
+    <div class="bulk-sheet-header">
+      <span class="fail-close-spacer"></span>
+      <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+      <button class="fail-close-btn" id="choice-sheet-cancel" aria-label="Cancel">&times;</button>
+    </div>
+    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:0.875rem;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
+    <div class="sheet-pin" style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+      ${choices.map((c, i) => `<button class="${cls(c.style)}" id="choice-sheet-${i}" style="width:100%">${escapeHTML(c.label || '')}</button>`).join('')}
+      <button class="btn-secondary" id="choice-sheet-no" style="width:100%">${escapeHTML(opts.cancelLabel || 'Cancel')}</button>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+  const x = document.getElementById('choice-sheet-cancel');
+  const no = document.getElementById('choice-sheet-no');
+  if (x) x.addEventListener('click', cleanup);
+  if (no) no.addEventListener('click', cleanup);
+  choices.forEach((c, i) => {
+    const b = document.getElementById('choice-sheet-' + i);
+    if (b) b.addEventListener('click', () => {
+      cleanup();
+      if (typeof c.onPick === 'function') c.onPick();
+    });
+  });
+  focusSheetOpened(sheet);   // V123 (3A)
 }
 
 // A single-line name/text input dialog. opts: { title, blurb, value='',
@@ -125,9 +438,10 @@ function openNameSheet(opts) {
       <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
       <button class="fail-close-btn" id="name-sheet-cancel" aria-label="Cancel">&times;</button>
     </div>
-    ${blurb ? `<p class="sheet-scroll" style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text-muted)">${escapeHTML(blurb)}</p>` : ''}
-    <input class="input sheet-pin" id="name-sheet-input" value="${escapeHTML(value)}" placeholder="${escapeHTML(placeholder)}" autocapitalize="on" autocomplete="off" maxlength="${maxlength}">
+    ${blurb ? `<p class="sheet-scroll" style="margin:0 0 12px;font-size:0.8125rem;line-height:1.5;color:var(--text-muted)">${escapeHTML(blurb)}</p>` : ''}
+    <input aria-label="${escapeHTML(title)}" class="input sheet-pin" id="name-sheet-input" value="${escapeHTML(value)}" placeholder="${escapeHTML(placeholder)}" autocapitalize="on" autocomplete="off" maxlength="${maxlength}">
     <button class="btn-primary sheet-pin" id="name-sheet-save" style="margin-top:12px">${escapeHTML(confirmLabel)}</button>
+    ${typeof opts.onDelete === 'function' ? `<button class="btn-secondary sheet-pin" id="name-sheet-delete" style="margin-top:10px;color:var(--fail-word)">${escapeHTML(opts.deleteLabel || 'Delete')}</button>` : ''}
   `;
   document.body.appendChild(backdrop);
   document.body.appendChild(sheet);
@@ -142,6 +456,10 @@ function openNameSheet(opts) {
     if (typeof opts.onConfirm === 'function') opts.onConfirm(v);
   }
   if (saveBtn) saveBtn.addEventListener('click', commit);
+  // V95.1: optional Delete under Save (the description list's fix sheet). The
+  // sheet closes first; the caller asks for confirmation itself.
+  const delBtn = document.getElementById('name-sheet-delete');
+  if (delBtn) delBtn.addEventListener('click', () => { cleanup(); opts.onDelete(); });
   if (inp) {
     inp.addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); commit(); } });
     // v75: the worst case of the five — this focuses AND selects on open, so a
@@ -149,6 +467,7 @@ function openNameSheet(opts) {
     focusInSheet(inp);
     try { inp.select(); } catch (e) {}
   }
+  focusSheetOpened(sheet);   // V123 (3A) — after focusInSheet, so the box keeps the cursor
 }
 
 // v41: a stays-until-tapped info/error sheet, replacing the last native alert()s
@@ -177,7 +496,7 @@ function openInfoSheet(opts) {
       <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
       <button class="fail-close-btn" id="info-sheet-close" aria-label="Close">&times;</button>
     </div>
-    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
+    ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:0.875rem;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
     <button class="btn-primary sheet-pin" id="info-sheet-ok">${escapeHTML(buttonLabel)}</button>
   `;
   document.body.appendChild(backdrop);
@@ -186,6 +505,7 @@ function openInfoSheet(opts) {
   const okBtn = document.getElementById('info-sheet-ok');
   if (xBtn) xBtn.addEventListener('click', close);
   if (okBtn) okBtn.addEventListener('click', close);
+  focusSheetOpened(sheet);   // V123 (3A)
 }
 
 // v9: confirm the migration prompt — sets the chosen name on the interim preset

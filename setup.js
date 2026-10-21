@@ -65,9 +65,13 @@ function buildSetupBundle(label, include) {
   if (inc.prefs) {
     sections.prefs = {
       theme: state.theme,
+      textSize: state.textSize,   // V121
       hapticsEnabled: state.hapticsEnabled,
       soundEnabled: state.soundEnabled,
       timestampsEnabled: state.timestampsEnabled,
+      undoEnabled: state.undoEnabled,   // V94
+      mapPinEnabled: state.mapPinEnabled,   // V99
+      reminders: normaliseReminders(state.reminders),   // V100
       multiPick: state.multiPick,
       sqpEnabled: state.sqpEnabled
       // NOTE: deliberately NOT sqpHistory — learned history is device-specific.
@@ -147,7 +151,7 @@ function importSetupFromFile(file) {
     // applied as a setup.
     if (!data || data.kind !== SETUP_KIND || typeof data.sections !== 'object' || !data.sections) {
       if (data && Array.isArray(data.sessions)) {
-        openInfoSheet({ title: 'That\u2019s a backup, not a setup', message: 'To restore a backup, use Restore (it replaces sessions too). Import setup only changes your configuration.' });
+        openInfoSheet({ title: 'That\u2019s a backup, not a setup', message: 'To restore a backup, use Restore (it replaces jobs too). Import setup only changes your configuration.' });
       } else {
         openInfoSheet({ title: 'Not a recognised setup', message: 'That file isn\u2019t a recognised PAT setup. Make sure you picked a setup file exported from this app.' });
       }
@@ -166,14 +170,14 @@ function importSetupFromFile(file) {
       title: `Import \u201c${name}\u201d?`,
       message:
         `This will REPLACE the following on this device: ${sectionLabels.join(', ')}. ` +
-        `Your sessions, clients and sites will NOT be changed.`,
+        `Your jobs, clients and sites will NOT be changed.`,
       confirmLabel: 'Import',
       danger: false,
       onConfirm: () => {
         applySetupBundle(data);
         save();
         showToast(`Setup \u201c${name}\u201d imported`);
-        state.view = 'settingsBackup';
+        state.view = 'settingsSetup';   // V97: was the Backup page — Setup has been its own page since v33
         render();
       }
     });
@@ -261,8 +265,15 @@ function applySetupBundle(data) {
       state.theme = pr.theme;
       applyTheme(state.theme);
     }
+    if (TEXT_SIZES.includes(pr.textSize)) {   // V121
+      state.textSize = pr.textSize;
+      applyTextSize(state.textSize);
+    }
     if (typeof pr.hapticsEnabled === 'boolean') state.hapticsEnabled = pr.hapticsEnabled;
     if (typeof pr.soundEnabled === 'boolean') state.soundEnabled = pr.soundEnabled;
+    if (typeof pr.undoEnabled === 'boolean') state.undoEnabled = pr.undoEnabled;   // V94
+    if (typeof pr.mapPinEnabled === 'boolean') state.mapPinEnabled = pr.mapPinEnabled;   // V99
+    if (pr.reminders && typeof pr.reminders === 'object' && !Array.isArray(pr.reminders)) state.reminders = normaliseReminders(pr.reminders);   // V100
     if (typeof pr.timestampsEnabled === 'boolean') state.timestampsEnabled = pr.timestampsEnabled;
     state.multiPick = normaliseMultiPickConfig(pr.multiPick);
     if (typeof pr.sqpEnabled === 'boolean') state.sqpEnabled = pr.sqpEnabled;

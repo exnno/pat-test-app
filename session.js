@@ -305,10 +305,11 @@ function sortedSessions() {
 
 // v15: predicate for the Sessions-list control filters (Status + Lock). The two
 // filters combine with AND. 'all' on either axis matches everything on that
-// axis. Status maps to exportStatus():
-//   'unexported' → status 'none'  (never exported — distinct from 'modified')
-//   'exported'   → status 'exported'
-//   'modified'   → status 'modified'
+// axis. V131: Status maps to jobDoneStatus() (certificates count):
+//   'unexported' → 'none'  (neither — distinct from 'modified')
+//   'exported'   → 'exported' or 'certificate'
+//   'modified'   → 'modified' or 'reopened' (4A)
+//   'notdone'    → anything not done — the nudge's own list (2A), not saved
 // Applied only when not searching (see renderSessionsListAreaHTML).
 function sessionMatchesControlFilters(s) {
   if (state.sessionFilter !== 'all') {
@@ -317,11 +318,16 @@ function sessionMatchesControlFilters(s) {
     // the feature is on (the option isn't offered otherwise).
     if (state.sessionFilter === 'retestdue') {
       if (!isRetestActive(s)) return false;
+    } else if (state.sessionFilter === 'remindexport') {
+      // V100: the not-exported reminder's jobs (Review on its banner).
+      if (!isExportReminderJob(s)) return false;
+    } else if (state.sessionFilter === 'notdone') {
+      if (jobIsDone(s)) return false;
     } else {
-      const st = exportStatus(s);
+      const st = jobDoneStatus(s);
       if (state.sessionFilter === 'unexported' && st !== 'none') return false;
-      if (state.sessionFilter === 'exported' && st !== 'exported') return false;
-      if (state.sessionFilter === 'modified' && st !== 'modified') return false;
+      if (state.sessionFilter === 'exported' && st !== 'exported' && st !== 'certificate') return false;
+      if (state.sessionFilter === 'modified' && st !== 'modified' && st !== 'reopened') return false;
     }
   }
   if (state.lockFilter === 'unlocked' && s.locked) return false;
@@ -400,6 +406,20 @@ function applyTheme(theme) {
   }
   // 'system' or anything else: no class, prefers-color-scheme media query wins.
 }
+
+// V121: text size. Every text size in styles.css (and every inline one) is in
+// rem, so one class on <html> scales the whole app: none = Standard (the html
+// rule pins 16px), ts-large = 115%, ts-larger = 130%. A class, like the theme
+// above, not an inline font-size — the stylesheet owns the numbers.
+function normaliseTextSize(v) {
+  return TEXT_SIZES.includes(v) ? v : 'standard';
+}
+function applyTextSize(size) {
+  const html = document.documentElement;
+  html.classList.remove('ts-large', 'ts-larger');
+  const s = normaliseTextSize(size);
+  if (s !== 'standard') html.classList.add('ts-' + s);
+}
 // ---------- v14: Session export-state ----------
 // Each session can carry two optional fields:
 //   exportedAt   — ISO timestamp of the last successful CSV export of THIS
@@ -440,17 +460,191 @@ function markSessionDirty(sess) {
   return true;
 }
 
-// Count sessions not in a clean 'exported' state (i.e. 'none' or 'modified').
-// Drives the "N sessions not yet exported" nudge on the Sessions list.
-function unexportedSessionCount() {
-  return state.sessions.filter(s => exportStatus(s) !== 'exported').length;
+// V131 (7A): undo a CSV export — a stray tap on Copy marks a job exported, and
+// then every open asks "Already exported". Clears the CSV mark only; a
+// certificate that counts (jobDoneStatus) is left alone. No save()/render() —
+// the caller decides. Encoding dropped as noteReportMade does (the signature
+// covers exportedAt too; belt and braces).
+function markSessionNotExported(sess) {
+  if (!sess) return false;
+  if (!sess.exportedAt && !sess.exportDirty) return false;
+  delete sess.exportedAt;
+  delete sess.exportDirty;
+  if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(sess);
+  return true;
 }
 
-// v15: the actual session objects behind that count (status 'none' or
-// 'modified'), in the current display order so a batch export produces files
-// in a sensible sequence. Drives the tappable bulk-export nudge.
-function unexportedSessions() {
-  return sortedSessions().filter(s => exportStatus(s) !== 'exported');
+// V131: the Jobs list's view of a job's paperwork — a CSV export OR a
+// certificate (1A: the same rule as the not-exported reminder, jobPaperworkDone
+// below). One of:
+//   'exported'    — a CSV it hasn't changed since (✓ Exported)
+//   'certificate' — a certificate made after the job was locked (✓ Certificate)
+//   'modified'    — a CSV, then edited (✓✎ Modified since export)
+//   'reopened'    — a certificate, but the job was unlocked (or locked again)
+//                   since — unlocking drops lockedAt (✓✎ Reopened since certificate)
+//   'none'        — neither
+// ORDER MATTERS: a clean CSV wins; a counting certificate beats an edited CSV
+// (the certificate is the later paperwork); an edited CSV beats a stale
+// certificate (one badge, the CSV's). exportStatus() stays CSV-only for the
+// things that must not trust a PDF: pruning (deletes jobs — a PDF can't be
+// imported back) and the "Already exported" warning.
+function jobDoneStatus(sess) {
+  const x = exportStatus(sess);
+  if (x === 'exported') return 'exported';
+  if (jobPaperworkDone(sess)) return 'certificate';
+  if (x === 'modified') return 'modified';
+  if (reportAtMs(sess) != null) return 'reopened';
+  return 'none';
+}
+function jobIsDone(sess) {
+  const st = jobDoneStatus(sess);
+  return st === 'exported' || st === 'certificate';
+}
+
+// Count jobs whose paperwork isn't done (V131: a counting certificate is done).
+// Drives the "N jobs not yet exported" nudge on the Jobs list.
+function unexportedSessionCount() {
+  return state.sessions.filter(s => !jobIsDone(s)).length;
+}
+
+// V131 (2A): tapping the nudge shows those jobs — the list, filtered — instead
+// of bulk-exporting CSVs (retired with bulkExportUnexported). Like Review on a
+// reminder banner: 'notdone' is not one of the saved filter choices, so a
+// reload returns to All.
+function reviewUnexported() {
+  state.sessionsSearchQuery = '';
+  state.sessionFilter = 'notdone';
+  state.lockFilter = 'all';
+}
+
+// ===== V100: in-app reminders (roadmap Stage 8 part 3) =====
+// Three per-phone timings (state.reminders, REMINDERS_KEY — config.js) and two
+// job fields: `lockedAt` (when the job was locked) and `reportAt` (when its
+// certificate was last downloaded or shared). Reminders are BANNERS on the Jobs
+// screen, worked out at render time from the clock — nothing is scheduled and
+// nothing is stored except the × day (REMINDER_QUIET_KEY). A phone that is never
+// opened is never reminded; that is what Stage 14's notifications are for.
+
+// Every value in, a clean object out. Anything unknown falls back per field, so
+// a garbage backup can never wedge a banner on or off.
+function normaliseReminders(raw) {
+  const r = (raw && typeof raw === 'object' && !Array.isArray(raw)) ? raw : {};
+  const pick = (v, list, dflt) => { const x = String(v == null ? '' : v); return list.includes(x) ? x : dflt; };
+  return {
+    exportAfter: pick(r.exportAfter, REMINDER_EXPORT_CHOICES, 'off'),
+    unlockedAt: pick(r.unlockedAt, REMINDER_UNLOCKED_CHOICES, 'off'),
+    backupDays: pick(r.backupDays, REMINDER_BACKUP_CHOICES, String(BACKUP_REMINDER_DAYS)),
+  };
+}
+
+// The backup interval in days, or 0 when switched off.
+function backupReminderDays() {
+  const v = normaliseReminders(state.reminders).backupDays;
+  return v === 'off' ? 0 : parseInt(v, 10);
+}
+
+// The phone's own calendar day, yyyy-mm-dd. NOT todayISO(), which is the UTC day
+// and would end "quiet until tomorrow" at 1 a.m. all summer.
+function reminderLocalDay(ms) {
+  const d = new Date(ms == null ? Date.now() : ms);
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+
+function _reminderQuiet() {
+  let q = null;
+  try { q = JSON.parse(localStorage.getItem(REMINDER_QUIET_KEY)); } catch (e) { q = null; }
+  return (q && typeof q === 'object' && !Array.isArray(q)) ? q : {};
+}
+// × on a banner: gone for the rest of the phone's day (6A). which = 'exp' | 'unl'.
+function quietReminder(which) {
+  const q = _reminderQuiet();
+  q[which] = reminderLocalDay();
+  try { localStorage.setItem(REMINDER_QUIET_KEY, JSON.stringify(q)); } catch (e) {}
+}
+
+// A job's lock time in ms — only while it IS locked. A V99 phone unlocking a job
+// leaves the field behind (it edits the job in place), so `locked` decides.
+function lockedAtMs(sess) {
+  if (!sess || !sess.locked || typeof sess.lockedAt !== 'string') return null;
+  const ms = Date.parse(sess.lockedAt);
+  return Number.isFinite(ms) ? ms : null;
+}
+function reportAtMs(sess) {
+  if (!sess || typeof sess.reportAt !== 'string') return null;
+  const ms = Date.parse(sess.reportAt);
+  return Number.isFinite(ms) ? ms : null;
+}
+
+// 2B: the job's paperwork is done — a CSV export it hasn't changed since, OR a
+// certificate made at or after the lock. A certificate made BEFORE locking
+// doesn't count: the job could have changed between the two.
+function jobPaperworkDone(sess) {
+  if (exportStatus(sess) === 'exported') return true;
+  const lk = lockedAtMs(sess), rp = reportAtMs(sess);
+  return lk != null && rp != null && rp >= lk;
+}
+
+// When "not exported" becomes due for a job locked at lockedMs.
+function exportReminderDueAt(lockedMs, mode) {
+  if (mode === '1h') return lockedMs + 60 * 60 * 1000;
+  if (mode === '4h') return lockedMs + 4 * 60 * 60 * 1000;
+  if (mode === 'morning') {
+    const d = new Date(lockedMs);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1, REMINDER_MORNING_HOUR, 0, 0, 0).getTime();
+  }
+  return null;
+}
+
+// Is this job one the not-exported reminder is about? (Also the Jobs list's
+// "Locked, not exported" filter.) Example job never; no lock time (1A) never.
+function isExportReminderJob(sess, now) {
+  if (!sess || sess[DEMO_SESSION_FLAG]) return false;
+  const mode = normaliseReminders(state.reminders).exportAfter;
+  if (mode === 'off') return false;
+  const lk = lockedAtMs(sess);
+  if (lk == null || jobPaperworkDone(sess)) return false;
+  const due = exportReminderDueAt(lk, mode);
+  return due != null && (now == null ? Date.now() : now) >= due;
+}
+function exportReminderJobs(now) {
+  return (state.sessions || []).filter(s => isExportReminderJob(s, now));
+}
+// The banner: the jobs, unless × was tapped today.
+function exportReminderDue(now) {
+  if (_reminderQuiet().exp === reminderLocalDay(now)) return [];
+  return exportReminderJobs(now);
+}
+
+// 4A: after the chosen hour, every unlocked job on this phone (not the example).
+function unlockedReminderDue(now) {
+  const at = normaliseReminders(state.reminders).unlockedAt;
+  if (at === 'off') return [];
+  const t = (now == null ? Date.now() : now);
+  if (new Date(t).getHours() < parseInt(at, 10)) return [];
+  if (_reminderQuiet().unl === reminderLocalDay(t)) return [];
+  return (state.sessions || []).filter(s => s && !s.locked && !s[DEMO_SESSION_FLAG]);
+}
+
+// "Review" on a banner: the Jobs list, filtered to what the banner counted.
+// The filter is not one of the saved choices, so a reload returns to All.
+function reviewReminder(which) {
+  state.sessionsSearchQuery = '';
+  if (which === 'exp') { state.sessionFilter = 'remindexport'; state.lockFilter = 'all'; }
+  else { state.sessionFilter = 'all'; state.lockFilter = 'unlocked'; }
+}
+
+// 2B: a certificate left the phone (downloaded or shared from the preview).
+// Looked up by id at that moment — a sync may have replaced the object while
+// the preview was open (sync rule 8). Written in place on a job that is often
+// not the open one, so the encoding is dropped explicitly (section 6 trap; the
+// signature covers reportAt as well). save() only — the preview is open.
+function noteReportMade(sessionId) {
+  const sess = (state.sessions || []).find(s => s && s.id === sessionId);
+  if (!sess) return;
+  sess.reportAt = new Date().toISOString();
+  if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(sess);
+  try { save(); } catch (e) {}
 }
 
 // ===== v56: Retest reminders (commercial chase list) =====
@@ -676,6 +870,15 @@ function savePruneAge() {
 // after the last edit — but we still guard by skipping state.activeId to be
 // safe). Deletion is permanent; we strongly word the confirm.
 function pruneOldSessions() {
+  // V91 (Stage 4, 7A): signed in, clearing old jobs is "safe in the cloud and
+  // older than N months" — exported or not — and lives on the Jobs on this
+  // phone screen, which syncs first and re-checks at the moment of clearing.
+  // Signed out: everything below, unchanged.
+  if (typeof syncActive === 'function' && syncActive() && typeof jobMgrOpen === 'function') {
+    if (typeof mgrNoteReturn === 'function') mgrNoteReturn();   // V96: Back returns here
+    jobMgrOpen({ tidy: true });
+    return;
+  }
   const candidates = prunableSessions().filter(s => s.id !== state.activeId);
   // v80 (decision 5A): while signed in to the cloud, clearing is local
   // housekeeping and the cloud keeps the job — so only a job whose LATEST
@@ -704,9 +907,9 @@ function pruneOldSessions() {
   }
   const itemTotal = targets.reduce((n, s) => n + (s.items ? s.items.length : 0), 0);
   openConfirmSheet({
-    title: 'Clear exported sessions?',
+    title: 'Clear exported jobs?',
     message:
-      `Clear ${targets.length} exported session${targets.length === 1 ? '' : 's'} ` +
+      `Clear ${targets.length} exported job${targets.length === 1 ? '' : 's'} ` +
       `(${itemTotal} item${itemTotal === 1 ? '' : 's'} in total)? ` +
       `These have all been exported to CSV and are older than ${state.pruneAgeMonths} month${state.pruneAgeMonths === 1 ? '' : 's'}. ` +
       (keptForCloud
@@ -732,8 +935,85 @@ function pruneOldSessions() {
       state.sessions = state.sessions.filter(s => !ids.has(s.id));
       save();
       render();
-      showToast(`Cleared ${targets.length} session${targets.length === 1 ? '' : 's'}`);
+      showToast(`Cleared ${targets.length} job${targets.length === 1 ? '' : 's'}`);
     }
+  });
+}
+
+// V91 (Stage 4): take jobs off THIS phone. The cloud and the other phones keep
+// them (the job is recorded as cleared, so the pull does not bring it back).
+// The CALLER has already re-checked that every id is safe in the cloud
+// (syncPruneFilter, fresh) — this does no checking of its own beyond never
+// touching the job on screen or the example job. Same order as the V80 clear:
+// tallies and photos before the job goes (MAP rule 5), then the cleared note.
+// Returns how many went.
+function removeJobsFromPhone(ids) {
+  const want = new Set((ids || []).map(String));
+  const going = state.sessions.filter(s => s && want.has(String(s.id))
+    && !(state.view === 'entry' && s.id === state.activeId) && !s[DEMO_SESSION_FLAG]);
+  if (!going.length) return 0;
+  const gone = new Set(going.map(s => s.id));
+  archiveSessionStats(going);
+  photosDeleteForSessions(Array.from(gone));
+  if (typeof syncNotePruned === 'function') {
+    try { syncNotePruned(Array.from(gone)); } catch (e) { console.error('Cleared-jobs note failed (non-fatal).', e); }
+  }
+  state.sessions = state.sessions.filter(s => !gone.has(s.id));
+  if (gone.has(state.activeId)) state.activeId = null;
+  // V93: the cloud tab's list was read without these (they were here): read
+  // it again next time the tab opens, so they show there.
+  if (state.cloudJobs) state.cloudJobs.stale = true;
+  save();
+  return going.length;
+}
+
+// V91 (Stage 4, 6A): the 🗑 on a job card. Signed out (or the example job) —
+// unchanged: one confirm, delete. Signed in — a choice: remove from this phone
+// (only when the job is safe in the cloud; otherwise the sheet says why not) or
+// delete everywhere, which asks a SECOND time with a hard final button (Peter,
+// V91 round: two steps to really make it safe).
+function deleteSessionAsk(id) {
+  const s = state.sessions.find(x => x.id === id);
+  if (!s) return;
+  const title = s.site || s.name || 'this job';
+  const signedIn = typeof syncActive === 'function' && syncActive() && !s[DEMO_SESSION_FLAG];
+  if (!signedIn) {
+    openConfirmSheet({
+      title: 'Delete job?',
+      message: `Delete "${title}"? This cannot be undone.`,
+      confirmLabel: 'Delete',
+      onConfirm: () => deleteSession(id)
+    });
+    return;
+  }
+  const r = (typeof syncJobsSafety === 'function') ? (syncJobsSafety(true) || { map: new Map() }).map.get(String(id)) : null;
+  const canRemove = !!(r && r.safe);
+  const why = r && !r.safe && typeof syncSafetyText === 'function' ? syncSafetyText(r) : '';
+  const choices = [];
+  if (canRemove) choices.push({ label: 'Remove from this phone', style: 'primary', onPick: () => jobsRemoveAsk([String(id)]) });
+  choices.push({ label: 'Delete everywhere\u2026', style: 'danger', onPick: () => deleteEverywhereAsk(id) });
+  openChoiceSheet({
+    title: `\u201c${title}\u201d`,
+    message: canRemove
+      ? 'Remove from this phone: it stays in the cloud and on your other phones, with its photos, and you can bring it back here. Delete everywhere: it goes from this phone, your other phones and the cloud.'
+      : `This job can\u2019t come off just this phone yet (${why.toLowerCase()}). Delete everywhere removes it from this phone, your other phones and the cloud.`,
+    choices,
+  });
+}
+
+function deleteEverywhereAsk(id) {
+  const s = state.sessions.find(x => x.id === id);
+  if (!s) return;
+  const title = s.site || s.name || 'this job';
+  const items = (s.items || []).length;
+  const pc = (typeof photoCountsForSession === 'function') ? photoCountsForSession(s) : { total: 0 };
+  openConfirmSheet({
+    title: 'Delete everywhere \u2014 are you sure?',
+    message: `\u201c${title}\u201d (${items} item${items === 1 ? '' : 's'}` +
+      (pc.total ? `, ${pc.total} photo${pc.total === 1 ? '' : 's'}` : '') +
+      ') will be deleted from this phone, every other phone and the cloud. It can\u2019t be brought back or undone.',
+    confirmLabel: 'Yes, delete everywhere',
+    onConfirm: () => deleteSession(id)
   });
 }
 
@@ -789,7 +1069,7 @@ function loadFormForCursor() {
 // ---------- Validation ----------
 function validateBeforeSave(opts = {}) {
   const sess = activeSession();
-  if (!sess) return 'No active session.';
+  if (!sess) return 'No active job.';
   // v13: location is now mandatory. Same skip pattern as item type for the
   // copy-last-result path (opts.skipLocation), since that flow copies the
   // location from the previous item before this check runs.
@@ -809,6 +1089,7 @@ function validateBeforeSave(opts = {}) {
 
 // ---------- Actions ----------
 function createSession() {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
   const { name, engineer, prefix, startNo } = state.newForm;
 
   // v19: resolve the Client and Site fields. The form carries the typed text in
@@ -825,7 +1106,7 @@ function createSession() {
   // Site was mandatory). Neither → block with a gentle inline message rather
   // than a silent return, so the user knows why nothing happened.
   if (!clientName && !siteName) {
-    state.newFormError = 'Enter a client or a site to start the session.';
+    state.newFormError = 'Enter a client or a site to start the job.';
     render();
     return;
   }
@@ -852,7 +1133,7 @@ function createSession() {
   const now = new Date().toISOString();
   const s = {
     id: newId(),
-    name: name.trim() || `Session ${state.sessions.length + 1}`,
+    name: name.trim() || `Job ${state.sessions.length + 1}`,
     site: snapshot,                              // combined text snapshot (back-compat)
     clientId: clientRec ? clientRec.id : '',     // v19: structured refs (convenience)
     siteId: siteRec ? siteRec.id : '',
@@ -902,6 +1183,7 @@ function createSession() {
 
 function openSession(id, opts) {
   state.activeId = id;
+  state.lastLog = null;   // V94: Undo belongs to the visit that logged it
   const s = activeSession();
   if (!s) return;
   // v10: when called from the sessions-list search with an item-level match, we
@@ -960,6 +1242,21 @@ function confirmReopenWarning() {
   else render();
 }
 
+// V131 (6B 8A): "Mark as not exported" on the reopen warning — clears the CSV
+// mark (7A), says so, and opens the job as Open anyway would. No confirm: an
+// export sets it back. Read the id and opts BEFORE clearing them (MAP rule 4).
+// No save() here: openSession() saves, and that is what keeps the change.
+function unmarkFromReopenWarning() {
+  const id = state.exportWarnSessionId;
+  const opts = pendingOpenOpts;
+  state.exportWarnSessionId = null;
+  pendingOpenOpts = null;
+  const s = id ? state.sessions.find(x => x.id === id) : null;
+  if (s && markSessionNotExported(s)) showToast('Marked as not exported');
+  if (s) openSession(id, opts);
+  else render();
+}
+
 // Cancel the reopen warning → stay on the Sessions list.
 function cancelReopenWarning() {
   state.exportWarnSessionId = null;
@@ -988,12 +1285,20 @@ function sessionCountsForStats(sess) {
 // Tally one array of sessions into { items, fails, types }. Pure — no state
 // access, no mutation of the input. Used by BOTH halves (the live count and the
 // archive hook), so the two can never disagree about what counts.
-function tallySessions(sessions) {
+function tallySessions(sessions, alreadyCounted) {
+  // V102: an item and its copies (a duplicated job, `copyOf`) are ONE item
+  // tested, counted once however many jobs hold it — so duplicating a job and
+  // then trimming each copy leaves the lifetime figures where they were.
+  // `alreadyCounted` (a Set of stats keys) skips items counted elsewhere: the
+  // archive hook passes the keys of the jobs that STAY.
   const out = { items: 0, fails: 0, types: {} };
+  const seen = alreadyCounted ? new Set(alreadyCounted) : new Set();
   (sessions || []).forEach(sess => {
     if (!sessionCountsForStats(sess)) return;
     (sess.items || []).forEach(it => {
       if (!it) return;
+      const key = statsKeyOf(it);
+      if (key) { if (seen.has(key)) return; seen.add(key); }
       out.items++;
       if (it.result === 'fail') out.fails++;
       const t = (it.itemType || '').trim();
@@ -1001,6 +1306,29 @@ function tallySessions(sessions) {
     });
   });
   return out;
+}
+
+// V102: what makes two items “the same item tested”. A copy carries `copyOf`,
+// the id of the item it was first copied from (a copy of a copy keeps the
+// first), so every copy shares its original's key. '' (no id at all) is never
+// de-duplicated.
+function statsKeyOf(it) {
+  if (!it) return '';
+  if (it.copyOf != null && String(it.copyOf) !== '') return String(it.copyOf);
+  return it.id != null ? String(it.id) : '';
+}
+
+// V102: the stats keys held by counting jobs NOT in `going` — items still
+// counted live, which a removal must not archive a second time.
+function statsKeysStaying(going) {
+  // By id, not object: a pull may hold a different object for the same job.
+  const leaving = new Set((going || []).filter(Boolean).map(x => String(x.id)));
+  const keys = new Set();
+  for (const sess of (state.sessions || [])) {
+    if (!sess || leaving.has(String(sess.id)) || !sessionCountsForStats(sess)) continue;
+    for (const it of (sess.items || [])) { const k = statsKeyOf(it); if (k) keys.add(k); }
+  }
+  return keys;
 }
 
 // Fold a set of sessions that are ABOUT TO BE REMOVED into the archived bucket.
@@ -1012,13 +1340,33 @@ function tallySessions(sessions) {
 // Calling it twice for the same session would double-count, which is why it is
 // deliberately NOT a general-purpose helper — it is paired with a removal.
 function archiveSessionStats(sessions) {
-  const add = tallySessions(sessions);
+  // V102: an item a job that stays still holds (its copy) is still counted live.
+  const add = tallySessions(sessions, statsKeysStaying(sessions));
   const bucket = state.archivedStats || makeEmptyArchivedStats();
   bucket.items = (bucket.items || 0) + add.items;
   bucket.fails = (bucket.fails || 0) + add.fails;
   bucket.types = bucket.types || {};
   Object.keys(add.types).forEach(t => {
     bucket.types[t] = (bucket.types[t] || 0) + add.types[t];
+  });
+  state.archivedStats = bucket;
+}
+
+// V91 (Stage 4, 10A): the reverse, for a job brought BACK onto this phone after
+// it was cleared (syncBringBack). Its tallies joined the archive when it left;
+// now it counts live again, so they come out — never below zero (a phone
+// restored from a backup may not have archived it).
+function unarchiveSessionStats(sessions) {
+  // V102: only what was archived comes out — an item another job here holds was
+  // still counted live, so it never joined the archive.
+  const sub = tallySessions(sessions, statsKeysStaying(sessions));
+  const bucket = state.archivedStats || makeEmptyArchivedStats();
+  bucket.items = Math.max(0, (bucket.items || 0) - sub.items);
+  bucket.fails = Math.max(0, (bucket.fails || 0) - sub.fails);
+  bucket.types = bucket.types || {};
+  Object.keys(sub.types).forEach(t => {
+    const n = (bucket.types[t] || 0) - sub.types[t];
+    if (n > 0) bucket.types[t] = n; else delete bucket.types[t];
   });
   state.archivedStats = bucket;
 }
@@ -1244,6 +1592,7 @@ function deleteSession(id) {
 }
 
 function saveItem(result, readings) {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
   const sess = activeSession();
   if (!sess) return;
   const err = validateBeforeSave();
@@ -1279,6 +1628,10 @@ function saveItem(result, readings) {
   // clears state in between. Revoking the object URLs does not invalidate the
   // Blobs, so the captured entries stay usable.
   const stagedPhotos = (state.pendingPhotos || []).slice();
+  // V120 (2A): what VoiceOver says once the save lands. Taken now — the cursor
+  // moves below. Position = the item's number in the job, edit or append.
+  const spokenPos = state.cursor + 1;
+  const spokenEdit = state.cursor < sess.items.length;
   if (state.cursor < sess.items.length) {
     // v17: editing an existing item must NOT change its original timestamp —
     // ts records when the item was FIRST logged, not last touched. We spread
@@ -1288,6 +1641,9 @@ function saveItem(result, readings) {
     // must not leave a stale one behind — spread first, then reconcile the key.
     const merged = { ...sess.items[state.cursor], ...item };
     if (state.readingsEnabled && !item.readings) delete merged.readings;
+    // V99 (7A): the fail → PASS sheet's "remove" button takes the map pin too.
+    // Read off the form here, before loadFormForCursor() below rebuilds it.
+    if (state.form.dropPin) delete merged.pin;
     sess.items[state.cursor] = merged;
     savedItemId = merged.id || '';
   } else {
@@ -1301,6 +1657,7 @@ function saveItem(result, readings) {
     const appended = { id: newId(), ...item };
     sess.items.push(appended);
     savedItemId = appended.id;
+    noteLastLog(sess, [appended], cleanType);   // V94: Undo
     // v18: learn this (location, type) pairing on first log (pass OR fail — a
     // failed item still belongs to that location). No-op when SQP is off.
     recordSqpUsage(cleanLocation, cleanType);
@@ -1330,12 +1687,25 @@ function saveItem(result, readings) {
   // item that has already been saved.
   commitPendingPhotos(sess.id, savedItemId, result, stagedPhotos);
   refreshEntryAfterLog();
+  // V120 (2A): no pop-up says an item was logged — only the flash and sound —
+  // so a VoiceOver user is told in words. Spoken only; nothing on screen.
+  if (typeof announce === 'function') announce(loggedAnnouncement(item, spokenPos, spokenEdit));
+  // V99 (5A): offer a map pin for a fail that has none — after the repaint
+  // above, which would otherwise wipe it. Switch off → mapPinOfferShow says no.
+  if (result === 'fail' && savedItemId) {
+    const saved = sess.items.find(it => it && it.id === savedItemId);
+    if (saved && !mapPinOf(saved)) mapPinOfferShow(savedItemId);
+  }
 }
 
 function passClicked() {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
   // v8: belt-and-braces — UI disables the buttons when locked, but block here too.
   const sess = activeSession();
   if (sess && sess.locked) return;
+  // V94 (12A): a Multi Pick tile is selected — PASS logs its sequence. Before
+  // validateBeforeSave(), which would ask for an item type the tile replaces.
+  if (state.form.qpTile && typeof qpTileFire === 'function') { qpTileFire(state.form.qpTile); return; }
   const err = validateBeforeSave();
   if (err) { showToast(err); return; }
 
@@ -1345,14 +1715,28 @@ function passClicked() {
   // the realistic route here is correcting a mis-tap, and someone who mis-tapped
   // needs to know what else that undo takes with it.
   const existing = (sess && state.cursor < sess.items.length) ? sess.items[state.cursor] : null;
-  const losing = (existing && existing.result === 'fail') ? photoCountForItem(existing.id) : 0;
+  // v89: photos only in the cloud count too — they go the same way (4A/5A).
+  const losing = (existing && existing.result === 'fail')
+    ? ((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(existing.id) : photoCountForItem(existing.id)) : 0;
+  const cloudToo = (typeof syncActive === 'function' && syncActive());
+  // V95 (1A, 2B): a fail changed to PASS keeps its notes, and pickFailReason()
+  // wrote the fail reason INTO the notes — so a corrected mistake printed as a
+  // PASS saying "Damaged plug" and confused the customer (team leaders' report).
+  // Any fail with notes asks first; the big button is the safe one (remove).
+  // Read from the FORM box, not the stored item: an engineer who already
+  // cleared or rewrote the notes before tapping PASS is not asked again.
+  const failNotes = (existing && existing.result === 'fail') ? String(state.form.notes || '').trim() : '';
+  // V99 (7A): a map pin is part of what the fail says, so a fail with a pin is
+  // asked about too, even with no notes.
+  const failPin = (existing && existing.result === 'fail') ? mapPinOf(existing) : '';
+  if (failNotes || failPin) { failToPassAsk(existing, failNotes, losing, cloudToo, failPin); return; }
   if (losing > 0) {
     openConfirmSheet({
       title: 'Change to PASS?',
       message:
         `This item is a FAIL with ${losing} photo${losing === 1 ? '' : 's'} attached. ` +
         `Changing it to PASS will delete ${losing === 1 ? 'that photo' : 'those photos'} ` +
-        `from this device. They can't be recovered.`,
+        `from this device${cloudToo ? ' and from your cloud copy' : ''}. They can't be recovered.`,
       confirmLabel: 'Change and delete',
       onConfirm: () => {
         // Delete first, THEN commit the result change. If the delete fails the
@@ -1364,6 +1748,60 @@ function passClicked() {
     return;
   }
   commitPassResult();
+}
+
+// V95: the notes with every fail-reason segment taken out. pickFailReason()
+// joins with ' — ' ("note — Damaged plug", or the reason alone), so split on
+// that, drop any segment that IS one of the current reasons (case and spaces
+// ignored), and rejoin. Returns { text, found } — found = a segment was dropped.
+// A reason since renamed, or typed through "Other…", is not recognised; 2B
+// still asks about those notes, offering to clear them instead.
+function stripFailReasons(notes) {
+  const reasons = {};
+  (state.failReasons || []).forEach(r => { const k = String(r || '').trim().toLowerCase(); if (k) reasons[k] = true; });
+  const parts = String(notes || '').split(' — ');
+  const kept = parts.filter(p => !reasons[p.trim().toLowerCase()]);
+  return { text: kept.map(p => p.trim()).filter(Boolean).join(' — '), found: kept.length !== parts.length };
+}
+
+// V95 (1A): the fail → PASS sheet. One sheet, photos included, so a fail with
+// both notes and photos is asked once. Cancel changes nothing (the form keeps
+// the notes; the result stays FAIL). The choice is applied to state.form.notes,
+// which saveItem() reads — and to the DOM box, so the readings sheet path (which
+// returns to the form) shows what will be saved.
+// V99 (7A): `pin` — the item's map pin, if any. The big (remove) button takes
+// it as well as the fail wording; "Keep" keeps both. A pin with no notes gets
+// its own pair of buttons.
+function failToPassAsk(existing, notes, losing, cloudToo, pin) {
+  const strip = stripFailReasons(notes);
+  const photoLine = losing > 0
+    ? ` It also has ${losing} photo${losing === 1 ? '' : 's'}, which will be deleted from this device` +
+      `${cloudToo ? ' and from your cloud copy' : ''}. They can't be recovered.`
+    : '';
+  const go = (newNotes, dropPin) => {
+    state.form.notes = newNotes;
+    state.form.dropPin = !!(pin && dropPin);
+    const box = document.getElementById('f-notes');
+    if (box) box.value = newNotes;
+    if (losing > 0) photosDeleteForItem(existing.id).then(() => commitPassResult());
+    else commitPassResult();
+  };
+  const pinTail = pin ? ' and the map pin' : '';
+  const choices = !notes
+    ? [{ label: 'Remove the map pin', style: 'primary', onPick: () => go('', true) },
+       { label: 'Keep the map pin', style: 'secondary', onPick: () => go('', false) }]
+    : strip.found
+    ? [{ label: (strip.text ? 'Remove the fail reason' : 'Remove the fail reason (clears the notes)') + pinTail, style: 'primary', onPick: () => go(strip.text, true) },
+       { label: pin ? 'Keep the notes and the pin' : 'Keep the notes as they are', style: 'secondary', onPick: () => go(notes, false) }]
+    : [{ label: 'Clear the notes' + pinTail, style: 'primary', onPick: () => go('', true) },
+       { label: pin ? 'Keep the notes and the pin' : 'Keep the notes as they are', style: 'secondary', onPick: () => go(notes, false) }];
+  const pinLine = pin ? ` It has a map pin (///${pin}).` : '';
+  openChoiceSheet({
+    title: 'Change to PASS?',
+    message: (notes ? `This item's notes say "${notes}". The certificate will print them beside a PASS.` : 'This item is a FAIL.')
+      + pinLine + photoLine,
+    choices
+  });
 }
 
 // The PASS commit itself, split out of passClicked so the v62 photo confirm can
@@ -1386,8 +1824,10 @@ function commitPassResult() {
 }
 
 function failClicked() {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
   const sess = activeSession();
   if (sess && sess.locked) return;
+  if (state.form.qpTile) return;   // V94: a multi-pick is passes only (FAIL is greyed)
   const err = validateBeforeSave();
   if (err) { showToast(err); return; }
   feedback('fail', 'fail-btn');   // v17: haptic + neutral flash + (opt-in) fail tone
@@ -1429,6 +1869,7 @@ function cancelFailModal() {
   state.failModalOpen = false;
   state.failModalStage = 'reasons';
   state.failOtherText = '';
+  state.readingsCarry = null;   // V104: a "Change to FAIL" backed out of — nothing logged
   // v62: nothing was logged, so any photo staged in the sheet is discarded and
   // its object URL released. Staged photos are never written to the store until
   // the item they belong to actually exists.
@@ -1557,15 +1998,76 @@ function openPhotoStrip(itemId) {
   photosForItem(itemId).then((records) => {
     // The sheet may have been closed, or another item opened, while we waited.
     if (!state.photoStripOpen || state.photoStripItemId !== itemId) return;
-    state.photoStripPhotos = records.map((r) => ({
-      id: r.id,
-      url: photoObjectUrl(r.blob),
-      bytes: r.bytes || 0,
-      at: r.at || ''
-    }));
+    state.photoStripPhotos = _photoStripEntries(itemId, records);
     state.photoStripLoading = false;
     render();
+    _photoStripFetchThumbs(itemId);
   });
+}
+
+// v89: the strip shows this phone's photos AND the item's photos that are only
+// in the cloud (2A), in the order they were taken. A cloud tile carries
+// `cloud: true`; its `url` is its preview once fetched (1A), '' until then.
+function _photoStripEntries(itemId, records) {
+  const local = (records || []).map((r) => ({
+    id: r.id, url: photoObjectUrl(r.blob), bytes: r.bytes || 0, at: r.at || ''
+  }));
+  const cloud = (typeof photoCloudOnlyForItem === 'function' ? photoCloudOnlyForItem(itemId) : []).map((e) => ({
+    id: e.id,
+    url: (typeof photoThumbCached === 'function') ? photoThumbCached(e.id) : '',
+    bytes: e.b || 0, at: e.a || '', cloud: true, thumb: !!e.t, busy: false
+  }));
+  return local.concat(cloud).sort((a, b) => String(a.at).localeCompare(String(b.at)) || String(a.id).localeCompare(String(b.id)));
+}
+
+// v89 (1A): previews come down when the strip is opened — that tap is the
+// request (R17). One at a time; kept for the session (photos.js), so reopening
+// costs nothing. Each arrival repaints: the strip is buttons only (MAP rule 3).
+function _photoStripFetchThumbs(itemId) {
+  if (typeof syncPhotoThumb !== 'function') return;
+  // syncPhotoThumb() itself refuses a photo with no preview — one guard, one place.
+  const want = (state.photoStripPhotos || []).filter((p) => p.cloud && !p.url).map((p) => p.id);
+  want.reduce((chain, id) => chain.then(() => syncPhotoThumb(id).then((blob) => {
+    if (!blob) return;
+    const url = photoThumbRemember(id, blob);
+    if (!state.photoStripOpen || state.photoStripItemId !== itemId) return;
+    const p = (state.photoStripPhotos || []).find((x) => x.id === id);
+    if (p && p.cloud && url) { p.url = url; render(); }
+  })), Promise.resolve()).catch(() => { /* a missing preview just stays a cloud */ });
+}
+
+// Re-read the strip from the store (what is on screen is what is persisted).
+function _photoStripReload(itemId) {
+  photoReleaseObjectUrls();
+  return photosForItem(itemId).then((records) => {
+    if (!state.photoStripOpen || state.photoStripItemId !== itemId) return;
+    state.photoStripPhotos = _photoStripEntries(itemId, records);
+    state.photoStripLoading = false;
+    render();
+    _photoStripFetchThumbs(itemId);
+  });
+}
+
+// v89 (2A): bring photos down onto this phone — one tile, or "Download all".
+function downloadStripPhotos(ids) {
+  const itemId = state.photoStripItemId;
+  const want = (ids || []).filter(Boolean);
+  if (!itemId || !want.length || typeof syncPhotoDownload !== 'function') return;
+  const busy = new Set(want);
+  if ((state.photoStripPhotos || []).some((p) => busy.has(p.id) && p.busy)) return;   // already going
+  (state.photoStripPhotos || []).forEach((p) => { if (busy.has(p.id)) p.busy = true; });
+  render();
+  syncPhotoDownload(want).then((res) => {
+    if (res.offline) showToast('No signal \u2014 the photo is safe in the cloud. Try again when you\u2019re connected.');
+    else if (res.notReady) showToast('Photos are still loading \u2014 try again in a moment');
+    else if (res.failed) showToast(`Couldn\u2019t download ${res.failed} photo${res.failed === 1 ? '' : 's'}. Try again later.`);
+    if (!state.photoStripOpen || state.photoStripItemId !== itemId) return null;
+    return _photoStripReload(itemId);
+  });
+}
+
+function downloadStripPhotosAll() {
+  downloadStripPhotos((state.photoStripPhotos || []).filter((p) => p.cloud).map((p) => p.id));
 }
 
 // Clear the strip's state and release its object URLs. Separate from
@@ -1597,7 +2099,7 @@ function closePhotoStrip() {
 function addPhotoToItemFromFile(file) {
   const itemId = state.photoStripItemId;
   if (!file || !itemId) return;
-  if (photoCountForItem(itemId) >= PHOTO_MAX_PER_ITEM) {
+  if (((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(itemId) : photoCountForItem(itemId)) >= PHOTO_MAX_PER_ITEM) {
     showToast(`Up to ${PHOTO_MAX_PER_ITEM} photos per item`);
     return;
   }
@@ -1616,15 +2118,7 @@ function addPhotoToItemFromFile(file) {
       if (!id) { showToast('Could not save that photo'); }
       // Reload the strip from the store rather than patching it in memory, so
       // what is on screen is always what is actually persisted.
-      photoReleaseObjectUrls();
-      state.photoStripPhotos = [];
-      return photosForItem(itemId).then((records) => {
-        state.photoStripPhotos = records.map((r) => ({
-          id: r.id, url: photoObjectUrl(r.blob), bytes: r.bytes || 0, at: r.at || ''
-        }));
-        state.photoStripLoading = false;
-        render();
-      });
+      return _photoStripReload(itemId);
     });
   });
 }
@@ -1634,6 +2128,22 @@ function addPhotoToItemFromFile(file) {
 function deletePhotoFromStrip(photoId) {
   if (!photoId) return;
   const itemId = state.photoStripItemId;
+  // v89 (5A): a photo only in the cloud is deleted from there.
+  const tile = (state.photoStripPhotos || []).find((p) => p.id === photoId);
+  if (tile && tile.cloud) {
+    openConfirmSheet({
+      title: 'Delete photo?',
+      message: "This photo is only in your cloud copy. Deleting it removes it from there. It can't be recovered.",
+      confirmLabel: 'Delete',
+      onConfirm: () => {
+        photoDeleteCloudOnly(photoId);
+        state.photoStripPhotos = state.photoStripPhotos.filter((p) => p.id !== photoId);
+        if (!state.photoStripPhotos.length) { closePhotoStrip(); return; }
+        render();
+      }
+    });
+    return;
+  }
   openConfirmSheet({
     title: 'Delete photo?',
     // v88: signed in, the cloud copy goes too (decision 4A).
@@ -1653,6 +2163,221 @@ function deletePhotoFromStrip(photoId) {
       void itemId;
     }
   });
+}
+
+// ---------- V99: map pin (Stage 8 part 2, spec 1A–9A) ----------
+// A fail's what3words address, pasted (1A), stored on the ITEM as `pin`
+// ('word.word.word', absent when none — 3A). Added only to a SAVED item (4A):
+// the fail sheet holds its reason and staged photos in memory until the fail is
+// saved, so switching to what3words from inside it could lose the whole fail if
+// iOS reloads the app. From a saved item the worst a reload can lose is the
+// paste — and MAP_PIN_OPEN_KEY + mapPinResume() reopen the sheet even then.
+// The switch (state.mapPinEnabled, per phone — 8A) gates only the WAYS OF
+// ADDING one; a pin on an item always shows, exports and prints (9A).
+
+// The item's pin, normalised ('' for none). Anything malformed — a hand-edited
+// backup, a row from a later version — reads as no pin rather than as junk.
+function mapPinOf(item) {
+  if (!item || typeof item.pin !== 'string' || !item.pin) return '';
+  return (typeof normaliseW3w === 'function') ? normaliseW3w(item.pin) : '';
+}
+
+function _mapPinTarget(sessionId, itemId) {
+  const sess = state.sessions.find(s => s && s.id === sessionId);
+  if (!sess || !Array.isArray(sess.items) || !itemId) return null;
+  const idx = sess.items.findIndex(it => it && it.id === itemId);
+  if (idx === -1) return null;
+  return { sess, idx, item: sess.items[idx] };
+}
+
+// Set or clear an item's pin. The item OBJECT is replaced (never edited in place)
+// and the job's cached encoding dropped — the v69 trap (sync spec section 6): the
+// encoding signature covers the item COUNT, not item contents. Returns null when
+// the item is gone, false when nothing changed, true when it did.
+function setItemMapPin(sessionId, itemId, words) {
+  const t = _mapPinTarget(sessionId, itemId);
+  if (!t) return null;
+  const clean = (typeof normaliseW3w === 'function') ? normaliseW3w(words) : '';
+  if (clean === mapPinOf(t.item) && (clean || !('pin' in t.item))) return false;
+  const copy = { ...t.item };
+  if (clean) copy.pin = clean; else delete copy.pin;
+  t.sess.items[t.idx] = copy;
+  if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(t.sess);
+  markSessionDirty(t.sess);
+  return true;
+}
+
+function _mapPinForgetOpen() {
+  try { localStorage.removeItem(MAP_PIN_OPEN_KEY); } catch (e) { /* ignore */ }
+}
+
+function openMapPinSheet(sessionId, itemId) {
+  const t = _mapPinTarget(sessionId, itemId);
+  if (!t) return;
+  mapPinOfferHide();
+  const pin = mapPinOf(t.item);
+  state.mapPinSheet = { sessionId, itemId, text: pin ? '///' + pin : '' };
+  render();
+}
+
+function closeMapPinSheet() {
+  state.mapPinSheet = null;
+  _mapPinForgetOpen();
+  render();
+}
+
+// The sheet's message line, written in place (the sheet has an input — MAP
+// rule 3: no render() while it is open).
+function _mapPinSheetMessage(text) {
+  const el = (typeof document !== 'undefined') ? document.getElementById('map-pin-error') : null;
+  if (el) el.textContent = text || '';
+}
+
+// Save: three words → set; an empty box → remove; anything else → say so and
+// keep the sheet open with the typing intact.
+function saveMapPinSheet() {
+  const sh = state.mapPinSheet;
+  if (!sh) return;
+  const raw = String(sh.text || '').trim();
+  const words = normaliseW3w(raw);
+  if (raw && !words) {
+    _mapPinSheetMessage('That isn\u2019t three words. Copy them from what3words \u2014 e.g. ///filled.count.soap');
+    return;
+  }
+  const changed = setItemMapPin(sh.sessionId, sh.itemId, words);
+  state.mapPinSheet = null;
+  _mapPinForgetOpen();
+  if (changed === null) { render(); showToast('That item is no longer in this job'); return; }
+  if (changed) saveSessions();
+  render();
+  if (changed) showToast(words ? 'Map pin saved' : 'Map pin removed');
+}
+
+function removeMapPinFromSheet() {
+  const sh = state.mapPinSheet;
+  if (!sh) return;
+  sh.text = '';
+  saveMapPinSheet();
+}
+
+// "Open what3words": remember which item's sheet is open FIRST (iOS may reload
+// the app while it is in the background — MAP_PIN_OPEN_KEY), then leave. The
+// sheet stays open: if the app is not reloaded the engineer comes back to it.
+function mapPinOpenW3w() {
+  const sh = state.mapPinSheet;
+  if (!sh) return;
+  try {
+    localStorage.setItem(MAP_PIN_OPEN_KEY, JSON.stringify({
+      s: sh.sessionId, i: sh.itemId, at: Date.now(), t: String(sh.text || '').slice(0, 200)
+    }));
+  } catch (e) { /* a full phone: the sheet still works, it just can't come back after a reload */ }
+  // V99.1: the APP, by its own link — no browser panel in between. The page is
+  // not replaced: an app link either opens the app or does nothing.
+  _mapPinWatchLeave(sh);
+  try { window.location.href = W3W_APP_URL; } catch (e) { /* nothing to open with */ }
+}
+
+// V99.1: did the tap leave PATGo? Leaving = the page hid, or the window lost
+// focus (iOS's own "Open in what3words?" question takes focus too). If neither
+// has happened W3W_APP_WAIT_MS later, what3words is not on this phone: the sheet
+// offers the website instead (state, so a repaint keeps it; written in place
+// because the sheet has an input — MAP rule 3).
+let _mapPinLeaveTimer = null;
+function _mapPinWatchLeave(sh) {
+  if (_mapPinLeaveTimer) { clearTimeout(_mapPinLeaveTimer); _mapPinLeaveTimer = null; }
+  let left = false;
+  const onLeave = () => { if (document.visibilityState === 'hidden') left = true; };
+  const onHide = () => { left = true; };
+  try {
+    document.addEventListener('visibilitychange', onLeave);
+    window.addEventListener('blur', onHide);
+    window.addEventListener('pagehide', onHide);
+  } catch (e) { /* no events: the timer alone decides */ }
+  _mapPinLeaveTimer = setTimeout(() => {
+    _mapPinLeaveTimer = null;
+    try {
+      document.removeEventListener('visibilitychange', onLeave);
+      window.removeEventListener('blur', onHide);
+      window.removeEventListener('pagehide', onHide);
+    } catch (e) { /* ignore */ }
+    if (left || state.mapPinSheet !== sh) return;
+    sh.noApp = true;
+    const el = (typeof document !== 'undefined') ? document.getElementById('map-pin-noapp') : null;
+    if (el) el.innerHTML = mapPinNoAppHTML();
+  }, W3W_APP_WAIT_MS);
+}
+
+// V99.1: the website, only when the app didn't open. Still window.open (the
+// panel's Done button brings you back) — said so on the button's line.
+function mapPinOpenW3wWeb() {
+  if (!state.mapPinSheet) return;
+  try { window.open(W3W_HOME_URL, '_blank', 'noopener'); } catch (e) { /* nothing to open with */ }
+}
+
+// The Paste button. iOS shows its own "Paste" bubble first; refusing it, or a
+// browser with no clipboard read, falls back to a plain instruction. The box
+// is written in place (no render — the sheet has an input).
+function mapPinPaste() {
+  const sh = state.mapPinSheet;
+  if (!sh) return;
+  const fallback = () => showToast('Long-press the box and choose Paste');
+  let p = null;
+  try { p = (navigator.clipboard && navigator.clipboard.readText) ? navigator.clipboard.readText() : null; } catch (e) { p = null; }
+  if (!p || typeof p.then !== 'function') { fallback(); return; }
+  p.then((text) => {
+    if (state.mapPinSheet !== sh) return;   // closed meanwhile
+    const words = normaliseW3w(text);
+    const shown = words ? '///' + words : String(text || '').trim().slice(0, 200);
+    sh.text = shown;
+    const box = document.getElementById('map-pin-input');
+    if (box) box.value = shown;
+    _mapPinSheetMessage(words || !shown ? '' : 'That isn\u2019t three words. Copy them from what3words \u2014 e.g. ///filled.count.soap');
+  }).catch(fallback);
+}
+
+// Boot, BEFORE the first loadFormForCursor()/render(): the app was reloaded
+// while the engineer was in what3words. Reopen the job's entry screen on that
+// item with the sheet open. A locked job too (a pin can be added to one, like
+// notes) — load() will have dropped it as the resume target. Stale or broken
+// → forgotten. Returns true when it reopened.
+function mapPinResume() {
+  let o = null;
+  try { o = JSON.parse(localStorage.getItem(MAP_PIN_OPEN_KEY) || 'null'); } catch (e) { o = null; }
+  if (!o) { _mapPinForgetOpen(); return false; }
+  const fresh = typeof o.at === 'number' && Date.now() - o.at >= 0 && Date.now() - o.at <= MAP_PIN_OPEN_MAX_MS;
+  const t = (fresh && typeof o.s === 'string' && typeof o.i === 'string') ? _mapPinTarget(o.s, o.i) : null;
+  if (!t) { _mapPinForgetOpen(); return false; }
+  state.activeId = t.sess.id;
+  state.view = 'entry';
+  state.cursor = t.idx;
+  state.mapPinSheet = { sessionId: t.sess.id, itemId: t.item.id, text: typeof o.t === 'string' ? o.t : '' };
+  return true;
+}
+
+// 5A: straight after a fail is logged, "📍 Add map pin" for a few seconds — at
+// the TOP of the screen, away from PASS / FAIL, so a tap meant for the next
+// item cannot land on it. A DOM node inside #app (so the delegated click
+// reaches it), added after the entry repaint; the next repaint removes it, as
+// does the timer. Switch off → never shown.
+let _mapPinOfferTimer = null;
+function mapPinOfferHide() {
+  if (_mapPinOfferTimer) { clearTimeout(_mapPinOfferTimer); _mapPinOfferTimer = null; }
+  try { document.querySelectorAll('.map-pin-offer').forEach(el => el.remove()); } catch (e) { /* no DOM */ }
+}
+function mapPinOfferShow(itemId) {
+  if (!state.mapPinEnabled || !itemId) return false;
+  const app = (typeof document !== 'undefined') ? document.getElementById('app') : null;
+  if (!app) return false;
+  mapPinOfferHide();
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'map-pin-offer';
+  el.setAttribute('data-action', 'map-pin-offer');
+  el.setAttribute('data-arg', itemId);
+  el.innerHTML = icon('map-pin') + ' Add map pin';   // V115: fixed markup, no user text
+  app.appendChild(el);
+  _mapPinOfferTimer = setTimeout(mapPinOfferHide, MAP_PIN_OFFER_MS);
+  return true;
 }
 
 // ---------- v53: Test Readings sheet ----------
@@ -1700,10 +2425,24 @@ function openReadingsSheet(mode, failReason) {
   }
   // Fresh FAIL: leave measurement fields blank (recording the actual reading).
 
+  // V104 (S10, 5A): arriving from "Change to FAIL" on the confirm step — the
+  // readings typed on the PASS sheet come with it. Read, then cleared, here and
+  // nowhere else (MAP rule 4): every other path to this sheet starts clean.
+  const carry = state.readingsCarry;
+  state.readingsCarry = null;
+  if (carry && mode === 'fail') {
+    if (READING_CLASSES.indexOf(carry.class) !== -1) draft.class = carry.class;
+    ['earth', 'insulation', 'leakage'].forEach(k => {
+      if (typeof carry[k] === 'string') draft[k] = carry[k];
+    });
+    draft.polarity = carry.polarity === true;
+  }
+
   state.readingsSheetMode = mode;
   state.readingsPendingResult = (mode === 'fail') ? 'fail' : 'pass';
   state.readingsPendingFailReason = (mode === 'fail') ? (failReason || null) : null;
   state.readingsDraft = draft;
+  state.readingsSheetStage = 'entry';
   state.readingsSheetOpen = true;
   render();
 }
@@ -1750,6 +2489,9 @@ function setReadingsField(field, value) {
   if (!state.readingsDraft) state.readingsDraft = { class: state.lastReadingsClass || READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '', polarity: false };
   state.readingsDraft[field] = value;
   // No render — the input already holds the text; re-rendering would steal focus.
+  // V104 (S10): the limit note under this box is updated in place instead (MAP
+  // rule 3 — this sheet has inputs).
+  if (typeof refreshReadingNote === 'function') refreshReadingNote(field);
 }
 
 // v54: toggle the Class I polarity checkbox on the readings sheet. Unlike the
@@ -1770,8 +2512,59 @@ function toggleReadingsPolarity() {
 // Readings are optional even when the feature is on (locked decision): an
 // all-blank sheet commits a pass/fail with just the class (or nothing) — never
 // blocked. lastReadingsClass is remembered for the next item.
-function commitReadingsSheet() {
+// V104 (S10): the readings in this draft that are DEFINITELY outside their usual
+// limit → [{ field, value, kind, limit, cls }]. Empty when the feature or the
+// check is off, or on a FAIL sheet (already failing — 6A), so callers just test
+// .length. The limits are READING_LIMITS (data.js); the verdict is utils.js's.
+function readingsOverLimit(draft, mode) {
+  if (!state.readingsEnabled || !state.readingsCheckEnabled) return [];
+  if (mode !== 'pass') return [];
+  const d = draft || {};
+  const cls = (READING_CLASSES.indexOf(d.class) !== -1) ? d.class : READING_CLASS_DEFAULT;
+  const out = [];
+  (READING_FIELDS_BY_CLASS[cls] || []).forEach(k => {
+    const lim = readingLimitFor(k, cls, state.readingsEarthLimit);
+    if (!lim) return;
+    const v = (typeof d[k] === 'string') ? d[k].trim() : '';
+    if (v && readingBreaksLimit(v, lim.kind, lim.limit)) out.push({ field: k, value: v, kind: lim.kind, limit: lim.limit, cls });
+  });
+  return out;
+}
+
+// V104 (S10, 5A): "Change to FAIL" on the confirm step. Nothing has been logged:
+// the typed readings are kept in readingsCarry and the ordinary fail flow takes
+// over — pick a reason, then the fail readings sheet opens with them in
+// (openReadingsSheet). It never fails anything by itself. A multi-pick tile is
+// passes only, so it can't change (and never reaches this sheet anyway).
+function readingsChangeToFail() {
+  if (state.form && state.form.qpTile) return;
+  const d = state.readingsDraft || {};
+  const carry = { class: d.class, earth: d.earth || '', insulation: d.insulation || '', leakage: d.leakage || '', polarity: d.polarity === true };
+  closeReadingsSheetState();   // clears any old carry — so set the new one AFTER
+  state.readingsCarry = carry;
+  state.failModalStage = 'reasons';
+  state.failOtherText = '';
+  state.failModalOpen = true;
+  render();
+}
+
+// V104 (S10, 5A): back from the confirm step to the readings, as typed.
+function readingsConfirmBack() {
+  state.readingsSheetStage = 'entry';
+  render();
+}
+
+// force === true is "Save as PASS anyway": the confirm step has been seen.
+function commitReadingsSheet(force) {
   const draft = state.readingsDraft || {};
+  // V104 (S10, 5A): a PASS with a reading definitely outside its usual limit
+  // stops once on a read-only confirm step. Rendering here is safe: it leaves
+  // the inputs for a sheet with none (MAP rule 3).
+  if (force !== true && state.readingsSheetMode === 'pass' && readingsOverLimit(draft, 'pass').length) {
+    state.readingsSheetStage = 'confirm';
+    render();
+    return;
+  }
   const cls = (READING_CLASSES.indexOf(draft.class) !== -1) ? draft.class : READING_CLASS_DEFAULT;
   const applicable = READING_FIELDS_BY_CLASS[cls] || [];
   const readings = { class: cls };
@@ -1814,10 +2607,13 @@ function closeReadingsSheetState() {
   state.readingsPendingResult = null;
   state.readingsPendingFailReason = null;
   state.readingsDraft = { class: state.lastReadingsClass || READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '', polarity: false };
+  state.readingsSheetStage = 'entry';   // V104
+  state.readingsCarry = null;           // V104 — readingsChangeToFail sets it after this
 }
 
 
 function copyLastResult() {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
   const sess = activeSession();
   if (!sess || sess.items.length === 0) return;
   if (sess.locked) return;   // v8
@@ -1832,17 +2628,24 @@ function copyLastResult() {
     notes: '',
     result: last.result
   };
+  // V120 (2A): spoken after the save, as in saveItem — taken before the cursor moves.
+  const spokenPos = state.cursor + 1;
+  const spokenEdit = state.cursor < sess.items.length;
   if (state.cursor < sess.items.length) {
     // v17: overwrite keeps the existing item's original ts (item has no ts key).
+    // V99: the overwrite clears the notes, so it clears the map pin too.
     sess.items[state.cursor] = { ...sess.items[state.cursor], ...item };
+    delete sess.items[state.cursor].pin;
   } else {
     // v17: stamp on first save (append). v61: unconditional — see saveItem and
     // the capture/exposure note in config.js. Copy-last is a genuine first log
     // of a new item, so it stamps exactly like any other.
     item.ts = new Date().toISOString();
-    sess.items.push({ id: newId(), ...item });
+    const pushed = { id: newId(), ...item };
+    sess.items.push(pushed);
     // v18: learn the copied (location, type) pairing as a fresh log.
     recordSqpUsage(item.location, item.itemType);
+    noteLastLog(sess, [pushed], item.itemType);   // V94: Undo
   }
   markSessionDirty(sess);   // v14
   state.cursor++;
@@ -1858,6 +2661,18 @@ function copyLastResult() {
   // (it reuses the previous item's type), so descriptions can't change here.
   saveSessions(); saveSqpHistory();
   refreshEntryAfterLog();
+  if (typeof announce === 'function') announce(loggedAnnouncement(item, spokenPos, spokenEdit));   // V120 (2A)
+}
+
+// V120 (2A): the line VoiceOver speaks after a single item is logged or
+// overwritten — "Logged: Kettle, pass. Item 14." Pure, so the harness can pin
+// the wording. Batches (Multi Pick, a tile, Log again ×N) already pop up
+// "Added N items", which the announcer now speaks — they don't call this.
+function loggedAnnouncement(item, position, edited) {
+  const type = String((item && item.itemType) || '').trim();
+  const res = item && item.result === 'fail' ? 'fail' : (item && item.result === 'pass' ? 'pass' : '');
+  const what = [type, res].filter(Boolean).join(', ');
+  return `${edited ? 'Updated' : 'Logged'}${what ? ': ' + what : ''}. Item ${position}.`;
 }
 
 // ---------- v77: "Log again ×N" ----------
@@ -1889,6 +2704,7 @@ function copyLastResult() {
 // engineer may have moved on since the last item, and the form is what they can
 // see. Item type and result come from the last item.
 function repeatLastResult(n) {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
   const sess = activeSession();
   if (!sess || sess.items.length === 0) return;
   if (sess.locked) return;   // belt-and-braces; the button is disabled too
@@ -1913,6 +2729,7 @@ function repeatLastResult(n) {
 
   const last = sess.items[sess.items.length - 1];
   const cleanType = normaliseItemType(last.itemType);
+  const added = [];   // V94: for Undo
 
   for (let i = 0; i < total; i++) {
     const item = {
@@ -1927,9 +2744,11 @@ function repeatLastResult(n) {
     // only (see config.js). Copy-last and saveItem both stamp unconditionally.
     item.ts = new Date().toISOString();
     sess.items.push(item);
+    added.push(item);
     // v18: each copy is a genuine fresh log of this (location, type) pairing.
     recordSqpUsage(cleanLocation, cleanType);
   }
+  noteLastLog(sess, added, `Log again: ${cleanType}`);   // V94: one Undo for the batch
 
   markSessionDirty(sess);             // v14: new entries invalidate a prior export
   state.repeatSheetOpen = false;
@@ -1947,6 +2766,143 @@ function repeatLastResult(n) {
   saveSessions(); saveSqpHistory();
   render();
   showToast(`Added ${total} more`);
+}
+
+// ============== V94 — Undo (8, 9B, 14A, 15A, 16B) ==============
+// ↶ Undo sits beside Copy last when switched on (per phone, off by default). It
+// removes the most recent LOGGING action — one new item, or a whole batch (Log
+// again ×N, Multi Pick, a Multi Pick tile) — one level only. Edits to existing
+// items are never undoable.
+//
+// WHAT IS RECORDED. state.lastLog = { sessionId, ids, sigs, sqp, label }: the ids
+// of the items that action appended, and a JSON snapshot of each. Memory only:
+// a reload, or opening any job, forgets it.
+//
+// ⚠ IT IS CHECKED AT THE MOMENT OF THE TAP, not trusted from when it was noted
+// (undoAvailable). Those items must still be the LAST ones in the open job, in
+// order, and unchanged — an edit, a delete, another log after them, or a lock
+// greys the button. A stale record must never remove items the engineer has
+// since worked on.
+//
+// WHAT IT REVERSES. The items (their photos first — MAP rule 5), and Smart Quick
+// Pick's learning, only if the log recorded any. Lifetime stats need nothing:
+// they are worked out from the jobs. A new description the item added stays in
+// the list. The frozen Quick Pick row is NOT rebuilt (no reshuffle under the
+// thumb). Certificate numbers are never touched by logging.
+function noteLastLog(sess, items, label) {
+  if (!sess || !Array.isArray(items) || !items.length) return;
+  state.lastLog = {
+    sessionId: sess.id,
+    ids: items.map(it => it.id),
+    sigs: items.map(it => JSON.stringify(it)),
+    sqp: !!state.sqpEnabled,          // recordSqpUsage() no-ops while it is off
+    label: String(label || '')
+  };
+  // V123 (2A): every log path comes through here (one item, Copy last, a tile,
+  // Multi Pick, Log again) — the redraw that follows puts VoiceOver on the
+  // screen heading, not on the button that logged (feedback.js).
+  if (typeof focusMarkLogged === 'function') focusMarkLogged();
+}
+
+function undoAvailable() {
+  if (!state.undoEnabled) return false;
+  const L = state.lastLog;
+  const sess = activeSession();
+  if (!L || !sess || sess.id !== L.sessionId || sess.locked) return false;
+  const n = L.ids.length;
+  const items = sess.items || [];
+  if (!n || items.length < n) return false;
+  for (let i = 0; i < n; i++) {
+    const it = items[items.length - n + i];
+    if (!it || it.id !== L.ids[i] || JSON.stringify(it) !== L.sigs[i]) return false;
+  }
+  return true;
+}
+
+// 14A: ask first — the button sits beside Copy last, and a mis-tap there would
+// otherwise delete a real item.
+function undoAsk() {
+  if (!undoAvailable()) {
+    showToast('Nothing to undo');
+    if (typeof refreshEntryAfterLog === 'function') refreshEntryAfterLog();
+    return;
+  }
+  const L = state.lastLog;
+  const sess = activeSession();
+  const n = L.ids.length;
+  const first = sess.items.length - n + 1;
+  const going = sess.items.slice(-n);
+  let message;
+  if (n === 1) {
+    const it = going[0];
+    message = `Remove item ${first} — ${it.itemType || 'item'}, ${String(it.result || '').toUpperCase()}?`;
+  } else {
+    message = `Remove items ${first}–${first + n - 1}${L.label ? ` (${L.label})` : ''}?`;
+  }
+  const photos = going.reduce((t, it) => t + ((it.result === 'fail' && it.id)
+    ? ((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id)
+      : (typeof photoCountForItem === 'function') ? photoCountForItem(it.id) : 0)
+    : 0), 0);
+  if (photos) message += ` ${photos === 1 ? 'Its photo' : `Its ${photos} photos`} will be deleted too.`;
+  openConfirmSheet({
+    title: 'Undo?',
+    message,
+    confirmLabel: n === 1 ? 'Remove it' : `Remove ${n} items`,
+    onConfirm: undoLastLog
+  });
+}
+
+function undoLastLog() {
+  // Checked again: the job may have changed while the sheet was open (a sync).
+  if (!undoAvailable()) { showToast('Nothing to undo — the job has changed'); refreshEntryAfterLog(); return; }
+  const L = state.lastLog;
+  const sess = activeSession();
+  const n = L.ids.length;
+  const start = sess.items.length - n;
+  const going = sess.items.slice(start);
+  const onNew = state.cursor >= sess.items.length;
+  const autoBefore = nextAssetNo(sess);
+
+  // Photos BEFORE the splice (MAP rule 5) — the same path deleteItem() uses,
+  // which also sends the delete to the cloud for any already uploaded.
+  if (typeof photosDeleteForItem === 'function') {
+    going.forEach(it => { if (it.id) { try { photosDeleteForItem(it.id); } catch (e) {} } });
+  }
+  if (L.sqp && typeof unrecordSqpUsage === 'function') {
+    going.forEach(it => unrecordSqpUsage(it.location, it.itemType));
+  }
+  sess.items.splice(start, n);
+  markSessionDirty(sess);
+  state.lastLog = null;
+
+  if (onNew) {
+    // 9B: the form stays on the next new item as it is — except an untouched
+    // automatic asset number, which goes back with the items it followed.
+    state.cursor = sess.items.length;
+    if (state.form.assetNo === autoBefore) state.form.assetNo = nextAssetNo(sess);
+  } else if (state.cursor >= start) {
+    state.cursor = sess.items.length;
+    loadFormForCursor();
+  }
+  saveSessions();
+  if (L.sqp) saveSqpHistory();
+  refreshEntryAfterLog();
+  showToast(n === 1 ? 'Undone — item removed' : `Undone — ${n} items removed`);
+}
+
+// V94 (6): how many items in THIS job are at the location on the form — shown
+// in the item readout ("Item 21 (new) · 15 at this location"). Matched the way
+// an engineer reads it: case, outer spaces and doubled spaces don't count.
+// null when the location is blank (the readout then shows nothing).
+function locationKey(loc) {
+  return String(loc || '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+function locationCountInJob(sess, location) {
+  const key = locationKey(location);
+  if (!sess || !key) return null;
+  let n = 0;
+  (sess.items || []).forEach(it => { if (locationKey(it.location) === key) n++; });
+  return n;
 }
 
 function deleteItem(idx) {
@@ -2020,6 +2976,9 @@ function setView(v) {
   closeReadingsSheetState();          // v53
   discardPendingPhotos();             // v62
   closePhotoStripState();             // v62
+  // V90: leaving the photo manager drops its selection, preview and cloud look.
+  if (v !== 'photoManager' && typeof photoMgrLeave === 'function') photoMgrLeave();
+  if (v !== 'jobManager' && typeof jobMgrLeave === 'function') jobMgrLeave();   // V91
   // v61: the asset-history sheet lives on the Sessions screen; leaving that
   // screen must not leave it armed to reappear on the way back.
   state.assetHistorySheetOpen = false;
@@ -2035,6 +2994,14 @@ function setView(v) {
   // v19: clear the Clients page add/rename sheets on any view change so an open
   // dialog can't leak across pages. The expanded-client accordion can persist
   // harmlessly.
+  state.siteNotesSheet = null;   // V98: the Overview's site-notes sheet
+  state.dupJob = null;           // V102: the Duplicate sheet (a copy under way still finishes)
+  // V99: leaving the screen closes the map pin sheet and forgets the reload note.
+  if (state.mapPinSheet) { state.mapPinSheet = null; _mapPinForgetOpen(); }
+  // V100: the replayed 100 moment and "PATGo tests itself" belong to About.
+  state.partyOpen = false;
+  if (state.egg && state.egg.timer) clearTimeout(state.egg.timer);
+  state.egg = null;
   state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
   state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null };
   // v39: close the New Session form on any view change too. Previously its open
@@ -2071,6 +3038,8 @@ function exitSelectionMode() {
   state.bulkEdit.typeValue = '';
   state.bulkEdit.notesValue = '';
   state.bulkEdit.notesMode = 'replace';
+  state.moveJob = null;   // V101
+  state.moveTo = null;    // V103
 }
 
 function toggleSelected(idx) {
@@ -2255,6 +3224,838 @@ function applyBulkDelete() {
   });
 }
 
+// ---------- V101: move selected items to a new job (roadmap Stage 9, split) ----------
+// Locked: 1A Overview → Select items → Edit selected → "Move to a new job…",
+// with a review of what is moving and an "Are you sure?" step; 2A a NEW job only
+// (an existing job is BACKLOG); 3A the sheet asks client + site, everything else
+// copied and editable under More details; 4A not on a locked job; 5A at least one
+// item stays; 6A the original keeps its certificate number, the confirm warns when
+// a certificate was already made; 7 photos and map pins move with their items;
+// 8A the original records what moved out, and where (`movedOut`); 10 always on
+// (Peter — an exception to R30); 11A stay on the original, "· Open" offer.
+//
+// ⚠ ITEMS MOVE, THEY ARE NOT COPIED. Item ids are unchanged, so each id is still
+// in exactly ONE job: photos are found and deleted by item id alone (photos.js
+// photosDeleteForItem), so a copy with the same ids would share — and delete —
+// the original's photos. That is V102's problem (duplicate mints new ids).
+//
+// ⚠ PHOTOS ARE RE-LABELLED. A photo also carries its job (IndexedDB `sessionId`,
+// sync's st.ph.sent[id].s, the cloud row's session_id), and deleting or clearing a
+// job sweeps photos BY THAT LABEL. Left alone, deleting the original would take
+// the moved items' photos with it. photosSettleJobs() re-labels this phone's
+// copies (a photo belongs to the one job holding its item); syncNoteMoved() tells
+// the sync state, which re-points the cloud rows at the next sync.
+//
+// The selection is captured as item IDS when the sheet opens: on the Overview the
+// pull may replace the job object underneath (it defers only the entry screen),
+// and indices would then point at different items.
+
+function moveJobBlockReason(sess, ids) {
+  if (!sess) return 'This job is no longer on this phone.';
+  if (sess.locked) return 'This job is locked. Unlock it in Job settings first, then move the items.';
+  const n = (ids || []).length;
+  if (!n) return 'Select the items to move first.';
+  if (n >= (sess.items || []).length) {
+    return 'At least one item must stay in this job. To change the client or site of the whole job, use Job settings.';
+  }
+  return '';
+}
+
+function openMoveJob() {
+  const sess = activeSession();
+  if (!sess) return;
+  const ids = state.selectedIndices
+    .map(i => sess.items[i] && sess.items[i].id)
+    .filter(id => id != null)
+    .map(String);
+  state.bulkEdit.menuOpen = false;
+  const why = moveJobBlockReason(sess, ids);
+  state.moveJob = why
+    ? { step: 'blocked', why, ids: [], from: sess.id }
+    : {
+        step: 'form', ids, from: sess.id,
+        client: '', site: '',
+        name: sess.name || '',
+        date: sess.date || todayISO(),
+        engineer: sess.engineer || '',
+        instrumentId: sess.instrumentId || '',
+        prefix: sess.prefix || '',
+        error: ''
+      };
+  render();
+}
+
+function closeMoveJob() {
+  state.moveJob = null;
+  render();
+}
+
+// Field edits arrive here from data-input-action (no render — MAP rule 3).
+function setMoveJobField(field, value) {
+  const m = state.moveJob;
+  if (!m || m.step !== 'form') return;
+  if (['client', 'site', 'name', 'date', 'engineer', 'instrumentId', 'prefix'].indexOf(field) === -1) return;
+  m[field] = String(value == null ? '' : value);
+}
+
+// The items still selected for the move, looked up by id in the job as it is NOW.
+function _moveJobItems(sess, ids) {
+  const want = new Set((ids || []).map(String));
+  return (sess && Array.isArray(sess.items)) ? sess.items.filter(it => it && want.has(String(it.id))) : [];
+}
+
+function moveJobSummary(sess, ids) {
+  const items = _moveJobItems(sess, ids);
+  let fails = 0, photos = 0, pins = 0;
+  for (const it of items) {
+    if (it.result === 'fail') fails++;
+    photos += (typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id)
+      : ((typeof photoCountForItem === 'function') ? photoCountForItem(it.id) : 0);
+    if (mapPinOf(it)) pins++;
+  }
+  return { n: items.length, fails, photos, pins, items };
+}
+
+function moveJobContinue() {
+  const m = state.moveJob;
+  if (!m || m.step !== 'form') return;
+  const client = String(m.client || '').trim();
+  const site = String(m.site || '').trim();
+  if (!client && !site) {
+    // No render: the sheet holds typing (MAP rule 3). Say it in place.
+    m.error = 'Enter a client or a site for the new job.';
+    try { const el = document.getElementById('move-job-error'); if (el) el.textContent = m.error; } catch (e) { /* no DOM */ }
+    return;
+  }
+  m.error = '';
+  m.step = 'confirm';
+  render();
+}
+
+function moveJobBack() {
+  const m = state.moveJob;
+  if (!m || m.step !== 'confirm') return;
+  m.step = 'form';
+  render();
+}
+
+// The title a job shows on the Jobs list — for the confirm and the offer.
+function moveJobTitle(clientName, siteName) {
+  return composeSiteSnapshot(String(clientName || '').trim(), String(siteName || '').trim());
+}
+
+function moveItemsToNewJob() {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
+  const m = state.moveJob;
+  if (!m || m.step !== 'confirm') return;
+  const sess = activeSession();
+  if (!sess || String(sess.id) !== String(m.from)) { closeMoveJob(); return; }
+  const moving = _moveJobItems(sess, m.ids);
+  // ⚠ Re-checked at the moment of moving: a sync may have changed the job since
+  // the sheet opened. Anything other than exactly what was reviewed → stop.
+  const why = moveJobBlockReason(sess, m.ids) ||
+    (moving.length !== m.ids.length ? 'This job changed while you were choosing. Check the items and try again.' : '');
+  if (why) { state.moveJob = { step: 'blocked', why, ids: [], from: sess.id }; render(); return; }
+
+  const clientName = String(m.client || '').trim();
+  const siteName = String(m.site || '').trim();
+  if (!clientName && !siteName) { m.step = 'form'; m.error = 'Enter a client or a site for the new job.'; render(); return; }
+  // Same resolution as createSession(): list entries made for anything new.
+  let clientRec = null, siteRec = null;
+  if (clientName && siteName) {
+    clientRec = ensureClient(clientName);
+    if (clientRec) siteRec = ensureSite(clientRec.id, siteName);
+  } else if (clientName) {
+    clientRec = ensureClient(clientName);
+  } else {
+    siteRec = ensureOrphanSite(siteName);
+  }
+
+  const now = new Date().toISOString();
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(m.date || '')) ? m.date : (sess.date || todayISO());
+  const job = {
+    id: newId(),
+    name: String(m.name || '').trim() || `Job ${state.sessions.length + 1}`,
+    site: moveJobTitle(clientName, siteName),
+    clientId: clientRec ? clientRec.id : '',
+    siteId: siteRec ? siteRec.id : '',
+    engineer: String(m.engineer || '').trim(),
+    prefix: String(m.prefix || '').trim(),
+    date,
+    startNumber: sess.startNumber || 1,
+    instrumentId: String(m.instrumentId || ''),
+    items: moving,
+    locked: false,
+    notes: '',          // 3A: job notes belong to the job they were written for
+    certNo: '',         // 6A: its own number, the first time its certificate is made
+    userId: null,
+    lastModified: now,
+    syncedAt: null
+  };
+  if (sess.startPad) job.startPad = sess.startPad;
+  // A frozen tester copy only means something for the tester it froze.
+  if (sess.instrumentSnapshot && job.instrumentId === String(sess.instrumentId || '')) {
+    job.instrumentSnapshot = JSON.parse(JSON.stringify(sess.instrumentSnapshot));
+  }
+  // Retest tracking and interval carry; the contact status starts fresh.
+  if (sess.retestTrack) { job.retestTrack = true; job.retestMonths = sess.retestMonths; job.retestContact = null; }
+  normaliseSessionRetest(job);
+
+  // The original: fewer items, and a note of where they went (8A). An id that has
+  // since come back into this job is no longer "moved out".
+  const goingIds = new Set(moving.map(it => String(it.id)));
+  const keep = sess.items.filter(it => !(it && goingIds.has(String(it.id))));
+  const out = {};
+  const prev = (sess.movedOut && typeof sess.movedOut === 'object' && !Array.isArray(sess.movedOut)) ? sess.movedOut : {};
+  const stays = new Set(keep.map(it => String(it && it.id)));
+  for (const k of Object.keys(prev)) if (!stays.has(k) && typeof prev[k] === 'string') out[k] = prev[k];
+  for (const id of goingIds) { delete out[id]; out[id] = job.id; }
+  const keys = Object.keys(out);
+  if (keys.length > MOVED_OUT_MAX) for (const k of keys.slice(0, keys.length - MOVED_OUT_MAX)) delete out[k];
+  sess.items = keep;
+  sess.movedOut = out;
+  markSessionDirty(sess);
+  sess.lastModified = now;
+  _invalidateSessionEncoding(sess);
+
+  state.sessions.unshift(job);
+  state.sessions = state.sessions.slice();
+  state.lastLog = null;   // Undo belongs to items that are still where they were logged
+  if (state.cursor > sess.items.length) state.cursor = sess.items.length;
+  exitSelectionMode();
+  state.moveJob = null;
+
+  // Photos: this phone's copies now, the cloud at the next sync (7).
+  const moved = {};
+  for (const id of goingIds) moved[id] = job.id;
+  if (typeof photosSettleJobs === 'function') { try { photosSettleJobs(); } catch (e) { console.error('photosSettleJobs failed', e); } }
+  if (typeof syncNoteMoved === 'function') {
+    try { Promise.resolve(syncNoteMoved(moved)).catch((e) => console.error('syncNoteMoved failed', e)); }
+    catch (e) { console.error('syncNoteMoved failed', e); }
+  }
+
+  save();
+  loadFormForCursor();
+  render();
+  moveOfferShow(job.id, moving.length, job.site);
+}
+
+// 11A: the original stays on screen; a short offer opens the new job.
+let _moveOfferTimer = null;
+function moveOfferHide() {
+  if (_moveOfferTimer) { clearTimeout(_moveOfferTimer); _moveOfferTimer = null; }
+  try { document.querySelectorAll('.move-offer').forEach(el => el.remove()); } catch (e) { /* no DOM */ }
+}
+function moveOfferShow(jobId, n, title) {
+  const app = (typeof document !== 'undefined') ? document.getElementById('app') : null;
+  if (!app || !jobId) return false;
+  moveOfferHide();
+  const el = document.createElement('button');
+  el.type = 'button';
+  el.className = 'move-offer';
+  el.setAttribute('data-action', 'move-open-new');
+  el.setAttribute('data-arg', jobId);
+  el.textContent = `Moved ${n} item${n === 1 ? '' : 's'} to ${title || 'a new job'} \u00b7 Open`;
+  app.appendChild(el);
+  _moveOfferTimer = setTimeout(moveOfferHide, MOVE_OFFER_MS);
+  return true;
+}
+function openMovedJob(id) {
+  moveOfferHide();
+  const s = (state.sessions || []).find(x => x && String(x.id) === String(id));
+  if (!s) return;
+  state.activeId = s.id;
+  state.lastLog = null;
+  state.cursor = s.items.length;
+  loadFormForCursor();
+  save();
+  setView('overview');
+}
+
+// ---------- V103: move selected items into an EXISTING job (roadmap Stage 9B) ----------
+// Locked: 1A a second option in Edit selected, "Move to another job…" (V101's
+// new-job path untouched); 2A the other jobs on this phone, newest first, locked
+// ones greyed with why, a filter once there are more than MOVE_TO_FILTER_AT;
+// 3A asset numbers already in the target are resolved per item before anything
+// moves — Leave it here (pre-selected, 3.2A) / Keep the one already there /
+// Use this one instead / Give it a new number (3.1A), with "Apply to all" at 3+;
+// 4B every item may go (the original is left empty); 5A the confirm warns about
+// either job's certificate and a different tester; 6A items go after the
+// target's own; 7A stay on the original, "· Open" offer (V101's).
+//
+// ⚠ Same ids, same rules as V101: items MOVE, photos are re-labelled to the job
+// holding their item (photosSettleJobs + syncNoteMoved), the original records
+// `movedOut`. The target may itself carry `movedOut` — an id coming back into it
+// is dropped from it, or another phone would think the item is still elsewhere.
+//
+// ⚠ DELETES ARE PART OF THE MOVE (3.3A). "Keep the one already there" deletes
+// the item being moved; "Use this one instead" deletes the target's item and the
+// moved one takes its place in the list. Photos are swept BEFORE the items go
+// (MAP rule 5) and a deleted item is NOT recorded in `movedOut` — to another
+// phone it is an ordinary delete, exactly as deleting by hand.
+//
+// ⚠ A job never holds the same asset number twice: "keep both" is not offered,
+// and new numbers are checked against everything the target will hold after.
+// Matching is findDuplicateAssetIndex's (exact, blank ignored) — the per-job rule.
+
+function _moveToSel(sess) {
+  return state.selectedIndices
+    .map(i => sess.items[i] && sess.items[i].id)
+    .filter(id => id != null)
+    .map(String);
+}
+
+// Every other job on this phone, newest first (date, then last change).
+function moveToTargets(sess) {
+  return (state.sessions || [])
+    .filter(s => s && sess && String(s.id) !== String(sess.id))
+    .slice()
+    .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) ||
+      String(b.lastModified || '').localeCompare(String(a.lastModified || '')));
+}
+function moveToTitle(s) { return (s && (s.site || s.name)) || 'Untitled job'; }
+// What the filter box matches against: the title, the job name and the date as shown.
+function moveToHay(s) {
+  return [moveToTitle(s), s && s.name, formatDate(s && s.date)].filter(Boolean).join(' ').toLowerCase();
+}
+
+function moveToBlockReason(sess, ids) {
+  if (!sess) return 'This job is no longer on this phone.';
+  if (sess.locked) return 'This job is locked. Unlock it in Job settings first, then move the items.';
+  if (!(ids || []).length) return 'Select the items to move first.';
+  if (!moveToTargets(sess).length) return 'There are no other jobs on this phone. Use \u201cMove to a new job\u201d instead.';
+  return '';
+}
+
+function openMoveTo() {
+  const sess = activeSession();
+  if (!sess) return;
+  const ids = _moveToSel(sess);
+  state.bulkEdit.menuOpen = false;
+  const why = moveToBlockReason(sess, ids);
+  state.moveTo = why
+    ? { step: 'blocked', why, ids: [], from: sess.id }
+    : { step: 'pick', ids, from: sess.id, to: '', filter: '', clashes: [], error: '' };
+  render();
+}
+
+function closeMoveTo() {
+  state.moveTo = null;
+  render();
+}
+
+// Typing in the filter: rows hidden in place (no render — MAP rule 3).
+function setMoveToFilter(value) {
+  const m = state.moveTo;
+  if (!m || m.step !== 'pick') return;
+  m.filter = String(value == null ? '' : value);
+  const q = m.filter.trim().toLowerCase();
+  try {
+    let shown = 0;
+    document.querySelectorAll('.move-to-job').forEach((el) => {
+      const hit = !q || String(el.getAttribute('data-hay') || '').indexOf(q) !== -1;
+      el.hidden = !hit;
+      if (hit) shown++;
+    });
+    const none = document.getElementById('move-to-none');
+    if (none) none.hidden = shown > 0;
+  } catch (e) { /* no DOM */ }
+}
+
+// The items being moved whose asset number the target already holds — one entry
+// each, with the target item it clashes with. Order follows the original.
+function moveToClashes(sess, target, ids) {
+  const out = [];
+  if (!target || !Array.isArray(target.items)) return out;
+  for (const it of _moveJobItems(sess, ids)) {
+    if (!it.assetNo) continue;
+    const k = findDuplicateAssetIndex(target, it.assetNo, -1);
+    if (k !== -1) out.push({ id: String(it.id), with: String(target.items[k].id), choice: 'leave', newNo: '' });
+  }
+  return out;
+}
+const MOVE_TO_CHOICES = ['leave', 'keep', 'replace', 'renumber'];
+
+function pickMoveTo(targetId) {
+  const m = state.moveTo;
+  if (!m || m.step !== 'pick') return;
+  const sess = activeSession();
+  const target = (state.sessions || []).find(s => s && String(s.id) === String(targetId));
+  if (!sess || !target || String(target.id) === String(sess.id) || target.locked) return;
+  m.to = String(target.id);
+  m.clashes = moveToClashes(sess, target, m.ids);
+  m.error = '';
+  m.step = m.clashes.length ? 'clash' : 'confirm';
+  render();
+}
+
+function _moveToNewRow(i, on) {
+  try { const el = document.getElementById('move-to-new-' + i); if (el) el.hidden = !on; } catch (e) { /* no DOM */ }
+}
+function setMoveToChoice(itemId, choice) {
+  const m = state.moveTo;
+  if (!m || m.step !== 'clash' || MOVE_TO_CHOICES.indexOf(choice) === -1) return;
+  const i = m.clashes.findIndex(c => c.id === String(itemId));
+  if (i === -1) return;
+  m.clashes[i].choice = choice;
+  _moveToNewRow(i, choice === 'renumber');
+}
+// "Apply to all" — the radios are set in place to match (no render).
+function setMoveToAll(choice) {
+  const m = state.moveTo;
+  if (!m || m.step !== 'clash' || MOVE_TO_CHOICES.indexOf(choice) === -1) return;
+  m.clashes.forEach((c, i) => {
+    c.choice = choice;
+    try {
+      const r = document.querySelector('input[name="move-to-c' + i + '"][value="' + choice + '"]');
+      if (r) r.checked = true;
+    } catch (e) { /* no DOM */ }
+    _moveToNewRow(i, choice === 'renumber');
+  });
+}
+function setMoveToNewNo(itemId, value) {
+  const m = state.moveTo;
+  if (!m || m.step !== 'clash') return;
+  const c = m.clashes.find(x => x.id === String(itemId));
+  if (c) c.newNo = String(value == null ? '' : value);
+}
+
+// What the choices add up to, from the jobs as they are NOW: the items that
+// move (in the original's order), which of them replace a target item, the
+// renumbers, and what is deleted on each side. `error` when it can't go ahead.
+function moveToPlan(sess, target, m) {
+  const plan = { move: [], replace: {}, renumber: {}, delFrom: [], delTo: [], error: '' };
+  const by = {};
+  for (const c of (m.clashes || [])) by[c.id] = c;
+  for (const it of _moveJobItems(sess, m.ids)) {
+    const id = String(it.id);
+    const c = by[id];
+    const ch = c ? c.choice : '';
+    if (ch === 'leave') continue;
+    if (ch === 'keep') { plan.delFrom.push(id); continue; }
+    if (ch === 'replace') {
+      if (plan.delTo.indexOf(c.with) === -1) { plan.delTo.push(c.with); plan.replace[c.with] = id; }
+    } else if (ch === 'renumber') {
+      const no = String(c.newNo || '').trim();
+      if (!no) { plan.error = `Enter a new asset number for ${it.assetNo}.`; return plan; }
+      plan.renumber[id] = no;
+    }
+    plan.move.push(it);
+  }
+  if (!plan.move.length) {
+    plan.error = `Nothing would move to ${moveToTitle(target)} with these choices. Choose another option, or close.`;
+    return plan;
+  }
+  // Every asset number the target will hold afterwards, once each.
+  const gone = new Set(plan.delTo);
+  const seen = new Set();
+  for (const it of (target.items || [])) if (it && it.assetNo && !gone.has(String(it.id))) seen.add(it.assetNo);
+  for (const it of plan.move) {
+    const no = plan.renumber[String(it.id)] || it.assetNo;
+    if (!no) continue;
+    if (seen.has(no)) {
+      plan.error = plan.renumber[String(it.id)]
+        ? `${no} is already in ${moveToTitle(target)}, or used twice here. Choose another number.`
+        : `${no} would be in ${moveToTitle(target)} twice.`;
+      return plan;
+    }
+    seen.add(no);
+  }
+  return plan;
+}
+
+function moveToContinue() {
+  const m = state.moveTo;
+  if (!m || m.step !== 'clash') return;
+  const sess = activeSession();
+  const target = (state.sessions || []).find(s => s && String(s.id) === String(m.to));
+  if (!sess || !target) { closeMoveTo(); return; }
+  const plan = moveToPlan(sess, target, m);
+  if (plan.error) {
+    // No render: the step holds typing (MAP rule 3). Say it in place.
+    m.error = plan.error;
+    try { const el = document.getElementById('move-to-error'); if (el) el.textContent = m.error; } catch (e) { /* no DOM */ }
+    return;
+  }
+  m.error = '';
+  m.step = 'confirm';
+  render();
+}
+
+function moveToBack() {
+  const m = state.moveTo;
+  if (!m) return;
+  if (m.step === 'confirm') m.step = (m.clashes && m.clashes.length) ? 'clash' : 'pick';
+  else if (m.step === 'clash') { m.step = 'pick'; m.clashes = []; m.to = ''; }
+  else return;
+  m.error = '';
+  render();
+}
+
+// The original's `movedOut` after some items leave for `destId` — V101's rule:
+// entries for items still here are dropped, the newest go last, bounded.
+function _moveOutAfter(sess, keep, goingIds, destId) {
+  const out = {};
+  const prev = (sess.movedOut && typeof sess.movedOut === 'object' && !Array.isArray(sess.movedOut)) ? sess.movedOut : {};
+  const stays = new Set(keep.map(it => String(it && it.id)));
+  for (const k of Object.keys(prev)) if (!stays.has(k) && typeof prev[k] === 'string') out[k] = prev[k];
+  for (const id of goingIds) { delete out[id]; out[id] = destId; }
+  const keys = Object.keys(out);
+  if (keys.length > MOVED_OUT_MAX) for (const k of keys.slice(0, keys.length - MOVED_OUT_MAX)) delete out[k];
+  return out;
+}
+
+function moveItemsToExistingJob() {
+  const m = state.moveTo;
+  if (!m || m.step !== 'confirm') return;
+  const sess = activeSession();
+  if (!sess || String(sess.id) !== String(m.from)) { closeMoveTo(); return; }
+  const target = (state.sessions || []).find(s => s && String(s.id) === String(m.to));
+  const blocked = (why) => { state.moveTo = { step: 'blocked', why, ids: [], from: sess.id }; render(); };
+  // ⚠ Re-checked at the moment of moving: a sync may have changed either job
+  // since the choices were made. Anything other than what was reviewed → stop.
+  if (sess.locked) return blocked(moveToBlockReason(sess, m.ids));
+  if (!target) return blocked('The job you chose is no longer on this phone.');
+  if (target.locked) return blocked(`${moveToTitle(target)} has been locked. Unlock it in Job settings first, then move the items.`);
+  const changed = 'One of the jobs changed while you were choosing. Check the items and try again.';
+  if (_moveJobItems(sess, m.ids).length !== m.ids.length) return blocked(changed);
+  const now0 = moveToClashes(sess, target, m.ids).map(c => c.id + '>' + c.with).join(',');
+  if (now0 !== (m.clashes || []).map(c => c.id + '>' + c.with).join(',')) return blocked(changed);
+  const plan = moveToPlan(sess, target, m);
+  if (plan.error) return blocked(changed);
+
+  // Photos of deleted items first (MAP rule 5 — the ids must still be findable).
+  const del = plan.delFrom.concat(plan.delTo);
+  if (del.length && typeof photosDeleteForItems === 'function') {
+    try { Promise.resolve(photosDeleteForItems(del)).catch((e) => console.error('photosDeleteForItems failed', e)); }
+    catch (e) { console.error('photosDeleteForItems failed', e); }
+  }
+
+  const now = new Date().toISOString();
+  for (const id of Object.keys(plan.renumber)) {
+    const it = plan.move.find(x => String(x.id) === id);
+    if (it) it.assetNo = plan.renumber[id];
+  }
+  const goingIds = new Set(plan.move.map(it => String(it.id)));
+  const leaving = new Set(plan.delFrom.concat(Array.from(goingIds)));
+  const keep = sess.items.filter(it => !(it && leaving.has(String(it.id))));
+
+  // The target: a replaced item's place is taken by the one replacing it (3A);
+  // everything else goes after its own items, in the original's order (6A).
+  const byId = new Map(plan.move.map(it => [String(it.id), it]));
+  const placed = new Set();
+  const items = [];
+  for (const it of target.items) {
+    const k = String(it && it.id);
+    if (plan.replace[k]) { items.push(byId.get(plan.replace[k])); placed.add(plan.replace[k]); }
+    else if (plan.delTo.indexOf(k) === -1) items.push(it);
+  }
+  for (const it of plan.move) if (!placed.has(String(it.id))) items.push(it);
+  target.items = items;
+  if (target.movedOut && typeof target.movedOut === 'object' && !Array.isArray(target.movedOut)) {
+    for (const id of goingIds) delete target.movedOut[id];
+  }
+
+  sess.movedOut = _moveOutAfter(sess, keep, goingIds, String(target.id));
+  sess.items = keep;
+  for (const s of [sess, target]) {
+    markSessionDirty(s);
+    s.lastModified = now;
+    _invalidateSessionEncoding(s);
+  }
+  state.sessions = state.sessions.slice();
+  state.lastLog = null;   // Undo belongs to items that are still where they were logged
+  if (state.cursor > sess.items.length) state.cursor = sess.items.length;
+  exitSelectionMode();
+  state.moveTo = null;
+
+  const moved = {};
+  for (const id of goingIds) moved[id] = String(target.id);
+  if (typeof photosSettleJobs === 'function') { try { photosSettleJobs(); } catch (e) { console.error('photosSettleJobs failed', e); } }
+  if (typeof syncNoteMoved === 'function') {
+    try { Promise.resolve(syncNoteMoved(moved)).catch((e) => console.error('syncNoteMoved failed', e)); }
+    catch (e) { console.error('syncNoteMoved failed', e); }
+  }
+
+  save();
+  loadFormForCursor();
+  render();
+  moveOfferShow(target.id, plan.move.length, moveToTitle(target));
+}
+
+// ---------- V102: duplicate a job (roadmap Stage 9 part 2) ----------
+// Locked: 1B in Session settings ("Duplicate this job…", below Save/Cancel); 2A
+// a sheet like Move's — client + site and More details pre-filled from this job,
+// editable, then "Are you sure?" with the counts; 3A job notes copied; 4A photos
+// only in the cloud are fetched first, and if any can't be, the sheet says how
+// many and offers "Duplicate without them"; 5A the copy opens; 6A always on.
+// 9C (V101 round) a FULL copy with new ids for the job, every item and every
+// photo; 12A photos copied; 13A a locked job may be duplicated (the copy is not).
+//
+// ⚠ NEW ITEM IDS, ALWAYS. Photos are found and deleted by item id alone (V101's
+// warning above): a copy sharing ids would share — and delete — the original's
+// photos, and photosSettleJobs would find each id in two jobs and settle neither.
+//
+// ⚠ PHOTOS FIRST, THE JOB LAST. photosCopyForItems is one transaction (all or
+// nothing); the job is only made once it has succeeded, and made whatever the
+// sheet is doing by then — the copy was confirmed, and photos with no job would
+// be the worse leftover. The items are copied BEFORE the photos, from the job as
+// it is at that moment, so the copy's items and its photos always agree.
+//
+// Not copied: the certificate number (its own the first time it is made), the
+// lock and lock time, export/certificate state, `movedOut`, the retest contact
+// status. Everything on the items is copied as it is — results, readings, notes,
+// times, map pins — and asset numbers stay the same.
+//
+// The sheet sits on the Session settings screen, which holds a Save/Cancel form:
+// it opens only when nothing there is unsaved, or the edits would be lost behind
+// it (the red line says so, in place — no render, MAP rule 3).
+
+function dupJobBlockReason(sess) {
+  if (!sess) return 'This job is no longer on this phone.';
+  return '';
+}
+
+// Anything typed into Session settings and not saved yet.
+function editFormDirty(sess) {
+  const f = state.editForm;
+  if (!sess || !f) return false;
+  return String(f.name || '') !== String(sess.name || '') ||
+    String(f.site || '') !== String(sess.site || '') ||
+    String(f.engineer || '') !== String(sess.engineer || '') ||
+    String(f.prefix || '') !== String(sess.prefix || '') ||
+    String(f.date || '') !== String(sess.date || '') ||
+    !!f.locked !== !!sess.locked ||
+    String(f.instrumentId || '') !== String(sess.instrumentId || '');
+}
+
+function openDupJob() {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
+  const sess = activeSession();
+  if (!sess) return;
+  if (editFormDirty(sess)) {
+    try { const el = document.getElementById('ef-dup-error'); if (el) el.textContent = 'Save or cancel your changes first.'; } catch (e) { /* no DOM */ }
+    return;
+  }
+  const why = dupJobBlockReason(sess);
+  const parts = splitSiteSnapshot(sess.site || '');
+  state.dupJob = why
+    ? { step: 'blocked', why, from: sess.id }
+    : {
+        step: 'form', from: sess.id,
+        client: parts.client, site: parts.site,
+        client0: parts.client, site0: parts.site,   // unchanged → the original's own links
+        name: (sess.name ? sess.name + ' (copy)' : ''),
+        date: sess.date || todayISO(),
+        engineer: sess.engineer || '',
+        instrumentId: sess.instrumentId || '',
+        prefix: sess.prefix || '',
+        error: '', failed: 0, skipCloud: false
+      };
+  render();
+}
+
+function closeDupJob() {
+  const m = state.dupJob;
+  if (m && m.step === 'working') return;   // nothing to cancel half-way
+  state.dupJob = null;
+  render();
+}
+
+// Field edits arrive here from data-input-action (no render — MAP rule 3).
+function setDupJobField(field, value) {
+  const m = state.dupJob;
+  if (!m || m.step !== 'form') return;
+  if (['client', 'site', 'name', 'date', 'engineer', 'instrumentId', 'prefix'].indexOf(field) === -1) return;
+  m[field] = String(value == null ? '' : value);
+}
+
+// What the copy will hold: items, fails, photos (on this phone and only in the
+// cloud) and roughly how much space the photos take.
+function dupJobSummary(sess) {
+  const out = { n: 0, fails: 0, photos: 0, cloud: 0, bytes: 0 };
+  if (!sess || !Array.isArray(sess.items)) return out;
+  const ids = new Set();
+  for (const it of sess.items) {
+    if (!it) continue;
+    out.n++;
+    if (it.result === 'fail') out.fails++;
+    if (it.id != null) ids.add(String(it.id));
+    out.photos += (typeof photoCountForItem === 'function') ? photoCountForItem(it.id) : 0;
+  }
+  const meta = state.photoMeta || {};
+  for (const id of Object.keys(meta)) if (meta[id] && ids.has(String(meta[id].i))) out.bytes += meta[id].b || 0;
+  const cloud = (typeof photoCloudOnlyForSession === 'function') ? photoCloudOnlyForSession(sess) : [];
+  out.cloud = cloud.length;
+  out.photos += cloud.length;
+  for (const e of cloud) out.bytes += e.b || 0;
+  return out;
+}
+
+function dupJobContinue() {
+  const m = state.dupJob;
+  if (!m || m.step !== 'form') return;
+  if (!String(m.client || '').trim() && !String(m.site || '').trim()) {
+    m.error = 'Enter a client or a site for the copy.';
+    try { const el = document.getElementById('dup-job-error'); if (el) el.textContent = m.error; } catch (e) { /* no DOM */ }
+    return;
+  }
+  m.error = '';
+  m.step = 'confirm';
+  render();
+}
+
+function dupJobBack() {
+  const m = state.dupJob;
+  if (!m || (m.step !== 'confirm' && m.step !== 'partial')) return;
+  m.step = 'form';
+  m.skipCloud = false;
+  render();
+}
+
+// Progress, written in place: the working step has no buttons, but a repaint
+// per photo would be pointless churn.
+function _dupJobProgress(text) {
+  try { const el = document.getElementById('dup-job-progress'); if (el) el.textContent = text; } catch (e) { /* no DOM */ }
+}
+
+// The Duplicate button (and "Duplicate without them"). Resolves when done, for
+// the harness; the app ignores the promise.
+function duplicateJob(skipCloud) {
+  const m = state.dupJob;
+  if (!m || (m.step !== 'confirm' && m.step !== 'partial')) return Promise.resolve(false);
+  const sess = (state.sessions || []).find(s => s && String(s.id) === String(m.from));
+  if (!sess) { state.dupJob = { step: 'blocked', why: dupJobBlockReason(null), from: m.from }; render(); return Promise.resolve(false); }
+  if (skipCloud) m.skipCloud = true;
+  const cloud = m.skipCloud ? [] : ((typeof photoCloudOnlyForSession === 'function') ? photoCloudOnlyForSession(sess) : []);
+  m.step = 'working';
+  render();
+  // 4A: fetched first. syncPhotoDownload answers "failed" for all of them when
+  // signed out or offline, so the one question covers every reason.
+  const fetch = (cloud.length && typeof syncPhotoDownload === 'function')
+    ? syncPhotoDownload(cloud.map(e => e.id), (done, all) => _dupJobProgress(`Fetching photos from the cloud\u2026 ${done} of ${all}`))
+    : Promise.resolve({ got: 0, failed: 0 });
+  return Promise.resolve(fetch).then((res) => {
+    if (res && res.failed > 0) {
+      if (state.dupJob !== m) return false;   // the sheet went: nothing was copied
+      m.step = 'partial';
+      m.failed = res.failed;
+      render();
+      return false;
+    }
+    return _dupJobCommit(m);
+  }).catch((e) => { console.error('duplicateJob failed', e); return _dupJobFail(m); });
+}
+
+function _dupJobFail(m, why) {
+  if (state.dupJob === m) {
+    state.dupJob = { step: 'blocked', from: m.from,
+      why: why || 'The copy could not be made. Nothing was duplicated \u2014 try again.' };
+    render();
+  }
+  return false;
+}
+
+function _dupJobCommit(m) {
+  const sess = (state.sessions || []).find(s => s && String(s.id) === String(m.from));
+  if (!sess) return _dupJobFail(m, dupJobBlockReason(null));
+  _dupJobProgress('Copying\u2026');
+  // The items, now: new ids, everything else as it is.
+  const itemMap = new Map();
+  const items = (sess.items || []).filter(Boolean).map((it) => {
+    const c = JSON.parse(JSON.stringify(it));
+    c.id = newId();
+    // Lifetime stats count an item and its copies once (statsKeyOf).
+    if (it.id != null && (it.copyOf == null || String(it.copyOf) === '')) c.copyOf = String(it.id);
+    if (it.id != null) itemMap.set(String(it.id), c.id);
+    return c;
+  });
+  // The job's own fields, from the same moment.
+  const src = JSON.parse(JSON.stringify(sess));
+  const jobId = newId();
+  const copyPhotos = (typeof photosCopyForItems === 'function')
+    ? photosCopyForItems(itemMap, jobId) : Promise.resolve({ ok: true, n: 0 });
+  return copyPhotos.then((r) => {
+    if (!r || !r.ok) {
+      return _dupJobFail(m, 'The photos could not be copied \u2014 this phone may be short of space. Nothing was duplicated.');
+    }
+    const job = _dupJobBuild(m, src, jobId, items);
+    state.sessions.unshift(job);
+    state.sessions = state.sessions.slice();
+    if (state.dupJob === m) {
+      // 5A: open the copy.
+      state.dupJob = null;
+      state.activeId = job.id;
+      state.lastLog = null;
+      state.cursor = job.items.length;
+      loadFormForCursor();
+      save();
+      setView('overview');
+      showToast('Duplicated \u2014 this is the copy');
+    } else {
+      save();
+      showToast(`Duplicated ${job.site || job.name || 'the job'}`);
+    }
+    return job;
+  });
+}
+
+// The copy's job record. `src` is the original as it was when copying began.
+function _dupJobBuild(m, src, jobId, items) {
+  const clientName = String(m.client || '').trim();
+  const siteName = String(m.site || '').trim();
+  let site, clientId = '', siteId = '';
+  if (clientName === String(m.client0 || '').trim() && siteName === String(m.site0 || '').trim()) {
+    // Unchanged: exactly the original's title and links — never a new list entry
+    // made from a title that was edited in Session settings.
+    site = src.site || '';
+    clientId = src.clientId || '';
+    siteId = src.siteId || '';
+  } else {
+    // Same resolution as createSession() / the move.
+    let clientRec = null, siteRec = null;
+    if (clientName && siteName) {
+      clientRec = ensureClient(clientName);
+      if (clientRec) siteRec = ensureSite(clientRec.id, siteName);
+    } else if (clientName) {
+      clientRec = ensureClient(clientName);
+    } else {
+      siteRec = ensureOrphanSite(siteName);
+    }
+    site = moveJobTitle(clientName, siteName);
+    clientId = clientRec ? clientRec.id : '';
+    siteId = siteRec ? siteRec.id : '';
+  }
+  const now = new Date().toISOString();
+  const date = /^\d{4}-\d{2}-\d{2}$/.test(String(m.date || '')) ? m.date : (src.date || todayISO());
+  const job = {
+    id: jobId,
+    name: String(m.name || '').trim() || `Job ${state.sessions.length + 1}`,
+    site,
+    clientId,
+    siteId,
+    engineer: String(m.engineer || '').trim(),
+    prefix: String(m.prefix || '').trim(),
+    date,
+    startNumber: src.startNumber || 1,
+    instrumentId: String(m.instrumentId || ''),
+    items,
+    locked: false,              // 13A: a locked job may be copied; the copy is open
+    notes: src.notes || '',     // 3A
+    certNo: '',                 // its own number, the first time it is made
+    userId: null,
+    lastModified: now,
+    syncedAt: null
+  };
+  if (src.startPad) job.startPad = src.startPad;
+  if (src.instrumentSnapshot && job.instrumentId === String(src.instrumentId || '')) {
+    job.instrumentSnapshot = JSON.parse(JSON.stringify(src.instrumentSnapshot));
+  }
+  if (src.retestTrack) { job.retestTrack = true; job.retestMonths = src.retestMonths; job.retestContact = null; }
+  normaliseSessionRetest(job);
+  return job;
+}
+
 // Edit-session flow
 function startEditSession() {
   const sess = activeSession();
@@ -2272,6 +4073,21 @@ function startEditSession() {
   render();
 }
 
+// V112: read the Edit session inputs into the draft. Used by Save and by the
+// Back guard (settings-actions.js), so both see the page exactly the same way.
+// Each lookup is guarded: the guard may run on a page that is mid-teardown.
+function captureEditSessionForm() {
+  const $ = id => document.getElementById(id);
+  const f = state.editForm;
+  if (!f) return;
+  if ($('ef-site')) f.site = $('ef-site').value;
+  if ($('ef-engineer')) f.engineer = $('ef-engineer').value;
+  if ($('ef-name')) f.name = $('ef-name').value;
+  if ($('ef-date')) f.date = $('ef-date').value;
+  if ($('ef-prefix')) f.prefix = $('ef-prefix').value;
+  f.locked = $('ef-locked') ? $('ef-locked').checked : false;   // v8
+}
+
 function saveSessionEdits() {
   const sess = activeSession();
   if (!sess) return;
@@ -2281,14 +4097,32 @@ function saveSessionEdits() {
     return;
   }
   sess.name = String(name).trim() || sess.name;
-  sess.site = String(site).trim();
   // v19: clientId/siteId refs are convenience-only and never drive display, CSV,
-  // or search (the `site` text snapshot does). We intentionally leave them as set
-  // at creation — editing the site text here won't and needn't update them.
+  // or search (the `site` text snapshot does).
+  // V98: the site link now decides whose SITE NOTES a job shows, so a changed
+  // site text re-links the job to the saved site it now names ('' when it names
+  // none — siteForSession() then falls back to the text). Nothing is created, and
+  // an unchanged text leaves the link alone (a site renamed in Clients & Sites
+  // keeps its old jobs). The text changes in the same step, so _sessionSig()
+  // sees the edit; the explicit invalidate covers siteId, which it doesn't list.
+  const newSite = String(site).trim();
+  if (newSite !== String(sess.site || '').trim()) {
+    const parts = splitSiteSnapshot(newSite);
+    const linked = siteForNames(parts.client, parts.site);
+    sess.siteId = linked ? linked.id : '';
+    if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(sess);
+  }
+  sess.site = newSite;
   sess.engineer = String(engineer).trim();
   sess.prefix = String(prefix).trim();
   sess.date = date || sess.date;
+  // V100 (1A): the lock TIME. Stamped only on the change to locked; removed on
+  // unlock, so it is absent unless the job is locked (sync rule 36). Re-saving a
+  // job that was already locked keeps its time.
+  const wasLocked = !!sess.locked;
   sess.locked = !!locked;   // v8
+  if (sess.locked && !wasLocked) sess.lockedAt = new Date().toISOString();
+  else if (!sess.locked) delete sess.lockedAt;
   // v66: the per-session instrument stamp (decision 2A).
   // ⚠ The snapshot describes the PREVIOUS stamp and nothing else, so it is
   // dropped whenever the stamp actually changes — unconditionally. An earlier
@@ -2313,5 +4147,6 @@ function unlockActiveSession() {
   const sess = activeSession();
   if (!sess) return;
   sess.locked = false;
+  delete sess.lockedAt;   // V100
   save(); render();
 }

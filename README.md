@@ -21,10 +21,14 @@ Everything works in aeroplane mode; nothing needs an account.
 - Quick Pick — up to nine one-tap item types, switchable presets, and Smart Quick
   Pick, which learns what gets logged where
 - Multi Pick for a fixed mixed sequence; "Log again ×N" for a run of the same item
-- A fail flow with reasons, optional test readings, and photo evidence
+- A fail flow with reasons, optional test readings (checked against the usual limits), and photo evidence
 - PDF certificates and CSV export/import
 - Backup and restore to a file, and an Export/Import Setup bundle for a new phone
 - Bluetooth HID barcode scanner support (keyboard-wedge mode)
+- Settings pages and Edit session ask before Back throws away unsaved changes (V112); first-time setup offers to switch PDF reports on
+- Cloud (test): every account is a business in the database, ready for teams — roles, a business stamp on every job, and no deleting a login that still has work (V113)
+- Settings speaks one language: jobs throughout, one heading style, and a Glossary that matches the screen (V114)
+- Line icons (Lucide) in place of emoji across the app, following light and dark themes (V115)
 
 `FEATURES.md` is the full reference — one `##` section per capability and per
 release. Don't read it whole: `grep -n '^## ' FEATURES.md`, then `sed` the section.
@@ -43,7 +47,7 @@ in the shipped app — the files in the repo root are the files the browser load
 | Offline | Service worker (`sw.js`) precaching every asset |
 | PDF | jsPDF 3.0.3 + jsPDF-AutoTable 5.0.2, vendored and self-hosted (MIT) |
 | PDF preview | PDF.js 3.11.174 legacy UMD, vendored, lazy-loaded (Apache-2.0) |
-| Cloud | supabase-js 2.116.0 UMD, vendored, lazy-loaded (MIT) — invite-only, test host only. Syncs both ways: jobs, clients, sites, instruments, presets, the tester in use, report settings, report templates, the certificate counter (V79–V84) and general settings (V86). Reached from Settings → Cloud behind an access code (V85). Photos not yet |
+| Cloud | supabase-js 2.116.0 UMD, vendored, lazy-loaded (MIT) — invite-only, test host only. Syncs both ways: jobs, clients, sites, instruments, presets, the tester in use, report settings, report templates, the certificate counter (V79–V84) and general settings (V86). Reached from Settings → Cloud behind an access code (V85). Photos go up (V88) and come down on request (V89); jobs come down only when they changed (V92, fingerprint column); a phone brings down the last 30 days plus retests being chased, and older jobs are reached from the Jobs screen's ☁ In the cloud tab (V93), where they can also be deleted from the cloud (V107); Settings → Data → Cloud Storage shows the space used and the biggest jobs (V108), also one tap from the cloud tab (V109). Every cloud read asks for the signed-in account's rows by name, ready for the business rules (V111) |
 | Hosting | `main` → GitHub Pages (test); `Release` → Cloudflare (the product) |
 | Tests | `harness/` — Node, no dependencies |
 
@@ -59,34 +63,38 @@ is no toolchain to rot between releases.
 
 ```
 index.html            script tags, in a load order that matters
-config.js … boot.js   31 first-party modules (see below)
+config.js … boot.js   36 first-party modules (see below)
 styles.css            one stylesheet, ordered by release, banner-indexed
 sw.js                 service worker + the precache ASSETS list
 manifest.webmanifest  PWA manifest
-icon-192.png  icon-512.png
+icon-192.png  icon-512.png   app icons (manifest)
+favicon.ico  apple-touch-icon.png   browser-tab icon (the plug) and 180 px home-screen icon (V109)
 jspdf.*.min.js        vendored PDF engine — precached, not <script>-tagged
 supabase.umd.js       vendored cloud client — precached, not <script>-tagged
-supabase/             server SQL: schema.sql (run once), isolation-test.sql (every release)
+supabase/             server SQL: schema.sql (run once), isolation-test.sql (every release),
+                      v92-fingerprint.sql (V92 change for an existing project)
+                      v93-archive.sql (V93 change for an existing project)
+                      v108-storage.sql (V108 change for an existing project)
+                      v113-organisations.sql (V113 businesses, for an existing project)
 harness/              the committed test harness — NOT shipped
 MAP.md  FEATURES.md  BACKLOG.md
-PAThandoff_vNN.md     the canonical state block for the current release
 ```
 
-### Load order — 31 files, and it is not arbitrary
+### Load order — 36 files, and it is not arbitrary
 
 ```
-config → data → state → utils → storage → clients → instruments → sqp
-→ multipick → feedback → bugreport → photos → csv → backup → session
-→ settings-actions → setup → tour → onboarding → report → pdfpreview
-→ render-core → render-review → render-settings → render-help
-→ cloud → sync → scanner → events → dispatch → boot
+config → data → state → utils → icons → storage → clients → instruments → sqp
+→ multipick → feedback → bugreport → photos → csv → backup → snapshots
+→ reset → session → settings-actions → setup → tour → onboarding → report → pdfpreview
+→ exportall → render-core → render-review → render-settings → render-help
+→ cloud → sync → plan → scanner → events → dispatch → boot
 ```
 
 `data` → `state` is the one adjacency that is a hard dependency rather than a
 readability choice: `state.js` seeds itself from `data.js` constants in a
 top-level initialiser that runs at load. `boot.js` must be last — it runs on load.
 
-`sw.js` ASSETS lists **34** `.js` entries: these 31 plus the two jsPDF files and
+`sw.js` ASSETS lists **39** `.js` entries: these 36 plus the two jsPDF files and
 `supabase.umd.js`, which are precached but injected on demand rather than
 script-tagged.
 
@@ -119,7 +127,7 @@ mutation survives **or** fails to apply. Both must be clean before a release, an
 
 ### Before changing anything
 
-1. Read `MAP.md`'s cross-cutting rules, then the current `PAThandoff_vNN.md`.
+1. Read `MAP.md`'s cross-cutting rules, then the current handoff.
 2. **Fetch the live repo and byte-compare.** The source of truth is what is
    deployed, not what a document says about it. Code wins over docs.
 3. Establish a green harness baseline *first*, so a red result later is
@@ -153,9 +161,11 @@ separately from behaviour changes.
   behaviour release
 - About changelog rolled — three versions, oldest dropped (`render-help.js`)
 - `MAP.md` accurate, `FEATURES.md` gains a section, `BACKLOG.md` reconciled
-- New assertions in `harness/tests/`, and **a matching mutation for each**
+- New assertions in `harness/tests/`, and **a matching mutation for each**, its
+  `why` ending with the test group that catches it (harness 01k)
 - Re-point the release-anchored mutations **M66** and **M82**, or they abort
-- A new `PAThandoff_vNN.md`, including the post-commit test checklist
+- The handoff updated (it lives in the Claude project, never here), including the
+  post-commit test checklist
 - From v79: `supabase/isolation-test.sql` run in the test project, all PASS,
   result recorded in the handoff — before any promotion to `Release`
 

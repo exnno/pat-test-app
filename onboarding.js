@@ -55,6 +55,20 @@ function captureWizardStep() {
     if (typeof adoptMirrorIntoInstruments === 'function') adoptMirrorIntoInstruments();
   }
   if (coEl && state.reportSettings) state.reportSettings.companyName = coEl.value.trim();
+  // V112 (4A): the reports switch (step 4) — its change handler records it too;
+  // reading it here as well means a value the handler missed is not lost.
+  const repEl = document.getElementById('wizard-reports');
+  if (repEl) state.wizardReportsOn = !!repEl.checked;
+}
+
+// V112 (5A): someone who has just set the phone up has no "previous version" —
+// the What's new sheet straight after setup describes changes to an app they
+// have never used. Finishing, skipping or importing a setup counts as having
+// seen this version's. (It also frees the barcode scanner, which stays off
+// while that sheet is unseen — scanner.js.) typeof-guarded like storage.js.
+function markWelcomeSeenAtSetup() {
+  state.welcomeSeen = true;
+  try { if (typeof WELCOME_KEY === 'string') localStorage.setItem(WELCOME_KEY, '1'); } catch (e) {}
 }
 
 // Mark onboarding finished (completed or skipped) and drop into the app.
@@ -64,6 +78,8 @@ function finishOnboarding() {
   state.wizardStep = 1;
   state.wizardPath = '';
   state.wizardSeedDemo = false;
+  state.wizardReportsOn = true;   // V112: the default for the next new setup
+  markWelcomeSeenAtSetup();       // V112 (5A)
   state.view = 'sessions';
   render();
 }
@@ -91,6 +107,14 @@ function wizardChoosePath(path) {
 // there is not wired (finish/tour buttons take over).
 function wizardNextStep() {
   captureWizardStep();
+  // V112 (4A): Continue on the branding step applies the reports switch, and
+  // saves report settings there and then — so the choice (and the branding with
+  // it) survives a later "Skip for now", which finishes without a save().
+  // "Skip for now" ON this step never reaches here: reports stay as they were.
+  if (state.wizardStep === 4 && state.reportSettings) {
+    state.reportSettings.enabled = !!state.wizardReportsOn;
+    saveReportSettings();
+  }
   if (state.wizardStep < WIZARD_LAST_STEP) state.wizardStep += 1;
   render();
 }
@@ -153,6 +177,7 @@ function onboardSetupImport(file) {
   state.wizardStep = 1;
   state.wizardPath = '';
   state.wizardSeedDemo = false;
+  markWelcomeSeenAtSetup();   // V112 (5A)
   importSetupFromFile(file);   // handles confirm/apply/save/render itself
 }
 
@@ -163,6 +188,9 @@ function restartOnboarding() {
   state.wizardStep = 1;
   state.wizardPath = '';
   state.wizardSeedDemo = false;
+  // V112 (4A): a re-run starts the reports switch at the phone's current
+  // setting, so Continue on step 4 changes nothing unless they flip it.
+  state.wizardReportsOn = !!(state.reportSettings && state.reportSettings.enabled);
   render();
 }
 
@@ -204,7 +232,7 @@ function seedDemoSession() {
       mk('005', 'Office', 'Desk lamp', 'pass')
     ],
     locked: false,
-    notes: 'This is an example session to show how the app works. Delete it any time.',
+    notes: 'This is an example job to show how the app works. Delete it any time.',
     certNo: '',
     [DEMO_SESSION_FLAG]: true,
     // v43: sync metadata for demo session

@@ -27,7 +27,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, freshApp, withSession, withItem, confirmSheet } = require('../fixture');
+const { tick, freshApp, withSession, withItem, confirmSheet, syncCurrent } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID_A = '11111111-1111-1111-1111-111111111111';
@@ -171,7 +171,7 @@ function markSent(app, ids) {
     else if (id === CERT) st.rec.sent[id] = h('settings', { id: CERT, next: rs(app).certNextNumber, setAt: rs(app).certSetAt });
     else st.rec.sent[id] = h('template', tpl(app, id));
   }
-  app.storage.setItem('pat:syncState', JSON.stringify(st));
+  app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
 }
 
 const sentIds = (app) => app.srv.rows('records').map(r => r.id);
@@ -220,7 +220,7 @@ module.exports = async function () {
   /* ------------------------------------------------------------------ 21c */
   t.group('21c — a counter typed in by hand is marked as a deliberate set; a re-render is not', () => {
     const app = freshApp();
-    app.run(`state.reportSettings.certEnabled = true; state.reportSettings.certNextNumber = 30; setView('settingsReport'); render();`);
+    app.run(`state.reportSettings.certEnabled = true; state.reportSettings.certNextNumber = 30; setView('settingsReportContent'); render();`);   // V117: on Certificate Content
     const input = app.doc.getElementById('report-cert-next');
     t.ok(!!input, 'the counter box is on the page');
     input.value = '30';                                  // what the page shows
@@ -397,6 +397,41 @@ module.exports = async function () {
     await app2.fn('syncPull')();
     await tick(5);
     t.eq(sentIds(app2).filter(i => i === REPORT).length, 1, 'once the page is left, it goes');
+  });
+
+  /* ------------------------------------------------------------------ 21r */
+  // V117 (1A): Report Settings is two pages. The second half, Certificate
+  // Content, holds the display switches and the counter, so it must hold sync
+  // off exactly as 21j does for the first half — or a pull could replace the
+  // settings under the page and its Save would write the old ones back over them.
+  await t.group('21r — V117: with Certificate Content open, sync holds off exactly as on Company & Branding', async () => {
+    const app = signedIn();
+    localReport(app, { enabled: true, companyName: 'ZZ Before', certNextNumber: 5 });
+    markSent(app, [REPORT, CERT]);
+    app.run(`setView('settingsReportContent'); render();`);
+    app.srv.tables.records.push(reportRow(app, { enabled: true, companyName: 'ZZ From There' }), certRow(50));
+    await app.fn('syncPull')();
+    await tick(5);
+    t.eq(rs(app).companyName, 'ZZ Before', 'the open page\u2019s settings are not replaced');
+    t.eq(rs(app).certNextNumber, 5, 'nor the counter it shows');
+    app.run(`setView('settings');`);
+    app.stopTimer();
+    await app.fn('syncPull')();
+    await tick(5);
+    t.eq(rs(app).companyName, 'ZZ From There', 'once the page is left, the change applies');
+
+    const app2 = signedIn();
+    localReport(app2, { enabled: true, companyName: 'ZZ Saved', certNextNumber: 5 });
+    markSent(app2, [REPORT, CERT]);
+    app2.run(`setView('settingsReportContent'); render(); state.reportSettings.showFails = false; state.reportSettings.certNextNumber = 6;`);
+    await app2.fn('syncPull')();
+    await tick(5);
+    t.eq(sentIds(app2).filter(i => i === REPORT || i === CERT).length, 0, 'the unsaved switch and counter are not sent');
+    app2.run(`setView('settings');`);
+    app2.stopTimer();
+    await app2.fn('syncPull')();
+    await tick(5);
+    t.eq(sentIds(app2).filter(i => i === REPORT).length, 1, 'once the page is left, they go');
   });
 
   /* ------------------------------------------------------------------ 21k */

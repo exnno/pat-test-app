@@ -447,7 +447,10 @@ function makeIndexedDB() {
       }, 0);
       return req;
     },
-    deleteDatabase() { const r = makeRequest(); stores.clear(); fire(r, 'onsuccess', undefined); return r; },
+    // V106: records WHICH database was deleted (the stores themselves still share
+    // one namespace, so a delete still empties all of them — see the note above).
+    _deleted: [],
+    deleteDatabase(name) { this._deleted.push(String(name)); const r = makeRequest(); stores.clear(); fire(r, 'onsuccess', undefined); return r; },
   };
 }
 
@@ -471,11 +474,17 @@ function makeNavigator(opts = {}) {
       async readText() { return calls.clipboard[calls.clipboard.length - 1] || ''; },
     },
     vibrate(p) { calls.vibrate.push(p); return true; },
+    // V126: listeners are recorded and dispatchable, so a test can fire the
+    // real controllerchange the page listens for. opts.swController: the page
+    // loaded under a worker (an installed app) rather than a first visit.
     serviceWorker: {
-      controller: null,
+      controller: opts.swController || null,
       async register() { return { addEventListener() {}, installing: null, waiting: null, update() {} }; },
       async getRegistration() { return null; },
-      addEventListener() {},
+      _listeners: {},
+      addEventListener(t, fn) { (this._listeners[t] ||= []).push(fn); },
+      removeEventListener(t, fn) { const a = this._listeners[t]; if (a) this._listeners[t] = a.filter(f => f !== fn); },
+      dispatchEvent(ev) { (this._listeners[ev.type] || []).forEach(fn => fn.call(this, ev)); return true; },
     },
     // V87 (S12): persisted()/persist() — the real API's shape. opts.persisted is
     // the starting answer; opts.persistGrants is what persist() decides.
@@ -495,7 +504,9 @@ class StubBlob {
   constructor(parts = [], opts = {}) {
     this._parts = parts;
     this.type = opts.type || '';
-    this.size = parts.reduce((n, p) => n + String(p).length, 0);
+    // V125: byte parts (a zip's Uint8Arrays) count their bytes, not the length
+    // of their String() form.
+    this.size = parts.reduce((n, p) => n + (p && typeof p.byteLength === 'number' ? p.byteLength : String(p).length), 0);
   }
   async text() { return this._parts.map(String).join(''); }
   slice() { return new StubBlob(this._parts, { type: this.type }); }
@@ -572,7 +583,9 @@ function makeEnvironment(opts = {}) {
       pathname: '/pat-test-app/',
       search: '',
       hash: '',
-      reload() {},
+      // V106: counted, so a test can see a reset ask for the reload.
+      _reloads: 0,
+      reload() { win.location._reloads++; },
       assign() {},
       replace() {},
     },
@@ -630,6 +643,9 @@ function makeEnvironment(opts = {}) {
     RegExp, Error, TypeError, RangeError, Map, Set, WeakMap, WeakSet, Symbol,
     parseInt, parseFloat, isNaN, isFinite, encodeURIComponent, decodeURIComponent,
     Intl, Buffer, structuredClone,
+    // V125: exportall.js encodes file contents to bytes for the zip. Node's own,
+    // as in every browser PATGo runs in.
+    TextEncoder, TextDecoder,
 
     // bugreport.js reads screen.width/height for the SCREEN diagnostic line.
     // typeof-guarded there, so omitting it would silently take the 'unknown'

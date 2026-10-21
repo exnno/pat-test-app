@@ -70,6 +70,22 @@ function recordSqpUsage(location, itemType) {
   bumpSqpHistoryVersion();   // v23 (E6): invalidate the scores memo
 }
 
+// V94: the reverse of recordSqpUsage(), for Undo — the same normalisation, so
+// it takes back exactly the count that log added. Never below zero; an emptied
+// type or location is removed so the history has no zero husks. Like
+// recordSqpUsage it does not save; the caller does.
+function unrecordSqpUsage(location, itemType) {
+  const loc = normaliseSqpLocation(location);
+  const type = String(itemType || '').trim();
+  if (!loc || !type) return;
+  const bucket = state.sqpHistory[loc];
+  if (!bucket || !bucket[type]) return;
+  bucket[type] -= 1;
+  if (bucket[type] <= 0) delete bucket[type];
+  if (!Object.keys(bucket).length) delete state.sqpHistory[loc];
+  bumpSqpHistoryVersion();
+}
+
 // Build (or rebuild) the entire history map from every item already in storage.
 // Used to seed the model the first time the feature is enabled — so it's useful
 // immediately on an existing database rather than starting empty — and by the

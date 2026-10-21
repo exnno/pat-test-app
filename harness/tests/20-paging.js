@@ -23,7 +23,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, withSession, withItem, CANARY } = require('../fixture');
+const { tick, withSession, withItem, CANARY, RECENT_DATE, syncCurrent } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID_A = '11111111-1111-1111-1111-111111111111';
@@ -148,7 +148,7 @@ function local(app, { clients = [], sites = [], sent = [] } = {}) {
     const kind = c ? 'client' : 'site';
     st.rec.sent[id] = app.fn('_syncRecordHash')(kind, c || s);
   }
-  app.storage.setItem('pat:syncState', JSON.stringify(st));
+  app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
 }
 
 function rename(app, kind, id, name) {
@@ -177,7 +177,7 @@ function batched(make) {
 function jobRow(id, items, at) {
   return {
     id,
-    doc: { id, site: 'ZZ PAGED', name: '', engineer: CANARY.engineer, prefix: '', date: '2026-09-10',
+    doc: { id, site: 'ZZ PAGED', name: '', engineer: CANARY.engineer, prefix: '', date: RECENT_DATE,
       startNumber: 1, locked: false,
       items: items.map((a, i) => ({ assetNo: a, location: 'ZZPAGED', itemType: 'Kettle', notes: '', result: 'pass', id: id + '-i' + i })) },
     deleted: false, last_modified: at, updated_at: at,
@@ -199,7 +199,7 @@ function sentJob(app, site) {
   st.userId = UID_A; st.hashV = 2;
   st.sent = st.sent || {};
   st.sent[String(sess.id)] = app.fn('syncHash')(app.fn('_syncCanonical')(sess));
-  app.storage.setItem('pat:syncState', JSON.stringify(st));
+  app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(st)));
   return sess;
 }
 
@@ -271,14 +271,16 @@ module.exports = async function () {
       records: [recRow('client', 'client_ZZPOLD', { id: 'client_ZZPOLD', name: 'ZZ Stepped Over' }, T1)],
     } });
     // A V83 phone whose cursors are PAST rows it never read (T2 > T1).
-    app.storage.setItem('pat:syncState', JSON.stringify({ userId: UID_A, hashV: 2, sent: {}, gone: {}, resend: {},
-      pulledAt: T2, rec: { sent: {}, gone: {}, resend: {}, pulledAt: T2, kinds: app.fn('_syncRecordKindsTag')() } }));
+    app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent({ userId: UID_A, hashV: 2, sent: {}, gone: {}, resend: {},
+      pulledAt: T2, rec: { sent: {}, gone: {}, resend: {}, pulledAt: T2, kinds: app.fn('_syncRecordKindsTag')() } })));
     await run(app);
     t.ok(jobById(app, 'ZZJOLD'), 'the job it had stepped over arrives');
     t.ok(client(app, 'client_ZZPOLD'), 'and the client');
     t.eq(syncState(app).pagerV, app.run('SYNC_PAGER_V'), 'the new pager version is saved');
     await run(app);
-    const url = (tbl) => decodeURIComponent(app.srv.gets(tbl).slice(-1)[0].url);
+    // V92: jobs also read docs by id and fingerprints after a push; the page
+    // request is the one carrying the cursor.
+    const url = (tbl) => decodeURIComponent(app.srv.gets(tbl).filter(c => c.url.includes('updated_at=')).slice(-1)[0].url);
     t.includes(url('sessions'), 'updated_at=gte.' + T1, 'after which jobs carry on from their cursor');
     t.includes(url('records'), 'updated_at=gte.' + T1, 'and so do records — it happens once, not every run');
   });
@@ -320,7 +322,7 @@ module.exports = async function () {
     const app = signedIn({ server: { sessions: rows } });
     await run(app);
     t.notOk(syncState(app).pulledAt, 'the cursor does not move past rows it may not have read');
-    t.ok(app.srv.gets('sessions').length <= 2, 'and the run ends rather than asking for the same page for ever');
+    t.ok(app.srv.gets('sessions').filter(c => c.url.includes('updated_at=')).length <= 2, 'and the run ends rather than asking for the same page for ever');
   });
 
   /* ------------------------------------------------------------------ 20f2 */

@@ -52,11 +52,11 @@ function renderOverviewBodyHTML(sess) {
   const visible = computeVisibleOverviewItems(sess);
   if (visible.length === 0) {
     if (state.searchQuery.trim()) return `<p class="muted">No items match your search.</p>`;
-    if (state.showFailsOnly) return `<p class="muted">No fails in this session.</p>`;
+    if (state.showFailsOnly) return `<p class="muted">No fails in this job.</p>`;
     // Genuinely empty session → rich empty state. No action button: the entry
     // controls to log the first item are right there on the screen.
-    return emptyStateHTML('⚡', 'No items logged yet',
-      'Use the item buttons to log your first test for this session.');
+    return emptyStateHTML('zap', 'No items logged yet',
+      'Use the item buttons to log your first test for this job.');
   }
   const sel = state.selectionMode;
   const checkColHead = sel ? `<th class="th"></th>` : '';
@@ -70,11 +70,11 @@ function renderOverviewBodyHTML(sess) {
         ${visible.map(({ it, i }) => {
           const checked = sel && state.selectedIndices.includes(i);
           const checkCol = sel
-            ? `<td class="td td-check"><input type="checkbox" data-change-action="row-select" data-arg="${i}" ${checked ? 'checked' : ''}></td>`
+            ? `<td class="td td-check"><input aria-label="Select item ${escapeHTML(String(it.assetNo))}" type="checkbox" data-change-action="row-select" data-arg="${i}" ${checked ? 'checked' : ''}></td>`
             : '';
           const actionCol = sel
             ? `<td class="td td-action"></td>`
-            : `<td class="td td-action" data-action="delete-item" data-arg="${i}" data-del-item="${i}">🗑</td>`;
+            : `<td class="td td-action" data-action="delete-item" data-arg="${i}" data-del-item="${i}">${icon('trash-2')}</td>`;
           const rowAttr = sel ? `data-action="row-toggle" data-arg="${i}" data-row-toggle="${i}"` : `data-action="jump-to-item" data-arg="${i}" data-jump="${i}"`;
           const rowClass = sel && checked ? 'tr selected' : 'tr';
           // v17: when timestamps are on, show HH:MM subtly beneath the item
@@ -89,18 +89,27 @@ function renderOverviewBodyHTML(sess) {
           // the markup is empty, so the table is untouched for existing users.
           // In selection mode it renders as an inert span: tapping a row there
           // must toggle the selection, not open a sheet.
-          const photoN = (it.result === 'fail' && it.id) ? photoCountForItem(it.id) : 0;
+          // v89 (3A): photos only in the cloud count too, with a ☁ when any are
+          // not on this phone. Signed out, it is this phone's photos, as before.
+          const photoN = (it.result === 'fail' && it.id)
+            ? ((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id) : photoCountForItem(it.id)) : 0;
+          const photoCloudN = (photoN && typeof photoCloudOnlyCountForItem === 'function') ? photoCloudOnlyCountForItem(it.id) : 0;
+          const photoMark = photoCloudN ? ' ' + icon('cloud') : '';
           const photoChip = !photoN ? ''
             : (sel
-              ? `<span class="photo-chip is-static">📷 ${photoN}</span>`
-              : `<button class="photo-chip" data-action="photo-strip-open" data-arg="${escapeHTML(it.id)}" aria-label="View ${photoN} photo${photoN === 1 ? '' : 's'}">📷 ${photoN}</button>`);
+              ? `<span class="photo-chip is-static">${icon('camera')} ${photoN}${photoMark}</span>`
+              : `<button class="photo-chip" data-action="photo-strip-open" data-arg="${escapeHTML(it.id)}" aria-label="View ${photoN} photo${photoN === 1 ? '' : 's'}${photoCloudN ? `, ${photoCloudN} in the cloud only` : ''}">${icon('camera')} ${photoN}${photoMark}</button>`);
+          // V99 (6A, 9A): 📍 on any item with a map pin, switch on or off. Static —
+          // tapping the row opens the item, where the pin is.
+          const itPin = (typeof mapPinOf === 'function') ? mapPinOf(it) : '';
+          const pinChip = itPin ? `<span class="pin-chip" title="${escapeHTML('///' + itPin)}" aria-label="Map pin ${escapeHTML(itPin)}">📍</span>` : '';
           return `
             <tr class="${rowClass}" ${rowAttr}>
               ${checkCol}
               <td class="td">${escapeHTML(it.assetNo)}</td>
               <td class="td">${escapeHTML(it.location)}</td>
               <td class="td">${escapeHTML(it.itemType)}${timeLine}</td>
-              <td class="td td-result ${it.result || ''}">${capitalise(it.result || '')}${photoChip}</td>
+              <td class="td td-result ${it.result || ''}">${capitalise(it.result || '')}${photoChip}${pinChip}</td>
               ${actionCol}
             </tr>
           `;
@@ -118,7 +127,7 @@ function renderOverview() {
 
   const filterRow = sess.items.length > 0 ? `
     <div class="overview-filters">
-      <input type="search" class="search-input" id="overview-search" data-input-action="overview-search" placeholder="Search asset, location, item, notes…" value="${escapeHTML(state.searchQuery)}" autocomplete="off">
+      <input aria-label="Search items" type="search" class="search-input" id="overview-search" data-input-action="overview-search" placeholder="Search asset, location, item, notes…" value="${escapeHTML(state.searchQuery)}" autocomplete="off">
       <label class="filter-toggle">
         <input type="checkbox" id="fails-only-toggle" data-change-action="fails-only" ${state.showFailsOnly ? 'checked' : ''}>
         <span>Show fails only</span>
@@ -131,21 +140,21 @@ function renderOverview() {
   if (state.selectionMode) {
     const n = state.selectedIndices.length;
     header = `
-      <header class="header-row">
-        <button class="icon-btn" id="cancel-selection-btn" data-action="cancel-selection" aria-label="Cancel selection">✕</button>
-        <div class="site-name">${n} selected</div>
+      <header class="header-row header-sticky">
+        <button class="icon-btn" id="cancel-selection-btn" data-action="cancel-selection" aria-label="Cancel selection">${icon('x')}</button>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">${n} selected</div>
         <span style="width:40px"></span>
       </header>
     `;
   } else {
     header = `
-      <header class="header-row">
-        <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">‹</button>
-        <div class="site-name">Overview</div>
+      <header class="header-row header-sticky">
+        <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">${icon('chevron-left')}</button>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Overview</div>
         <div class="header-actions">
-          ${state.reportSettings.enabled ? `<button class="icon-btn" id="produce-report-btn" data-action="produce-report" data-arg="${sess.id}" aria-label="Produce report" title="Produce report">📄</button>` : ''}
-          <button class="icon-btn" id="copy-btn" data-action="copy-current" aria-label="Copy CSV" title="Copy CSV">📋</button>
-          <button class="icon-btn" id="export-btn" data-action="export-current" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
+          ${state.reportSettings.enabled ? `<button class="icon-btn" id="produce-report-btn" data-action="produce-report" data-arg="${sess.id}" aria-label="Produce report" title="Produce report">${icon('file-text')}</button>` : ''}
+          <button class="icon-btn" id="copy-btn" data-action="copy-current" aria-label="Copy CSV" title="Copy CSV">${icon('clipboard-list')}</button>
+          <button class="icon-btn" id="export-btn" data-action="export-current" aria-label="Share CSV">${icon('share', 'share-icon')}</button>
         </div>
       </header>
     `;
@@ -158,7 +167,7 @@ function renderOverview() {
   const actionRow = (!state.selectionMode) ? `
     <div class="overview-action-row">
       ${sess.items.length > 0 ? `<button class="overview-action-btn" id="select-mode-btn" data-action="enter-selection">Select items</button>` : ''}
-      <button class="overview-action-btn" id="edit-session-btn" data-action="edit-session">Session settings</button>
+      <button class="overview-action-btn" id="edit-session-btn" data-action="edit-session">Job settings</button>
     </div>
   ` : '';
 
@@ -177,7 +186,7 @@ function renderOverview() {
   const selectionBar = state.selectionMode ? `
     <div class="selection-bar">
       <span class="selection-bar-count">${state.selectedIndices.length} selected</span>
-      <button class="selection-bar-action" id="bulk-edit-menu-btn" data-action="bulk-menu-open" ${state.selectedIndices.length === 0 ? 'disabled' : ''}>Edit selected ▾</button>
+      <button class="selection-bar-action" id="bulk-edit-menu-btn" data-action="bulk-menu-open" ${state.selectedIndices.length === 0 ? 'disabled' : ''}>Edit selected ${icon('chevron-down')}</button>
     </div>
   ` : '';
 
@@ -198,6 +207,8 @@ function renderOverview() {
         <button class="bulk-menu-btn" data-action="bulk-edit-mode" data-arg="type" data-bulk-edit="type">Change type</button>
         <button class="bulk-menu-btn" data-action="bulk-edit-mode" data-arg="notes" data-bulk-edit="notes">Change notes</button>
         <button class="bulk-menu-btn danger" data-action="bulk-edit-mode" data-arg="delete" data-bulk-edit="delete">Delete selected</button>
+        <button class="bulk-menu-btn bulk-menu-move" id="bulk-move-btn" data-action="move-job-open">Move to a new job\u2026</button>
+        <button class="bulk-menu-btn bulk-menu-move-to" id="bulk-move-to-btn" data-action="move-to-open">Move to another job\u2026</button>
       </div>
     </div>
   ` : '';
@@ -213,7 +224,7 @@ function renderOverview() {
         <h3 class="bulk-sheet-title">Change location for ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</h3>
         <button class="fail-close-btn" id="bulk-cancel-btn" data-action="bulk-cancel" aria-label="Cancel">×</button>
       </div>
-      <input class="input-big" id="bulk-location-input" data-input-action="bulk-location" value="${escapeHTML(state.bulkLocationValue)}" placeholder="New location" autofocus style="margin-bottom:14px">
+      <input aria-label="New location" class="input-big" id="bulk-location-input" data-input-action="bulk-location" value="${escapeHTML(state.bulkLocationValue)}" placeholder="New location" autofocus style="margin-bottom:14px">
       <button class="btn-primary" id="bulk-apply-btn" data-action="bulk-location-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
     </div>
   ` : '';
@@ -241,7 +252,7 @@ function renderOverview() {
         <button class="fail-close-btn" id="bulk-type-cancel" data-action="bulk-cancel" aria-label="Cancel">×</button>
       </div>
       <div class="quick-grid sheet-scroll" style="margin-bottom:10px">${typeQuickButtons}</div>
-      <input class="input-big sheet-pin" id="bulk-type-input" data-input-action="bulk-type" value="${escapeHTML(state.bulkEdit.typeValue)}" placeholder="…or type custom" autocomplete="off" style="margin-bottom:14px">
+      <input aria-label="New item type" class="input-big sheet-pin" id="bulk-type-input" data-input-action="bulk-type" value="${escapeHTML(state.bulkEdit.typeValue)}" placeholder="…or type custom" autocomplete="off" style="margin-bottom:14px">
       <button class="btn-primary sheet-pin" id="bulk-type-apply" data-action="bulk-type-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
     </div>
   ` : '';
@@ -268,7 +279,7 @@ function renderOverview() {
           <span><strong>Append</strong> — add to existing notes (separated by " ; ")</span>
         </label>
       </div>
-      <textarea class="input" id="bulk-notes-input" data-input-action="bulk-notes" rows="3" placeholder="${state.bulkEdit.notesMode === 'append' ? 'Text to append' : 'New notes (leave empty to clear)'}" style="margin-bottom:14px">${escapeHTML(state.bulkEdit.notesValue)}</textarea>
+      <textarea aria-label="Notes" class="input" id="bulk-notes-input" data-input-action="bulk-notes" rows="3" placeholder="${state.bulkEdit.notesMode === 'append' ? 'Text to append' : 'New notes (leave empty to clear)'}" style="margin-bottom:14px">${escapeHTML(state.bulkEdit.notesValue)}</textarea>
       <button class="btn-primary" id="bulk-notes-apply" data-action="bulk-notes-apply">Apply to ${state.selectedIndices.length} item${state.selectedIndices.length === 1 ? '' : 's'}</button>
     </div>
   ` : '';
@@ -290,10 +301,40 @@ function renderOverview() {
     </div>
   `;
 
+  // V98 (2A, 3A): the site's notes, at the top of the job — door codes and the
+  // like, read on arrival. They belong to the SITE (never copied into the job,
+  // never printed — 4A), so they show and can be edited on a locked job too.
+  // Hidden while selecting items, like the job details.
+  const notesSite = state.selectionMode ? null : siteForSession(sess);
+  const notesText = siteNotesOf(notesSite);
+  const siteNotes = !notesSite ? '' : (notesText ? `
+      <button type="button" class="site-notes-card" id="site-notes-card" data-action="site-notes-open">
+        <span class="site-notes-head">${icon('list')} Site notes &middot; ${escapeHTML(notesSite.name)}</span>
+        <span class="site-notes-text">${escapeHTML(notesText)}</span>
+        <span class="site-notes-more">Tap to read all or edit</span>
+      </button>` : `
+      <button type="button" class="link-btn site-notes-add" id="site-notes-add" data-action="site-notes-open">+ Add site notes</button>`);
+  const sn = state.siteNotesSheet;
+  const snSite = sn ? siteById(sn.siteId) : null;
+  const siteNotesSheet = sn ? `
+      <div class="modal-backdrop" id="site-notes-backdrop" data-action="site-notes-cancel" style="z-index:300"></div>
+      <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Site notes">
+        <div class="bulk-sheet-handle"></div>
+        <div class="bulk-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="bulk-sheet-title">Site notes</h3>
+          <button class="fail-close-btn" id="site-notes-cancel" data-action="site-notes-cancel" aria-label="Cancel">×</button>
+        </div>
+        <p class="muted" style="margin:0 0 10px">${escapeHTML(snSite ? snSite.name : 'This site')} &middot; shown in every job here. Only for you &mdash; never printed on a report.</p>
+        <textarea aria-label="Site notes" class="textarea site-notes-input" id="site-notes-input" data-input-action="site-notes-text" maxlength="${SITE_NOTES_MAX}" rows="8" placeholder="e.g. Door code 1234. Keys from reception. Server room on the 2nd floor &mdash; ask for Dave.">${escapeHTML(sn.text || '')}</textarea>
+        <button class="btn-primary" id="site-notes-save" data-action="site-notes-save" style="margin-top:12px">Save</button>
+      </div>` : '';
+
   return `
     <div class="screen">
       ${header}
       ${stats}
+      ${siteNotes}
       ${actionRow}
       ${jobDetails}
       ${state.selectionMode ? '' : filterRow}
@@ -305,8 +346,249 @@ function renderOverview() {
       ${renderPhotoStripSheet()}
       ${bulkTypeDialog}
       ${bulkNotesDialog}
+      ${siteNotesSheet}
+      ${renderMoveJobSheet(sess)}
+      ${renderMoveToSheet(sess)}
     </div>
   `;
+}
+
+// V101 (Stage 9, split): Move to a new job. Three steps in one sheet slot —
+// 'form' (what is moving, then client + site, More details), 'confirm' (the
+// "Are you sure?" — buttons only, so a repaint is allowed) and 'blocked' (why
+// not). The form's fields write state on input (data-input-action) and the sheet
+// never renders itself while open (MAP rule 3). Logic: session.js.
+function renderMoveJobSheet(sess) {
+  const m = state.moveJob;
+  if (!m || !sess || String(m.from) !== String(sess.id)) return '';
+  const head = (title) => `
+      <div class="modal-backdrop" id="move-job-backdrop" data-action="move-job-close"></div>
+      <div class="bulk-sheet move-job-sheet" role="dialog" aria-label="${escapeHTML(title)}">
+        <div class="bulk-sheet-handle"></div>
+        <div class="bulk-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+          <button class="fail-close-btn" id="move-job-close" data-action="move-job-close" aria-label="Cancel">\u00d7</button>
+        </div>`;
+  if (m.step === 'blocked') {
+    return head('Can\u2019t move these items') + `
+        <p class="move-job-why">${escapeHTML(m.why || '')}</p>
+        <button class="btn-primary" id="move-job-ok" data-action="move-job-close">OK</button>
+      </div>`;
+  }
+  const sum = moveJobSummary(sess, m.ids);
+  const n = sum.n;
+  const plural = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+  if (m.step === 'confirm') {
+    const from = sess.site || sess.name || 'this job';
+    const to = moveJobTitle(m.client, m.site);
+    const bits = [plural(n, 'item')];
+    if (sum.fails) bits.push(plural(sum.fails, 'fail'));
+    if (sum.photos) bits.push(plural(sum.photos, 'photo'));
+    const cert = (sess.certNo || sess.reportAt) ? `
+        <p class="move-job-warn">${icon('triangle-alert')} A certificate has already been made for this job${sess.certNo ? ' (No. ' + escapeHTML(sess.certNo) + ')' : ''}. It lists these items \u2014 make it again after moving. This job keeps its certificate number; the new job gets its own.</p>` : '';
+    const goes = (sum.photos || sum.pins) ? `
+        <p class="muted move-job-note">Their ${[sum.photos ? 'photos' : '', sum.pins ? 'map pins' : ''].filter(Boolean).join(' and ')} go with them.</p>` : '';
+    return head('Are you sure?') + `
+        <p class="move-job-msg">Move ${escapeHTML(bits.join(' \u00b7 '))} from <strong>${escapeHTML(from)}</strong> to a new job for <strong>${escapeHTML(to)}</strong>?</p>${cert}${goes}
+        <button class="btn-primary" id="move-job-go" data-action="move-job-go">Move ${plural(n, 'item')}</button>
+        <button class="btn-secondary move-job-back" id="move-job-back" data-action="move-job-back">Back</button>
+      </div>`;
+  }
+  // 'form'
+  const rows = sum.items.map((it) => {
+    const res = it.result === 'fail' ? '<span class="fail-text">FAIL</span>' : (it.result === 'pass' ? '<span class="pass-text">PASS</span>' : '');
+    const ph = (typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id) : 0;
+    const bits = [it.assetNo, it.itemType, it.location].filter(x => x != null && String(x).trim() !== '').map(x => escapeHTML(String(x)));
+    return `<li class="move-job-item"><span>${bits.join(' \u00b7 ') || '(no details)'}</span> ${res}${ph ? ' ' + icon('camera') + ph : ''}${mapPinOf(it) ? ' ' + icon('map-pin') : ''}</li>`;
+  }).join('');
+  const clientOpts = Array.from(new Set((state.clients || []).map(c => c && c.name).filter(Boolean)))
+    .map(x => `<option value="${escapeHTML(x)}"></option>`).join('');
+  const siteOpts = Array.from(new Set((state.sites || []).map(x => x && x.name).filter(Boolean)))
+    .map(x => `<option value="${escapeHTML(x)}"></option>`).join('');
+  const insts = (typeof instrumentList === 'function') ? instrumentList() : [];
+  const tester = insts.length ? `
+            <label class="label" for="move-job-tester">Tester</label>
+            <select class="input" id="move-job-tester" data-change-action="move-job-field" data-arg="instrumentId">
+              <option value=""${m.instrumentId ? '' : ' selected'}>The tester in use</option>
+              ${insts.map(i => `<option value="${escapeHTML(String(i.id))}"${String(i.id) === String(m.instrumentId) ? ' selected' : ''}>${escapeHTML(instrumentDisplayName(i))}</option>`).join('')}
+            </select>` : '';
+  const field = (id, key, label, extra) => `
+            <label class="label" for="${id}">${label}</label>
+            <input class="input" id="${id}" data-input-action="move-job-field" data-arg="${key}" value="${escapeHTML(m[key] || '')}" ${extra || ''}>`;
+  return head(`Move ${plural(n, 'item')} to a new job`) + `
+        <div class="sheet-scroll move-job-scroll">
+          <p class="muted move-job-note">Moving:</p>
+          <ul class="move-job-list">${rows}</ul>
+          <label class="label" for="move-job-client">New job\u2019s client</label>
+          <input class="input" id="move-job-client" data-input-action="move-job-field" data-arg="client" value="${escapeHTML(m.client || '')}" list="move-job-clients" autocomplete="off" placeholder="Client">
+          <datalist id="move-job-clients">${clientOpts}</datalist>
+          <label class="label" for="move-job-site">New job\u2019s site</label>
+          <input class="input" id="move-job-site" data-input-action="move-job-field" data-arg="site" value="${escapeHTML(m.site || '')}" list="move-job-sites" autocomplete="off" placeholder="Site">
+          <datalist id="move-job-sites">${siteOpts}</datalist>
+          <details class="move-job-more">
+            <summary>More details</summary>
+            ${field('move-job-name', 'name', 'Job name', 'autocomplete="off"')}
+            ${field('move-job-date', 'date', 'Date', 'type="date"')}
+            ${field('move-job-engineer', 'engineer', 'Engineer', 'autocomplete="off"')}
+            ${tester}
+            ${field('move-job-prefix', 'prefix', 'Asset prefix', 'autocomplete="off" autocapitalize="characters"')}
+            <p class="muted move-job-note">Copied from this job. Job notes, the certificate number and the lock stay here.</p>
+          </details>
+        </div>
+        <p class="move-job-error" id="move-job-error" role="alert">${escapeHTML(m.error || '')}</p>
+        <button class="btn-primary sheet-pin" id="move-job-continue" data-action="move-job-continue">Continue</button>
+      </div>`;
+}
+
+// V103 (Stage 9B): Move to another job — an EXISTING one. Steps in one sheet
+// slot: 'pick' (the jobs, a filter at MOVE_TO_FILTER_AT+ — typing hides rows in
+// place), 'clash' (asset numbers already there, one card each: radios + a new
+// number field — no render while open, MAP rule 3), 'confirm' (buttons only, so a
+// repaint is allowed) and 'blocked'. Logic: session.js.
+function renderMoveToSheet(sess) {
+  const m = state.moveTo;
+  if (!m || !sess || String(m.from) !== String(sess.id)) return '';
+  const head = (title) => `
+      <div class="modal-backdrop" id="move-to-backdrop" data-action="move-to-close"></div>
+      <div class="bulk-sheet move-job-sheet move-to-sheet" role="dialog" aria-label="${escapeHTML(title)}">
+        <div class="bulk-sheet-handle"></div>
+        <div class="bulk-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+          <button class="fail-close-btn" id="move-to-close" data-action="move-to-close" aria-label="Cancel">\u00d7</button>
+        </div>`;
+  const plural = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+  if (m.step === 'blocked') {
+    return head('Can\u2019t move these items') + `
+        <p class="move-job-why">${escapeHTML(m.why || '')}</p>
+        <button class="btn-primary" id="move-to-ok" data-action="move-to-close">OK</button>
+      </div>`;
+  }
+  const sum = moveJobSummary(sess, m.ids);
+  if (m.step === 'pick') {
+    const jobs = moveToTargets(sess);
+    const q = String(m.filter || '').trim().toLowerCase();
+    let shown = 0;
+    const rows = jobs.map((s) => {
+      const hay = moveToHay(s);
+      const hit = !q || hay.indexOf(q) !== -1;
+      if (hit) shown++;
+      const n = (s.items || []).length;
+      const sub = [formatDate(s.date), plural(n, 'item')].filter(Boolean).join(' \u00b7 ');
+      if (s.locked) {
+        return `<li class="move-to-job is-locked" data-hay="${escapeHTML(hay)}"${hit ? '' : ' hidden'}>
+            <span class="move-to-job-title">${icon('lock')} ${escapeHTML(moveToTitle(s))}</span>
+            <span class="muted move-to-job-sub">${escapeHTML(sub)} \u00b7 Locked \u2014 unlock it first</span></li>`;
+      }
+      return `<li class="move-to-job" data-hay="${escapeHTML(hay)}"${hit ? '' : ' hidden'}>
+            <button type="button" class="move-to-job-btn" data-action="move-to-pick" data-arg="${escapeHTML(String(s.id))}">
+              <span class="move-to-job-title">${escapeHTML(moveToTitle(s))}</span>
+              <span class="muted move-to-job-sub">${escapeHTML(sub)}</span>
+            </button></li>`;
+    }).join('');
+    const filter = jobs.length > MOVE_TO_FILTER_AT ? `
+          <input aria-label="Find a job" class="input move-to-filter" id="move-to-filter" type="search" data-input-action="move-to-filter" value="${escapeHTML(m.filter || '')}" placeholder="Find a job" autocomplete="off">` : '';
+    return head(`Move ${plural(sum.n, 'item')} to\u2026`) + `
+        <div class="sheet-scroll move-job-scroll">${filter}
+          <ul class="move-to-list">${rows}</ul>
+          <p class="muted move-job-note" id="move-to-none"${shown ? ' hidden' : ''}>No job matches.</p>
+        </div>
+      </div>`;
+  }
+  const target = (state.sessions || []).find(s => s && String(s.id) === String(m.to));
+  if (!target) return '';
+  const to = moveToTitle(target);
+  if (m.step === 'clash') {
+    const tItem = (id) => (target.items || []).find(it => it && String(it.id) === String(id));
+    const sItem = (id) => (sess.items || []).find(it => it && String(it.id) === String(id));
+    const side = (label, it) => {
+      if (!it) return '';
+      const res = it.result === 'fail' ? '<span class="fail-text">FAIL</span>' : (it.result === 'pass' ? '<span class="pass-text">PASS</span>' : '');
+      const ph = (typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id) : 0;
+      const when = it.ts ? formatTimestampCSV(it.ts) : '';
+      const bits = [it.itemType, it.location].filter(x => x != null && String(x).trim() !== '').map(x => escapeHTML(String(x)));
+      return `<div class="move-to-side"><span class="move-to-side-label">${label}</span>
+              <span>${bits.join(' \u00b7 ') || '(no details)'} ${res}${ph ? ' ' + icon('camera') + ph : ''}</span>
+              ${when ? `<span class="muted move-to-side-when">${escapeHTML(when)}</span>` : ''}</div>`;
+    };
+    const opts = [
+      ['leave', 'Leave it here'],
+      ['keep', 'Keep the one already there (delete this one)'],
+      ['replace', 'Use this one instead (delete the one there)'],
+      ['renumber', 'Give it a new number']
+    ];
+    const cards = m.clashes.map((c, i) => {
+      const it = sItem(c.id);
+      if (!it) return '';
+      return `<div class="move-to-card">
+            <p class="move-to-card-no">${escapeHTML(String(it.assetNo))}</p>
+            ${side('Moving', it)}
+            ${side('Already in ' + escapeHTML(to), tItem(c.with))}
+            <div class="move-to-opts" role="radiogroup">
+              ${opts.map(([v, l]) => `<label class="move-to-opt"><input type="radio" name="move-to-c${i}" value="${v}" data-change-action="move-to-choice" data-arg="${escapeHTML(c.id)}"${c.choice === v ? ' checked' : ''}> ${l}</label>`).join('')}
+            </div>
+            <div class="move-to-new" id="move-to-new-${i}"${c.choice === 'renumber' ? '' : ' hidden'}>
+              <label class="label" for="move-to-newno-${i}">New asset number</label>
+              <input class="input" id="move-to-newno-${i}" data-input-action="move-to-newno" data-arg="${escapeHTML(c.id)}" value="${escapeHTML(c.newNo || '')}" autocomplete="off" autocapitalize="characters">
+            </div>
+          </div>`;
+    }).join('');
+    const all = m.clashes.length >= 3 ? `
+          <div class="move-to-all"><span class="muted">Apply to all:</span>
+            ${opts.filter(o => o[0] !== 'renumber').map(([v, l]) => `<button type="button" class="btn-secondary move-to-all-btn" data-action="move-to-all" data-arg="${v}">${escapeHTML(l.replace(/ \(.*\)$/, ''))}</button>`).join('')}
+          </div>` : '';
+    return head(`Already in ${to}`) + `
+        <div class="sheet-scroll move-job-scroll">
+          <p class="move-job-note">${m.clashes.length === 1 ? 'This asset number is' : 'These asset numbers are'} already in <strong>${escapeHTML(to)}</strong>. A job can\u2019t hold the same number twice \u2014 choose what happens to each.</p>${all}
+          ${cards}
+        </div>
+        <p class="move-job-error" id="move-to-error" role="alert">${escapeHTML(m.error || '')}</p>
+        <button class="btn-primary sheet-pin" id="move-to-continue" data-action="move-to-continue">Continue</button>
+        <button class="btn-secondary move-job-back" id="move-to-back" data-action="move-to-back">Back</button>
+      </div>`;
+  }
+  // 'confirm'
+  const plan = moveToPlan(sess, target, m);
+  const from = sess.site || sess.name || 'this job';
+  const moving = plan.move;
+  let fails = 0, photos = 0;
+  for (const it of moving) {
+    if (it.result === 'fail') fails++;
+    photos += (typeof photoCountForItemAll === 'function') ? photoCountForItemAll(it.id) : 0;
+  }
+  const bits = [plural(moving.length, 'item')];
+  if (fails) bits.push(plural(fails, 'fail'));
+  if (photos) bits.push(plural(photos, 'photo'));
+  const notes = [];
+  const del = plan.delFrom.concat(plan.delTo);
+  if (del.length) {
+    const dp = del.reduce((t, id) => t + ((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(id) : 0), 0);
+    notes.push(`${plural(del.length, 'item')} will be deleted${dp ? ' (with ' + plural(dp, 'photo') + ')' : ''} \u2014 this can\u2019t be undone.`);
+  }
+  if (sess.certNo || sess.reportAt) {
+    notes.push(`A certificate has already been made for this job${sess.certNo ? ' (No. ' + sess.certNo + ')' : ''}. It lists these items \u2014 make it again after moving.`);
+  }
+  if (target.certNo || target.reportAt) {
+    notes.push(`A certificate has already been made for ${to}${target.certNo ? ' (No. ' + target.certNo + ')' : ''}. Make it again after the move to include these items.`);
+  }
+  const tFrom = instrumentDisplayName(instrumentForSession(sess));
+  const tTo = instrumentDisplayName(instrumentForSession(target));
+  if (tFrom !== tTo) {
+    notes.push(`These items were logged with ${tFrom || 'no tester set'}; ${to} uses ${tTo || 'no tester set'}. Its certificate will show ${tTo || 'no tester'} for them.`);
+  }
+  const renum = Object.keys(plan.renumber).length;
+  const left = [];
+  if (renum) left.push(`${plural(renum, 'item')} will get a new asset number.`);
+  if (sess.items.length - moving.length - plan.delFrom.length <= 0) left.push(`Every item leaves \u2014 ${from} will be left empty. Delete it from the Jobs list when you\u2019re ready.`);
+  if (photos || moving.some(it => mapPinOf(it))) left.push('Their photos and map pins go with them.');
+  return head('Are you sure?') + `
+        <p class="move-job-msg">Move ${escapeHTML(bits.join(' \u00b7 '))} from <strong>${escapeHTML(from)}</strong> into <strong>${escapeHTML(to)}</strong>?</p>
+        ${notes.map(x => `<p class="move-job-warn">${icon('triangle-alert')} ${escapeHTML(x)}</p>`).join('')}
+        ${left.map(x => `<p class="muted move-job-note">${escapeHTML(x)}</p>`).join('')}
+        <button class="btn-primary" id="move-to-go" data-action="move-to-go">Move ${plural(moving.length, 'item')}</button>
+        <button class="btn-secondary move-job-back" id="move-to-back" data-action="move-to-back">Back</button>
+      </div>`;
 }
 
 function refreshOverviewBody() {
@@ -371,7 +653,7 @@ function renderEditSession() {
       : 'From the first item logged to the last. It includes any breaks, so it is not time on tools.';
     durationBlock = `
       <div class="session-duration-row">
-        <div class="session-duration-label">⏱ Testing time</div>
+        <div class="session-duration-label">${icon('timer')} Testing time</div>
         <div class="session-duration-value">${escapeHTML(dur.text)}</div>
         <div class="session-duration-sub">${sub}</div>
       </div>
@@ -385,7 +667,7 @@ function renderEditSession() {
       retestBlock = `
         <div class="lock-toggle-row">
           <div class="lock-toggle-text">
-            <div class="lock-toggle-title">🔔 Remind me to chase this for retest</div>
+            <div class="lock-toggle-title">${icon('bell')} Remind me to chase this for retest</div>
             <div class="lock-toggle-sub">Adds this job to your retest chase list so you're reminded to contact the customer and rebook when it's due. Use it for clients you want to win repeat work from.</div>
           </div>
           <label class="toggle-switch">
@@ -400,14 +682,14 @@ function renderEditSession() {
       const contact = sess.retestContact;
       let contactLine = '';
       if (contact && contact.status === 'booked') {
-        contactLine = `<div class="lock-toggle-sub" style="margin-top:6px;color:var(--pass)">✓ Marked as rebooked${contact.at ? ' on ' + escapeHTML(formatDate(contact.at.slice(0, 10))) : ''}. Clear it below to chase again.</div>`;
+        contactLine = `<div class="lock-toggle-sub" style="margin-top:6px;color:var(--pass-word)">${icon('check')} Marked as rebooked${contact.at ? ' on ' + escapeHTML(formatDate(contact.at.slice(0, 10))) : ''}. Clear it below to chase again.</div>`;
       } else if (contact && contact.status === 'declined') {
-        contactLine = `<div class="lock-toggle-sub" style="margin-top:6px;color:var(--muted)">Marked as declined${contact.at ? ' on ' + escapeHTML(formatDate(contact.at.slice(0, 10))) : ''} (lost the job). Clear it below to chase again.</div>`;
+        contactLine = `<div class="lock-toggle-sub" style="margin-top:6px;color:var(--text-muted)">Marked as declined${contact.at ? ' on ' + escapeHTML(formatDate(contact.at.slice(0, 10))) : ''} (lost the job). Clear it below to chase again.</div>`;
       }
       retestBlock = `
         <div class="lock-toggle-row">
           <div class="lock-toggle-text">
-            <div class="lock-toggle-title">🔔 Retest reminder on</div>
+            <div class="lock-toggle-title">${icon('bell')} Retest reminder on</div>
             <div class="lock-toggle-sub">Due ${dueStr ? '<strong>' + escapeHTML(dueStr) + '</strong>' : '—'} (the month of this test + the interval below — a retest is due for the whole month). This job is on your chase list.</div>
             ${contactLine}
           </div>
@@ -417,37 +699,37 @@ function renderEditSession() {
           </label>
         </div>
         <label class="label">Retest interval (months)</label>
-        <input class="input" id="ef-retest-months" data-input-action="ef-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(String(months))}">
-        <p class="muted" style="margin:6px 0 0;font-size:12px">Captured from your default when you switched this on; change it here for this job only.</p>
+        <input aria-label="Retest interval (months)" class="input" id="ef-retest-months" data-input-action="ef-retest-months" type="number" inputmode="numeric" min="1" max="120" value="${escapeHTML(String(months))}">
+        <p class="muted" style="margin:6px 0 0;font-size:0.75rem">Captured from your default when you switched this on; change it here for this job only.</p>
       `;
     }
   }
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="cancel-edit-btn" data-action="edit-cancel" aria-label="Cancel">‹</button>
-        <div class="site-name">Edit session</div>
+        <button class="icon-btn" id="cancel-edit-btn" data-action="edit-back" aria-label="Back">${icon('chevron-left')}</button>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Job settings</div>
         <span style="width:40px"></span>
       </header>
       <div class="card">
         <label class="label">Site</label>
-        <input class="input" id="ef-site" data-input-action="ef-site" value="${escapeHTML(state.editForm.site)}">
-        <p class="muted" style="margin:6px 0 0;font-size:12px">This is the site name saved on the session. Editing it here changes only this session, not your Clients list.</p>
+        <input aria-label="Site" class="input" id="ef-site" data-input-action="ef-site" value="${escapeHTML(state.editForm.site)}">
+        <p class="muted" style="margin:6px 0 0;font-size:0.75rem">This is the site name saved on the job. Editing it here changes only this job, not your Clients list.</p>
         <label class="label">Engineer</label>
-        <input class="input" id="ef-engineer" data-input-action="ef-engineer" value="${escapeHTML(state.editForm.engineer)}">
-        <label class="label">Session name</label>
-        <input class="input" id="ef-name" data-input-action="ef-name" value="${escapeHTML(state.editForm.name)}">
+        <input aria-label="Engineer" class="input" id="ef-engineer" data-input-action="ef-engineer" value="${escapeHTML(state.editForm.engineer)}">
+        <label class="label">Job name</label>
+        <input aria-label="Job name" class="input" id="ef-name" data-input-action="ef-name" value="${escapeHTML(state.editForm.name)}">
         <label class="label">Date</label>
-        <input class="input input-date" id="ef-date" data-input-action="ef-date" type="date" value="${escapeHTML(state.editForm.date)}">
+        <input aria-label="Date" class="input input-date" id="ef-date" data-input-action="ef-date" type="date" value="${escapeHTML(state.editForm.date)}">
         <label class="label">Asset number prefix</label>
-        <input class="input" id="ef-prefix" data-input-action="ef-prefix" value="${escapeHTML(state.editForm.prefix)}">
+        <input aria-label="Asset number prefix" class="input" id="ef-prefix" data-input-action="ef-prefix" value="${escapeHTML(state.editForm.prefix)}">
 
         <!-- v8: lock toggle. When on, Pass/Fail/Copy on the entry screen are disabled.
              Bulk edit and item delete from the overview still work, so mistakes can be
              corrected without unlocking the whole session. -->
         <div class="lock-toggle-row">
           <div class="lock-toggle-text">
-            <div class="lock-toggle-title">🔒 Lock session</div>
+            <div class="lock-toggle-title">${icon('lock')} Lock job</div>
             <div class="lock-toggle-sub">Prevents new entries from the test screen. Edits via the overview still work.</div>
           </div>
           <label class="toggle-switch">
@@ -464,8 +746,113 @@ function renderEditSession() {
           <button class="btn-primary" id="ef-save" data-action="edit-save">Save</button>
         </div>
       </div>
+      <!-- V102 (1B): below Save/Cancel, so it never reads as part of the form. -->
+      <div class="card dup-job-card">
+        <button class="btn-secondary dup-job-open" id="ef-dup-btn" data-action="dup-job-open">Duplicate this job\u2026</button>
+        <p class="muted dup-job-hint">A full copy \u2014 items, results, readings, notes and photos \u2014 as a new job.</p>
+        <p class="move-job-error" id="ef-dup-error" role="alert"></p>
+      </div>
     </div>
+    ${renderDupJobSheet(sess)}
   `;
+}
+
+// V102 (Stage 9, duplicate): one sheet slot, five steps — 'form' (client + site,
+// More details; typing, so it never renders itself — MAP rule 3), 'confirm' (the
+// "Are you sure?", buttons only), 'working' (fetching / copying; no buttons),
+// 'partial' (cloud photos that couldn't be fetched: 4A) and 'blocked'. Shares
+// the Move sheet's styles. Logic: session.js.
+function renderDupJobSheet(sess) {
+  const m = state.dupJob;
+  if (!m || !sess || String(m.from) !== String(sess.id)) return '';
+  const working = m.step === 'working';
+  const head = (title) => `
+      <div class="modal-backdrop" id="dup-job-backdrop" ${working ? '' : 'data-action="dup-job-close"'}></div>
+      <div class="bulk-sheet move-job-sheet dup-job-sheet" role="dialog" aria-label="${escapeHTML(title)}">
+        <div class="bulk-sheet-handle"></div>
+        <div class="bulk-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+          ${working ? '<span class="fail-close-spacer"></span>' : '<button class="fail-close-btn" id="dup-job-close" data-action="dup-job-close" aria-label="Cancel">\u00d7</button>'}
+        </div>`;
+  const plural = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+  if (m.step === 'blocked') {
+    return head('Can\u2019t duplicate this job') + `
+        <p class="move-job-why">${escapeHTML(m.why || '')}</p>
+        <button class="btn-primary" id="dup-job-ok" data-action="dup-job-close">OK</button>
+      </div>`;
+  }
+  if (working) {
+    return head('Duplicating\u2026') + `
+        <p class="move-job-msg" id="dup-job-progress" role="status">Copying\u2026</p>
+        <p class="muted move-job-note">Keep the app open until the copy opens.</p>
+      </div>`;
+  }
+  if (m.step === 'partial') {
+    return head('Some photos aren\u2019t here') + `
+        <p class="move-job-msg">${escapeHTML(plural(m.failed || 0, 'photo'))} only in the cloud couldn\u2019t be fetched \u2014 check you\u2019re online and signed in. Duplicate without ${m.failed === 1 ? 'it' : 'them'}? The original keeps ${m.failed === 1 ? 'it' : 'them'} either way.</p>
+        <button class="btn-primary" id="dup-job-without" data-action="dup-job-without">Duplicate without ${m.failed === 1 ? 'it' : 'them'}</button>
+        <button class="btn-secondary move-job-back" id="dup-job-back" data-action="dup-job-back">Back</button>
+      </div>`;
+  }
+  const sum = dupJobSummary(sess);
+  if (m.step === 'confirm') {
+    const from = sess.site || sess.name || 'this job';
+    const to = moveJobTitle(m.client, m.site);
+    const bits = [plural(sum.n, 'item')];
+    if (sum.fails) bits.push(plural(sum.fails, 'fail'));
+    if (sum.photos) bits.push(plural(sum.photos, 'photo') + (sum.bytes ? ' (about ' + formatBytes(sum.bytes) + ')' : ''));
+    const cloud = sum.cloud ? `
+        <p class="muted move-job-note">${escapeHTML(plural(sum.cloud, 'photo'))} ${sum.cloud === 1 ? 'is' : 'are'} only in the cloud and will be fetched first.</p>` : '';
+    const space = sum.photos ? `
+        <p class="muted move-job-note">The copied photos take up space again, on this phone and in the cloud.</p>` : '';
+    return head('Are you sure?') + `
+        <p class="move-job-msg">Copy ${escapeHTML(bits.join(' \u00b7 '))} from <strong>${escapeHTML(from)}</strong> into a new job for <strong>${escapeHTML(to)}</strong>?</p>${cloud}${space}
+        <p class="muted move-job-note">The copy is unlocked and not exported, and gets its own certificate number when you make one. Both jobs hold the same items until you remove what doesn\u2019t belong.</p>
+        <button class="btn-primary" id="dup-job-go" data-action="dup-job-go">Duplicate</button>
+        <button class="btn-secondary move-job-back" id="dup-job-back" data-action="dup-job-back">Back</button>
+      </div>`;
+  }
+  // 'form'
+  const clientOpts = Array.from(new Set((state.clients || []).map(c => c && c.name).filter(Boolean)))
+    .map(x => `<option value="${escapeHTML(x)}"></option>`).join('');
+  const siteOpts = Array.from(new Set((state.sites || []).map(x => x && x.name).filter(Boolean)))
+    .map(x => `<option value="${escapeHTML(x)}"></option>`).join('');
+  const insts = (typeof instrumentList === 'function') ? instrumentList() : [];
+  const tester = insts.length ? `
+            <label class="label" for="dup-job-tester">Tester</label>
+            <select class="input" id="dup-job-tester" data-change-action="dup-job-field" data-arg="instrumentId">
+              <option value=""${m.instrumentId ? '' : ' selected'}>The tester in use</option>
+              ${insts.map(i => `<option value="${escapeHTML(String(i.id))}"${String(i.id) === String(m.instrumentId) ? ' selected' : ''}>${escapeHTML(instrumentDisplayName(i))}</option>`).join('')}
+            </select>` : '';
+  const field = (id, key, label, extra) => `
+            <label class="label" for="${id}">${label}</label>
+            <input class="input" id="${id}" data-input-action="dup-job-field" data-arg="${key}" value="${escapeHTML(m[key] || '')}" ${extra || ''}>`;
+  const what = [plural(sum.n, 'item')];
+  if (sum.fails) what.push(plural(sum.fails, 'fail'));
+  if (sum.photos) what.push(plural(sum.photos, 'photo'));
+  return head('Duplicate this job') + `
+        <div class="sheet-scroll move-job-scroll">
+          <p class="muted move-job-note">Copying ${escapeHTML(what.join(' \u00b7 '))}, with everything on them.</p>
+          <label class="label" for="dup-job-client">Copy\u2019s client</label>
+          <input class="input" id="dup-job-client" data-input-action="dup-job-field" data-arg="client" value="${escapeHTML(m.client || '')}" list="dup-job-clients" autocomplete="off" placeholder="Client">
+          <datalist id="dup-job-clients">${clientOpts}</datalist>
+          <label class="label" for="dup-job-site">Copy\u2019s site</label>
+          <input class="input" id="dup-job-site" data-input-action="dup-job-field" data-arg="site" value="${escapeHTML(m.site || '')}" list="dup-job-sites" autocomplete="off" placeholder="Site">
+          <datalist id="dup-job-sites">${siteOpts}</datalist>
+          <details class="move-job-more">
+            <summary>More details</summary>
+            ${field('dup-job-name', 'name', 'Job name', 'autocomplete="off"')}
+            ${field('dup-job-date', 'date', 'Date', 'type="date"')}
+            ${field('dup-job-engineer', 'engineer', 'Engineer', 'autocomplete="off"')}
+            ${tester}
+            ${field('dup-job-prefix', 'prefix', 'Asset prefix', 'autocomplete="off" autocapitalize="characters"')}
+            <p class="muted move-job-note">Copied from this job, with its job notes.</p>
+          </details>
+        </div>
+        <p class="move-job-error" id="dup-job-error" role="alert">${escapeHTML(m.error || '')}</p>
+        <button class="btn-primary sheet-pin" id="dup-job-continue" data-action="dup-job-continue">Continue</button>
+      </div>`;
 }
 
 // ============== PATGo PWA — v56 — Retest reminders ==============
@@ -494,8 +881,8 @@ function renderRetestReminders() {
             <h3 class="bulk-sheet-title">${escapeHTML(name)}</h3>
             <button class="fail-close-btn" id="retest-action-close" data-action="retest-action-close" aria-label="Close">×</button>
           </div>
-          <p style="margin:0 0 14px;font-size:14px;line-height:1.5;color:var(--text)">Once you've contacted the customer, mark the outcome to clear this from your chase list.</p>
-          <button class="btn-primary" style="margin-bottom:8px" data-action="retest-mark-booked" data-arg="${s.id}">✓ Rebooked — job won</button>
+          <p style="margin:0 0 14px;font-size:0.875rem;line-height:1.5;color:var(--text)">Once you've contacted the customer, mark the outcome to clear this from your chase list.</p>
+          <button class="btn-primary" style="margin-bottom:8px" data-action="retest-mark-booked" data-arg="${s.id}">${icon('check')} Rebooked — job won</button>
           <button class="btn-secondary" style="margin-bottom:8px" data-action="retest-mark-declined" data-arg="${s.id}">Declined — lost the job</button>
           <button class="btn-tertiary" data-action="retest-untrack" data-arg="${s.id}">Stop reminding me about this job</button>
         </div>
@@ -505,8 +892,8 @@ function renderRetestReminders() {
 
   let list;
   if (due.length === 0) {
-    list = emptyStateHTML('🔔', 'No retests due',
-      'When a job you\'ve flagged comes due, it\'ll appear here so you can ring the customer and rebook. Flag a job under its Session settings.');
+    list = emptyStateHTML('bell', 'No retests due',
+      'When a job you\'ve flagged comes due, it\'ll appear here so you can ring the customer and rebook. Flag a job under its Job settings.');
   } else {
     list = due.map(s => {
       const st = retestStatus(s);
@@ -515,7 +902,7 @@ function renderRetestReminders() {
         : (st === 'duesoon' ? 'retest-chip-soon' : 'retest-chip-upcoming');
       const chipLabel = retestChipLabel(st);
       const client = clientNameForSession(s);
-      const titleLine = escapeHTML(s.site || s.name || 'Untitled session');
+      const titleLine = escapeHTML(s.site || s.name || 'Untitled job');
       const clientLine = (client && client !== (s.site || s.name)) ? `<div class="retest-row-client">${escapeHTML(client)}</div>` : '';
       const itemCount = Array.isArray(s.items) ? s.items.length : 0;
       return `
@@ -524,9 +911,9 @@ function renderRetestReminders() {
             <div class="session-title">${titleLine}</div>
             ${clientLine}
             <div class="session-meta">Last tested ${formatDate(s.date)} · ${itemCount} item${itemCount === 1 ? '' : 's'} · due ${dueStr || '—'}</div>
-            <div class="session-export-row"><span class="retest-chip ${chipCls}">🔔 ${escapeHTML(chipLabel)}</span></div>
+            <div class="session-export-row"><span class="retest-chip ${chipCls}">${icon('bell')} ${escapeHTML(chipLabel)}</span></div>
           </div>
-          <button class="icon-btn-sm" data-action="retest-action-open" data-arg="${s.id}" aria-label="Mark contacted" title="Mark contacted">✓</button>
+          <button class="icon-btn-sm" data-action="retest-action-open" data-arg="${s.id}" aria-label="Mark contacted" title="Mark contacted">${icon('check')}</button>
         </div>
       `;
     }).join('');
@@ -535,9 +922,9 @@ function renderRetestReminders() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="retest-back-btn" data-action="go-sessions" aria-label="Back">‹</button>
-        <div class="site-name">Retest reminders</div>
-        <button class="icon-btn" id="retest-settings-btn" data-action="settings-page" data-arg="settingsRetest" data-page="settingsRetest" aria-label="Retest settings">⚙</button>
+        <button class="icon-btn" id="retest-back-btn" data-action="go-sessions" aria-label="Back">${icon('chevron-left')}</button>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Retest reminders</div>
+        <button class="icon-btn" id="retest-settings-btn" data-action="settings-page" data-arg="settingsRetest" data-page="settingsRetest" aria-label="Retest settings">${icon('settings')}</button>
       </header>
       <div class="settings-section" style="margin-top:4px">
         <p class="muted" style="margin-top:0">Jobs you've flagged that are coming due for retest, most urgent first. Ring the customer to rebook, then mark each one done.</p>
@@ -563,25 +950,25 @@ function renderReports() {
   });
 
   const needsCompany = !rs.companyName
-    ? `<div class="info-card" style="margin:0 0 12px"><p class="muted" style="margin:0">Tip: add your company name and logo in Report Settings so your reports are branded.</p></div>`
+    ? `<div class="info-card" style="margin:0 0 12px"><p class="muted" style="margin:0">Tip: add your company name and logo in Company &amp; Branding so your reports are branded.</p></div>`
     : '';
 
   let list;
   if (sorted.length === 0) {
-    list = emptyStateHTML('📄', 'Nothing to report yet',
-      'Once you\'ve logged a session, you can turn it into a PDF report here.');
+    list = emptyStateHTML('file-text', 'Nothing to report yet',
+      'Once you\'ve logged a job, you can turn it into a PDF report here.');
   } else {
     list = sorted.map(s => {
       const passes = s.items.filter(i => i.result === 'pass').length;
       const fails = s.items.filter(i => i.result === 'fail').length;
-      const lockMark = s.locked ? '<span class="session-lock" title="Locked">🔒</span>' : '';
+      const lockMark = s.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : '';
       return `
         <div class="session-card">
           <div class="session-info" data-action="produce-report" data-arg="${s.id}">
             <div class="session-title">${lockMark}${escapeHTML(s.site || s.name)}</div>
             <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span></div>
           </div>
-          <button class="icon-btn-sm" data-action="produce-report" data-arg="${s.id}" aria-label="Produce report">📄</button>
+          <button class="icon-btn-sm" data-action="produce-report" data-arg="${s.id}" aria-label="Produce report">${icon('file-text')}</button>
         </div>
       `;
     }).join('');
@@ -590,12 +977,12 @@ function renderReports() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="reports-back-btn" data-action="go-sessions" aria-label="Back">‹</button>
-        <div class="site-name">Reports</div>
-        <button class="icon-btn" id="reports-settings-btn" data-action="settings-page" data-arg="settingsReport" data-page="settingsReport" aria-label="Report Settings">⚙</button>
+        <button class="icon-btn" id="reports-back-btn" data-action="go-sessions" aria-label="Back">${icon('chevron-left')}</button>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Reports</div>
+        <button class="icon-btn" id="reports-settings-btn" data-action="settings-page" data-arg="settingsReport" data-page="settingsReport" aria-label="Company and Branding">${icon('settings')}</button>
       </header>
       <div class="settings-section" style="margin-top:4px">
-        <p class="muted" style="margin-top:0">Choose a session to produce a PDF Portable Appliance Test Report. You can preview it before sharing or saving.</p>
+        <p class="muted" style="margin-top:0">Choose a job to produce a PDF Portable Appliance Test Report. You can preview it before sharing or saving.</p>
       </div>
       ${needsCompany}
       <div class="sessions-list">${list}</div>
@@ -630,7 +1017,7 @@ function renderFailPhotoStripInner() {
 
   const addControl = (photos.length >= cap)
     ? `<span class="photo-add-full">${cap} photo maximum</span>`
-    : `<button class="photo-add-btn" id="fail-photo-pick-btn" data-action="fail-photo-pick">📷 ${photos.length ? 'Add another' : 'Add photo'}</button>`;
+    : `<button class="photo-add-btn" id="fail-photo-pick-btn" data-action="fail-photo-pick">${icon('camera')} ${photos.length ? 'Add another' : 'Add photo'}</button>`;
 
   return thumbs + addControl;
 }
@@ -654,13 +1041,25 @@ function renderPhotoStripSheet() {
   } else if (!count) {
     body = `<p class="muted photo-strip-loading">No photos on this item.</p>`;
   } else {
+    // v89 (2A): a photo only in the cloud is a tile with a ☁ — its preview once
+    // fetched, a plain cloud until then. Tapping it downloads it.
+    const tile = (p, i) => {
+      if (!p.cloud) return `<img src="${p.url}" alt="Photo ${i + 1}" loading="lazy">`;
+      const inner = p.url
+        ? `<img src="${p.url}" alt="Photo ${i + 1}, in the cloud" loading="lazy">`
+        : `<span class="photo-cloud-blank" aria-hidden="true">${icon('cloud')}</span>`;
+      return `<button class="photo-cloud-tile${p.busy ? ' is-busy' : ''}" data-action="photo-download" data-arg="${escapeHTML(p.id)}" aria-label="Download photo ${i + 1}" ${p.busy ? 'disabled' : ''}>
+              ${inner}
+              <span class="photo-cloud-badge">${p.busy ? 'Downloading…' : icon('cloud-download') + ' Tap to download'}</span>
+            </button>`;
+    };
     body = `
       <div class="photo-strip-grid">
         ${photos.map((p, i) => `
-          <figure class="photo-strip-item">
-            <img src="${p.url}" alt="Photo ${i + 1}" loading="lazy">
+          <figure class="photo-strip-item${p.cloud ? ' is-cloud' : ''}">
+            ${tile(p, i)}
             <figcaption>
-              <span class="photo-strip-size">${escapeHTML(formatBytes(p.bytes || 0))}</span>
+              <span class="photo-strip-size">${escapeHTML(formatBytes(p.bytes || 0))}${p.cloud ? ' · cloud' : ''}</span>
               <button class="photo-strip-delete" data-action="photo-delete" data-arg="${escapeHTML(p.id)}" aria-label="Delete photo ${i + 1}">Delete</button>
             </figcaption>
           </figure>
@@ -668,23 +1067,632 @@ function renderPhotoStripSheet() {
       </div>
     `;
   }
+  const cloudTiles = photos.filter((p) => p.cloud);
+  const cloudBytes = cloudTiles.reduce((n, p) => n + (p.bytes || 0), 0);
+  const anyBusy = cloudTiles.some((p) => p.busy);
+  const downloadAll = cloudTiles.length >= 2
+    ? `<button class="photo-add-btn wide photo-download-all" data-action="photo-download-all" ${anyBusy ? 'disabled' : ''}>${icon('cloud-download')} Download all (${cloudTiles.length} · ${escapeHTML(formatBytes(cloudBytes))})</button>`
+    : '';
 
   const addControl = (count >= cap)
     ? `<p class="muted photo-strip-note">${cap} photo maximum reached.</p>`
-    : `<button class="photo-add-btn wide" id="photo-strip-add-btn" data-action="photo-strip-add" ${state.photoStripLoading ? 'disabled' : ''}>📷 Add another photo</button>`;
+    : `<button class="photo-add-btn wide" id="photo-strip-add-btn" data-action="photo-strip-add" ${state.photoStripLoading ? 'disabled' : ''}>${icon('camera')} Add another photo</button>`;
 
   return `
     <div class="modal-backdrop" id="photo-strip-backdrop" data-action="photo-strip-close"></div>
-    <div class="bulk-sheet sheet-scroll" role="dialog" aria-label="Photos on this item">
+    <!-- V130 (I): the scroller is the body, not the shell (MAP rule 14) — the
+         header stays put and the buttons below are pinned, like every other
+         sheet. Before, it worked only because .sheet-scroll sits later in the
+         stylesheet than the shell's overflow:hidden. -->
+    <div class="bulk-sheet" role="dialog" aria-label="Photos on this item">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
         <h3 class="bulk-sheet-title">Photos${count ? ` (${count})` : ''}</h3>
         <button class="fail-close-btn" id="photo-strip-close" data-action="photo-strip-close" aria-label="Close">×</button>
       </div>
-      ${body}
-      ${addControl}
+      <div class="sheet-scroll">${body}</div>
+      <div class="sheet-pin">${downloadAll}${addControl}</div>
       <input type="file" id="photo-strip-file" data-change-action="photo-strip-file" accept="image/*" style="display:none">
     </div>
   `;
+}
+
+// ============== V90 (R18) — the photo manager screen ==============
+// Settings → Backup → Manage photos. Markup only; the logic is in
+// settings-actions.js (photoMgrModel and the photoMgr* actions). Read-only apart
+// from two selects, so it may render freely (MAP rule 3). Previews are painted
+// into #pm-t-<id> in place as they arrive; a render simply shows the cached one.
+function _pmWhenUK(iso) {
+  const d = new Date(iso);
+  if (!iso || isNaN(d.getTime())) return '';
+  try {
+    return d.toLocaleString('en-GB', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  } catch { return ''; }
+}
+
+function _pmItemLabel(e) {
+  const sess = (state.sessions || []).find((s) => s && String(s.id) === e.s);
+  const it = sess && Array.isArray(sess.items) ? sess.items.find((x) => x && String(x.id) === e.i) : null;
+  if (!it) return 'Photo';
+  const bits = [it.assetNo, it.itemType, it.location].map((x) => String(x || '').trim()).filter(Boolean);
+  return bits.length ? bits.join(' \u00b7 ') : 'Photo';
+}
+
+function _pmTile(e, pm, vis) {
+  const sel = !!pm.selected[e.id];
+  const url = photoThumbCached(e.id);
+  const inner = url
+    ? `<img src="${escapeHTML(url)}" alt="" loading="lazy">`
+    : `<span class="pm-thumb-blank" aria-hidden="true">${icon(e.local ? 'camera' : 'cloud')}</span>`;
+  const badge = !vis ? '' : (!e.local ? icon('cloud') + ' Cloud only' : (!e.cloud ? 'Not uploaded' : ''));
+  const label = `${e.local ? 'Photo on this phone' : 'Photo in the cloud'}${sel ? ', selected' : ''}`;
+  return `<button class="pm-tile${sel ? ' is-selected' : ''}${e.local ? '' : ' is-cloud'}" data-action="pm-tile" data-arg="${escapeHTML(e.id)}" aria-label="${label}">
+      <span class="pm-thumb" id="pm-t-${escapeHTML(e.id)}">${inner}</span>
+      ${badge ? `<span class="pm-badge">${badge}</span>` : ''}
+      ${pm.selecting ? `<span class="pm-tick" aria-hidden="true">${sel ? icon('check') : ''}</span>` : ''}
+    </button>`;
+}
+
+function _pmPreviewSheet(m, pm) {
+  const p = pm.preview;
+  if (!p) return '';
+  const e = m.byId.get(p.id);
+  if (!e) return '';
+  const vis = m.vis;
+  const img = p.url
+    ? `<img src="${escapeHTML(p.url)}" alt="Photo">`
+    : `<span class="pm-thumb-blank">${p.loading ? 'Loading\u2026' : icon('cloud') + ' No preview yet'}</span>`;
+  const where = !vis ? 'On this phone'
+    : (!e.local ? 'Only in the cloud' : (e.cloud ? 'On this phone and in the cloud' : 'On this phone \u00b7 not uploaded yet'));
+  const job = [e.client, e.title, formatDate(e.date)].filter(Boolean).join(' \u00b7 ');
+  const taken = _pmWhenUK(e.a);
+  const lines = [
+    job,
+    [taken ? `Taken ${taken}` : '', e.b ? formatBytes(e.b) : ''].filter(Boolean).join(' \u00b7 '),
+    where + (e.local ? '' : (e.onPhone ? '' : ' \u00b7 its job isn\u2019t on this phone')),
+  ].filter(Boolean);
+  const btns = [];
+  if (vis && !e.local && e.src === 'known' && e.onPhone) btns.push(`<button class="btn-primary" data-action="pm-download" data-arg="${escapeHTML(e.id)}">${icon('cloud-download')} Download</button>`);
+  if (vis && e.local && e.cloud) btns.push(`<button class="btn-secondary" data-action="pm-remove" data-arg="${escapeHTML(e.id)}">Remove from phone</button>`);
+  if (e.locked) btns.push(`<p class="muted pm-note">${icon('lock')} This job is locked. Unlock it to delete its photos.</p>`);
+  else if (e.local || vis) btns.push(`<button class="btn-danger" data-action="pm-delete" data-arg="${escapeHTML(e.id)}">${icon('trash-2')} ${vis ? 'Delete everywhere' : 'Delete'}</button>`);
+  return `
+    <div class="modal-backdrop" data-action="pm-preview-close"></div>
+    <div class="bulk-sheet" role="dialog" aria-label="Photo">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">${escapeHTML(e.onPhone ? _pmItemLabel(e) : 'Photo')}</h3>
+        <button class="fail-close-btn" data-action="pm-preview-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="sheet-scroll">
+        <div class="pm-preview-img">${img}</div>
+        ${lines.map((l) => `<p class="muted pm-preview-line">${escapeHTML(l)}</p>`).join('')}
+      </div>
+      <div class="sheet-pin pm-preview-actions">${btns.join('')}</div>
+    </div>
+  `;
+}
+
+function renderPhotoManager() {
+  const pm = state.photoMgr;
+  const m = photoMgrModel();
+  const vis = m.vis;
+  const t = m.totals;
+  const nSel = Object.keys(pm.selected || {}).filter((id) => m.byId.has(id)).length;
+  const anything = m.byId.size > 0;
+  const plural = (n) => `${n} photo${n === 1 ? '' : 's'}`;
+
+  const header = `
+    <header class="header-row">
+      <button class="icon-btn" data-action="pm-back" aria-label="Back">${icon('chevron-left')}</button>
+      <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Manage Photos</div>
+      ${anything ? `<button class="pm-select-btn" data-action="pm-select-toggle" ${pm.busy ? 'disabled' : ''}>${pm.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
+    </header>`;
+
+  // 3A: the cloud read is a tap, never automatic.
+  const cl = pm.cloud;
+  let look = '';
+  if (vis) {
+    if (cl && cl.loading) {
+      look = `<p class="muted pm-note">Looking in the cloud\u2026</p>`;
+    } else {
+      // V90.1 (Peter): a small secondary link, not a big button — it is not a
+      // sync, and each look reads the whole photo list. After a look, one line
+      // says what it found beyond this phone's jobs.
+      if (cl && cl.ok && cl.at) {
+        const when = escapeHTML(new Date(cl.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }));
+        const parts = [];
+        if (t.awayN) parts.push(`${plural(t.awayN)} from ${t.awayJobs} job${t.awayJobs === 1 ? '' : 's'} not on this phone`);
+        if (t.orphanN) parts.push(`${plural(t.orphanN)} with no job`);
+        const found = parts.length
+          ? 'Found ' + parts.join(' \u00b7 ')
+          : 'Nothing extra \u2014 every cloud photo belongs to a job on this phone.';
+        look = `
+        <p class="pm-note pm-found" role="status">${found}</p>
+        <p class="muted pm-note">Checked at ${when}${cl.capped ? ' \u00b7 very large account: the first 20,000 photos are shown' : ''} \u00b7 <button class="pm-look-link" data-action="pm-look">Look again</button></p>
+`;
+      } else {
+        look = `
+        <p class="muted pm-note">Photos of jobs not on this phone? <button class="pm-look-link" data-action="pm-look">Look in the cloud</button></p>
+`;
+      }
+      look += `        ${cl && cl.error ? `<p class="pm-note pm-error">${escapeHTML(cl.error)}</p>` : ''}`;
+    }
+  }
+
+  const totals = `
+    <div class="settings-section pm-totals">
+      <div class="pm-total-row"><span>${icon('smartphone')} On this phone</span><strong>${plural(t.phoneN)} \u00b7 ${escapeHTML(formatBytes(t.phoneB))}</strong></div>
+      ${vis ? `<div class="pm-total-row"><span>${icon('cloud')} In the cloud${t.cloudAll ? '' : ' <span class="muted">(jobs on this phone)</span>'}</span><strong>${plural(t.cloudN)} \u00b7 ${escapeHTML(formatBytes(t.cloudB))}</strong></div>` : ''}
+      ${look}
+    </div>`;
+
+  const opt = (v, cur, label) => `<option value="${v}"${cur === v ? ' selected' : ''}>${label}</option>`;
+  const controls = anything ? `
+    <div class="list-controls">
+      ${vis ? `<label class="control-field">
+        <span class="control-label">Show</span>
+        <select class="sort-select" data-change-action="pm-filter">
+          ${opt('all', m.filter, 'All')}${opt('phone', m.filter, 'On this phone')}${opt('cloud', m.filter, 'Cloud only')}${opt('notup', m.filter, 'Not uploaded yet')}
+        </select>
+      </label>` : ''}
+      <label class="control-field">
+        <span class="control-label">Sort jobs</span>
+        <select class="sort-select" data-change-action="pm-sort">
+          ${opt('newest', pm.sort, 'Newest')}${opt('oldest', pm.sort, 'Oldest')}${opt('space', pm.sort, 'Most space')}
+        </select>
+      </label>
+    </div>` : '';
+
+  const busy = pm.busy ? `<p class="pm-busy" id="pm-busy" role="status">${escapeHTML(pm.busy)}</p>` : '';
+
+  let body;
+  if (!m.total) {
+    body = !anything
+      ? emptyStateHTML('camera', 'No photos yet', 'Photos are added from the FAIL screen. They\u2019ll appear here, grouped by job.')
+      : `<p class="muted pm-note">No photos match this filter.</p>`;
+  } else {
+    body = m.groups.map((g) => {
+      const allSel = g.photos.every((e) => pm.selected[e.id]);
+      const sub = g.orphan
+        ? [`Their job was deleted, or never reached the cloud`, `${plural(g.photos.length)} \u00b7 ${formatBytes(g.bytes)}`]
+        : [g.client, formatDate(g.date), `${plural(g.photos.length)} \u00b7 ${formatBytes(g.bytes)}`, g.onPhone ? '' : 'not on this phone'];
+      return `
+        <section class="pm-group">
+          <div class="pm-group-head">
+            ${pm.selecting ? `<button class="pm-group-tick${allSel ? ' is-on' : ''}" data-action="pm-select-job" data-arg="${escapeHTML(g.key)}" aria-label="${allSel ? 'Deselect' : 'Select'} every photo in this job">${allSel ? icon('check') : ''}</button>` : ''}
+            <div class="pm-group-text">
+              <div class="pm-group-title">${g.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : ''}${escapeHTML(g.title)}</div>
+              <div class="pm-group-sub">${escapeHTML(sub.filter(Boolean).join(' \u00b7 '))}</div>
+            </div>
+          </div>
+          <div class="pm-grid">${g.shown.map((e) => _pmTile(e, pm, vis)).join('')}</div>
+        </section>`;
+    }).join('');
+    if (m.more) body += `<button class="backup-action-btn pm-more" data-action="pm-more">Show more (${m.more} more)</button>`;
+  }
+
+  let bar = '';
+  if (pm.selecting) {
+    const sel = Object.keys(pm.selected || {}).map((id) => m.byId.get(id)).filter(Boolean);
+    const bytes = sel.reduce((n, e) => n + (e.b || 0), 0);
+    const canRemove = sel.some((e) => e.local && e.cloud);
+    const canDown = sel.some((e) => !e.local && e.src === 'known' && e.onPhone);
+    const canDel = sel.some((e) => !e.locked && (e.local || vis));
+    const off = (ok) => (ok && !pm.busy) ? '' : 'disabled';
+    bar = `
+      <div class="selection-bar pm-bar">
+        <span class="selection-bar-count">${nSel} selected${nSel ? ` \u00b7 ${escapeHTML(formatBytes(bytes))}` : ''}</span>
+        ${vis ? `<button class="selection-bar-action pm-bar-btn" data-action="pm-remove" ${off(canRemove)}>Remove from phone</button>
+        <button class="selection-bar-action pm-bar-btn" data-action="pm-download" ${off(canDown)}>${icon('cloud-download')} Download</button>` : ''}
+        <button class="selection-bar-action pm-bar-btn is-danger" data-action="pm-delete" ${off(canDel)}>${icon('trash-2')} ${vis ? 'Delete everywhere' : 'Delete'}</button>
+      </div>`;
+  }
+
+  return `
+    <div class="screen pm-screen">
+      ${header}
+      ${totals}
+      ${controls}
+      ${busy}
+      ${body}
+    </div>
+    ${bar}
+    ${_pmPreviewSheet(m, pm)}
+  `;
+}
+
+// ============== V91 (roadmap Stage 4) — Jobs on this phone ==============
+// Settings → Backup → Jobs on this phone (5A). Logic in settings-actions.js
+// (jobMgr*, tidy*). Signed in only — signed out it is never linked; a stray
+// visit shows a line saying so. 🛡 = on this phone AND safe in the cloud;
+// ☁ stays "only in the cloud" (Peter, V91 4A — Stage 5 relies on it).
+
+// The tidy-up block (8A/9A) — the offer's two actions, also shown at the top of
+// this screen. '' when there is nothing to tidy.
+function renderTidyBlock(m, cls) {
+  if (!m || !m.active || (!m.jobs.length && !m.photos.length)) return '';
+  const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const lines = [];
+  if (m.jobs.length) {
+    lines.push(`
+        <div class="tidy-row">
+          <span class="tidy-text">${pl(m.jobs.length, 'job')} older than ${pl(m.jobAge, 'month')} (${pl(m.jobItems, 'item')})</span>
+          <button class="backup-action-btn tidy-btn" data-action="tidy-jobs">Remove from phone</button>
+        </div>`);
+  }
+  if (m.photos.length) {
+    lines.push(`
+        <div class="tidy-row">
+          <span class="tidy-text">${pl(m.photos.length, 'photo')} older than ${pl(m.photoAge, 'month')} (${escapeHTML(formatBytes(m.photoBytes))})</span>
+          <button class="backup-action-btn tidy-btn" data-action="tidy-photos">Remove from phone</button>
+        </div>`);
+  }
+  return `
+      <div class="tidy-block ${cls || ''}">
+        <p class="tidy-lead">Safe in the cloud and can come off this phone:</p>
+        ${lines.join('')}
+      </div>`;
+}
+
+function renderJobManager() {
+  const jm = state.jobMgr || {};
+  const m = jobMgrModel();
+  const header = `
+    <header class="header-row">
+      <button class="icon-btn" data-action="jm-back" aria-label="Back">${icon('chevron-left')}</button>
+      <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Jobs on This Phone</div>
+      ${m.active && m.counts.all ? `<button class="pm-select-btn" data-action="jm-select-toggle" ${jm.busy ? 'disabled' : ''}>${jm.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
+    </header>`;
+  if (!m.active) {
+    return `
+    <div class="screen jm-screen">
+      ${header}
+      <p class="muted pm-note">Sign in to the cloud to see which jobs are safe there.</p>
+    </div>`;
+  }
+
+  const summary = `
+    <div class="settings-section pm-totals">
+      <div class="pm-total-row"><span>${icon('shield-check')} Safe in the cloud</span><strong>${m.counts.safe} of ${m.counts.all}</strong></div>
+      <p class="muted pm-note">A job can come off this phone once the cloud copy matches it and all its photos are uploaded. It stays in the cloud and on your other phones, and you can bring it back.</p>
+    </div>`;
+
+  const tidy = renderTidyBlock(tidyModel(false), 'jm-tidy');
+
+  const opt = (v, label) => `<option value="${v}"${m.filter === v ? ' selected' : ''}>${label}</option>`;
+  const controls = m.counts.all ? `
+    <div class="list-controls">
+      <label class="control-field">
+        <span class="control-label">Show</span>
+        <select class="sort-select" data-change-action="jm-filter">
+          ${opt('all', 'All')}${opt('safe', 'Safe in the cloud')}${opt('notyet', 'Not safe yet')}
+        </select>
+      </label>
+    </div>` : '';
+
+  const busy = jm.busy ? `<p class="pm-busy" id="jm-busy" role="status">${escapeHTML(jm.busy)}</p>` : '';
+
+  let body;
+  if (!m.counts.all) {
+    body = `<p class="muted pm-note">No jobs on this phone.</p>`;
+  } else if (!m.rows.length) {
+    body = `<p class="muted pm-note">No jobs match this filter.</p>`;
+  } else {
+    body = m.rows.map((x) => {
+      const sel = !!(jm.selected || {})[x.id];
+      const meta = [x.client, formatDate(x.date), `${x.items} item${x.items === 1 ? '' : 's'}`].filter(Boolean).join(' \u00b7 ');
+      // V115: the photo count's camera is markup, so it joins after the escaped text.
+      const photoBit = x.photos ? ` \u00b7 ${icon('camera')} ${x.photos}` : '';
+      const status = x.r.safe
+        ? `<span class="jm-status is-safe">${icon('shield-check')} ${escapeHTML(syncSafetyText(x.r))}</span>`
+        : `<span class="jm-status">${escapeHTML(syncSafetyText(x.r))}</span>`;
+      const tick = jm.selecting
+        ? `<span class="jm-tick${sel ? ' is-on' : ''}${x.removable ? '' : ' is-off'}" role="img" aria-label="${sel ? 'Selected' : (x.removable ? 'Not selected' : 'Can\u2019t be selected')}">${sel ? icon('check') : ''}</span>`
+        : '';
+      return `
+        <div class="jm-row${sel ? ' is-selected' : ''}${jm.selecting && !x.removable ? ' is-dim' : ''}" data-action="jm-tap" data-arg="${escapeHTML(x.id)}">
+          ${tick}
+          <div class="jm-text">
+            <div class="pm-group-title">${x.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : ''}${escapeHTML(x.title)}</div>
+            <div class="pm-group-sub">${escapeHTML(meta)}${photoBit}</div>
+            <div class="jm-status-row">${status}</div>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  // V93 (7A): cleared jobs live with every other cloud job — on the Jobs
+  // screen's cloud tab. One path, not two.
+  const cleared = `<p class="muted pm-note">Jobs you remove from this phone stay in the cloud, with every older job. <button class="pm-look-link" data-action="jm-cloud-link">See them in ${icon('cloud')} In the cloud</button> on the Jobs screen \u2014 tap one to bring it back.</p>`;
+
+  let bar = '';
+  if (jm.selecting) {
+    const n = Object.keys(jm.selected || {}).filter((id) => m.byId.has(id)).length;
+    bar = `
+      <div class="selection-bar pm-bar">
+        <span class="selection-bar-count">${n} selected</span>
+        <button class="selection-bar-action pm-bar-btn" data-action="jm-remove" ${n && !jm.busy ? '' : 'disabled'}>Remove from phone</button>
+      </div>`;
+  }
+
+  return `
+    <div class="screen jm-screen">
+      ${header}
+      ${summary}
+      ${tidy}
+      ${controls}
+      ${busy}
+      ${body}
+      <div class="settings-section jm-cleared">
+        <h2 class="h2">Cleared from this phone</h2>
+        ${cleared}
+      </div>
+    </div>
+    ${bar}
+  `;
+}
+
+// ============== V93 (roadmap Stage 5 part 2) — the "In the cloud" tab ==============
+// Drawn by renderSessions() (render-core.js) when the cloud tab is chosen. Logic
+// and model in settings-actions.js (cloudJobsModel). Every job here is ☁ — only
+// in the cloud (R19). The search box sits OUTSIDE #cloud-list-area so typing
+// refreshes the list without rebuilding the input (MAP rule 3).
+function renderCloudJobsHTML() {
+  const cj = state.cloudJobs || {};
+  const busy = cj.busy ? `<p class="pm-busy" id="cloud-busy" role="status">${escapeHTML(cj.busy)}</p>` : '';
+  // V109 (2A): Cloud Storage one tap from the cloud tab — the roadmap's original
+  // placement (cloud views live where jobs live). Shown whether or not the list
+  // has been read, and even with no cloud-only jobs: jobs on this phone take
+  // cloud space too. Hidden while ticking jobs, so it never sits beside the
+  // selection bar. Settings → Data → Cloud Storage stays (3A). Back returns
+  // here: cloudStoreOpen notes 'sessions' as the view to go back to, and the
+  // Jobs screen remembers its tab.
+  const storageBtn = (cj.selecting || typeof cloudStoreOpen !== 'function') ? ''
+    : `<button class="pm-look-link cloud-storage-link" data-action="cs-open">${icon('cloud')} Cloud Storage ${icon('chevron-right', 'ic-trail')}</button>`;
+  if (!cj.ok) {
+    let msg;
+    if (cj.loading) msg = `<p class="muted pm-note" role="status">Reading the cloud\u2026</p>`;
+    else if (cj.error) msg = `<p class="pm-note pm-error">${escapeHTML(cj.error)}</p><button class="btn-secondary cloud-retry" data-action="cloud-refresh">Try again</button>`;
+    else msg = `<p class="muted pm-note">Jobs that aren't on this phone stay in the cloud. <button class="pm-look-link" data-action="cloud-refresh">Show them</button></p>`;
+    return `<div class="cloud-tab"><div class="cloud-head">${storageBtn}</div>${msg}</div>`;
+  }
+  const m = cloudJobsModel();
+  const search = m.total ? `
+    <div class="sessions-search-row">
+      <input aria-label="Search jobs in the cloud" type="search" class="search-input" id="cloud-search" data-input-action="cloud-search" placeholder="Search client, site or certificate\u2026" value="${escapeHTML(cj.q || '')}" autocomplete="off">
+    </div>` : '';
+  const selectBtn = m.total ? `<button class="pm-select-btn cloud-select-btn" data-action="cloud-select-toggle" ${cj.busy ? 'disabled' : ''}>${cj.selecting ? 'Done' : 'Select'}</button>` : '';
+  let bar = '';
+  if (cj.selecting) {
+    const n = Object.keys(cj.selected || {}).filter((id) => m.byId.has(id)).length;
+    bar = `
+      <div class="selection-bar pm-bar">
+        <span class="selection-bar-count">${n} selected</span>
+        <button class="selection-bar-action pm-bar-btn" data-action="cloud-bring" ${n && !cj.busy ? '' : 'disabled'}>Bring onto this phone</button>
+        <button class="selection-bar-action pm-bar-btn is-danger" data-action="cloud-delete" ${n && !cj.busy ? '' : 'disabled'}>${icon('trash-2')} Delete\u2026</button>
+      </div>`;
+  }
+  return `
+    <div class="cloud-tab">
+      <div class="cloud-head">${storageBtn}${selectBtn}</div>
+      ${search}
+      ${busy}
+      <div id="cloud-list-area">${renderCloudListAreaHTML(m)}</div>
+    </div>
+    ${bar}`;
+}
+
+function renderCloudListAreaHTML(model) {
+  const cj = state.cloudJobs || {};
+  const m = model || cloudJobsModel();
+  const when = cj.at ? escapeHTML(new Date(cj.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) : '';
+  const q = String(cj.q || '').trim();
+  const count = q
+    ? `${m.shown} of ${m.total} job${m.total === 1 ? '' : 's'} match`
+    : `${m.total} job${m.total === 1 ? '' : 's'} only in the cloud`;
+  const head = `<p class="muted pm-note cloud-count">${count} \u00b7 checked ${when} \u00b7 <button class="pm-look-link" data-action="cloud-refresh" aria-label="Read the cloud list again">${icon('refresh-cw')} Refresh</button></p>` +
+    (cj.capped ? `<p class="muted pm-note">Showing the first ${SYNC_CLOUD_MAX.toLocaleString('en-GB')} jobs.</p>` : '');
+  if (!m.total) return head + `<p class="muted pm-note">Every job in the cloud is on this phone.</p>`;
+  if (!m.shown) return head + `<p class="muted pm-note">No cloud jobs match.</p>`;
+  const sel = cj.selected || {};
+  const groups = m.groups.map((g) => {
+    const rows = g.rows.map((j) => {
+      const on = !!sel[j.id];
+      const counts = [];
+      if (j.items !== null && j.items !== undefined) counts.push(`${j.items} item${j.items === 1 ? '' : 's'}`);
+      if (j.fails) counts.push(`<span class="fail-text">${j.fails} fail</span>`);
+      if (j.photos) counts.push(`<span class="photo-text">${icon('camera')} ${j.photos}</span>`);
+      const meta = [j.client ? escapeHTML(j.client) : '', escapeHTML(formatDate(j.date))].concat(counts).filter(Boolean).join(' \u00b7 ');
+      // V120: the tick is the only sign of selection, so VoiceOver reads it (it was aria-hidden).
+      const tick = cj.selecting ? `<span class="jm-tick${on ? ' is-on' : ''}" role="img" aria-label="${on ? 'Selected' : 'Not selected'}">${on ? icon('check') : ''}</span>` : '';
+      return `
+        <div class="session-card cloud-card${on ? ' is-selected' : ''}${j.locked ? ' locked' : ''}">
+          <div class="session-info" data-action="cloud-tap" data-arg="${escapeHTML(j.id)}">
+            <div class="session-title">${tick}<span class="session-cloud" title="Only in the cloud" aria-label="Only in the cloud">${icon('cloud')}</span>${j.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : ''}${escapeHTML(j.title)}</div>
+            <div class="session-meta">${meta}</div>
+            ${j.certNo ? `<div class="session-meta cloud-cert">Certificate ${escapeHTML(j.certNo)}</div>` : ''}
+          </div>
+        </div>`;
+    }).join('');
+    return `<h3 class="cloud-month">${escapeHTML(g.label)}</h3>${rows}`;
+  }).join('');
+  return head + groups;
+}
+
+// V107 (Stage 5 part 3): the review before a cloud delete. `o` is
+// settings-actions.js cloudDeleteOverview(); `onYes(typed)` does the delete and
+// checks the word again itself (the disabled button is only a hint).
+// Each job is named with its counts and certificate; what goes, that other
+// phones lose it too, and that no copy is kept (5A) are said plainly. The word
+// box appears only when o.needWord (4B). Drawn on body; never render() while
+// open — it has an input (MAP rule 3). The box is not focused on open: the
+// keyboard would cover the list (as reset.js).
+function openCloudDeleteSheet(o, onYes) {
+  if (typeof _openSheet !== 'function' || !o || !o.n) return;
+  const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const word = (typeof CLOUD_DELETE_WORD === 'string') ? CLOUD_DELETE_WORD : 'DELETE';
+  const rows = o.jobs.map((j) => {
+    const bits = [j.client ? escapeHTML(j.client) : '', escapeHTML(formatDate(j.date))];
+    if (typeof j.items === 'number') bits.push(pl(j.items, 'item'));
+    if (j.photos) bits.push(`${icon('camera')} ${j.photos}`);
+    return `<li><strong>${escapeHTML(j.title || j.site || j.name || 'Untitled job')}</strong><br><span class="muted">${bits.filter(Boolean).join(' \u00b7 ')}</span>` +
+      (j.certNo ? `<br><span class="cloud-del-cert">Certificate ${escapeHTML(j.certNo)}</span>` : (j.locked ? `<br><span class="cloud-del-cert">Locked</span>` : '')) + `</li>`;
+  }).join('');
+  const totals = [pl(o.n, 'job'), pl(o.items, 'item')];
+  if (o.photos) totals.push(pl(o.photos, 'photo'));
+  const certLine = o.certJobs
+    ? `<p class="reset-warn" id="cloud-del-certs">&#9888; ${o.certJobs === 1 ? 'One of these has' : `${o.certJobs} of these have`} a certificate${o.certs.length ? ` (${escapeHTML(o.certs.join(', '))})` : ''}. Deleting ${o.certJobs === 1 ? 'it' : 'them'} deletes your record of ${o.certJobs === 1 ? 'that test' : 'those tests'}.</p>`
+    : '';
+  const yesLabel = `Yes, delete ${o.n === 1 ? 'this job' : pl(o.n, 'job')} for good`;
+  const { sheet, backdrop, cleanup } = _openSheet('Delete from the cloud');
+  sheet.classList.add('reset-sheet', 'cloud-del-sheet');
+  sheet.innerHTML = `
+    <div class="bulk-sheet-handle"></div>
+    <div class="bulk-sheet-header">
+      <span class="fail-close-spacer"></span>
+      <h3 class="bulk-sheet-title">Delete from the cloud &mdash; are you sure?</h3>
+      <button class="fail-close-btn" id="cloud-del-cancel" aria-label="Cancel">&times;</button>
+    </div>
+    <div class="sheet-scroll reset-overview">
+      ${certLine}
+      <h4 class="reset-h reset-h-gone">Deleted for good &mdash; ${escapeHTML(totals.join(' \u00b7 '))}</h4>
+      <ul class="reset-list reset-list-gone cloud-del-list" id="cloud-del-jobs">${rows}</ul>
+      <p class="reset-note">${o.n === 1 ? 'It goes' : 'They go'} from the cloud and from any other phone that has ${o.n === 1 ? 'it' : 'them'}, with ${o.photosKnown ? 'the photos' : 'any photos'}. A phone that has changed one and not sent it yet will ask before letting it go.</p>
+      <p class="reset-note">Want a copy? Bring the job onto this phone first, then make its certificate or export it.</p>
+      <p class="reset-final" id="cloud-del-final">No copy is kept, and it can&rsquo;t be undone.</p>
+    </div>
+    <div class="sheet-pin">
+      ${o.needWord ? `<label class="label" for="cloud-del-input">Type ${word} to confirm</label>
+      <input class="input" id="cloud-del-input" autocomplete="off" autocapitalize="characters" autocorrect="off" spellcheck="false" maxlength="12" placeholder="${word}">` : ''}
+      <div style="display:flex;gap:10px;margin-top:12px">
+        <button class="btn-secondary" id="cloud-del-no">Cancel</button>
+        <button class="btn-danger" id="cloud-del-yes" style="flex:1" ${o.needWord ? 'disabled' : ''}>${escapeHTML(yesLabel)}</button>
+      </div>
+    </div>
+  `;
+  document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+  const inp = document.getElementById('cloud-del-input');
+  const yes = document.getElementById('cloud-del-yes');
+  const x = document.getElementById('cloud-del-cancel');
+  const no = document.getElementById('cloud-del-no');
+  if (x) x.addEventListener('click', cleanup);
+  if (no) no.addEventListener('click', cleanup);
+  const sync = () => {
+    if (yes && o.needWord) yes.disabled = !(typeof cloudDeleteConfirmMatches === 'function' && cloudDeleteConfirmMatches(inp ? inp.value : ''));
+  };
+  if (inp) { inp.addEventListener('input', sync); inp.addEventListener('keyup', sync); }
+  if (yes) yes.addEventListener('click', () => {
+    const typed = inp ? inp.value : '';
+    if (o.needWord && !(typeof cloudDeleteConfirmMatches === 'function' && cloudDeleteConfirmMatches(typed))) { sync(); return; }
+    cleanup();   // first: the delete repaints the Jobs screen
+    onYes(typed);
+  });
+  if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);   // V123 (3A)
+}
+
+// The cloud search's partial refresh — the input itself is left alone.
+function refreshCloudListAreaOnly() {
+  const wrap = document.getElementById('cloud-list-area');
+  if (!wrap) return;
+  wrap.innerHTML = renderCloudListAreaHTML();
+}
+
+// V108 (Stage 5 part 3, second half): Settings → Data → Cloud Storage. Markup
+// only; settings-actions.js cloudStoreModel() works it out and sync.js
+// syncCloudStorage() reads it. Figures, no limit (2A); the biggest jobs (3A)
+// with ☁ / "on this phone"; Select → Delete… for cloud-only ones, through V107's
+// openCloudDeleteSheet (4A); Manage Photos (5A). No inputs — render() may run
+// while it is up (MAP rule 3).
+// Cloud figures can pass 1 GB (formatBytes stops at MB, which suits a phone).
+function cloudBytesText(b) {
+  const n = (typeof b === 'number' && isFinite(b) && b > 0) ? b : 0;
+  if (n >= 1024 * 1024 * 1024) return `${(n / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+  return formatBytes(n);
+}
+
+function renderCloudStorage() {
+  const cs = state.cloudStore || {};
+  const m = cloudStoreModel();
+  const about = (b) => 'about ' + cloudBytesText(b || 0);
+  const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const header = `
+    <header class="header-row">
+      <button class="icon-btn" data-action="cs-back" aria-label="Back">${icon('chevron-left')}</button>
+      <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Cloud Storage</div>
+      ${cs.ok && m.selectable ? `<button class="pm-select-btn" data-action="cs-select-toggle" ${cs.busy ? 'disabled' : ''}>${cs.selecting ? 'Done' : 'Select'}</button>` : '<span style="width:40px"></span>'}
+    </header>`;
+  const busy = cs.busy ? `<p class="pm-busy" id="cs-busy" role="status">${escapeHTML(cs.busy)}</p>` : '';
+  const err = cs.error ? `<p class="pm-note pm-error" id="cs-error">${escapeHTML(cs.error)}</p>` +
+    (cs.needsUpdate ? `<p class="muted pm-note" id="cs-needs-update">It’s a one-off step on the cloud’s side (the V108 database update). Nothing on this phone is affected.</p>` : '') : '';
+  if (!cs.ok) {
+    const body = cs.loading
+      ? `<p class="muted pm-note" role="status">Reading the cloud…</p>`
+      : `${err}<button class="btn-secondary cloud-retry" data-action="cs-refresh">Try again</button>`;
+    return `<div class="screen cs-screen">${header}${body}</div>`;
+  }
+  const when = cs.at ? escapeHTML(new Date(cs.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) : '';
+  const checked = cs.loading
+    ? `<p class="muted pm-note cs-checked" role="status">Reading the cloud…</p>`
+    : `<p class="muted pm-note cs-checked">Checked ${when} · <button class="pm-look-link" data-action="cs-refresh" aria-label="Read the cloud again">${icon('refresh-cw')} Refresh</button></p>`;
+  const totals = `
+    <div class="settings-section pm-totals" id="cs-totals">
+      <div class="pm-total-row"><span>${icon('clipboard-list')} Jobs</span><strong>${escapeHTML(m.jobs.n.toLocaleString('en-GB'))} · ${escapeHTML(about(m.jobs.bytes))}</strong></div>
+      <div class="pm-total-row"><span>${icon('camera')} Photos</span><strong>${escapeHTML(m.photos.n.toLocaleString('en-GB'))} · ${escapeHTML(about(m.photos.bytes))}</strong></div>
+      <div class="pm-total-row cs-total"><span>${icon('cloud')} In the cloud</span><strong>${escapeHTML(about(m.total))}</strong></div>
+      ${cs.capped ? `<p class="muted pm-note">Counted from the first ${SYNC_CLOUD_MAX.toLocaleString('en-GB')} jobs — there is more than this.</p>` : ''}
+      ${checked}
+      <p class="muted pm-note">Sizes are approximate. Photos are counted at full size. This phone’s own space is on Phone Storage.</p>
+      <button class="backup-action-btn" id="cs-photos-btn" data-action="cs-photos" ${cs.busy ? 'disabled' : ''}>${icon('images')} Manage Photos ${icon('chevron-right', 'ic-trail')}</button>
+    </div>`;
+  const sel = cs.selected || {};
+  const cards = m.rows.map((j) => {
+    const on = !!sel[j.id] && !j.onPhone;
+    const counts = [];
+    if (typeof j.items === 'number') counts.push(pl(j.items, 'item'));
+    if (j.photos) counts.push(`<span class="photo-text">${icon('camera')} ${j.photos}</span>`);
+    const meta = [j.client ? escapeHTML(j.client) : '', escapeHTML(formatDate(j.date))].concat(counts).filter(Boolean).join(' · ');
+    const where = j.onPhone
+      ? `<span class="cs-where">on this phone</span>`
+      : `<span class="session-cloud" title="Only in the cloud" aria-label="Only in the cloud">${icon('cloud')}</span>`;
+    const tick = cs.selecting && !j.onPhone ? `<span class="jm-tick${on ? ' is-on' : ''}" role="img" aria-label="${on ? 'Selected' : 'Not selected'}">${on ? icon('check') : ''}</span>` : '';
+    const parts = j.photoBytes ? ` <span class="muted">(job ${escapeHTML(cloudBytesText(j.bytes))} + photos ${escapeHTML(cloudBytesText(j.photoBytes))})</span>` : '';
+    return `
+        <div class="session-card cloud-card cs-card${on ? ' is-selected' : ''}${j.locked ? ' locked' : ''}${j.onPhone ? ' cs-on-phone' : ''}" data-id="${escapeHTML(j.id)}">
+          <div class="session-info" data-action="cs-tap" data-arg="${escapeHTML(j.id)}">
+            <div class="session-title">${tick}${j.onPhone ? '' : where}${j.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : ''}${escapeHTML(j.title)}</div>
+            <div class="session-meta">${meta}</div>
+            <div class="session-meta cs-size"><strong>${escapeHTML(about(j.total))}</strong>${parts}${j.onPhone ? ' · ' + where : ''}</div>
+            ${j.certNo ? `<div class="session-meta cloud-cert">Certificate ${escapeHTML(j.certNo)}</div>` : ''}
+          </div>
+        </div>`;
+  }).join('');
+  const top = m.rows.length ? `
+    <div class="settings-section" id="cs-top">
+      <h2 class="h2">Biggest jobs</h2>
+      ${cards}
+      <p class="muted pm-note">Only jobs that aren’t on this phone can be deleted here. A job on this phone is deleted from the phone’s job list (${icon('trash-2')} → Delete everywhere).</p>
+    </div>` : `<p class="muted pm-note">No jobs in the cloud yet.</p>`;
+  let bar = '';
+  if (cs.selecting) {
+    const pick = m.rows.filter(r => m.selected.indexOf(r.id) !== -1);
+    const bytes = pick.reduce((n, r) => n + (r.total || 0), 0);
+    bar = `
+      <div class="selection-bar pm-bar">
+        <span class="selection-bar-count">${pick.length} selected${pick.length ? ` · ${escapeHTML(about(bytes))}` : ''}</span>
+        <button class="selection-bar-action pm-bar-btn is-danger" data-action="cs-delete" ${pick.length && !cs.busy ? '' : 'disabled'}>${icon('trash-2')} Delete…</button>
+      </div>`;
+  }
+  return `
+    <div class="screen cs-screen">
+      ${header}
+      ${busy}
+      ${err}
+      ${totals}
+      ${top}
+    </div>
+    ${bar}`;
 }

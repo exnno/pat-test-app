@@ -167,6 +167,9 @@ module.exports = async function () {
     const calls = [];
     const app = boot({ fetch: async (u) => { calls.push(String(u)); throw new Error('offline'); } });
     await tick(5);
+    // V90: under a full run the store read can take longer than one tick (seen
+    // twice while building V90) — wait for it rather than race it.
+    for (let k = 0; k < 100 && !app.state().photoMetaReady; k++) await tick(10);
     t.ok(app.state().photoMetaReady, 'the mirror is ready once the store has been read');
     withSession(app, { site: 'ZZPHOUT' });
     const { item, ids } = await failWithPhotos(app, 2);
@@ -363,14 +366,19 @@ module.exports = async function () {
     t.notOk(app.srv.files.has(UID + '/' + p1.ids[0] + '.jpg'), 'its photo went with it');
     t.eq(app.srv.tables.photos.find(r => r.id === p1.ids[0]).deleted, true, 'and its row is marked');
 
-    // Clear job 2 as old: the cloud keeps it and its photo (V80 C).
-    app.fn('pruneOldSessions')();
+    // Clear job 2 from the phone: the cloud keeps it and its photo (V80 C).
+    // V91: through the one removal path (syncs first, asks, re-checks).
+    await app.fn('jobsRemoveAsk')([j2.id]);
+    app.stopTimer();
     t.ok(confirmSheet(app), 'clear confirmed');
     await tick(20); app.stopTimer();
     t.notOk(app.state().sessions.some(s => s.id === j2.id), 'job 2 cleared from the phone');
-    const before = app.srv.photoCalls().length;
+    // V89: every reading run now READS the photos table (rows down, 10A) —
+    // what must not happen is a write: no PATCH, no storage DELETE.
+    const writes = () => app.srv.photoCalls().filter(c => c.method !== 'GET').length;
+    const before = writes();
     await run(app);
-    t.eq(app.srv.photoCalls().length, before, 'clearing sends no photo delete');
+    t.eq(writes(), before, 'clearing sends no photo delete');
     t.ok(app.srv.files.has(UID + '/' + p2.ids[0] + '.jpg'), 'the cloud keeps its photo');
   });
 
@@ -412,10 +420,12 @@ module.exports = async function () {
     t.eq(app.fn('syncStatusSummary')().waiting, 0, 'the job itself is up to date in the cloud');
     let g = app.fn('syncPruneFilter')([app.state().sessions.find(s => s.id === j.id)]);
     t.eq(g.kept.length, 1, 'job in the cloud but its photo isn\u2019t: kept');
+    t.eq(g.kept[0] && g.kept[0].why, 'photos', '…and the reason is its photo');
     const toasts = [];
     app.sandbox.showToast = (m) => toasts.push(String(m));
-    app.fn('pruneOldSessions')();
-    t.includes(toasts.join('|'), 'or its photos', 'and the toast says photos may be why');
+    await app.fn('jobsRemoveAsk')([j.id]);   // V91: syncs first, the photo is still refused
+    app.stopTimer();
+    t.includes(toasts.join('|'), '1 photo still to upload', 'and the toast says the photo is why');
 
     app.srv.fail.delete('upload');
     await run(app);
@@ -485,7 +495,7 @@ module.exports = async function () {
     t.eq(sum.phTotal, 2, 'two photos counted');
     t.eq(sum.phUp, 0, 'none in the cloud');
     app.fn('setView')('cloudSync');
-    t.includes(app.doc.getElementById('app').innerHTML, 'Photos: <strong>0</strong> of 2 in the cloud', 'the page line');
+    t.includes(app.doc.getElementById('app').innerHTML, 'Photos: <strong>0</strong> of 2 on this phone in the cloud', 'the page line (V89 wording)');
     t.includes(app.doc.getElementById('app').innerHTML, '<strong>2</strong> waiting to send', '…with what waits');
     app.srv.fail.delete('upload');
     await run(app);

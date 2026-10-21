@@ -84,6 +84,9 @@ function handleDelegatedClick(e) {
   // Captured BEFORE the action so only a real screen change counts — tapping a
   // quick-pick button or a toggle is not navigation, and should not read.
   const viewBefore = state.view;
+  // V123: remember the tapped control, so the redraw its action causes can put
+  // VoiceOver back on it (feedback.js). Before the action — it may destroy it.
+  if (typeof focusNoteTap === 'function') { try { focusNoteTap(el); } catch (e4) {} }
   try {
     fn(arg, el, e);
     if (state.view !== viewBefore && typeof syncNoteNav === 'function') {
@@ -163,7 +166,17 @@ function handleDelegatedChange(e) {
   if (!el || el.nodeType !== 1 || !el.dataset || !el.dataset.changeAction) return;
   const fn = CHANGE_ACTIONS[el.dataset.changeAction];
   if (!fn) return;
+  if (typeof focusNoteTap === 'function') { try { focusNoteTap(el); } catch (e4) {} }   // V123: a switch or a list
   fn(_fieldValue(el), el, e);
+}
+
+// V139: a <form> never navigates. The cloud sign-in boxes sit in real forms so the
+// iPhone treats them as a sign-in (offers to save / fill from Passwords) and its
+// Go key works: implicit submission clicks the form's submit button, whose
+// data-action runs through handleDelegatedClick like any tap. The submit that
+// follows that click is cancelled here — left alone it would reload the app.
+function handleDelegatedSubmit(e) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
 }
 
 let _delegationInited = false;
@@ -174,6 +187,7 @@ function initDelegation() {
   app.addEventListener('click', handleDelegatedClick);
   app.addEventListener('input', handleDelegatedInput);    // v28 (E3-tail)
   app.addEventListener('change', handleDelegatedChange);  // v28 (E3-tail)
+  app.addEventListener('submit', handleDelegatedSubmit);  // V139
   _delegationInited = true;
 }
 
@@ -187,6 +201,7 @@ registerActions({
   // Sessions screen header / new-session form (click parts only).
   'open-settings': () => { state.settingsCategory = null; state.settingsSearchQuery = ''; setView('settings'); },
   'new-session': () => {
+    if (typeof planGate === 'function' && !planGate()) return;   // V127: before the form, not after it
     state.newForm.show = true;
     state.newFormError = '';
     if (!state.newForm.engineer && state.engineer) state.newForm.engineer = state.engineer;
@@ -211,10 +226,61 @@ registerActions({
   'fail-photo-pick':    () => { const inp = document.getElementById('fail-photo-file'); if (inp) inp.click(); },
   'fail-photo-remove':  (arg) => removePendingPhoto(parseInt(arg, 10)),
   'photo-strip-open':   (arg) => openPhotoStrip(arg),
+  // V99: map pins (session.js). The 📍 button and the offer both name an item of
+  // the job on screen; everything else works on the open sheet's own ids.
+  'map-pin-open':   (arg) => { const s = activeSession(); if (s) openMapPinSheet(s.id, arg); },
+  'map-pin-offer':  (arg) => { const s = activeSession(); if (s) openMapPinSheet(s.id, arg); },
+  'map-pin-cancel': () => closeMapPinSheet(),
+  'map-pin-save':   () => saveMapPinSheet(),
+  'map-pin-remove': () => removeMapPinFromSheet(),
+  'map-pin-w3w':    () => mapPinOpenW3w(),
+  'map-pin-w3w-web': () => mapPinOpenW3wWeb(),   // V99.1: only offered when the app didn't open
+  'map-pin-paste':  () => mapPinPaste(),
   'photo-strip-close':  () => closePhotoStrip(),
   'photo-strip-add':    () => { const inp = document.getElementById('photo-strip-file'); if (inp) inp.click(); },
   'photo-delete':       (arg) => deletePhotoFromStrip(arg),
+  'photo-download':     (arg) => downloadStripPhotos([arg]),     // v89 (2A)
+  'photo-download-all': () => downloadStripPhotosAll(),
   'photo-export':       () => downloadPhotoBundle(),
+  // V90 (R18): the photo manager (logic in settings-actions.js).
+  'pm-open':            () => { mgrNoteReturn(); photoMgrOpen(); },   // V96: Back returns where you came from
+  'pm-back':            () => mgrGoBack(),
+  'pm-select-toggle':   () => photoMgrToggleSelecting(),
+  'pm-tile':            (arg) => photoMgrTile(arg),
+  'pm-select-job':      (arg) => photoMgrSelectJob(arg),
+  'pm-more':            () => photoMgrShowMore(),
+  'pm-look':            () => photoMgrLook(),
+  'pm-preview-close':   () => photoMgrPreviewClose(),
+  'pm-remove':          (arg) => photoMgrRemove(arg),
+  'pm-download':        (arg) => photoMgrDownload(arg),
+  'pm-delete':          (arg) => photoMgrDelete(arg),
+  // V91 (Stage 4): Jobs on this phone and the tidy-up offer (settings-actions.js).
+  'jm-open':            () => { mgrNoteReturn(); jobMgrOpen(); },
+  'jm-back':            () => mgrGoBack(),
+  'jm-select-toggle':   () => jobMgrToggleSelecting(),
+  'jm-tap':             (arg) => jobMgrTap(arg),
+  'jm-remove':          () => jobMgrRemoveSelected(),
+  'jm-cloud-link':      () => jobMgrCloudLink(),              // V93 (7A)
+  // V93 (Stage 5 part 2): the Jobs screen's tabs and the cloud tab.
+  'jobs-tab':           (arg) => jobsTabSet(arg),
+  'cloud-refresh':      () => cloudJobsLoad(true),
+  'cloud-tap':          (arg) => cloudJobsTap(arg),
+  'cloud-select-toggle': () => cloudJobsToggleSelecting(),
+  'cloud-bring':        () => cloudJobsBringSelected(),
+  'cloud-delete':       () => cloudJobsDeleteSelected(),        // V107 (Stage 5 pt 3)
+  // V108 (Stage 5 pt 3, second half): Settings → Data → Cloud Storage.
+  'cs-open':            () => cloudStoreOpen(),
+  'cs-back':            () => cloudStoreBack(),
+  'cs-refresh':         () => cloudStoreLoad(),
+  'cs-select-toggle':   () => cloudStoreToggleSelecting(),
+  'cs-tap':             (arg) => cloudStoreTap(arg),
+  'cs-delete':          () => cloudStoreDeleteSelected(),
+  'cs-photos':          () => { if (state.cloudStore) { state.cloudStore.selecting = false; state.cloudStore.selected = {}; } mgrNoteReturn(); photoMgrOpen(); },
+  'tidy-jobs':          () => tidyJobsRemove(),
+  'tidy-photos':        () => tidyPhotosRemove(),
+  'tidy-review':        () => tidyOfferReview(),
+  'tidy-dismiss':       () => tidyOfferDismiss(),
+  'photo-age-save':     () => savePhotoAge(),
   'photo-import':       () => { const inp = document.getElementById('photo-import-file'); if (inp) inp.click(); },
   'photo-wipe':         () => {
     const n = photoStatsSync().count;
@@ -281,14 +347,7 @@ registerActions({
   },
   'delete-session': (arg, el, e) => {
     e.stopPropagation();
-    const s = state.sessions.find(x => x.id === arg);
-    if (!s) return;
-    openConfirmSheet({
-      title: 'Delete session?',
-      message: `Delete "${s.site || s.name}"? This cannot be undone.`,
-      confirmLabel: 'Delete',
-      onConfirm: () => deleteSession(arg)
-    });
+    deleteSessionAsk(arg);   // V91 (6A): signed in, remove from phone or delete everywhere (two steps)
   },
   'clear-session-filters': () => {
     state.sessionFilter = 'all';
@@ -296,7 +355,9 @@ registerActions({
     save();
     refreshSessionsListAreaOnly();
   },
-  'bulk-export-unexported': () => bulkExportUnexported()
+  // V131 (2A): the "N jobs not yet exported" line shows those jobs (it bulk-
+  // exported CSVs until V130 — retired with bulkExportUnexported).
+  'review-unexported': () => { reviewUnexported(); save(); render(); }
 });
 
 // ---------------------------------------------------------------------------
@@ -331,10 +392,12 @@ registerActions({
 
   // Quick-pick item-type buttons. data-arg carries the type.
   'quick-pick': (arg, el) => {
+    if (typeof qpTileClear === 'function') qpTileClear();   // V94: a type replaces a tile
     state.form.itemType = arg;
     const inp = document.getElementById('f-type');
     if (inp) inp.value = arg;
-    document.querySelectorAll('.quick-btn').forEach(x => x.classList.toggle('active', x === el));
+    // V123 (4A): aria-pressed follows the colour, so VoiceOver says "selected".
+    document.querySelectorAll('.quick-btn').forEach(x => { x.classList.toggle('active', x === el); x.setAttribute('aria-pressed', x === el ? 'true' : 'false'); });
     state.showSuggestions = false;
     renderSuggestionsOnly();
   },
@@ -346,6 +409,9 @@ registerActions({
   'log-pass': () => passClicked(),
   'log-fail': () => failClicked(),
   'copy-last': () => copyLastResult(),
+  // V94: Multi Pick tile in the Quick Pick grid (12A) and Undo (8, 14A).
+  'qp-tile': (arg) => qpTileSelect(parseInt(arg, 10)),
+  'undo-last': () => undoAsk(),
   'cursor-prev': () => moveCursor(-1),
   'cursor-next': () => moveCursor(1),
   'skip-new': () => skipToNew(),
@@ -375,6 +441,10 @@ registerActions({
   'readings-toggle-polarity': () => toggleReadingsPolarity(),
   'readings-commit': () => commitReadingsSheet(),
   'readings-cancel': () => cancelReadingsSheet(),
+  // V104 (S10): the confirm step for a reading outside its usual limit.
+  'readings-pass-anyway': () => commitReadingsSheet(true),
+  'readings-change-to-fail': () => readingsChangeToFail(),
+  'readings-confirm-back': () => readingsConfirmBack(),
 
   // Multi Pick sheet
   'multipick-open': () => { const sess = activeSession(); if (sess && sess.locked) return; state.multiPickSheetOpen = true; render(); },
@@ -472,6 +542,31 @@ registerActions({
   },
   'bulk-notes-apply': () => applyBulkNotes(),
 
+  // V101 (Stage 9, split): Move to a new job (session.js).
+  'move-job-open': () => openMoveJob(),
+  'move-job-close': () => closeMoveJob(),
+  'move-job-continue': () => moveJobContinue(),
+  'move-job-back': () => moveJobBack(),
+  'move-job-go': () => moveItemsToNewJob(),
+  'move-open-new': (arg) => openMovedJob(arg),
+
+  // V103 (Stage 9B): Move to another job — an existing one (session.js).
+  'move-to-open': () => openMoveTo(),
+  'move-to-close': () => closeMoveTo(),
+  'move-to-pick': (arg) => pickMoveTo(arg),
+  'move-to-all': (arg) => setMoveToAll(arg),
+  'move-to-continue': () => moveToContinue(),
+  'move-to-back': () => moveToBack(),
+  'move-to-go': () => moveItemsToExistingJob(),
+
+  // V102 (Stage 9, duplicate): Session settings → Duplicate this job (session.js).
+  'dup-job-open': () => openDupJob(),
+  'dup-job-close': () => closeDupJob(),
+  'dup-job-continue': () => dupJobContinue(),
+  'dup-job-back': () => dupJobBack(),
+  'dup-job-go': () => { duplicateJob(false); },
+  'dup-job-without': () => { duplicateJob(true); },
+
   // Overview body rows
   'jump-to-item': (arg) => jumpTo(parseInt(arg, 10)),
   'delete-item': (arg) => openConfirmSheet({
@@ -494,14 +589,11 @@ registerActions({
 // ---------------------------------------------------------------------------
 registerActions({
   'edit-cancel': () => setView('overview'),
+  // V112 (2A): the header arrow asks first if the draft changed. The Cancel
+  // button beside Save stays a plain discard — it says what it does.
+  'edit-back': () => unsavedLeave(() => setView('overview')),
   'edit-save': () => {
-    const $ = id => document.getElementById(id);
-    state.editForm.site = $('ef-site').value;
-    state.editForm.engineer = $('ef-engineer').value;
-    state.editForm.name = $('ef-name').value;
-    state.editForm.date = $('ef-date').value;
-    state.editForm.prefix = $('ef-prefix').value;
-    state.editForm.locked = $('ef-locked') ? $('ef-locked').checked : false;   // v8
+    captureEditSessionForm();   // V112: shared with the Back guard (session.js)
     saveSessionEdits();
   }
 });
@@ -523,43 +615,15 @@ registerActions({
   // v32: open a category sub-list from the hub.
   // v85: opening any group clears a stale "That code isn't right." from the
   // Cloud access-code box, so it never greets a later visit.
-  'settings-category': (arg) => { state.settingsCategory = arg; state.cloudCodeMessage = ''; setView('settingsCategory'); },
+  'settings-category': (arg) => settingsOpenCategory(arg),   // V96: one-page groups open the page
   // v32: back from a setting page returns to its category (if opened from one),
   // back from a category returns to the hub. setView is also used directly when
   // jumping to a page from a flat search result (settingsCategory stays null →
   // back goes to the hub, which is correct: there's no category context).
-  'back-to-settings': () => {
-    // v35: if we arrived at Report Settings via the preview's "Edit settings"
-    // deep-link, going back returns straight to a freshly-rebuilt preview.
-    if (state.reportPreviewReturnSessionId && state.view === 'settingsReport') {
-      const sid = state.reportPreviewReturnSessionId;
-      state.reportPreviewReturnSessionId = null;
-      setView('reports');   // a sensible underlay behind the preview overlay
-      // v64: async now (it may need to read photos before rebuilding the preview).
-      reopenReportPreview(sid).catch(() => {});
-      return;
-    }
-    // v77: if we arrived at Quick Pick Items from the entry screen's preset
-    // switcher ("⚙ Edit presets"), Back returns there rather than climbing into
-    // the Settings hierarchy the user never walked down. Consume the marker
-    // BEFORE setView, exactly as the report-preview branch above does — setView
-    // would clear it on the way out anyway, but reading it first is what makes
-    // the two branches the same shape.
-    if (state.presetEditReturnView && state.view === 'settingsItems') {
-      const back = state.presetEditReturnView;
-      state.presetEditReturnView = null;
-      setView(back);
-      return;
-    }
-    if (state.view === 'settingsCategory') {
-      state.settingsCategory = null;
-      setView('settings');
-    } else if (state.settingsCategory) {
-      setView('settingsCategory');
-    } else {
-      setView('settings');
-    }
-  },
+  // V112 (1A 2A): Back asks first when the page holds unsaved changes. The
+  // navigation itself moved to settingsBackNav() (settings-actions.js) so the
+  // Save handlers can land in the same place (3A).
+  'back-to-settings': () => unsavedLeave(settingsBackNav),
 
   // v30: Reports hub nav + actions. open-reports is defence-checked against the
   // master switch (the button is already hidden when off, this is a backstop).
@@ -698,6 +762,9 @@ registerActions({
   'settings-items-save': () => saveItemTypesSettings(),
   'settings-fails-save': () => saveFailReasonsSettings(),
   'settings-descriptions-save': () => saveDescriptionsSettings(),
+  'desc-edit': (arg) => descEditOpen(arg),                               // V95
+  'desc-text-mode': () => { state.descTextMode = true; render(); },      // V95
+  'desc-list-mode': () => { state.descTextMode = false; render(); },     // V95
   'settings-multipick-save': () => saveMultiPickSettings(),
   'settings-items-reset': () => resetItemsToDefaults(),
   'settings-fails-reset': () => resetFailReasonsToDefaults(),
@@ -708,7 +775,7 @@ registerActions({
   // Smart Quick Pick buttons (confirm before acting)
   'sqp-rebuild': () => openConfirmSheet({
     title: 'Rebuild history?',
-    message: 'Rebuild Smart Quick Pick history from all your current sessions? This replaces the learned history with a fresh scan of your data.',
+    message: 'Rebuild Smart Quick Pick history from all your current jobs? This replaces the learned history with a fresh scan of your data.',
     confirmLabel: 'Rebuild',
     danger: false,
     onConfirm: () => rebuildSqpHistory()
@@ -749,17 +816,40 @@ registerActions({
 
   // Theme (data-set-theme carries the value)
   'set-theme': (arg) => setTheme(arg),
+  'set-text-size': (arg) => setTextSize(arg),   // V121
 
   // Backup & Restore + prune + about
   'backup-export': () => downloadBackup(),
+  // V125: Export everything (exportall.js, optional — MAP rule 6).
+  'export-all': () => { if (typeof exportAllOpen === 'function') exportAllOpen(); },
+  // V127: Renew now (plan.js, optional — MAP rule 6).
+  'plan-renew': () => { if (typeof planRenew === 'function') planRenew(); },
+  // V106: a level on Reset This Phone opens its confirm (reset.js, optional).
+  'reset-open': (arg) => { if (typeof resetOpen === 'function') resetOpen(arg); },
+  // V105 (S14, 5B): a snapshot's two buttons. Both typeof-guarded — snapshots.js
+  // is optional (MAP rule 6).
+  'snapshot-restore': (arg) => { if (typeof snapshotRestoreAsk === 'function') snapshotRestoreAsk(arg); },
+  'snapshot-save': (arg) => { if (typeof snapshotSaveFile === 'function') snapshotSaveFile(arg); },
   // V87 (4A): the "not saved" sheet. Backing up leaves the sheet up (the item is
-  // still not in storage); Clear goes to the Backup page, where clearing lives.
+  // still not in storage); Clear goes to Phone Storage (V97), where clearing lives.
   'save-fail-backup': () => downloadBackup(),
-  'save-fail-clear': () => { state.saveFailureDismissed = true; setView('settingsBackup'); },
+  'save-fail-clear': () => { state.saveFailureDismissed = true; setView('settingsStorage'); },
   'save-fail-close': () => { state.saveFailureDismissed = true; render(); },
   // V87 (S13): the Jobs-screen storage banner.
-  'storage-banner-open': () => setView('settingsBackup'),
+  'storage-banner-open': () => setView('settingsStorage'),   // V97
   'storage-banner-dismiss': () => { dismissStorageBanner(); render(); },
+  // V100 (6A): the reminder banners. Review filters the Jobs list to what the
+  // banner counted; × hides it for the rest of the day.
+  'remind-export-review': () => { reviewReminder('exp'); save(); render(); },
+  'remind-export-dismiss': () => { quietReminder('exp'); render(); },
+  'remind-unlocked-review': () => { reviewReminder('unl'); save(); render(); },
+  'remind-unlocked-dismiss': () => { quietReminder('unl'); render(); },
+  // V100 (9A, 10A): the 100 moment again, and "PATGo tests itself".
+  'about-title-tap': () => aboutTitleTapped(),
+  'party-open': () => partyOpen(),
+  'party-close': () => { state.partyOpen = false; render(); },
+  'egg-close': () => eggClose(),
+  'egg-again': () => eggOpen(),
   // V87 (S12): a tap is a user gesture, which some browsers weigh when deciding.
   'storage-protect': () => { checkStorageProtection(true).catch(() => {}); },
   // v69 (D5): put the pre-repair spellings back. Confirmed first — it rewrites
@@ -802,12 +892,19 @@ registerActions({
   'wizard-finish-tour': () => wizardFinishFresh(true),
   'restart-onboarding': () => restartOnboarding(),
 
-  // v42: feature walkthrough (full-screen tour)
-  'tour-next': () => tourNext(),
-  'tour-prev': () => tourPrev(),
-  'tour-goto': (arg) => tourGoTo(arg),
-  'tour-skip': () => closeTour(),
+  // v42: feature walkthrough (full-screen tour). V134: the practice job (tour.js) —
+  // Next on a "look" step, Skip on a "do" step, Quit, and a tap inside the
+  // practice screen (only the highlighted control counts).
+  'tut-next': () => tourNext(),
+  'tut-skip': () => tourSkip(),
+  'tut-quit': () => closeTour(),
+  'tut-tap': (arg, el, e) => tutTap(arg, el, e),
+  'tut-free': () => tutFree(),   // V134.1 (4A): free practice after the last step
   'open-tour': () => openTour(),
+  'open-practice': () => openPractice(state.view),
+  'open-tutorial': (arg) => openTutorial(arg, state.view),   // V135: a Settings tutorial, by its id
+  'tut-next-tutorial': () => tutNextTutorial(),   // V135 (8A): the last step's Next tutorial
+  'tut-show-me-how': (arg) => tutShowMeHow(arg),   // V137: a page's own "Show me how ›"
 
   // v85: the cloud pages are ordinary Settings rows now (Settings → Cloud), so
   // the V43 'open-cloud-page' action is gone. The access-code box's one button:
@@ -820,6 +917,24 @@ registerActions({
   'cloud-send-code':  () => { if (typeof cloudSendCode === 'function') cloudSendCode(); },
   'cloud-verify-code':() => { if (typeof cloudVerifyCode === 'function') cloudVerifyCode(); },
   'cloud-change-email':() => { if (typeof cloudChangeEmail === 'function') cloudChangeEmail(); },
+  // V139: password sign-in, same guarding (MAP rule 6).
+  'cloud-password-sign-in': () => { if (typeof cloudPasswordSignIn === 'function') cloudPasswordSignIn(); },
+  'cloud-forgot':     () => { if (typeof cloudForgotPassword === 'function') cloudForgotPassword(); },
+  'cloud-use-code':   () => { if (typeof cloudUseCode === 'function') cloudUseCode(); },
+  'cloud-use-password':() => { if (typeof cloudUsePassword === 'function') cloudUsePassword(); },
+  'cloud-password-open':  () => { if (typeof cloudPasswordOpen === 'function') cloudPasswordOpen(); },
+  'cloud-password-cancel':() => { if (typeof cloudPasswordCancel === 'function') cloudPasswordCancel(); },
+  'cloud-password-save':  () => { if (typeof cloudPasswordSave === 'function') cloudPasswordSave(); },
+  'cloud-password-toggle':(arg, el) => { if (typeof cloudPasswordToggle === 'function') cloudPasswordToggle(el); },
+  // V140: Google. cloud-google / cloud-google-connect open the Google window
+  // inside this tap — it must stay a direct, synchronous call (iOS blocks a
+  // window opened after any wait).
+  'cloud-google':          () => { if (typeof cloudGoogleSignIn === 'function') cloudGoogleSignIn(); },
+  'cloud-google-connect':  () => { if (typeof cloudGoogleConnect === 'function') cloudGoogleConnect(); },
+  'cloud-google-cancel':   () => { if (typeof cloudGoogleCancel === 'function') cloudGoogleCancel(); },
+  'cloud-google-off':      () => { if (typeof cloudGoogleDisconnectAsk === 'function') cloudGoogleDisconnectAsk(); },
+  'cloud-google-keep':     () => { if (typeof cloudGoogleDisconnectKeep === 'function') cloudGoogleDisconnectKeep(); },
+  'cloud-google-disconnect':() => { if (typeof cloudGoogleDisconnect === 'function') cloudGoogleDisconnect(); },
   'cloud-check':      () => { if (typeof cloudCheckConnection === 'function') cloudCheckConnection(); },
   'cloud-sign-out':   () => { if (typeof cloudSignOut === 'function') cloudSignOut(); },
   // v80: sync (sync.js), same guarding. "Re-send all" ignores the fingerprints
@@ -863,6 +978,7 @@ registerActions({
   'bug-copy': () => copyBugReport(),
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
+  'reopen-unmark': () => unmarkFromReopenWarning(),   // V131 (6B)
 
   // Import conflict / summary dialogs
   'import-conflict-cancel': () => cancelImportConflict(),
@@ -889,8 +1005,8 @@ registerActions({
     render();
   },
   'clients-rebuild': () => openConfirmSheet({
-    title: 'Add from sessions?',
-    message: 'Scan all your sessions and add any clients and sites that aren\'t already listed? Nothing already here will be changed or removed.',
+    title: 'Add from jobs?',
+    message: 'Scan all your jobs and add any clients and sites that aren\'t already listed? Nothing already here will be changed or removed.',
     confirmLabel: 'Scan & add',
     danger: false,
     onConfirm: () => {
@@ -914,14 +1030,14 @@ registerActions({
   },
   'client-delete': (arg) => deleteClient(arg),
   'site-add': (arg) => {
-    state.clientsPage.siteDialog = { mode: 'add', name: '', editingId: null, clientId: arg };
+    state.clientsPage.siteDialog = { mode: 'add', name: '', editingId: null, clientId: arg, notes: '' };
     state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
     render();
   },
   'site-rename': (arg) => {
     const s = siteById(arg);
     if (!s) return;
-    state.clientsPage.siteDialog = { mode: 'rename', name: s.name, editingId: s.id, clientId: s.clientId };
+    state.clientsPage.siteDialog = { mode: 'rename', name: s.name, editingId: s.id, clientId: s.clientId, notes: siteNotesOf(s) };   // V98: Edit = name + notes
     state.clientsPage.clientDialog = { mode: null, name: '', editingId: null };
     render();
   },
@@ -945,7 +1061,31 @@ registerActions({
     if (state.clientsPage.siteDialog.mode === 'add') addSiteFromDialog();
     else renameSiteFromDialog();
   },
-  'site-dialog-cancel': () => { state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null }; render(); }
+  'site-dialog-cancel': () => { state.clientsPage.siteDialog = { mode: null, name: '', editingId: null, clientId: null }; render(); },
+
+  // V98: the Overview's site-notes sheet. Saved by site id at the moment of
+  // saving (a pull may have replaced the list while it was open — V82's rule for
+  // every records dialog). The text is the sheet's state, kept by the
+  // site-notes-text input action — the same single source the Clients site
+  // sheet uses for its name.
+  'site-notes-open': () => {
+    const site = siteForSession(activeSession());
+    if (!site) return;
+    state.siteNotesSheet = { siteId: site.id, text: siteNotesOf(site) };
+    render();
+  },
+  'site-notes-cancel': () => { state.siteNotesSheet = null; render(); },
+  'site-notes-save': () => {
+    const sh = state.siteNotesSheet;
+    if (!sh) return;
+    const text = sh.text;
+    state.siteNotesSheet = null;
+    if (!siteById(sh.siteId)) { render(); showToast('That site is no longer in your list'); return; }
+    const changed = setSiteNotes(sh.siteId, text);
+    if (changed) save();
+    render();
+    if (changed) showToast('Site notes saved');
+  }
 });
 
 // ===========================================================================
@@ -968,6 +1108,8 @@ registerInputActions({
     state.sessionsSearchQuery = v;
     refreshSessionsListAreaOnly();
   },
+  // V93: the cloud tab's search — partial refresh so focus is preserved
+  'cloud-search': (v) => cloudJobsSearch(v),
 
   // v32: Settings hub search — partial refresh so the search box keeps focus
   'settings-search': (v) => {
@@ -978,6 +1120,7 @@ registerInputActions({
   // Entry screen
   'f-asset': (v) => { state.form.assetNo = v; },
   'f-notes': (v) => { state.form.notes = v; },
+  'desc-filter': (v) => descFilter(v),   // V95: DOM-only, never renders (keyboard stays up)
 
   // Fail sheet — "other" reason free text
   'fail-other': (v) => { state.failOtherText = v; },
@@ -1004,6 +1147,10 @@ registerInputActions({
   'bulk-location': (v) => { state.bulkLocationValue = v; },
   'bulk-type': (v) => { state.bulkEdit.typeValue = v; },
   'bulk-notes': (v) => { state.bulkEdit.notesValue = v; },
+  'move-job-field': (v, el) => setMoveJobField(el && el.dataset ? el.dataset.arg : '', v),   // V101
+  'dup-job-field': (v, el) => setDupJobField(el && el.dataset ? el.dataset.arg : '', v),     // V102
+  'move-to-filter': (v) => setMoveToFilter(v),                                              // V103
+  'move-to-newno': (v, el) => setMoveToNewNo(el && el.dataset ? el.dataset.arg : '', v),    // V103
 
   // Edit-session form
   'ef-site': (v) => { state.editForm.site = v; },
@@ -1022,7 +1169,15 @@ registerInputActions({
   // Settings dialogs
   'preset-name': (v) => { state.presetDialog.name = v; },
   'client-name': (v) => { state.clientsPage.clientDialog.name = v; },
-  'site-name': (v) => { state.clientsPage.siteDialog.name = v; }
+  'site-name': (v) => { state.clientsPage.siteDialog.name = v; },
+  'site-dialog-notes': (v) => { state.clientsPage.siteDialog.notes = v; },   // V98
+  'site-notes-text': (v) => { if (state.siteNotesSheet) state.siteNotesSheet.text = v; },   // V98
+  // V99: the map pin box. Typing clears a "that isn't three words" message.
+  'map-pin-text': (v) => {
+    if (state.mapPinSheet) state.mapPinSheet.text = v;
+    const m = document.getElementById('map-pin-error');
+    if (m && m.textContent) m.textContent = '';
+  }
 });
 
 // ===========================================================================
@@ -1033,11 +1188,17 @@ registerInputActions({
 // render-core.js (bindSessionsListAreaEvents / bindOverviewBodyEvents).
 // ===========================================================================
 registerChangeActions({
+  'move-job-field': (v, el) => setMoveJobField(el && el.dataset ? el.dataset.arg : '', v),   // V101 (the tester picker)
+  'dup-job-field': (v, el) => setDupJobField(el && el.dataset ? el.dataset.arg : '', v),     // V102 (the tester picker)
+  'move-to-choice': (v, el) => setMoveToChoice(el && el.dataset ? el.dataset.arg : '', v),   // V103 (a clash card's radios)
   // Sessions list area — sort / status / lock filters (were in render-core.js).
   // Each persists and refreshes just the list area.
   'sessions-sort': (v) => { state.sort = v; save(); refreshSessionsListAreaOnly(); },
   'status-filter': (v) => { state.sessionFilter = v; save(); refreshSessionsListAreaOnly(); },
   'lock-filter': (v) => { state.lockFilter = v; save(); refreshSessionsListAreaOnly(); },
+  'pm-filter': (v) => photoMgrSetFilter(v),   // V90
+  'jm-filter': (v) => jobMgrSetFilter(v),     // V91
+  'pm-sort': (v) => photoMgrSetSort(v),
 
   // Import / backup file pickers (the change fires when a file is chosen)
   'import-file': (v, el) => {
@@ -1071,6 +1232,9 @@ registerChangeActions({
   // finish on the fresh path. No re-render needed (the checkbox holds its own
   // visual state), so just record the value.
   'wizard-seed-demo': (checked) => { wizardToggleDemo(checked); },
+  // V112 (4A): the step-4 reports switch. Recorded only — no re-render (the
+  // switch shows its own state, and step 4 holds a typed company name).
+  'wizard-reports': (checked) => { state.wizardReportsOn = !!checked; },
 
   // Overview — fails-only toggle + the per-row selection checkbox
   // (checkbox was in render-core.js bindOverviewBodyEvents).
@@ -1121,6 +1285,14 @@ registerChangeActions({
   // Display settings toggles — each re-renders to refresh its On/Off sub-text
   'haptics': (checked) => { setHaptics(checked); render(); },
   'sound': (checked) => { setSound(checked); render(); },
+  'undo': (checked) => { setUndo(checked); render(); },   // V94
+  'map-pin-enabled': (checked) => { setMapPinEnabled(checked); render(); },   // V99
+  // V100: the Reminders page (Phone & Display).
+  'remind-export': (v) => { setReminder('exportAfter', v); render(); },
+  'remind-unlocked': (v) => { setReminder('unlockedAt', v); render(); },
+  'remind-backup': (v) => { setReminder('backupDays', v); render(); },
+  // V94: a Quick Pick slot chosen for one multi-pick leaves every other row.
+  'mp-qp': (value, el) => mpQpPicked(el),
   'timestamps': (checked) => { setTimestamps(checked); render(); },
 
   // Multi Pick enabled — live sub-text update (no full render, matches old)
@@ -1139,6 +1311,38 @@ registerChangeActions({
     state.readingsEnabled = !!checked;
     localStorage.setItem(READINGS_KEY, state.readingsEnabled ? '1' : '0');
     // v86: the switch syncs (settings_work) — arm the trigger, as save() would.
+    if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error(e); } }
+    render();
+  },
+
+  // V104 (S10): the readings check switch (default ON) and the earth ceiling.
+  // Same instant-persist pattern as readings-toggle; both sync (settings_work).
+  // V105 (S14, 7A): the daily-snapshots switch. Not synced — it is about this
+  // phone's storage. render() is safe: the Backup page holds no text box.
+  'snapshots-toggle': (checked) => {
+    if (typeof setSnapshotsEnabled === 'function') setSnapshotsEnabled(checked);
+    else { state.snapshotsEnabled = !!checked; localStorage.setItem(SNAPSHOTS_KEY, state.snapshotsEnabled ? '1' : '0'); }
+    render();
+  },
+  'readings-check-toggle': (checked) => {
+    state.readingsCheckEnabled = !!checked;
+    localStorage.setItem(READINGS_CHECK_KEY, state.readingsCheckEnabled ? '1' : '0');
+    if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error(e); } }
+    render();
+  },
+  // A change event (fires on leaving the box), so the render can't drop a
+  // keyboard mid-typing. Out of range is refused with a toast and the box put
+  // back — never silently swapped for the default.
+  'readings-earth-limit': (v, el) => {
+    const n = Number(String(v == null ? '' : v).trim());
+    // Empty reads as 0, which is below the range, so it is refused too.
+    if (!isFinite(n) || n < READING_EARTH_LIMIT_MIN || n > READING_EARTH_LIMIT_MAX) {
+      showToast('Enter an earth limit from 0.10 to 0.50 \u03A9');
+      if (el) el.value = normaliseEarthLimit(state.readingsEarthLimit).toFixed(2);
+      return;
+    }
+    state.readingsEarthLimit = normaliseEarthLimit(n);
+    localStorage.setItem(READINGS_EARTH_LIMIT_KEY, String(state.readingsEarthLimit));
     if (typeof syncNoteSave === 'function') { try { syncNoteSave(); } catch (e) { console.error(e); } }
     render();
   },
@@ -1219,6 +1423,10 @@ registerChangeActions({
   // v64: photographic evidence appendix. Opt-in — defaults off (decision Q6A),
   // for the same reason as showDuration: it changes a client-facing certificate.
   'report-show-photos':      (checked) => { captureReportTextInputs(); state.reportSettings.showPhotos = checked; render(); },
+  // V95 (S7): remedial actions section + its optional action line. Opt-in, off
+  // by default — the same posture as photos (a client-facing change).
+  'report-show-remedial':    (checked) => { captureReportTextInputs(); state.reportSettings.showRemedial = checked; render(); },
+  'report-remedial-action':  (checked) => { captureReportTextInputs(); state.reportSettings.remedialActionOn = checked; render(); },
   'report-retest-enabled':   (checked) => { captureReportTextInputs(); state.reportSettings.retestEnabled = checked; render(); },
   // v36: certificate-numbers master toggle. Capture cert text inputs first so an
   // unsaved prefix/counter survives the re-render that enables/disables the

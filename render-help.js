@@ -38,6 +38,15 @@
 // body — so this file's load position is free. It sits after render-settings.js
 // purely for readability.
 
+// V97 (4A): About said "Nothing is uploaded, no account needed" even while
+// signed in and syncing. Same test as the hub footer (settingsWhereDataLives).
+function aboutWhereDataLives() {
+  const syncing = typeof syncActive === 'function' && syncActive();
+  return syncing
+    ? 'Your data is saved on this phone, with a copy in your cloud account so it reaches your other phones. No signal needed while you work &mdash; it catches up when you\'re back online.'
+    : 'Your data stays on this phone. Nothing is uploaded, no account needed, no signal required once installed.';
+}
+
 function renderSettingsAbout() {
   // v85 (decision 3A): the Cloud card and the long-press on the title that
   // revealed it are gone — the cloud pages live in Settings → Cloud now.
@@ -45,38 +54,48 @@ function renderSettingsAbout() {
     <div class="screen">
       ${renderSettingsSubHeader('About')}
       <div class="info-card">
-        <h2 id="about-title">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}</h2>
+        <h2 id="about-title" class="about-title-tap" data-action="about-title-tap">PATGo ${APP_VERSION}${typeof cloudVersionTag === 'function' ? cloudVersionTag() : ''}</h2>
         <p>A fast, offline-first portable appliance testing app for working PAT engineers. Built around speed of data entry — pass/fail decisions in two taps, no fighting the interface.</p>
-        <p>Your data stays on your device. Nothing is uploaded, no account needed, no signal required once installed. The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
+        <p>${aboutWhereDataLives()} The app is in active testing and ships refinements regularly — if something breaks or you've an idea for what's next, get in touch via the Contact page.</p>
+        <!-- V100 (9A): replay the 100 moment from the V100 welcome. -->
+        <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. v88: rolled forward — V88 on top, V85 dropped. -->
+      <!-- v8: rolling 3-version changelog. V141: rolled forward — V141 on top, V138 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
-        <p><strong>V88</strong> &middot; September 2026</p>
-        <p class="muted">For the invite-only cloud test: your fail photos are now copied up to the cloud, a few at a time while the app is open, and the Sync page shows how many are there. Deleting a photo, an item or a job deletes its cloud photos too. While you're signed in, old jobs can only be cleared once their photos are safe in the cloud, and Delete all photos clears only the ones already there, to free up space. Photos don't come down to your other devices yet.</p>
-        <p><strong>V87</strong> &middot; September 2026</p>
-        <p class="muted">Retests are now due for a whole month: a job tested on 30 September is due the following September, and your chase list picks it up on the 1st of the month before. The certificate shows the month. Report and export file names use spaces and UK dates (28-09-2026), and the report now carries its own title. If the phone's storage fills up, the app now tells you straight away instead of losing an item. The Backup page shows whether your data is protected, and a banner warns when storage gets full.</p>
-        <p><strong>V86</strong> &middot; September 2026</p>
-        <p class="muted">For the invite-only cloud test: your engineer name, fail reasons, descriptions, CSV columns, Multi Pick setup, Smart Quick Pick's learning and the switches that change what gets recorded (item times, test readings, Smart Quick Pick, retest reminders) now travel between your devices. Theme, sound, haptics and the barcode scanner stay set per phone.</p>
-                              </div>
+        <p><strong>V141</strong> &middot; October 2026</p>
+        <p class="muted">PATGo has a full privacy policy. About now sums up what's kept on your phone and what goes to the cloud if you sign in, with a link to read the whole policy.</p>
+        <p><strong>V140</strong> &middot; October 2026</p>
+        <p class="muted">Cloud accounts can sign in with Google. Connect your Google account once on the Account page, then Continue with Google signs you in. Disconnect it there any time.</p>
+        <p><strong>V139</strong> &middot; October 2026</p>
+        <p class="muted">Cloud accounts can sign in with an email and password, set or change it on the Account page, and get back in with an emailed code if it's forgotten. Signing in with a code still works.</p>
+
+
+
+        </div>
 
       <div class="info-card">
         <h3>Set up another device</h3>
         <p class="muted">Walk through the first-time setup again on this phone — useful for re-importing a setup file or refreshing your details.</p>
-        <button class="backup-action-btn" id="about-restart-onboarding" data-action="restart-onboarding" style="margin-top:8px">↻ Run first-time setup again</button>
+        <button class="backup-action-btn" id="about-restart-onboarding" data-action="restart-onboarding" style="margin-top:8px">${icon('rotate-cw')} Run first-time setup again</button>
       </div>
 
+      <!-- V134 (7A): the old picture tour is retired; the practice job lives on Tutorials. -->
       <div class="info-card">
-        <h3>Show me around</h3>
-        <p class="muted">A quick guided tour of the basics — Sessions, Quick Pick, the Overview, reports and backups. Handy if you're getting started or showing someone else the ropes.</p>
-        <button class="backup-action-btn" id="about-open-tour" data-action="open-tour" style="margin-top:8px">🧭 Show me around the app again</button>
+        <h3>Tutorials</h3>
+        <p class="muted">Practise a job on the real testing screen, set up your Settings, and find your way round your jobs and the cloud, step by step — handy when you're getting started or showing someone else the ropes.</p>
+        <button class="backup-action-btn" id="about-open-tutorials" data-action="settings-page" data-arg="settingsTutorials" style="margin-top:8px">${icon('compass')} Tutorials ${icon('chevron-right')}</button>
       </div>
 
       <div class="info-card">
         <h3>Privacy</h3>
-        <p class="muted">All test records, settings, and saved descriptions live in your phone or browser's local storage. The app makes no network calls after the initial install. Backups are stored only where you choose to save them.</p>
+        <!-- V141 (Stage 12, C — 3A): a short summary of the privacy policy, which
+             lives on the website (PRIVACY_URL, config.js) and opens in the browser.
+             Keep the two saying the same thing: change the policy, change this. -->
+        <p class="muted" id="about-privacy-summary">Your jobs, photos and settings are kept on this phone. If you sign in, a copy is kept in PATGo's cloud, in London, so you can get it back on another phone &mdash; along with your email address, your plan, and which version of the app each of your phones runs. Nothing is sold or shared, and there are no adverts or tracking. The app goes online to check for updates. Backups are saved only where you choose to save them.</p>
+        <a class="backup-action-btn" id="about-privacy-link" href="${escapeHTML(PRIVACY_URL)}" target="_blank" rel="noopener noreferrer" style="margin-top:8px">${icon('shield-check')} Read the full privacy policy</a>
       </div>
 
       <!-- v8: emergency reload — for the rare case where the app stops responding to
@@ -84,8 +103,8 @@ function renderSettingsAbout() {
            near the bottom (a maintenance utility, not a primary action). -->
       <div class="info-card">
         <h3>If the app stops responding</h3>
-        <p class="muted">If taps stop registering anywhere in the app, tap Reload below. Your sessions and settings are not affected — only the app itself reloads.</p>
-        <button class="backup-action-btn" id="about-reload-btn" data-action="about-reload" style="margin-top:8px">⟳ Reload app</button>
+        <p class="muted">If taps stop registering anywhere in the app, tap Reload below. Your jobs and settings are not affected — only the app itself reloads.</p>
+        <button class="backup-action-btn" id="about-reload-btn" data-action="about-reload" style="margin-top:8px">${icon('refresh-cw')} Reload app</button>
       </div>
 
       <div class="info-card">
@@ -117,7 +136,7 @@ const GLOSSARY_GROUPS = [
       ['Location', 'Where in the building the item is. It sticks between items, so you set it once per room and it carries down the list.'],
       ['Asset number', 'The number identifying the item. The app fills in the next one automatically, and you can set a prefix so they come out as OFF-001, OFF-002 and so on.'],
       ['Copy last', 'Repeats the item you just logged — same type, same location — so a run of identical items is one tap each.'],
-      ['Barcode scanner', 'A Bluetooth scanner that pairs with your phone as a keyboard — often sold as a "wedge" or HID scanner. Scan an asset label on the test screen and the number goes into the asset box without you touching the phone; scan on the Sessions list and it searches for that asset. There is no button to press: it works because the scanner types. See Settings → Testing Setup → Barcode Scanner.'],
+      ['Barcode scanner', 'A Bluetooth scanner that pairs with your phone as a keyboard — often sold as a "wedge" or HID scanner. Scan an asset label on the test screen and the number goes into the asset box without you touching the phone; scan on the Jobs screen and it searches for that asset. There is no button to press: it works because the scanner types. See Settings → Logging → Barcode Scanner.'],
       ['Fail reason', 'The reason an item failed, chosen from your own list when you tap FAIL.'],
       ['Fail tag', 'Only relevant when Test Readings is on. Each fail reason is tagged with the kind of test it relates to, so failing an item shows you the one measurement box that matters instead of all of them.']
     ]
@@ -134,34 +153,34 @@ const GLOSSARY_GROUPS = [
     ]
   },
   {
-    title: 'Jobs & sessions',
+    title: 'Jobs, clients & sites',
     terms: [
-      ['Session', 'One job — one visit to one site. Everything you test on that visit sits inside it. A session is the thing you export, report on and back up.'],
+      ['Job', 'One visit to one site. Everything you test on that visit sits inside it. A job is the thing you export, report on and back up. Its own settings are under Job settings. Earlier versions called this a session.'],
       ['Client', 'The company you are working for. One client can have several sites.'],
       ['Site', 'The building or address you are testing at. A site can sit under a client, or stand on its own if you have not assigned it to one.'],
-      ['Overview', 'The list of everything logged in the current session, where you can review, edit, select and bulk-edit items.'],
-      ['Locked session', 'A finished session. It is read-only so you cannot change it by accident. Unlock it if you genuinely need to edit it.'],
-      ['Retest reminder', 'An optional feature, off by default. Flags a session for a retest a set number of months out, and lists the ones coming due so you can chase the repeat work.'],
-      ['Calibration', 'Your tester\'s calibration due date. Set it and the app warns you when it is close or overdue. From V66 the warning covers every instrument you have saved, and names the one that is due.'],
-      ['Test instrument', 'The PAT tester itself. You can save up to five under Settings → User Settings, each with its own calibration details, and mark one as In use. Every job you start is recorded against the instrument in use at that moment, so its certificate keeps naming that tester even after you recalibrate or switch to another one. Change it for a single job under Session settings.']
+      ['Overview', 'The list of everything logged in the current job, where you can review, edit, select and bulk-edit items.'],
+      ['Locked job', 'A finished job. It is read-only so you cannot change it by accident. Unlock it if you genuinely need to edit it.'],
+      ['Retest reminder', 'An optional feature, off by default. Flags a job for a retest a set number of months out, and lists the ones coming due so you can chase the repeat work.'],
+      ['Calibration', 'Your tester\'s calibration due date. Set it and the app warns you when it is close or overdue. The warning covers every instrument you have saved, and names the one that is due.'],
+      ['Test instrument', 'The PAT tester itself. You can save up to five under Settings → Engineer & Tester, each with its own calibration details, and mark one as In use. Every job you start is recorded against the instrument in use at that moment, so its certificate keeps naming that tester even after you recalibrate or switch to another one. Change it for a single job under Job settings.']
     ]
   },
   {
     title: 'Output',
     terms: [
-      ['Report', 'The PDF certificate for a session — your details, the client\'s, and the full list of items tested. Preview it before you send it.'],
+      ['Report', 'The PDF certificate for a job — your details, the client\'s, and the full list of items tested. Preview it before you send it.'],
       ['Report template', 'A saved set of report settings — logo, colours, declaration wording — so you can switch between looks without setting it all up again.'],
-      ['Certificate number', 'An optional reference stamped onto a session the first time you produce its report. Once assigned it does not change.'],
-      ['CSV export', 'A spreadsheet file of a session, for sending on or opening in Excel. You choose which columns it contains.'],
-      ['Exported', 'Marks whether a session has been sent out yet. If you change a session after exporting it, it goes back to needing export, so nothing quietly goes stale.']
+      ['Certificate number', 'An optional reference stamped onto a job the first time you produce its report. Once assigned it does not change.'],
+      ['CSV export', 'A spreadsheet file of a job, for sending on or opening in Excel. You choose which columns it contains.'],
+      ['Exported', 'Marks whether a job has been sent out yet. If you change a job after exporting it, it goes back to needing export, so nothing quietly goes stale.']
     ]
   },
   {
     title: 'Data',
     terms: [
-      ['Backup', 'A file containing everything — all sessions, clients, sites and settings. This is the one to keep safe. Restoring it puts the app back exactly as it was.'],
-      ['Export Setup', 'A file containing only your configuration — presets, lists, report settings, columns. No job data. Use it to set up a second phone or hand your setup to someone else.'],
-      ['Pruning', 'Deleting sessions older than an age you choose, to keep the app tidy. It will not prune anything you have not exported yet.'],
+      ['Backup', 'A file containing everything — all jobs, clients, sites and settings. This is the one to keep safe. Restoring it puts the app back exactly as it was.'],
+      ['Setup file', 'A file containing only your configuration — presets, lists, report settings, columns. No job data. Use it to set up a second phone or hand your setup to someone else.'],
+      ['Clearing old jobs', 'Deleting jobs older than an age you choose, to keep the app tidy. It will not clear anything you have not exported yet.'],
       ['Offline', 'The app runs entirely on this phone and needs no signal. Your data is stored on the device, not on a server — which is exactly why backups matter.']
     ]
   }
@@ -190,6 +209,54 @@ function renderSettingsGlossary() {
   `;
 }
 
+// V134 (6A): Settings → Help → Tutorials. The practice job (tour.js), then
+// (V135, 2A) one short tutorial per Settings page, listed from tour.js
+// TUTORIALS so the list and the tutorials can't disagree; V136 adds the
+// getting-around ones under a heading of their own. Opening one remembers this page, so Quit and
+// Finish come back to it.
+function renderSettingsTutorials() {
+  const all = (typeof TUTORIALS !== 'undefined' ? TUTORIALS : []);
+  // V136 (2A): two headings — "Setting up" (the Settings ones) and "Your jobs
+  // & the cloud" (group 'cloud'). Each row's icon is its page's, or its own.
+  const rowsFor = (list) => list.map((d) => {
+    const meta = SETTINGS_PAGE_META[d.page] || {};
+    return `
+      <button class="settings-row" data-action="open-tutorial" data-arg="${escapeHTML(d.id)}">
+        <span class="settings-row-icon">${icon(d.icon || meta.icon || 'compass')}</span>
+        <div class="settings-row-text">
+          <div class="settings-row-title">${escapeHTML(d.title)}</div>
+          <div class="settings-row-sub">${escapeHTML(d.blurb || '')}</div>
+        </div>
+        <span class="settings-row-chevron">${icon('chevron-right')}</span>
+      </button>`;
+  }).join('');
+  const rows = rowsFor(all.filter((d) => d.settings));
+  const cloudRows = rowsFor(all.filter((d) => d.group === 'cloud'));
+  return `
+    <div class="screen">
+      ${renderSettingsSubHeader('Tutorials')}
+      <div class="info-card">
+        <h2>The practice job</h2>
+        <p class="muted">A job from start to finish on the real testing screen: start a job, log a pass, copy it, log a fail with its reason, check the Overview and see a sample of your certificate. A box shows what to look at and what to tap. About three minutes.</p>
+        <p class="muted">Nothing you do in it is saved — no job, no items, no certificate number.</p>
+        <button class="btn-primary" id="tutorials-practice-btn" data-action="open-practice" style="margin-top:8px">${icon('compass')} Start the practice job</button>
+      </div>
+      ${rows ? `
+      <div class="settings-section">
+        <h2 class="h2">Setting up</h2>
+        <p class="muted">The Settings you’ll want first, on the real pages. About a minute each. Nothing you do in them is saved — your own settings aren’t touched.</p>
+      </div>
+      <div class="settings-list" id="tutorials-settings-list">${rows}</div>` : ''}
+      ${cloudRows ? `
+      <div class="settings-section">
+        <h2 class="h2">Your jobs &amp; the cloud</h2>
+        <p class="muted">Getting around your Jobs list, finding jobs kept in the cloud, and how your phones keep in step — on a pretend account, so you can try them before you sign in. Nothing is sent and your own jobs aren’t touched.</p>
+      </div>
+      <div class="settings-list" id="tutorials-cloud-list">${cloudRows}</div>` : ''}
+    </div>
+  `;
+}
+
 function renderSettingsContact() {
   return `
     <div class="screen">
@@ -207,8 +274,8 @@ function renderSettingsContact() {
       <div class="info-card">
         <h3>Report a problem</h3>
         <p>Found a bug, or got an idea? Tap below. The app fills in your version, phone and settings automatically — you just describe what happened.</p>
-        <button class="bug-report-btn" id="bug-open" data-action="bug-open">🐞 Report a problem</button>
-        <p class="muted" style="font-size:12px;margin-top:10px">Your job data stays on your phone. Reports carry counts and settings only — never client names, sites or asset numbers.</p>
+        <button class="bug-report-btn" id="bug-open" data-action="bug-open">${icon('bug')} Report a problem</button>
+        <p class="muted" style="font-size:0.75rem;margin-top:10px">Reports carry counts and settings only — never client names, sites or asset numbers.</p>
       </div>
       ${renderBugSheet()}
     </div>
@@ -233,12 +300,12 @@ function renderBugSheet() {
   const isBug = d.type === 'bug';
 
   const typeRow = BUG_REPORT_TYPES.map(t => `
-    <button class="bug-chip ${t.id === d.type ? 'active' : ''}" data-action="bug-set-type" data-arg="${t.id}">${escapeHTML(t.label)}</button>
+    <button class="bug-chip ${t.id === d.type ? 'active' : ''}" aria-pressed="${t.id === d.type ? 'true' : 'false'}" data-action="bug-set-type" data-arg="${t.id}">${escapeHTML(t.label)}</button>
   `).join('');
 
   const severityRows = BUG_REPORT_SEVERITIES.map(s => `
-    <button class="bug-option ${s.id === d.severity ? 'active' : ''}" data-action="bug-set-severity" data-arg="${s.id}">
-      <span class="bug-option-dot">${s.id === d.severity ? '●' : '○'}</span>
+    <button class="bug-option ${s.id === d.severity ? 'active' : ''}" aria-pressed="${s.id === d.severity ? 'true' : 'false'}" data-action="bug-set-severity" data-arg="${s.id}">
+      <span class="bug-option-dot" aria-hidden="true">${s.id === d.severity ? '●' : '○'}</span>
       <span class="bug-option-label">${escapeHTML(s.label)}</span>
     </button>
   `).join('');
@@ -248,7 +315,7 @@ function renderBugSheet() {
       <label class="label">Can you make it happen again?</label>
       <div class="bug-chip-row">
         ${BUG_REPORT_REPRO.map(r => `
-          <button class="bug-chip ${r.id === d.repro ? 'active' : ''}" data-action="bug-set-repro" data-arg="${r.id}">${escapeHTML(r.label)}</button>
+          <button class="bug-chip ${r.id === d.repro ? 'active' : ''}" aria-pressed="${r.id === d.repro ? 'true' : 'false'}" data-action="bug-set-repro" data-arg="${r.id}">${escapeHTML(r.label)}</button>
         `).join('')}
       </div>
     </div>
@@ -270,7 +337,7 @@ function renderBugSheet() {
     <div class="fail-sheet bug-sheet" role="dialog" aria-label="Report a problem">
       <div class="fail-sheet-handle"></div>
       <div class="fail-sheet-header">
-        <button class="fail-close-btn" id="bug-cancel" data-action="bug-close" aria-label="Cancel">‹</button>
+        <button class="fail-close-btn" id="bug-cancel" data-action="bug-close" aria-label="Cancel">${icon('chevron-left')}</button>
         <h3 class="fail-sheet-title">Report a problem</h3>
         <span class="fail-close-spacer"></span>
       </div>
@@ -283,15 +350,15 @@ function renderBugSheet() {
         ${reproRow}
 
         <label class="label"><span id="bug-q1">${q1}</span></label>
-        <textarea class="input bug-textarea" id="bug-desc" data-input-action="bug-desc" rows="3" placeholder="Describe it in your own words">${escapeHTML(d.description)}</textarea>
+        <textarea aria-labelledby="bug-q1" class="input bug-textarea" id="bug-desc" data-input-action="bug-desc" rows="3" placeholder="Describe it in your own words">${escapeHTML(d.description)}</textarea>
 
         <label class="label"><span id="bug-q2">${q2}</span> <span class="hint">(optional)</span></label>
-        <textarea class="input bug-textarea" id="bug-context" data-input-action="bug-context" rows="2" placeholder="e.g. logging item 14 on a big job">${escapeHTML(d.context)}</textarea>
+        <textarea aria-labelledby="bug-q2" class="input bug-textarea" id="bug-context" data-input-action="bug-context" rows="2" placeholder="e.g. logging item 14 on a big job">${escapeHTML(d.context)}</textarea>
 
         <details class="bug-diag">
           <summary>What gets sent with this (tap to check)</summary>
           <pre class="bug-diag-pre">${escapeHTML(diagnosticsText())}</pre>
-          <p class="muted" style="font-size:12px">Counts and settings only. No client names, sites, locations, asset numbers or notes.</p>
+          <p class="muted" style="font-size:0.75rem">Counts and settings only. No client names, sites, locations, asset numbers or notes.</p>
         </details>
       </div>
 
@@ -326,36 +393,110 @@ function renderCloudAccount() {
     const plan = c.plan
       ? `<p class="muted" id="cloud-plan">Plan: <strong>${escapeHTML(c.plan)}</strong>${c.trialEndsAt ? ` &middot; trial ends ${escapeHTML(new Date(c.trialEndsAt).toLocaleDateString('en-GB'))}` : ''}</p>`
       : '';
+    // V139 (3A): "Set or change password" opens the card below in place of the
+    // buttons. The hidden username box is how the iPhone knows which account a
+    // new password belongs to when it offers to save it.
+    // V140 (4→A): the Google login connected to this account — Connect, or the
+    // address with Disconnect (asked in place: no dialogs). While the Google
+    // window is open, only Cancel.
+    const gWait = c.googlePending === 'link';
+    const googleBlock = gWait ? `
+        <p class="muted cloud-google-note" id="cloud-google-wait">${busy ? 'Connecting Google…' : 'Continue in the Google window, then come back here.'}</p>
+        <button class="backup-action-btn" id="cloud-google-cancel" data-action="cloud-google-cancel" ${dis} style="margin-top:6px">Cancel</button>`
+      : c.googleOff ? `
+        <p class="muted cloud-google-note" id="cloud-google-off-note">Disconnect <strong>${escapeHTML(c.google || '')}</strong>? You’ll sign in with your email instead.</p>
+        <button class="backup-action-btn" id="cloud-google-disconnect" data-action="cloud-google-disconnect" ${dis} style="margin-top:6px">${busy ? 'Disconnecting…' : 'Disconnect'}</button>
+        <button class="backup-action-btn" id="cloud-google-keep" data-action="cloud-google-keep" ${dis} style="margin-top:6px">Keep it</button>`
+      : c.google ? `
+        <p class="muted cloud-google-note" id="cloud-google-email">Google: <strong>${escapeHTML(c.google)}</strong></p>
+        <button class="backup-action-btn" id="cloud-google-off" data-action="cloud-google-off" ${dis} style="margin-top:6px">Disconnect Google</button>`
+      : `
+        <button class="backup-action-btn" id="cloud-google-connect" data-action="cloud-google-connect" ${dis} style="margin-top:6px">Connect Google</button>`;
+    const pwCard = c.pwOpen ? `
+        <form class="cloud-form" id="cloud-new-password-form" autocomplete="on" novalidate>
+        <h3 style="margin-top:14px">${c.pwReset ? 'Choose a new password' : 'Set or change password'}</h3>
+        ${c.pwReset ? `<p class="muted" style="font-size:0.8125rem" id="cloud-pw-reset-note">You’re signed in with the code. Choose a new password to use next time.</p>` : ''}
+        <input type="email" autocomplete="username" aria-label="Email" value="${escapeHTML(c.email || '')}" hidden tabindex="-1">
+        <label class="label" for="cloud-new-password">New password</label>
+        <div class="cloud-pw-row">
+          <input class="input" id="cloud-new-password" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="72" ${dis}>
+          <button type="button" class="cloud-pw-toggle" data-action="cloud-password-toggle" aria-pressed="false" aria-label="Show or hide the password">Show</button>
+        </div>
+        <label class="label" for="cloud-new-password2">Type it again</label>
+        <input class="input" id="cloud-new-password2" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="72" ${dis}>
+        <p class="muted" style="font-size:0.75rem;margin-top:6px" id="cloud-pw-hint">${escapeHTML(typeof CLOUD_PASSWORD_HINT === 'string' ? CLOUD_PASSWORD_HINT : '')}</p>
+        ${msg}
+        <button type="submit" class="btn-primary" id="cloud-password-save" data-action="cloud-password-save" ${dis} style="margin-top:10px">${busy ? 'Saving…' : 'Save password'}</button>
+        <button type="button" class="backup-action-btn" id="cloud-password-cancel" data-action="cloud-password-cancel" ${dis} style="margin-top:6px">${c.pwReset ? 'Not now' : 'Cancel'}</button>
+        </form>` : `
+        ${msg}
+        <button class="backup-action-btn" id="cloud-check" data-action="cloud-check" ${dis} style="margin-top:8px">${busy ? 'Checking…' : 'Check connection'}</button>
+        <button class="backup-action-btn" id="cloud-password-open" data-action="cloud-password-open" ${dis} style="margin-top:6px">Set or change password</button>
+        ${googleBlock}
+        <button class="backup-action-btn" id="cloud-sign-out" data-action="cloud-sign-out" ${dis} style="margin-top:6px">Sign out</button>`;
     body = `
       <div class="info-card">
         <h3>Signed in as</h3>
         <p id="cloud-signed-in-email"><strong>${escapeHTML(c.email || '(unknown)')}</strong></p>
         ${plan}
+        ${(typeof planAccountHTML === 'function') ? planAccountHTML() : ''}
+        ${pwCard}
+      </div>`;
+  } else if (c.googlePending === 'signin') {
+    // V140: the Google window is open. Cancel if it was closed without finishing.
+    body = `
+      <div class="info-card" id="cloud-google-waiting">
+        <h3>${busy ? 'Signing in…' : 'Continue in the Google window'}</h3>
+        <p class="muted" style="font-size:0.8125rem">Choose your Google account there. You’ll come back here signed in.</p>
         ${msg}
-        <button class="backup-action-btn" id="cloud-check" data-action="cloud-check" ${dis} style="margin-top:8px">${busy ? 'Checking…' : 'Check connection'}</button>
-        <button class="backup-action-btn" id="cloud-sign-out" data-action="cloud-sign-out" ${dis} style="margin-top:6px">Sign out</button>
+        <button class="backup-action-btn" id="cloud-google-cancel" data-action="cloud-google-cancel" ${dis} style="margin-top:8px">Cancel</button>
       </div>`;
   } else if (c.status === 'code-sent') {
+    // V139 (2A): the same code step serves "Forgot password?" — it says so.
     body = `
       <div class="info-card">
-        <h3>Enter your code</h3>
-        <p class="muted" style="font-size:13px">We emailed a code to <strong>${escapeHTML(c.email)}</strong>.</p>
+        <h3>${c.forgot ? 'Reset your password' : 'Enter your code'}</h3>
+        <p class="muted" style="font-size:0.8125rem">We emailed a code to <strong>${escapeHTML(c.email)}</strong>.${c.forgot ? ' Enter it, then choose a new password.' : ''}</p>
         <label class="label" for="cloud-code">Code</label>
         <input class="input cloud-code-input" id="cloud-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" ${dis}>
         ${msg}
-        <button class="btn-primary" id="cloud-verify-code" data-action="cloud-verify-code" ${dis} style="margin-top:10px">${busy ? 'Checking…' : 'Sign in'}</button>
+        <button class="btn-primary" id="cloud-verify-code" data-action="cloud-verify-code" ${dis} style="margin-top:10px">${busy ? 'Checking…' : (c.forgot ? 'Continue' : 'Sign in')}</button>
         <button class="backup-action-btn" id="cloud-resend" data-action="cloud-send-code" ${dis} style="margin-top:8px">Send a new code</button>
-        <button class="backup-action-btn" id="cloud-change-email" data-action="cloud-change-email" ${dis} style="margin-top:6px">Use a different email</button>
+        <button class="backup-action-btn" id="cloud-change-email" data-action="cloud-change-email" ${dis} style="margin-top:6px">${c.forgot ? 'Back to sign in' : 'Use a different email'}</button>
       </div>`;
-  } else {
+  } else if (c.useCode) {
     body = `
       <div class="info-card">
-        <h3>Sign in</h3>
-        <p class="muted" style="font-size:13px">We'll email you a code. No password.</p>
+        <h3>Sign in with a code</h3>
+        <p class="muted" style="font-size:0.8125rem">We'll email you a code to sign in with.</p>
         <label class="label" for="cloud-email">Email</label>
         <input class="input" id="cloud-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" value="${escapeHTML(c.email || '')}" placeholder="you@example.com" ${dis}>
         ${msg}
         <button class="btn-primary" id="cloud-send-code" data-action="cloud-send-code" ${dis} style="margin-top:10px">${busy ? 'Sending…' : 'Email me a code'}</button>
+        <button class="backup-action-btn" id="cloud-use-password" data-action="cloud-use-password" ${dis} style="margin-top:8px">Use a password instead</button>
+      </div>`;
+  } else {
+    // V139 (1A): email + password is the everyday card. A real <form> so the
+    // iPhone offers its saved password and Go signs in (dispatch.js
+    // handleDelegatedSubmit stops the form reloading the app).
+    body = `
+      <div class="info-card">
+        <form class="cloud-form" id="cloud-sign-in-form" autocomplete="on" novalidate>
+        <h3>Sign in</h3>
+        <button type="button" class="backup-action-btn cloud-google-btn" id="cloud-google" data-action="cloud-google" ${dis}>Continue with Google</button>
+        <p class="cloud-or" aria-hidden="true"><span>or</span></p>
+        <label class="label" for="cloud-email">Email</label>
+        <input class="input" id="cloud-email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" value="${escapeHTML(c.email || '')}" placeholder="you@example.com" ${dis}>
+        <label class="label" for="cloud-password">Password</label>
+        <div class="cloud-pw-row">
+          <input class="input" id="cloud-password" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" ${dis}>
+          <button type="button" class="cloud-pw-toggle" data-action="cloud-password-toggle" aria-pressed="false" aria-label="Show or hide the password">Show</button>
+        </div>
+        ${msg}
+        <button type="submit" class="btn-primary" id="cloud-password-sign-in" data-action="cloud-password-sign-in" ${dis} style="margin-top:10px">${busy ? 'Signing in…' : 'Sign in'}</button>
+        <button type="button" class="backup-action-btn" id="cloud-forgot" data-action="cloud-forgot" ${dis} style="margin-top:8px">Forgot password?</button>
+        <button type="button" class="backup-action-btn" id="cloud-use-code" data-action="cloud-use-code" ${dis} style="margin-top:6px">Email me a code instead</button>
+        </form>
       </div>`;
   }
 
@@ -364,7 +505,7 @@ function renderCloudAccount() {
       ${renderSettingsSubHeader('Account')}
       <div class="info-card">
         <h2>Cloud account (test)</h2>
-        <p class="muted" style="font-size:12px">While you're signed in, your jobs, clients and sites, testers, presets, report settings and most other settings are copied to the cloud test (see Sync). Theme, sound, haptics and the barcode scanner stay set on each phone, and the app works exactly the same signed in or not, signal or not.</p>
+        <p class="muted" style="font-size:0.75rem">While you're signed in, your jobs, clients and sites, testers, presets, report settings and most other settings are copied to the cloud test (see Sync). Theme, sound, haptics and the barcode scanner stay set on each phone, and the app works exactly the same signed in or not, signal or not.</p>
       </div>
       ${body}
     </div>
@@ -383,7 +524,7 @@ function renderCloudLocked() {
   const body = hasCloud ? `
       <div class="info-card" id="cloud-locked">
         <h3>Invite-only test</h3>
-        <p class="muted" style="font-size:13px">The cloud is being tested with a few engineers before it opens to everyone. Enter your access code to continue. You'll only be asked once on this phone.</p>
+        <p class="muted" style="font-size:0.8125rem">The cloud is being tested with a few engineers before it opens to everyone. Enter your access code to continue. You'll only be asked once on this phone.</p>
         <label class="label" for="cloud-access-code">Access code</label>
         <input class="input cloud-code-input" id="cloud-access-code" type="text" inputmode="numeric" autocomplete="off" maxlength="8" placeholder="Code">
         ${msg}
@@ -394,7 +535,7 @@ function renderCloudLocked() {
       </div>`;
   return `
     <div class="screen" id="cloud-locked-page">
-      ${renderSettingsSubHeader('Cloud')}
+      ${renderSettingsSubHeader('Account & Sync')}
       ${body}
     </div>
   `;
@@ -422,7 +563,7 @@ function renderCloudSync() {
     body = `
       <div class="info-card">
         <p class="muted" id="sync-signed-out">Sign in on the Account page first. Until you do, nothing leaves this phone.</p>
-        <button class="backup-action-btn" id="sync-go-account" data-action="open-cloud-page" data-arg="account" style="margin-top:8px">👤 Account</button>
+        <button class="backup-action-btn" id="sync-go-account" data-action="open-cloud-page" data-arg="account" style="margin-top:8px">${icon('user')} Account ${icon('chevron-right', 'ic-trail')}</button>
       </div>`;
   } else {
     const sum = syncStatusSummary();
@@ -439,14 +580,14 @@ function renderCloudSync() {
       <div class="info-card">
         <h3>Jobs</h3>
         <p id="sync-counts"><strong>${sum.upToDate}</strong> of ${sum.total} job${sum.total === 1 ? '' : 's'} in the cloud and up to date${sum.waiting ? ` &middot; <strong>${sum.waiting}</strong> waiting to send` : ''}</p>
-        ${sum.recTotal ? `<p id="sync-rec-counts" style="font-size:14px">Clients &amp; sites: <strong>${sum.recUpToDate}</strong> of ${sum.recTotal} up to date</p>` : ''}
-        ${sum.listTotal ? `<p id="sync-list-counts" style="font-size:14px">Instruments &amp; presets: <strong>${sum.listUpToDate}</strong> of ${sum.listTotal} up to date</p>` : ''}
-        ${sum.rpTotal ? `<p id="sync-rp-counts" style="font-size:14px">Report settings &amp; templates: <strong>${sum.rpUpToDate}</strong> of ${sum.rpTotal} up to date</p>` : ''}
-        ${sum.gsTotal ? `<p id="sync-gs-counts" style="font-size:14px">General settings: <strong>${sum.gsUpToDate}</strong> of ${sum.gsTotal} up to date</p>` : ''}
-        ${sum.phReady && sum.phTotal ? `<p id="sync-ph-counts" style="font-size:14px">Photos: <strong>${sum.phUp}</strong> of ${sum.phTotal} in the cloud${sum.phTotal > sum.phUp ? ` &middot; <strong>${sum.phTotal - sum.phUp}</strong> waiting to send` : ''}</p>` : ''}
-        ${inUse ? `<p class="muted" id="sync-inuse" style="font-size:13px">Tester in use: <strong>${escapeHTML(inUse)}</strong> &mdash; the same on each of your devices</p>` : ''}
-        <p class="muted" id="sync-last" style="font-size:13px">Last sent: ${stamp(sum.lastPushAt)}</p>
-        <p class="muted" id="sync-last-pull" style="font-size:13px">Last checked: ${stamp(sum.lastPullAt)}</p>
+        ${sum.recTotal ? `<p id="sync-rec-counts" style="font-size:0.875rem">Clients &amp; sites: <strong>${sum.recUpToDate}</strong> of ${sum.recTotal} up to date</p>` : ''}
+        ${sum.listTotal ? `<p id="sync-list-counts" style="font-size:0.875rem">Instruments &amp; presets: <strong>${sum.listUpToDate}</strong> of ${sum.listTotal} up to date</p>` : ''}
+        ${sum.rpTotal ? `<p id="sync-rp-counts" style="font-size:0.875rem">Report settings &amp; templates: <strong>${sum.rpUpToDate}</strong> of ${sum.rpTotal} up to date</p>` : ''}
+        ${sum.gsTotal ? `<p id="sync-gs-counts" style="font-size:0.875rem">General settings: <strong>${sum.gsUpToDate}</strong> of ${sum.gsTotal} up to date</p>` : ''}
+        ${sum.phReady && (sum.phTotal || sum.phCloudOnly) ? `<p id="sync-ph-counts" style="font-size:0.875rem">Photos: <strong>${sum.phUp}</strong> of ${sum.phTotal} on this phone in the cloud${sum.phTotal > sum.phUp ? ` &middot; <strong>${sum.phTotal - sum.phUp}</strong> waiting to send` : ''}${sum.phCloudOnly ? ` &middot; <strong>${sum.phCloudOnly}</strong> only in the cloud` : ''}</p>` : ''}
+        ${inUse ? `<p class="muted" id="sync-inuse" style="font-size:0.8125rem">Tester in use: <strong>${escapeHTML(inUse)}</strong> &mdash; the same on each of your devices</p>` : ''}
+        <p class="muted" id="sync-last" style="font-size:0.8125rem">Last sent: ${stamp(sum.lastPushAt)}</p>
+        <p class="muted" id="sync-last-pull" style="font-size:0.8125rem">Last checked: ${stamp(sum.lastPullAt)}</p>
         ${msg}
         <button class="btn-primary" id="sync-push" data-action="sync-push" ${dis} style="margin-top:10px">${busy ? 'Working…' : 'Push now'}</button>
         <button class="backup-action-btn" id="sync-pull" data-action="sync-pull" ${dis} style="margin-top:8px">↓ Check for updates</button>
@@ -457,9 +598,10 @@ function renderCloudSync() {
   return `
     <div class="screen" id="cloud-sync-page">
       ${renderSettingsSubHeader('Sync')}
+      ${settingsHowToHTML('cloudSync')}
       <div class="info-card">
         <h2>Sync (test)</h2>
-        <p class="muted" style="font-size:12px">Jobs, your clients and sites, your test instruments and item presets, and which tester is in use are copied both ways between this phone and the cloud: sent a few seconds after you stop logging, and checked for whenever you sign in, reopen the app or get signal back. Which preset is in use stays separate on each device. The example job is never sent. Deleting a job, client, site, instrument or preset deletes it on your other device too; jobs that used a deleted instrument keep their own copy of its details. Clearing old jobs only removes them from this phone, and the cloud keeps them. Photos are copied up to the cloud while the app is open, after their job; deleting a photo, an item or a job deletes its cloud photos too. Photos don't come down to your other devices yet, so a job that arrives from another device will show its photos as missing. This phone is still the master copy &mdash; keep making backups as normal.</p>
+        <p class="muted" style="font-size:0.75rem">Jobs, your clients and sites, your test instruments and item presets, and which tester is in use are copied both ways between this phone and the cloud: sent a few seconds after you stop logging, and checked for whenever you sign in, reopen the app or get signal back. Which preset is in use stays separate on each device. The example job is never sent. Deleting a job, client, site, instrument or preset deletes it on your other device too; jobs that used a deleted instrument keep their own copy of its details. Clearing old jobs only removes them from this phone, and the cloud keeps them. Photos are copied up to the cloud while the app is open, after their job, with a small preview; deleting a photo, an item or a job on either device deletes its cloud photos too. Photos don't come down by themselves: a photo that's only in the cloud shows with a &#9729;, and comes down to this phone when you tap it. This phone is still the master copy &mdash; keep making backups as normal.</p>
       </div>
       ${body}
     </div>
@@ -488,8 +630,8 @@ function renderSyncHeld(sy) {
   const n = (v, one, many) => `${v} ${v === 1 ? one : many}`;
   const keyOf = (h) => (typeof syncHeldKey === 'function') ? syncHeldKey(h) : String(h.id);
   const btns = (key, dis, phone, cloud) => `
-        <button class="backup-action-btn" data-action="sync-keep-phone" data-arg="${escapeHTML(key)}" ${dis} style="margin-top:8px">📱 ${phone}</button>
-        ${cloud ? `<button class="link-btn" data-action="sync-keep-cloud" data-arg="${escapeHTML(key)}" ${dis} style="margin-top:8px">☁ ${cloud}</button>` : ''}`;
+        <button class="backup-action-btn" data-action="sync-keep-phone" data-arg="${escapeHTML(key)}" ${dis} style="margin-top:8px">${icon('smartphone')} ${phone}</button>
+        ${cloud ? `<button class="link-btn" data-action="sync-keep-cloud" data-arg="${escapeHTML(key)}" ${dis} style="margin-top:8px">${icon('cloud')} ${cloud}</button>` : ''}`;
 
   const jobRow = (h) => {
     const key = keyOf(h);
@@ -516,12 +658,12 @@ function renderSyncHeld(sy) {
     }
     const busyDiff = diffing === String(h.id);
     const cmp = compare
-      ? `<button class="backup-action-btn" data-action="sync-held-diff" data-arg="${escapeHTML(String(h.id))}" ${busyDiff || dis ? 'disabled' : ''} style="margin-top:8px">${busyDiff ? 'Checking\u2026' : '🔍 What\u2019s different?'}</button>`
+      ? `<button class="backup-action-btn" data-action="sync-held-diff" data-arg="${escapeHTML(String(h.id))}" ${busyDiff || dis ? 'disabled' : ''} style="margin-top:8px">${busyDiff ? 'Checking\u2026' : icon('search') + ' What\u2019s different?'}</button>`
       : '';
     return `
       <div class="info-card sync-held-row" data-held-id="${escapeHTML(key)}" style="margin-top:8px">
         <p><strong>${name}</strong></p>
-        <p class="muted" style="font-size:13px">${what}</p>
+        <p class="muted" style="font-size:0.8125rem">${what}</p>
         ${cmp}${btns(key, dis, phone, cloud)}
       </div>`;
   };
@@ -554,11 +696,17 @@ function renderSyncHeld(sy) {
       if (isSite && h.localParent !== h.cloudParent) {
         lines.push(`Client &mdash; this phone: <strong>${parent(h.localParent)}</strong> &middot; cloud: <strong>${parent(h.cloudParent)}</strong>`);
       }
+      // V98: a site's notes — described (Written / Different / None), never shown.
+      if (isSite) {
+        for (const f of (h.diffs || [])) {
+          lines.push(`${escapeHTML(f.label)} &mdash; this phone: <strong>${escapeHTML(f.here || '')}</strong> &middot; cloud: <strong>${escapeHTML(f.cloud || '')}</strong>`);
+        }
+      }
     }
     return `
       <div class="info-card sync-held-row" data-held-id="${escapeHTML(key)}" style="margin-top:8px">
-        <p><span class="muted" style="font-size:12px">${tag}</span><br><strong>${title}</strong></p>
-        ${lines.map(l => `<p class="muted" style="font-size:13px">${l}</p>`).join('')}
+        <p><span class="muted" style="font-size:0.75rem">${tag}</span><br><strong>${title}</strong></p>
+        ${lines.map(l => `<p class="muted" style="font-size:0.8125rem">${l}</p>`).join('')}
         ${btns(key, dis, phone, cloud)}
       </div>`;
   };
@@ -608,8 +756,8 @@ function renderSyncHeld(sy) {
     }
     return `
       <div class="info-card sync-held-row" data-held-id="${escapeHTML(key)}" style="margin-top:8px">
-        <p><span class="muted" style="font-size:12px">${tag}</span>${title ? `<br><strong>${title}</strong>` : ''}</p>
-        ${lines.map(l => `<p class="muted" style="font-size:13px">${l}</p>`).join('')}
+        <p><span class="muted" style="font-size:0.75rem">${tag}</span>${title ? `<br><strong>${title}</strong>` : ''}</p>
+        ${lines.map(l => `<p class="muted" style="font-size:0.8125rem">${l}</p>`).join('')}
         ${btns(key, dis, phone, cloud)}
       </div>`;
   };
@@ -624,11 +772,11 @@ function renderSyncHeld(sy) {
   const gens = held.filter(isGs);
   const lists = held.filter(h => h.kind && h.kind !== 'session' && h.kind !== 'client' && h.kind !== 'site' && !isRp(h) && !isGs(h));
   const groups = (jobs.length ? 1 : 0) + (recs.length ? 1 : 0) + (lists.length ? 1 : 0) + (reps.length ? 1 : 0) + (gens.length ? 1 : 0);
-  const sub = (id, text) => `<h4 id="${id}" style="margin:14px 0 0;font-size:14px">${text}</h4>`;
+  const sub = (id, text) => `<h4 id="${id}" style="margin:14px 0 0;font-size:0.875rem">${text}</h4>`;
   return `
     <div class="info-card" id="sync-held" style="margin-top:12px">
       <h3>Needs a decision</h3>
-      <p class="muted" style="font-size:13px">Nothing has been changed on this phone. ${held.length === 1 ? 'This one' : 'These'} couldn\u2019t be settled automatically without the risk of losing work, so choose which copy to keep.</p>
+      <p class="muted" style="font-size:0.8125rem">Nothing has been changed on this phone. ${held.length === 1 ? 'This one' : 'These'} couldn\u2019t be settled automatically without the risk of losing work, so choose which copy to keep.</p>
     </div>
     ${jobs.length && groups > 1 ? sub('sync-held-jobs', 'Jobs') : ''}
     ${jobs.map(jobRow).join('')}
@@ -654,10 +802,10 @@ function openSyncDiffSheet(entry, diff) {
   const pair = (f) => (f.here == null && f.cloud == null)
     ? `${escapeHTML(f.label)} is different`
     : `${escapeHTML(f.label)} &mdash; this phone: ${val(f.here)} &middot; cloud: ${val(f.cloud)}`;
-  const row = (inner) => `<div style="padding:6px 0;border-top:1px solid var(--border);font-size:13px;line-height:1.45">${inner}</div>`;
-  const more = (total) => total > max ? `<p class="muted" style="font-size:12px;margin:6px 0 0">and ${total - max} more</p>` : '';
+  const row = (inner) => `<div style="padding:6px 0;border-top:1px solid var(--border);font-size:0.8125rem;line-height:1.45">${inner}</div>`;
+  const more = (total) => total > max ? `<p class="muted" style="font-size:0.75rem;margin:6px 0 0">and ${total - max} more</p>` : '';
   const section = (id, title, list, render) => list.length ? `
-      <h4 id="${id}" style="margin:14px 0 4px;font-size:14px">${title}</h4>
+      <h4 id="${id}" style="margin:14px 0 4px;font-size:0.875rem">${title}</h4>
       ${list.slice(0, max).map(x => row(render(x))).join('')}${more(list.length)}` : '';
 
   const summary = [];
@@ -674,10 +822,10 @@ function openSyncDiffSheet(entry, diff) {
 
   const name = entry && entry.name ? escapeHTML(entry.name) : 'Untitled job';
   const body = diff.none
-    ? `<p class="muted" id="sync-diff-none" style="font-size:13px">No differences found: the two copies hold the same details and items. Either answer leaves you with the same job.</p>`
+    ? `<p class="muted" id="sync-diff-none" style="font-size:0.8125rem">No differences found: the two copies hold the same details and items. Either answer leaves you with the same job.</p>`
     : `
-      <p class="muted" id="sync-diff-summary" style="font-size:13px;margin:0 0 6px">${summary.join(' &middot; ')}</p>
-      ${effects.map(e => `<p class="muted" style="font-size:13px;margin:0 0 6px">${e}</p>`).join('')}
+      <p class="muted" id="sync-diff-summary" style="font-size:0.8125rem;margin:0 0 6px">${summary.join(' &middot; ')}</p>
+      ${effects.map(e => `<p class="muted" style="font-size:0.8125rem;margin:0 0 6px">${e}</p>`).join('')}
       ${section('sync-diff-details', 'Job details', diff.details, pair)}
       ${section('sync-diff-here', 'Only on this phone', diff.onlyHere, (l) => escapeHTML(l))}
       ${section('sync-diff-cloud', 'Only in the cloud', diff.onlyCloud, (l) => escapeHTML(l))}
@@ -705,6 +853,7 @@ function openSyncDiffSheet(entry, diff) {
   const ok = document.getElementById('sync-diff-close');
   if (x) x.addEventListener('click', cleanup);
   if (ok) ok.addEventListener('click', cleanup);
+  if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);   // V123 (3A)
 }
 
 function renderCloudSubscription() {
@@ -719,3 +868,224 @@ function renderCloudSubscription() {
   `;
 }
 
+
+// ===== V100: the 100 moment (9A) and "PATGo tests itself" (10A) =====
+// The 100th version. Neither piece writes ANYTHING — no storage, no sync, no
+// backup (11A) — and both skip their animation when iPhone's Reduce Motion is on.
+// Neither sheet has an input, so render() may run while one is open (MAP rule 3).
+//
+// ⚠ iOS (MAP rule 12): no @keyframes. Everything moves by CSS TRANSITIONS on
+// elements already in the DOM, started from script after a forced reflow and the
+// next frame (_partyNextFrame — two RAFs, with a setTimeout fallback). If the
+// script never runs, the resting state is the finished picture: the "100" is
+// visible, the sparks stay invisible, the test sheet shows its current step.
+
+function _partyReducedMotion() {
+  try { return !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches); }
+  catch (e) { return false; }
+}
+function _partyNum(n) {
+  try { return Number(n).toLocaleString('en-GB'); } catch (e) { return String(n); }
+}
+function _partyNextFrame(fn) {
+  let done = false;
+  const run = () => { if (done) return; done = true; try { fn(); } catch (e) {} };
+  try { if (typeof requestAnimationFrame === 'function') requestAnimationFrame(() => requestAnimationFrame(run)); } catch (e) {}
+  setTimeout(run, 80);
+}
+
+// --- the 100 moment: the top of the V100 welcome, and About's replay (9A) ---
+function v100HeroHTML() {
+  let stats = null;
+  try { stats = (typeof computeAppStats === 'function') ? computeAppStats() : null; } catch (e) { stats = null; }
+  const line = stats
+    ? `You've tested <strong>${_partyNum(stats.items)}</strong> item${stats.items === 1 ? '' : 's'} with PATGo.`
+    : 'Here\u2019s to your first hundred items.';
+  // Sparks only until they have been fired once for this showing — a repaint
+  // mid-way (a sync, a toast) then can't fire them a second time.
+  const sparks = state.partySparked ? '' : `<div class="party-sparks" id="party-sparks" aria-hidden="true">${
+    Array.from({ length: PARTY_SPARKS }, (_, i) => `<span class="party-spark party-spark-${i % 3}"></span>`).join('')}</div>`;
+  return `
+      <div class="party-hero">
+        <div class="party-logo-wrap"><img class="welcome-logo" src="icon-192.png" alt="PATGo" width="64" height="64">${sparks}</div>
+        <div class="party-100" id="party-100" aria-hidden="true">100</div>
+        <div class="party-title">One hundred versions of PATGo</div>
+        <p class="party-line">${line}</p>
+      </div>`;
+}
+
+function renderPartyModal() {
+  if (!state.partyOpen) return '';
+  return `
+    <div class="modal-backdrop" data-action="party-close" style="z-index:300"></div>
+    <div class="bulk-sheet party-sheet" style="z-index:301" role="dialog" aria-label="PATGo V100">
+      <div class="bulk-sheet-handle"></div>
+      ${v100HeroHTML()}
+      <p class="muted party-thanks sheet-scroll">Thank you for testing with PATGo.</p>
+      <button class="btn-primary sheet-pin" data-action="party-close">Close</button>
+    </div>
+  `;
+}
+function partyOpen() {
+  state.partyOpen = true;
+  state.partySparked = false;
+  render();
+}
+
+// Called at the end of every render() (render-core.js). Fires the sparks once.
+function partyAfterRender() {
+  const box = document.getElementById('party-sparks');
+  if (!box) return;
+  state.partySparked = true;
+  if (_partyReducedMotion()) return;
+  const hundred = document.getElementById('party-100');
+  const sparks = Array.from(box.children || []);
+  if (hundred) { hundred.style.transition = 'none'; hundred.style.transform = 'scale(0.4)'; void hundred.offsetWidth; }
+  _partyNextFrame(() => {
+    if (hundred) { hundred.style.transition = ''; hundred.style.transform = ''; }
+    sparks.forEach((el, i) => {
+      const ang = (i / sparks.length) * Math.PI * 2 + (i % 2 ? 0.22 : 0);
+      const r = 58 + (i % 3) * 20;
+      el.style.opacity = '1';
+      el.style.transform = `translate(${Math.round(Math.cos(ang) * r)}px, ${Math.round(Math.sin(ang) * r)}px) scale(0.5)`;
+    });
+    setTimeout(() => sparks.forEach(el => { el.style.opacity = '0'; }), 480);
+  });
+}
+
+// --- "PATGo tests itself" (10A): seven taps on About's title ---
+// Steps: 0…3 = that reading is being tested (the ones before it are done);
+// 4 = all four done; 5 = the PASS sticker; 6 = the certificate. Each step is
+// painted IN PLACE (class changes, so the CSS transitions run); render() draws
+// whatever step state.egg holds, so a repaint mid-test simply continues.
+// The rows and step numbers are in config.js (EGG_ROWS…) — 09u: this file
+// declares no top-level binding but GLOSSARY_GROUPS. The tap count and the timer
+// live in state (eggTaps; egg.timer), memory only.
+
+function aboutTitleTapped() {
+  const now = Date.now();
+  const tp = state.eggTaps || (state.eggTaps = { n: 0, at: 0 });
+  if (now - tp.at > EGG_TAP_GAP_MS) tp.n = 0;
+  tp.n++;
+  tp.at = now;
+  if (tp.n >= EGG_TAPS) { tp.n = 0; eggOpen(); return; }
+  const left = EGG_TAPS - tp.n;
+  if (left <= 3 && typeof showToast === 'function') showToast(`${left} more\u2026`);
+}
+
+function _eggStopTimer() {
+  if (state.egg && state.egg.timer) { clearTimeout(state.egg.timer); state.egg.timer = null; }
+}
+function eggOpen() {
+  _eggStopTimer();
+  state.egg = { step: _partyReducedMotion() ? EGG_FINAL : 0, timer: null };
+  render();
+  if (state.egg && state.egg.step < EGG_FINAL) _eggSchedule();
+}
+function eggClose() {
+  _eggStopTimer();
+  state.egg = null;
+  render();
+}
+function _eggDelay(step) {
+  if (step < EGG_ROWS.length) return 700;     // a reading being taken
+  if (step === EGG_ROWS.length) return 350;   // all done → the sticker
+  return 1500;                                // admire the sticker → the certificate
+}
+function _eggSchedule() {
+  const st = state.egg;
+  if (!st) return;
+  st.timer = setTimeout(() => {
+    st.timer = null;
+    if (state.egg !== st) return;             // closed, or started again
+    st.step = Math.min(EGG_FINAL, st.step + 1);
+    _eggPaint();
+    if (st.step < EGG_FINAL) _eggSchedule();
+  }, _eggDelay(st.step));
+}
+function _eggRowClass(i, step) {
+  return 'egg-row ' + (i < step ? 'is-done' : (i === step ? 'is-testing' : 'is-waiting'));
+}
+function _eggPaint() {
+  const st = state.egg;
+  if (!st) return;
+  const root = document.getElementById('egg-sheet');
+  if (!root) return;
+  EGG_ROWS.forEach((r, i) => {
+    const el = document.getElementById('egg-row-' + i);
+    if (el) el.className = _eggRowClass(i, st.step);
+  });
+  const sticker = document.getElementById('egg-sticker');
+  if (sticker && st.step >= EGG_STICKER_STEP) sticker.classList.add('is-on');
+  if (st.step >= EGG_FINAL) {
+    root.classList.add('is-flipped');
+    const cert = document.getElementById('egg-cert');
+    if (cert) _partyNextFrame(() => cert.classList.add('is-shown'));
+  }
+}
+
+// The certificate's numbers — read from what the app already counts, never stored.
+function _eggCertData() {
+  let stats = null;
+  try { stats = (typeof computeAppStats === 'function') ? computeAppStats() : null; } catch (e) { stats = null; }
+  const jobs = (state.sessions || []).filter(s => s && !s[DEMO_SESSION_FLAG]);
+  const dates = jobs.map(s => s.date).filter(d => typeof d === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d)).sort();
+  return {
+    name: String(state.engineer || '').trim(),
+    items: stats ? stats.items : 0,
+    fails: stats ? stats.fails : 0,
+    failRate: stats ? stats.failRate : '0.0',
+    topType: stats ? stats.topType : '',
+    jobs: jobs.length,
+    oldest: dates.length ? dates[0] : '',
+  };
+}
+
+function renderEggSheet() {
+  const st = state.egg;
+  if (!st) return '';
+  const step = st.step;
+  const d = _eggCertData();
+  const rows = EGG_ROWS.map((r, i) => `
+        <div class="${_eggRowClass(i, step)}" id="egg-row-${i}">
+          <span class="egg-label">${escapeHTML(r[0])}</span>
+          <span class="egg-val"><span class="egg-v-wait">&mdash;</span><span class="egg-v-test">testing&hellip;</span><span class="egg-v-done">${escapeHTML(r[1])} &check;</span></span>
+        </div>`).join('');
+  const certRows = [
+    ['Fails found', `${_partyNum(d.fails)} (${d.failRate}%)`],
+    d.topType ? ['Most tested', d.topType] : null,
+    ['Jobs on this phone', _partyNum(d.jobs)],
+    d.oldest ? ['Oldest job here', formatDate(d.oldest)] : null,
+  ].filter(Boolean).map(([k, v]) => `<div class="egg-cert-row"><span>${escapeHTML(k)}</span><strong>${escapeHTML(v)}</strong></div>`).join('');
+  const flipped = step >= EGG_FINAL;
+  return `
+    <div class="modal-backdrop" data-action="egg-close" style="z-index:300"></div>
+    <div class="bulk-sheet egg-sheet${flipped ? ' is-flipped' : ''}" id="egg-sheet" style="z-index:301" role="dialog" aria-label="PATGo tests itself">
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">PATGo ${escapeHTML(APP_VERSION)} self-test</h3>
+        <button class="fail-close-btn" data-action="egg-close" aria-label="Close">&times;</button>
+      </div>
+      <div class="sheet-scroll egg-body">
+        <div class="egg-test">
+          <div class="egg-unit">Appliance: <strong>PATGo ${escapeHTML(APP_VERSION)}</strong> &middot; Location: your pocket</div>
+          ${rows}
+          <div class="egg-sticker${step >= EGG_STICKER_STEP ? ' is-on' : ''}" id="egg-sticker">PASS</div>
+        </div>
+        <div class="egg-cert${flipped ? ' is-shown' : ''}" id="egg-cert">
+          <div class="egg-cert-kicker">Certificate of testing</div>
+          <p class="egg-cert-text">This certifies that <strong>${escapeHTML(d.name || 'you')}</strong> ${d.name ? 'has' : 'have'} tested</p>
+          <div class="egg-cert-big">${_partyNum(d.items)}</div>
+          <p class="egg-cert-text">item${d.items === 1 ? '' : 's'} with PATGo.</p>
+          <div class="egg-cert-rows">${certRows}</div>
+          <div class="egg-cert-result"><span class="egg-cert-pass">PASS</span> Retest due: never</div>
+        </div>
+      </div>
+      <div class="btn-row sheet-pin" style="margin-top:12px">
+        <button class="btn-secondary" data-action="egg-again">Test again</button>
+        <button class="btn-primary" data-action="egg-close">Close</button>
+      </div>
+    </div>
+  `;
+}

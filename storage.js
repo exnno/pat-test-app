@@ -177,6 +177,11 @@ function _sessionSig(s) {
     s.id, s.name, s.site, s.engineer, s.prefix, s.date,
     s.startNumber, s.locked ? 1 : 0,
     s.exportedAt || '', s.exportDirty ? 1 : 0,
+    // V100: written in place — lockedAt by saveSessionEdits, reportAt when a
+    // certificate is made (often for a job that is not the open one).
+    s.lockedAt || '', s.reportAt || '',
+    // V101: what moved out of the job (and where) — written with the items.
+    (s.movedOut && typeof s.movedOut === 'object') ? Object.keys(s.movedOut).length : 0,
     (s.items ? s.items.length : 0),
     s.instrumentId || '', s.instrumentSnapshot ? 1 : 0
   ].join('\u0001');
@@ -357,6 +362,8 @@ function load() {
   // v7: theme + haptics
   const storedTheme = localStorage.getItem(THEME_KEY);
   state.theme = (storedTheme === 'light' || storedTheme === 'dark') ? storedTheme : 'system';
+  // V121: text size — garbage or nothing stored reads as Standard.
+  state.textSize = normaliseTextSize(localStorage.getItem(TEXT_SIZE_KEY));
   const storedHaptics = localStorage.getItem(HAPTICS_KEY);
   state.hapticsEnabled = storedHaptics !== '0';   // default true; only '0' disables
 
@@ -513,11 +520,10 @@ function loadV11Settings() {
   // install and every existing upgrading user start with the feature invisible.
   state.retestRemindersEnabled = localStorage.getItem(RETEST_REMINDERS_KEY) === '1';
 
-  // v79: the V43 MOCK sign-in is retired. An older version may have left its
-  // key behind (holding a made-up user id and token) — delete it so nothing
-  // ever mistakes it for a real sign-in. Real sign-in state is derived in
-  // cloudBoot() (cloud.js) from supabase-js's own storage, never from here.
-  try { localStorage.removeItem(PAT_AUTH_KEY); } catch {}
+  // V130 (2A): the clean-ups of two retired keys (the V43 mock sign-in, V79;
+  // the V115 Classic emoji switch, V116) are gone — every phone in use has run
+  // them. Real sign-in state is derived in cloudBoot() (cloud.js) from
+  // supabase-js's own storage, never from here.
 
   // v33: first-run wizard gate. onboardedV33Seen is set true once the wizard is
   // completed OR skipped. We treat the install as "already onboarded" (so the
@@ -544,6 +550,13 @@ function loadV11Settings() {
   // v17: Sound feedback + Item timestamps. Both default OFF; only an explicit
   // '1' enables them. Anything else (absent key, '0', garbage) reads as off.
   state.soundEnabled = localStorage.getItem(SOUNDFX_KEY) === '1';
+  // V94: Undo button — same rule, default OFF (16B).
+  state.undoEnabled = localStorage.getItem(UNDO_KEY) === '1';
+  // V99: map pins — same rule, default OFF.
+  state.mapPinEnabled = localStorage.getItem(MAP_PIN_KEY) === '1';
+  // V100: reminder timings (per phone). Garbage of any kind → the defaults.
+  { let rem = null; try { rem = JSON.parse(localStorage.getItem(REMINDERS_KEY)); } catch (e) { rem = null; }
+    state.reminders = normaliseReminders(rem); }
   state.timestampsEnabled = localStorage.getItem(TIMESTAMPS_KEY) === '1';
 
   // v18: Smart Quick Pick. Flag defaults OFF; history is validated defensively
@@ -557,6 +570,11 @@ function loadV11Settings() {
   // shipped reason the user hasn't overridden. A reason with no entry at all
   // (e.g. a custom one) is treated as 'visual' at read time by readingTagForReason().
   state.readingsEnabled = localStorage.getItem(READINGS_KEY) === '1';
+  // V104 (S10): the check DEFAULTS ON — only an explicit '0' is off.
+  state.readingsCheckEnabled = localStorage.getItem(READINGS_CHECK_KEY) !== '0';
+  state.readingsEarthLimit = normaliseEarthLimit(localStorage.getItem(READINGS_EARTH_LIMIT_KEY));
+  // V105 (S14, 7A): daily snapshots DEFAULT ON — only an explicit '0' is off.
+  state.snapshotsEnabled = localStorage.getItem(SNAPSHOTS_KEY) !== '0';
   state.failReasonTags = loadFailReasonTags();
 
   // v65: HID barcode scanner. ⚠ Note the comparison — this flag DEFAULTS ON, so
@@ -606,6 +624,11 @@ function loadV11Settings() {
   state.pruneAgeMonths = (Number.isFinite(storedPruneAge) && storedPruneAge >= 1 && storedPruneAge <= 120)
     ? storedPruneAge
     : PRUNE_AGE_DEFAULT;
+  // V91 (9A): photo age for the tidy-up offer — same rules as the prune age.
+  const storedPhotoAge = parseInt(localStorage.getItem(PHOTO_AGE_KEY) || '', 10);
+  state.photoAgeMonths = (Number.isFinite(storedPhotoAge) && storedPhotoAge >= 1 && storedPhotoAge <= 120)
+    ? storedPhotoAge
+    : PHOTO_AGE_DEFAULT;
 
   // v30: PDF Reports settings. Loaded defensively — any corrupt/garbage key
   // collapses to defaults so a bad value can never wedge boot. We merge stored
@@ -716,6 +739,12 @@ function normaliseReportSettings(stored) {
   // settings blob, backup or setup bundle written before v64 has no such key, so
   // every existing certificate stays byte-identical until it is switched on.
   out.showPhotos      = stored.showPhotos === true;
+  // V95 (S7): remedial section OFF unless switched on; its action line ON
+  // unless switched off; wording falls back to the default when blank.
+  out.showRemedial    = stored.showRemedial === true;
+  out.remedialActionOn = stored.remedialActionOn !== false;
+  out.remedialActionText = (typeof stored.remedialActionText === 'string' && stored.remedialActionText.trim())
+    ? stored.remedialActionText : defaults.remedialActionText;
   out.declaration     = stored.declaration !== false;
   out.retestEnabled   = stored.retestEnabled === true;
   const rm = parseInt(stored.retestMonths, 10);
@@ -913,6 +942,7 @@ function _saveSettingsWrites() {
   // v56: retest reminders master switch.
   localStorage.setItem(RETEST_REMINDERS_KEY, state.retestRemindersEnabled ? '1' : '0');
   localStorage.setItem(THEME_KEY, state.theme);
+  localStorage.setItem(TEXT_SIZE_KEY, normaliseTextSize(state.textSize));
   localStorage.setItem(HAPTICS_KEY, state.hapticsEnabled ? '1' : '0');
   // v11
   localStorage.setItem(CSV_COLUMNS_KEY, JSON.stringify(state.csvColumns));
@@ -929,10 +959,14 @@ function _saveSettingsWrites() {
   localStorage.setItem(CAL_DUE_KEY, state.calDue);
   // v14: prune-age setting.
   localStorage.setItem(PRUNE_AGE_KEY, String(state.pruneAgeMonths));
+  localStorage.setItem(PHOTO_AGE_KEY, String(state.photoAgeMonths || PHOTO_AGE_DEFAULT));   // V91
   // v16: Multi Pick config (single JSON object).
   localStorage.setItem(MULTIPICK_KEY, JSON.stringify(state.multiPick));
   // v17: Sound feedback + Item timestamps settings.
   localStorage.setItem(SOUNDFX_KEY, state.soundEnabled ? '1' : '0');
+  localStorage.setItem(UNDO_KEY, state.undoEnabled ? '1' : '0');   // V94
+  localStorage.setItem(MAP_PIN_KEY, state.mapPinEnabled ? '1' : '0');   // V99
+  localStorage.setItem(REMINDERS_KEY, JSON.stringify(normaliseReminders(state.reminders)));   // V100
   localStorage.setItem(TIMESTAMPS_KEY, state.timestampsEnabled ? '1' : '0');
   // v18: Smart Quick Pick flag + learned history.
   localStorage.setItem(SQP_ENABLED_KEY, state.sqpEnabled ? '1' : '0');
@@ -942,6 +976,11 @@ function _saveSettingsWrites() {
   // hot logging path needs no change — only this flag and the tag map (both
   // set in Settings, which calls full save()) are written here.
   localStorage.setItem(READINGS_KEY, state.readingsEnabled ? '1' : '0');
+  // V104 (S10): written explicitly so OFF persists (absent reads as on).
+  localStorage.setItem(READINGS_CHECK_KEY, state.readingsCheckEnabled ? '1' : '0');
+  localStorage.setItem(READINGS_EARTH_LIMIT_KEY, String(normaliseEarthLimit(state.readingsEarthLimit)));
+  // V105 (S14): written explicitly so OFF persists (absent reads as on).
+  localStorage.setItem(SNAPSHOTS_KEY, state.snapshotsEnabled === false ? '0' : '1');
   localStorage.setItem(FAIL_REASON_TAGS_KEY, JSON.stringify(state.failReasonTags || {}));
   // v65: barcode scanner on/off. Written explicitly as '1'/'0' (rather than
   // relying on the absent-means-on default) so that switching it OFF actually

@@ -492,12 +492,12 @@ module.exports = async function () {
     t.includes(liveEvents, "attachHoldGesture($('quick-grid')", 'the grid uses the helper');
     t.includes(liveEvents, "attachHoldGesture(copyBtn", 'Copy-last uses the helper');
 
-    // The other implementation, deliberately left alone: setupLongPress serves
-    // the About-title reveal, is pointer-based and has no tap to swallow. Two
-    // with a stated division is the shipped state; a THIRD is the defect.
-    t.includes(utilsSrc, 'function setupLongPress(', 'the pointer-based helper is still the only other one');
+    // V109 (housekeeping): the other implementation, utils.js's pointer-based
+    // setupLongPress, had no caller since the About long-press went, and was
+    // removed. attachHoldGesture is now the ONLY one; a second is the defect.
+    t.excludes(utilsSrc, 'function setupLongPress(', 'the old pointer-based helper is gone from utils.js');
     const pointerBinds = (stripJsComments(utilsSrc).match(/addEventListener\('pointerdown'/g) || []).length;
-    t.eq(pointerBinds, 1, 'and it binds pointerdown in exactly one place');
+    t.eq(pointerBinds, 0, 'and utils.js binds pointerdown nowhere');
   });
 
   await t.group('13o — the ×N sheet is wired end to end', () => {

@@ -92,57 +92,87 @@ const BUG_REPORT_REPRO_DEFAULT = 'unsure';
 // the structure — the hub, the category sub-list, search (which flattens this),
 // and back-navigation all read it. `pages` are view ids handled in render().
 // `aliases` are extra search keywords so plain-language terms find a page.
-// Grouping rationale: split by "whose data is this" — User (the engineer) vs the
-// job (clients/reports/CSV) vs the app vs data-movement vs help. Clients sits in
-// Reports & Output because it feeds the report header and CSV, not identity.
+// V96 (Stage 7, the settings redo — 3A): grouped by what the engineer is doing,
+// not by whose data it is. ⚠ View ids and category ids did NOT change (5A only
+// renamed what is shown), so deep links, SYNC_GENERAL_VIEWS,
+// SYNC_NO_REPAINT_VIEWS and every setView() call still resolve. catCloud is
+// FIRST here, but it is drawn first only once this phone is unlocked; a locked
+// phone draws it last (4A — render-settings.js settingsCategoriesInOrder), so
+// free users on the test host never see an access-code box at the top.
+// A group with ONE visible page opens that page straight from the hub
+// (settings-actions.js settingsOpenCategory) — no one-row list in between.
 const SETTINGS_CATEGORIES = [
-  { id: 'catUser',    icon: '👤', title: 'User & Calibration', blurb: 'Your engineer details and calibration',
+  { id: 'catCloud',   icon: 'cloud', title: 'Account & Sync', blurb: 'Your account, syncing between phones, and your subscription',
+    pages: ['cloudAccount', 'cloudSync', 'cloudSubscription'] },
+  { id: 'catUser',    icon: 'user', title: 'Engineer & Tester', blurb: 'Your name and your test instruments',
     pages: ['settingsUser'] },
-  { id: 'catTesting', icon: '⚡', title: 'Testing Setup', blurb: 'How Quick Pick, Multi Pick and descriptions behave',
-    pages: ['settingsItems', 'settingsFails', 'settingsReadings', 'settingsMultiPick', 'settingsDescriptions', 'settingsScanner'] },
-  { id: 'catReports', icon: '📄', title: 'Reports & Output', blurb: 'PDF reports, CSV export and your clients',
-    pages: ['settingsReport', 'settingsCsv', 'settingsClients', 'settingsRetest'] },
-  { id: 'catApp',     icon: '🎨', title: 'App & Display', blurb: 'Appearance and the resistance calculator',
-    pages: ['settingsDisplay', 'settingsCalculator'] },
-  { id: 'catData',    icon: '💾', title: 'Data', blurb: 'Back up, restore and share your setup',
-    pages: ['settingsBackup', 'settingsSetup'] },
-  { id: 'catHelp',    icon: 'ℹ️', title: 'Help', blurb: 'About this app, what the terms mean, and how to get in touch',
-    pages: ['settingsAbout', 'settingsGlossary', 'settingsContact'] },
-  // v85: the cloud pages' home (decision 1A), last so it sits below Help. ⚠ NOT
-  // shown on a copy of the app with no cloud, and its pages stay out of settings
-  // search until this phone is unlocked — both filtered in render-settings.js
-  // (settingsCategoryVisible / settingsPageSearchable). Until then the category
-  // screen shows the access-code box instead of this list (render-help.js).
-  { id: 'catCloud',   icon: '☁️', title: 'Cloud', blurb: 'Invite-only test: your account, sync and subscription',
-    pages: ['cloudAccount', 'cloudSync', 'cloudSubscription'] }
+  { id: 'catTesting', icon: 'zap', title: 'Logging', blurb: 'Quick Pick, fail reasons, descriptions and the tools you use while testing',
+    pages: ['settingsItems', 'settingsFails', 'settingsDescriptions', 'settingsMultiPick', 'settingsReadings', 'settingsScanner', 'settingsCalculator', 'settingsLogging'] },
+  { id: 'catClients', icon: 'building-2', title: 'Clients & Retests', blurb: 'Your clients and sites, and reminders to rebook them',
+    pages: ['settingsClients', 'settingsRetest'] },
+  { id: 'catReports', icon: 'file-text', title: 'Reports & Exports', blurb: 'The PDF certificate and the CSV export',
+    pages: ['settingsReport', 'settingsReportContent', 'settingsCsv'] },   // V117 (1A): Report Settings split in two
+  { id: 'catApp',     icon: 'palette', title: 'Phone & Display', blurb: 'Theme, text size, sound, vibration and reminders on this phone',
+    pages: ['settingsDisplay', 'settingsReminders'] },   // V100 (7A): + Reminders
+  { id: 'catData',    icon: 'database', title: 'Data', blurb: 'Backups, space on this phone, photos, moving your setup, and resetting this phone',
+    pages: ['settingsBackup', 'settingsStorage', 'cloudStorage', 'photoManager', 'jobManager', 'settingsSetup', 'settingsReset'] },   // V106: + Reset (last). V108: + Cloud Storage after Phone Storage (1A)
+  { id: 'catHelp',    icon: 'info', title: 'Help', blurb: 'Tutorials, about this app, what the terms mean, and how to get in touch',
+    pages: ['settingsTutorials', 'settingsAbout', 'settingsGlossary', 'settingsContact'] }   // V134 (6A): + Tutorials, first
 ];
 
+// V115: every `icon` in SETTINGS_CATEGORIES and SETTINGS_PAGE_META is a Lucide
+// name, drawn by icon() (icons.js) in --accent. Not an emoji any more.
 // Per-page metadata for the category sub-lists and for search. icon/title shown
 // on the row; `aliases` widen search matching. Subtitles are computed live in
 // renderSettingsCategory (counts/status), so they're not stored here.
 const SETTINGS_PAGE_META = {
-  settingsUser:        { icon: '👤', title: 'User Settings',         aliases: 'engineer name calibration cal due instrument tester testers multiple megger seaward kewtech' },
-  settingsItems:       { icon: '⚡', title: 'Quick Pick Items',      aliases: 'item types presets quick pick buttons' },
-  settingsFails:       { icon: '⚠️', title: 'Quick Pick Fail',       aliases: 'fail reasons failure quick pick' },
-  settingsReadings:    { icon: '🔬', title: 'Test Readings',          aliases: 'test readings ohms megohms leakage insulation earth continuity class measurements' },
-  settingsMultiPick:   { icon: '🧰', title: 'Multi Pick',            aliases: 'multi pick bulk multiple slots' },
-  settingsDescriptions:{ icon: '📝', title: 'Item Description List', aliases: 'descriptions notes labels' },
-  settingsScanner:     { icon: '🏷️', title: 'Barcode Scanner',      aliases: 'barcode scanner scan wedge hid bluetooth label qr code reader asset number' },
-  settingsReport:      { icon: '📄', title: 'Report Settings',       aliases: 'pdf report logo branding company certificate filename declaration signature sign colour color theme header accent cert number template preset notes' },
-  settingsCsv:         { icon: '📊', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
-  settingsClients:     { icon: '🏢', title: 'Clients',               aliases: 'clients sites customers addresses' },
-  settingsRetest:      { icon: '🔔', title: 'Retest Reminders',       aliases: 'retest reminders rebook chase due overdue recall renewal commercial repeat business follow up contact customer' },
-  settingsDisplay:     { icon: '🎨', title: 'Display Settings',      aliases: 'theme dark light haptics sound timestamps appearance' },
-  settingsCalculator:  { icon: '🧮', title: 'Resistance Calculator', aliases: 'earth continuity resistance limit ohms calculator csa' },
-  settingsBackup:      { icon: '💾', title: 'Backup & Restore',      aliases: 'backup restore export import data save json' },
-  settingsSetup:       { icon: '🔁', title: 'Export / Import Setup', aliases: 'setup share configuration new device employee copy presets transfer' },
-  settingsAbout:       { icon: 'ℹ️', title: 'About',                 aliases: 'about version changelog whats new' },
-  settingsGlossary:    { icon: '📖', title: 'Glossary',              aliases: 'glossary terms jargon what does mean definitions help explain quick pick smart multi pick preset asset session client site overview readings class earth insulation leakage polarity fail reason tag retest certificate template csv backup setup calibration pruning' },
-  settingsContact:     { icon: '✉️', title: 'Contact',              aliases: 'contact support email help feedback website' },
+  settingsUser:        { icon: 'user', title: 'Engineer & Tester',     aliases: 'user settings engineer name calibration cal due instrument tester testers multiple megger seaward kewtech' },
+  settingsItems:       { icon: 'zap', title: 'Quick Pick Items',      aliases: 'item types presets quick pick buttons' },
+  settingsFails:       { icon: 'triangle-alert', title: 'Fail Reasons',          aliases: 'quick pick fail reasons failure tags' },
+  settingsReadings:    { icon: 'gauge', title: 'Test Readings',          aliases: 'test readings ohms megohms leakage insulation earth continuity class measurements limits check limit' },
+  settingsMultiPick:   { icon: 'layers', title: 'Multi Pick',            aliases: 'multi pick bulk multiple slots quick pick tile' },
+  settingsDescriptions:{ icon: 'list', title: 'Descriptions',          aliases: 'item description list descriptions notes labels spelling typo fix rename' },
+  settingsScanner:     { icon: 'scan-barcode', title: 'Barcode Scanner',      aliases: 'barcode scanner scan wedge hid bluetooth label qr code reader asset number' },
+  // V117 (1A): the old Report Settings page, split in two. Both keep "report
+  // settings" in their search words so the old name still finds them.
+  settingsReport:      { icon: 'signature', title: 'Company & Branding',    aliases: 'report settings pdf report enable turn on logo branding brand company name address header title colour color theme accent signature sign' },
+  settingsReportContent: { icon: 'file-text', title: 'Certificate Content', aliases: 'report settings pdf report certificate what to include engineer instrument calibration readings testing time duration photos credit filename file name declaration cert number numbers template templates preset notes remedial actions fails failed summary retest recommended' },
+  settingsCsv:         { icon: 'table', title: 'CSV Columns',           aliases: 'csv columns spreadsheet export headers excel' },
+  settingsClients:     { icon: 'building-2', title: 'Clients',               aliases: 'clients sites customers addresses' },
+  settingsRetest:      { icon: 'bell', title: 'Retest Reminders',       aliases: 'retest reminders rebook chase due overdue recall renewal commercial repeat business follow up contact customer' },
+  // V100: the row is "Theme & Sound" now that the group holds two pages (a row
+  // named the same as its group read oddly); the old name stays in search.
+  settingsDisplay:     { icon: 'palette', title: 'Theme & Sound',         aliases: 'phone and display settings theme dark light haptics vibration sound appearance text size font bigger larger words zoom' },
+  // V100 (7A): the three in-app reminders — all per phone.
+  settingsReminders:   { icon: 'alarm-clock', title: 'Reminders',             aliases: 'reminders reminder nag alert prompt not exported export locked lock unlocked end of day backup back up certificate notification remind me' },
+  // V97 (3A): Undo and item times moved here from Phone & Display — item times
+  // sync with the engineer settings, so they never belonged under "this phone".
+  settingsLogging:     { icon: 'settings', title: 'Logging Options',       aliases: 'undo take back last item timestamps item times record time logged display settings map pin pins what3words w3w fail location where gps' },
+  settingsCalculator:  { icon: 'calculator', title: 'Resistance Calculator', aliases: 'earth continuity resistance limit ohms calculator csa' },
+  settingsBackup:      { icon: 'save', title: 'Backup & Restore',      aliases: 'backup restore export import data save json photos file snapshot snapshots daily undo everything zip certificates spreadsheets' },   // V105: snapshots; V125: export everything
+  // V97 (1A, 2A): split out of Backup & Restore — everything about space.
+  settingsStorage:     { icon: 'hard-drive', title: 'Phone Storage',         aliases: 'storage space full clear old jobs sessions prune protect keep data meter tidy free up delete photos age' },
+  // V106 (Stage 10 part 2, 9A): the last row in Data. Hidden without reset.js.
+  settingsReset:       { icon: 'eraser', title: 'Reset This Phone',      aliases: 'reset factory wipe erase clear delete everything all data start again fresh new install hand on give sell sign out' },
+  // V96 (3A): the photo manager and Jobs on this phone get their own rows in
+  // Data. They are screens of their own already (V90, V91); `action` opens them
+  // through their own open functions (which set their state up) instead of a
+  // bare setView. `whenVisible` is checked in render-settings.js
+  // settingsPageVisible: Jobs on this phone exists only while syncing.
+  photoManager:        { icon: 'images', title: 'Manage Photos',          aliases: 'photos pictures images storage space delete remove download cloud', action: 'pm-open' },
+  jobManager:          { icon: 'shield-check', title: 'Jobs on This Phone',     aliases: 'jobs sessions remove clear safe cloud storage space tidy', action: 'jm-open' },
+  // V108 (Stage 5 part 3, 1A): the cloud's figures beside the phone's. Signed in
+  // only (render-settings.js settingsPageVisible); opened by its own function.
+  cloudStorage:        { icon: 'cloud', title: 'Cloud Storage',          aliases: 'cloud storage space used size sizes biggest largest jobs photos total account megabytes mb gb delete free up', action: 'cs-open' },
+  settingsSetup:       { icon: 'arrow-left-right', title: 'Export / Import Setup', aliases: 'setup share configuration new device employee copy presets transfer' },
+  settingsTutorials:   { icon: 'compass', title: 'Tutorials',             aliases: 'tutorial tutorials practice practise job learn how to use show me around tour walkthrough guide getting started new here help training setting up settings logo instrument backup jobs list cloud sync bring back' },   // V134 (6A); V135: + the Settings tutorials; V136: + jobs & cloud
+  settingsAbout:       { icon: 'info', title: 'About',                 aliases: 'about version changelog whats new privacy policy' },
+  settingsGlossary:    { icon: 'book-open', title: 'Glossary',              aliases: 'glossary terms jargon what does mean definitions help explain quick pick smart multi pick preset asset session client site overview readings class earth insulation leakage polarity fail reason tag retest certificate template csv backup setup calibration pruning job locked setup file clearing old jobs' },
+  settingsContact:     { icon: 'mail', title: 'Contact',              aliases: 'contact support email help feedback website' },
   // v85: the Cloud group (searchable only once unlocked — see catCloud above).
-  cloudAccount:        { icon: '👤', title: 'Account',               aliases: 'cloud account sign in sign out email login' },
-  cloudSync:           { icon: '🔄', title: 'Sync',                  aliases: 'cloud sync upload send devices phones check for updates' },
-  cloudSubscription:   { icon: '💳', title: 'Subscription',          aliases: 'cloud subscription plan trial billing' }
+  cloudAccount:        { icon: 'user', title: 'Account',               aliases: 'cloud account sign in sign out email login' },
+  cloudSync:           { icon: 'refresh-cw', title: 'Sync',                  aliases: 'cloud sync upload send devices phones check for updates' },
+  cloudSubscription:   { icon: 'credit-card', title: 'Subscription',          aliases: 'cloud subscription plan trial billing' }
 };
 
 
@@ -224,6 +254,29 @@ const READING_FIELD_META = {
 // "Polarity" column emits only when some Class I item in the session has it
 // ticked (emit-only-if-used, mirroring the numeric reading columns).
 const READING_POLARITY_CLASSES = ['I'];
+
+// V104 (S10): the readings check — the usual limit each reading is checked
+// against on a PASS (IET CoP 5th edition; Peter checked these against his copy,
+// V104 round). kind 'max': a pass is at or below the limit; 'min': at or above.
+// A class with no entry is not checked — Class III insulation has no figure in
+// the CoP (Peter, Q1). Earth's `null` means "the engineer's own ceiling"
+// (state.readingsEarthLimit, Settings → Test Readings): the real limit is
+// (0.1 + R) Ω and the app doesn't know the lead (2A).
+// ⚠ Leakage is ONE 5 mA limit for Class I and II since the 5th edition. The old
+// 0.75 / 3.5 / 0.25 mA figures are gone — don't put them back. There is no
+// heater exception for insulation: the 0.3 MΩ heater figure was older guidance
+// and isn't in the 5th edition (Peter's copy, Q1/Q8).
+const READING_LIMITS = {
+  earth:      { kind: 'max', byClass: { 'I': null } },
+  insulation: { kind: 'min', byClass: { 'I': 1.0, 'II': 2.0 } },
+  leakage:    { kind: 'max', byClass: { 'I': 5, 'II': 5 } }
+};
+// The earth ceiling (ohms). 0.15 ≈ a typical 2 m, 0.75 mm² lead (0.1 + 0.052).
+// The bounds stop a typo making the check useless: 0.5 Ω is the 5th edition's
+// absolute ceiling for older equipment, 0.1 Ω the bare limit with no lead.
+const READING_EARTH_LIMIT_DEFAULT = 0.15;
+const READING_EARTH_LIMIT_MIN = 0.1;
+const READING_EARTH_LIMIT_MAX = 0.5;
 
 
 // ---------- Fail reason tags ----------
@@ -368,7 +421,13 @@ const DEFAULT_CSV_COLUMNS = [
   { id: 'readingLeakage',    header: 'Leakage (mA)',    visible: false },
   // v55: polarity (Class I only). 'Yes' when an item recorded a polarity tick,
   // blank otherwise — same emit-only-real-data rule as the columns above.
-  { id: 'readingPolarity',   header: 'Polarity',        visible: false }
+  { id: 'readingPolarity',   header: 'Polarity',        visible: false },
+  // V99 (6A): a fail's map pin, as "///word.word.word". Default HIDDEN. Emits
+  // whenever an item HAS a pin, whatever the Map pins switch says (9A). ⚠ While
+  // hidden with this header it is left out of the synced settings_csv row
+  // (sync.js _syncGeneralNormalise — rule 36), so ensureAllCsvColumns() adding
+  // it on upgrade never makes a phone's CSV settings look edited.
+  { id: 'mapPin',            header: 'Map pin',         visible: false }
 ];
 
 // v8: Resistance calculator — IET Code of Practice Table V1.1 nominal values.

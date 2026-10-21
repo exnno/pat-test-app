@@ -28,7 +28,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick } = require('../fixture');
+const { tick, syncCurrent } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID_A = '11111111-1111-1111-1111-111111111111';
@@ -151,7 +151,7 @@ function markSent(app, ids) {
     s.rec.sent[id] = app.fn('_syncGeneralHash')(id, gen(app, id));
     if (id === DESC) s.rec.descBase = gen(app, id).list.map(x => x.toLowerCase());
   }
-  app.storage.setItem('pat:syncState', JSON.stringify(s));
+  app.storage.setItem('pat:syncState', JSON.stringify(syncCurrent(s)));
 }
 
 function run(app) { return app.fn('syncPull')().then(() => tick(5)); }

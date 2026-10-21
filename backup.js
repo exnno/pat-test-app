@@ -8,6 +8,8 @@
 
 // ============== PATGo PWA — v22 — Backup / Restore ==============
 // Backup build/restore, export-state markers... NOTE only buildBackup/restore here.
+// V105: the restore is applyBackupData(), shared by a file and a snapshot
+// (snapshots.js); restoreWithSafetyCopy() keeps a copy before either.
 
 // ---------- Backup / Restore (v7) ----------
 // Full app state -> downloadable .json file. Restore replaces all current data.
@@ -31,6 +33,7 @@ function buildBackup() {
     engineer: state.engineer,
     sort: state.sort,
     theme: state.theme,
+    textSize: state.textSize,                 // V121 (additive — no backupVersion bump)
     hapticsEnabled: state.hapticsEnabled,
     // v11
     csvColumns: state.csvColumns,
@@ -54,6 +57,9 @@ function buildBackup() {
     // v17: feedback + timestamp settings.
     soundEnabled: state.soundEnabled,
     timestampsEnabled: state.timestampsEnabled,
+    undoEnabled: state.undoEnabled,   // V94: per phone; absent in older backups
+    mapPinEnabled: state.mapPinEnabled,   // V99: per phone; absent in older backups
+    reminders: normaliseReminders(state.reminders),   // V100: per phone; absent in older backups
     // v18: Smart Quick Pick flag + learned history (readable long-key form).
     sqpEnabled: state.sqpEnabled,
     sqpHistory: state.sqpHistory,
@@ -63,6 +69,13 @@ function buildBackup() {
     // without these keys restore with the feature OFF and the default tags.
     readingsEnabled: state.readingsEnabled,
     failReasonTags: state.failReasonTags,
+    // V104 (S10): the readings check switch + earth ceiling. Additive — no
+    // backupVersion bump; an older backup restores with the defaults.
+    readingsCheckEnabled: state.readingsCheckEnabled,
+    readingsEarthLimit: state.readingsEarthLimit,
+    // V105 (S14): the daily-snapshots switch. Additive — no backupVersion bump;
+    // an older backup restores with this phone's own setting.
+    snapshotsEnabled: state.snapshotsEnabled !== false,
     // v65: barcode scanner on/off. Additive and missing-field-tolerant, so NO
     // backupVersion bump — a pre-v65 backup simply has no key and restores with
     // the default (ON), which is also what a fresh install gets.
@@ -172,11 +185,16 @@ function shouldShowBackupReminder() {
     const snoozeMs = Date.parse(state.backupSnoozedUntil);
     if (!isNaN(snoozeMs) && snoozeMs > now) return false;
   }
+  if (!backupReminderDays()) return false;   // V100 (5A): switched off
   if (!state.lastBackupAt) return true; // never backed up
   const lastMs = Date.parse(state.lastBackupAt);
   if (isNaN(lastMs)) return true;
   const ageDays = (now - lastMs) / (1000 * 3600 * 24);
-  return ageDays >= BACKUP_REMINDER_DAYS;
+  // V100 (5A): the interval is a per-phone choice; 'off' never reminds. A phone
+  // that never chose gets 7 — BACKUP_REMINDER_DAYS, what it always did.
+  const days = backupReminderDays();
+  if (!days) return false;
+  return ageDays >= days;
 }
 
 function restoreBackupFromFile(file) {
@@ -200,12 +218,26 @@ function restoreBackupFromFile(file) {
     openConfirmSheet({
       title: 'Restore from backup?',
       message:
-        `This file contains ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'} ` +
+        `This file contains ${data.sessions.length} job${data.sessions.length === 1 ? '' : 's'} ` +
         `and ${itemCount} item${itemCount === 1 ? '' : 's'} in total` +
         (data.exportedAt ? `, exported ${new Date(data.exportedAt).toLocaleString('en-GB')}` : '') +
-        `. This will REPLACE all current data on this device and cannot be undone.`,
+        `. This will REPLACE all current data on this device. A copy of what's here now is kept first, so you can undo it from Daily snapshots on the Backup page.`,
       confirmLabel: 'Replace & restore',
-      onConfirm: () => {
+      onConfirm: () => restoreWithSafetyCopy(() => applyBackupData(data, { markExported: true })),
+    });
+  };
+  reader.onerror = () => openInfoSheet({ title: 'Couldn\u2019t read that file', message: 'The file couldn\u2019t be opened. Please try again.' });
+  reader.readAsText(file);
+}
+
+// V105: the restore itself, lifted out of restoreBackupFromFile so a snapshot
+// (snapshots.js) restores through EXACTLY the same validators and steps as a
+// file. The body below is the pre-V105 apply block, moved unchanged apart from
+// the two marked V105 lines. `data` must already have passed the sessions-array
+// check. opts.markExported: true for a file, false for a snapshot.
+function applyBackupData(data, opts) {
+    opts = opts || {};
+    const itemCount = data.sessions.reduce((n, s) => n + (Array.isArray(s.items) ? s.items.length : 0), 0);
     // Apply
     state.sessions = data.sessions;
     // v53: Test Readings — validate each item's readings object defensively on
@@ -265,6 +297,11 @@ function restoreBackupFromFile(file) {
       state.theme = data.theme;
       applyTheme(state.theme);
     }
+    // V121: only a known size is taken; older backups (no field) leave it alone.
+    if (TEXT_SIZES.includes(data.textSize)) {
+      state.textSize = data.textSize;
+      applyTextSize(state.textSize);
+    }
     if (typeof data.hapticsEnabled === 'boolean') {
       state.hapticsEnabled = data.hapticsEnabled;
     }
@@ -316,6 +353,21 @@ function restoreBackupFromFile(file) {
     if (typeof data.soundEnabled === 'boolean') {
       state.soundEnabled = data.soundEnabled;
     }
+    // V116: a V115 backup may carry iconsClassic (the retired Classic emoji
+    // switch). Deliberately not read — restore takes named fields only.
+    // V94: Undo button. Boolean only; an older backup leaves this phone's own.
+    if (typeof data.undoEnabled === 'boolean') {
+      state.undoEnabled = data.undoEnabled;
+    }
+    // V99: map pins switch. Boolean only; an older backup leaves this phone's own.
+    if (typeof data.mapPinEnabled === 'boolean') {
+      state.mapPinEnabled = data.mapPinEnabled;
+    }
+    // V100: reminder timings. An object only; anything odd in it falls back per
+    // field. An older backup has none and leaves this phone's own.
+    if (data.reminders && typeof data.reminders === 'object' && !Array.isArray(data.reminders)) {
+      state.reminders = normaliseReminders(data.reminders);
+    }
     if (typeof data.timestampsEnabled === 'boolean') {
       state.timestampsEnabled = data.timestampsEnabled;
     }
@@ -336,6 +388,19 @@ function restoreBackupFromFile(file) {
     // back inside `sessions` above (validated per item).
     if (typeof data.readingsEnabled === 'boolean') {
       state.readingsEnabled = data.readingsEnabled;
+    }
+    // V104 (S10): only a real boolean / a number is taken; the limit goes through
+    // normaliseEarthLimit, so an out-of-range value restores as the default.
+    if (typeof data.readingsCheckEnabled === 'boolean') {
+      state.readingsCheckEnabled = data.readingsCheckEnabled;
+    }
+    if (typeof data.readingsEarthLimit === 'number') {
+      state.readingsEarthLimit = normaliseEarthLimit(data.readingsEarthLimit);
+    }
+    // V105 (S14): the daily-snapshots switch. Boolean only; an older backup
+    // leaves this phone's own.
+    if (typeof data.snapshotsEnabled === 'boolean') {
+      state.snapshotsEnabled = data.snapshotsEnabled;
     }
 
     // v65: barcode scanner flag. Restored only when the backup actually carries
@@ -383,11 +448,11 @@ function restoreBackupFromFile(file) {
       : [];
     state.sites = Array.isArray(data.sites)
       ? data.sites
-          .map(s => ({
+          .map(s => withSiteNotes({   // V98: notes ride along (additive — no backupVersion bump)
             id: String(s && s.id || ''),
             clientId: String(s && s.clientId || ''),
             name: String(s && s.name || '').trim()
-          }))
+          }, s && s.notes))
           .filter(s => s.id && s.name)   // v26: clientId no longer required (orphan sites)
       : [];
     // v78: restore the deletion ledger, purged on the way in on the same rule as
@@ -437,9 +502,11 @@ function restoreBackupFromFile(file) {
     save();
     // v11: stamp the restore as a fresh backup checkpoint so we don't nag the
     // user the moment they restore from a known-good file.
-    markBackupExported();
+    // V105: a FILE only. A snapshot lives on this phone, so restoring one says
+    // nothing about whether a copy exists anywhere else.
+    if (opts.markExported !== false) markBackupExported();
     render();
-    showToast(`Restored ${data.sessions.length} session${data.sessions.length === 1 ? '' : 's'} (${itemCount} item${itemCount === 1 ? '' : 's'})`);
+    showToast(`Restored ${data.sessions.length} job${data.sessions.length === 1 ? '' : 's'} (${itemCount} item${itemCount === 1 ? '' : 's'})`);
     // v62: if this backup was taken on a device that had photos, say so — the
     // photos are NOT in this file and the user needs to import them separately.
     // Only shown when the photos aren't already here, so a same-device restore
@@ -456,9 +523,25 @@ function restoreBackupFromFile(file) {
           `Your jobs and items have all restored normally.`
       });
     }
-      }
+}
+
+// V105 (6A): before ANY restore replaces what is on this phone, keep a copy of
+// it (snapshots.js, the "Before your last restore" row), so a wrong restore can
+// be undone. If that copy is refused — usually a full phone — ask rather than
+// either restoring unprotected without saying so or blocking a restore the
+// engineer has already confirmed. With no snapshots file, no database, or no
+// real job to protect, the restore simply goes ahead as it always did.
+function restoreWithSafetyCopy(apply) {
+  if (typeof snapshotBeforeRestore !== 'function') { apply(); return; }
+  let p;
+  try { p = snapshotBeforeRestore(); } catch (e) { p = Promise.reject(e); }
+  Promise.resolve(p).then(() => apply(), (err) => {
+    console.error('Safety copy before restore not saved.', err);
+    openConfirmSheet({
+      title: 'Couldn\u2019t keep a safety copy',
+      message: 'Before restoring, PATGo keeps a copy of what\u2019s on this phone now, so the restore can be undone. That copy couldn\u2019t be saved \u2014 the phone may be short of space. Restore anyway?',
+      confirmLabel: 'Restore anyway',
+      onConfirm: apply,
     });
-  };
-  reader.onerror = () => openInfoSheet({ title: 'Couldn\u2019t read that file', message: 'The file couldn\u2019t be opened. Please try again.' });
-  reader.readAsText(file);
+  });
 }

@@ -124,4 +124,47 @@ function tick(ms = 0) {
   return new Promise(res => setTimeout(res, ms));
 }
 
-module.exports = { CANARY, freshApp, withInstrument, addInstrument, withSession, withItem, populated, confirmSheet, tick };
+// V95: a job date that is always "recent". V93's window brings a job the phone
+// has never held down only if it is dated within 30 days of today, so a fixed
+// date in a pull fixture is a time bomb: group 17's '2026-09-01' went red on
+// 2 Oct 2026 with no code change. Pull fixtures that mean "a normal recent job"
+// use this; tests that mean "an OLD job" keep their fixed old dates on purpose.
+function recentDate(daysAgo) {
+  const d = new Date(); d.setDate(d.getDate() - (daysAgo || 0));
+  const p = (n) => String(n).padStart(2, '0');
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
+}
+const RECENT_DATE = recentDate(1);
+
+/* V105: restore a backup file and wait for the FileReader to finish — until a
+   new sheet (the confirm, or the "not a backup" info sheet) is on screen, or 2 s.
+   Replaces a fixed `await tick(5)`: the stub's readAsText awaits a real
+   Blob.text(), which is real async work, and under load 5 ms was not always
+   enough — 03f went red about 1 run in 7 alone, and every time with two suites
+   side by side. A test that expects NO confirm sheet (03h) was the worse case:
+   it passed vacuously whenever the read had not finished. Resolves true when a
+   sheet appeared. */
+async function restoreFile(app, file, ms = 2000) {
+  const count = () => app.doc.querySelectorAll('.bulk-sheet').length;
+  const before = count();
+  app.fn('restoreBackupFromFile')(file);
+  const t0 = Date.now();
+  while (Date.now() - t0 < ms) {
+    if (count() > before) return true;
+    await tick(5);
+  }
+  return false;
+}
+
+// V128: a sync state a fixture writes describes a phone that is up to date
+// with the cloud — it has seen every row lately — so the stale-phone check is
+// not due. Group 66 writes stale states on purpose, without this.
+function syncCurrent(st) {
+  const now = new Date().toISOString();
+  st.seenAllAt = now;
+  if (st.rec) st.rec.seenAllAt = now;
+  if (st.ph) st.ph.seenAllAt = now;
+  return st;
+}
+
+module.exports = { syncCurrent, RECENT_DATE, recentDate, CANARY, freshApp, withInstrument, addInstrument, withSession, withItem, populated, confirmSheet, tick, restoreFile };

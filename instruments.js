@@ -552,7 +552,7 @@ function renderInstrumentListHTML() {
             <span class="instrument-head-name">${escapeHTML(instrumentDisplayName(inst))}${isActive ? ' <span class="instrument-badge">In use</span>' : ''}</span>
             <span class="instrument-head-sub">${sub}${usedLine}${chip}</span>
           </span>
-          <span class="instrument-head-chevron">›</span>
+          <span class="instrument-head-chevron">${icon('chevron-right')}</span>
         </button>
         ${isActive ? '' : `
         <div class="instrument-head-actions">
@@ -563,7 +563,7 @@ function renderInstrumentListHTML() {
   }).join('');
 
   const footer = list.length >= INSTRUMENTS_MAX
-    ? `<p class="muted" style="margin:10px 0 0;font-size:12px">That's the limit of ${INSTRUMENTS_MAX} instruments. Delete one to add another.</p>`
+    ? `<p class="muted" style="margin:10px 0 0;font-size:0.75rem">That's the limit of ${INSTRUMENTS_MAX} instruments. Delete one to add another.</p>`
     : `<button class="btn-secondary" data-action="instrument-add" style="margin-top:10px">+ Add instrument</button>`;
 
   return rows + footer;
@@ -587,8 +587,8 @@ function renderSettingsInstrument() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" data-action="instrument-editor-close" aria-label="Back">‹</button>
-        <div class="site-name">Test instrument</div>
+        <button class="icon-btn" data-action="instrument-editor-close" aria-label="Back">${icon('chevron-left')}</button>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Test instrument</div>
         <span style="width:40px"></span>
       </header>
 
@@ -597,10 +597,10 @@ function renderSettingsInstrument() {
         <p class="muted">The make and model of this PAT tester. Shown on certificates and on the CSV export when the "Test Instrument" column is switched on.</p>
 
         <label class="label">Manufacturer</label>
-        <input class="input" id="inst-make" value="${escapeHTML(inst.make)}" placeholder="e.g. Megger, Seaward, Kewtech">
+        <input aria-label="Manufacturer" class="input" id="inst-make" value="${escapeHTML(inst.make)}" placeholder="e.g. Megger, Seaward, Kewtech">
 
         <label class="label">Model</label>
-        <input class="input" id="inst-model" value="${escapeHTML(inst.model)}" placeholder="e.g. PAT250, Apollo 600, KT77">
+        <input aria-label="Model" class="input" id="inst-model" value="${escapeHTML(inst.model)}" placeholder="e.g. PAT250, Apollo 600, KT77">
       </div>
 
       <div class="settings-section">
@@ -608,22 +608,22 @@ function renderSettingsInstrument() {
         <p class="muted">All optional. Tap Clear to empty a date you no longer want recorded.</p>
 
         <label class="label">Last calibration date ${clearBtn('date', !!inst.calDate)}</label>
-        <input class="input input-date" id="inst-cal-date" type="date" value="${escapeHTML(inst.calDate)}">
+        <input aria-label="Last calibration date" class="input input-date" id="inst-cal-date" type="date" value="${escapeHTML(inst.calDate)}">
 
         <label class="label">Certificate number</label>
-        <input class="input" id="inst-cal-cert" value="${escapeHTML(inst.calCertNo)}" placeholder="e.g. CAL-2026-0142">
+        <input aria-label="Calibration certificate number" class="input" id="inst-cal-cert" value="${escapeHTML(inst.calCertNo)}" placeholder="e.g. CAL-2026-0142">
 
         <label class="label">Next calibration due ${clearBtn('due', !!inst.calDue)}${chip}</label>
-        <input class="input input-date" id="inst-cal-due" type="date" value="${escapeHTML(inst.calDue)}">
+        <input aria-label="Next calibration due" class="input input-date" id="inst-cal-due" type="date" value="${escapeHTML(inst.calDue)}">
       </div>
 
       ${isActive ? `
-      <p class="muted" style="margin:0 0 8px;font-size:13px">✓ This is the instrument new jobs are recorded against.</p>
+      <p class="muted" style="margin:0 0 8px;font-size:0.8125rem">${icon('check')} This is the instrument new jobs are recorded against.</p>
       ` : `
       <button class="btn-secondary" data-action="instrument-make-active" data-arg="${escapeHTML(inst.id)}" style="margin-bottom:8px">Use this instrument for new jobs</button>
       `}
 
-      ${used ? `<p class="muted" style="margin:0 0 8px;font-size:12px">Recorded on ${used} job${used === 1 ? '' : 's'}. Editing it here updates what those certificates show.</p>` : ''}
+      ${used ? `<p class="muted" style="margin:0 0 8px;font-size:0.75rem">Recorded on ${used} job${used === 1 ? '' : 's'}. Editing it here updates what those certificates show.</p>` : ''}
 
       <button class="btn-primary" data-action="instrument-save" style="margin-top:8px">Save</button>
       <button class="btn-danger" data-action="instrument-delete" data-arg="${escapeHTML(inst.id)}" style="margin-top:10px;width:100%">Delete instrument</button>
@@ -657,7 +657,7 @@ function renderEditSessionInstrumentBlock() {
 
   return `
     <label class="label">Test instrument</label>
-    <select class="input" id="ef-instrument" data-change-action="ef-instrument">${opts}</select>
-    <p class="muted" style="margin:6px 0 0;font-size:12px">Recorded on this job, so its certificate always names the tester you actually used — even after you recalibrate or change instrument.</p>
+    <select aria-label="Test instrument" class="input" id="ef-instrument" data-change-action="ef-instrument">${opts}</select>
+    <p class="muted" style="margin:6px 0 0;font-size:0.75rem">Recorded on this job, so its certificate always names the tester you actually used — even after you recalibrate or change instrument.</p>
   `;
 }

@@ -19,6 +19,8 @@ let state = {
   // syncItemTypesFromActivePreset() after preset edits or switches.
   itemTypes: DEFAULT_ITEM_TYPES.slice(),
   failReasons: DEFAULT_FAIL_REASONS.slice(),
+  mgrReturnView: null,      // V96: where Back from Manage photos / Jobs on this phone goes (settings-actions.js mgrNoteReturn)
+  descTextMode: false,      // V95: Item Description List shown as the old text box
   engineer: '',
   descriptions: [],
   sort: 'date_desc',
@@ -54,6 +56,24 @@ let state = {
   suggestions: [],
   showSuggestions: false,
   failModalOpen: false,
+  // V98: the Overview's site-notes sheet — { siteId, text } while open, else null.
+  // Holds the typing (the sheet has an input, so it is never rendered under the
+  // keyboard: MAP rule 3). Cleared by setView.
+  siteNotesSheet: null,
+  // V101: the Move to a new job sheet — null, or { step: 'form'|'confirm'|'blocked',
+  // ids (selected item ids, captured on open), from (job id), client, site, name,
+  // date, engineer, instrumentId, prefix, error, why }.
+  moveJob: null,
+  // V103: the Move to another job sheet — null, or { step: 'pick'|'clash'|'confirm'|
+  // 'blocked', ids (selected item ids, captured on open), from (job id), to (the
+  // chosen job's id), filter, clashes [{ id, with (the target item), choice
+  // 'leave'|'keep'|'replace'|'renumber', newNo }], error, why }.
+  moveTo: null,
+  // V102: the Duplicate sheet on Session settings — null, or { step: 'form'|'confirm'|
+  // 'working'|'partial'|'blocked', from (job id), client, site, client0, site0 (the
+  // pre-filled pair), name, date, engineer, instrumentId, prefix, error, failed
+  // (cloud photos that couldn't be fetched), skipCloud, why }.
+  dupJob: null,
   failModalStage: 'reasons',
   failOtherText: '',
 
@@ -77,6 +97,16 @@ let state = {
   // rules: derived, never saved, never in a backup. See photoIndexLoad().
   photoMeta: {},
   photoMetaReady: false,
+  // v89: a change counter for photoMeta (bumped on every put/drop) so the
+  // cloud-only lookup in photos.js can memoise without rescanning per item.
+  photoMetaV: 0,
+  // v89: the photos this phone KNOWS are in the cloud for the signed-in account
+  // — the same object as the sync state's ph.sent (sync.js keeps it pointed
+  // there on every save; photoCloudV moves with it). {photoId: {s, i, b?, t?, a?}}.
+  // photoCloudUser = the account it belongs to. Derived, never saved here.
+  photoCloud: {},
+  photoCloudV: 0,
+  photoCloudUser: '',
 
   // Photos taken DURING the fail flow, before the item exists. The item has no
   // id until saveItem() pushes it, so these are held here as
@@ -94,10 +124,39 @@ let state = {
   photoStripItemId: '',
   photoStripPhotos: [],
   photoStripLoading: false,
+  // V90 (R18): the photo manager. All transient — never saved; reset when the
+  // view is left (setView → photoMgrLeave). `cloud` is the last "Look in the
+  // cloud" read (3A): rows and job names, held in memory only, re-read on tap.
+  photoMgr: {
+    filter: 'all',        // 'all' | 'phone' | 'cloud' | 'notup'
+    sort: 'newest',       // 'newest' | 'oldest' | 'space'
+    selecting: false,
+    selected: {},         // photo id → true
+    shown: 0,             // tiles shown (0 = one page)
+    busy: '',             // progress text while an action runs
+    cloud: null,          // { at, loading, error, rows: [], jobs: {}, capped }
+    preview: null,        // { id, url, loading }
+    thumbGen: 0,          // bumped to stop an older preview round
+  },
+  // V91 (Stage 4, 5A): Jobs on this phone (Settings → Backup). Transient — never
+  // saved; reset when the view is left (setView → jobMgrLeave). V93 (7A): its
+  // Cleared section is a link to the Jobs screen's cloud tab.
+  jobMgr: {
+    filter: 'all',        // 'all' | 'safe' | 'notyet'
+    selecting: false,
+    selected: {},         // job id → true
+    busy: '',             // progress text while an action runs
+  },
+  // V93 (4A, 8A): the Jobs screen's tabs, signed in only — 'phone' | 'cloud' —
+  // and the cloud tab's list (settings-actions.js). Transient, never saved: the
+  // list lives for the app session (rule 25), each app start reads it afresh.
+  jobsTab: 'phone',
+  cloudJobs: null,        // { loading, ok, error, at, uid, jobs, capped, photos, stale, q, selecting, selected, busy }
   showFailsOnly: false,
   searchQuery: '',
   // v7
   theme: 'system',                  // 'system' | 'light' | 'dark'
+  textSize: 'standard',             // V121: 'standard' | 'large' | 'larger'
   hapticsEnabled: true,
   selectionMode: false,
   selectedIndices: [],              // absolute indices into sess.items
@@ -105,6 +164,8 @@ let state = {
   bulkLocationValue: '',
   updateAvailable: false,
   pendingWorker: null,              // SW that's installed and waiting
+  updateVersion: '',                // V124 (3A): 'V124' once the waiting worker says; '' = plain words
+  updateDismissed: false,           // V124: × hides the banner; the update still goes in (boot.js 2A)
   // v8
   calcCsa: '0.75',                  // matches pat-testing-training.net default
   calcLength: 0.75,
@@ -256,10 +317,19 @@ let state = {
   //   email:  signed-in address, or the address a code was sent to
   //   plan / trialEndsAt / checkedAt: last "Check connection" result
   //   message: one plain-language line for the Account page (errors included)
+  //   V139 (password sign-in): useCode — the signed-out card shows "Email me a
+  //   code" instead of email + password; forgot — this code was asked for by
+  //   "Forgot password?"; pwOpen — the "Choose a new password" card is showing;
+  //   pwReset — it opened straight after a Forgot sign-in. Never a password.
+  //   V140 (Google): google — the connected Google address ('' = none; read
+  //   from the stored session at boot); googlePending — 'signin' | 'link' while
+  //   the Google window is open; googleOff — "Disconnect Google?" is showing.
   // Replaces the V43 mock's userId/authToken/authStatus.
   cloud: {
     status: 'off', busy: false, email: '',
     plan: null, trialEndsAt: null, checkedAt: null, message: '',
+    useCode: false, forgot: false, pwOpen: false, pwReset: false,
+    google: '', googlePending: '', googleOff: false,
   },
   // v80: sync (sync.js). TRANSIENT, like `cloud` — the durable part (what was
   // sent, what was read, and when) lives in SYNC_STATE_KEY, owned by sync.js.
@@ -320,6 +390,10 @@ let state = {
   wizardStep: 1,
   wizardPath: '',
   wizardSeedDemo: false,
+  // V112 (4A): the step-4 "Make PDF reports" switch. Transient. ON for a new
+  // phone; restartOnboarding() sets it from the phone's current setting, so a
+  // re-run cannot quietly switch reports back on. Applied on Continue from step 4.
+  wizardReportsOn: true,
 
   // v42: full-screen feature walkthrough (decision 6-i). Transient — never
   // persisted, never in backups (the tour keeps no data). tourOpen gates the
@@ -379,7 +453,7 @@ let state = {
   clientsPage: {
     expandedClientId: null,
     clientDialog: { mode: null, name: '', editingId: null },   // 'add' | 'rename'
-    siteDialog: { mode: null, name: '', editingId: null, clientId: null },
+    siteDialog: { mode: null, name: '', editingId: null, clientId: null },   // V98: may also carry notes
     // v26 (Q3=B): assign/move a site to a client. siteId is the site being
     // moved; name holds the typed/selected target client name. When a same-name
     // clash is detected on confirm, `clash` holds { targetClientId } and the
@@ -390,6 +464,29 @@ let state = {
   // v17: Sound feedback (opt-in audio confirmation). Default OFF. When ON, a
   // short Web Audio tone plays on pass/fail/copy alongside the haptic call.
   soundEnabled: false,
+
+  // V94 (15A, 16B): the ↶ Undo button beside Copy last. Per phone, default OFF.
+  undoEnabled: false,
+  // V99: map pins. mapPinEnabled = the per-phone switch (8A), default OFF.
+  // mapPinSheet = { sessionId, itemId, text } while the pin sheet is open, else
+  // null. Holds the typing (the sheet has an input, so it is never rendered under
+  // the keyboard: MAP rule 3). Cleared by setView.
+  mapPinEnabled: false,
+  mapPinSheet: null,
+  // V100: reminder timings, per phone (REMINDERS_KEY, config.js). Defaults: the
+  // two new reminders off (3A, 4A), backups every 7 days as before (5A).
+  reminders: { exportAfter: 'off', unlockedAt: 'off', backupDays: '7' },
+  // V100: the "100" moment replayed from About (party) and "PATGo tests itself"
+  // (egg = { step } while its sheet is open, else null). Memory only, never saved
+  // (11A). Both cleared by setView. Neither sheet has an input, so either may
+  // render (MAP rule 3).
+  partyOpen: false,
+  partySparked: false,
+  egg: null,
+  eggTaps: { n: 0, at: 0 },
+  // V94: what the last logging action appended, for Undo (session.js
+  // noteLastLog). Memory only — never saved, never in a backup.
+  lastLog: null,
 
   // v17: Item timestamps. Default OFF. Gates both capture (stamping item.ts on
   // first save) and display (Overview HH:MM + CSV column output).
@@ -425,6 +522,26 @@ let state = {
   readingsDraft: { class: READING_CLASS_DEFAULT, earth: '', insulation: '', leakage: '', polarity: false },
   readingsPendingResult: null,        // 'pass' | 'fail' — the result being logged
   readingsPendingFailReason: null,    // the fail reason text (fail mode only)
+  // V104 (S10): the readings check. readingsCheckEnabled and readingsEarthLimit
+  // are persisted (READINGS_CHECK_KEY / READINGS_EARTH_LIMIT_KEY), backed up and
+  // synced in the settings_work row. readingsSheetStage ('entry' | 'confirm') is
+  // the sheet's own step; readingsCarry holds a PASS sheet's readings across
+  // "Change to FAIL" until the fail readings sheet takes them. Both transient —
+  // reset by closeReadingsSheetState (session.js), so any close or navigation
+  // drops them.
+  readingsCheckEnabled: true,
+  readingsEarthLimit: READING_EARTH_LIMIT_DEFAULT,
+  readingsSheetStage: 'entry',
+  readingsCarry: null,
+
+  // V105 (S14): daily snapshots. snapshotsEnabled is persisted (SNAPSHOTS_KEY)
+  // and backed up, not synced. snapList (metadata only, newest first; null until
+  // the database has answered), snapBytes and snapUnavailable are published by
+  // snapshots.js for the Backup page — transient, never saved.
+  snapshotsEnabled: true,
+  snapList: null,
+  snapBytes: 0,
+  snapUnavailable: false,
 
   // v65: HID barcode scanner. ONE persisted flag; everything else here is
   // transient and deliberately so.
@@ -494,6 +611,9 @@ let state = {
   // older than this are offered for pruning in the storage indicator. Loaded
   // from PRUNE_AGE_KEY; editable on the Backup & Restore page.
   pruneAgeMonths: PRUNE_AGE_DEFAULT,
+  // V91 (9A): photos older than this many months, known in the cloud, are
+  // offered for removal from this phone. PHOTO_AGE_KEY; per device.
+  photoAgeMonths: PHOTO_AGE_DEFAULT,
 
   // v14: reopen warning. When the user opens a session that has already been
   // exported (clean or modified-since), and it's not locked/view-only, we

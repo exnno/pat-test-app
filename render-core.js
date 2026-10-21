@@ -58,6 +58,9 @@ function dismissWelcome(seenFlag, key) {
 }
 
 function render() {
+  // V123: note what holds focus BEFORE anything is torn down — the modal sweep
+  // below and the innerHTML rewrite both destroy it (feedback.js).
+  if (typeof focusBeforeRender === 'function') { try { focusBeforeRender(); } catch (e) {} }
   if (_lastRenderHadModal) {
     document.querySelectorAll(
       'body > .modal-backdrop, body > .fail-sheet, body > .bulk-sheet'
@@ -112,10 +115,14 @@ function render() {
 
   // v42: the feature walkthrough is a full-screen view that owns #app entirely —
   // no banner, no stacked modals. Short-circuit before the normal screen build.
+  // V134: it is the practice job now (tour.js), drawn with the real screens.
   if (v === 'tour' && state.tourOpen) {
     app.innerHTML = renderTour();
     _lastRenderHadModal = false;
     _lastRenderedView = v;   // v46: keep the view tracker honest across the early return
+    if (typeof focusAfterRender === 'function') { try { focusAfterRender(); } catch (e) {} }   // V123
+    // V134: the moving box and the card, placed on the new markup (tour.js).
+    if (typeof tutAfterRender === 'function') { try { tutAfterRender(); } catch (e) { console.error('tutAfterRender failed (non-fatal).', e); } }
     return;
   }
 
@@ -136,16 +143,32 @@ function render() {
   else if (v === 'settingsDescriptions') html = renderSettingsDescriptions();
   else if (v === 'settingsDisplay') html = renderSettingsDisplay();
   else if (v === 'settingsBackup') html = renderSettingsBackup();
+  else if (v === 'settingsStorage') html = renderSettingsStorage();   // V97 (1A)
+  else if (v === 'settingsLogging') html = renderSettingsLogging();   // V97 (3A)
+  else if (v === 'settingsReminders') html = renderSettingsReminders();   // V100 (7A)
+  // V90 (R18): the photo manager, reached from Phone Storage (V97). Falls back
+  // to Phone Storage if its markup is missing (never a blank screen).
+  else if (v === 'photoManager') html = (typeof renderPhotoManager === 'function') ? renderPhotoManager() : renderSettingsStorage();
+  // V91 (Stage 4, 5A): Jobs on this phone — same fallback.
+  else if (v === 'jobManager') html = (typeof renderJobManager === 'function') ? renderJobManager() : renderSettingsStorage();
+  // V108 (Stage 5 part 3): Cloud Storage — signed in only; signed out (or its
+  // markup missing) it falls back to Phone Storage, never a blank screen.
+  else if (v === 'cloudStorage') html = (typeof renderCloudStorage === 'function' && typeof syncActive === 'function' && syncActive()) ? renderCloudStorage() : renderSettingsStorage();
   else if (v === 'settingsSetup') html = renderSettingsSetup();   // v33
+  // V106 (Stage 10 part 2): Reset This Phone — reset.js is optional, so a stale
+  // view without it falls back to Backup & Restore, never a blank screen.
+  else if (v === 'settingsReset') html = (typeof renderSettingsReset === 'function') ? renderSettingsReset() : renderSettingsBackup();
   else if (v === 'settingsCsv') html = renderSettingsCsv();   // v11
   else if (v === 'settingsClients') html = renderSettingsClients();   // v19
   else if (v === 'settingsRetest') html = renderSettingsRetest();   // v56
-  else if (v === 'settingsReport') html = renderSettingsReport();   // v30
+  else if (v === 'settingsReport') html = renderSettingsReport();   // v30 — V117: Company & Branding
+  else if (v === 'settingsReportContent') html = renderSettingsReportContent();   // V117 (1A)
   else if (v === 'reports') html = renderReports();   // v30
   else if (v === 'retestReminders') html = renderRetestReminders();   // v56
   else if (v === 'settingsCalculator') html = renderSettingsCalculator();
   else if (v === 'settingsAbout') html = renderSettingsAbout();
   else if (v === 'settingsGlossary') html = renderSettingsGlossary();   // v58
+  else if (v === 'settingsTutorials') html = renderSettingsTutorials();   // V134 (6A)
   else if (v === 'settingsContact') html = renderSettingsContact();
   // v85: the cloud pages live in Settings → Cloud. While this phone is not
   // unlocked they are never painted — any route in (a stale view) gets the
@@ -161,9 +184,16 @@ function render() {
   }
 
   // Update banner sits above the screen
-  const banner = state.updateAvailable ? `
+  // V124 (3A): the banner names the version the waiting worker reported
+  // (boot.js updateAskVersion); an older worker never says, so plain words.
+  // × hides it (updateDismissed) — the update still goes in at the next safe
+  // moment on the Jobs list (boot.js updateSafeMoment, 2A).
+  const updateWords = state.updateVersion
+    ? `PATGo ${escapeHTML(state.updateVersion)} is ready`
+    : 'New version ready';   // short: one line at 320px wide, Larger text
+  const banner = (state.updateAvailable && !state.updateDismissed) ? `
     <div class="update-banner" role="status">
-      <span class="update-banner-text">⟳ Update available</span>
+      <span class="update-banner-text">${icon('refresh-cw')} ${updateWords}</span>
       <div class="update-banner-actions">
         <button class="update-refresh-btn" id="update-refresh" data-action="update-refresh">Refresh</button>
         <button class="update-dismiss-btn" id="update-dismiss" data-action="update-dismiss" aria-label="Dismiss">×</button>
@@ -184,15 +214,15 @@ function render() {
         <h3 class="bulk-sheet-title">Welcome to V9</h3>
         <span class="fail-close-spacer"></span>
       </div>
-      <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--text)">
+      <p style="margin:0 0 12px;font-size:0.875rem;line-height:1.5;color:var(--text)">
         You can now save multiple Quick Pick lists as <strong>presets</strong> and switch between them.
       </p>
-      <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--text)">
+      <p style="margin:0 0 12px;font-size:0.875rem;line-height:1.5;color:var(--text)">
         Your current Quick Pick items have become your first preset. What would you like to call it?
       </p>
       <label class="label">Preset name</label>
-      <input class="input" id="migration-prompt-input" data-input-action="migration-name" value="${escapeHTML(state.migrationPrompt.name)}" placeholder="e.g. Default, My items, Office" autofocus>
-      <p class="muted" style="margin:8px 0 14px;font-size:12px">You can rename or add more presets later in Settings → Quick Pick Items.</p>
+      <input aria-label="Preset name" class="input" id="migration-prompt-input" data-input-action="migration-name" value="${escapeHTML(state.migrationPrompt.name)}" placeholder="e.g. Default, My items, Office" autofocus>
+      <p class="muted" style="margin:8px 0 14px;font-size:0.75rem">You can rename or add more presets later in Settings → Quick Pick Items.</p>
       <button class="btn-primary" id="migration-prompt-confirm" data-action="migration-confirm">Continue</button>
     </div>
   ` : '';
@@ -226,11 +256,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Retests go by the month.</strong> A retest is due for the whole month &mdash; a job tested on 30 September on a 12-month cycle is due next September. If you use retest reminders, the job joins your chase list on the <strong>1st of the month before</strong>, so you have a full month to ring the customer. Certificates show the month, e.g. <em>Recommended retest: September 2027</em>.</li>
-        <li><strong>Tidier file names.</strong> Reports and exports are saved with spaces and a UK date, like <em>PAT Report Office 28-09-2026.pdf</em> &mdash; no more underscores to tidy up. The report also has its own title when you print or open it.</li>
-        <li><strong>Full storage can't lose an item any more.</strong> If the phone runs out of room for PATGo, you're told straight away, with a button to back up what's on screen.</li>
-        <li><strong>Storage health on the Backup page.</strong> It shows whether the phone has agreed to keep PATGo's data, and a banner on the Jobs screen warns you when storage is getting full.</li>
-        <li><strong>Description suggestions close properly.</strong> The suggestions list now closes when you hide the keyboard or tap elsewhere, so it can't sit over the Pass and Fail buttons.</li>
+        <li><strong>Privacy policy.</strong> PATGo now has a full privacy policy: what stays on your phone, what goes to the cloud if you sign in, who helps run it and how long things are kept. Settings &rarr; Help &rarr; About sums it up, with a link to read it all.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -249,7 +275,7 @@ function render() {
     const step = state.wizardStep || 1;
     const rs = state.reportSettings || {};
     const skipBtn = `<button class="wizard-skip" data-action="wizard-skip">Skip for now</button>`;
-    const backBtn = `<button class="wizard-back" data-action="wizard-back">‹ Back</button>`;
+    const backBtn = `<button class="wizard-back" data-action="wizard-back">${icon('chevron-left')} Back</button>`;
     let bodyHTML = '';
     let footHTML = '';
 
@@ -283,26 +309,26 @@ function render() {
       `;
     } else if (step === 2) {
       bodyHTML = `
-        <div class="wizard-icon">📲</div>
+        <div class="wizard-icon">${icon('smartphone')}</div>
         <h3 class="bulk-sheet-title">Set up this device</h3>
         <p class="wizard-lead">Already got another phone set up how you like it? Bring its settings straight across. Starting from scratch? We'll walk you through it.</p>
         <input type="file" id="wizard-import-file" data-change-action="wizard-import-file" accept="application/json,.json" style="display:none">
       `;
       footHTML = `
-        <button class="btn-primary" data-action="wizard-import">⬇ Import a setup file</button>
+        <button class="btn-primary" data-action="wizard-import">${icon('download')} Import a setup file</button>
         <button class="btn-secondary" data-action="wizard-fresh">Start fresh</button>
         ${backBtn}
         ${skipBtn}
       `;
     } else if (step === 3) {
       bodyHTML = `
-        <div class="wizard-icon">👤</div>
+        <div class="wizard-icon">${icon('user')}</div>
         <h3 class="bulk-sheet-title">Your details</h3>
         <p class="wizard-lead">These show up on your reports. Both are optional, and you can add or change them any time in Settings.</p>
         <label class="label">Your name (the engineer)</label>
-        <input class="input" id="wizard-engineer" type="text" value="${escapeHTML(state.engineer || '')}" placeholder="e.g. Sam Taylor" autocomplete="name">
+        <input aria-label="Your name (the engineer)" class="input" id="wizard-engineer" type="text" value="${escapeHTML(state.engineer || '')}" placeholder="e.g. Sam Taylor" autocomplete="name">
         <label class="label" style="margin-top:12px">Calibration date of your tester</label>
-        <input class="input" id="wizard-caldate" type="date" value="${escapeHTML(state.calDate || '')}">
+        <input aria-label="Calibration date of your tester" class="input" id="wizard-caldate" type="date" value="${escapeHTML(state.calDate || '')}">
       `;
       footHTML = `
         <button class="btn-primary" data-action="wizard-next">Continue</button>
@@ -313,7 +339,7 @@ function render() {
       const logoPreview = rs.logo
         ? `<img class="wizard-logo-preview" src="${rs.logo}" alt="Company logo">
            <button class="btn-secondary" data-action="report-logo-remove">Remove logo</button>`
-        : `<button class="btn-secondary" data-action="report-logo-pick">⬆ Add a logo (optional)</button>`;
+        : `<button class="btn-secondary" data-action="report-logo-pick">${icon('upload')} Add a logo (optional)</button>`;
       const themes = (typeof REPORT_COLOR_THEMES !== 'undefined' ? REPORT_COLOR_THEMES : [])
         .map(t => {
           const on = (rs.headerColor === t.header && rs.accentColor === t.accent) ? ' is-on' : '';
@@ -322,16 +348,28 @@ function render() {
                   </button>`;
         }).join('');
       bodyHTML = `
-        <div class="wizard-icon">🎨</div>
+        <div class="wizard-icon">${icon('palette')}</div>
         <h3 class="bulk-sheet-title">Your report branding</h3>
         <p class="wizard-lead">This is what your clients see on every PDF report. All optional — leave it for now and set it up later if you'd rather.</p>
         <label class="label">Company name</label>
-        <input class="input" id="wizard-company" type="text" value="${escapeHTML(rs.companyName || '')}" placeholder="e.g. Birchley PAT Services">
+        <input aria-label="Company name" class="input" id="wizard-company" type="text" value="${escapeHTML(rs.companyName || '')}" placeholder="e.g. Birchley PAT Services">
         <input type="file" id="report-logo-file" data-change-action="report-logo-file" accept="image/png,image/jpeg" style="display:none">
         <label class="label" style="margin-top:12px">Logo</label>
         ${logoPreview}
         <label class="label" style="margin-top:12px">Report colour</label>
         <div class="wizard-theme-row">${themes}</div>
+        <!-- V112 (4A): reports start OFF (Settings says why); a phone being set up
+             is the moment to choose. ON for a new phone, current value on a re-run. -->
+        <div class="lock-toggle-row" style="margin-top:14px">
+          <div class="lock-toggle-text">
+            <div class="lock-toggle-title">Make PDF reports</div>
+            <div class="lock-toggle-sub">Adds the Reports button, so you can make a certificate from any job. You can turn it off in Settings → Reports &amp; Exports.</div>
+          </div>
+          <label class="toggle-switch">
+            <input type="checkbox" id="wizard-reports" data-change-action="wizard-reports" ${state.wizardReportsOn ? 'checked' : ''}>
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
       `;
       footHTML = `
         <button class="btn-primary" data-action="wizard-next">Continue</button>
@@ -341,10 +379,10 @@ function render() {
     } else if (step === 5) {
       const checked = state.wizardSeedDemo ? 'checked' : '';
       bodyHTML = `
-        <div class="wizard-icon">📋</div>
+        <div class="wizard-icon">${icon('clipboard-list')}</div>
         <h3 class="bulk-sheet-title">Add an example job?</h3>
-        <p class="wizard-lead">Want to see how it all hangs together first? We can drop in one example session with a few test results, so you can explore Sessions, the Overview and a report straight away. It's clearly labelled, and you can delete it whenever you like.</p>
-        <label class="label" style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:15px;font-weight:600">
+        <p class="wizard-lead">Want to see how it all hangs together first? We can drop in one example job with a few test results, so you can explore Jobs, the Overview and a report straight away. It's clearly labelled, and you can delete it whenever you like.</p>
+        <label class="label" style="display:flex;align-items:center;gap:10px;text-transform:none;font-size:0.9375rem;font-weight:600">
           <input type="checkbox" id="wizard-seed-demo" data-change-action="wizard-seed-demo" ${checked} style="width:auto">
           Add an example job
         </label>
@@ -359,18 +397,18 @@ function render() {
       // primary action with a one-line "what you'll see", "Go to the app" is a
       // clean secondary, and a muted line reassures you can replay it later.
       bodyHTML = `
-        <div class="wizard-icon">🎉</div>
+        <div class="wizard-icon">${icon('party-popper')}</div>
         <h3 class="bulk-sheet-title">You're all set</h3>
-        <p class="wizard-lead">Your phone's ready to go. Start a new session whenever you're on a job — pick a location, tap an item type, then tap PASS or FAIL.</p>
+        <p class="wizard-lead">Your phone's ready to go. Start a new job whenever you're on site — pick a location, tap an item type, then tap PASS or FAIL.</p>
         <div class="wizard-finish-tour">
-          <p class="wizard-finish-tour-title">New here? Take the 30-second tour.</p>
-          <p class="wizard-finish-tour-sub">A quick look at Sessions, logging, the Overview, reports and backups.</p>
-          <button class="btn-primary" data-action="wizard-finish-tour">Show me around</button>
+          <p class="wizard-finish-tour-title">New here? Try the practice job.</p>
+          <p class="wizard-finish-tour-sub">A few minutes on the real testing screen, step by step. Nothing you do in it is saved.</p>
+          <button class="btn-primary" data-action="wizard-finish-tour">Start the practice job</button>
         </div>
       `;
       footHTML = `
         <button class="btn-secondary" data-action="wizard-finish">Go straight to the app</button>
-        <p class="wizard-replay-note">You can run this tour again any time from Settings → About.</p>
+        <p class="wizard-replay-note">You can do it again any time from Settings → Help → Tutorials.</p>
         ${backBtn}
       `;
     }
@@ -394,8 +432,8 @@ function render() {
     if (ws) {
       const wasModified = exportStatus(ws) === 'modified';
       const line = wasModified
-        ? "You've already exported this session, and it's been edited since. If you make further changes you'll need to export it again."
-        : "You've already exported this session. If you make changes you'll need to export it again.";
+        ? "You've already exported this job, and it's been edited since. If you make further changes you'll need to export it again."
+        : "You've already exported this job. If you make changes you'll need to export it again.";
       reopenWarnModal = `
         <div class="modal-backdrop" data-action="reopen-cancel" style="z-index:300"></div>
         <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Already exported">
@@ -405,11 +443,13 @@ function render() {
             <h3 class="bulk-sheet-title">Already exported</h3>
             <button class="fail-close-btn" id="reopen-warn-cancel" data-action="reopen-cancel" aria-label="Cancel">×</button>
           </div>
-          <p style="margin:0 0 16px;font-size:14px;line-height:1.5;color:var(--text)">${escapeHTML(line)}</p>
+          <p style="margin:0 0 16px;font-size:0.875rem;line-height:1.5;color:var(--text)">${escapeHTML(line)}</p>
           <div class="btn-row">
             <button class="btn-secondary" id="reopen-warn-cancel2" data-action="reopen-cancel">Cancel</button>
             <button class="btn-primary" id="reopen-warn-continue" data-action="reopen-continue">Open anyway</button>
           </div>
+          <!-- V131 (6B): exported by mistake (a stray Copy) — clear the mark and open. -->
+          <button class="btn-secondary reopen-unmark" id="reopen-warn-unmark" data-action="reopen-unmark">Mark as not exported</button>
         </div>
       `;
     }
@@ -431,7 +471,7 @@ function render() {
           <h3 class="bulk-sheet-title">Draw your signature</h3>
           <button class="fail-close-btn" data-action="signature-pad-cancel" aria-label="Cancel">×</button>
         </div>
-        <p style="margin:0 0 10px;font-size:13px;color:var(--neutral-text)">Sign in the box below with your finger or a stylus.</p>
+        <p style="margin:0 0 10px;font-size:0.8125rem;color:var(--neutral-text)">Sign in the box below with your finger or a stylus.</p>
         <div class="sig-pad-wrap">
           <canvas id="sig-pad-canvas" class="sig-pad-canvas"></canvas>
           <span class="sig-pad-baseline"></span>
@@ -451,7 +491,10 @@ function render() {
   // every screen, because the thing on screen is not on disk. Not dismissible by
   // the backdrop — only by a button — so a stray tap can't hide it.
   const saveFailModal = renderSaveFailSheet();
-  const finalHTML = cloudStrip + banner + html + migrationModal + welcomeModal + wizardModal + signaturePadModal + reopenWarnModal + saveFailModal;
+  // V100 (9A, 10A): the replayed 100 moment and "PATGo tests itself" (render-help.js).
+  const partyModal = (typeof renderPartyModal === 'function') ? renderPartyModal() : '';
+  const eggModal = (typeof renderEggSheet === 'function') ? renderEggSheet() : '';
+  const finalHTML = cloudStrip + banner + html + migrationModal + welcomeModal + wizardModal + signaturePadModal + reopenWarnModal + partyModal + eggModal + saveFailModal;
   app.innerHTML = finalHTML;
   // v24 (E4): record whether THIS render put any modal/sheet into the DOM, so the
   // next render knows whether the orphan-sweep above could find anything. Cheap
@@ -463,7 +506,10 @@ function render() {
     finalHTML.indexOf('fail-sheet') !== -1 ||
     finalHTML.indexOf('bulk-sheet') !== -1;
   // Toggle body class for selection bar spacing
-  if (state.view === 'overview' && state.selectionMode) {
+  if ((state.view === 'overview' && state.selectionMode)
+      || (state.view === 'photoManager' && state.photoMgr && state.photoMgr.selecting)
+      || (state.view === 'jobManager' && state.jobMgr && state.jobMgr.selecting)
+      || (state.view === 'cloudStorage' && state.cloudStore && state.cloudStore.selecting)) {   // V108
     document.body.classList.add('has-selection-bar');
   } else {
     document.body.classList.remove('has-selection-bar');
@@ -493,13 +539,28 @@ function render() {
   // Record the view actually committed this render, for next render's comparison.
   _lastRenderedView = state.view;
   bindFocusFields();
+  // V112: the unsaved-changes guard reads what this paint put on the page
+  // (settings-actions.js). After the DOM is in, before anything focuses.
+  if (typeof unsavedAfterRender === 'function') { try { unsavedAfterRender(); } catch (e) {} }
   if (state.signaturePadOpen) initSignaturePad();   // v34
+  // V100: fire the 100 moment's sparks once (render-help.js). Cosmetic — never
+  // allowed to break a render.
+  if (typeof partyAfterRender === 'function') { try { partyAfterRender(); } catch (e) {} }
+  // V123 (1A 3A): put VoiceOver back where it was — the tapped control, the
+  // new screen's heading, or a sheet's title (feedback.js). After the scroll
+  // decision above (it never scrolls) and BEFORE focusAssetForScan() below, so
+  // paired scanner mode still ends with the cursor in the asset box.
+  if (typeof focusAfterRender === 'function') { try { focusAfterRender(); } catch (e) {} }
   // v67: paired mode puts the cursor in the asset box so a scan lands with no
   // tap. Last in the render tail on purpose — it must run after the scroll
   // restore above, or focusing would fight it. The function itself bails on
   // every view but 'entry', and on every state where a scan would be refused
   // anyway. typeof-guarded (rule 6).
   if (typeof focusAssetForScan === 'function') { try { focusAssetForScan(); } catch (e) {} }
+  // V124 (2A): with an update waiting, every redraw — arriving on the Jobs list,
+  // a sheet closing — looks for the safe moment again (boot.js; it waits for the
+  // screen to go untouched, so it never reloads under the tap that drew this).
+  if (state.updateAvailable && typeof updateTryLater === 'function') { try { updateTryLater(); } catch (e) {} }
 }
 
 // v34: attach pointer drawing to the live signature-pad canvas. Created fresh on
@@ -607,12 +668,16 @@ function refreshEntryAfterLog() {
   // overview selection bar (never relevant on the entry screen).
   document.body.classList.remove('has-selection-bar');
   document.body.classList.remove('view-entry');
+  if (typeof focusBeforeRender === 'function') { try { focusBeforeRender(); } catch (e) {} }   // V123
   app.innerHTML = renderEntry();
   // v24 (E4): the entry screen used to contain no modal/sheet at all, so this
   // was hard-coded false. v62 put the photo strip sheet on this screen, so the
   // flag must now tell the truth or a subsequent render() won't sweep it.
   _lastRenderHadModal = !!state.photoStripOpen;
   bindFocusFields();
+  // V123 (2A): an item was just logged — VoiceOver goes to the screen heading,
+  // never back onto PASS / FAIL / Copy last (feedback.js says why).
+  if (typeof focusAfterRender === 'function') { try { focusAfterRender('logged'); } catch (e) {} }
   // v67: this innerHTML rewrite is what dropped the cursor after every PASS or
   // FAIL, which presented as "the next scan goes nowhere". Paired mode puts it
   // back. typeof-guarded — scanner.js is an optional subsystem (rule 6) and a
@@ -668,17 +733,41 @@ function nfSuggestionsHTML(field) {
   </div>`;
 }
 
+// V98 (2A): the picked site's notes on the New Job form — read on arrival, before
+// the job starts. Resolved read-only, as starting the job will resolve it
+// (siteForNames). The form holds inputs, so this is repainted IN PLACE by
+// refreshNfSiteNotesOnly() (events.js, as the client or site changes) — never by
+// render() (MAP rule 3).
+function nfSiteNotesHTML() {
+  const site = (typeof siteForNames === 'function')
+    ? siteForNames(state.newForm.clientId, state.newForm.site) : null;
+  const text = siteNotesOf(site);
+  if (!text) return '';
+  return `<div class="site-notes-card site-notes-card-static">
+      <span class="site-notes-head">${icon('list')} Site notes &middot; ${escapeHTML(site.name)}</span>
+      <span class="site-notes-text site-notes-text-full">${escapeHTML(text)}</span>
+    </div>`;
+}
+
+function refreshNfSiteNotesOnly() {
+  const box = document.getElementById('nf-site-notes');
+  if (!box) return;
+  const html = nfSiteNotesHTML();
+  if (box.innerHTML !== html) box.innerHTML = html;
+}
+
 // v32: shared empty-state block — a centred icon, a bold line, a muted line, and
 // an optional primary action button. Used on the Sessions list, Overview,
 // Clients and Reports screens so "nothing here yet" always looks intentional and
 // points to the next step rather than showing a bare line of text.
-function emptyStateHTML(icon, title, body, actionLabel, actionName) {
+// V115 (2A): iconName is a Lucide name (icons.js), drawn large in soft grey.
+function emptyStateHTML(iconName, title, body, actionLabel, actionName) {
   const btn = (actionLabel && actionName)
     ? `<button class="btn-primary empty-state-action" data-action="${actionName}">+ ${escapeHTML(actionLabel)}</button>`
     : '';
   return `
     <div class="empty-state">
-      <div class="empty-state-icon" aria-hidden="true">${icon}</div>
+      <div class="empty-state-icon" aria-hidden="true">${icon(iconName)}</div>
       <div class="empty-state-title">${escapeHTML(title)}</div>
       <p class="empty-state-body">${escapeHTML(body)}</p>
       ${btn}
@@ -703,17 +792,17 @@ function renderCalWarningBanner() {
   let cls, label;
   if (worst.status === 'overdue') {
     cls = 'cal-overdue';
-    label = `⚠ ${worst.name} calibration overdue (${worst.days} day${worst.days === 1 ? '' : 's'} ago)${more}`;
+    label = `${worst.name} calibration overdue (${worst.days} day${worst.days === 1 ? '' : 's'} ago)${more}`;
   } else if (worst.days === 0) {
     cls = 'cal-due-soon';
-    label = `⚠ ${worst.name} calibration due today${more}`;
+    label = `${worst.name} calibration due today${more}`;
   } else {
     cls = 'cal-due-soon';
-    label = `⚠ ${worst.name} calibration due in ${worst.days} day${worst.days === 1 ? '' : 's'}${more}`;
+    label = `${worst.name} calibration due in ${worst.days} day${worst.days === 1 ? '' : 's'}${more}`;
   }
   return `
     <div class="cal-banner ${cls}" role="status">
-      <span class="cal-banner-text">${escapeHTML(label)}</span>
+      <span class="cal-banner-text">${icon('triangle-alert')} ${escapeHTML(label)}</span>
       <button class="cal-banner-action" data-action="edit-cal-date">Update</button>
     </div>
   `;
@@ -733,14 +822,14 @@ function renderRetestBanner() {
   const cls = overdue > 0 ? 'cal-overdue' : 'cal-due-soon';
   let label;
   if (overdue > 0) {
-    label = `🔔 ${overdue} retest${overdue === 1 ? '' : 's'} overdue` +
+    label = `${overdue} retest${overdue === 1 ? '' : 's'} overdue` +
       (due.length > overdue ? ` · ${due.length - overdue} due` : '');
   } else {
-    label = `🔔 ${due.length} client${due.length === 1 ? '' : 's'} due for retest`;
+    label = `${due.length} client${due.length === 1 ? '' : 's'} due for retest`;
   }
   return `
     <div class="cal-banner ${cls}" role="status">
-      <span class="cal-banner-text">${escapeHTML(label)}</span>
+      <span class="cal-banner-text">${icon('bell')} ${escapeHTML(label)}</span>
       <button class="cal-banner-action" data-action="open-retest-reminders">View</button>
     </div>
   `;
@@ -752,32 +841,33 @@ function renderSessions() {
   ` : '';
   const newForm = state.newForm.show ? `
     <div class="card">
-      <h2 class="h2">New session</h2>
+      <h2 class="h2" id="nf-title" tabindex="-1">New job</h2>
       <label class="label">Client <span class="hint">(optional)</span></label>
       <div class="nf-input-wrap" id="nf-client-wrap">
-        <input class="input" id="nf-client" value="${escapeHTML(state.newForm.clientId)}" placeholder="e.g. Acme Ltd" autocomplete="off">
+        <input aria-label="Client (optional)" class="input" id="nf-client" value="${escapeHTML(state.newForm.clientId)}" placeholder="e.g. Acme Ltd" autocomplete="off">
         ${nfSuggestionsHTML('client')}
       </div>
       <label class="label">Site <span class="hint">(optional)</span></label>
       <div class="nf-input-wrap" id="nf-site-wrap">
-        <input class="input" id="nf-site" value="${escapeHTML(state.newForm.site)}" placeholder="e.g. Unit 4, Head Office" autocomplete="off">
+        <input aria-label="Site (optional)" class="input" id="nf-site" value="${escapeHTML(state.newForm.site)}" placeholder="e.g. Unit 4, Head Office" autocomplete="off">
         ${nfSuggestionsHTML('site')}
       </div>
+      <div id="nf-site-notes">${nfSiteNotesHTML()}</div>
       <p class="muted nf-hint">Enter a client, a site, or both — at least one. Type new ones to save them for next time, or pick from your saved list. Manage them under Settings → Clients.</p>
       ${nfError}
       <label class="label">Engineer</label>
-      <input class="input" id="nf-engineer" value="${escapeHTML(state.newForm.engineer || state.engineer)}" placeholder="Your name">
-      <label class="label">Session name <span class="hint">(optional)</span></label>
-      <input class="input" id="nf-name" data-input-action="nf-name" value="${escapeHTML(state.newForm.name)}" placeholder="e.g. Annual test 2026">
+      <input aria-label="Engineer" class="input" id="nf-engineer" value="${escapeHTML(state.newForm.engineer || state.engineer)}" placeholder="Your name">
+      <label class="label">Job name <span class="hint">(optional)</span></label>
+      <input aria-label="Job name (optional)" class="input" id="nf-name" data-input-action="nf-name" value="${escapeHTML(state.newForm.name)}" placeholder="e.g. Annual test 2026">
       <label class="label">Asset number prefix <span class="hint">(optional, e.g. BT)</span></label>
-      <input class="input" id="nf-prefix" data-input-action="nf-prefix" value="${escapeHTML(state.newForm.prefix)}" placeholder="Leave blank for none">
+      <input aria-label="Asset number prefix (optional)" class="input" id="nf-prefix" data-input-action="nf-prefix" value="${escapeHTML(state.newForm.prefix)}" placeholder="Leave blank for none">
       <label class="label">Starting asset number <span class="hint">(type 001 to keep leading zeros)</span></label>
       <!-- v60: type="number" REMOVED. A numeric input normalises its own value,
            so '001' was silently rewritten to '1' before the app ever saw it —
            leading zeros could not survive no matter what the code did with them.
            text + inputmode="numeric" keeps the numeric keypad on mobile while
            leaving the typed string intact; pattern="[0-9]*" keeps it numeric. -->
-      <input class="input" id="nf-start" data-input-action="nf-start" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${escapeHTML(state.newForm.startNo)}">
+      <input aria-label="Starting asset number" class="input" id="nf-start" data-input-action="nf-start" type="text" inputmode="numeric" pattern="[0-9]*" autocomplete="off" value="${escapeHTML(state.newForm.startNo)}">
       <div class="btn-row">
         <button class="btn-secondary" id="nf-cancel" data-action="nf-cancel">Cancel</button>
         <button class="btn-primary" id="nf-submit" data-action="nf-submit">Start</button>
@@ -785,8 +875,8 @@ function renderSessions() {
     </div>
   ` : `
     <div class="sessions-actions-row">
-      <button class="btn-primary" id="new-session-btn" data-action="new-session">+ New session</button>
-      <button class="btn-secondary" id="import-session-btn" data-action="import-session">⬆ Import (.csv)</button>
+      <button class="btn-primary" id="new-session-btn" data-action="new-session">+ New job</button>
+      <button class="btn-secondary" id="import-session-btn" data-action="import-session">${icon('download')} Import (.csv)</button>
     </div>
     <input type="file" id="import-session-file" data-change-action="import-file" accept=".csv,text/csv" style="display:none">
   `;
@@ -803,7 +893,7 @@ function renderSessions() {
   const showSearch = hasSessions && !state.newForm.show;
   const searchRow = showSearch ? `
     <div class="sessions-search-row">
-      <input type="search" class="search-input" id="sessions-search" data-input-action="sessions-search" placeholder="Search sessions and items…" value="${escapeHTML(state.sessionsSearchQuery)}" autocomplete="off">
+      <input aria-label="Search jobs and items" type="search" class="search-input" id="sessions-search" data-input-action="sessions-search" placeholder="Search jobs and items…" value="${escapeHTML(state.sessionsSearchQuery)}" autocomplete="off">
     </div>
   ` : '';
   const sessionsListArea = `<div id="sessions-list-area">${renderSessionsListAreaHTML()}</div>`;
@@ -834,17 +924,53 @@ function renderSessions() {
 
   // V87 (S13): storage getting full — at STORAGE_BANNER_PCT, once a day.
   const storageBanner = renderStorageBanner();
+  // V91 (Stage 4, 8A): the tidy-up offer — signed in, once a month at most.
+  const tidyBanner = renderTidyBanner();
+  // V100 (Stage 8 part 3): the two in-app reminders — not exported, unlocked.
+  const reminderBanners = renderReminderBanners();
+  // V127: the plan line — the trial ending (4A), the countdown, the lock (6b).
+  // Above the tabs, so it shows on both. plan.js is optional (MAP rule 6).
+  let planBanner = '';
+  try { planBanner = (typeof planBannerHTML === 'function') ? planBannerHTML() : ''; } catch (e) { planBanner = ''; }
+
+  // V93 (4A — O9): signed in, the Jobs screen has two tabs. "In the cloud" is
+  // how old jobs are reached once a phone only brings down recent ones (R21):
+  // a paid product's everyday screen, so it lives where jobs live, not in
+  // Settings. Signed out there is no tab and nothing here changes.
+  const signedIn = typeof syncActive === 'function' && syncActive();
+  const cloudTab = signedIn && state.jobsTab === 'cloud' && typeof renderCloudJobsHTML === 'function';
+  const tabs = signedIn ? `
+      <div class="jobs-tabs" role="tablist">
+        <button class="jobs-tab${cloudTab ? '' : ' is-on'}" role="tab" aria-selected="${cloudTab ? 'false' : 'true'}" data-action="jobs-tab" data-arg="phone">On this phone</button>
+        <button class="jobs-tab${cloudTab ? ' is-on' : ''}" role="tab" aria-selected="${cloudTab ? 'true' : 'false'}" data-action="jobs-tab" data-arg="cloud">${icon('cloud')} In the cloud</button>
+      </div>` : '';
+  const header = `
+      <header class="header">
+        <h1 class="h1" id="screen-title" tabindex="-1">Jobs</h1>
+        ${state.reportSettings.enabled ? '<button class="icon-btn" id="reports-btn" data-action="open-reports" aria-label="Reports">' + icon('file-text') + '</button>' : ''}
+        <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">${icon('settings')}</button>
+      </header>`;
+  if (cloudTab) {
+    return `
+    <div class="screen">
+      ${header}
+      ${planBanner}
+      ${tabs}
+      ${renderCloudJobsHTML()}
+    </div>
+  `;
+  }
 
   return `
     <div class="screen">
-      <header class="header">
-        <h1 class="h1">PAT Sessions</h1>
-        ${state.reportSettings.enabled ? '<button class="icon-btn" id="reports-btn" data-action="open-reports" aria-label="Reports">📄</button>' : ''}
-        <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">⚙</button>
-      </header>
+      ${header}
+      ${planBanner}
+      ${tabs}
       ${storageBanner}
+      ${tidyBanner}
       ${calWarning}
       ${retestBanner}
+      ${reminderBanners}
       ${backupBanner}
       ${newForm}
       ${searchRow}
@@ -873,7 +999,7 @@ function renderAssetHistorySheet() {
   const body = rows.length ? rows.map(r => {
     const it = r.item;
     const isFail = it.result === 'fail';
-    const resultChip = `<span class="asset-history-result ${isFail ? 'fail' : 'pass'}">${isFail ? '✗ FAIL' : '✓ PASS'}</span>`;
+    const resultChip = `<span class="asset-history-result ${isFail ? 'fail' : 'pass'}">${isFail ? icon('x') + ' FAIL' : icon('check') + ' PASS'}</span>`;
     // A fail reason is stored in the item's notes (that's where pickFailReason
     // puts it), so notes carry it for free — no special case needed.
     const metaBits = [];
@@ -893,7 +1019,7 @@ function renderAssetHistorySheet() {
       if (rd.earth) bits.push(`${escapeHTML(String(rd.earth))} Ω`);
       if (rd.insulation) bits.push(`${escapeHTML(String(rd.insulation))} MΩ`);
       if (rd.leakage) bits.push(`${escapeHTML(String(rd.leakage))} mA`);
-      if (rd.polarity) bits.push('Polarity ✓');
+      if (rd.polarity) bits.push('Polarity ' + icon('check'));
       if (bits.length) {
         readingsLine = `<div class="asset-history-readings">${bits.join(' · ')}</div>`;
       }
@@ -992,6 +1118,62 @@ function renderStorageBanner() {
   `;
 }
 
+// V91 (Stage 4, 8A/9A — O4): one offer, jobs and photos together. Shown on the
+// Jobs screen when signed in, something is safe in the cloud and old enough, and
+// it hasn't been answered in TIDY_OFFER_DAYS. Review opens Jobs on this phone;
+// × waits another month. Either answer stamps TIDY_OFFER_KEY.
+function renderTidyBanner() {
+  let m = null;
+  try { m = (typeof tidyOfferDue === 'function') ? tidyOfferDue() : null; } catch (e) { m = null; }
+  if (!m) return '';
+  const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const parts = [];
+  if (m.jobs.length) parts.push(`${pl(m.jobs.length, 'old job')}`);
+  if (m.photos.length) parts.push(`${pl(m.photos.length, 'old photo')} (${formatBytes(m.photoBytes)})`);
+  return `
+    <div class="backup-banner tidy-banner" role="status">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text">Tidy up this phone? ${escapeHTML(parts.join(' and '))} ${m.jobs.length + m.photos.length === 1 ? 'is' : 'are'} safe in the cloud and can come off this phone.</div>
+        <div class="backup-banner-actions">
+          <button class="backup-banner-action primary" id="tidy-review-btn" data-action="tidy-review">Review</button>
+        </div>
+      </div>
+      <button class="backup-banner-dismiss" id="tidy-dismiss-btn" data-action="tidy-dismiss" aria-label="Not now">×</button>
+    </div>
+  `;
+}
+
+// V100 (6A): the reminder banners, in the backup banner's shape. Worked out from
+// the clock at render (session.js) — nothing is scheduled. Hidden while the New
+// Job form is open, like the backup banner.
+function renderReminderBanners() {
+  if (state.newForm && state.newForm.show) return '';
+  let exp = [], unl = [];
+  try { exp = (typeof exportReminderDue === 'function') ? exportReminderDue() : []; } catch (e) { exp = []; }
+  try { unl = (typeof unlockedReminderDue === 'function') ? unlockedReminderDue() : []; } catch (e) { unl = []; }
+  // V115 (1A): the alarm-clock icon sits outside the escaped text — never inside it.
+  const one = (cls, text, review, dismiss) => `
+    <div class="backup-banner reminder-banner ${cls}" role="status">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text">${icon('alarm-clock')} ${escapeHTML(text)}</div>
+        <div class="backup-banner-actions">
+          <button class="backup-banner-action primary" data-action="${review}">Review</button>
+        </div>
+      </div>
+      <button class="backup-banner-dismiss" data-action="${dismiss}" aria-label="Hide until tomorrow">×</button>
+    </div>`;
+  let out = '';
+  if (exp.length) {
+    const n = exp.length;
+    out += one('reminder-export', `${n} locked job${n === 1 ? ' has' : 's have'} no certificate or CSV export yet.`, 'remind-export-review', 'remind-export-dismiss');
+  }
+  if (unl.length) {
+    const n = unl.length;
+    out += one('reminder-unlocked', `${n} job${n === 1 ? ' is' : 's are'} still unlocked. Finished? Lock ${n === 1 ? 'it' : 'them'} in Job settings.`, 'remind-unlocked-review', 'remind-unlocked-dismiss');
+  }
+  return out;
+}
+
 function renderBackupReminderBanner() {
   let msg;
   if (!state.lastBackupAt) {
@@ -1033,7 +1215,7 @@ function renderSessionsListAreaHTML() {
   const filtered = filteredSessions(controlFiltered, state.sessionsSearchQuery);
 
   const countHTML = queryTrimmed
-    ? `<span class="sessions-search-count">${filtered.length} of ${sortedAll.length} session${sortedAll.length === 1 ? '' : 's'} match</span>`
+    ? `<span class="sessions-search-count">${filtered.length} of ${sortedAll.length} job${sortedAll.length === 1 ? '' : 's'} match</span>`
     : '';
 
   // v61: cross-session asset history offer. Appears ONLY when what was typed is
@@ -1045,7 +1227,7 @@ function renderSessionsListAreaHTML() {
   const historyCardHTML = historyOffer ? `
     <button type="button" class="asset-history-card" data-action="asset-history-open" data-arg="${escapeHTML(historyOffer.assetNo)}">
       <span class="asset-history-card-text">
-        <span class="asset-history-card-title">🕘 Asset ${escapeHTML(historyOffer.assetNo)}</span>
+        <span class="asset-history-card-title">${icon('history')} Asset ${escapeHTML(historyOffer.assetNo)}</span>
         <span class="asset-history-card-sub">Tested in ${historyOffer.jobCount} jobs — see the full history</span>
       </span>
       <span class="asset-history-card-cta">View →</span>
@@ -1054,19 +1236,19 @@ function renderSessionsListAreaHTML() {
   // v15: when a control filter is narrowing the list (and we're not searching),
   // show an "X of Y shown" line so a filtered list never looks like data loss.
   const filterCountHTML = (filtersActive && sortedAll.length > 0)
-    ? `<span class="sessions-search-count">${controlFiltered.length} of ${sortedAll.length} session${sortedAll.length === 1 ? '' : 's'} shown</span>`
+    ? `<span class="sessions-search-count">${controlFiltered.length} of ${sortedAll.length} job${sortedAll.length === 1 ? '' : 's'} shown</span>`
     : '';
 
-  // v14/v15: "N sessions not yet exported" nudge — now a tappable control that
-  // bulk-exports every not-yet-cleanly-exported session (status 'none' or
-  // 'modified') in one action. Count is global (independent of the active
-  // filter view). Hidden when there are none, the list is empty, or while
-  // searching (the search count takes the slot).
+  // v14/v15: "N jobs not yet exported" nudge. V131: a certificate counts
+  // (jobIsDone — 1A), and tapping it shows those jobs (2A) — it no longer
+  // bulk-exports CSVs. Count is global (independent of the active filter
+  // view). Hidden when there are none, the list is empty, while searching (the
+  // search count takes the slot), or while it is already the list shown.
   const unexported = unexportedSessionCount();
-  const nudgeHTML = (!queryTrimmed && sortedAll.length > 0 && unexported > 0)
-    ? `<button type="button" class="export-nudge" id="bulk-export-btn" data-action="bulk-export-unexported" aria-label="Export ${unexported} not-yet-exported session${unexported === 1 ? '' : 's'}">
-        <span class="export-nudge-text">${unexported} session${unexported === 1 ? '' : 's'} not yet exported</span>
-        <span class="export-nudge-cta">${SHARE_ICON_SVG} Export all</span>
+  const nudgeHTML = (!queryTrimmed && sortedAll.length > 0 && unexported > 0 && state.sessionFilter !== 'notdone')
+    ? `<button type="button" class="export-nudge" id="review-unexported-btn" data-action="review-unexported" aria-label="Show the ${unexported} job${unexported === 1 ? '' : 's'} not yet exported">
+        <span class="export-nudge-text">${unexported} job${unexported === 1 ? '' : 's'} not yet exported</span>
+        <span class="export-nudge-cta">Show ${icon('chevron-right', 'share-icon')}</span>
       </button>`
     : '';
 
@@ -1090,7 +1272,9 @@ function renderSessionsListAreaHTML() {
           <option value="unexported"${state.sessionFilter === 'unexported' ? ' selected' : ''}>Not exported</option>
           <option value="exported"${state.sessionFilter === 'exported' ? ' selected' : ''}>Exported</option>
           <option value="modified"${state.sessionFilter === 'modified' ? ' selected' : ''}>Modified since</option>
+          ${state.sessionFilter === 'notdone' ? `<option value="notdone" selected>Still to export</option>` : ''}
           ${state.retestRemindersEnabled ? `<option value="retestdue"${state.sessionFilter === 'retestdue' ? ' selected' : ''}>Retest due</option>` : ''}
+          ${(state.sessionFilter === 'remindexport' || (state.reminders && state.reminders.exportAfter && state.reminders.exportAfter !== 'off')) ? `<option value="remindexport"${state.sessionFilter === 'remindexport' ? ' selected' : ''}>Locked, not exported</option>` : ''}
         </select>
       </label>
       <label class="control-field">
@@ -1106,29 +1290,48 @@ function renderSessionsListAreaHTML() {
 
   let list;
   if (sortedAll.length === 0 && !state.newForm.show) {
-    list = emptyStateHTML('📋', 'No sessions yet',
+    list = emptyStateHTML('clipboard-list', 'No jobs yet',
       'Start logging appliance tests and they\'ll appear here.',
-      'Start your first session', 'new-session');
+      'Start your first job', 'new-session');
   } else if (queryTrimmed && filtered.length === 0) {
-    list = `<p class="muted">No sessions or items match "${escapeHTML(queryTrimmed)}".</p>`;
+    list = `<p class="muted">No jobs or items match "${escapeHTML(queryTrimmed)}".</p>`;
   } else if (!queryTrimmed && sortedAll.length > 0 && filtered.length === 0) {
     // v15: there ARE sessions, but the active filters hid them all.
-    list = `<p class="muted">No sessions match the current filters.</p>
-      <button type="button" class="btn-tertiary" id="clear-filters-btn" data-action="clear-session-filters">Show all sessions</button>`;
+    list = `<p class="muted">No jobs match the current filters.</p>
+      <button type="button" class="btn-tertiary" id="clear-filters-btn" data-action="clear-session-filters">Show all jobs</button>`;
   } else {
+    // V91 (Stage 4, 4A): 🛡 on jobs safe in the cloud, signed in only. Display
+    // check (fingerprints reused while storage.js reuses the saved encoding).
+    // ☁ is kept for "only in the cloud" (Peter, V91 round).
+    let safety = null;
+    try { safety = (typeof syncJobsSafety === 'function') ? syncJobsSafety(false) : null; } catch (e) { safety = null; }
     list = filtered.map(({ session: s, matchedItemIndex, itemMatchCount }) => {
       const passes = s.items.filter(i => i.result === 'pass').length;
       const fails = s.items.filter(i => i.result === 'fail').length;
+      // v89 (Peter, V89 round): photos after pass/fail, with how many are only in
+      // the cloud. Nothing at all for a job with no photos.
+      const pc = (typeof photoCountsForSession === 'function') ? photoCountsForSession(s) : { total: 0, cloud: 0 };
+      const photoMeta = pc.total
+        ? ` · <span class="photo-text">${icon('camera')} ${pc.total}${pc.cloud ? ` (${pc.cloud} in cloud)` : ''}</span>`
+        : '';
       // v8: subtle 🔒 prefix on locked sessions so they're easy to spot in the list.
-      const lockMark = s.locked ? '<span class="session-lock" title="Locked">🔒</span>' : '';
-      // v14: export-status badge in the meta row. 'exported' → ✓ Exported;
-      // 'modified' → ✓✎ Modified since export; 'none' → no badge.
-      const xStatus = exportStatus(s);
+      const lockMark = s.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : '';
+      const safeR = safety ? safety.map.get(String(s.id)) : null;
+      const safeMark = (safeR && safeR.safe) ? '<span class="session-safe" title="Safe in the cloud" aria-label="Safe in the cloud">' + icon('shield-check') + '</span>' : '';
+      // v14: export-status badge in the meta row. V131 (3A 4A): certificates
+      // count — jobDoneStatus(). 'exported' → ✓ Exported; 'certificate' →
+      // ✓ Certificate; 'modified' → ✓✎ Modified since export; 'reopened' →
+      // ✓✎ Reopened since certificate; 'none' → no badge.
+      const xStatus = jobDoneStatus(s);
       const exportBadge = xStatus === 'exported'
-        ? '<span class="export-badge exported" title="Exported">✓ Exported</span>'
-        : (xStatus === 'modified'
-            ? '<span class="export-badge modified" title="Edited since last export">✓✎ Modified since export</span>'
-            : '');
+        ? '<span class="export-badge exported" title="Exported">' + icon('check') + ' Exported</span>'
+        : xStatus === 'certificate'
+          ? '<span class="export-badge exported" title="Certificate made">' + icon('check') + ' Certificate</span>'
+          : xStatus === 'modified'
+            ? '<span class="export-badge modified" title="Edited since last export">' + icon('check') + icon('pencil') + ' Modified since export</span>'
+            : xStatus === 'reopened'
+              ? '<span class="export-badge modified" title="Unlocked since the certificate was made">' + icon('check') + icon('pencil') + ' Reopened since certificate</span>'
+              : '';
       // v10: when the query only hit item-level fields, show how many items matched
       // and (via data-open-at) jump straight to the first match.
       const itemBadge = matchedItemIndex !== -1
@@ -1142,8 +1345,8 @@ function renderSessionsListAreaHTML() {
         // V87: month wording, not day counts — a retest is due for a whole month.
         const rCls = rStatus === 'overdue' ? 'retest-chip-overdue'
           : (rStatus === 'duesoon' ? 'retest-chip-soon' : 'retest-chip-upcoming');
-        const rLabel = `🔔 ${retestChipLabel(rStatus)}`;
-        retestChip = `<div class="session-export-row"><span class="retest-chip ${rCls}">${escapeHTML(rLabel)}</span></div>`;
+        const rLabel = retestChipLabel(rStatus);
+        retestChip = `<div class="session-export-row"><span class="retest-chip ${rCls}">${icon('bell')} ${escapeHTML(rLabel)}</span></div>`;
       }
       const openAttr = matchedItemIndex !== -1
         ? `data-action="open-session" data-arg="${s.id}" data-open="${s.id}" data-open-at="${matchedItemIndex}"`
@@ -1151,15 +1354,15 @@ function renderSessionsListAreaHTML() {
       return `
         <div class="session-card${s.locked ? ' locked' : ''}">
           <div class="session-info" ${openAttr}>
-            <div class="session-title">${lockMark}${escapeHTML(s.site || s.name)}</div>
-            <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span></div>
+            <div class="session-title">${lockMark}${safeMark}${escapeHTML(s.site || s.name)}</div>
+            <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span>${photoMeta}</div>
             ${exportBadge ? `<div class="session-export-row">${exportBadge}</div>` : ''}
             ${retestChip}
             ${itemBadge}
           </div>
-          <button class="icon-btn-sm" data-action="copy-session" data-arg="${s.id}" aria-label="Copy CSV" title="Copy CSV">📋</button>
-          <button class="icon-btn-sm" data-action="export-session" data-arg="${s.id}" data-export="${s.id}" aria-label="Share CSV">${SHARE_ICON_SVG}</button>
-          <button class="icon-btn-sm" data-action="delete-session" data-arg="${s.id}" data-delete-session="${s.id}" aria-label="Delete">🗑</button>
+          <button class="icon-btn-sm" data-action="copy-session" data-arg="${s.id}" aria-label="Copy CSV" title="Copy CSV">${icon('clipboard-list')}</button>
+          <button class="icon-btn-sm" data-action="export-session" data-arg="${s.id}" data-export="${s.id}" aria-label="Share CSV">${icon('share', 'share-icon')}</button>
+          <button class="icon-btn-sm" data-action="delete-session" data-arg="${s.id}" data-delete-session="${s.id}" aria-label="Delete">${icon('trash-2')}</button>
         </div>
       `;
     }).join('');
@@ -1193,22 +1396,22 @@ function renderImportConflictModal() {
   const existingItemCount = existing && Array.isArray(existing.items) ? existing.items.length : 0;
   return `
     <div class="modal-backdrop" id="import-conflict-backdrop" data-action="import-conflict-cancel" style="z-index:300"></div>
-    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Session already exists">
+    <div class="bulk-sheet" style="z-index:301" role="dialog" aria-label="Job already exists">
       <div class="bulk-sheet-handle"></div>
       <div class="bulk-sheet-header">
         <span class="fail-close-spacer"></span>
-        <h3 class="bulk-sheet-title">Session already exists</h3>
+        <h3 class="bulk-sheet-title">Job already exists</h3>
         <button class="fail-close-btn" id="import-conflict-cancel" data-action="import-conflict-cancel" aria-label="Cancel">×</button>
       </div>
-      <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--text)">
-        A session for <strong>${escapeHTML(incoming.site)}</strong> on <strong>${escapeHTML(formatDate(incoming.date))}</strong> already exists with ${existingItemCount} item${existingItemCount === 1 ? '' : 's'}.
+      <p style="margin:0 0 12px;font-size:0.875rem;line-height:1.5;color:var(--text)">
+        A job for <strong>${escapeHTML(incoming.site)}</strong> on <strong>${escapeHTML(formatDate(incoming.date))}</strong> already exists with ${existingItemCount} item${existingItemCount === 1 ? '' : 's'}.
       </p>
-      <p style="margin:0 0 12px;font-size:14px;line-height:1.5;color:var(--text)">
+      <p style="margin:0 0 12px;font-size:0.875rem;line-height:1.5;color:var(--text)">
         The imported file has ${incoming.items.length} item${incoming.items.length === 1 ? '' : 's'}. How would you like to import them?
       </p>
       <div class="import-conflict-actions">
-        <button class="btn-primary" id="import-conflict-duplicate" data-action="import-conflict-duplicate">Import as duplicate (new session)</button>
-        <button class="btn-secondary" id="import-conflict-merge" data-action="import-conflict-merge">Merge into existing session</button>
+        <button class="btn-primary" id="import-conflict-duplicate" data-action="import-conflict-duplicate">Import as duplicate (new job)</button>
+        <button class="btn-secondary" id="import-conflict-merge" data-action="import-conflict-merge">Merge into existing job</button>
         <button class="btn-tertiary" id="import-conflict-cancel2" data-action="import-conflict-cancel">Cancel import</button>
       </div>
     </div>
@@ -1225,9 +1428,9 @@ function renderImportSummaryModal() {
     ? `Merged ${sum.itemCount} item${sum.itemCount === 1 ? '' : 's'} into <strong>${escapeHTML(sum.sessionName)}</strong>.`
     : (sum.mode === 'duplicate'
         ? `Imported ${sum.itemCount} item${sum.itemCount === 1 ? '' : 's'} as a new duplicate of <strong>${escapeHTML(sum.sessionName)}</strong>.`
-        : `Imported ${sum.itemCount} item${sum.itemCount === 1 ? '' : 's'} into new session <strong>${escapeHTML(sum.sessionName)}</strong>.`);
+        : `Imported ${sum.itemCount} item${sum.itemCount === 1 ? '' : 's'} into new job <strong>${escapeHTML(sum.sessionName)}</strong>.`);
   const skippedBlock = (sum.skipped && sum.skipped.length > 0) ? `
-    <p style="margin:12px 0 4px;font-size:14px;font-weight:600;color:var(--text)">
+    <p style="margin:12px 0 4px;font-size:0.875rem;font-weight:600;color:var(--text)">
       ${sum.skipped.length} row${sum.skipped.length === 1 ? '' : 's'} skipped:
     </p>
     <div class="import-summary-list">
@@ -1245,7 +1448,7 @@ function renderImportSummaryModal() {
         <h3 class="bulk-sheet-title">Import complete</h3>
         <button class="fail-close-btn" id="import-summary-close" data-action="import-summary-done" aria-label="Close">×</button>
       </div>
-      <p style="margin:0;font-size:14px;line-height:1.5;color:var(--text)">${modeText}</p>
+      <p style="margin:0;font-size:0.875rem;line-height:1.5;color:var(--text)">${modeText}</p>
       ${skippedBlock}
       <button class="btn-primary" id="import-summary-done" data-action="import-summary-done" style="margin-top:14px">Done</button>
     </div>
@@ -1280,10 +1483,25 @@ function renderImportSummaryModal() {
 // engineer the app is broken rather than the platform is.
 function assetFieldHTML() {
   const paired = !!(state.scannerEnabled && state.scannerPaired);
-  return `<input class="input-big" id="f-asset" data-input-action="f-asset"` +
+  return `<input aria-label="Asset number" class="input-big" id="f-asset" data-input-action="f-asset"` +
     ` value="${escapeHTML(state.form.assetNo)}"` +
     `${state.scannerEnabled ? ' placeholder="Scan or type"' : ''}` +
     `${paired ? ' inputmode="none"' : ''}>`;
+}
+
+// V94 (6): " · 15 at this location" for the item readout — '' while the
+// location box is blank. Shared by renderEntry and the in-place refresh below.
+function locationCountText() {
+  const n = (typeof locationCountInJob === 'function')
+    ? locationCountInJob(activeSession(), state.form.location) : null;
+  return (n === null) ? '' : ` · ${n} at this location`;
+}
+
+// The location is confirmed (blur, a suggestion) without a render — repaint
+// just the count, so the keyboard and the rest of the form are untouched.
+function refreshLocationCountOnly() {
+  const el = (typeof document !== 'undefined') ? document.getElementById('loc-count') : null;
+  if (el) el.textContent = locationCountText();
 }
 
 // v81.1, decision 3A. A change arrived from the other device for the job that
@@ -1321,6 +1539,35 @@ function syncWaitingBanner() {
        + ' style="margin-left:4px;font-weight:600">' + (busy ? 'Updating\u2026' : 'Update now') + '</button></div>';
 }
 
+// V104 (S10): the plain-words note for one over-limit reading (an entry from
+// readingsOverLimit, session.js). Earth names the real rule, because the app's
+// figure is the engineer's own ceiling, not the CoP limit (2A).
+function readingLimitNoteText(o) {
+  if (!o) return '';
+  if (o.field === 'earth') {
+    return 'Over your earth limit of ' + o.limit.toFixed(2) + ' \u03A9. The usual limit is 0.1 \u03A9 plus the lead\u2019s own resistance \u2014 check it before passing.';
+  }
+  if (o.field === 'insulation') {
+    return 'Below the usual minimum of ' + o.limit.toFixed(1) + ' M\u03A9 for Class ' + o.cls + ' \u2014 consider a fail.';
+  }
+  if (o.field === 'leakage') {
+    return 'Over the usual maximum of ' + String(o.limit) + ' mA \u2014 consider a fail.';
+  }
+  return '';
+}
+
+// V104 (S10): update ONE box's limit note in place while typing. The readings
+// sheet has inputs, so it must not render (MAP rule 3) — the note element is
+// always present (hidden when fine) so this only flips it.
+function refreshReadingNote(field) {
+  const el = document.getElementById('reading-note-' + field);
+  if (!el) return;
+  const mode = state.readingsSheetMode === 'fail' ? 'fail' : 'pass';
+  const hit = readingsOverLimit(state.readingsDraft, mode).filter(o => o.field === field)[0];
+  el.textContent = hit ? readingLimitNoteText(hit) : '';
+  el.hidden = !hit;
+}
+
 function renderEntry() {
   const sess = activeSession();
   if (!sess) { state.view = 'sessions'; return renderSessions(); }
@@ -1346,14 +1593,29 @@ function renderEntry() {
   // v20: read the FROZEN row (cached per location). It only recomputes when the
   // confirmed location changes — logging a PASS no longer reshuffles buttons.
   const orderedTypes = sqpRowForLocation(state.itemTypes, state.form.location);
-  const quickButtons = orderedTypes.map(t => `
-    <button class="quick-btn ${state.form.itemType === t ? 'active' : ''}" data-action="quick-pick" data-arg="${escapeHTML(t)}" data-type="${escapeHTML(t)}">${escapeHTML(t)}</button>
+  // V94 (7): Multi Pick tiles on the bottom row (slot 1 right, 2 middle, 3 left).
+  // Each takes one of the nine cells, so the preset fills the rest as usual and
+  // its LAST types (after Smart Quick Pick's ordering) are the ones that drop
+  // off. No tiles assigned → this is V93's grid exactly. The tiles are placed by
+  // CSS (.qp-tile-N), so the types flow around them however few there are.
+  // ⚠ sess.locked, not isLocked: that const is declared further down (TDZ).
+  const tiles = (typeof qpTiles === 'function') ? qpTiles() : [];
+  const shownTypes = tiles.length ? orderedTypes.slice(0, Math.max(0, 9 - tiles.length)) : orderedTypes;
+  const tileOff = (!!sess.locked || isExisting) ? ' disabled' : '';
+  // V123 (4A): every button here carries aria-pressed, so VoiceOver says which
+  // type (or tile) is chosen — before, only the colour said so. The in-place
+  // repaints keep it in step: dispatch.js 'quick-pick', events.js f-type input,
+  // multipick.js qpTileSelect / qpTileSyncDom.
+  const quickButtons = shownTypes.map(t => `
+    <button class="quick-btn ${state.form.itemType === t ? 'active' : ''}" aria-pressed="${state.form.itemType === t ? 'true' : 'false'}" data-action="quick-pick" data-arg="${escapeHTML(t)}" data-type="${escapeHTML(t)}">${escapeHTML(t)}</button>
+  `).join('') + tiles.map(tl => `
+    <button class="quick-btn qp-tile qp-tile-${tl.qp} ${state.form.qpTile === tl.qp ? 'active' : ''}" aria-pressed="${state.form.qpTile === tl.qp ? 'true' : 'false'}" data-action="qp-tile" data-arg="${tl.qp}"${tileOff}><span class="qp-tile-plus">${icon('plus')}</span>${escapeHTML(qpTileLabel(tl.slot))}</button>
   `).join('');
 
   const notesBlock = state.form.showNotes
     ? `<label class="label">Notes</label>
-       <textarea class="textarea" id="f-notes" data-input-action="f-notes" rows="2" placeholder="Optional">${escapeHTML(state.form.notes)}</textarea>`
-    : `<button class="notes-toggle" id="show-notes-btn" data-action="show-notes">✎ Add note</button>`;
+       <textarea aria-label="Notes" class="textarea" id="f-notes" data-input-action="f-notes" rows="2" placeholder="Optional">${escapeHTML(state.form.notes)}</textarea>`
+    : `<button class="notes-toggle" id="show-notes-btn" data-action="show-notes">${icon('pencil')} Add note</button>`;
 
   const resultBadge = isExisting && existing.result
     ? `<span class="result-badge ${existing.result}">· ${capitalise(existing.result).toUpperCase()}</span>`
@@ -1389,15 +1651,32 @@ function renderEntry() {
   // without a photo still lets you add one — the strip's own Add button handles
   // it from there.
   const entryItem = isExisting ? sess.items[state.cursor] : null;
+  // v89 (3A): cloud-only photos count too; ☁ when any aren't on this phone.
   const entryPhotoCount = (entryItem && entryItem.result === 'fail' && entryItem.id)
-    ? photoCountForItem(entryItem.id) : 0;
+    ? ((typeof photoCountForItemAll === 'function') ? photoCountForItemAll(entryItem.id) : photoCountForItem(entryItem.id)) : 0;
+  const entryPhotoCloud = (entryPhotoCount && typeof photoCloudOnlyCountForItem === 'function')
+    ? photoCloudOnlyCountForItem(entryItem.id) : 0;
   const showEntryPhotoRow = !!(entryItem && entryItem.result === 'fail' && entryItem.id
     && (typeof photosSupported !== 'function' || photosSupported()));
-  const entryPhotoRow = showEntryPhotoRow ? `
+  const entryPhotoBtn = showEntryPhotoRow ? `
       <button class="entry-photo-btn" id="entry-photo-btn" data-action="photo-strip-open" data-arg="${escapeHTML(entryItem.id)}">
-        📷 ${entryPhotoCount ? `Photos (${entryPhotoCount})` : 'Add a photo'}
+        ${icon('camera')} ${entryPhotoCount ? `Photos (${entryPhotoCount})${entryPhotoCloud ? ' ' + icon('cloud') : ''}` : 'Add a photo'}
       </button>
   ` : '';
+  // V99 (4A, 9A): the map pin button, on a SAVED item only — never the fail
+  // sheet (the iOS reload trap). Shown on a fail while the switch is on, and on
+  // any item that already has a pin whatever the switch says (9A: a pin is part
+  // of the job's record — it can always be seen, and so removed). Shares the
+  // photo button's row, half width each, so it takes no new space.
+  const entryPin = entryItem ? mapPinOf(entryItem) : '';
+  const showEntryPin = !!(entryItem && entryItem.id
+    && (entryPin || (state.mapPinEnabled && entryItem.result === 'fail')));
+  const entryPinBtn = showEntryPin ? `
+      <button class="entry-photo-btn entry-pin-btn${entryPin ? ' has-pin' : ''}" id="entry-pin-btn" data-action="map-pin-open" data-arg="${escapeHTML(entryItem.id)}">${icon('map-pin')} ${entryPin ? '///' + escapeHTML(entryPin) : 'Add map pin'}</button>
+  ` : '';
+  const entryPhotoRow = (entryPhotoBtn && entryPinBtn)
+    ? `<div class="entry-aux-row">${entryPhotoBtn}${entryPinBtn}</div>`
+    : (entryPhotoBtn || entryPinBtn);
 
   let failSheetInner = '';
   if (state.failModalStage === 'reasons') {
@@ -1420,8 +1699,8 @@ function renderEntry() {
     `;
   } else {
     failSheetInner = `
-      <button class="fail-other-back" id="fail-other-back" data-action="fail-other-back">‹ Back to reasons</button>
-      <textarea class="fail-other-input" id="fail-other-input" data-input-action="fail-other" placeholder="Type reason…" rows="3">${escapeHTML(state.failOtherText)}</textarea>
+      <button class="fail-other-back" id="fail-other-back" data-action="fail-other-back">${icon('chevron-left')} Back to reasons</button>
+      <textarea aria-label="Fail reason, in your own words" class="fail-other-input" id="fail-other-input" data-input-action="fail-other" placeholder="Type reason…" rows="3">${escapeHTML(state.failOtherText)}</textarea>
       <button class="fail-other-save" id="fail-other-save" data-action="fail-other-save">Save fail</button>
     `;
   }
@@ -1463,8 +1742,8 @@ function renderEntry() {
 
   const progressRow = `
     <div class="progress-row"${flashSearchJump ? ' data-search-jump="1"' : ''}>
-      <div class="progress">Item ${state.cursor + 1} ${isExisting ? `of ${sess.items.length}` : '(new)'}${resultBadge}</div>
-      ${isExisting ? `<button class="del-icon-top" id="del-item-btn" data-action="delete-current-item" aria-label="Delete item" title="Delete item">🗑</button>` : ''}
+      <div class="progress">Item ${state.cursor + 1} ${isExisting ? `of ${sess.items.length}` : '(new)'}${resultBadge}<span class="loc-count" id="loc-count">${locationCountText()}</span></div>
+      ${isExisting ? `<button class="del-icon-top" id="del-item-btn" data-action="delete-current-item" aria-label="Delete item" title="Delete item">${icon('trash-2')}</button>` : ''}
     </div>
   `;
 
@@ -1474,13 +1753,30 @@ function renderEntry() {
   const isLocked = !!sess.locked;
   const lockBanner = isLocked ? `
     <div class="lock-banner" role="status">
-      <span class="lock-banner-text">🔒 Session locked — no new entries</span>
+      <span class="lock-banner-text">${icon('lock')} Job locked — no new entries</span>
       <button class="lock-banner-action" id="lock-unlock-btn" data-action="unlock-session">Unlock</button>
     </div>
   ` : '';
 
   const passFailDisabled = isLocked ? 'disabled' : '';
+  // V94 (12A): a selected Multi Pick tile greys FAIL — a multi-pick is passes only.
+  const failDisabled = (isLocked || state.form.qpTile) ? 'disabled' : '';
   const copyDisabled = (!hasLast || isLocked) ? 'disabled' : '';
+
+  // V94 (8, 16B): with Undo switched on, Copy last shares its row with ↶ Undo
+  // (about 70/30), and its label shortens so the item it copies still shows.
+  // Undo is ALWAYS drawn while switched on — greyed when there is nothing to
+  // undo — so nothing moves under the thumb. Off: the row is V93's exactly.
+  const copyLabel = icon('copy') + (state.undoEnabled ? ' Copy last' : ' Copy last result');
+  const copyBtnHTML = `<button class="copy-last-btn" id="copy-last-btn" data-action="copy-last" ${copyDisabled}>
+        ${copyLabel}${lastInfo}
+      </button>`;
+  const copyUndoRow = state.undoEnabled
+    ? `<div class="copy-undo-row">
+        ${copyBtnHTML}
+        <button class="undo-btn" id="undo-btn" data-action="undo-last" aria-label="Undo the last item logged" ${(typeof undoAvailable === 'function' && undoAvailable()) ? '' : 'disabled'}>${icon('undo-2')} Undo</button>
+      </div>`
+    : copyBtnHTML;
 
   // v16: Multi Pick. Full-width button at the very bottom of the entry screen,
   // shown only when the feature is enabled in Settings. Disabled (like Pass/Fail)
@@ -1491,7 +1787,7 @@ function renderEntry() {
   const mpEnabled = !!(state.multiPick && state.multiPick.enabled);
   const multiPickButton = mpEnabled ? `
     <button class="multipick-btn" id="multipick-btn" data-action="multipick-open" ${isLocked ? 'disabled' : ''}>
-      ＋ Multi Pick
+      ${icon('plus')} Multi Pick
     </button>
   ` : '';
 
@@ -1555,8 +1851,8 @@ function renderEntry() {
             ? `${preview}${more}`
             : 'No items yet';
           return `
-            <button class="preset-switch-option${isActive ? ' active' : ''}" data-action="preset-sheet-pick" data-arg="${escapeHTML(p.id)}">
-              <span class="preset-switch-tick">${isActive ? '✓' : ''}</span>
+            <button class="preset-switch-option${isActive ? ' active' : ''}" aria-pressed="${isActive ? 'true' : 'false'}" data-action="preset-sheet-pick" data-arg="${escapeHTML(p.id)}">
+              <span class="preset-switch-tick">${isActive ? icon('check') : ''}</span>
               <span class="preset-switch-text">
                 <span class="preset-switch-name">${escapeHTML(p.name || 'Untitled preset')}</span>
                 <span class="preset-switch-sub">${escapeHTML(sub)}</span>
@@ -1565,7 +1861,7 @@ function renderEntry() {
           `;
         }).join('')}
       </div>
-      <button class="preset-switch-edit sheet-pin" data-action="preset-sheet-edit">⚙ Edit presets</button>
+      <button class="preset-switch-edit sheet-pin" data-action="preset-sheet-edit">${icon('settings')} Edit presets</button>
     ` : `
       <p class="multipick-empty">No presets set up yet. Add them in Settings.</p>
     `;
@@ -1589,12 +1885,14 @@ function renderEntry() {
   // identical items. Same bottom-sheet pattern as Multi Pick and the preset
   // switcher.
   //
-  // ⚠ No .sheet-scroll here, and that is correct rather than an omission: every
-  // part of this sheet is fixed — four preset buttons, one label, one input, one
-  // Add button. Nothing in it grows from user data, which is the test MAP rule 14
-  // actually applies. It DOES raise the keyboard for the custom box, so it is an
-  // E-group sheet in the V76 audit's terms and inherits the v75 keyboard vars
-  // from .fail-sheet without opting out of them.
+  // V110: the notes preview is the one part that grows from user data — an
+  // item's notes have no length limit — so IT is the .sheet-scroll, and the three
+  // controls under it are .sheet-pin (MAP rule 14: a sibling below a scroller
+  // compresses unless pinned, and the custom box + Add is what a long note would
+  // otherwise push off the screen). Until V110 this note said nothing here grows;
+  // the buttons, label and input are fixed, but the preview never was. The sheet
+  // guard (harness 47) found it. It raises the keyboard for the custom box, so it
+  // still inherits the v75 keyboard vars from .fail-sheet without opting out.
   //
   // The preview line is load-bearing, not decoration. This sheet duplicates the
   // source item's notes, which is right for a fail (the reason lives there) and
@@ -1606,7 +1904,7 @@ function renderEntry() {
     const src = sess.items[sess.items.length - 1];
     const srcNotes = String(src.notes || '').trim();
     const notesLine = srcNotes
-      ? `<p class="repeat-preview-notes">Notes copied too: “${escapeHTML(srcNotes)}”</p>`
+      ? `<p class="repeat-preview-notes sheet-scroll">Notes copied too: “${escapeHTML(srcNotes)}”</p>`
       : '';
     repeatSheet = `
       <div class="modal-backdrop" id="repeat-backdrop" data-action="repeat-close"></div>
@@ -1619,13 +1917,13 @@ function renderEntry() {
         </div>
         <p class="multipick-sheet-hint">Adds more copies of <strong>${escapeHTML(src.itemType)} · ${escapeHTML(capitalise(src.result))}</strong>, numbered on from the last one and using the location on the form.</p>
         ${notesLine}
-        <div class="repeat-count-grid">
+        <div class="repeat-count-grid sheet-pin">
           ${REPEAT_PRESET_COUNTS.map(n => `
             <button class="repeat-count-btn" data-action="repeat-fire" data-arg="${n}">+${n}</button>
           `).join('')}
         </div>
-        <label class="label" for="repeat-custom">Or a number (1–${REPEAT_MAX_N})</label>
-        <div class="repeat-custom-row">
+        <label class="label sheet-pin" for="repeat-custom">Or a number (1–${REPEAT_MAX_N})</label>
+        <div class="repeat-custom-row sheet-pin">
           <input class="input" id="repeat-custom" type="number" inputmode="numeric" min="1" max="${REPEAT_MAX_N}" placeholder="e.g. 12">
           <button class="btn-primary repeat-custom-add" id="repeat-custom-add" data-action="repeat-fire-custom">Add</button>
         </div>
@@ -1659,16 +1957,22 @@ function renderEntry() {
     }
 
     const classButtons = READING_CLASSES.map(c => `
-      <button class="reading-class-btn ${c === cls ? 'active' : ''}" data-action="readings-set-class" data-arg="${c}">Class ${c}</button>
+      <button class="reading-class-btn ${c === cls ? 'active' : ''}" aria-pressed="${c === cls ? 'true' : 'false'}" data-action="readings-set-class" data-arg="${c}">Class ${c}</button>
     `).join('');
 
+    // V104 (S10): readings definitely outside their usual limit (PASS only).
+    const overList = readingsOverLimit(draft, mode);
     const fieldRows = fields.map(k => {
       const meta = READING_FIELD_META[k];
       if (!meta) return '';
       const val = (typeof draft[k] === 'string') ? draft[k] : '';
+      const over = overList.filter(o => o.field === k)[0];
+      // The note is always in the DOM (hidden when fine) so typing can flip it
+      // in place — refreshReadingNote.
       return `
         <label class="reading-field-label">${escapeHTML(meta.label)} <span class="reading-unit">(${escapeHTML(meta.unit)})</span></label>
-        <input class="input reading-input" id="f-reading-${k}" data-input-action="f-reading-${k}" value="${escapeHTML(val)}" inputmode="text" autocomplete="off" placeholder="${escapeHTML(meta.passPlaceholder)}">
+        <input aria-label="${escapeHTML(meta.label)} (${escapeHTML(meta.unit)})" class="input reading-input" id="f-reading-${k}" data-input-action="f-reading-${k}" value="${escapeHTML(val)}" inputmode="text" autocomplete="off" placeholder="${escapeHTML(meta.passPlaceholder)}">
+        <div class="reading-limit-note" id="reading-note-${k}" role="status"${over ? '' : ' hidden'}>${over ? escapeHTML(readingLimitNoteText(over)) : ''}</div>
       `;
     }).join('');
 
@@ -1683,7 +1987,7 @@ function renderEntry() {
     const polarityOn = draft.polarity === true;
     const polarityRow = (READING_POLARITY_CLASSES.indexOf(cls) !== -1)
       ? `<button class="reading-polarity-row${polarityOn ? ' checked' : ''}" data-action="readings-toggle-polarity" role="checkbox" aria-checked="${polarityOn ? 'true' : 'false'}">
-          <span class="reading-polarity-box">${polarityOn ? '✓' : ''}</span>
+          <span class="reading-polarity-box">${polarityOn ? icon('check') : ''}</span>
           <span class="reading-polarity-label">Polarity correct</span>
         </button>`
       : '';
@@ -1694,12 +1998,30 @@ function renderEntry() {
       ? 'Pre-filled with typical pass values — edit if needed, or just tap OK.'
       : 'Record the reading for this failure, then save.';
 
-    readingsSheet = `
+    readingsSheet = (mode === 'pass' && state.readingsSheetStage === 'confirm' && overList.length) ? `
+      <div class="modal-backdrop" id="readings-backdrop" data-action="readings-confirm-back"></div>
+      <div class="fail-sheet readings-sheet readings-confirm" role="dialog" aria-label="Reading outside the usual limit">
+        <div class="fail-sheet-handle"></div>
+        <div class="fail-sheet-header">
+          <button class="fail-close-btn" id="readings-confirm-back" data-action="readings-confirm-back" aria-label="Back to readings">${icon('chevron-left')}</button>
+          <h3 class="fail-sheet-title">${overList.length === 1 ? 'Check this reading' : 'Check these readings'}</h3>
+          <span class="fail-close-spacer"></span>
+        </div>
+        <p class="multipick-sheet-hint">Class ${escapeHTML(cls)} \u2014 ${overList.length === 1 ? 'this reading is' : 'these readings are'} outside the usual limit. Nothing has been saved yet.</p>
+        ${overList.map(o => `
+          <div class="reading-confirm-row">
+            <div class="reading-confirm-head"><span>${escapeHTML((READING_FIELD_META[o.field] || {}).label || o.field)}</span><strong>${escapeHTML(o.value)} ${escapeHTML((READING_FIELD_META[o.field] || {}).unit || '')}</strong></div>
+            <div class="reading-confirm-note">${escapeHTML(readingLimitNoteText(o))}</div>
+          </div>`).join('')}
+        ${(state.form && state.form.qpTile) ? '' : `<button class="btn-danger reading-change-fail-btn" id="readings-change-to-fail" data-action="readings-change-to-fail">Change to FAIL</button>`}
+        <button class="reading-ok-btn reading-pass-anyway-btn" id="readings-pass-anyway" data-action="readings-pass-anyway">Save as PASS anyway</button>
+      </div>
+    ` : `
       <div class="modal-backdrop" id="readings-backdrop" data-action="readings-cancel"></div>
       <div class="fail-sheet readings-sheet" role="dialog" aria-label="Test readings">
         <div class="fail-sheet-handle"></div>
         <div class="fail-sheet-header">
-          <button class="fail-close-btn" id="readings-cancel" data-action="readings-cancel" aria-label="Cancel">‹</button>
+          <button class="fail-close-btn" id="readings-cancel" data-action="readings-cancel" aria-label="Cancel">${icon('chevron-left')}</button>
           <h3 class="fail-sheet-title">${title}</h3>
           <span class="fail-close-spacer"></span>
         </div>
@@ -1717,9 +2039,9 @@ function renderEntry() {
   return `
     <div class="screen">
       <header class="header-row">
-        <button class="icon-btn" id="sessions-btn" data-action="go-sessions" aria-label="Back to sessions">‹</button>
-        <div class="site-name">${escapeHTML(sess.site || sess.name)}</div>
-        <button class="icon-btn" id="overview-btn" data-action="go-overview" aria-label="Overview">▦</button>
+        <button class="icon-btn" id="sessions-btn" data-action="go-sessions" aria-label="Back to jobs">${icon('chevron-left')}</button>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">${escapeHTML(sess.site || sess.name)}</div>
+        <button class="icon-btn" id="overview-btn" data-action="go-overview" aria-label="Overview">${icon('layout-grid')}</button>
       </header>
 
       ${lockBanner}
@@ -1731,34 +2053,32 @@ function renderEntry() {
 
       <label class="label">Location ${carriedHint}</label>
       <div class="location-input-wrap">
-        <input class="input-big" id="f-location" value="${escapeHTML(state.form.location)}" placeholder="e.g. Office 1">
+        <input aria-label="Location" class="input-big" id="f-location" value="${escapeHTML(state.form.location)}" placeholder="e.g. Office 1">
         ${locationSuggestionsBlock}
       </div>
 
       <label class="label">Item type</label>
       <div class="quick-grid" id="quick-grid">${quickButtons}</div>
       <div class="custom-type-wrap">
-        <input class="input" id="f-type" value="${escapeHTML(state.form.itemType)}" placeholder="…or type custom" autocomplete="off" style="margin-top:8px">
+        <input aria-label="Item type, or type your own" class="input" id="f-type" value="${escapeHTML(state.form.itemType)}" placeholder="…or type custom" autocomplete="off" style="margin-top:8px">
         ${suggestionsBlock}
       </div>
 
       ${notesBlock}
 
       <div class="pass-fail-row">
-        <button class="pass-btn" id="pass-btn" data-action="log-pass" ${passFailDisabled}><span class="icon">✓</span>PASS</button>
-        <button class="fail-btn" id="fail-btn" data-action="log-fail" ${passFailDisabled}><span class="icon">✗</span>FAIL</button>
+        <button class="pass-btn" id="pass-btn" data-action="log-pass" ${passFailDisabled}><span class="icon">${icon('check')}</span>PASS</button>
+        <button class="fail-btn" id="fail-btn" data-action="log-fail" ${failDisabled}><span class="icon">${icon('x')}</span>FAIL</button>
       </div>
 
       ${entryPhotoRow}
 
-      <button class="copy-last-btn" id="copy-last-btn" data-action="copy-last" ${copyDisabled}>
-        ⎘ Copy last result${lastInfo}
-      </button>
+      ${copyUndoRow}
 
       <div class="nav-row">
-        <button class="nav-btn" id="prev-btn" data-action="cursor-prev" ${state.cursor === 0 ? 'disabled' : ''}>‹ Prev</button>
-        <button class="nav-btn" id="skip-new-btn" data-action="skip-new" ${!isExisting ? 'disabled' : ''}>⏭ New</button>
-        <button class="nav-btn" id="next-btn" data-action="cursor-next" ${state.cursor >= sess.items.length ? 'disabled' : ''}>Next ›</button>
+        <button class="nav-btn" id="prev-btn" data-action="cursor-prev" ${state.cursor === 0 ? 'disabled' : ''}>${icon('chevron-left')} Prev</button>
+        <button class="nav-btn" id="skip-new-btn" data-action="skip-new" ${!isExisting ? 'disabled' : ''}>${icon('skip-forward')} New</button>
+        <button class="nav-btn" id="next-btn" data-action="cursor-next" ${state.cursor >= sess.items.length ? 'disabled' : ''}>Next ${icon('chevron-right')}</button>
       </div>
 
       ${multiPickButton}
@@ -1769,7 +2089,48 @@ function renderEntry() {
       ${repeatSheet}
       ${readingsSheet}
       ${renderPhotoStripSheet()}
+      ${renderMapPinSheet()}
     </div>
   `;
+}
+
+// V99.1: shown in the pin sheet when the what3words app didn't open.
+function mapPinNoAppHTML() {
+  return `<p class="muted map-pin-noapp-text">Didn\u2019t open? The what3words app may not be on this phone. Get it from the App Store, or use the website &mdash; it opens in a panel: tap <strong>Done</strong> to come back.</p>
+        <button class="link-btn map-pin-web" id="map-pin-web" data-action="map-pin-w3w-web">Use the what3words website</button>`;
+}
+
+// V99: the map pin sheet (entry screen). Has an input → never re-rendered while
+// open except from state (MAP rule 3): the typing lives in state.mapPinSheet.text.
+// Item named from the open sheet's own ids, so a pull that replaced the job
+// object meanwhile still finds it.
+function renderMapPinSheet() {
+  const sh = state.mapPinSheet;
+  if (!sh) return '';
+  const sess = state.sessions.find(s => s && s.id === sh.sessionId);
+  const it = (sess && Array.isArray(sess.items)) ? sess.items.find(x => x && x.id === sh.itemId) : null;
+  const had = it ? mapPinOf(it) : '';
+  const label = it ? [it.assetNo, it.itemType].filter(Boolean).join(' \u00b7 ') : '';
+  return `
+      <div class="modal-backdrop" id="map-pin-backdrop" data-action="map-pin-cancel" style="z-index:300"></div>
+      <div class="bulk-sheet map-pin-sheet" style="z-index:301" role="dialog" aria-label="Map pin">
+        <div class="bulk-sheet-handle"></div>
+        <div class="bulk-sheet-header">
+          <span class="fail-close-spacer"></span>
+          <h3 class="bulk-sheet-title">${icon('map-pin')} Map pin</h3>
+          <button class="fail-close-btn" id="map-pin-cancel" data-action="map-pin-cancel" aria-label="Cancel">×</button>
+        </div>
+        <p class="muted" style="margin:0 0 10px">${label ? escapeHTML(label) + '. ' : ''}Open what3words, copy the three words for where this item is, then come back and paste them here.</p>
+        <button class="btn-secondary map-pin-w3w" id="map-pin-w3w" data-action="map-pin-w3w">Open the what3words app</button>
+        <div id="map-pin-noapp">${sh.noApp ? mapPinNoAppHTML() : ''}</div>
+        <div class="map-pin-input-row">
+          <input aria-label="what3words address" class="input map-pin-input" id="map-pin-input" data-input-action="map-pin-text" value="${escapeHTML(sh.text || '')}" placeholder="///filled.count.soap" autocomplete="off" autocapitalize="off" autocorrect="off" spellcheck="false" enterkeyhint="done" maxlength="200">
+          <button class="btn-secondary map-pin-paste" id="map-pin-paste" data-action="map-pin-paste">Paste</button>
+        </div>
+        <div class="map-pin-error" id="map-pin-error" role="alert"></div>
+        <p class="muted map-pin-where">Shows on the Overview, prints with this fail under Remedial actions, and goes in the Map pin CSV column.</p>
+        <button class="btn-primary" id="map-pin-save" data-action="map-pin-save" style="margin-top:12px">Save</button>
+        ${had ? '<button class="link-btn danger map-pin-remove" id="map-pin-remove" data-action="map-pin-remove">Remove map pin</button>' : ''}
+      </div>`;
 }
 

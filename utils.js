@@ -322,48 +322,6 @@ function safeHexColor(hex, fallback) {
   return '#' + h.toLowerCase();
 }
 
-// v43: reusable long-press detector. Attaches to an element and calls onLongPress()
-// if the pointer stays down for durationMs (default 2000 ms). Tracks via pointer events
-// so it works on both touch and mouse. Multiple calls on different elements are safe.
-// Returns a cleanup function to remove the listener.
-function setupLongPress(element, durationMs, onLongPress) {
-  if (!element) return () => {};
-  const duration = durationMs || 2000;
-  let timerId = null;
-  let isLongPress = false;
-
-  const onPointerDown = () => {
-    isLongPress = false;
-    timerId = setTimeout(() => {
-      isLongPress = true;
-      onLongPress();
-    }, duration);
-  };
-
-  const onPointerUp = () => {
-    if (timerId) clearTimeout(timerId);
-    timerId = null;
-  };
-
-  const onPointerCancel = () => {
-    if (timerId) clearTimeout(timerId);
-    timerId = null;
-  };
-
-  element.addEventListener('pointerdown', onPointerDown);
-  element.addEventListener('pointerup', onPointerUp);
-  element.addEventListener('pointercancel', onPointerCancel);
-
-  // Return cleanup function
-  return () => {
-    if (timerId) clearTimeout(timerId);
-    element.removeEventListener('pointerdown', onPointerDown);
-    element.removeEventListener('pointerup', onPointerUp);
-    element.removeEventListener('pointercancel', onPointerCancel);
-  };
-}
-
-
 // v53: Test Readings — validate/normalise an item's readings object. Used at
 // every boundary where a readings object enters from outside trusted code: on
 // backup RESTORE (a hand-edited or corrupt file) and, in the future, on cloud
@@ -406,6 +364,69 @@ function normaliseItemReadings(r) {
   return out;
 }
 
+// V104 (S10): read a reading AS TYPED into { op, n }. Readings are stored exactly
+// as typed — '<0.1', '≥19.99', '0.32', '0.32Ω', '> 299 MΩ' — so the check has to
+// read the shorthand. op is '=', '<', '<=', '>' or '>='. An optional unit or
+// letters may follow the number. Anything else (words, two numbers, a comma
+// decimal) is null, and null means the check says NOTHING (3A) — never a guess.
+// ⚠ Device bytes: iOS types ≤ ≥ as U+2264/U+2265 and Ω as Greek U+03A9, not the
+// ohm sign U+2126 (the V68 lesson) — all of them are accepted.
+function parseReadingValue(s) {
+  if (typeof s !== 'string') return null;
+  const t = s.replace(/\s+/g, '');
+  const m = t.match(/^(<=|>=|=<|=>|\u2264|\u2265|<|>|=)?(\d+(?:\.\d+)?|\.\d+)([A-Za-z\u2126\u03A9\u00B5\u03BC]*)$/);
+  if (!m) return null;
+  const opMap = { '<=': '<=', '=<': '<=', '\u2264': '<=', '>=': '>=', '=>': '>=', '\u2265': '>=', '<': '<', '>': '>', '=': '=' };
+  const n = Number(m[2]);
+  if (!isFinite(n)) return null;
+  return { op: m[1] ? opMap[m[1]] : '=', n };
+}
+
+// V104 (S10): the earth ceiling, from anything (a stored string, a backup's
+// number, a synced value). Out of range or unreadable → the default, so garbage
+// can never switch the earth check off or make it fire on everything.
+function normaliseEarthLimit(v) {
+  let n = NaN;
+  if (typeof v === 'number') n = v;
+  else if (typeof v === 'string' && v.trim() !== '') n = Number(v.trim());
+  if (!isFinite(n) || n < READING_EARTH_LIMIT_MIN || n > READING_EARTH_LIMIT_MAX) return READING_EARTH_LIMIT_DEFAULT;
+  return Math.round(n * 100) / 100;
+}
+
+// V104 (S10): the limit for one reading on one class → { kind, limit }, or null
+// when that reading isn't checked for that class (READING_LIMITS, data.js).
+function readingLimitFor(field, cls, earthLimit) {
+  const row = READING_LIMITS[field];
+  if (!row || !row.byClass || !Object.prototype.hasOwnProperty.call(row.byClass, cls)) return null;
+  const v = row.byClass[cls];
+  return { kind: row.kind, limit: (v === null) ? normaliseEarthLimit(earthLimit) : v };
+}
+
+// V104 (S10): is this reading DEFINITELY outside its limit? (3A)
+//   max (earth, leakage): '0.32' > 0.15 is over; '>5' or '≥6' is over; '<5' or
+//     '≤8' is "at most" — it can't be shown to be over, so it never fires.
+//   min (insulation): '0.8' < 1.0 is under; '<1' or '≤0.5' is under; '>' / '≥'
+//     never fires.
+// false covers "fine", "can't tell" and "unreadable" alike — all silent.
+function readingBreaksLimit(text, kind, limit) {
+  const p = parseReadingValue(text);
+  if (!p || typeof limit !== 'number' || !isFinite(limit)) return false;
+  const n = p.n;
+  if (kind === 'max') {
+    if (p.op === '=')  return n > limit;
+    if (p.op === '>')  return n >= limit;
+    if (p.op === '>=') return n > limit;
+    return false;
+  }
+  if (kind === 'min') {
+    if (p.op === '=')  return n < limit;
+    if (p.op === '<')  return n <= limit;
+    if (p.op === '<=') return n < limit;
+    return false;
+  }
+  return false;
+}
+
 // v75: the ONE way anything inside a bottom sheet takes focus.
 //
 // A bare `.focus()` on a field inside a `position: fixed` sheet makes iOS scroll
@@ -430,4 +451,31 @@ function focusInSheet(el) {
   } catch (e) {
     try { el.focus(); } catch (e2) {}
   }
+}
+
+// V99: a map pin's what3words address, from whatever the engineer pasted. Takes,
+// in this order: the first "///word.word.word" anywhere in the text (what the
+// what3words app's Share/Copy gives — often with a link and a sentence round
+// it); else the words in a what3words.com/… or w3w.co/… link; else the whole text
+// if it IS three words. Returns 'word.word.word' lower-cased, or '' when none
+// is found. Letters only (\p{L}), so "what3words.com" can never be taken for an
+// address, and a stray "https://" (two slashes) never starts one. A full stop
+// straight after the words ends a sentence; a fourth word makes it no address.
+function normaliseW3w(text) {
+  const t = String(text == null ? '' : text).replace(/[\u200B-\u200D\uFEFF]/g, '').trim();
+  if (!t || t.length > 2000) return '';
+  const W = '(\\p{L}+\\.\\p{L}+\\.\\p{L}+)';
+  let m = t.match(new RegExp('\\/\\/\\/' + W + '(?!\\p{L}|\\.\\p{L})', 'u'));
+  if (!m) m = t.match(new RegExp('(?:what3words\\.com|w3w\\.co)\\/' + W + '(?!\\p{L}|\\.\\p{L})', 'iu'));
+  if (!m) m = t.match(new RegExp('^' + W + '$', 'u'));
+  if (!m) return '';
+  const words = m[1].toLowerCase();
+  return words.length <= 80 ? words : '';
+}
+
+// V99: the what3words page for a pin ('' for no pin). Opens the what3words app
+// where it is installed, the website otherwise.
+function w3wUrl(words) {
+  const w = normaliseW3w(words);
+  return w ? 'https://what3words.com/' + w : '';
 }

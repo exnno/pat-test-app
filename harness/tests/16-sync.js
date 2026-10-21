@@ -26,7 +26,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, CANARY, withSession, withItem, confirmSheet } = require('../fixture');
+const { tick, CANARY, withSession, withItem, confirmSheet, restoreFile } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 const UID_A = '11111111-1111-1111-1111-111111111111';
@@ -129,7 +129,15 @@ module.exports = async function () {
       'a backup from a phone that never synced carries no syncPruned key — byte-identical to before');
 
     // The reopen/back-online triggers exist on a cloud host and not elsewhere.
-    const vis = (a) => ((a.doc._listeners || {}).visibilitychange || []).length;
+    // V105: snapshots.js hooks the same event (today's snapshot on reopen) on
+    // every host; it is counted separately so this still pins sync's own.
+    // V124: boot.js hooks it too (look for an update on reopen) — excluded the
+    // same way; 62b pins that one.
+    const snapHook = (a) => a.run('_snapOnVisible');
+    const updHook = (a) => a.run('updateOnResume');
+    const vis = (a) => ((a.doc._listeners || {}).visibilitychange || []).filter(fn => fn !== snapHook(a) && fn !== updHook(a)).length;
+    t.eq(((app.doc._listeners || {}).visibilitychange || []).filter(fn => fn === snapHook(app)).length, 1,
+      'snapshots registered its reopen hook once (V105)');
     t.eq(vis(app), 1, 'test host: syncBoot registered the app-reopen trigger');
     const off = boot({ hostname: 'localhost' });
     t.eq(vis(off), 0, 'no-cloud host: syncBoot registered nothing');
@@ -307,39 +315,36 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 16i */
-  await t.group('16i — clearing old jobs: cloud keeps them; unsent ones stay (decision 5A)', async () => {
-    const toasts = [];
+  await t.group('16i — clearing old jobs: cloud keeps them; unsent ones stay (decision 5A; V91: safe = read back)', async () => {
     const app = signedIn();
-    app.sandbox.showToast = (m) => toasts.push(String(m));
-    // Record what the confirm sheet was asked to say; the real sheet still opens.
-    const asked = [];
-    const realConfirm = app.sandbox.openConfirmSheet;
-    app.sandbox.openConfirmSheet = (o) => { asked.push(String(o && o.message)); return realConfirm(o); };
     const a = job(app, 'ZZOLDJOB');
     app.run(`(() => { const s = state.sessions.find(x => x.id === ${JSON.stringify(a.id)});
       s.date = '2020-01-01'; s.exportedAt = '2020-01-02T00:00:00Z'; s.exportDirty = false;
       state.activeId = null; })()`);
-    app.fn('pruneOldSessions')();
-    t.ok(app.state().sessions.some(s => s.id === a.id), 'never-sent old job is NOT cleared while signed in');
-    t.includes(toasts.join('|'), 'reached the cloud yet', 'and the toast says why');
+    const sess = () => app.state().sessions.find(s => s.id === a.id);
+    let g = app.fn('syncPruneFilter')([sess()]);
+    t.eq(g.clear.length, 0, 'never-sent old job is NOT clearable while signed in');
+    t.eq(g.kept[0] && g.kept[0].why, 'unsent', '…and the reason says its changes aren\u2019t sent');
 
     app.online();
     // V88: the photo mirror loads on a timer tick after boot; until it has, the
     // prune guard clears nothing (decision 6A). Let it load, as a phone would.
-    await tick(5);
+    // V94: wait for the mirror itself, not a fixed 5 ms — under a full run's
+    // load the fake IndexedDB read can take longer, and this read "photos-unknown"
+    // (a timing defect in the test, not the app: the group passes alone).
+    for (let i = 0; i < 100 && !app.state().photoMetaReady; i++) await tick(5);
+    t.ok(app.state().photoMetaReady, 'the photo mirror has loaded (precondition)');
     await app.fn('syncPush')({});
-    const tombsBefore = (app.state().tombstones || []).length;
-    app.fn('pruneOldSessions')();
-    t.includes(asked.join('|'), 'Your cloud copy keeps them', 'the confirm says the cloud keeps it');
-    t.ok(confirmSheet(app), 'confirm sheet shown');
     app.stopTimer();
-    t.notOk(app.state().sessions.some(s => s.id === a.id), 'the sent job is cleared from the phone');
-    t.eq((app.state().tombstones || []).length, tombsBefore, 'and it is NOT a deletion');
-    const pruned = JSON.parse(app.storage.getItem('pat:syncPruned') || '[]');
-    t.ok(pruned.some(e => e.id === String(a.id)), 'its id is remembered so the pull won\u2019t bring it back');
-    const posts = app.srv.posts().length;
-    await app.fn('syncPush')({});
-    t.eq(app.srv.posts().length, posts, 'clearing sends nothing to the server');
+    // ⚠ V91 (1A). This group's server answers every read with an empty account,
+    // so the push is never READ BACK. A push that succeeded is not proof the
+    // cloud holds the job — before V91 this was enough to clear it.
+    g = app.fn('syncPruneFilter')([sess()]);
+    t.eq(g.clear.length, 0, 'sent but never read back: still not clearable (V91)');
+    t.eq(g.kept[0] && g.kept[0].why, 'checking', '…and the reason says it is waiting for the check');
+    app.fn('pruneOldSessions')();
+    t.eq(app.state().view, 'jobManager', 'signed in, Review & clear opens Jobs on this phone (7A)');
+    t.ok(sess(), 'nothing was cleared by opening it');
 
     // Signed out: the pre-V80 behaviour, wording included.
     const out = boot();
@@ -370,8 +375,7 @@ module.exports = async function () {
     const bk2 = JSON.parse(JSON.stringify(bk));
     bk2.syncPruned = [{ id: 'ZZPRUNEDELSEWHERE', at: '2026-09-02T00:00:00Z' }, { id: 7 }, 'junk', null];
     const file = new app.sandbox.File([JSON.stringify(bk2)], 'b.json', { type: 'application/json' });
-    app.fn('restoreBackupFromFile')(file);
-    await tick(5);
+    await restoreFile(app, file);
     t.ok(confirmSheet(app), 'restore confirm shown');
     await tick(5);
     app.stopTimer();

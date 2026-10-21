@@ -20,7 +20,7 @@
 'use strict';
 
 const t = require('../assert');
-const { freshApp, populated, withSession, withItem, confirmSheet, tick } = require('../fixture');
+const { freshApp, populated, withSession, withItem, confirmSheet, tick, restoreFile } = require('../fixture');
 
 /* ⚠ THE FIRST DRAFT OF THIS FILE WAS VACUOUS AND LOOKED LIKE AN APP BUG.
    _scanTarget() declines while any full-screen interruption is up — the welcome
@@ -99,7 +99,17 @@ function onEntryScreen(opts = {}) {
   return app;
 }
 
+/* V125: the stub environment hands the vm the HOST's Date (stubs.js), so the
+   patch in withClock() replaced Date.now for every later group too — found in
+   V124, when group 62's "never touched" (0) read as 2 s ago. Kept here and put
+   back when this file finishes, pass or fail. */
+const REAL_DATE_NOW = Date.now;
+
 module.exports = async function run() {
+  try { await runScanner(); } finally { Date.now = REAL_DATE_NOW; }
+};
+
+async function runScanner() {
 
   /* ------------------------------------------------------------------
      The v67 repair itself
@@ -421,8 +431,7 @@ module.exports = async function run() {
     // that is the only route a backup ever takes in the field.
     const fresh = freshApp();
     const file = new fresh.sandbox.File([JSON.stringify(backup)], 'patgo-backup.json', { type: 'application/json' });
-    fresh.fn('restoreBackupFromFile')(file);
-    await tick(5);
+    await restoreFile(fresh, file);
     t.ok(confirmSheet(fresh, 'yes'), 'restore raised the confirm sheet');
     await tick(5);
     t.eq(fresh.state().scannerPaired, true, 'paired mode restored');
@@ -436,8 +445,7 @@ module.exports = async function run() {
     const good = app.fn('buildBackup')();
     good.scanSpeed = 'wide-open';
     const file = new app.sandbox.File([JSON.stringify(good)], 'b.json', { type: 'application/json' });
-    app.fn('restoreBackupFromFile')(file);
-    await tick(5);
+    await restoreFile(app, file);
     confirmSheet(app, 'yes');
     await tick(5);
     t.eq(app.state().scanSpeed, 'normal', 'the default was kept, not the garbage');
@@ -450,8 +458,7 @@ module.exports = async function run() {
     delete old.scanSpeed;
     app.state().scannerPaired = true;
     const file = new app.sandbox.File([JSON.stringify(old)], 'b.json', { type: 'application/json' });
-    app.fn('restoreBackupFromFile')(file);
-    await tick(5);
+    await restoreFile(app, file);
     confirmSheet(app, 'yes');
     await tick(5);
     t.eq(app.state().scannerPaired, true,
@@ -700,4 +707,4 @@ module.exports = async function run() {
       'which is above the gap limit, so a legitimate pause cannot split the burst');
   });
 
-};
+}

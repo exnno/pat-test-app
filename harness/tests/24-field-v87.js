@@ -88,7 +88,8 @@ module.exports = async function run() {
     t.includes(src('backup.js'), 'a.download = `PAT backup ${fileDateUK(todayISO())}.json`', 'backup file name: UK date, spaces');
     t.includes(src('photos.js'), 'a.download = `PATGo photos ${fileDateUK(todayISO())}.json`', 'photo export name: UK date, spaces');
     t.includes(src('csv.js'), 'const filename = csvFilename(session);', 'CSV share path uses the one name builder');
-    t.includes(src('csv.js'), "new File([BOM + buildCSV(s)], csvFilename(s)", 'CSV bulk share uses it too');
+    // V131: the bulk CSV share is retired (bulkExportUnexported) — no second builder to check.
+    t.excludes(src('csv.js'), 'function bulkExportUnexported', 'the bulk CSV share is gone (V131 2A)');
   });
 
   /* ------------------------------------------------------------------ 24b */
@@ -257,8 +258,8 @@ module.exports = async function run() {
 
     const refused = freshApp({ localStorage: seed, navigator: { persisted: false, persistGrants: false } });
     await tick(5);
-    refused.fn('setView')('settingsBackup');
-    t.includes(html(refused), 'Not protected', 'Backup page: not protected');
+    refused.fn('setView')('settingsStorage');   // V97: moved to Phone Storage
+    t.includes(html(refused), 'Not protected', 'Phone Storage page: not protected');
     t.includes(html(refused), 'data-action="storage-protect"', '…with the button');
     refused.nav._calls.persist = 0;
     tap(refused, 'storage-protect');
@@ -267,7 +268,7 @@ module.exports = async function run() {
 
     const granted = freshApp({ localStorage: seed, navigator: { persisted: false, persistGrants: false } });
     await tick(5);
-    granted.fn('setView')('settingsBackup');
+    granted.fn('setView')('settingsStorage');
     const slot = granted.doc.getElementById('storage-protect');
     t.ok(!!slot, 'the status line has its own slot to repaint');
     // The browser now says yes: the answer is painted IN PLACE, not by render().
@@ -289,12 +290,12 @@ module.exports = async function run() {
     fill(app, 50);
     app.fn('setView')('sessions');
     t.excludes(html(app), 'storage-banner-dismiss', '50%: no banner');
-    app.fn('setView')('settingsBackup');
+    app.fn('setView')('settingsStorage');   // V97
     t.excludes(html(app), 'Getting full', '50%: no note');
 
     fill(app, 65);
-    app.fn('setView')('settingsBackup');
-    t.includes(html(app), 'Getting full', '65%: amber note on the Backup page');
+    app.fn('setView')('settingsStorage');   // V97
+    t.includes(html(app), 'Getting full', '65%: amber note on the Phone Storage page');
     t.includes(html(app), 'storage-bar warn', '65%: bar amber');
     app.fn('setView')('sessions');
     t.excludes(html(app), 'storage-banner-dismiss', '65%: still no Jobs banner');
@@ -309,7 +310,7 @@ module.exports = async function run() {
     app.fn('render')();
     t.includes(html(app), 'storage-banner-dismiss', 'a new day: back');
     tap(app, 'storage-banner-open');
-    t.eq(app.state().view, 'settingsBackup', '"Back up & clear" opens the Backup page');
+    t.eq(app.state().view, 'settingsStorage', '"Back up & clear" opens Phone Storage (V97)');
   });
 
   /* ------------------------------------------------------------------ 24h */

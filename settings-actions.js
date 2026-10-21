@@ -36,7 +36,218 @@ function saveUserSettings() {
   // mirror of the active instrument and must never be written from here, or the
   // next syncActiveInstrumentMirror() would overwrite the write anyway.
   save();
-  setView('settings');
+  settingsBackNav();   // V112 (3A): Save lands where Back would
+}
+
+// ---------- V112 (1A 2A 3A): Back asks before it throws changes away ----------
+//
+// Seven Settings pages, and Edit session, keep what you type in the page itself
+// until you tap Save — and Save sits at the bottom of a long page while the Back
+// arrow is at the top. Before V112, Back simply left: everything typed, and on
+// Report Settings every switch flipped, was gone (the switches half-stuck in
+// memory until the app restarted). Now Back asks — Save / Discard changes /
+// Keep editing — but ONLY when something actually changed; an untouched page
+// leaves exactly as before, with no question.
+//
+// HOW "CHANGED" IS DECIDED, and why there are three ways:
+//
+//   • fields — the inputs Save reads. Read straight after every paint of the
+//     page (unsavedAfterRender, called from the render tail) and again on Back.
+//     After every paint, not just the first: a repaint draws from STATE, so the
+//     baseline is always "what the page showed" — a preset switched on Quick Pick
+//     Items (saved instantly) re-baselines instead of reading as an edit.
+//   • slice — for pages where an edit lives in STATE before Save (a CSV column
+//     moved up or down; the Edit session draft, which every keystroke mirrors).
+//     Those survive a repaint, so the per-paint field baseline cannot see them;
+//     the slice is compared with a copy taken when the page was FIRST opened, and
+//     that copy is what Discard puts back.
+//   • report — Report Settings mixes switches that wait for Save with ones that
+//     save instantly (Enable reports, the logo, templates). Compared with what is
+//     SAVED (loadReportSettings), so an instant save is never "unsaved"; and also
+//     with the page as opened, so a phone whose memory already differed from disk
+//     is not asked about changes nobody made. Discard re-reads what is saved.
+//
+// ⚠ Fields are looked up through `document`, one selector at a time — not a
+// comma list on #app. Same result on the phone, and it is the shape the harness
+// stub can answer (it registers ids, it does not parse markup).
+// ⚠ The question is a choice SHEET (feedback.js), built without render(): the
+// page underneath still holds the unsaved typing, and a repaint would wipe it —
+// the very thing this guard exists to stop (MAP rule 3).
+// ⚠ If the check itself throws, it counts as CHANGED: being asked once too often
+// is an annoyance; losing someone's typing is not recoverable.
+const UNSAVED_PAGES = {
+  settingsUser:         { fields: ['#settings-engineer'], save: () => saveUserSettings() },
+  settingsItems:        { fields: ['#settings-types'], save: () => saveItemTypesSettings() },
+  settingsFails:        { fields: ['#settings-reasons'], save: () => saveFailReasonsSettings() },
+  settingsDescriptions: { fields: ['#settings-descriptions'], save: () => saveDescriptionsSettings() },
+  settingsCsv: {
+    fields: ['.csv-col-row', '.csv-col-visible', '.csv-col-header'],
+    slice: () => state.csvColumns,
+    revert: (copy) => { state.csvColumns = copy; },
+    save: () => saveCsvColumnsSettings(),
+  },
+  settingsMultiPick: {
+    fields: ['#multipick-enabled', '.mp-slot-name', '.mp-slot-seq', '.mp-slot-qp'],
+    save: () => saveMultiPickSettings(),
+  },
+  settingsReport: { report: true, save: () => saveReportSettingsForm() },
+  settingsReportContent: { report: true, save: () => saveReportSettingsForm() },   // V117 (1A): same object, same Save
+  editSession: {
+    fields: ['#ef-site', '#ef-engineer', '#ef-name', '#ef-date', '#ef-prefix', '#ef-locked', '#ef-instrument'],
+    capture: () => captureEditSessionForm(),
+    slice: () => state.editForm,
+    save: () => { captureEditSessionForm(); saveSessionEdits(); },
+  },
+};
+
+let _unsaved = null;   // { view, dom, slice, report } for the page on screen
+
+// Key order fixed, so two equal objects always compare equal as text.
+function _unsavedText(v) {
+  const norm = (x) => {
+    if (Array.isArray(x)) return x.map(norm);
+    if (x && typeof x === 'object') {
+      const o = {};
+      Object.keys(x).sort().forEach(k => { o[k] = norm(x[k]); });
+      return o;
+    }
+    return x;
+  };
+  return JSON.stringify(norm(v === undefined ? null : v));
+}
+
+function unsavedFieldSnapshot(selectors) {
+  const out = [];
+  (selectors || []).forEach(sel => {
+    document.querySelectorAll(sel).forEach(el => {
+      if (el.type === 'checkbox' || el.type === 'radio') out.push(sel + '=' + (el.checked ? '1' : '0'));
+      else if (el.dataset && el.dataset.colId && !('value' in el && el.value)) out.push(sel + '@' + el.dataset.colId);
+      else out.push(sel + '=' + String(el.value == null ? '' : el.value));
+    });
+  });
+  return JSON.stringify(out);
+}
+
+function _unsavedReportNow() {
+  return _unsavedText(normaliseReportSettings(state.reportSettings));
+}
+
+// Render tail (render-core.js). Opening a guarded page takes the slice/report
+// copies; every paint of it re-reads the fields. Any other page clears the guard.
+function unsavedAfterRender() {
+  const page = UNSAVED_PAGES[state.view];
+  if (!page) { _unsaved = null; return; }
+  if (!_unsaved || _unsaved.view !== state.view) {
+    _unsaved = {
+      view: state.view,
+      slice: page.slice ? _unsavedText(page.slice()) : null,
+      sliceCopy: page.slice ? JSON.parse(_unsavedText(page.slice())) : null,
+      report: page.report ? _unsavedReportNow() : null,
+    };
+  }
+  _unsaved.dom = unsavedFieldSnapshot(page.fields);
+}
+
+function unsavedChanges() {
+  const page = UNSAVED_PAGES[state.view];
+  if (!page) return false;
+  // A guarded page with no baseline means the paint-time read failed: ask.
+  if (!_unsaved || _unsaved.view !== state.view) return true;
+  if (page.report) {
+    captureReportTextInputs();   // the page's typing, into state, as Save would
+    const now = _unsavedReportNow();
+    return now !== _unsaved.report && now !== _unsavedText(loadReportSettings());
+  }
+  if (page.capture) page.capture();
+  if (page.slice && _unsavedText(page.slice()) !== _unsaved.slice) return true;
+  return unsavedFieldSnapshot(page.fields) !== _unsaved.dom;
+}
+
+// Put memory back to what is saved — the half of Discard that is not "leave".
+function unsavedRevert() {
+  const page = UNSAVED_PAGES[state.view];
+  if (!page || !_unsaved) return;
+  if (page.report) state.reportSettings = loadReportSettings();
+  if (page.revert && _unsaved.sliceCopy) page.revert(_unsaved.sliceCopy);
+  if (state.view === 'settingsDescriptions') state.descTextMode = false;   // as Save leaves it
+}
+
+// Every guarded Back goes through here. `nav` is what Back did before V112.
+// V137 (3A): `then`, when given, is where Save leads instead of where Back
+// would — "Show me how ›" saves and then opens the page's tutorial, through the
+// same question as Back. Without it, Save behaves exactly as before.
+function unsavedLeave(nav, then) {
+  let changed;
+  try { changed = unsavedChanges(); } catch (e) { changed = true; }
+  if (!changed) { nav(); return; }
+  const page = UNSAVED_PAGES[state.view];
+  openChoiceSheet({
+    title: 'Save your changes?',
+    message: 'You changed something on this page and haven’t saved it yet.',
+    choices: [
+      { label: 'Save', style: 'primary', onPick: () => (then ? unsavedSaveThen(page, then) : page.save()) },
+      { label: 'Discard changes', style: 'danger', onPick: () => { unsavedRevert(); nav(); } },
+    ],
+    cancelLabel: 'Keep editing',
+  });
+}
+
+// V137 (3A): run a page's own Save, then `then` in place of where Save would
+// land. Every guarded Save ends in settingsBackNav(), which takes `_unsavedThen`
+// first. Report Settings' Save leaves for the certificate preview before it
+// reaches settingsBackNav when it was opened from the preview, so that marker is
+// held back for the save and put back after (4A: Back from the page still
+// returns to the preview). A save that stops early (nothing navigated) leaves
+// the marker as it was and the page where it is.
+let _unsavedThen = null;
+function unsavedSaveThen(page, then) {
+  const rp = state.reportPreviewReturnSessionId;
+  state.reportPreviewReturnSessionId = null;
+  let went = false;
+  _unsavedThen = () => { went = true; state.reportPreviewReturnSessionId = rp; then(); };
+  try { page.save(); }
+  finally {
+    _unsavedThen = null;
+    if (!went) state.reportPreviewReturnSessionId = rp;
+  }
+}
+
+// What a Settings page's Back arrow does (moved here from dispatch.js in V112 so
+// the Save handlers can land in the same place — 3A). Unchanged behaviour.
+function settingsBackNav() {
+  // V137: a Save asked for by "Show me how ›" goes on into the tutorial, the
+  // page's return markers untouched (unsavedSaveThen).
+  if (_unsavedThen) { const go = _unsavedThen; _unsavedThen = null; go(); return; }
+  // v35: if we arrived at Report Settings via the preview's "Edit settings"
+  // deep-link, going back returns straight to a freshly-rebuilt preview.
+  if (state.reportPreviewReturnSessionId && state.view === 'settingsReport') {
+    const sid = state.reportPreviewReturnSessionId;
+    state.reportPreviewReturnSessionId = null;
+    setView('reports');   // a sensible underlay behind the preview overlay
+    // v64: async now (it may need to read photos before rebuilding the preview).
+    reopenReportPreview(sid).catch(() => {});
+    return;
+  }
+  // v77: if we arrived at Quick Pick Items from the entry screen's preset
+  // switcher ("⚙ Edit presets"), Back returns there rather than climbing into
+  // the Settings hierarchy the user never walked down. Consume the marker
+  // BEFORE setView, exactly as the report-preview branch above does — setView
+  // would clear it on the way out anyway, but reading it first is what makes
+  // the two branches the same shape.
+  if (state.presetEditReturnView && state.view === 'settingsItems') {
+    const back = state.presetEditReturnView;
+    state.presetEditReturnView = null;
+    setView(back);
+    return;
+  }
+  if (state.view === 'settingsCategory') {
+    state.settingsCategory = null;
+    setView('settings');
+  } else if (state.settingsCategory) {
+    setView('settingsCategory');
+  } else {
+    setView('settings');
+  }
 }
 
 // ---------- v30: Report Settings ----------
@@ -60,6 +271,9 @@ function captureReportTextInputs() {
   if (addr) rs.companyAddress = addr.value.replace(/\s+$/, '');
   if (title) rs.reportTitle = title.value.trim() || 'Portable Appliance Test Report';
   if (decl) rs.declarationText = decl.value.trim();
+  // V95 (5B): the remedial action wording; blank goes back to the default.
+  const remAct = document.getElementById('report-remedial-text');
+  if (remAct) rs.remedialActionText = remAct.value.trim() || REPORT_REMEDIAL_ACTION_DEFAULT;
   if (fnpat) rs.reportFilenamePattern = fnpat.value.trim() || REPORT_FILENAME_DEFAULT;
   // v36: certificate-number fields.
   if (certPrefix) rs.certPrefix = certPrefix.value;
@@ -102,7 +316,7 @@ function saveReportSettingsForm() {
     reopenReportPreview(sid);
     return;
   }
-  setView('settings');
+  settingsBackNav();   // V112 (3A): Save lands where Back would
 }
 
 // Logo upload: read the chosen image, downscale its longest edge to
@@ -261,7 +475,7 @@ function saveDrawnSignature() {
 //     shouldn't block the save.
 function saveCsvColumnsSettings() {
   const rows = document.querySelectorAll('.csv-col-row');
-  if (!rows.length) { setView('settings'); return; }
+  if (!rows.length) { settingsBackNav(); return; }
   const next = [];
   rows.forEach(row => {
     const id = row.dataset.colId;
@@ -280,7 +494,7 @@ function saveCsvColumnsSettings() {
   state.csvColumns = next;
   ensureAllCsvColumns();
   save();
-  setView('settings');
+  settingsBackNav();   // V112 (3A)
 }
 
 function resetCsvColumnsSettings() {
@@ -354,7 +568,7 @@ function setSessionCertNo(sessionId, value) {
     if (dupe) {
       openConfirmSheet({
         title: 'Duplicate certificate number',
-        message: `Certificate number "${v}" is already used by another session. Use it anyway?`,
+        message: `Certificate number "${v}" is already used by another job. Use it anyway?`,
         confirmLabel: 'Use it',
         danger: false,
         onConfirm: commit
@@ -508,13 +722,16 @@ function startShareSetup() {
       <h3 class="bulk-sheet-title">Name this setup</h3>
       <button class="fail-close-btn" id="setup-name-cancel" aria-label="Cancel">×</button>
     </div>
-    <p style="margin:0 0 12px;font-size:13px;line-height:1.5;color:var(--text-muted)">Give this setup a name so it's easy to recognise when importing it later.</p>
-    <input class="input" id="setup-name-input" value="${escapeHTML(defaultName)}" autocapitalize="on" autocomplete="off" maxlength="60">
-    <p style="margin:12px 0 4px;font-size:12px;color:var(--text-muted)">Includes: ${escapeHTML(included.join(', '))}</p>
+    <p style="margin:0 0 12px;font-size:0.8125rem;line-height:1.5;color:var(--text-muted)">Give this setup a name so it's easy to recognise when importing it later.</p>
+    <input aria-label="Setup name" class="input" id="setup-name-input" value="${escapeHTML(defaultName)}" autocapitalize="on" autocomplete="off" maxlength="60">
+    <p style="margin:12px 0 4px;font-size:0.75rem;color:var(--text-muted)">Includes: ${escapeHTML(included.join(', '))}</p>
     <button class="btn-primary" id="setup-name-share" style="margin-top:12px">Share</button>
   `;
 
-  function cleanup() { backdrop.remove(); sheet.remove(); }
+  function cleanup() {
+    backdrop.remove(); sheet.remove();
+    if (typeof focusSheetClosed === 'function') focusSheetClosed();   // V123 (3A)
+  }
   backdrop.addEventListener('click', cleanup);
   document.getElementById && document.body.appendChild(backdrop);
   document.body.appendChild(sheet);
@@ -529,6 +746,7 @@ function startShareSetup() {
   });
   const nameInput = document.getElementById('setup-name-input');
   if (nameInput) { focusInSheet(nameInput); try { nameInput.select(); } catch (e) {} }
+  if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);   // V123 (3A) — the box keeps the cursor
 }
 
 function saveItemTypesSettings() {
@@ -541,7 +759,7 @@ function saveItemTypesSettings() {
     syncItemTypesFromActivePreset();
   }
   save();
-  setView('settings');
+  settingsBackNav();   // V112 (3A)
 }
 
 function saveFailReasonsSettings() {
@@ -549,7 +767,7 @@ function saveFailReasonsSettings() {
     .split('\n').map(s => s.trim()).filter(Boolean).slice(0, 6);
   state.failReasons = reasons.length ? reasons : DEFAULT_FAIL_REASONS.slice();
   save();
-  setView('settings');
+  settingsBackNav();   // V112 (3A)
 }
 
 function saveDescriptionsSettings() {
@@ -562,8 +780,136 @@ function saveDescriptionsSettings() {
     seen.add(l);
     return true;
   });
+  state.descTextMode = false;   // V95
   save();
-  setView('settings');
+  settingsBackNav();   // V112 (3A)
+}
+
+// ---------- V95 (3A, 4A): fix a description's spelling ----------
+// The list rename is a delete plus an add as far as sync is concerned — the V86
+// three-way merge carries both. Items are only ever changed in UNLOCKED jobs on
+// this phone (a locked job is a finished certificate); jobs only in the cloud
+// are not touched. Smart Quick Pick history keeps the old spelling on purpose:
+// renaming its keys would fight the highest-count merge between phones, and an
+// unused key simply stops being picked.
+
+function descFilter(v) {
+  const q = String(v || '').trim().toLowerCase();
+  document.querySelectorAll('.desc-row').forEach(el => {
+    el.style.display = (!q || (el.dataset.desc || '').includes(q)) ? '' : 'none';
+  });
+}
+
+// Every place the old spelling is used: { items, jobs, buttons, locked }.
+function descMatches(oldVal) {
+  const k = String(oldVal || '').trim().toLowerCase();
+  const out = { items: 0, jobs: 0, buttons: 0, locked: 0 };
+  if (!k) return out;
+  (state.sessions || []).forEach(s => {
+    if (!s || !Array.isArray(s.items)) return;
+    const n = s.items.filter(it => it && String(it.itemType || '').trim().toLowerCase() === k).length;
+    if (!n) return;
+    if (s.locked) { out.locked += n; return; }
+    out.items += n; out.jobs++;
+  });
+  (state.itemPresets || []).forEach(p => {
+    (p.items || []).forEach(t => { if (String(t || '').trim().toLowerCase() === k) out.buttons++; });
+  });
+  return out;
+}
+
+function descEditOpen(arg) {
+  const idx = parseInt(arg, 10);
+  const oldVal = state.descriptions[idx];
+  if (typeof oldVal !== 'string') return;
+  openNameSheet({
+    title: 'Fix description',
+    blurb: 'Correct the spelling. You can also change items already logged.',
+    value: oldVal,
+    maxlength: 100,
+    confirmLabel: 'Save',
+    onConfirm: (v) => descRenameAsk(oldVal, v),
+    deleteLabel: 'Delete from the list',
+    onDelete: () => descDeleteAsk(oldVal)
+  });
+}
+
+// V95.1: delete from the list only — autocomplete stops offering it. Items
+// already logged keep their description (they're records, not list entries),
+// and Quick Pick buttons are a preset's own list. Sync: a removal is what the
+// V86 three-way merge already carries (in the agreed base, gone here).
+function descDeleteAsk(oldVal) {
+  openConfirmSheet({
+    title: `Delete "${oldVal}"?`,
+    message: 'It comes off the description list, so it is no longer suggested. Items already logged keep it.',
+    confirmLabel: 'Delete',
+    onConfirm: () => {
+      const k = String(oldVal).toLowerCase();
+      state.descriptions = state.descriptions.filter(d => d.toLowerCase() !== k);
+      save();
+      render();
+      showToast('Description deleted');
+    }
+  });
+}
+
+function descRenameAsk(oldVal, newVal) {
+  const nv = String(newVal || '').trim();
+  if (!nv || nv === oldVal) return;
+  const m = descMatches(oldVal);
+  if (!m.items && !m.buttons) { descRenameApply(oldVal, nv, false); return; }
+  const bits = [];
+  if (m.items) bits.push(`${m.items} item${m.items === 1 ? '' : 's'} in ${m.jobs} unlocked job${m.jobs === 1 ? '' : 's'}`);
+  if (m.buttons) bits.push(`${m.buttons} Quick Pick button${m.buttons === 1 ? '' : 's'}`);
+  openChoiceSheet({
+    title: `Change to "${nv}"?`,
+    message: `"${oldVal}" is also used on ${bits.join(' and ')}.`
+      + (m.locked ? ` ${m.locked} item${m.locked === 1 ? '' : 's'} in locked jobs stay as they are.` : ''),
+    choices: [
+      { label: 'Change them too', style: 'primary', onPick: () => descRenameApply(oldVal, nv, true) },
+      { label: 'Only fix the list', style: 'secondary', onPick: () => descRenameApply(oldVal, nv, false) }
+    ]
+  });
+}
+
+function descRenameApply(oldVal, newVal, alsoUsed) {
+  const k = String(oldVal).trim().toLowerCase();
+  const nk = newVal.toLowerCase();
+  // The list: replace in place; if the new spelling is already there (a merge
+  // of two entries), the old one just goes.
+  const at = state.descriptions.findIndex(d => d.toLowerCase() === k);
+  const dupe = state.descriptions.findIndex(d => d.toLowerCase() === nk);
+  if (at !== -1) {
+    if (dupe !== -1 && dupe !== at) state.descriptions.splice(at, 1);
+    else state.descriptions[at] = newVal;
+  } else if (dupe === -1) state.descriptions.push(newVal);
+  let changed = 0;
+  if (alsoUsed) {
+    (state.sessions || []).forEach(s => {
+      if (!s || s.locked || !Array.isArray(s.items)) return;
+      let hit = false;
+      s.items.forEach(it => {
+        if (it && String(it.itemType || '').trim().toLowerCase() === k) { it.itemType = newVal; hit = true; changed++; }
+      });
+      if (hit) {
+        markSessionDirty(s);
+        // ⚠ In-place string edits: the encoding cache keys on item COUNT, so
+        // without this a non-open job writes its OLD encoding back and the fix
+        // silently un-happens on reload (sync spec section 6, the v69 trap).
+        if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(s);
+      }
+    });
+    (state.itemPresets || []).forEach(p => {
+      if (!Array.isArray(p.items)) return;
+      const seen = new Set();
+      p.items = p.items.map(t => String(t || '').trim().toLowerCase() === k ? newVal : t)
+        .filter(t => { const l = String(t).toLowerCase(); if (seen.has(l)) return false; seen.add(l); return true; });
+    });
+    syncItemTypesFromActivePreset();
+  }
+  save();
+  render();
+  showToast(changed ? `Fixed — ${changed} item${changed === 1 ? '' : 's'} changed` : 'Description fixed');
 }
 
 // v9: Reset-to-defaults helpers — overwrite the current list with the built-in
@@ -589,7 +935,7 @@ function resetItemsToDefaults() {
 function resetFailReasonsToDefaults() {
   openConfirmSheet({
     title: 'Reset fail reasons?',
-    message: 'Reset Quick Pick Fail to the built-in default reasons? This replaces the current list.',
+    message: 'Reset Fail Reasons to the built-in default reasons? This replaces the current list.',
     confirmLabel: 'Reset',
     onConfirm: () => {
       state.failReasons = DEFAULT_FAIL_REASONS.slice();
@@ -603,7 +949,7 @@ function resetFailReasonsToDefaults() {
 function resetDescriptionsToDefaults() {
   openConfirmSheet({
     title: 'Reset descriptions?',
-    message: 'Reset the Item Description List to the built-in defaults? This replaces the current list. Items already saved in past sessions are unaffected.',
+    message: 'Reset Descriptions to the built-in defaults? This replaces the current list. Items already saved in past jobs are unaffected.',
     confirmLabel: 'Reset',
     onConfirm: () => {
       state.descriptions = DEFAULT_DESCRIPTIONS.slice();
@@ -621,6 +967,15 @@ function setTheme(theme) {
   render();   // re-render to update radio button highlights
 }
 
+// V121: Settings → Theme & Sound → Text size. Same shape as setTheme: the page
+// has no open sheet, so a full render is safe (MAP rule 3).
+function setTextSize(size) {
+  state.textSize = normaliseTextSize(size);
+  applyTextSize(state.textSize);
+  save();
+  render();
+}
+
 function setHaptics(enabled) {
   state.hapticsEnabled = !!enabled;
   save();
@@ -630,6 +985,35 @@ function setHaptics(enabled) {
 // v17: opt-in sound feedback. Flipping it on plays a sample pass tone so the
 // user immediately hears what they've enabled (and it doubles as the first
 // user-gesture that unlocks the AudioContext on iOS). Flipping off is silent.
+// V94 (15A): the Undo button, per phone. Turning it off forgets any pending
+// undo. (Logging still notes itself while it is off — it costs nothing, and
+// undoAvailable() checks the record against the job at the tap anyway.)
+function setUndo(enabled) {
+  state.undoEnabled = !!enabled;
+  if (!state.undoEnabled) state.lastLog = null;
+  save();
+}
+
+// V99 (8A): map pins, per phone. Off hides only the ways of adding one — the 📍
+// button on a fail and the offer after logging one (9A).
+function setMapPinEnabled(enabled) {
+  state.mapPinEnabled = !!enabled;
+  if (!state.mapPinEnabled && typeof mapPinOfferHide === 'function') mapPinOfferHide();
+  save();
+}
+
+// V100 (7A, 8A): one of the three reminder timings, per phone. field =
+// 'exportAfter' | 'unlockedAt' | 'backupDays'; anything not on that field's list
+// falls back through normaliseReminders. Switching the not-exported reminder
+// off also leaves its Jobs-list filter.
+function setReminder(field, value) {
+  const r = normaliseReminders(state.reminders);
+  if (Object.prototype.hasOwnProperty.call(r, field)) r[field] = String(value);
+  state.reminders = normaliseReminders(r);
+  if (state.reminders.exportAfter === 'off' && state.sessionFilter === 'remindexport') state.sessionFilter = 'all';
+  save();
+}
+
 function setSound(enabled) {
   state.soundEnabled = !!enabled;
   save();
@@ -647,4 +1031,1265 @@ function setSound(enabled) {
 function setTimestamps(enabled) {
   state.timestampsEnabled = !!enabled;
   save();
+}
+
+// ============== V90 (R18) — the photo manager ==============
+// Settings → Backup → Manage photos. See what's on this phone and what's in the
+// cloud, and decide what stays where — iMessage "review attachments" style.
+// Markup: renderPhotoManager() in render-review.js. State: state.photoMgr
+// (state.js), all transient. Actions: pm-* in dispatch.js.
+//
+// It READS only what the phone already knows (state.photoMeta — this phone's
+// photos; state.photoCloud — photos known in the cloud, V89) until the engineer
+// taps "Look in the cloud" (3A), which reads rows only (sync.js syncPhotoBrowse)
+// and keeps them in memory. Every action goes through a path that already
+// existed:
+//   remove from phone = photosRemoveQuiet (known-in-cloud only, notes nothing)
+//   download          = syncPhotoDownload (cloud-only photos of jobs HERE — 4A)
+//   delete            = photoDelete / photoDeleteCloudOnly (the V89 ledger path);
+//                       a photo found by the look is made known first
+//                       (syncPhotoKnowForDelete), then the same ledger path.
+// ⚠ 8A: nothing on a LOCKED job is deleted here, signed in or out. Removing it
+// from the phone is fine — the cloud keeps it.
+//
+// The screen has no text inputs (two selects only), so it may render() freely;
+// previews arriving are painted in place, not by a render.
+
+function _pmVisible() {
+  return typeof _photoCloudVisible === 'function' && _photoCloudVisible();
+}
+
+function _pmReset(keepView) {
+  const old = state.photoMgr || {};
+  state.photoMgr = {
+    filter: keepView ? (old.filter || 'all') : 'all',
+    sort: keepView ? (old.sort || 'newest') : 'newest',
+    selecting: false,
+    selected: {},
+    shown: 0,
+    busy: '',
+    cloud: null,
+    preview: null,
+    thumbGen: (old.thumbGen || 0) + 1,   // stops a preview round still going
+  };
+}
+
+// V96 (Stage 7): opening a Settings group. A group with one visible page opens
+// that page straight away (Engineer & Tester, Phone & Display): a list with one
+// row is a wasted tap. settingsCategory is left null, so Back from the page
+// returns to the hub — the place the user actually was. Account & Sync always
+// shows its list (or the access-code box while locked), even if it shrinks.
+function settingsOpenCategory(id) {
+  state.cloudCodeMessage = '';
+  const cat = SETTINGS_CATEGORIES.find(c => c.id === id);
+  const pages = (cat && cat.id !== 'catCloud' && typeof settingsCategoryPages === 'function')
+    ? settingsCategoryPages(cat) : [];
+  if (pages.length === 1 && !(SETTINGS_PAGE_META[pages[0]] || {}).action) {
+    state.settingsCategory = null;
+    setView(pages[0]);
+    return;
+  }
+  state.settingsCategory = id;
+  setView('settingsCategory');
+}
+
+// V96: Manage photos and Jobs on this phone are reached from the Backup page,
+// from their own rows in Data, from search, and (jobs) from the Jobs screen's
+// tidy offer. Back used to go to the Backup page from all of them. Now each
+// opener notes where it was, and Back goes there. V97: their buttons moved to
+// Phone Storage, which is also the fallback. V130 (3A): the Backup page left
+// the list — it has opened none of them since V97.
+const _MGR_RETURN_VIEWS = ['settingsStorage', 'settingsCategory', 'settings', 'sessions', 'cloudStorage'];   // V108: + Cloud Storage
+function mgrNoteReturn() {
+  state.mgrReturnView = _MGR_RETURN_VIEWS.indexOf(state.view) !== -1 ? state.view : 'settingsStorage';
+}
+function mgrGoBack() {
+  const v = state.mgrReturnView || 'settingsStorage';
+  state.mgrReturnView = null;
+  setView(v);
+  // V108: back on Cloud Storage from Manage Photos — photos may have gone.
+  if (v === 'cloudStorage' && typeof cloudStoreLoad === 'function') cloudStoreLoad();
+}
+
+function photoMgrOpen() {
+  _pmReset(false);
+  setView('photoManager');
+  photoMgrLoadThumbs();
+}
+
+// Called by setView() on every navigation away. Cheap when there is nothing to do.
+function photoMgrLeave() {
+  const pm = state.photoMgr;
+  if (!pm) return;
+  if (pm.preview && pm.preview.own && typeof photoReleaseObjectUrls === 'function') photoReleaseObjectUrls();
+  // A fresh object: anything still running for the old screen sees it has gone
+  // (state.photoMgr !== pm) and stops. The cloud look is not kept (3A: re-read).
+  _pmReset(false);
+}
+
+function _pmJobInfo(e, sessById, pm) {
+  const sess = sessById.get(e.s);
+  if (sess) {
+    return {
+      onPhone: true, locked: !!sess.locked, orphan: false,
+      title: sess.site || sess.name || 'Untitled job',
+      client: (typeof clientNameForSession === 'function') ? clientNameForSession(sess) : '',
+      date: sess.date || '',
+    };
+  }
+  const cl = pm.cloud;
+  const j = (cl && cl.ok && cl.jobs) ? cl.jobs[e.s] : null;
+  // No job (5A) only when the look ASKED about it and the cloud had none, or a
+  // deleted one. A job never asked about (a capped look) is just unnamed.
+  const asked = !!(cl && cl.ok && Array.isArray(cl.asked) && cl.asked.indexOf(e.s) !== -1);
+  if (asked && (!j || j.deleted)) {
+    return { onPhone: false, locked: false, orphan: true, title: 'Photos with no job', client: '', date: '' };
+  }
+  if (j) {
+    const c = (j.clientId && typeof clientById === 'function') ? clientById(j.clientId) : null;
+    return { onPhone: false, locked: !!j.locked, orphan: false,
+      title: j.site || j.name || 'Untitled job', client: c ? c.name : '', date: j.date || '' };
+  }
+  return { onPhone: false, locked: false, orphan: false, title: 'A job not on this phone', client: '', date: '' };
+}
+
+// Everything the manager knows, as one list, plus the groups on screen.
+// Synchronous — render() calls it (MAP rule 2).
+function photoMgrModel() {
+  if (!state.photoMgr) _pmReset(false);
+  const pm = state.photoMgr;
+  const vis = _pmVisible();
+  const meta = state.photoMeta || {};
+  const known = vis ? (state.photoCloud || {}) : {};
+  const gone = new Set();
+  for (const t of (state.tombstones || [])) if (t && t.kind === 'photo') gone.add(String(t.id));
+  const sessById = new Map();
+  for (const s of (state.sessions || [])) if (s && s.id != null) sessById.set(String(s.id), s);
+
+  const all = [];
+  for (const id of Object.keys(meta)) {
+    const m = meta[id] || {};
+    all.push({ id, s: String(m.s || ''), i: String(m.i || ''), b: m.b || 0, a: m.at || '',
+      local: true, cloud: !!known[id], src: 'phone', t: !!(known[id] && known[id].t) });
+  }
+  if (vis) {
+    for (const id of Object.keys(known)) {
+      if (meta[id] || gone.has(id)) continue;
+      const e = known[id];
+      if (!e || !e.s || !e.i) continue;
+      all.push({ id, s: e.s, i: e.i, b: e.b || 0, a: e.a || '', local: false, cloud: true, src: 'known', t: !!e.t });
+    }
+    const cl = pm.cloud;
+    if (cl && cl.ok && Array.isArray(cl.rows)) {
+      for (const r of cl.rows) {
+        if (meta[r.id] || known[r.id] || gone.has(r.id)) continue;
+        // A job on this phone learns its own rows through the pull (rule 24).
+        if (sessById.has(r.s)) continue;
+        all.push({ id: r.id, s: r.s, i: r.i, b: r.b || 0, a: r.a || '', local: false, cloud: true, src: 'browse', t: !!r.t });
+      }
+    }
+  }
+  const byId = new Map();
+  for (const e of all) { Object.assign(e, _pmJobInfo(e, sessById, pm)); byId.set(e.id, e); }
+
+  // Totals (6A). The cloud line says what it covers: before a look, only what
+  // this phone knows; after, everything the account holds.
+  const totals = { phoneN: 0, phoneB: 0, cloudN: 0, cloudB: 0, cloudAll: false,
+    awayN: 0, awayJobs: 0, orphanN: 0 };
+  for (const e of all) if (e.local) { totals.phoneN++; totals.phoneB += e.b || 0; }
+  // V90.1: what lies beyond this phone's jobs — the look's result line says it,
+  // so a look that finds nothing new says so instead of looking like a sync.
+  const awayJobs = new Set();
+  for (const e of all) {
+    if (e.onPhone) continue;
+    if (e.orphan) totals.orphanN++;
+    else { totals.awayN++; awayJobs.add(e.s); }
+  }
+  totals.awayJobs = awayJobs.size;
+  if (vis) {
+    const cl = pm.cloud;
+    if (cl && cl.ok && Array.isArray(cl.rows)) {
+      totals.cloudAll = !cl.capped;
+      for (const r of cl.rows) if (!gone.has(r.id)) { totals.cloudN++; totals.cloudB += r.b || 0; }
+    } else {
+      for (const id of Object.keys(known)) if (!gone.has(id)) { totals.cloudN++; totals.cloudB += (known[id] && known[id].b) || 0; }
+    }
+  }
+
+  const f = vis ? (pm.filter || 'all') : 'all';
+  const keep = (e) => f === 'all' || (f === 'phone' && e.local) || (f === 'cloud' && !e.local)
+    || (f === 'notup' && e.local && !e.cloud);
+
+  const groups = new Map();
+  for (const e of all) {
+    if (!keep(e)) continue;
+    const key = e.orphan ? '~orphan' : e.s;
+    let g = groups.get(key);
+    if (!g) {
+      g = { key, title: e.title, client: e.client, date: e.date, onPhone: e.onPhone, locked: e.locked,
+            orphan: e.orphan, photos: [], bytes: 0, last: '' };
+      groups.set(key, g);
+    }
+    g.photos.push(e);
+    g.bytes += e.b || 0;
+    if (String(e.a) > g.last) g.last = String(e.a);
+  }
+  const list = Array.from(groups.values());
+  list.forEach((g) => g.photos.sort((a, b) => String(a.a).localeCompare(String(b.a)) || a.id.localeCompare(b.id)));
+  const when = (g) => g.date || String(g.last).slice(0, 10);
+  const sort = pm.sort || 'newest';
+  list.sort((a, b) => {
+    if (a.orphan !== b.orphan) return a.orphan ? 1 : -1;          // no job: always last
+    if (sort === 'space' && a.bytes !== b.bytes) return b.bytes - a.bytes;
+    const d = when(a).localeCompare(when(b));
+    if (d) return sort === 'oldest' ? d : -d;
+    return String(a.title).localeCompare(String(b.title)) || a.key.localeCompare(b.key);
+  });
+
+  // One page at a time (11A): a grid of hundreds never builds at once.
+  const page = (typeof PHOTO_MGR_PAGE === 'number') ? PHOTO_MGR_PAGE : 48;
+  const limit = pm.shown > 0 ? pm.shown : page;
+  let total = 0;
+  for (const g of list) total += g.photos.length;
+  let left = limit;
+  const shownGroups = [];
+  for (const g of list) {
+    if (left <= 0) break;
+    const take = g.photos.slice(0, left);
+    left -= take.length;
+    shownGroups.push(Object.assign({}, g, { shown: take }));
+  }
+  return { vis, filter: f, groups: shownGroups, allGroups: list, total,
+    more: Math.max(0, total - limit), byId, totals };
+}
+
+function _pmSelected(ids) {
+  const model = photoMgrModel();
+  const want = Array.isArray(ids) ? ids : Object.keys(state.photoMgr.selected || {});
+  return want.map((id) => model.byId.get(String(id))).filter(Boolean);
+}
+
+function _pmPaint(thumbs) {
+  render();
+  if (thumbs) photoMgrLoadThumbs();
+}
+
+// ---- previews (11A) ----
+// Tiles show small previews: a cloud photo's comes down (about 10 KB, only for
+// tiles on screen); this phone's own is made here from the photo (a full
+// 1280px picture per tile would fill a phone's memory). Kept for the session
+// (photos.js), so scrolling back or reopening costs nothing. One at a time.
+function _pmWithin(p, ms) {
+  let timer = null;
+  return Promise.race([p, new Promise((res) => { timer = setTimeout(() => res(null), ms); })])
+    .then((v) => { if (timer) clearTimeout(timer); return v; });
+}
+
+function _pmThumbFor(e) {
+  if (e.local) {
+    if (typeof photoThumbBlob !== 'function') return Promise.resolve(null);
+    return photoBlob(e.id).then((b) => b ? _pmWithin(photoThumbBlob(b), 8000) : null);
+  }
+  if (!e.t || typeof syncPhotoThumb !== 'function') return Promise.resolve(null);
+  return syncPhotoThumb(e.id, e.src === 'browse' ? { t: 1 } : undefined);
+}
+
+function _pmPaintThumb(id, url) {
+  try {
+    const el = document.getElementById('pm-t-' + id);
+    if (el && url) el.innerHTML = `<img src="${escapeHTML(url)}" alt="" loading="lazy">`;
+  } catch { /* the next render shows it */ }
+}
+
+function photoMgrLoadThumbs() {
+  const pm = state.photoMgr;
+  if (!pm || state.view !== 'photoManager') return Promise.resolve();
+  const gen = pm.thumbGen = (pm.thumbGen || 0) + 1;
+  const model = photoMgrModel();
+  const want = [];
+  for (const g of model.groups) for (const e of g.shown) if (!photoThumbCached(e.id)) want.push(e);
+  return want.reduce((chain, e) => chain.then(() => {
+    // A newer round (or leaving the screen) stops this one starting more…
+    if (state.photoMgr !== pm || pm.thumbGen !== gen || state.view !== 'photoManager') return null;
+    return _pmThumbFor(e).then((blob) => {
+      // …but a preview already on its way is kept: it was paid for.
+      if (!blob) return;
+      const url = photoThumbRemember(e.id, blob);
+      if (state.view === 'photoManager') _pmPaintThumb(e.id, url);
+      if (pm.preview && pm.preview.id === e.id && !pm.preview.url) { pm.preview.url = url; pm.preview.loading = false; render(); }
+    }, () => null);
+  }), Promise.resolve()).catch(() => { /* a missing preview stays a placeholder */ });
+}
+
+// ---- controls ----
+function photoMgrSetFilter(v) {
+  const ok = ['all', 'phone', 'cloud', 'notup'];
+  state.photoMgr.filter = ok.indexOf(v) === -1 ? 'all' : v;
+  state.photoMgr.shown = 0;
+  _pmPaint(true);
+}
+
+function photoMgrSetSort(v) {
+  const ok = ['newest', 'oldest', 'space'];
+  state.photoMgr.sort = ok.indexOf(v) === -1 ? 'newest' : v;
+  state.photoMgr.shown = 0;
+  _pmPaint(true);
+}
+
+function photoMgrShowMore() {
+  const page = (typeof PHOTO_MGR_PAGE === 'number') ? PHOTO_MGR_PAGE : 48;
+  const pm = state.photoMgr;
+  pm.shown = (pm.shown > 0 ? pm.shown : page) + page;
+  _pmPaint(true);
+}
+
+// 7A: Select → tap tiles; a job heading's tick takes the whole job.
+function photoMgrToggleSelecting() {
+  const pm = state.photoMgr;
+  if (pm.busy) return;
+  pm.selecting = !pm.selecting;
+  if (!pm.selecting) pm.selected = {};
+  _pmPaint(false);
+}
+
+function photoMgrTile(id) {
+  const pm = state.photoMgr;
+  if (!id || pm.busy) return;
+  if (!pm.selecting) { photoMgrPreview(id); return; }
+  if (pm.selected[id]) delete pm.selected[id]; else pm.selected[id] = true;
+  _pmPaint(false);
+}
+
+function photoMgrSelectJob(key) {
+  const pm = state.photoMgr;
+  if (!pm.selecting || pm.busy) return;
+  const g = photoMgrModel().allGroups.find((x) => x.key === key);
+  if (!g) return;
+  const all = g.photos.every((e) => pm.selected[e.id]);
+  g.photos.forEach((e) => { if (all) delete pm.selected[e.id]; else pm.selected[e.id] = true; });
+  _pmPaint(false);
+}
+
+function _pmForget(ids) {
+  const pm = state.photoMgr;
+  (ids || []).forEach((id) => { delete pm.selected[id]; });
+  if (pm.preview && (ids || []).indexOf(pm.preview.id) !== -1) photoMgrPreviewClose(true);
+}
+
+// ---- 3A: Look in the cloud ----
+function photoMgrLook() {
+  const pm = state.photoMgr;
+  if (!_pmVisible() || typeof syncPhotoBrowse !== 'function') return;
+  if (pm.cloud && pm.cloud.loading) return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    showToast('No signal \u2014 try again when you\u2019re connected');
+    return;
+  }
+  const prev = pm.cloud;
+  pm.cloud = Object.assign({}, prev || {}, { loading: true, error: '' });
+  _pmPaint(false);
+  syncPhotoBrowse().then((res) => {
+    if (state.photoMgr !== pm) return;             // left the screen meanwhile
+    if (res.ok) {
+      pm.cloud = { ok: true, loading: false, error: '', at: new Date().toISOString(),
+        rows: res.rows, jobs: res.jobs, asked: res.asked, capped: !!res.capped };
+    } else {
+      pm.cloud = Object.assign({}, prev && prev.ok ? prev : { ok: false, rows: [], jobs: {}, asked: [] }, {
+        loading: false,
+        error: res.offline ? 'No signal \u2014 try again when you\u2019re connected.' : (res.error || 'Couldn\u2019t reach the cloud. Try again.'),
+      });
+    }
+    pm.shown = 0;
+    if (state.view === 'photoManager') _pmPaint(true);
+  });
+}
+
+// ---- the preview (tap a tile outside Select) ----
+function photoMgrPreview(id) {
+  const pm = state.photoMgr;
+  const e = photoMgrModel().byId.get(String(id));
+  if (!e) return;
+  pm.preview = { id: e.id, url: photoThumbCached(e.id) || '', loading: true, own: false };
+  _pmPaint(false);
+  if (e.local) {
+    photoBlob(e.id).then((blob) => {
+      if (state.photoMgr !== pm || !pm.preview || pm.preview.id !== e.id) return;
+      const url = blob ? photoObjectUrl(blob) : '';
+      if (url) { pm.preview.url = url; pm.preview.own = true; }
+      pm.preview.loading = false;
+      render();
+    });
+    return;
+  }
+  if (pm.preview.url || !e.t) { pm.preview.loading = false; render(); return; }
+  _pmThumbFor(e).then((blob) => {
+    if (state.photoMgr !== pm || !pm.preview || pm.preview.id !== e.id) return;
+    if (blob) pm.preview.url = photoThumbRemember(e.id, blob);
+    pm.preview.loading = false;
+    render();
+  });
+}
+
+function photoMgrPreviewClose(quiet) {
+  const pm = state.photoMgr;
+  if (pm.preview && pm.preview.own && typeof photoReleaseObjectUrls === 'function') photoReleaseObjectUrls();
+  pm.preview = null;
+  if (!quiet) _pmPaint(false);
+}
+
+function _pmIdsOrSelected(arg) {
+  return arg ? [String(arg)] : Object.keys(state.photoMgr.selected || {});
+}
+
+const _pmPlural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+// ---- remove from phone (known in the cloud only) ----
+function photoMgrRemove(arg) {
+  const pm = state.photoMgr;
+  if (pm.busy || typeof syncPhotosUploadedIds !== 'function') return;
+  const sel = _pmSelected(_pmIdsOrSelected(arg));
+  const up = syncPhotosUploadedIds();
+  const go = sel.filter((e) => e.local && up.has(e.id));
+  const kept = sel.filter((e) => e.local && !up.has(e.id)).length;
+  if (!go.length) {
+    showToast(kept
+      ? 'Those photos haven\u2019t reached the cloud yet, so they stay on this phone'
+      : 'Those photos aren\u2019t on this phone');
+    return;
+  }
+  const bytes = go.reduce((n, e) => n + (e.b || 0), 0);
+  openConfirmSheet({
+    title: `Remove ${_pmPlural(go.length, 'photo')} from this phone?`,
+    message: `This frees about ${formatBytes(bytes)} on this phone. Your cloud copy keeps them, and you can download them again at any time. ` +
+      (kept ? `${_pmPlural(kept, 'photo')} not in the cloud yet ${kept === 1 ? 'is' : 'are'} kept. ` : '') +
+      'Your jobs and results are not affected.',
+    confirmLabel: 'Remove',
+    danger: false,
+    onConfirm: () => {
+      // Ask again at the moment of removing: only what is known in the cloud NOW.
+      const now = syncPhotosUploadedIds();
+      const ids = go.map((e) => e.id).filter((id) => now.has(id));
+      pm.busy = 'Removing\u2026';
+      _pmPaint(false);
+      photosRemoveQuiet(ids, true).then((n) => {
+        pm.busy = '';
+        if (n < 0) { showToast('Couldn\u2019t remove the photos. Try again.'); _pmPaint(false); return; }
+        _pmForget(ids);
+        showToast(`Removed ${_pmPlural(n, 'photo')} from this phone`);
+        _pmPaint(true);
+      });
+    },
+  });
+}
+
+// ---- download (cloud-only photos of jobs on this phone — 4A) ----
+function _pmPaintBusy() {
+  try {
+    const el = document.getElementById('pm-busy');
+    if (el) el.textContent = state.photoMgr.busy || '';
+  } catch { /* shown on the next render */ }
+}
+
+function photoMgrDownload(arg) {
+  const pm = state.photoMgr;
+  if (pm.busy || typeof syncPhotoDownload !== 'function') return;
+  const sel = _pmSelected(_pmIdsOrSelected(arg));
+  const go = sel.filter((e) => !e.local && e.src === 'known' && e.onPhone);
+  const away = sel.filter((e) => !e.local && !(e.src === 'known' && e.onPhone)).length;
+  if (!go.length) {
+    showToast(away
+      ? 'Those photos\u2019 jobs aren\u2019t on this phone. You can see and delete them here, but not download them yet'
+      : 'Those photos are already on this phone');
+    return;
+  }
+  const ids = go.map((e) => e.id);
+  pm.busy = `Downloading 0 of ${ids.length}\u2026`;
+  _pmPaint(false);
+  syncPhotoDownload(ids, (done, total) => { pm.busy = `Downloading ${done} of ${total}\u2026`; _pmPaintBusy(); }).then((res) => {
+    pm.busy = '';
+    if (res.offline) showToast('No signal \u2014 the photos are safe in the cloud. Try again when you\u2019re connected.');
+    else if (res.notReady) showToast('Photos are still loading \u2014 try again in a moment');
+    else if (res.failed) showToast(`Downloaded ${res.got}. Couldn\u2019t download ${res.failed} \u2014 try again later.`);
+    else showToast(`Downloaded ${_pmPlural(res.got, 'photo')}` + (away ? ` \u00b7 ${away} left: their jobs aren\u2019t on this phone` : ''));
+    const here = ids.filter((id) => state.photoMeta && state.photoMeta[id]);
+    here.forEach((id) => { delete pm.selected[id]; });
+    if (state.photoMgr === pm && state.view === 'photoManager') _pmPaint(true);
+  });
+}
+
+// ---- delete (everywhere when signed in — 9A; never on a locked job — 8A) ----
+function photoMgrDelete(arg) {
+  const pm = state.photoMgr;
+  if (pm.busy) return;
+  const vis = _pmVisible();
+  const sel = _pmSelected(_pmIdsOrSelected(arg));
+  const locked = sel.filter((e) => e.locked).length;
+  const go = sel.filter((e) => !e.locked && (e.local || vis));
+  if (!go.length) {
+    showToast(locked
+      ? 'Those photos are on a locked job. Unlock the job first to delete them.'
+      : 'Nothing to delete');
+    return;
+  }
+  const n = go.length;
+  const bytes = go.reduce((t, e) => t + (e.b || 0), 0);
+  const lockedNote = locked
+    ? ` ${_pmPlural(locked, 'photo')} on locked jobs ${locked === 1 ? 'is' : 'are'} left alone \u2014 unlock the job first to delete ${locked === 1 ? 'it' : 'them'}.`
+    : '';
+  openConfirmSheet({
+    title: vis ? `Delete ${_pmPlural(n, 'photo')} everywhere?` : `Delete ${_pmPlural(n, 'photo')}?`,
+    message: vis
+      ? `This deletes ${_pmPlural(n, 'photo')} (${formatBytes(bytes)}) from this phone and from your cloud copy, so they go from every phone too. It can\u2019t be undone.${lockedNote}`
+      : `This permanently deletes ${_pmPlural(n, 'photo')} (${formatBytes(bytes)}) from this phone. If you haven\u2019t exported them, they can\u2019t be recovered.${lockedNote}`,
+    confirmLabel: `Delete ${_pmPlural(n, 'photo')}`,
+    onConfirm: () => {
+      const locals = go.filter((e) => e.local);
+      const knownOnly = go.filter((e) => !e.local && e.src === 'known');
+      const found = go.filter((e) => e.src === 'browse');
+      pm.busy = 'Deleting\u2026';
+      _pmPaint(false);
+      let gone = 0;
+      locals.reduce((chain, e) => chain.then(() => photoDelete(e.id).then((ok) => { if (ok) gone++; })), Promise.resolve())
+        .then(() => {
+          knownOnly.forEach((e) => { if (photoDeleteCloudOnly(e.id)) gone++; });
+          // A photo the look found becomes known FIRST, then takes the same path.
+          return (found.length && typeof syncPhotoKnowForDelete === 'function')
+            ? syncPhotoKnowForDelete(found).then(() => { found.forEach((e) => { if (photoDeleteCloudOnly(e.id)) gone++; }); })
+            : null;
+        })
+        .catch((err) => { console.error('Photo manager delete (non-fatal).', err); })
+        .then(() => {
+          pm.busy = '';
+          locals.forEach((e) => { if (typeof photoThumbForget === 'function') photoThumbForget(e.id); });
+          _pmForget(go.map((e) => e.id));
+          showToast(gone === n ? `Deleted ${_pmPlural(n, 'photo')}` : `Deleted ${gone} of ${n} photos \u2014 try the rest again`);
+          if (state.photoMgr === pm && state.view === 'photoManager') _pmPaint(true);
+        });
+    },
+  });
+}
+
+// ============== V91 (roadmap Stage 4) — safe in the cloud ==============
+//
+// Settings → Backup → Jobs on this phone (5A), the tidy-up offer (8A, 9A — O4)
+// and every path that takes jobs off this phone. Signed in only: signed out
+// there is no cloud to keep anything, and the V14 clear-old-sessions is
+// unchanged.
+//
+// ⚠ One rule for every removal: sync first when there is signal, then check
+// (3A), then check AGAIN at the moment of removing (syncPruneFilter, fresh).
+// A job comes off this phone only if it is safe in the cloud (sync.js
+// syncJobsSafety). What is removed is recorded as cleared (the pull leaves it in
+// the cloud) and can be brought back from the Jobs screen's "In the cloud" tab
+// (V93 7A — the V91 Cleared section became a link there; one path).
+//
+// The screen has no text inputs, so it may render() freely.
+
+function _jmReset() {
+  const old = state.jobMgr || {};
+  state.jobMgr = { filter: 'all', selecting: false, selected: {}, busy: '',
+    gen: (old.gen || 0) + 1 };
+}
+
+function jobMgrOpen() {
+  _jmReset();
+  setView('jobManager');
+}
+
+// Called by setView() on every navigation away: a fresh object, so anything
+// still running for the old screen sees it has gone (state.jobMgr !== jm).
+function jobMgrLeave() {
+  if (!state.jobMgr) return;
+  _jmReset();
+}
+
+const _jmPlural = (n, word) => `${n} ${word}${n === 1 ? '' : 's'}`;
+
+function _jmCutoff(months) {
+  const d = new Date();
+  d.setMonth(d.getMonth() - (months || 12));
+  return d.toISOString().slice(0, 10);
+}
+
+// What the tidy-up offer would take off this phone (8A, 9A). Not signed in →
+// { active: false }. Old jobs: older than the clear-old age, safe in the cloud.
+// Old photos: taken more than the photo age ago, known in the cloud, of jobs
+// on this phone that are NOT already in the old-jobs list (those go with their
+// job). fresh as syncJobsSafety.
+function tidyModel(fresh) {
+  const out = { active: false, jobs: [], jobItems: 0, photos: [], photoBytes: 0,
+    jobAge: state.pruneAgeMonths || PRUNE_AGE_DEFAULT, photoAge: state.photoAgeMonths || PHOTO_AGE_DEFAULT };
+  const safety = (typeof syncJobsSafety === 'function') ? syncJobsSafety(fresh) : null;
+  if (!safety) return out;
+  out.active = true;
+  const jobCut = _jmCutoff(out.jobAge);
+  const onScreen = (state.view === 'entry') ? state.activeId : null;
+  const going = new Set();
+  for (const s of (state.sessions || [])) {
+    if (!s || s.id === onScreen) continue;
+    const r = safety.map.get(String(s.id));
+    if (!r || !r.safe || !s.date || !(s.date < jobCut)) continue;
+    out.jobs.push(s);
+    out.jobItems += (s.items || []).length;
+    going.add(String(s.id));
+  }
+  const vis = typeof _photoCloudVisible === 'function' && _photoCloudVisible();
+  if (vis && state.photoMetaReady) {
+    const photoCut = _jmCutoff(out.photoAge);
+    const known = state.photoCloud || {};
+    const jobDate = new Map();
+    for (const s of (state.sessions || [])) if (s && s.id != null) jobDate.set(String(s.id), s.date || '');
+    const meta = state.photoMeta || {};
+    for (const id of Object.keys(meta)) {
+      const m = meta[id] || {};
+      const job = String(m.s || '');
+      if (!known[id] || !jobDate.has(job) || going.has(job) || job === String(onScreen)) continue;
+      const when = String(m.at || jobDate.get(job) || '');
+      if (!when || !(when < photoCut)) continue;
+      out.photos.push(id);
+      out.photoBytes += (m.b || 0);
+    }
+  }
+  return out;
+}
+
+// ---- the offer (8A): Jobs screen, at most once every TIDY_OFFER_DAYS ----
+function tidyOfferDue() {
+  if (typeof syncActive !== 'function' || !syncActive()) return null;
+  let day = null;
+  try { day = localStorage.getItem(TIDY_OFFER_KEY); } catch (e) {}
+  if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
+    const next = new Date(day + 'T00:00:00Z');
+    next.setUTCDate(next.getUTCDate() + TIDY_OFFER_DAYS);
+    if (todayISO() < next.toISOString().slice(0, 10)) return null;
+  }
+  const m = tidyModel(false);
+  return (m.active && (m.jobs.length || m.photos.length)) ? m : null;
+}
+
+function tidyOfferAnswered() {
+  try { localStorage.setItem(TIDY_OFFER_KEY, todayISO()); } catch (e) {}
+}
+
+// ---- the removal flow (every path) ----
+// ids: job ids chosen. Syncs first when there's signal (3A), then asks, then
+// re-checks at the moment of removing. Works from any screen.
+function jobsRemoveAsk(ids, onDone) {
+  const want = new Set((ids || []).map(String));
+  if (!want.size || typeof syncPruneFilter !== 'function') return;
+  const jm = (state.view === 'jobManager') ? state.jobMgr : null;
+  const here = () => !jm || (state.jobMgr === jm && state.view === 'jobManager');
+  const busy = (text) => { if (jm && here()) { jm.busy = text; render(); } };
+  // V92 (3B): `verified` = the cloud's real contents, hashed, read just before
+  // asking. With signal every removal needs it; with none the last sync stands.
+  let verified = null;
+  const pick = () => syncPruneFilter((state.sessions || []).filter(s => s && want.has(String(s.id))), verified || undefined);
+  const online = typeof syncActive === 'function' && syncActive() && !(typeof _syncOffline === 'function' && _syncOffline());
+  if (online) { if (jm) busy('Checking with the cloud\u2026'); else showToast('Checking with the cloud\u2026'); }
+  const first = (online && typeof syncPull === 'function') ? syncPull({ manual: false }).catch(() => false) : Promise.resolve(false);
+  const check = () => {
+    if (!online || typeof syncVerifyJobs !== 'function') return true;
+    const safe = pick().clear.map(s => s.id);
+    if (!safe.length) return true;
+    return syncVerifyJobs(safe).then((m) => { verified = m; return true; }, () => false);
+  };
+  return first.then(check).then((ok) => {
+    if (!here()) return;
+    busy('');
+    if (!ok) { showToast('Couldn\u2019t check with the cloud \u2014 try again when the signal is better'); return; }
+    const g = pick();
+    if (!g.clear.length) {
+      const one = g.kept.length === 1 ? g.kept[0] : null;
+      showToast(one && typeof syncSafetyText === 'function'
+        ? `Can\u2019t take it off this phone yet \u2014 ${syncSafetyText(one.r || { why: one.why }).toLowerCase()}`
+        : 'None of those can come off this phone yet \u2014 they\u2019re not all safe in the cloud');
+      return;
+    }
+    const items = g.clear.reduce((n, s) => n + ((s.items || []).length), 0);
+    const kept = g.kept.length;
+    openConfirmSheet({
+      title: `Remove ${_jmPlural(g.clear.length, 'job')} from this phone?`,
+      message: `${g.clear.length === 1 ? 'It stays' : 'They stay'} in the cloud and on your other phones, with ${g.clear.length === 1 ? 'its' : 'their'} photos (${_jmPlural(items, 'item')}). ` +
+        `You can bring ${g.clear.length === 1 ? 'it' : 'them'} back from the Jobs screen \u2192 In the cloud.`   /* V115: plain text — no icon in a message */ +
+        (kept ? ` ${_jmPlural(kept, 'job')} not safe in the cloud yet ${kept === 1 ? 'stays' : 'stay'} on this phone.` : '') +
+        (online ? '' : ' No signal right now: checked against the last sync.'),
+      confirmLabel: 'Remove',
+      danger: false,
+      onConfirm: () => {
+        syncWhenIdle(() => {
+          // ⚠ The check AT the moment of removing — the cloud may have moved
+          // while the sheet was open (a run finished, another phone deleted it).
+          const g2 = pick();
+          const n = removeJobsFromPhone(g2.clear.map(s => s.id));
+          if (jm && here()) {
+            g2.clear.forEach(s => { delete jm.selected[String(s.id)]; });
+            if (!Object.keys(jm.selected).length) jm.selecting = false;
+          }
+          render();
+          showToast(n ? `Removed ${_jmPlural(n, 'job')} from this phone`
+            : 'Nothing removed \u2014 they changed while you were deciding');
+          if (typeof onDone === 'function') onDone(n);
+        });
+      },
+    });
+  });
+}
+
+// ---- the tidy-up actions (the offer, the Backup page, the manager's top) ----
+function tidyJobsRemove() {
+  const m = tidyModel(true);
+  tidyOfferAnswered();
+  if (!m.jobs.length) { showToast('No old jobs are ready to come off this phone'); render(); return; }
+  jobsRemoveAsk(m.jobs.map(s => s.id));
+}
+
+function tidyPhotosRemove() {
+  const m = tidyModel(false);
+  tidyOfferAnswered();
+  if (!m.photos.length) { showToast('No old photos are ready to come off this phone'); render(); return; }
+  openConfirmSheet({
+    title: `Remove ${_jmPlural(m.photos.length, 'photo')} from this phone?`,
+    message: `Photos taken more than ${_jmPlural(m.photoAge, 'month')} ago. This frees about ${formatBytes(m.photoBytes)} on this phone. ` +
+      'Your cloud copy keeps them, and a tap brings any of them back. Your jobs and results are not affected.',
+    confirmLabel: 'Remove',
+    danger: false,
+    onConfirm: () => {
+      // Only what is known in the cloud NOW.
+      const now = (typeof syncPhotosUploadedIds === 'function') ? syncPhotosUploadedIds() : new Set();
+      const ids = m.photos.filter(id => now.has(id));
+      photosRemoveQuiet(ids, false).then((n) => {
+        if (n < 0) { showToast('Couldn\u2019t remove the photos. Try again.'); return; }
+        showToast(`Removed ${_jmPlural(n, 'photo')} from this phone`);
+        render();
+      });
+    },
+  });
+}
+
+function tidyOfferDismiss() {
+  tidyOfferAnswered();
+  render();
+}
+
+function tidyOfferReview() {
+  tidyOfferAnswered();
+  jobMgrOpen();
+}
+
+// ---- Jobs on this phone: the list ----
+// Synchronous — render() calls it. Every job that syncs (the example job
+// never does), newest first, each with its safety and whether it can come off.
+function jobMgrModel() {
+  if (!state.jobMgr) _jmReset();
+  const jm = state.jobMgr;
+  const safety = (typeof syncJobsSafety === 'function') ? syncJobsSafety(false) : null;
+  const out = { active: !!safety, rows: [], counts: { all: 0, safe: 0, notyet: 0 }, filter: jm.filter, byId: new Map() };
+  if (!safety) return out;
+  const onScreen = (state.view === 'entry') ? state.activeId : null;
+  const all = [];
+  for (const s of (state.sessions || [])) {
+    if (!s || !safety.map.has(String(s.id))) continue;
+    const r = safety.map.get(String(s.id));
+    const pc = (typeof photoCountsForSession === 'function') ? photoCountsForSession(s) : { total: 0, cloud: 0 };
+    const row = {
+      id: String(s.id), s, r,
+      title: s.site || s.name || 'Untitled job',
+      client: (typeof clientNameForSession === 'function') ? clientNameForSession(s) : '',
+      date: s.date || '', items: (s.items || []).length, photos: pc.total, locked: !!s.locked,
+      removable: !!r.safe && s.id !== onScreen,
+    };
+    all.push(row);
+    out.byId.set(row.id, row);
+    out.counts.all++;
+    if (r.safe) out.counts.safe++; else out.counts.notyet++;
+  }
+  all.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+  out.rows = all.filter(x => jm.filter === 'safe' ? x.r.safe : (jm.filter === 'notyet' ? !x.r.safe : true));
+  return out;
+}
+
+function jobMgrSetFilter(v) {
+  const jm = state.jobMgr;
+  jm.filter = (v === 'safe' || v === 'notyet') ? v : 'all';
+  render();
+}
+
+function jobMgrToggleSelecting() {
+  const jm = state.jobMgr;
+  if (jm.busy) return;
+  jm.selecting = !jm.selecting;
+  if (!jm.selecting) jm.selected = {};
+  render();
+}
+
+function jobMgrTap(id) {
+  const jm = state.jobMgr;
+  if (!id || jm.busy || !jm.selecting) return;
+  const row = jobMgrModel().byId.get(String(id));
+  if (!row || !row.removable) {
+    if (row && typeof syncSafetyText === 'function') showToast(row.r.safe ? 'That job is open' : syncSafetyText(row.r));
+    return;
+  }
+  if (jm.selected[row.id]) delete jm.selected[row.id]; else jm.selected[row.id] = true;
+  render();
+}
+
+function jobMgrRemoveSelected() {
+  const jm = state.jobMgr;
+  if (jm.busy) return;
+  const ids = Object.keys(jm.selected || {});
+  if (!ids.length) return;
+  jobsRemoveAsk(ids);
+}
+
+// V93 (7A): the Cleared section is now a way to the cloud tab — one path.
+function jobMgrCloudLink() {
+  state.jobsTab = 'cloud';
+  setView('sessions');
+  cloudJobsLoad(false);
+}
+
+// V91 (9A): the photo age, from the Backup page (signed in).
+function savePhotoAge() {
+  const el = document.getElementById('photo-age-input');
+  if (!el) return;
+  const n = parseInt(el.value, 10);
+  if (!Number.isFinite(n) || n < 1 || n > 120) {
+    showToast('Enter a whole number of months (1\u2013120)');
+    return;
+  }
+  state.photoAgeMonths = n;
+  save();
+  render();
+}
+
+// ============== V93 (roadmap Stage 5 part 2) — the "In the cloud" tab ==============
+//
+// The Jobs screen gains two tabs when signed in (4A): On this phone | ☁ In the
+// cloud. The cloud tab lists every job the account holds that is NOT on this
+// phone — old jobs a fresh phone never brought down (1A), jobs cleared from it
+// (3A) — from one LIST read (8A, sync.js syncCloudList: names and counts, never
+// a job's contents). The list is kept in memory for the app session
+// (state.cloudJobs) with a ⟳ to read it again; it is re-read when this phone
+// removes jobs (stale) or a different account is signed in. Search and the
+// month groups are worked out on the phone.
+//
+// Tap a job → it comes down onto this phone and opens (5A, syncBringBack: one
+// download; a locked job stays locked). Select → Bring onto this phone for
+// several. V107: Select → Delete… deletes from the cloud (below, cloudDeleteOverview).
+//
+// ⚠ The search box is an input: typing refreshes only #cloud-list-area (as the
+// Jobs search does), never render(), or iOS drops the keyboard (MAP rule 3).
+
+function _cloudReset() {
+  state.cloudJobs = { loading: false, ok: false, error: '', at: '', uid: '', jobs: [],
+    capped: false, photos: false, stale: false, q: (state.cloudJobs && state.cloudJobs.q) || '',
+    selecting: false, selected: {}, busy: '' };
+}
+
+function cloudTabActive() {
+  return state.jobsTab === 'cloud' && typeof syncActive === 'function' && syncActive();
+}
+
+// The tab switch. Opening the cloud tab reads the list unless this session
+// already has a good one for this account.
+function jobsTabSet(tab) {
+  const t = tab === 'cloud' ? 'cloud' : 'phone';
+  if (state.jobsTab === t) return;
+  state.jobsTab = t;
+  if (t === 'cloud') cloudJobsLoad(false);
+  else if (state.cloudJobs) { state.cloudJobs.selecting = false; state.cloudJobs.selected = {}; }
+  render();
+}
+
+function cloudJobsLoad(force) {
+  if (!state.cloudJobs) _cloudReset();
+  const cj = state.cloudJobs;
+  if (cj.loading) return;
+  const uid = (typeof _syncCurrentUserId === 'function') ? _syncCurrentUserId() : '';
+  if (!force && cj.ok && !cj.stale && cj.uid === uid) return;
+  if (typeof syncCloudList !== 'function') return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    cj.error = 'No signal \u2014 the cloud list needs a connection.';
+    if (state.view === 'sessions') render();
+    return;
+  }
+  cj.loading = true;
+  cj.error = '';
+  if (state.view === 'sessions') render();
+  syncCloudList().then((res) => {
+    if (state.cloudJobs !== cj) return;
+    cj.loading = false;
+    if (res.ok) {
+      Object.assign(cj, { ok: true, stale: false, error: '', at: new Date().toISOString(), uid: res.uid,
+        jobs: res.jobs, capped: res.capped, photos: res.photos });
+    } else {
+      cj.error = res.offline ? 'No signal \u2014 the cloud list needs a connection.' : (res.error || 'Couldn\u2019t reach the cloud. Try again.');
+    }
+    if (state.view === 'sessions') render();
+  });
+}
+
+// What the tab shows: the list minus jobs now on this phone, filtered by the
+// search, newest first, grouped by month. Pure — render-core/review draw it.
+function cloudJobsModel() {
+  const cj = state.cloudJobs || {};
+  const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+  const all = (cj.jobs || []).filter(j => !local.has(j.id));
+  const q = String(cj.q || '').trim().toLowerCase();
+  const clientName = (id) => {
+    const c = (id && typeof clientById === 'function') ? clientById(id) : null;
+    return c && c.name ? c.name : '';
+  };
+  const rows = [];
+  for (const j of all) {
+    const client = clientName(j.clientId);
+    const title = j.site || j.name || 'Untitled job';
+    if (q) {
+      const hay = [j.site, j.name, client, j.certNo, j.date, (typeof formatDate === 'function' ? formatDate(j.date) : '')]
+        .join(' ').toLowerCase();
+      if (hay.indexOf(q) === -1) continue;
+    }
+    rows.push(Object.assign({}, j, { client, title }));
+  }
+  const groups = [];
+  let last = null;
+  for (const r of rows) {
+    const key = /^\d{4}-\d{2}/.test(r.date) ? r.date.slice(0, 7) : '';
+    if (!last || last.key !== key) {
+      let label = 'No date';
+      if (key) {
+        const idx = parseInt(key.slice(0, 4), 10) * 12 + parseInt(key.slice(5, 7), 10) - 1;
+        label = (typeof formatMonthIndex === 'function') ? formatMonthIndex(idx) : key;
+      }
+      last = { key, label, rows: [] };
+      groups.push(last);
+    }
+    last.rows.push(r);
+  }
+  return { total: all.length, shown: rows.length, groups, byId: new Map(rows.map(r => [r.id, r])) };
+}
+
+function cloudJobsSearch(v) {
+  if (!state.cloudJobs) _cloudReset();
+  state.cloudJobs.q = String(v || '');
+  if (typeof refreshCloudListAreaOnly === 'function') refreshCloudListAreaOnly();
+}
+
+function cloudJobsToggleSelecting() {
+  const cj = state.cloudJobs;
+  if (!cj || cj.busy) return;
+  cj.selecting = !cj.selecting;
+  cj.selected = {};
+  render();
+}
+
+// A tap: in select mode, tick it; otherwise bring it down and open it (5A).
+function cloudJobsTap(id) {
+  const cj = state.cloudJobs;
+  if (!cj || !id || cj.busy) return;
+  const key = String(id);
+  if (cj.selecting) {
+    if (cj.selected[key]) delete cj.selected[key]; else cj.selected[key] = true;
+    render();
+    return;
+  }
+  _cloudBring([key], true);
+}
+
+function cloudJobsBringSelected() {
+  const cj = state.cloudJobs;
+  if (!cj || cj.busy) return;
+  const ids = Object.keys(cj.selected || {});
+  if (!ids.length) return;
+  _cloudBring(ids, false);
+}
+
+function _cloudBring(ids, open) {
+  const cj = state.cloudJobs;
+  if (typeof syncBringBack !== 'function') return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    showToast('No signal \u2014 try again when you\u2019re connected');
+    return;
+  }
+  cj.busy = ids.length === 1 ? 'Bringing it onto this phone\u2026' : `Bringing ${ids.length} jobs onto this phone\u2026`;
+  render();
+  syncBringBack(ids).then((res) => {
+    if (state.cloudJobs === cj) {
+      cj.busy = '';
+      if (res.got) { cj.selecting = false; cj.selected = {}; }
+    }
+    if (res.got && open && ids.length === 1 && state.sessions.some(s => String(s.id) === ids[0])) {
+      // On the phone tab underneath, so Back from the job lands on the phone
+      // list where it now is. requestOpenSession keeps V10's reopen warning.
+      state.jobsTab = 'phone';
+      showToast('On this phone now \u2014 its photos download when you tap them');
+      requestOpenSession(ids[0]);
+      return;
+    }
+    if (res.got) {
+      showToast(`${res.got} job${res.got === 1 ? '' : 's'} brought onto this phone` +
+        (res.missing ? ` \u00b7 ${res.missing} no longer in the cloud` : ''));
+    } else if (res.offline) showToast('No signal \u2014 try again when you\u2019re connected');
+    else if (res.error) showToast(res.error);
+    else showToast(ids.length === 1 ? 'That job isn\u2019t in the cloud any more' : 'Those jobs aren\u2019t in the cloud any more');
+    // Deleted elsewhere since the list was read: read it again.
+    if (res.missing && state.cloudJobs === cj) cloudJobsLoad(true);
+    if (state.view === 'sessions') render();
+  });
+}
+
+// ---- V107 (Stage 5 part 3): delete jobs from the cloud ----------------------------
+// Select → tick jobs → Delete… (2A, 7A one at a time) → the review sheet
+// (render-review.js openCloudDeleteSheet): every job named with its counts and
+// certificate, what goes, that other phones lose it too, no copy kept (5A) →
+// "Yes, delete N jobs for good" (R20: the second step names it). At
+// CLOUD_DELETE_TYPE_AT or more, or when any has a certificate, DELETE must be
+// typed too (4B). Jobs with a certificate may be deleted (3A). Always on (6A).
+// The work is sync.js syncCloudDelete; nothing here touches the cloud.
+
+// What the sheet says, worked out from the list already read (never a doc).
+// Pure. Ids not in the list (gone since) are left out.
+// V108: `pool` — the jobs to name them from when the caller isn't the cloud tab
+// (Cloud Storage passes its biggest jobs, already named). Omitted: the cloud tab.
+function cloudDeleteOverview(ids, pool) {
+  const m = pool ? null : cloudJobsModel();
+  const all = new Map((pool || (state.cloudJobs && state.cloudJobs.jobs) || []).map(j => [j.id, j]));
+  const jobs = [];
+  for (const raw of (ids || [])) {
+    const id = String(raw);
+    const j = (m && m.byId.get(id)) || all.get(id);
+    if (j && !jobs.some(x => x.id === id)) jobs.push(j);
+  }
+  const num = (v) => (typeof v === 'number' && isFinite(v) && v > 0) ? v : 0;
+  const certs = jobs.filter(j => j.certNo || j.locked);
+  const items = jobs.reduce((n, j) => n + num(j.items), 0);
+  const photos = jobs.reduce((n, j) => n + num(j.photos), 0);
+  const at = (typeof CLOUD_DELETE_TYPE_AT === 'number') ? CLOUD_DELETE_TYPE_AT : 5;
+  return {
+    ids: jobs.map(j => j.id), jobs, n: jobs.length, items, photos,
+    photosKnown: pool ? true : !!(state.cloudJobs && state.cloudJobs.photos),
+    certs: certs.map(j => j.certNo).filter(Boolean),
+    certJobs: certs.length,
+    needWord: jobs.length >= at || certs.length > 0,
+  };
+}
+
+function cloudDeleteConfirmMatches(v) {
+  const word = (typeof CLOUD_DELETE_WORD === 'string') ? CLOUD_DELETE_WORD : 'DELETE';
+  return String(v == null ? '' : v).trim().toUpperCase() === word;
+}
+
+function cloudJobsDeleteSelected() {
+  const cj = state.cloudJobs;
+  if (!cj || cj.busy) return;
+  const o = cloudDeleteOverview(Object.keys(cj.selected || {}));
+  if (!o.n) return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    showToast('No signal — try again when you’re connected');
+    return;
+  }
+  if (typeof openCloudDeleteSheet !== 'function') return;
+  openCloudDeleteSheet(o, (typed) => {
+    // Checked again here: a disabled button is a hint, not a guard.
+    if (o.needWord && !cloudDeleteConfirmMatches(typed)) return false;
+    _cloudDelete(o.ids);
+    return true;
+  });
+}
+
+function _cloudDelete(ids) {
+  const cj = state.cloudJobs;
+  if (!cj || typeof syncCloudDelete !== 'function') return;
+  cj.busy = ids.length === 1 ? 'Deleting it from the cloud…' : `Deleting ${ids.length} jobs from the cloud…`;
+  render();
+  syncCloudDelete(ids).then((res) => {
+    const gone = new Set(res.ids || []);
+    if (state.cloudJobs === cj) {
+      cj.busy = '';
+      cj.jobs = (cj.jobs || []).filter(j => !gone.has(j.id));
+      for (const id of gone) delete cj.selected[id];
+      if (res.ok) { cj.selecting = false; cj.selected = {}; }
+    }
+    const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    const bits = [];
+    if (res.deleted) bits.push(`Deleted ${pl(res.deleted, 'job')} from the cloud` + (res.photos ? ` with ${pl(res.photos, 'photo')}` : ''));
+    if (res.missing) bits.push(`${res.missing} ${res.missing === 1 ? 'was' : 'were'} already gone`);
+    if (res.skipped) bits.push(`${res.skipped} ${res.skipped === 1 ? 'is' : 'are'} on this phone now — delete ${res.skipped === 1 ? 'it' : 'them'} from the phone tab`);
+    if (res.offline) showToast('No signal — nothing was deleted');
+    else if (res.error) {
+      const e = String(res.error);
+      showToast((res.deleted ? bits[0] + ', then ' : 'Nothing was deleted: ') + e.charAt(0).toLowerCase() + e.slice(1));
+    }
+    else if (bits.length) showToast(bits.join(' · '));
+    // Something changed that the list didn't know: read it again.
+    if ((res.missing || res.error) && state.cloudJobs === cj) cloudJobsLoad(true);
+    if (state.view === 'sessions') render();
+  });
+}
+
+// ---- V108 (Stage 5 part 3, second half): Cloud Storage --------------------------
+// Settings → Data → Cloud Storage (1A), signed in only. What the account holds in
+// the cloud — jobs, photos, the total; figures only, no limit (2A) — and its
+// CLOUD_STORAGE_TOP biggest jobs (3A, jobs on this phone included and marked).
+// Select → Delete… deletes biggest jobs that are NOT on this phone, through
+// V107's own review, word and sync (4A) — no second delete path. A job on this
+// phone can't be ticked: it keeps 🗑 → Delete everywhere on the phone's list.
+// Photos: a line and the Manage Photos button (5A). Read every time the page is
+// opened, with ⟳ (6A); the last figures stay on screen while it reads. Memory
+// only (state.cloudStore), never saved.
+// The read is sync.js syncCloudStorage; nothing here touches the cloud.
+
+function _cloudStoreReset(ret) {
+  const old = state.cloudStore || {};
+  state.cloudStore = { loading: false, ok: !!old.ok, error: '', needsUpdate: false, at: old.at || '', uid: old.uid || '',
+    jobs: old.jobs || { n: 0, bytes: 0 }, photos: old.photos || { n: 0, bytes: 0 }, top: old.top || [],
+    capped: !!old.capped, selecting: false, selected: {}, busy: '', ret: ret || old.ret || 'settingsStorage',
+    gen: (old.gen || 0) + 1 };
+}
+
+function cloudStoreOpen() {
+  _cloudStoreReset(_MGR_RETURN_VIEWS.indexOf(state.view) !== -1 && state.view !== 'cloudStorage' ? state.view : 'settingsStorage');
+  // Another account's figures are never shown, not even while reading.
+  const uid = (typeof _syncCurrentUserId === 'function') ? _syncCurrentUserId() : '';
+  if (state.cloudStore.uid && state.cloudStore.uid !== uid) _cloudStoreForget();
+  setView('cloudStorage');
+  cloudStoreLoad();
+}
+
+function _cloudStoreForget() {
+  Object.assign(state.cloudStore, { ok: false, at: '', uid: '', jobs: { n: 0, bytes: 0 }, photos: { n: 0, bytes: 0 }, top: [], capped: false });
+}
+
+function cloudStoreBack() {
+  const cs = state.cloudStore || {};
+  const v = cs.ret || 'settingsStorage';
+  cs.selecting = false; cs.selected = {};
+  setView(v);
+}
+
+function cloudStoreLoad() {
+  if (!state.cloudStore) _cloudStoreReset();
+  const cs = state.cloudStore;
+  if (cs.loading || typeof syncCloudStorage !== 'function') return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    cs.error = 'No signal — Cloud Storage needs a connection.';
+    if (state.view === 'cloudStorage') render();
+    return;
+  }
+  cs.loading = true;
+  cs.error = '';
+  if (state.view === 'cloudStorage') render();
+  syncCloudStorage().then((res) => {
+    if (state.cloudStore !== cs) return;
+    cs.loading = false;
+    if (res.ok) {
+      Object.assign(cs, { ok: true, error: '', needsUpdate: false, at: new Date().toISOString(), uid: res.uid,
+        jobs: res.jobs, photos: res.photos, top: res.top, capped: res.capped });
+      // A ticked job that has left the list can't stay ticked.
+      const ids = new Set(res.top.map(j => j.id));
+      for (const id of Object.keys(cs.selected)) if (!ids.has(id)) delete cs.selected[id];
+    } else {
+      cs.needsUpdate = !!res.needsUpdate;
+      cs.error = res.offline ? 'No signal — Cloud Storage needs a connection.' : (res.error || 'Couldn’t reach the cloud. Try again.');
+    }
+    if (state.view === 'cloudStorage') render();
+  });
+}
+
+// What the page shows. Pure. A job is "on this phone" by the phone's own list,
+// at draw time — a job brought down since the read moves across by itself.
+function cloudStoreModel() {
+  const cs = state.cloudStore || {};
+  const local = new Set((state.sessions || []).map(s => String(s && s.id)));
+  const clientName = (id) => {
+    const c = (id && typeof clientById === 'function') ? clientById(id) : null;
+    return c && c.name ? c.name : '';
+  };
+  const rows = (cs.top || []).map(j => Object.assign({}, j, {
+    client: clientName(j.clientId), title: j.site || j.name || 'Untitled job', onPhone: local.has(j.id),
+  }));
+  const jobs = cs.jobs || { n: 0, bytes: 0 };
+  const photos = cs.photos || { n: 0, bytes: 0 };
+  const sel = Object.keys(cs.selected || {}).filter(id => rows.some(r => r.id === id && !r.onPhone));
+  return { rows, jobs, photos, total: (jobs.bytes || 0) + (photos.bytes || 0), selected: sel,
+    selectable: rows.filter(r => !r.onPhone).length };
+}
+
+function cloudStoreToggleSelecting() {
+  const cs = state.cloudStore;
+  if (!cs || cs.busy) return;
+  cs.selecting = !cs.selecting;
+  cs.selected = {};
+  render();
+}
+
+// Only in Select. A job on this phone is never ticked (4A).
+function cloudStoreTap(id) {
+  const cs = state.cloudStore;
+  if (!cs || !id || cs.busy || !cs.selecting) return;
+  const key = String(id);
+  const row = cloudStoreModel().rows.find(r => r.id === key);
+  if (!row) return;
+  if (row.onPhone) {
+    showToast('That job is on this phone — delete it from the phone’s job list');
+    return;
+  }
+  if (cs.selected[key]) delete cs.selected[key]; else cs.selected[key] = true;
+  render();
+}
+
+function cloudStoreDeleteSelected() {
+  const cs = state.cloudStore;
+  if (!cs || cs.busy) return;
+  const m = cloudStoreModel();
+  // m.selected never holds a job on this phone (cloudStoreModel) — the one guard.
+  const o = cloudDeleteOverview(m.selected, m.rows);
+  if (!o.n) return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    showToast('No signal — try again when you’re connected');
+    return;
+  }
+  if (typeof openCloudDeleteSheet !== 'function') return;
+  openCloudDeleteSheet(o, (typed) => {
+    // Checked again here, as V107's own action does: the button is a hint.
+    if (o.needWord && !cloudDeleteConfirmMatches(typed)) return false;   // V108
+    _cloudStoreDelete(o.ids);
+    return true;
+  });
+}
+
+function _cloudStoreDelete(ids) {
+  const cs = state.cloudStore;
+  if (!cs || typeof syncCloudDelete !== 'function') return;
+  cs.busy = ids.length === 1 ? 'Deleting it from the cloud…' : `Deleting ${ids.length} jobs from the cloud…`;
+  render();
+  syncCloudDelete(ids).then((res) => {
+    const gone = new Set(res.ids || []);
+    // The cloud tab's list, if read, loses them too.
+    if (state.cloudJobs && state.cloudJobs.jobs) state.cloudJobs.jobs = state.cloudJobs.jobs.filter(j => !gone.has(j.id));
+    if (state.cloudStore === cs) {
+      cs.busy = '';
+      cs.top = (cs.top || []).filter(j => !gone.has(j.id));
+      for (const id of gone) delete cs.selected[id];
+      if (res.ok) { cs.selecting = false; cs.selected = {}; }
+    }
+    const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+    const bits = [];
+    if (res.deleted) bits.push(`Deleted ${pl(res.deleted, 'job')} from the cloud` + (res.photos ? ` with ${pl(res.photos, 'photo')}` : ''));
+    if (res.missing) bits.push(`${res.missing} ${res.missing === 1 ? 'was' : 'were'} already gone`);
+    if (res.skipped) bits.push(`${res.skipped} ${res.skipped === 1 ? 'is' : 'are'} on this phone now`);
+    if (res.offline) showToast('No signal — nothing was deleted');
+    else if (res.error) {
+      const e = String(res.error);
+      showToast((res.deleted ? bits[0] + ', then ' : 'Nothing was deleted: ') + e.charAt(0).toLowerCase() + e.slice(1));
+    }
+    else if (bits.length) showToast(bits.join(' · '));
+    // The totals and the biggest jobs have changed: read them again — AFTER the
+    // run syncCloudDelete starts, which is the one that removes the photo rows
+    // (V107); read before it and the photos are still counted.
+    if (state.view === 'cloudStorage') render();
+    const again = () => { if (state.cloudStore === cs && state.view === 'cloudStorage') cloudStoreLoad(); };
+    if (typeof syncWhenIdle === 'function') syncWhenIdle(again); else again();
+  });
 }

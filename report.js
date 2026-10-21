@@ -255,7 +255,8 @@ function _photoAppendixWanted(data) {
 // Draw the appendix onto the END of the document, after the declaration. Returns
 // nothing; the caller runs the footer pass afterwards so these pages are numbered
 // and footed like every other page.
-function _appendPhotoPages(doc, session, data, margin, headerRgb) {
+// V95: the page geometry both end sections share (photo pages, remedial actions).
+function _photoGeom(doc, margin) {
   const pageW = doc.internal.pageSize.getWidth();
   const pageH = doc.internal.pageSize.getHeight();
   const contentW = pageW - margin * 2;
@@ -265,24 +266,12 @@ function _appendPhotoPages(doc, session, data, margin, headerRgb) {
   const boxH = colW;                 // square slot; portrait and landscape shots both fit
   const bottomLimit = pageH - 46;    // clear of the footer band at pageH-20
 
-  doc.addPage();
-  let y = margin;
+  return { pageW, pageH, contentW, cols, gap, colW, boxH, bottomLimit };
+}
 
-  // ----- Appendix title -----
-  doc.setFontSize(14); doc.setFont(undefined, 'bold');
-  doc.setTextColor(headerRgb[0], headerRgb[1], headerRgb[2]);
-  doc.text(pdfSafe('Photographic evidence'), margin, y + 12);
-  doc.setTextColor(0);
-  y += 22;
-  doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
-  const introLines = doc.splitTextToSize(
-    pdfSafe('Photographs recorded during testing, listed against the asset each belongs to.'),
-    contentW
-  );
-  doc.text(introLines, margin, y + 8);
-  y += introLines.length * 11 + 8;
-  doc.setTextColor(0);
-
+// V95: the boxed "not every photo is printed" notice, drawn at y; returns new y.
+// Split out of _appendPhotoPages unchanged so the remedial section shows it too.
+function _drawPhotoOmitNotice(doc, data, margin, contentW, y) {
   // ----- The "not everything is here" notice (decision Q9A: make it clear) -----
   // Printed on the FIRST appendix page, boxed, not buried at the end of fifty
   // pages where nobody would reach it. It is repeated at the end as well.
@@ -305,8 +294,18 @@ function _appendPhotoPages(doc, session, data, margin, headerRgb) {
     doc.setTextColor(0); doc.setFont(undefined, 'normal'); doc.setDrawColor(0);
   }
 
+  return y;
+}
+
+// V95: one block per photo group (caption, the item's notes, a row of photos),
+// from y; returns new y. Split out of _appendPhotoPages unchanged.
+// V99 (6A): `withPins` — the remedial section passes true, so a fail's map pin
+// prints under its caption as a tap-to-open what3words link. The photo pages
+// (remedial off) pass nothing: pins print in the remedial section only.
+function _drawPhotoGroups(doc, groups, margin, G, y, withPins) {
+  const { contentW, cols, gap, colW, boxH, bottomLimit } = G;
   // ----- One block per item -----
-  data.groups.forEach((g) => {
+  groups.forEach((g) => {
     const it = g.item || {};
     const headBits = [];
     if (it.assetNo) headBits.push(String(it.assetNo));
@@ -321,8 +320,9 @@ function _appendPhotoPages(doc, session, data, margin, headerRgb) {
     // Rows of up to `cols` photos (the per-item cap is 3 and cols is 3, so this
     // is one row today — written as a loop so raising PHOTO_MAX_PER_ITEM later
     // doesn't silently drop photos off the side of the page).
+    const pin = (withPins && typeof mapPinOf === 'function') ? mapPinOf(it) : '';
     const rowCount = Math.max(1, Math.ceil(g.photos.length / cols));
-    const blockH = 14 + (noteLines.length * 11) + 6 + (rowCount * (boxH + 10)) + 8;
+    const blockH = 14 + (noteLines.length * 11) + (pin ? 12 : 0) + 6 + (rowCount * (boxH + 10)) + 8;
 
     if (y + blockH > bottomLimit) { doc.addPage(); y = margin; }
 
@@ -335,6 +335,7 @@ function _appendPhotoPages(doc, session, data, margin, headerRgb) {
       y += noteLines.length * 11;
       doc.setTextColor(0); doc.setFont(undefined, 'normal');
     }
+    if (pin) { _drawMapPinLine(doc, pin, margin, y + 9); y += 12; }
     y += 6;
 
     for (let r = 0; r < rowCount; r++) {
@@ -357,6 +358,12 @@ function _appendPhotoPages(doc, session, data, margin, headerRgb) {
     y += 8;
   });
 
+  return y;
+}
+
+// V95: the repeated omission line at the end; from y.
+function _drawPhotoOmitTail(doc, data, margin, contentW, bottomLimit, y) {
+  const omitted = data.omitted || 0;
   // ----- Repeat the omission notice at the end -----
   if (omitted > 0) {
     if (y + 30 > bottomLimit) { doc.addPage(); y = margin; }
@@ -368,6 +375,128 @@ function _appendPhotoPages(doc, session, data, margin, headerRgb) {
     );
     doc.text(tail, margin, y + 10);
     doc.setTextColor(0); doc.setFont(undefined, 'normal');
+  }
+}
+
+// V99: one map pin as "Map pin: ///word.word.word", the address a link to its
+// what3words page (opens the app or the site). Baseline at y.
+function _drawMapPinLine(doc, pin, margin, y) {
+  const label = 'Map pin: ';
+  const addr = '///' + pin;
+  doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+  doc.text(pdfSafe(label), margin, y);
+  const lw = (typeof doc.getTextWidth === 'function') ? doc.getTextWidth(label) : 40;
+  doc.setTextColor(30, 64, 175);
+  const url = (typeof w3wUrl === 'function') ? w3wUrl(pin) : '';
+  if (url && typeof doc.textWithLink === 'function') doc.textWithLink(pdfSafe(addr), margin + lw, y, { url });
+  else doc.text(pdfSafe(addr), margin + lw, y);
+  doc.setTextColor(0);
+}
+
+function _appendPhotoPages(doc, session, data, margin, headerRgb) {
+  const G = _photoGeom(doc, margin);
+  const contentW = G.contentW;
+
+  doc.addPage();
+  let y = margin;
+
+  // ----- Appendix title -----
+  doc.setFontSize(14); doc.setFont(undefined, 'bold');
+  doc.setTextColor(headerRgb[0], headerRgb[1], headerRgb[2]);
+  doc.text(pdfSafe('Photographic evidence'), margin, y + 12);
+  doc.setTextColor(0);
+  y += 22;
+  doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+  const introLines = doc.splitTextToSize(
+    pdfSafe('Photographs recorded during testing, listed against the asset each belongs to.'),
+    contentW
+  );
+  doc.text(introLines, margin, y + 8);
+  y += introLines.length * 11 + 8;
+  doc.setTextColor(0);
+
+  y = _drawPhotoOmitNotice(doc, data, margin, contentW, y);
+  y = _drawPhotoGroups(doc, data.groups, margin, G, y);
+  _drawPhotoOmitTail(doc, data, margin, contentW, G.bottomLimit, y);
+}
+
+// ---------------------------------------------------------------------------
+// V95 (S7 — 5B, 6A, 6C): the remedial actions section, at the END of the report.
+//
+// Every failed item once. Order (6C): first a list of the fails that have no
+// printed photo, then each fail that does, with its photos — so with photos ON
+// this section REPLACES the photo pages (6A: photos only ever attach to a fail,
+// so both on would print every photographed fail twice). With photos OFF every
+// fail is in the list. `data` is the photo data when photos are on, else null.
+// A job with no fails gets no section, switch on or not.
+// ---------------------------------------------------------------------------
+function _remedialWanted(session) {
+  const rs = state.reportSettings || {};
+  return rs.showRemedial === true && !!session && Array.isArray(session.items)
+    && session.items.some(i => i && i.result === 'fail');
+}
+
+function _appendRemedialPages(doc, session, data, margin, headerRgb) {
+  const rs = state.reportSettings || {};
+  const G = _photoGeom(doc, margin);
+  const contentW = G.contentW;
+  const fails = session.items.filter(i => i && i.result === 'fail');
+  const groups = (data && Array.isArray(data.groups)) ? data.groups : [];
+  const pictured = {};
+  groups.forEach(g => { if (g.item && g.item.id) pictured[g.item.id] = true; });
+  // Photos of a non-fail item (a stray left by a failed delete) still print —
+  // dropping them would lose evidence the photo pages used to show.
+  const listed = fails.filter(it => !pictured[it.id]);
+
+  doc.addPage();
+  let y = margin;
+  doc.setFontSize(14); doc.setFont(undefined, 'bold');
+  doc.setTextColor(headerRgb[0], headerRgb[1], headerRgb[2]);
+  doc.text(pdfSafe('Remedial actions'), margin, y + 12);
+  doc.setTextColor(0);
+  y += 22;
+  doc.setFontSize(9); doc.setFont(undefined, 'normal'); doc.setTextColor(90);
+  const intro = `${fails.length} ${fails.length === 1 ? 'item' : 'items'} failed testing.`
+    + ((rs.remedialActionOn !== false && String(rs.remedialActionText || '').trim())
+      ? ' ' + String(rs.remedialActionText).trim() : '');
+  const introLines = doc.splitTextToSize(pdfSafe(intro), contentW);
+  doc.text(introLines, margin, y + 8);
+  y += introLines.length * 11 + 8;
+  doc.setTextColor(0);
+
+  if (data && groups.length) y = _drawPhotoOmitNotice(doc, data, margin, contentW, y);
+
+  if (listed.length) {
+    // V99 (6A): a Map pin column only when a listed fail has one; each address
+    // is a link to its what3words page.
+    const pinOf = (it) => (typeof mapPinOf === 'function') ? mapPinOf(it) : '';
+    const anyPin = listed.some(it => pinOf(it));
+    const head = ['Asset', 'Description', 'Location', 'Reason'].concat(anyPin ? ['Map pin'] : []);
+    runAutoTable(doc, {
+      startY: y + 4,
+      head: [head.map(pdfSafe)],
+      body: listed.map(it => [it.assetNo || '', it.itemType || '', it.location || '', (it.notes || '').trim()]
+        .concat(anyPin ? [pinOf(it) ? '///' + pinOf(it) : ''] : []).map(v => pdfSafe(v))),
+      margin: { left: margin, right: margin },
+      styles: { fontSize: 9, cellPadding: 4 },
+      headStyles: { fillColor: headerRgb, textColor: contrastColor(headerRgb) },
+      ...(anyPin ? { didDrawCell: (d) => {
+        if (!d || d.section !== 'body' || d.column.index !== 4 || !d.cell) return;
+        const it = listed[d.row.index];
+        const url = it && (typeof w3wUrl === 'function') ? w3wUrl(pinOf(it)) : '';
+        if (url && typeof doc.link === 'function') {
+          try { doc.link(d.cell.x, d.cell.y, d.cell.width, d.cell.height, { url }); } catch (e) { /* a link never blocks the report */ }
+        }
+      } } : {})
+    });
+    y = (doc.lastAutoTable ? doc.lastAutoTable.finalY : y) + 16;
+    doc.setPage(doc.internal.getNumberOfPages());
+  }
+
+  if (groups.length) {
+    if (listed.length && y + 30 > G.bottomLimit) { doc.addPage(); y = margin; }
+    y = _drawPhotoGroups(doc, groups, margin, G, y, true);
+    _drawPhotoOmitTail(doc, data, margin, contentW, G.bottomLimit, y);
   }
 }
 
@@ -419,6 +548,7 @@ function buildReportDoc(session, photoData) {
 
   // ----- Header band: logo (left) + company (right) -----
   let headerBottom = y;
+  let logoRight = 0;   // V132: right edge of the drawn logo (0 = no logo drawn)
   if (rs.logo) {
     try {
       // Logo is a PNG data URL, downscaled on upload. Render at up to 120x60pt,
@@ -431,17 +561,33 @@ function buildReportDoc(session, photoData) {
         else { h = 60; w = 60 * ratio; }
       }
       doc.addImage(rs.logo, 'PNG', margin, y, w, h);
+      logoRight = margin + w;
       headerBottom = Math.max(headerBottom, y + h);
     } catch (e) { /* a bad logo never blocks the report */ }
   }
   if (rs.companyName || rs.companyAddress) {
+    // V132 (1A 2A): a name or address line too long for the room beside the
+    // logo wraps onto further right-aligned lines; it used to run into the logo,
+    // or off the left of the page with no logo. The room is measured against the
+    // logo actually drawn (2A) — a square logo is narrower, so text gets more.
+    // jsPDF's splitTextToSize returns a line that fits exactly as given (checked
+    // V132: spaces, tabs, Unicode), and breaks a single over-long word (a web
+    // address) too — so an ordinary header is drawn exactly as before (70c).
+    // ⚠ Set the font BEFORE fitLines: splitTextToSize measures in the current
+    // font, and the name (13pt bold) and address (9pt) differ.
+    const room = (pageW - margin) - (logoRight ? logoRight + 12 : margin);
+    const fitLines = (s) => doc.splitTextToSize(s, room);
     doc.setFontSize(13); doc.setFont(undefined, 'bold');
     let ty = y + 12;
-    if (rs.companyName) { doc.text(String(rs.companyName), pageW - margin, ty, { align: 'right' }); ty += 16; }
+    if (rs.companyName) {
+      fitLines(String(rs.companyName)).forEach(l => { doc.text(l, pageW - margin, ty, { align: 'right' }); ty += 16; });
+    }
     doc.setFontSize(9); doc.setFont(undefined, 'normal');
     if (rs.companyAddress) {
       String(rs.companyAddress).split('\n').forEach(line => {
-        if (line.trim()) { doc.text(line.trim(), pageW - margin, ty, { align: 'right' }); ty += 12; }
+        if (line.trim()) {
+          fitLines(line.trim()).forEach(l => { doc.text(l, pageW - margin, ty, { align: 'right' }); ty += 12; });
+        }
       });
     }
     headerBottom = Math.max(headerBottom, ty);
@@ -510,19 +656,33 @@ function buildReportDoc(session, photoData) {
   // Two-column label/value layout. The value is placed just after the label's
   // measured width (min 96pt) so a long label like "Recommended retest" never
   // overlaps its value, while short labels keep the values aligned.
+  // V119.1 (Peter, 3A): a value now wraps inside its OWN column. Before, it was
+  // drawn on one line with no width limit, so a long site name ran into the
+  // right-hand label, or off the page from the right column. Each value's width
+  // runs from its start to the end of its column (less a 10pt gap on the left
+  // column). A row is as tall as its tallest value; a one-line row moves down
+  // 15pt exactly as before, so a certificate with ordinary-length details is
+  // unchanged. One unbreakable word wider than the column is split by jsPDF.
   const colGap = (pageW - margin * 2) / 2;
+  const DETAIL_LINE = 12;              // spacing between a value's wrapped lines
+  let rowLines = 1;                    // lines in the tallest value of this row
   detailPairs.forEach((pair, i) => {
     const col = i % 2;
     const x = margin + col * colGap;
-    if (col === 0 && i > 0) y += 15;
+    if (col === 0 && i > 0) { y += 15 + (rowLines - 1) * DETAIL_LINE; rowLines = 1; }
     const label = pair[0] + ':';
     doc.setFont(undefined, 'bold');
     doc.text(label, x, y);
     const labelW = doc.getTextWidth(label);
     const valX = x + Math.max(96, labelW + 8);
     doc.setFont(undefined, 'normal');
-    doc.text(String(pair[1] || ''), valX, y);
+    const colEnd = col === 0 ? margin + colGap - 10 : pageW - margin;
+    const valW = Math.max(40, colEnd - valX);
+    const lines = doc.splitTextToSize(String(pair[1] || ''), valW);
+    doc.text(lines, valX, y, { lineHeightFactor: DETAIL_LINE / 10 });   // 10pt: the size set above
+    if (lines.length > rowLines) rowLines = lines.length;
   });
+  y += (rowLines - 1) * DETAIL_LINE;
   if (detailPairs.length % 2 === 1) y += 15;
   y += 22;
 
@@ -667,7 +827,12 @@ function buildReportDoc(session, photoData) {
   const _photos = (photoData !== undefined && photoData !== null)
     ? photoData
     : ((_reportPhotoCache.sessionId === session.id) ? _reportPhotoCache : null);
-  if (_photoAppendixWanted(_photos)) {
+  // V95 (6A): remedial on and the job has fails → one end section that also
+  // carries the photos (when they are on); otherwise the photo pages as before.
+  if (_remedialWanted(session)) {
+    try { _appendRemedialPages(doc, session, _photoAppendixWanted(_photos) ? _photos : null, margin, headerRgb); }
+    catch (e) { console.error('Remedial section failed (non-fatal).', e); }
+  } else if (_photoAppendixWanted(_photos)) {
     // Guarded: an appendix that throws must not cost the engineer the whole
     // certificate. Worst case the report prints without its photos.
     try { _appendPhotoPages(doc, session, _photos, margin, headerRgb); }
@@ -787,6 +952,7 @@ function reportFilename(session, patternOverride) {
 // preview can show them. ensureReportPhotos reuses the cache when this session's
 // photos were already collected, so the common case costs nothing.
 async function reopenReportPreview(sessionId) {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
   if (!sessionId) return;
   const session = state.sessions.find(s => s.id === sessionId);
   if (!session || !getJsPDF()) return;
@@ -830,9 +996,10 @@ function stampCertNumber(session) {
 }
 
 async function produceReport(sessionId) {
+  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
   if (!state.reportSettings.enabled) { setView('settings'); return; }
   const session = state.sessions.find(s => s.id === sessionId);
-  if (!session) { openInfoSheet({ title: 'Session not found', message: 'Couldn\u2019t find that session. Please try again.' }); return; }
+  if (!session) { openInfoSheet({ title: 'Job not found', message: 'Couldn\u2019t find that job. Please try again.' }); return; }
 
   // v51: the PDF engine is loaded lazily on first report rather than at startup.
   // Show a brief "preparing" toast while it loads (near-instant once it's cached,
@@ -849,6 +1016,25 @@ async function produceReport(sessionId) {
         message: 'The PDF engine didn\u2019t load. Close and reopen the app (reconnect once if you\u2019re offline so it can refresh), then try again.'
       });
       return;
+    }
+  }
+
+  // v89 (4A): photos of this job that are only in the cloud. Asked BEFORE the
+  // certificate number is stamped, so Cancel costs nothing. Only when the
+  // report shows photos at all. Downloaded photos stay on the phone.
+  if (state.reportSettings.showPhotos === true && typeof photoCloudOnlyForSession === 'function') {
+    const cloud = photoCloudOnlyForSession(session);
+    if (cloud.length) {
+      const offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
+      const choice = await _reportCloudPhotoChoice(cloud, offline);
+      if (choice === 'cancel') return;
+      if (choice === 'download' && typeof syncPhotoDownload === 'function') {
+        showToast(`Downloading photos\u2026 0 of ${cloud.length}`);
+        const res = await syncPhotoDownload(cloud.map((e) => e.id),
+          (done, total) => showToast(`Downloading photos\u2026 ${done} of ${total}`));
+        if (res.offline) showToast('No signal \u2014 the report shows the photos on this phone');
+        else if (res.failed) showToast(`${res.failed} photo${res.failed === 1 ? '' : 's'} couldn\u2019t be downloaded \u2014 the report shows the rest`);
+      }
     }
   }
 
@@ -880,6 +1066,48 @@ async function produceReport(sessionId) {
     return;
   }
   openReportPreview(doc, session);
+}
+
+// v89 (4A): "N photos for this job are only in the cloud — download them for
+// the certificate?" Resolves 'download' | 'without' | 'cancel'. Built on the
+// feedback.js sheet like every other dialog; no inputs, no render(). Offline,
+// Download isn't offered — it would only fail. Dismissing is Cancel.
+function _reportCloudPhotoChoice(cloud, offline) {
+  return new Promise((resolve) => {
+    const n = cloud.length;
+    const bytes = cloud.reduce((t, e) => t + (e.b || 0), 0);
+    const size = bytes ? ` (about ${formatBytes(bytes)})` : '';
+    const title = 'Photos in the cloud';
+    const msg = offline
+      ? `${n} photo${n === 1 ? '' : 's'} for this job ${n === 1 ? 'is' : 'are'} only in the cloud, and there\u2019s no signal to download ${n === 1 ? 'it' : 'them'}. You can make the report without ${n === 1 ? 'it' : 'them'}, or cancel and try again when you\u2019re connected.`
+      : `${n} photo${n === 1 ? '' : 's'} for this job ${n === 1 ? 'is' : 'are'} only in the cloud${size}. Download ${n === 1 ? 'it' : 'them'} for the certificate? ${n === 1 ? 'It stays' : 'They stay'} on this phone afterwards.`;
+    const { sheet, backdrop, cleanup } = _openSheet(title);
+    let settled = false;
+    const finish = (v) => { if (settled) return; settled = true; cleanup(); resolve(v); };
+    backdrop.addEventListener('click', () => finish('cancel'));
+    sheet.innerHTML = `
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">${escapeHTML(title)}</h3>
+        <button class="fail-close-btn" id="rcp-close" aria-label="Cancel">&times;</button>
+      </div>
+      <p class="sheet-scroll" style="margin:0 0 16px;font-size:0.875rem;line-height:1.5;color:var(--text-muted)">${escapeHTML(msg)}</p>
+      <div class="sheet-pin" style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
+        ${offline ? '' : '<button class="btn-primary" id="rcp-download">Download and continue</button>'}
+        <button class="btn-secondary" id="rcp-without">Without ${n === 1 ? 'it' : 'them'}</button>
+        <button class="btn-secondary" id="rcp-cancel">Cancel</button>
+      </div>
+    `;
+    document.body.appendChild(backdrop);
+    document.body.appendChild(sheet);
+    const on = (id, v) => { const el = document.getElementById(id); if (el) el.addEventListener('click', () => finish(v)); };
+    on('rcp-download', 'download');
+    on('rcp-without', 'without');
+    on('rcp-cancel', 'cancel');
+    on('rcp-close', 'cancel');
+    if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);   // V123 (3A)
+  });
 }
 
 // Preview modal (Q5=C): show the PDF with Share + Download + Close. Built
@@ -930,13 +1158,14 @@ function openReportPreview(doc, session) {
   function quickAdjustHTML() {
     const hasSig = !!(rs.signature && rs.signature);
     const chip = (action, on, label) =>
-      `<button class="qa-chip ${on ? 'on' : ''}" data-qa="${action}">${on ? '✓ ' : ''}${label}</button>`;
+      `<button class="qa-chip ${on ? 'on' : ''}" id="qa-chip-${action}" aria-pressed="${on ? 'true' : 'false'}" data-qa="${action}">${on ? icon('check') + ' ' : ''}${label}</button>`;
     return `
       <div class="report-qa-row">
         ${chip('fails', rs.showFails, 'List all items')}
         ${chip('calibration', rs.showCalibration, 'Calibration')}
         ${chip('signature', rs.declaration, 'Declaration')}
         ${chip('photos', rs.showPhotos, 'Photos')}
+        ${chip('remedial', rs.showRemedial === true, 'Remedial actions')}
         ${hasSig ? chip('sigside', rs.signaturePosition === 'right', 'Signature right') : ''}
       </div>
     `;
@@ -970,7 +1199,7 @@ function openReportPreview(doc, session) {
       <div class="report-preview-fallback">
         <div class="report-qa-label">Quick adjust</div>
         ${quickAdjustHTML()}
-        <button class="btn-secondary report-edit-settings-btn" id="report-edit-settings">⚙ Edit report settings</button>
+        <button class="btn-secondary report-edit-settings-btn" id="report-edit-settings">${icon('settings')} Edit report settings</button>
         <label class="label report-filename-label" for="report-filename-input">File name</label>
         <div class="report-filename-row">
           <input class="input report-filename-input" id="report-filename-input" value="${baseName.replace(/"/g, '&quot;')}" autocapitalize="off" autocomplete="off" spellcheck="false">
@@ -1041,11 +1270,14 @@ function openReportPreview(doc, session) {
     URL.revokeObjectURL(url);
     backdrop.remove();
     sheet.remove();
+    if (typeof focusSheetClosed === 'function') focusSheetClosed();   // V123 (3A)
   }
 
   // v35: rebuild the PDF after a quick-adjust change, keeping the modal open and
   // the typed filename. Revokes the old blob URL first to avoid leaks.
-  function rebuild() {
+  // V129 (2A): qaAction = the chip tapped. The rebuild replaces the sheet's
+  // markup, so VoiceOver would drop to the top; it goes back on that chip.
+  function rebuild(qaAction) {
     const keepName = currentBaseName();
     URL.revokeObjectURL(url);
     let d;
@@ -1057,6 +1289,9 @@ function openReportPreview(doc, session) {
     if (inp) inp.value = keepName;
     wireSheet();
     renderPreviewView();
+    if (qaAction && typeof focusControl === 'function') {
+      try { focusControl(document.getElementById('qa-chip-' + qaAction)); } catch (e) {}
+    }
   }
 
   // v35: quick-adjust handler — flip the field, persist, rebuild.
@@ -1070,26 +1305,37 @@ function openReportPreview(doc, session) {
     else if (action === 'signature')   state.reportSettings.declaration = !state.reportSettings.declaration;
     else if (action === 'sigside')      state.reportSettings.signaturePosition = (state.reportSettings.signaturePosition === 'right') ? 'left' : 'right';
     else if (action === 'photos')       state.reportSettings.showPhotos = !state.reportSettings.showPhotos;
+    else if (action === 'remedial')     state.reportSettings.showRemedial = !(state.reportSettings.showRemedial === true);   // V95 (7A)
     saveReportSettings();
     if (action === 'photos' && state.reportSettings.showPhotos === true) {
       try { _setReportPhotoCache(await ensureReportPhotos(session)); }
       catch (e) { console.error('Photo collection failed (non-fatal).', e); }
     }
-    rebuild();
+    rebuild(action);
   }
 
   // Wire all the sheet's controls (called on open and after each rebuild).
   function wireSheet() {
     document.getElementById('report-preview-close').addEventListener('click', cleanup);
+    // V100 (2B): a certificate that leaves the phone is "made" — it stamps the
+    // job's reportAt, which clears the not-exported reminder for a locked job.
+    // Opening the preview alone does not; a cancelled share does not.
+    const made = () => { if (typeof noteReportMade === 'function') noteReportMade(session.id); };
     document.getElementById('report-preview-download').addEventListener('click', () => {
       triggerDownload(blob, currentFilename());
+      made();
     });
     document.getElementById('report-preview-share').addEventListener('click', async () => {
-      await shareOrDownloadReport(blob, currentFilename());
+      if (await shareOrDownloadReport(blob, currentFilename())) made();
     });
-    sheet.querySelectorAll('[data-qa]').forEach(btn => {
-      btn.addEventListener('click', () => { onQuickAdjust(btn.getAttribute('data-qa')).catch(() => {}); });
-    });
+    // V129: wired by the ids the markup drew (qa-chip-<action>), read from the
+    // markup itself so a new chip needs no list kept beside it — and so the
+    // harness can press the same buttons the phone does.
+    for (const m of String(sheet.innerHTML).matchAll(/id="qa-chip-([a-z]+)"/g)) {
+      const qa = m[1];
+      const btn = document.getElementById('qa-chip-' + qa);
+      if (btn) btn.addEventListener('click', () => { onQuickAdjust(qa).catch(() => {}); });
+    }
     // Deep-link to Report Settings, returning to a fresh preview afterwards.
     const editBtn = document.getElementById('report-edit-settings');
     if (editBtn) editBtn.addEventListener('click', () => {
@@ -1104,6 +1350,7 @@ function openReportPreview(doc, session) {
   document.body.appendChild(sheet);
   wireSheet();
   renderPreviewView();
+  if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);   // V123 (3A)
 }
 
 function triggerDownload(blob, filename) {
@@ -1122,11 +1369,12 @@ async function shareOrDownloadReport(blob, filename) {
       const file = new File([blob], filename, { type: 'application/pdf' });
       if (navigator.canShare({ files: [file] })) {
         await navigator.share({ files: [file] });
-        return;
+        return true;
       }
     } catch (err) {
-      if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return;
+      if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return false;   // V100: not shared
     }
   }
   triggerDownload(blob, filename);
+  return true;
 }

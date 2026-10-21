@@ -15,20 +15,15 @@ function csvCellValue(colId, session, item) {
     case 'engineer':    return session.engineer || '';
     case 'description': return item.itemType;
     // v26 (Q4=B): Client/Site column split. The session stores ONE combined
-    // `site` snapshot ("Client — Site", or just one part). We resolve the two
-    // parts on the fly. To avoid changing exports for users who DON'T turn the
-    // new Client column on, the 'site' column's output adapts:
-    //   • Client column hidden  → 'site' emits the FULL snapshot (unchanged
-    //                              from pre-v26 — "Client — Site" as before).
-    //   • Client column visible  → 'site' emits only the SITE part, and the
-    //                              'client' column carries the client part, so
-    //                              the two columns together reconstruct it.
+    // `site` snapshot ("Client — Site", or just one part); the two parts are
+    // resolved on the fly.
+    // V119.1 (Peter, 1B): the Site column is ALWAYS just the site. Before, with
+    // the Client column hidden (its default) it carried the whole "Client — Site"
+    // text, which Peter reported as a bug. The Client column is left exactly as
+    // each user has it — hidden means the client is simply not in the export.
+    // ⚠ Do not bring back a Client-visibility branch here: that is the bug.
     case 'client':      return splitSiteSnapshot(session.site).client;
-    case 'site': {
-      const clientCol = state.csvColumns.find(c => c.id === 'client');
-      const clientVisible = clientCol ? clientCol.visible : false;
-      return clientVisible ? splitSiteSnapshot(session.site).site : session.site;
-    }
+    case 'site':        return splitSiteSnapshot(session.site).site;
     case 'location':    return item.location;
     case 'date':        return formatDate(session.date);
     case 'result':      return csvResultLabel(item.result);
@@ -65,6 +60,8 @@ function csvCellValue(colId, session, item) {
     case 'readingInsulation': return (state.readingsEnabled && item.readings && item.readings.insulation) ? item.readings.insulation : '';
     case 'readingLeakage':    return (state.readingsEnabled && item.readings && item.readings.leakage)    ? item.readings.leakage    : '';
     case 'readingPolarity':   return (state.readingsEnabled && item.readings && item.readings.polarity === true) ? 'Yes' : '';
+    // V99 (6A, 9A): the pin whenever there is one (not gated on the switch).
+    case 'mapPin': { const p = (typeof mapPinOf === 'function') ? mapPinOf(item) : ''; return p ? '///' + p : ''; }
     default:            return '';
   }
 }
@@ -96,7 +93,7 @@ function defaultHeaderFor(id) {
 // V87: one name builder for all three CSV paths (was three copies of the same
 // underscore template). "PAT Office Block 28-09-2026.csv" — spaces, UK date.
 function csvFilename(session) {
-  const site = fileSafe(session.site || session.name || '') || 'session';
+  const site = fileSafe(session.site || session.name || '') || 'job';
   const when = fileDateUK(session.date);
   return `PAT ${site}${when ? ' ' + when : ''}.csv`;
 }
@@ -111,17 +108,8 @@ function downloadCSV(session) {
   URL.revokeObjectURL(url);
 }
 
-// v10: Inline iOS share-style glyph (square with arrow protruding from the top).
-// Replaces the ⬇ unicode arrow on Export buttons. Uses currentColor so it
-// inherits the surrounding button colour. Used both in the sessions list
-// (.icon-btn-sm, muted) and in the overview header (.icon-btn, neutral).
-const SHARE_ICON_SVG =
-  '<svg class="share-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" ' +
-  'stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
-  '<path d="M5 12v7a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-7"/>' +
-  '<line x1="12" y1="3" x2="12" y2="15"/>' +
-  '<polyline points="7 8 12 3 17 8"/>' +
-  '</svg>';
+// V115: the share glyph that lived here (SHARE_ICON_SVG, v10) is now icon('share',
+// 'share-icon') in icons.js — the Lucide original it was drawn from.
 
 // v10: Share or download a session's CSV. Prefers the native share sheet via
 // Web Share API (iOS Safari, modern Android Chrome) so the engineer can send
@@ -217,59 +205,11 @@ async function copyCSV(session) {
     showToast('Could not copy — try Share instead');
   }
 }
-//
-// Strategy mirrors shareOrDownloadCSV but for many files:
-//   • Preferred path: a single navigator.share with ALL CSVs attached as files.
-//     iOS Safari and modern Android Chrome accept multi-file shares; the user
-//     picks one destination (Mail, Files, AirDrop…) for the whole batch.
-//   • If the platform can't share files (desktop, older mobile) or the file set
-//     is rejected by canShare, fall back to sequential downloads with a small
-//     stagger (some browsers collapse rapid programmatic downloads).
-//
-// Export-mark rule matches single export: on a COMPLETED share or the download
-// fallback, every batched session is marked exported (clears the nudge). On a
-// cancelled share sheet (AbortError / NotAllowedError) NOTHING is marked — the
-// user backed out, so the nudge stays exactly as it was.
-//
-// Per-session CSVs (one file each) are used deliberately rather than one
-// concatenated file: the importer refuses multi-session CSVs, so one-file-per
-// keeps every export round-trippable back through Import.
-async function bulkExportUnexported() {
-  const targets = unexportedSessions();
-  if (targets.length === 0) return;
-  const BOM = '\uFEFF';
 
-  if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare && typeof File === 'function') {
-    try {
-      const files = targets.map(s => {
-        return new File([BOM + buildCSV(s)], csvFilename(s), { type: 'text/csv' });
-      });
-      if (navigator.canShare({ files })) {
-        // v26: share ONLY the CSV files (no `title`/`text` — see single-export
-        // note above).
-        await navigator.share({ files });
-        // Share completed → mark all batched sessions exported.
-        targets.forEach(markSessionExported);
-        save();
-        render();
-        return;
-      }
-    } catch (err) {
-      // Cancelled share sheet — respect it, mark nothing.
-      if (err && (err.name === 'AbortError' || err.name === 'NotAllowedError')) return;
-      // Anything else → fall through to sequential downloads.
-    }
-  }
-
-  // Fallback: download each CSV in turn, lightly staggered.
-  for (const s of targets) {
-    downloadCSV(s);
-    await new Promise(r => setTimeout(r, 300));
-  }
-  targets.forEach(markSessionExported);
-  save();
-  render();
-}
+// V131 (2A): bulkExportUnexported (v15 — one share of every not-yet-exported
+// job's CSV) is retired: the Jobs list's nudge now shows those jobs instead,
+// since a certificate also counts and certificates are made one at a time.
+// Single-job export (above) and Export everything (exportall.js) remain.
 
 // ---------- v10: CSV Import ----------
 // v11 update: header-name-based matching. Columns may appear in any order;
@@ -421,6 +361,7 @@ function parseImportCSV(text) {
   const iDate   = idxOf('date');
   const iResult = idxOf('result');
   const iNotes  = idxOf('notes');
+  const iPin    = idxOf('mapPin');   // V99: optional Map pin column
 
   const missing = [];
   if (iAsset  === null) missing.push('Asset ID');
@@ -500,8 +441,8 @@ function parseImportCSV(text) {
     return {
       ok: false,
       error:
-        'This file contains rows from more than one session (different Client/Site or Date values).\n\n' +
-        'Importing combined CSVs isn\'t supported yet — please export each session separately and import them one at a time.'
+        'This file contains rows from more than one job (different Client/Site or Date values).\n\n' +
+        'Importing combined CSVs isn\'t supported yet — please export each job separately and import them one at a time.'
     };
   }
 
@@ -535,14 +476,19 @@ function parseImportCSV(text) {
       skipped.push({ row: rowNum, reason: `invalid Result "${resultRawDisplay}" (expected Passed or Failed)` });
       continue;
     }
-    items.push({
+    const imported = {
       id: uid(),
       assetNo,
       location,
       itemType: desc,
       notes,
       result: normResult
-    });
+    };
+    // V99: a Map pin cell that holds three words comes back as the item's pin
+    // (absent otherwise — 3A); anything else in the cell is ignored.
+    const pinWords = (iPin !== null && typeof normaliseW3w === 'function') ? normaliseW3w(r[iPin]) : '';
+    if (pinWords) imported.pin = pinWords;
+    items.push(imported);
   }
   if (items.length === 0) {
     return {

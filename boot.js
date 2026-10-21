@@ -11,10 +11,50 @@
 // RUNS ON LOAD. Must be the LAST script in index.html.
 
 // ---------- Service worker + update detection (v7) ----------
+// V124 (1A 2A 3A 4A): friendlier updates. Before V124 the app looked for a new
+// version only on a cold launch. An iPhone home-screen app is mostly brought
+// back from the background, which never looked — hence "close it from the app
+// switcher and reopen twice" after every release. Now it looks:
+//   1A  on launch (register() does that), every time the app comes back to the
+//       front (at most once a minute), and at least hourly while it is in use —
+//       the hourly look rides the next touch, so an idle app runs no timer;
+//   2A  and puts the update in BY ITSELF only at a safe moment: the Jobs list,
+//       showing, nothing open, nothing typed, no push in flight, nobody touching
+//       the screen for UPDATE_IDLE_MS. Anywhere else the banner shows and the
+//       engineer chooses — v61.2's rule (never reload under someone mid-job,
+//       see sw.js install) stands. × hides the banner; the update still goes in
+//       at the next safe moment.
+//   3A  the banner names the version, asked of the waiting worker (sw.js
+//       GET_VERSION). An older worker never answers: the plain words stay.
+//   4A  no switch — an exception to R30, like Move and Delete.
+const UPDATE_CHECK_MS = 60 * 60 * 1000;   // 1A: at least hourly while in use
+const UPDATE_RESUME_GAP_MS = 60 * 1000;   // a quick look away and back doesn't re-ask
+const UPDATE_IDLE_MS = 3000;              // 2A: untouched this long before it reloads
+let _updateReg = null;                    // the registration, once register() resolves
+let _updateLastCheck = 0;                 // when the server was last asked
+let _updateLastTouch = 0;                 // the last tap or key, anywhere
+let _updateTimer = null;                  // the one pending safe-moment check
+let _updateApplying = false;              // SKIP_WAITING sent; the reload is coming
+let _updateHadController = false;         // V126: the page loaded under a worker (not a first visit)
+let _updateAsked = false;                 // V126: we sent SKIP_WAITING (Refresh or the safe moment)
+let _updateReloading = false;             // V126: the one reload is under way
+
 function registerServiceWorker() {
   if (!('serviceWorker' in navigator)) return;
+  // V126 (1A): read once, now — whether this page loaded under a worker. A
+  // first visit has none until the new worker's clients.claim() (sw.js).
+  try { _updateHadController = !!navigator.serviceWorker.controller; } catch (e) { _updateHadController = false; }
+  // V124: every tap or key counts as "someone is using it" (2A) and carries the
+  // hourly look (1A). Capture phase, passive: nothing here may stop a tap.
+  try {
+    document.addEventListener('pointerdown', updateNoteTouch, true);
+    document.addEventListener('keydown', updateNoteTouch, true);
+    document.addEventListener('visibilitychange', updateOnResume);
+  } catch (e) { /* no document events: launch still looks, the banner still works */ }
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js').then(reg => {
+      _updateReg = reg;
+      _updateLastCheck = Date.now();   // register() has just looked
       // Check if a worker is already waiting from a previous tab/load.
       if (reg.waiting && navigator.serviceWorker.controller) {
         showUpdateBanner(reg.waiting);
@@ -32,34 +72,200 @@ function registerServiceWorker() {
       });
     }).catch(err => console.log('SW reg failed:', err));
 
-    // When the active SW changes (after we tell it to skipWaiting), reload to use it.
-    let reloading = false;
-    navigator.serviceWorker.addEventListener('controllerchange', () => {
-      if (reloading) return;
-      reloading = true;
-      window.location.reload();
-    });
+    // When the active SW changes, reload to use it — only when it REPLACED one
+    // (V126 1A, updateOnControllerChange).
+    navigator.serviceWorker.addEventListener('controllerchange', updateOnControllerChange);
   });
+}
+
+// V126 (1A): a worker taking over reloads the page only when it replaces one —
+// the page loaded under a worker, or we asked for the update (SKIP_WAITING).
+// On a first visit there is no worker; the new one's clients.claim() (sw.js
+// activate) fires controllerchange as well, and reloading then threw away the
+// setup wizard about a second in. Nothing is stale on a first visit: the page
+// came from the network. An update put in from ANOTHER tab still reloads this
+// one (it loaded under the old worker), so two tabs never run two versions.
+function updateShouldReload() {
+  return _updateHadController || _updateAsked;
+}
+
+function updateOnControllerChange() {
+  if (_updateReloading || !updateShouldReload()) return false;
+  _updateReloading = true;
+  window.location.reload();
+  return true;
+}
+
+// 3A: 'pat-v124' → 'V124', a hotfix 'pat-v124-1' → 'V124.1', anything else → ''.
+function updateVersionLabel(key) {
+  const m = /^pat-v(\d+)(?:-(\d+))?$/.exec(String(key || ''));
+  if (!m) return '';
+  return 'V' + m[1] + (m[2] ? '.' + m[2] : '');
+}
+
+// Ask the server for a newer sw.js. force: skip the once-a-minute limit.
+// Offline, update() rejects — swallowed; the next look tries again.
+function updateCheckNow(force) {
+  const reg = _updateReg;
+  if (!reg || typeof reg.update !== 'function') return false;
+  const now = Date.now();
+  if (!force && _updateLastCheck && now - _updateLastCheck < UPDATE_RESUME_GAP_MS) return false;   // 0 = never asked
+  _updateLastCheck = now;
+  try {
+    const p = reg.update();
+    if (p && typeof p.catch === 'function') p.catch(() => {});
+  } catch (e) { /* not fatal */ }
+  return true;
+}
+
+// state, or null. ⚠ MAP D1: when config.js fails to parse, even `typeof state`
+// throws (a TDZ binding) — these run from event listeners on a broken load too.
+function _updateState() {
+  try { return (typeof state === 'object' && state) ? state : null; } catch (e) { return null; }
+}
+
+// Every tap or key. The hourly look (1A) and the safe-moment wait (2A).
+function updateNoteTouch() {
+  const now = Date.now();
+  _updateLastTouch = now;
+  if (_updateLastCheck && now - _updateLastCheck >= UPDATE_CHECK_MS) updateCheckNow(true);
+  const st = _updateState();
+  if (st && st.updateAvailable) updateTryLater();
+}
+
+// The app comes back to the front (1A).
+function updateOnResume() {
+  try { if (document.visibilityState === 'hidden') return; } catch (e) { /* treat as showing */ }
+  updateCheckNow(false);
+  updateTryLater();
+}
+
+function _updateFieldHeld() {
+  const ae = document.activeElement;
+  if (!ae || ae === document.body || !ae.tagName) return false;
+  const tag = String(ae.tagName).toUpperCase();
+  if (tag === 'TEXTAREA' || tag === 'SELECT' || ae.isContentEditable === true) return true;
+  if (tag !== 'INPUT') return false;
+  const type = String((ae.getAttribute && ae.getAttribute('type')) || ae.type || 'text').toLowerCase();
+  return ['checkbox', 'radio', 'button', 'submit', 'reset', 'range'].indexOf(type) === -1;
+}
+
+// Anything open over the screen: a sheet, the fail sheet, the certificate
+// preview, the welcome / setup / tour backdrop. One selector per call (the
+// harness's stub DOM takes no selector lists).
+function _updateSheetOpen() {
+  for (const sel of ['.bulk-sheet', '.fail-sheet', '.report-preview-sheet', '.modal-backdrop']) {
+    try { if (document.querySelector(sel)) return true; } catch (e) { /* keep looking */ }
+  }
+  return false;
+}
+
+// The New job form is OPEN by default on a phone with no jobs (storage.js), so
+// "open" can't block — a brand-new user would never update. Typed-in can: any
+// box holding something other than what it starts with. Read from the boxes
+// (Engineer is only copied to state on Create) and from state (the rest is).
+function _updateNewFormTyped() {
+  const nf = state.newForm;
+  if (!nf || !nf.show) return false;
+  const eng = String(state.engineer || '').trim();
+  const start = { 'nf-client': '', 'nf-site': '', 'nf-name': '', 'nf-prefix': '', 'nf-start': '1', 'nf-engineer': eng };
+  for (const id of Object.keys(start)) {
+    const el = document.getElementById(id);
+    const v = el ? String(el.value == null ? '' : el.value).trim() : '';
+    if (v && v !== start[id]) return true;
+  }
+  if (nf.name || nf.site || nf.clientId || nf.siteId || nf.prefix) return true;
+  if (nf.startNo && String(nf.startNo).trim() !== '1') return true;
+  if (nf.engineer && String(nf.engineer).trim() !== eng) return true;
+  return false;
+}
+
+// 2A: the only moment the app reloads itself. Every condition is a reason a
+// reload would lose something or surprise someone.
+function updateSafeMoment() {
+  if (!_updateState()) return false;
+  if (!state.updateAvailable || !state.pendingWorker) return false;
+  try { if (document.visibilityState === 'hidden') return false; } catch (e) { /* showing */ }
+  if (state.view !== 'sessions') return false;                    // the Jobs list only
+  if (_updateNewFormTyped()) return false;                        // a New job half filled in
+  if (state.tourOpen) return false;
+  if (state.saveFailure && !state.saveFailureDismissed) return false;
+  if (state.searchQuery) return false;                            // a search typed
+  const cj = state.cloudJobs;
+  if (cj && (cj.selecting || cj.busy || cj.q)) return false;      // ticking, deleting, searching
+  if (typeof _syncRunning !== 'undefined' && _syncRunning) return false;  // a push in flight
+  if (_updateSheetOpen() || _updateFieldHeld()) return false;
+  if (_updateLastTouch && Date.now() - _updateLastTouch < UPDATE_IDLE_MS) return false;   // 0 = never touched
+  return true;
+}
+
+function updateTryApply() {
+  if (_updateApplying || !updateSafeMoment()) return false;
+  _updateApplying = true;
+  applyUpdate();
+  return true;
+}
+
+// Look again UPDATE_IDLE_MS after the latest touch, redraw or return to the
+// front — one timer, pushed back by each. Not safe then → nothing until the next
+// touch, redraw or return, so an idle app never polls.
+function updateTryLater() {
+  const st = _updateState();
+  if (!st || !st.updateAvailable || _updateApplying) return;
+  if (_updateTimer) clearTimeout(_updateTimer);
+  _updateTimer = setTimeout(() => { _updateTimer = null; updateTryApply(); }, UPDATE_IDLE_MS);
+}
+
+// 3A: ask the waiting worker its version on a private port.
+function updateAskVersion(worker) {
+  if (!worker || typeof worker.postMessage !== 'function' || typeof MessageChannel !== 'function') return false;
+  try {
+    const ch = new MessageChannel();
+    ch.port1.onmessage = (ev) => {
+      const v = updateVersionLabel(ev && ev.data && ev.data.version);
+      if (!v || state.pendingWorker !== worker) return;
+      state.updateVersion = v;
+      if (state.updateAvailable && !state.updateDismissed) updateRepaint();
+    };
+    worker.postMessage({ type: 'GET_VERSION' }, [ch.port2]);
+    return true;
+  } catch (e) { return false; }
+}
+
+// MAP rule 3: never redraw under a sheet or under the cursor — 1A now finds
+// updates mid-job, where a redraw would drop the keyboard. The next redraw that
+// happens anyway shows the banner.
+function updateRepaint() {
+  if (_updateSheetOpen() || _updateFieldHeld()) return false;
+  render();
+  return true;
 }
 
 function showUpdateBanner(worker) {
   state.updateAvailable = true;
   state.pendingWorker = worker;
+  state.updateVersion = '';
+  state.updateDismissed = false;
   document.body.classList.add('has-update-banner');
-  render();
+  updateAskVersion(worker);
+  updateRepaint();
+  updateTryLater();
 }
 
 function applyUpdate() {
   if (state.pendingWorker) {
+    _updateAsked = true;   // V126: before the message — the takeover may follow at once
     state.pendingWorker.postMessage({ type: 'SKIP_WAITING' });
-    // Page will reload via controllerchange listener.
+    // Page will reload via controllerchange listener (updateOnControllerChange).
   } else {
     window.location.reload();
   }
 }
 
+// V124: × hides the banner only. The update stays waiting and still goes in at
+// the next safe moment (2A); updateAvailable stays true for that.
 function dismissUpdateBanner() {
-  state.updateAvailable = false;
+  state.updateDismissed = true;
   document.body.classList.remove('has-update-banner');
   render();
 }
@@ -82,7 +288,7 @@ function bootIntegrityOK() {
   // uploaded, and without a probe that failure is silent until a user taps
   // something on a settings screen. Add a probe whenever a script file is added.
   const requiredFns = [
-    'load', 'save', 'render', 'applyTheme', 'initDelegation', 'loadFormForCursor',
+    'load', 'save', 'render', 'applyTheme', 'applyTextSize', 'initDelegation', 'loadFormForCursor',
     'loadMultiPickConfig', 'loadClients', 'loadSites', 'composeSiteSnapshot',
     'saveReportSettingsForm', 'wizardNextStep',
     // v72: sole probe for render-review.js (Overview / Edit Session / Retest
@@ -98,7 +304,10 @@ function bootIntegrityOK() {
     // is correct. It also declares one const, GLOSSARY_GROUPS, which a
     // requiredFns entry could NOT see (see the data.js note below); the function
     // probe covers the file either way.
-    'renderSettingsAbout'
+    'renderSettingsAbout',
+    // V115: sole probe for icons.js. Every screen draws through icon(), so a
+    // deploy missing this file must stop here, not blank the first render.
+    'icon'
   ];
   for (const name of requiredFns) {
     if (typeof window[name] !== 'function') {
@@ -227,12 +436,21 @@ if (!_bootIntegrity) {
       '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;line-height:1.5">' +
       '<h2 style="margin:0 0 8px">Update needed</h2>' +
       '<p style="margin:0 0 16px">The app didn\'t load completely. Your saved data is safe and untouched. Tap Reload to finish updating.</p>' +
-      '<button onclick="location.reload()" style="padding:12px 18px;font-size:16px;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
+      '<button onclick="location.reload()" style="padding:12px 18px;font-size:1rem;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
       _crashReportLink('The app did not load completely (boot integrity check failed).') +
       '</div>';
   }
   // Deliberately stop here — do NOT call load()/render()/save() with a partial build.
 } else {
+// V106 (Stage 10 part 2): finish a "Reset this phone" the last page started.
+// BEFORE load(), so load() reads the clean phone and nothing in memory can write
+// the old data back. After the integrity check, so a half-loaded build never
+// deletes anything. Optional (MAP rule 6): no reset.js, no wipe — the safe way.
+try {
+  if (typeof resetRunPending === 'function') resetRunPending();
+} catch (e) {
+  console.error('Reset could not finish at start-up (non-fatal).', e);
+}
 // v61.2: load() is now INSIDE a try/catch. It never was, which is why a throw in
 // here produced a blank screen with no message rather than the recovery prompt
 // the app has had since v16.1 for render() failures.
@@ -269,13 +487,14 @@ try {
       '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;line-height:1.5">' +
       '<h2 style="margin:0 0 8px">Update needed</h2>' +
       '<p style="margin:0 0 16px">The app didn\'t finish updating, so it couldn\'t start. <strong>Your saved data is safe and untouched</strong> — nothing has been changed or overwritten. Tap Reload to finish updating. If it keeps happening, fully close the app from the app switcher and open it again.</p>' +
-      '<button onclick="location.reload()" style="padding:12px 18px;font-size:16px;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
+      '<button onclick="location.reload()" style="padding:12px 18px;font-size:1rem;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
       _crashReportLink('load() threw during boot: ' + (e && e.message ? e.message : 'unknown')) +
       '</div>';
   }
 }
 if (_bootLoadOK) {
 applyTheme(state.theme);
+applyTextSize(state.textSize);   // V121: before the first render, so nothing jumps
 // v25 (E3): attach the single delegated click listener to #app once, before the
 // first render. It survives every innerHTML rewrite (it's on #app, not its
 // children), so clickable controls wired via data-action never need re-binding.
@@ -355,6 +574,17 @@ try {
   console.error('Sync failed to start (non-fatal).', e);
 }
 
+// V99: the app was reloaded while the engineer was in what3words adding a map
+// pin — reopen that job on that item with the pin sheet open. BEFORE the first
+// loadFormForCursor()/render() below, which build the form for state.cursor.
+// typeof-guarded and wrapped: a stale note must never stop the app starting.
+try {
+  if (typeof mapPinResume === 'function') mapPinResume();
+} catch (e) {
+  console.error('Map pin resume failed (non-fatal).', e);
+  try { localStorage.removeItem(MAP_PIN_OPEN_KEY); } catch (e2) { /* ignore */ }
+}
+
 // v16.1: boot-level safety net. A throw inside render() (e.g. a screen-specific
 // bug like the v16 entry-screen TDZ error) used to leave #app permanently
 // blank — and because the service worker serves the cached build, a plain
@@ -381,7 +611,7 @@ try {
         '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;line-height:1.5">' +
         '<h2 style="margin:0 0 8px">Something went wrong</h2>' +
         '<p style="margin:0 0 16px">The app hit an error while loading. Your saved data is safe. Tap Reload to try again.</p>' +
-        '<button onclick="location.reload()" style="padding:12px 18px;font-size:16px;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
+        '<button onclick="location.reload()" style="padding:12px 18px;font-size:1rem;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
         _crashReportLink('The app hit an error while loading: ' + ((e2 && e2.message) ? e2.message : 'unknown error')) +
         '</div>';
     }
@@ -404,6 +634,9 @@ try {
       // Only repaint if something was actually found. A user with no photos —
       // which is everyone on the day this ships — gets no second render at all.
       if (loaded && state.photoIndex && Object.keys(state.photoIndex).length) render();
+      // V101: re-label any photo whose item has moved to another job — heals a
+      // store write that failed after a move (photos.js photosSettleJobs).
+      if (loaded && typeof photosSettleJobs === 'function') photosSettleJobs();
     }).catch(() => {});
   }
 } catch (e) {
@@ -422,6 +655,24 @@ try {
   }
 } catch (e) {
   console.error('Storage protection check failed (non-fatal).', e);
+}
+// V105 (S14, 2A): the day's snapshot. Inside the good-load block on purpose —
+// a load that failed must never be kept as a snapshot. After the first render,
+// async and fail-soft like the photo index: nothing waits on it, and a missing
+// snapshots.js or a refused database changes nothing else (MAP rule 6).
+try {
+  if (typeof snapshotsBoot === 'function') snapshotsBoot();
+} catch (e) {
+  console.error('Daily snapshot failed to start (non-fatal).', e);
+}
+// V127: the plan (plan.js, optional — MAP rule 6). After the first render, on a
+// good load only: what the phone already knows about the account's plan applies
+// at once (offline too); then, signed in and online, a quiet fresh read. Fails
+// open — a missing or broken plan.js never locks anyone.
+try {
+  if (typeof planBoot === 'function') planBoot().catch(() => {});
+} catch (e) {
+  console.error('Plan check failed to start (non-fatal).', e);
 }
 }   // end if (_bootLoadOK)  — v61.2
 }   // end else (boot integrity OK)

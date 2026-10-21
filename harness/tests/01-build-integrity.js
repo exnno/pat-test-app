@@ -110,4 +110,98 @@ module.exports = function run() {
       t.notOk(/(?<![.\w])(alert|confirm|prompt)\s*\(/.test(src), `${f} calls no native dialog`);
     }
   });
+
+  // V108 harness amendment: the mutation runner's two speed-ups. Neither may
+  // ever turn a survivor into "caught": a bail only stops AFTER a failure, a
+  // hinted file is only trusted once it has passed on unmutated code, and a
+  // mutation the hint misses still runs the whole suite. Source guards — the
+  // runner cannot run itself headlessly from inside the suite.
+  t.group('01i — the mutation runner\'s speed-ups cannot hide a survivor', () => {
+    const run = fs.readFileSync(path.join(APP_DIR, 'harness', 'run.js'), 'utf8');
+    t.includes(run, "const bail = process.env.PATGO_BAIL === '1';", 'run.js bails only when the mutation runner asks');
+    t.includes(run, 'if (bail && t.failures.length) break;', '…and only after a failure');
+    const mut = fs.readFileSync(path.join(APP_DIR, 'harness', 'mutate.js'), 'utf8');
+    t.includes(mut, 'if (!runFileFails(tmp, f)) goodHints.add(f);', 'a hinted test file is trusted only once it passes on unmutated code');
+    t.includes(mut, 'hintFiles(m).some(f => goodHints.has(f) && runFileFails(tmp, f)))\n      || runSuiteExpectingFailure(tmp, !FULL);',
+      'a mutation its hinted file does not catch still runs the whole suite');
+    t.includes(mut, "const FULL = process.argv.includes('--full');", '--full turns both shortcuts off');
+  });
+
+  // V110 (spec 4A): the shortcut only works if a mutation's `why` names a real
+  // test group, so keep that true. The mutation list is read by running
+  // mutate.js up to (not including) its main() in a sandbox — the runner itself
+  // is untouched. A hint-shaped token is anything hintFiles() would act on.
+  function loadMutations() {
+    const src = fs.readFileSync(path.join(APP_DIR, 'harness', 'mutate.js'), 'utf8');
+    const cut = src.indexOf('\nfunction main()');
+    const body = src.slice(0, cut).replace(/^#!.*\n/, '');
+    const box = { require, __dirname: path.join(APP_DIR, 'harness'), process, console, module: {} };
+    vm.runInNewContext(body + '\n;module.exports = { MUTATIONS, hintFiles, anchorCount };', box);
+    return box.module.exports;
+  }
+  const HINT = /\b(\d\d)[a-z]\d?\b/g;
+  const groupIds = new Set();
+  for (const f of fs.readdirSync(path.join(APP_DIR, 'harness', 'tests')).filter(x => x.endsWith('.js'))) {
+    const src = fs.readFileSync(path.join(APP_DIR, 'harness', 'tests', f), 'utf8');
+    for (const m of src.matchAll(/\bgroup\(\s*['"`](\d\d[a-z]\d?) /g)) groupIds.add(m[1]);
+  }
+
+  t.group('01j — every test group a mutation names exists', () => {
+    const { MUTATIONS } = loadMutations();
+    t.ok(MUTATIONS.length > 700 && groupIds.size > 500, `read ${MUTATIONS.length} mutations and ${groupIds.size} test groups`);
+    const bad = [];
+    for (const m of MUTATIONS) for (const x of String(m.why || '').matchAll(HINT)) {
+      if (!groupIds.has(x[0])) bad.push(`${m.name.split(' ')[0]} names "${x[0]}"`);
+    }
+    t.deepEq(bad, [], 'a hint naming no group sends its mutation down the slow path (or to the wrong file) without a word — rename it to the group that catches it, or reword');
+  });
+
+  t.group('01k — every mutation names the test group that catches it', () => {
+    // V110 proved a group for every one of the 376 that had none — none is left
+    // over, so the rule is simply: all of them, from now on.
+    const { MUTATIONS, hintFiles } = loadMutations();
+    const untagged = MUTATIONS.filter(m => !hintFiles(m).length).map(m => m.name.split(' ')[0]);
+    t.deepEq(untagged, [], 'a mutation with no test group in its `why` — end it with the group that catches it, e.g. "(47b)"');
+  });
+
+  // V130 (1B): DEFENCE 3. Every mutation's anchor must occur EXACTLY once in
+  // its file — none and it cannot apply, more and replace() breaks only the
+  // first copy. The runner refuses both; this puts the same check in the
+  // 30-second run so a moved or doubled anchor shows before the sweep.
+  // ⚠ Under a mutation run the files in this copy are MUTATED (every mutation
+  // breaks its own anchor), so the runner passes PATGO_PRISTINE — the clean
+  // tree — and the anchors are counted there. anchorCount itself comes from
+  // the copy under test, which is what M1177 breaks.
+  t.group('01l — every mutation anchor occurs exactly once in its file', () => {
+    const { MUTATIONS, anchorCount } = loadMutations();
+    // The counter itself, on text whose answers are known.
+    t.eq(anchorCount('a b a', 'a'), 2, 'counts a repeat as 2');
+    t.eq(anchorCount('a b c', 'b'), 1, 'counts one as 1');
+    t.eq(anchorCount('a b c', 'z'), 0, 'counts a missing anchor as 0');
+    t.eq(anchorCount('abc', ''), 0, 'an empty anchor is never "found"');
+    const root = process.env.PATGO_PRISTINE || APP_DIR;
+    const cache = {};
+    const bad = [];
+    for (const m of MUTATIONS) {
+      if (!(m.file in cache)) {
+        try { cache[m.file] = fs.readFileSync(path.join(root, m.file), 'utf8'); } catch (e) { cache[m.file] = null; }
+      }
+      const src = cache[m.file];
+      const n = src === null ? 0 : anchorCount(src, m.from);
+      if (n !== 1) bad.push(`${m.name.split(' ')[0]} ${src === null ? 'names a missing file ' + m.file : n ? 'found ' + n + ' times in ' + m.file : 'not found in ' + m.file}`);
+    }
+    t.ok(MUTATIONS.length > 1000, `checked ${MUTATIONS.length} anchors`);
+    t.deepEq(bad, [], 'a mutation the runner would abort — re-aim it (missing) or add a line of context (repeated)');
+  });
+
+  t.group('01m — the runner refuses a repeated anchor, and counts anchors on the clean files', () => {
+    const mut = fs.readFileSync(path.join(APP_DIR, 'harness', 'mutate.js'), 'utf8');
+    t.includes(mut, '    const copies = anchorCount(original, m.from);\n    if (copies !== 1) {\n      aborted.push(m);',
+      'a mutation whose anchor is not there exactly once is aborted, never run');
+    // The whole line, from its newline: M1179's own definition holds this text
+    // too (with "\\n" written out), so a bare substring check would pass on
+    // the broken runner.
+    t.includes(mut, "\n      env: Object.assign({}, process.env, { PATGO_BAIL: bail ? '1' : '', PATGO_PRISTINE: APP_DIR }),",
+      'every test run is told where the clean files are (01l)');
+  });
 };

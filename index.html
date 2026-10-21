@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <!-- PATGo PWA — (c) 2026 Peter Birchley. All rights reserved. -->
-<html lang="en">
+<html lang="en-GB">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
@@ -11,13 +11,18 @@
   <meta name="apple-mobile-web-app-title" content="PATGo">
   <meta name="mobile-web-app-capable" content="yes">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="icon" href="icon-192.png">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <!-- V109: the tab icon is the plug on its own (the two-line logo is a blur at
+       16 px); the home-screen icon keeps the full logo at iOS's 180 px. -->
+  <link rel="icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+  <link rel="apple-touch-icon" href="apple-touch-icon.png">
   <title>PATGo</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <div id="app"></div>
+  <!-- V120: the one screen-reader announcer. OUTSIDE #app on purpose: render() rebuilds #app
+       wholesale, and a live region only speaks reliably if it already exists when its text changes. -->
+  <div id="sr-announcer" class="sr-only" aria-live="polite" aria-atomic="true"></div>
   <!-- v22: app.js fully split into single-concern modules. ORDER MATTERS —
        load top to bottom; later files may call functions defined earlier.
        data/state/utils/storage → feature files → render → events → boot.
@@ -30,6 +35,7 @@
   <script src="data.js"></script>
   <script src="state.js"></script>
   <script src="utils.js"></script>
+  <script src="icons.js"></script>   <!-- V115: icon() — before anything that draws -->
   <script src="storage.js"></script>
   <script src="clients.js"></script>
   <!-- v66: instruments.js — the test-instrument list, its CRUD and its two
@@ -46,6 +52,12 @@
   <script src="photos.js"></script>
   <script src="csv.js"></script>
   <script src="backup.js"></script>
+  <!-- V105: snapshots.js — daily on-phone copies (S14). Optional subsystem:
+       typeof-guarded wherever it is called, never probed at boot. -->
+  <script src="snapshots.js"></script>
+  <!-- V106: reset.js — Reset this phone (Stage 10 part 2). Optional subsystem:
+       typeof-guarded wherever it is called, never probed at boot. -->
+  <script src="reset.js"></script>
   <script src="session.js"></script>
   <!-- v70: settings-actions.js — the save/reset handlers behind the Settings
        screens, extracted from session.js. Sits immediately after its parent
@@ -66,6 +78,7 @@
        reports still work fully offline from first install. -->
   <script src="report.js"></script>
   <script src="pdfpreview.js"></script>
+  <script src="exportall.js"></script>   <!-- V125: Export everything (optional, MAP rule 6) -->
   <script src="render-core.js"></script>
   <!-- v72: the review screens (Overview, Edit Session, Retest Reminders, Reports
        and the shared photo markup) split out of render-core.js. Nothing here
@@ -85,6 +98,11 @@
   <!-- v80: sync. v81: push and pull. Optional subsystem like cloud.js; right after it
        because it asks cloud.js who is signed in. boot wraps syncBoot(). -->
   <script src="sync.js"></script>
+  <!-- V127: the plan — trial end, grace, the lock. Optional subsystem: every
+       call into it is typeof-guarded and fails open; boot wraps planBoot().
+       After sync.js, which must follow cloud.js directly (16n);
+       plan.js only asks cloud.js who is signed in, at run time. -->
+  <script src="plan.js"></script>
   <!-- v65: HID barcode scanner. Placed with the other input-handling files and
        AFTER the render files, because a scan writes into fields those render —
        and before events.js/dispatch.js purely so the three document-level

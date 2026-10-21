@@ -40,6 +40,7 @@ function bindFocusFields() {
   if ($('nf-client')) {
     $('nf-client').oninput = e => {
       state.newForm.clientId = e.target.value;
+      if (typeof refreshNfSiteNotesOnly === 'function') refreshNfSiteNotesOnly();   // V98
       state.nfActiveField = 'client';
       state.nfSuggestions = computeNfClientSuggestions(e.target.value);
       state.showNfSuggestions = state.nfSuggestions.length > 0;
@@ -64,6 +65,7 @@ function bindFocusFields() {
   if ($('nf-site')) {
     $('nf-site').oninput = e => {
       state.newForm.site = e.target.value;
+      if (typeof refreshNfSiteNotesOnly === 'function') refreshNfSiteNotesOnly();   // V98
       state.nfActiveField = 'site';
       state.nfSuggestions = computeNfSiteSuggestions(e.target.value);
       state.showNfSuggestions = state.nfSuggestions.length > 0;
@@ -132,7 +134,7 @@ function bindFocusFields() {
         // changed, so rebuild the FROZEN row (v20) and full-render to show it.
         // Otherwise the lightweight suggestions-only refresh is enough.
         if (state.sqpEnabled && locationChanged) { invalidateSqpRow(); render(); }
-        else renderLocationSuggestionsOnly();
+        else { renderLocationSuggestionsOnly(); refreshLocationCountOnly(); }   // V94 (6)
       }, 150);
     };
   }
@@ -142,9 +144,11 @@ function bindFocusFields() {
   if ($('f-type')) {
     $('f-type').oninput = e => {
       const val = e.target.value;
+      if (typeof qpTileClear === 'function') qpTileClear();   // V94: typing replaces a tile
       state.form.itemType = val;
       document.querySelectorAll('.quick-btn').forEach(b => {
         b.classList.toggle('active', b.dataset.type === val);
+        b.setAttribute('aria-pressed', b.dataset.type === val ? 'true' : 'false');   // V123 (4A): follows the colour
       });
       state.suggestions = computeSuggestions(val);
       state.showSuggestions = state.suggestions.length > 0;
@@ -180,10 +184,9 @@ function bindFocusFields() {
   // the drift slop and the capture-phase tap swallow are exactly the parts that
   // are easy to omit, and a per-site implementation is how the app ended up with
   // three sheet scrollers before V76. There is now ONE hold implementation for
-  // interactive controls. (utils.js's setupLongPress is the other one and is
-  // deliberately left alone — it is pointer-based, has no tap suppression, and
-  // serves the About-title reveal, which is a plain heading with no click action
-  // to swallow. Do not add a third; extend one of these two.)
+  // interactive controls — and since V109 the only one: utils.js's pointer-based
+  // setupLongPress (no caller since the About long-press went) was removed. Do
+  // not add a second; extend this one.)
   attachHoldGesture($('quick-grid'), QUICK_PICK_LONGPRESS_MS, () => {
     openPresetSheet();   // re-renders; handlers are rebound on the next paint
   });
@@ -466,6 +469,7 @@ function renderSuggestionsOnly(fromTyping) {
       // (the V57 fix); the click swallow kills the trailing ghost click that V57
       // missed (which was landing on Notes / PASS below the field).
       el.onpointerdown = makeSuggestionCommit((el) => {
+        if (typeof qpTileClear === 'function') qpTileClear();   // V94
         state.form.itemType = el.dataset.suggest;
         const inp = document.getElementById('f-type');
         if (inp) inp.value = el.dataset.suggest;
@@ -511,6 +515,8 @@ function renderNfSuggestionsOnly(field, fromTyping) {
         state.showNfSuggestions = false;
         state.nfSuggestions = [];
         renderNfSuggestionsOnly(field);
+        // V98: a picked client or site may bring site notes onto the form.
+        if (typeof refreshNfSiteNotesOnly === 'function') refreshNfSiteNotesOnly();
       });
     });
   }, `nf-${field}-suggestions`, fromTyping ? () => renderNfSuggestionsOnly(field, false) : null);
@@ -543,7 +549,7 @@ function renderLocationSuggestionsOnly(fromTyping) {
         // v18/v20: tapping a suggestion confirms the location, so rebuild the
         // frozen row (v20) and full-render when Smart Quick Pick is on.
         if (state.sqpEnabled) { invalidateSqpRow(); render(); }
-        else renderLocationSuggestionsOnly();
+        else { renderLocationSuggestionsOnly(); refreshLocationCountOnly(); }   // V94 (6)
       });
     });
   }, 'location-suggestions', fromTyping ? () => renderLocationSuggestionsOnly(false) : null);

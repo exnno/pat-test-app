@@ -30,7 +30,7 @@ const fs   = require('fs');
 const path = require('path');
 const t    = require('../assert');
 const { APP_DIR, bootApp } = require('../load');
-const { tick, CANARY } = require('../fixture');
+const { tick, CANARY, restoreFile } = require('../fixture');
 
 const LIB = fs.readFileSync(path.join(APP_DIR, 'supabase.umd.js'), 'utf8');
 
@@ -180,8 +180,7 @@ module.exports = async function () {
     const old = JSON.parse(JSON.stringify(fresh.fn('buildBackup')()));
     old.authUser = { userId: 'ZZMOCKUSER', authToken: 'ZZMOCKTOKEN', loginTime: '2026-01-01T00:00:00Z' };
     const file = new fresh.sandbox.File([JSON.stringify(old)], 'old.json', { type: 'application/json' });
-    fresh.fn('restoreBackupFromFile')(file);
-    await tick(5);
+    await restoreFile(fresh, file);
     const yes = fresh.doc.getElementById('confirm-sheet-yes');
     t.ok(!!yes, 'restore raised its confirm sheet');
     if (yes) yes.click();
@@ -194,10 +193,15 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 15e */
-  t.group('15e — the V43 mock key is deleted at load', () => {
+  // V130 (2A): the clean-up that deleted the key at load (V79) is retired with
+  // the key's name. What lasts: nothing in the app names it, so a leftover is
+  // inert — it can never be read as a sign-in.
+  t.group('15e — the V43 mock key is retired: nothing reads it, a leftover signs no one in', () => {
     const app = boot({ localStorage: { 'pat:authUser': JSON.stringify({ userId: 'ZZMOCK', authToken: 'ZZTOK' }) } });
-    t.eq(app.storage.getItem('pat:authUser'), null, 'pat:authUser removed on boot');
-    t.eq(app.state().cloud.status, 'signed-out', 'and it did not sign anyone in');
+    t.eq(app.state().cloud.status, 'signed-out', 'a leftover mock key did not sign anyone in');
+    const named = fs.readdirSync(APP_DIR).filter(f => f.endsWith('.js') || f === 'index.html')
+      .filter(f => { const s = fs.readFileSync(path.join(APP_DIR, f), 'utf8'); return s.includes('pat:authUser') || s.includes('PAT_AUTH_KEY'); });
+    t.deepEq(named, [], 'no app file names the retired key');
   });
 
   /* ------------------------------------------------------------------ 15f */

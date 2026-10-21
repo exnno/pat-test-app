@@ -1,4 +1,4 @@
-# PATGo — Code Map (V88)
+# PATGo — Code Map (V141)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -48,7 +48,7 @@ is discoverable from the file you happen to be editing.
    dependents are orphaned.
 
 6. **Optional subsystems fail soft.** `photos.js`, `scanner.js`, `bugreport.js`,
-   `cloud.js`, `sync.js` are `typeof`-guarded and try/catch-wrapped at their boot call sites. A missing
+   `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106), `exportall.js` (V125), `plan.js` (V127) are `typeof`-guarded and try/catch-wrapped at their boot call sites. A missing
    or broken one must never stop the app starting or break the fail flow.
 
 7. **Instrument fields on `state` are a MIRROR, not the truth.** Never read
@@ -65,8 +65,8 @@ is discoverable from the file you happen to be editing.
 
 9. **Feature-flag polarity.** Default-ON flags read `!== false`; default-OFF flags
    read `=== true`. Copying the wrong neighbour silently switches a feature on for
-   every existing user. `SCANNER_KEY` is the only default-ON flag and the only one
-   read as `!== '0'`. ⚠ `SCANNER_PAIRED_KEY` (v67) sits on the NEXT LINE in
+   every existing user. `SCANNER_KEY`, `READINGS_CHECK_KEY` (V104) and `SNAPSHOTS_KEY`
+   (V105) are the only default-ON flags read as `!== '0'` — a fourth needs adding to 07d's list. ⚠ `SCANNER_PAIRED_KEY` (v67) sits on the NEXT LINE in
    storage.js and is ordinary opt-in `=== '1'`. Harness-asserted both ways.
 
 10. **`backupVersion` is 5.** Additive fields ride through encode/decode wholesale
@@ -113,6 +113,12 @@ is discoverable from the file you happen to be editing.
     `overflow-y: auto` with `flex: 1 1 auto` and no `min-height: 0` — including
     rules for sheets that do not exist yet.
 
+    V110: harness 47 covers the other half — a sheet whose growing body was never
+    marked has no CSS rule to inspect. Every sheet the finder (`harness/sheets.js`)
+    sees must carry `.sheet-scroll` or be named in `harness/sheet-register.js`
+    with the reason nothing in it grows. **A new sheet fails 47b until you decide
+    which.** A register entry for a sheet that is gone, or now scrolls, fails 47c.
+
 15. **Banned: locking body scroll while a sheet is open.** Same family as the
     `100dvh + overflow:hidden` layout rolled back in v12.1. Harness 11i asserts
     on the shipped source, comments stripped.
@@ -125,10 +131,9 @@ is discoverable from the file you happen to be editing.
     gets one or two of the three. There is exactly one `.ontouchstart =` in the
     whole app and harness 13n fails if a second appears.
 
-    The other implementation, `setupLongPress()` (utils.js), is pointer-based
-    with no tap suppression and serves the About-title cloud reveal — a plain
-    heading with no click action to swallow. Two, with that division stated, is
-    the shipped state. A third is the defect; extend one of these instead.
+    It is the ONLY one: utils.js's pointer-based `setupLongPress()` (no caller
+    since the About long-press went) was removed in V109. A second is the
+    defect (13n); extend this one instead.
 
     ⚠ A control carrying a hold must also declare `-webkit-touch-callout: none`
     and BOTH forms of `user-select: none` in styles.css, per site — iOS answers a
@@ -136,25 +141,152 @@ is discoverable from the file you happen to be editing.
     global rule doing this; adding a fourth hold site means adding those
     properties too. Harness 13m.
 
+17. **Every storage key is classified for Reset this phone (V106).** A new
+    `*_KEY` in config.js needs a row in reset.js `RESET_KEY_PLAN` (work /
+    settings / account) or harness 43a goes red. The reset is PREFIX-SCOPED
+    (`pat:`, and `patgo:` at the everything level): the test host shares its
+    origin with PATGo Scan (`scan:` keys) — never a blanket clear of storage.
+    A new IndexedDB database needs adding to `_resetDeleteDatabases` and
+    `_resetClearStores` by hand (nothing enforces that one).
+
+18. **Every cloud read names its owner (V111).** A read, update or delete of
+    `sessions` / `records` / `photos` / `session_photo_counts` carries
+    `.eq('user_id', uid)`; an upsert lands on `onConflict: 'user_id,id'`. Never
+    rely on the database rules to narrow it: under V113's business rules an
+    Owner, Team leader or Office login may READ other members' rows, and ids are
+    unique per account only. All such calls live in sync.js today (cloud.js
+    reads only `profiles`, by the login's own id). Harness 48a fails any new
+    call without it, in any app file.
+
+19. **A page with a Save button is guarded (V112).** Its Back must go through
+    `unsavedLeave()` and the page must be listed in `UNSAVED_PAGES`
+    (settings-actions.js) with the inputs its Save reads — or Back silently
+    throws the typing away. Edits that live in STATE before Save (CSV moves, the
+    Edit session draft) need a `slice` (+ `revert`); a page mixing instant saves
+    (Report) compares with what is SAVED. Save lands via `settingsBackNav()`.
+    Harness 49a fails a new Settings Save page that is not listed.
+
+20. **Every icon goes through `icon(name)` (icons.js, V115).** Never type an
+    emoji or a glyph (⬇ 🗑 › ☁ …) into markup again — harness 52c sweeps every
+    screen for one. `icon()` returns HTML: never put it inside `escapeHTML()`
+    or a `title=` / `aria-label` / `textContent` — put it beside the escaped
+    words (`${icon('bell')} ${escapeHTML(label)}`). Plain-text places (PDF,
+    CSV, copied text, confirm-sheet messages) keep plain characters. A new name
+    must be added to `ICON_PATHS` (52a fails otherwise). Settings tables
+    (data.js) hold Lucide NAMES, not emoji. Button rule: BACKLOG "V115".
+
+21. **Screen readers (V120).** Anything VoiceOver should SAY goes through
+    `announce(text)` (feedback.js), which writes into `#sr-announcer` — the one
+    live region, in index.html OUTSIDE `#app` so `render()` never rebuilds it.
+    `showToast()` already calls it; never put `role="status"` on a freshly
+    created element (VoiceOver often ignores a region born with its text).
+    Every `<input>` / `<select>` / `<textarea>` needs a spoken name
+    (`aria-label` matching its visible label, `aria-labelledby`, `<label for>`
+    or a wrapping `<label>`) — harness 58e sweeps every screen for one. A tick or
+    icon that is the ONLY sign of a state is `role="img"` with a label, never
+    `aria-hidden`. The harness boot stands up `#sr-announcer` like `#app`.
+
+22. **Text sizes are rem, never px (V121).** Settings → Theme & Sound → Text
+    size scales the whole app through ONE number: `html { font-size }` in
+    styles.css (Standard pinned 16px, `html.ts-large` 18.4px, `html.ts-larger`
+    20.8px), switched by `applyTextSize()` (session.js) as a class on `<html>`.
+    So every `font-size` — stylesheet AND inline `style=""` in scripts — is
+    rem (px ÷ 16), and fixed icon sizes (`.ic` width/height) are rem too.
+    Kept px on purpose, and listed in the comment above the html rule: five
+    symbols in fixed-size marks (`.reading-polarity-box`, `.photo-thumb-remove`,
+    `.pm-group-tick`, `.pm-tick`, `.jm-tick`) and the three `.text-size-sample-*`
+    previews. Harness 59a sweeps every file a phone runs; a new fixed one goes
+    in 59's FIXED list AND that comment. The PDF (jsPDF `fontSize`) and CSV are
+    untouched by it. Pinch-zoom stays off (viewport `user-scalable=no`, 4A).
+
+23. **Visible text says job, never session (V122).** Every word a phone can
+    show — strings, markup, aria-labels, toasts, the tour, file names. Code
+    names stay as they are (`state.sessions`, `'sessions'` view, `pat:sessions`,
+    `data-action="edit-session"`, `#sessions-search`, sync `kind: 'session'`,
+    the Supabase `sessions` table) — saved data and the cloud depend on them.
+    Harness 60a sweeps every shipped script; history lines go in its ALLOW.
+
+24. **Focus after a redraw (V123).** Every screen title carries
+    `id="screen-title"` + `tabindex="-1"` (a `.site-name` div with
+    `role="heading" aria-level="1"`, the Jobs `<h1>`, the tour's `<h2>`);
+    `renderSettingsSubHeader()` gives one free. Harness 61a renders every view
+    and fails one with zero or two. A sheet appended to `<body>` (not drawn by
+    render) must call `focusSheetOpened(sheet)` once wired, and its own cleanup
+    `focusSheetClosed()` (`_openSheet`'s cleanup already does) — 61g sweeps it.
+    V129: a control whose own action swaps it for something else (+ New job →
+    the form; Cancel → the button) names what took its place in
+    `FOCUS_STAND_INS` (feedback.js), used only when the tapped control is gone.
+    Markup rebuilt OUTSIDE render() puts focus back itself with `focusControl(el)`
+    (report.js `rebuild(qaAction)`). A pick-one button group carries
+    `aria-pressed` on every option — colour alone says nothing to VoiceOver — and
+    an in-place repaint (`_applyBugSheetDOM`, `qpTileSyncDom`) must set it too.
+    A new LOGGING action joins `FOCUS_LOG_ACTIONS` (feedback.js) or VoiceOver is
+    left on a button a scanner can press. Never call `.focus()` on a text field
+    from a redraw (keyboard). The decision runs in render()'s tail BEFORE
+    `focusAssetForScan()`, so paired scanner mode still wins.
+
+25. **The app reloads itself at ONE moment only (V124).** `updateSafeMoment()`
+    (boot.js) is the definition: an update waiting, the page showing, the Jobs
+    list, no New job typed in, no tour, no not-saved sheet, no search, no cloud
+    select / delete / search, no push in flight, no sheet or backdrop in the
+    DOM, no text box / textarea / select holding the cursor, untouched for
+    `UPDATE_IDLE_MS`. ⚠ Anything new that can be OPEN or TYPED on the Jobs list
+    must be added there AND to harness 62c's blocker list, or the app can reload
+    under it. Everywhere else the banner, and the engineer taps Refresh (v61.2:
+    the worker never skips waiting at install — 62e). A found update must never
+    `render()` under a sheet or the cursor (`updateRepaint`, rule 3).
+    V126: a worker taking over (`controllerchange`) reloads only a page that
+    LOADED under a worker or ASKED for the update (`updateShouldReload`). A first
+    visit is never reloaded by sw.js's `clients.claim()`; keep the claim (it is
+    what makes a first visit work offline at once). Harness 64.
+
+26. **The plan gate (V127).** Anything that STARTS a job, LOGS a test or MAKES a
+    certificate asks `planGate()` (plan.js) first, as its first statement:
+    `if (typeof planGate === 'function' && !planGate()) return;`. Today:
+    session.js createSession, passClicked, failClicked, saveItem (the backstop),
+    copyLastResult, repeatLastResult, moveItemsToNewJob, openDupJob;
+    multipick.js multiPickFire, qpTileFire; report.js produceReport,
+    reopenReportPreview; dispatch.js `new-session` (before the form). A new door
+    in needs the line AND a 65b try, or a locked account walks straight through.
+    ⚠ Never gate the engineer's own records: opening, deleting, Export
+    everything (exportall.js builds certificates already made with
+    `buildReportDoc` directly — keep it that way), backup, CSV, sync. plan.js
+    fails OPEN everywhere (missing file, bad record, unknown plan = no lock).
+    Harness 65.
+
+27. **The stale-phone check (V128).** A phone learns of a delete made elsewhere
+    only from its marker (`deleted = true` row). The server's clean-up job may
+    clear markers older than `SYNC_MARKER_DAYS` (config.js) — never younger; the
+    phone lists a table's ids in full when it has not seen it whole for
+    `SYNC_STALE_DAYS` (keep it well below). Known-in-cloud and absent = deleted,
+    fed to the pulls as a marker would be. ⚠ A NEW UPLOAD PATH (any upsert) must
+    call `_syncNoteUploaded(table, ids)`, or a remembered check (one hour) can
+    remove what was just sent back. ⚠ A NEW DELETABLE RECORD KIND goes in
+    `_SYNC_DELETABLE_KINDS`. ⚠ A run while due always READS first (`reads`),
+    whatever triggered it. Snapshot copy first (snapshots.js
+    `snapshotBeforeCloudCheck`); no copy → ask. Harness 66.
+
 ---
 
-## Load order (index.html) — 31 first-party files
+## Load order (index.html) — 36 first-party files
 
-`config` → `data` → `state` → `utils` → `storage` → `clients` → `instruments` → `sqp`
+`config` → `data` → `state` → `utils` → `icons` → `storage` → `clients` → `instruments` → `sqp`
 → `multipick` → `feedback` → `bugreport` → `photos` → `csv` → `backup`
-→ `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
-→ `pdfpreview` → `render-core` → `render-review` → `render-settings` → `render-help`
-→ `cloud` → `sync` → `scanner` → `events` → `dispatch` → `boot`
+→ `snapshots` → `reset` → `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
+→ `pdfpreview` → `exportall` → `render-core` → `render-review` → `render-settings` → `render-help`
+→ `cloud` → `sync` → `plan` → `scanner` → `events` → `dispatch` → `boot`
 
 ⚠ `data` → `state` is the one adjacency in this chain that is NOT a readability
 choice. `state.js` seeds `itemTypes`/`failReasons` from `DEFAULT_ITEM_TYPES` /
 `DEFAULT_FAIL_REASONS` in its top-level initialiser, which runs at load, so
 `data.js` must precede it. Harness 09h/09i, mutation M61.
 
-`sw.js` ASSETS lists **34** `.js` entries: these 31 plus 3 lazy-loaded vendored
+`sw.js` ASSETS lists **39** `.js` entries: these 36 plus 3 lazy-loaded vendored
 files (precached, not `<script>` tags): the jsPDF pair (report.js injects them)
 and `supabase.umd.js` (cloud.js injects it, v79).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
+V140: `signin-done.html` (no script tag, not in ASSETS — only ever opened online,
+in the Google window; the SW caches it as it goes like any GET). See cloud.js.
 
 `boot.js` runs on load and must be last. Every other position is a readability
 choice, not a correctness constraint — cross-file calls resolve at call time, and
@@ -169,7 +301,7 @@ DATA-ONLY file needs a CONSTANT probe instead — top-level `const` never attach
 to `window`, so the `requiredFns` loop cannot see it whatever name you use.
 Harness 09e/09f/09k/09l and mutations M54/M55/M64/M65 hold all of this.
 ⚠ EXCEPT an optional subsystem (rule 6): `photos.js`, `scanner.js`,
-`bugreport.js`, `cloud.js`, `sync.js` are deliberately NOT probed — a probe would make a
+`bugreport.js`, `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106), `exportall.js` (V125), `plan.js` (V127) are deliberately NOT probed — a probe would make a
 missing optional file block boot, which is the opposite of the rule.
 
 ---
@@ -182,21 +314,93 @@ NOT in `index.html`, NOT in `sw.js` ASSETS — test 01c fails if either changes.
 **Touch to:** validate a release (`node harness/run.js`, `node harness/mutate.js`),
 or add this release's assertions and mutations. Never delete from `tests/`.
 **Coupling:** derives load order from `index.html`; source-guards `report.js`,
-`csv.js` and the flat-field writers (rule 7); asserts rules 1, 8, 9, 11, 14, 15, 16.
+`csv.js` and the flat-field writers (rule 7); asserts rules 1, 8, 9, 11, 14, 15, 16, 18.
 ⚠ v77: the stub's `dispatchEvent` now fires `on<type>` PROPERTY handlers as well
 as `addEventListener` registrations, the way a real element does. Without it a
 property-bound handler could only be tested by hand-calling it — the V67
 "listener never bound" blind spot. Do not narrow it back.
 ⚠ Two mutations are anchored on text that ROLLS every release and abort silently
 if not re-pointed: **M66** (`APP_VERSION` in config.js) and **M82** (the oldest
-About changelog entry). Re-point both as part of the release, and treat a non-zero
+About changelog entry). (M772, the cache key, is anchored on the stable
+`'pat-v` prefix since V110 and never needs it.) Re-point both as part of the release, and treat a non-zero
 abort count as a failed run — an aborted mutation is not a caught one.
+⚠ V95: pull fixtures date their jobs with `RECENT_DATE` (fixture.js). V93's
+30-day window makes a fixed date a time bomb — group 17 went red on 2 Oct with
+no code change. Fixed OLD dates stay only where a test means an old job.
 ⚠ v88: the fake IndexedDB now completes a transaction AFTER its requests and
 filters index lookups by key. Before V88 every photo READ in the harness came
 back empty — no test had ever read a photo back. Do not revert either.
+⚠ V105: the fake IndexedDB keeps ONE namespace of store names across every
+database (so `snapshots` must never share a store name with `photos`), and a
+database opens asynchronously at boot — a test that seeds the snapshot store
+must `await snapshotsLoad()` first or the upgrade replaces what it seeded (42).
+⚠ V106: the fake IndexedDB records deleted database NAMES (`indexedDB._deleted`)
+and the fake `location.reload()` counts calls (`location._reloads`). Its
+`clear()` lands at once where a real one lands on completion — a test asking
+"was the clear FINISHED before X" must defer it itself (43e, M724).
+⚠ V105: every restore applies AFTER the safety copy is kept (an async step), so
+a restore test awaits a tick after confirming (03f/03f2/03i, 41f).
+⚠ V105: a test restores a FILE with `await restoreFile(app, file)` (fixture.js),
+which waits for the read to finish (a new sheet on screen, max 2 s). Never a fixed
+`tick(5)`: the stub awaits a real Blob read, and under load 5 ms flaked 03f and let
+03h pass vacuously.
+⚠ V107: group 44's fake applies a PATCH (supabase-js `update`) to the rows its
+filters match and answers its `select`; the older fakes (16–43) still answer a
+PATCH with 204 and change nothing — a test of an UPDATE must use 44's.
+⚠ V108: group 45's fake (44's, extended) answers `doc_bytes` (the JSON's byte
+length) and the view's `b`, and `srv.noV108` answers "column does not exist".
+⚠ V109: group 46 copies 45's helpers and taps the cloud tab's DRAWN button
+(`tapRendered` reads its data-action from the markup). 46d keeps only the
+setupLongPress check since V110.
+⚠ V110: release pins live in the newest group (47f). `sheets.js` = the sheet
+finder (a small JS scanner: which template a sheet sits in, where a statement
+ends — it follows `${var}` and top-level helper calls into the body). Keys are
+`file · aria-label`, or `file · fn()` for a templated label (+ ` #2`).
+`sheet-register.js` = the sheets with no scroller and why. Groups 47a–47e.
+⚠ V111: release pins live in 48f. Group 48 copies 45's helpers with the fake
+keyed on (user_id, id) like the real primary key, and NO rules applied — it
+returns every account's rows, the widest read V113 allows (an Owner). A test of
+"only my rows" seeds a second account's rows (`MATE`) where an unfiltered read
+would take them. 48a's chain reader (`readChain`) skips comments between links.
+⚠ V112: release pins live in 49k. Group 49 "paints" a page: render() (real
+wiring), then fills the registered inputs with what the browser would show (the
+stub does not parse value=/checked=), then `unsavedAfterRender()`; 49b proves
+render() takes the read itself. The guard's question is found as the body child
+with aria-label "Save your changes?" (choice-sheet ids linger in the registry).
+⚠ V113: Group 50 reads the SQL files' TEXT; the rules themselves are proved by
+the SQL files' own checks and isolation-test.sql. (50e and 49k retired at V114.)
+⚠ V114: Group 51 draws every Settings page (one job, retest reminders on) and reads
+its visible text; 51e allows "session" only in the screen names listed in NAMED.
+M836 and M772 are anchored on stable prefixes — only M66/M82 need re-pointing
+(and M846, re-aimed at each welcome's first line).
+⚠ V117: release pins live in 54e (53d retired; 52h keeps only icons.js load/probe). Group 52
+compares against the app's OWN `icon(name)` output (`app.fn('icon')('camera')`),
+never a pasted SVG — so the expected text follows icons.js. 52c draws every view
+and Settings page and fails on any old glyph; it proves itself by swapping in an
+emoji-drawing icon() (`app.run`). 52g retired V116. load.js bridges ICON_PATHS.
+⚠ V108 harness amendment — mutate.js speed-ups: a mutation's own test file (named
+in its `why`, e.g. "(45a)") runs alone first, trusted only if it passed alone on
+unmutated code; otherwise the full suite runs with PATGO_BAIL=1 (run.js stops after
+the first failing FILE, never reorders). `--full` = the old behaviour (every failing
+group listed). Guarded by 01i, M761–M763.
+⚠ V110: every mutation's `why` names the test group that catches it ("(47b)") —
+01j fails on a group that does not exist, 01k on any mutation without one (all
+783 had one proved at V110 — the old 376 by running the named file alone with
+the break in place). Every mutation's `from` is unique in its file (the 11
+repeats were re-anchored in V110).
+⚠ V130 DEFENCE 3: the runner aborts a mutation whose `from` occurs anything but
+exactly once (`anchorCount`, mutate.js), and 01l checks every anchor the same
+way in the normal run — no hand scan. Under a mutation run 01l counts on the
+CLEAN tree (`PATGO_PRISTINE`, set by the runner), never the mutated copy. A
+mutation that targets harness/mutate.js itself must start its `from` with
+"\n" (the definition's own text would otherwise be a second copy). 01m, M1177–M1179.
 See `harness/README.md`.
 
 ---
+⚠ V125: the stub environment hands the vm the HOST's `Date`, so a test that
+replaces `Date.now` changes it for every later group — group 08 now puts it back
+(try/finally). stubs.js gained `TextEncoder`/`TextDecoder`, and `StubBlob.size`
+counts bytes for byte parts.
 
 ## Files
 
@@ -217,20 +421,32 @@ existing fleet. `saveSettings()` writes `SCAN_SPEED_KEY` on every settings save,
 so every phone holds an explicit preset name and never reads
 `SCAN_SPEED_DEFAULT` again — changing a DEFAULT reaches nobody but a fresh
 install. Applies to any tuning value with a stored counterpart. Mutation M85.
+V141: `PRIVACY_URL` — the privacy policy's address. The policy itself is on the
+WEBSITE (patgo.co.uk, DreamHost), not in this repo. Drawn only by render-help.js
+(About → Privacy); 80b fails if any other app file writes the address out.
 Rules 8, 9, 10 above all originate here.
 
-### data.js (~380 ln) — static tables and lists
+### data.js (~440 ln) — static tables and lists
 Split out of config.js in V71, byte identical. Built-in defaults
 (`DEFAULT_ITEM_TYPES`, `DEFAULT_FAIL_REASONS`, `DEFAULT_DESCRIPTIONS`,
-`DEFAULT_CSV_COLUMNS`), the v53 reading-field tables and fail-reason tags,
+`DEFAULT_CSV_COLUMNS`), the v53 reading-field tables and fail-reason tags, the
+V104 readings-check limits (`READING_LIMITS`, `READING_EARTH_LIMIT_*`),
 `SETTINGS_CATEGORIES` + `SETTINGS_PAGE_META` (single source of truth for the
 Settings hub, sub-lists, search aliases and back-nav), `SETUP_SECTIONS`, the
 bug-report option lists, `PATGO_FOOTER_LOGO`, `CSA_RESISTANCE`/`CALC_LENGTHS`.
 **Touch to:** change a default list, add a Settings page, retag a fail reason,
 edit the calculator tables.
-⚠ v85: `catCloud` (last, below Help) holds the three cloud pages. Its visibility
+⚠ v85: `catCloud` holds the three cloud pages. Its visibility
 and searchability are filtered in **render-settings.js**
 (`settingsCategoryVisible` / `settingsPageSearchable`), its lock in **cloud.js**.
+⚠ V96: groups and titles redone; view ids and category ids UNCHANGED (deep links,
+SYNC_GENERAL_VIEWS, SYNC_NO_REPAINT_VIEWS untouched). Hub order is NOT the array
+order: `settingsCategoriesInOrder` (render-settings.js) puts catCloud last while
+locked. A page meta may carry `action` (row opens through that ACTIONS entry —
+photoManager `pm-open`, jobManager `jm-open`, V108 cloudStorage `cs-open`); its visibility is
+`settingsPageVisible` (render-settings.js). 33b: every SETTINGS_PAGE_META key must
+sit in exactly one group. A renamed page also needs its `renderSettingsSubHeader`
+title changed and the old name kept in `aliases`.
 **Coupling:** ⚠ must load immediately after config.js and BEFORE state.js — see
 the load-order note above. Contains NO functions, deliberately, which is why its
 boot probe is a constant. Nothing here touches storage or the DOM.
@@ -244,9 +460,19 @@ in-memory caches and mirrors.
 survives navigation. Derived mirrors (`photoIndex`, `photoBytes`, the instrument
 flat fields) are never saved, backed up or validated. Rule 7 applies.
 
+### icons.js (~120 ln) — line icons — NEW V115
+`ICON_PATHS` (Lucide SVG children, only those used) and `icon(name, cls)`.
+Lucide ISC notice in its header; full notices in THIRD-PARTY-LICENSES.txt.
+**Touch to:** add or swap an icon (rule 20).
+**Coupling:** none at call time (V116: Classic emoji switch 14B retired; V130
+removed its key name, load()'s delete and the reset row — named nowhere, 53b).
+Probed in boot.js (`'icon'`). Sizes and colours per context in styles.css (`@@ icons`).
+
 ### utils.js (~265 ln) — pure helpers, no state access
-Formatting, escaping, colour, asset-number splitting/padding, long-press
-detector, boundary validators for item readings, `newId()`.
+Formatting, escaping, colour, asset-number splitting/padding, boundary validators for item readings, `newId()`. V104: the readings
+check's pure half — read the typed shorthand, the limit for a reading + class,
+"definitely outside?", the earth-ceiling normaliser (used by storage, backup,
+sync, dispatch, settings).
 **Touch to:** add a stateless helper.
 ⚠ v78: `newId()` (crypto.randomUUID, uid()-shaped fallback) is the ONLY way a
 NEW record gets an id. Minting sites: clients.js ×5, session.js ×5 (session,
@@ -330,12 +556,20 @@ the same way (24e found saveSqpHistory). Also here: `checkStorageProtection()`
 so it never does (sync.js calls it after a pull). `reportSettings.certSetAt` =
 when the counter was last typed by hand ('' never).
 
-### clients.js (~427 ln) — clients & sites
+### clients.js (~517 ln) — clients & sites
 CRUD, lookups, the site snapshot compose/split used by CSV, assign/move flows.
 Orphan sites (empty clientId) are legal.
 **Touch to:** change how clients/sites are stored or managed.
 **Coupling:** `load()`/`save()` in storage.js call in. `splitSiteSnapshot` is
 csv.js's dependency. Delete/rename confirms route through feedback.js sheets.
+V98: site notes — `normaliseSiteNotes`/`withSiteNotes` are the ONE normaliser
+(load, the site sheet, the Overview sheet, backup.js restore, sync.js
+`_syncRecordDoc`). ⚠ The `notes` key is ABSENT when empty — never `notes: ''`
+(sync rule 36; harness 35a/35b). `siteForSession` (link, then the site text) and
+`siteForNames` (read-only, as startSession resolves) are read by render-review.js
+(Overview card), render-core.js (New Job form), dispatch.js and session.js
+(`saveSessionEdits` re-links `siteId`). report.js and csv.js must never read notes
+(35k).
 
 ### instruments.js (~665 ln) — test instruments & calibration
 The instrument list, which is active, and **which instrument a given job's
@@ -362,22 +596,42 @@ Location→item-type learning, scoring, ordering, history persistence.
 **Coupling:** tuning constants in config.js. Toasts via feedback.js; confirms in
 dispatch.js. ⚠ v86: `clearSqpHistory`/`rebuildSqpHistory` stamp `SQP_RESET_KEY`
 (`markSqpReset`) — sync.js lets a later reset beat the merged counts.
+v94: `unrecordSqpUsage` is `recordSqpUsage`'s reverse — called only by Undo
+(session.js `undoLastLog`).
 
-### multipick.js (~135 ln) — Multi Pick
-Slot config, the batch-log fire path, settings save.
-**Touch to:** change the multi-pick sheet or its settings.
+### multipick.js (~290 ln) — Multi Pick + its Quick Pick tiles (v94)
+Slot config, the batch-log fire path, settings save. v94: a multi-pick's `qp`
+(1|2|3) puts it on the Quick Pick grid as a tile — `qpTiles`, `qpTileSelect`,
+`qpTileClear`, `qpTileFire` (PASS with a tile), `mpQpPicked` (settings clash).
+**Touch to:** change the multi-pick sheet, its settings, or the tiles.
+**Coupling (v94):** the tile is drawn by **render-core.js** `renderEntry` (types
+sliced to 9 − tiles; CSS places tiles on row 3); selected in `state.form.qpTile`,
+which `loadFormForCursor` does not rebuild (so it clears like the item type);
+cleared by **dispatch.js** `quick-pick` and **events.js** f-type input / type
+suggestion; **session.js** `passClicked` branches to `qpTileFire` BEFORE
+`validateBeforeSave`; `failClicked` refuses. `qp` must survive the
+normaliser here AND **sync.js** `_syncGeneralNormalise` / `_syncApplyGeneral` /
+`_syncGeneralDiffs` (13A). Every batch path calls `noteLastLog` (Undo).
 **Coupling:** computes asset numbers via `nextAssetNo()` and clears the scan
 carry-forward flags before `loadFormForCursor()` (rule 4). Stamps `ts`
 unconditionally since v77 — see the session.js entry.
 **⚠ Not the same feature as "Log again ×N"** (session.js): Multi Pick fires a
 fixed MIXED list of types as passes; ×N repeats ONE item, whatever its result.
 
-### feedback.js (~405 ln) — toast, dialogs, haptic / flash / sound
-`showToast`, the shared `.bulk-sheet` dialog builders (`openConfirmSheet`,
-`openNameSheet`, `openInfoSheet`), feedback channels.
-**Touch to:** change feedback channels, toasts, or the shared dialogs.
+### feedback.js (~715 ln) — screen-reader announcer, focus after a redraw, toast, dialogs, haptic / flash / sound
+`announce` (V120, rule 21), the V123 focus pass (rule 24: `focusNoteTap`,
+`focusBeforeRender`, `focusAfterRender`, `focusSheetOpened/Closed`,
+`focusMarkLogged`; V129 `FOCUS_STAND_INS`, `focusStandIn`, `focusControl`), `showToast`, the shared `.bulk-sheet` dialog builders (`openConfirmSheet`,
+`openNameSheet`, `openInfoSheet`, v91 `openChoiceSheet` — two or more choices +
+Cancel), feedback channels.
+**Touch to:** change feedback channels, toasts, spoken messages, or the shared dialogs.
 **Coupling:** rule 11 — every destructive confirm in the app routes here. No
-state, no re-render. Loads before everything that toasts.
+state, no re-render. Loads before everything that toasts. Rule 21: `announce`
+writes `#sr-announcer` (index.html); session.js `loggedAnnouncement` supplies
+the line spoken after one item is logged (saveItem, copyLastResult).
+V123: called from render-core.js (render top + tail, refreshEntryAfterLog),
+dispatch.js (click + change), session.js `noteLastLog`, and the body sheets in
+reset.js, report.js, render-review.js, render-help.js, settings-actions.js.
 
 ### bugreport.js (~330 ln) — one-tap problem reporting
 Global error capture, device diagnostics, the mailto report builder.
@@ -395,7 +649,7 @@ construction, so `_scrubCustomerData()` redacts known customer strings at
 report-build time. ⚠ It FAILS CLOSED — an incomplete term list withholds the
 message rather than passing it through. Do not add a raw-text fallback.
 
-### photos.js (~625 ln) — photo evidence store
+### photos.js (~990 ln) — photo evidence store
 **The app's only IndexedDB code.** Record store, count index, image processing,
 object-URL tracking, the separate photo export/import bundle.
 **Touch to:** anything about photo storage, processing, or the photo export file.
@@ -407,7 +661,25 @@ Photos are **not** in the JSON backup (separate file) — backup.js carries only
 informational count.
 ⚠ v88: `state.photoMeta` (photo id → job, item, size, time) is the mirror
 **sync.js** reads to upload; `photoMetaReady` gates it (and the prune guard).
-Every add/delete must keep BOTH mirrors in step. Engineer deletes (one photo, an
+Every add/delete must keep BOTH mirrors in step.
+⚠ V101: a photo's job (`sessionId` / meta `s`) is the job HOLDING its item —
+`photoItemJobs` + `photosSettleJobs` re-label after a move (session.js), after a
+pull that changed jobs (sync.js) and at boot (boot.js). A path that moves items
+between jobs must end in `photosSettleJobs`, or deleting the old job sweeps them.
+⚠ V102: `photosCopyForItems(itemMap, jobId)` (duplicate) writes NEW photos (new
+ids, the copy's item + job) in ONE readwrite transaction — reads and puts share
+it, so it is all or nothing. The caller (session.js `_dupJobCommit`) makes the
+job only after it resolves ok. Mirror/index updated only after `oncomplete`.
+⚠ v90: `photosRemoveQuiet(ids, keepPreview)` is also the manager's "Remove from
+phone" (known-in-cloud only, caller checks); notes nothing either way.
+⚠ v89: cloud-only lookups (`photoCloudOnlyForItem`, `photoCountForItemAll`,
+`photoCountsForSession`, `photoCloudOnlyForSession`) read **sync.js**'s
+`state.photoCloud`, memoised on `photoMetaV`/`photoCloudV`/ledger — every meta
+change must go through `_photoMetaPut`/`_photoMetaDrop` or reassign the object.
+Shown only while signed in to `state.photoCloudUser`. Consumers: render-core.js
+(jobs list, entry button), render-review.js (chip, strip), session.js (strip,
+fail→pass, cap), report.js (4A prompt). `photoAddFromCloud` keeps the cloud id
+(never re-uploaded); `photosRemoveQuiet` notes nothing. Engineer deletes (one photo, an
 item, fail→pass) call `_photoNoteGone` → ledger kind 'photo' (storage.js
 `saveTombstones`) + sync.js `syncNotePhotosGone`. `photosDeleteForSessions`,
 `photosDeleteAll`, `photosClearUploaded` NEVER note (V80 C, 5A) — harness 25h/25l,
@@ -415,14 +687,21 @@ M363/M368. The wipe action (dispatch.js) branches on `syncActive()`.
 
 ### csv.js (~665 ln) — CSV build + import
 Cell resolution per column, export/share/copy, import parsing and conflict flow.
+V115: the share glyph (SHARE_ICON_SVG) moved to icons.js as `icon('share', 'share-icon')`.
 **Touch to:** change CSV columns, export, or import parsing.
 **Coupling:** column list from config.js; `splitSiteSnapshot` from clients.js;
 instrument columns via `instrumentForSession()` (rule 7, source-guarded in the
 harness). Import learns new clients/sites into clients.js.
 
-### backup.js (~340 ln) — backup / restore
+### backup.js (~530 ln) — backup / restore
 `buildBackup`, restore, the export reminder/snooze logic.
 **Touch to:** change the JSON backup shape or restore path.
+⚠ V105: the restore is ONE routine, `applyBackupData(data, opts)`, used by a
+backup file AND a snapshot (snapshots.js) — never write a second.
+`opts.markExported` is true for a file, false for a snapshot (a copy on the same
+phone is not a backup). Both go through `restoreWithSafetyCopy()`, which keeps a
+"before restore" snapshot first and ASKS if that copy is refused (harness 42f,
+M688/M689). The apply therefore runs a moment after the confirm, not inside it.
 **⚠ Keep old-backup compatibility; bump `backupVersion` only for a genuine
 incompatible change (rule 10).**
 ⚠ v79: NO sign-in data in a backup, ever; restore ignores a V43 `authUser`
@@ -434,9 +713,61 @@ when empty) and is MERGED on restore (`syncPrunedMerge`), never replaced. The
 sync fingerprints (SYNC_STATE_KEY) are NEVER in a backup. Harness 16j.
 **Coupling:** restores through the SAME validators as `load()`
 (`normaliseReportSettings`, `normaliseArchivedStats`, `normaliseItemReadings`,
-`normaliseSessionRetest`, `restoreInstrumentsFromBackup`) — never write a second
-validator. ⚠ Instruments restore **after** the flat fields. Boolean flags restore
+`normaliseSessionRetest`, `restoreInstrumentsFromBackup`, V100
+`normaliseReminders` — session.js) — never write a second validator. V100: the
+backup interval comes from `backupReminderDays()` ('off' silences even
+"never backed up"); `BACKUP_REMINDER_DAYS` is only the default. ⚠ Instruments restore **after** the flat fields. Boolean flags restore
 only when the backup actually holds a boolean (absence ≠ off).
+
+### snapshots.js (~410 ln) — daily snapshots (V105, S14) — OPTIONAL SUBSYSTEM
+V128: `snapshotBeforeCloudCheck` — slot `before-cloud-check` (kind 'before',
+label "Before the cloud check"), called by sync.js before the stale-phone check
+removes anything; resolves 'saved' / 'unsupported', rejects on a refused write.
+Once a day (first open, or the app coming back to the front) keeps exactly what a
+backup file holds in its own IndexedDB database `patgo-snapshots` (store
+`snapshots`), only when the work changed since the newest copy; keeps 7 plus one
+"before restore" safety copy. Restore / Save as file from the Backup page.
+**Touch to:** change when or how many copies are kept, the Backup page's
+snapshot section (`snapshotsSectionHTML`), or the safety copy.
+**Coupling:** restores through backup.js `applyBackupData` (never its own
+apply). Started from boot.js INSIDE the good-load block, after the first render
+(`snapshotsBoot`), so a failed load is never kept. The Backup page
+(render-settings.js) includes the section only if this file loaded; dispatch.js
+wires `snapshot-restore`, `snapshot-save`, `snapshots-toggle`, all typeof-guarded.
+Switch `SNAPSHOTS_KEY` default ON (rule 9) — backed up, NOT synced;
+`SNAPSHOT_FAIL_KEY` is a per-device note, never backed up.
+⚠ WRITE FIRST, THEN PRUNE: the oldest copy is deleted only after the new one
+has committed (42e, M679). ⚠ The signature leaves out `exportedAt` and
+`lastBackupAt` or "nothing changed" never matches (M682). ⚠ Photos are never in
+a snapshot (4A). ⚠ `_snapCache` holds the records WITH json so Save as file runs
+synchronously inside the tap. ⚠ The safety copy is taken even with the daily
+switch OFF — it exists only when a restore is about to replace everything.
+⚠ Reset this phone (V106, reset.js) clears this store live and deletes the
+database at boot; the reset reaches `_snapTx`/`_snapCache` directly.
+
+### reset.js (~450 ln) — Reset this phone (V106, Stage 10 pt 2) — OPTIONAL SUBSYSTEM
+Three levels: work / + settings / + everything (sign-in). The page
+(`renderSettingsReset`, last row in Data), the confirm sheet (`resetOpen`,
+typed RESET, deleted/kept overview from `resetOverview`), the wipe
+(`_resetWipeLocal`, table `RESET_KEY_PLAN` — rule 17) and the boot pass
+(`resetRunPending`).
+**Touch to:** change what a level deletes, the confirm's wording, or the page.
+**Coupling:** TWO PASSES — the live page neutralises `save`/`saveSessions`/
+`saveSettings`/`render`, writes `RESET_PENDING_KEY` (config.js), wipes, clears
+the photo store (`photosDeleteAll`) and snapshot store (`_snapTx`), WAITS for
+both, then reloads; boot.js calls `resetRunPending()` after the integrity check
+and BEFORE `load()`, wipes again (anything a late sync wrote back) and deletes
+both databases. Settings level writes the certificate numbering back
+(`certEnabled/certNextNumber/certPrefix/certPadding`, 8B) as a bare object that
+`normaliseReportSettings` fills. Everything level calls cloud.js `cloudSignOut`
+first. Overview reads sync.js `syncJobsSafety` (4A warning) and photos.js
+`photoStatsSync`. Route: render-core.js (falls back to Backup); row visibility:
+render-settings.js `settingsPageVisible`; tap: dispatch.js `reset-open`.
+⚠ Local only: sync bookkeeping and the tombstone ledger go at EVERY level, so the
+phone is a fresh phone to sync (R21 brings 30 days back) and no delete can be
+sent. ⚠ `SQP_RESET_KEY` is removed, never re-stamped — a new stamp would clear
+Smart Quick Pick on the other phone. ⚠ The input is not focused on open — the
+keyboard would cover the overview.
 
 ### setup.js (~260 ln) — export/import Setup bundle
 Config-only shareable bundle: presets & lists / report settings / CSV columns /
@@ -446,16 +777,72 @@ tester & calibration / app preferences.
 **Coupling:** applies sections through the same validators as backup restore.
 File-kind guard rejects a backup imported as a setup and vice versa.
 
-### tour.js (~217 ln) — guided walkthrough
-Five self-contained slides, each a static HTML/CSS mock (no live-element
-coachmarks — the fragile iOS path). Transient state, never persisted.
-**Touch to:** change the walkthrough slides, mocks or paging.
-**Coupling:** routed as a full-screen view early in `render()`. Entry points: the
-wizard finish step and About.
+### tour.js (~1650 ln) — the tutorials: the practice job, the Settings tutorials, your jobs & the cloud, Show me how — V134, V134.1, V135, V136, V137, V138
+`TUTORIALS` (V135 — the list: `practice` + five Settings ones, each with its own
+steps array; `_tutSteps()` / `_tutDef()` = the open one's), `TUT_STEPS` (the practice
+job's 21), the practice state (`TUT_FRESH` = a new phone's state taken at
+load, + `TUT_FROM_PHONE` for the sample certificate), `_tutDraw()` (swaps the
+practice into `state`, draws, puts the real values back in `finally`; storage
+writes refused meanwhile), `_tutInert()` (practice markup can't reach ACTIONS or
+the keyboard), the practice's own log / copy / fail actions, the sample
+certificate (`buildReportDoc` + pdfpreview, never `stampCertNumber`), the box
+(`#tut-ring` on `<body>`, `tutPlace`; `tutCardEnd` picks the card's end — the page
+stays still, V134.1) and the card; V134.1: practice photos (`_tutPhotoPick`, a file
+box on `<body>`, object URLs only), three example presets + the hold (events.js
+`attachHoldGesture`), free practice (`tutFree`, `tutFreeTap` — the practice's own
+versions of the everyday taps). V135: Settings tutorials start from
+`_tutSettingsState` (a new phone — nothing copied from this one), draw the real
+Settings pages (`TUT_SETTINGS_VIEWS`), fill examples on tap, pick logo / signature
+into the practice only (`_tutPickImage`, `_tutAddPicture`), save through the
+practice's own functions (never the page's save handler), end on the result
+(`_tutSampleJob` + the sample certificate, or the testing screen); `box: 'row' |
+'section'` frames a toggle row / page section. V136: three cloud tutorials
+(`cloud: true`, `group: 'cloud'`) start from `_tutCloudState` — a pretend
+signed-in phone with sample jobs (`_tutPhoneJobs`) and cloud-only jobs
+(`_tutCloudOnlyJobs`); `_tutDraw` also swaps `TUT_CLOUD_STUBS` in for the draw
+(cloudAvailable, cloudPagesUnlocked, syncStatusSummary, syncHeldList,
+syncJobsSafety, planBannerHTML) and puts the real ones back in `finally`; the
+practice's sync records live on `_tut.sync` / `_tut.held`. `_tutNextDef` stays
+within a heading (`_tutGroup`); `box: 'card'` frames a job card. V137: a
+TUTORIALS entry's `page` is the page it teaches; that page draws
+`tutShowMeHowHTML(view)` under its title (render-settings.js `settingsHowToHTML`
+on Engineer & Tester, Quick Pick Items, Backup & Restore, both Report halves;
+render-help.js on Sync); `tutShowMeHow` opens it with `fromPage` (Finish only —
+`_tutNextDef` null) through settings-actions.js `unsavedLeave(go, go)`. Never
+drawn while a tutorial is open. V138: opened `fromPage`, `_tutSteps()` leaves out
+the walk steps (`TUT_WALK_KEYS` — step keys `group` / `page`) and `openTutorial`
+runs them first so the practice starts on the page; a step's `fromPage` text
+replaces its own (`_tutStepText`) — the six done steps. ⚠ A new walk step in a
+page tutorial must use one of those keys, or it shows from the page too (77a).
+Transient, never persisted.
+**Touch to:** change a step, its words or its target; how the box moves.
+**Coupling:** ⚠ draws the REAL `renderSessions` / `renderEntry` /
+`renderOverview` (render-core.js, render-review.js) and, V135, the real Settings
+pages (render-settings.js, instruments.js `renderSettingsInstrument`) — a renamed id
+or class used as a step `target` breaks the step (harness 72d, 74d). ⚠ A Settings
+tutorial must never call a page's real save / add / export handler (74c).
+⚠ V136: the Jobs list, cloud tab and Sync page read the PHONE's sync records
+through sync.js / cloud.js / plan.js functions, not `state` — a new such read
+in those screens must join `TUT_CLOUD_STUBS`, or the practice shows this
+phone's own numbers or held jobs (75b, 75c). Draws the real `renderCloudSync`
+(render-help.js) and `renderCloudJobsHTML` (render-review.js); cloud-tab
+targets: `.jobs-tab`, `.cloud-card`, `#cloud-search`, `.cloud-select-btn`,
+`.sync-held-row` (75d).
+⚠ `_tutInert` renames `snapshots-block` — snapshots.js paints live Restore buttons
+into that id later. Routed by `render()`'s tour
+branch, which then calls `tutAfterRender()`. Actions `tut-*` (V137 `tut-show-me-how`), `open-practice`,
+`open-tour`, `tut-free`, V135 `open-tutorial`, `tut-next-tutorial` (dispatch.js). ⚠ Practice photos must be cleared from the
+practice form BEFORE `loadFormForCursor()` — its `discardPendingPhotos()` calls
+photos.js `photoReleaseObjectUrls()`, which lets go of the PHONE's photo previews. Entry points: setup's finish (onboarding.js
+`openTour()`), Settings → Help → Tutorials (render-help.js). `state.tourOpen`
+is read by boot.js (update safe moment) and plan.js (prompts). Styles:
+styles.css `@@ tour` (`--tut-dim` in the three theme blocks).
 
-### report.js (~700 ln) — PDF certificates
+### report.js (~1190 ln) — PDF certificates
 Lazy-loads the vendored jsPDF + AutoTable, builds the document, the preview
-modal, filename tokens, share/download.
+modal, filename tokens, share/download. The preview's quick-adjust chips are
+wired by their ids (`qa-chip-<action>`, read from the markup — V129) and put
+focus back on the chip after a rebuild (rule 24).
 **Touch to:** change report layout/content, reading columns, orientation, or how
 the PDF is previewed, shared, named or coloured.
 **⚠ THE ASYNC BOUNDARY.** `buildReportDoc` is **synchronous** and has three call
@@ -471,6 +858,16 @@ job in `state.sessions` (jobs synced from the other phone included). V87: `repor
 title/author, set right after `new JsPDF` inside the sync build; file names go
 through utils `fileSafe`/`fileDateUK`; the retest line is a MONTH. Every `addImage` is try/caught — a bad image never blocks
 a report.
+V89: `produceReport` asks about cloud-only photos (`_reportCloudPhotoChoice`,
+built on **feedback.js** `_openSheet`) BEFORE `stampCertNumber` — Cancel must
+cost no number (M388) — and downloads through **sync.js** `syncPhotoDownload`.
+V95: the END of the document is one of two sections — `_appendRemedialPages`
+when `_remedialWanted` (it carries the photos too), else `_appendPhotoPages`.
+Both draw through the shared `_photoGeom` / `_drawPhotoGroups` / omit-notice
+helpers; change photo block layout there, once.
+V100: the preview's Download and (successful) Share call **session.js**
+`noteReportMade(session.id)` — a certificate that leaves the phone stamps the
+job's `reportAt`; `shareOrDownloadReport` returns false on a cancelled share.
 
 ### pdfpreview.js (~135 ln) — multi-page preview rasteriser
 Lazy-loads vendored PDF.js, renders each page to a stacked canvas, DPR-capped,
@@ -478,7 +875,30 @@ sequential for iOS memory.
 **Touch to:** change preview rasterising, the lazy load, or the PDF.js version.
 **Coupling:** throws on parse failure so report.js falls back to its iframe view.
 
-### session.js (~2160 ln) — sessions and items
+### exportall.js (~480 ln) — Export everything (V125, Stage 12) — OPTIONAL SUBSYSTEM
+One zip of everything on THIS phone: backup, a CSV per job with items, the
+certificates already made, the photo file (tick), Read me. Own STORE-only zip
+writer (`exportAllZip`, `exportAllCrc32`). Base for lapse handling (R8).
+**Touch to:** change what goes in the zip, its names/folders, or its sheets.
+**Coupling:** reuses backup.js `buildBackup`, csv.js `buildCSV`/`csvFilename`,
+report.js `buildReportDoc`/`reportFilename`/`collectReportPhotos`/
+`_emptyPhotoData`/`loadReportEngine`/`triggerDownload`, photos.js
+`buildPhotoBundle`/`photoStatsSync`, feedback.js `_openSheet`. Backup & Restore
+(render-settings.js) draws the section only if this file loaded; dispatch.js
+`export-all` typeof-guarded. Search alias in data.js `settingsBackup`.
+⚠ NEVER `stampCertNumber` (3A — only jobs with `certNo`/`reportAt`, no number
+issued) and NEVER `markSessionExported` (5A); a completed save calls backup.js
+`markBackupExported` (the zip is a backup). ⚠ iOS: share only from the ready
+sheet's tap — after a long build the starting tap has expired (NotAllowedError).
+⚠ Cloud-only jobs/photos are never fetched (4A). Harness 63, M1032–M1060.
+
+### session.js (~2560 ln) — sessions and items
+V121: `applyTextSize` / `normaliseTextSize` sit beside `applyTheme` (rule 22). Text size is per phone like the
+theme: storage (pat:textsize), backup, setup prefs, reset row, bug-report line — never synced.
+⚠ V104 readings check: `readingsCarry` (a PASS sheet's readings across "Change to
+FAIL") is read-then-cleared ONLY in `openReadingsSheet` (rule 4); dropped by
+`closeReadingsSheetState` (so `readingsChangeToFail` sets it AFTER that call) and
+by `cancelFailModal`.
 Session/item lifecycle, form and cursor, validation, suggestions,
 ⚠ V87: retest reminders are by MONTH — `retestStatus(sess, now)` buckets
 ('upcoming' = due next month, 'duesoon' = due this month, 'overdue' from the 1st
@@ -507,14 +927,94 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   box, and CARRIES the source item's notes because a fail's reason lives there.
   Mutations M110–M114.
 - `state.sessions` is reassigned in exactly four places: load, restore, prune,
-  delete. Any new removal path needs the same hooks.
+  delete. Any new removal path needs the same hooks. v91: `removeJobsFromPhone`
+  (take jobs off this phone, the cloud keeps them — stats archive, photo sweep,
+  `syncNotePruned`, then filter) is the signed-in clear; callers re-check safety
+  first. `unarchiveSessionStats` is its reverse (sync.js `syncBringBack`).
+- v91: `deleteSessionAsk` (the 🗑 on a card, via dispatch `delete-session`) —
+  signed in: **feedback.js** `openChoiceSheet` → remove from this phone
+  (**settings-actions.js** `jobsRemoveAsk`) or `deleteEverywhereAsk` (second
+  confirm) → `deleteSession`. `pruneOldSessions` signed in → `jobMgrOpen`.
+- v94 Undo: every APPEND path (`saveItem`, `copyLastResult`,
+  `repeatLastResult`, **multipick.js** `multiPickFire` / `qpTileFire`) calls
+  `noteLastLog`; edit branches don't. `undoAvailable` re-checks at the tap (still
+  last, unchanged — JSON snapshot). `undoLastLog` sweeps photos BEFORE the splice
+  (rule 5) and calls **sqp.js** `unrecordSqpUsage`. `openSession` clears
+  `state.lastLog`. A new append path must call `noteLastLog` or Undo takes back
+  the item BEFORE it. v94 `locationCountInJob` feeds **render-core.js**
+  `locationCountText`.
 - `captureWizardStep()` is the last legacy writer of the instrument flat mirror
   and calls `adoptMirrorIntoInstruments()` (rule 7).
+- V99 map pins (item field `pin`): `mapPinOf` is the one reader (**render-core**,
+  **render-review**, **csv.js**, **report.js** call it); `setItemMapPin` the one
+  writer (replaces the item object + `_invalidateSessionEncoding`). Never from the
+  fail sheet. `failToPassAsk` drops it via `state.form.dropPin` (read in
+  `saveItem` before `loadFormForCursor`); `copyLastResult` overwrite clears it.
+  `mapPinResume` is called by **boot.js** before the first render;
+  `mapPinOfferShow` appends into #app AFTER `refreshEntryAfterLog`.
+  V99.1: `mapPinOpenW3w` opens the APP (`W3W_APP_URL`, location.href — never
+  window.open, which leaves a blank panel); `_mapPinWatchLeave` offers the
+  website (`mapPinOpenW3wWeb`) only if the page never hid or lost focus.
+- V131 the Jobs list's export state (block after `markSessionDirty`):
+  `jobDoneStatus` / `jobIsDone` — a clean CSV OR a certificate after locking
+  (`jobPaperworkDone`, below) — drive the nudge (`unexportedSessionCount`), the
+  badges (**render-core.js**) and the Status filter (`sessionMatchesControlFilters`).
+  `exportStatus` stays CSV-only for pruning (`prunableSessions`) and the
+  "Already exported" pop-up (`requestOpenSession`) — a PDF can't be imported
+  back. `reviewUnexported` sets the transient 'notdone' filter (storage load
+  drops it, as `remindexport`). `markSessionNotExported` (CSV mark only) via
+  `unmarkFromReopenWarning`, which relies on `openSession`'s save().
+  `bulkExportUnexported` (csv.js) retired V131.
+- V100 reminders (block after `reviewUnexported`): `normaliseReminders` (the one
+  normaliser — storage, backup, setup, settings-actions), `backupReminderDays`
+  (**backup.js** `shouldShowBackupReminder`), `isExportReminderJob` /
+  `exportReminderDue` / `unlockedReminderDue` (**render-core.js**
+  `renderReminderBanners`), `reviewReminder` / `quietReminder` (dispatch).
+  `lockedAt` is written ONLY by `saveSessionEdits` (on the change to locked) and
+  removed by it and `unlockActiveSession` — a new lock/unlock path must do the
+  same. `noteReportMade` (called by **report.js** preview Download/Share) stamps
+  `reportAt` by id. Both fields are in `_sessionSig` (**storage.js**). Read
+  `lockedAt` only through `lockedAtMs` (ignores it on an unlocked job). The
+  `remindexport` and V131 `notdone` list filters are transient (storage load drops them).
+  `setView` clears `state.partyOpen` / `state.egg` (**render-help.js**).
+- V102 duplicate (block after the move, before "Edit-session flow"): `state.dupJob`
+  (cleared by `setView`; a copy under way still finishes). `openDupJob` refuses
+  while `editFormDirty` (Session settings has unsaved typing — message in place,
+  no render). `duplicateJob` → cloud-only photos via **sync.js**
+  `syncPhotoDownload` (failures → step 'partial') → `_dupJobCommit`: items copied
+  FIRST (new ids, `copyOf` = first original's id), then **photos.js**
+  `photosCopyForItems`, then the job (`_dupJobBuild`). Unchanged client + site
+  (`client0`/`site0`) keep the original's title and links; changed ones go
+  through ensureClient/ensureSite like createSession.
+- V102 lifetime stats: `tallySessions(sessions, alreadyCounted)` counts each
+  `statsKeyOf(it)` once (`copyOf` || id). `archiveSessionStats` /
+  `unarchiveSessionStats` pass `statsKeysStaying(going)` — keys still held by
+  other jobs (by job ID), so a copy's partner is never archived twice. Any new
+  path that copies items must set `copyOf`, or stats double.
+- V101 move to a new job (block before "Edit-session flow"): `openMoveJob` captures
+  the selection as item IDS in `state.moveJob` (cleared by `exitSelectionMode`, so
+  by `setView`); `moveJobBlockReason` (locked, all items) is checked on open AND at
+  the moment of moving with the ids looked up again; `moveItemsToNewJob` is the only
+  writer of `movedOut` on a job (rule 36 — absent until used, bounded by
+  `MOVED_OUT_MAX`), then calls **photos.js** `photosSettleJobs` and **sync.js**
+  `syncNoteMoved`. Items MOVE (ids unchanged): photos are found and deleted by item
+  id alone — a copy with the same ids would share them. Markup:
+  **render-review.js** `renderMoveJobSheet`. `moveOfferShow` appends into #app
+  after the render, like `mapPinOfferShow`.
+- V103 move into an EXISTING job (block after V101's move, before V102's duplicate):
+  `state.moveTo` (cleared by `exitSelectionMode`). `moveToClashes` uses
+  `findDuplicateAssetIndex` (the per-job asset rule); `moveToPlan` is the one place
+  the choices become moves/deletes/renumbers — render (confirm) and
+  `moveItemsToExistingJob` both call it. The move re-checks lock, items AND the
+  clash set before acting; deletes sweep photos first (rule 5). `moveItemsToExistingJob`
+  is the second writer of `movedOut` (`_moveOutAfter`, V101's rule) and drops
+  arriving ids from the TARGET's `movedOut`. Markup: **render-review.js**
+  `renderMoveToSheet`; offer reuses `moveOfferShow`.
 **Note:** `state.view` is set directly from ~14 places, so per-render concerns
 (scroll reset) live in `render()` via `_lastRenderedView`, not in `setView`.
 
-### settings-actions.js (~620 ln) — the write half of the Settings screens — NEW v70
-Per-page saves, Report Settings (text, logo, filename tokens), signature capture
+### settings-actions.js (~2250 ln) — the write half of the Settings screens + the photo manager (v90) + jobs on this phone (v91) + the Jobs screen's cloud tab (v93) + Cloud Storage (V108) — NEW v70
+Per-page saves, Report Settings — both V117 halves (text, logo, filename tokens), signature capture
 (draw and upload), CSV column ordering, Export/Import Setup UI handlers, the
 editable list settings (item types, fail reasons, descriptions) and the
 appearance/feedback toggles. Job notes, certificate-number override and report
@@ -525,12 +1025,75 @@ changed; `deleteReportTemplate` records a `template` tombstone and saves via
 save() (18r: nothing outside storage/sync calls saveSettings()).
 **Touch to:** change what a Settings screen SAVES. To change how one is drawn,
 go to render-settings.js; to change a default, config.js.
+⚠ V112: the unsaved-changes guard (`UNSAVED_PAGES`, `unsavedAfterRender` — called
+from render()'s tail in render-core.js — `unsavedLeave`, `unsavedRevert`) and
+`settingsBackNav()` (Back's navigation, moved from dispatch.js; every page Save
+ends with it). Rule 19. V137: `unsavedLeave(nav, then)` — `then` is where Save
+leads instead (tour.js Show me how); `unsavedSaveThen` arms `_unsavedThen`, which
+`settingsBackNav()` takes FIRST. ⚠ A new guarded page's Save must still end in
+`settingsBackNav()`, or Show me how's Save never opens the tutorial (76c).
 **Coupling:** `saveReportSettingsForm()` reads the DOM, so any re-render must
 call `captureReportTextInputs()` first or unsaved text is lost (dispatch.js
 depends on this). `setTheme` delegates to `applyTheme` (session.js). Extracted
 from session.js in v70, byte identical.
+⚠ V96: `settingsOpenCategory` (a one-page group opens its page, settingsCategory
+null so Back → hub) and `mgrNoteReturn`/`mgrGoBack` (Back from Manage photos /
+Jobs on this phone returns to the view that opened it; dispatch `pm-open`/`jm-open`
+note it, as does session.js's tidy offer before `jobMgrOpen`).
+⚠ v90: also the PHOTO MANAGER's logic (`photoMgr*`, `_pm*`): `photoMgrModel()`
+(synchronous — render() calls it) merges **photos.js** `state.photoMeta`,
+**sync.js** `state.photoCloud` and the in-memory look (`state.photoMgr.cloud`).
+⚠ V95: `descRenameApply` edits items IN PLACE in jobs that are not open — it must
+call **storage.js** `_invalidateSessionEncoding` per touched job (sync spec §6
+trap, M503). Locked jobs are never touched. V95.1: `descDeleteAsk` (list only) via
+**feedback.js** `openNameSheet`'s optional `onDelete` — other name sheets unchanged.
+Actions reuse existing paths only: `photosRemoveQuiet(ids, true)`,
+`syncPhotoDownload`, `photoDelete`/`photoDeleteCloudOnly`,
+`syncPhotoKnowForDelete`. 8A: nothing on a locked job is deleted. Markup is
+`renderPhotoManager()` in **render-review.js**; actions `pm-*` in **dispatch.js**;
+**session.js** `setView()` calls `photoMgrLeave()` on any other view.
+⚠ v91: JOBS ON THIS PHONE and the tidy-up offer (`jobMgr*`, `_jm*`, `tidy*`,
+`jobsRemoveAsk`, `savePhotoAge`). `jobMgrModel()`/`tidyModel()` are synchronous
+(render() calls them) over **sync.js** `syncJobsSafety`. EVERY removal goes
+through `jobsRemoveAsk`: sync first when online → `syncPruneFilter` (fresh) →
+v92 `syncVerifyJobs` (real contents; online only; a failed read stops) →
+confirm → `syncWhenIdle` → re-check with the same map → **session.js** `removeJobsFromPhone`.
+Old photos → `photosRemoveQuiet`. Offer timer TIDY_OFFER_KEY (`tidyOfferDue`/
+`tidyOfferAnswered`). Markup `renderJobManager()`/`renderTidyBlock()` in
+**render-review.js**; banner `renderTidyBanner()` in **render-core.js**; Phone
+Storage page block (V97, was Backup) in **render-settings.js**; actions `jm-*`, `tidy-*`,
+`photo-age-save` in **dispatch.js**; `setView()` calls `jobMgrLeave()`.
+v93: the Cleared section is a link (`jobMgrCloudLink`, `jm-cloud-link`) to the cloud tab.
+⚠ v93: THE "IN THE CLOUD" TAB (`cloudJobs*`, `_cloud*`, `jobsTabSet`,
+`cloudTabActive`). `state.jobsTab` / `state.cloudJobs` (state.js, transient).
+`cloudJobsLoad` → **sync.js** `syncCloudList` (memory only; kept for the session,
+re-read on ⟳, a different account, or `stale` — set by **session.js**
+`removeJobsFromPhone`). `cloudJobsModel()` is synchronous (render calls it):
+hides jobs on the phone, search, month groups. Tap → `_cloudBring` →
+`syncBringBack` → `requestOpenSession` (one job) or stays (several). The search
+box is an input: `cloudJobsSearch` → `refreshCloudListAreaOnly` (render-review.js),
+never render(). Markup `renderCloudJobsHTML`/`renderCloudListAreaHTML` in
+**render-review.js**, drawn by **render-core.js** `renderSessions`; actions
+`jobs-tab`, `cloud-*` (+ input `cloud-search`) in **dispatch.js**.
+⚠ V107: CLOUD DELETE (`cloudDeleteOverview`, `cloudDeleteConfirmMatches`,
+`cloudJobsDeleteSelected`, `_cloudDelete`). Select → Delete… → **render-review.js**
+`openCloudDeleteSheet` → **sync.js** `syncCloudDelete`. Word `CLOUD_DELETE_WORD`
+at `CLOUD_DELETE_TYPE_AT`+ jobs or any locked/certificated (config.js). Deleted ids
+drop off `cj.jobs` without a re-read; a re-read only after `missing`/error.
+V108: `cloudDeleteOverview(ids, pool)` — `pool` names the jobs when the caller
+isn't the cloud tab (Cloud Storage); omitted, the cloud tab as before.
+⚠ V108: CLOUD STORAGE (`cloudStore*`, `_cloudStore*`), view `cloudStorage`,
+`state.cloudStore` (memory only, created on first open). `cloudStoreOpen` notes its
+own return (`cs.ret`, from `_MGR_RETURN_VIEWS`) and reads every open →
+**sync.js** `syncCloudStorage`. `cloudStoreModel()` synchronous: `onPhone` from
+`state.sessions` at draw time; `selected` NEVER holds a phone job (the one guard;
+sync's `skipped` is the backstop). Delete… → `cloudDeleteOverview(sel, rows)` →
+**render-review.js** `openCloudDeleteSheet` → `syncCloudDelete` → re-read inside
+`syncWhenIdle` (after the follow-up run that removes the photos — M749).
+`'cloudStorage'` is in `_MGR_RETURN_VIEWS` (Manage Photos returns to it) and
+`mgrGoBack` re-reads on arriving there. Actions `cs-*` in **dispatch.js**.
 
-### onboarding.js (~195 ln) — first-run wizard — NEW v70
+### onboarding.js (~250 ln) — first-run wizard — NEW v70
 The wizard state machine (step capture, paging, fresh/import fork, theme pick,
 demo toggle, finish, skip), `restartOnboarding()`, and `seedDemoSession()`.
 Holds `WIZARD_LAST_STEP`.
@@ -539,9 +1102,18 @@ Holds `WIZARD_LAST_STEP`.
 instrument flat mirror and must keep calling `adoptMirrorIntoInstruments()`
 (rule 7). `onboardSetupImport()` delegates to setup.js; the final step can hand
 off to tour.js. Extracted from session.js in v70, byte identical.
+⚠ V112: Continue on step 4 applies `state.wizardReportsOn` to
+`reportSettings.enabled` and saves (a later Skip does not save()).
+`restartOnboarding()` sets the switch from the current setting. Finish / skip /
+import call `markWelcomeSeenAtSetup()` (WELCOME_KEY, config.js).
 
-### render-core.js (~1620 ln) — dispatcher + the logging screens
-Owns `const app` and the `render()` dispatcher. Sessions list, entry screen,
+### render-core.js (~1890 ln) — dispatcher + the logging screens
+Owns `const app` and the `render()` dispatcher.
+⚠ V104 readings check: the readings sheet's limit notes are ALWAYS in the DOM
+(hidden when fine) because typing repaints them in place (`refreshReadingNote`,
+called from session.js `setReadingsField`, rule 3). Which readings are over is
+session.js `readingsOverLimit`; the confirm step replaces the sheet when
+`readingsSheetStage === 'confirm'`. Sessions list, entry screen,
 empty states, welcome modal AND its `dismissWelcome()` handler (moved here
 v70 — see rule 8), first-run wizard markup, signature pad, calibration banner,
 retest/backup banners, asset-history sheet, import conflict/summary modals,
@@ -550,7 +1122,11 @@ client/site suggestion markup, tour route.
 emits. For Overview / Edit Session / Reports / Retest reminders, go to
 render-review.js.
 **Coupling:** `render()` calls `bindFocusFields()` (events.js) after setting
-`innerHTML`. Rules 2, 3 and 8 all bite here. `refreshEntryAfterLog` must set
+`innerHTML`. V123 (rule 24): `focusBeforeRender()` first thing, `focusAfterRender()`
+in the tail before `focusAssetForScan()` (also in the tour's early return and in
+`refreshEntryAfterLog`, as `'logged'`). The Quick Pick grid carries
+`aria-pressed`; its in-place repaints (dispatch 'quick-pick', events f-type,
+multipick tiles) keep it in step. Rules 2, 3 and 8 all bite here. `refreshEntryAfterLog` must set
 `_lastRenderHadModal` from live sheet state, not a constant. Sheets that hold
 inputs get targeted refresh helpers; read-only sheets may render.
 The **calibration banner is ONE banner** covering the worst instrument with
@@ -559,9 +1135,22 @@ The **calibration banner is ONE banner** covering the worst instrument with
 `renderPhotoStripSheet()`, which now live in **render-review.js**.
 ⚠ v85: the dispatcher paints the three cloud views only when
 `cloudPagesUnlocked()` (cloud.js); otherwise `renderCloudLocked()`. The V43 About
-long-press is gone — `setupLongPress` (utils.js) now has no caller.
+long-press is gone (V109 removed the dead `setupLongPress`).
+⚠ v93: `renderSessions()` draws the "On this phone | ☁ In the cloud" tabs when
+`syncActive()`; the cloud tab returns early with **render-review.js**
+`renderCloudJobsHTML()` (no banners, no new-session form there).
+⚠ V100: `renderReminderBanners()` (Jobs screen, reads **session.js** reminder
+logic at render — nothing scheduled); the Status filter offers `remindexport`
+while the not-exported reminder is on. The welcome's top is **render-help.js**
+`v100HeroHTML()`; `render()`'s finalHTML carries `renderPartyModal()` and
+`renderEggSheet()` (render-help.js) and its tail calls `partyAfterRender()`.
+⚠ v94: the entry screen's location count (`#loc-count`, `locationCountText`) is
+repainted in place by `refreshLocationCountOnly()` from **events.js** location
+blur / suggestion pick (no render). Multi Pick tiles + `failDisabled` + the
+Copy last / ↶ Undo row (`state.undoEnabled`) are built here — the tile block
+must read `sess.locked`, not `isLocked` (declared later: TDZ).
 
-### render-review.js (~690 ln) — review & manage screens — NEW v72
+### render-review.js (~1680 ln) — review & manage screens — NEW v72
 Overview (+ `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
 `refreshOverviewBody`, `refreshOverviewSelection`), Edit Session, Retest
 Reminders, the Reports hub, and the shared photo-evidence markup
@@ -576,29 +1165,100 @@ cover them instead. `dispatch.js` calls `refreshOverviewBody()` /
 helpers. Declares NO top-level bindings, so its load position is free.
 `renderRetestReminders()` bounces to the sessions list when the retest feature
 is off — any test of it must turn the flag on first.
+v90.1: "Look in the cloud" is a small `.pm-look-link`, not a button; after a
+look one line says what it found (`totals.awayN/awayJobs/orphanN` from the model).
+v90: `renderPhotoManager()` (view `photoManager`, reached from Phone Storage (V97);
+render-core falls back to Phone Storage if it is missing). Previews are
+painted into `#pm-t-<id>` in place by settings-actions.js, not by render.
+v91: `renderJobManager()` (view `jobManager`, same fallback) and
+`renderTidyBlock()` (also used by render-settings.js's Phone Storage page).
+v93: `renderCloudJobsHTML()`, `renderCloudListAreaHTML()` and
+`refreshCloudListAreaOnly()` — the Jobs screen's cloud tab (called from
+render-core.js, model in settings-actions.js). V109: its top row (`.cloud-head`)
+carries `cs-open` (Cloud Storage) in every state but selecting; Back returns to
+the tab because 'sessions' is in `_MGR_RETURN_VIEWS` (settings-actions.js).
+V98: the Overview's title bar is `.header-row.header-sticky` (styles.css; both the
+normal and selection headers). The site-notes card and its sheet
+(`state.siteNotesSheet`, cleared by setView) are drawn here; the sheet holds an
+input, so it is never re-rendered while typing (rule 3) — its text lives in state.
 Boot probe: `renderOverview` in `requiredFns`.
+V101: `renderMoveJobSheet(sess)` (Move to a new job — form / confirm / blocked),
+drawn from `renderOverview`; logic in session.js. The form holds inputs: never
+re-rendered while typing, its fields write `state.moveJob` on input; sync.js
+`_syncSafeToRepaint` refuses while `state.moveJob` is set.
+V102: `renderDupJobSheet(sess)` (Duplicate — form / confirm / working / partial /
+blocked), drawn from `renderEditSession` after its "Duplicate this job…" card
+(below Save/Cancel, `#ef-dup-error` for the unsaved-changes line). Same rules as
+Move's sheet; reuses the `.move-job-*` styles; `_syncSafeToRepaint` refuses while
+`state.dupJob` is set.
+V103: `renderMoveToSheet(sess)` (Move to another job — pick / clash / confirm /
+blocked), drawn from `renderOverview` after V101's. Pick and clash hold inputs (the
+filter, new numbers, radios): updated in place, never re-rendered while open;
+`_syncSafeToRepaint` refuses while `state.moveTo` is set. Styles `.move-to-*`.
+V107: `openCloudDeleteSheet(o, onYes)` — the review before a cloud delete (cloud
+tab Select → Delete…), drawn on body like reset.js's sheet (holds the DELETE box:
+never re-rendered while open). Overview from settings-actions.js
+`cloudDeleteOverview`; reuses `.reset-*` styles plus `.cloud-del-*`. The button
+re-checks the word on the tap; the action checks it again (44i, M737/M738).
+V108: `renderCloudStorage()` (view `cloudStorage`; **render-core.js** falls back to
+Phone Storage when signed out or missing) and `cloudBytesText(b)` (formatBytes +
+GB; also used by render-settings.js's row subtitle). No inputs — may render.
 
-### render-settings.js (~1377 ln) — settings screens that own a setting
+### render-settings.js (~1765 ln) — settings screens that own a setting
 The two-level Settings hub, its search, every `renderSettings*` sub-page with a
 write handler behind it, `renderSettingsSubHeader()`, the earth-resistance
-calculator, and `renderPhotoBackupSection()` (which paints inside the Backup
-page).
+calculator, `renderPhotoBackupSection()` (photo FILES, inside Backup & Restore)
+and `renderPhotoStorageSection()` (Manage Photos + clear, inside Phone Storage).
 **Touch to:** change any Settings page that changes a setting.
 **Coupling:** category structure and search aliases live in **data.js** (moved
-from config.js in v71), not here. Scanner test-log markup lives in **scanner.js**
+from config.js in v71), not here.
+⚠ V117: Report Settings is TWO views drawn by one function —
+`renderSettingsReport(part)`: 'settingsReport' = Company & Branding (kept id: the
+preview deep-link, report.js, lands here), 'settingsReportContent' = Certificate
+Content. One Save (`saveReportSettingsForm`) saves the whole object; capture must
+skip fields not on screen. "A report page is open" = `REPORT_SETTINGS_VIEWS`
+(config.js) — used by SYNC_NO_REPAINT_VIEWS, sync.js reportOpen ×2,
+UNSAVED_PAGES (settings-actions.js) has both views. Scanner test-log markup lives in **scanner.js**
 (it repaints without a render). Bug sheet logic lives in **bugreport.js**.
 Instrument settings live in **instruments.js**. The stats footer reads
 `computeAppStats()` (session.js) and returns `''` when null.
+⚠ V114/V122: Settings quotes screens by their on-screen names — "Jobs"
+(render-core.js h1), "Job settings" (render-review.js button AND the screen it
+opens), "New job" (render-core.js h2). Renaming any of those = update the text
+here and in render-help.js's Glossary too; 51b goes red until you do.
 ⚠ v73: About, Glossary, Contact, the bug-sheet markup and the cloud stubs left
 for **render-help.js**, and those pages still call `renderSettingsSubHeader()`
 from here. The About changelog is no longer in this file.
+V105: the Backup page's "Daily snapshots" section is a shell here; its inside is
+`snapshotsSectionHTML()` (snapshots.js), painted in place into `#snapshots-block`.
+V100: `renderSettingsReminders()` (view `settingsReminders`, Phone & Display) and
+`reminderSettingsSummary()`; labels in `REMINDER_LABELS`, values validated by
+**session.js** `normaliseReminders`, written by **settings-actions.js**
+`setReminder`.
+V108: Data's Cloud Storage row (`settingsPageVisible` — syncing only, like Jobs
+on this phone), its subtitle (last figures this session, `cloudBytesText`), and a
+"☁️ Cloud Storage ›" button on Phone Storage (signed in). The page is render-review.js.
 ⚠ v85: the hub hides the Cloud group where there is no cloud; search skips its
 pages and the group paints `renderCloudLocked()` (render-help.js) until
-`cloudPagesUnlocked()` (cloud.js). Row subtitles for the three cloud pages read
+`cloudPagesUnlocked()` (cloud.js).
+⚠ V96: hub order (`settingsCategoriesInOrder`), per-page visibility
+(`settingsPageVisible`, `settingsCategoryPages` — used by the list AND search),
+the locked catCloud blurb (`settingsCategoryBlurb`) and the footer
+(`settingsWhereDataLives`, reads `syncActive()`) live here. Opening a group is
+`settingsOpenCategory` in **settings-actions.js**. Row subtitles for the three cloud pages read
 `state.cloud` and `syncStatusSummary()` (sync.js), typeof-guarded.
+⚠ V97: Backup & Restore (`settingsBackup`) = copies only; Phone Storage
+(`settingsStorage`, `renderSettingsStorage`) = space (protection slot
+`#storage-protect` painted in place by storage.js, meter, prune/tidy, ages,
+photo clear). Logging Options (`settingsLogging`) = Undo + item times; item times
+sync (settings_work), so the view is in `SYNC_GENERAL_VIEWS` and
+`SYNC_NO_REPAINT_VIEWS` (config.js). A new page that owns a synced setting must
+join both lists. Ways in: `storage-banner-open`, `save-fail-clear` (dispatch.js);
+manager Back `_MGR_RETURN_VIEWS` (settings-actions.js).
 
-### render-help.js (~633 ln) — help, about & cloud pages — NEW v73
-About (+ the rolling 3-version changelog), Glossary (page + the
+### render-help.js (~1080 ln) — help, about & cloud pages — NEW v73 (V139: Account's password cards; V140: Google)
+About (+ the rolling 3-version changelog), Tutorials (V134 — starts tour.js's
+practice job; V135 lists tour.js `TUTORIALS`' Settings ones), Glossary (page + the
 `GLOSSARY_GROUPS` data array), Contact, `renderBugSheet()` markup, and the three
 cloud pages, reached from Settings → Cloud (v85; the About long-press is gone)
 plus `renderCloudLocked()`, the access-code box shown until the phone is
@@ -616,11 +1276,22 @@ cover them instead. Calls `renderSettingsSubHeader()` back across the seam into
 render-settings.js. `renderBugSheet()` is markup only — its logic and state are
 in **bugreport.js**, and it returns `''` unless `state.bugSheetOpen`. Declares
 ONE top-level binding, `GLOSSARY_GROUPS`, read only inside a function body, so
-its load position is free.
+its load position is free (09u — V100's egg constants live in **config.js**, its
+tap count and timer in `state`).
+V100: the 100 moment (`v100HeroHTML` — also called by **render-core.js**'s welcome;
+`renderPartyModal`, `partyOpen`, `partyAfterRender` — called at the end of
+`render()`) and "PATGo tests itself" (`aboutTitleTapped`, `eggOpen`/`eggClose`,
+`renderEggSheet`, painted in place by `_eggPaint`). Write nothing (11A). Both
+overlays are added to `render()`'s finalHTML in **render-core.js**. Animation is
+CSS transitions started from script (rule 12).
 Boot probe: `renderSettingsAbout` in `requiredFns`.
+V141: About → Privacy is a SUMMARY of the website's privacy policy plus a plain
+`<a target="_blank">` to it (config.js `PRIVACY_URL`; no data-action — the browser
+opens it). ⚠ Keep the summary and the policy saying the same thing: change one,
+change the other. Harness 80a–80e, M1380–M1392.
 
-### cloud.js (~315 ln) — cloud sign-in — NEW v79
-Email-code sign-in (Supabase), session state in `state.cloud`, the TEST strip
+### cloud.js (~800 ln) — cloud sign-in — NEW v79, password V139, Google V140
+Sign-in (Supabase): email + password (V139) or an emailed code (v79); session state in `state.cloud`, the TEST strip
 and version tag, lazy load of `supabase.umd.js`. v85: the Cloud access code —
 `cloudPagesUnlocked()`, `cloudUnlock()`, `CLOUD_UNLOCK_KEY` (config.js; per
 device, never backed up), remembered on code entry and on any sign-in. Sign-in ONLY — nothing syncs.
@@ -639,8 +1310,46 @@ a cloud promise directly (rules 2/3). ⚠ Signed out = no library, no request;
 harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 `supabase/*.sql`, NOT tested by the harness — `isolation-test.sql` every release.
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
+V127: `_cloudReadStoredSession()` also returns `issuedAt` (server time, plan.js);
+`cloudCheckConnection` hands the profile row to `planNote()` (typeof-guarded).
+V139: password sign-in. Both routes land through `_cloudSignedIn` + `_cloudAfterSignIn`
+(unlock, profile read, push+pull) — never give one route its own copy. Forgot = the code
+sign-in with `state.cloud.forgot`, then the "Choose a new password" card (`pwOpen`);
+⚠ never Supabase's reset LINK (opens in Safari, not the installed app). The password
+rule `cloudPasswordProblem` / `CLOUD_PASSWORD_HINT` must match the dashboard (min 8,
+letters and digits). ⚠ A password is read from its box at request time only — never
+state, storage or backup (78b). Card markup in **render-help.js** `renderCloudAccount`
+(real `<form>`s, iPhone autocomplete hints); dispatch.js `handleDelegatedSubmit` cancels
+every submit. Harness 78a–78d, M1344–M1357.
+V140: Google. `cloudGoogleSignIn` / `cloudGoogleConnect` → `_cloudGoogleStart` opens a
+window ⚠ synchronously inside the tap (iOS blocks a later one), then points it at
+`signInWithOAuth` / `linkIdentity` (implicit flow — the client's default; don't switch
+to PKCE without re-proving V139's routes). Google returns to **signin-done.html**
+(`CLOUD_GOOGLE_RETURN_PAGE`; must be in Supabase's Redirect URLs), which posts the
+#fragment to the opener (and a BroadcastChannel) and closes. `_cloudGoogleOnMessage`
+→ `cloudGoogleReturn` (own origin, a tap waiting, not busy) → `setSession` → sign-in
+lands through `_cloudSignedIn` as the others; Connect only updates `state.cloud.google`.
+Disconnect (asked in place: `googleOff`) unlinks then refreshes the session, because
+boot reads the connected address from the stored session (`_cloudGoogleEmail`).
+Dashboard: Google provider ON, "Allow manual linking" ON, sign-ups OFF (3A).
+Harness 79a–79e, M1358–M1379.
 
-### sync.js (~3050 ln) — cloud sync, PUSH AND PULL — v80–v88
+### sync.js (~4950 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check
+⚠ V128 (rule 27): section "the stale-phone check" before the push.
+`syncCheckDue` (per table: jobs / rec / ph; `seenAllAt` = when a pull last
+decided every row, cursor as stand-in) → `_syncCheckRun` (memo 1 h) →
+`_syncStaleCheck` (keyset id lists, paged to an EMPTY page; empty list = failed
+read) → `_syncCheckGone` → `_syncCheckSafetyCopy` (snapshots.js). `_syncRun`
+passes `chk` {jobs, rec, ph, ask, at} to `_syncPull`, `_syncRecordsHalf` →
+`_syncPullRecords`, `_syncPhotosHalf` → `_syncPhotoRowsPull`; each records its
+table's `seenAllAt` only when unblocked. `_syncStateFor` starts a NEW account's
+state seen-whole. Held "deleted-elsewhere" with no row at all → "use the cloud"
+deletes (syncHeldResolve, `_syncHeldResolveRecord`).
+⚠ V111: every table read names its owner — rule 18 (comment above
+`_syncCurrentUserId`; harness 48).
+V104: the settings_work row also carries `readingsCheck` (default ON — read
+`!== false`) and `earthLimit` (normaliseEarthLimit); normalise / record / valid /
+apply / diffs all list them.
 Jobs (sessions) both ways while signed in. Change detection is a per-job
 FINGERPRINT of what was last sent (SYNC_STATE_KEY, per account) — no edit
 timestamp exists, so pull compares hashes, not times. Deletes (session
@@ -648,6 +1357,18 @@ tombstones) send an emptied row both directions. Prune guard
 (`syncPruneFilter`) + cleared-ids list (SYNC_PRUNED_KEY). v81: pull cursor
 (`st.pulledAt`), held jobs awaiting a decision (SYNC_HELD_KEY), re-send set
 (`st.resend`), `syncHeldResolve`. Sync page logic.
+⚠ V101 (split): `_syncMovedOut` / `_syncMoveDestReady` / `_syncFetchMoveDests`
+relax the fewer-items guard ONLY when every missing item is in the cloud doc's
+`movedOut` and each job they went to is here, cleared, or fetched live in the same
+page — then it comes down first (`_syncTakeJob`, window ignored). `st.ph.mv`
+{photoId: jobId} queues cloud rows to re-point (`_syncPhotoMoves`, after the rows
+pull, before deletes); the rows pull keeps an `mv` job over the row's. Written by
+`syncNoteMoved` (session.js, via `syncWhenIdle`) and the pull's moved-out path
+(`_syncNoteMovedInState`).
+⚠ V103: a destination ON this phone is ready only when `_syncDestHolds` — its
+local copy holds every item sent to it, or its own `movedOut` sends it on. A
+stale copy (move into an EXISTING job) waits; the next run settles it.
+`_syncMoveDestReady` takes `moves.to`.
 **Touch to:** change what syncs, when, or how; add record kinds or photos.
 **Coupling:** asks **cloud.js** who is signed in (`cloudAvailable`,
 `cloudUserId`, `cloudClient`). Triggers: **storage.js** `saveSessions()` (one
@@ -733,7 +1454,7 @@ also refuses `SYNC_NO_REPAINT_VIEWS` (config.js).
 never held) — and kind `template` (`state.reportTemplates`). All hashed through
 `_syncReportProjection` (normalised, counter stripped). 5A `_syncNothingMade`:
 defaults / untouched starters / counter at 1 are never pushed while unsent.
-While `state.view === 'settingsReport'` the two report rows are neither applied
+While a report page is open (`REPORT_SETTINGS_VIEWS`, V117: either half) the two report rows are neither applied
 nor pushed. Held cards: group 'rp' (`_syncRecordGroup(kind, id)`). Pull saves
 through `_syncSaveLists()` — never `saveReportSettings()`/`saveReportTemplates()`,
 which arm the trigger (21q, M292).
@@ -746,6 +1467,8 @@ after a send), never held. SQP: `decideSqp`, highest count wins, a later
 `SQP_RESET_KEY` beats it, never held, never counted. ⚠ Both merged rows TAKE the
 cloud's copy when only the cloud moved — merging then re-sends this phone's
 order for ever (23f, M313). Open screens hold rows back (`SYNC_GENERAL_VIEWS`).
+⚠ v94: the MULTIPICK row carries a slot's `qp` (Quick Pick tile) ONLY when set —
+normalise, apply and diffs all three; a config with no tiles hashes as on V93.
 Sync page group 'gs'. Couples to: storage.js (`readingTagForReason`,
 `ensureAllCsvColumns`, `saveSettings`), sqp.js (`normaliseSqpHistory`,
 `bumpSqpHistoryVersion`, `invalidateSqpRow`, `buildSqpHistory`), multipick.js
@@ -757,10 +1480,100 @@ after both (M355/M356). Candidates via `_syncPhotoJobs()` (reads photos.js
 `state.photoMeta`): job syncs and is in `st.sent`, item still in it. Deletes:
 ledger 'photo' entries + photos of jobs in `st.gone` — row marked deleted, file
 removed, forgotten only after both. Prune guard (`syncPruneFilter`) also needs
-every photo up (`_syncPhotosPendingByJob`). Never reads the photos table (V89).
+every photo up (`_syncPhotosPendingByJob`).
+⚠ v89: PHOTOS DOWN, rows only (`_syncPhotoRowsPull`, first step of the photos
+half; own cursor `st.ph.pulledAt`, V83.1 pager shape). `st.ph.sent` now means
+KNOWN in the cloud (own uploads + rows for jobs on this phone), entries
+`{s, i, b?, t?, a?}`. Rows for jobs not here are skipped (R17); `st.ph.need`
+(pushed by `_syncPull`'s add branch and `syncHeldResolve`) fetches them by job.
+Deleted row → **photos.js** `photosRemoveQuiet` (no ledger). Deletes go to
+anything known (5A), file AND `{uid}/{id}_t.jpg`. Previews: `_syncThumbUpload`
+(photo → preview → row with `thumb`), `_syncThumbBackfill`. `_syncSave` points
+`state.photoCloud` at `st.ph.sent` (`_syncPhotoCloudPoint`). Images come down
+ONLY via `syncPhotoDownload` (session.js strip, report.js prompt); previews only
+via `syncPhotoThumb` (strip open).
+⚠ v90: the photo manager's two entry points (callers: **settings-actions.js**).
+`syncPhotoBrowse` = "Look in the cloud": photos rows (keyset by id) + five
+`doc->>` fields of jobs NOT on this phone; returns data, writes NOTHING (rule 24).
+`syncPhotoKnowForDelete` adds found photos to `st.ph.sent` so the normal delete
+step takes them — it waits for `_syncRunning` (a run saves its own `st` and would
+overwrite it). `syncPhotoThumb(id, hint)` accepts a found row's `{t}`.
+⚠ v91: SAFE IN THE CLOUD. `st.conf[jobId]` = hash of the cloud copy as the
+pull last READ it (set in `_syncPull` for every valid live row; deleted/
+unreadable clear it; trimmed to jobs on the phone). `SYNC_CONF_V` (config.js):
+a state without it clears the jobs cursor once. `syncJobsSafety(fresh)` —
+held / unsent / photos / checking / safe; `fresh=false` reuses a hash while
+**storage.js** `_encodedSessionCache` reuses the encoding (reads that const and
+`_sessionSig` — keep their reuse test and this one identical). `syncPruneFilter`
+is now safety-based (always fresh). `syncWhenIdle(fn)`. `_syncSafetyRepaint`
+after every run repaints `sessions`/`jobManager` when the safe set moved.
+`syncBringBack` (reads the rows, adds through `_syncTakeRows`/`_syncTakeJob`
+like a pull-add, sets conf, `ph.need`, leaves the cleared list, and — v93 —
+**session.js** `unarchiveSessionStats` ONLY for jobs that were cleared).
+⚠ v92: THE LIGHTER PULL. `sessions.fp` (server column + `sessions_fp_guard`
+trigger in **supabase/schema.sql**) = `syncHash(_syncCanonical(doc))`, sent by the
+push in the same row. `_syncPull` pages read `_SYNC_JOB_LIST_COLS` (no doc);
+`needsDoc` picks rows the fp can't settle, fetched by id (`_SYNC_JOB_DOC_COLS`)
+before the page is decided; a light row reaches `decide` with no doc — every
+doc-reading branch must be a needsDoc "yes" (the `!doc` guards). A blank fp =
+download (V91 phones). `_syncConfirmPushed` reads id+fp after the push → conf
+(4A). `syncVerifyJobs(ids)` reads real docs for **settings-actions.js**
+`jobsRemoveAsk`; `syncPruneFilter(targets, verified)` (3B). Records untouched.
+⚠ v92.1: `_syncPushHalf` FORGETS a session tombstone (ledger + saveTombstones)
+when the job is live, or its SYNC_PRUNED entry is newer — a stale tombstone
+fired on Remove from phone and emptied the cloud copy. `syncNotePruned` moves
+an existing entry's date on. Harness 29g–29i, M447–M451.
+⚠ v93: THE WINDOW (R21/R22). A job with no local copy and no tombstone comes down
+only if `_syncJobBelongs(_syncPicks(row))`: dated within SYNC_WINDOW_DAYS
+(config.js), an unreadable date, or `_syncRetestDue` (**session.js**
+`retestStatus`). The list carries `_SYNC_JOB_PICKS` (date, retest fields as
+`doc->>`); `needsDoc` and `decide` both check it — a light row MUST keep the
+picks. Nothing is stored about jobs left behind (the cloud is the list).
+`_syncRetestLook` runs in `_syncRun` after the jobs pull, once per calendar
+month (`st.rtMonth`), fail-soft. `syncCloudList` (replaces `syncClearedLook`)
+reads `_SYNC_CLOUD_JOB_COLS` incl. server columns `n_items`/`n_fails` and the
+view `session_photo_counts` (**supabase/v93-archive.sql**). Harness 30a–30i,
+M452–M474.
+⚠ V107: `syncCloudDelete(ids)` — jobs NOT on this phone, from the cloud tab
+(**settings-actions.js** `_cloudDelete`). HOLDS THE RUN LOCK itself (sets
+`_syncRunning` to its own promise, inside `syncWhenIdle`), then: photo rows read →
+sessions UPDATE (doc {}, fp null, deleted true; live rows only, `select('id')` says
+which) → for those only: forget sent/conf/resend/held + SYNC_PRUNED entry, photos
+into `st.ph.sent` + 'photo' tombstones → **photos.js** `photosDeleteForSessions`
+→ release → a READING run (the photo half only runs in those). Never a session
+tombstone or `st.gone` (a job back live would lose its photos). Rows before photos
+— never the other order. Harness 44a–44i, M726–M739.
+⚠ V108: `syncCloudStorage()` — Cloud Storage's read, LISTS only (R17): `id,doc_bytes`
+for every live job (sizePage), the view with `b` (bytesPage), then
+`_SYNC_CLOUD_JOB_COLS` for the CLOUD_STORAGE_TOP biggest only (one `in` request).
+Server columns from **supabase/v108-storage.sql**; "column does not exist"
+(42703) → `needsUpdate`. Memory only. Harness 45a–45d, M740–M745, M758.
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
-19a–19w, 20a–20f2, 21a–21q, 23a–23l and 25a–25n, mutations M142–M295, M306–M325,
-M355–M376.
+19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q, 27a–27m, 28a–28i and
+29a–29i and 30a–30i, mutations M142–M295, M306–M325, M355–M395, M396–M418, M419–M434, M436–M451, M452–M474.
+
+### plan.js (~405 ln) — the plan: trial end, grace, the lock — NEW V127 — OPTIONAL SUBSYSTEM
+What the signed-in account's plan means on this phone: `planStatus()` (pure:
+none / paid / trial / ending / grace / locked), the record (PLAN_KEY, per
+account, never backed up), `planGate()` (rule 26), the Jobs list line and the
+Account page line (`planBannerHTML` / `planAccountHTML`), the two sheets
+(`planMaybePrompt`, once each per ending, Jobs list only), Renew now
+(`planRenew` → PLAN_RENEW_URL or the email), and `planRefresh()` (its own
+profiles row, `.eq('id', uid)`).
+**Touch to:** change grace/warning lengths (config.js constants), the words, what
+the lock blocks (rule 26), or wire payment (PLAN_RENEW_URL in config.js).
+**Coupling:** constants in **config.js** (`PLAN_*`); signed-in id and the stored
+sign-in's server issue time from **cloud.js** (`cloudUserId`,
+`_cloudReadStoredSession().issuedAt`); cloud.js `cloudCheckConnection` feeds
+`planNote()`; quiet-moment helpers `_updateSheetOpen` / `_updateFieldHeld` from
+**boot.js**; `openChoiceSheet` (feedback.js); `exportAllOpen` (exportall.js);
+banner placed by **render-core.js** `renderSessions`, account line by
+**render-help.js**; `plan-renew` in **dispatch.js**; `planBoot()` from boot.js
+after the first render, good load only. Reset: PLAN_KEY is 'account' (reset.js).
+⚠ Loads AFTER sync.js: sync.js must follow cloud.js directly (16n).
+⚠ Time = max(phone clock, server time seen); the phone clock never ratchets the
+record (65h). ⚠ The visibility hook only when signed in (16a counts listeners).
+Harness 65a–65i, 65f; mutations M1073–M1108.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This
@@ -854,11 +1667,15 @@ and write `state` and call `render()`. Everything else
 is delegated in dispatch.js — these stay direct because focus/blur/pointer timing
 can't be safely delegated.
 
-### dispatch.js (~1100 ln) — delegated event handling
+### dispatch.js (~1470 ln) — delegated event handling
 Three registries attached once to `#app` at boot: `ACTIONS` (click, ancestor-walk
 by `data-action`/`data-arg`), `INPUT_ACTIONS` (`data-input-action`),
-`CHANGE_ACTIONS` (`data-change-action`).
+`CHANGE_ACTIONS` (`data-change-action`). V139: `handleDelegatedSubmit` cancels every
+`<form>` submit (the cloud sign-in forms; Go = a click on the submit button, which
+carries the data-action) — a form must never navigate.
 **Touch to:** add or route any delegated click / input / change handler.
+V112: `back-to-settings` and `edit-back` (Edit session's arrow) route through
+`unsavedLeave()` (settings-actions.js); `edit-cancel` stays a plain discard.
 **Coupling:** only the four focus-sensitive fields and the two hold gestures are
 **not** here (events.js). Text-input actions must not `render()` on keystroke.
 File inputs must clear `el.value` immediately or re-choosing the same file fires
@@ -869,11 +1686,25 @@ nothing. `handleDelegatedClick` returns early when no ancestor carries
 the post-boot half of the v16.1 net, which covers the FIRST render only. Assert
 this through `handleDelegatedClick`, never through `render()` directly.
 
-### boot.js (~300 ln) — startup, RUNS ON LOAD, must load LAST
+### boot.js (~670 ln) — startup, RUNS ON LOAD, must load LAST
 Service-worker registration and update banner, `bootIntegrityOK()`, the boot tail,
 the crash fallback screens, the v69 one-time data repair call.
+V124: update delivery — looks on launch / return to the front / hourly (riding
+a touch), the safe moment (rule 25), asking the waiting worker its version.
+V126: `updateOnControllerChange` / `updateShouldReload` — reload only a page
+that loaded under a worker (`_updateHadController`, read once at boot) or sent
+SKIP_WAITING (`_updateAsked`, set in `applyUpdate`). sw.js activate claims.
 **Touch to:** change the startup sequence, the SW update banner or the integrity
-guard.
+guard. **Coupling (V124):** render-core.js draws the banner
+(`state.updateVersion`, `updateDismissed`) and calls `updateTryLater()` in
+render()'s tail; sw.js answers `GET_VERSION`; dispatch.js `update-refresh` /
+`update-dismiss`. The update listeners read `state` through `_updateState()` —
+they run on a broken load too (D1). V99: `mapPinResume()` (session.js) runs before the first
+`loadFormForCursor()`/`render()` — it may set the active job, view and cursor.
+V105: `snapshotsBoot()` runs after the first render, inside the good-load block,
+typeof-guarded and NOT probed (snapshots.js is optional — rule 6).
+V106: `resetRunPending()` (reset.js) runs after the integrity check and BEFORE
+`load()` — typeof-guarded, NOT probed. Missing reset.js = no wipe (safe).
 **Coupling:** the integrity guard verifies the critical cross-file functions
 loaded before any storage write and skips `load()`/`render()`/`save()` if not —
 this is the guard against the duplicate-`const` data-loss class (rule 1).
@@ -915,10 +1746,42 @@ another file having parsed. Don't "DRY" this.
   ⚠ Do NOT reorder the file to match the index — several rules depend on being
   overridden by a later block. The banners describe the order, they don't
   license changing it.
-- `index.html` (~3KB) — the `<script>` chain. Small enough to read whole.
-- `sw.js` (~3.5KB) — `CACHE_VERSION` + `ASSETS`. Read whole.
+  ⚠ V118: text colours are MEASURED. Harness 55 reads the three theme blocks
+  (`:root, .theme-force-light`, the dark media block, `.theme-force-dark`) and
+  fails any text colour under 4.5:1 on its surfaces; the two dark blocks must
+  match token for token. Change a colour in one dark block → change the other.
+  ⚠ V119: WORDS vs BUTTONS. Green/red/blue text uses `--pass-word` /
+  `--fail-word` / `--accent-word`; `--pass` / `--fail` / `--accent` are for
+  buttons, icons, borders, fills. Harness 56c fails any `color:` rule on a
+  button colour unless its selector is in 56's BRAND_KEPT (icons + 26px+
+  display text — written 1.625rem+ since V121). New icon on a brand colour → add it there; new word → use a
+  -word token. Same for inline `style="color:…"` in scripts (feedback.js,
+  render-review.js, render-settings.js carry three).
+  ⚠ V121: every font-size is rem (MAP rule 22); the text-size scale is the
+  block just above `* { box-sizing }` near the top.
+- `index.html` (~3KB) — the `<script>` chain, `#app`, and (V120) `#sr-announcer` + `lang="en-GB"`. Small enough to read whole. Viewport keeps `user-scalable=no` (V121 4A).
+- `sw.js` (~4KB) — `CACHE_VERSION` + `ASSETS`; V124: answers `GET_VERSION` on the port sent (the banner's version). Read whole.
 - `supabase.umd.js` — vendored supabase-js (MIT). NEVER read or grep it (218 KB,
   one minified line — it floods context). Exclude it: `grep --exclude=supabase.umd.js`.
 - `supabase/schema.sql`, `supabase/isolation-test.sql` — server side (v79). Pasted
-  into the Supabase SQL editor by hand; not loaded by the app.
+  into the Supabase SQL editor by hand; not loaded by the app. `schema.sql` is the
+  whole server for a NEW project; `supabase/v92-fingerprint.sql` and
+  `supabase/v93-archive.sql`, `supabase/v108-storage.sql` and
+  `supabase/v113-organisations.sql` are the paste-once changes for an existing
+  one (they check themselves, F1–F3, A1–A5, B1–B5, O1–O9).
+  Harness 29e, 30i, 45j and 50a–50c read them.
+  ⚠ V113: schema.sql must carry every line of v113-organisations.sql between its
+  "businesses" and "self-check" banners (50b) — a new project = an upgraded one.
+  ⚠ V113: no app file may name `org_id` (50d) — the database stamps it (2A).
+  Policies call the `security definer` helpers (`my_role`, `can_read_org`,
+  `can_wipe`, `can_read_photo_file`, `can_wipe_photo_file`); never write a policy
+  that reads `memberships` under its own rules (recursion). ⚠ Same-event
+  triggers fire in NAME order: `org_stamp` must sort before `wipe_guard`.
+  ⚠ v93: `session_photo_counts` is a VIEW — it must stay `security_invoker`
+  (isolation 8a–8d), or it counts every account's photos. V108 added `b` (bytes)
+  as its LAST column — a replaced view may only gain columns at the end.
 - `manifest.webmanifest` — icons, name, display mode.
+- Icons (V109): `favicon.ico` (the plug alone, 16/32/48 — browser tab) and
+  `apple-touch-icon.png` (180, home screen) are linked in **index.html** and
+  precached in **sw.js** ASSETS; `icon-192/512.png` are the manifest's.
+  `patgo-mark-128.png` is not used by the app. Harness 46c.
