@@ -824,6 +824,11 @@ registerActions({
   'export-all': () => { if (typeof exportAllOpen === 'function') exportAllOpen(); },
   // V127: Renew now (plan.js, optional — MAP rule 6).
   'plan-renew': () => { if (typeof planRenew === 'function') planRenew(); },
+  // V142: paying (plan.js, optional). Each opens Stripe's window inside the tap.
+  'billing-subscribe':   () => { if (typeof billingSubscribe === 'function') billingSubscribe(); },
+  'billing-manage':      () => { if (typeof billingManage === 'function') billingManage(''); },
+  'billing-card':        () => { if (typeof billingManage === 'function') billingManage('card'); },
+  'billing-cancel-wait': () => { if (typeof billingCancelWait === 'function') billingCancelWait(); },
   // V106: a level on Reset This Phone opens its confirm (reset.js, optional).
   'reset-open': (arg) => { if (typeof resetOpen === 'function') resetOpen(arg); },
   // V105 (S14, 5B): a snapshot's two buttons. Both typeof-guarded — snapshots.js

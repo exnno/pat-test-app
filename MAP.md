@@ -1,4 +1,4 @@
-# PATGo — Code Map (V141)
+# PATGo — Code Map (V142)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -287,6 +287,8 @@ and `supabase.umd.js` (cloud.js injects it, v79).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
 V140: `signin-done.html` (no script tag, not in ASSETS — only ever opened online,
 in the Google window; the SW caches it as it goes like any GET). See cloud.js.
+V142: `billing-done.html` — the same, for Stripe's window (`?result=paid|cancelled|portal`
+→ postMessage + BroadcastChannel `patgo-billing-return`, own origin). See plan.js.
 
 `boot.js` runs on load and must be last. Every other position is a readability
 choice, not a correctness constraint — cross-file calls resolve at call time, and
@@ -1263,7 +1265,8 @@ practice job; V135 lists tour.js `TUTORIALS`' Settings ones), Glossary (page + t
 cloud pages, reached from Settings → Cloud (v85; the About long-press is gone)
 plus `renderCloudLocked()`, the access-code box shown until the phone is
 unlocked. Account is real (logic in **cloud.js**); Sync is real from v80
-(logic in **sync.js**); Subscription is a placeholder. v82: `renderSyncHeld()`
+(logic in **sync.js**); Subscription is real from V142 (`renderCloudSubscription`
+draws plan.js `billingView()`; Account's plan line links to it). v82: `renderSyncHeld()`
 groups jobs and clients & sites, and `openSyncDiffSheet()` builds the read-only
 comparison sheet via feedback.js `_openSheet()`. v83: a third group, instruments &
 presets (`listRow`, incl. the tester-in-use card and per-field `diffs`); the Sync
@@ -1561,7 +1564,7 @@ Account page line (`planBannerHTML` / `planAccountHTML`), the two sheets
 (`planRenew` → PLAN_RENEW_URL or the email), and `planRefresh()` (its own
 profiles row, `.eq('id', uid)`).
 **Touch to:** change grace/warning lengths (config.js constants), the words, what
-the lock blocks (rule 26), or wire payment (PLAN_RENEW_URL in config.js).
+the lock blocks (rule 26), or paying (V142, below).
 **Coupling:** constants in **config.js** (`PLAN_*`); signed-in id and the stored
 sign-in's server issue time from **cloud.js** (`cloudUserId`,
 `_cloudReadStoredSession().issuedAt`); cloud.js `cloudCheckConnection` feeds
@@ -1574,6 +1577,19 @@ after the first render, good load only. Reset: PLAN_KEY is 'account' (reset.js).
 ⚠ Time = max(phone clock, server time seen); the phone clock never ratchets the
 record (65h). ⚠ The visibility hook only when signed in (16a counts listeners).
 Harness 65a–65i, 65f; mutations M1073–M1108.
+V142: PAYING. `billingSubscribe` (the choice: PLAN_PRICES.year first) → `billingCheckout`
+/ `billingManage(flow)` → `_billStart`: ⚠ the window opens SYNCHRONOUSLY in the tap, then
+`cloudClient().functions.invoke('billing-checkout' | 'billing-portal')` and the window goes
+to the Stripe URL (only `checkout.`/`billing.stripe.com`). Back via **billing-done.html**
+→ `billingReturned` (own origin, only while `state.billing.pending`) → `_billConfirm` re-reads
+`my_billing` (BILLING_CONFIRM_DELAYS) until the DATABASE says paid — never trust the window.
+`billingRead` (rpc `my_billing`) also feeds `planNote`, so paying lifts the lock at once.
+`state.billing` is in memory, per uid (`_bill`). `planRenew` → the choice (or the card form
+when past_due) while `billingAvailable()`; the email only where there is no cloud.
+`billingView()` = the Subscription page's words (markup: render-help.js); `billingRowStatus()`
+= the Settings row (render-settings.js). Opened → `setView` (session.js) calls `billingRead`.
+Actions in **dispatch.js**: billing-subscribe / -manage / -card / -cancel-wait (guarded).
+Server: **supabase/functions/** (below). Harness 81a–81c, 81e; M1393–M1420.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This
@@ -1780,6 +1796,24 @@ another file having parsed. Don't "DRY" this.
   ⚠ v93: `session_photo_counts` is a VIEW — it must stay `security_invoker`
   (isolation 8a–8d), or it counts every account's photos. V108 added `b` (bytes)
   as its LAST column — a replaced view may only gain columns at the end.
+  V142: `supabase/v142-billing.sql` (self-checks B1–B6; schema.sql carries every line
+  between its "the business's plan" and "self-check" banners — 81g). The PLAN lives on
+  `organisations`; each member's `profiles.plan` / `trial_ends_at` is a COPY of their
+  default business (triggers `org_plan_to_members`, `member_plan_copy`, and
+  `profile_plan_up` for a hand edit) — phones still read profiles. ⚠ The Stripe ids are
+  NOT granted to `authenticated` (column grants): never `grant select on organisations`
+  whole again. `billing_apply` = Stripe's word → plan (comped kept; a trial never cut
+  short; an old subscription never ends a live one). Isolation 18a–18f.
+  `supabase/close-account.sql` (V142 round) — the account-closure procedure; refuses
+  team accounts. ⚠ From V142: cancel the Stripe subscription first (step 2).
+- `supabase/functions/` (V142) — the three Edge Functions (Deno, plain JS, no packages):
+  `billing-checkout`, `billing-portal`, `stripe-webhook`, each a one-line `index.js`
+  serving a maker from `_shared/billing.js` (all the logic). Deployed with "Verify JWT"
+  OFF (they check the caller themselves / Stripe's signature). Secrets in Supabase:
+  STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_MONTH, STRIPE_PRICE_YEAR,
+  optional APP_ORIGINS. ⚠ The webhook always re-reads the subscription from Stripe.
+  ⚠ A `sb_secret_` key goes on `apikey` only. Harness 81d imports `_shared/billing.js`
+  in Node with a pretend Stripe + database; M1421–M1434.
 - `manifest.webmanifest` — icons, name, display mode.
 - Icons (V109): `favicon.ico` (the plug alone, 16/32/48 — browser tab) and
   `apple-touch-icon.png` (180, home screen) are linked in **index.html** and

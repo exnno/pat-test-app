@@ -135,7 +135,10 @@ function settingsPageSubtitle(pageId) {
         return toSend > 0 ? `${toSend} to send` : 'Up to date';
       } catch { return ''; }
     }
-    case 'cloudSubscription': return 'Not built yet';
+    case 'cloudSubscription': {   // V142: the plan (plan.js, optional)
+      if (!state.cloud || state.cloud.status !== 'signed-in') return 'Sign in first';
+      try { return (typeof billingRowStatus === 'function' && billingRowStatus()) || 'Your plan'; } catch { return 'Your plan'; }
+    }
     default: return '';
   }
 }

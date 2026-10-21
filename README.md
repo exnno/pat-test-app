@@ -48,6 +48,7 @@ in the shipped app — the files in the repo root are the files the browser load
 | PDF | jsPDF 3.0.3 + jsPDF-AutoTable 5.0.2, vendored and self-hosted (MIT) |
 | PDF preview | PDF.js 3.11.174 legacy UMD, vendored, lazy-loaded (Apache-2.0) |
 | Cloud | supabase-js 2.116.0 UMD, vendored, lazy-loaded (MIT) — invite-only, test host only. Syncs both ways: jobs, clients, sites, instruments, presets, the tester in use, report settings, report templates, the certificate counter (V79–V84) and general settings (V86). Reached from Settings → Cloud behind an access code (V85). Photos go up (V88) and come down on request (V89); jobs come down only when they changed (V92, fingerprint column); a phone brings down the last 30 days plus retests being chased, and older jobs are reached from the Jobs screen's ☁ In the cloud tab (V93), where they can also be deleted from the cloud (V107); Settings → Data → Cloud Storage shows the space used and the biggest jobs (V108), also one tap from the cloud tab (V109). Every cloud read asks for the signed-in account's rows by name, ready for the business rules (V111) |
+| Payments | Stripe (V142) — Stripe's own payment and billing pages, opened in a window; no card code in the app. Three Supabase Edge Functions in `supabase/functions/` (plain JavaScript, no packages, no build) talk to Stripe and set the business's plan |
 | Hosting | `main` → GitHub Pages (test); `Release` → Cloudflare (the product) |
 | Tests | `harness/` — Node, no dependencies |
 
@@ -76,6 +77,9 @@ supabase/             server SQL: schema.sql (run once), isolation-test.sql (eve
                       v93-archive.sql (V93 change for an existing project)
                       v108-storage.sql (V108 change for an existing project)
                       v113-organisations.sql (V113 businesses, for an existing project)
+                      v133-cleanup.sql (V133), v142-billing.sql (V142 paying), close-account.sql
+supabase/functions/   the Edge Functions (V142): billing-checkout, billing-portal,
+                      stripe-webhook — each index.js one line; the logic in _shared/billing.js
 harness/              the committed test harness — NOT shipped
 MAP.md  FEATURES.md  BACKLOG.md
 ```
@@ -168,6 +172,8 @@ separately from behaviour changes.
   post-commit test checklist
 - From v79: `supabase/isolation-test.sql` run in the test project, all PASS,
   result recorded in the handoff — before any promotion to `Release`
+- From V142: a changed `supabase/functions/` file is deployed to Supabase too
+  (Edge Functions; "Verify JWT" off) — the repo copy is the record
 
 `backupVersion` bumps only for a genuinely incompatible schema change — additive
 fields ride through the codec and never spend a bump. It is its own event and is

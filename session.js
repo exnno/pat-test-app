@@ -3018,6 +3018,8 @@ function setView(v) {
   }
   state.view = v;
   render();
+  // V142: the Subscription page reads the plan on every open (plan.js, optional).
+  if (v === 'cloudSubscription' && typeof billingRead === 'function') billingRead();
 }
 
 // ---------- Bulk-edit (v7, extended in v11) ----------

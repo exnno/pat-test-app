@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V141';
+const APP_VERSION = 'V142';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -133,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V141';
+const WELCOME_VERSION = 'V142';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -375,11 +375,28 @@ const PLAN_WARN_DAYS = 7;
 // How long a fresh read of the plan lasts before the app reads it again when it
 // comes back to the front (it is also read at every start, online).
 const PLAN_REFRESH_MS = 6 * 60 * 60 * 1000;
-// Renew now (10A). Until payment exists this is blank and Renew opens an email
-// to PLAN_RENEW_EMAIL. When there is a payment page, put its address here:
-// nothing else in the app changes. The account's email is added as ?email=…
+// Renew now (10A). V142: signed in on a copy with a cloud, Renew now is the
+// Subscribe choice (plan.js billingSubscribe) — paying is Stripe's own pages.
+// Where there is no cloud it still opens PLAN_RENEW_URL, or an email to
+// PLAN_RENEW_EMAIL while that is blank. The account's email is added as ?email=…
 const PLAN_RENEW_URL = '';
 const PLAN_RENEW_EMAIL = 'hello@patgo.co.uk';
+
+// ---- V142: paying (plan.js; server: supabase/functions) ---------------------
+// Stripe sends the payment window back to this page (next to index.html), which
+// tells the app how it went and closes. Not in sw.js ASSETS (only ever opened
+// online, in Stripe's window — as signin-done.html).
+const BILLING_RETURN_PAGE = 'billing-done.html';
+const BILLING_MSG = 'patgo-billing-return';   // the landing page sends this type
+// Shown in the choice and on the Subscription page. The PRICE charged is the
+// Stripe price the server is set up with (STRIPE_PRICE_YEAR / _MONTH): change
+// both together. Not VAT-registered — no VAT (V142 round, 8).
+const PLAN_PRICES = { year: '£60 a year', month: '£6 a month' };
+// After paying, how long to wait before each re-read of the plan, while
+// Stripe's message reaches the database (usually a second or two).
+const BILLING_CONFIRM_DELAYS = [0, 2000, 4000, 8000, 15000];
+// The Terms of Service (website), for the Subscription page's refunds link.
+const TERMS_URL = 'https://www.patgo.co.uk/terms.html';
 
 // ---- V141: the privacy policy (Stage 12, C) ---------------------------------
 // The full policy lives on the website (patgo.co.uk, DreamHost), not in this

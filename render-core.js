@@ -256,7 +256,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Privacy policy.</strong> PATGo now has a full privacy policy: what stays on your phone, what goes to the cloud if you sign in, who helps run it and how long things are kept. Settings &rarr; Help &rarr; About sums it up, with a link to read it all.</li>
+        <li><strong>Subscriptions.</strong> Cloud accounts can now subscribe from Settings &rarr; Account &amp; Sync &rarr; Subscription: &pound;60 a year or &pound;6 a month, paid securely through Stripe. Subscribe during your free trial and you keep the rest of it.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

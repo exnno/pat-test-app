@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<!-- PATGo PWA — billing-done.html (V142: where Stripe's window comes back to)
+     (c) 2026 Peter Birchley. All rights reserved.
+     Unauthorised use, reproduction, or distribution prohibited. See LICENSE.txt.
+
+     Stripe's payment page or billing page returns here, inside the window PATGo
+     opened, with ?result=paid, cancelled or portal. This page tells the app that
+     opened it (only our own origin) how it went, and closes. It carries no card,
+     no plan and no Stripe id: whether someone has paid is only ever read from the
+     database, which the server writes after Stripe tells it (plan.js
+     billingReturned). Nothing is stored here and nothing is sent anywhere else. -->
+<html lang="en-GB">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="robots" content="noindex">
+  <meta name="referrer" content="no-referrer">
+  <title>PATGo</title>
+  <style>
+    :root { color-scheme: light dark; }
+    body { margin: 0; padding: 32px 20px; font: 16px/1.5 -apple-system, system-ui, sans-serif;
+           background: #f9fafb; color: #111827; }
+    @media (prefers-color-scheme: dark) { body { background: #0f172a; color: #e5e7eb; } }
+  </style>
+</head>
+<body>
+  <p id="m">Finishing…</p>
+  <script>
+  (function () {
+    'use strict';
+    var r = '';
+    try { r = new URLSearchParams(location.search).get('result') || ''; } catch (e) {}
+    if (['paid', 'cancelled', 'portal'].indexOf(r) === -1) r = '';
+    try { history.replaceState(null, '', location.pathname); } catch (e) {}
+    var msg = { type: 'patgo-billing-return', result: r };
+    try { if (window.opener && !window.opener.closed) window.opener.postMessage(msg, location.origin); } catch (e) {}
+    try {
+      if (typeof BroadcastChannel === 'function') {
+        var ch = new BroadcastChannel('patgo-billing-return');
+        ch.postMessage(msg);
+        setTimeout(function () { try { ch.close(); } catch (e) {} }, 1000);
+      }
+    } catch (e) {}
+    var m = document.getElementById('m');
+    m.textContent = r === 'paid' ? 'Payment done — going back to PATGo…'
+      : r === 'cancelled' ? 'No payment taken — going back to PATGo…'
+      : 'Going back to PATGo…';
+    setTimeout(function () {
+      try { window.close(); } catch (e) {}
+      m.textContent = 'You can close this window and go back to PATGo.';
+    }, 400);
+  })();
+  </script>
+</body>
+</html>

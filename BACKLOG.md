@@ -8,6 +8,36 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V142
+V142 = paying (Stage 13; pricing 1B 2 3A 4A 5A 6A 7A 8; build 0A 1A 2A 3A 4A 5A
+6A 7A). plan.js billing* (the choice, the window, the return, the page's words);
+render-help.js the Subscription page + Account's plan line; billing-done.html
+(new, non-script); supabase/v142-billing.sql (plan on the business, copies on
+profiles, Stripe columns hidden from the app, billing_apply, billing_events);
+supabase/functions/ (billing-checkout, billing-portal, stripe-webhook). Harness 81
++ M1393–M1439; 80e retired → 81e.
+**Next (V143, enforcement — 0A):** the server refusing a lapsed account's
+uploads; the 30-day-offline question (lock a phone that hasn't read its plan for
+30 days?); then sign-up + the launch switch (REQUIRE_ACCOUNT, shouldCreateUser,
+access code off, free site retired).
+
+### V142 residuals (known, accepted)
+- Stripe test mode on the test site only. Live keys, live prices and the live
+  webhook go on the PRODUCTION project at launch (same four secrets).
+- The R8 90-day deletion (privacy policy) is still not built — needed before any
+  paying account is 90 days lapsed. close-account.sql is the hand procedure.
+- A `lapsed` from Stripe counts its 7 days' grace from when each PHONE hears of
+  it (V127 2A); the server keeps no lapsed date. Fine for now; enforcement (V143)
+  may want one.
+- Team billing: only the Owner subscribes; a member sees "the owner looks after
+  it". Seats and pricing per engineer are Teams v1.
+- Stripe Checkout and the billing page are Stripe's own screens — branded in
+  Stripe's settings (logo, colour), not by the app.
+- terms.html (website) section 5 still says "Settings → Cloud → Account" for the
+  billing page — should be "Settings → Account & Sync → Subscription".
+- The real round trip (Stripe's window inside the installed iPhone app) can only
+  be seen on a phone — first item of the test list.
+
 ### Next after V141
 V141 = Stage 12's C (Peter 21 Oct: 0A 1A 2A 3A 4A + peter@patgo.co.uk alongside
 hello@). Claude drafted the privacy policy — WEBSITE file privacy.html for

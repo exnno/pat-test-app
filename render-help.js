@@ -61,16 +61,17 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V141: rolled forward — V141 on top, V138 dropped. -->
+      <!-- v8: rolling 3-version changelog. V142: rolled forward — V142 on top, V139 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V142</strong> &middot; October 2026</p>
+        <p class="muted">Cloud accounts can subscribe from Settings, paying securely through Stripe, and manage or cancel their plan there too. Subscribing during the free trial keeps the rest of it.</p>
         <p><strong>V141</strong> &middot; October 2026</p>
         <p class="muted">PATGo has a full privacy policy. About now sums up what's kept on your phone and what goes to the cloud if you sign in, with a link to read the whole policy.</p>
         <p><strong>V140</strong> &middot; October 2026</p>
         <p class="muted">Cloud accounts can sign in with Google. Connect your Google account once on the Account page, then Continue with Google signs you in. Disconnect it there any time.</p>
-        <p><strong>V139</strong> &middot; October 2026</p>
-        <p class="muted">Cloud accounts can sign in with an email and password, set or change it on the Account page, and get back in with an emailed code if it's forgotten. Signing in with a code still works.</p>
+
 
 
 
@@ -390,8 +391,15 @@ function renderCloudAccount() {
         <p class="muted">Cloud isn't available on this copy of the app.</p>
       </div>`;
   } else if (c.status === 'signed-in') {
+    // V142: the plan in words, and the way to the Subscription page.
+    const planWords = { trial: 'Free trial', active: 'Paid', lapsed: 'Ended', comped: 'Free' }[c.plan] || c.plan;
+    const trialEnd = (c.plan === 'trial' && c.trialEndsAt)
+      ? (typeof _planDate === 'function' && typeof _planTime === 'function' && isFinite(_planTime(c.trialEndsAt))
+          ? _planDate(_planTime(c.trialEndsAt)) : new Date(c.trialEndsAt).toLocaleDateString('en-GB'))
+      : '';
     const plan = c.plan
-      ? `<p class="muted" id="cloud-plan">Plan: <strong>${escapeHTML(c.plan)}</strong>${c.trialEndsAt ? ` &middot; trial ends ${escapeHTML(new Date(c.trialEndsAt).toLocaleDateString('en-GB'))}` : ''}</p>`
+      ? `<p class="muted" id="cloud-plan">Plan: <strong>${escapeHTML(planWords)}</strong>${trialEnd ? ` &middot; ends ${escapeHTML(trialEnd)}` : ''}</p>
+        <button class="backup-action-btn" id="cloud-plan-open" data-action="settings-page" data-arg="cloudSubscription" ${dis} style="margin-top:4px">Subscription ›</button>`
       : '';
     // V139 (3A): "Set or change password" opens the card below in place of the
     // buttons. The hidden username box is how the iPhone knows which account a
@@ -856,14 +864,52 @@ function openSyncDiffSheet(entry, diff) {
   if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);   // V123 (3A)
 }
 
+// V142 (2A): the Subscription page — the plan, Subscribe / Manage billing.
+// Words and rules in plan.js (billingView, optional — MAP rule 6); paying is
+// Stripe's own pages in a window (plan.js). Read on every open (setView).
+// No inputs: async results may repaint it (MAP rule 3 is not in play).
 function renderCloudSubscription() {
-  return `
-    <div class="screen" id="cloud-subscription-placeholder">
-      ${renderSettingsSubHeader('Subscription')}
+  const v = (typeof billingView === 'function') ? billingView() : { kind: 'off', lines: [], actions: [] };
+  const b = state.billing || {};
+  let body;
+  if (v.kind === 'off') {
+    body = `
       <div class="info-card">
-        <h2>Subscription</h2>
-        <p class="muted">Not built yet. Nothing is charged and there is nothing to sign up to.</p>
+        <p class="muted">Paying isn't available on this copy of the app.</p>
+      </div>`;
+  } else if (v.kind === 'signedOut') {
+    body = `
+      <div class="info-card">
+        <p class="muted">Sign in to see your plan.</p>
+        <button class="backup-action-btn" id="billing-account" data-action="settings-page" data-arg="cloudAccount" style="margin-top:8px">Account ›</button>
+      </div>`;
+  } else {
+    const busy = !!b.pending;
+    const dis = busy || b.reading ? 'disabled' : '';
+    const msg = b.message ? `<p class="muted cloud-msg" id="billing-msg" role="status">${escapeHTML(b.message)}</p>` : '';
+    const btn = {
+      subscribe: `<button class="btn-primary" id="billing-subscribe" data-action="billing-subscribe" ${dis} style="margin-top:10px">Subscribe</button>`,
+      card: `<button class="btn-primary" id="billing-card" data-action="billing-card" ${dis} style="margin-top:10px">Update card</button>`,
+      manage: `<button class="backup-action-btn" id="billing-manage" data-action="billing-manage" ${dis} style="margin-top:8px">Manage billing</button>`,
+    };
+    const wait = busy ? `
+        <p class="muted" id="billing-wait">${b.pending === 'checkout' ? 'Continue in the Stripe window, then come back here.' : 'Your billing page is open in the Stripe window.'}</p>
+        <button class="backup-action-btn" id="billing-cancel-wait" data-action="billing-cancel-wait" style="margin-top:6px">Cancel</button>` : '';
+    body = `
+      <div class="info-card" id="billing-card-${escapeHTML(v.kind)}">
+        <h3 id="billing-title">${escapeHTML(v.title || 'Your plan')}</h3>
+        ${v.lines.map((l, i) => `<p class="muted" id="billing-line-${i}">${escapeHTML(l)}</p>`).join('')}
+        ${msg}
+        ${wait || v.actions.map((a) => btn[a] || '').join('')}
       </div>
+      <div class="info-card">
+        <p class="muted" style="font-size:0.75rem" id="billing-note">Payments are handled by Stripe — PATGo never sees your card details. Cancel any time: your plan runs to the end of what you've paid for. ${typeof TERMS_URL === 'string' ? `<a href="${escapeHTML(TERMS_URL)}#refunds" id="billing-terms" target="_blank" rel="noopener noreferrer">Cancelling and refunds</a>` : ''}</p>
+      </div>`;
+  }
+  return `
+    <div class="screen" id="cloud-subscription-page">
+      ${renderSettingsSubHeader('Subscription')}
+      ${body}
     </div>
   `;
 }
