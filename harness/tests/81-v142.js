@@ -316,7 +316,9 @@ module.exports = async function () {
     st.view = 'cloudAccount';
     app.fn('render')();
     const a = html(app);
-    t.includes(a, `Plan: <strong>Free trial</strong> &middot; ends ${d(end)}`, 'Account: the plan in words, UK date');
+    // V144 (7A): the date now follows the days left.
+    t.includes(a, `Plan: <strong>Free trial</strong> &middot; <span id="cloud-trial-left">`, 'Account: the plan in words');
+    t.includes(a, `(ends ${d(end)})`, 'Account: the plan in words, UK date');
     t.includes(a, 'id="cloud-plan-open" data-action="settings-page" data-arg="cloudSubscription"', '…and Subscription ›');
     st.cloud.plan = 'comped';
     app.fn('render')();

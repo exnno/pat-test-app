@@ -262,7 +262,7 @@ module.exports = async function () {
     app.fn('render')();
     app.doc.getElementById('cloud-email').value = 'stranger@example.com';
     t.notOk(await app.fn('cloudSendCode')(), 'unknown email: send resolves false');
-    t.includes(st.cloud.message, 'isn\u2019t set up', 'unknown email explained');
+    t.includes(st.cloud.message, 'no PATGo account for that email', 'unknown email explained');   // V144: points at Create an account
     t.eq(st.cloud.status, 'signed-out', 'stays on the email step');
     t.eq(st.cloud.busy, false, 'busy cleared after a failure');
 

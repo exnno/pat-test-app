@@ -28,8 +28,8 @@
      82g  the SQL: v143-enforcement.sql's parts; schema.sql carries every V143
           line; the 14 days = PLAN_GRACE_DAYS + 7; isolation 19a–19h;
           self-checks C1–C6.
-     82e  release: V143, cache, What's new (one line), About V143 / V142 /
-          V141, Check now wired; plus 81e's lasting checks (81e retired).
+     82e  (retired at V144 — the release checks and the lasting ones moved
+          to 83e).
 
    Whether the SQL WORKS is proved by its own checks (C1–C6) and isolation
    19a–19h, run in the Supabase SQL editor — at V143 also against a local
@@ -394,101 +394,5 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 82e */
-  await t.group('82e — release: V143, cache, What’s new, About; wiring; no Stripe script (81e’s lasting checks)', async () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V143', 'APP_VERSION V143');
-    t.eq(app.run('WELCOME_VERSION'), 'V143', 'What’s new rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v143';", 'cache key pat-v143');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>Plan checks.</strong>', '…Plan checks');
-    t.includes(sheetCopy, 'at least once every 30 days', '…the 30 days');
-    t.includes(sheetCopy, 'everything uploads as soon as you renew', '…and nothing is lost');
-    t.includes(core, 'New here? Try the practice job.', 'setup offers the practice job');
-    t.includes(core, 'You can do it again any time from Settings → Help → Tutorials.', '…and says where it lives');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V143</strong>'), b = help.indexOf('<p><strong>V142</strong>'), c = help.indexOf('<p><strong>V141</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V143, V142, V141');
-    t.excludes(help, '<p><strong>V140</strong>', 'V140 rolled off');
-    t.includes(help, 'PATGo confirms your plan online at least once every 30 days. When a subscription ends', 'About: V143’s line');
-    t.includes(help, 'Cloud accounts can subscribe from Settings, paying securely through Stripe', 'About: V142’s line still there');
-    t.includes(help, 'PATGo has a full privacy policy. About now sums up', 'About: V141’s line still there');
-    t.includes(help, 'data-action="settings-page" data-arg="settingsTutorials"', 'About points at Tutorials');
-    const prices = app.run('PLAN_PRICES');
-    t.deepEq({ year: prices.year, month: prices.month }, { year: '£60 a year', month: '£6 a month' }, 'the prices shown match the pricing round (1B)');
-
-    // Stripe-hosted (V142 5A): no Stripe or Google script anywhere in the app.
-    const shipped = read('index.html') + read('plan.js') + read('cloud.js') + read('billing-done.html') + read('signin-done.html');
-    t.notOk(/js\.stripe\.com|<script[^>]+stripe/i.test(shipped), 'no Stripe script in the app');
-    t.notOk(/accounts\.google\.com\/gsi|<script[^>]+google/i.test(shipped), 'no Google script (V140 1A)');
-    t.notOk(/billing-done\.html/.test(read('sw.js')) || /billing-done\.html/.test(read('index.html')), 'billing-done.html is not in ASSETS or index.html (only opened online)');
-    t.notOk(new RegExp(String.raw`\bconfirm\(|\balert\(|\bprompt\(`).test(read('plan.js') + read('cloud.js') + read('sync.js')), 'no browser dialogs');
-
-    // The taps: wired, guarded, harmless without plan.js (rule 6).
-    const disp = read('dispatch.js');
-    const NEWB = ['billing-subscribe', 'billing-manage', 'billing-card', 'billing-cancel-wait', 'plan-check'];
-    t.includes(disp, "'plan-check': () => { if (typeof planCheckNow === 'function') planCheckNow(); },", 'Check now wired, typeof-guarded (V143)');
-    for (const n of NEWB.slice(0, 4)) t.ok(new RegExp(`'${n}':\\s*\\(\\) => \\{ if \\(typeof billing\\w+ === 'function'\\)`).test(disp), `${n} wired, typeof-guarded`);
-    const noPlan = bootApp({ skip: ['plan.js'] });
-    noPlan.state = () => noPlan.refresh('state').state;
-    const actsP = noPlan.run('ACTIONS');
-    for (const n of NEWB) t.doesNotThrow(() => actsP[n]('', noPlan.doc.createElement('button')), `${n} harmless without plan.js`);
-    noPlan.state().view = 'cloudSubscription';
-    t.doesNotThrow(() => noPlan.fn('render')(), 'the Subscription page renders without plan.js');
-    t.doesNotThrow(() => noPlan.fn('setView')('cloudSubscription'), '…and opens without it');
-    noPlan.state().view = 'sessions';
-    t.doesNotThrow(() => noPlan.fn('render')(), 'the Jobs list renders without plan.js');
-    // sync.js asks plan.js; plan.js asks sync.js — each fails soft without the other.
-    const noSync = bootApp({ skip: ['sync.js'] });
-    noSync.state = () => noSync.refresh('state').state;
-    t.doesNotThrow(() => noSync.fn('planNote')({ plan: 'active' }), 'planNote without sync.js');
-    t.eq(noSync.fn('planLineText')({ phase: 'paid' }), '', 'the plan line without sync.js');
-
-    // 80e's lasting checks: every cloud tap from V139 and V140 wired and guarded.
-    const NEW = ['cloud-google', 'cloud-google-connect', 'cloud-google-cancel', 'cloud-google-off',
-                 'cloud-google-keep', 'cloud-google-disconnect',
-                 'cloud-password-sign-in', 'cloud-forgot', 'cloud-use-code', 'cloud-use-password',
-                 'cloud-password-open', 'cloud-password-cancel', 'cloud-password-save', 'cloud-password-toggle'];
-    for (const n of NEW) t.ok(new RegExp(`'${n}':\\s*\\([^)]*\\) => \\{ if \\(typeof cloud\\w+ === 'function'\\)`).test(disp), `${n} wired, typeof-guarded`);
-    const bare = bootApp({ skip: ['cloud.js'] });
-    bare.state = () => bare.refresh('state').state;
-    const actions = bare.run('ACTIONS');
-    for (const n of NEW) t.doesNotThrow(() => actions[n]('', bare.doc.createElement('button')), `${n} harmless without cloud.js`);
-    bare.state().view = 'cloudAccount';
-    t.doesNotThrow(() => bare.fn('render')(), 'Account page renders without cloud.js');
-    bare.state().view = 'cloudSubscription';
-    t.doesNotThrow(() => bare.fn('render')(), 'the Subscription page renders without cloud.js');
-
-    // A form never navigates: the submit that follows Sign in / Go is cancelled at #app.
-    const f = bootApp({});
-    f.state = () => f.refresh('state').state;
-    f.sandbox.localStorage.setItem('pat:cloudUnlocked', '1');
-    f.state().view = 'cloudAccount';
-    f.fn('render')();
-    const ev = { type: 'submit', target: f.doc.createElement('form'), defaultPrevented: false,
-                 preventDefault() { this.defaultPrevented = true; }, stopPropagation() {} };
-    f.doc.getElementById('app').dispatchEvent(ev);
-    t.ok(ev.defaultPrevented, 'a submit on the Account page is cancelled (the app does not reload)');
-
-    // 77e's lasting checks (carried by 78e, 79e, 80e, 81e).
-    t.eq(app.run("SETTINGS_CATEGORIES.find(c => c.id === 'catHelp').pages[0]"), 'settingsTutorials', 'Tutorials heads the Help group');
-    const al = ' ' + app.run('SETTINGS_PAGE_META.settingsTutorials.aliases') + ' ';
-    t.ok(/ tutorial /.test(al) && / practice /.test(al), 'search finds it by tutorial or practice');
-    t.ok(/ settings /.test(al) && / instrument /.test(al) && / backup /.test(al), '…and by settings, instrument or backup (V135)');
-    app.fn('setView')('settingsTutorials');
-    const pg = html(app);
-    t.includes(pg, 'data-action="open-practice"', 'the page starts the practice job');
-    t.includes(pg, 'Nothing you do in it is saved', '…and says nothing is kept');
-    const rows = [...pg.slice(0, pg.indexOf('id="tutorials-cloud-list"')).matchAll(/data-action="open-tutorial" data-arg="([^"]+)"/g)].map(m => m[1]);
-    t.deepEq(rows, ['engineer', 'branding', 'content', 'items', 'backup'], 'the page lists the five Settings tutorials under Setting up');
-    t.includes(pg, 'Nothing you do in them is saved', '…and says nothing is kept');
-    t.excludes(pg, 'data-action="tut-show-me-how"', 'the Tutorials page itself has no Show me how');
-    t.eq(app.run('typeof TOUR_SLIDES'), 'undefined', 'the five picture slides stay retired');
-    t.eq(app.run('TUT_STEPS.length'), 21, 'the practice job: 21 steps (V134.1, unchanged)');
-    t.includes(read('styles.css'), '.tut-howto-row {', 'the Show me how line has its own style (V137)');
-    t.includes(disp, "'tut-show-me-how': (arg) => tutShowMeHow(arg),", 'the tap is wired (V137)');
-    t.includes(read('tour.js'), "const TUT_WALK_KEYS = ['group', 'page'];", 'a page tutorial skips the walk (V138)');
-  });
+  // 82e retired at V144 — its lasting checks moved to 83e.
 };
