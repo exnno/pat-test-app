@@ -1,4 +1,4 @@
-# PATGo — Code Map (V139)
+# PATGo — Code Map (V140)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -285,6 +285,8 @@ choice. `state.js` seeds `itemTypes`/`failReasons` from `DEFAULT_ITEM_TYPES` /
 files (precached, not `<script>` tags): the jsPDF pair (report.js injects them)
 and `supabase.umd.js` (cloud.js injects it, v79).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
+V140: `signin-done.html` (no script tag, not in ASSETS — only ever opened online,
+in the Google window; the SW caches it as it goes like any GET). See cloud.js.
 
 `boot.js` runs on load and must be last. Every other position is a readability
 choice, not a correctness constraint — cross-file calls resolve at call time, and
@@ -1251,7 +1253,7 @@ sync (settings_work), so the view is in `SYNC_GENERAL_VIEWS` and
 join both lists. Ways in: `storage-banner-open`, `save-fail-clear` (dispatch.js);
 manager Back `_MGR_RETURN_VIEWS` (settings-actions.js).
 
-### render-help.js (~1060 ln) — help, about & cloud pages — NEW v73 (V139: Account's password cards)
+### render-help.js (~1080 ln) — help, about & cloud pages — NEW v73 (V139: Account's password cards; V140: Google)
 About (+ the rolling 3-version changelog), Tutorials (V134 — starts tour.js's
 practice job; V135 lists tour.js `TUTORIALS`' Settings ones), Glossary (page + the
 `GLOSSARY_GROUPS` data array), Contact, `renderBugSheet()` markup, and the three
@@ -1281,7 +1283,7 @@ overlays are added to `render()`'s finalHTML in **render-core.js**. Animation is
 CSS transitions started from script (rule 12).
 Boot probe: `renderSettingsAbout` in `requiredFns`.
 
-### cloud.js (~565 ln) — cloud sign-in — NEW v79, password V139
+### cloud.js (~800 ln) — cloud sign-in — NEW v79, password V139, Google V140
 Sign-in (Supabase): email + password (V139) or an emailed code (v79); session state in `state.cloud`, the TEST strip
 and version tag, lazy load of `supabase.umd.js`. v85: the Cloud access code —
 `cloudPagesUnlocked()`, `cloudUnlock()`, `CLOUD_UNLOCK_KEY` (config.js; per
@@ -1311,7 +1313,19 @@ rule `cloudPasswordProblem` / `CLOUD_PASSWORD_HINT` must match the dashboard (mi
 letters and digits). ⚠ A password is read from its box at request time only — never
 state, storage or backup (78b). Card markup in **render-help.js** `renderCloudAccount`
 (real `<form>`s, iPhone autocomplete hints); dispatch.js `handleDelegatedSubmit` cancels
-every submit. Harness 78a–78e, M1344–M1357.
+every submit. Harness 78a–78d, M1344–M1357.
+V140: Google. `cloudGoogleSignIn` / `cloudGoogleConnect` → `_cloudGoogleStart` opens a
+window ⚠ synchronously inside the tap (iOS blocks a later one), then points it at
+`signInWithOAuth` / `linkIdentity` (implicit flow — the client's default; don't switch
+to PKCE without re-proving V139's routes). Google returns to **signin-done.html**
+(`CLOUD_GOOGLE_RETURN_PAGE`; must be in Supabase's Redirect URLs), which posts the
+#fragment to the opener (and a BroadcastChannel) and closes. `_cloudGoogleOnMessage`
+→ `cloudGoogleReturn` (own origin, a tap waiting, not busy) → `setSession` → sign-in
+lands through `_cloudSignedIn` as the others; Connect only updates `state.cloud.google`.
+Disconnect (asked in place: `googleOff`) unlinks then refreshes the session, because
+boot reads the connected address from the stored session (`_cloudGoogleEmail`).
+Dashboard: Google provider ON, "Allow manual linking" ON, sign-ups OFF (3A).
+Harness 79a–79e, M1358–M1379.
 
 ### sync.js (~4950 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check
 ⚠ V128 (rule 27): section "the stale-phone check" before the push.

@@ -321,11 +321,15 @@ let state = {
   //   code" instead of email + password; forgot — this code was asked for by
   //   "Forgot password?"; pwOpen — the "Choose a new password" card is showing;
   //   pwReset — it opened straight after a Forgot sign-in. Never a password.
+  //   V140 (Google): google — the connected Google address ('' = none; read
+  //   from the stored session at boot); googlePending — 'signin' | 'link' while
+  //   the Google window is open; googleOff — "Disconnect Google?" is showing.
   // Replaces the V43 mock's userId/authToken/authStatus.
   cloud: {
     status: 'off', busy: false, email: '',
     plan: null, trialEndsAt: null, checkedAt: null, message: '',
     useCode: false, forgot: false, pwOpen: false, pwReset: false,
+    google: '', googlePending: '', googleOff: false,
   },
   // v80: sync (sync.js). TRANSIENT, like `cloud` — the durable part (what was
   // sent, what was read, and when) lives in SYNC_STATE_KEY, owned by sync.js.

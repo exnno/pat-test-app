@@ -926,6 +926,15 @@ registerActions({
   'cloud-password-cancel':() => { if (typeof cloudPasswordCancel === 'function') cloudPasswordCancel(); },
   'cloud-password-save':  () => { if (typeof cloudPasswordSave === 'function') cloudPasswordSave(); },
   'cloud-password-toggle':(arg, el) => { if (typeof cloudPasswordToggle === 'function') cloudPasswordToggle(el); },
+  // V140: Google. cloud-google / cloud-google-connect open the Google window
+  // inside this tap — it must stay a direct, synchronous call (iOS blocks a
+  // window opened after any wait).
+  'cloud-google':          () => { if (typeof cloudGoogleSignIn === 'function') cloudGoogleSignIn(); },
+  'cloud-google-connect':  () => { if (typeof cloudGoogleConnect === 'function') cloudGoogleConnect(); },
+  'cloud-google-cancel':   () => { if (typeof cloudGoogleCancel === 'function') cloudGoogleCancel(); },
+  'cloud-google-off':      () => { if (typeof cloudGoogleDisconnectAsk === 'function') cloudGoogleDisconnectAsk(); },
+  'cloud-google-keep':     () => { if (typeof cloudGoogleDisconnectKeep === 'function') cloudGoogleDisconnectKeep(); },
+  'cloud-google-disconnect':() => { if (typeof cloudGoogleDisconnect === 'function') cloudGoogleDisconnect(); },
   'cloud-check':      () => { if (typeof cloudCheckConnection === 'function') cloudCheckConnection(); },
   'cloud-sign-out':   () => { if (typeof cloudSignOut === 'function') cloudSignOut(); },
   // v80: sync (sync.js), same guarding. "Re-send all" ignores the fingerprints

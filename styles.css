@@ -4018,6 +4018,16 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
   border: 1px solid var(--border-strong); border-radius: 8px;
   background: var(--input-bg); color: var(--text); font-size: 0.875rem; font-weight: 600;
 }
+/* V140: Google. "Continue with Google" heads the sign-in card, then a thin
+   "or" rule before the email and password. Plain text, the app's own button
+   style — no Google artwork. */
+.cloud-google-btn { margin: 4px 0 0; }
+.cloud-or {
+  display: flex; align-items: center; gap: 10px; margin: 6px 0 4px;
+  color: var(--text-muted); font-size: 0.8125rem;
+}
+.cloud-or::before, .cloud-or::after { content: ''; flex: 1 1 auto; border-top: 1px solid var(--border); }
+.cloud-google-note { margin: 12px 0 0; font-size: 0.8125rem; overflow-wrap: anywhere; }
 
 /* @@ V90: the photo manager (Settings → Backup → Manage photos) */
 .pm-select-btn {

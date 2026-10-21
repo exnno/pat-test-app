@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V139: rolled forward — V139 on top, V136 dropped. -->
+      <!-- v8: rolling 3-version changelog. V140: rolled forward — V140 on top, V137 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V140</strong> &middot; October 2026</p>
+        <p class="muted">Cloud accounts can sign in with Google. Connect your Google account once on the Account page, then Continue with Google signs you in. Disconnect it there any time.</p>
         <p><strong>V139</strong> &middot; October 2026</p>
         <p class="muted">Cloud accounts can sign in with an email and password, set or change it on the Account page, and get back in with an emailed code if it's forgotten. Signing in with a code still works.</p>
         <p><strong>V138</strong> &middot; October 2026</p>
         <p class="muted">Show me how now starts on the page you opened it from, not the Settings list, and its last step says Finish brings you back there.</p>
-        <p><strong>V137</strong> &middot; October 2026</p>
-        <p class="muted">Show me how: a link under the title of each Settings page a tutorial covers, and on Sync. It opens that page's tutorial and brings you back to the page. Nothing you do in it is saved.</p>
 
 
 
@@ -393,6 +393,22 @@ function renderCloudAccount() {
     // V139 (3A): "Set or change password" opens the card below in place of the
     // buttons. The hidden username box is how the iPhone knows which account a
     // new password belongs to when it offers to save it.
+    // V140 (4→A): the Google login connected to this account — Connect, or the
+    // address with Disconnect (asked in place: no dialogs). While the Google
+    // window is open, only Cancel.
+    const gWait = c.googlePending === 'link';
+    const googleBlock = gWait ? `
+        <p class="muted cloud-google-note" id="cloud-google-wait">${busy ? 'Connecting Google…' : 'Continue in the Google window, then come back here.'}</p>
+        <button class="backup-action-btn" id="cloud-google-cancel" data-action="cloud-google-cancel" ${dis} style="margin-top:6px">Cancel</button>`
+      : c.googleOff ? `
+        <p class="muted cloud-google-note" id="cloud-google-off-note">Disconnect <strong>${escapeHTML(c.google || '')}</strong>? You’ll sign in with your email instead.</p>
+        <button class="backup-action-btn" id="cloud-google-disconnect" data-action="cloud-google-disconnect" ${dis} style="margin-top:6px">${busy ? 'Disconnecting…' : 'Disconnect'}</button>
+        <button class="backup-action-btn" id="cloud-google-keep" data-action="cloud-google-keep" ${dis} style="margin-top:6px">Keep it</button>`
+      : c.google ? `
+        <p class="muted cloud-google-note" id="cloud-google-email">Google: <strong>${escapeHTML(c.google)}</strong></p>
+        <button class="backup-action-btn" id="cloud-google-off" data-action="cloud-google-off" ${dis} style="margin-top:6px">Disconnect Google</button>`
+      : `
+        <button class="backup-action-btn" id="cloud-google-connect" data-action="cloud-google-connect" ${dis} style="margin-top:6px">Connect Google</button>`;
     const pwCard = c.pwOpen ? `
         <form class="cloud-form" id="cloud-new-password-form" autocomplete="on" novalidate>
         <h3 style="margin-top:14px">${c.pwReset ? 'Choose a new password' : 'Set or change password'}</h3>
@@ -413,6 +429,7 @@ function renderCloudAccount() {
         ${msg}
         <button class="backup-action-btn" id="cloud-check" data-action="cloud-check" ${dis} style="margin-top:8px">${busy ? 'Checking…' : 'Check connection'}</button>
         <button class="backup-action-btn" id="cloud-password-open" data-action="cloud-password-open" ${dis} style="margin-top:6px">Set or change password</button>
+        ${googleBlock}
         <button class="backup-action-btn" id="cloud-sign-out" data-action="cloud-sign-out" ${dis} style="margin-top:6px">Sign out</button>`;
     body = `
       <div class="info-card">
@@ -421,6 +438,15 @@ function renderCloudAccount() {
         ${plan}
         ${(typeof planAccountHTML === 'function') ? planAccountHTML() : ''}
         ${pwCard}
+      </div>`;
+  } else if (c.googlePending === 'signin') {
+    // V140: the Google window is open. Cancel if it was closed without finishing.
+    body = `
+      <div class="info-card" id="cloud-google-waiting">
+        <h3>${busy ? 'Signing in…' : 'Continue in the Google window'}</h3>
+        <p class="muted" style="font-size:0.8125rem">Choose your Google account there. You’ll come back here signed in.</p>
+        ${msg}
+        <button class="backup-action-btn" id="cloud-google-cancel" data-action="cloud-google-cancel" ${dis} style="margin-top:8px">Cancel</button>
       </div>`;
   } else if (c.status === 'code-sent') {
     // V139 (2A): the same code step serves "Forgot password?" — it says so.
@@ -454,6 +480,8 @@ function renderCloudAccount() {
       <div class="info-card">
         <form class="cloud-form" id="cloud-sign-in-form" autocomplete="on" novalidate>
         <h3>Sign in</h3>
+        <button type="button" class="backup-action-btn cloud-google-btn" id="cloud-google" data-action="cloud-google" ${dis}>Continue with Google</button>
+        <p class="cloud-or" aria-hidden="true"><span>or</span></p>
         <label class="label" for="cloud-email">Email</label>
         <input class="input" id="cloud-email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" value="${escapeHTML(c.email || '')}" placeholder="you@example.com" ${dis}>
         <label class="label" for="cloud-password">Password</label>

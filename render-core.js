@@ -256,7 +256,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Sign in with a password.</strong> If you have a cloud account, you can now sign in with your email and a password, and set or change it on the Account page. Forgot it? An emailed code gets you back in. Signing in with a code still works too.</li>
+        <li><strong>Sign in with Google.</strong> If you have a cloud account, tap Connect Google on the Account page once. After that, Continue with Google signs you in, even if your Google email is different from your PATGo one.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

@@ -8,6 +8,37 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V140
+V140 = Google sign-in (Stage 13, B; Peter 21 Oct: 1A 2A 3A, 4→A — Connect Google
+brought in because his main account is a Yahoo address; Q5 dropped: the cloud
+only runs on the test copy anyway). cloud.js `cloudGoogleSignIn` /
+`cloudGoogleConnect` / `cloudGoogleReturn` / `cloudGoogleDisconnect`; the window
+opens inside the tap; Google returns to signin-done.html (new, non-script) which
+posts the session to the app; implicit flow. render-help.js: Continue with
+Google + "or" on the sign-in card; Connect / Google: address + Disconnect on the
+signed-in card. Harness 79 + M1358–M1379; 78e retired → 79e. No SQL.
+**Next (Peter's order): C About/Privacy from the privacy terms (waits on the
+policy) — and with it, PUBLISH the Google app (Google Auth Platform → Branding:
+homepage patgo.co.uk + privacy policy URL, then Audience → Publish). Until then
+Google sign-in is in Testing: only Google accounts on its Test users list can use
+it. → D Stage 13 pricing round + Stripe account.**
+**At the Supabase Pro + production move:** production project needs the same
+Google setup — Google provider ON (the same client, plus production's callback
+URL in the Google client's redirect URIs), "Allow manual linking" ON, the
+product site's signin-done.html in Redirect URLs. Consider the custom-domain
+add-on so Google's screen says patgo rather than …supabase.co.
+
+### V140 residuals (known, accepted)
+- ⚠ The real test is the installed iPhone app: does Google accept the window
+  (no `disallowed_useragent`), and does it come back and close? If the window
+  can't reach the app, the landing page says "You can close this window and go
+  back to PATGo" and nothing is signed in — then we look at alternatives.
+- If the Google window is closed without finishing, the app keeps waiting until
+  Cancel (iOS doesn't reliably say a window closed). The card says Cancel.
+- Google's screen names the Supabase address (…supabase.co), not PATGo, until
+  the custom-domain add-on.
+- Testing mode: each tester's Google address must be on the Test users list.
+
 ### Next after V139
 V139 = password sign-in (Stage 13, A; Peter 20 Oct: 1A 2A 3A 4B 5A). cloud.js
 `cloudPasswordSignIn` / `cloudForgotPassword` / `cloudPasswordSave`, both sign-in
@@ -25,7 +56,7 @@ same as test (sign-ups off, minimum 8, letters and digits, secure password chang
 OFF, require current password OFF).
 
 ### V139 residuals (known, accepted)
-- Not yet seen on a real iPhone: whether Safari offers to save the password
+- Peter 21 Oct: all sign-in paths work on the live V139. Still unseen: whether Safari offers to save the password
   (its call, not ours — the forms and hints are in place), Passwords autofill on
   the sign-in card, the strong-password suggestion on "New password", and Go.
 - Changing the password does not sign the account's other phones out (Supabase
