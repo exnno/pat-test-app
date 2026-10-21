@@ -1,12 +1,13 @@
 /*!
  * PATGo PWA — cloud.js (cloud sign-in)
- * v85 (September 2026)
+ * v85 (September 2026) · V139 (October 2026): password sign-in
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
  *
- * Email-code sign-in to the cloud project chosen by config.js (CLOUD_ENV /
- * CLOUD). This file is SIGN-IN ONLY. Sending data is sync.js's job (V80: jobs,
+ * Sign-in to the cloud project chosen by config.js (CLOUD_ENV / CLOUD): email +
+ * password (V139, the everyday route) or a code emailed to you (V79, still there,
+ * and how "Forgot password?" works). This file is SIGN-IN ONLY. Sending data is sync.js's job (V80: jobs,
  * one way); this file only tells it who is signed in (cloudUserId) and when a
  * sign-in has just happened.
  *
@@ -28,6 +29,21 @@
  * that free users already have. Only accounts created by hand in the Supabase
  * dashboard can sign in; nobody can create one from the app. Flip this when
  * sign-up is meant to be open (commercial launch, REQUIRE_ACCOUNT).
+ *
+ * ⚠ V139: WHY "FORGOT PASSWORD?" SENDS A CODE, NOT SUPABASE'S RESET LINK (2A).
+ * A link in an email opens in Safari, and on an iPhone Safari and the installed
+ * home-screen app keep separate storage — the reset would sign Safari in, not
+ * PATGo. So Forgot = the emailed-code sign-in we already have, then "Choose a new
+ * password" (updateUser) while that sign-in is minutes old. Nothing arrives in
+ * the URL (detectSessionInUrl stays false). Don't "upgrade" it to
+ * resetPasswordForEmail.
+ *
+ * ⚠ V139: A PASSWORD IS NEVER KEPT. It is read from its box at the moment of the
+ * request and handed to the library — never put in state, never stored, never in
+ * a backup. The phone keeps only the session the library writes (as for a code).
+ * Supabase stores a salted bcrypt hash. The dashboard's "Secure password change"
+ * and "Require current password" switches stay OFF (5A) — either would stop
+ * Forgot (and first-time Set) from working.
  */
 
 const CLOUD_LIB_SRC = './supabase.umd.js';
@@ -172,7 +188,34 @@ function cloudErrorMessage(err, stage) {
     return 'Couldn\u2019t reach the server. Check your signal and try again.';
   }
   if (status === 429 || /rate.?limit/i.test(code + ' ' + msg)) {
+    // V139: a password route is "tries", not "codes requested".
+    if (stage === 'password' || stage === 'new-password') return 'Too many tries. Wait a few minutes, then try again.';
     return 'Too many codes requested. Wait a few minutes, then try again.';
+  }
+  if (stage === 'password' && (code === 'invalid_credentials' || /invalid login credentials/i.test(msg))) {
+    // Also what an account with no password yet gets — hence the Forgot pointer.
+    return 'That email and password don\u2019t match. Try again, or tap Forgot password.';
+  }
+  if (stage === 'password' && (code === 'email_not_confirmed' || /not confirmed/i.test(msg))) {
+    return 'That account hasn\u2019t been confirmed yet. Use Email me a code instead.';
+  }
+  if (stage === 'new-password') {
+    if (code === 'same_password' || /should be different/i.test(msg)) {
+      return 'That\u2019s already your password \u2014 nothing to change.';
+    }
+    if (code === 'weak_password' || /weak/i.test(msg)) {
+      const reasons = (err && err.reasons) || [];
+      if (reasons.indexOf('pwned') !== -1 || /pwned|leak/i.test(msg)) {
+        return 'That password has turned up in a known data leak. Choose a different one.';
+      }
+      return 'The server turned that password down. ' + CLOUD_PASSWORD_HINT;
+    }
+    if (code === 'reauthentication_needed' || /reauthenticat/i.test(msg)) {
+      return 'For safety, sign out, sign back in with an emailed code, then set the password straight away.';
+    }
+    if (err && err.name === 'AuthSessionMissingError') {
+      return 'You\u2019ve been signed out. Sign in again, then set the password.';
+    }
   }
   if (stage === 'send' && (code === 'otp_disabled' || /signups? not allowed/i.test(msg))) {
     return 'That email isn\u2019t set up for the cloud test. Accounts are added by hand for now.';
@@ -238,31 +281,175 @@ function cloudVerifyCode() {
         _cloudSet({ busy: false, message: cloudErrorMessage(res.error, 'verify') });
         return false;
       }
-      const user = res && res.data && res.data.user;
-      _cloudSet({ busy: false, status: 'signed-in', email: (user && user.email) || email,
-        message: '', plan: null, trialEndsAt: null, checkedAt: null });
-      _cloudRememberUnlock();   // v85 2A
+      const forgot = !!state.cloud.forgot;
+      _cloudSignedIn(res && res.data && res.data.user, email);
+      // V139 (2A): signed in by "Forgot password?" — straight to choosing a new one.
+      if (forgot) _cloudSet({ pwOpen: true, pwReset: true });
       return true;
     })
     .catch((e) => { _cloudSet({ busy: false, message: cloudErrorMessage(e, 'verify') }); return false; })
-    .then((ok) => {
-      _cloudRepaint();
-      // Prove the round trip straight away: read our own profile row. v80: then
-      // send this phone's jobs (sync.js; optional, so guarded). v81: and read
-      // the account's jobs back — signing in on a second phone is the moment
-      // there is most to fetch, so this trigger pulls as well as pushes.
-      if (ok) {
-        return cloudCheckConnection().then(() => {
-          if (typeof syncPushSoon === 'function') { try { syncPushSoon(0, { pull: true }); } catch (e) { console.error(e); } }
-          return ok;
-        });
-      }
+    .then(_cloudAfterSignIn);
+}
+
+// V139: the one place a sign-in lands, by code or by password — both routes must
+// do exactly the same afterwards, so they share it rather than keep two copies
+// in step. The address shown is the one the server returned, falling back to
+// the one typed.
+function _cloudSignedIn(user, email) {
+  _cloudSet({ busy: false, status: 'signed-in', email: (user && user.email) || email,
+    message: '', plan: null, trialEndsAt: null, checkedAt: null, forgot: false, useCode: false });
+  _cloudRememberUnlock();   // v85 2A
+}
+
+function _cloudAfterSignIn(ok) {
+  _cloudRepaint();
+  // Prove the round trip straight away: read our own profile row. v80: then
+  // send this phone's jobs (sync.js; optional, so guarded). v81: and read
+  // the account's jobs back — signing in on a second phone is the moment
+  // there is most to fetch, so this trigger pulls as well as pushes.
+  if (ok) {
+    return cloudCheckConnection().then(() => {
+      if (typeof syncPushSoon === 'function') { try { syncPushSoon(0, { pull: true }); } catch (e) { console.error(e); } }
       return ok;
     });
+  }
+  return ok;
+}
+
+// ---- V139: password sign-in (spec 1A–5A, 4B) ------------------------------------
+// The rule the dashboard is set to as well (Auth → Email: minimum 8, "letters and
+// digits"), checked here first so a refusal reads plainly before any request.
+// Only on CHOOSING a password — signing in never judges one (an older, weaker
+// password still signs in; the server decides). ASCII letters/digits only,
+// because those are the sets the server counts. 72 is bcrypt's limit; the
+// server refuses longer.
+const CLOUD_PASSWORD_HINT = 'Use at least 8 characters, with a letter and a number.';
+function cloudPasswordProblem(pw) {
+  const p = String(pw || '');
+  if (p.length < 8) return 'Use at least 8 characters.';
+  if (p.length > 72) return 'Use 72 characters or fewer.';
+  if (!/[A-Za-z]/.test(p)) return 'Add at least one letter.';
+  if (!/[0-9]/.test(p)) return 'Add at least one number.';
+  return '';
+}
+
+function cloudPasswordSignIn() {
+  if (!cloudAvailable() || state.cloud.busy) return Promise.resolve(false);
+  const typed = _cloudInputValue('cloud-email').trim().toLowerCase();
+  const email = typed || state.cloud.email || '';
+  const password = _cloudInputValue('cloud-password');   // never trimmed, never kept
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    _cloudSet({ email, forgot: false, message: 'Enter the email address your account was set up with.' });
+    render();
+    return Promise.resolve(false);
+  }
+  if (!password) {
+    _cloudSet({ email, forgot: false, message: 'Enter your password \u2014 or tap Forgot password.' });
+    render();
+    return Promise.resolve(false);
+  }
+  if (_cloudOffline()) {
+    _cloudSet({ email, message: 'You need a signal to sign in. Everything else works offline as normal.' });
+    render();
+    return Promise.resolve(false);
+  }
+  _cloudSet({ email, forgot: false, busy: true, message: '' });
+  render();
+  return cloudClient()
+    .then((c) => c.auth.signInWithPassword({ email, password }))
+    .then((res) => {
+      if (res && res.error) {
+        _cloudSet({ busy: false, message: cloudErrorMessage(res.error, 'password') });
+        return false;
+      }
+      _cloudSignedIn(res && res.data && res.data.user, email);
+      return true;
+    })
+    .catch((e) => { _cloudSet({ busy: false, message: cloudErrorMessage(e, 'password') }); return false; })
+    .then(_cloudAfterSignIn);
+}
+
+// 2A: Forgot = the emailed-code sign-in, remembered as a reset so the code step
+// says so and a successful code opens "Choose a new password".
+function cloudForgotPassword() {
+  if (!cloudAvailable() || state.cloud.busy) return Promise.resolve(false);
+  _cloudSet({ forgot: true });
+  return cloudSendCode();
+}
+
+// The two sign-in cards share the email box; whatever is typed carries over.
+function _cloudSwitchCard(useCode) {
+  const typed = _cloudInputValue('cloud-email').trim().toLowerCase();
+  _cloudSet({ useCode, forgot: false, message: '', email: typed || state.cloud.email || '' });
+  render();
+}
+function cloudUseCode() { _cloudSwitchCard(true); }
+function cloudUsePassword() { _cloudSwitchCard(false); }
+
+// 3A: Account → "Set or change password". 5A: no current password asked.
+function cloudPasswordOpen() {
+  if (state.cloud.status !== 'signed-in' || state.cloud.busy) return;
+  _cloudSet({ pwOpen: true, pwReset: false, message: '' });
+  render();
+}
+function cloudPasswordCancel() {
+  _cloudSet({ pwOpen: false, pwReset: false, message: '' });
+  render();
+}
+
+function cloudPasswordSave() {
+  if (!cloudAvailable() || state.cloud.busy || state.cloud.status !== 'signed-in' || !state.cloud.pwOpen) {
+    return Promise.resolve(false);
+  }
+  const pw = _cloudInputValue('cloud-new-password');
+  const again = _cloudInputValue('cloud-new-password2');
+  const problem = cloudPasswordProblem(pw) || (pw !== again ? 'The two passwords don\u2019t match. Type it again in both boxes.' : '');
+  if (problem) {
+    _cloudSet({ message: problem });
+    render();
+    return Promise.resolve(false);
+  }
+  if (_cloudOffline()) {
+    _cloudSet({ message: 'You need a signal to set a password.' });
+    render();
+    return Promise.resolve(false);
+  }
+  _cloudSet({ busy: true, message: '' });
+  render();
+  return cloudClient()
+    .then((c) => c.auth.updateUser({ password: pw }))
+    .then((res) => {
+      if (res && res.error) {
+        _cloudSet({ busy: false, message: cloudErrorMessage(res.error, 'new-password') });
+        return false;
+      }
+      _cloudSet({ busy: false, pwOpen: false, pwReset: false,
+        message: 'Password saved. Next time, sign in with your email and this password.' });
+      return true;
+    })
+    .catch((e) => { _cloudSet({ busy: false, message: cloudErrorMessage(e, 'new-password') }); return false; })
+    .then((ok) => { _cloudRepaint(); return ok; });
+}
+
+// Show / Hide. Flips the boxes in place — a render() would empty them, and a
+// password is never held anywhere it could be painted back from.
+function cloudPasswordToggle(btn) {
+  const ids = ['cloud-password', 'cloud-new-password', 'cloud-new-password2'];
+  let showing = false;
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.type = el.type === 'password' ? 'text' : 'password';
+    showing = el.type === 'text';
+  });
+  if (btn) {
+    btn.textContent = showing ? 'Hide' : 'Show';
+    try { btn.setAttribute('aria-pressed', showing ? 'true' : 'false'); } catch {}
+  }
 }
 
 function cloudChangeEmail() {
-  _cloudSet({ status: 'signed-out', busy: false, message: '' });
+  _cloudSet({ status: 'signed-out', busy: false, message: '', forgot: false });
   render();
 }
 
@@ -313,7 +500,8 @@ function cloudSignOut() {
       doomed.forEach((k) => localStorage.removeItem(k));
     } catch {}
     _cloudSet({ status: cloudAvailable() ? 'signed-out' : 'off', busy: false, message: 'Signed out.',
-      plan: null, trialEndsAt: null, checkedAt: null });
+      plan: null, trialEndsAt: null, checkedAt: null,
+      useCode: false, forgot: false, pwOpen: false, pwReset: false });   // V139
     render();
   };
   if (!_cloudClientPromise) { finish(); return Promise.resolve(true); }

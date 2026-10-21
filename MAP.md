@@ -1,4 +1,4 @@
-# PATGo — Code Map (V138)
+# PATGo — Code Map (V139)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1251,7 +1251,7 @@ sync (settings_work), so the view is in `SYNC_GENERAL_VIEWS` and
 join both lists. Ways in: `storage-banner-open`, `save-fail-clear` (dispatch.js);
 manager Back `_MGR_RETURN_VIEWS` (settings-actions.js).
 
-### render-help.js (~633 ln) — help, about & cloud pages — NEW v73
+### render-help.js (~1060 ln) — help, about & cloud pages — NEW v73 (V139: Account's password cards)
 About (+ the rolling 3-version changelog), Tutorials (V134 — starts tour.js's
 practice job; V135 lists tour.js `TUTORIALS`' Settings ones), Glossary (page + the
 `GLOSSARY_GROUPS` data array), Contact, `renderBugSheet()` markup, and the three
@@ -1281,8 +1281,8 @@ overlays are added to `render()`'s finalHTML in **render-core.js**. Animation is
 CSS transitions started from script (rule 12).
 Boot probe: `renderSettingsAbout` in `requiredFns`.
 
-### cloud.js (~315 ln) — cloud sign-in — NEW v79
-Email-code sign-in (Supabase), session state in `state.cloud`, the TEST strip
+### cloud.js (~565 ln) — cloud sign-in — NEW v79, password V139
+Sign-in (Supabase): email + password (V139) or an emailed code (v79); session state in `state.cloud`, the TEST strip
 and version tag, lazy load of `supabase.umd.js`. v85: the Cloud access code —
 `cloudPagesUnlocked()`, `cloudUnlock()`, `CLOUD_UNLOCK_KEY` (config.js; per
 device, never backed up), remembered on code entry and on any sign-in. Sign-in ONLY — nothing syncs.
@@ -1303,6 +1303,15 @@ harness 15b fails otherwise. ⚠ The server side (tables, RLS) is in
 Not probed at boot (optional subsystem). Harness 15a–15k, mutations M130–M141.
 V127: `_cloudReadStoredSession()` also returns `issuedAt` (server time, plan.js);
 `cloudCheckConnection` hands the profile row to `planNote()` (typeof-guarded).
+V139: password sign-in. Both routes land through `_cloudSignedIn` + `_cloudAfterSignIn`
+(unlock, profile read, push+pull) — never give one route its own copy. Forgot = the code
+sign-in with `state.cloud.forgot`, then the "Choose a new password" card (`pwOpen`);
+⚠ never Supabase's reset LINK (opens in Safari, not the installed app). The password
+rule `cloudPasswordProblem` / `CLOUD_PASSWORD_HINT` must match the dashboard (min 8,
+letters and digits). ⚠ A password is read from its box at request time only — never
+state, storage or backup (78b). Card markup in **render-help.js** `renderCloudAccount`
+(real `<form>`s, iPhone autocomplete hints); dispatch.js `handleDelegatedSubmit` cancels
+every submit. Harness 78a–78e, M1344–M1357.
 
 ### sync.js (~4950 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check
 ⚠ V128 (rule 27): section "the stale-phone check" before the push.
@@ -1640,7 +1649,9 @@ can't be safely delegated.
 ### dispatch.js (~1470 ln) — delegated event handling
 Three registries attached once to `#app` at boot: `ACTIONS` (click, ancestor-walk
 by `data-action`/`data-arg`), `INPUT_ACTIONS` (`data-input-action`),
-`CHANGE_ACTIONS` (`data-change-action`).
+`CHANGE_ACTIONS` (`data-change-action`). V139: `handleDelegatedSubmit` cancels every
+`<form>` submit (the cloud sign-in forms; Go = a click on the submit button, which
+carries the data-action) — a form must never navigate.
 **Touch to:** add or route any delegated click / input / change handler.
 V112: `back-to-settings` and `edit-back` (Edit session's arrow) route through
 `unsavedLeave()` (settings-actions.js); `edit-cancel` stays a plain discard.

@@ -317,10 +317,15 @@ let state = {
   //   email:  signed-in address, or the address a code was sent to
   //   plan / trialEndsAt / checkedAt: last "Check connection" result
   //   message: one plain-language line for the Account page (errors included)
+  //   V139 (password sign-in): useCode — the signed-out card shows "Email me a
+  //   code" instead of email + password; forgot — this code was asked for by
+  //   "Forgot password?"; pwOpen — the "Choose a new password" card is showing;
+  //   pwReset — it opened straight after a Forgot sign-in. Never a password.
   // Replaces the V43 mock's userId/authToken/authStatus.
   cloud: {
     status: 'off', busy: false, email: '',
     plan: null, trialEndsAt: null, checkedAt: null, message: '',
+    useCode: false, forgot: false, pwOpen: false, pwReset: false,
   },
   // v80: sync (sync.js). TRANSIENT, like `cloud` — the durable part (what was
   // sent, what was read, and when) lives in SYNC_STATE_KEY, owned by sync.js.

@@ -61,16 +61,17 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V138: rolled forward — V138 on top, V135 dropped. -->
+      <!-- v8: rolling 3-version changelog. V139: rolled forward — V139 on top, V136 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V139</strong> &middot; October 2026</p>
+        <p class="muted">Cloud accounts can sign in with an email and password, set or change it on the Account page, and get back in with an emailed code if it's forgotten. Signing in with a code still works.</p>
         <p><strong>V138</strong> &middot; October 2026</p>
         <p class="muted">Show me how now starts on the page you opened it from, not the Settings list, and its last step says Finish brings you back there.</p>
         <p><strong>V137</strong> &middot; October 2026</p>
         <p class="muted">Show me how: a link under the title of each Settings page a tutorial covers, and on Sync. It opens that page's tutorial and brings you back to the page. Nothing you do in it is saved.</p>
-        <p><strong>V136</strong> &middot; October 2026</p>
-        <p class="muted">Your jobs &amp; the cloud tutorials: the Jobs list, finding and bringing back a job kept in the cloud, and Sync, on a pretend account. Settings &rarr; Help &rarr; Tutorials. Nothing you do in them is saved or sent.</p>
+
 
 
         </div>
@@ -389,37 +390,82 @@ function renderCloudAccount() {
     const plan = c.plan
       ? `<p class="muted" id="cloud-plan">Plan: <strong>${escapeHTML(c.plan)}</strong>${c.trialEndsAt ? ` &middot; trial ends ${escapeHTML(new Date(c.trialEndsAt).toLocaleDateString('en-GB'))}` : ''}</p>`
       : '';
+    // V139 (3A): "Set or change password" opens the card below in place of the
+    // buttons. The hidden username box is how the iPhone knows which account a
+    // new password belongs to when it offers to save it.
+    const pwCard = c.pwOpen ? `
+        <form class="cloud-form" id="cloud-new-password-form" autocomplete="on" novalidate>
+        <h3 style="margin-top:14px">${c.pwReset ? 'Choose a new password' : 'Set or change password'}</h3>
+        ${c.pwReset ? `<p class="muted" style="font-size:0.8125rem" id="cloud-pw-reset-note">You’re signed in with the code. Choose a new password to use next time.</p>` : ''}
+        <input type="email" autocomplete="username" aria-label="Email" value="${escapeHTML(c.email || '')}" hidden tabindex="-1">
+        <label class="label" for="cloud-new-password">New password</label>
+        <div class="cloud-pw-row">
+          <input class="input" id="cloud-new-password" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="72" ${dis}>
+          <button type="button" class="cloud-pw-toggle" data-action="cloud-password-toggle" aria-pressed="false" aria-label="Show or hide the password">Show</button>
+        </div>
+        <label class="label" for="cloud-new-password2">Type it again</label>
+        <input class="input" id="cloud-new-password2" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="72" ${dis}>
+        <p class="muted" style="font-size:0.75rem;margin-top:6px" id="cloud-pw-hint">${escapeHTML(typeof CLOUD_PASSWORD_HINT === 'string' ? CLOUD_PASSWORD_HINT : '')}</p>
+        ${msg}
+        <button type="submit" class="btn-primary" id="cloud-password-save" data-action="cloud-password-save" ${dis} style="margin-top:10px">${busy ? 'Saving…' : 'Save password'}</button>
+        <button type="button" class="backup-action-btn" id="cloud-password-cancel" data-action="cloud-password-cancel" ${dis} style="margin-top:6px">${c.pwReset ? 'Not now' : 'Cancel'}</button>
+        </form>` : `
+        ${msg}
+        <button class="backup-action-btn" id="cloud-check" data-action="cloud-check" ${dis} style="margin-top:8px">${busy ? 'Checking…' : 'Check connection'}</button>
+        <button class="backup-action-btn" id="cloud-password-open" data-action="cloud-password-open" ${dis} style="margin-top:6px">Set or change password</button>
+        <button class="backup-action-btn" id="cloud-sign-out" data-action="cloud-sign-out" ${dis} style="margin-top:6px">Sign out</button>`;
     body = `
       <div class="info-card">
         <h3>Signed in as</h3>
         <p id="cloud-signed-in-email"><strong>${escapeHTML(c.email || '(unknown)')}</strong></p>
         ${plan}
         ${(typeof planAccountHTML === 'function') ? planAccountHTML() : ''}
-        ${msg}
-        <button class="backup-action-btn" id="cloud-check" data-action="cloud-check" ${dis} style="margin-top:8px">${busy ? 'Checking…' : 'Check connection'}</button>
-        <button class="backup-action-btn" id="cloud-sign-out" data-action="cloud-sign-out" ${dis} style="margin-top:6px">Sign out</button>
+        ${pwCard}
       </div>`;
   } else if (c.status === 'code-sent') {
+    // V139 (2A): the same code step serves "Forgot password?" — it says so.
     body = `
       <div class="info-card">
-        <h3>Enter your code</h3>
-        <p class="muted" style="font-size:0.8125rem">We emailed a code to <strong>${escapeHTML(c.email)}</strong>.</p>
+        <h3>${c.forgot ? 'Reset your password' : 'Enter your code'}</h3>
+        <p class="muted" style="font-size:0.8125rem">We emailed a code to <strong>${escapeHTML(c.email)}</strong>.${c.forgot ? ' Enter it, then choose a new password.' : ''}</p>
         <label class="label" for="cloud-code">Code</label>
         <input class="input cloud-code-input" id="cloud-code" type="text" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="123456" ${dis}>
         ${msg}
-        <button class="btn-primary" id="cloud-verify-code" data-action="cloud-verify-code" ${dis} style="margin-top:10px">${busy ? 'Checking…' : 'Sign in'}</button>
+        <button class="btn-primary" id="cloud-verify-code" data-action="cloud-verify-code" ${dis} style="margin-top:10px">${busy ? 'Checking…' : (c.forgot ? 'Continue' : 'Sign in')}</button>
         <button class="backup-action-btn" id="cloud-resend" data-action="cloud-send-code" ${dis} style="margin-top:8px">Send a new code</button>
-        <button class="backup-action-btn" id="cloud-change-email" data-action="cloud-change-email" ${dis} style="margin-top:6px">Use a different email</button>
+        <button class="backup-action-btn" id="cloud-change-email" data-action="cloud-change-email" ${dis} style="margin-top:6px">${c.forgot ? 'Back to sign in' : 'Use a different email'}</button>
       </div>`;
-  } else {
+  } else if (c.useCode) {
     body = `
       <div class="info-card">
-        <h3>Sign in</h3>
-        <p class="muted" style="font-size:0.8125rem">We'll email you a code. No password.</p>
+        <h3>Sign in with a code</h3>
+        <p class="muted" style="font-size:0.8125rem">We'll email you a code to sign in with.</p>
         <label class="label" for="cloud-email">Email</label>
         <input class="input" id="cloud-email" type="email" inputmode="email" autocomplete="email" autocapitalize="off" spellcheck="false" value="${escapeHTML(c.email || '')}" placeholder="you@example.com" ${dis}>
         ${msg}
         <button class="btn-primary" id="cloud-send-code" data-action="cloud-send-code" ${dis} style="margin-top:10px">${busy ? 'Sending…' : 'Email me a code'}</button>
+        <button class="backup-action-btn" id="cloud-use-password" data-action="cloud-use-password" ${dis} style="margin-top:8px">Use a password instead</button>
+      </div>`;
+  } else {
+    // V139 (1A): email + password is the everyday card. A real <form> so the
+    // iPhone offers its saved password and Go signs in (dispatch.js
+    // handleDelegatedSubmit stops the form reloading the app).
+    body = `
+      <div class="info-card">
+        <form class="cloud-form" id="cloud-sign-in-form" autocomplete="on" novalidate>
+        <h3>Sign in</h3>
+        <label class="label" for="cloud-email">Email</label>
+        <input class="input" id="cloud-email" type="email" inputmode="email" autocomplete="username" autocapitalize="off" spellcheck="false" value="${escapeHTML(c.email || '')}" placeholder="you@example.com" ${dis}>
+        <label class="label" for="cloud-password">Password</label>
+        <div class="cloud-pw-row">
+          <input class="input" id="cloud-password" type="password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" ${dis}>
+          <button type="button" class="cloud-pw-toggle" data-action="cloud-password-toggle" aria-pressed="false" aria-label="Show or hide the password">Show</button>
+        </div>
+        ${msg}
+        <button type="submit" class="btn-primary" id="cloud-password-sign-in" data-action="cloud-password-sign-in" ${dis} style="margin-top:10px">${busy ? 'Signing in…' : 'Sign in'}</button>
+        <button type="button" class="backup-action-btn" id="cloud-forgot" data-action="cloud-forgot" ${dis} style="margin-top:8px">Forgot password?</button>
+        <button type="button" class="backup-action-btn" id="cloud-use-code" data-action="cloud-use-code" ${dis} style="margin-top:6px">Email me a code instead</button>
+        </form>
       </div>`;
   }
 

@@ -4007,6 +4007,17 @@ body.has-selection-bar .screen { padding-bottom: 88px; }
 }
 .cloud-msg { margin: 10px 0 0; font-size: 0.8125rem; }
 .cloud-code-input { font-size: 1.375rem; letter-spacing: 0.2em; text-align: center; }
+/* V139: password sign-in. The form is only there for the iPhone's Passwords —
+   it adds no spacing of its own. The Show/Hide button sits beside the box at a
+   full 44px tap height so it can't be mis-hit for the box itself. */
+.cloud-form { margin: 0; }
+.cloud-pw-row { display: flex; gap: 8px; align-items: stretch; }
+.cloud-pw-row .input { flex: 1 1 auto; min-width: 0; }
+.cloud-pw-toggle {
+  flex: 0 0 auto; min-width: 64px; min-height: 44px; padding: 0 12px;
+  border: 1px solid var(--border-strong); border-radius: 8px;
+  background: var(--input-bg); color: var(--text); font-size: 0.875rem; font-weight: 600;
+}
 
 /* @@ V90: the photo manager (Settings → Backup → Manage photos) */
 .pm-select-btn {

@@ -8,6 +8,31 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V139
+V139 = password sign-in (Stage 13, A; Peter 20 Oct: 1A 2A 3A 4B 5A). cloud.js
+`cloudPasswordSignIn` / `cloudForgotPassword` / `cloudPasswordSave`, both sign-in
+routes through `_cloudSignedIn` + `_cloudAfterSignIn`; Forgot = emailed code then
+"Choose a new password" (never the reset link); rule 8+ with a letter and a
+number (`cloudPasswordProblem`, matches the dashboard); no current password.
+render-help.js Account cards in real forms; dispatch.js `handleDelegatedSubmit`.
+Harness 78 + M1344–M1357; 77e retired → 78e. No SQL.
+**Next (Peter's order): B Google sign-in (Google Cloud OAuth setup first) → C
+About/Privacy from the privacy terms (waits on the policy) → D Stage 13 pricing
+round + Stripe account.**
+**At the Supabase Pro + production move:** turn on leaked-password protection
+(HaveIBeenPwned — Pro only), and set the production project's Email provider the
+same as test (sign-ups off, minimum 8, letters and digits, secure password change
+OFF, require current password OFF).
+
+### V139 residuals (known, accepted)
+- Not yet seen on a real iPhone: whether Safari offers to save the password
+  (its call, not ours — the forms and hints are in place), Passwords autofill on
+  the sign-in card, the strong-password suggestion on "New password", and Go.
+- Changing the password does not sign the account's other phones out (Supabase
+  keeps their sessions). Fine for testers; revisit with teams.
+- No "you have no password yet" hint: the app can't tell (Supabase doesn't say).
+  A hand-made account without one gets "don't match… tap Forgot password".
+
 ### Next after V138
 V138 = Show me how starts on the page (V137's residuals; Peter 20 Oct: 1A 2A
 3A, all defaults). tour.js: opened `fromPage`, `_tutSteps()` leaves out the walk
@@ -17,9 +42,9 @@ their `run`s first, so the practice stands exactly where the walk leaves it
 back to this page (2A, the six page tutorials). From Tutorials unchanged.
 Scroll left alone (3A — the link is at the top). Harness 77 + M1336–M1343;
 76f retired → 77e.
-**Next (Peter's order, 20 Oct): A password sign-in (with Forgot password;
-Google later) → B Google sign-in → C About/Privacy from the privacy terms
-(waits on the policy) → D Stage 13 pricing round + Stripe account.**
+**Next (Peter's order, 20 Oct): A password sign-in (V139, done) → B Google
+sign-in → C About/Privacy from the privacy terms (waits on the policy) → D
+Stage 13 pricing round + Stripe account.**
 
 ### V138 residuals (known, accepted)
 - Not yet seen on a real iPhone: a tutorial opening straight onto the page

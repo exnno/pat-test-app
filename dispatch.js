@@ -170,6 +170,15 @@ function handleDelegatedChange(e) {
   fn(_fieldValue(el), el, e);
 }
 
+// V139: a <form> never navigates. The cloud sign-in boxes sit in real forms so the
+// iPhone treats them as a sign-in (offers to save / fill from Passwords) and its
+// Go key works: implicit submission clicks the form's submit button, whose
+// data-action runs through handleDelegatedClick like any tap. The submit that
+// follows that click is cancelled here — left alone it would reload the app.
+function handleDelegatedSubmit(e) {
+  if (e && typeof e.preventDefault === 'function') e.preventDefault();
+}
+
 let _delegationInited = false;
 function initDelegation() {
   if (_delegationInited) return;       // idempotent — attach exactly once
@@ -178,6 +187,7 @@ function initDelegation() {
   app.addEventListener('click', handleDelegatedClick);
   app.addEventListener('input', handleDelegatedInput);    // v28 (E3-tail)
   app.addEventListener('change', handleDelegatedChange);  // v28 (E3-tail)
+  app.addEventListener('submit', handleDelegatedSubmit);  // V139
   _delegationInited = true;
 }
 
@@ -907,6 +917,15 @@ registerActions({
   'cloud-send-code':  () => { if (typeof cloudSendCode === 'function') cloudSendCode(); },
   'cloud-verify-code':() => { if (typeof cloudVerifyCode === 'function') cloudVerifyCode(); },
   'cloud-change-email':() => { if (typeof cloudChangeEmail === 'function') cloudChangeEmail(); },
+  // V139: password sign-in, same guarding (MAP rule 6).
+  'cloud-password-sign-in': () => { if (typeof cloudPasswordSignIn === 'function') cloudPasswordSignIn(); },
+  'cloud-forgot':     () => { if (typeof cloudForgotPassword === 'function') cloudForgotPassword(); },
+  'cloud-use-code':   () => { if (typeof cloudUseCode === 'function') cloudUseCode(); },
+  'cloud-use-password':() => { if (typeof cloudUsePassword === 'function') cloudUsePassword(); },
+  'cloud-password-open':  () => { if (typeof cloudPasswordOpen === 'function') cloudPasswordOpen(); },
+  'cloud-password-cancel':() => { if (typeof cloudPasswordCancel === 'function') cloudPasswordCancel(); },
+  'cloud-password-save':  () => { if (typeof cloudPasswordSave === 'function') cloudPasswordSave(); },
+  'cloud-password-toggle':(arg, el) => { if (typeof cloudPasswordToggle === 'function') cloudPasswordToggle(el); },
   'cloud-check':      () => { if (typeof cloudCheckConnection === 'function') cloudCheckConnection(); },
   'cloud-sign-out':   () => { if (typeof cloudSignOut === 'function') cloudSignOut(); },
   // v80: sync (sync.js), same guarding. "Re-send all" ignores the fingerprints
