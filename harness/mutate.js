@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V140';",
-    to:   "const APP_VERSION = 'V139';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V141';",
+    to:   "const APP_VERSION = 'V140';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 79e see it.
-    from: '        <p><strong>V138</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V136</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V137</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 79e)',
+    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141).
+    from: '        <p><strong>V139</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V137</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V138</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 80e)',
   },
 
   {
@@ -6102,9 +6102,10 @@ const MUTATIONS = [
     // V138: welcome rolled (one line) — re-aimed at it; 77e pinned it.
     // V139: welcome rolled (one line) — re-aimed at it; 78e pins it.
     // V140: welcome rolled (one line) — re-aimed at it; 79e pins it.
-    from: "<li><strong>Sign in with Google.</strong>",
+    // V141: welcome rolled (one line) — re-aimed at it; 80e pins it.
+    from: "<li><strong>Privacy policy.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (79e)",
+    why:  "11A: the welcome says plainly what changed on screen (80e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8581,18 +8582,18 @@ const MUTATIONS = [
     name: "M1221 (V132) What's new not rolled",
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
-    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed.
-    from: "const WELCOME_VERSION = 'V140';",
-    to:   "const WELCOME_VERSION = 'V139';",
-    why:  "a behaviour release says what's new (79e)",
+    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed.
+    from: "const WELCOME_VERSION = 'V141';",
+    to:   "const WELCOME_VERSION = 'V140';",
+    why:  "a behaviour release says what's new (80e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
     file: "render-core.js",
-    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's. V138: at V138's. V139: at V139's. V140: at V140's.
-    from: "different from your PATGo one.</li>\n",
-    to:   "different from your PATGo one.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (79e)",
+    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's. V138: at V138's. V139: at V139's. V140: at V140's. V141: at V141's.
+    from: "with a link to read it all.</li>\n",
+    to:   "with a link to read it all.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (80e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8600,9 +8601,10 @@ const MUTATIONS = [
     // V135: V132's line rolled off — re-aimed at V135's. V136: at V136's.
     // V139: V136's line rolled off — re-aimed at V139's own.
     // V140: re-aimed at V140's own (V139's moves to M1259).
-    from: "Cloud accounts can sign in with Google. Connect your Google account once",
+    // V141: re-aimed at V141's own (V140's moves to M1259, V139's to M1238).
+    from: "PATGo has a full privacy policy. About now sums up",
     to:   "Better",
-    why:  "the About page must say what changed in this version (79e)",
+    why:  "the About page must say what changed in this version (80e)",
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8711,16 +8713,18 @@ const MUTATIONS = [
     // V138: V135's line rolled off — re-aimed at V136's, the oldest now.
     // V139: V136's line rolled off — re-aimed at V137's, the oldest now.
     // V140: V137's line rolled off — re-aimed at V138's, the oldest now.
-    from: "Show me how now starts on the page you opened it from",
+    // V141: V138's line rolled off — re-aimed at V139's, the oldest now.
+    from: "Cloud accounts can sign in with an email and password, set or change it on the Account page",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (79e)",
+    why:  "the About page keeps the last three versions' lines (80e)",
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
     file: "render-help.js",
-    from: "A signed-in phone also tells the cloud which version of the app it is running. ",
-    to:   "",
-    why:  "V130's honest Privacy note stays honest (79e)",
+    // V141: the Privacy note became the policy summary — re-aimed at its version line.
+    from: "along with your email address, your plan, and which version of the app each of your phones runs.",
+    to:   "along with your email address and your plan.",
+    why:  "V130's honest Privacy note stays honest — the version report is said (80a)",
   },
 
 
@@ -8850,14 +8854,14 @@ const MUTATIONS = [
     file: "data.js",
     from: "pages: ['settingsTutorials', 'settingsAbout',",
     to:   "pages: ['settingsAbout',",
-    why:  "6A: Settings → Help → Tutorials (79e)",
+    why:  "6A: Settings → Help → Tutorials (80e)",
   },
   {
     name: "M1258 (V134) search can't find the tutorials",
     file: "data.js",
     from: "aliases: 'tutorial tutorials practice practise job learn",
     to:   "aliases: 'learn",
-    why:  "6A: findable in Settings search (79e)",
+    why:  "6A: findable in Settings search (80e)",
   },
   {
     name: "M1259 (V134; re-aimed V137) the About changelog loses this version's line",
@@ -8866,16 +8870,17 @@ const MUTATIONS = [
     // V138: re-aimed at V138's own (V137's is still pinned by 77e).
     // V139: V138's line stays (still in the window); M1223 holds V139's own.
     // V140: V138's line is the oldest now (M1238) — re-aimed at V139's, still in the window.
-    from: "Cloud accounts can sign in with an email and password, set or change it on the Account page",
+    // V141: V139's line is the oldest now (M1238) — re-aimed at V140's, still in the window.
+    from: "Cloud accounts can sign in with Google. Connect your Google account once",
     to:   "Better",
-    why:  "the About page must say what changed in this version (79e)",
+    why:  "the About page must say what changed in this version (80e)",
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
     file: "render-core.js",
     from: "New here? Try the practice job.",
     to:   "New here? Take the 30-second tour.",
-    why:  "6A: setup offers the practice job (79e)",
+    why:  "6A: setup offers the practice job (80e)",
   },
   {
     name: "M1261 (V134) Quit always lands on the Jobs list",
@@ -8994,10 +8999,10 @@ const MUTATIONS = [
   {
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
-    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e).
-    from: "const CACHE_VERSION = 'pat-v140';",
-    to:   "const CACHE_VERSION = 'pat-v139';",
-    why:  "a release needs its cache bump or phones never get it (79e)",
+    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e).
+    from: "const CACHE_VERSION = 'pat-v141';",
+    to:   "const CACHE_VERSION = 'pat-v140';",
+    why:  "a release needs its cache bump or phones never get it (80e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -9071,7 +9076,7 @@ const MUTATIONS = [
     // V136: the page lists two headings (rowsFor) — re-aimed.
     from: "const rows = rowsFor(all.filter((d) => d.settings));",
     to:   "const rows = rowsFor(all.filter((d) => false));",
-    why:  "2A: listed on the Tutorials page (79e)",
+    why:  "2A: listed on the Tutorials page (80e)",
   },
   {
     name: "M1288 (V135) the Tutorials rows aren't wired",
@@ -9411,7 +9416,7 @@ const MUTATIONS = [
     file: "styles.css",
     from: ".tut-howto-row { display: flex; justify-content: center; margin: -4px 0 8px; }",
     to:   "",
-    why:  "2A: one centred line under the title (79e)",
+    why:  "2A: one centred line under the title (80e)",
   },
   // ---- V138 (1A 2A 3A, all defaults): Show me how starts on the page. Group 77 + M1336–M1343. ----
   {
@@ -9517,14 +9522,14 @@ const MUTATIONS = [
     file: "dispatch.js",
     from: "  if (e && typeof e.preventDefault === 'function') e.preventDefault();\n",
     to:   "",
-    why:  "Sign in / Go would submit the form and reload the app mid sign-in (79e)",
+    why:  "Sign in / Go would submit the form and reload the app mid sign-in (80e)",
   },
   {
     name: "M1351 (V139) the password sign-in tap loses its typeof guard",
     file: "dispatch.js",
     from: "'cloud-password-sign-in': () => { if (typeof cloudPasswordSignIn === 'function') cloudPasswordSignIn(); },",
     to:   "'cloud-password-sign-in': () => { cloudPasswordSignIn(); },",
-    why:  "MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (79e)",
+    why:  "MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (80e)",
   },
   {
     name: "M1352 (V139) the password box is not marked current-password",
@@ -9722,6 +9727,98 @@ const MUTATIONS = [
     from: "    try { history.replaceState(null, '', location.pathname); } catch (e) {}   // wipe the tokens from the address",
     to:   "",
     why:  "the session must not sit in the window's address or history (79b)",
+  },
+  // ---- V141 (0A 1A 2A 3A 4A): About → Privacy from the privacy policy. Group 80 + M1380–M1392. ----
+  {
+    name: "M1380 (V141) About → Privacy loses the policy link",
+    file: "render-help.js",
+    from: "        <a class=\"backup-action-btn\" id=\"about-privacy-link\"",
+    to:   "        <a class=\"backup-action-btn\" hidden id=\"x-about-privacy-link\"",
+    why:  "3A: the summary points at the whole policy (80a)",
+  },
+  {
+    name: "M1381 (V141) the policy link opens in place of the app",
+    file: "render-help.js",
+    from: "target=\"_blank\" rel=\"noopener noreferrer\" style=\"margin-top:8px\">${icon('shield-check')}",
+    to:   "rel=\"noopener noreferrer\" style=\"margin-top:8px\">${icon('shield-check')}",
+    why:  "3A: opens in the browser — an installed app that navigates away has no way back (80a)",
+  },
+  {
+    name: "M1382 (V141) the policy link keeps a way back into the app's window",
+    file: "render-help.js",
+    from: "target=\"_blank\" rel=\"noopener noreferrer\" style=\"margin-top:8px\">${icon('shield-check')}",
+    to:   "target=\"_blank\" style=\"margin-top:8px\">${icon('shield-check')}",
+    why:  "a page opened from the app gets no handle on it (80a)",
+  },
+  {
+    name: "M1383 (V141) the policy link loses its words",
+    file: "render-help.js",
+    from: "${icon('shield-check')} Read the full privacy policy</a>",
+    to:   "${icon('shield-check')} More</a>",
+    why:  "3A: the link says what it opens (80a)",
+  },
+  {
+    name: "M1384 (V141) the summary drops where the cloud copy is",
+    file: "render-help.js",
+    from: "a copy is kept in PATGo's cloud, in London, so you can",
+    to:   "a copy is kept in the cloud so you can",
+    why:  "the summary says what the policy says — the cloud is in London (80a)",
+  },
+  {
+    name: "M1385 (V141) the summary drops 'nothing sold or shared'",
+    file: "render-help.js",
+    from: "Nothing is sold or shared, and there are no adverts or tracking. ",
+    to:   "",
+    why:  "the summary says what the policy says (80a)",
+  },
+  {
+    name: "M1386 (V141) a tap on the policy link is taken over by the app",
+    file: "render-help.js",
+    from: "id=\"about-privacy-link\" href=",
+    to:   "id=\"about-privacy-link\" data-action=\"about-reload\" href=",
+    why:  "the link is the browser's to open — a tap must not become an app action (80a)",
+  },
+  {
+    name: "M1387 (V141) PRIVACY_URL goes back to plain http",
+    file: "config.js",
+    from: "const PRIVACY_URL = 'https://www.patgo.co.uk/privacy.html';",
+    to:   "const PRIVACY_URL = 'http://www.patgo.co.uk/privacy.html';",
+    why:  "Google's Branding page and the link both want the https address (80b)",
+  },
+  {
+    name: "M1388 (V141) the policy address is written into About by hand",
+    file: "render-help.js",
+    from: "href=\"${escapeHTML(PRIVACY_URL)}\"",
+    to:   "href=\"https://www.patgo.co.uk/privacy.html\"",
+    why:  "one address, changed in config.js only — the drawn page is the same, the source is not (80b)",
+  },
+  {
+    name: "M1389 (V141) the policy address is drawn unescaped",
+    file: "render-help.js",
+    from: "href=\"${escapeHTML(PRIVACY_URL)}\"",
+    to:   "href=\"${PRIVACY_URL}\"",
+    why:  "anything put into an attribute goes through escapeHTML (80b)",
+  },
+  {
+    name: "M1390 (V141) the policy link is underlined",
+    file: "styles.css",
+    from: "a.backup-action-btn { text-decoration: none; }",
+    to:   "a.backup-action-btn { }",
+    why:  "the link wears the button look (80b)",
+  },
+  {
+    name: "M1391 (V141) Report a problem says job data stays on the phone again",
+    file: "render-help.js",
+    from: ">Reports carry counts and settings only — never client names, sites or asset numbers.",
+    to:   ">Your job data stays on your phone. Reports carry counts and settings only — never client names, sites or asset numbers.",
+    why:  "untrue for anyone signed in to the cloud (80c)",
+  },
+  {
+    name: "M1392 (V141) Settings search can't find About by 'privacy'",
+    file: "data.js",
+    from: "aliases: 'about version changelog whats new privacy policy' }",
+    to:   "aliases: 'about version changelog whats new' }",
+    why:  "the privacy summary is findable in Settings search (80c)",
   },
 ];
 

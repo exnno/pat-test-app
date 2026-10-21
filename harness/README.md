@@ -279,6 +279,13 @@ bug; leaving it red trains everyone to ignore the suite.
   first message has been read. The real pop-up → landing page → hand-over
   round trip was run in Chromium against a stand-in Supabase (Playwright, not
   committed): 26/26, both themes.
+  V141 (group 80): About → Privacy from the privacy policy. One trap: an
+  element fetched by id from a drawn page is a bare stub — no attributes, no
+  dataset — so a tap on it passes whatever the HTML says (a `data-action`
+  written on the link would never be seen). 80a rebuilds the link from the
+  DRAWN tag's own attributes and taps that; M1386 (a data-action on the link)
+  is the proof. The website's privacy.html is not in the repo and nothing
+  checks it — 80a pins the app's summary only.
 
 ---
 
