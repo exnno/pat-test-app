@@ -11,6 +11,10 @@
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
+-- V143: CHECKS 19a–19h NEED supabase/v143-enforcement.sql RUN FIRST (19a names it
+-- if not). B's business is made to look lapsed 20 days ago while B tries every
+-- kind of upload, then put back exactly as it was (19h). On a PASS nothing is
+-- left behind (19e: only if it FAILS is a test file left in B's photo folder).
 -- V142: CHECKS 18a–18f NEED supabase/v142-billing.sql RUN FIRST (18a names it
 -- if not). Nothing is changed: B only tries.
 -- V133: CHECKS 17a–17g NEED supabase/v133-cleanup.sql RUN FIRST (17a names it
@@ -47,6 +51,7 @@ declare
   r text; g text; rn text; reads boolean;           -- V113
   res text[] := '{}';
   rls_off text;
+  lap_b timestamptz; lap_seen timestamptz;          -- V143
 begin
   select id into a from auth.users where lower(email) = lower(email_a);
   select id into b from auth.users where lower(email) = lower(email_b);
@@ -698,6 +703,83 @@ begin
                                                        or (id = org_b and plan is not distinct from rn);
     select count(*) into k from public.organisations where id in (org_a, org_b) and stripe_customer = 'cus_iso';
     res := res || array['18f|A''s and B''s plans are unchanged|' || case when n = 2 and k = 0 then 'PASS|' else 'FAIL|' || n || ' of 2 unchanged' end];
+  end if;
+
+  -- ================================================================ V143
+  -- Enforcement: a locked business's uploads are refused; reading never is.
+  if to_regprocedure('public.can_upload(uuid)') is null then
+    res := res || array['19a|enforcement|FAIL|run supabase/v143-enforcement.sql first'];
+  else
+    org_b := public.default_org(b);
+    select plan, lapsed_at into g, lap_b from public.organisations where id = org_b;
+    -- 19a control: B reads B's own lapse date, the same as the business's.
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      select lapsed_at into lap_seen from public.profiles where id = b;
+      res := res || array['19a|control: B reads B''s own lapse date|' || case when lap_seen is not distinct from lap_b then 'PASS|' || coalesce(lap_seen::text, 'none (not lapsed)') else 'FAIL|read ' || coalesce(lap_seen::text, 'nothing') end];
+    exception when others then
+      res := res || array['19a|control: B reads B''s own lapse date|FAIL|' || sqlerrm];
+    end;
+    execute 'reset role';
+    perform set_config('request.jwt.claims', '', true);
+    -- One job of B's (written as the dashboard, never refused), then B's
+    -- business made to look lapsed 20 days ago.
+    insert into public.sessions (id, user_id, doc, last_modified) values ('iso-test-v143', b, '{"items":[]}', now());
+    update public.organisations set plan = 'lapsed', lapsed_at = now() - interval '20 days' where id = org_b;
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    -- 19b: a new job.
+    begin
+      insert into public.sessions (id, user_id, doc, last_modified) values ('iso-test-v143-new', b, '{}', now());
+      res := res || array['19b|a locked business cannot add a job|FAIL|accepted'];
+    exception when others then
+      res := res || array['19b|a locked business cannot add a job|' || case when sqlerrm like 'patgo_plan_locked%' then 'PASS|refused' else 'FAIL|refused, but not by the plan: ' || sqlerrm end];
+    end;
+    -- 19c: a change to a job already in the cloud.
+    begin
+      update public.sessions set doc = '{"items":[1]}' where user_id = b and id = 'iso-test-v143';
+      get diagnostics n = row_count;
+      res := res || array['19c|…nor change one already in the cloud|' || case when n = 0 then 'FAIL|not reached (0 rows)' else 'FAIL|accepted' end];
+    exception when others then
+      res := res || array['19c|…nor change one already in the cloud|' || case when sqlerrm like 'patgo_plan_locked%' then 'PASS|refused' else 'FAIL|' || sqlerrm end];
+    end;
+    -- 19d: settings and a photo row.
+    k := 0;
+    begin
+      insert into public.records (id, user_id, kind, doc, last_modified) values ('iso-test-v143', b, 'client', '{}', now());
+    exception when others then if sqlerrm like 'patgo_plan_locked%' then k := k + 1; end if;
+    end;
+    begin
+      insert into public.photos (id, user_id, session_id, item_id, storage_path, last_modified)
+      values ('iso-test-v143', b, 'iso-test-v143', 'i1', b::text || '/iso-test-v143.jpg', now());
+    exception when others then if sqlerrm like 'patgo_plan_locked%' then k := k + 1; end if;
+    end;
+    res := res || array['19d|…nor send settings or a photo|' || case when k = 2 then 'PASS|2 refused' else 'FAIL|' || k || ' of 2 refused' end];
+    -- 19e: a photo FILE in B's own folder.
+    begin
+      insert into storage.objects (bucket_id, name) values ('photos', b::text || '/iso-test-v143.jpg');
+      res := res || array['19e|…nor upload a photo file|FAIL|accepted — remove photos/' || b::text || '/iso-test-v143.jpg by hand'];
+    exception when others then
+      res := res || array['19e|…nor upload a photo file|PASS|refused'];
+    end;
+    -- 19f: reading is never refused.
+    select count(*) into n from public.sessions where user_id = b and id = 'iso-test-v143';
+    res := res || array['19f|a locked business still reads its jobs|' || case when n = 1 then 'PASS|' else 'FAIL|read ' || n end];
+    -- 19g: B cannot get round it — its plan and date are not B's to change, and
+    -- the rule itself is not B's to call.
+    k := 0;
+    begin update public.organisations set plan = 'active', lapsed_at = null where id = org_b; get diagnostics n = row_count; k := k + n; exception when others then null; end;
+    begin update public.profiles set lapsed_at = now() where id = b; get diagnostics n = row_count; k := k + n; exception when others then null; end;
+    begin perform public.can_upload(org_b); k := k + 1; exception when others then null; end;
+    res := res || array['19g|B cannot undo its own lock|' || case when k = 0 then 'PASS|3 refused' else 'FAIL|' || k || ' allowed' end];
+    execute 'reset role';
+    perform set_config('request.jwt.claims', '', true);
+    -- 19h: B's business exactly as it was, and B's copy with it.
+    update public.organisations set plan = g, lapsed_at = lap_b where id = org_b;
+    select count(*) into n from public.organisations where id = org_b and plan is not distinct from g and lapsed_at is not distinct from lap_b;
+    select count(*) into k from public.profiles where id = b and plan is not distinct from g and lapsed_at is not distinct from lap_b;
+    res := res || array['19h|B''s plan and lapse date are put back|' || case when n = 1 and k = 1 then 'PASS|' || g else 'FAIL|business ' || n || ', profile ' || k end];
   end if;
 
   delete from public.sessions where id like 'iso-test-%';

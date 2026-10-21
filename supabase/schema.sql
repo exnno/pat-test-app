@@ -999,3 +999,176 @@ grant execute on function public.billing_context(uuid), public.billing_set_custo
                           public.billing_event_log(text, text, uuid, text)
   to service_role;
 grant select, insert, update on public.billing_events to service_role;
+
+
+-- ================================================================ V143
+-- Enforcement: the business keeps the date its paid plan lapsed (phones count
+-- the grace from it), and the database refuses a locked business's uploads 14
+-- days after its plan ended (7 grace + 7 catch-up). Existing projects:
+-- supabase/v143-enforcement.sql (the same, plus self-checks C1–C6). Kept in
+-- step with it by harness group 82.
+
+-- ------------------------------------------------------------ when a paid plan lapsed (3A)
+alter table public.organisations add column if not exists lapsed_at timestamptz;
+alter table public.profiles add column if not exists lapsed_at timestamptz;
+
+-- Entering `lapsed` stamps the moment (unless the same edit sets the date by
+-- hand — testing); any other plan clears it. A business that was already lapsed
+-- before V143 gets its last word from Stripe as the date (below), or now.
+create or replace function public.org_lapsed_at()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if new.plan = 'lapsed' then
+    if tg_op = 'INSERT' then
+      new.lapsed_at := coalesce(new.lapsed_at, now());
+    elsif old.plan is distinct from 'lapsed' and new.lapsed_at is not distinct from old.lapsed_at then
+      new.lapsed_at := now();
+    end if;
+  else
+    new.lapsed_at := null;
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists org_lapsed_at on public.organisations;
+create trigger org_lapsed_at
+  before insert or update on public.organisations
+  for each row execute function public.org_lapsed_at();
+
+update public.organisations set lapsed_at = coalesce(billing_at, now())
+where plan = 'lapsed' and lapsed_at is null;
+
+-- The copies carry the date too (V142's three triggers, one column more). The
+-- date never goes UP from a profile on its own: a hand edit of a profile's plan
+-- still does, and the business then stamps its own date and copies it down.
+create or replace function public.org_plan_to_members()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  update public.profiles p
+  set plan = new.plan, trial_ends_at = new.trial_ends_at, lapsed_at = new.lapsed_at
+  where p.id in (select m.user_id from public.memberships m where m.org_id = new.id and m.is_default)
+    and (p.plan is distinct from new.plan or p.trial_ends_at is distinct from new.trial_ends_at
+         or p.lapsed_at is distinct from new.lapsed_at);
+  return null;
+end;
+$$;
+drop trigger if exists org_plan_to_members on public.organisations;
+create trigger org_plan_to_members
+  after update of plan, trial_ends_at, lapsed_at on public.organisations
+  for each row execute function public.org_plan_to_members();
+
+create or replace function public.member_plan_copy()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if new.is_default then
+    update public.profiles p
+    set plan = o.plan, trial_ends_at = o.trial_ends_at, lapsed_at = o.lapsed_at
+    from public.organisations o
+    where p.id = new.user_id and o.id = new.org_id
+      and (p.plan is distinct from o.plan or p.trial_ends_at is distinct from o.trial_ends_at
+           or p.lapsed_at is distinct from o.lapsed_at);
+  end if;
+  return null;
+end;
+$$;
+
+-- Fill every copy once (a re-run finds nothing to do).
+update public.profiles p
+set lapsed_at = o.lapsed_at
+from public.memberships m
+join public.organisations o on o.id = m.org_id
+where m.user_id = p.id and m.is_default and p.lapsed_at is distinct from o.lapsed_at;
+
+-- Phones read it: on the business (column grant, as V142) and in my_billing.
+grant select (lapsed_at) on public.organisations to authenticated;
+
+create or replace function public.my_billing()
+returns jsonb language sql stable security definer set search_path = '' as $$
+  select jsonb_build_object(
+    'plan', o.plan,
+    'trial_ends_at', o.trial_ends_at,
+    'lapsed_at', o.lapsed_at,
+    'status', o.billing_status,
+    'interval', o.billing_interval,
+    'period_end', o.period_end,
+    'cancel_at_period_end', o.cancel_at_period_end,
+    'has_customer', o.stripe_customer is not null,
+    'has_subscription', o.stripe_subscription is not null,
+    'role', m.role,
+    'can_manage', m.role = 'owner')
+  from public.memberships m
+  join public.organisations o on o.id = m.org_id
+  where m.user_id = auth.uid() and m.is_default
+  limit 1
+$$;
+revoke all on function public.my_billing() from public, anon;
+grant execute on function public.my_billing() to authenticated;
+
+
+-- ------------------------------------------------------------ may this business upload? (1A, 2A)
+-- ⚠ 14 days = the phone's 7 days' grace (PLAN_GRACE_DAYS) + 7 days' catch-up
+-- (2A). Change one and the other must move with it, or a phone that still lets
+-- an engineer log would be refused — or a locked one taken from.
+-- An unknown business, or a lapsed one with no date at all, is let through:
+-- the membership rules already decide WHO may write; this only decides WHEN.
+create or replace function public.can_upload(o uuid)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select coalesce((
+    select case
+      when x.plan in ('active','comped') then true
+      when x.plan = 'trial'  then x.trial_ends_at is null or now() < x.trial_ends_at + interval '14 days'
+      when x.plan = 'lapsed' then x.lapsed_at is null or now() < x.lapsed_at + interval '14 days'
+      else true end
+    from public.organisations x where x.id = o), true)
+$$;
+
+-- Jobs, settings, photo rows: refused on the way in. ⚠ Named so it fires AFTER
+-- org_stamp (same-event triggers run in name order): a new row's business is
+-- only known once the stamp has filled it.
+create or replace function public.plan_guard()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is not null and not public.can_upload(new.org_id) then
+    raise exception 'patgo_plan_locked: this business''s PATGo plan has ended, so the cloud is not taking changes'
+      using errcode = '42501', hint = 'Renew in PATGo: Settings, Account & Sync, Subscription.';
+  end if;
+  return new;
+end;
+$$;
+
+do $$
+declare t text;
+begin
+  foreach t in array array['sessions','records','photos'] loop
+    execute format('drop trigger if exists plan_guard on public.%I', t);
+    execute format('create trigger plan_guard before insert or update on public.%I
+                    for each row execute function public.plan_guard()', t);
+  end loop;
+end $$;
+
+-- Photo files: the person's own folder, while their default business may upload.
+-- Reading and deleting files are unchanged. ⚠ The policy runs as the signed-in
+-- person, who may not call default_org or can_upload directly (closed since
+-- V113) — so it asks this one helper, which reads with the owner's rights. A
+-- policy calling a closed function refuses EVERY upload, paid or not (caught on
+-- the V143 stand-in before it shipped).
+create or replace function public.can_upload_files()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select public.can_upload(public.default_org(auth.uid()))
+$$;
+
+drop policy if exists "add own photo files" on storage.objects;
+drop policy if exists "change own photo files" on storage.objects;
+create policy "add own photo files" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'photos' and (storage.foldername(name))[1] = (select auth.uid())::text
+              and (select public.can_upload_files()));
+create policy "change own photo files" on storage.objects
+  for update to authenticated
+  using      (bucket_id = 'photos' and (storage.foldername(name))[1] = (select auth.uid())::text)
+  with check (bucket_id = 'photos' and (storage.foldername(name))[1] = (select auth.uid())::text
+              and (select public.can_upload_files()));
+
+revoke all on function public.can_upload(uuid), public.can_upload_files(), public.plan_guard()
+  from public, anon, authenticated;
+grant execute on function public.can_upload_files() to authenticated;
