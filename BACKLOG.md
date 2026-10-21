@@ -8,6 +8,41 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V141
+V141 = Stage 12's C (Peter 21 Oct: 0A 1A 2A 3A 4A + peter@patgo.co.uk alongside
+hello@). Claude drafted the privacy policy — WEBSITE file privacy.html for
+patgo.co.uk (DreamHost), NOT in this repo; it replaces the July waitlist page.
+App: About → Privacy = a short summary + "Read the full privacy policy"
+(config.js `PRIVACY_URL`, opens in the browser); Contact's bug-report note no
+longer says job data stays on the phone; search finds About by "privacy".
+Harness 80 + M1380–M1392; 79e retired → 80e. No SQL.
+**Publish the Google app** once the page is live (Google Auth Platform →
+Branding: app name, support email, homepage https://www.patgo.co.uk, privacy
+https://www.patgo.co.uk/privacy.html, authorised domain patgo.co.uk — NO logo,
+which would start brand verification; then Audience → Publish app).
+**Next (Peter's order): D Stage 13 pricing round + Stripe account.** The
+policy's Payments line must be rewritten before payments go live.
+
+### V141 residuals (known, accepted) — promises the policy makes that need work
+- ⚠ The policy says lapsed accounts are deleted 90 days after lapsing and jobs
+  after 7 years. Neither is built (the clean-up job's R8/R7 parts — R8 after
+  billing). R8 must exist, or be done by hand, before any paying account can be
+  90 days lapsed. R7 has nothing to do until 2033.
+- ⚠ Closing an account by email (4A, within 30 days) is done BY HAND, and the
+  database refuses to delete a login that still has work (V113 5A). A written
+  close-an-account procedure (or a one-file SQL helper) is needed before the
+  first request — removes photos' storage files, rows, memberships, then the
+  login. Not built.
+- "If your business needs written terms" — the processor terms (Stage 12,
+  non-code) need writing before someone asks.
+- The ICO registration line is a commented placeholder in privacy.html — add
+  the number once the fee is paid.
+- The in-app summary and the website policy are two copies of the same facts.
+  The app's copy is pinned by 80a; the website's is not checked by anything.
+  Change one, change the other.
+- The landing page's own copy (index.html on DreamHost) was not seen this round
+  — it may still say there is no account or upload. Check it when uploading.
+
 ### Next after V140
 V140 = Google sign-in (Stage 13, B; Peter 21 Oct: 1A 2A 3A, 4→A — Connect Google
 brought in because his main account is a Yahoo address; Q5 dropped: the cloud

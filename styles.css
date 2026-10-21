@@ -1432,6 +1432,8 @@ body.has-update-banner .screen { padding-top: 4rem; }
   gap: 8px;
 }
 .backup-action-btn:active { background: var(--row-active); }
+/* V141: About's privacy link is an <a> wearing the button look — no underline. */
+a.backup-action-btn { text-decoration: none; }
 .backup-action-btn.primary {
   background: var(--accent);
   color: #fff;

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V140)
+# PATGo — Code Map (V141)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -421,6 +421,9 @@ existing fleet. `saveSettings()` writes `SCAN_SPEED_KEY` on every settings save,
 so every phone holds an explicit preset name and never reads
 `SCAN_SPEED_DEFAULT` again — changing a DEFAULT reaches nobody but a fresh
 install. Applies to any tuning value with a stored counterpart. Mutation M85.
+V141: `PRIVACY_URL` — the privacy policy's address. The policy itself is on the
+WEBSITE (patgo.co.uk, DreamHost), not in this repo. Drawn only by render-help.js
+(About → Privacy); 80b fails if any other app file writes the address out.
 Rules 8, 9, 10 above all originate here.
 
 ### data.js (~440 ln) — static tables and lists
@@ -1282,6 +1285,10 @@ V100: the 100 moment (`v100HeroHTML` — also called by **render-core.js**'s wel
 overlays are added to `render()`'s finalHTML in **render-core.js**. Animation is
 CSS transitions started from script (rule 12).
 Boot probe: `renderSettingsAbout` in `requiredFns`.
+V141: About → Privacy is a SUMMARY of the website's privacy policy plus a plain
+`<a target="_blank">` to it (config.js `PRIVACY_URL`; no data-action — the browser
+opens it). ⚠ Keep the summary and the policy saying the same thing: change one,
+change the other. Harness 80a–80e, M1380–M1392.
 
 ### cloud.js (~800 ln) — cloud sign-in — NEW v79, password V139, Google V140
 Sign-in (Supabase): email + password (V139) or an emailed code (v79); session state in `state.cloud`, the TEST strip

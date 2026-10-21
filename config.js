@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V140';
+const APP_VERSION = 'V141';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -133,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V140';
+const WELCOME_VERSION = 'V141';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -380,6 +380,14 @@ const PLAN_REFRESH_MS = 6 * 60 * 60 * 1000;
 // nothing else in the app changes. The account's email is added as ?email=…
 const PLAN_RENEW_URL = '';
 const PLAN_RENEW_EMAIL = 'hello@patgo.co.uk';
+
+// ---- V141: the privacy policy (Stage 12, C) ---------------------------------
+// The full policy lives on the website (patgo.co.uk, DreamHost), not in this
+// repo: Google's Branding page needs it at the homepage's own domain, and the
+// website form is covered by the same page. About → Privacy shows a short
+// summary and opens this in the browser (3A). The www form matches Contact's
+// link, which is known to work. Change it here only — nothing else names it.
+const PRIVACY_URL = 'https://www.patgo.co.uk/privacy.html';
 
 // ---- v80/v81: sync (push and pull — see sync.js) ----------------------------
 // SYNC_STATE_KEY: which account the phone last sent to, a fingerprint of every

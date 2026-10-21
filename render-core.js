@@ -256,7 +256,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Sign in with Google.</strong> If you have a cloud account, tap Connect Google on the Account page once. After that, Continue with Google signs you in, even if your Google email is different from your PATGo one.</li>
+        <li><strong>Privacy policy.</strong> PATGo now has a full privacy policy: what stays on your phone, what goes to the cloud if you sign in, who helps run it and how long things are kept. Settings &rarr; Help &rarr; About sums it up, with a link to read it all.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

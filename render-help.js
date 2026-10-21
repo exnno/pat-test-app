@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V140: rolled forward — V140 on top, V137 dropped. -->
+      <!-- v8: rolling 3-version changelog. V141: rolled forward — V141 on top, V138 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V141</strong> &middot; October 2026</p>
+        <p class="muted">PATGo has a full privacy policy. About now sums up what's kept on your phone and what goes to the cloud if you sign in, with a link to read the whole policy.</p>
         <p><strong>V140</strong> &middot; October 2026</p>
         <p class="muted">Cloud accounts can sign in with Google. Connect your Google account once on the Account page, then Continue with Google signs you in. Disconnect it there any time.</p>
         <p><strong>V139</strong> &middot; October 2026</p>
         <p class="muted">Cloud accounts can sign in with an email and password, set or change it on the Account page, and get back in with an emailed code if it's forgotten. Signing in with a code still works.</p>
-        <p><strong>V138</strong> &middot; October 2026</p>
-        <p class="muted">Show me how now starts on the page you opened it from, not the Settings list, and its last step says Finish brings you back there.</p>
 
 
 
@@ -91,8 +91,11 @@ function renderSettingsAbout() {
 
       <div class="info-card">
         <h3>Privacy</h3>
-        <!-- V130 (4A): honest until the privacy terms replace it (Stage 12). -->
-        <p class="muted">Your test records, settings and saved descriptions are kept on this phone. If you sign in to a cloud account, a copy is also kept there so you can get it back on another phone. A signed-in phone also tells the cloud which version of the app it is running. The app goes online to check for updates. Backups are saved only where you choose to save them.</p>
+        <!-- V141 (Stage 12, C — 3A): a short summary of the privacy policy, which
+             lives on the website (PRIVACY_URL, config.js) and opens in the browser.
+             Keep the two saying the same thing: change the policy, change this. -->
+        <p class="muted" id="about-privacy-summary">Your jobs, photos and settings are kept on this phone. If you sign in, a copy is kept in PATGo's cloud, in London, so you can get it back on another phone &mdash; along with your email address, your plan, and which version of the app each of your phones runs. Nothing is sold or shared, and there are no adverts or tracking. The app goes online to check for updates. Backups are saved only where you choose to save them.</p>
+        <a class="backup-action-btn" id="about-privacy-link" href="${escapeHTML(PRIVACY_URL)}" target="_blank" rel="noopener noreferrer" style="margin-top:8px">${icon('shield-check')} Read the full privacy policy</a>
       </div>
 
       <!-- v8: emergency reload — for the rare case where the app stops responding to
@@ -272,7 +275,7 @@ function renderSettingsContact() {
         <h3>Report a problem</h3>
         <p>Found a bug, or got an idea? Tap below. The app fills in your version, phone and settings automatically — you just describe what happened.</p>
         <button class="bug-report-btn" id="bug-open" data-action="bug-open">${icon('bug')} Report a problem</button>
-        <p class="muted" style="font-size:0.75rem;margin-top:10px">Your job data stays on your phone. Reports carry counts and settings only — never client names, sites or asset numbers.</p>
+        <p class="muted" style="font-size:0.75rem;margin-top:10px">Reports carry counts and settings only — never client names, sites or asset numbers.</p>
       </div>
       ${renderBugSheet()}
     </div>
