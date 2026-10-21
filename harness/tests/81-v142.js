@@ -36,9 +36,7 @@
      81g  the SQL: the plan on the business, the copies, comped and trials kept,
           old subscriptions ignored, the Stripe side closed to the app;
           schema.sql carries every V142 line; isolation 18a–18f.
-     81e  release: V142, cache, What's new (one line), About V142 / V141 /
-          V140, the four taps wired, no Stripe script; plus 80e's lasting
-          checks (80e retired).
+     81e  release: V142 … — retired at V143; its lasting checks are 82e.
 
    Whether the SQL WORKS is proved by its own checks (B1–B6) and isolation
    18a–18f, run in the Supabase SQL editor — at V142 also against a local
@@ -719,93 +717,6 @@ module.exports = async function () {
     for (const c of ['B1', 'B2', 'B3', 'B4', 'B5', 'B6']) t.includes(sql, "'" + c + '|', 'self-check ' + c);
   });
 
-  /* ------------------------------------------------------------------ 81e */
-  await t.group('81e — release: V142, cache, What’s new, About; wiring; no Stripe script (80e’s lasting checks)', async () => {
-    const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V142', 'APP_VERSION V142');
-    t.eq(app.run('WELCOME_VERSION'), 'V142', 'What’s new rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v142';", 'cache key pat-v142');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>Subscriptions.</strong>', '…Subscriptions');
-    t.includes(sheetCopy, 'Settings &rarr; Account &amp; Sync &rarr; Subscription', '…and says where');
-    t.includes(core, 'New here? Try the practice job.', 'setup offers the practice job');
-    t.includes(core, 'You can do it again any time from Settings → Help → Tutorials.', '…and says where it lives');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V142</strong>'), b = help.indexOf('<p><strong>V141</strong>'), c = help.indexOf('<p><strong>V140</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V142, V141, V140');
-    t.excludes(help, '<p><strong>V139</strong>', 'V139 rolled off');
-    t.includes(help, 'Cloud accounts can subscribe from Settings, paying securely through Stripe', 'About: V142’s line');
-    t.includes(help, 'PATGo has a full privacy policy. About now sums up', 'About: V141’s line still there');
-    t.includes(help, 'Cloud accounts can sign in with Google. Connect your Google account once', 'About: V140’s line still there');
-    t.includes(help, 'data-action="settings-page" data-arg="settingsTutorials"', 'About points at Tutorials');
-    const prices = app.run('PLAN_PRICES');
-    t.deepEq({ year: prices.year, month: prices.month }, { year: '£60 a year', month: '£6 a month' }, 'the prices shown match the pricing round (1B)');
+  // 81e retired at V143 → 82e (the release checks move with each release).
 
-    // Stripe-hosted (5A): no Stripe or Google script anywhere in the app.
-    const shipped = read('index.html') + read('plan.js') + read('cloud.js') + read('billing-done.html') + read('signin-done.html');
-    t.notOk(/js\.stripe\.com|<script[^>]+stripe/i.test(shipped), 'no Stripe script in the app (5A)');
-    t.notOk(/accounts\.google\.com\/gsi|<script[^>]+google/i.test(shipped), 'no Google script (V140 1A)');
-    t.notOk(/billing-done\.html/.test(read('sw.js')) || /billing-done\.html/.test(read('index.html')), 'billing-done.html is not in ASSETS or index.html (only opened online)');
-    t.notOk(new RegExp(String.raw`\bconfirm\(|\balert\(|\bprompt\(`).test(read('plan.js') + read('cloud.js')), 'no browser dialogs');
-
-    // The four new taps: wired, guarded, harmless without plan.js (rule 6).
-    const disp = read('dispatch.js');
-    const NEWB = ['billing-subscribe', 'billing-manage', 'billing-card', 'billing-cancel-wait'];
-    for (const n of NEWB) t.ok(new RegExp(`'${n}':\\s*\\(\\) => \\{ if \\(typeof billing\\w+ === 'function'\\)`).test(disp), `${n} wired, typeof-guarded`);
-    const noPlan = bootApp({ skip: ['plan.js'] });
-    noPlan.state = () => noPlan.refresh('state').state;
-    const actsP = noPlan.run('ACTIONS');
-    for (const n of NEWB) t.doesNotThrow(() => actsP[n]('', noPlan.doc.createElement('button')), `${n} harmless without plan.js`);
-    noPlan.state().view = 'cloudSubscription';
-    t.doesNotThrow(() => noPlan.fn('render')(), 'the Subscription page renders without plan.js');
-    t.doesNotThrow(() => noPlan.fn('setView')('cloudSubscription'), '…and opens without it');
-
-    // 80e's lasting checks: every cloud tap from V139 and V140 wired and guarded.
-    const NEW = ['cloud-google', 'cloud-google-connect', 'cloud-google-cancel', 'cloud-google-off',
-                 'cloud-google-keep', 'cloud-google-disconnect',
-                 'cloud-password-sign-in', 'cloud-forgot', 'cloud-use-code', 'cloud-use-password',
-                 'cloud-password-open', 'cloud-password-cancel', 'cloud-password-save', 'cloud-password-toggle'];
-    for (const n of NEW) t.ok(new RegExp(`'${n}':\\s*\\([^)]*\\) => \\{ if \\(typeof cloud\\w+ === 'function'\\)`).test(disp), `${n} wired, typeof-guarded`);
-    const bare = bootApp({ skip: ['cloud.js'] });
-    bare.state = () => bare.refresh('state').state;
-    const actions = bare.run('ACTIONS');
-    for (const n of NEW) t.doesNotThrow(() => actions[n]('', bare.doc.createElement('button')), `${n} harmless without cloud.js`);
-    bare.state().view = 'cloudAccount';
-    t.doesNotThrow(() => bare.fn('render')(), 'Account page renders without cloud.js');
-    bare.state().view = 'cloudSubscription';
-    t.doesNotThrow(() => bare.fn('render')(), 'the Subscription page renders without cloud.js');
-
-    // A form never navigates: the submit that follows Sign in / Go is cancelled at #app.
-    const f = bootApp({});
-    f.state = () => f.refresh('state').state;
-    f.sandbox.localStorage.setItem('pat:cloudUnlocked', '1');
-    f.state().view = 'cloudAccount';
-    f.fn('render')();
-    const ev = { type: 'submit', target: f.doc.createElement('form'), defaultPrevented: false,
-                 preventDefault() { this.defaultPrevented = true; }, stopPropagation() {} };
-    f.doc.getElementById('app').dispatchEvent(ev);
-    t.ok(ev.defaultPrevented, 'a submit on the Account page is cancelled (the app does not reload)');
-
-    // 77e's lasting checks (carried by 78e, 79e, 80e).
-    t.eq(app.run("SETTINGS_CATEGORIES.find(c => c.id === 'catHelp').pages[0]"), 'settingsTutorials', 'Tutorials heads the Help group');
-    const al = ' ' + app.run('SETTINGS_PAGE_META.settingsTutorials.aliases') + ' ';
-    t.ok(/ tutorial /.test(al) && / practice /.test(al), 'search finds it by tutorial or practice');
-    t.ok(/ settings /.test(al) && / instrument /.test(al) && / backup /.test(al), '…and by settings, instrument or backup (V135)');
-    app.fn('setView')('settingsTutorials');
-    const pg = html(app);
-    t.includes(pg, 'data-action="open-practice"', 'the page starts the practice job');
-    t.includes(pg, 'Nothing you do in it is saved', '…and says nothing is kept');
-    const rows = [...pg.slice(0, pg.indexOf('id="tutorials-cloud-list"')).matchAll(/data-action="open-tutorial" data-arg="([^"]+)"/g)].map(m => m[1]);
-    t.deepEq(rows, ['engineer', 'branding', 'content', 'items', 'backup'], 'the page lists the five Settings tutorials under Setting up');
-    t.includes(pg, 'Nothing you do in them is saved', '…and says nothing is kept');
-    t.excludes(pg, 'data-action="tut-show-me-how"', 'the Tutorials page itself has no Show me how');
-    t.eq(app.run('typeof TOUR_SLIDES'), 'undefined', 'the five picture slides stay retired');
-    t.eq(app.run('TUT_STEPS.length'), 21, 'the practice job: 21 steps (V134.1, unchanged)');
-    t.includes(read('styles.css'), '.tut-howto-row {', 'the Show me how line has its own style (V137)');
-    t.includes(disp, "'tut-show-me-how': (arg) => tutShowMeHow(arg),", 'the tap is wired (V137)');
-    t.includes(read('tour.js'), "const TUT_WALK_KEYS = ['group', 'page'];", 'a page tutorial skips the walk (V138)');
-  });
 };
