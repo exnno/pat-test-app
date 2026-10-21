@@ -83,8 +83,7 @@ module.exports = async function () {
     const app = ready();
     const p = draw(app, 'settingsAbout');
     t.excludes(p, 'makes no network calls', 'the old "no network calls" claim is gone');
-    t.includes(p, 'Your test records, settings and saved descriptions are kept on this phone.', 'records: on this phone');
-    t.includes(p, 'If you sign in to a cloud account, a copy is also kept there so you can get it back on another phone.', 'the cloud copy, said plainly');
+    // V141: the records and cloud-copy sentences became the policy summary — 80a.
     t.includes(p, 'The app goes online to check for updates.', 'the update check, said plainly');
     t.includes(p, 'Backups are saved only where you choose to save them.', 'backups: where you choose');
   });
