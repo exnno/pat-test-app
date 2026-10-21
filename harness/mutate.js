@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V141';",
-    to:   "const APP_VERSION = 'V140';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V142';",
+    to:   "const APP_VERSION = 'V141';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141).
-    from: '        <p><strong>V139</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V137</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V138</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 80e)',
+    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142).
+    from: '        <p><strong>V140</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V138</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V139</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 81e)',
   },
 
   {
@@ -6103,9 +6103,10 @@ const MUTATIONS = [
     // V139: welcome rolled (one line) — re-aimed at it; 78e pins it.
     // V140: welcome rolled (one line) — re-aimed at it; 79e pins it.
     // V141: welcome rolled (one line) — re-aimed at it; 80e pins it.
-    from: "<li><strong>Privacy policy.</strong>",
+    // V142: welcome rolled (one line) — re-aimed at it; 81e pins it.
+    from: "<li><strong>Subscriptions.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (80e)",
+    why:  "11A: the welcome says plainly what changed on screen (81e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8582,18 +8583,18 @@ const MUTATIONS = [
     name: "M1221 (V132) What's new not rolled",
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
-    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed.
-    from: "const WELCOME_VERSION = 'V141';",
-    to:   "const WELCOME_VERSION = 'V140';",
-    why:  "a behaviour release says what's new (80e)",
+    // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed.
+    from: "const WELCOME_VERSION = 'V142';",
+    to:   "const WELCOME_VERSION = 'V141';",
+    why:  "a behaviour release says what's new (81e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
     file: "render-core.js",
-    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's. V138: at V138's. V139: at V139's. V140: at V140's. V141: at V141's.
-    from: "with a link to read it all.</li>\n",
-    to:   "with a link to read it all.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (80e)",
+    // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's. V138: at V138's. V139: at V139's. V140: at V140's. V141: at V141's. V142: at V142's.
+    from: "you keep the rest of it.</li>\n",
+    to:   "you keep the rest of it.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (81e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8602,9 +8603,10 @@ const MUTATIONS = [
     // V139: V136's line rolled off — re-aimed at V139's own.
     // V140: re-aimed at V140's own (V139's moves to M1259).
     // V141: re-aimed at V141's own (V140's moves to M1259, V139's to M1238).
-    from: "PATGo has a full privacy policy. About now sums up",
+    // V142: re-aimed at V142's own (V141's moves to M1259, V140's to M1238).
+    from: "Cloud accounts can subscribe from Settings, paying securely through Stripe",
     to:   "Better",
-    why:  "the About page must say what changed in this version (80e)",
+    why:  "the About page must say what changed in this version (81e)",
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8714,9 +8716,10 @@ const MUTATIONS = [
     // V139: V136's line rolled off — re-aimed at V137's, the oldest now.
     // V140: V137's line rolled off — re-aimed at V138's, the oldest now.
     // V141: V138's line rolled off — re-aimed at V139's, the oldest now.
-    from: "Cloud accounts can sign in with an email and password, set or change it on the Account page",
+    // V142: V139's line rolled off — re-aimed at V140's, the oldest now.
+    from: "Cloud accounts can sign in with Google. Connect your Google account once",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (80e)",
+    why:  "the About page keeps the last three versions' lines (81e)",
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8854,14 +8857,14 @@ const MUTATIONS = [
     file: "data.js",
     from: "pages: ['settingsTutorials', 'settingsAbout',",
     to:   "pages: ['settingsAbout',",
-    why:  "6A: Settings → Help → Tutorials (80e)",
+    why:  "6A: Settings → Help → Tutorials (81e)",
   },
   {
     name: "M1258 (V134) search can't find the tutorials",
     file: "data.js",
     from: "aliases: 'tutorial tutorials practice practise job learn",
     to:   "aliases: 'learn",
-    why:  "6A: findable in Settings search (80e)",
+    why:  "6A: findable in Settings search (81e)",
   },
   {
     name: "M1259 (V134; re-aimed V137) the About changelog loses this version's line",
@@ -8871,16 +8874,17 @@ const MUTATIONS = [
     // V139: V138's line stays (still in the window); M1223 holds V139's own.
     // V140: V138's line is the oldest now (M1238) — re-aimed at V139's, still in the window.
     // V141: V139's line is the oldest now (M1238) — re-aimed at V140's, still in the window.
-    from: "Cloud accounts can sign in with Google. Connect your Google account once",
+    // V142: V140's line is the oldest now (M1238) — re-aimed at V141's, still in the window.
+    from: "PATGo has a full privacy policy. About now sums up",
     to:   "Better",
-    why:  "the About page must say what changed in this version (80e)",
+    why:  "the About page must say what changed in this version (81e)",
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
     file: "render-core.js",
     from: "New here? Try the practice job.",
     to:   "New here? Take the 30-second tour.",
-    why:  "6A: setup offers the practice job (80e)",
+    why:  "6A: setup offers the practice job (81e)",
   },
   {
     name: "M1261 (V134) Quit always lands on the Jobs list",
@@ -8999,10 +9003,10 @@ const MUTATIONS = [
   {
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
-    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e).
-    from: "const CACHE_VERSION = 'pat-v141';",
-    to:   "const CACHE_VERSION = 'pat-v140';",
-    why:  "a release needs its cache bump or phones never get it (80e)",
+    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e).
+    from: "const CACHE_VERSION = 'pat-v142';",
+    to:   "const CACHE_VERSION = 'pat-v141';",
+    why:  "a release needs its cache bump or phones never get it (81e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -9076,7 +9080,7 @@ const MUTATIONS = [
     // V136: the page lists two headings (rowsFor) — re-aimed.
     from: "const rows = rowsFor(all.filter((d) => d.settings));",
     to:   "const rows = rowsFor(all.filter((d) => false));",
-    why:  "2A: listed on the Tutorials page (80e)",
+    why:  "2A: listed on the Tutorials page (81e)",
   },
   {
     name: "M1288 (V135) the Tutorials rows aren't wired",
@@ -9416,7 +9420,7 @@ const MUTATIONS = [
     file: "styles.css",
     from: ".tut-howto-row { display: flex; justify-content: center; margin: -4px 0 8px; }",
     to:   "",
-    why:  "2A: one centred line under the title (80e)",
+    why:  "2A: one centred line under the title (81e)",
   },
   // ---- V138 (1A 2A 3A, all defaults): Show me how starts on the page. Group 77 + M1336–M1343. ----
   {
@@ -9522,14 +9526,14 @@ const MUTATIONS = [
     file: "dispatch.js",
     from: "  if (e && typeof e.preventDefault === 'function') e.preventDefault();\n",
     to:   "",
-    why:  "Sign in / Go would submit the form and reload the app mid sign-in (80e)",
+    why:  "Sign in / Go would submit the form and reload the app mid sign-in (81e)",
   },
   {
     name: "M1351 (V139) the password sign-in tap loses its typeof guard",
     file: "dispatch.js",
     from: "'cloud-password-sign-in': () => { if (typeof cloudPasswordSignIn === 'function') cloudPasswordSignIn(); },",
     to:   "'cloud-password-sign-in': () => { cloudPasswordSignIn(); },",
-    why:  "MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (80e)",
+    why:  "MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (81e)",
   },
   {
     name: "M1352 (V139) the password box is not marked current-password",
@@ -9819,6 +9823,336 @@ const MUTATIONS = [
     from: "aliases: 'about version changelog whats new privacy policy' }",
     to:   "aliases: 'about version changelog whats new' }",
     why:  "the privacy summary is findable in Settings search (80c)",
+  },
+  // ---- V142 (pricing 1B 2 3A 4A 5A 6A 7A 8; build 0A 1A 2A 3A 4A 5A 6A 7A): paying. Group 81 + M1393–M1439. ----
+  {
+    name: "M1393 (V142) the Stripe window opens after the app starts waiting, not first in the tap",
+    file: "plan.js",
+    from: "  const w = _billOpenWindow();   // ⚠ synchronously, inside the tap",
+    to:   "  b.pending = kind; const w = _billOpenWindow();",
+    why:  "1A: iOS only opens a window inside the tap — it must be the first thing the tap does (81b)",
+  },
+  {
+    name: "M1394 (V142) the yearly button asks for monthly",
+    file: "plan.js",
+    from: "{ label: PLAN_PRICES.year + ' — two months free', style: 'primary', onPick: () => billingCheckout('year') },",
+    to:   "{ label: PLAN_PRICES.year + ' — two months free', style: 'primary', onPick: () => billingCheckout('month') },",
+    why:  "1A: the button charges what it says (81b)",
+  },
+  {
+    name: "M1395 (V142) Stripe is sent back to the Google page",
+    file: "plan.js",
+    from: "  try { return location.origin + location.pathname.replace(/[^/]*$/, '') + BILLING_RETURN_PAGE; }",
+    to:   "  try { return location.origin + location.pathname.replace(/[^/]*$/, '') + CLOUD_GOOGLE_RETURN_PAGE; }",
+    why:  "the window must come back to billing-done.html, which the server also insists on (81b)",
+  },
+  {
+    name: "M1396 (V142) any address the server returns is opened",
+    file: "plan.js",
+    from: "if (!url || !/^https:\\/\\/(checkout|billing)\\.stripe\\.com\\//.test(url)) {",
+    to:   "if (!url || !/^https:\\/\\//.test(url)) {",
+    why:  "the app only ever opens Stripe's own pages (81b)",
+  },
+  {
+    name: "M1397 (V142) already subscribed: no billing page, just an error",
+    file: "plan.js",
+    from: "          if (said && said.manage && fn !== 'billing-portal') {",
+    to:   "          if (false) {",
+    why:  "a second phone's Subscribe must land on the billing page, not a dead end (81b)",
+  },
+  {
+    name: "M1398 (V142) the return message is taken from any origin",
+    file: "plan.js",
+    from: "  try { if (e.origin !== location.origin) return; } catch (x) { return; }\n  billingReturned(e.data.result);",
+    to:   "  billingReturned(e.data.result);",
+    why:  "only our own billing-done.html may say how it went (81c)",
+  },
+  {
+    name: "M1399 (V142) a return is taken with nothing waiting",
+    file: "plan.js",
+    from: "  if (!b.pending) return false;\n  const kind = b.pending;\n",
+    to:   "  const kind = b.pending || 'checkout';\n",
+    why:  "a stray or second message must do nothing (81c)",
+  },
+  {
+    name: "M1400 (V142) 'paid' believed from the window, not the database",
+    file: "plan.js",
+    from: "    const paid = b.info && (b.info.plan === 'active' || b.info.plan === 'comped');",
+    to:   "    const paid = true;",
+    why:  "only the database, written by the server after Stripe, says paid (81c)",
+  },
+  {
+    name: "M1401 (V142) reading the plan doesn't refresh the plan record",
+    file: "plan.js",
+    from: "      try { planNote({ plan: info.plan, trial_ends_at: info.trial_ends_at }); } catch (e) { /* record only */ }",
+    to:   "",
+    why:  "paying must lift a lock at once, no restart (81c)",
+  },
+  {
+    name: "M1402 (V142) Renew now still opens an email with paying on",
+    file: "plan.js",
+    from: "  if (typeof billingAvailable === 'function' && billingAvailable()) {\n    const b = _bill();",
+    to:   "  if (false) {\n    const b = _bill();",
+    why:  "2A: Renew now is the same choice as Subscribe (81b)",
+  },
+  {
+    name: "M1403 (V142) a failed payment's Renew now opens the billing page, not the card form",
+    file: "plan.js",
+    from: "      return billingManage(b.info.status === 'past_due' ? 'card' : '');",
+    to:   "      return billingManage('');",
+    why:  "4A: a failed payment goes straight to updating the card (81b)",
+  },
+  {
+    name: "M1404 (V142) back from a closed Stripe window, the app keeps waiting",
+    file: "plan.js",
+    from: "    if (state.billing && state.billing.pending && (!_billWindow || _billWindow.closed)) billingCancelWait();",
+    to:   "",
+    why:  "a window closed by hand must not leave the page stuck on 'waiting' (81c)",
+  },
+  {
+    name: "M1405 (V142) a comped account is offered Subscribe",
+    file: "plan.js",
+    from: "    if (info.plan === 'comped') {",
+    to:   "    if (false) {",
+    why:  "comped never pays (81a)",
+  },
+  {
+    name: "M1406 (V142) a team member is offered Subscribe",
+    file: "plan.js",
+    from: "    if (!info.can_manage) {",
+    to:   "    if (false) {",
+    why:  "only the owner pays for the business (81a)",
+  },
+  {
+    name: "M1407 (V142) a failed payment has no Update card",
+    file: "plan.js",
+    from: "        out.actions.push('card');",
+    to:   "",
+    why:  "4A: Update card is the way to fix a failed payment (81a)",
+  },
+  {
+    name: "M1408 (V142) the trial's line forgets the free days are kept",
+    file: "plan.js",
+    from: "      else if (end) out.lines.push(`Your free trial ends on ${end}. Subscribe now and you keep the rest of your free days.`);",
+    to:   "      else if (end) out.lines.push(`Your free trial ends on ${end}.`);",
+    why:  "3A: paying in the trial keeps the rest of it — say so (81a)",
+  },
+  {
+    name: "M1409 (V142) the choice says nothing of the free days",
+    file: "plan.js",
+    from: "      ? `Your free trial carries on — the first payment is taken on ${first}. `",
+    to:   "      ? ''",
+    why:  "3A (81b)",
+  },
+  {
+    name: "M1410 (V142) the refunds link goes to the top of the terms",
+    file: "render-help.js",
+    from: "#refunds\" id=\"billing-terms\"",
+    to:   "\" id=\"billing-terms\"",
+    why:  "the note points at cancelling and refunds (81a)",
+  },
+  {
+    name: "M1411 (V142) the Account page's Subscription › opens Account",
+    file: "render-help.js",
+    from: "id=\"cloud-plan-open\" data-action=\"settings-page\" data-arg=\"cloudSubscription\"",
+    to:   "id=\"cloud-plan-open\" data-action=\"settings-page\" data-arg=\"cloudAccount\"",
+    why:  "2A: the way from Account to the plan (81a)",
+  },
+  {
+    name: "M1412 (V142) the Account page shows the raw plan word",
+    file: "render-help.js",
+    from: "    const planWords = { trial: 'Free trial', active: 'Paid', lapsed: 'Ended', comped: 'Free' }[c.plan] || c.plan;",
+    to:   "    const planWords = c.plan;",
+    why:  "plain words, not database words (81a)",
+  },
+  {
+    name: "M1413 (V142) the waiting card offers Subscribe again",
+    file: "render-help.js",
+    from: "        ${wait || v.actions.map((a) => btn[a] || '').join('')}",
+    to:   "        ${wait}${v.actions.map((a) => btn[a] || '').join('')}",
+    why:  "nothing to tap twice while Stripe's window is open (81a)",
+  },
+  {
+    name: "M1414 (V142) opening the Subscription page doesn't read the plan",
+    file: "session.js",
+    from: "  if (v === 'cloudSubscription' && typeof billingRead === 'function') billingRead();",
+    to:   "",
+    why:  "2A: the page reads the plan on every open (81c)",
+  },
+  {
+    name: "M1415 (V142) Update card opens the plain billing page",
+    file: "dispatch.js",
+    from: "  'billing-card':        () => { if (typeof billingManage === 'function') billingManage('card'); },",
+    to:   "  'billing-card':        () => { if (typeof billingManage === 'function') billingManage(''); },",
+    why:  "4A (81b)",
+  },
+  {
+    name: "M1416 (V142) Subscribe loses its typeof guard",
+    file: "dispatch.js",
+    from: "  'billing-subscribe':   () => { if (typeof billingSubscribe === 'function') billingSubscribe(); },",
+    to:   "  'billing-subscribe':   () => billingSubscribe(),",
+    why:  "MAP rule 6 — with plan.js missing a tap must be a no-op, not a ReferenceError (81e)",
+  },
+  {
+    name: "M1417 (V142) the Subscription row never says the plan",
+    file: "render-settings.js",
+    from: "      try { return (typeof billingRowStatus === 'function' && billingRowStatus()) || 'Your plan'; } catch { return 'Your plan'; }",
+    to:   "      return 'Your plan';",
+    why:  "the Settings row says the plan at a glance (81a)",
+  },
+  {
+    name: "M1418 (V142) the yearly price shown isn't the price agreed",
+    file: "config.js",
+    from: "const PLAN_PRICES = { year: '£60 a year', month: '£6 a month' };",
+    to:   "const PLAN_PRICES = { year: '£80 a year', month: '£6 a month' };",
+    why:  "1B: £6 / £60 — the words must match what Stripe charges (81a 81b 81e)",
+  },
+  {
+    name: "M1419 (V142) billing-done.html passes any result through",
+    file: "billing-done.html",
+    from: "    if (['paid', 'cancelled', 'portal'].indexOf(r) === -1) r = '';\n",
+    to:   "",
+    why:  "only the three results are ever passed on (81c)",
+  },
+  {
+    name: "M1420 (V142) billing-done.html posts to any origin",
+    file: "billing-done.html",
+    from: "window.opener.postMessage(msg, location.origin);",
+    to:   "window.opener.postMessage(msg, '*');",
+    why:  "only our own origin hears how it went (81c)",
+  },
+  {
+    name: "M1421 (V142 server) an old signature is accepted",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  if (Math.abs(nowSeconds - Number(t)) > SIGNATURE_TOLERANCE_SECONDS) return false;\n",
+    to:   "",
+    why:  "a replayed message from Stripe must be refused (81d)",
+  },
+  {
+    name: "M1422 (V142 server) any signature is accepted",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  return sigs.some((s) => timingSafeEqual(s, hex));",
+    to:   "  return sigs.length > 0;",
+    why:  "the webhook would believe anyone who posts to it (81d)",
+  },
+  {
+    name: "M1423 (V142 server) the webhook skips the signature",
+    file: "supabase/functions/_shared/billing.js",
+    from: "    if (!ok) return json({ error: 'bad signature' }, 400);",
+    to:   "",
+    why:  "the webhook would believe anyone who posts to it (81d)",
+  },
+  {
+    name: "M1424 (V142 server) anyone in the business may subscribe",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  if (ctx.role !== 'owner') return { status: 403, error: 'Only your business’s owner can subscribe.' };",
+    to:   "",
+    why:  "only the owner pays for the business (81d)",
+  },
+  {
+    name: "M1425 (V142 server) a comped account may subscribe",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  if (ctx.plan === 'comped') return { status: 409, error: 'Your account is free — there’s nothing to pay.' };",
+    to:   "",
+    why:  "comped never pays (81d)",
+  },
+  {
+    name: "M1426 (V142 server) paying in the trial ends it",
+    file: "supabase/functions/_shared/billing.js",
+    from: "    if (isFinite(end) && end - nowSeconds >= TRIAL_MIN_SECONDS) p.subscription_data.trial_end = end;",
+    to:   "",
+    why:  "3A: the first payment is the day the trial would end (81d)",
+  },
+  {
+    name: "M1427 (V142 server) founders can't type a code",
+    file: "supabase/functions/_shared/billing.js",
+    from: "    allow_promotion_codes: 'true',            // founders' codes (V142 round, 2)",
+    to:   "    allow_promotion_codes: 'false',",
+    why:  "round 2: founders' deals by code at checkout (81d)",
+  },
+  {
+    name: "M1428 (V142 server) Stripe may send people back anywhere",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  if (!allowedOrigins(env).includes(u.origin)) return null;",
+    to:   "",
+    why:  "the return address is ours alone — never one a caller names (81d)",
+  },
+  {
+    name: "M1429 (V142 server) a customer per tap, not per business",
+    file: "supabase/functions/_shared/billing.js",
+    from: "        }, 'patgo-customer-' + ctx.org_id);",
+    to:   "        });",
+    why:  "two taps at once would make two Stripe customers (81d)",
+  },
+  {
+    name: "M1430 (V142 server) the second customer made is used",
+    file: "supabase/functions/_shared/billing.js",
+    from: "        ctx.stripe_customer = await rpc(deps, 'billing_set_customer', { o: ctx.org_id, cus: made.id }) || made.id;",
+    to:   "        await rpc(deps, 'billing_set_customer', { o: ctx.org_id, cus: made.id }); ctx.stripe_customer = made.id;",
+    why:  "the business keeps one Stripe customer (81d)",
+  },
+  {
+    name: "M1431 (V142 server) the webhook trusts the message, not Stripe",
+    file: "supabase/functions/_shared/billing.js",
+    from: "      const sub = await stripe(deps, 'GET', 'subscriptions/' + encodeURIComponent(target.sub));",
+    to:   "      const sub = event.data.object;",
+    why:  "messages arrive late and out of order — Stripe's word NOW decides (81d)",
+  },
+  {
+    name: "M1432 (V142 server) a new secret key is also sent as a JWT",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  return key.startsWith('sb_') ? { apikey: key } : { apikey: key, authorization: 'Bearer ' + key };",
+    to:   "  return { apikey: key, authorization: 'Bearer ' + key };",
+    why:  "Supabase refuses a sb_ key on the Authorization header (81d)",
+  },
+  {
+    name: "M1433 (V142 server) any site may call the functions from a browser",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  if (!allowedOrigins(env).includes(origin)) return {};\n",
+    to:   "",
+    why:  "only the app's own pages are answered (81d)",
+  },
+  {
+    name: "M1434 (V142 server) Update card opens the plain billing page",
+    file: "supabase/functions/_shared/billing.js",
+    from: "      if (body.flow === 'card') params.flow_data = { type: 'payment_method_update' };",
+    to:   "",
+    why:  "4A (81d)",
+  },
+  {
+    name: "M1435 (V142 SQL) Stripe changes a comped account",
+    file: "supabase/v142-billing.sql",
+    from: "  if r.plan <> 'comped' then\n",
+    to:   "  if true then\n",
+    why:  "comped is never changed by Stripe (81g)",
+  },
+  {
+    name: "M1436 (V142 SQL) a failed first payment ends the trial",
+    file: "supabase/v142-billing.sql",
+    from: "    elsif over and r.plan = 'active' then next_plan := 'lapsed';",
+    to:   "    elsif over then next_plan := 'lapsed';",
+    why:  "a trial runs to its own end (81g)",
+  },
+  {
+    name: "M1437 (V142 SQL) phones can read the Stripe ids",
+    file: "supabase/v142-billing.sql",
+    from: "grant select (id, name, created_at, updated_at, plan, trial_ends_at, billing_status,\n              billing_interval,",
+    to:   "grant select (id, name, created_at, updated_at, plan, trial_ends_at, billing_status, stripe_customer,\n              billing_interval,",
+    why:  "the Stripe side is the server's alone (81g)",
+  },
+  {
+    name: "M1438 (V142 SQL) schema.sql misses a V142 trigger",
+    file: "supabase/schema.sql",
+    from: "create trigger profile_plan_up\n  after update of plan, trial_ends_at on public.profiles",
+    to:   "create trigger profile_plan_upx\n  after update of plan, trial_ends_at on public.profiles",
+    why:  "a new project must get every V142 line (81g)",
+  },
+  {
+    name: "M1439 (V142 SQL) the isolation test drops 18e",
+    file: "supabase/isolation-test.sql",
+    from: "    res := res || array['18e|B cannot reach",
+    to:   "    res := res || array['18x|B cannot reach",
+    why:  "every V142 isolation check stays in the test (81g)",
   },
 ];
 

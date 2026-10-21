@@ -286,6 +286,18 @@ bug; leaving it red trains everyone to ignore the suite.
   DRAWN tag's own attributes and taps that; M1386 (a data-action on the link)
   is the proof. The website's privacy.html is not in the repo and nothing
   checks it — 80a pins the app's summary only.
+  V142 (group 81): paying. Two things new here. (1) SERVER code is tested:
+  81d `import()`s `supabase/functions/_shared/billing.js` (plain ES module,
+  no Deno at import time) and runs the three handlers against a pretend
+  Stripe and database (`serverDeps`) — `Request` / `Response` / WebCrypto are
+  Node's own. The real Deno runtime is only exercised on Supabase. (2) The
+  Stripe window is the V140 window: `installWindow` records `openedWhile`
+  (`state.billing.pending` at the moment of `window.open`) — '' proves the
+  window opened before the app started waiting, i.e. first in the tap.
+  `_planOnVisible` returns early unless `document.visibilityState` is
+  'visible' — the stub leaves it undefined, so set it on `app.doc`. The SQL's
+  real behaviour (copies, comped, trial, old subscriptions, isolation 18a–18f)
+  was proved against a local Postgres 16 stand-in, not here; 81g pins the text.
 
 ---
 
