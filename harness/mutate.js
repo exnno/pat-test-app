@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V144';",
-    to:   "const APP_VERSION = 'V143';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V145';",
+    to:   "const APP_VERSION = 'V144';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -640,9 +640,9 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143).
-    from: '        <p><strong>V142</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V140</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V141</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 83e)',
+    from: '        <p><strong>V143</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V141</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V142</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 84e)',
   },
 
   {
@@ -1031,8 +1031,9 @@ const MUTATIONS = [
   {
     name: 'M137 (V79) a cloud dispatch handler loses its typeof guard',
     file: 'dispatch.js',
-    from: "'cloud-sign-out':   () => { if (typeof cloudSignOut === 'function') cloudSignOut(); },",
-    to:   "'cloud-sign-out':   () => { cloudSignOut(); },",
+    // V145: re-aimed — the button now asks first (cloudSignOutAsk, then cloudSignOut).
+    from: "'cloud-sign-out':   () => { if (typeof cloudSignOutAsk === 'function') cloudSignOutAsk(); else if (typeof cloudSignOut === 'function') cloudSignOut(); },",
+    to:   "'cloud-sign-out':   () => { cloudSignOutAsk(); },",
     why:  'MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (15i)',
   },
   {
@@ -1045,7 +1046,8 @@ const MUTATIONS = [
   {
     name: 'M139 (V79) sign-out relies on the library alone',
     file: 'cloud.js',
-    from: '      doomed.forEach((k) => localStorage.removeItem(k));\n',
+    // V145: re-aimed — the sweep moved into _cloudSweepLogin (shared with the refusal).
+    from: '    doomed.forEach((k) => localStorage.removeItem(k));\n',
     to:   '',
     why:  'signing out offline (library never loaded) would silently leave the session in place (15c)',
   },
@@ -2049,8 +2051,9 @@ const MUTATIONS = [
   {
     name: "M275 (V84) nothing-made records are pushed while unsent",
     file: "sync.js",
-    from: "if (!rs.sent[id] && !rs.resend[id] && _syncNothingMade(kind, id, r)) continue;",
-    to:   "",
+    // V145: context added — syncOwnerPending repeats the test (it counts what this would send).
+    from: "// v84 5A: nothing anyone made, and never sent — nothing to send.\n      if (!rs.sent[id] && !rs.resend[id] && _syncNothingMade(kind, id, r)) continue;",
+    to:   "// v84 5A: nothing anyone made, and never sent — nothing to send.\n",
     why:  "a fresh phone pushes defaults over the account (or makes the branded phone's first sync a question) (21d)",
   },
   {
@@ -4966,8 +4969,9 @@ const MUTATIONS = [
   {
     name: "M688 (V105) a file restore keeps no safety copy",
     file: "backup.js",
-    from: "      onConfirm: () => restoreWithSafetyCopy(() => applyBackupData(data, { markExported: true })),",
-    to:   "      onConfirm: () => applyBackupData(data, { markExported: true }),",
+    // V145: re-aimed — the apply also adopts the backup's account (7A).
+    from: "      onConfirm: () => restoreWithSafetyCopy(() => {\n        applyBackupData(data, { markExported: true });",
+    to:   "      onConfirm: () => ((f) => f())(() => {\n        applyBackupData(data, { markExported: true });",
     why:  "6A: a wrong restore could not be undone (42f)",
   },
   {
@@ -5148,8 +5152,9 @@ const MUTATIONS = [
   {
     name: "M714 (V106) boot does not delete the databases",
     file: "reset.js",
-    from: "  _resetWipeLocal(m.level, m.cert);\n  _resetDeleteDatabases();\n",
-    to:   "  _resetWipeLocal(m.level, m.cert);\n",
+    // V145: re-aimed — the owner is re-stamped between the wipe and the databases.
+    from: "  _resetAfterWipe(m);\n  _resetDeleteDatabases();\n",
+    to:   "  _resetAfterWipe(m);\n",
     why:  "the empty databases stay behind (43e)",
   },
   {
@@ -5190,8 +5195,9 @@ const MUTATIONS = [
   {
     name: "M720 (V106) the work level sweeps everything",
     file: "reset.js",
-    from: "  if (level === 'work') {\n    const work",
-    to:   "  if (level === 'work-x') {\n    const work",
+    // V145: re-aimed — the handover branch comes first now.
+    from: "  } else if (level === 'work') {\n    const work",
+    to:   "  } else if (level === 'work-x') {\n    const work",
     why:  "Clear my work would take the settings and the sign-in too (43b)",
   },
   {
@@ -6107,10 +6113,11 @@ const MUTATIONS = [
     // V141: welcome rolled (one line) — re-aimed at it; 80e pins it.
     // V142: welcome rolled (one line) — re-aimed at it; 81e pins it.
     // V143: welcome rolled (one line) — re-aimed at it; 82e pins it.
-    // V144: welcome rolled (two lines) — re-aimed at the first; 83e pins it.
-    from: "<li><strong>Create an account.</strong>",
+    // V144: welcome rolled (two lines) — re-aimed at the first; 84e pins it.
+    // V145: welcome rolled (two lines) — re-aimed at the first; 84e pins it.
+    from: "<li><strong>Your jobs stay yours.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (83e)",
+    why:  "11A: the welcome says plainly what changed on screen (84e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8589,18 +8596,19 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V144';",
-    to:   "const WELCOME_VERSION = 'V143';",
-    why:  "a behaviour release says what's new (83e)",
+    from: "const WELCOME_VERSION = 'V145';",   // V145: re-aimed
+    to:   "const WELCOME_VERSION = 'V144';",
+    why:  "a behaviour release says what's new (84e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
     file: "render-core.js",
     // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's. V138: at V138's. V139: at V139's. V140: at V140's. V141: at V141's. V142: at V142's. V143: at V143's.
     // V144: two lines — re-aimed at the second's end; still caught by the count.
-    from: "subscribing ends with a proper thank-you.</li>\n",
-    to:   "subscribing ends with a proper thank-you.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "two lines (83e)",
+    // V145: two lines again — re-aimed at the second's end.
+    from: "Backups now remember which account they belong to.</li>\n",
+    to:   "Backups now remember which account they belong to.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "two lines (84e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8611,9 +8619,10 @@ const MUTATIONS = [
     // V141: re-aimed at V141's own (V140's moves to M1259, V139's to M1238).
     // V142: re-aimed at V142's own (V141's moves to M1259, V140's to M1238).
     // V143: re-aimed at V143's own (V142's moves to M1259, V141's to M1238).
-    from: "You can create your own cloud account from Settings, by email or with Google",
+    // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
+    from: "A phone&rsquo;s jobs belong to one account, and are never sent into another.",
     to:   "Better",
-    why:  "the About page must say what changed in this version (83e)",   // V144: re-aimed at V144's line
+    why:  "the About page must say what changed in this version (84e)",   // V145: re-aimed at V145's line
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8725,9 +8734,10 @@ const MUTATIONS = [
     // V141: V138's line rolled off — re-aimed at V139's, the oldest now.
     // V142: V139's line rolled off — re-aimed at V140's, the oldest now.
     // V143: V140's line rolled off — re-aimed at V141's, the oldest now.
-    from: "Cloud accounts can subscribe from Settings, paying securely through Stripe",
+    // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
+    from: "PATGo confirms your plan online at least once every 30 days. When a subscription ends",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (83e)",   // V144: re-aimed at V142's, the oldest now
+    why:  "the About page keeps the last three versions' lines (84e)",   // V145: re-aimed at V143's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8865,14 +8875,14 @@ const MUTATIONS = [
     file: "data.js",
     from: "pages: ['settingsTutorials', 'settingsAbout',",
     to:   "pages: ['settingsAbout',",
-    why:  "6A: Settings → Help → Tutorials (83e)",
+    why:  "6A: Settings → Help → Tutorials (84e)",
   },
   {
     name: "M1258 (V134) search can't find the tutorials",
     file: "data.js",
     from: "aliases: 'tutorial tutorials practice practise job learn",
     to:   "aliases: 'learn",
-    why:  "6A: findable in Settings search (83e)",
+    why:  "6A: findable in Settings search (84e)",
   },
   {
     name: "M1259 (V134; re-aimed V137) the About changelog loses this version's line",
@@ -8884,16 +8894,17 @@ const MUTATIONS = [
     // V141: V139's line is the oldest now (M1238) — re-aimed at V140's, still in the window.
     // V142: V140's line is the oldest now (M1238) — re-aimed at V141's, still in the window.
     // V143: V141's line is the oldest now (M1238) — re-aimed at V142's, still in the window.
-    from: "PATGo confirms your plan online at least once every 30 days. When a subscription ends",
+    // V145: re-aimed at V144's, still in the window.
+    from: "You can create your own cloud account from Settings, by email or with Google",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (83e)",   // V144: re-aimed at V143's
+    why:  "the About page keeps the last three versions' lines (84e)",   // V145: re-aimed at V144's
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
     file: "render-core.js",
     from: "New here? Try the practice job.",
     to:   "New here? Take the 30-second tour.",
-    why:  "6A: setup offers the practice job (83e)",
+    why:  "6A: setup offers the practice job (84e)",
   },
   {
     name: "M1261 (V134) Quit always lands on the Jobs list",
@@ -9012,10 +9023,10 @@ const MUTATIONS = [
   {
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
-    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 83e).
-    from: "const CACHE_VERSION = 'pat-v144';",
-    to:   "const CACHE_VERSION = 'pat-v143';",
-    why:  "a release needs its cache bump or phones never get it (83e)",
+    // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
+    from: "const CACHE_VERSION = 'pat-v145';",   // V145: re-aimed (→ 84e)
+    to:   "const CACHE_VERSION = 'pat-v144';",
+    why:  "a release needs its cache bump or phones never get it (84e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -9089,7 +9100,7 @@ const MUTATIONS = [
     // V136: the page lists two headings (rowsFor) — re-aimed.
     from: "const rows = rowsFor(all.filter((d) => d.settings));",
     to:   "const rows = rowsFor(all.filter((d) => false));",
-    why:  "2A: listed on the Tutorials page (83e)",
+    why:  "2A: listed on the Tutorials page (84e)",
   },
   {
     name: "M1288 (V135) the Tutorials rows aren't wired",
@@ -9429,7 +9440,7 @@ const MUTATIONS = [
     file: "styles.css",
     from: ".tut-howto-row { display: flex; justify-content: center; margin: -4px 0 8px; }",
     to:   "",
-    why:  "2A: one centred line under the title (83e)",
+    why:  "2A: one centred line under the title (84e)",
   },
   // ---- V138 (1A 2A 3A, all defaults): Show me how starts on the page. Group 77 + M1336–M1343. ----
   {
@@ -9505,7 +9516,8 @@ const MUTATIONS = [
   {
     name: "M1346 (V139) a Forgot sign-in does not open Choose a new password",
     file: "cloud.js",
-    from: "      if (forgot) _cloudSet({ pwOpen: true, pwReset: true });\n",
+    // V145: re-aimed — the flags are gathered, then applied if the sign-in stands.
+    from: "      if (forgot) Object.assign(after, { pwOpen: true, pwReset: true });\n",
     to:   "",
     why:  "2A: signed in by the code, then left to find the password card alone (78c)",
   },
@@ -9535,14 +9547,14 @@ const MUTATIONS = [
     file: "dispatch.js",
     from: "  if (e && typeof e.preventDefault === 'function') e.preventDefault();\n",
     to:   "",
-    why:  "Sign in / Go would submit the form and reload the app mid sign-in (83e)",
+    why:  "Sign in / Go would submit the form and reload the app mid sign-in (84e)",
   },
   {
     name: "M1351 (V139) the password sign-in tap loses its typeof guard",
     file: "dispatch.js",
     from: "'cloud-password-sign-in': () => { if (typeof cloudPasswordSignIn === 'function') cloudPasswordSignIn(); },",
     to:   "'cloud-password-sign-in': () => { cloudPasswordSignIn(); },",
-    why:  "MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (83e)",
+    why:  "MAP rule 6 — with cloud.js missing a tap must be a no-op, not a ReferenceError (84e)",
   },
   {
     name: "M1352 (V139) the password box is not marked current-password",
@@ -10001,7 +10013,7 @@ const MUTATIONS = [
     file: "dispatch.js",
     from: "  'billing-subscribe':   () => { if (typeof billingSubscribe === 'function') billingSubscribe(); },",
     to:   "  'billing-subscribe':   () => billingSubscribe(),",
-    why:  "MAP rule 6 — with plan.js missing a tap must be a no-op, not a ReferenceError (83e)",
+    why:  "MAP rule 6 — with plan.js missing a tap must be a no-op, not a ReferenceError (84e)",
   },
   {
     name: "M1417 (V142) the Subscription row never says the plan",
@@ -10015,7 +10027,7 @@ const MUTATIONS = [
     file: "config.js",
     from: "const PLAN_PRICES = { year: '£60 a year', month: '£6 a month' };",
     to:   "const PLAN_PRICES = { year: '£80 a year', month: '£6 a month' };",
-    why:  "1B: £6 / £60 — the words must match what Stripe charges (81a 81b 83e)",
+    why:  "1B: £6 / £60 — the words must match what Stripe charges (81a 81b 84e)",
   },
   {
     name: "M1419 (V142) billing-done.html passes any result through",
@@ -10422,7 +10434,7 @@ const MUTATIONS = [
     file: "dispatch.js",
     from: "  'plan-check': () => { if (typeof planCheckNow === 'function') planCheckNow(); },   // V143 (4A)",
     to:   "  'plan-check': () => {},   // V143 (4A)",
-    why:  "4A: the button must read the plan (82b 83e)",
+    why:  "4A: the button must read the plan (82b 84e)",
   },
   {
     name: "M1477 (V143) the hold waits 60 days",
@@ -10519,15 +10531,15 @@ const MUTATIONS = [
   {
     name: "M1490 (V144) a new account isn't asked for a password",
     file: "cloud.js",
-    from: "        if (cloudIsNewAccount(user)) _cloudSet({ pwOpen: true, pwReset: false, pwNew: true, welcome: 'due' });",
-    to:   "        if (cloudIsNewAccount(user)) _cloudSet({ welcome: 'due' });",
+    from: "        if (cloudIsNewAccount(user)) Object.assign(after, { pwOpen: true, pwReset: false, pwNew: true, welcome: 'due' });",   // V145: re-aimed
+    to:   "        if (cloudIsNewAccount(user)) Object.assign(after, { welcome: 'due' });",
     why:  "2A: a new account isn't finished until it has a password (83b)",
   },
   {
     name: "M1491 (V144) an account that already existed is made to choose a new password",
     file: "cloud.js",
-    from: "        else _cloudSet({ welcome: 'had' });   // said after the plan read (it clears the line)",
-    to:   "        else _cloudSet({ pwOpen: true, pwNew: true, welcome: 'had' });",
+    from: "        else after.welcome = 'had';   // said after the plan read (it clears the line)",   // V145: re-aimed
+    to:   "        else Object.assign(after, { pwOpen: true, pwNew: true, welcome: 'had' });",
     why:  "1A: nobody's password is replaced from the Create card (83b)",
   },
   {
@@ -10568,7 +10580,7 @@ const MUTATIONS = [
   {
     name: "M1497 (V144) a Google-made account gets no welcome",
     file: "cloud.js",
-    from: "      if (cloudIsNewAccount(user)) _cloudSet({ welcome: 'due' });\n",
+    from: "        if (stands) _cloudSet({ welcome: 'due' });\n",   // V145: re-aimed
     to:   "\n",
     why:  "3A 6A: Google makes accounts too, and they are welcomed (83c)",
   },
@@ -10603,15 +10615,15 @@ const MUTATIONS = [
   {
     name: "M1502 (V144) signing in leaves the Create card open",
     file: "cloud.js",
-    from: "    signup: false, pwNew: false, welcome: '' });                          // V144",
-    to:   "    pwNew: false, welcome: '' });                          // V144",
+    from: "    signup: false, pwNew: false, welcome: '', handover: null });          // V144, V145",   // V145: re-aimed
+    to:   "    pwNew: false, welcome: '', handover: null });          // V144, V145",
     why:  "the next code request after signing in would create (83b)",
   },
   {
     name: "M1503 (V144) signing out keeps the half-made sign-up",
     file: "cloud.js",
-    from: "      signup: false, pwNew: false, welcome: '' });                    // V144",
-    to:   "      welcome: '' });                    // V144",
+    from: "      signup: false, pwNew: false, welcome: '',                       // V144",   // V145: re-aimed
+    to:   "      welcome: '',                       // V144",
     why:  "a signed-out phone must not carry a password card or a welcome (83b)",
   },
   {
@@ -10773,14 +10785,14 @@ const MUTATIONS = [
     file: "styles.css",
     from: ".plan-happy-body { margin: 0 0 16px; }",
     to:   ".plan-happy { margin: 0 0 16px; }",
-    why:  "6A 8A: the sheets' paragraphs (83e)",
+    why:  "6A 8A: the sheets' paragraphs (84e)",
   },
   {
     name: "M1527 (V144) the trial is 14 days in the words",
     file: "config.js",
     from: "const PLAN_TRIAL_DAYS = 30;",
     to:   "const PLAN_TRIAL_DAYS = 14;",
-    why:  "the words must match the 30 days handle_new_user gives (83a 83e)",
+    why:  "the words must match the 30 days handle_new_user gives (83a 84e)",
   },
   {
     name: "M1528 (V144) the Create card is open by default",
@@ -10802,6 +10814,238 @@ const MUTATIONS = [
     from: "  'cloud-signup-close': () => { if (typeof cloudSignupClose === 'function') cloudSignupClose(); },",
     to:   "  'cloud-signup-close': () => {},",
     why:  "back to Sign in (83a)",
+  },
+  // ---- V145 (1A 2A 3A 4A 5A 7A 8A): one owner per phone. Group 84 + M1531–M1563. ----
+  {
+    name: "M1531 (V145) syncActive forgets the owner",
+    file: "sync.js",
+    from: "      && (typeof cloudOwnerAllows !== 'function' || cloudOwnerAllows(_syncCurrentUserId()));",
+    to:   "      && true;",
+    why:  "the trigger guard: a save, a screen change or the idle backstop would start a run as a signed-in account that isn't the phone's owner (84a)",
+  },
+  {
+    name: "M1532 (V145) _syncRun files writes under a session that isn't the owner's",
+    file: "sync.js",
+    from: "    if (typeof cloudOwnerAllows === 'function' && !cloudOwnerAllows(uid)) {",
+    to:   "    if (false) {",
+    why:  "the last guard — the live session is what a write is filed under; the bug Peter found was exactly this (84a)",
+  },
+  {
+    name: "M1533 (V145) cloudOwnerAllows lets any account",
+    file: "cloud.js",
+    from: "  return !o || o.id === uid;",
+    to:   "  return true;",
+    why:  "1A: the phone's owner is the only account that may sync it (84a)",
+  },
+  {
+    name: "M1534 (V145) first run ignores the account the phone last synced to",
+    file: "cloud.js",
+    from: "  if (st && typeof st.userId === 'string' && st.userId) cloudOwnerSet(st.userId, '');",
+    to:   "",
+    why:  "a phone signed out before V145 would be adopted by whoever signs in next, with the last account's jobs on it (84a)",
+  },
+  {
+    name: "M1535 (V145) boot keeps a stored login that isn't the owner's",
+    file: "cloud.js",
+    from: "  if (own && stored.id && own.id !== stored.id) {",
+    to:   "  if (false) {",
+    why:  "the app closed while the takeover was asked: next start would be signed in as the other account (84a)",
+  },
+  {
+    name: "M1536 (V145) the landing adopts a phone that already has an owner",
+    file: "cloud.js",
+    from: "  if (!o) { cloudOwnerSet(uid, addr); return true; }      // 8A: adopted",
+    to:   "  { cloudOwnerSet(uid, addr); return true; }      // 8A: adopted",
+    why:  "1A: THE bug — another account signs in and the owner's jobs go up as its own (84c)",
+  },
+  {
+    name: "M1537 (V145) the takeover is never asked — refused even when all is safe",
+    file: "cloud.js",
+    from: "  if (p && p.total === 0) {\n    _cloudSet({ handover: { id: uid, email: addr, from: o.email || '' } });   // 2A: asked",
+    to:   "  if (false) {\n    _cloudSet({ handover: { id: uid, email: addr, from: o.email || '' } });   // 2A: asked",
+    why:  "2A: a phone whose owner's work is all safe could never be handed on (84c)",
+  },
+  {
+    name: "M1538 (V145) a refused login is left on the phone",
+    file: "cloud.js",
+    from: "  // 1A: refused. Nothing of the owner's has been read, shown or sent as this account.\n  _cloudForgetLogin();",
+    to:   "  // 1A: refused. Nothing of the owner's has been read, shown or sent as this account.",
+    why:  "1A: signed straight back out — the login must not stay behind (84c)",
+  },
+  {
+    name: "M1539 (V145) a sign-in being asked about goes on to read and sync",
+    file: "cloud.js",
+    from: "  if (state.cloud.status !== 'signed-in' || state.cloud.handover) return ok;",
+    to:   "  if (state.cloud.status !== 'signed-in') return ok;",
+    why:  "2A: nothing is read or sent as the asking account until it is the owner (84c)",
+  },
+  {
+    name: "M1540 (V145) Use doesn't count again before wiping",
+    file: "cloud.js",
+    from: "  const p = o ? _cloudOwnerPending(o.id) : { total: 0 };\n  if (!p || p.total > 0) {",
+    to:   "  const p = { total: 0 };\n  if (!p || p.total > 0) {",
+    why:  "a job logged while the question was up would be wiped unsent (84c)",
+  },
+  {
+    name: "M1541 (V145) Cancel leaves the asking account signed in",
+    file: "cloud.js",
+    from: "  const who = cloudOwnerName();\n  return cloudSignOut().then(() => {",
+    to:   "  const who = cloudOwnerName();\n  return Promise.resolve().then(() => {",
+    why:  "2A: Cancel = the phone stays its owner's; the other account is signed out (84c)",
+  },
+  {
+    name: "M1542 (V145) the new account's next step is lost in the restart",
+    file: "reset.js",
+    from: "    _resetCarry = (m.carry && typeof m.carry === 'object') ? m.carry : null;   // cloud.js takes it at boot",
+    to:   "    _resetCarry = null;",
+    why:  "a new account made on someone else's phone would land with no password and no welcome (84c)",
+  },
+  {
+    name: "M1543 (V145) the handover keeps the jobs",
+    file: "reset.js",
+    from: "      if (k === RESET_PENDING_KEY || keep.has(k)) continue;",
+    to:   "      if (k === RESET_PENDING_KEY || keep.has(k) || k === STORAGE_KEY) continue;",
+    why:  "2A 5A: the old owner's jobs would show for the new account, then sync into it (84c)",
+  },
+  {
+    name: "M1544 (V145) the handover forgets the phone's look",
+    file: "reset.js",
+    from: "  'THEME_KEY', 'TEXT_SIZE_KEY', 'HAPTICS_KEY',",
+    to:   "  'TEXT_SIZE_KEY', 'HAPTICS_KEY',",
+    why:  "5A: this phone's own preferences stay — they don't sync, so they'd be lost for good (84e)",
+  },
+  {
+    name: "M1545 (V145) the handover doesn't make the new account the owner",
+    file: "reset.js",
+    from: "    if (typeof cloudOwnerSet === 'function') cloudOwnerSet(o.id, o.email || '');\n    else localStorage",
+    to:   "    if (false) cloudOwnerSet(o.id, o.email || '');\n    else if (false) localStorage",
+    why:  "the phone would be ownerless after a takeover: half the guard gone (84c)",
+  },
+  {
+    name: "M1546 (V145) the leaving owner's stats are not kept aside",
+    file: "reset.js",
+    from: "  delete held[ownerId];\n  held[ownerId] = bucket;   // newest last",
+    to:   "  delete held[ownerId];",
+    why:  "Q6: the old owner's lifetime figures would be wiped for good, not returned when it signs in here again (84c)",
+  },
+  {
+    name: "M1547 (V145) setup changes don't count as unsent",
+    file: "sync.js",
+    from: "      if (rs.resend[id] || rs.sent[id] !== syncHash(_syncCanonical(doc))) out.other++;",
+    to:   "",
+    why:  "a new client or instrument would be wiped by a takeover, unsent (84b)",
+  },
+  {
+    name: "M1548 (V145) photos not yet up don't count",
+    file: "sync.js",
+    from: "  else for (const n of pend.values()) out.photos += n;",
+    to:   "",
+    why:  "a fail's photo evidence would be wiped by a takeover, unsent (84b)",
+  },
+  {
+    name: "M1549 (V145) held entries don't count",
+    file: "sync.js",
+    from: "  out.other += held.filter(e => e.kind !== 'session').length;",
+    to:   "",
+    why:  "an unanswered Sync-page question would be wiped by a takeover (84b)",
+  },
+  {
+    name: "M1550 (V145) bookkeeping that isn't the owner's is trusted",
+    file: "sync.js",
+    from: "  const mine = !!ownerId && st.userId === ownerId;",
+    to:   "  const mine = !!ownerId;",
+    why:  "another account's sent-list says nothing about what THIS owner's cloud holds (84b)",
+  },
+  {
+    name: "M1551 (V145) an unsent delete doesn't count",
+    file: "sync.js",
+    from: "        if (st.resend[id] || (st.sent[id] && !st.gone[id])) out.other++;",
+    to:   "",
+    why:  "a delete the cloud never heard of — the job comes back for the owner on another phone (84b)",
+  },
+  {
+    name: "M1552 (V145) the photo index still loading counts as safe",
+    file: "sync.js",
+    from: "  if (pend === null) { if (typeof photosSupported === 'function') out.other++; }",
+    to:   "  if (pend === null) { }",
+    why:  "unknown is never safe — a takeover mid-load could wipe photos not yet up (84b)",
+  },
+  {
+    name: "M1553 (V145) Sign out skips the last sync",
+    file: "cloud.js",
+    from: "      syncWhenIdle(() => syncPush({ pull: true })).catch(() => null),",
+    to:   "      Promise.resolve(),",
+    why:  "4A: the warning would show for work that could have gone up there and then (84d)",
+  },
+  {
+    name: "M1554 (V145) Sign out never warns",
+    file: "cloud.js",
+    from: "    if (p && p.total === 0) return cloudSignOut();\n    _cloudRepaint();",
+    to:   "    return cloudSignOut();\n    _cloudRepaint();",
+    why:  "4A: signing out with unsent work must say so first (84d)",
+  },
+  {
+    name: "M1555 (V145) the warning keeps a third Cancel button",
+    file: "feedback.js",
+    from: "      ${opts.noCancel ? '' : `<button class=\"btn-secondary\" id=\"choice-sheet-no\"",
+    to:   "      ${false ? '' : `<button class=\"btn-secondary\" id=\"choice-sheet-no\"",
+    why:  "4A: two answers, Stay signed in / Sign out anyway (84d)",
+  },
+  {
+    name: "M1556 (V145) Sign out anyway does nothing",
+    file: "cloud.js",
+    from: "      { label: 'Sign out anyway', style: 'danger', onPick: () => { cloudSignOut(); } },",
+    to:   "      { label: 'Sign out anyway', style: 'danger', onPick: () => {} },",
+    why:  "4A: the person chose to sign out (84d)",
+  },
+  {
+    name: "M1557 (V145) a backup doesn't record its account",
+    file: "backup.js",
+    from: "    owner: backupOwnerField()\n",
+    to:   "    owner: undefined\n",
+    why:  "7A: nothing to refuse a wrong-account restore by (84e)",
+  },
+  {
+    name: "M1558 (V145) a backup from another account restores",
+    file: "backup.js",
+    from: "    if (acct && own.id !== acct) {",
+    to:   "    if (false) {",
+    why:  "7A: a wrong-account restore would put another account's jobs into this one (84e)",
+  },
+  {
+    name: "M1559 (V145) an old backup isn't asked about",
+    file: "backup.js",
+    from: "    if (!v.ask) { replace(); return; }",
+    to:   "    { replace(); return; }",
+    why:  "7A: an old backup's account can't be checked, so the person decides — never by accident (84e)",
+  },
+  {
+    name: "M1560 (V145) a phone with no owner doesn't take the backup's",
+    file: "backup.js",
+    from: "        if (v.adopt && typeof cloudOwnerSet === 'function') cloudOwnerSet(v.adopt.id, v.adopt.email);",
+    to:   "",
+    why:  "7A: restored onto a fresh phone, the jobs would be adopted by whoever signs in first (84e)",
+  },
+  {
+    name: "M1561 (V145) Clear my work frees the phone from its owner",
+    file: "reset.js",
+    from: "  ['OWNER_KEY', OWNER_KEY, 'account'],",
+    to:   "  ['OWNER_KEY', OWNER_KEY, 'work'],",
+    why:  "only Everything, as new frees the phone; otherwise the settings left behind are adopted by another account (84e)",
+  },
+  {
+    name: "M1562 (V145) Use b@… here is unwired",
+    file: "dispatch.js",
+    from: "  'cloud-handover-go':     () => { if (typeof cloudHandoverGo === 'function') cloudHandoverGo(); },",
+    to:   "  'cloud-handover-go':     () => {},",
+    why:  "2A: the button must do it (84c)",
+  },
+  {
+    name: "M1563 (V145) the cloud tutorials' drawn phone has no owner",
+    file: "tour.js",
+    from: "  cloudOwnerAllows: () => true,   // V145: the sample account owns the drawn phone (no stored login to judge by)\n",
+    to:   "",
+    why:  "the tutorials' signed-in phone would draw as signed out — the cloud steps lose their targets (75c 75d)",
   },
 ];
 

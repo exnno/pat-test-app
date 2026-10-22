@@ -323,6 +323,17 @@ bug; leaving it red trains everyone to ignore the suite.
   (4) `cloudCheckConnection` clears the message line, so anything said at a
   sign-in must be said AFTER it (83b caught the "you already had an account"
   line vanishing).
+  V145 (group 84): one owner per phone. (1) The stand-in server reads the
+  ACCOUNT off each request's bearer token and files every write under it, as
+  the database does — so "nothing was sent as B" is read off the wire
+  (`restAs`, `sentJobs`), not off a helper that could agree with the bug.
+  (2) ⚠ stubs.js registers a sheet's ids with the LAST document created
+  (`STUB_DOC`): make the phone whose sheets you will tap AFTER any other app in
+  the group, or `getElementById('confirm-sheet-yes')` returns null on it (84e).
+  (3) A restart is `bootApp` once (boot.js runs load()) — `freshApp` loads a
+  second time, which resets `state.view` and hides where boot landed (84c).
+  (4) A job made with a NEW client also leaves an unsent client — counts read
+  "1 job and other changes"; reuse the synced client to test "1 job".
 
 ---
 
