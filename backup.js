@@ -133,8 +133,44 @@ function buildBackup() {
     // already ride inside `sessions`, so the photo file re-links itself with no
     // help from here. Additive and missing-field-tolerant on old backups →
     // **backupVersion stays 5**.
-    photoCount: (typeof photoStatsSync === 'function') ? photoStatsSync().count : 0
+    photoCount: (typeof photoStatsSync === 'function') ? photoStatsSync().count : 0,
+    // V145 (7A): the account this phone's work belongs to — its id and address,
+    // never a credential. A restore uses it to refuse a backup from a different
+    // account (backupRestoreVerdict). Additive → backupVersion stays 5. Absent on
+    // a phone with no owner (a free user's), and in every backup made before V145.
+    owner: backupOwnerField()
   };
+}
+
+// ---- V145 (7A): a backup belongs to an account --------------------------------------
+function backupOwnerField() {
+  if (typeof cloudOwner !== 'function') return undefined;
+  const o = cloudOwner();
+  return o ? { id: o.id, email: o.email || '' } : undefined;
+}
+// Restoring this file here: { ok, adopt } | { refuse: words } | { ask, email }.
+//   its account = this phone's (signed in, or the owner) → as ever;
+//   a phone with no account → as ever, and the phone becomes the backup's;
+//   a DIFFERENT account → refused, in words;
+//   no account recorded (before V145) on a phone with one → asked first, naming
+//   the account and the job count, so a wrong-account restore is deliberate.
+// Never a quiet stop: every route that protected data still does (Peter's condition).
+function backupRestoreVerdict(data) {
+  const phone = (typeof cloudOwner === 'function') ? cloudOwner() : null;
+  const signedIn = (typeof cloudUserId === 'function') ? cloudUserId() : '';
+  const acct = signedIn || (phone && phone.id) || '';
+  const own = (data && data.owner && typeof data.owner === 'object' && typeof data.owner.id === 'string' && data.owner.id)
+    ? data.owner : null;
+  if (own) {
+    if (acct && own.id !== acct) {
+      return { refuse: `This backup belongs to ${own.email || 'another account'} — sign in as that account to restore it.` };
+    }
+    return { ok: true, adopt: acct ? null : { id: own.id, email: typeof own.email === 'string' ? own.email : '' } };
+  }
+  if (!acct) return { ok: true, adopt: null };
+  const email = (signedIn && state.cloud && state.cloud.email)
+    || (typeof cloudOwnerName === 'function' ? cloudOwnerName(phone) : '') || 'this account';
+  return { ask: true, email };
 }
 
 function downloadBackup() {
@@ -213,9 +249,16 @@ function restoreBackupFromFile(file) {
       return;
     }
     const itemCount = data.sessions.reduce((n, s) => n + (Array.isArray(s.items) ? s.items.length : 0), 0);
+    // V145 (7A): whose backup — before anything is asked or replaced.
+    const v = backupRestoreVerdict(data);
+    if (v.refuse) {
+      openInfoSheet({ title: 'This backup belongs to another account', message: v.refuse });
+      return;
+    }
+    const jobs = data.sessions.length;
     // v40: in-app confirm sheet (was native confirm). The apply block runs only
     // when the user confirms; dismissing leaves all current data untouched.
-    openConfirmSheet({
+    const replace = () => openConfirmSheet({
       title: 'Restore from backup?',
       message:
         `This file contains ${data.sessions.length} job${data.sessions.length === 1 ? '' : 's'} ` +
@@ -223,7 +266,20 @@ function restoreBackupFromFile(file) {
         (data.exportedAt ? `, exported ${new Date(data.exportedAt).toLocaleString('en-GB')}` : '') +
         `. This will REPLACE all current data on this device. A copy of what's here now is kept first, so you can undo it from Daily snapshots on the Backup page.`,
       confirmLabel: 'Replace & restore',
-      onConfirm: () => restoreWithSafetyCopy(() => applyBackupData(data, { markExported: true })),
+      onConfirm: () => restoreWithSafetyCopy(() => {
+        applyBackupData(data, { markExported: true });
+        // V145: a phone with no account becomes the backup's.
+        if (v.adopt && typeof cloudOwnerSet === 'function') cloudOwnerSet(v.adopt.id, v.adopt.email);
+      }),
+    });
+    if (!v.ask) { replace(); return; }
+    openConfirmSheet({
+      title: `Restore into ${v.email}?`,
+      message: `This backup was made before backups recorded their account. Restoring puts its ${jobs} job${jobs === 1 ? '' : 's'} ` +
+        `into ${v.email}’s account.`,
+      confirmLabel: 'Restore into this account',
+      danger: false,
+      onConfirm: replace,
     });
   };
   reader.onerror = () => openInfoSheet({ title: 'Couldn\u2019t read that file', message: 'The file couldn\u2019t be opened. Please try again.' });

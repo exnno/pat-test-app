@@ -381,7 +381,9 @@ function openConfirmSheet(opts) {
 // V91: a sheet of two or more choices plus Cancel — the confirm sheet's shape
 // with a button per choice, stacked full width. opts: { title, message,
 // choices: [{ label, style: 'primary'|'secondary'|'danger', onPick }],
-// cancelLabel='Cancel' }. A pick closes the sheet first, then runs its onPick.
+// cancelLabel='Cancel', noCancel }. A pick closes the sheet first, then runs its
+// onPick. V145: noCancel drops the Cancel button when a choice already says it
+// (× and the backdrop still close, doing nothing).
 function openChoiceSheet(opts) {
   opts = opts || {};
   const title = opts.title || 'Choose';
@@ -399,7 +401,7 @@ function openChoiceSheet(opts) {
     ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:0.875rem;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
     <div class="sheet-pin" style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
       ${choices.map((c, i) => `<button class="${cls(c.style)}" id="choice-sheet-${i}" style="width:100%">${escapeHTML(c.label || '')}</button>`).join('')}
-      <button class="btn-secondary" id="choice-sheet-no" style="width:100%">${escapeHTML(opts.cancelLabel || 'Cancel')}</button>
+      ${opts.noCancel ? '' : `<button class="btn-secondary" id="choice-sheet-no" style="width:100%">${escapeHTML(opts.cancelLabel || 'Cancel')}</button>`}
     </div>
   `;
   document.body.appendChild(backdrop);

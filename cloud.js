@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — cloud.js (cloud sign-in)
- * v85 (September 2026) · V139 (October 2026): password sign-in · V140: Google
+ * v85 (September 2026) · V139 (October 2026): password sign-in · V140: Google · V145: one owner per phone
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -92,6 +92,128 @@ function cloudUserId() {
   return s ? s.id : '';
 }
 
+// ---- V145: one owner per phone (spec 1A 2A 3A 4A 5A 7A 8A) ---------------------
+// THE RULE. A phone's jobs and setup belong to ONE account — OWNER_KEY (config.js).
+// The cloud cannot enforce this: a write is filed under whoever is signed in, so
+// the owner's jobs sent while another account is signed in would be filed as that
+// account's (found by Peter, 21 Oct, testing several accounts on one phone). So
+// the phone enforces it, in three places that do not trust each other:
+//   • the landing (_cloudOwnerLanding): a different account only takes the phone
+//     over once the owner's work is ALL in the owner's cloud (2A: asked first);
+//     otherwise it is signed straight back out, told why (1A);
+//   • sync.js syncActive: no trigger fires while the signed-in account isn't
+//     the owner;
+//   • sync.js _syncRun: the live session's account, the one a write is filed
+//     under, must be the owner — or the run stops before reading or sending.
+// No owner = whoever signs in first adopts the phone (8A), as a free user's work
+// has always carried across. Signing out never clears the owner (3A): the jobs
+// stay, and another account takes them off only through the handover.
+let _cloudOwnerMemo;   // undefined = not read yet; storage is the truth
+function cloudOwner() {
+  if (_cloudOwnerMemo !== undefined) return _cloudOwnerMemo;
+  let o = null;
+  try {
+    const raw = JSON.parse(localStorage.getItem(OWNER_KEY) || 'null');
+    if (raw && typeof raw === 'object' && typeof raw.id === 'string' && raw.id) {
+      o = { id: raw.id, email: typeof raw.email === 'string' ? raw.email : '' };
+    }
+  } catch { o = null; }   // unreadable = no owner: the next sign-in stamps it
+  _cloudOwnerMemo = o;
+  return o;
+}
+function cloudOwnerSet(id, email) {
+  _cloudOwnerMemo = undefined;
+  if (!id) { try { localStorage.removeItem(OWNER_KEY); } catch {} return false; }
+  try {
+    localStorage.setItem(OWNER_KEY, JSON.stringify({ id, email: email || '', at: new Date().toISOString() }));
+    return true;
+  } catch { return false; }   // full: no stamp — the guard then reads "no owner" (8A)
+}
+// May sync run as this account? Only the owner — or anyone on a phone with no
+// owner (it is stamped at the landing; this only covers a stamp that could not
+// be written). An empty id never may.
+function cloudOwnerAllows(uid) {
+  if (!uid) return false;
+  const o = cloudOwner();
+  return !o || o.id === uid;
+}
+// The owner in words. A phone stamped from its sync record (V145's first run,
+// signed out) knows the account but not its address.
+function cloudOwnerName(o) {
+  const own = o || cloudOwner();
+  return (own && own.email) || 'the account this phone belongs to';
+}
+
+// "3 jobs, 2 photos and other changes" — the shared words of the sign-out
+// warning (4A) and the refusal (1A), from sync.js syncOwnerPending's counts.
+function cloudPendingWords(p) {
+  const parts = [];
+  const n = (k, one, many) => (p[k] === 1 ? '1 ' + one : p[k] + ' ' + many);
+  if (p.jobs) parts.push(n('jobs', 'job', 'jobs'));
+  if (p.photos) parts.push(n('photos', 'photo', 'photos'));
+  if (p.other) parts.push(parts.length ? 'other changes' : 'Some changes');
+  const what = parts.length > 1 ? parts.slice(0, -1).join(', ') + ' and ' + parts[parts.length - 1] : (parts[0] || 'Some changes');
+  const one = parts.length === 1 && ((p.jobs === 1 && !p.photos && !p.other) || (p.photos === 1 && !p.jobs && !p.other));
+  return { what, have: one ? 'hasn’t' : 'haven’t', them: one ? 'it' : 'them' };
+}
+
+// What of the owner's is on this phone and not in the owner's cloud. null when
+// it cannot be counted (sync.js missing) — which counts as "not safe".
+function _cloudOwnerPending(ownerId) {
+  if (typeof syncOwnerPending !== 'function') return null;
+  try { return syncOwnerPending(ownerId); } catch (e) { console.error(e); return null; }
+}
+
+// The login itself, gone from this phone (the sign-out's own sweep, storage
+// only). _cloudForgetLogin also tells the library's copy in memory, best-effort,
+// so it stops refreshing.
+function _cloudSweepLogin() {
+  try {
+    const doomed = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf(CLOUD_AUTH_STORAGE_KEY) === 0) doomed.push(k);
+    }
+    doomed.forEach((k) => localStorage.removeItem(k));
+  } catch {}
+}
+function _cloudForgetLogin() {
+  _cloudSweepLogin();
+  if (_cloudClientPromise) _cloudClientPromise.then((c) => c.auth.signOut({ scope: 'local' })).catch(() => {});
+}
+
+// Where every sign-in lands (from _cloudSignedIn). true = the sign-in stands;
+// false = it doesn't (yet): refused and signed out (1A), or the takeover is
+// being asked (2A — state.cloud.handover). Synchronous: storage only.
+function _cloudOwnerLanding(user, email) {
+  const stored = _cloudReadStoredSession();
+  const uid = (user && typeof user.id === 'string' && user.id) || (stored && stored.id) || '';
+  const addr = (user && user.email) || email || '';
+  if (!uid) return true;                                  // nothing to judge by: the guards still hold
+  const o = cloudOwner();
+  if (!o) { cloudOwnerSet(uid, addr); return true; }      // 8A: adopted
+  if (o.id === uid) {
+    if (addr && addr !== o.email) cloudOwnerSet(uid, addr);   // a changed address, or one learned now
+    return true;
+  }
+  const p = _cloudOwnerPending(o.id);
+  if (p && p.total === 0) {
+    _cloudSet({ handover: { id: uid, email: addr, from: o.email || '' } });   // 2A: asked
+    return false;
+  }
+  // 1A: refused. Nothing of the owner's has been read, shown or sent as this account.
+  _cloudForgetLogin();
+  const who = cloudOwnerName(o);
+  const w = p ? cloudPendingWords(p) : null;
+  _cloudSet({ status: 'signed-out', busy: false, plan: null, trialEndsAt: null, checkedAt: null,
+    pwOpen: false, pwReset: false, pwNew: false, welcome: '', signup: false, google: '', handover: null,
+    message: w
+      ? `This phone has ${w.what.charAt(0).toLowerCase() + w.what.slice(1)} from ${who} that ${w.have} reached the cloud. ` +
+        `Sign in as ${who} to send ${w.them} first — or save a backup, then Reset this phone (Everything, as new).`
+      : `This phone belongs to ${who}. Sign in as ${who} first.` });
+  return false;
+}
+
 // Lazy library load. The UMD file defines the global `supabase` when run. It is
 // in sw.js ASSETS, so once installed it loads offline like jsPDF does.
 function cloudLoadLib() {
@@ -127,6 +249,18 @@ function cloudClient() {
   return _cloudClientPromise;
 }
 
+// V145's first run: a phone with no owner yet takes the account signed in on it
+// now — or, signed out, the account its sync record says it last sent to, so a
+// phone that was syncing as A stays A's (better than "whoever signs in first").
+// A phone that never synced stays unowned: the first sign-in adopts it (8A).
+function _cloudOwnerFirstRun(stored) {
+  if (cloudOwner()) return;
+  if (stored && stored.id) { cloudOwnerSet(stored.id, stored.email || ''); return; }
+  let st = null;
+  try { st = JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || 'null'); } catch { st = null; }
+  if (st && typeof st.userId === 'string' && st.userId) cloudOwnerSet(st.userId, '');
+}
+
 // ---- boot --------------------------------------------------------------------
 // Synchronous part first (no network, no library). Then, ONLY if someone is
 // signed in and the phone is online, a background check that the session is
@@ -135,11 +269,25 @@ function cloudBoot() {
   if (!cloudAvailable()) { state.cloud.status = 'off'; return; }
   _cloudGoogleListen();   // V140: ready for the Google window's answer (no network)
   const stored = _cloudReadStoredSession();
+  _cloudOwnerFirstRun(stored);   // V145
   if (!stored) { state.cloud.status = 'signed-out'; return; }
+  // V145: a login that isn't the owner's (the app closed while the takeover was
+  // being asked) is not kept — nothing has been sent as it. Signed out, told why.
+  const own = cloudOwner();
+  if (own && stored.id && own.id !== stored.id) {
+    _cloudForgetLogin();
+    state.cloud.status = 'signed-out';
+    state.cloud.message = `Signed out — this phone belongs to ${cloudOwnerName(own)}.`;
+    return;
+  }
   state.cloud.status = 'signed-in';
   state.cloud.email = stored.email;
   state.cloud.google = stored.google;   // V140: the connected Google address, or ''
   _cloudRememberUnlock();   // v85 2A: a signed-in phone never asks for the code
+  // V145: straight after a takeover's restart — the new account's next step.
+  if (typeof resetTakeCarry === 'function') {
+    try { const carry = resetTakeCarry(); if (carry) cloudHandoverLanded(carry); } catch (e) { console.error(e); }
+  }
   if (typeof navigator !== 'undefined' && navigator.onLine === false) return;
   cloudClient()
     .then((c) => c.auth.getSession())
@@ -352,16 +500,20 @@ function cloudVerifyCode() {
       const forgot = !!state.cloud.forgot;
       const creating = !!state.cloud.signup;   // V144
       const user = res && res.data && res.data.user;
-      _cloudSignedIn(user, email);
+      const stands = _cloudSignedIn(user, email);
       // V139 (2A): signed in by "Forgot password?" — straight to choosing a new one.
-      if (forgot) _cloudSet({ pwOpen: true, pwReset: true });
       // V144 (2A): a NEW account isn't finished until it has a password — the
       // card has no Cancel. An address that already had an account just signs
       // in: nobody's password is replaced from the Create card.
+      const after = {};
+      if (forgot) Object.assign(after, { pwOpen: true, pwReset: true });
       if (creating) {
-        if (cloudIsNewAccount(user)) _cloudSet({ pwOpen: true, pwReset: false, pwNew: true, welcome: 'due' });
-        else _cloudSet({ welcome: 'had' });   // said after the plan read (it clears the line)
+        if (cloudIsNewAccount(user)) Object.assign(after, { pwOpen: true, pwReset: false, pwNew: true, welcome: 'due' });
+        else after.welcome = 'had';   // said after the plan read (it clears the line)
       }
+      // V145: a takeover being asked carries them through its reload (cloudHandoverGo).
+      if (stands) _cloudSet(after);
+      else if (state.cloud.handover) state.cloud.handover.after = after;
       return true;
     })
     .catch((e) => { _cloudSet({ busy: false, message: cloudErrorMessage(e, 'verify') }); return false; })
@@ -376,12 +528,15 @@ function _cloudSignedIn(user, email) {
   _cloudSet({ busy: false, status: 'signed-in', email: (user && user.email) || email,
     message: '', plan: null, trialEndsAt: null, checkedAt: null, forgot: false, useCode: false,
     google: _cloudGoogleEmail(user), googlePending: '', googleOff: false,   // V140
-    signup: false, pwNew: false, welcome: '' });                          // V144
+    signup: false, pwNew: false, welcome: '', handover: null });          // V144, V145
   _cloudRememberUnlock();   // v85 2A
+  return _cloudOwnerLanding(user, email);   // V145: true = the sign-in stands
 }
 
 function _cloudAfterSignIn(ok) {
   _cloudRepaint();
+  // V145: refused (1A) or being asked (2A) — no profile read, no sync, no welcome.
+  if (state.cloud.status !== 'signed-in' || state.cloud.handover) return ok;
   // Prove the round trip straight away: read our own profile row. v80: then
   // send this phone's jobs (sync.js; optional, so guarded). v81: and read
   // the account's jobs back — signing in on a second phone is the moment
@@ -741,10 +896,13 @@ function cloudGoogleReturn(params) {
         _cloudRepaint();
         return 'linked';
       }
-      _cloudSignedIn(user, user.email || '');   // the same landing as a code or password
+      const stands = _cloudSignedIn(user, user.email || '');   // the same landing as a code or password
       // V144 (3A): with sign-ups on, a Google login nobody knew has just been
       // made an account. No password is asked for — Google is its way in.
-      if (cloudIsNewAccount(user)) _cloudSet({ welcome: 'due' });
+      if (cloudIsNewAccount(user)) {
+        if (stands) _cloudSet({ welcome: 'due' });
+        else if (state.cloud.handover) state.cloud.handover.after = { welcome: 'due' };   // V145
+      }
       return true;
     })
     .catch((e) => { _cloudSet({ busy: false, googlePending: '', message: cloudErrorMessage(e, 'google') }); return false; })
@@ -844,19 +1002,13 @@ function cloudCheckConnection() {
 // keys are removed directly regardless, so a sign-out can never fail to stick.
 function cloudSignOut() {
   const finish = () => {
-    try {
-      const doomed = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const k = localStorage.key(i);
-        if (k && k.indexOf(CLOUD_AUTH_STORAGE_KEY) === 0) doomed.push(k);
-      }
-      doomed.forEach((k) => localStorage.removeItem(k));
-    } catch {}
+    _cloudSweepLogin();
     _cloudSet({ status: cloudAvailable() ? 'signed-out' : 'off', busy: false, message: 'Signed out.',
       plan: null, trialEndsAt: null, checkedAt: null,
       useCode: false, forgot: false, pwOpen: false, pwReset: false,   // V139
       google: '', googlePending: '', googleOff: false,                // V140
-      signup: false, pwNew: false, welcome: '' });                    // V144
+      signup: false, pwNew: false, welcome: '',                       // V144
+      handover: null, signingOut: false });                           // V145
     _cloudGoogleCloseWindow();
     render();
   };
@@ -865,6 +1017,110 @@ function cloudSignOut() {
     .then((c) => c.auth.signOut({ scope: 'local' }))
     .catch(() => {})
     .then(() => { finish(); return true; });
+}
+
+// ---- V145: signing out (4A) and the takeover (2A) ------------------------------
+// The Sign out button. One last sync first (online), so the warning only shows for
+// what genuinely couldn't go; then, if anything of this account's is still not in
+// its cloud, it is said — Stay signed in / Sign out anyway. Signing out anyway
+// loses nothing: the jobs stay on this phone under its owner (3A) and send at the
+// owner's next sign-in here, and no other account can take the phone until then.
+function cloudSignOutAsk() {
+  if (!cloudAvailable() || state.cloud.busy || state.cloud.status !== 'signed-in') return Promise.resolve(false);
+  const uid = cloudUserId();
+  const canSend = !_cloudOffline() && typeof syncPush === 'function' && typeof syncWhenIdle === 'function'
+    && typeof syncActive === 'function' && syncActive();
+  let send = Promise.resolve();
+  if (canSend) {
+    _cloudSet({ busy: true, signingOut: true, message: '' });
+    _cloudRepaint();
+    send = Promise.race([
+      syncWhenIdle(() => syncPush({ pull: true })).catch(() => null),
+      new Promise((res) => setTimeout(res, CLOUD_SIGNOUT_SYNC_MS)),
+    ]);
+  }
+  return send.then(() => {
+    _cloudSet({ busy: false, signingOut: false });
+    if (state.cloud.status !== 'signed-in') return false;   // signed out meanwhile (a revoked login)
+    const p = _cloudOwnerPending(uid);
+    if (p && p.total === 0) return cloudSignOut();
+    _cloudRepaint();
+    cloudSignOutWarn(p);
+    return false;
+  });
+}
+
+function cloudSignOutWarn(p) {
+  const who = state.cloud.email || cloudOwnerName();
+  const w = p ? cloudPendingWords(p) : { what: 'Some changes', have: 'haven’t' };
+  const words = `${w.what} ${w.have} been sent to ${who}’s cloud yet. If you sign out they stay safely ` +
+    `on this phone and send next time you sign in as ${who}. Until then, no other account can sign in on this phone.`;
+  if (typeof openChoiceSheet !== 'function') return false;
+  try { const a = document.activeElement; if (a && typeof a.blur === 'function') a.blur(); } catch (e) { /* nothing focused */ }
+  openChoiceSheet({
+    title: 'Not everything has reached the cloud',
+    message: words,
+    noCancel: true,   // × and the backdrop = Stay signed in
+    choices: [
+      { label: 'Stay signed in', style: 'primary', onPick: () => {} },
+      { label: 'Sign out anyway', style: 'danger', onPick: () => { cloudSignOut(); } },
+    ],
+  });
+  return true;
+}
+
+// 2A, "Use this account here". The owner's work was all in its cloud when asked —
+// counted again now, because the phone was usable meanwhile (a job logged since
+// would otherwise go with the wipe). Then reset.js's handover: everything that
+// follows the account comes off the phone (5A), this phone's own preferences stay,
+// the new account becomes the owner, and the app restarts clean for it.
+function cloudHandoverGo() {
+  const h = state.cloud.handover;
+  if (!h || state.cloud.status !== 'signed-in' || state.cloud.busy) return Promise.resolve(false);
+  if (typeof resetHandover !== 'function') return cloudHandoverCancel();   // reset.js missing: the phone stays
+  const o = cloudOwner();
+  const p = o ? _cloudOwnerPending(o.id) : { total: 0 };
+  if (!p || p.total > 0) {
+    // Something of the owner's is unsent after all: refused, in words (1A).
+    _cloudSet({ handover: null });
+    _cloudOwnerLanding({ id: h.id, email: h.email }, h.email);
+    render();
+    return Promise.resolve(false);
+  }
+  _cloudSet({ busy: true, message: '' });
+  render();
+  return resetHandover({ id: h.id, email: h.email }, h.after || null);
+}
+
+// 2A, Cancel: the phone stays its owner's; the account that asked is signed out.
+function cloudHandoverCancel() {
+  if (!state.cloud.handover) return Promise.resolve(false);
+  const who = cloudOwnerName();
+  return cloudSignOut().then(() => {
+    _cloudSet({ message: `Signed out. This phone stays ${who}’s.` });
+    render();
+    return true;
+  });
+}
+
+// After a takeover's restart (boot): what the new account was in the middle of —
+// a new account's password card (V144 2A), its welcome — carried through the
+// reload by reset.js, for this account only.
+function cloudHandoverLanded(carry) {
+  if (!carry || typeof carry !== 'object' || state.cloud.status !== 'signed-in') return false;
+  if (carry.id !== cloudUserId()) return false;
+  const a = carry.after || {};
+  const patch = {};
+  if (a.pwOpen) Object.assign(patch, { pwOpen: true, pwReset: !!a.pwReset, pwNew: !!a.pwNew });
+  if (a.welcome === 'due' || a.welcome === 'had') patch.welcome = a.welcome;
+  patch.message = `Signed in as ${state.cloud.email || carry.email || 'your account'}. Your jobs and setup are coming down from the cloud.`;
+  _cloudSet(patch);
+  state.view = 'cloudAccount';
+  // The plan read the sign-in would have made, then the welcome (after it, as V144).
+  if (!_cloudOffline()) {
+    Promise.resolve().then(() => cloudCheckConnection()).then(() => cloudMaybeWelcome()).catch(() => {});
+  }
+  return true;
 }
 
 // ---- v85: the access code in front of the Cloud group (decisions 1A/2A) -------

@@ -256,8 +256,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Create an account.</strong> New to PATGo? You can now make your own cloud account from Settings &rarr; Account &amp; Sync, by email or with Google, and try everything free for 30 days &mdash; no card needed.</li>
-        <li><strong>Your trial at a glance.</strong> The Account page shows how many days of your free trial are left, and subscribing ends with a proper thank-you.</li>
+        <li><strong>Your jobs stay yours.</strong> A phone&rsquo;s jobs now belong to one account. Signing in as someone else can never send them into the wrong account &mdash; another account can only take the phone over once everything is safe in your cloud.</li>
+        <li><strong>A safer sign-out.</strong> Signing out sends your last changes first, and tells you if anything hasn&rsquo;t reached the cloud yet. Backups now remember which account they belong to.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

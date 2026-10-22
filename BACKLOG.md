@@ -8,6 +8,62 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V145
+V145 = one owner per phone (Stage 13; Peter 22 Oct: 1A 2A 3A 4A 5A 7A 8A). config.js
+(OWNER_KEY, OWNER_STATS_KEY, CLOUD_SIGNOUT_SYNC_MS), cloud.js (the owner, the landing,
+the boot check, cloudSignOutAsk / Warn, the takeover), sync.js (syncActive + _syncRun
+guards, syncOwnerPending), reset.js (the handover level, the stats kept aside, the
+carry), backup.js (owner, backupRestoreVerdict), render-help.js (the takeover card, the
+Sign out button's words), feedback.js (openChoiceSheet noCancel), state.js, dispatch.js,
+tour.js (the drawn phone's owner). Harness 84 + M1531–M1563; 83e retired → 84e.
+**Next (V146, the launch switch — own spec round):** REQUIRE_ACCOUNT (a sign-in / create
+wall; a free user's local jobs go up with the first sign-in — under the V145 owner
+stamp), the access code out, the free site retired. ⚠ PETER'S HARD RULE (22 Oct): once the
+app is sign-in only, it must NEVER sign you out, or wall you off, because there's no
+signal — an engineer must always be able to work. Today (V145): cloud.js `cloudBoot` signs
+out only when ONLINE and the server says the login is gone; offline nothing changes, and
+supabase-js keeps a session whose refresh fails for want of signal. V146 must keep that
+and add: the wall shows only to a phone with NO owner (never to an owner whose login
+lapsed — they keep working and are asked to sign in again when there's signal), and a
+login the server revokes while the engineer is mid-job never stops the job. Prove it in
+the harness with the stand-in server offline / refusing refresh.
+**Then:** the production move (Pro project from schema.sql, Auth / Google / sign-up
+settings, live Stripe; CLOUD_PROJECTS.prod); R8 90-day deletion.
+**Own releases, specced, not scheduled (Peter 22 Oct):**
+- **Lifetime stats follow the account (Q6)** — "your lifetime of testing across PATGo on
+  any device". Needs a cloud home (SQL + Sync Spec section): the figure = every job in the
+  account's cloud (live) + a per-account tally of jobs DELETED (a server trigger adds a
+  job's tallies as its row is emptied, so no phone can miss it), with copies counted once
+  (V102's copyOf rule, server side). Seed: each phone's archive bucket less the jobs the
+  cloud still holds (SYNC_PRUNED_KEY) — decide at the spec whether every phone's seed
+  adds or only the first. Retires OWNER_STATS_KEY. Spec round questions in the roadmap.
+- **Jobs drift from the phone to the cloud over time (Peter's note on 3A)** — like iCloud's
+  optimised storage: jobs safe in the cloud and not needed (outside the window, no retest
+  due, not opened lately) leave the phone on their own, a few at a time, so a phone never
+  builds up a huge store and signing in / switching phones stays quick. Uses V91's "safe
+  in the cloud" and V93's window; the cloud tab brings any back. Own spec (how old, how
+  many at once, a setting to turn it off, what the Jobs list says).
+
+### V145 residuals (known, accepted)
+- A phone that never synced and is signed out has no owner: whoever signs in first adopts
+  its work (8A — a free user's case; on Peter's test phones, any account).
+- A job held for its owner waits for that account on THAT phone; it can't move to another
+  phone except by a backup.
+- Phones used with several accounts before V145 may already hold mixed jobs — V145 can't
+  tell whose a job was; the first run stamps the account last synced.
+- "Not yet in the cloud" counts what the push confirmed (V80's fingerprint), not V91's
+  read-back — a confirmed upload is in the cloud.
+- The old owner's lifetime figures are kept aside on THAT phone only (up to 20 accounts)
+  until the stats release.
+- A phone stamped at V145's first run from its sync record knows the account, not its
+  address — the words say "the account this phone belongs to" until it signs in.
+- A refused sign-in still happened on the server (its last sign-in time moves); nothing
+  else is read or written.
+- Backups made before V145 carry no account: asked about, not refused.
+- Setup-bundle import is unchanged — copying setup between accounts is deliberate.
+- Shared phones: one owner at a time ("sync before switching"); separate storage per
+  account stays Stage 16 (teams).
+
 ### Next after V144
 V144 = sign-up (Stage 13; Peter 21 Oct: 0A 1A 2A 3A 4A 5A 6A 7A 8A). cloud.js (the
 Create card's code request — cloudCodeOptions; cloudIsNewAccount; pwNew; the welcome
@@ -15,7 +71,7 @@ hand-off), render-help.js (the Create card, the offer, the password step, days l
 plan.js (planShowWelcome, planShowThanks / planMaybeThank, thanksDue in the plan record,
 planTrialDaysLeft / planTrialWords), state.js, config.js (CLOUD_NEW_ACCOUNT_MS,
 PLAN_TRIAL_DAYS), dispatch.js, styles.css. Harness 83 + M1486–M1530; 82e retired → 83e.
-**Next (V145, the launch switch — 0A):** an account required to use the app
+**Next (then V145; the launch switch moved to V146):** an account required to use the app
 (REQUIRE_ACCOUNT — a sign-in / create wall, what a free user's local jobs do), the
 access code out, the free site retired; then the production project + live Stripe (a
 guided dashboard session + a small config release); R8 90-day deletion.

@@ -138,7 +138,9 @@ let _syncAllowOpen = null;      // v81.4: the one open job the engineer asked to
 // "signed in but no signal" still matters to the prune guard.
 function syncActive() {
   return typeof cloudAvailable === 'function' && cloudAvailable()
-      && !!state.cloud && state.cloud.status === 'signed-in';
+      && !!state.cloud && state.cloud.status === 'signed-in'
+      // V145: only as the phone's owner (cloud.js) — no trigger fires otherwise.
+      && (typeof cloudOwnerAllows !== 'function' || cloudOwnerAllows(_syncCurrentUserId()));
 }
 
 function _syncOffline() {
@@ -512,6 +514,76 @@ function syncJobsSafety(fresh) {
     map.set(id, r);
   }
   return { map, safe, total: map.size };
+}
+
+// ---- V145: the owner's work not yet in the owner's cloud --------------------------
+// Counted from the stored bookkeeping alone — no sign-in, no network — so it can be
+// asked while a DIFFERENT account is signed in (the takeover, cloud.js 1A/2A) and
+// at a sign-out (4A). { jobs, photos, other, total }: other = setup changes
+// (clients, sites, instruments, presets, settings…), deletes not yet sent and
+// anything waiting for an answer on the Sync page. If the stored bookkeeping
+// isn't the owner's (never synced as them), nothing counts as sent.
+// "Sent" here is what the push confirmed, not the later read-back (V91's
+// "checking"): a confirmed upload is in the cloud. Photos the phone can't count
+// yet (the photo index still loading) count as one change — never as safe.
+// ⚠ Mirror of the three pushes' "would send" tests (_syncPushHalf,
+// _syncPushRecords, the photos half). A new thing that syncs must be counted here
+// too, or a takeover could wipe it unsent (harness 84b).
+function syncOwnerPending(ownerId) {
+  const out = { jobs: 0, photos: 0, other: 0, total: 0 };
+  const st = _syncLoad();
+  const mine = !!ownerId && st.userId === ownerId;
+  const held = _syncHeldLoad();
+  const heldJobs = new Set(held.filter(e => e.kind === 'session').map(e => String(e.id)));
+  out.other += held.filter(e => e.kind !== 'session').length;
+  const live = new Set();
+  for (const s of _syncSessions()) {
+    const id = String(s.id);
+    live.add(id);
+    if (!mine || heldJobs.has(id) || st.resend[id] || st.sent[id] !== _syncJobHash(s, true)) out.jobs++;
+  }
+  if (mine) {
+    // Deletes the cloud hasn't heard of (the jobs push's own test, less the stale ones).
+    const clearedAt = new Map(_syncPrunedLoad().map(e => [e.id, e.at]));
+    for (const t of (state.tombstones || [])) {
+      if (!t) continue;
+      const id = String(t.id);
+      if (t.kind === 'session') {
+        if (live.has(id)) continue;
+        const cAt = clearedAt.get(id);
+        if (typeof cAt === 'string' && (typeof t.at !== 'string' || cAt >= t.at)) continue;
+        if (st.resend[id] || (st.sent[id] && !st.gone[id])) out.other++;
+      } else if (t.kind === 'photo') {
+        if (st.ph.sent[id]) out.other++;
+      }
+    }
+  }
+  // Setup: every record the records push would send now.
+  const rs = mine ? st.rec : _syncRecEmpty();
+  for (const kind of SYNC_RECORD_KINDS) {
+    const here = new Set();
+    for (const r of _syncRecordList(kind)) {
+      if (!r || r.id == null || r.id === '') continue;
+      const id = String(r.id);
+      here.add(id);
+      const doc = _syncRecordDoc(kind, r);
+      if (kind === 'settings' && id === SYNC_INUSE_ID && !doc.instrumentId) continue;
+      if (!rs.sent[id] && !rs.resend[id] && _syncNothingMade(kind, id, r)) continue;
+      if (!_syncValidRecord(kind, doc, id)) continue;   // never sendable: not "unsent"
+      if (rs.resend[id] || rs.sent[id] !== syncHash(_syncCanonical(doc))) out.other++;
+    }
+    for (const t of (state.tombstones || [])) {
+      if (!t || t.kind !== kind || here.has(String(t.id))) continue;
+      const id = String(t.id);
+      if (rs.resend[id] || (rs.sent[id] && !rs.gone[id])) out.other++;
+    }
+  }
+  // Photos of jobs that sync, not yet known to be in the cloud.
+  const pend = _syncPhotosPendingByJob(mine ? st : _syncEmpty(''));
+  if (pend === null) { if (typeof photosSupported === 'function') out.other++; }   // no photos.js: no photos
+  else for (const n of pend.values()) out.photos += n;
+  out.total = out.jobs + out.photos + out.other;
+  return out;
 }
 
 // One plain line for a reason. Never shown signed out.
@@ -1866,6 +1938,12 @@ function _syncRun(o) {
     const session = res && res.data ? res.data.session : null;
     const uid = session && session.user ? session.user.id : '';
     if (!uid) { const e = new Error('not signed in'); e.syncStage = 'auth'; throw e; }
+    // ⚠ V145. The account a write is filed under is THIS session's — so it must
+    // be the phone's owner, checked here against the live session, not only by
+    // syncActive's stored copy. Stops before anything is read or sent.
+    if (typeof cloudOwnerAllows === 'function' && !cloudOwnerAllows(uid)) {
+      const e = new Error('not this phone\u2019s account'); e.syncStage = 'owner'; throw e;
+    }
     const st = _syncStateFor(uid);
     const pulled = { applied: 0, added: 0, removed: 0, held: 0, waiting: null };
     // V143 (5A): the cloud refused this account's changes, and no plan read
@@ -3935,6 +4013,7 @@ function syncErrorMessage(err) {
   const code = String(err && (err.code || '') || '');
   const msg = String(err && err.message || '');
   if (err && err.syncStage === 'auth') return 'Your sign-in has lapsed. Sign out and back in on the Account page.';
+  if (err && err.syncStage === 'owner') return 'This phone belongs to another account, so nothing was sent.';   // V145
   if (status === 0 || /fetch|network/i.test(msg) || (err && err.name === 'AuthRetryableFetchError')) {
     return 'Couldn\u2019t reach the server. Your jobs are safe on this phone \u2014 try again when you have signal.';
   }

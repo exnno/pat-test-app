@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — reset.js (Reset this phone)
- * V106 (October 2026) — roadmap Stage 10 part 2
+ * V106 (October 2026) — roadmap Stage 10 part 2 · V145: the takeover (handover level)
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -11,6 +11,17 @@
  *   settings   — the above plus every setting. Sign-in stays, and so does the
  *                certificate numbering (8B: counter, prefix, padding, on/off).
  *   everything — the above plus the sign-in, the access code and the counter.
+ *   handover   — V145 (2A, 5A), never offered on the Reset page: another account
+ *                takes this phone over (cloud.js cloudHandoverGo, only once the
+ *                owner's work is all in its cloud). Everything that follows the
+ *                account goes — work, settings that sync, certificate numbering,
+ *                the plan record; this phone's own preferences stay (look, sound,
+ *                scanner, sort, the on/off features that don't sync); the new
+ *                account's sign-in stays and it becomes the owner (OWNER_KEY).
+ *
+ * THE OWNER (V145). OWNER_KEY is 'account': only "Everything, as new" frees a
+ * phone from its owner. The other two levels keep it, so clearing your work
+ * never lets a different account adopt what is left (your settings).
  *
  * RULES THIS FILE KEEPS
  *   • Local only. Nothing is ever deleted from the cloud. The deletion ledger
@@ -40,6 +51,7 @@
  */
 
 const RESET_LEVELS = ['work', 'settings', 'everything'];
+const RESET_HANDOVER = 'handover';   // V145: not a page level — see the header
 const RESET_CONFIRM_WORD = 'RESET';   // 7A: typed, any case
 const RESET_IDB_WAIT_MS = 3000;       // the live store clears; a hang must not trap the page
 const RESET_SIGNOUT_WAIT_MS = 4000;
@@ -127,6 +139,19 @@ const RESET_KEY_PLAN = [
   ['PLAN_KEY', PLAN_KEY, 'account'],
   // V133: this phone's private id for the version report goes with the sign-in.
   ['PHONE_KEY', PHONE_KEY, 'account'],
+  // V145: the phone's owner, and the stats of accounts that handed it over.
+  ['OWNER_KEY', OWNER_KEY, 'account'],
+  ['OWNER_STATS_KEY', OWNER_STATS_KEY, 'account'],
+];
+
+// V145 (5A): what a handover KEEPS — this phone's own preferences, none of which
+// sync, so clearing them would lose them for good. Everything else of ours goes
+// (the What's-new markers stay too: they are this phone's, not the account's).
+const RESET_HANDOVER_KEEP = [
+  'THEME_KEY', 'TEXT_SIZE_KEY', 'HAPTICS_KEY', 'SOUNDFX_KEY', 'SCANNER_KEY', 'SCANNER_PAIRED_KEY',
+  'SCAN_SPEED_KEY', 'SORT_KEY', 'UNDO_KEY', 'MAP_PIN_KEY', 'REMINDERS_KEY', 'PRUNE_AGE_KEY',
+  'PHOTO_AGE_KEY', 'SNAPSHOTS_KEY', 'ONBOARD_KEY', 'REPAIR_DONE_KEY',
+  'CLOUD_UNLOCK_KEY', 'PHONE_KEY', 'OWNER_STATS_KEY',
 ];
 
 // The certificate numbering kept at the settings level (8B). The number alone
@@ -135,7 +160,7 @@ const RESET_CERT_FIELDS = ['certEnabled', 'certNextNumber', 'certPrefix', 'certP
 
 let _resetRunning = false;
 
-function _resetValidLevel(level) { return RESET_LEVELS.indexOf(level) !== -1; }
+function _resetValidLevel(level) { return RESET_LEVELS.indexOf(level) !== -1 || level === RESET_HANDOVER; }
 
 // ---- the wipe itself (synchronous; runs in the live page AND at boot) ----------
 // Returns the keys it removed, for the harness. Removing never needs space, so
@@ -145,7 +170,15 @@ function _resetWipeLocal(level, cert) {
   const all = [];
   try { for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k) all.push(k); } } catch (e) { return []; }
   const doomed = [];
-  if (level === 'work') {
+  if (level === RESET_HANDOVER) {
+    const keep = new Set(RESET_KEY_PLAN.filter(r => RESET_HANDOVER_KEEP.indexOf(r[0]) !== -1).map(r => r[1]));
+    for (const k of all) {
+      if (k === RESET_PENDING_KEY || keep.has(k)) continue;
+      if (k.indexOf('pat:') !== 0) continue;                 // ⚠ the new sign-in ('patgo:') and other apps stay
+      if (/^pat:v[0-9]+(-[0-9]+)?welcome$/.test(k)) continue; // What's new, seen on this phone
+      doomed.push(k);
+    }
+  } else if (level === 'work') {
     const work = new Set(RESET_KEY_PLAN.filter(r => r[2] === 'work').map(r => r[1]));
     for (const k of all) if (work.has(k)) doomed.push(k);
   } else {
@@ -193,12 +226,67 @@ function resetRunPending() {
     return null;
   }
   _resetWipeLocal(m.level, m.cert);
+  _resetAfterWipe(m);
   _resetDeleteDatabases();
   try { localStorage.removeItem(RESET_PENDING_KEY); } catch (e) {}
-  setTimeout(() => {
-    try { if (typeof showToast === 'function') showToast('This phone has been reset'); } catch (e) {}
-  }, 800);
+  if (m.level === RESET_HANDOVER) {
+    _resetCarry = (m.carry && typeof m.carry === 'object') ? m.carry : null;   // cloud.js takes it at boot
+  } else {
+    setTimeout(() => {
+      try { if (typeof showToast === 'function') showToast('This phone has been reset'); } catch (e) {}
+    }, 800);
+  }
   return m.level;
+}
+
+// ---- V145: after either pass's wipe — the owner, and a handover's stats ------------
+// Idempotent: the live page and boot both run it. m.owner = who owns the phone
+// from here ({id, email}); absent = the owner key is left as the wipe left it.
+function _resetAfterWipe(m) {
+  const o = m && m.owner;
+  if (!o || typeof o.id !== 'string' || !o.id) return;
+  try {
+    if (typeof cloudOwnerSet === 'function') cloudOwnerSet(o.id, o.email || '');
+    else localStorage.setItem(OWNER_KEY, JSON.stringify({ id: o.id, email: o.email || '', at: new Date().toISOString() }));
+  } catch (e) { /* full phone: unowned — the next sign-in adopts it, and that is this account */ }
+  if (m.level !== RESET_HANDOVER) return;
+  // The new owner's own lifetime figures, if it handed this phone over before.
+  let held = {};
+  try { held = JSON.parse(localStorage.getItem(OWNER_STATS_KEY) || '{}') || {}; } catch (e) { held = {}; }
+  const mine = held && typeof held === 'object' ? held[o.id] : null;
+  if (mine && typeof mine === 'object') {
+    try { localStorage.setItem(PAT_STATS_KEY, JSON.stringify(mine)); } catch (e) { /* empty figures, then */ }
+  }
+}
+
+// The leaving owner's lifetime-stats bucket, kept aside under its account (Q6:
+// until the stats follow the account through the cloud). Before the wipe.
+function _resetStashStats(ownerId) {
+  if (!ownerId) return;
+  let held = {};
+  try { held = JSON.parse(localStorage.getItem(OWNER_STATS_KEY) || '{}') || {}; } catch (e) { held = {}; }
+  if (!held || typeof held !== 'object' || Array.isArray(held)) held = {};
+  let bucket = null;
+  try {
+    bucket = (typeof normaliseArchivedStats === 'function' && state && state.archivedStats)
+      ? normaliseArchivedStats(state.archivedStats)
+      : JSON.parse(localStorage.getItem(PAT_STATS_KEY) || 'null');
+  } catch (e) { bucket = null; }
+  if (!bucket || typeof bucket !== 'object') return;
+  delete held[ownerId];
+  held[ownerId] = bucket;   // newest last
+  const ids = Object.keys(held);
+  while (ids.length > OWNER_STATS_MAX) delete held[ids.shift()];
+  try { localStorage.setItem(OWNER_STATS_KEY, JSON.stringify(held)); } catch (e) { /* the figures go with the wipe */ }
+}
+
+// What the new account was in the middle of when it took the phone over (cloud.js
+// cloudHandoverLanded). Memory only, taken once.
+let _resetCarry = null;
+function resetTakeCarry() {
+  const c = _resetCarry;
+  _resetCarry = null;
+  return c;
 }
 
 // Fire and forget: the live page already emptied both stores, so this is tidying.
@@ -248,25 +336,47 @@ function _resetReload() {
 }
 
 function resetPerform(level) {
-  if (!_resetValidLevel(level) || _resetRunning) return Promise.resolve(false);
+  if (RESET_LEVELS.indexOf(level) === -1 || _resetRunning) return Promise.resolve(false);
   _resetRunning = true;
   const cert = (level === 'settings') ? _resetCertKeep() : null;
   const signOut = (level === 'everything' && _resetSignedIn() && typeof cloudSignOut === 'function')
     ? _resetWithin(cloudSignOut(), RESET_SIGNOUT_WAIT_MS) : Promise.resolve();
-  return signOut.then(() => {
+  return signOut.then(() => _resetLive({ level, cert, at: new Date().toISOString() }));
+}
+
+// V145 (2A, 5A): another account takes this phone over. cloud.js has checked the
+// owner's work is all in its cloud, twice. owner = the new account {id, email};
+// after = its next step, carried through the restart (cloud.js).
+function resetHandover(owner, after) {
+  if (!owner || typeof owner.id !== 'string' || !owner.id || _resetRunning) return Promise.resolve(false);
+  _resetRunning = true;
+  const old = (typeof cloudOwner === 'function') ? cloudOwner() : null;
+  _resetStashStats(old && old.id);
+  const who = { id: owner.id, email: owner.email || '' };
+  return _resetLive({ level: RESET_HANDOVER, cert: null, owner: who,
+    carry: { id: who.id, email: who.email, after: after || null }, at: new Date().toISOString() });
+}
+
+// The live page's pass (both kinds): neutralise, mark, wipe, clear the stores,
+// reload. The marker is what boot finishes from (resetRunPending).
+function _resetLive(m) {
+  return Promise.resolve().then(() => {
     // From here on nothing in memory may be written back or painted over.
     try { save = function () {}; } catch (e) {}
     try { saveSessions = function () {}; } catch (e) {}
     try { saveSettings = function () {}; } catch (e) {}
     try {
       const el = document.getElementById('app');
-      if (el) el.innerHTML = '<div class="screen reset-busy"><p>Resetting this phone&hellip;</p></div>';
+      if (el) el.innerHTML = m.level === RESET_HANDOVER
+        ? '<div class="screen reset-busy"><p>Setting up this phone for ' + escapeHTML((m.owner && m.owner.email) || 'your account') + '&hellip;</p></div>'
+        : '<div class="screen reset-busy"><p>Resetting this phone&hellip;</p></div>';
     } catch (e) {}
     try { render = function () {}; } catch (e) {}
-    const marker = JSON.stringify({ level, cert, at: new Date().toISOString() });
+    const marker = JSON.stringify(m);
     let marked = false;
     try { localStorage.setItem(RESET_PENDING_KEY, marker); marked = true; } catch (e) { /* full: wipe first */ }
-    _resetWipeLocal(level, cert);
+    _resetWipeLocal(m.level, m.cert);
+    _resetAfterWipe(m);
     if (!marked) { try { localStorage.setItem(RESET_PENDING_KEY, marker); } catch (e) {} }
     return _resetClearStores();
   }).then(() => { _resetReload(); return true; });

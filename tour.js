@@ -988,6 +988,7 @@ function _tutSafety() {
 const TUT_CLOUD_STUBS = {
   cloudAvailable: () => true,
   cloudPagesUnlocked: () => true,
+  cloudOwnerAllows: () => true,   // V145: the sample account owns the drawn phone (no stored login to judge by)
   syncStatusSummary: () => _tutSyncSummary(),
   syncHeldList: () => ((_tut && _tut.held) || []).slice(),
   syncJobsSafety: () => _tutSafety(),

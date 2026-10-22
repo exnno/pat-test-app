@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V144';
+const APP_VERSION = 'V145';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -133,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V144';
+const WELCOME_VERSION = 'V145';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -362,6 +362,28 @@ const CLOUD_ACCESS_CODE = '1111';
 // V144: an account counts as made just now when its address was confirmed within
 // this long of the sign-in (cloud.js cloudIsNewAccount — two server times).
 const CLOUD_NEW_ACCOUNT_MS = 5 * 60 * 1000;
+
+// V145 (Stage 13): ONE OWNER PER PHONE. OWNER_KEY = { id, email, at } — the
+// account this phone's jobs and setup belong to. Stamped by the first account
+// to sign in on a phone with no owner (8A: a free user's work carries across),
+// or at V145's first run from the sign-in on the phone / the account it last
+// synced to. Sync never runs as any other account (cloud.js cloudOwnerAllows,
+// sync.js syncActive and _syncRun), and another account takes the phone over
+// only once the owner's work is all in the cloud (1A, 2A — the handover, a
+// level of reset.js). Per device: NEVER in a backup's data or a setup export
+// (a backup records its account separately, backup.js). Reset: 'work' — and
+// re-stamped from the reset's marker while someone is signed in.
+const OWNER_KEY = 'pat:owner';
+// V145 (Q6 — until the stats follow the account): the lifetime-stats bucket of
+// each account that handed this phone over — { accountId: bucket } — so it
+// comes back if that account signs in here again. Small (a bucket is three numbers and up to 50 names),
+// capped at OWNER_STATS_MAX accounts. Per device, never backed up. Reset: 'work'.
+// Retired when the stats follow the account through the cloud (roadmap).
+const OWNER_STATS_KEY = 'pat:ownerStats';
+const OWNER_STATS_MAX = 20;
+// 4A: before a sign-out, one last sync — waited for at most this long, then
+// whatever is still unsent is counted and the warning shows.
+const CLOUD_SIGNOUT_SYNC_MS = 20000;
 
 // ---- V127: the plan — trial end, grace, the lock (plan.js) -------------------
 // PLAN_KEY: what this phone last learned about the signed-in account's plan, so

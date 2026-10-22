@@ -329,6 +329,10 @@ let state = {
   //   card is finishing a NEW account (no Cancel); welcome — 'due' once an
   //   account was made just now, 'shown' after the welcome sheet; 'had' when
   //   the Create card signed in an account that already existed (a line).
+  //   V145 (one owner per phone): handover — { id, email, from, after? } while a
+  //   different account is asking to take over a phone whose owner's work is all
+  //   in the cloud (2A; the Account page shows the question); signingOut — the
+  //   last sync before a sign-out is running (4A).
   // Replaces the V43 mock's userId/authToken/authStatus.
   cloud: {
     status: 'off', busy: false, email: '',
@@ -336,6 +340,7 @@ let state = {
     useCode: false, forgot: false, pwOpen: false, pwReset: false,
     google: '', googlePending: '', googleOff: false,
     signup: false, pwNew: false, welcome: '',
+    handover: null, signingOut: false,
   },
   // v80: sync (sync.js). TRANSIENT, like `cloud` — the durable part (what was
   // sent, what was read, and when) lives in SYNC_STATE_KEY, owned by sync.js.

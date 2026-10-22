@@ -946,7 +946,11 @@ registerActions({
   'cloud-signup-close': () => { if (typeof cloudSignupClose === 'function') cloudSignupClose(); },
   'cloud-signup-send':  () => { if (typeof cloudSignupSend === 'function') cloudSignupSend(); },
   'cloud-check':      () => { if (typeof cloudCheckConnection === 'function') cloudCheckConnection(); },
-  'cloud-sign-out':   () => { if (typeof cloudSignOut === 'function') cloudSignOut(); },
+  // V145 (4A): the button asks — one last sync, then the warning if anything is unsent.
+  'cloud-sign-out':   () => { if (typeof cloudSignOutAsk === 'function') cloudSignOutAsk(); else if (typeof cloudSignOut === 'function') cloudSignOut(); },
+  // V145 (2A): another account taking this phone over (cloud.js), same guarding.
+  'cloud-handover-go':     () => { if (typeof cloudHandoverGo === 'function') cloudHandoverGo(); },
+  'cloud-handover-cancel': () => { if (typeof cloudHandoverCancel === 'function') cloudHandoverCancel(); },
   // v80: sync (sync.js), same guarding. "Re-send all" ignores the fingerprints
   // and sends every job again — the fix for a cloud copy that looks wrong.
   'sync-push':        () => { if (typeof syncPush === 'function') syncPush({ manual: true, pull: true }); },

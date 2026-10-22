@@ -1,4 +1,4 @@
-# PATGo — Code Map (V144)
+# PATGo — Code Map (V145)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -275,6 +275,19 @@ is discoverable from the file you happen to be editing.
     `_SYNC_DELETABLE_KINDS`. ⚠ A run while due always READS first (`reads`),
     whatever triggered it. Snapshot copy first (snapshots.js
     `snapshotBeforeCloudCheck`); no copy → ask. Harness 66.
+
+29. **One owner per phone (V145).** `OWNER_KEY` (config.js) = the account the
+    phone's jobs and setup belong to. Sync runs ONLY as the owner: cloud.js
+    `cloudOwnerAllows` is checked by sync.js `syncActive` (no trigger fires) and
+    by `_syncRun` against the LIVE session (the account a write is filed under).
+    Every sign-in lands through `_cloudSignedIn` → `_cloudOwnerLanding`: no
+    owner → adopted (8A); another account → asked to take over if
+    `syncOwnerPending(owner)` is 0 (2A, `state.cloud.handover`), else signed
+    straight out (1A). ⚠ A NEW THING THAT SYNCS must be counted in sync.js
+    `syncOwnerPending`, or a takeover can wipe it unsent (84b). ⚠ A NEW STORAGE
+    KEY: `RESET_KEY_PLAN` (rule 17) AND, if it is this phone's own preference
+    (doesn't sync), `RESET_HANDOVER_KEEP` — everything else of ours goes at a
+    takeover. Harness 84.
 
 ---
 
@@ -635,7 +648,7 @@ fixed MIXED list of types as passes; ×N repeats ONE item, whatever its result.
 `focusBeforeRender`, `focusAfterRender`, `focusSheetOpened/Closed`,
 `focusMarkLogged`; V129 `FOCUS_STAND_INS`, `focusStandIn`, `focusControl`), `showToast`, the shared `.bulk-sheet` dialog builders (`openConfirmSheet`,
 `openNameSheet`, `openInfoSheet`, v91 `openChoiceSheet` — two or more choices +
-Cancel), feedback channels.
+Cancel; V145 `noCancel` drops the Cancel when a choice says it), feedback channels.
 **Touch to:** change feedback channels, toasts, spoken messages, or the shared dialogs.
 **Coupling:** rule 11 — every destructive confirm in the app routes here. No
 state, no re-render. Loads before everything that toasts. Rule 21: `announce`
@@ -730,6 +743,12 @@ sync fingerprints (SYNC_STATE_KEY) are NEVER in a backup. Harness 16j.
 backup interval comes from `backupReminderDays()` ('off' silences even
 "never backed up"); `BACKUP_REMINDER_DAYS` is only the default. ⚠ Instruments restore **after** the flat fields. Boolean flags restore
 only when the backup actually holds a boolean (absence ≠ off).
+⚠ V145 (7A): `buildBackup` carries `owner` {id, email} (`backupOwnerField`, from
+cloud.js `cloudOwner`; absent when unowned). `backupRestoreVerdict` decides a FILE
+restore before any question: another account's → refused (info sheet); none
+recorded on a phone with an account → asked first ("Restore into …?"); a phone
+with no account → adopts the backup's (`cloudOwnerSet` after the apply). A
+snapshot restore is the phone's own — not checked. Harness 84e.
 
 ### snapshots.js (~410 ln) — daily snapshots (V105, S14) — OPTIONAL SUBSYSTEM
 V128: `snapshotBeforeCloudCheck` — slot `before-cloud-check` (kind 'before',
@@ -757,8 +776,15 @@ switch OFF — it exists only when a restore is about to replace everything.
 ⚠ Reset this phone (V106, reset.js) clears this store live and deletes the
 database at boot; the reset reaches `_snapTx`/`_snapCache` directly.
 
-### reset.js (~450 ln) — Reset this phone (V106, Stage 10 pt 2) — OPTIONAL SUBSYSTEM
-Three levels: work / + settings / + everything (sign-in). The page
+### reset.js (~540 ln) — Reset this phone (V106, Stage 10 pt 2) + the takeover (V145) — OPTIONAL SUBSYSTEM
+Three levels: work / + settings / + everything (sign-in). V145: a fourth,
+`RESET_HANDOVER`, never on the page — cloud.js `cloudHandoverGo` → `resetHandover`
+(stashes the old owner's stats in OWNER_STATS_KEY, `_resetLive` with an owner +
+carry in the marker). Its wipe keeps `RESET_HANDOVER_KEEP` (this phone's own
+preferences), 'patgo:' (the new login), What's-new markers; `_resetAfterWipe`
+(both passes) re-stamps the owner and returns the new owner's stashed stats;
+`resetTakeCarry` hands boot the new account's next step. OWNER_KEY is 'account':
+only Everything frees a phone. The page
 (`renderSettingsReset`, last row in Data), the confirm sheet (`resetOpen`,
 typed RESET, deleted/kept overview from `resetOverview`), the wipe
 (`_resetWipeLocal`, table `RESET_KEY_PLAN` — rule 17) and the boot pass
@@ -1303,7 +1329,7 @@ V141: About → Privacy is a SUMMARY of the website's privacy policy plus a plai
 opens it). ⚠ Keep the summary and the policy saying the same thing: change one,
 change the other. Harness 80a–80e, M1380–M1392.
 
-### cloud.js (~900 ln) — cloud sign-in — NEW v79, password V139, Google V140, sign-up V144
+### cloud.js (~1150 ln) — cloud sign-in — NEW v79, password V139, Google V140, sign-up V144, one owner per phone V145
 Sign-in (Supabase): email + password (V139) or an emailed code (v79); session state in `state.cloud`, the TEST strip
 and version tag, lazy load of `supabase.umd.js`. v85: the Cloud access code —
 `cloudPagesUnlocked()`, `cloudUnlock()`, `CLOUD_UNLOCK_KEY` (config.js; per
@@ -1356,8 +1382,28 @@ the plan read, which clears the message). Google: a new account → `welcome: 'd
 `cloudMaybeWelcome()` (after the password save, and at the end of `_cloudAfterSignIn`)
 calls plan.js `planShowWelcome` (guarded). Dashboard: "Allow new users to sign up" ON;
 "Confirm signup" email template shows `{{ .Token }}`. Harness 83a–83c, M1486–M1514.
+V145: ONE OWNER PER PHONE (rule 29). Section "V145: one owner per phone" after
+`cloudUserId`: `cloudOwner` (memoised; `cloudOwnerSet` clears it), `cloudOwnerAllows`,
+`cloudOwnerName`, `cloudPendingWords`, `_cloudOwnerLanding` (from `_cloudSignedIn`,
+which now RETURNS whether the sign-in stands — callers apply their pwOpen / welcome
+only then, else carry them in `state.cloud.handover.after`). `_cloudAfterSignIn`
+stops while refused or asked (no profile read, no sync, no welcome). `cloudBoot`:
+`_cloudOwnerFirstRun` (signed in → that account; else SYNC_STATE_KEY's userId),
+then a stored login that isn't the owner's is dropped. `_cloudSweepLogin` (storage)
+/ `_cloudForgetLogin` (+ the library). Section "V145: signing out (4A) and the
+takeover (2A)" before the access code: `cloudSignOutAsk` (the button: one last
+`syncPush` via `syncWhenIdle`, CLOUD_SIGNOUT_SYNC_MS at most, then
+`cloudSignOutWarn` — feedback.js `openChoiceSheet` with `noCancel`),
+`cloudHandoverGo` (counts AGAIN, then reset.js `resetHandover`),
+`cloudHandoverCancel`, `cloudHandoverLanded` (boot, after the restart: reset.js
+`resetTakeCarry`). Card markup: render-help.js `#cloud-handover`. Harness 84.
 
-### sync.js (~4950 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check
+### sync.js (~5030 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner
+⚠ V145 (rule 29): `syncActive` and `_syncRun` (stage 'owner', before anything is
+read) refuse any account but the phone's owner. `syncOwnerPending(ownerId)`
+(section before `syncSafetyText`) counts the owner's unsent jobs / photos /
+other from the STORED bookkeeping (works while another account is signed in) —
+it mirrors the three pushes' "would send" tests; keep them in step.
 ⚠ V128 (rule 27): section "the stale-phone check" before the push.
 `syncCheckDue` (per table: jobs / rec / ph; `seenAllAt` = when a pull last
 decided every row, cursor as stand-in) → `_syncCheckRun` (memo 1 h) →

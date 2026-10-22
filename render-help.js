@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V144: rolled forward — V144 on top, V141 dropped. -->
+      <!-- v8: rolling 3-version changelog. V145: rolled forward — V145 on top, V142 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V145</strong> &middot; October 2026</p>
+        <p class="muted">A phone&rsquo;s jobs belong to one account, and are never sent into another. Signing out sends your last changes first and warns you if anything hasn&rsquo;t reached the cloud. Backups remember their account.</p>
         <p><strong>V144</strong> &middot; October 2026</p>
         <p class="muted">You can create your own cloud account from Settings, by email or with Google, with a 30-day free trial and no card needed. The Account page shows how many days of the trial are left.</p>
         <p><strong>V143</strong> &middot; October 2026</p>
         <p class="muted">PATGo confirms your plan online at least once every 30 days. When a subscription ends there are 7 days&rsquo; grace from that date, and cloud syncing pauses a week after the account locks &mdash; your work stays safe on the phone and uploads once you renew.</p>
-        <p><strong>V142</strong> &middot; October 2026</p>
-        <p class="muted">Cloud accounts can subscribe from Settings, paying securely through Stripe, and manage or cancel their plan there too. Subscribing during the free trial keeps the rest of it.</p>
 
 
 
@@ -444,8 +444,23 @@ function renderCloudAccount() {
         <button class="backup-action-btn" id="cloud-check" data-action="cloud-check" ${dis} style="margin-top:8px">${busy ? 'Checking…' : 'Check connection'}</button>
         <button class="backup-action-btn" id="cloud-password-open" data-action="cloud-password-open" ${dis} style="margin-top:6px">Set or change password</button>
         ${googleBlock}
-        <button class="backup-action-btn" id="cloud-sign-out" data-action="cloud-sign-out" ${dis} style="margin-top:6px">Sign out</button>`;
-    body = `
+        <button class="backup-action-btn" id="cloud-sign-out" data-action="cloud-sign-out" ${dis} style="margin-top:6px">${c.signingOut ? 'Sending your last changes…' : 'Sign out'}</button>`;
+    // V145 (2A): a different account asking to take over this phone. Nothing of
+    // the owner's is shown or sent meanwhile; Cancel signs this account out.
+    const h = c.handover;
+    if (h) {
+      const from = h.from || (typeof cloudOwnerName === 'function' ? cloudOwnerName() : 'another account');
+      const to = h.email || c.email || 'this account';
+      body = `
+      <div class="info-card" id="cloud-handover">
+        <h3>Take over this phone?</h3>
+        <p id="cloud-handover-words">This phone has ${escapeHTML(from)}&rsquo;s jobs and setup &mdash; all safe in ${escapeHTML(from)}&rsquo;s cloud.
+          To use ${escapeHTML(to)} here they come off this phone; ${escapeHTML(from)} gets them back by signing in again.</p>
+        ${msg}
+        <button class="btn-primary" id="cloud-handover-go" data-action="cloud-handover-go" ${dis} style="margin-top:10px;width:100%">${busy ? 'Setting up…' : 'Use ' + escapeHTML(to) + ' here'}</button>
+        <button class="backup-action-btn" id="cloud-handover-cancel" data-action="cloud-handover-cancel" ${dis} style="margin-top:6px">Cancel</button>
+      </div>`;
+    } else body = `
       <div class="info-card">
         <h3>Signed in as</h3>
         <p id="cloud-signed-in-email"><strong>${escapeHTML(c.email || '(unknown)')}</strong></p>
