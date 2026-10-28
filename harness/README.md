@@ -334,6 +334,19 @@ bug; leaving it red trains everyone to ignore the suite.
   second time, which resets `state.view` and hides where boot landed (84c).
   (4) A job made with a NEW client also leaves an unsent client — counts read
   "1 job and other changes"; reuse the synced client to test "1 job".
+  V146 (group 85): the field bug-fix release. (1) A job "not on this phone"
+  with known cloud photos is made by removing it the way "Remove from this
+  phone" leaves it (`offPhone`: off `state.sessions`, recorded in
+  `pat:syncPruned`, its local photo records gone) — known photos stay in
+  `st.ph.sent`, which is what the field saw. (2) Photos go up a few a run:
+  run the sync a few times before asserting they are known. (3) Test-shape
+  change: Job settings' draft holds `client` and `site` apart — 35f and the 49
+  paints set both (`ef-client` is a Back-guard field now). (4) The tutorial
+  card's slide is tested on a stub element (`_tutCardAt`, `_tutFadeIn`): the
+  stub's innerHTML isn't parsed, so a rendered card has no `.tut-text` child —
+  the words' fade is source-guarded. Reduced motion via `matchMedia` in the
+  boot options. (5) `exportStatus` says 'exported' for a clean export, not
+  'clean' — compare before/after rather than naming it.
 
 ---
 

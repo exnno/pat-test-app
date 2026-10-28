@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V145';",
-    to:   "const APP_VERSION = 'V144';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V146';",
+    to:   "const APP_VERSION = 'V145';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143).
-    from: '        <p><strong>V143</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V141</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V142</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 84e)',
+    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146).
+    from: '        <p><strong>V144</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V142</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V143</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 85e)',
   },
 
   {
@@ -2921,8 +2921,8 @@ const MUTATIONS = [
   {
     name: "M397 (V90) opening the manager looks in the cloud by itself",
     file: "settings-actions.js",
-    from: "  setView('photoManager');\n  photoMgrLoadThumbs();\n}",
-    to:   "  setView('photoManager');\n  photoMgrLoadThumbs();\n  photoMgrLook();\n}",
+    from: "  photoMgrLoadThumbs();\n  _pmNameJobs();   // V146 (1A)\n}",
+    to:   "  photoMgrLoadThumbs();\n  _pmNameJobs();   // V146 (1A)\n  photoMgrLook();\n}",
     why:  "3A/R17: the cloud read is a tap, never automatic (27c)",
   },
   {
@@ -6115,9 +6115,10 @@ const MUTATIONS = [
     // V143: welcome rolled (one line) — re-aimed at it; 82e pins it.
     // V144: welcome rolled (two lines) — re-aimed at the first; 84e pins it.
     // V145: welcome rolled (two lines) — re-aimed at the first; 84e pins it.
-    from: "<li><strong>Your jobs stay yours.</strong>",
+    // V146: welcome rolled (four lines) — re-aimed at the first; 85e pins it.
+    from: "<li><strong>Typing a description.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (84e)",
+    why:  "11A: the welcome says plainly what changed on screen (85e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8596,9 +8597,9 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V145';",   // V145: re-aimed
-    to:   "const WELCOME_VERSION = 'V144';",
-    why:  "a behaviour release says what's new (84e)",
+    from: "const WELCOME_VERSION = 'V146';",   // V145: re-aimed. V146: re-aimed.
+    to:   "const WELCOME_VERSION = 'V145';",
+    why:  "a behaviour release says what's new (85e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
@@ -8606,9 +8607,10 @@ const MUTATIONS = [
     // V134: re-aimed at V134's one line. V135: re-aimed at V135's one line. V136: at V136's. V137: at V137's. V138: at V138's. V139: at V139's. V140: at V140's. V141: at V141's. V142: at V142's. V143: at V143's.
     // V144: two lines — re-aimed at the second's end; still caught by the count.
     // V145: two lines again — re-aimed at the second's end.
-    from: "Backups now remember which account they belong to.</li>\n",
-    to:   "Backups now remember which account they belong to.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "two lines (84e)",
+    // V146: four lines — re-aimed at the last one's end; still caught by the count.
+    from: "and the tutorials move smoothly.</li>\n",
+    to:   "and the tutorials move smoothly.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "four lines (85e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8620,9 +8622,10 @@ const MUTATIONS = [
     // V142: re-aimed at V142's own (V141's moves to M1259, V140's to M1238).
     // V143: re-aimed at V143's own (V142's moves to M1259, V141's to M1238).
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
-    from: "A phone&rsquo;s jobs belong to one account, and are never sent into another.",
+    // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
+    from: "Tapping the description box empties it, ready for a new word, and suggestions no longer vanish",
     to:   "Better",
-    why:  "the About page must say what changed in this version (84e)",   // V145: re-aimed at V145's line
+    why:  "the About page must say what changed in this version (85e)",   // V146: re-aimed at V146's line
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8735,9 +8738,10 @@ const MUTATIONS = [
     // V142: V139's line rolled off — re-aimed at V140's, the oldest now.
     // V143: V140's line rolled off — re-aimed at V141's, the oldest now.
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
-    from: "PATGo confirms your plan online at least once every 30 days. When a subscription ends",
+    // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
+    from: "You can create your own cloud account from Settings, by email or with Google, with a 30-day free trial",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (84e)",   // V145: re-aimed at V143's, the oldest now
+    why:  "the About page keeps the last three versions' lines (85e)",   // V146: re-aimed at V144's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8895,9 +8899,10 @@ const MUTATIONS = [
     // V142: V140's line is the oldest now (M1238) — re-aimed at V141's, still in the window.
     // V143: V141's line is the oldest now (M1238) — re-aimed at V142's, still in the window.
     // V145: re-aimed at V144's, still in the window.
-    from: "You can create your own cloud account from Settings, by email or with Google",
+    // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
+    from: "A phone&rsquo;s jobs belong to one account, and are never sent into another.",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (84e)",   // V145: re-aimed at V144's
+    why:  "the About page keeps the last three versions' lines (85e)",   // V146: re-aimed at V145's
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9024,9 +9029,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v145';",   // V145: re-aimed (→ 84e)
-    to:   "const CACHE_VERSION = 'pat-v144';",
-    why:  "a release needs its cache bump or phones never get it (84e)",
+    from: "const CACHE_VERSION = 'pat-v146';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e).
+    to:   "const CACHE_VERSION = 'pat-v145';",
+    why:  "a release needs its cache bump or phones never get it (85e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -11046,6 +11051,259 @@ const MUTATIONS = [
     from: "  cloudOwnerAllows: () => true,   // V145: the sample account owns the drawn phone (no stored login to judge by)\n",
     to:   "",
     why:  "the tutorials' signed-in phone would draw as signed out — the cloud steps lose their targets (75c 75d)",
+  },
+  // ---- V146 (1A 2A 3A 4A 5A 6A 8A): the field bug-fix release. Group 85 + M1564–M1599. ----
+  {
+    name: "M1564 (V146) the manager opens without reading its jobs' names",
+    file: "settings-actions.js",
+    from: "  photoMgrLoadThumbs();\n  _pmNameJobs();   // V146 (1A)\n}",
+    to:   "  photoMgrLoadThumbs();\n}",
+    why:  "1A: the headings stay \"A job not on this phone\" (85a)",
+  },
+  {
+    name: "M1565 (V146) the names read asks about jobs on this phone too",
+    file: "settings-actions.js",
+    from: "  for (const id of Object.keys(known)) { const s = String((known[id] || {}).s || ''); if (s && !onPhone.has(s)) ids.add(s); }",
+    to:   "  for (const id of Object.keys(known)) { const s = String((known[id] || {}).s || ''); if (s) ids.add(s); }",
+    why:  "1A: only jobs NOT on this phone are asked about \u2014 the phone names its own (85a)",
+  },
+  {
+    name: "M1566 (V146) the headings ignore the names read",
+    file: "settings-actions.js",
+    from: "  const j = from(cl) || from(nm);",
+    to:   "  const j = from(cl);",
+    why:  "1A: the names come back and the heading still says \"A job not on this phone\" (85a)",
+  },
+  {
+    name: "M1567 (V146) a job deleted in the cloud keeps a heading",
+    file: "settings-actions.js",
+    from: "  const asked = asks(cl) || asks(nm);",
+    to:   "  const asked = asks(cl);",
+    why:  "5A, as the look: a deleted job's photos have no job (85a)",
+  },
+  {
+    name: "M1568 (V146) leaving the manager keeps the names",
+    file: "settings-actions.js",
+    from: "    names: null,   // V146 (1A): the names of jobs not on this phone (_pmNameJobs)\n",
+    to:   "    names: old.names || null,\n",
+    why:  "1A: nothing read is kept after the manager closes (85a)",
+  },
+  {
+    name: "M1569 (V146) an unnamed heading doesn't say why",
+    file: "render-review.js",
+    from: "(pm.names && pm.names.loading ? 'finding its name\\u2026' : 'its name shows when you\\u2019re connected')",
+    to:   "'not on this phone'",
+    why:  "1A: with no signal the heading says its name comes when connected (85a)",
+  },
+  {
+    name: "M1570 (V146) the names read downloads whole jobs",
+    file: "sync.js",
+    from: "      chain = chain.then(() => c.from('sessions').select(_SYNC_BROWSE_JOB_COLS).eq('user_id', uid).in('id', chunk))\n        .then((r) => {\n          if (r && r.error) throw r.error;\n          for (const j of ((r && r.data) || [])) {\n            const id = String(j && j.id != null ? j.id : '');\n            if (id) res.jobs[id] = _syncBrowseJobOf(j);",
+    to:   "      chain = chain.then(() => c.from('sessions').select('id,doc,deleted,' + _SYNC_BROWSE_JOB_COLS.slice(11)).eq('user_id', uid).in('id', chunk))\n        .then((r) => {\n          if (r && r.error) throw r.error;\n          for (const j of ((r && r.data) || [])) {\n            const id = String(j && j.id != null ? j.id : '');\n            if (id) res.jobs[id] = _syncBrowseJobOf(j);",
+    why:  "R17: names only \u2014 a job's items never come down to name it (85a)",
+  },
+  {
+    name: "M1571 (V146) the names read isn't scoped to the account",
+    file: "sync.js",
+    from: "      chain = chain.then(() => c.from('sessions').select(_SYNC_BROWSE_JOB_COLS).eq('user_id', uid).in('id', chunk))\n        .then((r) => {\n          if (r && r.error) throw r.error;\n          for (const j of ((r && r.data) || [])) {\n            const id = String(j && j.id != null ? j.id : '');\n            if (id) res.jobs",
+    to:   "      chain = chain.then(() => c.from('sessions').select(_SYNC_BROWSE_JOB_COLS).in('id', chunk))\n        .then((r) => {\n          if (r && r.error) throw r.error;\n          for (const j of ((r && r.data) || [])) {\n            const id = String(j && j.id != null ? j.id : '');\n            if (id) res.jobs",
+    why:  "this account's jobs only (85a)",
+  },
+  {
+    name: "M1572 (V146) Lock job is unwired",
+    file: "dispatch.js",
+    from: "  'reopen-lock': () => lockFromReopenWarning(),     // V146 (2A)",
+    to:   "  'reopen-lock': () => {},",
+    why:  "2A: the button must lock the job (85b)",
+  },
+  {
+    name: "M1573 (V146) Lock job leaves no lock time",
+    file: "session.js",
+    from: "    s.locked = true;\n    s.lockedAt = new Date().toISOString();\n    save();\n    showToast('Job locked');",
+    to:   "    s.locked = true;\n    save();\n    showToast('Job locked');",
+    why:  "V100: a locked job carries its lock time (85b)",
+  },
+  {
+    name: "M1574 (V146) Lock job isn't saved",
+    file: "session.js",
+    from: "    s.lockedAt = new Date().toISOString();\n    save();\n    showToast('Job locked');",
+    to:   "    s.lockedAt = new Date().toISOString();\n    showToast('Job locked');",
+    why:  "2A: the lock must survive a restart (85b)",
+  },
+  {
+    name: "M1575 (V146) Lock job opens the job",
+    file: "session.js",
+    from: "    showToast('Job locked');\n  }\n  render();\n}",
+    to:   "    showToast('Job locked');\n  }\n  openSession(id);\n}",
+    why:  "2A: locking stays on the Jobs list (85b)",
+  },
+  {
+    name: "M1576 (V146) the popup has no Lock job",
+    file: "render-core.js",
+    from: "          <button class=\"btn-secondary reopen-unmark reopen-lock\" id=\"reopen-warn-lock\" data-action=\"reopen-lock\">${icon('lock')} Lock job</button>\n",
+    to:   "",
+    why:  "2A (85b)",
+  },
+  {
+    name: "M1577 (V146) Job settings opens with the two combined",
+    file: "session.js",
+    from: "    client: parts.client,\n    site: parts.site,",
+    to:   "    client: '',\n    site: sess.site || '',",
+    why:  "3A: the field report \u2014 Client and Site in their own boxes (85c)",
+  },
+  {
+    name: "M1578 (V146) an untouched Job settings looks changed",
+    file: "session.js",
+    from: "    editFormSiteText(f) !== String(sess.site || '') ||",
+    to:   "    String(f.site || '') !== String(sess.site || '') ||",
+    why:  "the Back guard would ask about a page nobody touched (85c 49b)",
+  },
+  {
+    name: "M1579 (V146) Save drops the client",
+    file: "session.js",
+    from: "  const site = editFormSiteText(state.editForm);",
+    to:   "  const site = String(state.editForm.site || '');",
+    why:  "3A: Save must join them back (85c)",
+  },
+  {
+    name: "M1580 (V146) the client link doesn't follow the client",
+    file: "session.js",
+    from: "    sess.clientId = linkedClient ? linkedClient.id : '';\n",
+    to:   "",
+    why:  "3A: the Retests list would name the old client (85c)",
+  },
+  {
+    name: "M1581 (V146) the client box isn't read off the page",
+    file: "session.js",
+    from: "  if ($('ef-client')) f.client = $('ef-client').value;   // V146 (3A)\n",
+    to:   "",
+    why:  "the Back guard's Save would lose a typed client (85c)",
+  },
+  {
+    name: "M1582 (V146) the site suggestions don't follow the client",
+    file: "dispatch.js",
+    from: "    if (dl && typeof efSiteOptionsHTML === 'function') dl.innerHTML = efSiteOptionsHTML(v);\n",
+    to:   "",
+    why:  "3A: the site list stays the old client's (85c)",
+  },
+  {
+    name: "M1583 (V146) Job settings shows no client box",
+    file: "render-review.js",
+    from: "        <input aria-label=\"Client\" class=\"input\" id=\"ef-client\" list=\"ef-client-list\" data-input-action=\"ef-client\" value=\"${escapeHTML(state.editForm.client || '')}\" placeholder=\"Optional\" autocomplete=\"off\">",
+    to:   "",
+    why:  "3A (85c)",
+  },
+  {
+    name: "M1584 (V146) the lists don't trim the ends",
+    file: "session.js",
+    from: "  return String(s == null ? '' : s).replace(/\\s+/g, ' ').trim().toLowerCase();",
+    to:   "  return String(s == null ? '' : s).replace(/\\s+/g, ' ').toLowerCase();",
+    why:  "4A: \"printer \" empties the list \u2014 the field report (85d)",
+  },
+  {
+    name: "M1585 (V146) the lists count a doubled space as two",
+    file: "session.js",
+    from: "  return String(s == null ? '' : s).replace(/\\s+/g, ' ').trim().toLowerCase();",
+    to:   "  return String(s == null ? '' : s).trim().toLowerCase();",
+    why:  "4A (85d)",
+  },
+  {
+    name: "M1586 (V146) the lists ignore every space",
+    file: "session.js",
+    from: "  return String(s == null ? '' : s).replace(/\\s+/g, ' ').trim().toLowerCase();",
+    to:   "  return String(s == null ? '' : s).replace(/\\s+/g, '').trim().toLowerCase();",
+    why:  "4A: the space between words must still count \u2014 \"kettle b\" is not \"kettleb\" (85d)",
+  },
+  {
+    name: "M1587 (V146) the location list keeps the stray space",
+    file: "session.js",
+    from: "  const q = suggestKey(query);   // V146 (4A)\n  if (!q) return [];\n  const sess = activeSession();",
+    to:   "  const q = String(query || '').toLowerCase();\n  if (!q) return [];\n  const sess = activeSession();",
+    why:  "4A: all four lists (85d)",
+  },
+  {
+    name: "M1588 (V146) tapping the description box doesn't empty it",
+    file: "events.js",
+    from: "      e.target.value = '';\n      state.suggestions = [];",
+    to:   "      state.suggestions = [];",
+    why:  "5A: the field report (85d)",
+  },
+  {
+    name: "M1589 (V146) tapping the description box pops the list up",
+    file: "events.js",
+    from: "      state.suggestions = [];\n      state.showSuggestions = false;\n      renderSuggestionsOnly();\n    };",
+    to:   "      state.suggestions = computeSuggestions(e.target.dataset.original);\n      state.showSuggestions = state.suggestions.length > 0;\n      renderSuggestionsOnly();\n    };",
+    why:  "4A/5A: the \"kettle\" half \u2014 a list under the finger as the box is tapped (85d)",
+  },
+  {
+    name: "M1590 (V146) left empty, the box stays empty",
+    file: "events.js",
+    from: "        const orig = e.target.dataset.original || '';\n        e.target.value = orig;",
+    to:   "        const orig = e.target.dataset.original || '';\n        e.target.value = '';",
+    why:  "5A: tapping away puts back what was there (85d)",
+  },
+  {
+    name: "M1591 (V146) typed then deleted, the type stays blank",
+    file: "events.js",
+    from: "        if (orig) {\n          state.form.itemType = orig;",
+    to:   "        if (orig) {\n          state.form.itemType = state.form.itemType;",
+    why:  "5A: the box says Kettle and the item would log with no type (85d)",
+  },
+  {
+    name: "M1592 (V146) Copy last drops a fail's reason",
+    file: "session.js",
+    from: "    notes: last.result === 'fail' ? (last.notes || '') : '',",
+    to:   "    notes: '',",
+    why:  "8A: the field report (85e)",
+  },
+  {
+    name: "M1593 (V146) Copy last copies a pass's notes",
+    file: "session.js",
+    from: "    notes: last.result === 'fail' ? (last.notes || '') : '',",
+    to:   "    notes: last.notes || '',",
+    why:  "8A: a pass still starts blank (85e)",
+  },
+  {
+    name: "M1594 (V146) the box goes back to top/left",
+    file: "tour.js",
+    from: "  ring.style.transform = 'translate3d(' + Math.round(r.left - pad) + 'px, ' + Math.round(r.top - pad) + 'px, 0)';",
+    to:   "  ring.style.top = Math.round(r.top - pad) + 'px';\n  ring.style.left = Math.round(r.left - pad) + 'px';",
+    why:  "6A: top/left redraw the whole dimmed screen each frame (85e)",
+  },
+  {
+    name: "M1595 (V146) the card jumps to a new end",
+    file: "tour.js",
+    from: "  _tutFadeIn(card, 'translateX(-50%) translateY(' + off + 'px)', 'translateX(-50%)', TUT_CARD_MS);",
+    to:   "",
+    why:  "6A (85e)",
+  },
+  {
+    name: "M1596 (V146) the card slides every redraw, not only a new end",
+    file: "tour.js",
+    from: "  _tut.cardEnd = end;\n  if (was === end) return;",
+    to:   "  _tut.cardEnd = end;",
+    why:  "6A: the card would bounce on every step (85e)",
+  },
+  {
+    name: "M1597 (V146) reduced motion still moves",
+    file: "tour.js",
+    from: "  if (!el || _tutReducedMotion()) return;\n  el.style.transition = 'none';",
+    to:   "  if (!el) return;\n  el.style.transition = 'none';",
+    why:  "reduced motion: nothing slides (85e)",
+  },
+  {
+    name: "M1598 (V146) the card's slide never finishes",
+    file: "tour.js",
+    from: "    el.style.opacity = '1';\n    el.style.transform = to;",
+    to:   "    el.style.transform = to;",
+    why:  "6A: the card would stay invisible (85e)",
+  },
+  {
+    name: "M1599 (V146) the What's new sheet loses Copy last's line",
+    file: "render-core.js",
+    from: "        <li><strong>Copy last keeps the fail reason.</strong> Copying a FAIL now carries its reason across.</li>\n",
+    to:   "",
+    why:  "four lines (85e)",
   },
 ];
 
