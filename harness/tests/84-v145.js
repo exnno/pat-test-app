@@ -36,8 +36,8 @@
           offline / a failed send → the warning, Stay signed in, Sign out anyway
           (the jobs stay, the owner stays).
      84e  backups (7A), the takeover's keep list (5A), the reset levels and the
-          owner; release: V145, cache, What's new, About; wiring; plus 83e's
-          lasting checks (83e retired). */
+          owner; wiring; plus 83e's lasting checks (83e retired). V146: its
+          release checks (V145, cache, What's new, About) moved to 85e. */
 
 'use strict';
 
@@ -503,7 +503,7 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 84e */
-  await t.group('84e — backups (7A), the keep list (5A), the reset levels; release: V145; 83e’s lasting checks', async () => {
+  await t.group('84e — backups (7A), the keep list (5A), the reset levels; 83e’s lasting checks', async () => {
     // ---- 7A backups.
     const own = freshApp({ localStorage: { [AUTH]: storedFor(A) }, navigator: { onLine: false } });
     t.deepEq(own.fn('buildBackup')().owner, { id: A.id, email: A.email }, 'a backup records its account (id and address only)');
@@ -569,28 +569,12 @@ module.exports = async function () {
     t.eq(owner(w), null, 'Everything, as new frees the phone');
     t.includes(read('cloud.js'), 'or save a backup, then Reset this phone (Everything, as new).', 'the refusal names that level');
 
-    // ---- release.
+    // ---- V145's release checks retired V146 (→ 85e). What lasts stays here.
     const app = freshApp();
-    t.eq(app.run('APP_VERSION'), 'V145', 'APP_VERSION V145');
-    t.eq(app.run('WELCOME_VERSION'), 'V145', 'What’s new rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v145';", 'cache key pat-v145');
     const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 2, 'What’s new: two lines');
-    t.includes(sheetCopy, '<li><strong>Your jobs stay yours.</strong>', '…Your jobs stay yours');
-    t.includes(sheetCopy, 'another account can only take the phone over once everything is safe in your cloud.', '…what it means');
-    t.includes(sheetCopy, '<li><strong>A safer sign-out.</strong>', '…A safer sign-out');
-    t.includes(sheetCopy, 'Backups now remember which account they belong to.', '…and backups');
     t.includes(core, 'New here? Try the practice job.', 'setup offers the practice job');
     t.includes(core, 'You can do it again any time from Settings → Help → Tutorials.', '…and says where it lives');
     const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V145</strong>'), b = help.indexOf('<p><strong>V144</strong>'), c = help.indexOf('<p><strong>V143</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V145, V144, V143');
-    t.excludes(help, '<p><strong>V142</strong>', 'V142 rolled off');
-    t.includes(help, 'A phone&rsquo;s jobs belong to one account, and are never sent into another.', 'About: V145’s line');
-    t.includes(help, 'You can create your own cloud account from Settings, by email or with Google, with a 30-day free trial', 'About: V144’s line still there');
-    t.includes(help, 'PATGo confirms your plan online at least once every 30 days. When a subscription ends', 'About: V143’s line still there');
     t.includes(help, 'data-action="settings-page" data-arg="settingsTutorials"', 'About points at Tutorials');
     const prices = app.run('PLAN_PRICES');
     t.deepEq({ year: prices.year, month: prices.month }, { year: '£60 a year', month: '£6 a month' }, 'the prices shown match the pricing round (1B)');

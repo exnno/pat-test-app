@@ -194,13 +194,16 @@ module.exports = async function () {
     const other = app.fn('ensureSite')(site.clientId, 'ZZOTHERSITE');
     app.fn('setSiteNotes')(other.id, 'ZZOTHERNOTES');
     app.fn('startEditSession')();
-    app.state().editForm.site = CANARY.client + ' \u2014 ZZOTHERSITE';
+    // V146 (3A): the form holds client and site in their own boxes.
+    app.state().editForm.client = CANARY.client;
+    app.state().editForm.site = 'ZZOTHERSITE';
     app.fn('saveSessionEdits')();
     t.eq(app.fn('activeSession')().siteId, other.id, 'linked to the site it now names');
     app.fn('setView')('overview');
     t.includes(app.html(), 'ZZOTHERNOTES', 'and shows that site\u2019s notes');
 
     app.fn('startEditSession')();
+    app.state().editForm.client = '';
     app.state().editForm.site = 'ZZNOWHERE';
     app.fn('saveSessionEdits')();
     t.eq(app.fn('activeSession')().siteId, '', 'a site not in the list → no link (no stale notes)');

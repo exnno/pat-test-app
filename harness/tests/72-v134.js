@@ -233,7 +233,8 @@ module.exports = async function () {
     t.includes(ring, 'border: 3px solid var(--accent);', 'the box is PATGo blue (3B)');
     t.includes(ring, 'pointer-events: none;', 'the box never takes a tap');
     const ms = Number((tour.match(/const TUT_GLIDE_MS = (\d+);/) || [])[1]);
-    t.includes(ring, `transition: top ${ms}ms ease, left ${ms}ms ease, width ${ms}ms ease, height ${ms}ms ease`, 'the glide is TUT_GLIDE_MS long');
+    // V146 (6A): the box glides by transform (not top/left), same length.
+    t.includes(ring, `transition: transform ${ms}ms cubic-bezier(0.22, 1, 0.36, 1), width ${ms}ms cubic-bezier(0.22, 1, 0.36, 1), height ${ms}ms cubic-bezier(0.22, 1, 0.36, 1)`, 'the glide is TUT_GLIDE_MS long');
     t.ok(/@media \(prefers-reduced-motion: reduce\) \{\s*\.tut-ring \{ transition: none; \}/.test(css), 'reduced motion: the box jumps');
     t.includes(rule('.tut-practice'), 'pointer-events: none;', 'nothing in the practice screen can be touched…');
     t.includes(css, '.tut-practice .tut-live,\n.tut-practice .tut-live * { pointer-events: auto;', '…but the highlighted control');

@@ -154,7 +154,7 @@ module.exports = async function () {
     const i = css.indexOf('\n.tut-practice {');
     t.excludes(css.slice(i, css.indexOf('}', i)), 'vh', 'no room added below the screen — the page is the real screen’s length');
     t.includes(read('tour.js'), "const pick = sheet ? { end: 'top', dy: 0 } : tutCardEnd(", 'a control in a sheet: the card at the top (browser check)');
-    t.includes(read('tour.js'), "if (_tut.screen && _tut.screen !== screen) { try { window.scrollTo(0, 0); }", 'a new screen starts at the top, as in the app');
+    t.includes(read('tour.js'), "if (newScreen) { try { window.scrollTo(0, 0); }", 'a new screen starts at the top, as in the app');
   });
 
   /* ------------------------------------------------------------------ 73d */

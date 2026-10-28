@@ -163,7 +163,7 @@ module.exports = async function () {
     app.fn('setView')('overview');
     app.fn('startEditSession')();
     const st = app.state(), f = st.editForm;
-    paint(app, { 'ef-site': f.site, 'ef-engineer': f.engineer, 'ef-name': f.name, 'ef-date': f.date, 'ef-prefix': f.prefix, 'ef-locked': false });
+    paint(app, { 'ef-client': f.client, 'ef-site': f.site, 'ef-engineer': f.engineer, 'ef-name': f.name, 'ef-date': f.date, 'ef-prefix': f.prefix, 'ef-locked': false });
     tapBack(app);
     t.eq(sheet(app), null, 'Edit session: no question');
     t.eq(app.state().view, 'overview', 'Edit session: back to the Overview');
@@ -303,7 +303,7 @@ module.exports = async function () {
     app.fn('setView')('overview');
     app.fn('startEditSession')();
     const f = () => app.state().editForm;
-    const vals = () => ({ 'ef-site': f().site, 'ef-engineer': f().engineer, 'ef-name': f().name, 'ef-date': f().date, 'ef-prefix': f().prefix, 'ef-locked': false });
+    const vals = () => ({ 'ef-client': f().client, 'ef-site': f().site, 'ef-engineer': f().engineer, 'ef-name': f().name, 'ef-date': f().date, 'ef-prefix': f().prefix, 'ef-locked': false });
     paint(app, vals());
     t.eq(actionOf(app, 'cancel-edit-btn'), 'edit-back', 'the header arrow is the guarded Back');
     app.doc.getElementById('ef-name').value = 'Job B';
