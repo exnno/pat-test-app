@@ -76,6 +76,12 @@ const TUT_PRESETS = [
 // The box's glide, and the pause after a log before it moves on (so the
 // button's flash is seen inside the box). The glide matches styles.css #tut-ring.
 const TUT_GLIDE_MS = 350;
+// V146 (6A): the card slides to its new end, the words of a new step fade in,
+// and a new screen fades up — so nothing on the practice jumps.
+const TUT_CARD_MS = 260;
+const TUT_TEXT_MS = 200;
+const TUT_SCREEN_MS = 220;
+const TUT_SLIDE_PX = 24;
 const TUT_PAUSE_MS = 650;
 
 // _tut while open: { id, st, from, cert, certNodes, said, sheet, screen, free, photoUrls }
@@ -1627,7 +1633,7 @@ function tutPlace(snap) {
   const el = _tut.free ? null : _tutTarget(s);
   if (!el) {
     ring.classList.add('tut-ring-off');
-    if (card && !_tut.free) { card.classList.remove('tut-card-top'); card.classList.add('tut-card-bottom'); }
+    if (card && !_tut.free) _tutCardAt(card, 'bottom');
     return;
   }
   ring.classList.remove('tut-ring-off');
@@ -1649,7 +1655,7 @@ function tutPlace(snap) {
   // certificate): the card goes to the top — the sheet can't scroll from under
   // it (found in the browser check: the certificate sat behind the card).
   const pick = sheet ? { end: 'top', dy: 0 } : tutCardEnd(r.top, r.bottom, cardH, vh);
-  if (card) { card.classList.toggle('tut-card-top', pick.end === 'top'); card.classList.toggle('tut-card-bottom', pick.end === 'bottom'); }
+  if (card) _tutCardAt(card, pick.end);
   if (pick.dy) {
     const smooth = !snap && !_tutReducedMotion();
     try { window.scrollBy({ top: pick.dy, behavior: smooth ? 'smooth' : 'auto' }); } catch (e) { window.scrollBy(0, pick.dy); }
@@ -1663,10 +1669,43 @@ function tutPlace(snap) {
   }
   const pad = 6;
   ring.classList.toggle('tut-ring-snap', !!snap);
-  ring.style.top = Math.round(r.top - pad) + 'px';
-  ring.style.left = Math.round(r.left - pad) + 'px';
+  // V146 (6A): moved by transform, sized by width/height (styles.css .tut-ring).
+  ring.style.transform = 'translate3d(' + Math.round(r.left - pad) + 'px, ' + Math.round(r.top - pad) + 'px, 0)';
   ring.style.width = Math.round(r.width + pad * 2) + 'px';
   ring.style.height = Math.round(r.height + pad * 2) + 'px';
+}
+
+// V146 (6A): the card goes to an end. A card is drawn afresh with every step,
+// so it can't simply glide: when its end CHANGES (or it first appears) it
+// slides in from that edge; otherwise it stays put and tutAfterRender fades
+// in the new step's words. _tut.cardEnd outlives the redraw that replaces it.
+function _tutCardAt(card, end) {
+  card.classList.toggle('tut-card-top', end === 'top');
+  card.classList.toggle('tut-card-bottom', end === 'bottom');
+  const was = _tut.cardEnd;
+  _tut.cardEnd = end;
+  if (was === end) return;
+  _tut.cardSlid = state.tourStep;
+  const off = end === 'top' ? -TUT_SLIDE_PX : TUT_SLIDE_PX;
+  _tutFadeIn(card, 'translateX(-50%) translateY(' + off + 'px)', 'translateX(-50%)', TUT_CARD_MS);
+}
+
+// One element fades (and slides) in. The skill's iOS rule for a node just
+// put on the page: inline styles, a forced reflow, then the change on the next
+// frame (setTimeout when there is no frame to wait for) — @keyframes on a fresh
+// fixed node can silently not run. Reduced motion: nothing moves.
+function _tutFadeIn(el, from, to, ms) {
+  if (!el || _tutReducedMotion()) return;
+  el.style.transition = 'none';
+  el.style.opacity = '0';
+  el.style.transform = from;
+  void el.offsetHeight;   // the start is drawn before the change
+  const go = () => {
+    el.style.transition = 'opacity ' + ms + 'ms ease, transform ' + ms + 'ms cubic-bezier(0.22, 1, 0.36, 1)';
+    el.style.opacity = '1';
+    el.style.transform = to;
+  };
+  if (typeof requestAnimationFrame === 'function') requestAnimationFrame(go); else setTimeout(go, 16);
 }
 
 // After every tutorial render: pass a `when` step that has nothing to show;
@@ -1678,7 +1717,8 @@ function tutAfterRender() {
   const s = _tutSteps()[state.tourStep];
   if (!_tut.free && s && s.when && !_tutTarget(s)) { state.tourStep += 1; render(); return; }
   const screen = _tut.st.view;
-  if (_tut.screen && _tut.screen !== screen) { try { window.scrollTo(0, 0); } catch (e) {} }
+  const newScreen = !!(_tut.screen && _tut.screen !== screen);
+  if (newScreen) { try { window.scrollTo(0, 0); } catch (e) {} }
   _tut.screen = screen;
   const box = document.getElementById('tut-cert-box');
   if (box && _tut.certNodes && _tut.certNodes.parentNode !== box) { box.innerHTML = ''; box.appendChild(_tut.certNodes); }
@@ -1688,6 +1728,19 @@ function tutAfterRender() {
   }
   const first = !document.getElementById('tut-ring');
   try { tutPlace(first); } catch (e) { console.error('Tutorial box not placed (non-fatal).', e); }
+  // V146 (6A): a new screen fades up under the box; a new step's words fade in
+  // when the card stayed at its end (a card that moved has already slid in).
+  // A log's pause repaints the same step — nothing moves for that.
+  if (!_tut.free) {
+    if (newScreen) _tutFadeIn(document.getElementById('tut-practice'), 'none', 'none', TUT_SCREEN_MS);
+    if (_tut.shownStep !== state.tourStep) {
+      if (_tut.shownStep != null && _tut.cardSlid !== state.tourStep) {
+        const card = document.getElementById('tut-card');
+        _tutFadeIn(card && card.querySelector('.tut-text'), 'translateY(4px)', 'none', TUT_TEXT_MS);
+      }
+      _tut.shownStep = state.tourStep;
+    }
+  }
   if (first) {
     const ring = document.getElementById('tut-ring');
     const lift = () => { if (ring) ring.classList.remove('tut-ring-snap'); };

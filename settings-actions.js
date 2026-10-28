@@ -93,7 +93,7 @@ const UNSAVED_PAGES = {
   settingsReport: { report: true, save: () => saveReportSettingsForm() },
   settingsReportContent: { report: true, save: () => saveReportSettingsForm() },   // V117 (1A): same object, same Save
   editSession: {
-    fields: ['#ef-site', '#ef-engineer', '#ef-name', '#ef-date', '#ef-prefix', '#ef-locked', '#ef-instrument'],
+    fields: ['#ef-client', '#ef-site', '#ef-engineer', '#ef-name', '#ef-date', '#ef-prefix', '#ef-locked', '#ef-instrument'],
     capture: () => captureEditSessionForm(),
     slice: () => state.editForm,
     save: () => { captureEditSessionForm(); saveSessionEdits(); },
@@ -1069,6 +1069,7 @@ function _pmReset(keepView) {
     shown: 0,
     busy: '',
     cloud: null,
+    names: null,   // V146 (1A): the names of jobs not on this phone (_pmNameJobs)
     preview: null,
     thumbGen: (old.thumbGen || 0) + 1,   // stops a preview round still going
   };
@@ -1115,6 +1116,34 @@ function photoMgrOpen() {
   _pmReset(false);
   setView('photoManager');
   photoMgrLoadThumbs();
+  _pmNameJobs();   // V146 (1A)
+}
+
+// V146 (1A): the manager opens with photos the phone already knows are in the
+// cloud for jobs no longer on it. Their headings used to say only "A job not on
+// this phone" until "Look in the cloud" was tapped. Now their names are read
+// once, quietly, as the manager opens (sync.js syncJobNames — five fields a
+// job, never a photo). No signal, or signed out: the heading stays unnamed and
+// says its name shows when connected. Nothing is kept after the manager closes.
+function _pmNameJobs() {
+  const pm = state.photoMgr;
+  if (!pm || !_pmVisible() || typeof syncJobNames !== 'function') return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) return;
+  const onPhone = new Set((state.sessions || []).map(x => String(x && x.id)));
+  const meta = state.photoMeta || {};
+  const known = state.photoCloud || {};
+  const ids = new Set();
+  for (const id of Object.keys(meta)) { const s = String((meta[id] || {}).s || ''); if (s && !onPhone.has(s)) ids.add(s); }
+  for (const id of Object.keys(known)) { const s = String((known[id] || {}).s || ''); if (s && !onPhone.has(s)) ids.add(s); }
+  if (!ids.size) return;
+  pm.names = { loading: true, ok: false, jobs: {}, asked: [] };
+  syncJobNames(Array.from(ids)).then((res) => {
+    if (state.photoMgr !== pm) return;             // left the screen meanwhile
+    pm.names = res && res.ok
+      ? { loading: false, ok: true, jobs: res.jobs || {}, asked: res.asked || [] }
+      : { loading: false, ok: false, jobs: {}, asked: [] };
+    if (state.view === 'photoManager') _pmPaint(false);
+  });
 }
 
 // Called by setView() on every navigation away. Cheap when there is nothing to do.
@@ -1138,10 +1167,13 @@ function _pmJobInfo(e, sessById, pm) {
     };
   }
   const cl = pm.cloud;
-  const j = (cl && cl.ok && cl.jobs) ? cl.jobs[e.s] : null;
-  // No job (5A) only when the look ASKED about it and the cloud had none, or a
-  // deleted one. A job never asked about (a capped look) is just unnamed.
-  const asked = !!(cl && cl.ok && Array.isArray(cl.asked) && cl.asked.indexOf(e.s) !== -1);
+  const nm = pm.names;   // V146 (1A): read as the manager opened
+  const asks = (x) => !!(x && x.ok && Array.isArray(x.asked) && x.asked.indexOf(e.s) !== -1);
+  const from = (x) => (x && x.ok && x.jobs && x.jobs[e.s]) || null;
+  const j = from(cl) || from(nm);
+  // No job (5A) only when the look (or the names read) ASKED about it and the
+  // cloud had none, or a deleted one. A job never asked about is just unnamed.
+  const asked = asks(cl) || asks(nm);
   if (asked && (!j || j.deleted)) {
     return { onPhone: false, locked: false, orphan: true, title: 'Photos with no job', client: '', date: '' };
   }
@@ -1150,7 +1182,7 @@ function _pmJobInfo(e, sessById, pm) {
     return { onPhone: false, locked: !!j.locked, orphan: false,
       title: j.site || j.name || 'Untitled job', client: c ? c.name : '', date: j.date || '' };
   }
-  return { onPhone: false, locked: false, orphan: false, title: 'A job not on this phone', client: '', date: '' };
+  return { onPhone: false, locked: false, orphan: false, title: 'A job not on this phone', client: '', date: '', unnamed: true };
 }
 
 // Everything the manager knows, as one list, plus the groups on screen.
@@ -1227,7 +1259,7 @@ function photoMgrModel() {
     let g = groups.get(key);
     if (!g) {
       g = { key, title: e.title, client: e.client, date: e.date, onPhone: e.onPhone, locked: e.locked,
-            orphan: e.orphan, photos: [], bytes: 0, last: '' };
+            orphan: e.orphan, unnamed: !!e.unnamed, photos: [], bytes: 0, last: '' };
       groups.set(key, g);
     }
     g.photos.push(e);

@@ -52,7 +52,7 @@ let state = {
   // neither client nor site is entered). '' = no error shown.
   newFormError: '',
   // v66: instrumentId added — the per-session instrument stamp, editable here.
-  editForm: { name: '', site: '', engineer: '', prefix: '', date: '', locked: false, instrumentId: '' },
+  editForm: { name: '', client: '', site: '', engineer: '', prefix: '', date: '', locked: false, instrumentId: '' },
   suggestions: [],
   showSuggestions: false,
   failModalOpen: false,
@@ -135,6 +135,7 @@ let state = {
     shown: 0,             // tiles shown (0 = one page)
     busy: '',             // progress text while an action runs
     cloud: null,          // { at, loading, error, rows: [], jobs: {}, capped }
+    names: null,          // V146 (1A): { loading, ok, jobs: {}, asked: [] } — job names read on open
     preview: null,        // { id, url, loading }
     thumbGen: 0,          // bumped to stop an older preview round
   },

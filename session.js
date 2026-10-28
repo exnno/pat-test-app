@@ -205,13 +205,23 @@ function findDuplicateAssetIndex(sess, assetNo, excludeCursor) {
   return -1;
 }
 
+// V146 (4A): what a suggestion list matches on — lower case, the ends trimmed
+// and any run of spaces counted as one. The field report: iPhone's predictive
+// text adds a space after a word picked from the bar ("printer "), and the list
+// emptied the moment the engineer went to tap it. The space BETWEEN words still
+// counts, so "kettle b" finds "Kettle Base" and two-word descriptions match
+// exactly as before. Matching only — what the engineer typed is never changed.
+function suggestKey(s) {
+  return String(s == null ? '' : s).replace(/\s+/g, ' ').trim().toLowerCase();
+}
+
 function computeSuggestions(query) {
-  if (!query || query.length < 1) return [];
-  const q = query.toLowerCase();
-  const quickLower = state.itemTypes.map(t => t.toLowerCase());
-  const all = state.descriptions.filter(t => !quickLower.includes(t.toLowerCase()));
-  const starts = all.filter(t => t.toLowerCase().startsWith(q) && t.toLowerCase() !== q);
-  const contains = all.filter(t => !t.toLowerCase().startsWith(q) && t.toLowerCase().includes(q));
+  const q = suggestKey(query);
+  if (!q) return [];
+  const quickLower = state.itemTypes.map(t => suggestKey(t));
+  const all = state.descriptions.filter(t => !quickLower.includes(suggestKey(t)));
+  const starts = all.filter(t => suggestKey(t).startsWith(q) && suggestKey(t) !== q);
+  const contains = all.filter(t => !suggestKey(t).startsWith(q) && suggestKey(t).includes(q));
   const merged = [...starts, ...contains];
 
   // v12: descriptions already used in the current session sort to the top of
@@ -250,10 +260,10 @@ function computeSuggestions(query) {
 // identical strings. Sort order is alphabetical, case-insensitive.
 // Cap at 5 to match the item-type list.
 function computeLocationSuggestions(query) {
-  if (!query || query.length < 1) return [];
+  const q = suggestKey(query);   // V146 (4A)
+  if (!q) return [];
   const sess = activeSession();
   if (!sess) return [];
-  const q = query.toLowerCase();
   const seen = new Set();
   const distinct = [];
   sess.items.forEach(it => {
@@ -262,7 +272,7 @@ function computeLocationSuggestions(query) {
     seen.add(loc);
     distinct.push(loc);
   });
-  const matches = distinct.filter(l => l.toLowerCase().includes(q));
+  const matches = distinct.filter(l => suggestKey(l).includes(q));
   matches.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
   return matches.slice(0, 5);
 }
@@ -1255,6 +1265,26 @@ function unmarkFromReopenWarning() {
   if (s && markSessionNotExported(s)) showToast('Marked as not exported');
   if (s) openSession(id, opts);
   else render();
+}
+
+// V146 (2A): "Lock job" on the reopen warning — an exported job is usually a
+// finished one, so it can be locked from here without opening it. Locks it the
+// way Job settings does (V100: the lock time stamped on the change to locked),
+// stays on the Jobs list, and says so. Unlocking stays where it was (the job's
+// own banner, or Job settings) — deliberate friction, as v8 set out. Read the
+// id BEFORE clearing it (MAP rule 4). save() is what keeps it (and syncs it).
+function lockFromReopenWarning() {
+  const id = state.exportWarnSessionId;
+  state.exportWarnSessionId = null;
+  pendingOpenOpts = null;
+  const s = id ? state.sessions.find(x => x.id === id) : null;
+  if (s && !s.locked) {
+    s.locked = true;
+    s.lockedAt = new Date().toISOString();
+    save();
+    showToast('Job locked');
+  }
+  render();
 }
 
 // Cancel the reopen warning → stay on the Sessions list.
@@ -2625,7 +2655,11 @@ function copyLastResult() {
     assetNo: state.form.assetNo.trim() || nextAssetNo(sess),
     location: normaliseLocation(state.form.location),
     itemType: last.itemType,
-    notes: '',
+    // V146 (8A): a fail's reason lives in its notes (pickFailReason), so a
+    // copied FAIL carries them — a fail with no reason is no use on a
+    // certificate. A pass still starts blank: its notes are usually about that
+    // one item. Readings and photos are never copied (they belong to the item).
+    notes: last.result === 'fail' ? (last.notes || '') : '',
     result: last.result
   };
   // V120 (2A): spoken after the save, as in saveItem — taken before the cursor moves.
@@ -3822,8 +3856,9 @@ function dupJobBlockReason(sess) {
 function editFormDirty(sess) {
   const f = state.editForm;
   if (!sess || !f) return false;
+  // V146 (3A): the form holds client and site apart; the job holds them joined.
   return String(f.name || '') !== String(sess.name || '') ||
-    String(f.site || '') !== String(sess.site || '') ||
+    editFormSiteText(f) !== String(sess.site || '') ||
     String(f.engineer || '') !== String(sess.engineer || '') ||
     String(f.prefix || '') !== String(sess.prefix || '') ||
     String(f.date || '') !== String(sess.date || '') ||
@@ -4062,9 +4097,14 @@ function _dupJobBuild(m, src, jobId, items) {
 function startEditSession() {
   const sess = activeSession();
   if (!sess) return;
+  // V146 (3A): the job's "Client — Site" text is shown as its two parts, in
+  // two boxes, and put back together on Save (composeSiteSnapshot) — the way
+  // the New Job form builds it. A plain text with no dash is a site on its own.
+  const parts = splitSiteSnapshot(sess.site || '');
   state.editForm = {
     name: sess.name || '',
-    site: sess.site || '',
+    client: parts.client,
+    site: parts.site,
     engineer: sess.engineer || '',
     prefix: sess.prefix || '',
     date: sess.date || '',
@@ -4082,6 +4122,7 @@ function captureEditSessionForm() {
   const $ = id => document.getElementById(id);
   const f = state.editForm;
   if (!f) return;
+  if ($('ef-client')) f.client = $('ef-client').value;   // V146 (3A)
   if ($('ef-site')) f.site = $('ef-site').value;
   if ($('ef-engineer')) f.engineer = $('ef-engineer').value;
   if ($('ef-name')) f.name = $('ef-name').value;
@@ -4090,14 +4131,21 @@ function captureEditSessionForm() {
   f.locked = $('ef-locked') ? $('ef-locked').checked : false;   // v8
 }
 
+// V146 (3A): the job's site text from the form's two boxes. Site alone gives
+// just the site; client + site give "Client — Site" (same as starting a job).
+function editFormSiteText(f) {
+  return composeSiteSnapshot(f && f.client, f && f.site);
+}
+
 function saveSessionEdits() {
   const sess = activeSession();
   if (!sess) return;
-  const { name, site, engineer, prefix, date, locked, instrumentId } = state.editForm;
-  if (!String(site).trim()) {
+  const { name, engineer, prefix, date, locked, instrumentId } = state.editForm;
+  if (!String(state.editForm.site || '').trim()) {
     showToast('Site is required');
     return;
   }
+  const site = editFormSiteText(state.editForm);
   sess.name = String(name).trim() || sess.name;
   // v19: clientId/siteId refs are convenience-only and never drive display, CSV,
   // or search (the `site` text snapshot does).
@@ -4112,6 +4160,11 @@ function saveSessionEdits() {
     const parts = splitSiteSnapshot(newSite);
     const linked = siteForNames(parts.client, parts.site);
     sess.siteId = linked ? linked.id : '';
+    // V146 (3A): the client box can now change the client, so the client link
+    // follows the same rule as the site's: the saved client it names, else none
+    // (the Retests list names the client from this link).
+    const linkedClient = parts.client ? findClientByName(parts.client) : null;
+    sess.clientId = linkedClient ? linkedClient.id : '';
     if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(sess);
   }
   sess.site = newSite;

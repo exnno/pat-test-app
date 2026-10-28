@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V145: rolled forward — V145 on top, V142 dropped. -->
+      <!-- v8: rolling 3-version changelog. V146: rolled forward — V146 on top, V143 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V146</strong> &middot; October 2026</p>
+        <p class="muted">Tapping the description box empties it, ready for a new word, and suggestions no longer vanish when your phone adds a space. Copy last keeps a fail&rsquo;s reason. Job settings has separate Client and Site boxes, and an exported job can be locked from the &ldquo;Already exported&rdquo; message. Cloud photos show their job&rsquo;s name, and the tutorials move smoothly.</p>
         <p><strong>V145</strong> &middot; October 2026</p>
         <p class="muted">A phone&rsquo;s jobs belong to one account, and are never sent into another. Signing out sends your last changes first and warns you if anything hasn&rsquo;t reached the cloud. Backups remember their account.</p>
         <p><strong>V144</strong> &middot; October 2026</p>
         <p class="muted">You can create your own cloud account from Settings, by email or with Google, with a 30-day free trial and no card needed. The Account page shows how many days of the trial are left.</p>
-        <p><strong>V143</strong> &middot; October 2026</p>
-        <p class="muted">PATGo confirms your plan online at least once every 30 days. When a subscription ends there are 7 days&rsquo; grace from that date, and cloud syncing pauses a week after the account locks &mdash; your work stays safe on the phone and uploads once you renew.</p>
 
 
 

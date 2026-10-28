@@ -627,6 +627,30 @@ function refreshOverviewSelection() {
   if (editBtn) editBtn.disabled = (n === 0);
 }
 
+
+// V146 (3A): the Job settings Client and Site suggestions — a plain <datalist>
+// (fine on iOS for a simple typed pick, and no list of our own to tap past).
+// Sites: the typed client's when it is a saved one, else every site, as the
+// New Job form does (computeNfSiteSuggestions). Typing a client refreshes the
+// site list in place (dispatch 'ef-client') — never a render (MAP rule 3).
+function efClientOptionsHTML() {
+  return sortedClients().map(c => `<option value="${escapeHTML(c.name)}"></option>`).join('');
+}
+function efSiteOptionsHTML(clientName) {
+  const match = findClientByName(String(clientName || '').trim());
+  const list = match ? sitesForClient(match.id) : (state.sites || []).slice();
+  const seen = new Set();
+  const names = [];
+  list.forEach(st => {
+    const key = String(st.name || '').toLowerCase();
+    if (!key || seen.has(key)) return;
+    seen.add(key);
+    names.push(st.name);
+  });
+  names.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
+  return names.map(n => `<option value="${escapeHTML(n)}"></option>`).join('');
+}
+
 function renderEditSession() {
   const lockChecked = state.editForm.locked ? 'checked' : '';
   const sess = activeSession();
@@ -712,9 +736,14 @@ function renderEditSession() {
         <span style="width:40px"></span>
       </header>
       <div class="card">
+        <!-- V146 (3A): client and site in their own boxes, joined on Save. -->
+        <label class="label">Client</label>
+        <input aria-label="Client" class="input" id="ef-client" list="ef-client-list" data-input-action="ef-client" value="${escapeHTML(state.editForm.client || '')}" placeholder="Optional" autocomplete="off">
+        <datalist id="ef-client-list">${efClientOptionsHTML()}</datalist>
         <label class="label">Site</label>
-        <input aria-label="Site" class="input" id="ef-site" data-input-action="ef-site" value="${escapeHTML(state.editForm.site)}">
-        <p class="muted" style="margin:6px 0 0;font-size:0.75rem">This is the site name saved on the job. Editing it here changes only this job, not your Clients list.</p>
+        <input aria-label="Site" class="input" id="ef-site" list="ef-site-list" data-input-action="ef-site" value="${escapeHTML(state.editForm.site)}" autocomplete="off">
+        <datalist id="ef-site-list">${efSiteOptionsHTML(state.editForm.client)}</datalist>
+        <p class="muted" style="margin:6px 0 0;font-size:0.75rem">The client and site saved on this job. Changing them here changes only this job, not your Clients list.</p>
         <label class="label">Engineer</label>
         <input aria-label="Engineer" class="input" id="ef-engineer" data-input-action="ef-engineer" value="${escapeHTML(state.editForm.engineer)}">
         <label class="label">Job name</label>
@@ -1258,7 +1287,9 @@ function renderPhotoManager() {
       const allSel = g.photos.every((e) => pm.selected[e.id]);
       const sub = g.orphan
         ? [`Their job was deleted, or never reached the cloud`, `${plural(g.photos.length)} \u00b7 ${formatBytes(g.bytes)}`]
-        : [g.client, formatDate(g.date), `${plural(g.photos.length)} \u00b7 ${formatBytes(g.bytes)}`, g.onPhone ? '' : 'not on this phone'];
+        : [g.client, formatDate(g.date), `${plural(g.photos.length)} \u00b7 ${formatBytes(g.bytes)}`,
+          // V146 (1A): a job whose name hasn't come yet says why.
+          g.onPhone ? '' : (g.unnamed ? (pm.names && pm.names.loading ? 'finding its name\u2026' : 'its name shows when you\u2019re connected') : 'not on this phone')];
       return `
         <section class="pm-group">
           <div class="pm-group-head">

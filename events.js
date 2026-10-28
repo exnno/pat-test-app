@@ -17,7 +17,7 @@
 //   • nf-client / nf-site  — New Session client & site autocomplete
 //   • f-location           — Entry location (focus-clears-field + casing on blur
 //                            + Smart-Quick-Pick row rebuild on blur)
-//   • f-type               — Entry item-type (casing on blur)
+//   • f-type               — Entry item-type (focus-clears-field, V146 + casing on blur)
 //
 // These use the onmousedown→preventDefault suggestion-tap trick and setTimeout
 // blur delays; getting that timing wrong breaks the suggestion dropdowns on iOS
@@ -154,12 +154,18 @@ function bindFocusFields() {
       state.showSuggestions = state.suggestions.length > 0;
       renderSuggestionsOnly(true);   // v70.1: typing → shrink hysteresis
     };
+    // V146 (5A): tapping the box empties it, as the Location box does, so a new
+    // word can be typed straight in. Tap away with it still empty and what was
+    // there comes back — a Quick Pick type stays chosen (its button stays lit:
+    // nothing here touches state.form.itemType until something is typed).
+    // ⚠ Empty on focus also means no list pops up under the finger as the box
+    // is tapped — the "kettle" half of the dropdown report (4A).
     $('f-type').onfocus = e => {
-      if (e.target.value) {
-        state.suggestions = computeSuggestions(e.target.value);
-        state.showSuggestions = state.suggestions.length > 0;
-        renderSuggestionsOnly(true);   // v70.1: typing → shrink hysteresis
-      }
+      e.target.dataset.original = e.target.value;
+      e.target.value = '';
+      state.suggestions = [];
+      state.showSuggestions = false;
+      renderSuggestionsOnly();
     };
     $('f-type').onblur = e => {
       const v = String(e.target.value || '').trim();
@@ -167,6 +173,20 @@ function bindFocusFields() {
         const cased = normaliseItemType(v);
         e.target.value = cased;
         state.form.itemType = cased;
+      } else {
+        // Left empty: put back what was there. Typing and then deleting it all
+        // went through oninput, which blanked the type and unlit its button, so
+        // both are put back too. (A Multi Pick tile cleared by that typing stays
+        // cleared — typing over a tile always gives it up.)
+        const orig = e.target.dataset.original || '';
+        e.target.value = orig;
+        if (orig) {
+          state.form.itemType = orig;
+          document.querySelectorAll('.quick-btn').forEach(b => {
+            b.classList.toggle('active', b.dataset.type === orig);
+            b.setAttribute('aria-pressed', b.dataset.type === orig ? 'true' : 'false');
+          });
+        }
       }
       setTimeout(() => { state.showSuggestions = false; renderSuggestionsOnly(); }, 150);
     };

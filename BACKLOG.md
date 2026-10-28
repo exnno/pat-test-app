@@ -8,6 +8,39 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V146
+V146 = Peter's field bug list (28 Oct: 0A 1A 2A 3A 4A 5A 6A 8A). session.js (suggestKey
+for all four lists, copyLastResult fail notes, Job settings client/site split +
+editFormSiteText + clientId re-link, lockFromReopenWarning), events.js (f-type empties on
+focus), render-core.js (Lock job on the Already exported popup; nf lists via suggestKey;
+What's new), render-review.js (Client + Site boxes + datalists; the unnamed heading),
+settings-actions.js (_pmNameJobs, pm.names), sync.js (syncJobNames, _syncBrowseJobOf),
+dispatch.js, state.js, tour.js + styles.css (the tutorial motion). Harness 85 + M1564–M1599.
+**Next (V147, renumbering asset numbers — Peter 28 Oct: 7C 7b A; workflow still to work
+through):** Peter's framing: "renumber from item X to item Z sequentially starting with Y"
+(the 500-sticker roll he forgot to change). 7C = both entry points: Overview → Edit
+selected → Renumber (the selected items, in logged order) and a per-item "Renumber from
+here"; the X-to-Z range is the shape to settle at the spec. 7b A: a new number already on
+another item in the same job is refused, naming the item. Leading zeros carry as typed;
+locked jobs can't be renumbered. ⚠ It rewrites asset numbers — undo / confirm wording,
+sync of item edits, asset history, an exported job going "modified", photos keyed by
+item id (unaffected) — all for the spec.
+**Then:** the launch switch (was V146 — see "Next after V145" below; Peter's no-signal
+rule stands), the production move, R8.
+- **Sticker roll reminder (Peter 28 Oct, 7c → backlog):** an optional Settings → "Sticker
+  roll size" (off / 250 / 500 / 1000): after that many numbers since a new start was typed
+  or scanned, the asset box asks "New roll? Type its first number." Counts across jobs on
+  the phone. Own small spec.
+
+### V146 residuals (known, accepted)
+- A Multi Pick tile cleared by typing in the description box stays cleared if the typing
+  is then deleted (5A puts back the type, not the tile — typing over a tile gives it up).
+- Job settings' Client/Site suggestions are a native <datalist> (iOS shows them above the
+  keyboard), not the New Job form's own list — fine for a typed pick, per the skill.
+- The tutorial card's slide is checked in Chromium (frame by frame) — on an iPhone it
+  should be smoother still (transforms run on the graphics chip), but only Peter's phone
+  can confirm the old jerkiness is gone.
+
 ### Next after V145
 V145 = one owner per phone (Stage 13; Peter 22 Oct: 1A 2A 3A 4A 5A 7A 8A). config.js
 (OWNER_KEY, OWNER_STATS_KEY, CLOUD_SIGNOUT_SYNC_MS), cloud.js (the owner, the landing,
@@ -16,13 +49,13 @@ guards, syncOwnerPending), reset.js (the handover level, the stats kept aside, t
 carry), backup.js (owner, backupRestoreVerdict), render-help.js (the takeover card, the
 Sign out button's words), feedback.js (openChoiceSheet noCancel), state.js, dispatch.js,
 tour.js (the drawn phone's owner). Harness 84 + M1531–M1563; 83e retired → 84e.
-**Next (V146, the launch switch — own spec round):** REQUIRE_ACCOUNT (a sign-in / create
+**Next (the launch switch — own spec round; V148 or later since V146 became the bug-fix release):** REQUIRE_ACCOUNT (a sign-in / create
 wall; a free user's local jobs go up with the first sign-in — under the V145 owner
 stamp), the access code out, the free site retired. ⚠ PETER'S HARD RULE (22 Oct): once the
 app is sign-in only, it must NEVER sign you out, or wall you off, because there's no
 signal — an engineer must always be able to work. Today (V145): cloud.js `cloudBoot` signs
 out only when ONLINE and the server says the login is gone; offline nothing changes, and
-supabase-js keeps a session whose refresh fails for want of signal. V146 must keep that
+supabase-js keeps a session whose refresh fails for want of signal. The launch switch must keep that
 and add: the wall shows only to a phone with NO owner (never to an owner whose login
 lapsed — they keep working and are asked to sign in again when there's signal), and a
 login the server revokes while the engineer is mid-job never stops the job. Prove it in

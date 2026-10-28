@@ -1,4 +1,4 @@
-# PATGo — Code Map (V145)
+# PATGo — Code Map (V146)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -951,6 +951,15 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
 **Coupling:** the busiest file in the app —
 - `setView` and `loadFormForCursor` clear transient overlays; new transients must
   be added there (rules 3, 4).
+- V146 (4A): every suggestion list matches through `suggestKey` (ends trimmed,
+  runs of spaces as one) — the two in **render-core.js** (`computeNfClient/Site
+  Suggestions`) call it too. (3A) Job settings' draft holds `client` and `site`
+  APART; `editFormSiteText` joins them for `editFormDirty` and `saveSessionEdits`
+  (which also re-links `clientId`). **render-review.js** draws the two boxes +
+  datalists (`efClientOptionsHTML`/`efSiteOptionsHTML`); **dispatch.js**
+  'ef-client' refreshes the site datalist in place; **settings-actions.js**
+  `UNSAVED_PAGES.editSession` lists `#ef-client`. (2A) `lockFromReopenWarning`
+  ← **render-core.js** popup's Lock job ('reopen-lock').
 - Four removal paths cascade to photos.js and two archive stats before removing
   (rule 5).
 - Append paths (`saveItem`, `copyLastResult`, `repeatLastResult`, `multiPickFire`,
@@ -1017,7 +1026,7 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   `setView` clears `state.partyOpen` / `state.egg` (**render-help.js**).
 - V102 duplicate (block after the move, before "Edit-session flow"): `state.dupJob`
   (cleared by `setView`; a copy under way still finishes). `openDupJob` refuses
-  while `editFormDirty` (Session settings has unsaved typing — message in place,
+  while `editFormDirty` (Job settings has unsaved typing — message in place,
   no render). `duplicateJob` → cloud-only photos via **sync.js**
   `syncPhotoDownload` (failures → step 'partial') → `_dupJobCommit`: items copied
   FIRST (new ids, `copyOf` = first original's id), then **photos.js**
@@ -1063,6 +1072,10 @@ changed; `deleteReportTemplate` records a `template` tombstone and saves via
 save() (18r: nothing outside storage/sync calls saveSettings()).
 **Touch to:** change what a Settings screen SAVES. To change how one is drawn,
 go to render-settings.js; to change a default, config.js.
+⚠ V146 (1A): the photo manager's open reads its away jobs' names (`_pmNameJobs` →
+**sync.js** `syncJobNames`) into `pm.names` (memory only; `_pmReset` drops it);
+`_pmJobInfo` names from the look (`pm.cloud`) first, then `pm.names`. An unnamed
+group carries `unnamed` — **render-review.js** says its name comes with signal.
 ⚠ V112: the unsaved-changes guard (`UNSAVED_PAGES`, `unsavedAfterRender` — called
 from render()'s tail in render-core.js — `unsavedLeave`, `unsavedRevert`) and
 `settingsBackNav()` (Back's navigation, moved from dispatch.js; every page Save
@@ -1568,9 +1581,11 @@ anything known (5A), file AND `{uid}/{id}_t.jpg`. Previews: `_syncThumbUpload`
 `state.photoCloud` at `st.ph.sent` (`_syncPhotoCloudPoint`). Images come down
 ONLY via `syncPhotoDownload` (session.js strip, report.js prompt); previews only
 via `syncPhotoThumb` (strip open).
-⚠ v90: the photo manager's two entry points (callers: **settings-actions.js**).
+⚠ v90: the photo manager's entry points (callers: **settings-actions.js**).
 `syncPhotoBrowse` = "Look in the cloud": photos rows (keyset by id) + five
 `doc->>` fields of jobs NOT on this phone; returns data, writes NOTHING (rule 24).
+V146 (1A): `syncJobNames(ids)` = the same five fields for named ids only — the
+manager's open (`_pmNameJobs`) names its away jobs. Both share `_syncBrowseJobOf`.
 `syncPhotoKnowForDelete` adds found photos to `st.ph.sent` so the normal delete
 step takes them — it waits for `_syncRunning` (a run saves its own `st` and would
 overwrite it). `syncPhotoThumb(id, hint)` accepts a found row's `{t}`.
@@ -1732,7 +1747,8 @@ rather than append.
 
 ### events.js (~490 ln) — focus-sensitive binding, per render
 Direct binds for the four focus-sensitive fields only (`nf-client`, `nf-site`,
-`f-location`, `f-type`), the three suggestion dropdowns, the two hold gestures
+`f-location`, `f-type` — V146: `f-type` empties on focus like `f-location`, and
+restores `state.form.itemType` + the lit quick button on an empty blur), the three suggestion dropdowns, the two hold gestures
 and the shared `attachHoldGesture()` helper behind them, the sheet drag guard,
 the suggestion click swallow. Plus (v75, and NOT per-render) the keyboard-inset
 publisher.

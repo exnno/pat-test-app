@@ -256,8 +256,10 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Your jobs stay yours.</strong> A phone&rsquo;s jobs now belong to one account. Signing in as someone else can never send them into the wrong account &mdash; another account can only take the phone over once everything is safe in your cloud.</li>
-        <li><strong>A safer sign-out.</strong> Signing out sends your last changes first, and tells you if anything hasn&rsquo;t reached the cloud yet. Backups now remember which account they belong to.</li>
+        <li><strong>Typing a description.</strong> Tap the description box and it empties, like Location, ready for a new word &mdash; tap away and what was there comes back. Suggestions no longer vanish when your phone adds a space after a word.</li>
+        <li><strong>Copy last keeps the fail reason.</strong> Copying a FAIL now carries its reason across.</li>
+        <li><strong>Client and site, apart.</strong> Job settings has its own Client and Site boxes, and an exported job can be locked straight from the &ldquo;Already exported&rdquo; message.</li>
+        <li><strong>Photos and tutorials.</strong> Cloud photos show which job they&rsquo;re from, and the tutorials move smoothly.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -450,6 +452,8 @@ function render() {
             <button class="btn-primary" id="reopen-warn-continue" data-action="reopen-continue">Open anyway</button>
           </div>
           <!-- V131 (6B): exported by mistake (a stray Copy) — clear the mark and open. -->
+          <!-- V146 (2A): a finished job can be locked from here without opening it. -->
+          <button class="btn-secondary reopen-unmark reopen-lock" id="reopen-warn-lock" data-action="reopen-lock">${icon('lock')} Lock job</button>
           <button class="btn-secondary reopen-unmark" id="reopen-warn-unmark" data-action="reopen-unmark">Mark as not exported</button>
         </div>
       `;
@@ -694,9 +698,9 @@ function refreshEntryAfterLog() {
 // substring. An empty field shows the full list (so a tap reveals everything).
 // Case-insensitive sort and filter. Capped at 6 to keep the list compact.
 function computeNfClientSuggestions(query) {
-  const q = String(query || '').trim().toLowerCase();
+  const q = suggestKey(query);   // V146 (4A)
   const names = sortedClients().map(c => c.name);
-  const matches = q ? names.filter(n => n.toLowerCase().includes(q)) : names;
+  const matches = q ? names.filter(n => suggestKey(n).includes(q)) : names;
   return matches.slice(0, 6);
 }
 
@@ -717,8 +721,8 @@ function computeNfSiteSuggestions(query) {
     names.push(s.name);
   });
   names.sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
-  const q = String(query || '').trim().toLowerCase();
-  const matches = q ? names.filter(n => n.toLowerCase().includes(q)) : names;
+  const q = suggestKey(query);   // V146 (4A)
+  const matches = q ? names.filter(n => suggestKey(n).includes(q)) : names;
   return matches.slice(0, 6);
 }
 

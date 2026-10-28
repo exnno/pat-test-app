@@ -993,6 +993,7 @@ registerActions({
   'reopen-continue': () => confirmReopenWarning(),
   'reopen-cancel': () => cancelReopenWarning(),
   'reopen-unmark': () => unmarkFromReopenWarning(),   // V131 (6B)
+  'reopen-lock': () => lockFromReopenWarning(),     // V146 (2A)
 
   // Import conflict / summary dialogs
   'import-conflict-cancel': () => cancelImportConflict(),
@@ -1167,6 +1168,12 @@ registerInputActions({
   'move-to-newno': (v, el) => setMoveToNewNo(el && el.dataset ? el.dataset.arg : '', v),    // V103
 
   // Edit-session form
+  // V146 (3A): the client box — its site suggestions follow it, in place.
+  'ef-client': (v) => {
+    state.editForm.client = v;
+    const dl = document.getElementById('ef-site-list');
+    if (dl && typeof efSiteOptionsHTML === 'function') dl.innerHTML = efSiteOptionsHTML(v);
+  },
   'ef-site': (v) => { state.editForm.site = v; },
   'ef-engineer': (v) => { state.editForm.engineer = v; },
   'ef-name': (v) => { state.editForm.name = v; },

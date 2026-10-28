@@ -4579,6 +4579,17 @@ function syncPhotoDownload(ids, onStep) {
 const _SYNC_BROWSE_COLS = 'id,session_id,item_id,bytes,thumb,taken_at';
 const _SYNC_BROWSE_JOB_COLS = 'id,deleted,site:doc->>site,name:doc->>name,date:doc->>date,clientId:doc->>clientId,locked:doc->>locked';
 
+// One job row picked out by _SYNC_BROWSE_JOB_COLS, as the photo manager uses
+// it. Shared by the look (syncPhotoBrowse) and the names read (syncJobNames).
+function _syncBrowseJobOf(j) {
+  const str = (v) => (typeof v === 'string') ? v : '';
+  return {
+    deleted: j.deleted === true,
+    site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
+    locked: j.locked === true || j.locked === 'true',
+  };
+}
+
 function syncPhotoBrowse() {
   const res = { ok: false, offline: false, error: '', rows: [], jobs: {}, asked: [], capped: false };
   if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
@@ -4627,12 +4638,7 @@ function syncPhotoBrowse() {
             for (const j of ((r && r.data) || [])) {
               const id = String(j && j.id != null ? j.id : '');
               if (!id) continue;
-              const str = (v) => (typeof v === 'string') ? v : '';
-              res.jobs[id] = {
-                deleted: j.deleted === true,
-                site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
-                locked: j.locked === true || j.locked === 'true',
-              };
+              res.jobs[id] = _syncBrowseJobOf(j);
             }
           });
       }
@@ -4641,6 +4647,41 @@ function syncPhotoBrowse() {
   }).catch((e) => {
     res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn\u2019t reach the cloud.';
     res.rows = []; res.jobs = {}; res.asked = [];
+    return res;
+  });
+}
+
+// V146 (1A): the NAMES of jobs not on this phone, for the photo manager's
+// headings — "A job not on this phone" told the engineer nothing. The same five
+// fields the look reads (_SYNC_BROWSE_JOB_COLS), for the ids asked about only,
+// SYNC_PHOTO_NEED_BATCH at a time. Never a photo, never a job's items.
+// ⚠ Nothing is remembered (as the look, rule 24): the manager keeps the answer
+// in memory until it closes. Resolves { ok, offline, error, jobs, asked }.
+function syncJobNames(ids) {
+  const want = Array.from(new Set((ids || []).map(String).filter(Boolean)));
+  const res = { ok: false, offline: false, error: '', jobs: {}, asked: want };
+  if (!want.length) { res.ok = true; return Promise.resolve(res); }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
+  return cloudClient().then((c) => {
+    let chain = Promise.resolve();
+    for (let k = 0; k < want.length; k += batch) {
+      const chunk = want.slice(k, k + batch);
+      chain = chain.then(() => c.from('sessions').select(_SYNC_BROWSE_JOB_COLS).eq('user_id', uid).in('id', chunk))
+        .then((r) => {
+          if (r && r.error) throw r.error;
+          for (const j of ((r && r.data) || [])) {
+            const id = String(j && j.id != null ? j.id : '');
+            if (id) res.jobs[id] = _syncBrowseJobOf(j);
+          }
+        });
+    }
+    return chain.then(() => { res.ok = true; return res; });
+  }).catch((e) => {
+    res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn\u2019t reach the cloud.';
+    res.jobs = {};
     return res;
   });
 }
