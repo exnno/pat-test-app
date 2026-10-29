@@ -347,6 +347,17 @@ bug; leaving it red trains everyone to ignore the suite.
   the words' fade is source-guarded. Reduced motion via `matchMedia` in the
   boot options. (5) `exportStatus` says 'exported' for a clean export, not
   'clean' — compare before/after rather than naming it.
+  V147 (group 86): renumbering. (1) The action toast is RECORDED and left to
+  run (boot wraps `showActionToast`), so its timers and button are the real
+  ones; keep `realShowToast` before boot's recorder replaces the global, or a
+  plain toast can't push the action toast off. (2) The toast lives on <body>:
+  find it in `doc.body.children` and `click()` its button — #app's delegation
+  never sees it. (3) "No render" (MAP rule 3) is counted by wrapping
+  `sandbox.render`. (4) Saving on the entry screen while PARKED on an item
+  overwrites that item — move the cursor to the new item (`jumpTo(length)`)
+  before `withItem` after a "from here" renumber (86d). (5) A tapped toast's
+  `onGone` must stay unrun even when the NEXT toast comes (M1618 survived until
+  86d showed a later toast).
 
 ---
 

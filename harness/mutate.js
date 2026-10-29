@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V146';",
-    to:   "const APP_VERSION = 'V145';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V147';",
+    to:   "const APP_VERSION = 'V146';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146).
-    from: '        <p><strong>V144</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V142</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V143</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 85e)',
+    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147).
+    from: '        <p><strong>V145</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V143</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V144</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 86e)',
   },
 
   {
@@ -6116,9 +6116,10 @@ const MUTATIONS = [
     // V144: welcome rolled (two lines) — re-aimed at the first; 84e pins it.
     // V145: welcome rolled (two lines) — re-aimed at the first; 84e pins it.
     // V146: welcome rolled (four lines) — re-aimed at the first; 85e pins it.
-    from: "<li><strong>Typing a description.</strong>",
+    // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
+    from: "<li><strong>Renumber asset numbers.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (85e)",
+    why:  "11A: the welcome says plainly what changed on screen (86e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8597,9 +8598,9 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V146';",   // V145: re-aimed. V146: re-aimed.
-    to:   "const WELCOME_VERSION = 'V145';",
-    why:  "a behaviour release says what's new (85e)",
+    from: "const WELCOME_VERSION = 'V147';",   // V145: re-aimed. V146: re-aimed. V147: re-aimed.
+    to:   "const WELCOME_VERSION = 'V146';",
+    why:  "a behaviour release says what's new (86e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
@@ -8608,9 +8609,10 @@ const MUTATIONS = [
     // V144: two lines — re-aimed at the second's end; still caught by the count.
     // V145: two lines again — re-aimed at the second's end.
     // V146: four lines — re-aimed at the last one's end; still caught by the count.
-    from: "and the tutorials move smoothly.</li>\n",
-    to:   "and the tutorials move smoothly.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "four lines (85e)",
+    // V147: one line — re-aimed at its end.
+    from: "Undo is there for a few seconds if it&rsquo;s wrong.</li>\n",
+    to:   "Undo is there for a few seconds if it&rsquo;s wrong.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (86e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8623,9 +8625,10 @@ const MUTATIONS = [
     // V143: re-aimed at V143's own (V142's moves to M1259, V141's to M1238).
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
-    from: "Tapping the description box empties it, ready for a new word, and suggestions no longer vanish",
+    // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
+    from: "Renumber asset numbers when a new roll of stickers starts",
     to:   "Better",
-    why:  "the About page must say what changed in this version (85e)",   // V146: re-aimed at V146's line
+    why:  "the About page must say what changed in this version (86e)",   // V147: re-aimed at V147's line
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8739,9 +8742,10 @@ const MUTATIONS = [
     // V143: V140's line rolled off — re-aimed at V141's, the oldest now.
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
-    from: "You can create your own cloud account from Settings, by email or with Google, with a 30-day free trial",
+    // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
+    from: "A phone&rsquo;s jobs belong to one account, and are never sent into another.",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (85e)",   // V146: re-aimed at V144's, the oldest now
+    why:  "the About page keeps the last three versions' lines (86e)",   // V147: re-aimed at V145's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8900,9 +8904,10 @@ const MUTATIONS = [
     // V143: V141's line is the oldest now (M1238) — re-aimed at V142's, still in the window.
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
-    from: "A phone&rsquo;s jobs belong to one account, and are never sent into another.",
+    // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
+    from: "Tapping the description box empties it, ready for a new word, and suggestions no longer vanish",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (85e)",   // V146: re-aimed at V145's
+    why:  "the About page keeps the last three versions' lines (86e)",   // V147: re-aimed at V146's
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9029,9 +9034,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v146';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e).
-    to:   "const CACHE_VERSION = 'pat-v145';",
-    why:  "a release needs its cache bump or phones never get it (85e)",
+    from: "const CACHE_VERSION = 'pat-v147';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e).
+    to:   "const CACHE_VERSION = 'pat-v146';",
+    why:  "a release needs its cache bump or phones never get it (86e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -11298,14 +11303,268 @@ const MUTATIONS = [
     to:   "    el.style.transform = to;",
     why:  "6A: the card would stay invisible (85e)",
   },
+  // M1599 (V146: the What's new sheet loses Copy last's line) RETIRED V147: V147 rolls the sheet (M846, M1222).  // ---- V147 (7C 7b A; 1A 2A 3A 4A 5A): renumbering asset numbers. Group 86 + M1600–M1636. ----
   {
-    name: "M1599 (V146) the What's new sheet loses Copy last's line",
-    file: "render-core.js",
-    from: "        <li><strong>Copy last keeps the fail reason.</strong> Copying a FAIL now carries its reason across.</li>\n",
+    name: "M1600 (V147) a renumber drops the leading zeros",
+    file: "session.js",
+    from: "  for (let k = 0; k < n; k++) out.push(sp.prefix + String(sp.number + k).padStart(sp.width, '0'));",
+    to:   "  for (let k = 0; k < n; k++) out.push(sp.prefix + String(sp.number + k));",
+    why:  "0451 would become 451 — not the sticker (86a)",
+  },
+  {
+    name: "M1601 (V147) numbered in the order picked, not logged",
+    file: "session.js",
+    from: "  idx.sort((a, b) => a - b);   // logged order\n",
     to:   "",
-    why:  "four lines (85e)",
+    why:  "7C: logged order whatever order they were tapped (86a)",
+  },
+  {
+    name: "M1602 (V147) the block clashes with itself",
+    file: "session.js",
+    from: "    if (block.has(j)) continue;\n    const it = items[j];",
+    to:   "    const it = items[j];",
+    why:  "7b A: numbers swapping round inside the block are not a clash (86a)",
+  },
+  {
+    name: "M1603 (V147) a clash with another item goes through",
+    file: "session.js",
+    from: "    if (it && it.assetNo && wanted.has(it.assetNo)) {",
+    to:   "    if (false) {",
+    why:  "7b A: two items would carry one number (86a)",
+  },
+  {
+    name: "M1604 (V147) a locked job can be renumbered",
+    file: "session.js",
+    from: "  if (sess.locked) return fail('This job is locked. Unlock it to renumber.');\n",
+    to:   "",
+    why:  "a locked job is finished paperwork (86a)",
+  },
+  {
+    name: "M1605 (V147) a renumber that changes nothing goes ahead",
+    file: "session.js",
+    from: "  if (rows.every(r => r.from === r.to)) return fail('These items already have those numbers.');\n",
+    to:   "",
+    why:  "an exported job would turn \"modified\" for nothing (86a)",
+  },
+  {
+    name: "M1606 (V147) a refused Check repaints the form",
+    file: "session.js",
+    from: "  if (plan.error) { _renumberShowError(plan.error); return; }",
+    to:   "  if (plan.error) { _renumberShowError(plan.error); render(); return; }",
+    why:  "MAP rule 3: the keyboard drops on every refusal (86c)",
+  },
+  {
+    name: "M1607 (V147) a refused Check says nothing on the page",
+    file: "session.js",
+    from: "  if (el) { el.textContent = msg; el.hidden = !msg; }\n  if (msg && typeof announce",
+    to:   "  if (msg && typeof announce",
+    why:  "Check would seem to do nothing (86c)",
+  },
+  {
+    name: "M1608 (V147) typing again leaves the old reason up",
+    file: "dispatch.js",
+    from: "    state.renumber.first = v;\n    if (state.renumber.error && typeof _renumberShowError === 'function') _renumberShowError('');",
+    to:   "    state.renumber.first = v;",
+    why:  "a stale reason under a good number (86c)",
+  },
+  {
+    name: "M1609 (V147) Renumber writes over a job that changed under the sheet",
+    file: "session.js",
+    from: "  if (!same) {\n    r.step = 'form';",
+    to:   "  if (false) {\n    r.step = 'form';",
+    why:  "a pull's numbers overwritten unseen (86d)",
+  },
+  {
+    name: "M1610 (V147) the parked item's box keeps the old number",
+    file: "session.js",
+    from: "    if (row.id === parked && state.form && state.form.assetNo === unpick(row)) state.form.assetNo = pick(row);\n",
+    to:   "",
+    why:  "saving the item next would put the old number back (86c)",
+  },
+  {
+    name: "M1611 (V147) the next number doesn't follow",
+    file: "session.js",
+    from: "  if (atNew && state.form && state.form.assetNo === autoBefore) state.form.assetNo = nextAssetNo(sess);\n",
+    to:   "",
+    why:  "the next item would get a number off the old roll (86c)",
+  },
+  {
+    name: "M1612 (V147) a job not open keeps its stale saved copy",
+    file: "session.js",
+    from: "  markSessionDirty(sess);\n  if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(sess);\n}\n\n// Put `rows` on the job",
+    to:   "  markSessionDirty(sess);\n}\n\n// Put `rows` on the job",
+    why:  "an Undo on a job not open never reaches the disk (86d)",
+  },
+  {
+    name: "M1613 (V147) an exported job doesn't show as changed",
+    file: "session.js",
+    from: "function _renumberTouched(sess) {\n  markSessionDirty(sess);\n",
+    to:   "function _renumberTouched(sess) {\n",
+    why:  "the CSV sent out no longer matches the job (86b)",
+  },
+  {
+    name: "M1614 (V147) Undo overwrites a number changed since",
+    file: "session.js",
+    from: "  let back = u.rows.filter(x => { const i = pos.get(x.id); return i != null && items[i].assetNo === x.to; });",
+    to:   "  let back = u.rows.filter(x => { const i = pos.get(x.id); return i != null; });",
+    why:  "3A: a hand correction undone too (86d)",
+  },
+  {
+    name: "M1615 (V147) Undo puts back a number another item has taken",
+    file: "session.js",
+    from: "  back = back.filter(x => !taken.has(x.from));\n",
+    to:   "",
+    why:  "two items with one number (86d)",
+  },
+  {
+    name: "M1616 (V147) the Undo offer outlives its toast",
+    file: "feedback.js",
+    from: "    _toastTimer = null;\n    _toastClearGone();\n    close();",
+    to:   "    _toastTimer = null;\n    close();",
+    why:  "3A: a few seconds, then gone (86d)",
+  },
+  {
+    name: "M1617 (V147) a plain toast leaves the Undo offer behind",
+    file: "feedback.js",
+    from: "function showToast(message) {\n  _toastClearGone();\n",
+    to:   "function showToast(message) {\n",
+    why:  "no button, but the offer still live (86d)",
+  },
+  {
+    name: "M1618 (V147) tapping Undo counts as the toast going",
+    file: "feedback.js",
+    from: "    _toastGone = null;            // tapped — so not \"gone without the tap\"\n",
+    to:   "",
+    why:  "the offer cleared before Undo runs (86d)",
+  },
+  {
+    name: "M1619 (V147) the Undo toast is hidden from VoiceOver",
+    file: "feedback.js",
+    from: "  el.className = 'toast toast-action';\n",
+    to:   "  el.className = 'toast toast-action';\n  el.setAttribute('aria-hidden', 'true');\n",
+    why:  "the button would be out of reach (86d)",
+  },
+  {
+    name: "M1620 (V147) Edit selected has no Renumber",
+    file: "render-review.js",
+    from: "        <button class=\"bulk-menu-btn\" id=\"bulk-renumber-btn\" data-action=\"renumber-selected\"${sess.locked ? ' disabled' : ''}>Renumber\\u2026</button>",
+    to:   "",
+    why:  "7C: one of the two ways in (86b)",
+  },
+  {
+    name: "M1621 (V147) Renumber looks usable on a locked job",
+    file: "render-review.js",
+    from: "data-action=\"renumber-selected\"${sess.locked ? ' disabled' : ''}>",
+    to:   "data-action=\"renumber-selected\">",
+    why:  "it would do nothing when tapped (86b)",
+  },
+  {
+    name: "M1622 (V147) Renumber opens on a locked job",
+    file: "session.js",
+    from: "  if (!sess || sess.locked) return;\n  const items = sess.items || [];\n  const keys",
+    to:   "  if (!sess) return;\n  const items = sess.items || [];\n  const keys",
+    why:  "a locked job can't be renumbered (86b)",
+  },
+  {
+    name: "M1623 (V147) Renumber from here on a new item",
+    file: "render-core.js",
+    from: "  const renumberLink = (isExisting && !isLocked) ? `",
+    to:   "  const renumberLink = (!isLocked) ? `",
+    why:  "2A: only on a logged item (86c)",
+  },
+  {
+    name: "M1624 (V147) Renumber from here on a locked job",
+    file: "render-core.js",
+    from: "  const renumberLink = (isExisting && !isLocked) ? `",
+    to:   "  const renumberLink = (isExisting) ? `",
+    why:  "a locked job can't be renumbered (86c)",
+  },
+  {
+    name: "M1625 (V147) Up to starts on this item",
+    file: "session.js",
+    from: "fromIdx: i, toIdx: items.length - 1 });",
+    to:   "fromIdx: i, toIdx: i });",
+    why:  "1A: the last item, so the usual case is one box (86c)",
+  },
+  {
+    name: "M1626 (V147) the Up to list is ignored",
+    file: "dispatch.js",
+    from: "    if (Number.isFinite(n)) state.renumber.toIdx = n;\n",
+    to:   "",
+    why:  "1A: stopping partway (86c)",
+  },
+  {
+    name: "M1627 (V147) Check isn't the form's submit",
+    file: "render-review.js",
+    from: "<button type=\"submit\" class=\"btn-primary\" id=\"renumber-check\"",
+    to:   "<button class=\"btn-primary\" id=\"renumber-check\"",
+    why:  "Done and a scanner's Enter would do nothing (86b)",
+  },
+  {
+    name: "M1628 (V147) the sheet waits on another screen",
+    file: "render-core.js",
+    from: "    else if (typeof renumberClosed === 'function') state.renumber = renumberClosed();\n",
+    to:   "",
+    why:  "it would pop up again later, out of place (86e)",
+  },
+  {
+    name: "M1629 (V147) the sheet follows you into another job",
+    file: "render-core.js",
+    from: " && state.renumber.sid === state.activeId;",
+    to:   ";",
+    why:  "one job's renumber offered on another (86e)",
+  },
+  {
+    name: "M1630 (V147) the selection stays after renumbering",
+    file: "session.js",
+    from: "  if (wasSelected) { state.selectionMode = false; state.selectedIndices = []; }\n",
+    to:   "",
+    why:  "done means done, as the other bulk edits (86b)",
+  },
+  {
+    name: "M1631 (V147) a renumber isn't saved",
+    file: "session.js",
+    from: "  save();\n  render();\n  state.renumberUndo = {",
+    to:   "  render();\n  state.renumberUndo = {",
+    why:  "lost on the next restart (86b)",
+  },
+  {
+    name: "M1632 (V147) Undo is offered but has nothing to put back",
+    file: "session.js",
+    from: "  state.renumberUndo = { sid: sess.id, rows: rows.map(x => ({ id: x.id, from: x.from, to: x.to })) };",
+    to:   "  state.renumberUndo = null;",
+    why:  "3A (86d)",
+  },
+  {
+    name: "M1633 (V147) Undo flashes past",
+    file: "config.js",
+    from: "const RENUMBER_UNDO_MS = 8000;",
+    to:   "const RENUMBER_UNDO_MS = 1900;",
+    why:  "3A: long enough to read and reach (86b)",
+  },
+  {
+    name: "M1634 (V147) the check doesn't say an exported job will change",
+    file: "render-review.js",
+    from: "    const exported = sess.exportedAt ? ' This job has been exported, so it will show as changed.' : '';",
+    to:   "    const exported = '';",
+    why:  "the export mark changes unannounced (86b)",
+  },
+  {
+    name: "M1635 (V147) the check lists every line",
+    file: "render-review.js",
+    from: "    const shown = rows.length <= 4 ? rows : [rows[0], rows[1], null, rows[rows.length - 1]];",
+    to:   "    const shown = rows;",
+    why:  "500 lines in a bottom sheet (86e)",
+  },
+  {
+    name: "M1636 (V147) Renumber from here opens nothing",
+    file: "dispatch.js",
+    from: "  'renumber-from': () => openRenumberFrom(),",
+    to:   "  'renumber-from': () => {},",
+    why:  "2A (86c)",
   },
 ];
+
 
 /* SPEED (V109 harness): two shortcuts, neither of which can turn a survivor
    into a "caught".

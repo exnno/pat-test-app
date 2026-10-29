@@ -52,6 +52,10 @@ module.exports = {
     'one line naming the site, an 8-row text box (its text scrolls inside it) and Save',
   'render-review.js · Retest reminder action':
     'a title naming the job, one fixed sentence and three buttons',
+  'render-review.js · Renumber':
+    'V147 check step: at most four lines (the first two, a gap, the last), one sentence and two buttons',
+  'render-review.js · Renumber #2':
+    'V147 form step: one line naming the item, one input, the Up to list (a native picker, not part of the sheet), a one-line reason and Check',
 
   // render-settings.js
   'render-settings.js · renderSettingsItems()':
