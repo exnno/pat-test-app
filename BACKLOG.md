@@ -8,6 +8,25 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V147
+V147 = renumbering asset numbers (Peter 28–29 Oct: 7C 7b A; 1A 2A 3A 4A 5A). session.js
+(renumberPlan, openRenumberSelected/From, renumberCheck, applyRenumber, undoRenumber,
+_renumberTouched), render-review.js (renderRenumberSheet; Renumber… in Edit selected),
+render-core.js (the link; the sheet joined in render(); What's new), feedback.js
+(showActionToast), dispatch.js, state.js, config.js (RENUMBER_UNDO_MS), styles.css,
+render-help.js, sw.js. Harness 86 + M1600–M1636; 85e's release checks → 86e; M1599 retired.
+**Next:** the launch switch (see "Next after V145" below; Peter's no-signal rule stands),
+the production move, R8. Then the sticker roll reminder (below) if wanted.
+
+### V147 residuals (known, accepted)
+- "Renumber from here" is simply absent on a locked job (the lock banner says why);
+  Edit selected shows Renumber… greyed with "Unlock the job to renumber."
+- The Up to list is a native picker — on a 500-item job it is a long wheel.
+- Other jobs are not checked for a clash (by design: a new number every year — S4).
+- Undo lasts 8 s (RENUMBER_UNDO_MS) and goes if another message pops up first.
+- The check sheet shows positions ("Item 3") like the entry screen; the Overview's
+  # column shows asset numbers.
+
 ### Next after V146
 V146 = Peter's field bug list (28 Oct: 0A 1A 2A 3A 4A 5A 6A 8A). session.js (suggestKey
 for all four lists, copyLastResult fail notes, Job settings client/site split +

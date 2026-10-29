@@ -542,6 +542,15 @@ registerActions({
   },
   'bulk-notes-apply': () => applyBulkNotes(),
 
+  // V147: Renumber (session.js; the sheet in render-review.js). Two ways in —
+  // Edit selected → Renumber… and "Renumber from here" on the entry screen.
+  'renumber-selected': () => openRenumberSelected(),
+  'renumber-from': () => openRenumberFrom(),
+  'renumber-close': () => closeRenumber(),
+  'renumber-check': () => renumberCheck(),
+  'renumber-back': () => renumberBack(),
+  'renumber-apply': () => applyRenumber(),
+
   // V101 (Stage 9, split): Move to a new job (session.js).
   'move-job-open': () => openMoveJob(),
   'move-job-close': () => closeMoveJob(),
@@ -1166,6 +1175,12 @@ registerInputActions({
   'dup-job-field': (v, el) => setDupJobField(el && el.dataset ? el.dataset.arg : '', v),     // V102
   'move-to-filter': (v) => setMoveToFilter(v),                                              // V103
   'move-to-newno': (v, el) => setMoveToNewNo(el && el.dataset ? el.dataset.arg : '', v),    // V103
+  // V147: the Renumber sheet's First new number — kept in state, no render (MAP
+  // rule 3); a fresh keystroke clears a refused Check's reason in place.
+  'renumber-first': (v) => {
+    state.renumber.first = v;
+    if (state.renumber.error && typeof _renumberShowError === 'function') _renumberShowError('');
+  },
 
   // Edit-session form
   // V146 (3A): the client box — its site suggestions follow it, in place.
@@ -1272,6 +1287,13 @@ registerChangeActions({
     if (ta) ta.placeholder = state.bulkEdit.notesMode === 'append'
       ? 'Text to append'
       : 'New notes (leave empty to clear)';
+  },
+
+  // V147: the Renumber sheet's Up to list (a position in the job) — no render.
+  'renumber-to': (v) => {
+    const n = parseInt(v, 10);
+    if (Number.isFinite(n)) state.renumber.toIdx = n;
+    if (state.renumber.error && typeof _renumberShowError === 'function') _renumberShowError('');
   },
 
   // Edit-session locked checkbox

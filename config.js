@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V146';
+const APP_VERSION = 'V147';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -133,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V146';
+const WELCOME_VERSION = 'V147';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -249,6 +249,11 @@ function makeEmptyBugDraft() {
 // pathological stored value (e.g. a hand-edited backup claiming a width of
 // 5000) turning every asset number into a wall of zeros. Real jobs use 3–4.
 const ASSET_PAD_MAX = 12;
+
+// V147 (3A): how long the "Renumbered N items · Undo" toast stays up, in ms —
+// long enough to read the count and reach the button, short enough that the Undo
+// can't be found much later meaning something else.
+const RENUMBER_UNDO_MS = 8000;
 
 // ---------------------------------------------------------------------------
 // v61: cross-session asset history (decisions Q2A / Q3A / Q4A / Q5C).

@@ -256,10 +256,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Typing a description.</strong> Tap the description box and it empties, like Location, ready for a new word &mdash; tap away and what was there comes back. Suggestions no longer vanish when your phone adds a space after a word.</li>
-        <li><strong>Copy last keeps the fail reason.</strong> Copying a FAIL now carries its reason across.</li>
-        <li><strong>Client and site, apart.</strong> Job settings has its own Client and Site boxes, and an exported job can be locked straight from the &ldquo;Already exported&rdquo; message.</li>
-        <li><strong>Photos and tutorials.</strong> Cloud photos show which job they&rsquo;re from, and the tutorials move smoothly.</li>
+        <li><strong>Renumber asset numbers.</strong> Started a new roll of stickers and forgot to tell the app? Tap an item on the Overview and choose &ldquo;Renumber from here&rdquo;, or select items and use Edit selected &rarr; Renumber. Type the first new number, check the list, done &mdash; and Undo is there for a few seconds if it&rsquo;s wrong.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -499,7 +496,17 @@ function render() {
   // V100 (9A, 10A): the replayed 100 moment and "PATGo tests itself" (render-help.js).
   const partyModal = (typeof renderPartyModal === 'function') ? renderPartyModal() : '';
   const eggModal = (typeof renderEggSheet === 'function') ? renderEggSheet() : '';
-  const finalHTML = cloudStrip + banner + html + migrationModal + welcomeModal + wizardModal + signaturePadModal + reopenWarnModal + partyModal + eggModal + saveFailModal;
+  // V147: the Renumber sheet (render-review.js) — opened from the entry screen
+  // ("Renumber from here") or the Overview (Edit selected), so it is joined here
+  // rather than inside either screen. It belongs to ONE job on those two screens:
+  // anywhere else, or another job open, it is shut (not left waiting to reappear).
+  let renumberModal = '';
+  if (state.renumber && state.renumber.open) {
+    const here = (state.view === 'entry' || state.view === 'overview') && state.renumber.sid === state.activeId;
+    if (here && typeof renderRenumberSheet === 'function') renumberModal = renderRenumberSheet();
+    else if (typeof renumberClosed === 'function') state.renumber = renumberClosed();
+  }
+  const finalHTML = cloudStrip + banner + html + migrationModal + welcomeModal + wizardModal + signaturePadModal + reopenWarnModal + partyModal + eggModal + renumberModal + saveFailModal;
   app.innerHTML = finalHTML;
   // v24 (E4): record whether THIS render put any modal/sheet into the DOM, so the
   // next render knows whether the orphan-sweep above could find anything. Cheap
@@ -1756,6 +1763,12 @@ function renderEntry() {
   // (Pass / Fail / Copy last) are disabled. Editing existing items via the overview
   // is still possible — the lock is a soft guard against accidental new entries.
   const isLocked = !!sess.locked;
+  // V147 (2A): "Renumber from here" — only on a logged item (the entry screen
+  // parked on it from the Overview), never on a locked job. Opens the Renumber
+  // sheet (render-review.js) from this item up to the last (1A).
+  const renumberLink = (isExisting && !isLocked) ? `
+      <button type="button" class="renumber-link" id="renumber-from-btn" data-action="renumber-from">Renumber from here</button>` : '';
+
   const lockBanner = isLocked ? `
     <div class="lock-banner" role="status">
       <span class="lock-banner-text">${icon('lock')} Job locked — no new entries</span>
@@ -2054,7 +2067,7 @@ function renderEntry() {
       ${progressRow}
 
       <label class="label">Asset number</label>
-      ${assetFieldHTML()}
+      ${assetFieldHTML()}${renumberLink}
 
       <label class="label">Location ${carriedHint}</label>
       <div class="location-input-wrap">

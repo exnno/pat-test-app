@@ -656,5 +656,22 @@ let state = {
     typeValue: '',
     notesValue: '',
     notesMode: 'replace'
-  }
+  },
+
+  // V147: the Renumber sheet (session.js). Transient — never saved.
+  //   open    — the sheet is showing (entry or Overview).
+  //   kind    — 'selected' (Edit selected → Renumber) | 'from' (Renumber from here).
+  //   sid     — the job it was opened on; a different active job closes it.
+  //   indices — 'selected': the chosen items' keys (item ids — never positions).
+  //   fromKey / fromIdx / toIdx — 'from': the first item, and the Up to box (a position).
+  //   first   — the First new number box, as typed.
+  //   step    — 'form' (has inputs: no render while open) | 'check' (buttons only).
+  //   rows    — the checked plan [{ i, id, from, to }], filled at 'check'.
+  //   error   — why the last Check was refused ('' when it wasn't).
+  // Same shape as renumberClosed() (session.js).
+  renumber: { open: false, kind: null, sid: null, indices: [], fromKey: null, fromIdx: 0, toIdx: 0, first: '', step: 'form', rows: [], error: '' },
+
+  // V147 (3A): what the Undo on the "Renumbered" toast puts back —
+  // { sid, rows: [{ id, i, from, to }] } while that toast shows, else null.
+  renumberUndo: null
 };

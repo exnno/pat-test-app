@@ -278,7 +278,16 @@ function focusSheetClosed() {
 }
 
 let _toastTimer = null;
+// V147: what to run when an action toast goes — timed out OR pushed off by the
+// next toast — so an offer like Undo never outlives its button.
+let _toastGone = null;
+function _toastClearGone() {
+  const g = _toastGone;
+  _toastGone = null;
+  if (typeof g === 'function') { try { g(); } catch (e) { /* the toast still goes */ } }
+}
 function showToast(message) {
+  _toastClearGone();
   document.querySelectorAll('body > .toast').forEach(el => el.remove());
   if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
   const el = document.createElement('div');
@@ -297,6 +306,51 @@ function showToast(message) {
     setTimeout(() => el.remove(), 250);   // wait out the fade-out transition
     _toastTimer = null;
   }, 1900);
+}
+
+// V147 (3A): a toast with one button — the Undo after a renumber. Stays for `ms`
+// (long enough to read and reach); a tap runs `onTap` once and closes it; `onGone`
+// runs when it goes WITHOUT the tap (timed out, or replaced by another toast).
+// The toast lives on <body>, outside #app, so a render() never touches it — and
+// the button carries its own listener (the app's delegation is on #app only).
+// Unlike the plain toast it is NOT hidden from VoiceOver: the button must be
+// reachable. The message is still spoken through the announcer.
+function showActionToast(message, label, onTap, ms, onGone) {
+  _toastClearGone();
+  document.querySelectorAll('body > .toast').forEach(el => el.remove());
+  if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+  const el = document.createElement('div');
+  el.className = 'toast toast-action';
+  announce(message);
+  const text = document.createElement('span');
+  text.className = 'toast-text';
+  text.setAttribute('aria-hidden', 'true');
+  text.textContent = message;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'toast-btn';
+  btn.textContent = label;
+  el.appendChild(text);
+  el.appendChild(btn);
+  document.body.appendChild(el);
+  const close = () => {
+    if (_toastTimer) { clearTimeout(_toastTimer); _toastTimer = null; }
+    el.classList.remove('toast-show');
+    setTimeout(() => el.remove(), 250);
+  };
+  _toastGone = onGone || null;
+  btn.addEventListener('click', () => {
+    _toastGone = null;            // tapped — so not "gone without the tap"
+    close();
+    if (typeof onTap === 'function') onTap();
+  });
+  void el.offsetWidth;
+  el.classList.add('toast-show');
+  _toastTimer = setTimeout(() => {
+    _toastTimer = null;
+    _toastClearGone();
+    close();
+  }, (typeof ms === 'number' && ms > 0) ? ms : 6000);
 }
 
 // v40: in-app bottom-sheet dialogs replacing native prompt()/confirm() — those

@@ -3260,6 +3260,258 @@ function applyBulkDelete() {
   });
 }
 
+// ---------- V147: renumber asset numbers ----------
+// Peter's shape: "renumber from item X to item Z sequentially starting with Y" —
+// a new roll of stickers the app wasn't told about, so the app's numbers no
+// longer match what is on the appliances. Locked 29 Oct: 7C two ways in — Edit
+// selected → Renumber (the selected items, numbered in LOGGED order whatever order
+// they were tapped) and "Renumber from here" under the asset box on a logged item
+// (2A), whose Up to box defaults to the last item (1A); 7b A a new number already
+// on an item OUTSIDE the block is refused, naming it (inside the block numbers
+// are only being swapped round, so they never clash); other jobs are not checked
+// (a new number every year — S4); 3A a check sheet first, then Undo on the toast;
+// 4A no "was" note (notes print on the certificate); 5A no Settings switch; a
+// locked job can't be renumbered.
+//
+// ⚠ ITEMS ARE HELD BY ID from the moment the sheet opens, never by index: on the
+// Overview the pull may replace the job object underneath (see V101 below). Each
+// step finds them again, and apply refuses if any went or changed number since
+// the check. Photos, readings and pins hang off item ids, so they are untouched.
+// Sync sends it like any other edit (the job's hash changes); markSessionDirty
+// turns an exported job "modified".
+
+// An item's handle — its id, or its position for an item that somehow has none.
+function _renumberKey(it, i) {
+  return (it && it.id != null) ? String(it.id) : '#' + i;
+}
+
+// n numbers counting up from `first`, as typed: its prefix kept and its digits'
+// width kept (leading zeros carry: 0451 → 0452). Padded by hand rather than
+// padAssetNumber, which caps the width at ASSET_PAD_MAX — a renumber must give
+// back exactly the first number that was typed. null when it doesn't end in a
+// number, or would count past what a phone can add up exactly.
+function renumberNumbers(first, n) {
+  const sp = splitAssetNo(String(first || '').trim());
+  if (sp.number == null || !Number.isSafeInteger(sp.number + n)) return null;
+  const out = [];
+  for (let k = 0; k < n; k++) out.push(sp.prefix + String(sp.number + k).padStart(sp.width, '0'));
+  return out;
+}
+
+function _renumberItemName(it, j) {
+  const bits = [it.itemType, it.location].map(s => String(s || '').trim()).filter(Boolean);
+  return `item ${j + 1}${bits.length ? ' (' + bits.join(', ') + ')' : ''}`;
+}
+
+// The plan for the items `keys` (see _renumberKey) of `sess` starting at `first`:
+// { rows: [{ i, id, from, to }] in logged order, error: '' } or { rows: [], error }.
+function renumberPlan(sess, keys, first) {
+  const fail = (error) => ({ rows: [], error });
+  if (!sess) return fail('This job is no longer on this phone.');
+  if (sess.locked) return fail('This job is locked. Unlock it to renumber.');
+  const items = sess.items || [];
+  const pos = new Map();
+  items.forEach((it, i) => pos.set(_renumberKey(it, i), i));
+  const idx = [];
+  for (const k of (keys || [])) {
+    const i = pos.get(String(k));
+    if (i == null) return fail('Some of these items are no longer in this job. Close this and try again.');
+    idx.push(i);
+  }
+  idx.sort((a, b) => a - b);   // logged order
+  if (!idx.length) return fail('Select the items to renumber first.');
+  const typed = String(first || '').trim();
+  if (!typed) return fail('Type the first new number.');
+  const nos = renumberNumbers(typed, idx.length);
+  if (!nos) return fail('The first new number needs to end in a number, like 1001 or A1001.');
+  const block = new Set(idx);
+  const wanted = new Set(nos);
+  for (let j = 0; j < items.length; j++) {
+    if (block.has(j)) continue;
+    const it = items[j];
+    if (it && it.assetNo && wanted.has(it.assetNo)) {
+      return fail(`${it.assetNo} is already on ${_renumberItemName(it, j)}. Pick a different first number.`);
+    }
+  }
+  const rows = idx.map((i, k) => ({ i, id: _renumberKey(items[i], i), from: items[i].assetNo || '', to: nos[k] }));
+  if (rows.every(r => r.from === r.to)) return fail('These items already have those numbers.');
+  return { rows, error: '' };
+}
+
+// The keys the open sheet is about: the selection, or From → Up to.
+function _renumberKeys(sess) {
+  const r = state.renumber;
+  if (!sess) return [];
+  const items = sess.items || [];
+  if (r.kind === 'selected') return r.indices.slice();
+  const from = items.findIndex((it, i) => _renumberKey(it, i) === r.fromKey);
+  if (from < 0) return [];
+  const to = Math.min(Math.max(r.toIdx, from), items.length - 1);
+  const out = [];
+  for (let i = from; i <= to; i++) out.push(_renumberKey(items[i], i));
+  return out;
+}
+
+// The sheet's shut state — the same shape state.js starts with.
+function renumberClosed() {
+  return { open: false, kind: null, sid: null, indices: [], fromKey: null, fromIdx: 0, toIdx: 0, first: '', step: 'form', rows: [], error: '' };
+}
+
+function _renumberOpen(o) {
+  state.renumber = Object.assign(renumberClosed(), { open: true }, o);
+  render();
+}
+
+// Edit selected → Renumber. The selection is kept as item keys (see above).
+function openRenumberSelected() {
+  const sess = activeSession();
+  if (!sess || sess.locked) return;
+  const items = sess.items || [];
+  const keys = state.selectedIndices.slice().sort((a, b) => a - b)
+    .filter(i => items[i]).map(i => _renumberKey(items[i], i));
+  if (!keys.length) return;
+  state.bulkEdit.menuOpen = false;
+  _renumberOpen({ kind: 'selected', sid: sess.id, indices: keys });
+}
+
+// "Renumber from here" — the item the entry screen is parked on, up to the
+// last item (1A).
+function openRenumberFrom() {
+  const sess = activeSession();
+  if (!sess || sess.locked) return;
+  const items = sess.items || [];
+  const i = state.cursor;
+  if (!(i >= 0 && i < items.length)) return;
+  _renumberOpen({ kind: 'from', sid: sess.id, fromKey: _renumberKey(items[i], i), fromIdx: i, toIdx: items.length - 1 });
+}
+
+function closeRenumber() {
+  state.renumber = renumberClosed();
+  render();
+}
+
+// The form step has inputs, so a refused Check writes its reason in place —
+// no render (MAP rule 3), the keyboard stays up.
+function _renumberShowError(msg) {
+  state.renumber.error = msg;
+  const el = (typeof document !== 'undefined') ? document.getElementById('renumber-error') : null;
+  if (el) { el.textContent = msg; el.hidden = !msg; }
+  if (msg && typeof announce === 'function') announce(msg);
+}
+
+function renumberCheck() {
+  const r = state.renumber;
+  const sess = activeSession();
+  if (!r.open || !sess || sess.id !== r.sid) { closeRenumber(); return; }
+  const plan = renumberPlan(sess, _renumberKeys(sess), r.first);
+  if (plan.error) { _renumberShowError(plan.error); return; }
+  r.rows = plan.rows;
+  r.error = '';
+  r.step = 'check';
+  render();   // the check step is buttons only — a repaint is allowed
+}
+
+function renumberBack() {
+  state.renumber.step = 'form';
+  state.renumber.rows = [];
+  render();
+}
+
+// After numbers change in place: an exported job turns "modified", and the saved
+// encoding is dropped. ⚠ storage.js reuses a job's encoding unless the job is
+// the open one or its items array was replaced — numbers rewritten INSIDE the
+// items would never reach the disk (or the sync hash) for a job that isn't
+// open, which is exactly where an Undo can land (v69's lesson).
+function _renumberTouched(sess) {
+  markSessionDirty(sess);
+  if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(sess);
+}
+
+// Put `rows` on the job: each item found by key, its number set to `pick(row)`.
+// The entry form follows when it shows a changed item's old number, and the
+// "next number" follows when the box held the automatic one.
+function _renumberWrite(sess, rows, pick, unpick) {
+  const items = sess.items || [];
+  const atNew = state.cursor >= items.length;
+  const autoBefore = atNew ? nextAssetNo(sess) : null;
+  const parked = !atNew ? _renumberKey(items[state.cursor], state.cursor) : null;
+  const pos = new Map();
+  items.forEach((it, i) => pos.set(_renumberKey(it, i), i));
+  let n = 0;
+  for (const row of rows) {
+    const i = pos.get(row.id);
+    if (i == null) continue;
+    items[i].assetNo = pick(row);
+    n++;
+    if (row.id === parked && state.form && state.form.assetNo === unpick(row)) state.form.assetNo = pick(row);
+  }
+  if (atNew && state.form && state.form.assetNo === autoBefore) state.form.assetNo = nextAssetNo(sess);
+  if (n) _renumberTouched(sess);
+  return n;
+}
+
+function applyRenumber() {
+  const r = state.renumber;
+  const sess = activeSession();
+  if (!r.open || r.step !== 'check' || !sess || sess.id !== r.sid) { closeRenumber(); return; }
+  // Checked again: the job may have changed under the sheet (a pull on the
+  // Overview). Anything different from what was shown → back to the form.
+  const plan = renumberPlan(sess, r.rows.map(x => x.id), r.first);
+  const same = !plan.error && plan.rows.length === r.rows.length &&
+    plan.rows.every((x, k) => x.id === r.rows[k].id && x.from === r.rows[k].from && x.to === r.rows[k].to);
+  if (!same) {
+    r.step = 'form';
+    r.rows = [];
+    r.error = plan.error || 'These items changed while this was open. Check the numbers again.';
+    render();
+    return;
+  }
+  const rows = plan.rows.filter(x => x.from !== x.to);
+  const n = _renumberWrite(sess, rows, x => x.to, x => x.from);
+  const wasSelected = r.kind === 'selected';
+  state.renumber = renumberClosed();
+  if (wasSelected) { state.selectionMode = false; state.selectedIndices = []; }
+  save();
+  render();
+  state.renumberUndo = { sid: sess.id, rows: rows.map(x => ({ id: x.id, from: x.from, to: x.to })) };
+  const msg = `Renumbered ${n} item${n === 1 ? '' : 's'}`;
+  if (typeof showActionToast === 'function') {
+    showActionToast(msg, 'Undo', () => undoRenumber(), RENUMBER_UNDO_MS, () => { state.renumberUndo = null; });
+  } else {
+    state.renumberUndo = null;
+    showToast(msg);
+  }
+}
+
+// 3A: Undo puts back only the items still carrying the number the renumber gave
+// them — one changed since by hand keeps its new number — and never a number
+// another item has been given since.
+function undoRenumber() {
+  const u = state.renumberUndo;
+  state.renumberUndo = null;
+  if (!u) return;
+  const sess = (state.sessions || []).find(s => s && s.id === u.sid);
+  if (!sess || sess.locked) { showToast('Can’t undo — the job has changed'); return; }
+  const items = sess.items || [];
+  const pos = new Map();
+  items.forEach((it, i) => pos.set(_renumberKey(it, i), i));
+  let back = u.rows.filter(x => { const i = pos.get(x.id); return i != null && items[i].assetNo === x.to; });
+  // Never put a number back that another item has taken since (7b A's rule,
+  // the other way round): that item keeps it, this one keeps its new number.
+  const going = new Set(back.map(x => x.id));
+  const taken = new Set();
+  items.forEach((it, i) => { if (it && it.assetNo && !going.has(_renumberKey(it, i))) taken.add(it.assetNo); });
+  back = back.filter(x => !taken.has(x.from));
+  // The form and "next number" only follow when the undone job is the open one.
+  const n = (state.activeId === sess.id)
+    ? _renumberWrite(sess, back, x => x.from, x => x.to)
+    : back.reduce((k, x) => { items[pos.get(x.id)].assetNo = x.from; return k + 1; }, 0);
+  if (n && state.activeId !== sess.id) _renumberTouched(sess);
+  save();
+  render();
+  showToast(n ? `Put back ${n} number${n === 1 ? '' : 's'}` : 'Nothing to undo');
+}
+
 // ---------- V101: move selected items to a new job (roadmap Stage 9, split) ----------
 // Locked: 1A Overview → Select items → Edit selected → "Move to a new job…",
 // with a review of what is moving and an "Are you sure?" step; 2A a NEW job only

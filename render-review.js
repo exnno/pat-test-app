@@ -206,6 +206,8 @@ function renderOverview() {
         <button class="bulk-menu-btn" data-action="bulk-edit-mode" data-arg="location" data-bulk-edit="location">Change location</button>
         <button class="bulk-menu-btn" data-action="bulk-edit-mode" data-arg="type" data-bulk-edit="type">Change type</button>
         <button class="bulk-menu-btn" data-action="bulk-edit-mode" data-arg="notes" data-bulk-edit="notes">Change notes</button>
+        <button class="bulk-menu-btn" id="bulk-renumber-btn" data-action="renumber-selected"${sess.locked ? ' disabled' : ''}>Renumber\u2026</button>${sess.locked ? `
+        <p class="muted bulk-menu-note" id="bulk-renumber-note">Unlock the job to renumber.</p>` : ''}
         <button class="bulk-menu-btn danger" data-action="bulk-edit-mode" data-arg="delete" data-bulk-edit="delete">Delete selected</button>
         <button class="bulk-menu-btn bulk-menu-move" id="bulk-move-btn" data-action="move-job-open">Move to a new job\u2026</button>
         <button class="bulk-menu-btn bulk-menu-move-to" id="bulk-move-to-btn" data-action="move-to-open">Move to another job\u2026</button>
@@ -882,6 +884,92 @@ function renderDupJobSheet(sess) {
         <p class="move-job-error" id="dup-job-error" role="alert">${escapeHTML(m.error || '')}</p>
         <button class="btn-primary sheet-pin" id="dup-job-continue" data-action="dup-job-continue">Continue</button>
       </div>`;
+}
+
+// ============== V147 — the Renumber sheet ==============
+// Opened from Edit selected → Renumber (the Overview) or "Renumber from here"
+// (the entry screen); joined into the page by render() in render-core.js. Logic
+// and the locked decisions: session.js (renumberPlan and friends).
+//
+// Two steps. 'form' HAS INPUTS (First new number; Up to on "from here"), so while
+// it is open nothing may render (MAP rule 3): a refused Check writes its reason
+// into #renumber-error in place, which is why that line is always in the markup.
+// 'check' is buttons only, so it may repaint.
+//
+// The form step sits in a real <form> (as V139's sign-in boxes do) so the
+// keyboard's Done key — and a scanner's Enter after scanning the first sticker —
+// presses Check: implicit submission clicks the submit button, whose data-action
+// runs like any tap; dispatch.js cancels the submit itself.
+function renumberItemLine(it, i) {
+  const bits = [it.assetNo || '—', it.itemType, it.location].map(s => String(s || '').trim()).filter(Boolean);
+  return `Item ${i + 1} · ${bits.join(' · ')}`;
+}
+
+function renderRenumberSheet() {
+  const r = state.renumber;
+  const sess = activeSession();
+  if (!r || !r.open || !sess) return '';
+  const items = sess.items || [];
+  const plural = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+  const head = (title) => `
+      <div class="bulk-sheet-handle"></div>
+      <div class="bulk-sheet-header">
+        <span class="fail-close-spacer"></span>
+        <h3 class="bulk-sheet-title">${title}</h3>
+        <button class="fail-close-btn" id="renumber-close" data-action="renumber-close" aria-label="Cancel">×</button>
+      </div>`;
+
+  if (r.step === 'check') {
+    const rows = r.rows || [];
+    // First two, a gap, the last — the whole list when it is short.
+    const shown = rows.length <= 4 ? rows : [rows[0], rows[1], null, rows[rows.length - 1]];
+    const lines = shown.map(x => x
+      ? `<li><span>Item ${x.i + 1}</span><span>${escapeHTML(x.from || '—')} → <strong>${escapeHTML(x.to)}</strong></span></li>`
+      : `<li class="renumber-gap" aria-hidden="true">…</li>`).join('');
+    const exported = sess.exportedAt ? ' This job has been exported, so it will show as changed.' : '';
+    return `
+    <div class="modal-backdrop" id="renumber-backdrop" data-action="renumber-close"></div>
+    <div class="bulk-sheet" role="dialog" aria-label="Renumber">${head(`Renumber ${plural(rows.length, 'item')}?`)}
+      <ul class="renumber-list" id="renumber-list">${lines}</ul>
+      <p class="muted renumber-from">Photos, readings and notes stay with their items.${exported}</p>
+      <button class="btn-primary" id="renumber-apply" data-action="renumber-apply">Renumber ${plural(rows.length, 'item')}</button>
+      <button class="btn-secondary" id="renumber-back" data-action="renumber-back" style="margin-top:10px">Back</button>
+    </div>`;
+  }
+
+  let lead = '';
+  let upTo = '';
+  let title = 'Renumber';
+  if (r.kind === 'from') {
+    const from = items.findIndex((it, i) => _renumberKey(it, i) === r.fromKey);
+    if (from < 0) return '';
+    title = `Renumber from item ${from + 1}`;
+    lead = `<p class="muted renumber-from" id="renumber-from-line">From ${escapeHTML(renumberItemLine(items[from], from))}</p>`;
+    const to = Math.min(Math.max(r.toIdx, from), items.length - 1);
+    const opts = [];
+    for (let j = from; j < items.length; j++) {
+      opts.push(`<option value="${j}"${j === to ? ' selected' : ''}>${escapeHTML(renumberItemLine(items[j], j))}${j === items.length - 1 ? ' (last)' : ''}</option>`);
+    }
+    upTo = `
+      <label class="label" for="renumber-to">Up to</label>
+      <select class="input" id="renumber-to" data-change-action="renumber-to" style="margin-bottom:14px">${opts.join('')}</select>`;
+  } else {
+    const n = (r.indices || []).length;
+    title = `Renumber ${plural(n, 'item')}`;
+    lead = `<p class="muted renumber-from" id="renumber-from-line">The selected items are numbered in the order they were logged.</p>`;
+  }
+  const err = r.error || '';
+  return `
+    <div class="modal-backdrop" id="renumber-backdrop" data-action="renumber-close"></div>
+    <div class="bulk-sheet" role="dialog" aria-label="Renumber">${head(title)}
+      <form class="renumber-form" id="renumber-form" novalidate>
+      ${lead}
+      <label class="label" for="renumber-first">First new number</label>
+      <input class="input-big" id="renumber-first" data-input-action="renumber-first" value="${escapeHTML(r.first || '')}" placeholder="e.g. 1001" autocomplete="off" autocorrect="off" spellcheck="false" enterkeyhint="done" style="margin-bottom:14px">${upTo}
+      <p class="renumber-error" id="renumber-error"${err ? '' : ' hidden'}>${escapeHTML(err)}</p>
+      <button type="submit" class="btn-primary" id="renumber-check" data-action="renumber-check">Check</button>
+      </form>
+    </div>`;
 }
 
 // ============== PATGo PWA — v56 — Retest reminders ==============

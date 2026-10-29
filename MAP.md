@@ -1,4 +1,4 @@
-# PATGo — Code Map (V146)
+# PATGo — Code Map (V147)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -649,6 +649,10 @@ fixed MIXED list of types as passes; ×N repeats ONE item, whatever its result.
 `focusMarkLogged`; V129 `FOCUS_STAND_INS`, `focusStandIn`, `focusControl`), `showToast`, the shared `.bulk-sheet` dialog builders (`openConfirmSheet`,
 `openNameSheet`, `openInfoSheet`, v91 `openChoiceSheet` — two or more choices +
 Cancel; V145 `noCancel` drops the Cancel when a choice says it), feedback channels.
+V147: `showActionToast` — a toast with one button (the renumber's Undo): spoken
+via `announce`, NOT aria-hidden (the button must be reachable), own listener on
+the button (it lives on <body>, outside #app's delegation); `_toastGone` runs its
+`onGone` when it times out or ANY later toast (showToast too) pushes it off.
 **Touch to:** change feedback channels, toasts, spoken messages, or the shared dialogs.
 **Coupling:** rule 11 — every destructive confirm in the app routes here. No
 state, no re-render. Loads before everything that toasts. Rule 21: `announce`
@@ -951,6 +955,16 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
 **Coupling:** the busiest file in the app —
 - `setView` and `loadFormForCursor` clear transient overlays; new transients must
   be added there (rules 3, 4).
+- V147: renumbering — `renumberPlan` (the rules), `openRenumberSelected` /
+  `openRenumberFrom`, `renumberCheck`, `applyRenumber`, `undoRenumber`; state in
+  `state.renumber` (+ `renumberClosed()`, its shut shape) and `state.renumberUndo`.
+  ⚠ Items held by id (`_renumberKey`), never index — the Overview pull can swap the
+  job object. ⚠ Numbers rewritten IN PLACE: `_renumberTouched` drops the saved
+  encoding (storage.js reuse rule) as well as marking an export dirty. The sheet:
+  **render-review.js** `renderRenumberSheet`, joined in **render-core.js**
+  `render()` (closes itself off entry/overview or on another job); the link:
+  render-core.js `renderEntry`; Undo: **feedback.js** `showActionToast`;
+  **dispatch.js** renumber-* (click), 'renumber-first' (input), 'renumber-to' (change).
 - V146 (4A): every suggestion list matches through `suggestKey` (ends trimmed,
   runs of spaces as one) — the two in **render-core.js** (`computeNfClient/Site
   Suggestions`) call it too. (3A) Job settings' draft holds `client` and `site`
@@ -1214,6 +1228,11 @@ cover them instead. `dispatch.js` calls `refreshOverviewBody()` /
 `refreshOverviewSelection()`; `session.js` calls `computeVisibleOverviewItems()`
 / `renderFailPhotoStripInner()`; `render-core.js` (renderEntry) calls both photo
 helpers. Declares NO top-level bindings, so its load position is free.
+V147: `renderRenumberSheet()` (+ `renumberItemLine`) — the Renumber sheet; NOT
+drawn by renderOverview: render-core.js `render()` joins it, because the entry
+screen opens it too. Form step has inputs (rule 3: session.js writes a refusal
+into `#renumber-error` in place); it sits in a real <form> so Done / a scanner's
+Enter presses Check. Edit selected's "Renumber…" button lives in renderOverview.
 `renderRetestReminders()` bounces to the sessions list when the retest feature
 is off — any test of it must turn the flag on first.
 v90.1: "Look in the cloud" is a small `.pm-look-link`, not a button; after a
