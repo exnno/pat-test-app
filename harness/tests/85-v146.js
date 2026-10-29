@@ -30,8 +30,8 @@
           suggestions following the client.
      85d  4A the matching (and two-word descriptions unchanged); 5A through the
           handlers the browser calls.
-     85e  8A through the rendered Copy last button; 6A; release: V146, cache,
-          What's new, About. */
+     85e  8A through the rendered Copy last button; 6A. (Release checks: V146's
+          retired at V147 → 86e.) */
 
 'use strict';
 
@@ -440,7 +440,7 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 85e */
-  await t.group('85e — 8A Copy last carries a fail’s reason; 6A the tutorial motion; release: V146', async () => {
+  await t.group('85e — 8A Copy last carries a fail’s reason; 6A the tutorial motion', async () => {
     // ---- 8A, through the rendered Copy last button.
     const app = boot({});
     withSession(app, { site: 'ZZCOPY' });
@@ -503,29 +503,6 @@ module.exports = async function () {
     const css = read('styles.css');
     t.includes(css, '  will-change: transform;\n  transition: transform 350ms', 'the box is its own layer');
 
-    // ---- release.
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V146', 'APP_VERSION V146');
-    t.eq(rel.run('WELCOME_VERSION'), 'V146', 'What’s new rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v146';", 'cache key pat-v146');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 4, 'What’s new: four lines');
-    t.includes(sheetCopy, '<li><strong>Typing a description.</strong>', '…the description box');
-    t.includes(sheetCopy, '<li><strong>Copy last keeps the fail reason.</strong>', '…Copy last');
-    t.includes(sheetCopy, '<li><strong>Client and site, apart.</strong>', '…Job settings and Lock job');
-    t.includes(sheetCopy, 'and the tutorials move smoothly.</li>', '…photos and tutorials');
-    const help = read('render-help.js');
-    const a = help.indexOf('<p><strong>V146</strong>'), b = help.indexOf('<p><strong>V145</strong>'), c = help.indexOf('<p><strong>V144</strong>');
-    t.ok(a > -1 && b > a && c > b, 'About: V146, V145, V144');
-    t.excludes(help, '<p><strong>V143</strong>', 'V143 rolled off');
-    t.includes(help, 'Tapping the description box empties it, ready for a new word, and suggestions no longer vanish', 'About: V146’s line');
-    t.includes(help, 'A phone&rsquo;s jobs belong to one account, and are never sent into another.', 'About: V145’s line still there');
-    t.includes(help, 'You can create your own cloud account from Settings, by email or with Google, with a 30-day free trial', 'About: V144’s line still there');
-    // The new taps wired.
-    const disp = read('dispatch.js');
-    t.includes(disp, "'reopen-lock': () => lockFromReopenWarning(),", 'Lock job wired');
-    t.includes(disp, "'ef-client': (v) => {", 'the client box wired');
+    // ---- release: V146's checks retired at V147 → 86e.
   });
 };
