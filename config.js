@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V147';
+const APP_VERSION = 'V148';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -349,8 +349,22 @@ const CLOUD = CLOUD_PROJECTS[CLOUD_ENV] || { url: '', publishableKey: '' };
 // sign-in can never be mistaken for a production one. Owned by the library —
 // the app only ever reads it (cloudBoot) or deletes it (sign-out fallback).
 const CLOUD_AUTH_STORAGE_KEY = 'patgo:cloudAuth:' + CLOUD_ENV;
-// Flip to true at commercial launch (spec decision 5). Nothing reads it yet.
-const REQUIRE_ACCOUNT = false;
+// V148 — THE LAUNCH SWITCH (spec 1A 2A 3A 4A 5A). Which environments need an
+// account before the app is used: the product only. A host with no cloud has no
+// wall whatever this says (cloud.js cloudWallOn — no cloud, nothing to sign in
+// to), so the product site stays as it is until its Pro project exists and
+// CLOUD_PROJECTS.prod gets its keys. The test site never walls anyone (1A):
+// free users there carry on as before.
+// ⚠ Peter's hard rule (22 Oct): no lack of signal may ever sign an engineer out
+// or stop them working. So the wall is ONLY for a phone with no owner (V145's
+// OWNER_KEY) — never for an owner whose login lapsed or was revoked (4A), and
+// it is decided from what is stored on the phone, never from a network answer.
+const REQUIRE_ACCOUNT = { prod: true, test: false };
+// 1A: a per-phone way to see the wall on the test site — open the app once at
+// …/pat-test-app/?wall (…/?wall=off to undo). '1' = on for this phone. Per
+// device and for good, like CLOUD_UNLOCK_KEY: never in a backup or setup file.
+// Reset: 'account' (Everything, as new); a takeover keeps it (the phone's own).
+const WALL_TEST_KEY = 'pat:wallTest';
 
 // v85 (decisions 1A/2A): the Cloud group in Settings sits behind an access code.
 // ⚠ A CURTAIN, NOT A LOCK. The code is readable in this public file. It exists so
@@ -362,6 +376,8 @@ const REQUIRE_ACCOUNT = false;
 // has been signed in (cloud.js). Per device and for good (2A) — signing out does
 // not clear it. NEVER in a backup or setup export: restoring onto a new phone must
 // not open the curtain. Factory reset (own spec, BACKLOG) must clear it.
+// V148 (5A): never asked for where the wall is on — getting past the wall IS
+// signing in (cloud.js cloudPagesUnlocked).
 const CLOUD_UNLOCK_KEY = 'pat:cloudUnlocked';
 const CLOUD_ACCESS_CODE = '1111';
 // V144: an account counts as made just now when its address was confirmed within

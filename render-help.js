@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V147: rolled forward — V147 on top, V144 dropped. -->
+      <!-- v8: rolling 3-version changelog. V148: rolled forward — V148 on top, V145 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V148</strong> &middot; November 2026</p>
+        <p class="muted">Behind the scenes: PATGo is ready to ask for an account when it launches. Nothing changes on this phone today.</p>
         <p><strong>V147</strong> &middot; October 2026</p>
         <p class="muted">Renumber asset numbers when a new roll of stickers starts: &ldquo;Renumber from here&rdquo; on an item, or Edit selected &rarr; Renumber on the Overview. You check the new numbers before they change, and can undo straight after.</p>
         <p><strong>V146</strong> &middot; October 2026</p>
         <p class="muted">Tapping the description box empties it, ready for a new word, and suggestions no longer vanish when your phone adds a space. Copy last keeps a fail&rsquo;s reason. Job settings has separate Client and Site boxes, and an exported job can be locked from the &ldquo;Already exported&rdquo; message. Cloud photos show their job&rsquo;s name, and the tutorials move smoothly.</p>
-        <p><strong>V145</strong> &middot; October 2026</p>
-        <p class="muted">A phone&rsquo;s jobs belong to one account, and are never sent into another. Signing out sends your last changes first and warns you if anything hasn&rsquo;t reached the cloud. Backups remember their account.</p>
 
 
 
@@ -422,24 +422,7 @@ function renderCloudAccount() {
         <button class="backup-action-btn" id="cloud-google-off" data-action="cloud-google-off" ${dis} style="margin-top:6px">Disconnect Google</button>`
       : `
         <button class="backup-action-btn" id="cloud-google-connect" data-action="cloud-google-connect" ${dis} style="margin-top:6px">Connect Google</button>`;
-    const pwCard = c.pwOpen ? `
-        <form class="cloud-form" id="cloud-new-password-form" autocomplete="on" novalidate>
-        <h3 style="margin-top:14px">${c.pwNew ? 'Choose a password' : c.pwReset ? 'Choose a new password' : 'Set or change password'}</h3>
-        ${c.pwNew ? `<p class="muted" style="font-size:0.8125rem" id="cloud-pw-new-note">One last step: choose a password to sign in with next time.</p>`
-          : c.pwReset ? `<p class="muted" style="font-size:0.8125rem" id="cloud-pw-reset-note">You’re signed in with the code. Choose a new password to use next time.</p>` : ''}
-        <input type="email" autocomplete="username" aria-label="Email" value="${escapeHTML(c.email || '')}" hidden tabindex="-1">
-        <label class="label" for="cloud-new-password">New password</label>
-        <div class="cloud-pw-row">
-          <input class="input" id="cloud-new-password" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="72" ${dis}>
-          <button type="button" class="cloud-pw-toggle" data-action="cloud-password-toggle" aria-pressed="false" aria-label="Show or hide the password">Show</button>
-        </div>
-        <label class="label" for="cloud-new-password2">Type it again</label>
-        <input class="input" id="cloud-new-password2" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="72" ${dis}>
-        <p class="muted" style="font-size:0.75rem;margin-top:6px" id="cloud-pw-hint">${escapeHTML(typeof CLOUD_PASSWORD_HINT === 'string' ? CLOUD_PASSWORD_HINT : '')}</p>
-        ${msg}
-        <button type="submit" class="btn-primary" id="cloud-password-save" data-action="cloud-password-save" ${dis} style="margin-top:10px">${busy ? 'Saving…' : (c.pwNew ? 'Save and finish' : 'Save password')}</button>
-        ${c.pwNew ? '' : `<button type="button" class="backup-action-btn" id="cloud-password-cancel" data-action="cloud-password-cancel" ${dis} style="margin-top:6px">${c.pwReset ? 'Not now' : 'Cancel'}</button>`}
-        </form>` : `
+    const pwCard = c.pwOpen ? cloudPasswordFormHTML(c, msg, dis, busy) : `
         ${msg}
         <button class="backup-action-btn" id="cloud-check" data-action="cloud-check" ${dis} style="margin-top:8px">${busy ? 'Checking…' : 'Check connection'}</button>
         <button class="backup-action-btn" id="cloud-password-open" data-action="cloud-password-open" ${dis} style="margin-top:6px">Set or change password</button>
@@ -468,7 +451,54 @@ function renderCloudAccount() {
         ${(typeof planAccountHTML === 'function') ? planAccountHTML() : ''}
         ${pwCard}
       </div>`;
-  } else if (c.googlePending === 'signin') {
+  } else {
+    body = cloudSignedOutCardsHTML(c, msg, dis, busy);
+  }
+
+  return `
+    <div class="screen" id="cloud-account-page">
+      ${renderSettingsSubHeader('Account')}
+      <div class="info-card">
+        <h2>Cloud account (test)</h2>
+        <p class="muted" style="font-size:0.75rem">While you're signed in, your jobs, clients and sites, testers, presets, report settings and most other settings are copied to the cloud test (see Sync). Theme, sound, haptics and the barcode scanner stay set on each phone, and the app works exactly the same signed in or not, signal or not.</p>
+      </div>
+      ${body}
+    </div>
+  `;
+}
+
+// V148: the two halves of the Account page the launch wall shows as well
+// (renderAccountWall below) — taken out of renderCloudAccount UNCHANGED, so the
+// page's markup is byte-identical to V147's and the wall can never drift from it.
+// The password form a signed-in account fills in (V139 3A; V144 2A's "Choose a
+// password", which a new account finishes on the wall).
+function cloudPasswordFormHTML(c, msg, dis, busy) {
+  return `
+        <form class="cloud-form" id="cloud-new-password-form" autocomplete="on" novalidate>
+        <h3 style="margin-top:14px">${c.pwNew ? 'Choose a password' : c.pwReset ? 'Choose a new password' : 'Set or change password'}</h3>
+        ${c.pwNew ? `<p class="muted" style="font-size:0.8125rem" id="cloud-pw-new-note">One last step: choose a password to sign in with next time.</p>`
+          : c.pwReset ? `<p class="muted" style="font-size:0.8125rem" id="cloud-pw-reset-note">You’re signed in with the code. Choose a new password to use next time.</p>` : ''}
+        <input type="email" autocomplete="username" aria-label="Email" value="${escapeHTML(c.email || '')}" hidden tabindex="-1">
+        <label class="label" for="cloud-new-password">New password</label>
+        <div class="cloud-pw-row">
+          <input class="input" id="cloud-new-password" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="72" ${dis}>
+          <button type="button" class="cloud-pw-toggle" data-action="cloud-password-toggle" aria-pressed="false" aria-label="Show or hide the password">Show</button>
+        </div>
+        <label class="label" for="cloud-new-password2">Type it again</label>
+        <input class="input" id="cloud-new-password2" type="password" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false" maxlength="72" ${dis}>
+        <p class="muted" style="font-size:0.75rem;margin-top:6px" id="cloud-pw-hint">${escapeHTML(typeof CLOUD_PASSWORD_HINT === 'string' ? CLOUD_PASSWORD_HINT : '')}</p>
+        ${msg}
+        <button type="submit" class="btn-primary" id="cloud-password-save" data-action="cloud-password-save" ${dis} style="margin-top:10px">${busy ? 'Saving…' : (c.pwNew ? 'Save and finish' : 'Save password')}</button>
+        ${c.pwNew ? '' : `<button type="button" class="backup-action-btn" id="cloud-password-cancel" data-action="cloud-password-cancel" ${dis} style="margin-top:6px">${c.pwReset ? 'Not now' : 'Cancel'}</button>`}
+        </form>`;
+}
+
+// Everything a signed-out phone sees: Google waiting (V140), the code step
+// (V79, V139 Forgot, V144 sign-up), the Create card (V144), code sign-in and
+// the everyday password card (V139).
+function cloudSignedOutCardsHTML(c, msg, dis, busy) {
+  let body = '';
+  if (c.googlePending === 'signin') {
     // V140: the Google window is open. Cancel if it was closed without finishing.
     body = `
       <div class="info-card" id="cloud-google-waiting">
@@ -558,14 +588,64 @@ function renderCloudAccount() {
         <button type="button" class="btn-primary" id="cloud-signup-open" data-action="cloud-signup-open" ${dis} style="margin-top:8px">Create an account</button>
       </div>`;
   }
+  return body;
+}
 
-  return `
-    <div class="screen" id="cloud-account-page">
-      ${renderSettingsSubHeader('Account')}
+// V148 (2A 3A): THE WALL — the first screen where an account is required
+// (cloud.js cloudWallShows: no owner yet, or a new account choosing its
+// password). Drawn by render() in place of everything else, like the tutorial.
+// Two steps: the start (Create an account, big; Sign in), then V144's own cards,
+// shared with the Account page. A screen, not a sheet, and it holds inputs —
+// so, as on the Account page, only taps render it (MAP rule 3).
+// 3A: a phone that already holds jobs (an old free install) is told they go up
+// to the account at sign-in, and can save a copy first without an account.
+function renderAccountWall() {
+  const c = state.cloud || {};
+  const busy = !!c.busy;
+  const dis = busy ? 'disabled' : '';
+  const msg = c.message ? `<p class="muted cloud-msg" id="cloud-msg" role="status">${escapeHTML(c.message)}</p>` : '';
+  const trialDays = typeof PLAN_TRIAL_DAYS === 'number' ? PLAN_TRIAL_DAYS : 30;
+  let offline = false;
+  try { offline = typeof navigator !== 'undefined' && navigator.onLine === false; } catch (e) { offline = false; }
+  const jobs = Array.isArray(state.sessions) ? state.sessions.length : 0;
+  const jobsCard = jobs > 0 ? `
+      <div class="info-card" id="wall-jobs">
+        <p style="margin:0" id="wall-jobs-words">${jobs === 1 ? 'The job on this phone goes' : `Your ${jobs} jobs on this phone go`} up to your account when you sign in.</p>
+        <button class="backup-action-btn" id="wall-save-copy" data-action="export-all" ${dis} style="margin-top:8px">Save a copy first</button>
+      </div>` : '';
+  const offlineNote = offline
+    ? `<p class="muted wall-note" id="wall-offline" role="status">You&rsquo;ll need signal to sign in the first time. After that, PATGo works with or without it.</p>` : '';
+  const cards = state.wallStage === 'cards' || c.status === 'code-sent' || c.status === 'signed-in'
+    || !!c.googlePending || busy;
+  let body;
+  if (c.status === 'signed-in') {
+    // A new account finishing its password (V144 2A) — that card alone.
+    body = `
       <div class="info-card">
-        <h2>Cloud account (test)</h2>
-        <p class="muted" style="font-size:0.75rem">While you're signed in, your jobs, clients and sites, testers, presets, report settings and most other settings are copied to the cloud test (see Sync). Theme, sound, haptics and the barcode scanner stay set on each phone, and the app works exactly the same signed in or not, signal or not.</p>
+        ${cloudPasswordFormHTML(c, msg, dis, busy)}
+      </div>`;
+  } else if (cards) {
+    const back = c.status === 'code-sent' || c.googlePending ? '' : `
+      <button class="backup-action-btn" id="wall-back" data-action="wall-back" ${dis} style="margin-top:4px">Back</button>`;
+    body = cloudSignedOutCardsHTML(c, msg, dis, busy) + back;
+  } else {
+    body = `
+      <div class="wall-actions">
+        <button class="btn-primary wall-create" id="wall-create" data-action="wall-create" ${dis}>Create an account</button>
+        <p class="muted wall-note" id="wall-trial">Free for ${trialDays} days &mdash; no card needed.</p>
+        <button class="backup-action-btn" id="wall-sign-in" data-action="wall-sign-in" ${dis}>Sign in</button>
       </div>
+      ${msg}`;
+  }
+  return `
+    <div class="screen wall-screen" id="account-wall">
+      <div class="wall-hero">
+        <img class="wall-logo" src="icon-192.png" alt="" width="72" height="72">
+        <h1 class="h1" id="screen-title" tabindex="-1">Welcome to PATGo</h1>
+        <p class="muted wall-sub">Sign in or create an account to start testing.</p>
+      </div>
+      ${offlineNote}
+      ${jobsCard}
       ${body}
     </div>
   `;

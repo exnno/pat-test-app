@@ -189,6 +189,14 @@ function updateSafeMoment() {
   if (state.view !== 'sessions') return false;                    // the Jobs list only
   if (_updateNewFormTyped()) return false;                        // a New job half filled in
   if (state.tourOpen) return false;
+  // V148: on the launch wall, only its start screen is a safe moment — past it
+  // someone is typing an email, a code or a password, or waiting on Google.
+  try {
+    if (typeof cloudWallShows === 'function' && cloudWallShows()) {
+      const c = state.cloud || {};
+      if (state.wallStage !== 'start' || c.status !== 'signed-out' || c.busy || c.googlePending) return false;
+    }
+  } catch (e) { return false; }
   if (state.saveFailure && !state.saveFailureDismissed) return false;
   if (state.searchQuery) return false;                            // a search typed
   const cj = state.cloudJobs;

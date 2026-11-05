@@ -4523,3 +4523,14 @@ body.has-selection-bar .cs-screen { padding-bottom: 100px; }
 .reading-confirm-note { margin-top: 4px; font-size: 0.875rem; line-height: 1.35; }
 .reading-change-fail-btn { width: 100%; margin-top: 20px; padding: 16px 0; font-size: 1.0625rem; border-radius: 12px; }
 .readings-confirm .reading-pass-anyway-btn { margin-top: 10px; }
+
+/* V148 (2A): the launch wall — the first screen where an account is required.
+   A plain screen (render-help.js renderAccountWall): logo and welcome, then the
+   two choices, then V144's own cards. Sizes in rem so Text size moves them. */
+.wall-screen { padding-top: 28px; }
+.wall-hero { text-align: center; margin: 8px 0 18px; }
+.wall-logo { width: 72px; height: 72px; border-radius: 16px; display: block; margin: 0 auto 12px; }
+.wall-sub { margin: 6px 0 0; font-size: 0.9375rem; }
+.wall-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
+.wall-create { font-size: 1.0625rem; padding: 16px; }
+.wall-note { font-size: 0.8125rem; text-align: center; margin: 0 0 8px; }

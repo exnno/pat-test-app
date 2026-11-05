@@ -673,5 +673,10 @@ let state = {
 
   // V147 (3A): what the Undo on the "Renumbered" toast puts back —
   // { sid, rows: [{ id, i, from, to }] } while that toast shows, else null.
-  renumberUndo: null
+  renumberUndo: null,
+
+  // V148 (2A): which step of the launch wall is showing — 'start' (Create an
+  // account / Sign in) or 'cards' (V144's cards). Transient: a restart starts
+  // the wall again. Only read while the wall shows (cloud.js cloudWallShows).
+  wallStage: 'start'
 };

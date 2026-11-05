@@ -267,6 +267,7 @@ function _cloudOwnerFirstRun(stored) {
 // still good — a revoked session signs out; a network failure changes nothing.
 function cloudBoot() {
   if (!cloudAvailable()) { state.cloud.status = 'off'; return; }
+  cloudWallTestFromUrl();   // V148 (1A): ?wall / ?wall=off — before the first paint
   _cloudGoogleListen();   // V140: ready for the Google window's answer (no network)
   const stored = _cloudReadStoredSession();
   _cloudOwnerFirstRun(stored);   // V145
@@ -1132,6 +1133,7 @@ function cloudHandoverLanded(carry) {
 function cloudPagesUnlocked() {
   if (!cloudAvailable()) return false;
   if (state.cloud && state.cloud.status === 'signed-in') return true;
+  if (cloudWallOn()) return true;   // V148 (5A): where an account is required there is no curtain
   try { return localStorage.getItem(CLOUD_UNLOCK_KEY) === '1'; } catch { return false; }
 }
 
@@ -1154,6 +1156,105 @@ function cloudUnlock() {
   state.cloudCodeMessage = '';
   render();
   return true;
+}
+
+// ---- V148: the launch switch (spec 1A 2A 3A 4A 5A) ------------------------------
+// THE RULE (Peter's, 22 Oct): no lack of signal may ever sign an engineer out or
+// stop them working. So the wall is decided ONLY from what this phone holds —
+// never a network answer — and it is only ever for a phone with NO owner (V145).
+// A phone with an owner works on whatever its login does: lapsed, revoked,
+// signed out, no signal. Where the wall is on, that phone's plan follows its
+// owner instead (plan.js planRecord, 4A), so signing out gets round nothing.
+//   • cloudWallOn    — this copy needs an account: the environment says so
+//                      (REQUIRE_ACCOUNT, config.js — the product only) or this
+//                      phone opened ?wall (1A). No cloud = never.
+//   • cloudWallShows — the wall is up now: no owner and nobody signed in, or a
+//                      brand-new account still choosing its password (V144 2A
+//                      can't be skipped, so it finishes on the wall).
+// Everything here fails OPEN: a throw means no wall.
+function _cloudWallTest() {
+  try { return localStorage.getItem(WALL_TEST_KEY) === '1'; } catch (e) { return false; }
+}
+
+// 1A: ?wall turns the test wall on for this phone, ?wall=off (or 0 / no) turns
+// it off. Anything else in the address is left alone. Returns true / false when
+// the address said, null when it didn't.
+function cloudWallTestFromUrl(search) {
+  let q = '';
+  try { q = String(search != null ? search : ((typeof location !== 'undefined' && location && location.search) || '')); } catch (e) { q = ''; }
+  const m = q.match(/[?&]wall(?:=([^&#]*))?(?=&|#|$)/);
+  if (!m) return null;
+  const off = /^(off|0|no|false)$/i.test(decodeURIComponent(m[1] || ''));
+  try {
+    if (off) localStorage.removeItem(WALL_TEST_KEY);
+    else localStorage.setItem(WALL_TEST_KEY, '1');
+  } catch (e) { /* private mode: the wall just doesn't stick */ }
+  return !off;
+}
+
+function cloudWallOn() {
+  try {
+    if (!cloudAvailable()) return false;
+    const envOn = typeof REQUIRE_ACCOUNT === 'object' && REQUIRE_ACCOUNT !== null
+      && REQUIRE_ACCOUNT[CLOUD_ENV] === true;
+    return envOn || _cloudWallTest();
+  } catch (e) { return false; }
+}
+
+function cloudWallShows() {
+  try {
+    if (!cloudWallOn()) return false;
+    const c = state.cloud || {};
+    if (c.status === 'signed-in') return !!(c.pwOpen && c.pwNew);
+    return !cloudOwner();
+  } catch (e) { return false; }
+}
+
+// 4A: a phone that has an owner, where the wall is on, with nobody signed in —
+// it keeps working (never walled) and is asked to sign in again.
+function cloudSignedOutOwner() {
+  try {
+    return cloudWallOn() && !!cloudOwner() && !!state.cloud && state.cloud.status !== 'signed-in';
+  } catch (e) { return false; }
+}
+
+// 4A: the Jobs list line for that phone (render-core.js renderSessions). The
+// plan line, when there is one, comes first and carries the Sign in button
+// itself (plan.js) — so this shows only when that has nothing to say.
+function cloudSignedOutBannerHTML() {
+  if (!cloudSignedOutOwner()) return '';
+  return `
+    <div class="backup-banner" id="signed-out-banner">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text" id="signed-out-banner-text">${icon('cloud')} Signed out &mdash; sign in to send your jobs to the cloud. Everything still works on this phone.</div>
+        <div class="backup-banner-actions">
+          <button class="backup-banner-action primary" id="signed-out-sign-in" data-action="settings-page" data-arg="cloudAccount">Sign in</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// 2A: the wall's two buttons. The cards themselves are V144's (render-help.js),
+// so the wall and the Account page can never drift apart.
+function cloudWallCreate() {
+  if (state.cloud.busy) return;
+  state.wallStage = 'cards';
+  _cloudSet({ signup: true, useCode: false, forgot: false, message: '' });
+  render();
+}
+function cloudWallSignIn() {
+  if (state.cloud.busy) return;
+  state.wallStage = 'cards';
+  _cloudSet({ signup: false, useCode: false, forgot: false, message: '' });
+  render();
+}
+function cloudWallBack() {
+  if (state.cloud.busy) return;
+  state.wallStage = 'start';
+  _cloudSet({ signup: false, useCode: false, forgot: false, message: '',
+    status: state.cloud.status === 'code-sent' ? 'signed-out' : state.cloud.status });
+  render();
 }
 
 // ---- render helpers (render-core / render-help / render-settings) ------------

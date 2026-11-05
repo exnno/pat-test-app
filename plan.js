@@ -80,8 +80,20 @@ function _planUid() {
 }
 
 // The record for the account signed in now — another login's is ignored.
+// V148 (4A): where an account is required, a phone whose owner is signed out
+// keeps the owner's plan — so signing out gets round no lock and no 30-day
+// check. Elsewhere (the test site today) nothing changes: signed out, no plan.
+function _planOwnerUid() {
+  try {
+    if (typeof cloudSignedOutOwner !== 'function' || !cloudSignedOutOwner()) return '';
+    const o = (typeof cloudOwner === 'function') ? cloudOwner() : null;
+    return (o && o.id) || '';
+  } catch (e) { return ''; }
+}
+function _planSignedOut() { return !_planUid() && !!_planOwnerUid(); }
+
 function planRecord() {
-  const uid = _planUid();
+  const uid = _planUid() || _planOwnerUid();
   if (!uid) return null;
   const r = _planRead();
   return (r && r.uid === uid) ? r : null;
@@ -368,7 +380,7 @@ function planLineText(st) {
       ? `Your account is locked and cloud syncing is paused. Renew to carry on ${PLAN_LOCKED_WORDS}.`
       : `Your account is locked. Renew to carry on ${PLAN_LOCKED_WORDS}.`;
   }
-  if (st.unchecked) return `PATGo hasn’t been able to confirm your plan for ${PLAN_CHECK_DAYS} days. Connect to the internet to carry on ${PLAN_LOCKED_WORDS}.`;
+  if (st.unchecked) return `PATGo hasn’t been able to confirm your plan for ${PLAN_CHECK_DAYS} days. ${_planSignedOut() ? 'Sign in' : 'Connect to the internet'} to carry on ${PLAN_LOCKED_WORDS}.`;
   if (paused) return 'Cloud syncing is paused because your PATGo subscription has ended. Renew to resume — your work remains safe on this phone.';
   if (st.phase === 'ending') return `Your free trial ends on ${_planDate(st.endsAt)}.`;
   if (st.phase === 'grace') return `${_planEndedWords(st)} ${_planCountdownWords(st)}`;
@@ -377,6 +389,8 @@ function planLineText(st) {
 
 // V143 (4A): the button beside the line — Check now while held, else Renew now.
 function _planLineButton(st, id) {
+  // V148 (4A): signed out, the way on is signing in (renewing and checking both need it).
+  if (_planSignedOut()) return `<button class="backup-banner-action primary" id="${id}" data-action="settings-page" data-arg="cloudAccount">Sign in</button>`;
   return (st && st.unchecked && st.phase !== 'locked')
     ? `<button class="backup-banner-action primary" id="${id}" data-action="plan-check">Check now</button>`
     : `<button class="backup-banner-action primary" id="${id}" data-action="plan-renew">Renew now</button>`;
@@ -406,6 +420,8 @@ function planAccountHTML() {
   const text = planLineText(st);
   if (!text) return '';
   const check = st.unchecked && st.phase !== 'locked';
+  if (_planSignedOut()) return `
+        <p class="muted" id="cloud-plan-status">${escapeHTML(text)}</p>`;   // V148: the sign-in card is right below
   return `
         <p class="muted" id="cloud-plan-status">${escapeHTML(text)}</p>
         <button class="btn-primary" id="cloud-plan-renew" data-action="${check ? 'plan-check' : 'plan-renew'}" style="margin-top:6px">${check ? 'Check now' : 'Renew now'}</button>`;
@@ -448,8 +464,12 @@ function planRenew() {
 }
 
 // ---- the sheets ------------------------------------------------------------
+// V148 (4A): signed out, the sheets' first button signs in instead.
+function _planSignInChoice() {
+  return { label: 'Sign in', style: 'primary', onPick: () => setView('cloudAccount') };
+}
 function _planChoices() {
-  const out = [{ label: 'Renew now', style: 'primary', onPick: () => planRenew() }];
+  const out = [_planSignedOut() ? _planSignInChoice() : { label: 'Renew now', style: 'primary', onPick: () => planRenew() }];
   if (typeof exportAllOpen === 'function') out.push({ label: 'Export everything', style: 'secondary', onPick: () => exportAllOpen() });
   return out;
 }
@@ -466,11 +486,11 @@ function planShowLocked() {
 
 // V143 (4A): held because the plan hasn't been read for PLAN_CHECK_DAYS.
 function planShowUnchecked() {
-  const out = [{ label: 'Check now', style: 'primary', onPick: () => planCheckNow() }];
+  const out = [_planSignedOut() ? _planSignInChoice() : { label: 'Check now', style: 'primary', onPick: () => planCheckNow() }];
   if (typeof exportAllOpen === 'function') out.push({ label: 'Export everything', style: 'secondary', onPick: () => exportAllOpen() });
   openChoiceSheet({
     title: 'Plan check needed',
-    message: `This phone hasn’t been able to confirm your PATGo plan for ${PLAN_CHECK_DAYS} days, so ${PLAN_LOCKED_WORDS} are paused. Connect to the internet and tap Check now — it only takes a moment. ${PLAN_SAFE_WORDS}`,
+    message: `This phone hasn’t been able to confirm your PATGo plan for ${PLAN_CHECK_DAYS} days, so ${PLAN_LOCKED_WORDS} are paused. ${_planSignedOut() ? 'Sign in to confirm it' : 'Connect to the internet and tap Check now'} — it only takes a moment. ${PLAN_SAFE_WORDS}`,
     choices: out,
     cancelLabel: 'Close',
   });

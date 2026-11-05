@@ -142,6 +142,8 @@ const RESET_KEY_PLAN = [
   // V145: the phone's owner, and the stats of accounts that handed it over.
   ['OWNER_KEY', OWNER_KEY, 'account'],
   ['OWNER_STATS_KEY', OWNER_STATS_KEY, 'account'],
+  // V148 (1A): the per-phone test wall (?wall) — only "Everything, as new" clears it.
+  ['WALL_TEST_KEY', WALL_TEST_KEY, 'account'],
 ];
 
 // V145 (5A): what a handover KEEPS — this phone's own preferences, none of which
@@ -151,7 +153,7 @@ const RESET_HANDOVER_KEEP = [
   'THEME_KEY', 'TEXT_SIZE_KEY', 'HAPTICS_KEY', 'SOUNDFX_KEY', 'SCANNER_KEY', 'SCANNER_PAIRED_KEY',
   'SCAN_SPEED_KEY', 'SORT_KEY', 'UNDO_KEY', 'MAP_PIN_KEY', 'REMINDERS_KEY', 'PRUNE_AGE_KEY',
   'PHOTO_AGE_KEY', 'SNAPSHOTS_KEY', 'ONBOARD_KEY', 'REPAIR_DONE_KEY',
-  'CLOUD_UNLOCK_KEY', 'PHONE_KEY', 'OWNER_STATS_KEY',
+  'CLOUD_UNLOCK_KEY', 'PHONE_KEY', 'OWNER_STATS_KEY', 'WALL_TEST_KEY',
 ];
 
 // The certificate numbering kept at the settings level (8B). The number alone

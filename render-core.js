@@ -57,6 +57,26 @@ function dismissWelcome(seenFlag, key) {
   render();
 }
 
+// The update banner (V124 3A): it names the version the waiting worker reported
+// (boot.js updateAskVersion); an older worker never says, so plain words.
+// × hides it (updateDismissed) — the update still goes in at the next safe
+// moment on the Jobs list (boot.js updateSafeMoment, 2A). V148: its own
+// function so the wall shows it too — a phone on the wall must still update.
+function updateBannerHTML() {
+  const updateWords = state.updateVersion
+    ? `PATGo ${escapeHTML(state.updateVersion)} is ready`
+    : 'New version ready';   // short: one line at 320px wide, Larger text
+  return (state.updateAvailable && !state.updateDismissed) ? `
+    <div class="update-banner" role="status">
+      <span class="update-banner-text">${icon('refresh-cw')} ${updateWords}</span>
+      <div class="update-banner-actions">
+        <button class="update-refresh-btn" id="update-refresh" data-action="update-refresh">Refresh</button>
+        <button class="update-dismiss-btn" id="update-dismiss" data-action="update-dismiss" aria-label="Dismiss">×</button>
+      </div>
+    </div>
+  ` : '';
+}
+
 function render() {
   // V123: note what holds focus BEFORE anything is torn down — the modal sweep
   // below and the innerHTML rewrite both destroy it (feedback.js).
@@ -126,6 +146,25 @@ function render() {
     return;
   }
 
+  // V148 (2A): the launch wall — where an account is required and this phone
+  // has no owner yet (cloud.js cloudWallShows, decided from what the phone
+  // holds, never the network). It owns #app like the tutorial; the update
+  // banner stays, so a walled phone can still take an update. Fails open: any
+  // throw draws the app as normal.
+  let wallHTML = '';
+  try {
+    if (typeof cloudWallShows === 'function' && cloudWallShows() && typeof renderAccountWall === 'function') {
+      wallHTML = updateBannerHTML() + renderAccountWall();
+    }
+  } catch (e) { console.error('The account wall failed to draw (non-fatal).', e); wallHTML = ''; }
+  if (wallHTML) {
+    app.innerHTML = wallHTML;
+    _lastRenderHadModal = false;
+    _lastRenderedView = 'wall';   // leaving the wall is a new screen: the app starts at the top
+    if (typeof focusAfterRender === 'function') { try { focusAfterRender(); } catch (e) {} }   // V123
+    return;
+  }
+
   let html = '';
   if (v === 'sessions') html = renderSessions();
   else if (v === 'entry') html = renderEntry();
@@ -188,18 +227,7 @@ function render() {
   // (boot.js updateAskVersion); an older worker never says, so plain words.
   // × hides it (updateDismissed) — the update still goes in at the next safe
   // moment on the Jobs list (boot.js updateSafeMoment, 2A).
-  const updateWords = state.updateVersion
-    ? `PATGo ${escapeHTML(state.updateVersion)} is ready`
-    : 'New version ready';   // short: one line at 320px wide, Larger text
-  const banner = (state.updateAvailable && !state.updateDismissed) ? `
-    <div class="update-banner" role="status">
-      <span class="update-banner-text">${icon('refresh-cw')} ${updateWords}</span>
-      <div class="update-banner-actions">
-        <button class="update-refresh-btn" id="update-refresh" data-action="update-refresh">Refresh</button>
-        <button class="update-dismiss-btn" id="update-dismiss" data-action="update-dismiss" aria-label="Dismiss">×</button>
-      </div>
-    </div>
-  ` : '';
+  const banner = updateBannerHTML();   // V148: shared with the wall
 
   // v9: first-launch migration prompt — shown above everything when the user is
   // upgrading from v8 (or earlier) with a non-empty itemTypes list. Asks them to
@@ -300,7 +328,9 @@ function render() {
       bodyHTML = `
         <div class="wizard-logo-wrap"><img class="wizard-logo" src="icon-192.png" alt="PATGo" width="72" height="72"></div>
         <h3 class="bulk-sheet-title">Welcome to PATGo</h3>
-        <p class="wizard-lead">A fast, fully-offline way to log portable appliance tests on site. Everything stays on this phone — no account, no signal needed.</p>
+        <p class="wizard-lead">${(typeof cloudWallOn === 'function' && cloudWallOn())
+          ? 'A fast way to log portable appliance tests on site. It works with or without signal, and your jobs are kept safe in your account.'   /* V148: where an account is required */
+          : 'A fast, fully-offline way to log portable appliance tests on site. Everything stays on this phone — no account, no signal needed.'}</p>
         <p class="wizard-lead">Let's get this device ready. It takes a couple of minutes, and nothing here is final — you can change any of it later.</p>
       `;
       footHTML = `
@@ -944,6 +974,12 @@ function renderSessions() {
   // Above the tabs, so it shows on both. plan.js is optional (MAP rule 6).
   let planBanner = '';
   try { planBanner = (typeof planBannerHTML === 'function') ? planBannerHTML() : ''; } catch (e) { planBanner = ''; }
+  // V148 (4A): signed out on a phone that has an owner, where an account is
+  // required — it keeps working, and says so. The plan line, when there is one,
+  // speaks first and carries Sign in itself (plan.js).
+  if (!planBanner) {
+    try { planBanner = (typeof cloudSignedOutBannerHTML === 'function') ? cloudSignedOutBannerHTML() : ''; } catch (e) { planBanner = ''; }
+  }
 
   // V93 (4A — O9): signed in, the Jobs screen has two tabs. "In the cloud" is
   // how old jobs are reached once a phone only brings down recent ones (R21):

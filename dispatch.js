@@ -954,6 +954,10 @@ registerActions({
   'cloud-signup-open':  () => { if (typeof cloudSignupOpen === 'function') cloudSignupOpen(); },
   'cloud-signup-close': () => { if (typeof cloudSignupClose === 'function') cloudSignupClose(); },
   'cloud-signup-send':  () => { if (typeof cloudSignupSend === 'function') cloudSignupSend(); },
+  // V148 (2A): the launch wall's start buttons and Back (cloud.js), same guarding.
+  'wall-create':  () => { if (typeof cloudWallCreate === 'function') cloudWallCreate(); },
+  'wall-sign-in': () => { if (typeof cloudWallSignIn === 'function') cloudWallSignIn(); },
+  'wall-back':    () => { if (typeof cloudWallBack === 'function') cloudWallBack(); },
   'cloud-check':      () => { if (typeof cloudCheckConnection === 'function') cloudCheckConnection(); },
   // V145 (4A): the button asks — one last sync, then the warning if anything is unsent.
   'cloud-sign-out':   () => { if (typeof cloudSignOutAsk === 'function') cloudSignOutAsk(); else if (typeof cloudSignOut === 'function') cloudSignOut(); },

@@ -8,6 +8,39 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V148
+V148 = the launch switch, built and dormant (Peter 2 Nov: 1A 2A 3A 4A 5A, all defaults).
+config.js (REQUIRE_ACCOUNT per environment, WALL_TEST_KEY), cloud.js (cloudWallOn /
+cloudWallShows / cloudSignedOutOwner, ?wall, the Jobs line, the wall's buttons),
+render-help.js (renderAccountWall; the Account page's cards taken out unchanged into
+cloudPasswordFormHTML / cloudSignedOutCardsHTML), render-core.js (the wall in render();
+updateBannerHTML), plan.js (the owner's plan where the wall is on; Sign in),
+boot.js (safe moment), reset.js, state.js, dispatch.js, styles.css, sw.js. Harness 87 +
+M1637–M1660; 86e's release checks → 87e; stubs take `search`.
+**New order (Peter, 2 Nov): Teams v1 and v2 back to back, BEFORE launch.**
+**Next: V149 — every job knows its business** (locked 2 Nov: 0A 1A 2A 3A 4A):
+the job carries its business, sent by the phone, the database accepting only one you
+belong to (default for old phones); "For: [business]" on New job, shown only to someone
+in two or more, starting on the last used (1A); Job settings "Business: X · Change…" —
+your own job, unlocked, no certificate number, recorded; a move OUT of a team business
+waits for that business's Owner / Team leader / Office to approve (2A + Peter's approval
+step — the Approve screen comes with the invite/team-admin release); a Business page,
+the Owner names it, pre-filled from the Company name (3A); a server minimum app version —
+below it a phone stops syncing and says update; invites refused while any phone in the
+business is below it (4A). One SQL file. 0A: push notifications and the tablet layout
+stay after launch (v2's assigned jobs arrive at the next sync; Office edits at phone size).
+Then the rest of Teams (roadmap Stage 16/17, re-sequenced). Team leader and Office can
+invite (Peter). Launch = the production move (Pro project — Peter holding off for now)
++ a small config release, whenever chosen; the wall then bites by itself.
+**PATGuard import (Peter's spec in the project, 2 Nov)** — a launch tool, after Teams,
+before charging; needs one anonymised PATGuard CSV export first; Phase 2 (GAR/SSS) parked.
+
+### V148 residuals (known, accepted)
+- A signed-out owner whose plan was NEVER read has no record, so no lock or 30-day hold
+  (V127's "never read = no hold"). Rare: the wall's sign-in reads the plan at once.
+- The wall isn't proven on a real iPhone yet (Peter: open …/?wall once in the installed app).
+- ?wall is in the address only for that one open; the setting stays on the phone.
+
 ### Next after V147
 V147 = renumbering asset numbers (Peter 28–29 Oct: 7C 7b A; 1A 2A 3A 4A 5A). session.js
 (renumberPlan, openRenumberSelected/From, renumberCheck, applyRenumber, undoRenumber,

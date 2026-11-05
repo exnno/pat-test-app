@@ -1,4 +1,4 @@
-# PATGo — Code Map (V147)
+# PATGo — Code Map (V148)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -449,6 +449,9 @@ install. Applies to any tuning value with a stored counterpart. Mutation M85.
 V141: `PRIVACY_URL` — the privacy policy's address. The policy itself is on the
 WEBSITE (patgo.co.uk, DreamHost), not in this repo. Drawn only by render-help.js
 (About → Privacy); 80b fails if any other app file writes the address out.
+V148: `REQUIRE_ACCOUNT` is per environment (`{ prod: true, test: false }`) — read only by
+cloud.js `cloudWallOn`; `WALL_TEST_KEY` (?wall, per phone; reset.js 'account', kept by a
+takeover). Flipping the product on needs nothing here: its Pro keys in `CLOUD_PROJECTS.prod`.
 Rules 8, 9, 10 above all originate here.
 
 ### data.js (~440 ln) — static tables and lists
@@ -1214,6 +1217,11 @@ repainted in place by `refreshLocationCountOnly()` from **events.js** location
 blur / suggestion pick (no render). Multi Pick tiles + `failDisabled` + the
 Copy last / ↶ Undo row (`state.undoEnabled`) are built here — the tile block
 must read `sess.locked`, not `isLocked` (declared later: TDZ).
+⚠ V148: `render()` draws the launch wall (render-help.js `renderAccountWall`) INSTEAD of
+the screen when cloud.js `cloudWallShows()`, after the tutorial's early return and
+before the view chain — `updateBannerHTML()` (the V124 banner, now its own function) on
+top; `_lastRenderedView = 'wall'`; any throw draws the app (fails open).
+`renderSessions` adds cloud.js `cloudSignedOutBannerHTML()` when plan.js has no line.
 
 ### render-review.js (~1680 ln) — review & manage screens — NEW v72
 Overview (+ `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
@@ -1326,7 +1334,7 @@ sync (settings_work), so the view is in `SYNC_GENERAL_VIEWS` and
 join both lists. Ways in: `storage-banner-open`, `save-fail-clear` (dispatch.js);
 manager Back `_MGR_RETURN_VIEWS` (settings-actions.js).
 
-### render-help.js (~1110 ln) — help, about & cloud pages — NEW v73 (V139: Account's password cards; V140: Google; V144: the Create card)
+### render-help.js (~1190 ln) — help, about & cloud pages — NEW v73 (V139: Account's password cards; V140: Google; V144: the Create card; V148: the wall)
 About (+ the rolling 3-version changelog), Tutorials (V134 — starts tour.js's
 practice job; V135 lists tour.js `TUTORIALS`' Settings ones), Glossary (page + the
 `GLOSSARY_GROUPS` data array), Contact, `renderBugSheet()` markup, and the three
@@ -1360,8 +1368,13 @@ V141: About → Privacy is a SUMMARY of the website's privacy policy plus a plai
 `<a target="_blank">` to it (config.js `PRIVACY_URL`; no data-action — the browser
 opens it). ⚠ Keep the summary and the policy saying the same thing: change one,
 change the other. Harness 80a–80e, M1380–M1392.
+V148: `renderCloudAccount`'s password form and signed-out cards are their own functions
+(`cloudPasswordFormHTML`, `cloudSignedOutCardsHTML` — taken out unchanged, the page
+byte-identical to V147's) so `renderAccountWall` (the launch wall, drawn by
+**render-core.js** `render()` when cloud.js `cloudWallShows()`) shows the SAME cards.
+⚠ Change a card in one place only. Harness 87b, 87e.
 
-### cloud.js (~1150 ln) — cloud sign-in — NEW v79, password V139, Google V140, sign-up V144, one owner per phone V145
+### cloud.js (~1260 ln) — cloud sign-in — NEW v79, password V139, Google V140, sign-up V144, one owner per phone V145, the launch switch V148
 Sign-in (Supabase): email + password (V139) or an emailed code (v79); session state in `state.cloud`, the TEST strip
 and version tag, lazy load of `supabase.umd.js`. v85: the Cloud access code —
 `cloudPagesUnlocked()`, `cloudUnlock()`, `CLOUD_UNLOCK_KEY` (config.js; per
@@ -1429,6 +1442,17 @@ takeover (2A)" before the access code: `cloudSignOutAsk` (the button: one last
 `cloudHandoverGo` (counts AGAIN, then reset.js `resetHandover`),
 `cloudHandoverCancel`, `cloudHandoverLanded` (boot, after the restart: reset.js
 `resetTakeCarry`). Card markup: render-help.js `#cloud-handover`. Harness 84.
+V148: THE LAUNCH SWITCH. Section "V148: the launch switch" before the render helpers:
+`cloudWallOn` (config.js `REQUIRE_ACCOUNT[CLOUD_ENV]` — the product only — or
+`WALL_TEST_KEY`, set by `cloudWallTestFromUrl` from ?wall / ?wall=off, called first in
+`cloudBoot`; no cloud = false), `cloudWallShows` (no owner and not signed in, or a new
+account's `pwOpen`+`pwNew`), `cloudSignedOutOwner` (wall on + owner + not signed in),
+`cloudSignedOutBannerHTML` (the Jobs line), `cloudWallCreate` / `cloudWallSignIn` /
+`cloudWallBack` (`state.wallStage`). ⚠ PETER'S RULE: decided only from what the phone
+holds — never a network answer, never for a phone with an owner. `cloudPagesUnlocked`
+is true wherever the wall is on (5A). Readers: **render-core.js** `render()` (the wall,
+before the view chain) and `renderSessions` (the line); **plan.js** `_planOwnerUid`;
+**boot.js** `updateSafeMoment`. Harness 87, M1637–M1660.
 
 ### sync.js (~5030 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner
 ⚠ V145 (rule 29): `syncActive` and `_syncRun` (stage 'owner', before anything is
@@ -1712,6 +1736,10 @@ the record reads paid: `_billConfirm` / `billingRead` on the Subscription page, 
 `planMaybePrompt` on the Jobs list. `planTrialDaysLeft` / `planTrialWords` = the Account
 line (render-help.js). ⚠ PLAN_TRIAL_DAYS (config.js) must match handle_new_user's 30 days
 (83e). Harness 83b–83d, M1515–M1525.
+V148 (4A): `planRecord` falls back to `_planOwnerUid()` — the owner's record while
+**cloud.js** `cloudSignedOutOwner()` (wall on only; the test site is unchanged).
+`_planSignedOut()` turns the line's button, the Account line and the two sheets' first
+choice into Sign in (`settings-page` → cloudAccount). Harness 87d, M1652–M1655.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This
