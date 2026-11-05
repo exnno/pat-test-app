@@ -23,8 +23,9 @@
      86c  2A/1A Renumber from here: the link (and where it isn't), the Up to
           list, a refused Check in place (no render), the form follows.
      86d  3A Undo, the action toast itself, and a job changed under the sheet.
-     86e  the sheet belongs to one job and two screens; ids, photos and sync;
-          release: V147, cache, What's new, About. */
+     86e  the sheet belongs to one job and two screens; ids, photos and sync.
+          (Its release checks — V147, cache, What's new, About — moved to 87e
+          at V148.) */
 
 'use strict';
 
@@ -387,7 +388,7 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 86e */
-  await t.group('86e — one job, two screens; ids, photos and sync untouched; release: V147', () => {
+  await t.group('86e — one job, two screens; ids, photos and sync untouched', () => {
     const app = boot({});
     const a = job(app, ['0451', '0452'], { site: 'ZZJOBA' });
     app.fn('setView')('entry');
@@ -441,24 +442,7 @@ module.exports = async function () {
     t.eq(sy.state().photoMeta.p1.i, ids[0], 'a photo still points at its item');
     t.eq(JSON.stringify(sy.fn('activeSession')().items.map(it => it.notes)), JSON.stringify(['', '']), 'no "was" note (4A)');
 
-    // ---- release.
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V147', 'APP_VERSION V147');
-    t.eq(rel.run('WELCOME_VERSION'), 'V147', 'What’s new rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v147';", 'cache key pat-v147');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>Renumber asset numbers.</strong>', '…renumbering');
-    t.includes(sheetCopy, 'choose &ldquo;Renumber from here&rdquo;, or select items and use Edit selected &rarr; Renumber.', '…both ways in');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V147</strong>'), y = help.indexOf('<p><strong>V146</strong>'), z = help.indexOf('<p><strong>V145</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V147, V146, V145');
-    t.excludes(help, '<p><strong>V144</strong>', 'V144 rolled off');
-    t.includes(help, 'Renumber asset numbers when a new roll of stickers starts', 'About: V147’s line');
-    t.includes(help, 'Tapping the description box empties it, ready for a new word, and suggestions no longer vanish', 'About: V146’s line still there');
-    t.includes(help, 'A phone&rsquo;s jobs belong to one account, and are never sent into another.', 'About: V145’s line still there');
+    // ---- release checks moved to 87e (V148); the lasting ones stay.
     const disp = read('dispatch.js');
     t.includes(disp, "'renumber-apply': () => applyRenumber(),", 'Renumber wired');
     t.includes(disp, "'renumber-first': (v) => {", 'the First new number box wired');
