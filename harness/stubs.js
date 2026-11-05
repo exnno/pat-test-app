@@ -581,7 +581,7 @@ function makeEnvironment(opts = {}) {
       // on GitHub Pages gets. 15-cloud overrides it to prove unknown = off.
       hostname: opts.hostname ?? 'exnno.github.io',
       pathname: '/pat-test-app/',
-      search: '',
+      search: opts.search ?? '',   // V148: a test can open the app at ?wall
       hash: '',
       // V106: counted, so a test can see a reset ask for the reload.
       _reloads: 0,

@@ -358,6 +358,18 @@ bug; leaving it red trains everyone to ignore the suite.
   before `withItem` after a "from here" renumber (86d). (5) A tapped toast's
   `onGone` must stay unrun even when the NEXT toast comes (M1618 survived until
   86d showed a later toast).
+  V148 (group 87): the launch switch. (1) The stub's `location.search` takes
+  `opts.search`, so a test opens the app at ?wall through the REAL start-up
+  (boot.js → cloudBoot). (2) The product with keys: boot with
+  `hostname: 'pat-test-app.peterbirchley.workers.dev'`, then set
+  `CLOUD.url` / `CLOUD.publishableKey` with `app.run` — CLOUD is a const object,
+  its fields are not. (3) Peter's no-signal rule is proved with the REAL library
+  booting (`runBoot: false`, install the library, then `app.run(boot.js)`) on a
+  stored sign-in whose token has EXPIRED — the only boot that asks the server
+  anything — against a server that is unreachable or refuses the refresh.
+  (4) Each new mutation was probed against group 87 alone: every one fails the
+  sub-group its hint names (some also its neighbours — ?wall is how they all
+  switch the wall on).
 
 ---
 

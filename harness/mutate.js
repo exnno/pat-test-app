@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V147';",
-    to:   "const APP_VERSION = 'V146';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V148';",
+    to:   "const APP_VERSION = 'V147';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,9 +639,9 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147).
-    from: '        <p><strong>V145</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V143</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V144</strong> &middot; October 2026</p>',
+    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148).
+    from: '        <p><strong>V146</strong> &middot; October 2026</p>',
+    to:   '        <p><strong>V144</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V145</strong> &middot; October 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 86e)',
   },
 
@@ -6117,9 +6117,10 @@ const MUTATIONS = [
     // V145: welcome rolled (two lines) — re-aimed at the first; 84e pins it.
     // V146: welcome rolled (four lines) — re-aimed at the first; 85e pins it.
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
+    // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
     from: "<li><strong>Renumber asset numbers.</strong>",
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (86e)",
+    why:  "11A: the welcome says plainly what changed on screen (87e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -7284,8 +7285,9 @@ const MUTATIONS = [
   {
     name: "M1025 (V124) \u00d7 hides nothing",
     file: "render-core.js",
-    from: "  const banner = (state.updateAvailable && !state.updateDismissed) ? `",
-    to:   "  const banner = state.updateAvailable ? `",
+    // V148: the banner moved into updateBannerHTML() (shared with the wall) — re-anchored there.
+    from: "  return (state.updateAvailable && !state.updateDismissed) ? `",
+    to:   "  return state.updateAvailable ? `",
     why:  "\u00d7 (62d)",
   },
   {
@@ -8598,9 +8600,9 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V147';",   // V145: re-aimed. V146: re-aimed. V147: re-aimed.
+    from: "const WELCOME_VERSION = 'V147';",   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays.
     to:   "const WELCOME_VERSION = 'V146';",
-    why:  "a behaviour release says what's new (86e)",
+    why:  "What's new stays on the release that last had something to show (87e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
@@ -8610,9 +8612,10 @@ const MUTATIONS = [
     // V145: two lines again — re-aimed at the second's end.
     // V146: four lines — re-aimed at the last one's end; still caught by the count.
     // V147: one line — re-aimed at its end.
+    // V148: no welcome — V147's one line stays, so the anchor stays.
     from: "Undo is there for a few seconds if it&rsquo;s wrong.</li>\n",
     to:   "Undo is there for a few seconds if it&rsquo;s wrong.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (86e)",
+    why:  "one line (87e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8626,9 +8629,9 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Renumber asset numbers when a new roll of stickers starts",
+    from: "Behind the scenes: PATGo is ready to ask for an account when it launches.",
     to:   "Better",
-    why:  "the About page must say what changed in this version (86e)",   // V147: re-aimed at V147's line
+    why:  "the About page must say what changed in this version (87e)",   // V147: re-aimed at V147's line. V148: at V148's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8743,9 +8746,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "A phone&rsquo;s jobs belong to one account, and are never sent into another.",
+    from: "Tapping the description box empties it, ready for a new word, and suggestions no longer vanish",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (86e)",   // V147: re-aimed at V145's, the oldest now
+    why:  "the About page keeps the last three versions' lines (87e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8905,9 +8908,9 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Tapping the description box empties it, ready for a new word, and suggestions no longer vanish",
+    from: "Renumber asset numbers when a new roll of stickers starts",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (86e)",   // V147: re-aimed at V146's
+    why:  "the About page keeps the last three versions' lines (87e)",   // V147: re-aimed at V146's. V148: at V147's, still in the window
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9034,9 +9037,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v147';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e).
-    to:   "const CACHE_VERSION = 'pat-v146';",
-    why:  "a release needs its cache bump or phones never get it (86e)",
+    from: "const CACHE_VERSION = 'pat-v148';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e).
+    to:   "const CACHE_VERSION = 'pat-v147';",
+    why:  "a release needs its cache bump or phones never get it (87e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -11562,6 +11565,174 @@ const MUTATIONS = [
     from: "  'renumber-from': () => openRenumberFrom(),",
     to:   "  'renumber-from': () => {},",
     why:  "2A (86c)",
+  },
+  // ---- V148 (1A 2A 3A 4A 5A): the launch switch. Group 87 + M1637–M1660. ----
+  {
+    name: "M1637 (V148) the product's switch is ignored",
+    file: "cloud.js",
+    from: "      && REQUIRE_ACCOUNT[CLOUD_ENV] === true;",
+    to:   "      && false;",
+    why:  "1A: the product would never ask for an account (87a)",
+  },
+  {
+    name: "M1638 (V148) the test site walls everyone",
+    file: "config.js",
+    from: "const REQUIRE_ACCOUNT = { prod: true, test: false };",
+    to:   "const REQUIRE_ACCOUNT = { prod: true, test: true };",
+    why:  "1A: free users on the test site would be walled (87a)",
+  },
+  {
+    name: "M1639 (V148) a copy with no cloud still walls",
+    file: "cloud.js",
+    from: "    if (!cloudAvailable()) return false;\n    const envOn",
+    to:   "    const envOn",
+    why:  "no cloud = nothing to sign in to — the product site today would be a dead end (87a)",
+  },
+  {
+    name: "M1640 (V148) ?wall=off doesn't turn it off",
+    file: "cloud.js",
+    from: "  const off = /^(off|0|no|false)$/i.test(decodeURIComponent(m[1] || ''));",
+    to:   "  const off = false;",
+    why:  "1A: a tester could never leave the test wall (87a)",
+  },
+  {
+    name: "M1641 (V148) the start-up never reads ?wall",
+    file: "cloud.js",
+    from: "  cloudWallTestFromUrl();   // V148 (1A): ?wall / ?wall=off — before the first paint\n",
+    to:   "",
+    why:  "1A: opening ?wall would do nothing (87a)",
+  },
+  {
+    name: "M1642 (V148) the access code shows where the wall is on",
+    file: "cloud.js",
+    from: "  if (cloudWallOn()) return true;   // V148 (5A): where an account is required there is no curtain\n",
+    to:   "",
+    why:  "5A: an owner signed out on the product would be asked for a test code (87c)",
+  },
+  {
+    name: "M1643 (V148) an owner is walled",
+    file: "cloud.js",
+    from: "    return !cloudOwner();\n  } catch (e) { return false; }",
+    to:   "    return true;\n  } catch (e) { return false; }",
+    why:  "PETER'S RULE: a signed-out or revoked owner would be stopped working (87c)",
+  },
+  {
+    name: "M1644 (V148) a new account's password isn't finished on the wall",
+    file: "cloud.js",
+    from: "    if (c.status === 'signed-in') return !!(c.pwOpen && c.pwNew);",
+    to:   "    if (c.status === 'signed-in') return false;",
+    why:  "V144 2A: Choose a password could be skipped by walking into the app (87c)",
+  },
+  {
+    name: "M1645 (V148) render never draws the wall",
+    file: "render-core.js",
+    from: "    if (typeof cloudWallShows === 'function' && cloudWallShows() && typeof renderAccountWall === 'function') {",
+    to:   "    if (false) {",
+    why:  "2A (87b)",
+  },
+  {
+    name: "M1646 (V148) the wall hides the update banner",
+    file: "render-core.js",
+    from: "      wallHTML = updateBannerHTML() + renderAccountWall();",
+    to:   "      wallHTML = renderAccountWall();",
+    why:  "a walled phone could never be updated past a broken wall (87b)",
+  },
+  {
+    name: "M1647 (V148) Create an account does nothing",
+    file: "dispatch.js",
+    from: "  'wall-create':  () => { if (typeof cloudWallCreate === 'function') cloudWallCreate(); },",
+    to:   "  'wall-create':  () => {},",
+    why:  "2A (87b)",
+  },
+  {
+    name: "M1648 (V148) the wall's Back does nothing",
+    file: "cloud.js",
+    from: "  state.wallStage = 'start';\n",
+    to:   "",
+    why:  "2A: no way back from a card (87b)",
+  },
+  {
+    name: "M1649 (V148) the jobs on the phone aren't mentioned",
+    file: "render-help.js",
+    from: "  const jobsCard = jobs > 0 ? `",
+    to:   "  const jobsCard = false ? `",
+    why:  "3A: an old install's engineer wouldn't know their jobs go up, or that they can save a copy (87b)",
+  },
+  {
+    name: "M1650 (V148) no word about signal on a fresh phone offline",
+    file: "render-help.js",
+    from: "  const offlineNote = offline\n",
+    to:   "  const offlineNote = false\n",
+    why:  "a fresh phone with no signal would just fail to sign in (87b)",
+  },
+  {
+    name: "M1651 (V148) the wall's cards are a safe moment to update",
+    file: "boot.js",
+    from: "      if (state.wallStage !== 'start' || c.status !== 'signed-out' || c.busy || c.googlePending) return false;",
+    to:   "      if (c.busy) return false;",
+    why:  "R42: the app would reload under someone typing a code (87b)",
+  },
+  {
+    name: "M1652 (V148) signing out gets round the lock",
+    file: "plan.js",
+    from: "  const uid = _planUid() || _planOwnerUid();",
+    to:   "  const uid = _planUid();",
+    why:  "4A: sign out, keep logging on a lapsed plan (87d)",
+  },
+  {
+    name: "M1653 (V148) the owner's plan follows a signed-out phone on the test site too",
+    file: "cloud.js",
+    from: "    return cloudWallOn() && !!cloudOwner() && !!state.cloud && state.cloud.status !== 'signed-in';",
+    to:   "    return !!cloudOwner() && !!state.cloud && state.cloud.status !== 'signed-in';",
+    why:  "Peter: with V148 live nothing changes — the test site must behave as V147 (87d)",
+  },
+  {
+    name: "M1654 (V148) a signed-out locked phone is told to Renew, which can't work signed out",
+    file: "plan.js",
+    from: "  if (_planSignedOut()) return `<button class=\"backup-banner-action primary\" id=\"${id}\" data-action=\"settings-page\" data-arg=\"cloudAccount\">Sign in</button>`;\n",
+    to:   "",
+    why:  "4A: signed out, the way on is signing in (87d)",
+  },
+  {
+    name: "M1655 (V148) the locked sheet offers Renew signed out",
+    file: "plan.js",
+    from: "  const out = [_planSignedOut() ? _planSignInChoice() : { label: 'Renew now', style: 'primary', onPick: () => planRenew() }];",
+    to:   "  const out = [{ label: 'Renew now', style: 'primary', onPick: () => planRenew() }];",
+    why:  "4A (87d)",
+  },
+  {
+    name: "M1656 (V148) the signed-out line is missing",
+    file: "render-core.js",
+    from: "    try { planBanner = (typeof cloudSignedOutBannerHTML === 'function') ? cloudSignedOutBannerHTML() : ''; } catch (e) { planBanner = ''; }",
+    to:   "    planBanner = '';",
+    why:  "4A: an owner signed out would never be asked to sign in again (87c)",
+  },
+  {
+    name: "M1657 (V148) the ?wall key survives Everything, as new",
+    file: "reset.js",
+    from: "  ['WALL_TEST_KEY', WALL_TEST_KEY, 'account'],",
+    to:   "  ['WALL_TEST_KEY', WALL_TEST_KEY, 'settings'],",
+    why:  "the key is the phone's: only the account level clears it (87e)",
+  },
+  {
+    name: "M1658 (V148) a takeover clears the ?wall key",
+    file: "reset.js",
+    from: "  'CLOUD_UNLOCK_KEY', 'PHONE_KEY', 'OWNER_STATS_KEY', 'WALL_TEST_KEY',",
+    to:   "  'CLOUD_UNLOCK_KEY', 'PHONE_KEY', 'OWNER_STATS_KEY',",
+    why:  "5A V145: a takeover keeps the phone's own things (87e)",
+  },
+  {
+    name: "M1659 (V148) the wall draws its own Create card",
+    file: "render-help.js",
+    from: "    body = cloudSignedOutCardsHTML(c, msg, dis, busy) + back;",
+    to:   "    body = '<div class=\"info-card\" id=\"cloud-signup-card\"><form class=\"cloud-form\" id=\"cloud-signup-form\"></form></div>' + back;",
+    why:  "the wall and the Account page share one set of cards, so they can't drift (87e)",
+  },  {
+    name: "M1660 (V148) setup after the wall still promises \"no account\"",
+    file: "render-core.js",
+    from: "        <p class=\"wizard-lead\">${(typeof cloudWallOn === 'function' && cloudWallOn())\n",
+    to:   "        <p class=\"wizard-lead\">${(false)\n",
+    why:  "found in the browser check: a product phone would read an untrue promise (87b)",
   },
 ];
 
