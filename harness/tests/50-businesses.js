@@ -128,13 +128,18 @@ module.exports = async function () {
   // keeps it only for a member, on the first upload only). Still: one place in
   // the app, the job row — never a record or a photo row, whose business the
   // database decides (records: the default, 4A; photos: their job's).
-  await t.group('50d — only a JOB row names its business, and only in one place (2A; V149)', () => {
+  // V150 (3A): and the pull READS it back — the job list's org:org_id, nothing
+  // else. Comments aside (business.js explains the read), still one place.
+  await t.group('50d — only a JOB row names its business, and only in one place (2A; V149, V150)', () => {
     const files = scriptOrderFromIndex().filter(f => !/\.min\.js$|^supabase\.umd\.js$|^pdfjs/.test(f));
     t.ok(files.length > 25 && files.includes('sync.js'), `the app's own files are read (${files.length})`);
-    const hits = files.filter(f => /org_id/.test(read(f)));
-    t.deepEq(hits, ['sync.js'], 'only sync.js mentions org_id' + (hits.length ? ' — ' + hits.join(', ') : ''));
-    const lines = read('sync.js').split('\n').filter(l => /org_id/.test(l) && !/^\s*\/\//.test(l));
-    t.deepEq(lines.map(l => l.trim()), ['if (biz) row.org_id = biz;'], 'one line: the job row, from the job\u2019s own businessId');
+    const code = (f) => read(f).split('\n').filter(l => /org_id/.test(l) && !/^\s*\/\//.test(l));
+    const hits = files.filter(f => code(f).length);
+    t.deepEq(hits, ['sync.js'], 'only sync.js mentions org_id outside comments' + (hits.length ? ' — ' + hits.join(', ') : ''));
+    t.deepEq(code('sync.js').map(l => l.trim()), [
+      "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS;",
+      'if (biz) row.org_id = biz;',
+    ], 'two lines: the job list reads it (V150), the job row names it from the job\u2019s own businessId');
   });
 
   /* ------------------------------------------------------------------ 50e */

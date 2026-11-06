@@ -23,7 +23,8 @@
      88e  3A: the Business page — signed out, the cards, roles, the default
           line, Rename only for the Owner, the name sheet pre-filled from
           Company & Branding, the save through set_business_name; the Settings
-          row; reset and takeover; the app without business.js; release: V149.
+          row; reset and takeover; the app without business.js. (V150: its
+          release checks moved to 89e.)
      88f  the SQL's text: the stamp keeps only a member's business, photos
           follow their job, the Owner-only name, the grants; schema.sql carries
           every V149 line (last); isolation 20a–20h; the test aid and its undo.
@@ -364,14 +365,19 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 88e */
-  await t.group('88e — the Business page, the row, reset and takeover; without business.js; release: V149', async () => {
+  await t.group('88e — the Business page, the row, reset and takeover; without business.js; wiring', async () => {
     const app = await signedIn({ localStorage: { 'pat:businesses': stored(TWO) } });
     app.state().reportSettings.companyName = 'Birchley PAT Services';
+    // V150: a reading run at start reads the list too (owed) — let any settle and
+    // clear the debt, so the read counted below is the page's own (M1686).
+    await tick(50);
+    app.run('if (typeof _bizReadOwed !== "undefined") _bizReadOwed = false');
+    const nOpen = app.srv.rpcs('my_businesses').length;
     tap(app, 'settings-page', 'cloudBusiness');
     t.eq(app.state().view, 'cloudBusiness', 'the page opens from its row');
-    await until(() => app.srv.rpcs('my_businesses').length > 0);
+    await until(() => app.srv.rpcs('my_businesses').length > nOpen);
     await until(() => !app.run('state.business && state.business.reading'));
-    t.ok(app.srv.rpcs('my_businesses').length >= 1, 'opening reads the list (every open)');
+    t.ok(app.srv.rpcs('my_businesses').length > nOpen, 'opening reads the list (every open)');
     let h = html(app);
     t.includes(h, '<h3 id="biz-name-0">Your business</h3>', 'card 1: your own, unnamed');
     t.includes(h, 'id="biz-role-0">You: Owner · Just you</p>', '…Owner, just you');
@@ -440,25 +446,9 @@ module.exports = async function () {
     t.excludes(html(bare), 'id="nf-business"', '…and no For:');
     t.notOk(bare.run("settingsPageVisible('cloudBusiness')"), '…and no Business row');
 
-    // ---- release (87e's release checks moved here).
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V149', 'APP_VERSION V149');
-    t.eq(rel.run('WELCOME_VERSION'), 'V149', 'What’s new rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v149';", 'cache key pat-v149');
+    // ---- wiring (V150: the release checks moved to 89e).
     t.includes(read('sw.js'), "  './business.js',       // V149\n", 'business.js is precached');
     t.includes(read('index.html'), '<script src="business.js"></script>', '…and loaded');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>Your business.</strong> Signed in to a PATGo account?', '…your business, for signed-in phones');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V149</strong>'), y = help.indexOf('<p><strong>V148</strong>'), z = help.indexOf('<p><strong>V147</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V149, V148, V147');
-    t.excludes(help, '<p><strong>V146</strong>', 'V146 rolled off');
-    t.includes(help, 'Every job now knows which business it belongs to.', 'About: V149’s line');
-    t.includes(help, 'Behind the scenes: PATGo is ready to ask for an account when it launches.', 'About: V148’s line still there');
-    t.includes(help, 'Renumber asset numbers when a new roll of stickers starts', 'About: V147’s line still there');
   });
 
   /* ------------------------------------------------------------------ 88f */
