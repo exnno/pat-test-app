@@ -11982,6 +11982,13 @@ const MUTATIONS = [
     to:   "    values ('iso-test-BinA', b, org_a, 'iso-test-BinA', 'x', b::text || '/iso-test-BinA.jpg', now());\n",
     why:  "9a\u20139c would run with B a member of A's business (50c)",
   },
+  {
+    name: "M1696 (V149) isolation 5: back to \"not comped\" \u2014 a comped B fails though refused",
+    file: "supabase/isolation-test.sql",
+    from: "                || case when ok and plan_before is not null and plan_after is not distinct from plan_before\n",
+    to:   "                || case when ok and coalesce(plan_after,'') <> 'comped'\n",
+    why:  "Peter's run, 6 Nov: B set to comped by hand made check 5 FAIL though B was refused (88f)",
+  },
 ];
 
 
