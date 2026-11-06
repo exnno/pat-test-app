@@ -358,7 +358,7 @@ let state = {
   //   waiting:   v81.1 — {id, kind} when a pulled change is being held back
   //              because that job is open on screen (decision 3A). Recomputed
   //              by every pull, so it clears itself when it stops being true.
-  sync: { busy: false, message: '', resolving: null, waiting: null, diffing: null },   // v82: diffing = held job being compared
+  sync: { busy: false, message: '', resolving: null, waiting: null, diffing: null, versionLookAt: 0 },   // v82: diffing = held job being compared; V151: versionLookAt = when Update now asked for a version not yet here
   // v85: the one line under the Cloud access-code box ("That code isn't right.").
   // Replaces V43's cloudPagesRevealed and the About long-press (decision 3A):
   // whether the Cloud group is open is cloud.js cloudPagesUnlocked(), per phone.

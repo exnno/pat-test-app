@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V150';
+const APP_VERSION = 'V151';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -437,6 +437,19 @@ const BUSINESS_READ_MS = 6 * 60 * 60 * 1000;
 // toName, st, at }] }. Per device, NEVER in a backup or setup export; Reset
 // 'account', and a takeover clears it — like BUSINESSES_KEY.
 const JOB_MOVES_KEY = 'pat:jobMoves';
+// MIN_VERSION_KEY (V151): the oldest PATGo the cloud last said this account may
+// sync with (my_min_version — supabase/v151-min-version.sql), as last read. Kept
+// so a phone KNOWN to be too old stays stopped after a restart or a failed read;
+// never known = no minimum (it fails open). Shape (sync.js _syncMinLoad):
+// { u: uid, min: number, at: ms }. Per device, NEVER in a backup or setup
+// export; Reset 'account', and a takeover clears it.
+const MIN_VERSION_KEY = 'pat:minVersion';
+// Read on every start and every return to the front, and otherwise at most this
+// often (before a sync run). One small number (~50 bytes).
+const SYNC_MIN_CHECK_MS = 60 * 60 * 1000;
+// "Update now" with nothing waiting asks for the new version; if it arrives
+// within this long it goes in at once (they asked), else at V124's safe moment.
+const SYNC_VERSION_LOOK_MS = 20000;
 // 3A: the account keeps everything for this many days after the trial (or the
 // plan) ends. 4A: the Jobs list says when the trial ends from this many days out.
 // ⚠ The SERVER's refusal (supabase/v143-enforcement.sql, can_upload) is set at

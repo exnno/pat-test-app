@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V150: rolled forward — V150 on top, V147 dropped. -->
+      <!-- v8: rolling 3-version changelog. V151: rolled forward — V151 on top, V148 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V151</strong> &middot; November 2026</p>
+        <p class="muted">Behind the scenes: the cloud can now ask for a newer PATGo before a phone syncs. If it ever does, the Jobs list says Update PATGo, with Update now &mdash; your work stays safe on the phone meanwhile.</p>
         <p><strong>V150</strong> &middot; November 2026</p>
         <p class="muted">Move a job to another business: Job settings &rarr; Business &rarr; Change&hellip;, for anyone who works for more than one. Leaving a team&rsquo;s business waits for someone there to approve, and every move is recorded.</p>
         <p><strong>V149</strong> &middot; November 2026</p>
         <p class="muted">Every job now knows which business it belongs to. Settings &rarr; Account &amp; Sync &rarr; Business shows yours, and its owner can name it. Someone who works for more than one business is asked which one on New job.</p>
-        <p><strong>V148</strong> &middot; November 2026</p>
-        <p class="muted">Behind the scenes: PATGo is ready to ask for an account when it launches. Nothing changes on this phone today.</p>
 
 
 
@@ -735,9 +735,14 @@ function renderCloudSync() {
       </div>
       ${renderSyncHeld(sy)}`;
   }
+  // V151: below the minimum app version the Sync page LEADS with the line — above
+  // the long intro, so it is the first thing seen (sync.js; '' otherwise).
+  let version = '';
+  try { version = (typeof syncVersionBannerHTML === 'function') ? syncVersionBannerHTML('sync') : ''; } catch (e) { version = ''; }
   return `
     <div class="screen" id="cloud-sync-page">
       ${renderSettingsSubHeader('Sync')}
+      ${version}
       ${settingsHowToHTML('cloudSync')}
       <div class="info-card">
         <h2>Sync (test)</h2>

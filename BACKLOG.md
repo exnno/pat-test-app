@@ -8,6 +8,37 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V151
+V151 = the minimum app version (Peter 6 Nov: 0A 1A 2A 3A 4A). SQL supabase/v151-min-version.sql:
+app_settings (min_version 151, invite_phone_days 60), app_min_overrides (one account's raise —
+the test aid v151-test-min-version.sql), my_min_version(), app_min_version_for(), and
+org_phones_behind() for invites. sync.js: the minimum read before anything in a run
+(hourly; at once after a start / return), stage 'version' → nothing read or sent;
+syncDataClient() gates every on-request call (business.js _bizClient); the Update PATGo
+line (Jobs list + Sync page, team / solo words) with Update now; boot.js puts an update in
+when it arrives within 20 s of the tap. Isolation 22a–22e. Harness 90 + M1737–M1766;
+89e's release checks → 90e.
+**Next (model: Opus — database rules + security): V152 invites + roles with the Approve /
+Refuse screen.** Its round decides: how an invite reaches someone (an address to sign in
+with / a code / an email sent by a server function), who may invite (Owner, Team leader,
+Office — R58), the roles offered, accept / decline, the invite refused while
+org_phones_behind(business) > 0 (and whether the invitee's own phones count), raising the
+minimum to 152 at its deploy, the approvers' list of waiting moves (decide_job_move is
+ready), leaving / removing a member, and team pricing (O10) before anyone can be charged.
+Then shared client lists per business, certificate numbering per business, … (Stage 16).
+
+### V151 residuals (known, accepted)
+- A phone older than V151 can't stop itself: below the minimum it keeps syncing. The
+  invite check (V152) counts such phones, and the database refuses nothing by version (1A).
+- A phone signs in, then reports its version only at the end of its first sync — until
+  then the invite check counts it as unknown (too old). Harmless: invites wait a moment.
+- Raising the minimum above the newest version live leaves every phone stopped with
+  nothing to update to — only ever raise it to a version already live (said in the SQL).
+- The test aid's 999999 can't be met: Update now says "Looking for the update…" and then
+  the line again. Run the aid with 'undo' to finish.
+- The phone's clock decides the hourly re-read; a clock wound forward or back only makes
+  it read sooner (now < at counts as stale).
+
 ### Next after V150
 V150 = moving a job to another business (Peter 5–6 Nov: 0A 1A 2A 3A 4A). business.js:
 the list owed on every start / return to the front; Job settings' Business card and

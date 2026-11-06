@@ -148,6 +148,13 @@ function _biz() {
   return state.business;
 }
 
+// V151: through sync.js's gate, so a phone below the minimum app version reads
+// and writes no businesses or moves (sync.js syncDataClient). business.js loads
+// after sync.js; the typeof is for a copy whose sync.js failed to load.
+function _bizClient() {
+  return (typeof syncDataClient === 'function') ? syncDataClient() : cloudClient();
+}
+
 function _bizOffline() {
   try { return navigator.onLine === false; } catch (e) { return false; }
 }
@@ -214,7 +221,7 @@ function businessRefresh() {
   if (_bizOffline()) { b.error = 'offline'; _bizRepaint(); return Promise.resolve(false); }
   b.reading = true; b.error = '';
   _bizRepaint();
-  return cloudClient()
+  return _bizClient()
     .then((c) => businessRead(c, uid))
     .then((ok) => { if (!ok) b.error = 'read'; return ok; })
     .catch(() => { b.error = 'read'; return false; })
@@ -246,7 +253,7 @@ function businessSaveName(id, name) {
   if (_bizOffline()) { showToast('You need a signal to name your business.'); return Promise.resolve(false); }
   const uid = typeof cloudUserId === 'function' ? cloudUserId() : '';
   if (!uid) { showToast('Sign in first.'); return Promise.resolve(false); }
-  return cloudClient()
+  return _bizClient()
     .then((c) => c.rpc('set_business_name', { o: id, n: v }))
     .then((res) => {
       if (!res || res.error) throw (res && res.error) || new Error('no answer');
@@ -504,7 +511,7 @@ function businessJobSettingsOpened() {
   if (!m || m.st !== 'waiting' || _bizOffline()) return Promise.resolve(false);
   const uid = typeof cloudUserId === 'function' ? cloudUserId() : '';
   if (!uid || typeof cloudClient !== 'function') return Promise.resolve(false);
-  return cloudClient()
+  return _bizClient()
     .then((c) => businessMovesRead(c, uid))
     .then((ok) => { if (ok) _bizMoveRepaint(); return ok; }, () => false);
 }
@@ -607,7 +614,7 @@ function businessMoveGo() {
   m.step = 'working';
   render();
   let client = null;
-  return cloudClient()
+  return _bizClient()
     .then((c) => { client = c; return c.rpc('move_job', { job: String(sess.id), target: to }); })
     .then((res) => {
       const err = res && res.error;
@@ -643,7 +650,7 @@ function businessMoveCancel(id) {
   const uid = typeof cloudUserId === 'function' ? cloudUserId() : '';
   if (!uid) { showToast('Sign in first.'); return Promise.resolve(false); }
   let client = null;
-  return cloudClient()
+  return _bizClient()
     .then((c) => { client = c; return c.rpc('cancel_job_move', { move: id }); })
     .then((res) => {
       if (!res || res.error) throw (res && res.error) || new Error('no answer');

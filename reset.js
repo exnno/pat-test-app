@@ -150,6 +150,8 @@ const RESET_KEY_PLAN = [
   ['LAST_BUSINESS_KEY', LAST_BUSINESS_KEY, 'account'],
   // V150: the moves Job settings shows follow the account too.
   ['JOB_MOVES_KEY', JOB_MOVES_KEY, 'account'],
+  // V151: the minimum app version as last read — the account's.
+  ['MIN_VERSION_KEY', MIN_VERSION_KEY, 'account'],
 ];
 
 // V145 (5A): what a handover KEEPS — this phone's own preferences, none of which

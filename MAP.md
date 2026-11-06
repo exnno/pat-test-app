@@ -1,4 +1,4 @@
-# PATGo — Code Map (V150)
+# PATGo — Code Map (V151)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1479,7 +1479,20 @@ is true wherever the wall is on (5A). Readers: **render-core.js** `render()` (th
 before the view chain) and `renderSessions` (the line); **plan.js** `_planOwnerUid`;
 **boot.js** `updateSafeMoment`. Harness 87, M1637–M1660.
 
-### sync.js (~5040 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner, V149 job business
+### sync.js (~5420 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner, V149 job business, V151 minimum app version
+⚠ V151: `_syncRun` reads the minimum (`syncMinVersionRead` — rpc `my_min_version`, at most
+every SYNC_MIN_CHECK_MS, at once after a start or a return: `_syncMinOwed` / `syncMinOwe`
+from the resume listener) BEFORE anything else, then stops (stage 'version') when
+`syncTooOld(uid)`; the run itself is `_syncRunAs` (split out unchanged). MIN_VERSION_KEY
+{u, min, at} — a failed read keeps what was known; never known = open. ⚠ Every ON-REQUEST
+cloud call (held answers, diff, photo thumb / download / look, job names, cloud tab, Cloud
+Storage, bring back, cloud delete, verify) goes through `syncDataClient()`, never
+`cloudClient()` — a new one must too (business.js `_bizClient`). Section "V151: the minimum
+app version" before the V133 phone report: the words (team / solo — `businessList` n ≥ 2),
+`syncVersionBannerHTML(where)` (render-core.js Jobs list, render-help.js Sync page),
+`syncVersionUpdate` (dispatch `version-update`; boot.js `showUpdateBanner` puts in an update
+arriving within SYNC_VERSION_LOOK_MS of the tap — state.sync.versionLookAt). Harness 90a–90d;
+M1737–M1761.
 ⚠ V149 (rule 30): `_syncPushHalf` adds `org_id` to a job row from `_syncJobBusiness(s)`
 (well-formed uuid only — one bad value would fail the batch); records / photo rows never.
 A reading run ends with business.js `businessMaybeRead` (after the phone report; never rejects).
@@ -1804,6 +1817,8 @@ Cancel request → rpc `cancel_job_move`. **Coupling:** dispatch.js `biz-move-*`
 `edit-session` (→ `businessJobSettingsOpened`); session.js setView clears state.bizMove;
 state.js declares it; reset.js JOB_MOVES_KEY 'account'; storage.js `_sessionSig`
 (businessId). Harness 89a–89f; M1697–M1736.
+V151: every cloud call here goes through `_bizClient()` (sync.js `syncDataClient` — a phone
+below the minimum app version reads and writes no businesses or moves).
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This
@@ -1929,7 +1944,9 @@ SKIP_WAITING (`_updateAsked`, set in `applyUpdate`). sw.js activate claims.
 guard. **Coupling (V124):** render-core.js draws the banner
 (`state.updateVersion`, `updateDismissed`) and calls `updateTryLater()` in
 render()'s tail; sw.js answers `GET_VERSION`; dispatch.js `update-refresh` /
-`update-dismiss`. The update listeners read `state` through `_updateState()` —
+`update-dismiss`. V151: `showUpdateBanner` puts the update straight in when the person
+tapped Update now (sync.js) within SYNC_VERSION_LOOK_MS — never under a sheet or field;
+62e allows exactly that second `applyUpdate()` caller. The update listeners read `state` through `_updateState()` —
 they run on a broken load too (D1). V99: `mapPinResume()` (session.js) runs before the first
 `loadFormForCursor()`/`render()` — it may set the active job, view and cursor.
 V105: `snapshotsBoot()` runs after the first render, inside the good-load block,
@@ -2031,6 +2048,13 @@ another file having parsed. Don't "DRY" this.
   (no date) — run v143-enforcement.sql again after it.
   `supabase/close-account.sql` (V142 round) — the account-closure procedure; refuses
   team accounts. ⚠ From V142: cancel the Stripe subscription first (step 2).
+  V151: `supabase/v151-min-version.sql` (self-checks V1–V4; schema.sql ENDS with exactly
+  its statements — 90f). `app_settings` (one row: `min_version`, `invite_phone_days`) and
+  `app_min_overrides` (one account's raise — the test aid `v151-test-min-version.sql`),
+  both closed to the app; `my_min_version()` (signed in); `app_min_version_for(u)` and
+  `org_phones_behind(o)` (the invite check: members' phones reported older, or sign-ins
+  never reported, in the window) closed. Nothing refuses by version (1A). Isolation 22a–22e.
+  ⚠ Raise `min_version` only to a version already live.
 - `supabase/functions/` (V142) — the three Edge Functions (Deno, plain JS, no packages):
   `billing-checkout`, `billing-portal`, `stripe-webhook`, each a one-line `index.js`
   serving a maker from `_shared/billing.js` (all the logic). Deployed with "Verify JWT"

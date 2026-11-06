@@ -622,6 +622,8 @@ registerActions({
 registerActions({
   // Update banner (present on any view)
   'update-refresh': () => applyUpdate(),
+  // V151 (2A): the Update PATGo line's button (sync.js).
+  'version-update': () => { if (typeof syncVersionUpdate === 'function') syncVersionUpdate(); },
   'update-dismiss': () => dismissUpdateBanner(),
 
   // Settings hub + sub-page nav. data-page carries the target view.

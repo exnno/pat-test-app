@@ -256,6 +256,22 @@ function showUpdateBanner(worker) {
   state.updateDismissed = false;
   document.body.classList.add('has-update-banner');
   updateAskVersion(worker);
+  // V151 (2A): the person tapped Update now on the Update PATGo line moments
+  // ago and this is what they asked for — straight in, unless a sheet or a
+  // field has since been opened (then the safe moment below, as ever).
+  // ⚠ MAP D1: this can run on a broken load, where config.js's constants throw.
+  let wanted = false;
+  try {
+    const asked = state.sync && state.sync.versionLookAt;
+    wanted = !!asked && Date.now() - asked >= 0 && Date.now() - asked < SYNC_VERSION_LOOK_MS;
+  } catch (e) { wanted = false; }
+  if (wanted && !_updateApplying && !_updateSheetOpen() && !_updateFieldHeld()) {
+    const st = _updateState();
+    st.sync.versionLookAt = 0;
+    _updateApplying = true;
+    applyUpdate();
+    return;
+  }
   updateRepaint();
   updateTryLater();
 }

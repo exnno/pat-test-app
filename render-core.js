@@ -983,6 +983,10 @@ function renderSessions() {
   if (!planBanner) {
     try { planBanner = (typeof cloudSignedOutBannerHTML === 'function') ? cloudSignedOutBannerHTML() : ''; } catch (e) { planBanner = ''; }
   }
+  // V151 (2A 3A): this PATGo is older than the cloud now needs — syncing has
+  // stopped until it is updated. First, above the plan line (sync.js, optional).
+  let versionBanner = '';
+  try { versionBanner = (typeof syncVersionBannerHTML === 'function') ? syncVersionBannerHTML('jobs') : ''; } catch (e) { versionBanner = ''; }
 
   // V93 (4A — O9): signed in, the Jobs screen has two tabs. "In the cloud" is
   // how old jobs are reached once a phone only brings down recent ones (R21):
@@ -1005,6 +1009,7 @@ function renderSessions() {
     return `
     <div class="screen">
       ${header}
+      ${versionBanner}
       ${planBanner}
       ${tabs}
       ${renderCloudJobsHTML()}
@@ -1015,6 +1020,7 @@ function renderSessions() {
   return `
     <div class="screen">
       ${header}
+      ${versionBanner}
       ${planBanner}
       ${tabs}
       ${storageBanner}

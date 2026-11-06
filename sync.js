@@ -638,7 +638,7 @@ function syncVerifyJobs(ids) {
   if (!uid) return Promise.resolve(null);
   const out = new Map(want.map(id => [id, null]));
   const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
-  return cloudClient().then((c) => {
+  return syncDataClient().then((c) => {
     let chain = Promise.resolve();
     for (let k = 0; k < want.length; k += batch) {
       const chunk = want.slice(k, k + batch);
@@ -1078,6 +1078,7 @@ function syncBoot() {
       // V150: back at the front → the reading run below re-reads the person's
       // businesses whatever BUSINESS_READ_MS says (business.js, optional).
       if (typeof businessReadOwe === 'function') businessReadOwe();
+      syncMinOwe();   // V151: …and the minimum app version
       syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true });
     });
   } catch { /* no document events: the save trigger still works */ }
@@ -1961,6 +1962,19 @@ function _syncRun(o) {
     if (typeof cloudOwnerAllows === 'function' && !cloudOwnerAllows(uid)) {
       const e = new Error('not this phone\u2019s account'); e.syncStage = 'owner'; throw e;
     }
+    // ⚠ V151 (0A): the minimum app version, read BEFORE anything else is read or
+    // sent — at once after a start or a return to the front, else at most every
+    // SYNC_MIN_CHECK_MS. Below it the run stops here: nothing read, nothing sent.
+    return syncMinVersionRead(c, uid).then(() => {
+      if (syncTooOld(uid)) { const e = new Error('PATGo needs updating'); e.syncStage = 'version'; throw e; }
+      return _syncRunAs(c, uid, session, opts);
+    });
+  }));
+}
+
+// The run itself, once the account and the version are allowed (V151 split it
+// out of _syncRun unchanged).
+function _syncRunAs(c, uid, session, opts) {
     const st = _syncStateFor(uid);
     const pulled = { applied: 0, added: 0, removed: 0, held: 0, waiting: null };
     // V143 (5A): the cloud refused this account's changes, and no plan read
@@ -2025,7 +2039,149 @@ function _syncRun(o) {
           ? businessMaybeRead(c, uid).then(() => out, () => out) : out));
     });
     });   // V128: found.then
-  }));
+}
+
+// ---- V151: the minimum app version (Stage 16 — 0A 1A 2A 3A 4A) -----------------
+// The cloud names the oldest PATGo an account may sync with
+// (supabase/v151-min-version.sql: one setting, raised by hand when a release
+// needs every phone on it; a raise for one account is the test aid). A phone
+// below it stops syncing completely — no reads, no sends — because an old
+// phone's READS are what can go wrong once a business has a second person
+// (V111: a phone before then took a teammate's jobs as its own). It keeps
+// working on the phone, and says "Update PATGo" with Update now (2A).
+// Not stopped: signing in and out, the plan and paying (cloud.js, plan.js) —
+// those are the account's own, and Update now may need a renewed sign-in.
+// The database refuses nothing by version (1A): the phone checks itself, and
+// invites (V152) check the business's phones (org_phones_behind).
+// Fails OPEN: a minimum never read is no minimum. But a phone once told it is
+// too old stays stopped (MIN_VERSION_KEY) until a read says otherwise — a
+// failed read never lets it start again.
+let _syncMinOwed = true;   // a start owes a fresh read; so does every return to the front
+
+function syncMinOwe() { _syncMinOwed = true; }
+
+// 'V151' → 151, 'V151.1' → 151 — the same rule as the database's app_version_num.
+function syncAppVersionNum(v) {
+  const m = /^[Vv]([0-9]{1,6})/.exec(String(v == null ? APP_VERSION : v));
+  return m ? parseInt(m[1], 10) : 0;
+}
+
+function _syncMinLoad() {
+  try {
+    const r = JSON.parse(localStorage.getItem(MIN_VERSION_KEY) || 'null');
+    if (!r || typeof r !== 'object' || Array.isArray(r)) return {};
+    const out = {};
+    if (typeof r.u === 'string' && r.u) out.u = r.u;
+    if (Number.isInteger(r.min) && r.min >= 0 && r.min <= 999999) out.min = r.min;
+    if (Number.isFinite(r.at) && r.at > 0) out.at = r.at;
+    return (out.u && 'min' in out) ? out : {};
+  } catch (e) { return {}; }
+}
+
+function _syncMinSave(rec) {
+  try { localStorage.setItem(MIN_VERSION_KEY, JSON.stringify(rec)); } catch (e) { /* full phone: read again next time */ }
+}
+
+// Read the account's minimum. Never rejects: resolves the minimum it now knows
+// for this account, or null when it knows none.
+function syncMinVersionRead(c, uid, force) {
+  const rec = _syncMinLoad();
+  const known = rec.u === uid ? rec.min : null;
+  const now = Date.now();
+  if (!force && !_syncMinOwed && rec.u === uid && rec.at && now >= rec.at && now - rec.at < SYNC_MIN_CHECK_MS) {
+    return Promise.resolve(known);
+  }
+  return Promise.resolve()
+    .then(() => c.rpc('my_min_version'))
+    .then((res) => {
+      if (!res || res.error) throw (res && res.error) || new Error('no answer');
+      const n = Number(res.data);
+      if (!Number.isInteger(n) || n < 0 || n > 999999) throw new Error('not a version: ' + res.data);
+      const was = syncTooOld(uid);
+      _syncMinOwed = false;
+      _syncMinSave({ u: uid, min: n, at: now });
+      // The line appears (or goes) on whatever screen is showing — the Jobs list
+      // carries it, not only the Sync page.
+      if (syncTooOld(uid) !== was) _syncRepaintApp();
+      return n;
+    })
+    .catch((e) => {
+      // No SQL yet, no signal, an odd answer: what was known stands (nothing → open).
+      console.warn('Sync: the minimum app version wasn’t read this time (non-fatal).', e);
+      return known;
+    });
+}
+
+// Is this phone known to be too old for the account signed in (or uid)?
+function syncTooOld(uid) {
+  const u = uid || _syncCurrentUserId();
+  if (!u) return false;
+  const rec = _syncMinLoad();
+  return rec.u === u && Number.isInteger(rec.min) && rec.min > syncAppVersionNum();
+}
+
+// Every on-request cloud read and write (the cloud tab, Cloud Storage, the photo
+// manager's look, held answers, a cloud delete, the businesses and moves) goes
+// through this instead of cloudClient(), so a phone below the minimum touches
+// no work in the cloud at all.
+function syncDataClient() {
+  return cloudClient().then((c) => {
+    if (syncTooOld()) { const e = new Error('PATGo needs updating'); e.syncStage = 'version'; throw e; }
+    return c;
+  });
+}
+
+// 3A: a team gets the team line; everyone else the plain one.
+const SYNC_VERSION_TEAM_WORDS = 'Update PATGo to keep working with your team.';
+const SYNC_VERSION_SOLO_WORDS = 'Update PATGo to keep syncing — your work is safe on this phone.';
+// The Sync page's line after a stopped run — under the banner, so it says what happened.
+const SYNC_VERSION_STOPPED_WORDS = 'Nothing was sent or brought in: this version of PATGo is older than the cloud now needs. Your work is safe on this phone.';
+
+function _syncInTeam() {
+  try { return typeof businessList === 'function' && businessList().some(b => b && Number(b.n) >= 2); } catch (e) { return false; }
+}
+
+function syncVersionWords() {
+  return _syncInTeam() ? SYNC_VERSION_TEAM_WORDS : SYNC_VERSION_SOLO_WORDS;
+}
+
+function _syncVersionLooking() {
+  const at = state.sync && state.sync.versionLookAt;
+  return !!at && Date.now() - at >= 0 && Date.now() - at < SYNC_VERSION_LOOK_MS;
+}
+
+// The line, on the Jobs list and the Sync page (where = 'jobs' | 'sync'), or ''.
+function syncVersionBannerHTML(where) {
+  if (!syncActive() || !syncTooOld()) return '';
+  const id = where === 'sync' ? 'sync-version' : 'version-banner';
+  const looking = _syncVersionLooking();
+  const text = looking ? 'Looking for the update…' : syncVersionWords();
+  return `
+    <div class="backup-banner plan-banner plan-banner-locked" id="${id}" role="status">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text" id="${id}-text">${escapeHTML(text)}</div>
+        <div class="backup-banner-actions">
+          <button class="backup-banner-action primary" id="${id}-update" data-action="version-update"${looking ? ' disabled' : ''}>Update now</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// 2A — Update now. A new version already waiting goes in at once (the tap is
+// the person choosing, as Refresh is). Nothing waiting: ask for it, and if it
+// arrives within SYNC_VERSION_LOOK_MS it goes in straight away (boot.js
+// showUpdateBanner); later than that, V124's safe moment puts it in.
+function syncVersionUpdate() {
+  if (state.updateAvailable && state.pendingWorker && typeof applyUpdate === 'function') {
+    applyUpdate();
+    return 'applying';
+  }
+  state.sync.versionLookAt = Date.now();
+  if (typeof updateCheckNow === 'function') updateCheckNow(true);
+  render();
+  setTimeout(() => { if (!_syncVersionLooking()) _syncRepaintApp(); }, SYNC_VERSION_LOOK_MS + 100);
+  return 'looking';
 }
 
 // ---- V133: which phone, which version (Stage 12, the clean-up job — 4A) ------
@@ -3705,7 +3861,7 @@ function syncHeldResolve(id, choice) {
     return syncPush({ manual: true, pull: true }).then(() => true);
   }
 
-  return cloudClient()
+  return syncDataClient()
     .then((c) => c.from('sessions').select('id,doc,deleted,last_modified,updated_at')
       .eq('user_id', _syncCurrentUserId()).eq('id', sid).limit(1)   // V111: ids are unique per account only
       .then((r) => {
@@ -3781,7 +3937,7 @@ function _syncHeldResolveRecord(kind, sid, choice, key, reason) {
     return syncPush({ manual: true, pull: true }).then(() => true);
   }
 
-  return cloudClient()
+  return syncDataClient()
     .then((c) => c.from('records').select('id,kind,doc,deleted,last_modified,updated_at')
       .eq('user_id', _syncCurrentUserId()).eq('id', sid).limit(1)   // V111: this account's copy of the record
       .then((r) => {
@@ -3974,7 +4130,7 @@ function syncHeldDiff(id) {
     if (msg) state.sync.message = msg;
     _syncRepaint();
   };
-  return cloudClient()
+  return syncDataClient()
     .then((c) => c.from('sessions').select('id,doc,deleted,updated_at')
       .eq('user_id', _syncCurrentUserId()).eq('id', sid).limit(1))   // V111: compare with this account's copy
     .then((r) => {
@@ -4048,6 +4204,7 @@ function syncErrorMessage(err) {
   const msg = String(err && err.message || '');
   if (err && err.syncStage === 'auth') return 'Your sign-in has lapsed. Sign out and back in on the Account page.';
   if (err && err.syncStage === 'owner') return 'This phone belongs to another account, so nothing was sent.';   // V145
+  if (err && err.syncStage === 'version') return SYNC_VERSION_STOPPED_WORDS;   // V151
   if (status === 0 || /fetch|network/i.test(msg) || (err && err.name === 'AuthRetryableFetchError')) {
     return 'Couldn\u2019t reach the server. Your jobs are safe on this phone \u2014 try again when you have signal.';
   }
@@ -4551,7 +4708,7 @@ function syncPhotoThumb(photoId, hint) {
   if (!id || !e || !e.t || !syncActive() || _syncOffline()) return Promise.resolve(null);
   const uid = _syncCurrentUserId();
   if (!uid || state.photoCloudUser !== uid) return Promise.resolve(null);
-  return cloudClient()
+  return syncDataClient()
     .then((c) => c.storage.from('photos').download(_syncThumbPath(uid, id)))
     .then((r) => (r && !r.error && r.data) ? r.data : null)
     .catch(() => null);
@@ -4571,7 +4728,7 @@ function syncPhotoDownload(ids, onStep) {
   if (!uid || state.photoCloudUser !== uid) { res.offline = true; res.failed = list.length; return Promise.resolve(res); }
   let done = 0;
   const step = () => { done++; if (typeof onStep === 'function') { try { onStep(done, list.length); } catch { /* progress only */ } } };
-  return cloudClient().then((c) => {
+  return syncDataClient().then((c) => {
     let chain = Promise.resolve();
     for (const id of list) {
       chain = chain.then(() => {
@@ -4632,7 +4789,7 @@ function syncPhotoBrowse() {
   const size = (typeof SYNC_BROWSE_PAGE === 'number') ? SYNC_BROWSE_PAGE : 1000;
   const max = (typeof SYNC_BROWSE_MAX === 'number') ? SYNC_BROWSE_MAX : 20000;
   const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
-  return cloudClient().then((c) => {
+  return syncDataClient().then((c) => {
     function page(after) {
       let q = c.from('photos').select(_SYNC_BROWSE_COLS).eq('user_id', uid).eq('deleted', false);
       if (after) q = q.gt('id', after);
@@ -4699,7 +4856,7 @@ function syncJobNames(ids) {
   const uid = _syncCurrentUserId();
   if (!uid) { res.offline = true; return Promise.resolve(res); }
   const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
-  return cloudClient().then((c) => {
+  return syncDataClient().then((c) => {
     let chain = Promise.resolve();
     for (let k = 0; k < want.length; k += batch) {
       const chunk = want.slice(k, k + batch);
@@ -4815,7 +4972,7 @@ function syncCloudList() {
       return photoPage(String(rows[rows.length - 1].session_id), n + 1);
     });
   }
-  return cloudClient().then((c) => { client = c; return jobsPage(''); })
+  return syncDataClient().then((c) => { client = c; return jobsPage(''); })
     .then(() => photoPage('', 0).then(() => { res.photos = true; },
       (e) => { console.error('Cloud list: photo counts not read (non-fatal).', e); }))
     .then(() => {
@@ -4896,7 +5053,7 @@ function syncCloudStorage() {
       return bytesPage(String(rows[rows.length - 1].session_id), k + 1);
     });
   }
-  return cloudClient().then((c) => { client = c; return sizePage(''); })
+  return syncDataClient().then((c) => { client = c; return sizePage(''); })
     .then(() => bytesPage('', 1))
     .then(() => {
       const all = [];
@@ -4968,7 +5125,7 @@ function syncBringBack(ids) {
   if (!uid) { res.offline = true; return Promise.resolve(res); }
   const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
   const rows = [];
-  return cloudClient().then((c) => {
+  return syncDataClient().then((c) => {
     let chain = Promise.resolve();
     for (let k = 0; k < want.length; k += batch) {
       const chunk = want.slice(k, k + batch);
@@ -5075,7 +5232,7 @@ function _syncCloudDeleteRun(uid, want, res) {
   const photos = [];
   const done = [];
   let c = null, failed = null;
-  return cloudClient().then((cl) => {
+  return syncDataClient().then((cl) => {
     c = cl;
     // 1. The photo rows, keyset paged within each batch of jobs.
     let chain = Promise.resolve();
