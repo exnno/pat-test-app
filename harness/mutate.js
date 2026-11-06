@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V150';",
-    to:   "const APP_VERSION = 'V149';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V151';",
+    to:   "const APP_VERSION = 'V150';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150).
-    from: '        <p><strong>V148</strong> &middot; November 2026</p>',   // V150: V147 rolled off — the oldest is V148
-    to:   '        <p><strong>V146</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V147</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 89e)',
+    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151).
+    from: '        <p><strong>V149</strong> &middot; November 2026</p>',   // V151: V148 rolled off — the oldest is V149
+    to:   '        <p><strong>V147</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V148</strong> &middot; November 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 90e)',
   },
 
   {
@@ -1187,8 +1187,9 @@ const MUTATIONS = [
     name: 'M157 (V80) the app-reopen listener does nothing',
     file: 'sync.js',
     // V150: re-anchored — businessReadOwe() now sits between the two lines.
-    from: "      if (typeof businessReadOwe === 'function') businessReadOwe();\n      syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true });",
-    to:   "      if (typeof businessReadOwe === 'function') businessReadOwe();",
+    // V151: re-anchored — syncMinOwe() now sits between too.
+    from: "      syncMinOwe();   // V151: …and the minimum app version\n      syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true });",
+    to:   "      syncMinOwe();   // V151: …and the minimum app version",
     why:  'reopening the app is the main moment a job reaches the cloud after a day offline (17p)',
   },
   {
@@ -6121,9 +6122,9 @@ const MUTATIONS = [
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
     // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
-    from: "<li><strong>Move a job to another business.</strong>",   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it.
+    from: "<li><strong>Move a job to another business.</strong>",   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it.
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (89e)",
+    why:  "11A: the welcome says plainly what changed on screen (90e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -7099,8 +7100,8 @@ const MUTATIONS = [
   {
     name: "M998 (V124) a found update never asks its version",
     file: "boot.js",
-    from: "  updateAskVersion(worker);\n  updateRepaint();",
-    to:   "  updateRepaint();",
+    from: "  updateAskVersion(worker);\n  // V151 (2A): the person tapped",   // V151: re-anchored — Update now's check sits between
+    to:   "  // V151 (2A): the person tapped",
     why:  "3A: plain words for ever (62d)",
   },
   {
@@ -7735,8 +7736,8 @@ const MUTATIONS = [
   {
     name: "M1091 (V127) the Jobs list loses the plan line",
     file: "render-core.js",
-    from: "      ${header}\n      ${planBanner}\n      ${tabs}\n      ${storageBanner}",
-    to:   "      ${header}\n      ${tabs}\n      ${storageBanner}",
+    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${tabs}\n      ${storageBanner}",   // V151: re-anchored (the version line above it)
+    to:   "      ${header}\n      ${versionBanner}\n      ${tabs}\n      ${storageBanner}",
     why:  "4A 6b: the countdown is on the Jobs list (65e)",
   },
   {
@@ -8605,7 +8606,7 @@ const MUTATIONS = [
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
     from: "const WELCOME_VERSION = 'V150';",   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
     to:   "const WELCOME_VERSION = 'V149';",
-    why:  "What's new is rolled on a feature release (89e)",
+    why:  "What's new is rolled on a feature release (90e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
@@ -8620,7 +8621,7 @@ const MUTATIONS = [
     // V150: one line — re-aimed at its end.
     from: "Working for just one business? Nothing changes.</li>\n",
     to:   "Working for just one business? Nothing changes.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (89e)",
+    why:  "one line (90e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8636,7 +8637,7 @@ const MUTATIONS = [
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
     from: "Move a job to another business: Job settings &rarr; Business &rarr; Change&hellip;",
     to:   "Better",
-    why:  "the About page must say what changed in this version (89e)",   // V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's
+    why:  "the About page must say what changed in this version (90e)",   // V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8751,9 +8752,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Behind the scenes: PATGo is ready to ask for an account when it launches.",
+    from: "Behind the scenes: the cloud can now ask for a newer PATGo before a phone syncs.",   // V151: V148's line rolled off — re-aimed at V151's (90e)
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (89e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
+    why:  "the About page keeps the last three versions' lines (90e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8915,7 +8916,7 @@ const MUTATIONS = [
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
     from: "Every job now knows which business it belongs to.",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (89e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window
+    why:  "the About page keeps the last three versions' lines (90e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9042,9 +9043,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v150';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e).
-    to:   "const CACHE_VERSION = 'pat-v149';",
-    why:  "a release needs its cache bump or phones never get it (89e)",
+    from: "const CACHE_VERSION = 'pat-v151';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e).
+    to:   "const CACHE_VERSION = 'pat-v150';",
+    why:  "a release needs its cache bump or phones never get it (90e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -12273,6 +12274,215 @@ const MUTATIONS = [
     from: "delete from public.job_moves x\nwhere (select id from public.organisations where name = 'PATGo Test Team') in (x.from_org, x.to_org);\n",
     to:   "",
     why:  "the undo fails: a business with records can't be deleted (89f)",
+  },  {
+    name: "M1737 (V151) the run never stops for an old version",
+    file: "sync.js",
+    from: "      if (syncTooOld(uid)) { const e = new Error('PATGo needs updating'); e.syncStage = 'version'; throw e; }\n      return _syncRunAs(c, uid, session, opts);",
+    to:   "      return _syncRunAs(c, uid, session, opts);",
+    why:  "a phone below the minimum carries on reading and sending — the thing V151 exists to stop (90b)",
+  },
+  {
+    name: "M1738 (V151) the run never reads the minimum",
+    file: "sync.js",
+    from: "    return syncMinVersionRead(c, uid).then(() => {\n      if (syncTooOld(uid))",
+    to:   "    return Promise.resolve().then(() => {\n      if (syncTooOld(uid))",
+    why:  "a raised minimum is never heard (90a)",
+  },
+  {
+    name: "M1739 (V151) the minimum is never read again after the first time",
+    file: "sync.js",
+    from: "  if (!force && !_syncMinOwed && rec.u === uid && rec.at && now >= rec.at && now - rec.at < SYNC_MIN_CHECK_MS) {",
+    to:   "  if (!force && rec.u === uid && rec.at) {",
+    why:  "a minimum raised later never reaches a phone that read it once (90a)",
+  },
+  {
+    name: "M1740 (V151) every run reads the minimum",
+    file: "sync.js",
+    from: "      const was = syncTooOld(uid);\n      _syncMinOwed = false;",
+    to:   "      const was = syncTooOld(uid);",
+    why:  "one extra request per run, every save (90a)",
+  },
+  {
+    name: "M1741 (V151) coming back to the front doesn't read the minimum again",
+    file: "sync.js",
+    from: "      syncMinOwe();   // V151: …and the minimum app version\n",
+    to:   "",
+    why:  "a phone left open waits up to an hour to hear it must update (90a)",
+  },
+  {
+    name: "M1742 (V151) a failed read forgets that the phone is too old",
+    file: "sync.js",
+    from: "      return known;\n    });\n}",
+    to:   "      try { localStorage.removeItem(MIN_VERSION_KEY); } catch (e2) { /* */ }\n      return null;\n    });\n}",
+    why:  "no signal, or a hiccup, and a too-old phone starts syncing again (90a)",
+  },
+  {
+    name: "M1743 (V151) another account's minimum stops this one",
+    file: "sync.js",
+    from: "  return rec.u === u && Number.isInteger(rec.min) && rec.min > syncAppVersionNum();",
+    to:   "  return Number.isInteger(rec.min) && rec.min > syncAppVersionNum();",
+    why:  "the minimum follows the account, not the phone (90b)",
+  },
+  {
+    name: "M1744 (V151) a phone ON the minimum counts as too old",
+    file: "sync.js",
+    from: "  return rec.u === u && Number.isInteger(rec.min) && rec.min > syncAppVersionNum();",
+    to:   "  return rec.u === u && Number.isInteger(rec.min) && rec.min >= syncAppVersionNum();",
+    why:  "every phone stops the moment the minimum is raised to the version it runs (90a)",
+  },
+  {
+    name: "M1745 (V151) a hotfix reads as a different version",
+    file: "sync.js",
+    from: "  const m = /^[Vv]([0-9]{1,6})/.exec(String(v == null ? APP_VERSION : v));",
+    to:   "  const m = /([0-9]+)$/.exec(String(v == null ? APP_VERSION : v));",
+    why:  "V151.1 would read as 1 — every hotfix phone stopped (90a)",
+  },
+  {
+    name: "M1746 (V151) the on-request gate lets an old phone through",
+    file: "sync.js",
+    from: "    if (syncTooOld()) { const e = new Error('PATGo needs updating'); e.syncStage = 'version'; throw e; }\n    return c;",
+    to:   "    return c;",
+    why:  "the cloud tab, bring back and Cloud Storage still read the cloud on an old phone (90b)",
+  },
+  {
+    name: "M1747 (V151) the cloud tab's list goes round the gate",
+    file: "sync.js",
+    from: "  return syncDataClient().then((c) => { client = c; return jobsPage(''); })",
+    to:   "  return cloudClient().then((c) => { client = c; return jobsPage(''); })",
+    why:  "one on-request read forgotten (90b)",
+  },
+  {
+    name: "M1748 (V151) the Business page goes round the gate",
+    file: "business.js",
+    from: "  return (typeof syncDataClient === 'function') ? syncDataClient() : cloudClient();",
+    to:   "  return cloudClient();",
+    why:  "businesses and moves read and written by an old phone (90b)",
+  },
+  {
+    name: "M1749 (V151) a stopped run says nothing useful",
+    file: "sync.js",
+    from: "  if (err && err.syncStage === 'version') return SYNC_VERSION_STOPPED_WORDS;   // V151\n",
+    to:   "",
+    why:  "the Sync page says 'Couldn't send your jobs: PATGo needs updating' (90b)",
+  },
+  {
+    name: "M1750 (V151) everyone gets the team words",
+    file: "sync.js",
+    from: "  try { return typeof businessList === 'function' && businessList().some(b => b && Number(b.n) >= 2); } catch (e) { return false; }",
+    to:   "  try { return typeof businessList === 'function' && businessList().length > 0; } catch (e) { return false; }",
+    why:  "3A: a sole trader is told about 'your team' (90c)",
+  },
+  {
+    name: "M1751 (V151) the line shows on a phone that is new enough",
+    file: "sync.js",
+    from: "  if (!syncActive() || !syncTooOld()) return '';\n  const id = where === 'sync'",
+    to:   "  if (!syncActive()) return '';\n  const id = where === 'sync'",
+    why:  "every signed-in phone told to update (90c)",
+  },
+  {
+    name: "M1752 (V151) the Jobs list loses the version line",
+    file: "render-core.js",
+    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${tabs}\n      ${storageBanner}",
+    to:   "      ${header}\n      ${planBanner}\n      ${tabs}\n      ${storageBanner}",
+    why:  "syncing stops with nothing on the Jobs list to say why (90c)",
+  },
+  {
+    name: "M1753 (V151) the Sync page loses the version line",
+    file: "render-help.js",
+    from: "      ${renderSettingsSubHeader('Sync')}\n      ${version}\n",
+    to:   "      ${renderSettingsSubHeader('Sync')}\n",
+    why:  "the Sync page shows the counts but not why nothing moves (90c)",
+  },
+  {
+    name: "M1754 (V151) Update now ignores an update already waiting",
+    file: "sync.js",
+    from: "  if (state.updateAvailable && state.pendingWorker && typeof applyUpdate === 'function') {\n    applyUpdate();",
+    to:   "  if (false) {\n    applyUpdate();",
+    why:  "the tap waits for the server although the update is already on the phone (90c)",
+  },
+  {
+    name: "M1755 (V151) Update now with nothing waiting doesn't ask for it",
+    file: "sync.js",
+    from: "  if (typeof updateCheckNow === 'function') updateCheckNow(true);\n  render();",
+    to:   "  render();",
+    why:  "the tap says 'Looking' and looks for nothing (90c)",
+  },
+  {
+    name: "M1756 (V151) the update asked for doesn't go in when it arrives",
+    file: "boot.js",
+    from: "    wanted = !!asked && Date.now() - asked >= 0 && Date.now() - asked < SYNC_VERSION_LOOK_MS;",
+    to:   "    wanted = false;",
+    why:  "Update now finds the version and then waits for the safe moment (90c)",
+  },
+  {
+    name: "M1757 (V151) an update asked for long ago goes in whenever it arrives",
+    file: "boot.js",
+    from: "    wanted = !!asked && Date.now() - asked >= 0 && Date.now() - asked < SYNC_VERSION_LOOK_MS;",
+    to:   "    wanted = !!asked;",
+    why:  "a tap hours ago reloads the app mid-job — v61.2 broken (90c)",
+  },
+  {
+    name: "M1758 (V151) the update asked for goes in under a sheet",
+    file: "boot.js",
+    from: "  if (wanted && !_updateApplying && !_updateSheetOpen() && !_updateFieldHeld()) {",
+    to:   "  if (wanted && !_updateApplying) {",
+    why:  "a sheet opened since the tap is torn down by the reload (90c)",
+  },
+  {
+    name: "M1759 (V151) Update now is not wired",
+    file: "dispatch.js",
+    from: "  'version-update': () => { if (typeof syncVersionUpdate === 'function') syncVersionUpdate(); },\n",
+    to:   "",
+    why:  "the button does nothing (90c 90d)",
+  },
+  {
+    name: "M1760 (V151) the minimum survives a reset of the account",
+    file: "reset.js",
+    from: "  ['MIN_VERSION_KEY', MIN_VERSION_KEY, 'account'],",
+    to:   "  ['MIN_VERSION_KEY', MIN_VERSION_KEY, 'everything'],",
+    why:  "the record follows the account: a reset or a takeover must clear it (90d)",
+  },
+  {
+    name: "M1761 (V151) garbage in the stored minimum is believed",
+    file: "sync.js",
+    from: "    if (Number.isInteger(r.min) && r.min >= 0 && r.min <= 999999) out.min = r.min;",
+    to:   "    if (r.min != null) out.min = Number(r.min) || r.min;",
+    why:  "a malformed record could stop a phone for good (90d)",
+  },
+  {
+    name: "M1762 (V151) the invite check forgets phones that never reported",
+    file: "supabase/v151-min-version.sql",
+    from: "  + (select count(*) from auth.sessions ses join m on m.user_id = ses.user_id, s\n     where greatest(ses.created_at, ses.updated_at, ses.refreshed_at at time zone 'UTC') > s.win\n       and not exists (select 1 from public.phones p\n                       where p.user_id = ses.user_id and p.auth_session = ses.id))\n",
+    to:   "",
+    why:  "a phone from before V133 (never reports) would let an invite through (90f)",
+  },
+  {
+    name: "M1763 (V151) the invite check opened to the app",
+    file: "supabase/v151-min-version.sql",
+    from: "revoke all on function public.org_phones_behind(uuid) from public, anon, authenticated;\n",
+    to:   "",
+    why:  "anyone could ask how many old phones another business has (90f)",
+  },
+  {
+    name: "M1764 (V151) a new project's minimum starts at 1",
+    file: "supabase/schema.sql",
+    from: "  min_version        integer not null default 151 check (min_version between 1 and 999999),",
+    to:   "  min_version        integer not null default 1 check (min_version between 1 and 999999),",
+    why:  "schema.sql must carry exactly the migration (90f)",
+  },
+  {
+    name: "M1765 (V151) isolation loses 22c",
+    file: "supabase/isolation-test.sql",
+    from: "    res := res || array['22c|B can''t change the minimum (the setting, B''s, A''s)|'",
+    to:   "    res := res || array['22x|B can''t change the minimum (the setting, B''s, A''s)|'",
+    why:  "nothing would show an app changing the minimum (90f)",
+  },
+  {
+    name: "M1766 (V151) the test aid raises everyone",
+    file: "supabase/v151-test-min-version.sql",
+    from: "    insert into public.app_min_overrides (user_id, min_version, note)\n    values (u, 999999, 'V151 test aid')",
+    to:   "    update public.app_settings set min_version = 999999 where id = 1;\n    insert into public.app_min_overrides (user_id, min_version, note)\n    values (u, 999999, 'V151 test aid')",
+    why:  "4A: your testers' phones would stop too (90f)",
   },
 ];
 

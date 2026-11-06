@@ -393,6 +393,20 @@ bug; leaving it red trains everyone to ignore the suite.
   from schema.sql), where ten broken copies were each caught. (5) Each of the 40
   new mutations was probed against the groups its hint names alone: all 40 fail
   their own sub-group.
+  V151 (group 90): the minimum app version. (1) Every sync run now opens with an
+  rpc (my_min_version) — a POST that only READS. A test that takes "the first
+  POST" as "the first send" must leave rpc calls out (66d's `firstPost` does). Fakes
+  that 404 an unknown rpc are fine: a failed read is no minimum (fails open).
+  (2) 62e counts `applyUpdate()` callers in boot.js: two since V151 (the safe moment,
+  and the update the person asked for with Update now) — 90c proves the second is
+  only within SYNC_VERSION_LOOK_MS and never under a sheet. (3) The on-request
+  functions report a refusal in their result (`{ok:false, error}`), they don't
+  reject — assert the words, not a throw. (4) The SQL's TEXT is 90f; whether it
+  WORKS is the migration's V1–V4 and isolation 22a–22e, run on the local Postgres 16
+  stand-in (an upgraded V150 project and one from schema.sql), eight broken copies
+  each caught. (5) Each of the 30 new mutations was probed against the groups its
+  hint names alone: all 30 fail their own sub-group (M1750 survived first — the
+  solo words were never checked after the team words; fixed in the test).
 
 ---
 
