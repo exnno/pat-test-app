@@ -31,7 +31,7 @@
      87d  4A the plan follows the owner where the wall is on — locked or
           unchecked, signed out, the way on is Sign in; on the test site
           nothing changed (signed out = no plan, as V147).
-     87e  the Account page uses the shared cards; reset and takeover keep the
+     87e  (V149: its release checks moved to 88e.) The Account page uses the shared cards; reset and takeover keep the
           ?wall key right; wiring; release: V148, cache, no What's new, About.
           Plus 86e's release checks (86e keeps its lasting ones). */
 
@@ -382,7 +382,7 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 87e */
-  await t.group('87e — the shared cards; reset and takeover; wiring; release: V148', () => {
+  await t.group('87e — the shared cards; reset and takeover; wiring', () => {
     const help = read('render-help.js');
     const acct = help.slice(help.indexOf('function renderCloudAccount()'), help.indexOf('function cloudPasswordFormHTML('));
     t.includes(acct, 'const pwCard = c.pwOpen ? cloudPasswordFormHTML(c, msg, dis, busy) : `', 'the Account page draws the password form from the shared helper…');
@@ -418,23 +418,6 @@ module.exports = async function () {
     let ok = true; let h2 = '';
     try { h2 = bare.draw(); } catch (e) { ok = false; }
     t.ok(ok && !walled(h2), 'no cloud.js: no wall, no crash');
-
-    // ---- release (86e's release checks moved here).
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V148', 'APP_VERSION V148');
-    t.eq(rel.run('WELCOME_VERSION'), 'V147', 'no What’s new this time — nothing to show anyone yet');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v148';", 'cache key pat-v148');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: still V147’s one line');
-    t.includes(sheetCopy, '<li><strong>Renumber asset numbers.</strong>', '…renumbering');
-    t.includes(sheetCopy, 'choose &ldquo;Renumber from here&rdquo;, or select items and use Edit selected &rarr; Renumber.', '…both ways in');
-    const x = help.indexOf('<p><strong>V148</strong>'), y = help.indexOf('<p><strong>V147</strong>'), z = help.indexOf('<p><strong>V146</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V148, V147, V146');
-    t.excludes(help, '<p><strong>V145</strong>', 'V145 rolled off');
-    t.includes(help, 'Behind the scenes: PATGo is ready to ask for an account when it launches. Nothing changes on this phone today.', 'About: V148’s line');
-    t.includes(help, 'Renumber asset numbers when a new roll of stickers starts', 'About: V147’s line still there');
-    t.includes(help, 'Tapping the description box empties it, ready for a new word, and suggestions no longer vanish', 'About: V146’s line still there');
+    // V149: the release checks moved to 88e.
   });
 };

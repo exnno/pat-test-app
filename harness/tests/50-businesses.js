@@ -111,19 +111,30 @@ module.exports = async function () {
     t.includes(iso, "foreach r in array array['engineer','office','team_leader'] loop", 'B tried as Engineer, Office and Team leader');
     for (const l of ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'])
       t.includes(iso, `g || '${l}|`, `each role checks ${l}`);
-    t.includes(iso, "    delete from public.memberships where org_id = org_a and user_id = b;\n",
+    // V149: the line appears three times now — each pinned with its own context.
+    t.includes(iso, "    -- 14: B leaves A's business. The job B did for A stays A's.\n    delete from public.memberships where org_id = org_a and user_id = b;\n",
       'B is taken out of A\'s business again (nothing left behind)');
+    t.includes(iso, "    values ('iso-test-BinA', b, org_a, 'iso-test-BinA', 'x', b::text || '/iso-test-BinA.jpg', now());\n    delete from public.memberships where org_id = org_a and user_id = b;\n",
+      'V149: B leaves again straight after the seed (a leaver\'s jobs), so 9a–9c see B outside A\'s business');
+    t.includes(iso, "    delete from public.photos where id = 'iso-test-v149-p' and user_id = b;\n    delete from public.memberships where org_id = org_a and user_id = b;\n",
+      'V149: 20h takes B out of A\'s business again');
     t.includes(iso, "      delete from auth.users where id = b;\n      raise exception 'iso-undo';",
       'the login-delete check is always undone — B is never really deleted');
     t.includes(iso, "'organisations','memberships')\n    and not c.relrowsecurity", 'check 0 covers the two new tables');
   });
 
   /* ------------------------------------------------------------------ 50d */
-  await t.group('50d — no phone ever sends the business stamp (2A)', () => {
+  // V149: a job may now NAME its business (supabase/v149-business-per-job.sql
+  // keeps it only for a member, on the first upload only). Still: one place in
+  // the app, the job row — never a record or a photo row, whose business the
+  // database decides (records: the default, 4A; photos: their job's).
+  await t.group('50d — only a JOB row names its business, and only in one place (2A; V149)', () => {
     const files = scriptOrderFromIndex().filter(f => !/\.min\.js$|^supabase\.umd\.js$|^pdfjs/.test(f));
     t.ok(files.length > 25 && files.includes('sync.js'), `the app's own files are read (${files.length})`);
     const hits = files.filter(f => /org_id/.test(read(f)));
-    t.eq(hits.length, 0, 'no app file mentions org_id' + (hits.length ? ' — ' + hits.join(', ') : ''));
+    t.deepEq(hits, ['sync.js'], 'only sync.js mentions org_id' + (hits.length ? ' — ' + hits.join(', ') : ''));
+    const lines = read('sync.js').split('\n').filter(l => /org_id/.test(l) && !/^\s*\/\//.test(l));
+    t.deepEq(lines.map(l => l.trim()), ['if (biz) row.org_id = biz;'], 'one line: the job row, from the job\u2019s own businessId');
   });
 
   /* ------------------------------------------------------------------ 50e */
