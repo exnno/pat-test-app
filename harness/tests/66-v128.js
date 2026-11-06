@@ -151,7 +151,9 @@ function fakeServer() {
     && new URLSearchParams(c.url.split('?')[1] || '').get('select') === 'id');
   srv.posts = (table) => calls.filter(c => c.method === 'POST' && c.url.includes('/rest/v1/' + table));
   srv.sentIds = (table) => srv.posts(table).flatMap(c => (Array.isArray(c.body) ? c.body : [c.body]).map(r => String(r && r.id)));
-  srv.firstPost = () => calls.findIndex(c => c.method === 'POST' || c.method === 'PATCH');
+  // V151: an rpc is a POST that only READS (my_min_version, before every run) —
+  // not a send.
+  srv.firstPost = () => calls.findIndex(c => (c.method === 'POST' && !c.url.includes('/rest/v1/rpc/')) || c.method === 'PATCH');
   return srv;
 }
 

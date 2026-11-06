@@ -370,7 +370,10 @@ module.exports = async function run() {
     const boot = strip(read('boot.js'));
     t.eq((boot.match(/type: 'SKIP_WAITING'/g) || []).length, 1, 'one SKIP_WAITING sent, from applyUpdate');
     const callers = (s) => (s.match(/(?<!function )applyUpdate\(\)/g) || []).length;
-    t.eq(callers(boot), 1, 'boot.js calls applyUpdate only from the safe moment');
+    // V151 (2A): one more — the update the person asked for with Update now,
+    // within SYNC_VERSION_LOOK_MS of the tap, never under a sheet or a field
+    // (90c proves it by behaviour). Still never by itself.
+    t.eq(callers(boot), 2, 'boot.js calls applyUpdate only from the safe moment and from Update now (V151)');
     t.eq(callers(strip(read('dispatch.js'))), 1, 'dispatch.js only from Refresh');
     const apply = boot.slice(boot.indexOf('function updateTryApply()'), boot.indexOf('function updateTryLater()'));
     t.ok(apply.indexOf('updateSafeMoment()') > -1 && apply.indexOf('updateSafeMoment()') < apply.indexOf('applyUpdate()'), 'the safe moment is checked first');

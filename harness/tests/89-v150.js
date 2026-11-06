@@ -23,8 +23,8 @@
      89d  Sync: the job list reads org:org_id; the cloud's business wins on the
           pull and the corrected job goes up; a held job is left for its
           question; back at the front the list is read again inside 6 hours.
-     89e  Release: V150, What's new (one line), cache, About V150 / V149 / V148;
-          state.bizMove declared; JOB_MOVES_KEY follows the account (reset,
+     89e  state.bizMove declared (V151: its release checks — V150, What's new,
+          cache, About — moved to 90e); JOB_MOVES_KEY follows the account (reset,
           takeover); leaving the screen closes the sheet; no business.js.
      89f  The SQL's text: the move, the request, who decides, the record no app
           writes, the stamp's one exception; schema.sql ends with exactly the
@@ -497,25 +497,8 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 89e */
-  await t.group('89e — release: V150; the sheet in state; the record follows the account; no business.js', async () => {
+  await t.group('89e — the sheet in state; the record follows the account; no business.js (release checks → 90e)', async () => {
     const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V150', 'APP_VERSION V150');
-    t.eq(rel.run('WELCOME_VERSION'), 'V150', 'What’s new rolled');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v150';", 'cache key pat-v150');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>Move a job to another business.</strong> For anyone who works for more than one business:', '…moving a job');
-    t.includes(sheetCopy, 'Working for just one business? Nothing changes.</li>', '…and nothing changes for everyone else');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V150</strong>'), y = help.indexOf('<p><strong>V149</strong>'), z = help.indexOf('<p><strong>V148</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V150, V149, V148');
-    t.excludes(help, '<p><strong>V147</strong>', 'V147 rolled off');
-    t.includes(help, 'Move a job to another business: Job settings &rarr; Business &rarr; Change&hellip;', 'About: V150’s line');
-    t.includes(help, 'Every job now knows which business it belongs to.', 'About: V149’s line still there');
-    t.includes(help, 'Behind the scenes: PATGo is ready to ask for an account when it launches.', 'About: V148’s line still there');
-
     t.eq(rel.run('JSON.stringify(state.bizMove)'), 'null', 'state.bizMove is declared (null)');
     t.eq(rel.run('JOB_MOVES_KEY'), 'pat:jobMoves', 'JOB_MOVES_KEY');
     t.ok(rel.run("RESET_KEY_PLAN.some(k => k[0] === 'JOB_MOVES_KEY' && k[2] === 'account')"), 'Reset: the record goes with the account');
@@ -578,7 +561,9 @@ module.exports = async function () {
 
     // schema.sql ENDS with exactly these definitions — the stamp a new project keeps.
     const schema = read('supabase/schema.sql');
-    t.ok(schema.endsWith(body.replace(/\n*$/, '\n')), 'schema.sql ends with exactly the V150 statements');
+    // V151: V151's section follows V150's, so "ends with" became "carries, before V151's".
+    t.ok(schema.includes(body.replace(/\n*$/, '\n')), 'schema.sql carries exactly the V150 statements');
+    t.ok(schema.indexOf('============ V150') < schema.indexOf('============ V151'), '…before V151’s section');
     t.ok(schema.indexOf('============ V150') > schema.indexOf('================ V149'), '…in their own section, after V149’s');
 
     const iso = read('supabase/isolation-test.sql');
