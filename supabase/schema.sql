@@ -1172,3 +1172,84 @@ create policy "change own photo files" on storage.objects
 revoke all on function public.can_upload(uuid), public.can_upload_files(), public.plan_guard()
   from public, anon, authenticated;
 grant execute on function public.can_upload_files() to authenticated;
+
+-- ================================================================ V149
+-- Every job knows its business: a phone may name the business a NEW job is for
+-- (kept only if the writer belongs to it, else the default); a photo row takes
+-- its job's business; my_businesses() and set_business_name() (Owner only).
+-- Existing projects: supabase/v149-business-per-job.sql (the same, plus
+-- self-checks B1–B5). Kept in step with it by harness group 88. Comes AFTER
+-- V113's org_stamp on purpose: this definition replaces it.
+
+-- ------------------------------------------------- the stamp (new jobs)
+-- Insert: a named business is kept only if the writer belongs to it; a photo
+--         with none takes its job's; anything left gets the writer's default.
+-- Update: the stamp never changes once set (unchanged from V113 — a phone's
+--         upsert may name a business, and it is ignored).
+-- ⚠ RLS checks the row AFTER this trigger, so a business swapped for the default
+-- here is checked as the default — an old membership never turns into an error.
+create or replace function public.org_stamp()
+returns trigger language plpgsql security definer set search_path = '' as $$
+begin
+  if tg_op = 'INSERT' then
+    if new.org_id is not null and not exists (
+      select 1 from public.memberships m where m.org_id = new.org_id and m.user_id = new.user_id
+    ) then
+      new.org_id := null;
+    end if;
+    -- (Only reached for photos: NEW.session_id exists on that table alone.)
+    if new.org_id is null and tg_table_name = 'photos' then
+      select s.org_id into new.org_id from public.sessions s
+      where s.user_id = new.user_id and s.id = new.session_id;
+      if new.org_id is not null and not exists (
+        select 1 from public.memberships m where m.org_id = new.org_id and m.user_id = new.user_id
+      ) then
+        new.org_id := null;
+      end if;
+    end if;
+    if new.org_id is null then
+      new.org_id := public.default_org(new.user_id);
+      if new.org_id is null then
+        raise exception 'PATGo: account % has no business', new.user_id;
+      end if;
+    end if;
+  elsif old.org_id is not null then
+    new.org_id := old.org_id;
+  end if;
+  return new;
+end;
+$$;
+
+
+-- ------------------------------------------------- my businesses
+create or replace function public.my_businesses()
+returns table (id uuid, name text, role text, is_default boolean, members integer)
+language sql stable security definer set search_path = '' as $$
+  select o.id, o.name, m.role, m.is_default, public.org_size(o.id)
+  from public.memberships m
+  join public.organisations o on o.id = m.org_id
+  where m.user_id = auth.uid()
+  order by m.is_default desc, o.created_at, o.id
+$$;
+revoke all on function public.my_businesses() from public, anon;
+grant execute on function public.my_businesses() to authenticated;
+
+
+-- ------------------------------------------------- naming (3A)
+-- The Owner only. 1–80 characters after trimming; returns the name kept.
+create or replace function public.set_business_name(o uuid, n text)
+returns text language plpgsql security definer set search_path = '' as $$
+declare v text := btrim(coalesce(n, ''));
+begin
+  if public.my_role(o) is distinct from 'owner' then
+    raise exception 'PATGo: only the owner can name this business' using errcode = '42501';
+  end if;
+  if length(v) < 1 or length(v) > 80 then
+    raise exception 'PATGo: a business name is 1 to 80 characters' using errcode = '22023';
+  end if;
+  update public.organisations set name = v where id = o;
+  return v;
+end;
+$$;
+revoke all on function public.set_business_name(uuid, text) from public, anon;
+grant execute on function public.set_business_name(uuid, text) to authenticated;

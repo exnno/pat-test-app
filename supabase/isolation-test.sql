@@ -11,6 +11,9 @@
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
+-- V149: CHECKS 20a–20h NEED supabase/v149-business-per-job.sql RUN FIRST (20a names
+-- it if not). B is put into A's business as Engineer and taken out again; B's
+-- business name is put back as it was. Nothing is left behind.
 -- V143: CHECKS 19a–19h NEED supabase/v143-enforcement.sql RUN FIRST (19a names it
 -- if not). B's business is made to look lapsed 20 days ago while B tries every
 -- kind of upload, then put back exactly as it was (19h). On a PASS nothing is
@@ -377,18 +380,30 @@ begin
     join public.photos p on p.storage_path = o.name and p.user_id = a and p.org_id = org_a
     where o.bucket_id = 'photos' limit 1;
     -- Seed (as admin): a job and a photo of B's, done for A's business.
+    -- V149: the stamp keeps a named business only for a member, so B is a member
+    -- while the seed goes in, then leaves — B's jobs done for A, as a leaver's.
+    insert into public.memberships (org_id, user_id, role) values (org_a, b, 'engineer')
+    on conflict (org_id, user_id) do nothing;
     insert into public.sessions (id, user_id, org_id, doc, last_modified)
     values ('iso-test-BinA', b, org_a, '{"owner":"B for A"}', now());
     insert into public.photos (id, user_id, org_id, session_id, item_id, storage_path, last_modified)
     values ('iso-test-BinA', b, org_a, 'iso-test-BinA', 'x', b::text || '/iso-test-BinA.jpg', now());
+    delete from public.memberships where org_id = org_a and user_id = b;
 
     perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
-    -- 9b: not a member, B can't put a row into A's business.
+    -- 9b: not a member, B can't put a row into A's business. V149: a job naming
+    -- a business its writer isn't in is filed under the writer's own instead —
+    -- refused (before V149) or landed in B's own (V149) are both a PASS.
     begin
       insert into public.sessions (id, user_id, org_id, doc, last_modified)
       values ('iso-test-forged2', b, org_a, '{}', now());
-      res := res || array['9b|B cannot put a job into A''s business|FAIL|insert was accepted'];
+      execute 'reset role';
+      select count(*) into n from public.sessions where id = 'iso-test-forged2' and user_id = b and org_id = org_a;
+      res := res || array['9b|B cannot put a job into A''s business|' || case when n = 0 then 'PASS|filed under B''s own (V149)' else 'FAIL|it is in A''s business' end];
+      delete from public.sessions where id = 'iso-test-forged2' and user_id = b;
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
     exception when others then
       res := res || array['9b|B cannot put a job into A''s business|PASS|rejected: ' || sqlerrm];
     end;
@@ -780,6 +795,89 @@ begin
     select count(*) into n from public.organisations where id = org_b and plan is not distinct from g and lapsed_at is not distinct from lap_b;
     select count(*) into k from public.profiles where id = b and plan is not distinct from g and lapsed_at is not distinct from lap_b;
     res := res || array['19h|B''s plan and lapse date are put back|' || case when n = 1 and k = 1 then 'PASS|' || g else 'FAIL|business ' || n || ', profile ' || k end];
+  end if;
+
+  -- ========================================================== V149 (20a–20h)
+  -- Every job knows its business. B names A's business on a new job while NOT a
+  -- member (→ B's own), then as A's Engineer (→ A's, its photo too); an update
+  -- naming B's own never moves it; B can't name A's business, A can (put back).
+  if to_regprocedure('public.my_businesses()') is null then
+    res := res || array['20a|business per job|FAIL|run supabase/v149-business-per-job.sql first'];
+  else
+    org_a := public.default_org(a);
+    org_b := public.default_org(b);
+    select name into g from public.organisations where id = org_a;
+    select name into msg from public.organisations where id = org_b;   -- put back at 20h
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    -- 20a: not a member — the named business is not kept.
+    begin
+      insert into public.sessions (id, user_id, doc, last_modified, org_id)
+      values ('iso-test-v149-1', b, '{"v149":1}', now(), org_a);
+      execute 'reset role';
+      select count(*) into n from public.sessions where id = 'iso-test-v149-1' and user_id = b and org_id = org_b;
+      res := res || array['20a|B naming A''s business (not a member) gets B''s own|' || case when n = 1 then 'PASS|' else 'FAIL|stamped elsewhere' end];
+    exception when others then
+      execute 'reset role';
+      res := res || array['20a|B naming A''s business (not a member) gets B''s own|FAIL|' || sqlerrm];
+    end;
+    perform set_config('request.jwt.claims', '', true);
+    -- 20b–20d: B as A's Engineer.
+    insert into public.memberships (org_id, user_id, role) values (org_a, b, 'engineer')
+    on conflict (org_id, user_id) do update set role = excluded.role;
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      insert into public.sessions (id, user_id, doc, last_modified, org_id)
+      values ('iso-test-v149-2', b, '{"v149":2}', now(), org_a);
+      insert into public.photos (id, user_id, session_id, item_id, storage_path, last_modified)
+      values ('iso-test-v149-p', b, 'iso-test-v149-2', 'i1', b::text || '/iso-test-v149-p.jpg', now());
+      update public.sessions set doc = '{"v149":3}', org_id = org_b where id = 'iso-test-v149-2' and user_id = b;
+      execute 'reset role';
+      select count(*) into n from public.sessions where id = 'iso-test-v149-2' and user_id = b and org_id = org_a;
+      select count(*) into k from public.photos where id = 'iso-test-v149-p' and user_id = b and org_id = org_a;
+      res := res || array['20b|B (A''s Engineer) naming A''s business keeps it|' || case when n = 1 then 'PASS|' else 'FAIL|not kept' end];
+      res := res || array['20c|…its photo follows the job, not B''s default|' || case when k = 1 then 'PASS|' else 'FAIL|not followed' end];
+      select count(*) into n from public.sessions where id = 'iso-test-v149-2' and doc->>'v149' = '3' and org_id = org_a;
+      res := res || array['20d|…and an update naming B''s own never moves it|' || case when n = 1 then 'PASS|' else 'FAIL|moved' end];
+    exception when others then
+      execute 'reset role';
+      res := res || array['20b|B (A''s Engineer) naming A''s business keeps it|FAIL|' || sqlerrm];
+    end;
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    -- 20e: B's list shows both, B's own first (the default).
+    begin
+      select count(*) into n from public.my_businesses();
+      select count(*) into k from public.my_businesses() x where x.id = org_a and x.role = 'engineer' and not x.is_default;
+      res := res || array['20e|B''s businesses: two, A''s as Engineer|' || case when n = 2 and k = 1 then 'PASS|' else 'FAIL|' || n || ' listed' end];
+    exception when others then
+      res := res || array['20e|B''s businesses: two, A''s as Engineer|FAIL|' || sqlerrm];
+    end;
+    -- 20f: an Engineer cannot name A's business; nor write the table directly.
+    k := 0;
+    begin perform public.set_business_name(org_a, 'iso-test-v149'); k := k + 1; exception when others then null; end;
+    begin update public.organisations set name = 'iso-test-v149' where id = org_a; get diagnostics n = row_count; k := k + n; exception when others then null; end;
+    res := res || array['20f|B (Engineer) cannot rename A''s business|' || case when k = 0 then 'PASS|refused' else 'FAIL|' || k || ' allowed' end];
+    -- 20g: B CAN name B's own (control), put back below.
+    begin
+      perform public.set_business_name(org_b, ' iso-test-v149 ');
+      execute 'reset role';
+      select count(*) into n from public.organisations where id = org_b and name = 'iso-test-v149';
+      res := res || array['20g|control: an Owner names their own business (trimmed)|' || case when n = 1 then 'PASS|' else 'FAIL|not named' end];
+    exception when others then
+      execute 'reset role';
+      res := res || array['20g|control: an Owner names their own business (trimmed)|FAIL|' || sqlerrm];
+    end;
+    perform set_config('request.jwt.claims', '', true);
+    -- 20h: everything put back — B out of A's business, names as they were.
+    delete from public.photos where id = 'iso-test-v149-p' and user_id = b;
+    delete from public.memberships where org_id = org_a and user_id = b;
+    select name into rn from public.organisations where id = org_a;
+    update public.organisations set name = coalesce(msg, '') where id = org_b;
+    select count(*) into n from public.memberships where org_id = org_a and user_id = b;
+    select count(*) into k from public.organisations where id = org_b and name is not distinct from coalesce(msg, '');
+    res := res || array['20h|B out of A''s business; A''s name untouched, B''s put back|' || case when n = 0 and k = 1 and rn is not distinct from g then 'PASS|' else 'FAIL|' || n || ' left, A''s name ' || coalesce(rn, '?') || ', B''s ' || k end];
   end if;
 
   delete from public.sessions where id like 'iso-test-%';
