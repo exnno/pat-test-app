@@ -495,6 +495,11 @@ module.exports = async function () {
     for (const c of ['20a', '20b', '20c', '20d', '20e', '20f', '20g', '20h']) t.includes(iso, `array['${c}|`, `isolation ${c}`);
     t.includes(iso, "PASS|filed under B''s own (V149)", '9b: landing in B’s own business is a PASS');
     t.includes(iso, "    update public.organisations set name = coalesce(msg, '') where id = org_b;", '20h: B’s business name put back');
+    // Check 5 fixed (Peter, 6 Nov: B comped by hand → FAIL though B was refused).
+    t.includes(iso, "  plan_try := case when plan_before = 'comped' then 'active' else 'comped' end;",
+      '5: B tries a plan DIFFERENT from its own');
+    t.includes(iso, "                || case when ok and plan_before is not null and plan_after is not distinct from plan_before\n",
+      '5: PASS = refused AND the plan unchanged from before (not “not comped”)');
 
     const aid = read('supabase/v149-test-second-business.sql');
     t.includes(aid, "insert into public.organisations (name, plan) values ('PATGo Test Team', 'comped')", 'the test aid: a comped test business');
