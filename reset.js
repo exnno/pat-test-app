@@ -144,6 +144,10 @@ const RESET_KEY_PLAN = [
   ['OWNER_STATS_KEY', OWNER_STATS_KEY, 'account'],
   // V148 (1A): the per-phone test wall (?wall) — only "Everything, as new" clears it.
   ['WALL_TEST_KEY', WALL_TEST_KEY, 'account'],
+  // V149: the account's businesses and the last one picked — they follow the
+  // account (a takeover clears both: neither is in RESET_HANDOVER_KEEP).
+  ['BUSINESSES_KEY', BUSINESSES_KEY, 'account'],
+  ['LAST_BUSINESS_KEY', LAST_BUSINESS_KEY, 'account'],
 ];
 
 // V145 (5A): what a handover KEEPS — this phone's own preferences, none of which

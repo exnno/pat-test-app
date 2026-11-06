@@ -2001,7 +2001,11 @@ function _syncRun(o) {
         })
         // V133 (4A): which phone, which version — LAST, on reading runs only,
         // and it never rejects, so it can never fail or delay a run's result.
-        .then((out) => (reads ? _syncPhoneReport(c, uid).then(() => out) : out));
+        .then((out) => (reads ? _syncPhoneReport(c, uid).then(() => out) : out))
+        // V149: the account's businesses (business.js, optional) — reading runs
+        // only, at most every BUSINESS_READ_MS, and never rejects.
+        .then((out) => (reads && typeof businessMaybeRead === 'function'
+          ? businessMaybeRead(c, uid).then(() => out, () => out) : out));
     });
     });   // V128: found.then
   }));
@@ -2071,6 +2075,14 @@ function _syncPhoneReport(c, uid) {
   });
 }
 
+// V149: the business a job names, if it is a well-formed id ('' otherwise). A
+// malformed value (an old backup, a hand edit) is never sent: the cloud column is
+// a uuid, and one bad row would fail its whole batch.
+function _syncJobBusiness(s) {
+  const v = s && typeof s.businessId === 'string' ? s.businessId : '';
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v : '';
+}
+
 function _syncPushHalf(c, uid, st, force) {
   return Promise.resolve().then(() => {
     const now = new Date().toISOString();
@@ -2100,8 +2112,13 @@ function _syncPushHalf(c, uid, st, force) {
       // favour — the cloud copy is to be overwritten even though nothing local
       // changed since the last push.
       if (!force && !st.resend[id] && st.sent[id] === hash) continue;
-      work.push({ id, hash, gone: false, bytes: json.length,
-        row: { id, user_id: uid, doc: JSON.parse(json), fp: hash, deleted: false, last_modified: now } });
+      const row = { id, user_id: uid, doc: JSON.parse(json), fp: hash, deleted: false, last_modified: now };
+      // V149: the job names its business. The database keeps it on the FIRST
+      // upload only, and only if this account belongs to it (else the default);
+      // later uploads never move it. A job with none gets the default, as before.
+      const biz = _syncJobBusiness(s);
+      if (biz) row.org_id = biz;
+      work.push({ id, hash, gone: false, bytes: json.length, row });
     }
 
     // Deletions (decision 4A): the cloud copy is emptied, and the row kept as a

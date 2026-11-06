@@ -1,4 +1,4 @@
-# PATGo — Code Map (V148)
+# PATGo — Code Map (V149)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -289,22 +289,35 @@ is discoverable from the file you happen to be editing.
     (doesn't sync), `RESET_HANDOVER_KEEP` — everything else of ours goes at a
     takeover. Harness 84.
 
+30. **A job's business (V149).** A job may carry `businessId` (business.js:
+    "For:" on New job, only for someone in 2+ businesses). sync.js sends it as
+    the row's `org_id` on upload (`_syncJobBusiness` — well-formed uuids only);
+    the DATABASE keeps it on the FIRST insert only, and only for a member
+    (supabase/v149-business-per-job.sql `org_stamp`), so no business = the
+    default, as before. ⚠ ANYTHING THAT MAKES A JOB FROM A JOB (split,
+    duplicate, a future import-into) copies `businessId`; ANYTHING THAT MOVES
+    ITEMS BETWEEN JOBS compares session.js `moveToSameBusiness` (business.js
+    `jobBusinessKey`: the default and "none" are one key) — at the pick AND at
+    the moment of moving. Changing a job's business is V150's recorded,
+    approved move — never an upload. Records and photo rows NEVER name a
+    business (harness 50d). Harness 88.
+
 ---
 
-## Load order (index.html) — 36 first-party files
+## Load order (index.html) — 37 first-party files
 
 `config` → `data` → `state` → `utils` → `icons` → `storage` → `clients` → `instruments` → `sqp`
 → `multipick` → `feedback` → `bugreport` → `photos` → `csv` → `backup`
 → `snapshots` → `reset` → `session` → `settings-actions` → `setup` → `tour` → `onboarding` → `report`
 → `pdfpreview` → `exportall` → `render-core` → `render-review` → `render-settings` → `render-help`
-→ `cloud` → `sync` → `plan` → `scanner` → `events` → `dispatch` → `boot`
+→ `cloud` → `sync` → `plan` → `business` → `scanner` → `events` → `dispatch` → `boot`
 
 ⚠ `data` → `state` is the one adjacency in this chain that is NOT a readability
 choice. `state.js` seeds `itemTypes`/`failReasons` from `DEFAULT_ITEM_TYPES` /
 `DEFAULT_FAIL_REASONS` in its top-level initialiser, which runs at load, so
 `data.js` must precede it. Harness 09h/09i, mutation M61.
 
-`sw.js` ASSETS lists **39** `.js` entries: these 36 plus 3 lazy-loaded vendored
+`sw.js` ASSETS lists **40** `.js` entries: these 37 plus 3 lazy-loaded vendored
 files (precached, not `<script>` tags): the jsPDF pair (report.js injects them)
 and `supabase.umd.js` (cloud.js injects it, v79).
 PDF.js is vendored but **not** precached (pdfpreview.js fetches it lazily).
@@ -326,7 +339,7 @@ DATA-ONLY file needs a CONSTANT probe instead — top-level `const` never attach
 to `window`, so the `requiredFns` loop cannot see it whatever name you use.
 Harness 09e/09f/09k/09l and mutations M54/M55/M64/M65 hold all of this.
 ⚠ EXCEPT an optional subsystem (rule 6): `photos.js`, `scanner.js`,
-`bugreport.js`, `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106), `exportall.js` (V125), `plan.js` (V127) are deliberately NOT probed — a probe would make a
+`bugreport.js`, `cloud.js`, `sync.js`, `snapshots.js` (V105), `reset.js` (V106), `exportall.js` (V125), `plan.js` (V127), `business.js` (V149) are deliberately NOT probed — a probe would make a
 missing optional file block boot, which is the opposite of the rule.
 
 ---
@@ -938,6 +951,10 @@ sheet's tap — after a long build the starting tap has expired (NotAllowedError
 ⚠ Cloud-only jobs/photos are never fetched (4A). Harness 63, M1032–M1060.
 
 ### session.js (~2560 ln) — sessions and items
+V149 (rule 30): `createSession` records `businessId` (business.js `businessNewJobPick`); split
+(`moveItemsToNewJob`) and duplicate (`_dupJobBuild`) copy it; Move to another job lists only
+`moveToSameBusiness` targets and re-checks at the moment of moving. setView reads the
+Business page (`businessRefresh`).
 V121: `applyTextSize` / `normaliseTextSize` sit beside `applyTheme` (rule 22). Text size is per phone like the
 theme: storage (pat:textsize), backup, setup prefs, reset row, bug-report line — never synced.
 ⚠ V104 readings check: `readingsCarry` (a PASS sheet's readings across "Change to
@@ -1454,7 +1471,10 @@ is true wherever the wall is on (5A). Readers: **render-core.js** `render()` (th
 before the view chain) and `renderSessions` (the line); **plan.js** `_planOwnerUid`;
 **boot.js** `updateSafeMoment`. Harness 87, M1637–M1660.
 
-### sync.js (~5030 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner
+### sync.js (~5040 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner, V149 job business
+⚠ V149 (rule 30): `_syncPushHalf` adds `org_id` to a job row from `_syncJobBusiness(s)`
+(well-formed uuid only — one bad value would fail the batch); records / photo rows never.
+A reading run ends with business.js `businessMaybeRead` (after the phone report; never rejects).
 ⚠ V145 (rule 29): `syncActive` and `_syncRun` (stage 'owner', before anything is
 read) refuse any account but the phone's owner. `syncOwnerPending(ownerId)`
 (section before `syncSafetyText`) counts the owner's unsent jobs / photos /
@@ -1740,6 +1760,26 @@ V148 (4A): `planRecord` falls back to `_planOwnerUid()` — the owner's record w
 **cloud.js** `cloudSignedOutOwner()` (wall on only; the test site is unchanged).
 `_planSignedOut()` turns the line's button, the Account line and the two sheets' first
 choice into Sign in (`settings-page` → cloudAccount). Harness 87d, M1652–M1655.
+
+### business.js (~330 ln) — every job knows its business — NEW V149 — OPTIONAL SUBSYSTEM
+The owner's businesses (BUSINESSES_KEY `{u, at, list}`, read via rpc `my_businesses`),
+New job's "For:" (`businessForHTML` / `businessNewJobPick`, LAST_BUSINESS_KEY — 2+ only),
+the compare key (`jobBusinessKey`, rule 30), and the Business page
+(`renderCloudBusiness`, `businessRefresh`, `businessRename` → `openNameSheet` →
+rpc `set_business_name`, Owner only).
+**Touch to:** change who is asked For:, the page's words, how often the list is read
+(BUSINESS_READ_MS), or the V150 move (Change… / approval) — it belongs here.
+**Coupling:** keys in **config.js**; sync.js calls `businessMaybeRead(c, uid)` on
+READING runs (last, never rejects) and sends `businessId` (rule 30); session.js
+`createSession` / split / `_dupJobBuild` / `moveToSameBusiness`; render-core.js draws
+For: (`${typeof businessForHTML…}`) and routes `cloudBusiness` (fallback: Account page);
+dispatch.js `nf-business` (change, no repaint), `nf-submit` reads `#nf-business`,
+`biz-refresh` / `biz-rename`; data.js catCloud + SETTINGS_PAGE_META (icon `briefcase`,
+icons.js); render-settings.js `settingsPageVisible` / subtitle (`businessRowStatus`);
+setView (session.js) reads on every open. Reset: both keys 'account'; a takeover
+clears both (not in RESET_HANDOVER_KEEP). ⚠ The list is the phone OWNER's whatever the
+sign-in (sync runs only as the owner). ⚠ `_bizRepaint` never paints under the name
+sheet. Harness 88a–88f; M1661–M1695.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

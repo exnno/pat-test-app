@@ -387,6 +387,7 @@ registerActions({
     state.newForm.name = $('nf-name').value;
     state.newForm.prefix = $('nf-prefix').value;
     state.newForm.startNo = $('nf-start').value;
+    if ($('nf-business')) state.newForm.businessId = $('nf-business').value;   // V149 (1A)
     createSession();
   },
 
@@ -836,6 +837,9 @@ registerActions({
   'plan-check': () => { if (typeof planCheckNow === 'function') planCheckNow(); },   // V143 (4A)
   // V142: paying (plan.js, optional). Each opens Stripe's window inside the tap.
   'billing-subscribe':   () => { if (typeof billingSubscribe === 'function') billingSubscribe(); },
+  // V149 (3A): the Business page (business.js, optional).
+  'biz-refresh': () => { if (typeof businessRefresh === 'function') businessRefresh(); },
+  'biz-rename': (arg) => { if (typeof businessRename === 'function') businessRename(arg); },
   'billing-manage':      () => { if (typeof billingManage === 'function') billingManage(''); },
   'billing-card':        () => { if (typeof billingManage === 'function') billingManage('card'); },
   'billing-cancel-wait': () => { if (typeof billingCancelWait === 'function') billingCancelWait(); },
@@ -1228,6 +1232,7 @@ registerInputActions({
 // render-core.js (bindSessionsListAreaEvents / bindOverviewBodyEvents).
 // ===========================================================================
 registerChangeActions({
+  'nf-business': (v) => { state.newForm.businessId = v; },   // V149 (1A): New job's "For:" — no repaint (MAP rule 3)
   'move-job-field': (v, el) => setMoveJobField(el && el.dataset ? el.dataset.arg : '', v),   // V101 (the tester picker)
   'dup-job-field': (v, el) => setDupJobField(el && el.dataset ? el.dataset.arg : '', v),     // V102 (the tester picker)
   'move-to-choice': (v, el) => setMoveToChoice(el && el.dataset ? el.dataset.arg : '', v),   // V103 (a clash card's radios)

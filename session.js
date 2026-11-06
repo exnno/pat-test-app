@@ -1180,6 +1180,11 @@ function createSession() {
     lastModified: now,
     syncedAt: null
   };
+  // V149 (1A): "For:" — only someone in two or more businesses is asked; the
+  // job records the one picked (business.js, optional). Nobody else's job
+  // changes: no businessId = the default business, as before.
+  const biz = (typeof businessNewJobPick === 'function') ? businessNewJobPick(state.newForm.businessId) : '';
+  if (biz) s.businessId = biz;
   state.sessions.unshift(s);
   state.activeId = s.id;
   state.cursor = 0;
@@ -3054,6 +3059,8 @@ function setView(v) {
   render();
   // V142: the Subscription page reads the plan on every open (plan.js, optional).
   if (v === 'cloudSubscription' && typeof billingRead === 'function') billingRead();
+  // V149 (3A): the Business page reads the account's businesses on every open.
+  if (v === 'cloudBusiness' && typeof businessRefresh === 'function') businessRefresh();
 }
 
 // ---------- Bulk-edit (v7, extended in v11) ----------
@@ -3681,6 +3688,9 @@ function moveItemsToNewJob() {
     syncedAt: null
   };
   if (sess.startPad) job.startPad = sess.startPad;
+  // V149 (1A): a job made from a job is for the same business — items never
+  // leave a business this way (V150 brings the deliberate, approved move).
+  if (sess.businessId) job.businessId = sess.businessId;
   // A frozen tester copy only means something for the tester it froze.
   if (sess.instrumentSnapshot && job.instrumentId === String(sess.instrumentId || '')) {
     job.instrumentSnapshot = JSON.parse(JSON.stringify(sess.instrumentSnapshot));
@@ -3794,9 +3804,15 @@ function _moveToSel(sess) {
 }
 
 // Every other job on this phone, newest first (date, then last change).
+// V149 (1A): only jobs of the SAME business — moving items between businesses
+// would take a team's work out of the team with no approval.
+function moveToSameBusiness(a, b) {
+  if (typeof jobBusinessKey !== 'function') return true;
+  return jobBusinessKey(a) === jobBusinessKey(b);
+}
 function moveToTargets(sess) {
   return (state.sessions || [])
-    .filter(s => s && sess && String(s.id) !== String(sess.id))
+    .filter(s => s && sess && String(s.id) !== String(sess.id) && moveToSameBusiness(s, sess))
     .slice()
     .sort((a, b) => String(b.date || '').localeCompare(String(a.date || '')) ||
       String(b.lastModified || '').localeCompare(String(a.lastModified || '')));
@@ -3811,7 +3827,12 @@ function moveToBlockReason(sess, ids) {
   if (!sess) return 'This job is no longer on this phone.';
   if (sess.locked) return 'This job is locked. Unlock it in Job settings first, then move the items.';
   if (!(ids || []).length) return 'Select the items to move first.';
-  if (!moveToTargets(sess).length) return 'There are no other jobs on this phone. Use \u201cMove to a new job\u201d instead.';
+  if (!moveToTargets(sess).length) {
+    const others = (state.sessions || []).some(s => s && String(s.id) !== String(sess.id));
+    return others
+      ? 'There are no other jobs for this business on this phone. Use \u201cMove to a new job\u201d instead.'   // V149 (1A)
+      : 'There are no other jobs on this phone. Use \u201cMove to a new job\u201d instead.';
+  }
   return '';
 }
 
@@ -4005,6 +4026,8 @@ function moveItemsToExistingJob() {
   if (sess.locked) return blocked(moveToBlockReason(sess, m.ids));
   if (!target) return blocked('The job you chose is no longer on this phone.');
   if (target.locked) return blocked(`${moveToTitle(target)} has been locked. Unlock it in Job settings first, then move the items.`);
+  // V149 (1A): never across businesses — checked again at the moment of moving.
+  if (!moveToSameBusiness(sess, target)) return blocked(`${moveToTitle(target)} is for a different business. Items can only move between jobs of the same business.`);
   const changed = 'One of the jobs changed while you were choosing. Check the items and try again.';
   if (_moveJobItems(sess, m.ids).length !== m.ids.length) return blocked(changed);
   const now0 = moveToClashes(sess, target, m.ids).map(c => c.id + '>' + c.with).join(',');
@@ -4337,6 +4360,7 @@ function _dupJobBuild(m, src, jobId, items) {
     syncedAt: null
   };
   if (src.startPad) job.startPad = src.startPad;
+  if (src.businessId) job.businessId = src.businessId;   // V149 (1A): the copy is the same business's
   if (src.instrumentSnapshot && job.instrumentId === String(src.instrumentId || '')) {
     job.instrumentSnapshot = JSON.parse(JSON.stringify(src.instrumentSnapshot));
   }

@@ -103,6 +103,10 @@
        After sync.js, which must follow cloud.js directly (16n);
        plan.js only asks cloud.js who is signed in, at run time. -->
   <script src="plan.js"></script>
+  <!-- V149: every job knows its business — New job's "For:", the Business page.
+       Optional subsystem (MAP rule 6): every call into it is typeof-guarded;
+       without it a job names no business and gets the default, as V148 did. -->
+  <script src="business.js"></script>
   <!-- v65: HID barcode scanner. Placed with the other input-handling files and
        AFTER the render files, because a scan writes into fields those render —
        and before events.js/dispatch.js purely so the three document-level

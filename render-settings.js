@@ -135,6 +135,10 @@ function settingsPageSubtitle(pageId) {
         return toSend > 0 ? `${toSend} to send` : 'Up to date';
       } catch { return ''; }
     }
+    case 'cloudBusiness': {   // V149 (3A): business.js, optional
+      if (!state.cloud || state.cloud.status !== 'signed-in') return 'Sign in first';
+      try { return (typeof businessRowStatus === 'function' && businessRowStatus()) || 'Your business'; } catch { return 'Your business'; }
+    }
     case 'cloudSubscription': {   // V142: the plan (plan.js, optional)
       if (!state.cloud || state.cloud.status !== 'signed-in') return 'Sign in first';
       try { return (typeof billingRowStatus === 'function' && billingRowStatus()) || 'Your plan'; } catch { return 'Your plan'; }
@@ -196,6 +200,8 @@ function settingsPageVisible(pageId) {
   if (pageId === 'cloudStorage') {
     return typeof syncActive === 'function' && syncActive() && typeof renderCloudStorage === 'function';
   }
+  // V149 (3A): the Business page lives in business.js, an optional subsystem.
+  if (pageId === 'cloudBusiness') return typeof renderCloudBusiness === 'function';
   // V106: Reset This Phone lives in reset.js, an optional subsystem (MAP rule 6).
   if (pageId === 'settingsReset') return typeof renderSettingsReset === 'function';
   return !!SETTINGS_PAGE_META[pageId];

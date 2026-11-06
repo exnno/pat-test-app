@@ -102,8 +102,8 @@ const BUG_REPORT_REPRO_DEFAULT = 'unsure';
 // A group with ONE visible page opens that page straight from the hub
 // (settings-actions.js settingsOpenCategory) — no one-row list in between.
 const SETTINGS_CATEGORIES = [
-  { id: 'catCloud',   icon: 'cloud', title: 'Account & Sync', blurb: 'Your account, syncing between phones, and your subscription',
-    pages: ['cloudAccount', 'cloudSync', 'cloudSubscription'] },
+  { id: 'catCloud',   icon: 'cloud', title: 'Account & Sync', blurb: 'Your account and business, syncing between phones, and your subscription',
+    pages: ['cloudAccount', 'cloudBusiness', 'cloudSync', 'cloudSubscription'] },   // V149 (3A): + Business
   { id: 'catUser',    icon: 'user', title: 'Engineer & Tester', blurb: 'Your name and your test instruments',
     pages: ['settingsUser'] },
   { id: 'catTesting', icon: 'zap', title: 'Logging', blurb: 'Quick Pick, fail reasons, descriptions and the tools you use while testing',
@@ -172,7 +172,8 @@ const SETTINGS_PAGE_META = {
   // v85: the Cloud group (searchable only once unlocked — see catCloud above).
   cloudAccount:        { icon: 'user', title: 'Account',               aliases: 'cloud account sign in sign out email login' },
   cloudSync:           { icon: 'refresh-cw', title: 'Sync',                  aliases: 'cloud sync upload send devices phones check for updates' },
-  cloudSubscription:   { icon: 'credit-card', title: 'Subscription',          aliases: 'cloud subscription plan trial billing' }
+  cloudSubscription:   { icon: 'credit-card', title: 'Subscription',          aliases: 'cloud subscription plan trial billing' },
+  cloudBusiness:       { icon: 'briefcase', title: 'Business',              aliases: 'business company team organisation organization owner role name rename for whose jobs employer subcontract' }   // V149 (3A)
 };
 
 

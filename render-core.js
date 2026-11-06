@@ -212,10 +212,12 @@ function render() {
   // v85: the cloud pages live in Settings → Cloud. While this phone is not
   // unlocked they are never painted — any route in (a stale view) gets the
   // Cloud group's access-code box instead. Without cloud.js that is every time.
-  else if (v === 'cloudAccount' || v === 'cloudSync' || v === 'cloudSubscription') {
+  else if (v === 'cloudAccount' || v === 'cloudSync' || v === 'cloudSubscription' || v === 'cloudBusiness') {
     if (typeof cloudPagesUnlocked === 'function' && cloudPagesUnlocked()) {
       html = v === 'cloudAccount' ? renderCloudAccount()
            : v === 'cloudSync'    ? renderCloudSync()
+           : v === 'cloudBusiness'   // V149 (3A): business.js, optional
+             ? (typeof renderCloudBusiness === 'function' ? renderCloudBusiness() : renderCloudAccount())
            : renderCloudSubscription();
     } else {
       html = renderCloudLocked();
@@ -284,7 +286,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Renumber asset numbers.</strong> Started a new roll of stickers and forgot to tell the app? Tap an item on the Overview and choose &ldquo;Renumber from here&rdquo;, or select items and use Edit selected &rarr; Renumber. Type the first new number, check the list, done &mdash; and Undo is there for a few seconds if it&rsquo;s wrong.</li>
+        <li><strong>Your business.</strong> Signed in to a PATGo account? Settings &rarr; Account &amp; Sync &rarr; Business shows the business your jobs belong to, and if it&rsquo;s yours you can give it a name. Getting ready for teams: anyone who works for more than one business will be asked which one each new job is for.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -884,6 +886,7 @@ function renderSessions() {
   const newForm = state.newForm.show ? `
     <div class="card">
       <h2 class="h2" id="nf-title" tabindex="-1">New job</h2>
+      ${typeof businessForHTML === 'function' ? businessForHTML() : ''}
       <label class="label">Client <span class="hint">(optional)</span></label>
       <div class="nf-input-wrap" id="nf-client-wrap">
         <input aria-label="Client (optional)" class="input" id="nf-client" value="${escapeHTML(state.newForm.clientId)}" placeholder="e.g. Acme Ltd" autocomplete="off">

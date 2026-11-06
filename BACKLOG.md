@@ -8,32 +8,48 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V149
+V149 = every job knows its business (Peter 2 and 5 Nov: 0A 1A 2A 3A 4A 5A 6A — 0A split
+the locked V149 in two). business.js (NEW, optional): the owner's businesses
+(BUSINESSES_KEY, rpc my_businesses), For: on New job (2+ only, last used —
+LAST_BUSINESS_KEY), the Business page (Owner names it, rpc set_business_name).
+sync.js sends a job's businessId as org_id on upload; session.js: split / duplicate keep
+it, Move to another job only within one business. SQL supabase/v149-business-per-job.sql
+(+ the test aid and its undo); isolation 20a–20h (+ V113's seed and 9b adjusted).
+Harness 88 + M1661–M1695; 87e's release checks → 88e.
+**Next: V150 — Change… (the move) and the minimum app version** (locked 5 Nov):
+- Job settings "Business: X · Change…" — your own job, unlocked, no certificate number,
+  member of both; recorded (who, when, from → to); photos move with the job. Out of a
+  team business it waits for approval (2A): the Owner of the business it is leaving moves
+  without asking; Team leader, Office and Engineer need someone ELSE (Owner / Team leader
+  / Office) to approve — the job stays put, "Move to X waiting for approval". V150 = the
+  request + the database rule; the Approve / Refuse screen comes with invites.
+  ⚠ The database is the truth for a job's business from V150: the move rewrites org_id
+  (an rpc, never an upload — org_stamp still refuses an upload's change) and the phone
+  must READ the column back (today a job's `businessId` lives in its doc; a membership
+  lost between choosing and uploading files the job under the default while the doc
+  still names the other — reconcile from the column).
+- The minimum app version: below it a phone stops syncing and says "Update PATGo to keep
+  working with your team"; invites refused while any phone in the business, used in the
+  last 60 days (5A), is below it (phones table, V133).
+Then invites + roles (with the Approve screen), shared client lists per business,
+certificate branding / numbering per business, … (roadmap Stage 16).
+**PATGuard import (Peter's spec in the project, 2 Nov)** — after Teams, before charging.
+
+### V149 residuals (known, accepted)
+- A job's business lives in the job (`businessId`, synced in its doc) AND in the cloud
+  column; the column wins. They differ only if the person left the business between New
+  job and the first upload (the database files it under the default) — V150 reads the
+  column back.
+- Nobody is in two businesses until invites exist; For: is proved with the test aid
+  (supabase/v149-test-second-business.sql) only.
+- The Business page shows what the phone last read when there's no signal (said on the page).
+- Clients, sites and presets are the default business's (4A) — a team job's client is
+  still in the engineer's own list until shared lists per business.
+
 ### Next after V148
 V148 = the launch switch, built and dormant (Peter 2 Nov: 1A 2A 3A 4A 5A, all defaults).
-config.js (REQUIRE_ACCOUNT per environment, WALL_TEST_KEY), cloud.js (cloudWallOn /
-cloudWallShows / cloudSignedOutOwner, ?wall, the Jobs line, the wall's buttons),
-render-help.js (renderAccountWall; the Account page's cards taken out unchanged into
-cloudPasswordFormHTML / cloudSignedOutCardsHTML), render-core.js (the wall in render();
-updateBannerHTML), plan.js (the owner's plan where the wall is on; Sign in),
-boot.js (safe moment), reset.js, state.js, dispatch.js, styles.css, sw.js. Harness 87 +
-M1637–M1660; 86e's release checks → 87e; stubs take `search`.
-**New order (Peter, 2 Nov): Teams v1 and v2 back to back, BEFORE launch.**
-**Next: V149 — every job knows its business** (locked 2 Nov: 0A 1A 2A 3A 4A):
-the job carries its business, sent by the phone, the database accepting only one you
-belong to (default for old phones); "For: [business]" on New job, shown only to someone
-in two or more, starting on the last used (1A); Job settings "Business: X · Change…" —
-your own job, unlocked, no certificate number, recorded; a move OUT of a team business
-waits for that business's Owner / Team leader / Office to approve (2A + Peter's approval
-step — the Approve screen comes with the invite/team-admin release); a Business page,
-the Owner names it, pre-filled from the Company name (3A); a server minimum app version —
-below it a phone stops syncing and says update; invites refused while any phone in the
-business is below it (4A). One SQL file. 0A: push notifications and the tablet layout
-stay after launch (v2's assigned jobs arrive at the next sync; Office edits at phone size).
-Then the rest of Teams (roadmap Stage 16/17, re-sequenced). Team leader and Office can
-invite (Peter). Launch = the production move (Pro project — Peter holding off for now)
-+ a small config release, whenever chosen; the wall then bites by itself.
-**PATGuard import (Peter's spec in the project, 2 Nov)** — a launch tool, after Teams,
-before charging; needs one anonymised PATGuard CSV export first; Phase 2 (GAR/SSS) parked.
+(The rest moved to Next after V149.)
 
 ### V148 residuals (known, accepted)
 - A signed-out owner whose plan was NEVER read has no record, so no lock or 30-day hold

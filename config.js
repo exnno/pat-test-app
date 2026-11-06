@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V148';
+const APP_VERSION = 'V149';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -133,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V147';
+const WELCOME_VERSION = 'V149';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -414,6 +414,19 @@ const CLOUD_SIGNOUT_SYNC_MS = 20000;
 // setup export (a restore must not carry one account's plan to another phone).
 // Reset this phone: 'account'.
 const PLAN_KEY = 'pat:plan';
+
+// ---- V149: every job knows its business (business.js) ----------------------
+// BUSINESSES_KEY: the owner's businesses as last read from the cloud
+// (my_businesses), so New job's "For:" works offline. Shape (business.js
+// businessLoad): { u: uid, at: ms, list: [{ id, name, role, def, n }] }. Per
+// device, NEVER in a backup or setup export; it follows the account: Reset
+// 'account', and a takeover (V145) clears it. LAST_BUSINESS_KEY: the business
+// this phone's last new job was for (1A — "starting on the last used"), per phone.
+const BUSINESSES_KEY = 'pat:businesses';
+const LAST_BUSINESS_KEY = 'pat:lastBusiness';
+// How often a sync run re-reads the list (a reading run; fail-soft). The
+// Business page reads on every open.
+const BUSINESS_READ_MS = 6 * 60 * 60 * 1000;
 // 3A: the account keeps everything for this many days after the trial (or the
 // plan) ends. 4A: the Jobs list says when the trial ends from this many days out.
 // ⚠ The SERVER's refusal (supabase/v143-enforcement.sql, can_upload) is set at
