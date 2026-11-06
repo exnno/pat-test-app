@@ -1,4 +1,4 @@
-# PATGo — Code Map (V149)
+# PATGo — Code Map (V150)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -301,6 +301,13 @@ is discoverable from the file you happen to be editing.
     the moment of moving. Changing a job's business is V150's recorded,
     approved move — never an upload. Records and photo rows NEVER name a
     business (harness 50d). Harness 88.
+    V150: the CLOUD'S COLUMN IS THE TRUTH. The move is rpc `move_job` (the only
+    thing that changes org_id after insert — supabase/v150-business-move.sql);
+    the pull lists each job's `org:org_id` and business.js
+    `businessReconcileJobs` rewrites `businessId` in place (held jobs skipped).
+    ⚠ businessId changes IN PLACE on jobs that aren't open — storage.js
+    `_sessionSig` carries it, or the saved copy is reused and the change is
+    lost on reload (found building V150). Harness 89.
 
 ---
 
@@ -1246,7 +1253,8 @@ Overview (+ `computeVisibleOverviewItems`, `renderOverviewBodyHTML`,
 Reminders, the Reports hub, and the shared photo-evidence markup
 (`renderFailPhotoStripInner`, `renderPhotoStripSheet`).
 **Touch to:** change the Overview, edit-session, retest reminders or reports
-screens, or the fail-sheet/overview photo strip.
+screens, or the fail-sheet/overview photo strip. (V150: Job settings draws
+business.js's Business card and Change… sheet — the logic and words live there.)
 **Coupling:** reached only through `render()`'s dispatcher — NOT through the
 dispatch.js ACTIONS table, so 09d's generic guard is blind to these; 09m–09q
 cover them instead. `dispatch.js` calls `refreshOverviewBody()` /
@@ -1475,6 +1483,10 @@ before the view chain) and `renderSessions` (the line); **plan.js** `_planOwnerU
 ⚠ V149 (rule 30): `_syncPushHalf` adds `org_id` to a job row from `_syncJobBusiness(s)`
 (well-formed uuid only — one bad value would fail the batch); records / photo rows never.
 A reading run ends with business.js `businessMaybeRead` (after the phone report; never rejects).
+⚠ V150 (rule 30): `_SYNC_JOB_LIST_COLS` reads `org:org_id`; `_syncPull` collects it per listed
+job (`orgs`) and, after the pages, calls `businessReconcileJobs(orgs, uid)` (held jobs removed
+first); a change sets `changed`, so the push half sends the corrected doc. The resume
+(visibilitychange) listener calls `businessReadOwe()` before its reading run.
 ⚠ V145 (rule 29): `syncActive` and `_syncRun` (stage 'owner', before anything is
 read) refuse any account but the phone's owner. `syncOwnerPending(ownerId)`
 (section before `syncSafetyText`) counts the owner's unsent jobs / photos /
@@ -1761,7 +1773,7 @@ V148 (4A): `planRecord` falls back to `_planOwnerUid()` — the owner's record w
 `_planSignedOut()` turns the line's button, the Account line and the two sheets' first
 choice into Sign in (`settings-page` → cloudAccount). Harness 87d, M1652–M1655.
 
-### business.js (~330 ln) — every job knows its business — NEW V149 — OPTIONAL SUBSYSTEM
+### business.js (~760 ln) — every job knows its business; V150 moving one — NEW V149 — OPTIONAL SUBSYSTEM
 The owner's businesses (BUSINESSES_KEY `{u, at, list}`, read via rpc `my_businesses`),
 New job's "For:" (`businessForHTML` / `businessNewJobPick`, LAST_BUSINESS_KEY — 2+ only),
 the compare key (`jobBusinessKey`, rule 30), and the Business page
@@ -1780,6 +1792,18 @@ setView (session.js) reads on every open. Reset: both keys 'account'; a takeover
 clears both (not in RESET_HANDOVER_KEEP). ⚠ The list is the phone OWNER's whatever the
 sign-in (sync runs only as the owner). ⚠ `_bizRepaint` never paints under the name
 sheet. Harness 88a–88f; M1661–M1695.
+V150 (second half of the file): the list is OWED on every start and return to the front
+(`_bizReadOwed`, `businessReadOwe`); `businessRead` also reads rpc `my_job_moves` →
+JOB_MOVES_KEY (`businessMovesLoad` / `businessMoveFor`, then `businessMovesSweep` drops a
+waiting request whose job is locked / certified); `businessReconcileJobs` (rule 30);
+Job settings' card (`businessJobCardHTML`, drawn by render-review.js `renderEditSession`)
+and the Change… sheet (state.bizMove — `businessMoveOpen/Pick/Back/Go/Close`,
+`renderBusinessMoveSheet`; buttons only, so it renders itself) → rpc `move_job`
+('moved' | 'waiting'; `patgo_move_gone` = not in the cloud → changes here only);
+Cancel request → rpc `cancel_job_move`. **Coupling:** dispatch.js `biz-move-*` and
+`edit-session` (→ `businessJobSettingsOpened`); session.js setView clears state.bizMove;
+state.js declares it; reset.js JOB_MOVES_KEY 'account'; storage.js `_sessionSig`
+(businessId). Harness 89a–89f; M1697–M1736.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

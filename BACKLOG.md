@@ -8,6 +8,37 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V150
+V150 = moving a job to another business (Peter 5–6 Nov: 0A 1A 2A 3A 4A). business.js:
+the list owed on every start / return to the front; Job settings' Business card and
+Change… sheet → rpc move_job (moved at once out of a business you own; a waiting request
+out of a team — 2A); Cancel request; JOB_MOVES_KEY from rpc my_job_moves (the line, 1A);
+a waiting request dropped if its job is locked / certified; businessReconcileJobs — the
+cloud's org_id wins (3A). sync.js reads org:org_id on the job list. storage.js
+_sessionSig carries businessId. SQL supabase/v150-business-move.sql (+ the test aid
+v150-test-decide-move.sql; the V149 undo clears the test team's records). Isolation
+21a–21h. Harness 89 + M1697–M1736; 88e's release checks → 89e.
+**Next (model: Opus — database rules + security): invites + roles with the Approve /
+Refuse screen** (decide_job_move is already there for it), then the minimum app version
+(moved here by 0A: below it a phone stops syncing and says "Update PATGo to keep working
+with your team"; invites refused while any phone in the business used in the last 60
+days is below it — 5A), shared client lists per business, certificate branding /
+numbering per business, … (roadmap Stage 16).
+
+### V150 residuals (known, accepted)
+- Nobody can approve from a phone until invites (4A): the test aid does it by hand.
+- A waiting request is only seen by its asker — the approvers' list comes with the
+  Approve screen (the database already lets Owner / Team leader / Office read it).
+- A job locked while its request waits is dropped at the asker's next read (start,
+  return, Job settings) or by the database at approval once the lock has uploaded —
+  whichever is first; in between the request still shows as waiting.
+- The cloud's business wins quietly (3A): a job moved by an approval elsewhere just
+  shows its new business on Job settings; no note.
+- Moving the job's photos changes their rows' updated_at, so other phones re-read those
+  rows once (metadata only — no image is downloaded).
+- Re-running supabase/v149-business-per-job.sql after V150 would put back V149's stamp
+  and every move would fail ("the move did not take"); isolation 21a names it.
+
 ### Next after V149
 V149 = every job knows its business (Peter 2 and 5 Nov: 0A 1A 2A 3A 4A 5A 6A — 0A split
 the locked V149 in two). business.js (NEW, optional): the owner's businesses

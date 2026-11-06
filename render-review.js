@@ -777,6 +777,9 @@ function renderEditSession() {
           <button class="btn-primary" id="ef-save" data-action="edit-save">Save</button>
         </div>
       </div>
+      <!-- V150: the job's business and Change… — only for someone in 2+ businesses
+           (or a job with a move on record). Outside the form, like Duplicate. -->
+      ${typeof businessJobCardHTML === 'function' ? businessJobCardHTML(sess) : ''}
       <!-- V102 (1B): below Save/Cancel, so it never reads as part of the form. -->
       <div class="card dup-job-card">
         <button class="btn-secondary dup-job-open" id="ef-dup-btn" data-action="dup-job-open">Duplicate this job\u2026</button>
@@ -785,6 +788,7 @@ function renderEditSession() {
       </div>
     </div>
     ${renderDupJobSheet(sess)}
+    ${typeof renderBusinessMoveSheet === 'function' ? renderBusinessMoveSheet(sess) : ''}
   `;
 }
 

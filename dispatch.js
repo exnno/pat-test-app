@@ -514,7 +514,11 @@ registerActions({
   },
   'export-current': () => { const s = activeSession(); if (s) shareOrDownloadCSV(s); },
   'copy-current': () => { const s = activeSession(); if (s) copyCSV(s); },   // v37.1
-  'edit-session': () => startEditSession(),
+  'edit-session': () => {
+    startEditSession();
+    // V150: a waiting move's line is re-read (business.js, optional).
+    if (typeof businessJobSettingsOpened === 'function') businessJobSettingsOpened();
+  },
   'enter-selection': () => enterSelectionMode(),
   'cancel-selection': () => { exitSelectionMode(); render(); },
   'select-all-visible': () => selectAllVisible(),
@@ -840,6 +844,13 @@ registerActions({
   // V149 (3A): the Business page (business.js, optional).
   'biz-refresh': () => { if (typeof businessRefresh === 'function') businessRefresh(); },
   'biz-rename': (arg) => { if (typeof businessRename === 'function') businessRename(arg); },
+  // V150: Job settings → Business → Change… (business.js, optional).
+  'biz-move-open': () => { if (typeof businessMoveOpen === 'function') businessMoveOpen(); },
+  'biz-move-close': () => { if (typeof businessMoveClose === 'function') businessMoveClose(); },
+  'biz-move-pick': (arg) => { if (typeof businessMovePick === 'function') businessMovePick(arg); },
+  'biz-move-back': () => { if (typeof businessMoveBack === 'function') businessMoveBack(); },
+  'biz-move-go': () => { if (typeof businessMoveGo === 'function') businessMoveGo(); },
+  'biz-move-cancel': (arg) => { if (typeof businessMoveCancel === 'function') businessMoveCancel(arg); },
   'billing-manage':      () => { if (typeof billingManage === 'function') billingManage(''); },
   'billing-card':        () => { if (typeof billingManage === 'function') billingManage('card'); },
   'billing-cancel-wait': () => { if (typeof billingCancelWait === 'function') billingCancelWait(); },

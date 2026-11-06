@@ -74,6 +74,9 @@ let state = {
   // pre-filled pair), name, date, engineer, instrumentId, prefix, error, failed
   // (cloud photos that couldn't be fetched), skipCloud, why }.
   dupJob: null,
+  // V150: Job settings' Change… sheet (business.js) — null, or { job, step: 'pick'|
+  // 'confirm'|'working'|'blocked', to (business id), why }.
+  bizMove: null,
   failModalStage: 'reasons',
   failOtherText: '',
 

@@ -944,7 +944,9 @@ function _syncValidDoc(doc, id) {
 // this phone hasn't got comes down — its date and its retest reminder — picked
 // out of the doc by the database (~40 bytes), never the doc itself.
 const _SYNC_JOB_PICKS = 'date:doc->>date,rt:doc->>retestTrack,rm:doc->>retestMonths,rc:doc->retestContact->>status';
-const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,' + _SYNC_JOB_PICKS;
+// V150 (3A): and the job's business (org_id, ~40 bytes) — the cloud's answer,
+// which wins over the job's own businessId (business.js businessReconcileJobs).
+const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS;
 const _SYNC_JOB_DOC_COLS = 'id,doc,fp,deleted,updated_at';
 
 // ---- V93: which jobs belong on this phone (1A, 2A — R21, R22) -------------------
@@ -1073,6 +1075,9 @@ function syncBoot() {
   try {
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'hidden') return;
+      // V150: back at the front → the reading run below re-reads the person's
+      // businesses whatever BUSINESS_READ_MS says (business.js, optional).
+      if (typeof businessReadOwe === 'function') businessReadOwe();
       syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true });
     });
   } catch { /* no document events: the save trigger still works */ }
@@ -1247,6 +1252,8 @@ function _syncPull(c, uid, st, out, chk) {
   // V101 (8A): the jobs items moved TO, fetched for this page by docsFor (id →
   // row with doc), so a moved-out job never leaves its items on no job here.
   let destRows = new Map();
+  // V150 (3A): each listed job's business, as the cloud has it (id → org_id).
+  const orgs = {};
 
   function decide(row) {
     const id = String(row && row.id != null ? row.id : '');
@@ -1519,6 +1526,7 @@ function _syncPull(c, uid, st, out, chk) {
           for (const row of rows) {
             const u = row && row.updated_at;
             const key = String(row && row.id) + '|' + String(u);
+            if (row && row.id != null && typeof row.org === 'string') orgs[String(row.id)] = row.org;   // V150
             if (!seen.has(key)) {
               seen.add(key);
               const id = String(row && row.id != null ? row.id : '');
@@ -1565,6 +1573,15 @@ function _syncPull(c, uid, st, out, chk) {
     const onPhone = new Set((state.sessions || []).map(s => String(s && s.id)));
     for (const k of Object.keys(st.conf)) if (!onPhone.has(k)) delete st.conf[k];
     _syncSave(st);
+    // V150 (3A): the cloud's business column wins — quietly (business.js,
+    // optional). A held job waits for its question; the corrected job goes up in
+    // this run's push half (an upload never moves the column: org_stamp).
+    if (typeof businessReconcileJobs === 'function') {
+      try {
+        for (const e of _syncHeldLoad()) if (e && e.kind === 'session') delete orgs[String(e.id)];
+        if (businessReconcileJobs(orgs, uid) > 0) changed = true;
+      } catch (e) { console.error('Sync: business not read back this time (non-fatal).', e); }
+    }
     if (changed) {
       // A new array reference busts activeSession()'s memo (session.js), which
       // validates on the array identity. Individual session objects keep their

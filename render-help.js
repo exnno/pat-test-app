@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V149: rolled forward — V149 on top, V146 dropped. -->
+      <!-- v8: rolling 3-version changelog. V150: rolled forward — V150 on top, V147 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V150</strong> &middot; November 2026</p>
+        <p class="muted">Move a job to another business: Job settings &rarr; Business &rarr; Change&hellip;, for anyone who works for more than one. Leaving a team&rsquo;s business waits for someone there to approve, and every move is recorded.</p>
         <p><strong>V149</strong> &middot; November 2026</p>
         <p class="muted">Every job now knows which business it belongs to. Settings &rarr; Account &amp; Sync &rarr; Business shows yours, and its owner can name it. Someone who works for more than one business is asked which one on New job.</p>
         <p><strong>V148</strong> &middot; November 2026</p>
         <p class="muted">Behind the scenes: PATGo is ready to ask for an account when it launches. Nothing changes on this phone today.</p>
-        <p><strong>V147</strong> &middot; October 2026</p>
-        <p class="muted">Renumber asset numbers when a new roll of stickers starts: &ldquo;Renumber from here&rdquo; on an item, or Edit selected &rarr; Renumber on the Overview. You check the new numbers before they change, and can undo straight after.</p>
 
 
 
@@ -156,7 +156,7 @@ const GLOSSARY_GROUPS = [
   {
     title: 'Jobs, clients & sites',
     terms: [
-      ['Business', 'Who a job is done for. Everyone has their own business; someone who also works for a team belongs to that business too, and New job asks which one each job is for. See Settings \u2192 Account & Sync \u2192 Business.'],
+      ['Business', 'Who a job is done for. Everyone has their own business; someone who also works for a team belongs to that business too, and New job asks which one each job is for; Job settings \u2192 Change\u2026 moves a job later. See Settings \u2192 Account & Sync \u2192 Business.'],
       ['Job', 'One visit to one site. Everything you test on that visit sits inside it. A job is the thing you export, report on and back up. Its own settings are under Job settings. Earlier versions called this a session.'],
       ['Client', 'The company you are working for. One client can have several sites.'],
       ['Site', 'The building or address you are testing at. A site can sit under a client, or stand on its own if you have not assigned it to one.'],

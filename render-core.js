@@ -286,7 +286,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Your business.</strong> Signed in to a PATGo account? Settings &rarr; Account &amp; Sync &rarr; Business shows the business your jobs belong to, and if it&rsquo;s yours you can give it a name. Getting ready for teams: anyone who works for more than one business will be asked which one each new job is for.</li>
+        <li><strong>Move a job to another business.</strong> For anyone who works for more than one business: Job settings now shows which business a job belongs to, with Change&hellip; to move it. Leaving a team&rsquo;s business needs someone there to approve, and every move is recorded. Working for just one business? Nothing changes.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

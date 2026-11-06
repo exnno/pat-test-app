@@ -148,6 +148,8 @@ const RESET_KEY_PLAN = [
   // account (a takeover clears both: neither is in RESET_HANDOVER_KEEP).
   ['BUSINESSES_KEY', BUSINESSES_KEY, 'account'],
   ['LAST_BUSINESS_KEY', LAST_BUSINESS_KEY, 'account'],
+  // V150: the moves Job settings shows follow the account too.
+  ['JOB_MOVES_KEY', JOB_MOVES_KEY, 'account'],
 ];
 
 // V145 (5A): what a handover KEEPS — this phone's own preferences, none of which

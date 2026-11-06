@@ -183,7 +183,10 @@ function _sessionSig(s) {
     // V101: what moved out of the job (and where) — written with the items.
     (s.movedOut && typeof s.movedOut === 'object') ? Object.keys(s.movedOut).length : 0,
     (s.items ? s.items.length : 0),
-    s.instrumentId || '', s.instrumentSnapshot ? 1 : 0
+    s.instrumentId || '', s.instrumentSnapshot ? 1 : 0,
+    // V150: a job's business changes in place (Change…, and the cloud's answer
+    // read back by sync) — usually on a job that is not the open one.
+    s.businessId || ''
   ].join('\u0001');
 }
 

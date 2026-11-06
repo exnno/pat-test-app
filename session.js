@@ -3035,6 +3035,7 @@ function setView(v) {
   // harmlessly.
   state.siteNotesSheet = null;   // V98: the Overview's site-notes sheet
   state.dupJob = null;           // V102: the Duplicate sheet (a copy under way still finishes)
+  state.bizMove = null;          // V150: Job settings' Change… sheet (a move under way still finishes)
   // V99: leaving the screen closes the map pin sheet and forgets the reload note.
   if (state.mapPinSheet) { state.mapPinSheet = null; _mapPinForgetOpen(); }
   // V100: the replayed 100 moment and "PATGo tests itself" belong to About.
