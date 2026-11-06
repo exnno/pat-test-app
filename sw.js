@@ -10,7 +10,7 @@
 // when app files are added or removed). The cache key is what pulls a new build
 // onto already-installed PWAs; shipping without bumping it strands users on the
 // old version served from cache.
-const CACHE_VERSION = 'pat-v148';
+const CACHE_VERSION = 'pat-v149';
 const ASSETS = [
   './',
   './index.html',
@@ -56,6 +56,7 @@ const ASSETS = [
   './supabase.umd.js',
   './sync.js',           // v80
   './plan.js',           // V127
+  './business.js',       // V149
   './scanner.js',
   './events.js',
   './dispatch.js',
