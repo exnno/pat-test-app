@@ -46,7 +46,7 @@ declare
   email_a text := 'CHANGE-ME-A@example.com';   -- ← account A (e.g. your own)
   email_b text := 'CHANGE-ME-B@example.com';   -- ← account B (a second address)
   a uuid; b uuid;
-  n int; ok boolean; msg text; plan_after text;
+  n int; ok boolean; msg text; plan_after text; plan_before text; plan_try text;
   j bigint; k int;   -- V108 (8d)
   real_a text;   -- V88: one real photo file of A's, if there is one
   thumb_a text;  -- V89: one real preview file of A's, if there is one
@@ -296,8 +296,13 @@ begin
   end;
 
   -- 5. B cannot change B's own plan (no update route on profiles at all).
+  -- V149 fix (Peter, 6 Nov): B's plan is read FIRST and B tries a DIFFERENT one
+  -- (comped, or active if B is already comped). Before, the check tried comped
+  -- and failed whenever B was comped all along — a refusal looked like a leak.
+  select plan into plan_before from public.profiles where id = b;   -- as B: B may read its own
+  plan_try := case when plan_before = 'comped' then 'active' else 'comped' end;
   begin
-    update public.profiles set plan = 'comped' where id = b;
+    update public.profiles set plan = plan_try where id = b;
     get diagnostics n = row_count;
     ok := (n = 0); msg := n || ' row(s) affected';
   exception when others then
@@ -345,8 +350,10 @@ begin
   end if;
   select plan into plan_after from public.profiles where id = b;
   res := res || array['5|B cannot change own plan|'
-                || case when ok and coalesce(plan_after,'') <> 'comped'
-                        then 'PASS|' || msg else 'FAIL|' || msg || ', plan now ' || coalesce(plan_after,'(no profile)') end];
+                || case when ok and plan_before is not null and plan_after is not distinct from plan_before
+                        then 'PASS|' || msg || ' (tried ' || plan_try || ', still ' || plan_before || ')'
+                        else 'FAIL|' || msg || ', tried ' || coalesce(plan_try, '?') || ', was '
+                             || coalesce(plan_before, '(no profile)') || ', now ' || coalesce(plan_after, '(no profile)') end];
 
   select doc->>'owner' into msg from public.sessions where id = 'iso-test-A';
   res := res || array['3b|A''s session content untouched|'
