@@ -370,6 +370,17 @@ bug; leaving it red trains everyone to ignore the suite.
   (4) Each new mutation was probed against group 87 alone: every one fails the
   sub-group its hint names (some also its neighbours — ?wall is how they all
   switch the wall on).
+  V149 (group 88): every job knows its business. (1) A New job opened from the
+  entry screen draws the entry screen — `setView('sessions')` before tapping
+  `new-session`, or the form's ids are stale ones from an earlier paint and the
+  test reads the wrong screen (88b found this on itself). (2) A save path with two
+  guards (the name sheet trims, and so does `businessSaveName`) needs a test that
+  calls the inner one directly — M1684 survived until 88e did. (3) The SQL's
+  TEXT is 88f; whether it WORKS is the migration's B1–B5 and isolation 20a–20h,
+  run at V149 against a local Postgres 16 stand-in (Supabase's auth / storage /
+  cron schemas stubbed), where six broken copies of the migration were each
+  caught. (4) Each new mutation was probed against the groups its hint names
+  alone: all 35 fail their own sub-group.
 
 ---
 

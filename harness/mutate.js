@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V148';",
-    to:   "const APP_VERSION = 'V147';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V149';",
+    to:   "const APP_VERSION = 'V148';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148).
-    from: '        <p><strong>V146</strong> &middot; October 2026</p>',
-    to:   '        <p><strong>V144</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V145</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 86e)',
+    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149).
+    from: '        <p><strong>V147</strong> &middot; October 2026</p>',   // V149: V146 rolled off — the oldest is V147
+    to:   '        <p><strong>V145</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V146</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 88e)',
   },
 
   {
@@ -4507,8 +4507,8 @@ const MUTATIONS = [
   {
     name: "M622 (V103) the picker offers the job itself",
     file: "session.js",
-    from: "    .filter(s => s && sess && String(s.id) !== String(sess.id))\n",
-    to:   "    .filter(s => s && sess)\n",
+    from: "    .filter(s => s && sess && String(s.id) !== String(sess.id) && moveToSameBusiness(s, sess))\n",   // V149: re-anchored (+ the business)
+    to:   "    .filter(s => s && sess && moveToSameBusiness(s, sess))\n",
     why:  "moving a job's items into itself (40a)",
   },
   {
@@ -5988,8 +5988,9 @@ const MUTATIONS = [
   {
     name: "M833 (V113) the isolation test leaves B in A's business",
     file: "supabase/isolation-test.sql",
-    from: "    delete from public.memberships where org_id = org_a and user_id = b;\n",
-    to:   "",
+    // V149: the line now appears three times (V149's seed and 20h) — anchored with check 14's own comment.
+    from: "    -- 14: B leaves A's business. The job B did for A stays A's.\n    delete from public.memberships where org_id = org_a and user_id = b;\n",
+    to:   "    -- 14: B leaves A's business. The job B did for A stays A's.\n",
     why:  "Peter's second test account stays a member of his real business after every run (50c)",
   },
   {
@@ -6118,9 +6119,9 @@ const MUTATIONS = [
     // V146: welcome rolled (four lines) — re-aimed at the first; 85e pins it.
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
-    from: "<li><strong>Renumber asset numbers.</strong>",
+    from: "<li><strong>Your business.</strong>",   // V149: welcome rolled (one line) — re-aimed at it; 88e pins it.
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (87e)",
+    why:  "11A: the welcome says plainly what changed on screen (88e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8600,9 +8601,9 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V147';",   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays.
-    to:   "const WELCOME_VERSION = 'V146';",
-    why:  "What's new stays on the release that last had something to show (87e)",
+    from: "const WELCOME_VERSION = 'V149';",   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed.
+    to:   "const WELCOME_VERSION = 'V148';",
+    why:  "What's new is rolled on a feature release (88e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
@@ -8613,9 +8614,10 @@ const MUTATIONS = [
     // V146: four lines — re-aimed at the last one's end; still caught by the count.
     // V147: one line — re-aimed at its end.
     // V148: no welcome — V147's one line stays, so the anchor stays.
-    from: "Undo is there for a few seconds if it&rsquo;s wrong.</li>\n",
-    to:   "Undo is there for a few seconds if it&rsquo;s wrong.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (87e)",
+    // V149: one line — re-aimed at its end.
+    from: "which one each new job is for.</li>\n",
+    to:   "which one each new job is for.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (88e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8629,24 +8631,24 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Behind the scenes: PATGo is ready to ask for an account when it launches.",
+    from: "Every job now knows which business it belongs to.",
     to:   "Better",
-    why:  "the About page must say what changed in this version (87e)",   // V147: re-aimed at V147's line. V148: at V148's
+    why:  "the About page must say what changed in this version (88e)",   // V147: re-aimed at V147's line. V148: at V148's. V149: at V149's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
   {
     name: "M1224 (V133) a reading run never reports the phone",
     file: "sync.js",
-    from: "        .then((out) => (reads ? _syncPhoneReport(c, uid).then(() => out) : out));",
-    to:   "        .then((out) => out);",
+    from: "        .then((out) => (reads ? _syncPhoneReport(c, uid).then(() => out) : out))\n",   // V149: re-anchored (no semicolon: the business read follows)
+    to:   "        .then((out) => out)\n",
     why:  "4A: no phone ever reports, so the job holds every account back for ever (71b)",
   },
   {
     name: "M1225 (V133) \"Re-send all jobs\" reports too",
     file: "sync.js",
-    from: "        .then((out) => (reads ? _syncPhoneReport(c, uid).then(() => out) : out));",
-    to:   "        .then((out) => (true ? _syncPhoneReport(c, uid).then(() => out) : out));",
+    from: "        .then((out) => (reads ? _syncPhoneReport(c, uid).then(() => out) : out))\n",   // V149: re-anchored
+    to:   "        .then((out) => (true ? _syncPhoneReport(c, uid).then(() => out) : out))\n",
     why:  "the report rides reading runs only, like photos (71d)",
   },
   {
@@ -8746,9 +8748,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Tapping the description box empties it, ready for a new word, and suggestions no longer vanish",
+    from: "Renumber asset numbers when a new roll of stickers starts",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (87e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's, the oldest now
+    why:  "the About page keeps the last three versions' lines (88e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8908,9 +8910,9 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Renumber asset numbers when a new roll of stickers starts",
+    from: "Behind the scenes: PATGo is ready to ask for an account when it launches.",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (87e)",   // V147: re-aimed at V146's. V148: at V147's, still in the window
+    why:  "the About page keeps the last three versions' lines (88e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's, still in the window
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9037,9 +9039,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v148';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e).
-    to:   "const CACHE_VERSION = 'pat-v147';",
-    why:  "a release needs its cache bump or phones never get it (87e)",
+    from: "const CACHE_VERSION = 'pat-v149';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e).
+    to:   "const CACHE_VERSION = 'pat-v148';",
+    why:  "a release needs its cache bump or phones never get it (88e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -11733,6 +11735,252 @@ const MUTATIONS = [
     from: "        <p class=\"wizard-lead\">${(typeof cloudWallOn === 'function' && cloudWallOn())\n",
     to:   "        <p class=\"wizard-lead\">${(false)\n",
     why:  "found in the browser check: a product phone would read an untrue promise (87b)",
+  },
+  // ---- V149 (0A 1A 3A 4A): every job knows its business. Group 88 + M1661–M1695. ----
+  {
+    name: "M1661 (V149) the stored list keeps a bad id or a repeat",
+    file: "business.js",
+    from: "    if (!b || !businessValidId(b.id) || seen.has(b.id)) continue;",
+    to:   "    if (!b) continue;",
+    why:  "garbage on the phone becomes a business (88a)",
+  },
+  {
+    name: "M1662 (V149) an unnamed business you own isn't \"Your business\"",
+    file: "business.js",
+    from: "  return b.role === 'owner' ? 'Your business' : 'Unnamed business';",
+    to:   "  return 'Unnamed business';",
+    why:  "3A (88a)",
+  },
+  {
+    name: "M1663 (V149) the default and \"none\" are two businesses",
+    file: "business.js",
+    from: "  return (d && d.id === id) ? '' : id;",
+    to:   "  return id;",
+    why:  "a job naming the default couldn't take items from one naming none (88a)",
+  },
+  {
+    name: "M1664 (V149) For: for someone in one business",
+    file: "business.js",
+    from: "  return list.length >= 2 ? list : [];",
+    to:   "  return list.length >= 1 ? list : [];",
+    why:  "1A: only 2+ are asked (88a)",
+  },
+  {
+    name: "M1665 (V149) For: never starts on the last used",
+    file: "business.js",
+    from: "  if (last && list.some(b => b.id === last)) return last;\n",
+    to:   "",
+    why:  "1A: \"starting on the last used\" (88a)",
+  },
+  {
+    name: "M1666 (V149) the last used is trusted after you've left it",
+    file: "business.js",
+    from: "  if (last && list.some(b => b.id === last)) return last;\n",
+    to:   "  if (last) return last;\n",
+    why:  "a business you left would be offered first (88a)",
+  },
+  {
+    name: "M1667 (V149) the pick is never remembered",
+    file: "business.js",
+    from: "  if (v) { try { localStorage.setItem(LAST_BUSINESS_KEY, v); }",
+    to:   "  if (false) { try { localStorage.setItem(LAST_BUSINESS_KEY, v); }",
+    why:  "1A (88b)",
+  },
+  {
+    name: "M1668 (V149) a business that isn't yours is recorded",
+    file: "business.js",
+    from: "  const v = businessValidId(value) && list.some(b => b.id === value) ? value : businessForInitial();",
+    to:   "  const v = businessValidId(value) ? value : businessForInitial();",
+    why:  "a stale form would file a job under a business you're not in (88b)",
+  },
+  {
+    name: "M1669 (V149) New job ignores For:",
+    file: "session.js",
+    from: "  if (biz) s.businessId = biz;\n",
+    to:   "",
+    why:  "the job would land in the default whoever it was for \u2014 the V148 finding (88b)",
+  },
+  {
+    name: "M1670 (V149) Start doesn't read For:",
+    file: "dispatch.js",
+    from: "    if ($('nf-business')) state.newForm.businessId = $('nf-business').value;   // V149 (1A)\n",
+    to:   "",
+    why:  "the box shows one business, the job gets another (88b)",
+  },
+  {
+    name: "M1671 (V149) a change to For: isn't kept",
+    file: "dispatch.js",
+    from: "  'nf-business': (v) => { state.newForm.businessId = v; },",
+    to:   "  'nf-business': (v) => { },",
+    why:  "a repaint (a suggestion tap) resets the choice (88b)",
+  },
+  {
+    name: "M1672 (V149) the job row never names its business",
+    file: "sync.js",
+    from: "      if (biz) row.org_id = biz;\n",
+    to:   "",
+    why:  "the database files every job under the default (88c)",
+  },
+  {
+    name: "M1673 (V149) a malformed business is sent",
+    file: "sync.js",
+    from: "  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v : '';",
+    to:   "  return v;",
+    why:  "one bad id fails the whole batch of jobs (88c)",
+  },
+  {
+    name: "M1674 (V149) a sync run never reads the businesses",
+    file: "sync.js",
+    from: "        .then((out) => (reads && typeof businessMaybeRead === 'function'",
+    to:   "        .then((out) => (false && typeof businessMaybeRead === 'function'",
+    why:  "For: never appears on a phone that never opens the Business page (88c)",
+  },
+  {
+    name: "M1675 (V149) the list is read on every run",
+    file: "business.js",
+    from: "  return now - rec.at >= BUSINESS_READ_MS;",
+    to:   "  return true;",
+    why:  "a call per save's quick send (88a, 88c)",
+  },
+  {
+    name: "M1676 (V149) a split loses the business",
+    file: "session.js",
+    from: "  if (sess.businessId) job.businessId = sess.businessId;\n",
+    to:   "",
+    why:  "1A: a team's items leave the team by splitting (88d)",
+  },
+  {
+    name: "M1677 (V149) a duplicate loses the business",
+    file: "session.js",
+    from: "  if (src.businessId) job.businessId = src.businessId;   // V149 (1A): the copy is the same business's\n",
+    to:   "",
+    why:  "1A: a team's job copied out of the team (88d, 88f)",
+  },
+  {
+    name: "M1678 (V149) Move to another job lists every business's jobs",
+    file: "session.js",
+    from: "  return jobBusinessKey(a) === jobBusinessKey(b);\n",
+    to:   "  return true;\n",
+    why:  "1A: items move out of a team with no approval (88d)",
+  },
+  {
+    name: "M1679 (V149) the move doesn't re-check the business",
+    file: "session.js",
+    from: "  if (!moveToSameBusiness(sess, target)) return blocked(",
+    to:   "  if (false) return blocked(",
+    why:  "a target that changed business while choosing still takes the items (88d)",
+  },
+  {
+    name: "M1680 (V149) no word for \"none in this business\"",
+    file: "session.js",
+    from: "    return others\n",
+    to:   "    return false\n",
+    why:  "the message says there are no other jobs when there are (88d)",
+  },
+  {
+    name: "M1681 (V149) an Engineer gets a Rename button",
+    file: "business.js",
+    from: "    const btn = x.role === 'owner'\n",
+    to:   "    const btn = true\n",
+    why:  "3A: the Owner names it (88e)",
+  },
+  {
+    name: "M1682 (V149) the phone opens the name sheet for anyone",
+    file: "business.js",
+    from: "  if (!biz || biz.role !== 'owner') return false;",
+    to:   "  if (!biz) return false;",
+    why:  "3A (88e)",
+  },
+  {
+    name: "M1683 (V149) the name box isn't pre-filled from Company & Branding",
+    file: "business.js",
+    from: "    value: (biz.name || company).slice(0, 80),",
+    to:   "    value: (biz.name || '').slice(0, 80),",
+    why:  "3A (88e)",
+  },
+  {
+    name: "M1684 (V149) the name isn't trimmed",
+    file: "business.js",
+    from: "  const v = String(name || '').trim().slice(0, 80);",
+    to:   "  const v = String(name || '').slice(0, 80);",
+    why:  "spaces sent and kept (88e)",
+  },
+  {
+    name: "M1685 (V149) a saved name isn't kept on the phone",
+    file: "business.js",
+    from: "      if (biz) { biz.name = typeof res.data === 'string' ? res.data : v; businessSave(rec); }\n",
+    to:   "",
+    why:  "For: and the page show the old name until the next read (88e)",
+  },
+  {
+    name: "M1686 (V149) the page isn't read on open",
+    file: "session.js",
+    from: "  if (v === 'cloudBusiness' && typeof businessRefresh === 'function') businessRefresh();",
+    to:   "",
+    why:  "3A: shows stale businesses, or none (88e)",
+  },
+  {
+    name: "M1687 (V149) no Business row in Account & Sync",
+    file: "data.js",
+    from: "    pages: ['cloudAccount', 'cloudBusiness', 'cloudSync', 'cloudSubscription'] },",
+    to:   "    pages: ['cloudAccount', 'cloudSync', 'cloudSubscription'] },",
+    why:  "3A: the page can't be reached (88e)",
+  },
+  {
+    name: "M1688 (V149) the router draws the Account page for Business",
+    file: "render-core.js",
+    from: "             ? (typeof renderCloudBusiness === 'function' ? renderCloudBusiness() : renderCloudAccount())\n",
+    to:   "             ? renderCloudAccount()\n",
+    why:  "3A (88e)",
+  },
+  {
+    name: "M1689 (V149) the Business row shows without business.js",
+    file: "render-settings.js",
+    from: "  if (pageId === 'cloudBusiness') return typeof renderCloudBusiness === 'function';\n",
+    to:   "",
+    why:  "MAP rule 6: a row to a page that can't be drawn (88e)",
+  },
+  {
+    name: "M1690 (V149) the businesses survive \"Clear my work + settings\"",
+    file: "reset.js",
+    from: "  ['BUSINESSES_KEY', BUSINESSES_KEY, 'account'],",
+    to:   "  ['BUSINESSES_KEY', BUSINESSES_KEY, 'settings'],",
+    why:  "they follow the account (88e)",
+  },
+  {
+    name: "M1691 (V149) New job needs business.js",
+    file: "render-core.js",
+    from: "      ${typeof businessForHTML === 'function' ? businessForHTML() : ''}\n",
+    to:   "      ${businessForHTML()}\n",
+    why:  "MAP rule 6: no business.js = no Jobs list (88e)",
+  },
+  {
+    name: "M1692 (V149) SQL: a stranger's business is kept on a new job",
+    file: "supabase/v149-business-per-job.sql",
+    from: "    if new.org_id is not null and not exists (\n      select 1 from public.memberships m where m.org_id = new.org_id and m.user_id = new.user_id\n    ) then\n      new.org_id := null;\n    end if;\n    -- (Only",
+    to:   "    -- (Only",
+    why:  "the database's own rule (B3, isolation 20a); here, the text (88f)",
+  },
+  {
+    name: "M1693 (V149) SQL: schema.sql loses the photo rule",
+    file: "supabase/schema.sql",
+    from: "    if new.org_id is null and tg_table_name = 'photos' then",
+    to:   "    if false then",
+    why:  "a new project's team photos land in the default (88f)",
+  },
+  {
+    name: "M1694 (V149) SQL: anyone may name a business",
+    file: "supabase/v149-business-per-job.sql",
+    from: "  if public.my_role(o) is distinct from 'owner' then",
+    to:   "  if public.my_role(o) is null then",
+    why:  "3A: an Engineer renames the team (isolation 20f; text 88f)",
+  },
+  {
+    name: "M1695 (V149) SQL: the isolation seed leaves B in A's business",
+    file: "supabase/isolation-test.sql",
+    from: "    values ('iso-test-BinA', b, org_a, 'iso-test-BinA', 'x', b::text || '/iso-test-BinA.jpg', now());\n    delete from public.memberships where org_id = org_a and user_id = b;\n",
+    to:   "    values ('iso-test-BinA', b, org_a, 'iso-test-BinA', 'x', b::text || '/iso-test-BinA.jpg', now());\n",
+    why:  "9a\u20139c would run with B a member of A's business (50c)",
   },
 ];
 
