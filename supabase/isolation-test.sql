@@ -502,7 +502,10 @@ begin
         end;
       end if;
       begin
-        select count(*) into n from public.memberships where user_id = a;
+        -- (V150 fix: a business B OWNS may rightly show B its members — e.g. the V149
+        -- test aid's PATGo Test Team with A as Engineer; those are left out.)
+        select count(*) into n from public.memberships m where m.user_id = a
+          and m.org_id not in (select o.org_id from public.memberships o where o.user_id = b and o.role = 'owner');
         update public.memberships set role = 'owner' where org_id = org_a and user_id = b;
         get diagnostics k = row_count;
         res := res || array[g || 'j|B as ' || rn || ': cannot see A''s membership or promote B|'
@@ -858,7 +861,9 @@ begin
     execute 'set local role authenticated';
     -- 20e: B's list shows both, B's own first (the default).
     begin
-      select count(*) into n from public.my_businesses();
+      -- (V150 fix: only A's and B's own count — other businesses, e.g. the V149 test
+      -- aid's PATGo Test Team, may be listed too.)
+      select count(*) into n from public.my_businesses() x where x.id in (org_a, org_b);
       select count(*) into k from public.my_businesses() x where x.id = org_a and x.role = 'engineer' and not x.is_default;
       res := res || array['20e|B''s businesses: two, A''s as Engineer|' || case when n = 2 and k = 1 then 'PASS|' else 'FAIL|' || n || ' listed' end];
     exception when others then
@@ -977,7 +982,7 @@ begin
     perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
     select count(*) into n from public.job_moves where session_id = 'iso-test-v150-1';
-    select count(*) into k from public.my_job_moves();
+    select count(*) into k from public.my_job_moves() x where x.session_id like 'iso-test-%';   -- A's real moves aside
     execute 'reset role';
     perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
