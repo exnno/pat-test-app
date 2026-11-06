@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V149';",
-    to:   "const APP_VERSION = 'V148';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V150';",
+    to:   "const APP_VERSION = 'V149';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149).
-    from: '        <p><strong>V147</strong> &middot; October 2026</p>',   // V149: V146 rolled off — the oldest is V147
-    to:   '        <p><strong>V145</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V146</strong> &middot; October 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 88e)',
+    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150).
+    from: '        <p><strong>V148</strong> &middot; November 2026</p>',   // V150: V147 rolled off — the oldest is V148
+    to:   '        <p><strong>V146</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V147</strong> &middot; October 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 89e)',
   },
 
   {
@@ -1186,8 +1186,9 @@ const MUTATIONS = [
   {
     name: 'M157 (V80) the app-reopen listener does nothing',
     file: 'sync.js',
-    from: "      if (document.visibilityState === 'hidden') return;\n      syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true });",
-    to:   "      if (document.visibilityState === 'hidden') return;",
+    // V150: re-anchored — businessReadOwe() now sits between the two lines.
+    from: "      if (typeof businessReadOwe === 'function') businessReadOwe();\n      syncPushSoon(SYNC_RESUME_DELAY_MS, { pull: true });",
+    to:   "      if (typeof businessReadOwe === 'function') businessReadOwe();",
     why:  'reopening the app is the main moment a job reaches the cloud after a day offline (17p)',
   },
   {
@@ -1698,8 +1699,8 @@ const MUTATIONS = [
   {
     name: 'M226 (V83) the encoding cache ignores the instrument fields again',
     file: 'storage.js',
-    from: "    s.instrumentId || '', s.instrumentSnapshot ? 1 : 0\n",
-    to:   "    ''\n",
+    from: "    s.instrumentId || '', s.instrumentSnapshot ? 1 : 0,\n",   // V150: a comma — businessId follows
+    to:   "    '',\n",
     why:  'the v66 bug: a deleted instrument\u2019s frozen copy never reaches the disk for any job but the open one, and after a reopen the certificate names today\u2019s tester (19a)',
   },
   {
@@ -3199,8 +3200,8 @@ const MUTATIONS = [
   {
     name: "M436 (V92) the pull's list read downloads the contents again",
     file: "sync.js",
-    from: "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,' + _SYNC_JOB_PICKS;",
-    to:   "const _SYNC_JOB_LIST_COLS = 'id,doc,fp,deleted,updated_at,' + _SYNC_JOB_PICKS;",
+    from: "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS;",   // V150: + org
+    to:   "const _SYNC_JOB_LIST_COLS = 'id,doc,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS;",
     why:  "R17: every push comes straight back down in full — the waste V92 exists to remove (29a, 29e)",
   },
   {
@@ -6119,9 +6120,10 @@ const MUTATIONS = [
     // V146: welcome rolled (four lines) — re-aimed at the first; 85e pins it.
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
-    from: "<li><strong>Your business.</strong>",   // V149: welcome rolled (one line) — re-aimed at it; 88e pins it.
+    // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
+    from: "<li><strong>Move a job to another business.</strong>",   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it.
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (88e)",
+    why:  "11A: the welcome says plainly what changed on screen (89e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8601,9 +8603,9 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V149';",   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed.
-    to:   "const WELCOME_VERSION = 'V148';",
-    why:  "What's new is rolled on a feature release (88e)",
+    from: "const WELCOME_VERSION = 'V150';",   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
+    to:   "const WELCOME_VERSION = 'V149';",
+    why:  "What's new is rolled on a feature release (89e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
@@ -8615,9 +8617,10 @@ const MUTATIONS = [
     // V147: one line — re-aimed at its end.
     // V148: no welcome — V147's one line stays, so the anchor stays.
     // V149: one line — re-aimed at its end.
-    from: "which one each new job is for.</li>\n",
-    to:   "which one each new job is for.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (88e)",
+    // V150: one line — re-aimed at its end.
+    from: "Working for just one business? Nothing changes.</li>\n",
+    to:   "Working for just one business? Nothing changes.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (89e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8631,9 +8634,9 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Every job now knows which business it belongs to.",
+    from: "Move a job to another business: Job settings &rarr; Business &rarr; Change&hellip;",
     to:   "Better",
-    why:  "the About page must say what changed in this version (88e)",   // V147: re-aimed at V147's line. V148: at V148's. V149: at V149's
+    why:  "the About page must say what changed in this version (89e)",   // V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8748,9 +8751,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Renumber asset numbers when a new roll of stickers starts",
+    from: "Behind the scenes: PATGo is ready to ask for an account when it launches.",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (88e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's, the oldest now
+    why:  "the About page keeps the last three versions' lines (89e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8910,9 +8913,9 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Behind the scenes: PATGo is ready to ask for an account when it launches.",
+    from: "Every job now knows which business it belongs to.",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (88e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's, still in the window
+    why:  "the About page keeps the last three versions' lines (89e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9039,9 +9042,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v149';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e).
-    to:   "const CACHE_VERSION = 'pat-v148';",
-    why:  "a release needs its cache bump or phones never get it (88e)",
+    from: "const CACHE_VERSION = 'pat-v150';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e).
+    to:   "const CACHE_VERSION = 'pat-v149';",
+    why:  "a release needs its cache bump or phones never get it (89e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -11964,9 +11967,11 @@ const MUTATIONS = [
   {
     name: "M1693 (V149) SQL: schema.sql loses the photo rule",
     file: "supabase/schema.sql",
-    from: "    if new.org_id is null and tg_table_name = 'photos' then",
-    to:   "    if false then",
-    why:  "a new project's team photos land in the default (88f)",
+    // V150: schema.sql now has V150's stamp too (the one a new project ends with) —
+    // re-aimed at it, past the line only it has.
+    from: "declare mv text; ok boolean := false;\nbegin\n  if tg_op = 'INSERT' then\n    if new.org_id is not null and not exists (\n      select 1 from public.memberships m where m.org_id = new.org_id and m.user_id = new.user_id\n    ) then\n      new.org_id := null;\n    end if;\n    -- (Only reached for photos: NEW.session_id exists on that table alone.)\n    if new.org_id is null and tg_table_name = 'photos' then",
+    to:   "declare mv text; ok boolean := false;\nbegin\n  if tg_op = 'INSERT' then\n    if new.org_id is not null and not exists (\n      select 1 from public.memberships m where m.org_id = new.org_id and m.user_id = new.user_id\n    ) then\n      new.org_id := null;\n    end if;\n    -- (Only reached for photos: NEW.session_id exists on that table alone.)\n    if false then",
+    why:  "a new project's team photos land in the default (89f)",
   },
   {
     name: "M1694 (V149) SQL: anyone may name a business",
@@ -11988,6 +11993,286 @@ const MUTATIONS = [
     from: "                || case when ok and plan_before is not null and plan_after is not distinct from plan_before\n",
     to:   "                || case when ok and coalesce(plan_after,'') <> 'comped'\n",
     why:  "Peter's run, 6 Nov: B set to comped by hand made check 5 FAIL though B was refused (88f)",
+  },
+  {
+    name: "M1697 (V150) the list is not owed on start or return",
+    file: "business.js",
+    from: "  if (!uid || (!_bizReadOwed && !businessReadDue(businessLoad(), uid, Date.now()))) return Promise.resolve(false);",
+    to:   "  if (!uid || !businessReadDue(businessLoad(), uid, Date.now())) return Promise.resolve(false);",
+    why:  "Peter's test, 6 Nov: an invite waits up to 6 hours to show (89a 89d)",
+  },
+  {
+    name: "M1698 (V150) a read never clears the owed flag",
+    file: "business.js",
+    from: "      if (ok) _bizReadOwed = false;\n",
+    to:   "",
+    why:  "every reading run reads the list again — not the 6 hours promised (89a)",
+  },
+  {
+    name: "M1699 (V150) back at the front doesn't owe a read",
+    file: "sync.js",
+    from: "      if (typeof businessReadOwe === 'function') businessReadOwe();\n",
+    to:   "",
+    why:  "returning to the app keeps the old list for up to 6 hours (89d)",
+  },
+  {
+    name: "M1700 (V150) the saved-copy check ignores a job's business",
+    file: "storage.js",
+    from: "    s.businessId || ''\n  ].join('\\u0001');",
+    to:   "    ''\n  ].join('\\u0001');",
+    why:  "a move on a job that isn't open never reaches storage and is undone on reload (89a)",
+  },
+  {
+    name: "M1701 (V150) the job list doesn't read the business column",
+    file: "sync.js",
+    from: "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS;",
+    to:   "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,' + _SYNC_JOB_PICKS;",
+    why:  "3A: an approved move never reaches the phone (89d 50d)",
+  },
+  {
+    name: "M1702 (V150) the pull never puts a job's business right",
+    file: "sync.js",
+    from: "    if (typeof businessReconcileJobs === 'function') {\n      try {",
+    to:   "    if (false) {\n      try {",
+    why:  "3A: the cloud's answer is ignored (89d)",
+  },
+  {
+    name: "M1703 (V150) a held job's business is put right under its question",
+    file: "sync.js",
+    from: "        for (const e of _syncHeldLoad()) if (e && e.kind === 'session') delete orgs[String(e.id)];\n",
+    to:   "",
+    why:  "a held job changes under the question it is waiting on (89d)",
+  },
+  {
+    name: "M1704 (V150) the default never clears a team's name",
+    file: "business.js",
+    from: "    if (want) s.businessId = want; else delete s.businessId;",
+    to:   "    if (want) s.businessId = want;",
+    why:  "3A: a job moved home still names the team (89a)",
+  },
+  {
+    name: "M1705 (V150) another account's list decides",
+    file: "business.js",
+    from: "  if (!uid || rec.u !== uid) return 0;\n  const d = rec.list.find(b => b.def);",
+    to:   "  if (!uid) return 0;\n  const d = rec.list.find(b => b.def);",
+    why:  "a stale account's default re-files jobs (89a)",
+  },
+  {
+    name: "M1706 (V150) a move the cloud made isn't followed here",
+    file: "business.js",
+    from: "      if (res.data === 'moved') businessSetJob(sess, to);\n",
+    to:   "",
+    why:  "the phone keeps the old business until the next read (89c)",
+  },
+  {
+    name: "M1707 (V150) a waiting request moves the job here anyway",
+    file: "business.js",
+    from: "      if (res.data === 'moved') businessSetJob(sess, to);\n",
+    to:   "      businessSetJob(sess, to);\n",
+    why:  "2A broken on the phone: it says waiting but files the job as moved (89c)",
+  },
+  {
+    name: "M1708 (V150) a job not in the cloud can't change",
+    file: "business.js",
+    from: "      if (err && String(err.message || '').indexOf('patgo_move_gone') !== -1) {",
+    to:   "      if (err && String(err.message || '').indexOf('patgo_move_gone') === -2) {",
+    why:  "a job made offline can never be moved (89c)",
+  },
+  {
+    name: "M1709 (V150) moving home names the default instead of none",
+    file: "business.js",
+    from: "  if (!businessValidId(id) || (d && d.id === id)) delete sess.businessId; else sess.businessId = id;",
+    to:   "  if (!businessValidId(id)) delete sess.businessId; else sess.businessId = id;",
+    why:  "V149's rule: the default is \"none\" (89c)",
+  },
+  {
+    name: "M1710 (V150) solo users get a Business card",
+    file: "business.js",
+    from: "  if (!several && !m) return '';\n  const cur = businessOfJob(sess);",
+    to:   "  const cur = businessOfJob(sess);",
+    why:  "nothing should change for one-business users (89b)",
+  },
+  {
+    name: "M1711 (V150) Change… shows while a request waits",
+    file: "business.js",
+    from: "        ${waiting\n          ?",
+    to:   "        ${false\n          ?",
+    why:  "2A: a second request over a waiting one; no Cancel (89b 89c)",
+  },
+  {
+    name: "M1712 (V150) the sheet offers the business the job is already in",
+    file: "business.js",
+    from: "  const rows = businessChoices().filter(b => b.id !== curId).map((b) => `",
+    to:   "  const rows = businessChoices().map((b) => `",
+    why:  "a pointless choice (89b)",
+  },
+  {
+    name: "M1713 (V150) the sheet never mentions approval",
+    file: "business.js",
+    from: "  return !!(cur && cur.role !== 'owner');",
+    to:   "  return false;",
+    why:  "2A: an Engineer is told it moves straight away (89b)",
+  },
+  {
+    name: "M1714 (V150) a locked job can be moved",
+    file: "business.js",
+    from: "  if (sess.locked) return 'This job is locked. Unlock it in Job settings first, then change its business.';\n",
+    to:   "",
+    why:  "the database refuses it; the phone should say why first (89b)",
+  },
+  {
+    name: "M1715 (V150) a certified job can be moved",
+    file: "business.js",
+    from: "  if (typeof sess.certNo === 'string' && sess.certNo.trim()) {\n    return 'This job has a certificate number, so it stays with the business it was certified for.';\n  }\n",
+    to:   "",
+    why:  "a certificate's business must not change (89b)",
+  },
+  {
+    name: "M1716 (V150) no signal isn't caught first",
+    file: "business.js",
+    from: "  if (_bizOffline()) return 'You need a signal to move a job to another business.';\n",
+    to:   "",
+    why:  "a spinner then a vague error, offline (89b)",
+  },
+  {
+    name: "M1717 (V150) a locked job's waiting request is never dropped",
+    file: "business.js",
+    from: "    if (!s || !(s.locked || (typeof s.certNo === 'string' && s.certNo.trim()))) continue;",
+    to:   "    if (true) continue;",
+    why:  "2A (89c)",
+  },
+  {
+    name: "M1718 (V150) the drop is sent as a cancel",
+    file: "business.js",
+    from: "    chain = chain.then(() => c.rpc('cancel_job_move', { move: m.id, dropped: true }))",
+    to:   "    chain = chain.then(() => c.rpc('cancel_job_move', { move: m.id }))",
+    why:  "the record says cancelled, not dropped (89c)",
+  },
+  {
+    name: "M1719 (V150) Cancel request is sent as a drop",
+    file: "business.js",
+    from: "    .then((c) => { client = c; return c.rpc('cancel_job_move', { move: id }); })",
+    to:   "    .then((c) => { client = c; return c.rpc('cancel_job_move', { move: id, dropped: true }); })",
+    why:  "the record says dropped (89c)",
+  },
+  {
+    name: "M1720 (V150) another account's record is shown",
+    file: "business.js",
+    from: "  if (!uid || rec.u !== uid) return null;\n  return rec.list.find(m => m.job === String(jobId)) || null;",
+    to:   "  if (!uid) return null;\n  return rec.list.find(m => m.job === String(jobId)) || null;",
+    why:  "a takeover shows the old owner's moves (89a)",
+  },
+  {
+    name: "M1721 (V150) the stored record keeps two per job",
+    file: "business.js",
+    from: "    if (!m || !businessValidId(m.id) || typeof m.job !== 'string' || !m.job || seen.has(m.job)) continue;",
+    to:   "    if (!m || !businessValidId(m.id) || typeof m.job !== 'string' || !m.job) continue;",
+    why:  "(89a)",
+  },
+  {
+    name: "M1722 (V150) a refusal isn't said",
+    file: "business.js",
+    from: "  if (m.st === 'refused') return `Move to ${_bizNameFor(m.to, m.toName)} refused${day ? ' · ' + day : ''}`;\n",
+    to:   "",
+    why:  "the engineer never learns the request was refused (89a)",
+  },
+  {
+    name: "M1723 (V150) an unknown business shows blank",
+    file: "business.js",
+    from: "  return n || 'another business';",
+    to:   "  return n;",
+    why:  "(89a)",
+  },
+  {
+    name: "M1724 (V150) Job settings doesn't re-read a waiting request",
+    file: "dispatch.js",
+    from: "    if (typeof businessJobSettingsOpened === 'function') businessJobSettingsOpened();\n",
+    to:   "",
+    why:  "an approved move shows as waiting until the next start (89c)",
+  },
+  {
+    name: "M1725 (V150) leaving the screen leaves the sheet open",
+    file: "session.js",
+    from: "  state.bizMove = null;          // V150: Job settings' Change… sheet (a move under way still finishes)\n",
+    to:   "",
+    why:  "the sheet comes back on another job's settings (89e)",
+  },
+  {
+    name: "M1726 (V150) the sheet's state isn't declared",
+    file: "state.js",
+    from: "  bizMove: null,\n",
+    to:   "",
+    why:  "a practice draw leaves a key behind (72c 89e)",
+  },
+  {
+    name: "M1727 (V150) the record doesn't follow the account",
+    file: "reset.js",
+    from: "  ['JOB_MOVES_KEY', JOB_MOVES_KEY, 'account'],\n",
+    to:   "",
+    why:  "a reset or takeover keeps the old account's moves (43a 89e)",
+  },
+  {
+    name: "M1728 (V150) Job settings has no Business card",
+    file: "render-review.js",
+    from: "      ${typeof businessJobCardHTML === 'function' ? businessJobCardHTML(sess) : ''}\n",
+    to:   "",
+    why:  "Change… can't be reached (89b)",
+  },
+  {
+    name: "M1729 (V150) Job settings never draws the sheet",
+    file: "render-review.js",
+    from: "    ${typeof renderBusinessMoveSheet === 'function' ? renderBusinessMoveSheet(sess) : ''}\n",
+    to:   "",
+    why:  "Change… does nothing visible (89b)",
+  },
+  {
+    name: "M1730 (V150) SQL: anyone out of a team moves at once",
+    file: "supabase/v150-business-move.sql",
+    from: "  if r_from = 'owner' then\n",
+    to:   "  if r_from is not null then\n",
+    why:  "2A broken in the database (89f; on the stand-in M4 / 21b)",
+  },
+  {
+    name: "M1731 (V150) SQL: schema.sql lets the asker approve",
+    file: "supabase/schema.sql",
+    from: "  if decider is null or decider = m.requested_by then\n",
+    to:   "  if decider is null then\n",
+    why:  "a Team leader approves their own move (89f; on the stand-in M4)",
+  },
+  {
+    name: "M1732 (V150) SQL: the stamp's exception skips the membership",
+    file: "supabase/v150-business-move.sql",
+    from: "      ok := ok and exists (select 1 from public.memberships m where m.org_id = new.org_id and m.user_id = new.user_id);\n",
+    to:   "",
+    why:  "belt and braces lost: the mark alone moves a job (89f)",
+  },
+  {
+    name: "M1733 (V150) SQL: phones may write the record",
+    file: "supabase/v150-business-move.sql",
+    from: "grant select on public.job_moves to authenticated;",
+    to:   "grant select, insert, update, delete on public.job_moves to authenticated;",
+    why:  "1A: the record could be rewritten (89f; on the stand-in M1 / 21c)",
+  },
+  {
+    name: "M1734 (V150) isolation: 21h never reported",
+    file: "supabase/isolation-test.sql",
+    from: "    res := res || array['21h|B out of A''s business; nothing left behind|'",
+    to:   "    res := res || array['21x|B out of A''s business; nothing left behind|'",
+    why:  "the clean-up goes unchecked (89f)",
+  },
+  {
+    name: "M1735 (V150) test aid: decides as nobody",
+    file: "supabase/v150-test-decide-move.sql",
+    from: "  st := public._job_move_decide(mid, decision = 'approve', u_spare);",
+    to:   "  st := public._job_move_decide(mid, decision = 'approve', null);",
+    why:  "the aid always fails (89f)",
+  },
+  {
+    name: "M1736 (V150) V149 undo: test move records left behind",
+    file: "supabase/v149-test-second-business-undo.sql",
+    from: "delete from public.job_moves x\nwhere (select id from public.organisations where name = 'PATGo Test Team') in (x.from_org, x.to_org);\n",
+    to:   "",
+    why:  "the undo fails: a business with records can't be deleted (89f)",
   },
 ];
 

@@ -381,6 +381,18 @@ bug; leaving it red trains everyone to ignore the suite.
   cron schemas stubbed), where six broken copies of the migration were each
   caught. (4) Each new mutation was probed against the groups its hint names
   alone: all 35 fail their own sub-group.
+  V150 (group 89): moving a job. (1) A job created by `withSession` on a phone
+  in two businesses already NAMES the default (V149's For:) — "untouched" means
+  "unchanged", never "absent" (89b / 89d found this on themselves). (2) The
+  pretend server must give each move its own id, or Cancel request finds an
+  older record with the same id. (3) The saved-copy reuse (storage.js
+  `_sessionSig`) hides an in-place change on a job that isn't open — 89a proves
+  businessId reaches storage; M1700 removes it from the signature. (4) The SQL's
+  TEXT is 89f; whether it WORKS is the migration's M1–M5 and isolation 21a–21h,
+  run at V150 on the local Postgres 16 stand-in (an upgraded project and one
+  from schema.sql), where ten broken copies were each caught. (5) Each of the 40
+  new mutations was probed against the groups its hint names alone: all 40 fail
+  their own sub-group.
 
 ---
 
