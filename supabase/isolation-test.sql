@@ -11,6 +11,8 @@
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
+-- V151: CHECKS 22a–22e NEED supabase/v151-min-version.sql RUN FIRST (22a names
+-- it if not). Nothing is changed: B only tries.
 -- V150: CHECKS 21a–21h NEED supabase/v150-business-move.sql RUN FIRST (21a names
 -- it if not). B is put into A's business as Engineer, moves a test job in and out
 -- (A approves), then everything is taken away again; nothing is left behind.
@@ -58,6 +60,7 @@ declare
   res text[] := '{}';
   rls_off text;
   lap_b timestamptz; lap_seen timestamptz;          -- V143
+  min0 int; ovr0 bigint; got_min int;              -- V151
 begin
   select id into a from auth.users where lower(email) = lower(email_a);
   select id into b from auth.users where lower(email) = lower(email_b);
@@ -1012,6 +1015,55 @@ begin
     select count(*) into k from public.job_moves where session_id like 'iso-test-%';
     res := res || array['21h|B out of A''s business; nothing left behind|' || case when n = 0 and k = 0 then 'PASS|' else 'FAIL|' || n || ' membership, ' || k || ' records left' end];
   end if;
+
+  -- ------------------------------------------------- V151: the minimum app version
+  if to_regclass('public.app_settings') is null or to_regprocedure('public.my_min_version()') is null then
+    res := res || array['22a|the minimum app version|FAIL|run supabase/v151-min-version.sql first'];
+  else
+    select min_version into min0 from public.app_settings where id = 1;
+    select count(*) into ovr0 from public.app_min_overrides;
+    -- 22a (control): B reads B's own minimum — the setting, B having no raise of its own.
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      got_min := public.my_min_version();
+      execute 'reset role';
+      res := res || array['22a|control: B reads B''s own minimum|' || case when got_min = public.app_min_version_for(b) then 'PASS|' || got_min else 'FAIL|' || coalesce(got_min::text, 'nothing') end];
+    exception when others then
+      execute 'reset role';
+      res := res || array['22a|control: B reads B''s own minimum|FAIL|' || sqlerrm];
+    end;
+    -- 22b: B can't read the setting or anyone's raise directly.
+    execute 'set local role authenticated';
+    k := 0;
+    begin perform 1 from public.app_settings; exception when others then k := k + 1; end;
+    begin perform 1 from public.app_min_overrides; exception when others then k := k + 1; end;
+    execute 'reset role';
+    res := res || array['22b|B can''t read the setting or anyone''s raise directly|' || case when k = 2 then 'PASS|2 refused' else 'FAIL|' || (2 - k) || ' readable' end];
+    -- 22c: B can't change the minimum — the setting, its own, or A's.
+    execute 'set local role authenticated';
+    k := 0;
+    begin update public.app_settings set min_version = 1 where id = 1; get diagnostics n = row_count; if n = 0 then k := k + 1; end if; exception when others then k := k + 1; end;
+    begin insert into public.app_min_overrides (user_id, min_version) values (b, 1); exception when others then k := k + 1; end;
+    begin insert into public.app_min_overrides (user_id, min_version) values (a, 999999); exception when others then k := k + 1; end;
+    execute 'reset role';
+    res := res || array['22c|B can''t change the minimum (the setting, B''s, A''s)|' || case when k = 3 then 'PASS|3 refused' else 'FAIL|' || (3 - k) || ' accepted' end];
+    -- 22d: B can't ask the database's own questions; signed out, nobody reads a minimum.
+    execute 'set local role authenticated';
+    k := 0;
+    begin perform public.app_min_version_for(a); exception when others then k := k + 1; end;
+    begin perform public.org_phones_behind(org_a); exception when others then k := k + 1; end;
+    execute 'reset role';
+    perform set_config('request.jwt.claims', '', true);
+    execute 'set local role anon';
+    begin perform public.my_min_version(); exception when others then k := k + 1; end;
+    execute 'reset role';
+    res := res || array['22d|B can''t ask about A or A''s business; signed out, no minimum|' || case when k = 3 then 'PASS|3 refused' else 'FAIL|' || (3 - k) || ' answered' end];
+    -- 22e (admin): nothing changed.
+    select count(*) into n from public.app_min_overrides;
+    res := res || array['22e|the minimum and the raises are as they were|' || case when (select min_version from public.app_settings where id = 1) = min0 and n = ovr0 then 'PASS|' || min0 else 'FAIL|setting ' || (select min_version from public.app_settings where id = 1) || ', raises ' || n end];
+  end if;
+  perform set_config('request.jwt.claims', '', true);
 
   delete from public.sessions where id like 'iso-test-%';
   delete from public.records where id like 'iso-test-%';

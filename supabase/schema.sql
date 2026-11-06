@@ -1539,3 +1539,88 @@ grant execute on function public.move_job(text, uuid) to authenticated;
 grant execute on function public.cancel_job_move(uuid, boolean) to authenticated;
 grant execute on function public.decide_job_move(uuid, boolean) to authenticated;
 grant execute on function public.my_job_moves() to authenticated;
+
+
+-- ============================================================ V151
+-- The minimum app version: one setting (starts at 151), a raise for one account
+-- (testing), what a phone reads, and the invite check V152 uses. Existing
+-- projects: supabase/v151-min-version.sql (the same, plus self-checks).
+-- Raise it later with:  update public.app_settings set min_version = NNN where id = 1;
+
+-- ------------------------------------------------- the setting
+create table if not exists public.app_settings (
+  id                 integer primary key default 1 check (id = 1),
+  min_version        integer not null default 151 check (min_version between 1 and 999999),
+  invite_phone_days  integer not null default 60 check (invite_phone_days between 1 and 3650),
+  updated_at         timestamptz not null default now()
+);
+insert into public.app_settings (id) values (1) on conflict (id) do nothing;
+
+-- One account's own minimum (testing; or to make one account update first).
+create table if not exists public.app_min_overrides (
+  user_id      uuid primary key references auth.users(id) on delete cascade,
+  min_version  integer not null check (min_version between 1 and 999999),
+  note         text,
+  created_at   timestamptz not null default now()
+);
+
+-- Nobody signed in reads or writes either table directly: the phone asks
+-- my_min_version(). RLS on with no policies, every grant taken away.
+alter table public.app_settings enable row level security;
+alter table public.app_min_overrides enable row level security;
+revoke all on public.app_settings, public.app_min_overrides from public, anon, authenticated;
+
+drop trigger if exists touch_updated_at on public.app_settings;
+create trigger touch_updated_at before update on public.app_settings
+  for each row execute function public.touch_updated_at();
+
+-- ------------------------------------------------- an account's minimum
+-- The higher of the setting and the account's own; 0 if the row is missing
+-- (no minimum — the phone carries on).
+create or replace function public.app_min_version_for(u uuid)
+returns integer language sql stable security definer set search_path = '' as $$
+  select greatest(
+    coalesce((select s.min_version from public.app_settings s where s.id = 1), 0),
+    coalesce((select o.min_version from public.app_min_overrides o where o.user_id = u), 0))
+$$;
+
+-- What the phone reads. Signed in only.
+create or replace function public.my_min_version()
+returns integer language plpgsql stable security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then
+    raise exception 'patgo_min_version: sign in first' using errcode = '42501';
+  end if;
+  return public.app_min_version_for(auth.uid());
+end;
+$$;
+
+-- ------------------------------------------------- the invite check (5A)
+-- How many phones in business o are too old for its members' minimum:
+--   • a phone that has reported (V133+) in the last invite_phone_days with an
+--     older version, and
+--   • a sign-in used in that time that has never reported on that sign-in — a
+--     phone before V133, or one signed in a moment ago that hasn't synced yet.
+-- Invites (V152) are refused while this is above 0.
+create or replace function public.org_phones_behind(o uuid)
+returns integer language sql stable security definer set search_path = '' as $$
+  with s as (
+    select now() - make_interval(days => coalesce((select x.invite_phone_days from public.app_settings x where x.id = 1), 60)) as win
+  ), m as (
+    select mm.user_id, public.app_min_version_for(mm.user_id) as need
+    from public.memberships mm where mm.org_id = o
+  )
+  select (
+    (select count(*) from public.phones p join m on m.user_id = p.user_id, s
+     where p.seen_at > s.win and coalesce(p.version_num, 0) < m.need)
+  + (select count(*) from auth.sessions ses join m on m.user_id = ses.user_id, s
+     where greatest(ses.created_at, ses.updated_at, ses.refreshed_at at time zone 'UTC') > s.win
+       and not exists (select 1 from public.phones p
+                       where p.user_id = ses.user_id and p.auth_session = ses.id))
+  )::integer
+$$;
+
+revoke all on function public.app_min_version_for(uuid) from public, anon, authenticated;
+revoke all on function public.org_phones_behind(uuid) from public, anon, authenticated;
+revoke all on function public.my_min_version() from public, anon;
+grant execute on function public.my_min_version() to authenticated;
