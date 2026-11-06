@@ -3,8 +3,9 @@
 --
 -- Takes away what supabase/v149-test-second-business.sql made. Any job, photo or
 -- record filed under the test business goes back to its maker's own (default)
--- business first — nothing is deleted — then the memberships and the business
--- go. HOW: Dashboard → SQL Editor → New query → paste this file → Run.
+-- business first — nothing is deleted — then the memberships, the business and
+-- (V150) its test move records go.
+-- HOW: Dashboard → SQL Editor → New query → paste this file → Run.
 --
 -- ⚠ The business stamp is normally never moved (the org_stamp trigger), so this
 -- switches that one trigger off for the length of the move, inside one
@@ -27,6 +28,10 @@ alter table public.sessions enable trigger org_stamp;
 alter table public.records  enable trigger org_stamp;
 alter table public.photos   enable trigger org_stamp;
 
+-- V150: the test team's move records go too (a business with records can't be
+-- deleted — on a real one that is the point; this is a test business).
+delete from public.job_moves x
+where (select id from public.organisations where name = 'PATGo Test Team') in (x.from_org, x.to_org);
 delete from public.organisations where name = 'PATGo Test Team';   -- its memberships go with it
 commit;
 

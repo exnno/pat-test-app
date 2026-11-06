@@ -11,6 +11,9 @@
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
+-- V150: CHECKS 21a–21h NEED supabase/v150-business-move.sql RUN FIRST (21a names
+-- it if not). B is put into A's business as Engineer, moves a test job in and out
+-- (A approves), then everything is taken away again; nothing is left behind.
 -- V149: CHECKS 20a–20h NEED supabase/v149-business-per-job.sql RUN FIRST (20a names
 -- it if not). B is put into A's business as Engineer and taken out again; B's
 -- business name is put back as it was. Nothing is left behind.
@@ -885,6 +888,124 @@ begin
     select count(*) into n from public.memberships where org_id = org_a and user_id = b;
     select count(*) into k from public.organisations where id = org_b and name is not distinct from coalesce(msg, '');
     res := res || array['20h|B out of A''s business; A''s name untouched, B''s put back|' || case when n = 0 and k = 1 and rn is not distinct from g then 'PASS|' else 'FAIL|' || n || ' left, A''s name ' || coalesce(rn, '?') || ', B''s ' || k end];
+  end if;
+
+  -- ========================================================== V150 (21a–21h)
+  -- Moving a job (Change…). B's own job goes into A's business (B is A's
+  -- Engineer) at once; out again it waits; B can't approve it or write the
+  -- record; A (Owner) approves; B can't move A's job, or into a business B isn't
+  -- in, or a locked job. Everything put back (21h).
+  if to_regprocedure('public.move_job(text,uuid)') is null then
+    res := res || array['21a|moving a job|FAIL|run supabase/v150-business-move.sql first'];
+  elsif not exists (select 1 from pg_proc p join pg_namespace s on s.oid = p.pronamespace
+                    where s.nspname = 'public' and p.proname = 'org_stamp' and p.prosrc like '%patgo.job_move%') then
+    res := res || array['21a|moving a job|FAIL|the business stamp is an older one — run supabase/v150-business-move.sql again'];
+  else
+    org_a := public.default_org(a);
+    org_b := public.default_org(b);
+    delete from public.job_moves where session_id like 'iso-test-%';
+    insert into public.memberships (org_id, user_id, role) values (org_a, b, 'engineer')
+    on conflict (org_id, user_id) do update set role = excluded.role;
+    insert into public.sessions (id, user_id, doc, last_modified) values ('iso-test-v150-1', b, '{"v150":1}', now());
+    insert into public.photos (id, user_id, session_id, item_id, storage_path, last_modified)
+    values ('iso-test-v150-p', b, 'iso-test-v150-1', 'i1', b::text || '/iso-test-v150-p.jpg', now());
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    -- 21a: out of B's own business (B is its Owner) → moved at once, photo too.
+    begin
+      msg := public.move_job('iso-test-v150-1', org_a);
+      execute 'reset role';
+      select count(*) into n from public.sessions where id = 'iso-test-v150-1' and user_id = b and org_id = org_a;
+      select count(*) into k from public.photos where id = 'iso-test-v150-p' and user_id = b and org_id = org_a;
+      res := res || array['21a|B moves B''s own job into A''s business: at once, photo too|' || case when msg = 'moved' and n = 1 and k = 1 then 'PASS|' else 'FAIL|' || coalesce(msg, '?') || ', job ' || n || ', photo ' || k end];
+    exception when others then
+      execute 'reset role';
+      res := res || array['21a|B moves B''s own job into A''s business: at once, photo too|FAIL|' || sqlerrm];
+    end;
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    -- 21b: back out of A's business as its Engineer → waits; the job stays.
+    begin
+      msg := public.move_job('iso-test-v150-1', org_b);
+      select count(*) into n from public.sessions where id = 'iso-test-v150-1' and org_id = org_a;
+      res := res || array['21b|…out of A''s business as Engineer: it waits, the job stays|' || case when msg = 'waiting' and n = 1 then 'PASS|' else 'FAIL|' || coalesce(msg, '?') || ', ' || n end];
+    exception when others then
+      res := res || array['21b|…out of A''s business as Engineer: it waits, the job stays|FAIL|' || sqlerrm];
+    end;
+    -- 21c: B can't approve B's own request, nor write the record directly.
+    k := 0;
+    select id into team_file from (select x.id::text as id from public.job_moves x where x.session_id = 'iso-test-v150-1' and x.status = 'waiting') y;
+    begin perform public.decide_job_move(team_file::uuid, true); k := k + 1; exception when others then null; end;
+    begin update public.job_moves set status = 'moved' where id = team_file::uuid; get diagnostics n = row_count; k := k + n; exception when others then null; end;
+    begin delete from public.job_moves where id = team_file::uuid; get diagnostics n = row_count; k := k + n; exception when others then null; end;
+    begin insert into public.job_moves (user_id, session_id, from_org, to_org, requested_by, status)
+          values (b, 'iso-test-v150-1', org_a, org_b, b, 'moved'); k := k + 1; exception when others then null; end;
+    execute 'reset role';
+    select count(*) into n from public.sessions where id = 'iso-test-v150-1' and org_id = org_a;
+    res := res || array['21c|B can''t approve B''s own request or write the record|' || case when k = 0 and n = 1 then 'PASS|refused' else 'FAIL|' || k || ' allowed' end];
+    -- 21d: B takes it back, asks again; A (Owner) approves → back in B's, photo too.
+    begin
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      g := public.cancel_job_move(team_file::uuid);
+      msg := public.move_job('iso-test-v150-1', org_b);
+      select x.id::text into team_file from public.job_moves x where x.session_id = 'iso-test-v150-1' and x.status = 'waiting';
+      execute 'reset role';
+      perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      begin perform public.cancel_job_move(team_file::uuid); g := 'A cancelled B''s request'; exception when others then null; end;
+      rn := public.decide_job_move(team_file::uuid, true);
+      execute 'reset role';
+      select count(*) into n from public.sessions where id = 'iso-test-v150-1' and org_id = org_b;
+      select count(*) into k from public.photos where id = 'iso-test-v150-p' and org_id = org_b;
+      res := res || array['21d|B cancels and asks again; A can''t cancel it but approves: back in B''s, photo too|' || case when g = 'cancelled' and msg = 'waiting' and rn = 'moved' and n = 1 and k = 1 then 'PASS|' else 'FAIL|' || coalesce(g, '?') || ', ' || coalesce(msg, '?') || ', ' || coalesce(rn, '?') || ', job ' || n || ', photo ' || k end];
+    exception when others then
+      execute 'reset role';
+      res := res || array['21d|B cancels and asks again; A (Owner) approves: back in B''s, photo too|FAIL|' || sqlerrm];
+    end;
+    -- 21e: B can't move A's job, nor into a business B isn't in.
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    k := 0;
+    begin perform public.move_job('iso-test-A', org_b); k := k + 1; exception when others then null; end;
+    begin perform public.move_job('iso-test-v150-1', gen_random_uuid()); k := k + 1; exception when others then null; end;
+    execute 'reset role';
+    select count(*) into n from public.sessions where id = 'iso-test-A' and user_id = a and org_id = org_a;
+    res := res || array['21e|B can''t move A''s job, or into a business B isn''t in|' || case when k = 0 and n = 1 then 'PASS|refused' else 'FAIL|' || k || ' allowed' end];
+    -- 21f: A (Owner) reads the record of moves through A's business; B's list
+    -- has B's job only; A's own list has none (B's job is not A's).
+    perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    select count(*) into n from public.job_moves where session_id = 'iso-test-v150-1';
+    select count(*) into k from public.my_job_moves();
+    execute 'reset role';
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    select count(*) into j from public.my_job_moves() x where x.session_id = 'iso-test-v150-1' and x.status = 'moved';
+    execute 'reset role';
+    res := res || array['21f|A sees the moves through A''s business; each list is its own jobs|' || case when n = 3 and k = 0 and j = 1 then 'PASS|' else 'FAIL|' || n || ' seen, A ' || k || ', B ' || j end];
+    -- 21g: a locked job stays where it is.
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    update public.sessions set doc = '{"v150":2,"locked":true}' where id = 'iso-test-v150-1' and user_id = b;
+    begin
+      perform public.move_job('iso-test-v150-1', org_a);
+      execute 'reset role';
+      res := res || array['21g|a locked job stays where it is|FAIL|moved'];
+    exception when others then
+      execute 'reset role';
+      select count(*) into n from public.sessions where id = 'iso-test-v150-1' and org_id = org_b;
+      res := res || array['21g|a locked job stays where it is|' || case when n = 1 and sqlerrm like 'patgo_move_locked%' then 'PASS|refused' else 'FAIL|' || sqlerrm end];
+    end;
+    perform set_config('request.jwt.claims', '', true);
+    -- 21h: put back — B out of A's business, the test job, photo and record gone.
+    delete from public.job_moves where session_id like 'iso-test-%';
+    delete from public.photos where id = 'iso-test-v150-p' and user_id = b;
+    delete from public.sessions where id = 'iso-test-v150-1' and user_id = b;
+    delete from public.memberships where org_id = org_a and user_id = b;
+    select count(*) into n from public.memberships where org_id = org_a and user_id = b;
+    select count(*) into k from public.job_moves where session_id like 'iso-test-%';
+    res := res || array['21h|B out of A''s business; nothing left behind|' || case when n = 0 and k = 0 then 'PASS|' else 'FAIL|' || n || ' membership, ' || k || ' records left' end];
   end if;
 
   delete from public.sessions where id like 'iso-test-%';

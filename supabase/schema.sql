@@ -1253,3 +1253,289 @@ end;
 $$;
 revoke all on function public.set_business_name(uuid, text) from public, anon;
 grant execute on function public.set_business_name(uuid, text) to authenticated;
+
+
+-- ============================================================ V150
+-- Moving a job to another business (Change…): the move record, the move, the
+-- request and its approval. Existing projects: supabase/v150-business-move.sql
+-- (the same, plus self-checks). This org_stamp replaces V149's above.
+
+-- ------------------------------------------------- the move log (1A)
+-- One row per move or request. Kept for good: no app can write, change or
+-- delete a row — only the functions below, and they only ever close a WAITING
+-- row (waiting → moved / refused / cancelled / dropped). No foreign key to the
+-- job: the record outlives the job (7 years, like everything else).
+create table if not exists public.job_moves (
+  id            uuid primary key default gen_random_uuid(),
+  user_id       uuid not null references auth.users(id) on delete restrict,   -- the job's owner
+  session_id    text not null,
+  from_org      uuid not null references public.organisations(id) on delete restrict,
+  to_org        uuid not null references public.organisations(id) on delete restrict,
+  requested_by  uuid not null references auth.users(id) on delete restrict,
+  requested_at  timestamptz not null default clock_timestamp(),
+  status        text not null check (status in ('waiting','moved','refused','cancelled','dropped')),
+  decided_by    uuid references auth.users(id) on delete restrict,
+  decided_at    timestamptz
+);
+alter table public.job_moves alter column requested_at set default clock_timestamp();
+create index if not exists job_moves_job on public.job_moves (user_id, session_id, requested_at);
+create index if not exists job_moves_from on public.job_moves (from_org, status);
+-- One waiting request per job at a time.
+create unique index if not exists job_moves_one_waiting on public.job_moves (user_id, session_id) where status = 'waiting';
+
+alter table public.job_moves enable row level security;
+revoke insert, update, delete, truncate, references, trigger on public.job_moves from public, anon, authenticated;
+grant select on public.job_moves to authenticated;
+drop policy if exists "read job moves" on public.job_moves;
+-- The job's owner, and whoever reads either business (Owner / Team leader / Office).
+create policy "read job moves" on public.job_moves for select to authenticated
+  using (user_id = auth.uid() or public.can_read_org(from_org) or public.can_read_org(to_org));
+
+-- Belt and braces under the grants: a row is never deleted by a signed-in
+-- person, and only a waiting row ever changes — its status and who decided.
+create or replace function public.job_moves_guard()
+returns trigger language plpgsql set search_path = '' as $$
+begin
+  if tg_op = 'DELETE' then
+    if auth.uid() is not null then
+      raise exception 'PATGo: the move record is kept' using errcode = '42501';
+    end if;
+    return old;
+  end if;
+  if old.status <> 'waiting'
+     or new.user_id is distinct from old.user_id or new.session_id is distinct from old.session_id
+     or new.from_org is distinct from old.from_org or new.to_org is distinct from old.to_org
+     or new.requested_by is distinct from old.requested_by or new.requested_at is distinct from old.requested_at then
+    raise exception 'PATGo: the move record is kept as it was' using errcode = '42501';
+  end if;
+  return new;
+end;
+$$;
+drop trigger if exists job_moves_guard on public.job_moves;
+create trigger job_moves_guard before update or delete on public.job_moves
+  for each row execute function public.job_moves_guard();
+
+
+-- ------------------------------------------------- the stamp (V150)
+-- Insert: unchanged from V149 (a named business only if the writer belongs to
+--         it; a photo follows its job; else the default).
+-- Update: the stamp still never changes — EXCEPT the one change the move itself
+--         makes (_job_move_apply below), which marks its transaction with
+--         exactly which job is going where. An upload naming a business is
+--         still ignored, as since V113. Settings (records) never move.
+-- ⚠ The mark is a transaction-local setting no app can make (there is no way to
+-- run SQL from a phone), and the destination must still be one the job's owner
+-- belongs to.
+create or replace function public.org_stamp()
+returns trigger language plpgsql security definer set search_path = '' as $$
+declare mv text; ok boolean := false;
+begin
+  if tg_op = 'INSERT' then
+    if new.org_id is not null and not exists (
+      select 1 from public.memberships m where m.org_id = new.org_id and m.user_id = new.user_id
+    ) then
+      new.org_id := null;
+    end if;
+    -- (Only reached for photos: NEW.session_id exists on that table alone.)
+    if new.org_id is null and tg_table_name = 'photos' then
+      select s.org_id into new.org_id from public.sessions s
+      where s.user_id = new.user_id and s.id = new.session_id;
+      if new.org_id is not null and not exists (
+        select 1 from public.memberships m where m.org_id = new.org_id and m.user_id = new.user_id
+      ) then
+        new.org_id := null;
+      end if;
+    end if;
+    if new.org_id is null then
+      new.org_id := public.default_org(new.user_id);
+      if new.org_id is null then
+        raise exception 'PATGo: account % has no business', new.user_id;
+      end if;
+    end if;
+  elsif old.org_id is not null and new.org_id is distinct from old.org_id then
+    mv := coalesce(current_setting('patgo.job_move', true), '');
+    if mv <> '' and new.org_id is not null and tg_table_name in ('sessions', 'photos') then
+      if tg_table_name = 'sessions' then
+        ok := mv = new.user_id::text || '/' || new.id || '/' || new.org_id::text;
+      else
+        -- (Only reached for photos, as above.)
+        ok := mv = new.user_id::text || '/' || new.session_id || '/' || new.org_id::text;
+      end if;
+      ok := ok and exists (select 1 from public.memberships m where m.org_id = new.org_id and m.user_id = new.user_id);
+    end if;
+    if not ok then
+      new.org_id := old.org_id;
+    end if;
+  end if;
+  return new;
+end;
+$$;
+
+
+-- ------------------------------------------------- the move (V150)
+-- Someone's role in a business (any person — the helpers above ask for "me").
+create or replace function public.member_role(o uuid, u uuid)
+returns text language sql stable security definer set search_path = '' as $$
+  select m.role from public.memberships m where m.org_id = o and m.user_id = u
+$$;
+
+-- The move itself: the job row and its photo rows, together. Never called by a
+-- phone (closed below) — only by move_job and _job_move_decide.
+create or replace function public._job_move_apply(u uuid, job text, o_from uuid, o_to uuid)
+returns void language plpgsql security definer set search_path = '' as $$
+declare n int;
+begin
+  perform set_config('patgo.job_move', u::text || '/' || job || '/' || o_to::text, true);
+  update public.sessions set org_id = o_to where user_id = u and id = job and org_id = o_from;
+  get diagnostics n = row_count;
+  if n <> 1 then
+    perform set_config('patgo.job_move', '', true);
+    raise exception 'patgo_move_gone: that job is not where it was' using errcode = 'P0002';
+  end if;
+  update public.photos set org_id = o_to where user_id = u and session_id = job and org_id is distinct from o_to;
+  perform set_config('patgo.job_move', '', true);
+  if not exists (select 1 from public.sessions where user_id = u and id = job and org_id = o_to) then
+    raise exception 'patgo_move_gone: the move did not take' using errcode = 'P0002';
+  end if;
+end;
+$$;
+
+-- Job settings → Business → Change… (2A). Your own job, in the cloud, not
+-- deleted, unlocked, no certificate number; you belong to both businesses.
+-- Out of a business where you are the Owner → moved now. Otherwise (a team
+-- business you're Engineer / Team leader / Office in) → a request, waiting for
+-- someone ELSE (Owner / Team leader / Office of that business) to approve.
+-- Returns 'moved' or 'waiting'.
+create or replace function public.move_job(job text, target uuid)
+returns text language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  s record;
+  r_from text; r_to text;
+begin
+  if me is null then
+    raise exception 'patgo_move_role: sign in first' using errcode = '42501';
+  end if;
+  select x.org_id, x.doc, x.deleted into s from public.sessions x
+  where x.user_id = me and x.id = job for update;
+  if not found or s.deleted then
+    raise exception 'patgo_move_gone: that job is not in the cloud' using errcode = 'P0002';
+  end if;
+  if target is null or s.org_id = target then
+    raise exception 'patgo_move_same: the job is already there' using errcode = '22023';
+  end if;
+  r_from := public.member_role(s.org_id, me);
+  r_to := public.member_role(target, me);
+  if r_from is null or r_to is null then
+    raise exception 'patgo_move_both: you need to belong to both businesses' using errcode = '42501';
+  end if;
+  if coalesce(s.doc ->> 'locked', '') = 'true' or coalesce(s.doc ->> 'certNo', '') <> '' then
+    raise exception 'patgo_move_locked: a locked or certified job stays where it is' using errcode = '22023';
+  end if;
+  if exists (select 1 from public.job_moves m where m.user_id = me and m.session_id = job and m.status = 'waiting') then
+    raise exception 'patgo_move_waiting: this job already has a move waiting' using errcode = '22023';
+  end if;
+  if r_from = 'owner' then
+    perform public._job_move_apply(me, job, s.org_id, target);
+    insert into public.job_moves (user_id, session_id, from_org, to_org, requested_by, status, decided_by, decided_at)
+    values (me, job, s.org_id, target, me, 'moved', me, clock_timestamp());
+    return 'moved';
+  end if;
+  insert into public.job_moves (user_id, session_id, from_org, to_org, requested_by, status)
+  values (me, job, s.org_id, target, me, 'waiting');
+  return 'waiting';
+end;
+$$;
+
+-- The person who asked takes a waiting request back. dropped = true when the
+-- phone found the job locked or certified meanwhile (2A).
+create or replace function public.cancel_job_move(move uuid, dropped boolean default false)
+returns text language plpgsql security definer set search_path = '' as $$
+declare m record; st text := case when dropped then 'dropped' else 'cancelled' end;
+begin
+  select * into m from public.job_moves x where x.id = move for update;
+  if not found or m.requested_by is distinct from auth.uid() then
+    raise exception 'patgo_move_role: only the person who asked can take it back' using errcode = '42501';
+  end if;
+  if m.status <> 'waiting' then
+    return m.status;
+  end if;
+  update public.job_moves set status = st, decided_by = auth.uid(), decided_at = clock_timestamp() where id = move;
+  return st;
+end;
+$$;
+
+-- Approve or refuse a waiting request, as person `decider` — someone ELSE who
+-- is Owner / Team leader / Office of the business the job is leaving. On
+-- approval it is checked again: still there, still unlocked and uncertified,
+-- its owner still in both — otherwise 'dropped'. Closed to phones: they use
+-- decide_job_move (below), which is this as the signed-in person. The test aid
+-- (supabase/v150-test-decide-move.sql) calls it directly from the SQL Editor.
+create or replace function public._job_move_decide(move uuid, approve boolean, decider uuid)
+returns text language plpgsql security definer set search_path = '' as $$
+declare m record; s record;
+begin
+  select * into m from public.job_moves x where x.id = move for update;
+  if not found or m.status <> 'waiting' then
+    raise exception 'patgo_move_stale: that request is no longer waiting' using errcode = 'P0002';
+  end if;
+  if decider is null or decider = m.requested_by then
+    raise exception 'patgo_move_self: someone else has to approve this' using errcode = '42501';
+  end if;
+  if coalesce(public.member_role(m.from_org, decider) in ('owner','team_leader','office'), false) is not true then
+    raise exception 'patgo_move_role: only the Owner, a Team leader or the Office can decide this' using errcode = '42501';
+  end if;
+  if not approve then
+    update public.job_moves set status = 'refused', decided_by = decider, decided_at = clock_timestamp() where id = move;
+    return 'refused';
+  end if;
+  select x.org_id, x.doc, x.deleted into s from public.sessions x
+  where x.user_id = m.user_id and x.id = m.session_id for update;
+  if not found or s.deleted or s.org_id is distinct from m.from_org
+     or coalesce(s.doc ->> 'locked', '') = 'true' or coalesce(s.doc ->> 'certNo', '') <> ''
+     or public.member_role(m.to_org, m.user_id) is null then
+    update public.job_moves set status = 'dropped', decided_by = decider, decided_at = clock_timestamp() where id = move;
+    return 'dropped';
+  end if;
+  perform public._job_move_apply(m.user_id, m.session_id, m.from_org, m.to_org);
+  update public.job_moves set status = 'moved', decided_by = decider, decided_at = clock_timestamp() where id = move;
+  return 'moved';
+end;
+$$;
+
+create or replace function public.decide_job_move(move uuid, approve boolean)
+returns text language plpgsql security definer set search_path = '' as $$
+begin
+  if auth.uid() is null then
+    raise exception 'patgo_move_role: sign in first' using errcode = '42501';
+  end if;
+  return public._job_move_decide(move, approve, auth.uid());
+end;
+$$;
+
+-- The phone's view: the latest move or request for each of MY jobs, with both
+-- businesses' names (a business I've since left still has its name here).
+create or replace function public.my_job_moves()
+returns table (id uuid, session_id text, from_org uuid, from_name text, to_org uuid, to_name text,
+               status text, requested_at timestamptz, decided_at timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select distinct on (m.session_id)
+         m.id, m.session_id, m.from_org, f.name, m.to_org, t.name, m.status, m.requested_at, m.decided_at
+  from public.job_moves m
+  join public.organisations f on f.id = m.from_org
+  join public.organisations t on t.id = m.to_org
+  where m.user_id = auth.uid()
+  order by m.session_id, m.requested_at desc, m.id
+$$;
+
+revoke all on function public.member_role(uuid, uuid) from public, anon, authenticated;
+revoke all on function public._job_move_apply(uuid, text, uuid, uuid) from public, anon, authenticated;
+revoke all on function public._job_move_decide(uuid, boolean, uuid) from public, anon, authenticated;
+revoke all on function public.move_job(text, uuid) from public, anon;
+revoke all on function public.cancel_job_move(uuid, boolean) from public, anon;
+revoke all on function public.decide_job_move(uuid, boolean) from public, anon;
+revoke all on function public.my_job_moves() from public, anon;
+grant execute on function public.move_job(text, uuid) to authenticated;
+grant execute on function public.cancel_job_move(uuid, boolean) to authenticated;
+grant execute on function public.decide_job_move(uuid, boolean) to authenticated;
+grant execute on function public.my_job_moves() to authenticated;
