@@ -87,6 +87,9 @@ const RESET_KEY_PLAN = [
   ['REPAIR_UNDO_KEY', REPAIR_UNDO_KEY, 'work'],       // old item text from the V69 repair
   ['SESSION_FILTER_KEY', SESSION_FILTER_KEY, 'work'],
   ['LOCK_FILTER_KEY', LOCK_FILTER_KEY, 'work'],
+  // V152: the note of data set aside unread. Its copies (UNREADABLE_PREFIX + key)
+  // are a PREFIX — swept with the work below; at the higher levels by the 'pat:' sweep.
+  ['UNREADABLE_KEY', UNREADABLE_KEY, 'work'],
   // ---- settings ----
   ['ITEMS_KEY', ITEMS_KEY, 'settings'],
   ['FAIL_REASONS_KEY', FAIL_REASONS_KEY, 'settings'],
@@ -190,7 +193,7 @@ function _resetWipeLocal(level, cert) {
     }
   } else if (level === 'work') {
     const work = new Set(RESET_KEY_PLAN.filter(r => r[2] === 'work').map(r => r[1]));
-    for (const k of all) if (work.has(k)) doomed.push(k);
+    for (const k of all) if (work.has(k) || k.indexOf(UNREADABLE_PREFIX) === 0) doomed.push(k);   // V152: the kept copies are work
   } else {
     const keepAccount = (level === 'settings')
       ? RESET_KEY_PLAN.filter(r => r[2] === 'account').map(r => r[1]) : [];

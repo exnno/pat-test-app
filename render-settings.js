@@ -975,10 +975,33 @@ function renderSettingsBackup() {
         <button class="backup-action-btn primary" id="export-all-btn" data-action="export-all">${icon('upload')} Export everything (.zip)</button>
       </div>
   ` : '';
+  // V152 (audit finding 1, 2B): data PATGo couldn't read, kept safe when it
+  // opened (storage.js). Top of the page — while it's here it is the reason the
+  // engineer came. Only while a copy is kept.
+  let unreadableBlock = '';
+  try {
+    const kept = (typeof storeUnreadableKept === 'function') ? storeUnreadableKept() : [];
+    if (kept.length) {
+      const note = storeUnreadableNote();
+      const when = note.at ? ` on ${escapeHTML(formatDate(note.at.slice(0, 10)))}` : '';
+      const work = storeUnreadableHasWork(kept);
+      unreadableBlock = `
+      <div class="settings-section unreadable-section" id="unreadable-section">
+        <h2 class="h2">Data PATGo couldn\u2019t read</h2>
+        <p class="muted">When PATGo opened${when}, it couldn\u2019t read ${escapeHTML(storeUnreadableWords(kept))}. ${kept.length === 1 ? 'It\u2019s' : 'They\u2019re'} kept safe on this phone exactly as ${kept.length === 1 ? 'it was' : 'they were'}, and PATGo started without ${kept.length === 1 ? 'it' : 'them'}.</p>
+        <p class="muted">${work
+          ? 'To get your work back, restore your most recent daily snapshot or backup below. If neither has it, save a copy and send it to us with Report a problem.'
+          : 'PATGo went back to its standard setup for this. Restore a daily snapshot or a backup below if you want yours back.'}</p>
+        <button class="backup-action-btn" id="unreadable-save" data-action="unreadable-save">${icon('upload')} Save a copy (.json)</button>
+        <button class="backup-action-btn danger" id="unreadable-delete" data-action="unreadable-delete">${icon('trash-2')} Delete the kept copy</button>
+      </div>`;
+    }
+  } catch (e) { unreadableBlock = ''; }
   return `
     <div class="screen">
       ${renderSettingsSubHeader('Backup & Restore')}
       ${settingsHowToHTML('settingsBackup')}
+      ${unreadableBlock}
       ${exportAllBlock}
       <div class="settings-section">
         <h2 class="h2">Backup</h2>

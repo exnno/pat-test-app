@@ -870,6 +870,20 @@ registerActions({
   // V87 (S13): the Jobs-screen storage banner.
   'storage-banner-open': () => setView('settingsStorage'),   // V97
   'storage-banner-dismiss': () => { dismissStorageBanner(); render(); },
+  // V152 (audit finding 1): data that couldn't be read, kept safe at start.
+  'unreadable-open': () => setView('settingsBackup'),
+  'unreadable-dismiss': () => { storeUnreadableSeen(); render(); },
+  'unreadable-save': () => { storeUnreadableDownload(storeUnreadableKept()); },
+  'unreadable-delete': () => {
+    const n = storeUnreadableKept().length;
+    if (!n) return;
+    openConfirmSheet({
+      title: 'Delete the kept copy?',
+      message: 'This deletes the data PATGo couldn\u2019t read. It can\u2019t be undone \u2014 save a copy first if you might need it.',
+      confirmLabel: 'Delete',
+      onConfirm: () => { storeUnreadableDelete(); render(); showToast('Kept copy deleted'); }
+    });
+  },
   // V100 (6A): the reminder banners. Review filters the Jobs list to what the
   // banner counted; × hides it for the rest of the day.
   'remind-export-review': () => { reviewReminder('exp'); save(); render(); },

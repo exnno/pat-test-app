@@ -234,7 +234,11 @@ function serialiseSessions(sessions) {
 // Parse a localStorage sessions string. Handles BOTH the new compressed
 // wrapper ({_c:1, s:[...]}) and the legacy plain array (v13 and earlier).
 // Always returns an array of full-key session objects. On any failure,
-// returns an empty array — the same fail-safe behaviour load() had before.
+// returns an empty array.
+// ⚠ V152: TOLERANT ON PURPOSE, AND NOT WHAT PROTECTS THE JOBS. An empty list
+// from here must never decide that a phone has no jobs — load() checks the
+// stored value with storeReadValue() first and refuses an unreadable one, and
+// storeGuardBoot() has already set any such value aside before load() runs.
 function parseStoredSessions(raw) {
   if (!raw) return [];
   let parsed;
@@ -243,6 +247,10 @@ function parseStoredSessions(raw) {
   } catch {
     return [];
   }
+  return _sessionsFromParsed(parsed);
+}
+
+function _sessionsFromParsed(parsed) {
   // Legacy: a plain array of full-key sessions.
   if (Array.isArray(parsed)) {
     return parsed;
@@ -253,6 +261,245 @@ function parseStoredSessions(raw) {
   }
   // Anything else is unrecognised — treat as empty rather than risk a crash.
   return [];
+}
+
+// ---- V152: saved data that can't be read (audit finding 1 — Peter 6 Nov, 1C 2B) ----
+// ⚠ THE RULE: A VALUE THAT EXISTS BUT CAN'T BE READ IS NEVER "NOTHING STORED".
+// Before V152 unreadable jobs parsed to an empty list, PATGo opened as a new
+// phone, and the next save wrote over them — not even a tap needed: signed in,
+// sync's retest look (_syncRetestLook) saves a few seconds after start.
+// storeGuardBoot() runs BEFORE load(): every unreadable value is copied byte
+// for byte to UNREADABLE_PREFIX + key, read back and compared, and only then
+// removed from its key, so PATGo starts without it and nothing written later
+// can land on it. When a copy can't be made (a full phone) or an earlier,
+// DIFFERENT copy is in the way, nothing at all is changed and boot stops on its
+// own screen (boot.js) — save() and render() neutralised, as for any failed load.
+//
+// Every key in reset.js RESET_KEY_PLAN is classified here (harness 91a fails a
+// new key until it is). JSON keys carry the shape their readers need:
+//   'sessions'  the codec wrapper {_c, s:[…]} or the legacy array; every job an object
+//   'array' / 'object'  the top level
+// JSON null and an empty string read as nothing stored (readers default them,
+// nothing is lost). STORE_TEXT keys are read as text — whatever is stored IS the
+// value, so they can't be unreadable. A job's items, a client's fields: each
+// reader still drops a broken ENTRY as before; this guards the whole value.
+const STORE_JSON = [
+  ['STORAGE_KEY', STORAGE_KEY, 'sessions', 'your jobs'],
+  ['CLIENTS_KEY', CLIENTS_KEY, 'array', 'your clients'],
+  ['SITES_KEY', SITES_KEY, 'array', 'your sites'],
+  ['TOMBSTONES_KEY', TOMBSTONES_KEY, 'array', 'the deletions waiting to sync'],
+  ['PAT_STATS_KEY', PAT_STATS_KEY, 'object', 'your lifetime stats'],
+  ['SQP_HISTORY_KEY', SQP_HISTORY_KEY, 'object', 'Smart Quick Pick\u2019s history'],
+  ['SYNC_STATE_KEY', SYNC_STATE_KEY, 'object', 'sync\u2019s progress'],
+  ['SYNC_PRUNED_KEY', SYNC_PRUNED_KEY, 'array', 'the jobs cleared off this phone'],
+  ['SYNC_HELD_KEY', SYNC_HELD_KEY, 'array', 'the jobs held for a sync question'],
+  ['MAP_PIN_OPEN_KEY', MAP_PIN_OPEN_KEY, 'object', 'the open map pin'],
+  ['REMINDER_QUIET_KEY', REMINDER_QUIET_KEY, 'object', 'the reminders closed today'],
+  ['REPAIR_UNDO_KEY', REPAIR_UNDO_KEY, 'array', 'the apostrophe correction\u2019s undo'],
+  ['ITEMS_KEY', ITEMS_KEY, 'array', 'your old item list'],
+  ['FAIL_REASONS_KEY', FAIL_REASONS_KEY, 'array', 'your fail reasons'],
+  ['FAIL_REASON_TAGS_KEY', FAIL_REASON_TAGS_KEY, 'object', 'your fail reason tags'],
+  ['DESCRIPTIONS_KEY', DESCRIPTIONS_KEY, 'array', 'your item descriptions'],
+  ['ITEM_PRESETS_KEY', ITEM_PRESETS_KEY, 'array', 'your Quick Pick presets'],
+  ['CSV_COLUMNS_KEY', CSV_COLUMNS_KEY, 'array', 'your CSV columns'],
+  ['INSTRUMENTS_KEY', INSTRUMENTS_KEY, 'array', 'your test instruments'],
+  ['REPORT_SETTINGS_KEY', REPORT_SETTINGS_KEY, 'object', 'your certificate settings'],
+  ['REPORT_TEMPLATES_KEY', REPORT_TEMPLATES_KEY, 'array', 'your report templates'],
+  ['REMINDERS_KEY', REMINDERS_KEY, 'object', 'your reminder settings'],
+  ['MULTIPICK_KEY', MULTIPICK_KEY, 'object', 'your Multi Pick setup'],
+  ['PLAN_KEY', PLAN_KEY, 'object', 'your plan\u2019s details'],
+  ['PHONE_KEY', PHONE_KEY, 'object', 'this phone\u2019s sync name'],
+  ['OWNER_KEY', OWNER_KEY, 'object', 'this phone\u2019s owner'],
+  ['OWNER_STATS_KEY', OWNER_STATS_KEY, 'object', 'stats kept for another account'],
+  ['BUSINESSES_KEY', BUSINESSES_KEY, 'object', 'your businesses'],
+  ['JOB_MOVES_KEY', JOB_MOVES_KEY, 'object', 'your job moves'],
+  ['MIN_VERSION_KEY', MIN_VERSION_KEY, 'object', 'the cloud\u2019s minimum version'],
+];
+const STORE_TEXT = [
+  'ACTIVE_KEY', 'SQP_RESET_KEY', 'LAST_BACKUP_KEY', 'BACKUP_SNOOZE_KEY', 'STORAGE_BANNER_KEY',
+  'TIDY_OFFER_KEY', 'SNAPSHOT_FAIL_KEY', 'SESSION_FILTER_KEY', 'LOCK_FILTER_KEY', 'ENGINEER_KEY',
+  'SORT_KEY', 'THEME_KEY', 'TEXT_SIZE_KEY', 'HAPTICS_KEY', 'ACTIVE_PRESET_KEY', 'TESTER_KEY',
+  'TESTER_MAKE_KEY', 'TESTER_MODEL_KEY', 'CAL_DATE_KEY', 'CAL_CERT_KEY', 'CAL_DUE_KEY',
+  'ACTIVE_INSTRUMENT_KEY', 'WELCOME_KEY', 'ONBOARD_KEY', 'SQP_ENABLED_KEY', 'READINGS_KEY',
+  'READINGS_CHECK_KEY', 'READINGS_EARTH_LIMIT_KEY', 'SCANNER_KEY', 'SCANNER_PAIRED_KEY',
+  'SCAN_SPEED_KEY', 'REPAIR_DONE_KEY', 'SOUNDFX_KEY', 'TIMESTAMPS_KEY', 'UNDO_KEY', 'MAP_PIN_KEY',
+  'PRUNE_AGE_KEY', 'SNAPSHOTS_KEY', 'PHOTO_AGE_KEY', 'RETEST_REMINDERS_KEY', 'CLOUD_UNLOCK_KEY',
+  'WALL_TEST_KEY', 'LAST_BUSINESS_KEY',
+];
+// Not ours to judge: supabase-js's own sign-in keys (a prefix), and this guard's note.
+const STORE_OTHER = ['CLOUD_AUTH_STORAGE_KEY', 'UNREADABLE_KEY'];
+
+function _storePlainObject(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+
+// { ok, parsed }. parsed is the JSON value (null when nothing is stored).
+function storeReadValue(shape, raw) {
+  if (raw === null || raw === undefined || raw === '') return { ok: true, parsed: null };
+  let v;
+  try { v = JSON.parse(raw); } catch (e) { return { ok: false, parsed: null }; }
+  if (v === null) return { ok: true, parsed: null };
+  if (shape === 'array') return { ok: Array.isArray(v), parsed: v };
+  if (shape === 'object') return { ok: _storePlainObject(v), parsed: v };
+  if (shape === 'sessions') {
+    const list = Array.isArray(v) ? v
+      : (_storePlainObject(v) && Number.isInteger(v._c) && v._c >= 1 && v._c <= STORAGE_CODEC_VERSION && Array.isArray(v.s)) ? v.s
+      : null;
+    return { ok: !!list && list.every(_storePlainObject), parsed: v };
+  }
+  return { ok: false, parsed: null };
+}
+
+// The jobs, as the guard just read them — so load() doesn't parse them twice.
+let _storeSessionsSeen = null;
+
+// [{ key, label, raw }] — every stored value that exists but can't be read.
+function storeUnreadableKeys() {
+  const bad = [];
+  _storeSessionsSeen = null;
+  for (const [, key, shape, label] of STORE_JSON) {
+    const raw = localStorage.getItem(key);   // a throw here is a failed boot (boot.js)
+    const res = storeReadValue(shape, raw);
+    if (key === STORAGE_KEY) _storeSessionsSeen = { raw, res };
+    if (!res.ok) bad.push({ key, label, raw });
+  }
+  return bad;
+}
+
+function storeLabelFor(key) {
+  const row = STORE_JSON.find(r => r[1] === key);
+  return row ? row[3] : 'some saved settings';
+}
+
+// Runs at boot, after the integrity check and a pending reset, BEFORE load().
+// Returns the keys set aside ([] almost always). Throws an Error carrying
+// .storeUnreadable (the [{key,label,raw}] list) and .storeWhy when it must stop.
+function storeGuardBoot() {
+  const bad = storeUnreadableKeys();
+  if (!bad.length) return [];
+  const made = [];
+  const stop = (why) => {
+    // Only copies made in THIS run, and only before any original was removed:
+    // with the originals untouched, a half-made set of copies is just clutter.
+    for (const k of made) { try { localStorage.removeItem(k); } catch (e) { /* stays: harmless */ } }
+    const e = new Error('saved data could not be read: ' + bad.map(b => b.key).join(', ') + ' (' + why + ')');
+    e.storeUnreadable = bad;
+    e.storeWhy = why;
+    throw e;
+  };
+  // 1. A copy of each — written, read back, compared byte for byte.
+  for (const b of bad) {
+    const ck = UNREADABLE_PREFIX + b.key;
+    const prev = localStorage.getItem(ck);
+    if (prev !== null) {
+      if (prev === b.raw) continue;   // already kept (a start that stopped before the removal) — safe
+      stop('an earlier copy is in the way');
+    }
+    try { localStorage.setItem(ck, b.raw); } catch (e) { stop('no room for a copy'); }
+    made.push(ck);
+    if (localStorage.getItem(ck) !== b.raw) stop('the copy did not match');
+  }
+  // 2. The note. Best effort — the copies are what the Backup page looks for.
+  const note = storeUnreadableNote();
+  const keys = note.keys.slice();
+  for (const b of bad) if (keys.indexOf(b.key) === -1) keys.push(b.key);
+  try { localStorage.setItem(UNREADABLE_KEY, JSON.stringify({ at: new Date().toISOString(), keys, seen: false })); } catch (e) { /* the copies still show */ }
+  // 3. Only now, off their own keys. From here a stop must NOT remove copies:
+  //    an original already removed has only its copy left.
+  made.length = 0;
+  for (const b of bad) {
+    try { localStorage.removeItem(b.key); } catch (e) { /* checked next */ }
+    if (localStorage.getItem(b.key) !== null) stop('the original would not move');
+  }
+  _storeSessionsSeen = null;
+  console.warn('PATGo: saved data that could not be read was kept safe and set aside:', bad.map(b => b.key).join(', '));
+  return bad.map(b => b.key);
+}
+
+// The note: { at, keys, seen }. Garbage reads as nothing noted.
+function storeUnreadableNote() {
+  let r = null;
+  try { r = JSON.parse(localStorage.getItem(UNREADABLE_KEY) || 'null'); } catch (e) { r = null; }
+  const out = { at: '', keys: [], seen: false };
+  if (!_storePlainObject(r)) return out;
+  if (typeof r.at === 'string') out.at = r.at;
+  if (Array.isArray(r.keys)) out.keys = r.keys.filter(k => typeof k === 'string' && k);
+  out.seen = r.seen === true;
+  return out;
+}
+
+// What is kept now: [{ key, label, raw }], found by the copies themselves.
+function storeUnreadableKept() {
+  const out = [];
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.indexOf(UNREADABLE_PREFIX) === 0) {
+        const key = k.slice(UNREADABLE_PREFIX.length);
+        out.push({ key, label: storeLabelFor(key), raw: localStorage.getItem(k) || '' });
+      }
+    }
+  } catch (e) { /* nothing listed */ }
+  const order = STORE_JSON.map(r => r[1]);
+  const at = (k) => { const i = order.indexOf(k); return i === -1 ? order.length : i; };
+  return out.sort((a, b) => at(a.key) - at(b.key));
+}
+
+// "your jobs, your clients and your sites"
+function storeUnreadableWords(list) {
+  const labels = [];
+  for (const x of (list || [])) if (x && x.label && labels.indexOf(x.label) === -1) labels.push(x.label);
+  if (labels.length <= 1) return labels[0] || 'some saved data';
+  return labels.slice(0, -1).join(', ') + ' and ' + labels[labels.length - 1];
+}
+
+// Does the list hold the engineer's work (jobs, clients, sites)?
+function storeUnreadableHasWork(list) {
+  return (list || []).some(x => x && (x.key === STORAGE_KEY || x.key === CLIENTS_KEY || x.key === SITES_KEY));
+}
+
+function storeUnreadableBannerDue() {
+  return storeUnreadableKept().length > 0 && !storeUnreadableNote().seen;
+}
+
+function storeUnreadableSeen() {
+  const n = storeUnreadableNote();
+  try { localStorage.setItem(UNREADABLE_KEY, JSON.stringify({ at: n.at, keys: n.keys, seen: true })); } catch (e) { /* shows again next start */ }
+}
+
+// Removes the kept copies and the note. Returns how many copies went.
+function storeUnreadableDelete() {
+  const kept = storeUnreadableKept();
+  for (const x of kept) { try { localStorage.removeItem(UNREADABLE_PREFIX + x.key); } catch (e) {} }
+  try { localStorage.removeItem(UNREADABLE_KEY); } catch (e) {}
+  return kept.length;
+}
+
+// The file "Save a copy" gives: every value exactly as stored, as text.
+function storeUnreadableFileText(list) {
+  const values = {};
+  for (const x of (list || [])) if (x && x.key) values[x.key] = String(x.raw == null ? '' : x.raw);
+  return JSON.stringify({
+    app: 'PATGo',
+    version: (typeof APP_VERSION === 'string') ? APP_VERSION : '',
+    savedAt: new Date().toISOString(),
+    note: 'Saved data PATGo could not read. Each value is exactly as it was stored on the phone.',
+    values,
+  }, null, 2);
+}
+
+function storeUnreadableFileName() {
+  return 'PATGo unreadable data ' + fileDateUK(todayISO()) + '.json';   // UK date, no underscores (V87)
+}
+
+// Download (a tap — the boot screen's button and the Backup page's both are).
+function storeUnreadableDownload(list) {
+  const blob = new Blob([storeUnreadableFileText(list)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = storeUnreadableFileName();
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => { try { URL.revokeObjectURL(url); } catch (e) {} }, 1000);
+  return true;
 }
 
 // ---------- State ---------- (moved to state.js)
@@ -282,7 +529,20 @@ function load() {
   // v14: sessions are now stored compressed (key-shortened). parseStoredSessions
   // transparently handles both the new compressed wrapper and the legacy v13
   // plain-array format, so old installs migrate seamlessly on the next save().
-  state.sessions = parseStoredSessions(localStorage.getItem(STORAGE_KEY));
+  // ⚠ V152: an unreadable jobs value is REFUSED, never read as "no jobs" —
+  // the throw is boot's failed-load path (save() and render() neutralised).
+  // storeGuardBoot() has normally set such a value aside already; this is the
+  // backstop if load() is ever reached without it.
+  const rawSessions = localStorage.getItem(STORAGE_KEY);
+  const seen = (_storeSessionsSeen && _storeSessionsSeen.raw === rawSessions) ? _storeSessionsSeen.res : storeReadValue('sessions', rawSessions);
+  _storeSessionsSeen = null;
+  if (!seen.ok) {
+    const e = new Error('saved jobs could not be read');
+    e.storeUnreadable = [{ key: STORAGE_KEY, label: storeLabelFor(STORAGE_KEY), raw: rawSessions }];
+    e.storeWhy = 'not set aside';
+    throw e;
+  }
+  state.sessions = seen.parsed ? _sessionsFromParsed(seen.parsed) : [];
   state.activeId = localStorage.getItem(ACTIVE_KEY) || null;
 
   // v78: the deletion ledger, purged on the way IN rather than on the way out.

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V151)
+# PATGo — Code Map (V152)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -309,6 +309,20 @@ is discoverable from the file you happen to be editing.
     `_sessionSig` carries it, or the saved copy is reused and the change is
     lost on reload (found building V150). Harness 89.
 
+31. **Unreadable saved data is never "nothing stored" (V152).** storage.js
+    `storeGuardBoot()` runs in boot.js AFTER the integrity check and
+    `resetRunPending()`, BEFORE `load()`: every stored value that exists but
+    can't be read is copied byte for byte to `UNREADABLE_PREFIX + key`, read
+    back, compared, and only then moved off its key; can't be done safely →
+    nothing changed, boot's failed-load path with its own stop screen. `load()`
+    also refuses unreadable jobs by itself (the backstop). ⚠ A NEW STORAGE KEY
+    joins storage.js `STORE_JSON` (with its shape) or `STORE_TEXT` — harness 91a
+    fails it otherwise, as 43a does for reset.js. ⚠ A JSON key's shape must be
+    what its WRITER writes — a wrong shape sets good data aside on every start.
+    Readers still default garbage as before; they just never see it now.
+    Copies: Reset 'work' sweeps the prefix (reset.js), the higher levels and a
+    takeover by the 'pat:' sweep; never backed up. Harness 91.
+
 ---
 
 ## Load order (index.html) — 37 first-party files
@@ -599,6 +613,12 @@ catch via `_isQuotaError()`. A new saver on the logging hot path must be guarded
 the same way (24e found saveSqpHistory). Also here: `checkStorageProtection()`
 (S12, paints #storage-protect IN PLACE, never render) and
 `storageBannerDue()`/`dismissStorageBanner()` (S13, STORAGE_BANNER_KEY).
+⚠ V152: the UNREADABLE-DATA GUARD lives here (rule 31) — `STORE_JSON` /
+`STORE_TEXT` / `STORE_OTHER` classify every key; `storeReadValue`,
+`storeUnreadableKeys`, `storeGuardBoot`, and the kept-copy helpers the Jobs banner
+(render-core `renderUnreadableBanner`), the Backup page (render-settings) and
+dispatch (`unreadable-*`) use. `parseStoredSessions()` stays tolerant on
+purpose; `load()` checks the value with `storeReadValue` first.
 ⚠ v84: `saveReportSettings()` / `saveReportTemplates()` arm the sync trigger;
 `saveSettings()` writes report settings through the plain `_writeReportSettings()`
 so it never does (sync.js calls it after a pull). `reportSettings.certSetAt` =
@@ -1953,6 +1973,10 @@ V105: `snapshotsBoot()` runs after the first render, inside the good-load block,
 typeof-guarded and NOT probed (snapshots.js is optional — rule 6).
 V106: `resetRunPending()` (reset.js) runs after the integrity check and BEFORE
 `load()` — typeof-guarded, NOT probed. Missing reset.js = no wipe (safe).
+V152: `storeGuardBoot()` (storage.js, rule 31) runs inside load()'s try, just
+before it; an error carrying `.storeUnreadable` paints its own stop screen
+("Some saved data couldn't be read", Save a copy wired by addEventListener —
+initDelegation never ran) instead of the update screen.
 **Coupling:** the integrity guard verifies the critical cross-file functions
 loaded before any storage write and skips `load()`/`render()`/`save()` if not —
 this is the guard against the duplicate-`const` data-loss class (rule 1).

@@ -454,10 +454,12 @@ try {
 }
 
 if (!_bootIntegrity) {
+  // V152: every start-up screen carries its own white background — the theme
+  // never ran, and in dark mode #111 text sat on the dark page (browser check).
   const appEl = document.getElementById('app');
   if (appEl) {
     appEl.innerHTML =
-      '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;line-height:1.5">' +
+      '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;background:#fff;min-height:100vh;box-sizing:border-box;line-height:1.5">' +
       '<h2 style="margin:0 0 8px">Update needed</h2>' +
       '<p style="margin:0 0 16px">The app didn\'t load completely. Your saved data is safe and untouched. Tap Reload to finish updating.</p>' +
       '<button onclick="location.reload()" style="padding:12px 18px;font-size:1rem;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
@@ -479,7 +481,13 @@ try {
 // here produced a blank screen with no message rather than the recovery prompt
 // the app has had since v16.1 for render() failures.
 let _bootLoadOK = true;
+let _bootUnreadable = null;   // V152: the boot screen's Save a copy
 try {
+  // V152 (audit finding 1, 2B): saved data that exists but can't be read is set
+  // aside — copied, checked, then moved off its key — BEFORE load() reads
+  // anything, so PATGo starts without it and nothing can write over it. When it
+  // can't be kept safely it throws (e.storeUnreadable) and lands below.
+  storeGuardBoot();
   load();
 } catch (e) {
   _bootLoadOK = false;
@@ -506,9 +514,31 @@ try {
   try { render = function () {}; } catch (e2) {}
 
   const failEl = document.getElementById('app');
-  if (failEl) {
+  if (failEl && e && Array.isArray(e.storeUnreadable) && e.storeUnreadable.length) {
+    // V152 (2B's fallback): unreadable data that couldn't be kept safely — no
+    // room for a copy, or an earlier, different copy in the way. Nothing has
+    // been changed. Reload alone would only come back here, so the way out is a
+    // copy as a file, sent with a report. Wired by addEventListener: the
+    // delegated click listener (initDelegation) never ran on this page.
+    _bootUnreadable = e.storeUnreadable;
+    let words = 'some saved data';
+    try { words = storeUnreadableWords(e.storeUnreadable); } catch (e2) {}
     failEl.innerHTML =
-      '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;line-height:1.5">' +
+      '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;background:#fff;min-height:100vh;box-sizing:border-box;line-height:1.5">' +
+      '<h2 style="margin:0 0 8px">Some saved data couldn\u2019t be read</h2>' +
+      '<p style="margin:0 0 12px">PATGo couldn\u2019t read ' + escapeHTML(words) + ' on this phone, and couldn\u2019t put a safe copy aside to start without ' + (e.storeUnreadable.length === 1 ? 'it' : 'them') + '. <strong>Nothing has been changed or deleted.</strong></p>' +
+      '<p style="margin:0 0 16px">Tap Save a copy to keep it as a file, then send it to us with the link below.</p>' +
+      '<button id="boot-unreadable-save" style="padding:12px 18px;font-size:1rem;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px;margin:0 10px 10px 0">Save a copy</button>' +
+      '<button onclick="location.reload()" style="padding:12px 18px;font-size:1rem;font-weight:700;background:#e5e7eb;color:#111;border:none;border-radius:10px">Reload</button>' +
+      _crashReportLink('saved data could not be read (' + (e.storeWhy || 'unknown') + '): ' + e.storeUnreadable.map(x => x.key).join(', ')) +
+      '</div>';
+    const saveBtn = document.getElementById('boot-unreadable-save');
+    if (saveBtn && typeof saveBtn.addEventListener === 'function') {
+      saveBtn.addEventListener('click', () => { try { storeUnreadableDownload(_bootUnreadable); } catch (e3) { console.error(e3); } });
+    }
+  } else if (failEl) {
+    failEl.innerHTML =
+      '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;background:#fff;min-height:100vh;box-sizing:border-box;line-height:1.5">' +
       '<h2 style="margin:0 0 8px">Update needed</h2>' +
       '<p style="margin:0 0 16px">The app didn\'t finish updating, so it couldn\'t start. <strong>Your saved data is safe and untouched</strong> — nothing has been changed or overwritten. Tap Reload to finish updating. If it keeps happening, fully close the app from the app switcher and open it again.</p>' +
       '<button onclick="location.reload()" style="padding:12px 18px;font-size:1rem;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +
@@ -632,7 +662,7 @@ try {
     const appEl = document.getElementById('app');
     if (appEl) {
       appEl.innerHTML =
-        '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;line-height:1.5">' +
+        '<div style="padding:24px;font-family:system-ui,-apple-system,sans-serif;color:#111;background:#fff;min-height:100vh;box-sizing:border-box;line-height:1.5">' +
         '<h2 style="margin:0 0 8px">Something went wrong</h2>' +
         '<p style="margin:0 0 16px">The app hit an error while loading. Your saved data is safe. Tap Reload to try again.</p>' +
         '<button onclick="location.reload()" style="padding:12px 18px;font-size:1rem;font-weight:700;background:#2563eb;color:#fff;border:none;border-radius:10px">Reload</button>' +

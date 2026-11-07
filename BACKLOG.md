@@ -8,6 +8,37 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V152
+V152 = saved data that can't be read is kept safe (audit finding 1 — Peter 6 Nov: 1C 2B).
+storage.js: STORE_JSON / STORE_TEXT / STORE_OTHER classify every key; storeGuardBoot()
+before load() copies each unreadable value to UNREADABLE_PREFIX + key, checks it, moves it
+off; load() refuses unreadable jobs itself. boot.js: the stop screen when it can't be done
+safely. The Jobs banner, the Backup page section, unreadable-* actions; reset.js sweeps the
+copies at the work level. Also: V151's tests read the version from config.js (N / N + 1);
+main's hand-made 'pat-v151.1' replaced by pat-v152. Harness 91 + M1767–M1792; 90e's
+release checks → 91e.
+**Next, the audit order (Peter 6 Nov, 3A):**
+- **V153 (model: Opus — sync):** the minimum version kept in memory (audit finding 2):
+  `_syncMinSave()` swallows a failed write and `syncTooOld()` reads storage back, so a
+  full phone told it's too old carries on. Hold the received minimum in memory for the
+  account before persisting; `syncDataClient()` reads the minimum first when this page has
+  not (a cloud-tab tap before the first sync run after a restart).
+- **V154 (model: Opus — security):** ids checked on the way in (backup restore, cloud
+  intake, load) and escaped wherever they enter HTML (audit finding 3: `${s.id}` raw in
+  79 attributes; a crafted backup — or, once Teams exists, a teammate's job via the
+  cloud — could run script where the sign-in token is). Real-browser test.
+- **V155:** invites + roles with the Approve / Refuse screen (was V152 — see below).
+
+### V152 residuals (known, accepted)
+- The check is per stored VALUE. A broken entry inside a readable value (one client
+  without a name, one item that isn't an object) is still dropped by its reader as before.
+- A very large unreadable value on a nearly full phone can't be copied → the stop screen.
+  Save a copy is then the way out; there is no in-app repair.
+- An unreadable owner record (OWNER_KEY) is set aside like anything else, leaving the
+  phone unowned until the next sign-in adopts it — as an unreadable one behaved before.
+- Restoring from the kept copy itself isn't offered (it's unreadable by definition) —
+  daily snapshots or a backup are the way back; the copy is for us to look at.
+
 ### Next after V151
 V151 = the minimum app version (Peter 6 Nov: 0A 1A 2A 3A 4A). SQL supabase/v151-min-version.sql:
 app_settings (min_version 151, invite_phone_days 60), app_min_overrides (one account's raise —
@@ -18,8 +49,8 @@ syncDataClient() gates every on-request call (business.js _bizClient); the Updat
 line (Jobs list + Sync page, team / solo words) with Update now; boot.js puts an update in
 when it arrives within 20 s of the tap. Isolation 22a–22e. Harness 90 + M1737–M1766;
 89e's release checks → 90e.
-**Next (model: Opus — database rules + security): V152 invites + roles with the Approve /
-Refuse screen.** Its round decides: how an invite reaches someone (an address to sign in
+**Next (model: Opus — database rules + security): invites + roles with the Approve /
+Refuse screen — now V155, after the audit fixes (V152–V154).** Its round decides: how an invite reaches someone (an address to sign in
 with / a code / an email sent by a server function), who may invite (Owner, Team leader,
 Office — R58), the roles offered, accept / decline, the invite refused while
 org_phones_behind(business) > 0 (and whether the invitee's own phones count), raising the

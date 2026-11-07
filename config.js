@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V151';
+const APP_VERSION = 'V152';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -1405,6 +1405,15 @@ const SNAPSHOTS_KEY = 'pat:snapshots';
 // on the next success. Per device, a status note only — NOT in backups or setup
 // exports. Factory reset must clear it.
 const SNAPSHOT_FAIL_KEY = 'pat:snapshotFailDay';
+
+// V152 (audit finding 1): saved data that couldn't be read when PATGo opened
+// (storeGuardBoot, storage.js). Each unreadable value is copied, byte for byte,
+// to UNREADABLE_PREFIX + its own key, checked, and only then removed from its
+// key — so nothing PATGo writes afterwards can land on it. UNREADABLE_KEY is the
+// note of what was kept: JSON {at, keys, seen}. Per device: never backed up,
+// never synced. Reset: 'work' (reset.js also sweeps the prefix at that level).
+const UNREADABLE_KEY = 'pat:unreadable';
+const UNREADABLE_PREFIX = 'pat:unreadable:';
 
 // V106 (Stage 10 part 2): Reset this phone (reset.js). Present only between the
 // confirm tap and the next boot finishing the job: JSON {level, cert, at}. Read

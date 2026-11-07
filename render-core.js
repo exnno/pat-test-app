@@ -969,6 +969,7 @@ function renderSessions() {
 
   // V87 (S13): storage getting full — at STORAGE_BANNER_PCT, once a day.
   const storageBanner = renderStorageBanner();
+  const unreadableBanner = renderUnreadableBanner();   // V152
   // V91 (Stage 4, 8A): the tidy-up offer — signed in, once a month at most.
   const tidyBanner = renderTidyBanner();
   // V100 (Stage 8 part 3): the two in-app reminders — not exported, unlocked.
@@ -1023,6 +1024,7 @@ function renderSessions() {
       ${versionBanner}
       ${planBanner}
       ${tabs}
+      ${unreadableBanner}
       ${storageBanner}
       ${tidyBanner}
       ${calWarning}
@@ -1155,6 +1157,29 @@ function renderSaveFailSheet() {
         <button class="btn-secondary" data-action="save-fail-clear">Clear old jobs</button>
         <button class="btn-secondary" data-action="save-fail-close">Close</button>
       </div>
+    </div>
+  `;
+}
+
+// V152 (audit finding 1, 2B): saved data that couldn't be read was set aside
+// when PATGo opened (storeGuardBoot, storage.js). First of the phone tab's
+// banners — it can mean the jobs list is missing work. "Show me" opens the
+// Backup page (the kept copy, snapshots, restore); × hides it until the next
+// time something is set aside. Never under the cloud tab: it is this phone's.
+function renderUnreadableBanner() {
+  let kept = [];
+  try { kept = (typeof storeUnreadableBannerDue === 'function' && storeUnreadableBannerDue()) ? storeUnreadableKept() : []; } catch (e) { kept = []; }
+  if (!kept.length) return '';
+  const work = storeUnreadableHasWork(kept);
+  return `
+    <div class="backup-banner unreadable-banner" role="alert">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text">PATGo couldn\u2019t read ${escapeHTML(storeUnreadableWords(kept))} when it opened. ${work ? 'It\u2019s kept safe on this phone, untouched \u2014 you can get your work back from a daily snapshot or a backup.' : 'It\u2019s kept safe on this phone, untouched, and PATGo went back to its standard setup for it.'}</div>
+        <div class="backup-banner-actions">
+          <button class="backup-banner-action primary" id="unreadable-open" data-action="unreadable-open">Show me</button>
+        </div>
+      </div>
+      <button class="backup-banner-dismiss" id="unreadable-dismiss" data-action="unreadable-dismiss" aria-label="Hide">\u00d7</button>
     </div>
   `;
 }
