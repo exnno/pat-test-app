@@ -20,9 +20,8 @@
           sheet.
      90d  Plumbing: the action is wired; MIN_VERSION_KEY follows the account
           (reset, takeover), is never in a backup; garbage reads as nothing.
-     90e  Release: V151, cache, About V151 / V150 / V149 (V148 rolled off), no
-          What's new (still V150's — pinned here since 89e's release checks
-          moved).
+     90e  Carried (V152: its release checks — V151, cache, About, What's
+          new — moved to 91e).
      90f  The SQL's text: the setting, the raise, what a phone may call, the
           invite check counting old and unreported phones; schema.sql ends with
           exactly the V151 statements; self-checks V1–V4; isolation 22a–22e;
@@ -51,6 +50,9 @@ const OWN  = 'aaaaaaaa-0000-4000-8000-000000000001';
 const TEAM = 'aaaaaaaa-0000-4000-8000-000000000002';
 const json = (v, status = 200) => new Response(JSON.stringify(v), { status, headers: { 'content-type': 'application/json' } });
 const HOUR = 3600000;
+// V152: the phone's own version, read from config.js — so 'meets the minimum'
+// (N) and 'too old' (N + 1) stay true in every later release.
+const N = Number(/const APP_VERSION = 'V(\d+)/.exec(read('config.js'))[1]);
 const TABLES = /\/rest\/v1\/(sessions|records|photos|phones|session_photo_counts)\b|\/rest\/v1\/rpc\/(my_businesses|my_job_moves|move_job)\b|\/storage\/v1\//;
 
 function storedSession() {
@@ -65,7 +67,7 @@ function storedSession() {
 // A pretend Supabase. my_min_version answers srv.min (or fails: srv.minFail).
 function fakeServer() {
   const calls = [];
-  const srv = { calls, min: 151, minFail: false };
+  const srv = { calls, min: N, minFail: false };
   srv.fetchImpl = async (url, init = {}) => {
     const u = String(url);
     const method = init.method || 'GET';
@@ -144,7 +146,7 @@ module.exports = async function () {
   await t.group('90a — the minimum is read before anything else; hourly, at once after a start or return; a failed read keeps what was known', async () => {
     t.eq(freshApp().run("syncAppVersionNum('V151.1')"), 151, "'V151.1' → 151 (the database's rule)");
     t.eq(freshApp().run("syncAppVersionNum('beta')"), 0, 'not a version → 0');
-    t.eq(freshApp().run('syncAppVersionNum()'), 151, 'this phone → 151');
+    t.eq(freshApp().run('syncAppVersionNum()'), N, 'this phone → its own APP_VERSION');
 
     const app = await signedIn();
     await app.run('syncPull()');
@@ -152,7 +154,7 @@ module.exports = async function () {
     t.ok(first > -1, 'a run reads the minimum');
     t.ok(app.srv.firstWork() > first, '…before any work is read or sent');
     const rec = JSON.parse(app.storage.getItem('pat:minVersion'));
-    t.eq(rec.u + ' ' + rec.min, UID + ' 151', 'kept: this account, 151');
+    t.eq(rec.u + ' ' + rec.min, UID + ' ' + N, 'kept: this account, its minimum');
     t.notOk(app.run('syncTooOld()'), 'V151 against 151: not too old');
 
     const n0 = app.srv.rpcs('my_min_version').length;
@@ -165,7 +167,7 @@ module.exports = async function () {
     await app.run('syncPull()');
     t.eq(app.srv.rpcs('my_min_version').length, n0 + 1, 'back at the front (visibilitychange through document): read again');
 
-    app.storage.setItem('pat:minVersion', minRec(151, UID, Date.now() - 2 * HOUR));
+    app.storage.setItem('pat:minVersion', minRec(N, UID, Date.now() - 2 * HOUR));
     await app.run('syncPull()');
     t.eq(app.srv.rpcs('my_min_version').length, n0 + 2, 'over an hour old: read again');
 
@@ -187,7 +189,7 @@ module.exports = async function () {
   /* ------------------------------------------------------------------ 90b */
   await t.group('90b — below it: nothing read, nothing sent, nothing asked for; a lower minimum or another account syncs', async () => {
     const app = await signedIn();
-    app.srv.min = 152;
+    app.srv.min = N + 1;
     withUnsentJob(app);
     await app.run('syncPull()');
     t.eq(app.srv.rpcs('my_min_version').length, 1, 'the minimum was read');
@@ -211,7 +213,7 @@ module.exports = async function () {
     t.eq(app.srv.work().length, before, '…none of them, nor the Business page, asked the cloud anything');
 
     // Lowered again (or the phone updated): it syncs, and the job goes up.
-    app.srv.min = 151;
+    app.srv.min = N;
     app.run('syncMinOwe()');
     await app.run('syncPull()');
     t.notOk(app.run('syncTooOld()'), 'a lower minimum: no longer too old');
@@ -231,7 +233,7 @@ module.exports = async function () {
     ok.fn('render')();
     t.excludes(html(ok), 'id="version-banner"', 'new enough: no line');
 
-    const app = await signedIn({ localStorage: { 'pat:minVersion': minRec(152) } });
+    const app = await signedIn({ localStorage: { 'pat:minVersion': minRec(N + 1) } });
     const st = app.state();
     st.view = 'sessions';
     app.fn('render')();
@@ -268,7 +270,7 @@ module.exports = async function () {
     t.eq(skipped(w), 1, 'an update waiting: Update now puts it in at once');
 
     // Nothing waiting: it asks for one, and says so.
-    const b = await signedIn({ localStorage: { 'pat:minVersion': minRec(152) } });
+    const b = await signedIn({ localStorage: { 'pat:minVersion': minRec(N + 1) } });
     const bs = b.state();
     bs.view = 'sessions';
     let asked = 0;
@@ -284,7 +286,7 @@ module.exports = async function () {
     t.eq(skipped(nw), 1, 'the update arrives while looking: in straight away');
 
     // Arriving later than SYNC_VERSION_LOOK_MS: the safe moment decides, as ever.
-    const c = await signedIn({ localStorage: { 'pat:minVersion': minRec(152) } });
+    const c = await signedIn({ localStorage: { 'pat:minVersion': minRec(N + 1) } });
     c.state().view = 'sessions';
     c.state().sync.versionLookAt = Date.now() - c.run('SYNC_VERSION_LOOK_MS') - 1000;
     c.run('_updateLastTouch = Date.now()');
@@ -294,7 +296,7 @@ module.exports = async function () {
     c.run('if (_updateTimer) { clearTimeout(_updateTimer); _updateTimer = null; }');
 
     // Within the window but a sheet is open: never under it.
-    const d = await signedIn({ localStorage: { 'pat:minVersion': minRec(152) } });
+    const d = await signedIn({ localStorage: { 'pat:minVersion': minRec(N + 1) } });
     d.state().view = 'sessions';
     d.state().sync.versionLookAt = Date.now();
     const sheet = d.doc.createElement('div');
@@ -325,24 +327,13 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 90e */
-  await t.group('90e — release: V151; cache; About V151 / V150 / V149; no What’s new', () => {
+  // V152: the release checks (version, cache, About, What's new) moved to 91e.
+  // What stays is V151's own and never rolls: its About line, while in the window
+  // M1259 pins it via 91e; the Update now action stays wired (90d).
+  await t.group('90e — V151 carried (release checks → 91e)', () => {
     const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V151', 'APP_VERSION V151');
-    t.eq(rel.run('WELCOME_VERSION'), 'V150', 'What’s new not rolled (still V150’s)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v151';", 'cache key pat-v151');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: V150’s one line');
-    t.includes(sheetCopy, '<li><strong>Move a job to another business.</strong> For anyone who works for more than one business:', '…moving a job');
-    t.includes(sheetCopy, 'Working for just one business? Nothing changes.</li>', '…and nothing changes for everyone else');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V151</strong>'), y = help.indexOf('<p><strong>V150</strong>'), z = help.indexOf('<p><strong>V149</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V151, V150, V149');
-    t.excludes(help, '<p><strong>V148</strong>', 'V148 rolled off');
-    t.includes(help, 'Behind the scenes: the cloud can now ask for a newer PATGo before a phone syncs.', 'About: V151’s line');
-    t.includes(help, 'Move a job to another business: Job settings &rarr; Business &rarr; Change&hellip;', 'About: V150’s line still there');
-    t.includes(help, 'Every job now knows which business it belongs to.', 'About: V149’s line still there');
+    t.ok(rel.run('syncAppVersionNum()') >= 151, 'this phone is V151 or later');
+    t.eq(rel.run("syncAppVersionNum('V151')"), 151, 'V151 reads as 151 (the minimum the setting started at)');
   });
 
   /* ------------------------------------------------------------------ 90f */

@@ -600,3 +600,8 @@ module.exports = async function () {
     t.ok(fs.readFileSync(path.join(APP_DIR, 'index.html'), 'utf8').indexOf('30-') === -1, 'the test is not shipped');
   });
 };
+
+// V152: group 91 drives a signed-in pull with this fake rather than copying it.
+module.exports.fakeServer = fakeServer;
+module.exports.seed = seed;
+module.exports.monthsAgo = monthsAgo;
