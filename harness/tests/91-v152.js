@@ -22,8 +22,8 @@
           that won't move — nothing changed, nothing left half-done, save() and
           render() neutralised, the stop screen's Save a copy holds the bytes.
           load() refuses unreadable jobs by itself (the backstop).
-     91e  Release: V152, cache pat-v152 (the label reads it), About V152 / V151 /
-          V150, What's new not rolled (still V150's).
+     91e  Carried (V153: its release checks — V152, cache, About, What's
+          new — moved to 92c); the label reads release and hotfix keys.
      91f  What the engineer sees: the Jobs banner (phone tab only; Show me, ×),
           the Backup page section (words, Save a copy, Delete), Reset and a
           takeover clear the copies, a backup never carries them.
@@ -311,26 +311,14 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 91e */
-  await t.group('91e — release: V152; cache pat-v152; About V152 / V151 / V150; no What’s new', () => {
+  // V153: the release checks (version, cache, About, What's new) moved to 92c.
+  // What stays is V152's own and never rolls: the update banner reads a release
+  // key and a hotfix key (the form a hand edit to sw.js must take — 'pat-v151.1'
+  // was unreadable).
+  await t.group('91e — V152 carried (release checks → 92c)', () => {
     const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V152', 'APP_VERSION V152');
-    t.eq(rel.run('WELCOME_VERSION'), 'V150', 'What’s new not rolled (still V150’s)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v152';", 'cache key pat-v152');
-    t.eq(rel.fn('updateVersionLabel')('pat-v152'), 'V152', 'the update banner reads the key as V152');
+    t.eq(rel.fn('updateVersionLabel')('pat-v152'), 'V152', 'the update banner reads pat-v152 as V152');
     t.eq(rel.fn('updateVersionLabel')('pat-v152-1'), 'V152.1', '…and a hotfix key as V152.1');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: V150’s one line');
-    t.includes(sheetCopy, '<li><strong>Move a job to another business.</strong> For anyone who works for more than one business:', '…moving a job');
-    t.includes(sheetCopy, 'Working for just one business? Nothing changes.</li>', '…and nothing changes for everyone else');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V152</strong>'), y = help.indexOf('<p><strong>V151</strong>'), z = help.indexOf('<p><strong>V150</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V152, V151, V150');
-    t.excludes(help, '<p><strong>V149</strong>', 'V149 rolled off');
-    t.includes(help, 'Behind the scenes: if PATGo ever can&rsquo;t read something saved on this phone', 'About: V152’s line');
-    t.includes(help, 'Behind the scenes: the cloud can now ask for a newer PATGo before a phone syncs.', 'About: V151’s line still there');
-    t.includes(help, 'Move a job to another business: Job settings &rarr; Business &rarr; Change&hellip;', 'About: V150’s line still there');
   });
 
   /* ------------------------------------------------------------------ 91f */

@@ -167,7 +167,9 @@ module.exports = async function () {
     await app.run('syncPull()');
     t.eq(app.srv.rpcs('my_min_version').length, n0 + 1, 'back at the front (visibilitychange through document): read again');
 
+    // V153: the answer held in memory decides (not its stored copy) — age that.
     app.storage.setItem('pat:minVersion', minRec(N, UID, Date.now() - 2 * HOUR));
+    app.run(`_syncMinHeld = { u: '${UID}', min: ${N}, at: Date.now() - 2 * ${HOUR} }`);
     await app.run('syncPull()');
     t.eq(app.srv.rpcs('my_min_version').length, n0 + 2, 'over an hour old: read again');
 
