@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V151';",
-    to:   "const APP_VERSION = 'V150';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V152';",
+    to:   "const APP_VERSION = 'V151';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151).
-    from: '        <p><strong>V149</strong> &middot; November 2026</p>',   // V151: V148 rolled off — the oldest is V149
+    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152).
+    from: '        <p><strong>V150</strong> &middot; November 2026</p>',   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150
     to:   '        <p><strong>V147</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V148</strong> &middot; November 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 90e)',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 91e)',
   },
 
   {
@@ -5205,8 +5205,8 @@ const MUTATIONS = [
   {
     name: "M721 (V106) the work level keeps the sync bookkeeping",
     file: "reset.js",
-    from: "    for (const k of all) if (work.has(k)) doomed.push(k);",
-    to:   "    for (const k of all) if (work.has(k) && k !== SYNC_STATE_KEY) doomed.push(k);",
+    from: "    for (const k of all) if (work.has(k) || k.indexOf(UNREADABLE_PREFIX) === 0) doomed.push(k);",   // V152: re-anchored (the kept copies join the work)
+    to:   "    for (const k of all) if ((work.has(k) || k.indexOf(UNREADABLE_PREFIX) === 0) && k !== SYNC_STATE_KEY) doomed.push(k);",
     why:  "signed in, the phone would think the cloud's jobs were already here (43b, 43h)",
   },
   {
@@ -6122,9 +6122,9 @@ const MUTATIONS = [
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
     // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
-    from: "<li><strong>Move a job to another business.</strong>",   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it.
+    from: "<li><strong>Move a job to another business.</strong>",   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it.
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (90e)",
+    why:  "11A: the welcome says plainly what changed on screen (91e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -6861,8 +6861,8 @@ const MUTATIONS = [
   {
     name: "M962 (V122) loading quietly renames old Session N jobs",
     file: "storage.js",
-    from: "  state.sessions = parseStoredSessions(localStorage.getItem(STORAGE_KEY));",
-    to:   "  state.sessions = parseStoredSessions(localStorage.getItem(STORAGE_KEY));\n  state.sessions.forEach(s => { if (/^Session \\d+$/.test(s.name || '')) s.name = s.name.replace('Session', 'Job'); });",
+    from: "  state.sessions = seen.parsed ? _sessionsFromParsed(seen.parsed) : [];",   // V152: re-anchored (load() checks the value first)
+    to:   "  state.sessions = seen.parsed ? _sessionsFromParsed(seen.parsed) : [];\n  state.sessions.forEach(s => { if (/^Session \\d+$/.test(s.name || '')) s.name = s.name.replace('Session', 'Job'); });",
     why:  "4A: a saved job's name is the engineer's data — never rewritten (60c)",
   },
   {
@@ -7736,8 +7736,8 @@ const MUTATIONS = [
   {
     name: "M1091 (V127) the Jobs list loses the plan line",
     file: "render-core.js",
-    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${tabs}\n      ${storageBanner}",   // V151: re-anchored (the version line above it)
-    to:   "      ${header}\n      ${versionBanner}\n      ${tabs}\n      ${storageBanner}",
+    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${tabs}\n      ${unreadableBanner}",   // V151: re-anchored (the version line above it). V152: (the unreadable banner below)
+    to:   "      ${header}\n      ${versionBanner}\n      ${tabs}\n      ${unreadableBanner}",
     why:  "4A 6b: the countdown is on the Jobs list (65e)",
   },
   {
@@ -8606,7 +8606,7 @@ const MUTATIONS = [
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
     from: "const WELCOME_VERSION = 'V150';",   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
     to:   "const WELCOME_VERSION = 'V149';",
-    why:  "What's new is rolled on a feature release (90e)",
+    why:  "What's new is rolled on a feature release (91e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
@@ -8621,7 +8621,7 @@ const MUTATIONS = [
     // V150: one line — re-aimed at its end.
     from: "Working for just one business? Nothing changes.</li>\n",
     to:   "Working for just one business? Nothing changes.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (90e)",
+    why:  "one line (91e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8635,9 +8635,9 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Move a job to another business: Job settings &rarr; Business &rarr; Change&hellip;",
+    from: "Behind the scenes: if PATGo ever can&rsquo;t read something saved on this phone",
     to:   "Better",
-    why:  "the About page must say what changed in this version (90e)",   // V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's
+    why:  "the About page must say what changed in this version (91e)",   // V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8752,9 +8752,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Behind the scenes: the cloud can now ask for a newer PATGo before a phone syncs.",   // V151: V148's line rolled off — re-aimed at V151's (90e)
+    from: "Move a job to another business: Job settings &rarr; Business &rarr; Change&hellip;",   // V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e)
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (90e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
+    why:  "the About page keeps the last three versions' lines (91e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8914,9 +8914,9 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Every job now knows which business it belongs to.",
+    from: "Behind the scenes: the cloud can now ask for a newer PATGo before a phone syncs.",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (90e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window
+    why:  "the About page keeps the last three versions' lines (91e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9043,9 +9043,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v151';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e).
-    to:   "const CACHE_VERSION = 'pat-v150';",
-    why:  "a release needs its cache bump or phones never get it (90e)",
+    from: "const CACHE_VERSION = 'pat-v152';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them.
+    to:   "const CACHE_VERSION = 'pat-v151.1';",
+    why:  "a release needs its cache bump or phones never get it (91e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -12382,8 +12382,8 @@ const MUTATIONS = [
   {
     name: "M1752 (V151) the Jobs list loses the version line",
     file: "render-core.js",
-    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${tabs}\n      ${storageBanner}",
-    to:   "      ${header}\n      ${planBanner}\n      ${tabs}\n      ${storageBanner}",
+    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${tabs}\n      ${unreadableBanner}",   // V152: re-anchored (the unreadable banner below)
+    to:   "      ${header}\n      ${planBanner}\n      ${tabs}\n      ${unreadableBanner}",
     why:  "syncing stops with nothing on the Jobs list to say why (90c)",
   },
   {
@@ -12483,6 +12483,188 @@ const MUTATIONS = [
     from: "    insert into public.app_min_overrides (user_id, min_version, note)\n    values (u, 999999, 'V151 test aid')",
     to:   "    update public.app_settings set min_version = 999999 where id = 1;\n    insert into public.app_min_overrides (user_id, min_version, note)\n    values (u, 999999, 'V151 test aid')",
     why:  "4A: your testers' phones would stop too (90f)",
+  },  // ---- V152 (1C 2B): saved data that can't be read. Group 91 + M1767–M1792. ----
+  {
+    name: "M1767 (V152) the guard never runs at start",
+    file: "boot.js",
+    from: "  storeGuardBoot();\n  load();\n",
+    to:   "  load();\n",
+    why:  "1C 2B: without it the backstop stops every start with unreadable jobs, and nothing is set aside (91b)",
+  },
+  {
+    name: "M1768 (V152) a list of anything reads as jobs",
+    file: "storage.js",
+    from: "    return { ok: !!list && list.every(_storePlainObject), parsed: v };",
+    to:   "    return { ok: !!list, parsed: v };",
+    why:  "a job that isn't an object reads as an empty phone's worth of junk (91b)",
+  },
+  {
+    name: "M1769 (V152) broken JSON reads as nothing stored",
+    file: "storage.js",
+    from: "  try { v = JSON.parse(raw); } catch (e) { return { ok: false, parsed: null }; }",
+    to:   "  try { v = JSON.parse(raw); } catch (e) { return { ok: true, parsed: null }; }",
+    why:  "the exact pre-V152 behaviour: unreadable is 'nothing', and the next save writes over it (91b)",
+  },
+  {
+    name: "M1770 (V152) any shape passes as a list",
+    file: "storage.js",
+    from: "  if (shape === 'array') return { ok: Array.isArray(v), parsed: v };",
+    to:   "  if (shape === 'array') return { ok: true, parsed: v };",
+    why:  "a sites value that isn't a list would read as no sites (91b)",
+  },
+  {
+    name: "M1771 (V152) a list passes as a settings object",
+    file: "storage.js",
+    from: "  if (shape === 'object') return { ok: _storePlainObject(v), parsed: v };",
+    to:   "  if (shape === 'object') return { ok: !!v && typeof v === 'object', parsed: v };",
+    why:  "the readers default a list, and the settings are saved over (91b)",
+  },
+  {
+    name: "M1772 (V152) a stored null is unreadable",
+    file: "storage.js",
+    from: "  if (v === null) return { ok: true, parsed: null };",
+    to:   "  if (v === null) return { ok: false, parsed: null };",
+    why:  "'null' is what nothing-stored looks like \u2014 setting it aside every start would be a false alarm (91a)",
+  },
+  {
+    name: "M1773 (V152) the copy is never compared",
+    file: "storage.js",
+    from: "    if (localStorage.getItem(ck) !== b.raw) stop('the copy did not match');\n",
+    to:   "",
+    why:  "a phone that stores the copy wrongly would lose the original once it moves (91d)",
+  },
+  {
+    name: "M1774 (V152) an identical copy already kept stops the start",
+    file: "storage.js",
+    from: "      if (prev === b.raw) continue;   // already kept (a start that stopped before the removal) \u2014 safe\n",
+    to:   "",
+    why:  "a start interrupted after the copy would stop every start after it (91b)",
+  },
+  {
+    name: "M1775 (V152) an earlier, different copy is written over",
+    file: "storage.js",
+    from: "      stop('an earlier copy is in the way');\n",
+    to:   "",
+    why:  "the older kept copy would be lost (91d)",
+  },
+  {
+    name: "M1776 (V152) a stop leaves the copies it made",
+    file: "storage.js",
+    from: "    for (const k of made) { try { localStorage.removeItem(k); } catch (e) { /* stays: harmless */ } }\n",
+    to:   "",
+    why:  "a full phone fills further with half a set of copies, every start (91d)",
+  },
+  {
+    name: "M1777 (V152) a stop after the move takes the copies back",
+    file: "storage.js",
+    from: "  made.length = 0;\n",
+    to:   "",
+    why:  "an original already moved has only its copy left \u2014 removing it loses the data (91d)",
+  },
+  {
+    name: "M1778 (V152) the original is never moved off",
+    file: "storage.js",
+    from: "    try { localStorage.removeItem(b.key); } catch (e) { /* checked next */ }\n",
+    to:   "",
+    why:  "the unreadable value stays where the next save lands (91b)",
+  },
+  {
+    name: "M1779 (V152) load() reads unreadable jobs as none",
+    file: "storage.js",
+    from: "  if (!seen.ok) {\n    const e = new Error('saved jobs could not be read');",
+    to:   "  if (false) {\n    const e = new Error('saved jobs could not be read');",
+    why:  "the backstop: load() alone must never turn unreadable jobs into an empty phone (91d)",
+  },
+  {
+    name: "M1780 (V152) a new set-aside keeps the old 'seen'",
+    file: "storage.js",
+    from: "JSON.stringify({ at: new Date().toISOString(), keys, seen: false })",
+    to:   "JSON.stringify({ at: new Date().toISOString(), keys, seen: note.seen })",
+    why:  "something newly set aside would never be shown (91f)",
+  },
+  {
+    name: "M1781 (V152) the Jobs list never shows the banner",
+    file: "render-core.js",
+    from: "      ${tabs}\n      ${unreadableBanner}\n",
+    to:   "      ${tabs}\n",
+    why:  "the engineer would never know work was set aside (91f)",
+  },
+  {
+    name: "M1782 (V152) \u00d7 doesn't stick",
+    file: "storage.js",
+    from: "  try { localStorage.setItem(UNREADABLE_KEY, JSON.stringify({ at: n.at, keys: n.keys, seen: true })); } catch (e) { /* shows again next start */ }",
+    to:   "",
+    why:  "the banner can't be dismissed (91f)",
+  },
+  {
+    name: "M1783 (V152) the Backup page leaves the section out",
+    file: "render-settings.js",
+    from: "      ${settingsHowToHTML('settingsBackup')}\n      ${unreadableBlock}\n",
+    to:   "      ${settingsHowToHTML('settingsBackup')}\n",
+    why:  "Show me leads nowhere: no Save a copy, no Delete (91f)",
+  },
+  {
+    name: "M1784 (V152) Clear my work leaves the kept copies",
+    file: "reset.js",
+    from: "if (work.has(k) || k.indexOf(UNREADABLE_PREFIX) === 0) doomed.push(k);",
+    to:   "if (work.has(k)) doomed.push(k);",
+    why:  "the old work survives a reset of the work (91f)",
+  },
+  {
+    name: "M1785 (V152) Save a copy writes empty values",
+    file: "storage.js",
+    from: "values[x.key] = String(x.raw == null ? '' : x.raw);",
+    to:   "values[x.key] = '';",
+    why:  "the file is the only way to send us the data (91d)",
+  },
+  {
+    name: "M1786 (V152) the stop screen is the update screen",
+    file: "boot.js",
+    from: "  if (failEl && e && Array.isArray(e.storeUnreadable) && e.storeUnreadable.length) {",
+    to:   "  if (false) {",
+    why:  "Reload would only come back; no Save a copy (91d)",
+  },
+  {
+    name: "M1787 (V152) the stop screen's Save a copy does nothing",
+    file: "boot.js",
+    from: "      saveBtn.addEventListener('click', () => { try { storeUnreadableDownload(_bootUnreadable); } catch (e3) { console.error(e3); } });",
+    to:   "      saveBtn.addEventListener('click', () => {});",
+    why:  "the button is the way out of the stop screen (91d)",
+  },
+  {
+    name: "M1788 (V152) clients drop out of the check",
+    file: "storage.js",
+    from: "  ['CLIENTS_KEY', CLIENTS_KEY, 'array', 'your clients'],\n",
+    to:   "",
+    why:  "1C: every key \u2014 unreadable clients would read as none (91a)",
+  },
+  {
+    name: "M1789 (V152) an unknown codec reads as jobs",
+    file: "storage.js",
+    from: " && v._c >= 1 && v._c <= STORAGE_CODEC_VERSION && ",
+    to:   " && v._c >= 1 && ",
+    why:  "a newer PATGo's jobs would be decoded wrongly and saved over (91b)",
+  },
+  {
+    name: "M1790 (V152) Show me opens the wrong page",
+    file: "dispatch.js",
+    from: "  'unreadable-open': () => setView('settingsBackup'),",
+    to:   "  'unreadable-open': () => setView('settings'),",
+    why:  "the banner's one button (91f)",
+  },
+  {
+    name: "M1791 (V152) Delete doesn't ask first",
+    file: "dispatch.js",
+    from: "    const n = storeUnreadableKept().length;\n    if (!n) return;\n    openConfirmSheet({\n      title: 'Delete the kept copy?',",
+    to:   "    const n = storeUnreadableKept().length;\n    if (!n) return;\n    storeUnreadableDelete(); render();\n    if (0) openConfirmSheet({\n      title: 'Delete the kept copy?',",
+    why:  "it can't be undone (91f)",
+  },
+  {
+    name: "M1792 (V152) the stop screen has no background of its own",
+    file: "boot.js",
+    from: "background:#fff;min-height:100vh;box-sizing:border-box;line-height:1.5\">' +\n      '<h2 style=\"margin:0 0 8px\">Some saved data couldn",
+    to:   "line-height:1.5\">' +\n      '<h2 style=\"margin:0 0 8px\">Some saved data couldn",
+    why:  "in dark mode the words are dark on dark \u2014 unreadable exactly when it matters (91d)",
   },
 ];
 
