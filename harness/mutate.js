@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V152';",
-    to:   "const APP_VERSION = 'V151';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V153';",
+    to:   "const APP_VERSION = 'V152';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -639,10 +639,10 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON THE OLDEST ENTRY, WHICH ROLLS EVERY RELEASE. Re-point it at
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
-    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152).
-    from: '        <p><strong>V150</strong> &middot; November 2026</p>',   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150
-    to:   '        <p><strong>V147</strong> &middot; October 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V148</strong> &middot; November 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 91e)',
+    // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
+    from: '        <p><strong>V151</strong> &middot; November 2026</p>',   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151
+    to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 92c)',
   },
 
   {
@@ -6122,9 +6122,9 @@ const MUTATIONS = [
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
     // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
-    from: "<li><strong>Move a job to another business.</strong>",   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it.
+    from: "<li><strong>Move a job to another business.</strong>",   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (91e)",
+    why:  "11A: the welcome says plainly what changed on screen (92c)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8606,7 +8606,7 @@ const MUTATIONS = [
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
     from: "const WELCOME_VERSION = 'V150';",   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
     to:   "const WELCOME_VERSION = 'V149';",
-    why:  "What's new is rolled on a feature release (91e)",
+    why:  "What's new is rolled on a feature release (92c)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
@@ -8621,7 +8621,7 @@ const MUTATIONS = [
     // V150: one line — re-aimed at its end.
     from: "Working for just one business? Nothing changes.</li>\n",
     to:   "Working for just one business? Nothing changes.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (91e)",
+    why:  "one line (92c)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8635,9 +8635,9 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Behind the scenes: if PATGo ever can&rsquo;t read something saved on this phone",
+    from: "Behind the scenes: a phone that&rsquo;s too old to sync now stops",
     to:   "Better",
-    why:  "the About page must say what changed in this version (91e)",   // V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's
+    why:  "the About page must say what changed in this version (92c)",   // V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8752,9 +8752,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Move a job to another business: Job settings &rarr; Business &rarr; Change&hellip;",   // V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e)
+    from: "Behind the scenes: the cloud can now ask for a newer PATGo before a phone syncs.",   // V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (92c)
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (91e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
+    why:  "the About page keeps the last three versions' lines (92c)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8914,9 +8914,9 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Behind the scenes: the cloud can now ask for a newer PATGo before a phone syncs.",
+    from: "Behind the scenes: if PATGo ever can&rsquo;t read something saved on this phone",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (91e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window
+    why:  "the About page keeps the last three versions' lines (92c)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9043,9 +9043,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v152';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them.
-    to:   "const CACHE_VERSION = 'pat-v151.1';",
-    why:  "a release needs its cache bump or phones never get it (91e)",
+    from: "const CACHE_VERSION = 'pat-v153';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v152';",
+    why:  "a release needs its cache bump or phones never get it (92c)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -12291,8 +12291,9 @@ const MUTATIONS = [
   {
     name: "M1739 (V151) the minimum is never read again after the first time",
     file: "sync.js",
-    from: "  if (!force && !_syncMinOwed && rec.u === uid && rec.at && now >= rec.at && now - rec.at < SYNC_MIN_CHECK_MS) {",
-    to:   "  if (!force && rec.u === uid && rec.at) {",
+    // V153: re-anchored — rec is now this account's (_syncMinFor), held or stored.
+    from: "  if (!force && !_syncMinOwed && rec.at && now >= rec.at && now - rec.at < SYNC_MIN_CHECK_MS) {",
+    to:   "  if (!force && rec.at) {",
     why:  "a minimum raised later never reaches a phone that read it once (90a)",
   },
   {
@@ -12312,22 +12313,25 @@ const MUTATIONS = [
   {
     name: "M1742 (V151) a failed read forgets that the phone is too old",
     file: "sync.js",
-    from: "      return known;\n    });\n}",
-    to:   "      try { localStorage.removeItem(MIN_VERSION_KEY); } catch (e2) { /* */ }\n      return null;\n    });\n}",
+    // V153: re-anchored — the read ends by letting go of the shared promise; forgetting now drops the held answer too.
+    from: "      return known;\n    })\n    .then((v) =>",
+    to:   "      try { localStorage.removeItem(MIN_VERSION_KEY); } catch (e2) { /* */ }\n      _syncMinHeld = null;\n      return null;\n    })\n    .then((v) =>",
     why:  "no signal, or a hiccup, and a too-old phone starts syncing again (90a)",
   },
   {
     name: "M1743 (V151) another account's minimum stops this one",
     file: "sync.js",
-    from: "  return rec.u === u && Number.isInteger(rec.min) && rec.min > syncAppVersionNum();",
-    to:   "  return Number.isInteger(rec.min) && rec.min > syncAppVersionNum();",
+    // V153: re-anchored — the stored copy's account check moved to _syncMinFor (the held one: M1795).
+    from: "  return r.u === u ? r : {};",
+    to:   "  return r;",
     why:  "the minimum follows the account, not the phone (90b)",
   },
   {
     name: "M1744 (V151) a phone ON the minimum counts as too old",
     file: "sync.js",
-    from: "  return rec.u === u && Number.isInteger(rec.min) && rec.min > syncAppVersionNum();",
-    to:   "  return rec.u === u && Number.isInteger(rec.min) && rec.min >= syncAppVersionNum();",
+    // V153: re-anchored (syncTooOld reads _syncMinFor, already this account's).
+    from: "  return Number.isInteger(rec.min) && rec.min > syncAppVersionNum();",
+    to:   "  return Number.isInteger(rec.min) && rec.min >= syncAppVersionNum();",
     why:  "every phone stops the moment the minimum is raised to the version it runs (90a)",
   },
   {
@@ -12340,8 +12344,9 @@ const MUTATIONS = [
   {
     name: "M1746 (V151) the on-request gate lets an old phone through",
     file: "sync.js",
-    from: "    if (syncTooOld()) { const e = new Error('PATGo needs updating'); e.syncStage = 'version'; throw e; }\n    return c;",
-    to:   "    return c;",
+    // V153: re-anchored — the gate now waits for the read first (1A).
+    from: "      if (syncTooOld(uid)) { const e = new Error('PATGo needs updating'); e.syncStage = 'version'; throw e; }\n      return c;",
+    to:   "      return c;",
     why:  "the cloud tab, bring back and Cloud Storage still read the cloud on an old phone (90b)",
   },
   {
@@ -12665,6 +12670,63 @@ const MUTATIONS = [
     from: "background:#fff;min-height:100vh;box-sizing:border-box;line-height:1.5\">' +\n      '<h2 style=\"margin:0 0 8px\">Some saved data couldn",
     to:   "line-height:1.5\">' +\n      '<h2 style=\"margin:0 0 8px\">Some saved data couldn",
     why:  "in dark mode the words are dark on dark \u2014 unreadable exactly when it matters (91d)",
+  },
+  // ---- V153 (1A 2A): the minimum app version held in memory (audit finding 2). Group 92 + M1793–M1800. ----
+  {
+    name: "M1793 (V153) the check goes back to the stored copy",
+    file: "sync.js",
+    from: "  const rec = _syncMinFor(u);\n  return Number.isInteger(rec.min) && rec.min > syncAppVersionNum();",
+    to:   "  const rec = _syncMinLoad();\n  return rec.u === u && Number.isInteger(rec.min) && rec.min > syncAppVersionNum();",
+    why:  "a full phone told too old syncs anyway — the audit's finding (92a)",
+  },
+  {
+    name: "M1794 (V153) the answer is held only once it has been stored",
+    file: "sync.js",
+    from: "  _syncMinHeld = { u: rec.u, min: rec.min, at: rec.at };\n  try { localStorage.setItem(MIN_VERSION_KEY, JSON.stringify(rec)); } catch",
+    to:   "  try { localStorage.setItem(MIN_VERSION_KEY, JSON.stringify(rec)); _syncMinHeld = { u: rec.u, min: rec.min, at: rec.at }; } catch",
+    why:  "the write that fails on a full phone would skip the line that matters (92a)",
+  },
+  {
+    name: "M1795 (V153) the held answer stops every account",
+    file: "sync.js",
+    from: "  if (_syncMinHeld && _syncMinHeld.u === u) return _syncMinHeld;",
+    to:   "  if (_syncMinHeld) return _syncMinHeld;",
+    why:  "one account's minimum must not stop another signing in on the phone (92a)",
+  },
+  {
+    name: "M1796 (V153) a cloud action doesn't read the minimum first",
+    file: "sync.js",
+    from: "    const asked = uid ? syncMinVersionRead(c, uid) : Promise.resolve();",
+    to:   "    const asked = Promise.resolve();",
+    why:  "1A: a tap before the first run goes by an out-of-date stored answer (92b)",
+  },
+  {
+    name: "M1797 (V153) a cloud action doesn't wait for the read",
+    file: "sync.js",
+    from: "    return asked.then(() => {\n      if (syncTooOld(uid)) { const e = new Error('PATGo needs updating');",
+    to:   "    return Promise.resolve().then(() => {\n      if (syncTooOld(uid)) { const e = new Error('PATGo needs updating');",
+    why:  "the action must not go ahead before the answer is in (92b)",
+  },
+  {
+    name: "M1798 (V153) actions at the same moment each read the minimum",
+    file: "sync.js",
+    from: "  if (!force && _syncMinReading && _syncMinReading.u === uid) return _syncMinReading.p;",
+    to:   "",
+    why:  "one read answers everyone asking at once (92b)",
+  },
+  {
+    name: "M1799 (V153) a finished read is never let go",
+    file: "sync.js",
+    from: "    .then((v) => { if (_syncMinReading && _syncMinReading.p === p) _syncMinReading = null; return v; });",
+    to:   "    .then((v) => v);",
+    why:  "back at the front, the old answer would be handed out instead of a new read (92b)",
+  },
+  {
+    name: "M1800 (V153) a failed read stops trying",
+    file: "sync.js",
+    from: "      // Still owed: the next run or action tries again (2A).\n",
+    to:   "      _syncMinOwed = false;\n",
+    why:  "2A: a failed read goes by what was known, and the next tap asks again (92b)",
   },
 ];
 
