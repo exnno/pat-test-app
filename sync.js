@@ -2056,7 +2056,15 @@ function _syncRunAs(c, uid, session, opts) {
 // Fails OPEN: a minimum never read is no minimum. But a phone once told it is
 // too old stays stopped (MIN_VERSION_KEY) until a read says otherwise — a
 // failed read never lets it start again.
+// ⚠ V153 (audit finding 2, Peter 7 Nov — 1A 2A). The answer that DECIDES is the
+// one held in memory (_syncMinHeld, per account), not its stored copy. Before
+// V153 every check read MIN_VERSION_KEY back: a full phone told "too old"
+// couldn't store it, read the old copy (or none) and synced anyway — every run,
+// with no line on screen. MIN_VERSION_KEY is now only the copy a NEW start goes
+// by until its own read; a new start always owes one (_syncMinOwed).
 let _syncMinOwed = true;   // a start owes a fresh read; so does every return to the front
+let _syncMinHeld = null;   // V153: { u, min, at } — the last answer read on this page
+let _syncMinReading = null; // V153: { u, p } — a read in flight, shared by everyone asking at once
 
 function syncMinOwe() { _syncMinOwed = true; }
 
@@ -2078,20 +2086,36 @@ function _syncMinLoad() {
   } catch (e) { return {}; }
 }
 
+// V153: held first, then stored — and the stored copy only after the held answer
+// is in place, so a write that fails (a full phone) can't undo it. Its failure
+// is otherwise harmless: the next start reads the minimum again before syncing.
 function _syncMinSave(rec) {
-  try { localStorage.setItem(MIN_VERSION_KEY, JSON.stringify(rec)); } catch (e) { /* full phone: read again next time */ }
+  _syncMinHeld = { u: rec.u, min: rec.min, at: rec.at };
+  try { localStorage.setItem(MIN_VERSION_KEY, JSON.stringify(rec)); } catch (e) { /* full phone: held in memory; the next start reads it again */ }
+}
+
+// V153: what this phone knows for account u — the answer held on this page,
+// else the stored copy (a new start, before its read), else {} (never told).
+function _syncMinFor(u) {
+  if (!u) return {};
+  if (_syncMinHeld && _syncMinHeld.u === u) return _syncMinHeld;
+  const r = _syncMinLoad();
+  return r.u === u ? r : {};
 }
 
 // Read the account's minimum. Never rejects: resolves the minimum it now knows
 // for this account, or null when it knows none.
 function syncMinVersionRead(c, uid, force) {
-  const rec = _syncMinLoad();
-  const known = rec.u === uid ? rec.min : null;
+  const rec = _syncMinFor(uid);
+  const known = 'min' in rec ? rec.min : null;
   const now = Date.now();
-  if (!force && !_syncMinOwed && rec.u === uid && rec.at && now >= rec.at && now - rec.at < SYNC_MIN_CHECK_MS) {
+  if (!force && !_syncMinOwed && rec.at && now >= rec.at && now - rec.at < SYNC_MIN_CHECK_MS) {
     return Promise.resolve(known);
   }
-  return Promise.resolve()
+  // V153 (1A): the cloud tab, Cloud Storage and the Business page can all ask at
+  // the same moment as a run — one read answers them all.
+  if (!force && _syncMinReading && _syncMinReading.u === uid) return _syncMinReading.p;
+  const p = Promise.resolve()
     .then(() => c.rpc('my_min_version'))
     .then((res) => {
       if (!res || res.error) throw (res && res.error) || new Error('no answer');
@@ -2107,27 +2131,41 @@ function syncMinVersionRead(c, uid, force) {
     })
     .catch((e) => {
       // No SQL yet, no signal, an odd answer: what was known stands (nothing → open).
+      // Still owed: the next run or action tries again (2A).
       console.warn('Sync: the minimum app version wasn’t read this time (non-fatal).', e);
       return known;
-    });
+    })
+    .then((v) => { if (_syncMinReading && _syncMinReading.p === p) _syncMinReading = null; return v; });
+  _syncMinReading = { u: uid, p };
+  return p;
 }
 
 // Is this phone known to be too old for the account signed in (or uid)?
 function syncTooOld(uid) {
   const u = uid || _syncCurrentUserId();
   if (!u) return false;
-  const rec = _syncMinLoad();
-  return rec.u === u && Number.isInteger(rec.min) && rec.min > syncAppVersionNum();
+  const rec = _syncMinFor(u);
+  return Number.isInteger(rec.min) && rec.min > syncAppVersionNum();
 }
 
 // Every on-request cloud read and write (the cloud tab, Cloud Storage, the photo
 // manager's look, held answers, a cloud delete, the businesses and moves) goes
 // through this instead of cloudClient(), so a phone below the minimum touches
 // no work in the cloud at all.
+// V153 (1A): when this start (or return to the front) hasn't read the minimum
+// yet, it is read FIRST — the same read a run makes, shared, once — so a tap in
+// the seconds before the first run can't go by an out-of-date stored answer.
+// A failed read goes by what was known (2A) and stays owed for the next tap.
 function syncDataClient() {
   return cloudClient().then((c) => {
-    if (syncTooOld()) { const e = new Error('PATGo needs updating'); e.syncStage = 'version'; throw e; }
-    return c;
+    // syncMinVersionRead decides whether a read is due (owed since a start or a
+    // return, over an hour old, or another account's answer) — the same rule as a run.
+    const uid = _syncCurrentUserId();
+    const asked = uid ? syncMinVersionRead(c, uid) : Promise.resolve();
+    return asked.then(() => {
+      if (syncTooOld(uid)) { const e = new Error('PATGo needs updating'); e.syncStage = 'version'; throw e; }
+      return c;
+    });
   });
 }
 

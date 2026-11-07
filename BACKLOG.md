@@ -8,6 +8,19 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V153
+V153 = the minimum app version held in memory (audit finding 2 — Peter 7 Nov: 1A 2A).
+sync.js only: `_syncMinHeld` per account decides (`_syncMinFor`), set before the stored
+write; `syncDataClient()` reads the minimum first (shared, once per start / return).
+Harness 92 + M1793–M1800; 91e's release checks → 92c; five V151 mutations re-anchored.
+**Next:** V154 (Opus — security) ids checked and escaped (below); then V155 invites.
+
+### V153 residuals (known, accepted — 2A)
+- A full phone that couldn't store "too old", restarted where the read then fails (weak
+  signal): it goes by the older stored answer until a read succeeds (V151's fail-open).
+  The data requests nearly always fail in that state too; V155's invite check is the
+  cloud-side guard.
+
 ### Next after V152
 V152 = saved data that can't be read is kept safe (audit finding 1 — Peter 6 Nov: 1C 2B).
 storage.js: STORE_JSON / STORE_TEXT / STORE_OTHER classify every key; storeGuardBoot()
@@ -18,11 +31,7 @@ copies at the work level. Also: V151's tests read the version from config.js (N 
 main's hand-made 'pat-v151.1' replaced by pat-v152. Harness 91 + M1767–M1792; 90e's
 release checks → 91e.
 **Next, the audit order (Peter 6 Nov, 3A):**
-- **V153 (model: Opus — sync):** the minimum version kept in memory (audit finding 2):
-  `_syncMinSave()` swallows a failed write and `syncTooOld()` reads storage back, so a
-  full phone told it's too old carries on. Hold the received minimum in memory for the
-  account before persisting; `syncDataClient()` reads the minimum first when this page has
-  not (a cloud-tab tap before the first sync run after a restart).
+- ✅ V153 built 7 Nov (see "Next after V153").
 - **V154 (model: Opus — security):** ids checked on the way in (backup restore, cloud
   intake, load) and escaped wherever they enter HTML (audit finding 3: `${s.id}` raw in
   79 attributes; a crafted backup — or, once Teams exists, a teammate's job via the

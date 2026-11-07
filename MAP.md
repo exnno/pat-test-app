@@ -1,4 +1,4 @@
-# PATGo — Code Map (V152)
+# PATGo — Code Map (V153)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1499,12 +1499,17 @@ is true wherever the wall is on (5A). Readers: **render-core.js** `render()` (th
 before the view chain) and `renderSessions` (the line); **plan.js** `_planOwnerUid`;
 **boot.js** `updateSafeMoment`. Harness 87, M1637–M1660.
 
-### sync.js (~5420 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner, V149 job business, V151 minimum app version
+### sync.js (~5420 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner, V149 job business, V151 minimum app version, V153 held in memory
 ⚠ V151: `_syncRun` reads the minimum (`syncMinVersionRead` — rpc `my_min_version`, at most
 every SYNC_MIN_CHECK_MS, at once after a start or a return: `_syncMinOwed` / `syncMinOwe`
 from the resume listener) BEFORE anything else, then stops (stage 'version') when
 `syncTooOld(uid)`; the run itself is `_syncRunAs` (split out unchanged). MIN_VERSION_KEY
-{u, min, at} — a failed read keeps what was known; never known = open. ⚠ Every ON-REQUEST
+{u, min, at} — a failed read keeps what was known; never known = open. ⚠ V153: what DECIDES
+is `_syncMinHeld` (memory, per account) via `_syncMinFor(u)`; the stored key is only a new
+start's copy until its read — never read the key directly to decide (a full phone can't
+write it). `_syncMinSave` sets the held answer BEFORE the write. One read in flight is
+shared (`_syncMinReading`). `syncDataClient()` calls `syncMinVersionRead` first (1A) —
+it decides whether a read is due. ⚠ Every ON-REQUEST
 cloud call (held answers, diff, photo thumb / download / look, job names, cloud tab, Cloud
 Storage, bring back, cloud delete, verify) goes through `syncDataClient()`, never
 `cloudClient()` — a new one must too (business.js `_bizClient`). Section "V151: the minimum

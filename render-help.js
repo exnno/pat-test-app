@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V152: rolled forward — V152 on top, V149 dropped. -->
+      <!-- v8: rolling 3-version changelog. V153: rolled forward — V153 on top, V150 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V153</strong> &middot; November 2026</p>
+        <p class="muted">Behind the scenes: a phone that&rsquo;s too old to sync now stops reliably, even when it&rsquo;s nearly full, and checks before you open the cloud tab or the Business page.</p>
         <p><strong>V152</strong> &middot; November 2026</p>
         <p class="muted">Behind the scenes: if PATGo ever can&rsquo;t read something saved on this phone, it now keeps it safe and untouched instead of starting without it and saving over it. The Jobs list tells you, and Backup &amp; Restore shows how to get your work back.</p>
         <p><strong>V151</strong> &middot; November 2026</p>
         <p class="muted">Behind the scenes: the cloud can now ask for a newer PATGo before a phone syncs. If it ever does, the Jobs list says Update PATGo, with Update now &mdash; your work stays safe on the phone meanwhile.</p>
-        <p><strong>V150</strong> &middot; November 2026</p>
-        <p class="muted">Move a job to another business: Job settings &rarr; Business &rarr; Change&hellip;, for anyone who works for more than one. Leaving a team&rsquo;s business waits for someone there to approve, and every move is recorded.</p>
 
 
 
