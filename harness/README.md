@@ -53,6 +53,7 @@ starting from nothing.
 | `mutate.js` | Deliberately breaks the app and checks the suite goes red. |
 | `sheets.js` | V110. Finds every bottom sheet in the app source, for group 47. |
 | `sheet-register.js` | V110. The sheets with no `.sheet-scroll`, each with the reason nothing in it grows. |
+| `markup-scan.js` | V154. Finds every `${…}` in page markup that puts a stored value in without escapeHTML, for group 93a. |
 | `tests/` | The standing assertions. |
 
 ---

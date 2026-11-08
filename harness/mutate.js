@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V153';",
-    to:   "const APP_VERSION = 'V152';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V154';",
+    to:   "const APP_VERSION = 'V153';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -640,7 +640,7 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V151</strong> &middot; November 2026</p>',   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151
+    from: '        <p><strong>V152</strong> &middot; November 2026</p>',   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 92c)',
   },
@@ -1087,8 +1087,8 @@ const MUTATIONS = [
   {
     name: 'M144 (V80) the example job is sent',
     file: 'sync.js',
-    from: "&& !s[flag]);",
-    to:   ');',
+    from: "&& !s[flag] && jobIdsSafe(s));",   // V154: re-anchored (the id check joined the line)
+    to:   '&& jobIdsSafe(s));',
     why:  'the demo job would appear in every engineer\u2019s cloud data (16d)',
   },
   {
@@ -6124,7 +6124,7 @@ const MUTATIONS = [
     // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
     from: "<li><strong>Move a job to another business.</strong>",   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (92c)",
+    why:  "11A: the welcome says plainly what changed on screen (93e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8606,7 +8606,7 @@ const MUTATIONS = [
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
     from: "const WELCOME_VERSION = 'V150';",   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
     to:   "const WELCOME_VERSION = 'V149';",
-    why:  "What's new is rolled on a feature release (92c)",
+    why:  "What's new is rolled on a feature release (93e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
@@ -8621,7 +8621,7 @@ const MUTATIONS = [
     // V150: one line — re-aimed at its end.
     from: "Working for just one business? Nothing changes.</li>\n",
     to:   "Working for just one business? Nothing changes.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (92c)",
+    why:  "one line (93e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8635,9 +8635,9 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Behind the scenes: a phone that&rsquo;s too old to sync now stops",
+    from: "Behind the scenes: PATGo now checks what comes in from a backup file",
     to:   "Better",
-    why:  "the About page must say what changed in this version (92c)",   // V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
+    why:  "the About page must say what changed in this version (93e)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8752,9 +8752,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Behind the scenes: the cloud can now ask for a newer PATGo before a phone syncs.",   // V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (92c)
+    from: "Behind the scenes: if PATGo ever can&rsquo;t read something saved on this phone",   // V154: V151's rolled off — re-aimed at V152's, the oldest now (93e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (93e)
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (92c)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
+    why:  "the About page keeps the last three versions' lines (93e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8914,9 +8914,9 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Behind the scenes: if PATGo ever can&rsquo;t read something saved on this phone",
+    from: "Behind the scenes: a phone that&rsquo;s too old to sync now stops",
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (92c)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
+    why:  "the About page keeps the last three versions' lines (93e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9043,9 +9043,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v153';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v152';",
-    why:  "a release needs its cache bump or phones never get it (92c)",
+    from: "const CACHE_VERSION = 'pat-v154';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v153';",
+    why:  "a release needs its cache bump or phones never get it (93e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -12727,6 +12727,175 @@ const MUTATIONS = [
     from: "      // Still owed: the next run or action tries again (2A).\n",
     to:   "      _syncMinOwed = false;\n",
     why:  "2A: a failed read goes by what was known, and the next tap asks again (92b)",
+  },
+  // ---- V154 (1A–5A): ids checked on the way in, stored values escaped (audit finding 3). Group 93 + M1801–M1824. ----
+  {
+    name: "M1801 (V154) a job's id goes back into the Jobs list raw",
+    file: "render-core.js",
+    from: "data-action=\"open-session\" data-arg=\"${escapeHTML(s.id)}\" data-open=\"${escapeHTML(s.id)}\" data-open-at",
+    to:   "data-action=\"open-session\" data-arg=\"${s.id}\" data-open=\"${s.id}\" data-open-at",
+    why:  "a tampered file's job id would run script on the Jobs list — the audit's finding (93a)",
+  },
+  {
+    name: "M1802 (V154) an item's result goes back into the job screen raw",
+    file: "render-review.js",
+    from: "<td class=\"td td-result ${escapeHTML(it.result || '')}\">",
+    to:   "<td class=\"td td-result ${it.result || ''}\">",
+    why:  "a result is stored text from a file or the cloud, not one of two words (93a)",
+  },
+  {
+    name: "M1803 (V154) a job's date goes back onto the Jobs list raw",
+    file: "render-core.js",
+    from: "<div class=\"session-meta\">${escapeHTML(formatDate(s.date))} · ${s.items.length} items",
+    to:   "<div class=\"session-meta\">${formatDate(s.date)} · ${s.items.length} items",
+    why:  "formatDate hands anything that isn't a date back as it was (93a)",
+  },
+  {
+    name: "M1804 (V154) the logo goes back into Settings raw",
+    file: "render-settings.js",
+    from: "<div class=\"report-logo-preview\"><img src=\"${escapeHTML(rs.logo)}\"",
+    to:   "<div class=\"report-logo-preview\"><img src=\"${rs.logo}\"",
+    why:  "the logo is an <img src> (93a)",
+  },
+  {
+    name: "M1805 (V154) a logo that isn't a picture is kept at load",
+    file: "storage.js",
+    from: "  out.logo            = safePicture(stored.logo);",
+    to:   "  out.logo            = typeof stored.logo === 'string' ? stored.logo : '';",
+    why:  "1A: only a picture PATGo could have made goes in an <img src> (93b)",
+  },
+  {
+    name: "M1806 (V154) a signature that isn't a picture is kept at load",
+    file: "storage.js",
+    from: "  out.signature       = safePicture(stored.signature);",
+    to:   "  out.signature       = typeof stored.signature === 'string' ? stored.signature : '';",
+    why:  "1A: the signature too (93b)",
+  },
+  {
+    name: "M1807 (V154) a backup with a bad id restores",
+    file: "backup.js",
+    from: "    if (unsafe) {\n      openInfoSheet({",
+    to:   "    if (false) {\n      openInfoSheet({",
+    why:  "2A: a tampered file is refused whole, nothing touched (93c)",
+  },
+  {
+    name: "M1808 (V154) any text is an id",
+    file: "utils.js",
+    from: "  return typeof v === 'string' && SAFE_ID_RE.test(v)",
+    to:   "  return typeof v === 'string' && v !== ''",
+    why:  "only letters, digits and hyphens are PATGo's — the check every way in leans on (93c)",
+  },
+  {
+    name: "M1809 (V154) an item's id isn't checked",
+    file: "utils.js",
+    from: "    if (!safeId(it.id)) return false;\n",
+    to:   "",
+    why:  "an item id goes into the page and the cloud just as a job's does (93c)",
+  },
+  {
+    name: "M1810 (V154) the Object names count as ids",
+    file: "utils.js",
+    from: "\n    && v !== '__proto__' && v !== 'constructor' && v !== 'prototype';",
+    to:   ";",
+    why:  "an id is an object key in the sync bookkeeping (93c)",
+  },
+  {
+    name: "M1811 (V154) the pull doesn't set a bad cloud job aside",
+    file: "sync.js",
+    from: "    if (!safeId(id) || (row.deleted !== true && row.doc && Array.isArray(row.doc.items) && !jobIdsSafe({ id, items: row.doc.items }))) {",
+    to:   "    if (false) {",
+    why:  "3A: not held as a question with no good answer, and the Sync page says why (93d)",
+  },
+  {
+    name: "M1812 (V154) every other way in takes a bad cloud job",
+    file: "sync.js",
+    from: "  if (!jobIdsSafe(doc)) return false;\n  return true;\n}",
+    to:   "  return true;\n}",
+    why:  "3A: the cloud tab, the archive, a compare, a held answer (93d)",
+  },
+  {
+    name: "M1813 (V154) a bad job on this phone is sent",
+    file: "sync.js",
+    from: " && jobIdsSafe(s));\n}\n\n// V154 (5A): how many",
+    to:   "));\n}\n\n// V154 (5A): how many",
+    why:  "5A: kept on the phone, never sent — the database refuses it anyway (93d)",
+  },
+  {
+    name: "M1814 (V154) a bad job's delete is sent",
+    file: "sync.js",
+    from: "      if (!safeId(id)) continue;\n      if (!st.sent[id] && !st.gone[id] && !st.resend[id]) continue;",
+    to:   "      if (!st.sent[id] && !st.gone[id] && !st.resend[id]) continue;",
+    why:  "one refused row fails its whole batch (93d)",
+  },
+  {
+    name: "M1815 (V154) a bad cloud row deleted since is never forgotten",
+    file: "sync.js",
+    from: "      if (row.deleted === true) delete st.bad[id];",
+    to:   "      if (row.deleted === true) {}",
+    why:  "the Sync page line would stay for ever (93d)",
+  },
+  {
+    name: "M1816 (V154) the Sync page doesn't say a cloud job was kept off",
+    file: "render-help.js",
+    from: "        ${sum.badCloud ? `<p class=\"sync-bad-line\"",
+    to:   "        ${false ? `<p class=\"sync-bad-line\"",
+    why:  "3A: the Sync page says so (93d)",
+  },
+  {
+    name: "M1817 (V154) the Sync page doesn't say a job here isn't sent",
+    file: "render-help.js",
+    from: "        ${sum.badHere ? `<p class=\"sync-bad-line\"",
+    to:   "        ${false ? `<p class=\"sync-bad-line\"",
+    why:  "5A: the Sync page says so (93d)",
+  },
+  {
+    name: "M1818 (V154) the restore doesn't say the logo will be left out",
+    file: "backup.js",
+    from: "(backupDroppedPictures(data) ? ' Its company logo",
+    to:   "(false ? ' Its company logo",
+    why:  "said before anything is replaced (93c)",
+  },
+  {
+    name: "M1819 (V154) an SVG counts as a picture",
+    file: "utils.js",
+    from: "const SAFE_PICTURE_RE = /^data:image\\/(png|jpeg);base64,",
+    to:   "const SAFE_PICTURE_RE = /^data:image\\/(png|jpeg|svg\\+xml);base64,",
+    why:  "an SVG can carry script; PATGo never saves one (93b)",
+  },
+  {
+    name: "M1820 (V154) a photo preview's address goes back in raw",
+    file: "render-review.js",
+    from: "<img src=\"${escapeHTML(p.url)}\" alt=\"Photo ${i + 1}\">",
+    to:   "<img src=\"${p.url}\" alt=\"Photo ${i + 1}\">",
+    why:  "every stored value goes in through escapeHTML (93a)",
+  },
+  {
+    name: "M1821 (V154) the retest list's id goes back in raw",
+    file: "render-review.js",
+    from: "data-action=\"retest-untrack\" data-arg=\"${escapeHTML(s.id)}\"",
+    to:   "data-action=\"retest-untrack\" data-arg=\"${s.id}\"",
+    why:  "the retest list shows jobs from any backup (93a)",
+  },
+  {
+    name: "M1822 (V154) the noted bad cloud jobs aren't read back",
+    file: "sync.js",
+    from: "    for (const k of Object.keys(raw.bad)) if (raw.bad[k] === true && n < SYNC_BAD_MAX) { out.bad[k] = true; n++; }",
+    to:   "",
+    why:  "the next run would lose the Sync page's line (93d)",
+  },
+  {
+    name: "M1823 (V154) a new project's rule drifts from the migration",
+    file: "supabase/schema.sql",
+    from: "t ~ '^[A-Za-z0-9_-]{1,80}$'",
+    to:   "t ~ '^[A-Za-z0-9_ -]{1,80}$'",
+    why:  "4A: a new project gets exactly what an existing one does (93f)",
+  },
+  {
+    name: "M1824 (V154) the entry screen's result badge goes back in raw",
+    file: "render-core.js",
+    from: "<span class=\"result-badge ${escapeHTML(existing.result)}\">",
+    to:   "<span class=\"result-badge ${existing.result}\">",
+    why:  "the entry screen shows an item from any backup (93a)",
   },
 ];
 
