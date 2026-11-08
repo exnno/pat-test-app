@@ -1624,3 +1624,65 @@ revoke all on function public.app_min_version_for(uuid) from public, anon, authe
 revoke all on function public.org_phones_behind(uuid) from public, anon, authenticated;
 revoke all on function public.my_min_version() from public, anon;
 grant execute on function public.my_min_version() to authenticated;
+
+
+-- ================================================================ V154
+-- Ids and pictures PATGo never makes are refused (audit finding 3, 4A).
+-- Existing projects: supabase/v154-safe-ids.sql (plus self-checks V1–V4).
+-- Kept in step with it byte for byte by harness group 93f.
+
+-- ------------------------------------------------- the patterns
+create or replace function public.patgo_safe_id(t text) returns boolean
+language sql immutable as $$
+  select t is not null and t ~ '^[A-Za-z0-9_-]{1,80}$'
+     and t not in ('__proto__', 'constructor', 'prototype')
+$$;
+
+-- An item's id inside a job's doc: missing, null, '' , a safe string, or a whole number.
+create or replace function public.patgo_safe_item_id(v jsonb) returns boolean
+language sql immutable as $$
+  select v is null
+      or jsonb_typeof(v) = 'null'
+      or (jsonb_typeof(v) = 'string' and (v #>> '{}' = '' or public.patgo_safe_id(v #>> '{}')))
+      or (jsonb_typeof(v) = 'number' and (v #>> '{}') ~ '^[0-9]{1,15}$')
+$$;
+
+create or replace function public.patgo_job_ok(job_id text, doc jsonb) returns boolean
+language sql immutable as $$
+  select public.patgo_safe_id(job_id)
+     and (jsonb_typeof(doc -> 'items') is distinct from 'array'
+          or not exists (
+            select 1 from jsonb_array_elements(doc -> 'items') e
+            where jsonb_typeof(e) = 'object' and not public.patgo_safe_item_id(e -> 'id')))
+$$;
+
+-- A logo / signature: missing, null, '', or a PNG / JPEG picture as PATGo saves it.
+create or replace function public.patgo_safe_picture(v jsonb) returns boolean
+language sql immutable as $$
+  select v is null
+      or jsonb_typeof(v) = 'null'
+      or (jsonb_typeof(v) = 'string' and (v #>> '{}' = ''
+          or (v #>> '{}') ~ '^data:image/(png|jpeg);base64,[A-Za-z0-9+/]*={0,2}$'))
+$$;
+
+create or replace function public.patgo_record_ok(kind text, doc jsonb) returns boolean
+language sql immutable as $$
+  select case
+    when kind = 'settings' then public.patgo_safe_picture(doc -> 'logo') and public.patgo_safe_picture(doc -> 'signature')
+    when kind = 'template' then public.patgo_safe_picture(doc -> 'settings' -> 'logo') and public.patgo_safe_picture(doc -> 'settings' -> 'signature')
+    else true end
+$$;
+
+-- ------------------------------------------------- the rules (only on a clean cloud)
+do $v154$
+begin
+  if not exists (select 1 from pg_constraint where conname = 'sessions_safe_ids' and conrelid = 'public.sessions'::regclass)
+     and not exists (select 1 from public.sessions where not public.patgo_job_ok(id, doc)) then
+    alter table public.sessions add constraint sessions_safe_ids check (public.patgo_job_ok(id, doc));
+  end if;
+  if not exists (select 1 from pg_constraint where conname = 'records_safe_pictures' and conrelid = 'public.records'::regclass)
+     and not exists (select 1 from public.records where not public.patgo_record_ok(kind, doc)) then
+    alter table public.records add constraint records_safe_pictures check (public.patgo_record_ok(kind, doc));
+  end if;
+end
+$v154$;
