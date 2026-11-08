@@ -1529,7 +1529,7 @@ function renderSettingsReport(part) {
 
   // Logo preview (if set) with a Remove button; otherwise a file picker.
   const logoBlock = rs.logo
-    ? `<div class="report-logo-preview"><img src="${rs.logo}" alt="Company logo" style="max-width:160px;max-height:80px;display:block;margin:8px 0;border-radius:6px"></div>
+    ? `<div class="report-logo-preview"><img src="${escapeHTML(rs.logo)}" alt="Company logo" style="max-width:160px;max-height:80px;display:block;margin:8px 0;border-radius:6px"></div>
        <button class="preset-action-btn preset-action-danger" id="report-logo-remove" data-action="report-logo-remove">${icon('trash-2')} Remove logo</button>`
     : `<button class="preset-action-btn" id="report-logo-pick-btn" data-action="report-logo-pick">${icon('upload')} Upload logo</button>`;
   const logoError = state.reportSettingsError
@@ -1566,7 +1566,7 @@ function renderSettingsReport(part) {
   // buttons when not. The position segmented control only shows when a signature
   // exists (no point choosing a side for nothing).
   const sigBlock = rs.signature
-    ? `<div class="report-sig-preview"><img src="${rs.signature}" alt="Signature" style="max-width:200px;max-height:70px;display:block;margin:8px 0;border-radius:6px;background:#fff;padding:4px"></div>
+    ? `<div class="report-sig-preview"><img src="${escapeHTML(rs.signature)}" alt="Signature" style="max-width:200px;max-height:70px;display:block;margin:8px 0;border-radius:6px;background:#fff;padding:4px"></div>
        <div class="btn-row">
          <button class="preset-action-btn" data-action="signature-draw">${icon('signature')} Draw again</button>
          <button class="preset-action-btn" data-action="signature-upload">${icon('upload')} Upload</button>

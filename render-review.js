@@ -109,7 +109,7 @@ function renderOverviewBodyHTML(sess) {
               <td class="td">${escapeHTML(it.assetNo)}</td>
               <td class="td">${escapeHTML(it.location)}</td>
               <td class="td">${escapeHTML(it.itemType)}${timeLine}</td>
-              <td class="td td-result ${it.result || ''}">${capitalise(it.result || '')}${photoChip}${pinChip}</td>
+              <td class="td td-result ${escapeHTML(it.result || '')}">${escapeHTML(capitalise(String(it.result || '')))}${photoChip}${pinChip}</td>
               ${actionCol}
             </tr>
           `;
@@ -152,7 +152,7 @@ function renderOverview() {
         <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">${icon('chevron-left')}</button>
         <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Overview</div>
         <div class="header-actions">
-          ${state.reportSettings.enabled ? `<button class="icon-btn" id="produce-report-btn" data-action="produce-report" data-arg="${sess.id}" aria-label="Produce report" title="Produce report">${icon('file-text')}</button>` : ''}
+          ${state.reportSettings.enabled ? `<button class="icon-btn" id="produce-report-btn" data-action="produce-report" data-arg="${escapeHTML(sess.id)}" aria-label="Produce report" title="Produce report">${icon('file-text')}</button>` : ''}
           <button class="icon-btn" id="copy-btn" data-action="copy-current" aria-label="Copy CSV" title="Copy CSV">${icon('clipboard-list')}</button>
           <button class="icon-btn" id="export-btn" data-action="export-current" aria-label="Share CSV">${icon('share', 'share-icon')}</button>
         </div>
@@ -296,10 +296,10 @@ function renderOverview() {
     <div class="overview-jobdetails">
       ${state.reportSettings.certEnabled ? `
         <label class="label" for="session-cert-no">Certificate number</label>
-        <input class="input" id="session-cert-no" data-change-action="session-cert-no" data-arg="${sess.id}" value="${escapeHTML(sess.certNo || '')}" placeholder="Assigned when you produce the report" autocapitalize="characters" autocomplete="off" spellcheck="false">
+        <input class="input" id="session-cert-no" data-change-action="session-cert-no" data-arg="${escapeHTML(sess.id)}" value="${escapeHTML(sess.certNo || '')}" placeholder="Assigned when you produce the report" autocapitalize="characters" autocomplete="off" spellcheck="false">
       ` : ''}
       <label class="label" for="session-notes" style="margin-top:10px">Job notes</label>
-      <textarea class="textarea" id="session-notes" data-change-action="session-notes" data-arg="${sess.id}" placeholder="Optional notes that print on the report (e.g. access issues, items removed from service)" style="min-height:64px">${escapeHTML(sess.notes || '')}</textarea>
+      <textarea class="textarea" id="session-notes" data-change-action="session-notes" data-arg="${escapeHTML(sess.id)}" placeholder="Optional notes that print on the report (e.g. access issues, items removed from service)" style="min-height:64px">${escapeHTML(sess.notes || '')}</textarea>
     </div>
   `;
 
@@ -1003,9 +1003,9 @@ function renderRetestReminders() {
             <button class="fail-close-btn" id="retest-action-close" data-action="retest-action-close" aria-label="Close">×</button>
           </div>
           <p style="margin:0 0 14px;font-size:0.875rem;line-height:1.5;color:var(--text)">Once you've contacted the customer, mark the outcome to clear this from your chase list.</p>
-          <button class="btn-primary" style="margin-bottom:8px" data-action="retest-mark-booked" data-arg="${s.id}">${icon('check')} Rebooked — job won</button>
-          <button class="btn-secondary" style="margin-bottom:8px" data-action="retest-mark-declined" data-arg="${s.id}">Declined — lost the job</button>
-          <button class="btn-tertiary" data-action="retest-untrack" data-arg="${s.id}">Stop reminding me about this job</button>
+          <button class="btn-primary" style="margin-bottom:8px" data-action="retest-mark-booked" data-arg="${escapeHTML(s.id)}">${icon('check')} Rebooked — job won</button>
+          <button class="btn-secondary" style="margin-bottom:8px" data-action="retest-mark-declined" data-arg="${escapeHTML(s.id)}">Declined — lost the job</button>
+          <button class="btn-tertiary" data-action="retest-untrack" data-arg="${escapeHTML(s.id)}">Stop reminding me about this job</button>
         </div>
       `;
     }
@@ -1028,13 +1028,13 @@ function renderRetestReminders() {
       const itemCount = Array.isArray(s.items) ? s.items.length : 0;
       return `
         <div class="session-card">
-          <div class="session-info" data-action="open-session" data-arg="${s.id}" data-open="${s.id}">
+          <div class="session-info" data-action="open-session" data-arg="${escapeHTML(s.id)}" data-open="${escapeHTML(s.id)}">
             <div class="session-title">${titleLine}</div>
             ${clientLine}
-            <div class="session-meta">Last tested ${formatDate(s.date)} · ${itemCount} item${itemCount === 1 ? '' : 's'} · due ${dueStr || '—'}</div>
+            <div class="session-meta">Last tested ${escapeHTML(formatDate(s.date))} · ${itemCount} item${itemCount === 1 ? '' : 's'} · due ${dueStr || '—'}</div>
             <div class="session-export-row"><span class="retest-chip ${chipCls}">${icon('bell')} ${escapeHTML(chipLabel)}</span></div>
           </div>
-          <button class="icon-btn-sm" data-action="retest-action-open" data-arg="${s.id}" aria-label="Mark contacted" title="Mark contacted">${icon('check')}</button>
+          <button class="icon-btn-sm" data-action="retest-action-open" data-arg="${escapeHTML(s.id)}" aria-label="Mark contacted" title="Mark contacted">${icon('check')}</button>
         </div>
       `;
     }).join('');
@@ -1085,11 +1085,11 @@ function renderReports() {
       const lockMark = s.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : '';
       return `
         <div class="session-card">
-          <div class="session-info" data-action="produce-report" data-arg="${s.id}">
+          <div class="session-info" data-action="produce-report" data-arg="${escapeHTML(s.id)}">
             <div class="session-title">${lockMark}${escapeHTML(s.site || s.name)}</div>
-            <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span></div>
+            <div class="session-meta">${escapeHTML(formatDate(s.date))} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span></div>
           </div>
-          <button class="icon-btn-sm" data-action="produce-report" data-arg="${s.id}" aria-label="Produce report">${icon('file-text')}</button>
+          <button class="icon-btn-sm" data-action="produce-report" data-arg="${escapeHTML(s.id)}" aria-label="Produce report">${icon('file-text')}</button>
         </div>
       `;
     }).join('');
@@ -1131,7 +1131,7 @@ function renderFailPhotoStripInner() {
 
   const thumbs = photos.map((p, i) => `
     <span class="photo-thumb">
-      <img src="${p.url}" alt="Photo ${i + 1}">
+      <img src="${escapeHTML(p.url)}" alt="Photo ${i + 1}">
       <button class="photo-thumb-remove" data-action="fail-photo-remove" data-arg="${i}" aria-label="Remove photo ${i + 1}">×</button>
     </span>
   `).join('');
@@ -1165,9 +1165,9 @@ function renderPhotoStripSheet() {
     // v89 (2A): a photo only in the cloud is a tile with a ☁ — its preview once
     // fetched, a plain cloud until then. Tapping it downloads it.
     const tile = (p, i) => {
-      if (!p.cloud) return `<img src="${p.url}" alt="Photo ${i + 1}" loading="lazy">`;
+      if (!p.cloud) return `<img src="${escapeHTML(p.url)}" alt="Photo ${i + 1}" loading="lazy">`;
       const inner = p.url
-        ? `<img src="${p.url}" alt="Photo ${i + 1}, in the cloud" loading="lazy">`
+        ? `<img src="${escapeHTML(p.url)}" alt="Photo ${i + 1}, in the cloud" loading="lazy">`
         : `<span class="photo-cloud-blank" aria-hidden="true">${icon('cloud')}</span>`;
       return `<button class="photo-cloud-tile${p.busy ? ' is-busy' : ''}" data-action="photo-download" data-arg="${escapeHTML(p.id)}" aria-label="Download photo ${i + 1}" ${p.busy ? 'disabled' : ''}>
               ${inner}

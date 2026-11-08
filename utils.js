@@ -29,6 +29,55 @@ const newId = () => (typeof self !== 'undefined' && self.crypto && typeof self.c
   ? self.crypto.randomUUID()
   : (Date.now().toString(36) + Math.random().toString(36).slice(2, 7));
 
+/* V154 (audit finding 3 — Peter, 8 Nov: 1A–5A). An id PATGo makes is only ever
+ * letters, digits and hyphens: uid() is base-36 (every version since the first
+ * app.js), newId() a UUID, the practice jobs 'tutorial-' + a UUID. So an id with
+ * anything else in it — a quote, a '<', a space — was not made by PATGo: a
+ * tampered backup, or a cloud row written by hand. It is never trusted:
+ *   • a backup FILE carrying one is refused whole, nothing touched (2A, backup.js)
+ *   • a cloud job carrying one is never brought onto the phone (3A, sync.js pull;
+ *     _syncValidDoc refuses it on every other way in)
+ *   • a job already on the phone with one is kept, shown escaped, and never sent
+ *     (5A — _syncSessions leaves it out, exactly as it leaves out example jobs)
+ *   • the database refuses one from anyone (4A, supabase/v154-safe-ids.sql —
+ *     the SAME pattern; change one, change both).
+ * ⚠ The check is about where an id came from; it is not what makes the page
+ * safe. Every id still goes into markup through escapeHTML() (harness 93a).
+ * The three Object names are refused too: an id is used as an object key in the
+ * sync bookkeeping, and no generator can produce them.
+ * A number is allowed (a whole one): it cannot carry markup, and String(id) is
+ * how every lookup compares. An item's id may be missing (null / '' / absent). */
+const SAFE_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
+function safeId(v) {
+  if (typeof v === 'number') return Number.isSafeInteger(v) && v >= 0;
+  return typeof v === 'string' && SAFE_ID_RE.test(v)
+    && v !== '__proto__' && v !== 'constructor' && v !== 'prototype';
+}
+// A job's own id and every item's id — ids only, nothing else about its shape
+// (a job that isn't an object has no id to trust, so it counts as unsafe).
+function jobIdsSafe(s) {
+  if (!s || typeof s !== 'object' || Array.isArray(s)) return false;
+  if (!safeId(s.id)) return false;
+  if (!Array.isArray(s.items)) return true;
+  for (const it of s.items) {
+    if (!it || typeof it !== 'object') continue;
+    if (it.id === undefined || it.id === null || it.id === '') continue;
+    if (!safeId(it.id)) return false;
+  }
+  return true;
+}
+// V154 (1A): the company logo and the signature go into an <img src>. PATGo
+// only ever stores them as canvas.toDataURL('image/png') (every version since
+// the logo arrived), so a genuine one is always this shape; JPEG is allowed for
+// safety. Anything else — 'javascript:', a web address, text with a quote — is
+// left out ('' = none), at every way in: normaliseReportSettings (storage.js)
+// is what load, restore, a setup file and the cloud all go through.
+// The database checks the same shape (supabase/v154-safe-ids.sql).
+const SAFE_PICTURE_RE = /^data:image\/(png|jpeg);base64,[A-Za-z0-9+/]*={0,2}$/;
+function safePicture(v) {
+  return (typeof v === 'string' && SAFE_PICTURE_RE.test(v)) ? v : '';
+}
+
 // v68 (D2): an apostrophe is a word boundary, so the old /\b\w/g turned
 // "Bob's Office" into "Bob'S Office" — and because this runs on locations and
 // item types it reached certificates and CSV exports, not just the screen.

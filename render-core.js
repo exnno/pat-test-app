@@ -369,7 +369,7 @@ function render() {
       `;
     } else if (step === 4) {
       const logoPreview = rs.logo
-        ? `<img class="wizard-logo-preview" src="${rs.logo}" alt="Company logo">
+        ? `<img class="wizard-logo-preview" src="${escapeHTML(rs.logo)}" alt="Company logo">
            <button class="btn-secondary" data-action="report-logo-remove">Remove logo</button>`
         : `<button class="btn-secondary" data-action="report-logo-pick">${icon('upload')} Add a logo (optional)</button>`;
       const themes = (typeof REPORT_COLOR_THEMES !== 'undefined' ? REPORT_COLOR_THEMES : [])
@@ -1431,20 +1431,20 @@ function renderSessionsListAreaHTML() {
         retestChip = `<div class="session-export-row"><span class="retest-chip ${rCls}">${icon('bell')} ${escapeHTML(rLabel)}</span></div>`;
       }
       const openAttr = matchedItemIndex !== -1
-        ? `data-action="open-session" data-arg="${s.id}" data-open="${s.id}" data-open-at="${matchedItemIndex}"`
-        : `data-action="open-session" data-arg="${s.id}" data-open="${s.id}"`;
+        ? `data-action="open-session" data-arg="${escapeHTML(s.id)}" data-open="${escapeHTML(s.id)}" data-open-at="${matchedItemIndex}"`
+        : `data-action="open-session" data-arg="${escapeHTML(s.id)}" data-open="${escapeHTML(s.id)}"`;
       return `
         <div class="session-card${s.locked ? ' locked' : ''}">
           <div class="session-info" ${openAttr}>
             <div class="session-title">${lockMark}${safeMark}${escapeHTML(s.site || s.name)}</div>
-            <div class="session-meta">${formatDate(s.date)} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span>${photoMeta}</div>
+            <div class="session-meta">${escapeHTML(formatDate(s.date))} · ${s.items.length} items · <span class="pass-text">${passes} pass</span> · <span class="fail-text">${fails} fail</span>${photoMeta}</div>
             ${exportBadge ? `<div class="session-export-row">${exportBadge}</div>` : ''}
             ${retestChip}
             ${itemBadge}
           </div>
-          <button class="icon-btn-sm" data-action="copy-session" data-arg="${s.id}" aria-label="Copy CSV" title="Copy CSV">${icon('clipboard-list')}</button>
-          <button class="icon-btn-sm" data-action="export-session" data-arg="${s.id}" data-export="${s.id}" aria-label="Share CSV">${icon('share', 'share-icon')}</button>
-          <button class="icon-btn-sm" data-action="delete-session" data-arg="${s.id}" data-delete-session="${s.id}" aria-label="Delete">${icon('trash-2')}</button>
+          <button class="icon-btn-sm" data-action="copy-session" data-arg="${escapeHTML(s.id)}" aria-label="Copy CSV" title="Copy CSV">${icon('clipboard-list')}</button>
+          <button class="icon-btn-sm" data-action="export-session" data-arg="${escapeHTML(s.id)}" data-export="${escapeHTML(s.id)}" aria-label="Share CSV">${icon('share', 'share-icon')}</button>
+          <button class="icon-btn-sm" data-action="delete-session" data-arg="${escapeHTML(s.id)}" data-delete-session="${escapeHTML(s.id)}" aria-label="Delete">${icon('trash-2')}</button>
         </div>
       `;
     }).join('');
@@ -1700,7 +1700,7 @@ function renderEntry() {
     : `<button class="notes-toggle" id="show-notes-btn" data-action="show-notes">${icon('pencil')} Add note</button>`;
 
   const resultBadge = isExisting && existing.result
-    ? `<span class="result-badge ${existing.result}">· ${capitalise(existing.result).toUpperCase()}</span>`
+    ? `<span class="result-badge ${escapeHTML(existing.result)}">· ${escapeHTML(capitalise(String(existing.result)).toUpperCase())}</span>`
     : '';
 
   const suggestionsBlock = (state.showSuggestions && state.suggestions.length > 0)
@@ -1720,7 +1720,7 @@ function renderEntry() {
     : '';
 
   const lastInfo = hasLast
-    ? ` (${escapeHTML(sess.items[sess.items.length - 1].itemType)} · ${capitalise(sess.items[sess.items.length - 1].result)})`
+    ? ` (${escapeHTML(sess.items[sess.items.length - 1].itemType)} · ${escapeHTML(capitalise(String(sess.items[sess.items.length - 1].result || '')))})`
     : '';
 
   // v62.1: decision 13A said photos must be reachable from the entry form when

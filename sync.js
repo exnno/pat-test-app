@@ -165,7 +165,17 @@ function syncHash(str) {
 // The jobs that sync. The example job never leaves the phone.
 function _syncSessions() {
   const flag = (typeof DEMO_SESSION_FLAG !== 'undefined') ? DEMO_SESSION_FLAG : 'isExample';
-  return (state.sessions || []).filter(s => s && s.id != null && s.id !== '' && !s[flag]);
+  // V154 (5A): a job carrying an id PATGo could never have made (utils.js
+  // jobIdsSafe — only a tampered file restored before V154 can put one here) is
+  // left out exactly as an example job is: kept and shown on this phone, never
+  // sent, never counted. syncUnsafeHereCount() is the Sync page's line for it.
+  return (state.sessions || []).filter(s => s && s.id != null && s.id !== '' && !s[flag] && jobIdsSafe(s));
+}
+
+// V154 (5A): how many jobs on this phone are kept off the cloud for their ids.
+function syncUnsafeHereCount() {
+  const flag = (typeof DEMO_SESSION_FLAG !== 'undefined') ? DEMO_SESSION_FLAG : 'isExample';
+  return (state.sessions || []).filter(s => s && !s[flag] && !jobIdsSafe(s)).length;
 }
 
 // ---- sync state (SYNC_STATE_KEY) -----------------------------------------------
@@ -210,7 +220,12 @@ function _syncEmpty(userId) {
            // by a pull that finished with nothing left undecided. Older than
            // SYNC_STALE_DAYS (or never) = list the table in full before sending.
            // rec and ph keep their own.
-           seenAllAt: null };
+           seenAllAt: null,
+           // V154 (3A): {jobId: true} — cloud jobs never brought onto this phone
+           // because an id in them is one PATGo could never have made. Only the
+           // Sync page's line reads it; an entry goes when the cloud row is
+           // deleted. Keys are those odd ids — never used for anything else.
+           bad: {} };
 }
 
 // v83: two more fields.
@@ -326,6 +341,11 @@ function _syncLoad() {
     for (const k of Object.keys(raw.conf)) if (typeof raw.conf[k] === 'string') out.conf[k] = raw.conf[k];
   }
   if (Number.isInteger(raw.rtMonth)) out.rtMonth = raw.rtMonth;   // V93: garbage → look again
+  // V154 (3A): garbage → no line; the next pull that meets the row notes it again.
+  if (raw.bad && typeof raw.bad === 'object' && !Array.isArray(raw.bad)) {
+    let n = 0;
+    for (const k of Object.keys(raw.bad)) if (raw.bad[k] === true && n < SYNC_BAD_MAX) { out.bad[k] = true; n++; }
+  }
   if (raw.hashV !== SYNC_HASH_V) { out.sent = {}; out.rec.sent = {}; out.conf = {}; }
   else out.hashV = SYNC_HASH_V;
   // v83.1 (decision 3A). Cursors written by a pager that could step over rows
@@ -446,6 +466,9 @@ function syncStatusSummary() {
     // v81
     lastPullAt: st.lastPullAt,
     held: _syncHeldLoad().length,
+    // V154 (3A, 5A): the Sync page's two lines — jobs kept off each side.
+    badCloud: Object.keys(st.bad || {}).length,
+    badHere: syncUnsafeHereCount(),
   };
 }
 
@@ -931,6 +954,10 @@ function _syncValidDoc(doc, id) {
   if (!doc || typeof doc !== 'object' || Array.isArray(doc)) return false;
   if (doc.id == null || String(doc.id) !== String(id)) return false;
   if (!Array.isArray(doc.items)) return false;
+  // V154 (3A): an id PATGo could never have made is not readable either — this
+  // is what stops the cloud tab, the archive, a compare and a held answer from
+  // bringing one onto the phone. The pull says why on the Sync page (syncBad).
+  if (!jobIdsSafe(doc)) return false;
   return true;
 }
 
@@ -1259,6 +1286,20 @@ function _syncPull(c, uid, st, out, chk) {
   function decide(row) {
     const id = String(row && row.id != null ? row.id : '');
     if (!id) { blocked = true; return; }
+
+    // V154 (3A). A cloud job with an id PATGo could never have made — its own,
+    // or an item's — is never brought onto the phone, compared or held: there
+    // is no copy of it worth choosing. Resolved, so the cursor moves on (a held
+    // row would stop it, and the full listing, for ever); the Sync page says so
+    // from st.bad until the cloud row is deleted. Before every other branch, so
+    // nothing below ever acts on it. The phone's own job of the same id, if
+    // any, is untouched (and is sent over the tampered copy when it differs).
+    if (!safeId(id) || (row.deleted !== true && row.doc && Array.isArray(row.doc.items) && !jobIdsSafe({ id, items: row.doc.items }))) {
+      if (row.deleted === true) delete st.bad[id];
+      else if (st.bad[id] || Object.keys(st.bad).length < SYNC_BAD_MAX) st.bad[id] = true;
+      return;
+    }
+    if (st.bad[id]) delete st.bad[id];   // put right in the cloud since
 
     // Deliberately cleared from this phone (V80 decision 5A). The cloud keeps
     // the job as an archive; bringing it back is exactly what clearing meant to
@@ -2355,6 +2396,10 @@ function _syncPushHalf(c, uid, st, force) {
       const cAt = clearedAt.get(id);
       if (typeof cAt === 'string' && (typeof t.at !== 'string' || cAt >= t.at)) { stale.add(t); continue; }
       if (heldIds.has(id)) continue;                 // awaiting a decision
+      // V154 (5A, 4A): a job with an id PATGo could never have made is never sent
+      // — its delete neither (the database refuses that id, and one refused row
+      // fails its whole batch). Kept, so a later fix can still send it.
+      if (!safeId(id)) continue;
       if (!st.sent[id] && !st.gone[id] && !st.resend[id]) continue;  // server never had it
       if (st.gone[id] && !force && !st.resend[id]) continue;          // already sent
       const at = (typeof t.at === 'string' && !isNaN(Date.parse(t.at))) ? t.at : now;

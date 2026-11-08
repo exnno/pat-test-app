@@ -8,12 +8,37 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V154
+V154 = ids checked on the way in, stored values escaped (audit finding 3 — Peter 8 Nov:
+1A–5A, all defaults). utils.js `safeId` / `jobIdsSafe` / `safePicture`; backup.js refuses
+a bad file whole; sync.js: pull sets a bad cloud job aside (`st.bad`, Sync page line),
+`_syncValidDoc` refuses it, `_syncSessions` leaves a bad local job out (never sent, nor its
+delete); storage.js `normaliseReportSettings` drops a non-picture logo / signature; 34
+escapes in render-core / render-review / render-settings. SQL: supabase/v154-safe-ids.sql
+(+ schema.sql) — CHECK constraints `sessions_safe_ids`, `records_safe_pictures`, added only
+over a clean cloud. Harness 93 + markup-scan.js + M1801–M1824; 92c's release checks → 93e;
+90f "ends with" → "carries"; M144 re-anchored.
+**Next:** V155 (Opus) invites + roles with the Approve / Refuse screen — raise the minimum
+to 155 in its deploy steps once V155 is live. The audit's three findings are all fixed.
+
+### V154 residuals (known, accepted)
+- 93a sees a stored field put straight into markup; it can't see one copied into a plain
+  local first and that local put in raw. V154's sweep traced every such local by hand
+  (none raw); rule 32 says escape at the point of insertion.
+- A crafted backup can still carry odd values in fields that aren't ids or pictures (a
+  number where text belongs, say) — shown escaped, but a renderer that assumes a string
+  could fail on it (e.g. `capitalise` on a number — V154 wraps those it touched in
+  String()). Not script; a shape check of the whole job on restore is its own release.
+- Photo rows (`photos.id`, `session_id`, `item_id`) and client / site / instrument ids
+  have no database rule: every place they reach the page already escapes them (93a).
+- `st.bad` remembers at most SYNC_BAD_MAX (200) cloud jobs for the Sync page's count.
+
 ### Next after V153
 V153 = the minimum app version held in memory (audit finding 2 — Peter 7 Nov: 1A 2A).
 sync.js only: `_syncMinHeld` per account decides (`_syncMinFor`), set before the stored
 write; `syncDataClient()` reads the minimum first (shared, once per start / return).
 Harness 92 + M1793–M1800; 91e's release checks → 92c; five V151 mutations re-anchored.
-**Next:** V154 (Opus — security) ids checked and escaped (below); then V155 invites.
+**Next:** ✅ V154 built 8 Nov; then V155 invites.
 
 ### V153 residuals (known, accepted — 2A)
 - A full phone that couldn't store "too old", restarted where the read then fails (weak
@@ -32,10 +57,7 @@ main's hand-made 'pat-v151.1' replaced by pat-v152. Harness 91 + M1767–M1792; 
 release checks → 91e.
 **Next, the audit order (Peter 6 Nov, 3A):**
 - ✅ V153 built 7 Nov (see "Next after V153").
-- **V154 (model: Opus — security):** ids checked on the way in (backup restore, cloud
-  intake, load) and escaped wherever they enter HTML (audit finding 3: `${s.id}` raw in
-  79 attributes; a crafted backup — or, once Teams exists, a teammate's job via the
-  cloud — could run script where the sign-in token is). Real-browser test.
+- ✅ V154 built 8 Nov (see "Next after V154").
 - **V155:** invites + roles with the Approve / Refuse screen (was V152 — see below).
 
 ### V152 residuals (known, accepted)

@@ -65,12 +65,12 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V154</strong> &middot; November 2026</p>
+        <p class="muted">Behind the scenes: PATGo now checks what comes in from a backup file or the cloud, and turns away anything it didn&rsquo;t make itself &mdash; so a changed file can&rsquo;t slip anything onto your screen.</p>
         <p><strong>V153</strong> &middot; November 2026</p>
         <p class="muted">Behind the scenes: a phone that&rsquo;s too old to sync now stops reliably, even when it&rsquo;s nearly full, and checks before you open the cloud tab or the Business page.</p>
         <p><strong>V152</strong> &middot; November 2026</p>
         <p class="muted">Behind the scenes: if PATGo ever can&rsquo;t read something saved on this phone, it now keeps it safe and untouched instead of starting without it and saving over it. The Jobs list tells you, and Backup &amp; Restore shows how to get your work back.</p>
-        <p><strong>V151</strong> &middot; November 2026</p>
-        <p class="muted">Behind the scenes: the cloud can now ask for a newer PATGo before a phone syncs. If it ever does, the Jobs list says Update PATGo, with Update now &mdash; your work stays safe on the phone meanwhile.</p>
 
 
 
@@ -725,6 +725,8 @@ function renderCloudSync() {
         ${sum.rpTotal ? `<p id="sync-rp-counts" style="font-size:0.875rem">Report settings &amp; templates: <strong>${sum.rpUpToDate}</strong> of ${sum.rpTotal} up to date</p>` : ''}
         ${sum.gsTotal ? `<p id="sync-gs-counts" style="font-size:0.875rem">General settings: <strong>${sum.gsUpToDate}</strong> of ${sum.gsTotal} up to date</p>` : ''}
         ${sum.phReady && (sum.phTotal || sum.phCloudOnly) ? `<p id="sync-ph-counts" style="font-size:0.875rem">Photos: <strong>${sum.phUp}</strong> of ${sum.phTotal} on this phone in the cloud${sum.phTotal > sum.phUp ? ` &middot; <strong>${sum.phTotal - sum.phUp}</strong> waiting to send` : ''}${sum.phCloudOnly ? ` &middot; <strong>${sum.phCloudOnly}</strong> only in the cloud` : ''}</p>` : ''}
+        ${sum.badHere ? `<p class="sync-bad-line" id="sync-bad-here" role="status" style="font-size:0.875rem;color:var(--warn-soft-text)">${sum.badHere === 1 ? '1 job on this phone isn’t sent to the cloud' : `${sum.badHere} jobs on this phone aren’t sent to the cloud`} &mdash; ${sum.badHere === 1 ? 'it has' : 'they have'} details PATGo didn’t make (from a changed backup file). ${sum.badHere === 1 ? 'It stays' : 'They stay'} safe on this phone.</p>` : ''}
+        ${sum.badCloud ? `<p class="sync-bad-line" id="sync-bad-cloud" role="status" style="font-size:0.875rem;color:var(--warn-soft-text)">${sum.badCloud === 1 ? '1 job in the cloud couldn’t be brought down safely' : `${sum.badCloud} jobs in the cloud couldn’t be brought down safely`} &mdash; ${sum.badCloud === 1 ? 'it has' : 'they have'} details PATGo didn’t make. Nothing on this phone has been changed.</p>` : ''}
         ${inUse ? `<p class="muted" id="sync-inuse" style="font-size:0.8125rem">Tester in use: <strong>${escapeHTML(inUse)}</strong> &mdash; the same on each of your devices</p>` : ''}
         <p class="muted" id="sync-last" style="font-size:0.8125rem">Last sent: ${stamp(sum.lastPushAt)}</p>
         <p class="muted" id="sync-last-pull" style="font-size:0.8125rem">Last checked: ${stamp(sum.lastPullAt)}</p>

@@ -233,6 +233,24 @@ function shouldShowBackupReminder() {
   return ageDays >= days;
 }
 
+// V154 (2A): how many of a backup's jobs carry an id PATGo could never have
+// made (utils.js jobIdsSafe) — a job that isn't even an object counts too.
+function backupUnsafeJobCount(data) {
+  const list = (data && Array.isArray(data.sessions)) ? data.sessions : [];
+  let n = 0;
+  for (const s of list) if (!jobIdsSafe(s)) n++;
+  return n;
+}
+// V154 (1A): would normaliseReportSettings leave out this backup's logo or
+// signature (or a template's)? Said in the confirm, before anything is replaced.
+function backupDroppedPictures(data) {
+  const odd = (v) => typeof v === 'string' && v !== '' && safePicture(v) === '';
+  const has = (rs) => !!(rs && typeof rs === 'object' && (odd(rs.logo) || odd(rs.signature)));
+  if (!data) return false;
+  if (has(data.reportSettings)) return true;
+  return Array.isArray(data.reportTemplates) && data.reportTemplates.some(t => t && has(t.settings));
+}
+
 function restoreBackupFromFile(file) {
   if (!file) return;
   const reader = new FileReader();
@@ -246,6 +264,21 @@ function restoreBackupFromFile(file) {
     }
     if (!data || !Array.isArray(data.sessions)) {
       openInfoSheet({ title: 'Not a recognised backup', message: 'That file isn\u2019t a recognised PATGo backup. Make sure you picked a file exported from this app.' });
+      return;
+    }
+    // V154 (2A): a job or item id PATGo could never have made (utils.js
+    // jobIdsSafe) means the file was changed or damaged. Refused WHOLE, before
+    // anything is asked or replaced — a genuine backup always passes, and half
+    // of a tampered file is not something to trust. (A snapshot restore does not
+    // come through here: it is this phone's own copy — 5A keeps such a job.)
+    const unsafe = backupUnsafeJobCount(data);
+    if (unsafe) {
+      openInfoSheet({
+        title: 'This backup can’t be restored',
+        message: (data.sessions.length === 1 ? 'Its job has' : `${unsafe} of its ${data.sessions.length} jobs ${unsafe === 1 ? 'has' : 'have'}`) +
+          ' details PATGo didn’t make, so the file has been changed or damaged. ' +
+          'Nothing on this phone has been changed. Try another backup, or a daily snapshot on the Backup page.',
+      });
       return;
     }
     const itemCount = data.sessions.reduce((n, s) => n + (Array.isArray(s.items) ? s.items.length : 0), 0);
@@ -264,7 +297,8 @@ function restoreBackupFromFile(file) {
         `This file contains ${data.sessions.length} job${data.sessions.length === 1 ? '' : 's'} ` +
         `and ${itemCount} item${itemCount === 1 ? '' : 's'} in total` +
         (data.exportedAt ? `, exported ${new Date(data.exportedAt).toLocaleString('en-GB')}` : '') +
-        `. This will REPLACE all current data on this device. A copy of what's here now is kept first, so you can undo it from Daily snapshots on the Backup page.`,
+        `. This will REPLACE all current data on this device. A copy of what's here now is kept first, so you can undo it from Daily snapshots on the Backup page.` +
+        (backupDroppedPictures(data) ? ' Its company logo or signature isn’t a picture PATGo can use, so it will be left out.' : ''),
       confirmLabel: 'Replace & restore',
       onConfirm: () => restoreWithSafetyCopy(() => {
         applyBackupData(data, { markExported: true });

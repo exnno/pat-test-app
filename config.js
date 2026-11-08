@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V153';
+const APP_VERSION = 'V154';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -1284,6 +1284,9 @@ const MOVE_OFFER_MS = 6000;
 // (`movedOut`, {itemId: jobId}), so another phone can take the smaller job without
 // the "fewer items" question. Bounded; the oldest entries go first.
 const MOVED_OUT_MAX = 5000;
+// V154 (3A): at most this many cloud jobs remembered as "couldn't be brought down
+// safely" (sync.js st.bad) — only for the Sync page's count.
+const SYNC_BAD_MAX = 200;
 // V103 (Stage 9B, 2A): the job picker shows a filter box above this many jobs.
 const MOVE_TO_FILTER_AT = 8;
 const W3W_HOME_URL = 'https://what3words.com/';

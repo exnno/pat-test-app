@@ -1014,10 +1014,12 @@ function normaliseReportSettings(stored) {
   out.retestMonths    = (Number.isFinite(rm) && rm >= 1 && rm <= 120) ? rm : null;
   out.companyName     = typeof stored.companyName === 'string' ? stored.companyName : '';
   out.companyAddress  = typeof stored.companyAddress === 'string' ? stored.companyAddress : '';
-  out.logo            = typeof stored.logo === 'string' ? stored.logo : '';
+  // V154 (1A): only a picture PATGo could have made (utils.js safePicture) —
+  // anything else would go into an <img src> as written. '' = no logo.
+  out.logo            = safePicture(stored.logo);
   // v34: signature is a base64 data URL string like logo (empty if none). The
   // position is constrained to 'left'|'right', anything else falls back to left.
-  out.signature       = typeof stored.signature === 'string' ? stored.signature : '';
+  out.signature       = safePicture(stored.signature);   // V154 (1A), as the logo
   out.signaturePosition = (stored.signaturePosition === 'right') ? 'right' : 'left';
   // v35: report colours — normalise to a safe '#rrggbb' or fall back to the
   // default look. Old data/backups/setups without these fields backfill cleanly.

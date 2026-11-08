@@ -1,4 +1,4 @@
-# PATGo — Code Map (V153)
+# PATGo — Code Map (V154)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -323,6 +323,26 @@ is discoverable from the file you happen to be editing.
     Copies: Reset 'work' sweeps the prefix (reset.js), the higher levels and a
     takeover by the 'pat:' sweep; never backed up. Harness 91.
 
+32. **Stored values reach the page only through escapeHTML; ids are checked on
+    the way in (V154, audit finding 3).** Anything saved — a backup file or the
+    cloud can carry it — goes into markup as `${escapeHTML(x)}`, attributes and
+    text alike; formatDate()/capitalise() hand garbage back as is, so escape
+    their result. ⚠ harness 93a (harness/markup-scan.js) fails any ${…} in markup
+    that puts a record's field in raw; a genuine non-stored exception goes in
+    93a's ALLOWED list with why. It can't see a field copied to a local first —
+    escape at the point of insertion anyway.
+    Ids: utils.js `safeId` / `jobIdsSafe` (letters, digits, `_`, `-`, ≤80; not
+    the three Object names; a whole number ok; an item may have no id). A backup
+    FILE with one fails → refused whole (backup.js, 2A); a cloud row → never
+    brought down, noted in `st.bad` for the Sync page (sync.js pull, 3A) and
+    refused by `_syncValidDoc` on every other way in; a job on the phone → kept,
+    shown escaped, left out of `_syncSessions()` like an example job (never sent,
+    its delete neither, 5A). Logo / signature: `safePicture` in
+    `normaliseReportSettings` (storage.js) — the one path load, restore, setup
+    and the cloud all take. ⚠ The patterns are ALSO the database's
+    (supabase/v154-safe-ids.sql, schema.sql — CHECK constraints on sessions and
+    records, 4A): change one, change both (harness 93f).
+
 ---
 
 ## Load order (index.html) — 37 first-party files
@@ -374,6 +394,8 @@ NOT in `index.html`, NOT in `sw.js` ASSETS — test 01c fails if either changes.
 or add this release's assertions and mutations. Never delete from `tests/`.
 **Coupling:** derives load order from `index.html`; source-guards `report.js`,
 `csv.js` and the flat-field writers (rule 7); asserts rules 1, 8, 9, 11, 14, 15, 16, 18.
+V154: `markup-scan.js` — finds every ${…} in a markup template that puts a
+stored field in raw (group 93a, rule 32). Not a test file; required by 93.
 ⚠ v77: the stub's `dispatchEvent` now fires `on<type>` PROPERTY handlers as well
 as `addEventListener` registrations, the way a real element does. Without it a
 property-bound handler could only be tested by hand-calling it — the V67
@@ -542,6 +564,10 @@ items ×3, preset), storage.js ×2 (seeded presets), photos.js, instruments.js.
 `uid()` (session.js) still exists and still works — which is exactly why a
 revert to it is invisible. Ids already stored are never rewritten.
 **Coupling:** none by design — nothing here reads `state`.
+⚠ V154: `safeId` / `jobIdsSafe` / `safePicture` (+ `SAFE_ID_RE`, `SAFE_PICTURE_RE`)
+— rule 32. Callers: backup.js (restore), sync.js (`_syncSessions`, pull,
+`_syncValidDoc`, tombstone push), storage.js `normaliseReportSettings`. Same
+patterns as supabase/v154-safe-ids.sql.
 ⚠ v75: `focusInSheet()` is the ONE way anything inside a bottom sheet takes
 focus (`preventScroll`, try/catch fallback to bare `focus()`). Callers:
 feedback.js ×2, dispatch.js (`fail-other-input`), settings-actions.js ×2.
