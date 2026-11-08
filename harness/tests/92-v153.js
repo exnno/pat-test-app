@@ -18,8 +18,7 @@
           run has read it; a raised minimum stops them before anything is
           touched; 2A: a failed read goes by what was known, and the next
           action tries again.
-     92c  Release: V153, cache pat-v153, About V153 / V152 / V151, What's new
-          not rolled (still V150's).
+     92c  V153's lasting label checks (its release checks moved to 93e in V154).
 
    ⚠ WHAT THIS FILE CANNOT PROVE: a real iPhone with genuinely full storage
    (the harness throws on demand). */
@@ -249,24 +248,9 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 92c */
-  await t.group('92c — release: V153; cache pat-v153; About V153 / V152 / V151; no What’s new', () => {
+  await t.group('92c — V153 carried (release checks → 93e)', () => {
     const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V153', 'APP_VERSION V153');
-    t.eq(rel.run('WELCOME_VERSION'), 'V150', 'What’s new not rolled (still V150’s)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v153';", 'cache key pat-v153');
-    t.eq(rel.fn('updateVersionLabel')('pat-v153'), 'V153', 'the update banner reads the key as V153');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: V150’s one line');
-    t.includes(sheetCopy, '<li><strong>Move a job to another business.</strong> For anyone who works for more than one business:', '…moving a job');
-    t.includes(sheetCopy, 'Working for just one business? Nothing changes.</li>', '…and nothing changes for everyone else');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V153</strong>'), y = help.indexOf('<p><strong>V152</strong>'), z = help.indexOf('<p><strong>V151</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V153, V152, V151');
-    t.excludes(help, '<p><strong>V150</strong>', 'V150 rolled off');
-    t.includes(help, 'Behind the scenes: a phone that&rsquo;s too old to sync now stops', 'About: V153’s line');
-    t.includes(help, 'Behind the scenes: if PATGo ever can&rsquo;t read something saved on this phone', 'About: V152’s line still there');
-    t.includes(help, 'Behind the scenes: the cloud can now ask for a newer PATGo before a phone syncs.', 'About: V151’s line still there');
+    t.eq(rel.fn('updateVersionLabel')('pat-v153'), 'V153', 'the update banner reads pat-v153 as V153');
+    t.eq(rel.fn('updateVersionLabel')('pat-v153-1'), 'V153.1', '…and a hotfix key as V153.1');
   });
 };

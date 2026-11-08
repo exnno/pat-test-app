@@ -365,7 +365,8 @@ module.exports = async function () {
     t.includes(mig, "      raise exception 'v151-undo';", 'the self-check undoes what it tries');
 
     const schema = read('supabase/schema.sql');
-    t.ok(schema.endsWith(body.replace(/\n*$/, '\n')), 'schema.sql ends with exactly the V151 statements');
+    // V154: its own section follows V151's, so "ends with" became "carries" (93f pins V154's).
+    t.includes(schema, body.replace(/\n*$/, '\n'), 'schema.sql carries exactly the V151 statements');
     t.ok(schema.indexOf('============ V151') > schema.indexOf('============ V150'), '…in their own section, after V150’s');
 
     const iso = read('supabase/isolation-test.sql');
