@@ -23,8 +23,7 @@
           someone whose main business is another person's sees the owner line
           and Check now, never Renew now, and no Renew sheets; the Sync page's
           paused words likewise.
-     94e  Release: V155; cache pat-v155; What's new rolled (two lines); About
-          V155 / V154 / V153.
+     94e  Carried: the update banner reads pat-v155 (release checks → 95e).
      94f  The SQL's text: schema.sql carries v155-invites.sql's block byte for
           byte; the database offers what the app offers; the confirmed address;
           both phone checks; the cover never pushed up; isolation 23a–23h.
@@ -453,26 +452,10 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 94e */
-  await t.group('94e — release: V155; cache pat-v155; What’s new rolled; About V155 / V154 / V153', () => {
+  await t.group('94e — V155 carried (release checks → 95e)', () => {
     const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V155', 'APP_VERSION V155');
-    t.eq(rel.run('WELCOME_VERSION'), 'V155', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v155';", 'cache key pat-v155');
-    t.eq(rel.fn('updateVersionLabel')('pat-v155'), 'V155', 'the update banner reads the key as V155');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 2, 'What’s new: two lines');
-    t.includes(sheetCopy, '<li><strong>Invite people to your business.</strong>', '…inviting');
-    t.includes(sheetCopy, '<li><strong>Been invited?</strong>', '…being invited');
-    t.includes(sheetCopy, 'Your own jobs stay where they are.</li>', '…nothing of yours moves');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V155</strong>'), y = help.indexOf('<p><strong>V154</strong>'), z = help.indexOf('<p><strong>V153</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V155, V154, V153');
-    t.excludes(help, '<p><strong>V152</strong>', 'V152 rolled off');
-    t.includes(help, 'Invite people to your business by email address, see who&rsquo;s in it', 'About: V155’s line');
-    t.includes(help, 'Behind the scenes: PATGo now checks what comes in from a backup file', 'About: V154’s line still there');
-    t.includes(help, 'Behind the scenes: a phone that&rsquo;s too old to sync now stops reliably', 'About: V153’s line still there');
+    t.eq(rel.fn('updateVersionLabel')('pat-v155'), 'V155', 'the update banner reads pat-v155 as V155');
+    t.eq(rel.fn('updateVersionLabel')('pat-v155-1'), 'V155.1', '…and a hotfix key as V155.1');
   });
 
   /* ------------------------------------------------------------------ 94f */
