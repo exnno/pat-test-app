@@ -517,7 +517,7 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V155';",   // V155: re-pointed
+    from: "const APP_VERSION = 'V156';",   // V156: re-pointed
     to:   "const APP_VERSION = 'V154';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
@@ -640,9 +640,9 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V153</strong> &middot; November 2026</p>',   // V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
+    from: '        <p><strong>V154</strong> &middot; November 2026</p>',   // V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 94e)',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 95e)',
   },
 
   {
@@ -6122,9 +6122,9 @@ const MUTATIONS = [
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
     // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
-    from: "<li><strong>Invite people to your business.</strong>",   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
+    from: "<li><strong>Your devices.</strong>",   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (94e)",
+    why:  "11A: the welcome says plainly what changed on screen (95e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8604,9 +8604,9 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V155';",   // V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
-    to:   "const WELCOME_VERSION = 'V154';",
-    why:  "What's new is rolled on a feature release (94e)",
+    from: "const WELCOME_VERSION = 'V156';",   // V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
+    to:   "const WELCOME_VERSION = 'V155';",
+    why:  "What's new is rolled on a feature release (95e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
@@ -8620,9 +8620,9 @@ const MUTATIONS = [
     // V149: one line — re-aimed at its end.
     // V150: one line — re-aimed at its end.
     // V155: two lines — re-aimed at the second's end; still caught by the count.
-    from: "Your own jobs stay where they are.</li>\n",
-    to:   "Your own jobs stay where they are.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (94e)",
+    from: "a device that&rsquo;s been signed out no longer counts.</li>\n",   // V156: two lines — re-aimed at the second's end; still caught by the count.
+    to:   "a device that&rsquo;s been signed out no longer counts.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "two lines (95e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8636,9 +8636,9 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Invite people to your business by email address, see who&rsquo;s in it",   // V155: at V155's (V154's moves to M1259, V153's to M1238).
+    from: "Your devices: see every phone, tablet or computer signed in to your account",   // V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
     to:   "Better",
-    why:  "the About page must say what changed in this version (94e)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
+    why:  "the About page must say what changed in this version (95e)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8753,9 +8753,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Behind the scenes: a phone that&rsquo;s too old to sync now stops reliably",   // V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
+    from: "Behind the scenes: PATGo now checks what comes in from a backup file",   // V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (94e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
+    why:  "the About page keeps the last three versions' lines (95e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8915,9 +8915,9 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Behind the scenes: PATGo now checks what comes in from a backup file",   // V155: at V154's, still in the window.
+    from: "Invite people to your business by email address, see who&rsquo;s in it",   // V156: at V155's, still in the window. V155: at V154's.
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (94e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
+    why:  "the About page keeps the last three versions' lines (95e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9044,9 +9044,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v155';",   // V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v154';",
-    why:  "a release needs its cache bump or phones never get it (94e)",
+    from: "const CACHE_VERSION = 'pat-v156';",   // V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v155';",
+    why:  "a release needs its cache bump or phones never get it (95e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -13116,6 +13116,201 @@ const MUTATIONS = [
     from: "      if (businessMyInvites().map(v => v.id).join(',') !== was) _bizJobsRepaint();\n",
     to:   "",
     why:  "the read finishes seconds after the Jobs list is drawn (94b)",
+  },  {
+    name: "M1856 (V156) a device row keeps a kind the database never names",
+    file: "business.js",
+    from: "kind: Object.prototype.hasOwnProperty.call(BUSINESS_DEVICE_KINDS, r.kind) ? r.kind : 'Device',",
+    to:   "kind: r.kind || 'Device',",
+    why:  "rows from the cloud are made safe (95a)",
+  },
+  {
+    name: "M1857 (V156) a device row keeps a version PATGo never had",
+    file: "business.js",
+    from: "version: typeof r.app_version === 'string' && _BIZ_VERSION_RE.test(r.app_version) ? r.app_version : '',",
+    to:   "version: typeof r.app_version === 'string' ? r.app_version : '',",
+    why:  "rows from the cloud are made safe (95a)",
+  },
+  {
+    name: "M1858 (V156) a device row keeps a sign-in that isn't an id",
+    file: "business.js",
+    from: "const sid = businessValidId(r.session_id) ? r.session_id : '';",
+    to:   "const sid = typeof r.session_id === 'string' ? r.session_id : '';",
+    why:  "Sign it out only ever names a real sign-in (95a)",
+  },
+  {
+    name: "M1859 (V156) an iPhone is written IPhone",
+    file: "business.js",
+    from: "function _bizKindHead(kind) { return /^(computer|device)$/.test(kind) ?",
+    to:   "function _bizKindHead(kind) { return true ?",
+    why:  "the device in words (95a 95b)",
+  },
+  {
+    name: "M1860 (V156) a sign-in that never synced is shown as an older PATGo",
+    file: "business.js",
+    from: "const ver = d.reported ? (d.version || 'an older PATGo') : 'signed in, never synced';",
+    to:   "const ver = d.version || 'an older PATGo';",
+    why:  "2A: a sign-in that never synced says so (95a)",
+  },
+  {
+    name: "M1861 (V156) the Account page loses Your devices",
+    file: "render-help.js",
+    from: "        ${(typeof renderCloudDevices === 'function') ? `<button class=\"backup-action-btn\" id=\"cloud-devices-open\" data-action=\"settings-page\" data-arg=\"cloudDevices\" ${dis} style=\"margin-top:6px\">Your devices ›</button>` : ''}\n",
+    to:   "",
+    why:  "3A: Account → Your devices (95b)",
+  },
+  {
+    name: "M1862 (V156) this device gets Sign it out",
+    file: "business.js",
+    from: "const btn = d.here ? '' :",
+    to:   "const btn = false ? '' :",
+    why:  "the device you're using signs out from the Account page (95b)",
+  },
+  {
+    name: "M1863 (V156) an older device doesn't say it holds up invites",
+    file: "business.js",
+    from: "const old = d.behind ? `<div class=\"dev-old\"",
+    to:   "const old = false ? `<div class=\"dev-old\"",
+    why:  "3A: which device holds invites up (95b)",
+  },
+  {
+    name: "M1864 (V156) Back from Your devices climbs to the Settings list",
+    file: "business.js",
+    from: "id=\"dev-back\" data-action=\"settings-page\" data-arg=\"cloudAccount\"",
+    to:   "id=\"dev-back\" data-action=\"back-to-settings\" data-arg=\"\"",
+    why:  "Account → Your devices → Back is Account (95b)",
+  },
+  {
+    name: "M1865 (V156) Your devices isn't read on open",
+    file: "session.js",
+    from: "  if (v === 'cloudDevices' && typeof businessDevicesRefresh === 'function') businessDevicesRefresh();\n",
+    to:   "",
+    why:  "3A: read on every open (95b)",
+  },
+  {
+    name: "M1866 (V156) the Your devices page has no route",
+    file: "render-core.js",
+    from: " || v === 'cloudBusiness' || v === 'cloudDevices') {",
+    to:   " || v === 'cloudBusiness') {",
+    why:  "3A: the page is painted, only once unlocked (95b)",
+  },
+  {
+    name: "M1867 (V156) Sign it out doesn't ask first",
+    file: "business.js",
+    from: "  const kind = BUSINESS_DEVICE_KINDS[d.kind] || 'device';\n  openConfirmSheet({\n    title: `Sign out this",
+    to:   "  const kind = BUSINESS_DEVICE_KINDS[d.kind] || 'device';\n  businessDeviceSignOutGo(sessionId); return true;\n  openConfirmSheet({\n    title: `Sign out this",
+    why:  "signing out only ever on a tap, asked first (95c)",
+  },
+  {
+    name: "M1868 (V156) this device can start a Sign it out",
+    file: "business.js",
+    from: "  if (!d || d.here || !businessValidId(sessionId)) return false;",
+    to:   "  if (!d || !businessValidId(sessionId)) return false;",
+    why:  "never the device you're using (95c)",
+  },
+  {
+    name: "M1869 (V156) Sign it out tries with no signal",
+    file: "business.js",
+    from: "  if (_bizOffline()) { showToast('You need a signal to sign a device out.'); return Promise.resolve(false); }\n",
+    to:   "",
+    why:  "no signal: said, nothing sent (95c)",
+  },
+  {
+    name: "M1870 (V156) Your devices isn't read again after Sign it out",
+    file: "business.js",
+    from: "    .then((ok) => { if (state.view === 'cloudDevices') businessDevicesRefresh(); return ok; });",
+    to:   "    .then((ok) => ok);",
+    why:  "the page shows what the cloud now has (95c)",
+  },
+  {
+    name: "M1871 (V156) Your devices goes through the minimum-version gate",
+    file: "business.js",
+    from: "function _bizDevClient() { return cloudClient(); }",
+    to:   "function _bizDevClient() { return _bizClient(); }",
+    why:  "account-level: works below the minimum (R61) (95c)",
+  },
+  {
+    name: "M1872 (V156) the dev-signout tap does nothing",
+    file: "dispatch.js",
+    from: "  'dev-signout': (arg) => { if (typeof businessDeviceSignOut === 'function') businessDeviceSignOut(arg); },\n",
+    to:   "",
+    why:  "the page's button (95c)",
+  },
+  {
+    name: "M1873 (V156) a refusal for an old device isn't named",
+    file: "business.js",
+    from: "      if (_bizHeldUp(e) && typeof businessHeldUp === 'function') {",
+    to:   "      if (false && _bizHeldUp(e)) {",
+    why:  "2A: the refusal names the devices (95d)",
+  },
+  {
+    name: "M1874 (V156) an invite refusal lists my own devices instead of the business's",
+    file: "business.js",
+    from: "businessHeldUp(e, name === 'invite_member' && args ? args.o : '')",
+    to:   "businessHeldUp(e, '')",
+    why:  "2A: the business's devices (95d)",
+  },
+  {
+    name: "M1875 (V156) a teammate's device gets a Sign out button",
+    file: "business.js",
+    from: "_bizHeldMine = list.filter(d => d.you && d.session && !d.here);",
+    to:   "_bizHeldMine = list.filter(d => !d.here);",
+    why:  "2A: a teammate's is named only (95d)",
+  },
+  {
+    name: "M1876 (V156) Join's refusal lists every device of mine",
+    file: "business.js",
+    from: ".filter(d => orgId ? true : d.behind);",
+    to:   ".filter(d => true);",
+    why:  "2A: only those holding it up (95d)",
+  },
+  {
+    name: "M1877 (V156) the choice sheet drops its lines",
+    file: "feedback.js",
+    from: "    ${lines.length ? `<ul class=\"sheet-scroll choice-sheet-lines\"",
+    to:   "    ${false ? `<ul class=\"sheet-scroll choice-sheet-lines\"",
+    why:  "2A: the devices one per line (95d)",
+  },
+  {
+    name: "M1878 (V156) every refusal reads the device list",
+    file: "business.js",
+    from: "  return /patgo_(your_)?phones_behind/.test(t);",
+    to:   "  return /patgo_/.test(t);",
+    why:  "only the old-phone refusals name devices (95d)",
+  },
+  {
+    name: "M1879 (V156) a device list that can't be read says nothing",
+    file: "business.js",
+    from: "    .catch(() => { plain(); return false; });\n}",
+    to:   "    .catch(() => false);\n}",
+    why:  "no list: V155's words still (95d)",
+  },
+  {
+    name: "M1880 (V156) schema.sql drifts from the migration (ended sign-ins)",
+    file: "supabase/schema.sql",
+    from: "      and (ses.not_after is null or ses.not_after > now())\n",
+    to:   "",
+    why:  "a new project gets the same (95f)",
+  },
+  {
+    name: "M1881 (V156) Sign it out ends anyone's sign-in",
+    file: "supabase/v156-devices.sql",
+    from: "  delete from auth.sessions x where x.id = s and x.user_id = me;",
+    to:   "  delete from auth.sessions x where x.id = s;",
+    why:  "my own sign-ins only (95f)",
+  },
+  {
+    name: "M1882 (V156) the database's kinds drift from the app's",
+    file: "supabase/v156-devices.sql",
+    from: "    when ua ~* 'android' then 'Android phone'",
+    to:   "    when ua ~* 'android' then 'Android'",
+    why:  "the kinds as the app has them (95f)",
+  },
+  {
+    name: "M1883 (V156) a teammate's sign-in is handed out",
+    file: "supabase/v156-devices.sql",
+    from: "           case when mm.user_id = me then d.session_id end as session_id,",
+    to:   "           d.session_id as session_id,",
+    why:  "2A: a teammate's named only (95f)",
   },
 ];
 
