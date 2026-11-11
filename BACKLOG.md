@@ -8,6 +8,41 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V155
+V155 = invites, roles and the people in a business (Peter 11 Nov: 0A 1A 2A 3A 4A 5A 6A 7C
+8A; names typed at invite; a paid seat anywhere = never locked). business.js third part
+(memory only): `my_invites` with the list (Jobs line), `business_people` / `business_invites`
+on the page, the invite / Join / Decline / Cancel / role / name / Make main sheets; plan.js
+`planIsMember` (8A) + billingRead takes my_billing's `cover`; sync.js member paused words;
+feedback.js `openNameSheet` inputType 'email'. SQL supabase/v155-invites.sql (+ schema.sql):
+invites, memberships.name, the rpcs, `plan_cover` / `plan_cover_refresh` (profile copy =
+best plan of all businesses; `patgo.plan_copy` stops profile_plan_up pushing it up).
+Isolation 23a–23h. Harness 94 + M1825–M1855; 93e's release checks → 94e.
+**Next (model: Opus — database rules):** V156 the Approve / Refuse screen (job_moves waiting
+from a business the reader `can_read_org`; `decide_job_move` ready). Then V157 leaving /
+removing a member (R5) + what the leaver's phone does. Seat billing (7C: £6 incl. Owner +
+£3 per extra Engineer / Team leader; Office free) with **the per-business lock** (Peter
+11 Nov: each job covered by its own business's plan — a member's own lapsed business
+locks only its own jobs) — its own release before launch.
+**Possible switch (6A, Peter 11 Nov):** let the Owner hide what Engineers see of the
+member list (names / roles) — not built; raise if wanted.
+
+### V155 residuals (known, accepted)
+- Until the per-business lock: a member whose OWN business has ended may have a job of
+  that business refused by the cloud, which pauses the phone's sending (V143) — the
+  team's jobs too — until a read clears it. Can't happen for real before seat billing
+  (nothing is charged on the test project).
+- The invite is matched to the sign-in's email address exactly (confirmed only). Someone
+  who signs in with another address (Google with a different email) won't see it — the
+  invite sheet and Share message both say "this exact address".
+- A joiner who just signed in on a phone that hasn't synced yet counts as "too old" (V151
+  residual): Join says to wait a minute and try again.
+- `set_member_role`'s "never your own" guard is belt-and-braces: the Owner's own row is
+  refused anyway as an Owner (the broken-copy run found that mutation equivalent).
+- Names: an Owner's own name starts blank until they set it ("You — add your name").
+- 25l (photos, Delete all signed in) failed once in a full run under load and passed alone
+  on V154 and V155 and in the next full run — timing, not V155.
+
 ### Next after V154
 V154 = ids checked on the way in, stored values escaped (audit finding 3 — Peter 8 Nov:
 1A–5A, all defaults). utils.js `safeId` / `jobIdsSafe` / `safePicture`; backup.js refuses

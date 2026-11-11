@@ -173,7 +173,7 @@ const SETTINGS_PAGE_META = {
   cloudAccount:        { icon: 'user', title: 'Account',               aliases: 'cloud account sign in sign out email login' },
   cloudSync:           { icon: 'refresh-cw', title: 'Sync',                  aliases: 'cloud sync upload send devices phones check for updates' },
   cloudSubscription:   { icon: 'credit-card', title: 'Subscription',          aliases: 'cloud subscription plan trial billing' },
-  cloudBusiness:       { icon: 'briefcase', title: 'Business',              aliases: 'business company team organisation organization owner role name rename for whose jobs employer subcontract' }   // V149 (3A)
+  cloudBusiness:       { icon: 'briefcase', title: 'Business',              aliases: 'business company team organisation organization owner role name rename for whose jobs employer subcontract invite invites join people members staff engineer team leader office main' }   // V149 (3A); V155: invites
 };
 
 

@@ -4534,3 +4534,12 @@ body.has-selection-bar .cs-screen { padding-bottom: 100px; }
 .wall-actions { display: flex; flex-direction: column; gap: 8px; margin-top: 4px; }
 .wall-create { font-size: 1.0625rem; padding: 16px; }
 .wall-note { font-size: 0.8125rem; text-align: center; margin: 0 0 8px; }
+
+/* @@ V155 — the people in a business (business.js) */
+.biz-sub { margin: 14px 0 4px; font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.biz-people { list-style: none; margin: 0; padding: 0; }
+.biz-person { padding: 8px 0; border-top: 1px solid var(--border); font-size: 0.9375rem; }
+.biz-person:first-child { border-top: none; }
+.biz-person-name { font-weight: 600; }
+.biz-person-email { font-size: 0.8125rem; overflow-wrap: anywhere; }
+.biz-person .link-btn { margin-right: 14px; }

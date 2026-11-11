@@ -1,4 +1,4 @@
-// ============== PATGo PWA — V150 — Moving a job to another business ===========
+// ============== PATGo PWA — V155 — Invites, roles and the people in a business ===
 // (c) 2026 Peter Birchley. All rights reserved.
 //
 // business.js (Stage 16 / Teams v1).
@@ -179,8 +179,9 @@ function businessRead(c, uid) {
       const ok = !!businessFromRows(uid, res.data);
       if (ok) _bizReadOwed = false;
       // V150: the moves too — on their own, so a project without the V150 SQL
-      // (or a failed read) never stops the list.
-      return businessMovesRead(c, uid).then(() => ok, () => ok);
+      // (or a failed read) never stops the list. V155: and the invites to me.
+      return businessMovesRead(c, uid).then(() => ok, () => ok)
+        .then(() => businessMyInvitesRead(c, uid).then(() => ok, () => ok));
     });
 }
 
@@ -222,7 +223,8 @@ function businessRefresh() {
   b.reading = true; b.error = '';
   _bizRepaint();
   return _bizClient()
-    .then((c) => businessRead(c, uid))
+    .then((c) => businessRead(c, uid)
+      .then((ok) => businessTeamRead(c, uid).then(() => ok, () => ok)))   // V155: the people and invites
     .then((ok) => { if (!ok) b.error = 'read'; return ok; })
     .catch(() => { b.error = 'read'; return false; })
     .then((ok) => { b.reading = false; _bizRepaint(); return ok; });
@@ -303,10 +305,13 @@ function renderCloudBusiness() {
         <p class="muted" id="biz-role-${i}">You: ${escapeHTML(who)} · ${escapeHTML(people)}</p>
         ${x.def ? `<p class="muted" id="biz-default-${i}">Your main business — new jobs go here unless you choose another.</p>` : ''}
         ${btn}
+        ${!x.def ? `<button class="backup-action-btn" id="biz-main-${i}" data-action="biz-main" data-arg="${escapeHTML(x.id)}" style="margin-top:8px">Make this my main business</button>` : ''}
+        ${businessPeopleHTML(x, i)}
       </div>`;
     }).join('');
     body = `
       ${status ? `<p class="muted cloud-msg" id="biz-status" role="status">${escapeHTML(status)}</p>` : ''}
+      ${businessMyInvitesHTML()}
       ${cards || (b.reading ? '' : '<div class="info-card"><p class="muted" id="biz-none">Nothing read yet.</p></div>')}
       <button class="backup-action-btn" id="biz-refresh" data-action="biz-refresh" ${b.reading ? 'disabled' : ''} style="margin-top:4px">Check again</button>`;
   }
@@ -314,7 +319,7 @@ function renderCloudBusiness() {
     <div class="screen" id="cloud-business-page">
       ${renderSettingsSubHeader('Business')}
       <div class="info-card">
-        <p class="muted" id="biz-intro">Every job belongs to a business. Most people have one — their own. If you work for more than one, New job asks which business each job is for.</p>
+        <p class="muted" id="biz-intro">Every job belongs to a business. Most people have one — their own. Invite people to work in yours; if you work for more than one, New job asks which business each job is for.</p>
       </div>
       ${body}
     </div>
@@ -716,4 +721,412 @@ function renderBusinessMoveSheet(sess) {
           <ul class="move-to-list" id="biz-move-list">${rows}</ul>
         </div>
       </div>`;
+}
+
+// ============================================================================
+// V155 — invites, roles and the people in a business
+// ============================================================================
+// Locked 11 Nov (Peter): 1A an invite goes to an email address and waits there
+// until that address signs in; Share sends a ready-written message · 2A Owner
+// offers Team leader / Engineer / Office, Team leader and Office offer Engineer
+// only, only the Owner changes a role · 3A refused while a phone in the business
+// (or one of the joiner's) is below the minimum app version — the database
+// decides, the phone puts it into words · 4A joining moves nothing; "make it my
+// main business?" is asked at Join, Make main later · 5A 14 days, one waiting
+// per address · 6A everyone sees names and roles, only Owner / Team leader /
+// Office see addresses and invites · names typed at invite, each person changes
+// their own. supabase/v155-invites.sql holds every rule.
+//
+// Nothing here is stored on the phone: invites and people are read on every
+// start / return (my invites — the Jobs list line) and on every open of the
+// Business page (people and the business's invites). Each read is the
+// signed-in account's (u), so a sign-out or a takeover shows nothing stale.
+// ⚠ A project without the V155 SQL answers "no such function": every read here
+// fails soft and the page shows what it did before V155.
+
+const BUSINESS_OFFER = { owner: ['engineer', 'team_leader', 'office'], team_leader: ['engineer'], office: ['engineer'] };
+const BUSINESS_ROLE_ABOUT = {
+  engineer: 'Engineer — logs their own jobs',
+  team_leader: 'Team leader — logs jobs and sees the whole team’s',
+  office: 'Office — sees the whole team’s jobs, doesn’t log',
+};
+const BUSINESS_INVITE_WORDS = { waiting: 'Waiting', joined: 'Joined', declined: 'Declined', cancelled: 'Cancelled', expired: 'Expired' };
+const _BIZ_EMAIL_RE = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const BUSINESS_INVITE_DAYS = 14;   // supabase/v155-invites.sql: expires_at default — said in the words
+
+let _bizMine = { u: '', list: [] };                // invites to me
+let _bizTeam = { u: '', people: [], invites: [] }; // the Business page
+
+function _bizUid() { return typeof cloudUserId === 'function' ? (cloudUserId() || '') : ''; }
+function _bizStr(v, max) { return typeof v === 'string' ? v.slice(0, max) : ''; }
+
+// Rows from my_invites → the list. A bad row is dropped.
+function businessMyInvitesFromRows(uid, rows) {
+  const list = [];
+  for (const r of (Array.isArray(rows) ? rows : [])) {
+    if (!r || !businessValidId(r.id) || !businessValidId(r.business_id) || !BUSINESS_OFFER.owner.includes(r.role)) continue;
+    list.push({ id: r.id, org: r.business_id, orgName: _bizStr(r.business_name, 80), role: r.role, by: _bizStr(r.invited_by_name, 60), until: _bizStr(r.expires_at, 40) });
+  }
+  _bizMine = { u: uid, list };
+  return list;
+}
+
+function businessMyInvites() {
+  const uid = _bizUid();
+  return uid && _bizMine.u === uid ? _bizMine.list : [];
+}
+
+function businessMyInvitesRead(c, uid) {
+  return Promise.resolve()
+    .then(() => c.rpc('my_invites'))
+    .then((res) => {
+      if (!res || res.error) throw (res && res.error) || new Error('no answer');
+      const was = businessMyInvites().map(v => v.id).join(',');
+      businessMyInvitesFromRows(uid, res.data);
+      if (businessMyInvites().map(v => v.id).join(',') !== was) _bizJobsRepaint();
+      return true;
+    });
+}
+
+// The Jobs list line appears (or goes) when the read finishes — never under a
+// sheet or the cursor (MAP rules 2/3; the new job form has boxes).
+function _bizJobsRepaint() {
+  if (state.view !== 'sessions') return;
+  try {
+    const a = document.activeElement;
+    if (a && (a.tagName === 'INPUT' || a.tagName === 'TEXTAREA' || a.tagName === 'SELECT')) return;
+    if (document.querySelector('body > .bulk-sheet, body > .fail-sheet, body > .modal-backdrop')) return;
+  } catch (e) { /* no DOM to inspect */ }
+  render();
+}
+
+// Rows from business_people / business_invites → the page's record.
+function businessTeamFromRows(uid, people, invites) {
+  const p = [], v = [];
+  for (const r of (Array.isArray(people) ? people : [])) {
+    if (!r || !businessValidId(r.business_id) || !businessValidId(r.user_id) || !BUSINESS_ROLE_WORDS[r.role]) continue;
+    p.push({ org: r.business_id, user: r.user_id, name: _bizStr(r.name, 60), role: r.role, you: r.is_you === true, email: _bizStr(r.email, 254) });
+  }
+  for (const r of (Array.isArray(invites) ? invites : [])) {
+    if (!r || !businessValidId(r.id) || !businessValidId(r.business_id) || !BUSINESS_OFFER.owner.includes(r.role) || !BUSINESS_INVITE_WORDS[r.status]) continue;
+    v.push({ id: r.id, org: r.business_id, email: _bizStr(r.email, 254), name: _bizStr(r.name, 60), role: r.role, st: r.status,
+      until: _bizStr(r.expires_at, 40), at: _bizStr(r.decided_at, 40), cancel: r.can_cancel === true });
+  }
+  _bizTeam = { u: uid, people: p, invites: v };
+  return _bizTeam;
+}
+
+function businessTeam() {
+  const uid = _bizUid();
+  return uid && _bizTeam.u === uid ? _bizTeam : { u: '', people: [], invites: [] };
+}
+
+// Both reads on their own: an Engineer's business_invites is simply empty, and
+// a project without the V155 SQL leaves the page as V154 drew it.
+function businessTeamRead(c, uid) {
+  const one = (name) => Promise.resolve().then(() => c.rpc(name))
+    .then((res) => (res && !res.error && Array.isArray(res.data)) ? res.data : null, () => null);
+  return Promise.all([one('business_people'), one('business_invites')]).then(([people, invites]) => {
+    if (people === null && invites === null) return false;
+    businessTeamFromRows(uid, people || [], invites || []);
+    return true;
+  });
+}
+
+function businessMayInvite(b) { return !!(b && BUSINESS_OFFER[b.role]); }
+
+function _bizOrg(id) { return businessList().find(x => x.id === id) || null; }
+
+// The cloud's refusals in plain words.
+function businessTeamError(err) {
+  const t = [err && err.message, err && err.hint, err && err.details].map(x => String(x || '')).join(' ');
+  if (/patgo_phones_behind/.test(t)) return 'A phone in this business has an older PATGo. Everyone in the business needs to open PATGo with a signal so it updates — then try again.';
+  if (/patgo_your_phones_behind/.test(t)) return 'A phone you’ve signed in on has an older PATGo, or hasn’t synced since you signed in. Open PATGo on each of your phones with a signal so it updates, wait a minute, then tap Join again.';
+  if (/patgo_invite_member/.test(t)) return 'They’re already in this business.';
+  if (/patgo_invite_waiting/.test(t)) return 'They already have an invite waiting — share it again, or cancel it first.';
+  if (/patgo_invite_many/.test(t)) return 'This business has 50 invites waiting — cancel some first.';
+  if (/patgo_invite_email/.test(t)) return 'That doesn’t look like an email address.';
+  if (/patgo_invite_name/.test(t)) return 'Add a name — up to 60 letters.';
+  if (/patgo_invite_gone/.test(t)) return 'This invite has ended — it was cancelled, answered or is more than 14 days old. Ask for a new one.';
+  if (/patgo_not_allowed/.test(t)) return 'That isn’t something your role in this business can do.';
+  return 'That didn’t go through — try again with a signal.';
+}
+
+// One cloud step from a tap: signal and sign-in first, then the rpc, then the
+// page read again. Resolves the rpc's data, or null (already said why).
+function _bizCall(name, args, needSignal) {
+  if (_bizOffline()) { showToast(needSignal || 'You need a signal for that.'); return Promise.resolve(null); }
+  const uid = _bizUid();
+  if (!uid) { showToast('Sign in first.'); return Promise.resolve(null); }
+  return _bizClient()
+    .then((c) => c.rpc(name, args).then((res) => {
+      if (!res || res.error) throw (res && res.error) || new Error('no answer');
+      return res.data === undefined ? true : (res.data === null ? true : res.data);
+    }))
+    .catch((e) => {
+      openInfoSheet({ title: 'Not done', message: businessTeamError(e) });
+      return null;
+    });
+}
+
+// After a change: the businesses, my invites and the page, read again.
+function businessAfterChange() {
+  const uid = _bizUid();
+  if (!uid) return Promise.resolve(false);
+  return _bizClient()
+    .then((c) => businessRead(c, uid).catch(() => false)
+      .then(() => businessTeamRead(c, uid)))
+    .catch(() => false)
+    .then((ok) => { _bizRepaint(); try { if (state.view === 'sessions') render(); } catch (e) { /* next paint */ } return ok; });
+}
+
+// ---- inviting (1A 2A 5A) ------------------------------------------------------
+function businessInviteStart(orgId) {
+  const b = _bizOrg(orgId);
+  if (!businessMayInvite(b)) return false;
+  const roles = BUSINESS_OFFER[b.role];
+  if (roles.length === 1) { _bizInviteName(orgId, roles[0], ''); return true; }
+  openChoiceSheet({
+    title: 'Invite someone',
+    message: `What will they do in ${businessLabel(b)}?`,
+    choices: roles.map((r) => ({ label: BUSINESS_ROLE_ABOUT[r], style: r === 'engineer' ? 'primary' : 'secondary', onPick: () => _bizInviteName(orgId, r, '') })),
+  });
+  return true;
+}
+
+function _bizInviteName(orgId, role, value) {
+  openNameSheet({
+    title: 'Their name',
+    blurb: `Shown to everyone in the business. Invited as ${BUSINESS_ROLE_WORDS[role]}.`,
+    value, placeholder: 'e.g. Dave Smith', confirmLabel: 'Next', maxlength: 60,
+    onConfirm: (v) => _bizInviteEmail(orgId, role, v, ''),
+  });
+}
+
+function _bizInviteEmail(orgId, role, name, value) {
+  openNameSheet({
+    title: 'Their email address',
+    blurb: `${name} joins by signing in to PATGo with this exact address. The invite waits ${BUSINESS_INVITE_DAYS} days.`,
+    value, placeholder: 'name@example.co.uk', confirmLabel: 'Send invite', maxlength: 254, inputType: 'email',
+    onConfirm: (v) => {
+      const e = String(v).trim().toLowerCase();
+      if (!_BIZ_EMAIL_RE.test(e)) { showToast('That doesn’t look like an email address.'); _bizInviteEmail(orgId, role, name, v); return; }
+      businessInviteSend(orgId, role, name, e);
+    },
+  });
+}
+
+function businessInviteSend(orgId, role, name, email) {
+  return _bizCall('invite_member', { o: orgId, e: email, n: name, r: role }, 'You need a signal to send an invite.')
+    .then((id) => {
+      if (id === null) return false;
+      const b = _bizOrg(orgId);
+      openChoiceSheet({
+        title: 'Invite sent',
+        message: `${name} can join ${businessLabel(b)} by signing in to PATGo with ${email}. Let them know — the invite waits ${BUSINESS_INVITE_DAYS} days.`,
+        choices: [{ label: 'Share the invite', style: 'primary', onPick: () => businessInviteShare({ org: orgId, email, role }) }],
+        cancelLabel: 'Done',
+      });
+      businessAfterChange();
+      return true;
+    });
+}
+
+// The message Share sends (1A): who, as what, where to go, which address.
+function businessInviteText(inv) {
+  const b = _bizOrg(inv.org);
+  let url = '';
+  try { url = String(location.href).split('#')[0].split('?')[0]; } catch (e) { url = ''; }
+  return `${b ? businessLabel(b) : 'A business'} has invited you to join them on PATGo as ${BUSINESS_ROLE_WORDS[inv.role] || 'a member'}. `
+    + `Open PATGo${url ? ' (' + url + ')' : ''} and sign in with ${inv.email} — the invite waits on the Business page for ${BUSINESS_INVITE_DAYS} days.`;
+}
+
+function businessInviteShare(inv) {
+  if (!inv) return false;
+  const text = businessInviteText(inv);
+  try {
+    if (navigator.share) {
+      navigator.share({ title: 'PATGo invite', text }).catch(() => { /* closed — nothing to say */ });
+      return true;
+    }
+  } catch (e) { /* fall through to copying */ }
+  try {
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => showToast('Invite copied — paste it into a message.'),
+        () => openInfoSheet({ title: 'Send them this', message: text }));
+      return true;
+    }
+  } catch (e) { /* the sheet below */ }
+  openInfoSheet({ title: 'Send them this', message: text });
+  return true;
+}
+
+function businessInviteShareId(id) {
+  return businessInviteShare(businessTeam().invites.find(v => v.id === id) || null);
+}
+
+function businessInviteCancel(id) {
+  const v = businessTeam().invites.find(x => x.id === id);
+  if (!v || !v.cancel) return false;
+  openConfirmSheet({
+    title: 'Cancel this invite?',
+    message: `${v.name} (${v.email}) won’t be able to join with it. You can invite them again later.`,
+    confirmLabel: 'Cancel invite', cancelLabel: 'Keep it',
+    onConfirm: () => { _bizCall('cancel_invite', { i: id }).then((r) => { if (r !== null) { showToast('Invite cancelled'); businessAfterChange(); } }); },
+  });
+  return true;
+}
+
+// ---- answering (1A 3A 4A) -----------------------------------------------------
+function _bizInviteOrgLabel(v) { return v.orgName ? v.orgName : 'A PATGo business'; }
+
+function businessJoinStart(id) {
+  const v = businessMyInvites().find(x => x.id === id);
+  if (!v) return false;
+  const org = _bizInviteOrgLabel(v);
+  openChoiceSheet({
+    title: `Join ${org}?`,
+    message: `Make ${org} your main business? Choose Yes if you work for them: new jobs go to ${org} unless you choose another. `
+      + `Choose No if you run your own PATGo business and only do some work for them. Your own jobs stay where they are either way, and you can change this later.`,
+    choices: [
+      { label: 'Yes — make it my main business', style: 'primary', onPick: () => businessJoin(id, true) },
+      { label: 'No — keep my own as main', style: 'secondary', onPick: () => businessJoin(id, false) },
+    ],
+  });
+  return true;
+}
+
+function businessJoin(id, main) {
+  const v = businessMyInvites().find(x => x.id === id);
+  return _bizCall('accept_invite', { i: id, make_main: main === true }, 'You need a signal to join.')
+    .then((r) => {
+      if (r === null) return false;
+      showToast(`You’ve joined ${v ? _bizInviteOrgLabel(v) : 'the business'}`);
+      return businessAfterChange().then(() => true);
+    });
+}
+
+function businessDecline(id) {
+  const v = businessMyInvites().find(x => x.id === id);
+  if (!v) return false;
+  openConfirmSheet({
+    title: 'Decline this invite?',
+    message: `You won’t join ${_bizInviteOrgLabel(v)}. They can invite you again if you change your mind.`,
+    confirmLabel: 'Decline', cancelLabel: 'Not now',
+    onConfirm: () => { _bizCall('decline_invite', { i: id }).then((r) => { if (r !== null) { showToast('Invite declined'); businessAfterChange(); } }); },
+  });
+  return true;
+}
+
+// ---- roles, names, main (2A, names, 4A) ---------------------------------------
+function businessRoleStart(arg) {
+  const [orgId, user] = String(arg || '').split(':');
+  const b = _bizOrg(orgId);
+  const p = businessTeam().people.find(x => x.org === orgId && x.user === user);
+  if (!b || b.role !== 'owner' || !p || p.you || p.role === 'owner') return false;
+  openChoiceSheet({
+    title: `${p.name || 'Their'} role`,
+    message: `Now: ${BUSINESS_ROLE_WORDS[p.role]}. Choose their new role in ${businessLabel(b)}.`,
+    choices: BUSINESS_OFFER.owner.filter(r => r !== p.role).map((r) => ({ label: BUSINESS_ROLE_ABOUT[r], style: 'secondary',
+      onPick: () => { _bizCall('set_member_role', { o: orgId, u: user, r }).then((x) => { if (x !== null) { showToast('Role changed'); businessAfterChange(); } }); } })),
+  });
+  return true;
+}
+
+function businessMyNameStart(orgId) {
+  const p = businessTeam().people.find(x => x.org === orgId && x.you);
+  if (!p) return false;
+  openNameSheet({
+    title: 'Your name', blurb: 'How everyone in this business sees you.', value: p.name, placeholder: 'e.g. Peter Birchley',
+    confirmLabel: 'Save', maxlength: 60,
+    onConfirm: (v) => { _bizCall('set_my_member_name', { o: orgId, n: v }).then((x) => { if (x !== null) { showToast('Name saved'); businessAfterChange(); } }); },
+  });
+  return true;
+}
+
+function businessMakeMain(orgId) {
+  const b = _bizOrg(orgId);
+  if (!b || b.def) return false;
+  openConfirmSheet({
+    title: `Make ${businessLabel(b)} your main business?`,
+    message: 'New jobs go there unless you choose another on New job. Nothing already made moves.',
+    confirmLabel: 'Make main', cancelLabel: 'Cancel', danger: false,
+    onConfirm: () => { _bizCall('set_main_business', { o: orgId }).then((x) => { if (x !== null) { showToast('Main business changed'); businessAfterChange(); } }); },
+  });
+  return true;
+}
+
+// ---- on screen ----------------------------------------------------------------
+function _bizUntil(iso) { const ms = Date.parse(String(iso || '').replace(/(\.\d{3})\d+/, '$1')); return isFinite(ms) ? _bizDay(ms) : ''; }
+
+// The Jobs list line (1A): an invite waiting for me.
+function businessInviteBannerHTML() {
+  const list = businessMyInvites();
+  if (!list.length) return '';
+  const text = list.length === 1
+    ? `${_bizInviteOrgLabel(list[0])} has invited you to join them on PATGo as ${BUSINESS_ROLE_WORDS[list[0].role]}.`
+    : `You have ${list.length} invites to join a business on PATGo.`;
+  return `
+    <div class="backup-banner plan-banner" id="invite-banner" role="status">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text" id="invite-banner-text">${escapeHTML(text)}</div>
+        <div class="backup-banner-actions">
+          <button class="backup-banner-action primary" id="invite-banner-open" data-action="settings-page" data-arg="cloudBusiness">See invite</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// The Business page's invites to me.
+function businessMyInvitesHTML() {
+  return businessMyInvites().map((v, i) => `
+      <div class="info-card biz-invite" id="biz-invite-${i}">
+        <h3 id="biz-invite-title-${i}">${escapeHTML(_bizInviteOrgLabel(v))} has invited you</h3>
+        <p class="muted" id="biz-invite-role-${i}">To join as ${escapeHTML(BUSINESS_ROLE_WORDS[v.role])}${v.by ? ' · from ' + escapeHTML(v.by) : ''}${_bizUntil(v.until) ? ' · until ' + escapeHTML(_bizUntil(v.until)) : ''}</p>
+        <div style="display:flex;gap:8px;margin-top:8px">
+          <button class="btn-primary" id="biz-join-${i}" data-action="biz-join" data-arg="${escapeHTML(v.id)}" style="flex:1">Join</button>
+          <button class="btn-secondary" id="biz-decline-${i}" data-action="biz-decline" data-arg="${escapeHTML(v.id)}" style="flex:1">Decline</button>
+        </div>
+      </div>`).join('');
+}
+
+// One business's people and invites (6A), inside its card.
+function businessPeopleHTML(b, i) {
+  const team = businessTeam();
+  const people = team.people.filter(p => p.org === b.id);
+  const invites = team.invites.filter(v => v.org === b.id);
+  const invite = businessMayInvite(b);
+  if (!people.length && !invite) return '';
+  const rows = people.map((p, k) => {
+    const nm = p.name || (p.you ? 'You — add your name' : 'No name yet');
+    const btn = p.you
+      ? `<button class="link-btn" id="biz-myname-${i}" data-action="biz-myname" data-arg="${escapeHTML(b.id)}">${p.name ? 'Change your name' : 'Add your name'}</button>`
+      : (b.role === 'owner' && p.role !== 'owner'
+        ? `<button class="link-btn" id="biz-role-${i}-${k}" data-action="biz-role" data-arg="${escapeHTML(b.id + ':' + p.user)}">Change role</button>` : '');
+    return `
+          <li class="biz-person" id="biz-person-${i}-${k}">
+            <span class="biz-person-name">${escapeHTML(nm)}${p.you && p.name ? ' (you)' : ''}</span>
+            <span class="muted"> · ${escapeHTML(BUSINESS_ROLE_WORDS[p.role])}</span>
+            ${p.email ? `<div class="muted biz-person-email">${escapeHTML(p.email)}</div>` : ''}
+            ${btn}
+          </li>`;
+  }).join('');
+  const inv = invites.map((v, k) => {
+    const when = v.st === 'waiting' ? (_bizUntil(v.until) ? ' until ' + _bizUntil(v.until) : '') : (_bizUntil(v.at) ? ' · ' + _bizUntil(v.at) : '');
+    const acts = v.st === 'waiting' && v.cancel ? `
+            <button class="link-btn" id="biz-inv-share-${i}-${k}" data-action="biz-invite-share" data-arg="${escapeHTML(v.id)}">Share</button>
+            <button class="link-btn" id="biz-inv-cancel-${i}-${k}" data-action="biz-invite-cancel" data-arg="${escapeHTML(v.id)}">Cancel invite</button>` : '';
+    return `
+          <li class="biz-person" id="biz-inv-${i}-${k}">
+            <span class="biz-person-name">${escapeHTML(v.name)}</span><span class="muted"> · ${escapeHTML(BUSINESS_ROLE_WORDS[v.role])}</span>
+            <div class="muted biz-person-email">${escapeHTML(v.email)} · ${escapeHTML(BUSINESS_INVITE_WORDS[v.st] + when)}</div>
+            ${acts}
+          </li>`;
+  }).join('');
+  return `
+        <h4 class="biz-sub" id="biz-people-head-${i}">People</h4>
+        ${rows ? `<ul class="biz-people" id="biz-people-${i}">${rows}</ul>` : ''}
+        ${inv ? `<h4 class="biz-sub" id="biz-invites-head-${i}">Invites</h4><ul class="biz-people" id="biz-invites-${i}">${inv}</ul>` : ''}
+        ${invite ? `<button class="backup-action-btn" id="biz-invite-${i}" data-action="biz-invite" data-arg="${escapeHTML(b.id)}" style="margin-top:8px">Invite someone</button>` : ''}`;
 }

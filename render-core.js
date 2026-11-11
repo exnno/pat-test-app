@@ -286,7 +286,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Move a job to another business.</strong> For anyone who works for more than one business: Job settings now shows which business a job belongs to, with Change&hellip; to move it. Leaving a team&rsquo;s business needs someone there to approve, and every move is recorded. Working for just one business? Nothing changes.</li>
+        <li><strong>Invite people to your business.</strong> Settings &rarr; Account &amp; Sync &rarr; Business: invite someone by their email address as an Engineer, Team leader or Office, and share the invite with them. They join by signing in to PATGo with that address.</li>
+        <li><strong>Been invited?</strong> The Jobs list tells you &mdash; Join or Decline on the Business page. Your own jobs stay where they are.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -988,6 +989,9 @@ function renderSessions() {
   // stopped until it is updated. First, above the plan line (sync.js, optional).
   let versionBanner = '';
   try { versionBanner = (typeof syncVersionBannerHTML === 'function') ? syncVersionBannerHTML('jobs') : ''; } catch (e) { versionBanner = ''; }
+  // V155 (1A): an invite waiting for this account (business.js, optional).
+  let inviteBanner = '';
+  try { inviteBanner = (typeof businessInviteBannerHTML === 'function') ? businessInviteBannerHTML() : ''; } catch (e) { inviteBanner = ''; }
 
   // V93 (4A — O9): signed in, the Jobs screen has two tabs. "In the cloud" is
   // how old jobs are reached once a phone only brings down recent ones (R21):
@@ -1023,6 +1027,7 @@ function renderSessions() {
       ${header}
       ${versionBanner}
       ${planBanner}
+      ${inviteBanner}
       ${tabs}
       ${unreadableBanner}
       ${storageBanner}

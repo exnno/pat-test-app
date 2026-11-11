@@ -65,12 +65,12 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V155</strong> &middot; November 2026</p>
+        <p class="muted">Invite people to your business by email address, see who&rsquo;s in it and their roles, and join a business you&rsquo;ve been invited to. While any business you&rsquo;re in covers you, PATGo stays unlocked.</p>
         <p><strong>V154</strong> &middot; November 2026</p>
         <p class="muted">Behind the scenes: PATGo now checks what comes in from a backup file or the cloud, and turns away anything it didn&rsquo;t make itself &mdash; so a changed file can&rsquo;t slip anything onto your screen.</p>
         <p><strong>V153</strong> &middot; November 2026</p>
         <p class="muted">Behind the scenes: a phone that&rsquo;s too old to sync now stops reliably, even when it&rsquo;s nearly full, and checks before you open the cloud tab or the Business page.</p>
-        <p><strong>V152</strong> &middot; November 2026</p>
-        <p class="muted">Behind the scenes: if PATGo ever can&rsquo;t read something saved on this phone, it now keeps it safe and untouched instead of starting without it and saving over it. The Jobs list tells you, and Backup &amp; Restore shows how to get your work back.</p>
 
 
 

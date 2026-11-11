@@ -1,4 +1,4 @@
-# PATGo — Code Map (V154)
+# PATGo — Code Map (V155)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1837,7 +1837,7 @@ V148 (4A): `planRecord` falls back to `_planOwnerUid()` — the owner's record w
 `_planSignedOut()` turns the line's button, the Account line and the two sheets' first
 choice into Sign in (`settings-page` → cloudAccount). Harness 87d, M1652–M1655.
 
-### business.js (~760 ln) — every job knows its business; V150 moving one — NEW V149 — OPTIONAL SUBSYSTEM
+### business.js (~1,150 ln) — every job knows its business; V150 moving one; V155 invites + people — NEW V149 — OPTIONAL SUBSYSTEM
 The owner's businesses (BUSINESSES_KEY `{u, at, list}`, read via rpc `my_businesses`),
 New job's "For:" (`businessForHTML` / `businessNewJobPick`, LAST_BUSINESS_KEY — 2+ only),
 the compare key (`jobBusinessKey`, rule 30), and the Business page
@@ -1870,6 +1870,19 @@ state.js declares it; reset.js JOB_MOVES_KEY 'account'; storage.js `_sessionSig`
 (businessId). Harness 89a–89f; M1697–M1736.
 V151: every cloud call here goes through `_bizClient()` (sync.js `syncDataClient` — a phone
 below the minimum app version reads and writes no businesses or moves).
+V155 (third part of the file): invites, roles, people — memory only, nothing stored.
+`businessRead` also reads rpc `my_invites` (`_bizMine`; a change repaints the Jobs list via
+`_bizJobsRepaint`); `businessRefresh` also reads `business_people` + `business_invites`
+(`_bizTeam`). Sheets: invite (role choice for an Owner → name → address, `openNameSheet`
+inputType 'email') → rpc `invite_member` → Share (`navigator.share`, else clipboard, else
+info sheet); `cancel_invite`; Join (asks "main business?") → `accept_invite(i, make_main)`;
+`decline_invite`; `set_member_role` (Owner); `set_my_member_name`; `set_main_business`.
+Errors → `businessTeamError` words. `BUSINESS_OFFER` must match the SQL's `_may_offer` (94f).
+⚠ The rpcs return `business_id`, never `org_id` (50d: only sync.js names org_id).
+**Coupling:** dispatch.js `biz-invite*` / `biz-join` / `biz-decline` / `biz-role` /
+`biz-myname` / `biz-main`; render-core.js draws `businessInviteBannerHTML` on the Jobs
+list (phone tab); feedback.js `openNameSheet` inputType; plan.js `planIsMember` reads
+`businessDefault()` (8A); styles.css `.biz-*`. Harness 94a–94f; M1825–M1855.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

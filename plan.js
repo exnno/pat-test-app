@@ -371,10 +371,29 @@ function _planCloudPaused() {
   try { return typeof syncPlanRefused === 'function' && syncPlanRefused(); } catch (e) { return false; }
 }
 
+// V155 (8A): someone whose MAIN business is another person's (they joined a
+// team and made it main) doesn't renew — its Owner does. The lock itself goes by
+// the best plan of all their businesses (the database's cover): it only
+// reaches here when none of them covers them.
+function planIsMember() {
+  try {
+    const d = (typeof businessDefault === 'function') ? businessDefault() : null;
+    return !!(d && d.role !== 'owner');
+  } catch (e) { return false; }
+}
+const PLAN_MEMBER_WORDS = 'the business owner looks after it';
+
 // The line itself, or '' — shared by the Jobs list and the Account page.
 function planLineText(st) {
   if (!st) return '';
   const paused = _planCloudPaused();
+  if (planIsMember() && !st.unchecked) {
+    if (st.phase === 'locked') return `Your business’s plan has ended, so ${PLAN_LOCKED_WORDS} are locked — ${PLAN_MEMBER_WORDS}.`;
+    if (paused) return `Cloud syncing is paused because your business’s plan has ended — ${PLAN_MEMBER_WORDS}. Your work remains safe on this phone.`;
+    if (st.phase === 'ending') return `Your business’s free trial ends on ${_planDate(st.endsAt)} — ${PLAN_MEMBER_WORDS}.`;
+    if (st.phase === 'grace') return `Your business’s plan has ended — ${PLAN_MEMBER_WORDS}. ${_planCountdownWords(st)}`;
+    return '';
+  }
   if (st.phase === 'locked') {
     return paused
       ? `Your account is locked and cloud syncing is paused. Renew to carry on ${PLAN_LOCKED_WORDS}.`
@@ -391,7 +410,7 @@ function planLineText(st) {
 function _planLineButton(st, id) {
   // V148 (4A): signed out, the way on is signing in (renewing and checking both need it).
   if (_planSignedOut()) return `<button class="backup-banner-action primary" id="${id}" data-action="settings-page" data-arg="cloudAccount">Sign in</button>`;
-  return (st && st.unchecked && st.phase !== 'locked')
+  return ((st && st.unchecked && st.phase !== 'locked') || planIsMember())   // V155 (8A): a member checks, the Owner renews
     ? `<button class="backup-banner-action primary" id="${id}" data-action="plan-check">Check now</button>`
     : `<button class="backup-banner-action primary" id="${id}" data-action="plan-renew">Renew now</button>`;
 }
@@ -419,7 +438,7 @@ function planAccountHTML() {
   const st = planCurrent();
   const text = planLineText(st);
   if (!text) return '';
-  const check = st.unchecked && st.phase !== 'locked';
+  const check = (st.unchecked && st.phase !== 'locked') || planIsMember();   // V155 (8A)
   if (_planSignedOut()) return `
         <p class="muted" id="cloud-plan-status">${escapeHTML(text)}</p>`;   // V148: the sign-in card is right below
   return `
@@ -548,6 +567,7 @@ function planMaybePrompt() {
     const rec = planRecord();
     const st = planStatus(rec, planNow(rec));
     if (st.phase !== 'grace' || !_planCanPrompt()) return '';
+    if (planIsMember()) return '';   // V155 (8A): the sheets say Renew now — the Owner's to do; the line still counts down
     const key = String(st.lockAt);
     if (rec.shownEnded !== key) {
       rec.shownEnded = key;
@@ -706,7 +726,10 @@ function billingRead() {
       const info = res && !res.error ? res.data : null;
       if (!info || typeof info !== 'object') { b.error = 'read'; return false; }
       b.info = info; b.readAt = Date.now();
-      try { planNote({ plan: info.plan, trial_ends_at: info.trial_ends_at, lapsed_at: info.lapsed_at }); } catch (e) { /* record only */ }
+      // V155: the lock goes by the cover — the best plan of every business the
+      // person is in ("a paid seat anywhere"); the page shows the main one's.
+      const cov = (info.cover && typeof info.cover === 'object') ? info.cover : info;
+      try { planNote({ plan: cov.plan, trial_ends_at: cov.trial_ends_at, lapsed_at: cov.lapsed_at }); } catch (e) { /* record only */ }
       if (state.cloud) { state.cloud.plan = info.plan || null; state.cloud.trialEndsAt = info.trial_ends_at || null; }
       return true;
     })

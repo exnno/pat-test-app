@@ -1857,7 +1857,7 @@ function syncPush(opts) {
   _syncRepaint();
   _syncRunning = _syncRun({ force: !!o.force, pull: !!o.pull, manual: !!o.manual })
     .then((r) => {
-      state.sync.message = (r && r.paused) ? SYNC_PLAN_PAUSED_WORDS : _syncOutcome(r);
+      state.sync.message = (r && r.paused) ? syncPlanPausedWords() : _syncOutcome(r);
       return true;
     }, (e) => {
       _syncNotePlanRefusal(e);
@@ -4242,6 +4242,11 @@ function syncHeldDiff(id) {
 // syncPlanChecked). Per account: another login on this phone is not paused.
 // In memory only — every start online reads the plan anyway.
 const SYNC_PLAN_PAUSED_WORDS = 'Cloud syncing is paused because your PATGo subscription has ended. Your work remains safe on this phone and will upload automatically once you renew.';
+// V155 (8A): for someone whose main business is another person's (plan.js planIsMember).
+const SYNC_PLAN_PAUSED_MEMBER_WORDS = 'Cloud syncing is paused because your business’s plan has ended — the business owner looks after it. Your work remains safe on this phone and will upload automatically once it’s renewed.';
+function syncPlanPausedWords() {
+  try { return (typeof planIsMember === 'function' && planIsMember()) ? SYNC_PLAN_PAUSED_MEMBER_WORDS : SYNC_PLAN_PAUSED_WORDS; } catch (e) { return SYNC_PLAN_PAUSED_WORDS; }
+}
 let _syncPlanRefusedUid = '';
 
 function _syncUid() {
@@ -4276,7 +4281,7 @@ function syncPlanRefused() {
 function syncPlanChecked(canUpload) {
   if (!canUpload || !_syncPlanRefusedUid) return false;
   _syncPlanRefusedUid = '';
-  if (state.sync && state.sync.message === SYNC_PLAN_PAUSED_WORDS) state.sync.message = '';
+  if (state.sync && (state.sync.message === SYNC_PLAN_PAUSED_WORDS || state.sync.message === SYNC_PLAN_PAUSED_MEMBER_WORDS)) state.sync.message = '';
   try { syncPushSoon(1000, { pull: true }); } catch (e) { /* the next trigger sends it */ }
   return true;
 }
@@ -4295,7 +4300,7 @@ function syncErrorMessage(err) {
     return 'Your sign-in has lapsed. Sign out and back in on the Account page.';
   }
   // V143 (5A): the cloud refused this business's changes — its plan has ended.
-  if (_syncIsPlanRefusal(err)) return SYNC_PLAN_PAUSED_WORDS;
+  if (_syncIsPlanRefusal(err)) return syncPlanPausedWords();
   // V128 (5A): after the network and sign-in cases, which say what to do.
   if (err && err.syncStage === 'check') {
     return 'Before sending anything, this phone checks its work against the cloud (it does this after a long time away). ' +
