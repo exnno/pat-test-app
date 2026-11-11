@@ -3062,6 +3062,8 @@ function setView(v) {
   if (v === 'cloudSubscription' && typeof billingRead === 'function') billingRead();
   // V149 (3A): the Business page reads the account's businesses on every open.
   if (v === 'cloudBusiness' && typeof businessRefresh === 'function') businessRefresh();
+  // V156 (3A): Your devices reads the account's signed-in devices on every open.
+  if (v === 'cloudDevices' && typeof businessDevicesRefresh === 'function') businessDevicesRefresh();
 }
 
 // ---------- Bulk-edit (v7, extended in v11) ----------

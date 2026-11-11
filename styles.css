@@ -4543,3 +4543,13 @@ body.has-selection-bar .cs-screen { padding-bottom: 100px; }
 .biz-person-name { font-weight: 600; }
 .biz-person-email { font-size: 0.8125rem; overflow-wrap: anywhere; }
 .biz-person .link-btn { margin-right: 14px; }
+
+/* @@ V156 — devices (business.js) and the lines on a choice sheet (feedback.js) */
+.choice-sheet-lines { margin: 0 0 16px; padding-left: 18px; font-size: 0.875rem; line-height: 1.5; color: var(--text); }
+.choice-sheet-lines li { margin: 2px 0; }
+.dev-list { list-style: none; margin: 0; padding: 0; }
+.dev-row { padding: 10px 0; border-top: 1px solid var(--border); font-size: 0.9375rem; }
+.dev-row:first-child { border-top: none; }
+.dev-name { font-weight: 600; }
+.dev-old { font-size: 0.8125rem; color: var(--fail-word); margin-top: 2px; }
+.dev-row .link-btn { margin-top: 4px; }

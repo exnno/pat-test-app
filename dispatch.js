@@ -853,6 +853,9 @@ registerActions({
   'biz-move-back': () => { if (typeof businessMoveBack === 'function') businessMoveBack(); },
   'biz-move-go': () => { if (typeof businessMoveGo === 'function') businessMoveGo(); },
   'biz-move-cancel': (arg) => { if (typeof businessMoveCancel === 'function') businessMoveCancel(arg); },
+  // V156: Your devices and Sign it out (business.js, optional).
+  'dev-refresh': () => { if (typeof businessDevicesRefresh === 'function') businessDevicesRefresh(); },
+  'dev-signout': (arg) => { if (typeof businessDeviceSignOut === 'function') businessDeviceSignOut(arg); },
   // V155: invites, roles, names, main business (business.js, optional).
   'biz-invite': (arg) => { if (typeof businessInviteStart === 'function') businessInviteStart(arg); },
   'biz-invite-share': (arg) => { if (typeof businessInviteShareId === 'function') businessInviteShareId(arg); },

@@ -8,7 +8,28 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V155
+### Next after V156
+V156 = devices that hold up invites (Peter 11 Nov, "defaults", R66: 1A only signed-in devices
+count; 2A the refusal names them, Sign out for your own; 3A Account → Your devices).
+business.js fourth part (memory only); feedback.js `openChoiceSheet` `opts.lines`. SQL
+supabase/v156-devices.sql (+ schema.sql). Isolation 24a–24e. Harness 95 + M1856–M1883.
+**Next (model: Opus — database rules):** V157 the Approve / Refuse screen (job_moves waiting
+from a business the reader `can_read_org`; `decide_job_move` ready; where it lives — the
+Business page, a Jobs line for an approver). Then V158 leaving / removing a member (R5).
+Seat billing + the per-business lock — its own release before launch. O11 unchanged.
+
+### V156 residuals (known, accepted)
+- A device signed out keeps syncing until its current access token runs out (up to an hour):
+  the database checks the token, not the sign-in list. The old-phone check clears at once.
+- The device's kind comes from the browser line it signed in with: an iPad in desktop mode
+  says "Mac"; a home-screen PATGo on iPhone says "iPhone".
+- Re-running v151-min-version.sql or v155-invites.sql puts the old checks back — the V156
+  file says to run it again after either.
+- "Never synced" is equivalent to "an older PATGo" in the database's test (no version =
+  too old) — the broken-copy run found that clause equivalent; kept for readability.
+- Dates on Your devices follow the phone's date setting (06/11/2026), like the rest of PATGo.
+
+### Next after V155 (done — V156 took devices; Approve / Refuse → V157)
 V155 = invites, roles and the people in a business (Peter 11 Nov: 0A 1A 2A 3A 4A 5A 6A 7C
 8A; names typed at invite; a paid seat anywhere = never locked). business.js third part
 (memory only): `my_invites` with the list (Jobs line), `business_people` / `business_invites`

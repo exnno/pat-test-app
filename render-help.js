@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V153: rolled forward — V153 on top, V150 dropped. -->
+      <!-- v8: rolling 3-version changelog. V156: rolled forward — V156 on top, V153 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V156</strong> &middot; November 2026</p>
+        <p class="muted">Your devices: see every phone, tablet or computer signed in to your account and sign out one you don&rsquo;t use. An old device that&rsquo;s signed out no longer holds up invites, and PATGo names the one that does.</p>
         <p><strong>V155</strong> &middot; November 2026</p>
         <p class="muted">Invite people to your business by email address, see who&rsquo;s in it and their roles, and join a business you&rsquo;ve been invited to. While any business you&rsquo;re in covers you, PATGo stays unlocked.</p>
         <p><strong>V154</strong> &middot; November 2026</p>
         <p class="muted">Behind the scenes: PATGo now checks what comes in from a backup file or the cloud, and turns away anything it didn&rsquo;t make itself &mdash; so a changed file can&rsquo;t slip anything onto your screen.</p>
-        <p><strong>V153</strong> &middot; November 2026</p>
-        <p class="muted">Behind the scenes: a phone that&rsquo;s too old to sync now stops reliably, even when it&rsquo;s nearly full, and checks before you open the cloud tab or the Business page.</p>
 
 
 
@@ -450,6 +450,7 @@ function renderCloudAccount() {
         <p id="cloud-signed-in-email"><strong>${escapeHTML(c.email || '(unknown)')}</strong></p>
         ${plan}
         ${(typeof planAccountHTML === 'function') ? planAccountHTML() : ''}
+        ${(typeof renderCloudDevices === 'function') ? `<button class="backup-action-btn" id="cloud-devices-open" data-action="settings-page" data-arg="cloudDevices" ${dis} style="margin-top:6px">Your devices ›</button>` : ''}
         ${pwCard}
       </div>`;
   } else {

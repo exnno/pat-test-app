@@ -443,6 +443,9 @@ function openChoiceSheet(opts) {
   const title = opts.title || 'Choose';
   const message = opts.message || '';
   const choices = Array.isArray(opts.choices) ? opts.choices : [];
+  // V156: opts.lines — short lines shown one per row under the message (the
+  // devices holding up an invite). Text only, escaped like the message.
+  const lines = Array.isArray(opts.lines) ? opts.lines.filter(l => typeof l === 'string' && l) : [];
   const cls = (st) => st === 'danger' ? 'btn-danger' : (st === 'primary' ? 'btn-primary' : 'btn-secondary');
   const { sheet, backdrop, cleanup } = _openSheet(title);
   sheet.innerHTML = `
@@ -453,6 +456,7 @@ function openChoiceSheet(opts) {
       <button class="fail-close-btn" id="choice-sheet-cancel" aria-label="Cancel">&times;</button>
     </div>
     ${message ? `<p class="sheet-scroll" style="margin:0 0 16px;font-size:0.875rem;line-height:1.5;color:var(--text-muted)">${escapeHTML(message)}</p>` : ''}
+    ${lines.length ? `<ul class="sheet-scroll choice-sheet-lines" id="choice-sheet-lines">${lines.map(l => `<li>${escapeHTML(l)}</li>`).join('')}</ul>` : ''}
     <div class="sheet-pin" style="display:flex;flex-direction:column;gap:10px;margin-top:4px">
       ${choices.map((c, i) => `<button class="${cls(c.style)}" id="choice-sheet-${i}" style="width:100%">${escapeHTML(c.label || '')}</button>`).join('')}
       ${opts.noCancel ? '' : `<button class="btn-secondary" id="choice-sheet-no" style="width:100%">${escapeHTML(opts.cancelLabel || 'Cancel')}</button>`}

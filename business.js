@@ -1,4 +1,4 @@
-// ============== PATGo PWA — V155 — Invites, roles and the people in a business ===
+// ============== PATGo PWA — V156 — Devices that hold up invites ===
 // (c) 2026 Peter Birchley. All rights reserved.
 //
 // business.js (Stage 16 / Teams v1).
@@ -864,6 +864,10 @@ function _bizCall(name, args, needSignal) {
       return res.data === undefined ? true : (res.data === null ? true : res.data);
     }))
     .catch((e) => {
+      // V156 (2A): an older device holding it up — name it, with Sign it out.
+      if (_bizHeldUp(e) && typeof businessHeldUp === 'function') {
+        return businessHeldUp(e, name === 'invite_member' && args ? args.o : '').then(() => null, () => null);
+      }
       openInfoSheet({ title: 'Not done', message: businessTeamError(e) });
       return null;
     });
@@ -1129,4 +1133,229 @@ function businessPeopleHTML(b, i) {
         ${rows ? `<ul class="biz-people" id="biz-people-${i}">${rows}</ul>` : ''}
         ${inv ? `<h4 class="biz-sub" id="biz-invites-head-${i}">Invites</h4><ul class="biz-people" id="biz-invites-${i}">${inv}</ul>` : ''}
         ${invite ? `<button class="backup-action-btn" id="biz-invite-${i}" data-action="biz-invite" data-arg="${escapeHTML(b.id)}" style="margin-top:8px">Invite someone</button>` : ''}`;
+}
+
+// ============================================================================
+// V156 — devices that hold up invites (Teams v1)
+// ============================================================================
+// Locked 11 Nov (Peter, "defaults"; found running v155-invites.sql: his own
+// second device, last used 6 Nov on V150 and still signed in, blocked every
+// invite): 1A only devices STILL SIGNED IN count (the database's own list,
+// supabase/v156-devices.sql _signed_in_devices) · 2A a refused invite or Join
+// names the devices holding it up — your own with Sign it out, a teammate's
+// named only · 3A Account → Your devices: every device signed in, Sign it out.
+// Signing out only ever on a tap, never the device you're using (that's the
+// Account page's own Sign out). Nothing stored on the phone: memory only, read
+// on every open of Your devices and at each refusal.
+//
+// ⚠ Your devices reads with cloudClient(), NOT _bizClient(): it is account-level
+// like signing in, so a phone below the minimum version can still sign an old
+// device out (R61: sign-in, the plan and paying still work below the minimum).
+
+const BUSINESS_DEVICE_KINDS = {   // supabase/v156-devices.sql _device_kind — same words
+  iPhone: 'iPhone', iPad: 'iPad', 'Android phone': 'Android phone', Mac: 'Mac',
+  'Windows computer': 'Windows computer', Computer: 'computer', Device: 'device',
+};
+const _BIZ_VERSION_RE = /^V\d{1,6}(\.\d{1,3})?$/;
+
+let _bizDev = { u: '', list: [], reading: false, error: '' };
+
+// At the start of a line: "Computer", "Device" — but "iPhone", "iPad" as they are.
+function _bizKindHead(kind) { return /^(computer|device)$/.test(kind) ? kind.charAt(0).toUpperCase() + kind.slice(1) : kind; }
+
+function _bizDevClient() { return cloudClient(); }
+
+// Rows from my_devices / business_devices_behind → one shape. A bad row is dropped.
+function businessDevicesFromRows(rows) {
+  const out = [];
+  for (const r of (Array.isArray(rows) ? rows : [])) {
+    if (!r || typeof r !== 'object') continue;
+    const sid = businessValidId(r.session_id) ? r.session_id : '';
+    out.push({
+      session: sid,
+      kind: Object.prototype.hasOwnProperty.call(BUSINESS_DEVICE_KINDS, r.kind) ? r.kind : 'Device',
+      version: typeof r.app_version === 'string' && _BIZ_VERSION_RE.test(r.app_version) ? r.app_version : '',
+      used: _bizStr(r.last_used, 40),
+      reported: r.reported === true,
+      behind: r.behind === true,
+      here: r.this_device === true,
+      you: r.is_you !== false,           // my_devices has no is_you: all mine
+      who: _bizStr(r.name, 254),
+    });
+  }
+  return out;
+}
+
+function businessDevices() {
+  const uid = _bizUid();
+  return uid && _bizDev.u === uid ? _bizDev.list : [];
+}
+
+// "iPhone · V150 · last used 6 Nov" — the device in words. who: '' (mine, no
+// owner words), 'your' or a teammate's name.
+function businessDeviceWords(d, who) {
+  const kind = BUSINESS_DEVICE_KINDS[d.kind] || 'device';
+  const head = who === 'your' ? `Your ${kind}` : who ? `${who}’s ${kind}` : _bizKindHead(kind);
+  const ver = d.reported ? (d.version || 'an older PATGo') : 'signed in, never synced';
+  const day = _bizUntil(d.used);
+  return `${head} · ${ver}${day ? ' · last used ' + day : ''}`;
+}
+
+// ---- Your devices (3A) ----------------------------------------------------------
+function businessDevicesRefresh() {
+  const uid = _bizUid();
+  if (!uid || _bizDev.reading) return Promise.resolve(false);
+  if (_bizDev.u !== uid) _bizDev = { u: uid, list: [], reading: false, error: '' };
+  if (_bizOffline()) { _bizDev.error = 'offline'; _bizDevRepaint(); return Promise.resolve(false); }
+  _bizDev.reading = true; _bizDev.error = '';
+  _bizDevRepaint();
+  return _bizDevClient()
+    .then((c) => c.rpc('my_devices'))
+    .then((res) => {
+      if (!res || res.error || !Array.isArray(res.data)) throw (res && res.error) || new Error('no answer');
+      if (_bizUid() === uid) _bizDev.list = businessDevicesFromRows(res.data);
+      return true;
+    })
+    .catch(() => { _bizDev.error = 'read'; return false; })
+    .then((ok) => { _bizDev.reading = false; _bizDevRepaint(); return ok; });
+}
+
+function _bizDevRepaint() {
+  if (state.view !== 'cloudDevices') return;
+  try { if (document.querySelector('body > .bulk-sheet, body > .modal-backdrop')) return; } catch (e) { /* no DOM */ }
+  render();
+}
+
+// Sign it out (2A, 3A): asked first; never this device (the button isn't there,
+// and the database refuses it anyway — patgo_this_device).
+function businessDeviceSignOut(sessionId) {
+  const d = businessDevices().find(x => x.session === sessionId) || _bizHeldMine.find(x => x.session === sessionId);
+  if (!d || d.here || !businessValidId(sessionId)) return false;
+  const kind = BUSINESS_DEVICE_KINDS[d.kind] || 'device';
+  openConfirmSheet({
+    title: `Sign out this ${kind}?`,
+    message: `${businessDeviceWords(d, 'your')}. It’s signed out within the hour, and asks you to sign in next time it’s used. `
+      + 'Everything on it stays on it — any jobs it hasn’t sent wait there until you sign in on it again.',
+    confirmLabel: 'Sign it out', cancelLabel: 'Keep it',
+    onConfirm: () => { businessDeviceSignOutGo(sessionId); },
+  });
+  return true;
+}
+
+function businessDeviceSignOutGo(sessionId) {
+  if (_bizOffline()) { showToast('You need a signal to sign a device out.'); return Promise.resolve(false); }
+  if (!_bizUid()) { showToast('Sign in first.'); return Promise.resolve(false); }
+  return _bizDevClient()
+    .then((c) => c.rpc('sign_out_device', { s: sessionId }))
+    .then((res) => {
+      if (!res || res.error) throw (res && res.error) || new Error('no answer');
+      _bizHeldMine = _bizHeldMine.filter(x => x.session !== sessionId);
+      showToast(res.data === false ? 'That device was already signed out' : 'Signed out — it no longer holds anything up');
+      return true;
+    })
+    .catch((e) => {
+      const t = [e && e.message, e && e.details].map(x => String(x || '')).join(' ');
+      openInfoSheet({ title: 'Not done', message: /patgo_this_device/.test(t)
+        ? 'That’s the device you’re using — sign out from the Account page instead.'
+        : 'That didn’t go through — try again with a signal.' });
+      return false;
+    })
+    .then((ok) => { if (state.view === 'cloudDevices') businessDevicesRefresh(); return ok; });
+}
+
+function renderCloudDevices() {
+  const signedIn = !!(state.cloud && state.cloud.status === 'signed-in');
+  let body;
+  if (!signedIn) {
+    body = `
+      <div class="info-card">
+        <p class="muted">Sign in to see your devices.</p>
+        <button class="backup-action-btn" id="dev-account" data-action="settings-page" data-arg="cloudAccount" style="margin-top:8px">Account ›</button>
+      </div>`;
+  } else {
+    const list = businessDevices();
+    const status = _bizDev.reading ? 'Checking your devices…'
+      : _bizDev.error === 'offline' ? 'No signal — connect to see your devices.'
+      : _bizDev.error ? 'Couldn’t check just now — try again with a signal.' : '';
+    const rows = list.map((d, i) => {
+      const kind = BUSINESS_DEVICE_KINDS[d.kind] || 'device';
+      const name = d.here ? `This ${kind} (the one you’re using)` : _bizKindHead(kind);
+      const ver = d.reported ? (d.version ? `PATGo ${d.version}` : 'PATGo') : 'Signed in, never synced';
+      const day = _bizUntil(d.used);
+      const old = d.behind ? `<div class="dev-old" id="dev-old-${i}">${d.reported
+        ? 'An older PATGo — holds up invites until it updates or is signed out.'
+        : 'Hasn’t synced since it signed in — holds up invites until it does or is signed out.'}</div>` : '';
+      const btn = d.here ? '' : `<button class="link-btn" id="dev-signout-${i}" data-action="dev-signout" data-arg="${escapeHTML(d.session)}">Sign it out</button>`;
+      return `
+          <li class="dev-row" id="dev-row-${i}">
+            <div class="dev-name" id="dev-name-${i}">${escapeHTML(name)}</div>
+            <div class="muted" id="dev-detail-${i}">${escapeHTML(ver)}${day ? ' · last used ' + escapeHTML(day) : ''}</div>
+            ${old}
+            ${btn}
+          </li>`;
+    }).join('');
+    body = `
+      ${status ? `<p class="muted cloud-msg" id="dev-status" role="status">${escapeHTML(status)}</p>` : ''}
+      ${rows ? `<div class="info-card"><ul class="dev-list" id="dev-list">${rows}</ul></div>` : ''}
+      <button class="backup-action-btn" id="dev-refresh" data-action="dev-refresh" ${_bizDev.reading ? 'disabled' : ''} style="margin-top:4px">Check again</button>`;
+  }
+  return `
+    <div class="screen" id="cloud-devices-page">
+      <header class="header-row">
+        <button class="icon-btn" id="dev-back" data-action="settings-page" data-arg="cloudAccount" aria-label="Back">${icon('chevron-left')}</button>
+        <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Your devices</div>
+        <span style="width:40px"></span>
+      </header>
+      <div class="info-card">
+        <p class="muted" id="dev-intro">Every phone, tablet or computer signed in to your PATGo account. Sign out one you don’t use any more — an old one left signed in can hold up inviting people to a business.</p>
+      </div>
+      ${body}
+    </div>
+  `;
+}
+
+// ---- the refusal, naming the devices (2A) --------------------------------------
+// _bizCall hands a phones-behind refusal here. orgId: the business an invite was
+// for ('' = Join: my own devices). If the list can't be read, the V155 words.
+let _bizHeldMine = [];   // my devices named on the open refusal sheet (Sign it out)
+
+function _bizHeldUp(err) {
+  const t = [err && err.message, err && err.hint, err && err.details].map(x => String(x || '')).join(' ');
+  return /patgo_(your_)?phones_behind/.test(t);
+}
+
+function businessHeldUp(err, orgId) {
+  const plain = () => openInfoSheet({ title: 'Not done', message: businessTeamError(err) });
+  const read = orgId
+    ? _bizClient().then((c) => c.rpc('business_devices_behind', { o: orgId }))
+    : _bizDevClient().then((c) => c.rpc('my_devices'));
+  return read
+    .then((res) => {
+      if (!res || res.error || !Array.isArray(res.data)) throw new Error('no list');
+      const list = businessDevicesFromRows(res.data).filter(d => orgId ? true : d.behind);
+      if (!list.length) { plain(); return false; }
+      _bizHeldMine = list.filter(d => d.you && d.session && !d.here);
+      const mineCount = list.filter(d => d.you).length;
+      const theirs = list.length - mineCount;
+      const message = orgId
+        ? `Not sent yet: ${list.length === 1 ? 'a device' : list.length + ' devices'} in this business ${list.length === 1 ? 'has' : 'have'} an older PATGo signed in. `
+          + (mineCount ? 'Open PATGo on yours with a signal so it updates, or sign it out if you don’t use it any more. ' : '')
+          + (theirs ? 'Ask the others to open PATGo with a signal, or sign out a device they don’t use (Account → Your devices). ' : '')
+          + 'Then try again.'
+        : `Not joined yet: ${list.length === 1 ? 'a device' : list.length + ' devices'} signed in to your account ${list.length === 1 ? 'has' : 'have'} an older PATGo, or ${list.length === 1 ? 'hasn’t' : 'haven’t'} synced since signing in. `
+          + 'Open PATGo on it with a signal so it updates, or sign it out if you don’t use it any more. Then tap Join again.';
+      openChoiceSheet({
+        title: 'Not done',
+        message,
+        lines: list.map(d => businessDeviceWords(d, d.you ? 'your' : (d.who || 'A teammate'))),
+        choices: _bizHeldMine.slice(0, 4).map((d) => ({
+          label: `Sign out your ${BUSINESS_DEVICE_KINDS[d.kind] || 'device'} (${d.reported ? (d.version || 'older') : 'never synced'})`,
+          style: 'secondary',
+          onPick: () => businessDeviceSignOut(d.session),
+        })),
+        cancelLabel: 'Close',
+      });
+      return true;
+    })
+    .catch(() => { plain(); return false; });
 }

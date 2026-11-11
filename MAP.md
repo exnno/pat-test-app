@@ -1,4 +1,4 @@
-# PATGo — Code Map (V155)
+# PATGo — Code Map (V156)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1837,7 +1837,7 @@ V148 (4A): `planRecord` falls back to `_planOwnerUid()` — the owner's record w
 `_planSignedOut()` turns the line's button, the Account line and the two sheets' first
 choice into Sign in (`settings-page` → cloudAccount). Harness 87d, M1652–M1655.
 
-### business.js (~1,150 ln) — every job knows its business; V150 moving one; V155 invites + people — NEW V149 — OPTIONAL SUBSYSTEM
+### business.js (~1,420 ln) — every job knows its business; V150 moving one; V155 invites + people; V156 devices — NEW V149 — OPTIONAL SUBSYSTEM
 The owner's businesses (BUSINESSES_KEY `{u, at, list}`, read via rpc `my_businesses`),
 New job's "For:" (`businessForHTML` / `businessNewJobPick`, LAST_BUSINESS_KEY — 2+ only),
 the compare key (`jobBusinessKey`, rule 30), and the Business page
@@ -1883,6 +1883,18 @@ Errors → `businessTeamError` words. `BUSINESS_OFFER` must match the SQL's `_ma
 `biz-myname` / `biz-main`; render-core.js draws `businessInviteBannerHTML` on the Jobs
 list (phone tab); feedback.js `openNameSheet` inputType; plan.js `planIsMember` reads
 `businessDefault()` (8A); styles.css `.biz-*`. Harness 94a–94f; M1825–M1855.
+V156 (fourth part): devices — memory only (`_bizDev`). Your devices page
+(`renderCloudDevices`, view `cloudDevices`, reached from the Account page's
+`#cloud-devices-open`; Back = settings-page cloudAccount, not back-to-settings) reads rpc
+`my_devices`; Sign it out → confirm → rpc `sign_out_device`. ⚠ These use `_bizDevClient()`
+= cloudClient(), NOT `_bizClient()` — account-level, works below the minimum (R61).
+`_bizCall`'s catch hands `patgo_phones_behind` / `patgo_your_phones_behind` to
+`businessHeldUp` (invite → `business_devices_behind(o)`, Join → `my_devices` behind only),
+which names them on `openChoiceSheet` (feedback.js `opts.lines`); unreadable → V155 words.
+`BUSINESS_DEVICE_KINDS` must match the SQL's `_device_kind` (95f).
+**Coupling:** render-core.js routes `cloudDevices` (unlocked only); session.js setView reads
+on open; render-help.js `renderCloudAccount` draws the button; dispatch.js `dev-refresh` /
+`dev-signout`; styles.css `.dev-*`, `.choice-sheet-lines`. Harness 95a–95f; M1856–M1883.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

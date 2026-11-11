@@ -212,12 +212,14 @@ function render() {
   // v85: the cloud pages live in Settings → Cloud. While this phone is not
   // unlocked they are never painted — any route in (a stale view) gets the
   // Cloud group's access-code box instead. Without cloud.js that is every time.
-  else if (v === 'cloudAccount' || v === 'cloudSync' || v === 'cloudSubscription' || v === 'cloudBusiness') {
+  else if (v === 'cloudAccount' || v === 'cloudSync' || v === 'cloudSubscription' || v === 'cloudBusiness' || v === 'cloudDevices') {
     if (typeof cloudPagesUnlocked === 'function' && cloudPagesUnlocked()) {
       html = v === 'cloudAccount' ? renderCloudAccount()
            : v === 'cloudSync'    ? renderCloudSync()
            : v === 'cloudBusiness'   // V149 (3A): business.js, optional
              ? (typeof renderCloudBusiness === 'function' ? renderCloudBusiness() : renderCloudAccount())
+           : v === 'cloudDevices'    // V156 (3A): Account → Your devices (business.js, optional)
+             ? (typeof renderCloudDevices === 'function' ? renderCloudDevices() : renderCloudAccount())
            : renderCloudSubscription();
     } else {
       html = renderCloudLocked();
@@ -286,8 +288,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Invite people to your business.</strong> Settings &rarr; Account &amp; Sync &rarr; Business: invite someone by their email address as an Engineer, Team leader or Office, and share the invite with them. They join by signing in to PATGo with that address.</li>
-        <li><strong>Been invited?</strong> The Jobs list tells you &mdash; Join or Decline on the Business page. Your own jobs stay where they are.</li>
+        <li><strong>Your devices.</strong> Settings &rarr; Account &amp; Sync &rarr; Account &rarr; Your devices: every phone, tablet or computer signed in to your account, with Sign it out for one you don&rsquo;t use any more. Everything on it stays on it.</li>
+        <li><strong>Invites that won&rsquo;t send?</strong> PATGo now names the device with an older PATGo that&rsquo;s holding it up &mdash; and a device that&rsquo;s been signed out no longer counts.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
