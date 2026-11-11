@@ -28,7 +28,7 @@
           deleted; every other way in refuses it (_syncValidDoc). A bad job on
           the phone is kept, never sent, its delete never sent; the Sync page
           says so.
-     93e  Release: V154, cache pat-v154, About V154 / V153 / V152, no What's new.
+     93e  V154 carried: the update banner reads its key (its release checks moved to 94e in V155).
      93f  4A: schema.sql carries v154-safe-ids.sql's rules byte for byte, and the
           app and the database use the same patterns.
 
@@ -435,24 +435,9 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 93e */
-  await t.group('93e — release: V154; cache pat-v154; About V154 / V153 / V152; no What’s new', () => {
+  await t.group('93e — V154 carried (release checks → 94e)', () => {
     const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V154', 'APP_VERSION V154');
-    t.eq(rel.run('WELCOME_VERSION'), 'V150', 'What’s new not rolled (still V150’s)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v154';", 'cache key pat-v154');
-    t.eq(rel.fn('updateVersionLabel')('pat-v154'), 'V154', 'the update banner reads the key as V154');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: V150’s one line');
-    t.includes(sheetCopy, '<li><strong>Move a job to another business.</strong> For anyone who works for more than one business:', '…moving a job');
-    t.includes(sheetCopy, 'Working for just one business? Nothing changes.</li>', '…and nothing changes for everyone else');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V154</strong>'), y = help.indexOf('<p><strong>V153</strong>'), z = help.indexOf('<p><strong>V152</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V154, V153, V152');
-    t.excludes(help, '<p><strong>V151</strong>', 'V151 rolled off');
-    t.includes(help, 'Behind the scenes: PATGo now checks what comes in from a backup file', 'About: V154’s line');
-    t.includes(help, 'Behind the scenes: a phone that&rsquo;s too old to sync now stops', 'About: V153’s line still there');
-    t.includes(help, 'Behind the scenes: if PATGo ever can&rsquo;t read something saved on this phone', 'About: V152’s line still there');
+    t.eq(rel.fn('updateVersionLabel')('pat-v154'), 'V154', 'the update banner reads pat-v154 as V154');
+    t.eq(rel.fn('updateVersionLabel')('pat-v154-1'), 'V154.1', '…and a hotfix key as V154.1');
   });
 };
