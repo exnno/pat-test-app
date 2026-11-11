@@ -11,6 +11,9 @@
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
+-- V156: CHECKS 24a–24e NEED supabase/v156-devices.sql RUN FIRST (24a names it
+-- if not). A pretend sign-in of A's is added for the test and removed (24e);
+-- B only tries.
 -- V155: CHECKS 23a–23h NEED supabase/v155-invites.sql RUN FIRST (23a names it
 -- if not). A invites B as Engineer; B joins, is made Team leader, tries what it
 -- mustn't; then B is taken out and every invite removed. B's main business, name
@@ -67,6 +70,7 @@ declare
   lap_b timestamptz; lap_seen timestamptz;          -- V143
   min0 int; ovr0 bigint; got_min int;              -- V151
   inv uuid; inv2 uuid; def_b uuid; plan_b text; skip155 text;   -- V155
+  dev_a uuid; devs_a uuid[];                        -- V156
 begin
   select id into a from auth.users where lower(email) = lower(email_a);
   select id into b from auth.users where lower(email) = lower(email_b);
@@ -1197,6 +1201,49 @@ begin
     res := res || array['23h|B out of A''s business; B''s main and plan as before; nothing left behind|'
       || case when n = 0 and k = 0 and public.default_org(b) = def_b and (select plan from public.profiles where id = b) is not distinct from plan_b
               then 'PASS|' else 'FAIL|' || n || ' membership, ' || k || ' invites, plan ' || coalesce((select plan from public.profiles where id = b), '?') end];
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
+  -- ------------------------------------------------- V156: devices (24a–24e)
+  if to_regprocedure('public.my_devices()') is null then
+    res := res || array['24a|devices|FAIL|run supabase/v156-devices.sql first'];
+  else
+    -- A pretend sign-in of A's for the length of the test (removed in 24e).
+    delete from auth.sessions where user_agent = 'patgo-iso-test-156';
+    insert into auth.sessions (id, user_id, created_at, updated_at, user_agent)
+      values (gen_random_uuid(), a, now(), now(), 'patgo-iso-test-156') returning id into dev_a;
+    -- 24a: B's list is B's own — none of A's sign-ins.
+    select coalesce(array_agg(s.id), '{}') into devs_a from auth.sessions s where s.user_id = a;
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    select count(*) into n from public.my_devices() x where x.session_id = any(devs_a);
+    execute 'reset role';
+    res := res || array['24a|B''s Your devices lists none of A''s|' || case when n = 0 then 'PASS|' else 'FAIL|' || n || ' of A''s seen' end];
+    -- 24b: B can't sign out A's device.
+    execute 'set local role authenticated';
+    begin ok := public.sign_out_device(dev_a); exception when others then ok := false; end;
+    execute 'reset role';
+    res := res || array['24b|B can''t sign out A''s device|'
+      || case when not ok and exists (select 1 from auth.sessions where id = dev_a) then 'PASS|refused, still signed in' else 'FAIL|A''s sign-in ended' end];
+    -- 24c: B (not in A's business) can't see the devices holding A's business up.
+    execute 'set local role authenticated';
+    k := 0;
+    begin perform public.business_devices_behind(org_a); exception when others then k := k + 1; end;
+    execute 'reset role';
+    res := res || array['24c|B can''t see the devices of A''s business|' || case when k = 1 then 'PASS|refused' else 'FAIL|answered' end];
+    -- 24d: signed out, nothing.
+    perform set_config('request.jwt.claims', '', true);
+    execute 'set local role anon';
+    k := 0;
+    begin perform public.my_devices(); exception when others then k := k + 1; end;
+    begin perform public.sign_out_device(dev_a); exception when others then k := k + 1; end;
+    begin perform public.business_devices_behind(org_a); exception when others then k := k + 1; end;
+    execute 'reset role';
+    res := res || array['24d|signed out: no devices, no signing out|' || case when k = 3 then 'PASS|3 refused' else 'FAIL|' || (3 - k) || ' answered' end];
+    -- 24e: put back.
+    delete from auth.sessions where user_agent = 'patgo-iso-test-156';
+    res := res || array['24e|the test sign-in is gone; nothing left behind|'
+      || case when not exists (select 1 from auth.sessions where user_agent = 'patgo-iso-test-156') then 'PASS|' else 'FAIL|' end];
   end if;
   perform set_config('request.jwt.claims', '', true);
 

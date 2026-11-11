@@ -2087,3 +2087,148 @@ grant execute on function public.set_member_role(uuid, uuid, text) to authentica
 grant execute on function public.set_my_member_name(uuid, text) to authenticated;
 grant execute on function public.set_main_business(uuid) to authenticated;
 grant execute on function public.my_billing() to authenticated;
+
+
+
+-- ================================================================ V156
+-- Devices that hold up invites (Teams v1 — Peter, 11 Nov: 1A 2A 3A, the
+-- defaults). Existing projects: supabase/v156-devices.sql (plus self-checks
+-- V1–V4). Kept in step with it byte for byte by harness group 95f.
+--
+-- One list decides everything: _signed_in_devices(u) — every sign-in of u still
+-- in auth.sessions (and not past its not_after), with the phone report that
+-- arrived on it if any. "behind" is the V151/V155 test on that list: used in the
+-- last invite_phone_days, and either never reported on that sign-in or reported
+-- a version below u's minimum. org_phones_behind, _user_phones_behind and the
+-- device lists all read it, so they can never disagree.
+
+-- ------------------------------------------------- what kind of device (2A, 3A)
+-- From the sign-in's browser line only — never anything the phone sent.
+create or replace function public._device_kind(ua text)
+returns text language sql immutable set search_path = '' as $$
+  select case
+    when ua ~* 'iphone' then 'iPhone'
+    when ua ~* 'ipad' then 'iPad'
+    when ua ~* 'android' then 'Android phone'
+    when ua ~* 'macintosh|mac os x' then 'Mac'
+    when ua ~* 'windows' then 'Windows computer'
+    when ua ~* 'linux|cros' then 'Computer'
+    else 'Device' end
+$$;
+
+-- ------------------------------------------------- the one list (1A)
+create or replace function public._signed_in_devices(u uuid)
+returns table (session_id uuid, kind text, app_version text, version_num integer,
+               last_used timestamptz, reported boolean, behind boolean)
+language sql stable security definer set search_path = '' as $$
+  with s as (
+    select now() - make_interval(days => coalesce((select x.invite_phone_days from public.app_settings x where x.id = 1), 60)) as win,
+           public.app_min_version_for(u) as need
+  ), d as (
+    select ses.id as session_id,
+           public._device_kind(ses.user_agent) as kind,
+           p.app_version, p.version_num,
+           greatest(ses.created_at, ses.updated_at, ses.refreshed_at at time zone 'UTC', p.seen_at) as last_used,
+           (p.phone_id is not null) as reported
+    from auth.sessions ses
+    left join lateral (
+      select ph.phone_id, ph.app_version, ph.version_num, ph.seen_at from public.phones ph
+      where ph.user_id = ses.user_id and ph.auth_session = ses.id
+      order by ph.seen_at desc limit 1
+    ) p on true
+    where ses.user_id = u
+      and (ses.not_after is null or ses.not_after > now())
+  )
+  select d.session_id, d.kind, d.app_version, d.version_num, d.last_used, d.reported,
+         (d.last_used > s.win and (not d.reported or coalesce(d.version_num, 0) < s.need)) as behind
+  from d, s
+$$;
+
+-- ------------------------------------------------- the checks invites make (1A)
+-- Same names and answers as V151 / V155, now counting signed-in devices only.
+create or replace function public.org_phones_behind(o uuid)
+returns integer language sql stable security definer set search_path = '' as $$
+  select count(*)::integer
+  from public.memberships mm, lateral public._signed_in_devices(mm.user_id) d
+  where mm.org_id = o and d.behind
+$$;
+
+create or replace function public._user_phones_behind(u uuid)
+returns integer language sql stable security definer set search_path = '' as $$
+  select count(*)::integer from public._signed_in_devices(u) d where d.behind
+$$;
+
+revoke all on function public._device_kind(text) from public, anon, authenticated;
+revoke all on function public._signed_in_devices(uuid) from public, anon, authenticated;
+revoke all on function public.org_phones_behind(uuid) from public, anon, authenticated;
+revoke all on function public._user_phones_behind(uuid) from public, anon, authenticated;
+
+-- ------------------------------------------------- the sign-in this request came on
+create or replace function public._my_session()
+returns uuid language sql stable set search_path = '' as $$
+  select case when s ~ '^[0-9a-fA-F-]{36}$' then s::uuid end
+  from (select nullif(coalesce(current_setting('request.jwt.claims', true), ''), '')::jsonb ->> 'session_id' as s) x
+$$;
+revoke all on function public._my_session() from public, anon, authenticated;
+
+-- ------------------------------------------------- Your devices (3A)
+-- Every device signed in to my account. this_device = the one asking.
+create or replace function public.my_devices()
+returns table (session_id uuid, kind text, app_version text, last_used timestamptz,
+               reported boolean, behind boolean, this_device boolean)
+language plpgsql stable security definer set search_path = '' as $$
+declare me uuid := auth.uid();
+begin
+  if me is null then raise exception 'patgo_not_allowed' using errcode = '42501'; end if;
+  return query
+    select d.session_id, d.kind, d.app_version, d.last_used, d.reported, d.behind,
+           (d.session_id = public._my_session()) as this_device
+    from public._signed_in_devices(me) d
+    order by (d.session_id = public._my_session()) desc nulls last, d.last_used desc;
+end $$;
+
+-- 2A: the devices holding up an invite to business o — for the people who invite
+-- (Owner / Team leader / Office). A teammate's sign-in is never handed out.
+create or replace function public.business_devices_behind(o uuid)
+returns table (user_id uuid, name text, is_you boolean, session_id uuid, kind text,
+               app_version text, last_used timestamptz, reported boolean)
+language plpgsql stable security definer set search_path = '' as $$
+declare me uuid := auth.uid();
+begin
+  if me is null or not public.can_read_org(o) then
+    raise exception 'patgo_not_allowed' using errcode = '42501';
+  end if;
+  return query
+    select mm.user_id,
+           coalesce(nullif(btrim(mm.name), ''), lower(btrim(u.email)), '') as name,
+           (mm.user_id = me) as is_you,
+           case when mm.user_id = me then d.session_id end as session_id,
+           d.kind, d.app_version, d.last_used, d.reported
+    from public.memberships mm
+    join auth.users u on u.id = mm.user_id,
+    lateral public._signed_in_devices(mm.user_id) d
+    where mm.org_id = o and d.behind
+    order by (mm.user_id = me) desc, d.last_used desc;
+end $$;
+
+-- Sign it out (2A, 3A): ends one of MY sign-ins — never someone else's, never the
+-- one asking. The device keeps its data; it can't refresh the sign-in, so it is
+-- signed out within the hour at most. False = already gone.
+create or replace function public.sign_out_device(s uuid)
+returns boolean language plpgsql volatile security definer set search_path = '' as $$
+declare me uuid := auth.uid(); n integer;
+begin
+  if me is null then raise exception 'patgo_not_allowed' using errcode = '42501'; end if;
+  if s is null then return false; end if;
+  if s = public._my_session() then raise exception 'patgo_this_device'; end if;
+  delete from auth.sessions x where x.id = s and x.user_id = me;
+  get diagnostics n = row_count;
+  return n > 0;
+end $$;
+
+revoke all on function public.my_devices() from public, anon;
+revoke all on function public.business_devices_behind(uuid) from public, anon;
+revoke all on function public.sign_out_device(uuid) from public, anon;
+grant execute on function public.my_devices() to authenticated;
+grant execute on function public.business_devices_behind(uuid) to authenticated;
+grant execute on function public.sign_out_device(uuid) to authenticated;
