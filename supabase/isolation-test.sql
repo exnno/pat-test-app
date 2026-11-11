@@ -11,6 +11,11 @@
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
+-- V155: CHECKS 23a–23h NEED supabase/v155-invites.sql RUN FIRST (23a names it
+-- if not). A invites B as Engineer; B joins, is made Team leader, tries what it
+-- mustn't; then B is taken out and every invite removed. B's main business, name
+-- and plan are put back as they were. 23a–23f say INCONCLUSIVE while a phone of
+-- A's or B's is below the minimum app version (update it and run again).
 -- V151: CHECKS 22a–22e NEED supabase/v151-min-version.sql RUN FIRST (22a names
 -- it if not). Nothing is changed: B only tries.
 -- V150: CHECKS 21a–21h NEED supabase/v150-business-move.sql RUN FIRST (21a names
@@ -61,6 +66,7 @@ declare
   rls_off text;
   lap_b timestamptz; lap_seen timestamptz;          -- V143
   min0 int; ovr0 bigint; got_min int;              -- V151
+  inv uuid; inv2 uuid; def_b uuid; plan_b text; skip155 text;   -- V155
 begin
   select id into a from auth.users where lower(email) = lower(email_a);
   select id into b from auth.users where lower(email) = lower(email_b);
@@ -1062,6 +1068,135 @@ begin
     -- 22e (admin): nothing changed.
     select count(*) into n from public.app_min_overrides;
     res := res || array['22e|the minimum and the raises are as they were|' || case when (select min_version from public.app_settings where id = 1) = min0 and n = ovr0 then 'PASS|' || min0 else 'FAIL|setting ' || (select min_version from public.app_settings where id = 1) || ', raises ' || n end];
+  end if;
+
+  -- ------------------------------------------------- V155: invites and roles (23a–23h)
+  if to_regprocedure('public.invite_member(uuid,text,text,text)') is null then
+    res := res || array['23a|invites|FAIL|run supabase/v155-invites.sql first'];
+  else
+    org_a := public.default_org(a);
+    def_b := public.default_org(b);
+    select plan into plan_b from public.profiles where id = b;
+    delete from public.invites where org_id = org_a and email = (select lower(btrim(email)) from auth.users where id = b);
+    delete from public.memberships where org_id = org_a and user_id = b;
+    skip155 := null;
+    -- 23a: A (Owner) invites B's address as Engineer.
+    perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      inv := public.invite_member(org_a, email_b, 'Iso Test B', 'engineer');
+      execute 'reset role';
+      res := res || array['23a|A (Owner) invites B as Engineer|PASS|'];
+    exception when others then
+      execute 'reset role';
+      if sqlerrm like 'patgo_phones_behind%' then skip155 := 'a phone in A''s business is below the minimum app version';
+      else res := res || array['23a|A (Owner) invites B as Engineer|FAIL|' || sqlerrm]; skip155 := 'see 23a'; end if;
+    end;
+    if skip155 is not null then
+      if skip155 <> 'see 23a' then
+        res := res || array['23a|A (Owner) invites B as Engineer|INCONCLUSIVE|' || skip155];
+      end if;
+      res := res || array['23b|B can''t read or write invites, or invite into A''s business|INCONCLUSIVE|' || skip155];
+    else
+      -- 23b: B can't touch invites directly, can't invite into A's business, and
+      -- (not yet a member) sees none of A's people or invites.
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      k := 0;
+      begin perform 1 from public.invites; exception when others then k := k + 1; end;
+      begin update public.invites set status = 'joined' where id = inv; exception when others then k := k + 1; end;
+      begin insert into public.memberships (org_id, user_id, role) values (org_a, b, 'owner'); exception when others then k := k + 1; end;
+      begin perform public.invite_member(org_a, 'iso-test-155@example.invalid', 'X', 'engineer'); exception when others then k := k + 1; end;
+      begin perform public.set_member_role(org_a, b, 'team_leader'); exception when others then k := k + 1; end;
+      select count(*) into n from public.business_people() x where x.business_id = org_a;
+      select count(*) + n into n from public.business_invites() x where x.business_id = org_a;
+      execute 'reset role';
+      res := res || array['23b|B can''t read or write invites, or invite into A''s business|' || case when k = 5 and n = 0 then 'PASS|5 refused, nothing seen' else 'FAIL|' || (5 - k) || ' allowed, ' || n || ' seen' end];
+    end if;
+    -- 23c: B sees the invite and joins (A's business not made main).
+    if skip155 is null then
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      begin
+        select count(*) into n from public.my_invites() x where x.id = inv;
+        msg := public.accept_invite(inv, false);
+        execute 'reset role';
+        res := res || array['23c|B sees the invite and joins as Engineer; B''s main business unchanged|'
+          || case when n = 1 and msg = 'joined' and public.member_role(org_a, b) = 'engineer' and public.default_org(b) = def_b then 'PASS|' else 'FAIL|' || n || ', ' || coalesce(msg, '?') end];
+      exception when others then
+        execute 'reset role';
+        if sqlerrm like 'patgo_your_phones_behind%' then skip155 := 'a phone of B''s is below the minimum app version';
+          res := res || array['23c|B sees the invite and joins as Engineer; B''s main business unchanged|INCONCLUSIVE|' || skip155];
+        else res := res || array['23c|B sees the invite and joins as Engineer; B''s main business unchanged|FAIL|' || sqlerrm]; skip155 := 'see 23c'; end if;
+      end;
+    else
+      res := res || array['23c|B sees the invite and joins as Engineer; B''s main business unchanged|INCONCLUSIVE|' || skip155];
+    end if;
+    if skip155 is null then
+      -- 23d: B as Engineer: no invites, no roles, no addresses, no invite list.
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      k := 0;
+      begin perform public.invite_member(org_a, 'iso-test-155@example.invalid', 'X', 'engineer'); exception when others then k := k + 1; end;
+      begin perform public.set_member_role(org_a, b, 'team_leader'); exception when others then k := k + 1; end;
+      begin perform public.set_member_role(org_a, a, 'engineer'); exception when others then k := k + 1; end;
+      select count(*) into n from public.business_people() x where x.business_id = org_a and x.email is not null;
+      select count(*) + n into n from public.business_invites() x where x.business_id = org_a;
+      select count(*) into j from public.business_people() x where x.business_id = org_a;
+      execute 'reset role';
+      res := res || array['23d|B as Engineer: can''t invite or change roles; sees names, not addresses or invites|'
+        || case when k = 3 and n = 0 and j >= 2 then 'PASS|' || j || ' people' else 'FAIL|' || (3 - k) || ' allowed, ' || n || ' addresses/invites seen' end];
+      -- 23e: A makes B Team leader; B may offer Engineer only, and now sees addresses.
+      perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      msg := public.set_member_role(org_a, b, 'team_leader');
+      execute 'reset role';
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      k := 0;
+      begin perform public.invite_member(org_a, 'iso-test-155@example.invalid', 'X', 'office'); exception when others then k := k + 1; end;
+      begin perform public.set_member_role(org_a, a, 'engineer'); exception when others then k := k + 1; end;
+      begin inv2 := public.invite_member(org_a, 'iso-test-155@example.invalid', 'X', 'engineer'); exception when others then inv2 := null; end;
+      select count(*) into n from public.business_people() x where x.business_id = org_a and x.email is not null;
+      execute 'reset role';
+      res := res || array['23e|B as Team leader: offers Engineer only, can''t change A; sees addresses|'
+        || case when msg = 'team_leader' and k = 2 and inv2 is not null and n >= 2 then 'PASS|' else 'FAIL|' || coalesce(msg, '?') || ', ' || (2 - k) || ' allowed, invite ' || coalesce(inv2::text, 'refused') || ', ' || n || ' addresses' end];
+      -- 23f: B can't accept or decline an invite that isn't B's; Make main only for B's own businesses.
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      k := 0;
+      begin perform public.accept_invite(inv2, false); exception when others then k := k + 1; end;
+      begin perform public.decline_invite(inv2); exception when others then k := k + 1; end;
+      begin perform public.set_main_business(gen_random_uuid()); exception when others then k := k + 1; end;
+      execute 'reset role';
+      res := res || array['23f|B can''t answer someone else''s invite, or make a stranger business main|' || case when k = 3 then 'PASS|3 refused' else 'FAIL|' || (3 - k) || ' allowed' end];
+    else
+      res := res || array['23d|B as Engineer: can''t invite or change roles; sees names, not addresses or invites|INCONCLUSIVE|' || skip155];
+      res := res || array['23e|B as Team leader: offers Engineer only, can''t change A; sees addresses|INCONCLUSIVE|' || skip155];
+      res := res || array['23f|B can''t answer someone else''s invite, or make a stranger business main|INCONCLUSIVE|' || skip155];
+    end if;
+    -- 23g: signed out, nothing.
+    perform set_config('request.jwt.claims', '', true);
+    execute 'set local role anon';
+    k := 0;
+    begin perform public.my_invites(); exception when others then k := k + 1; end;
+    begin perform public.business_people(); exception when others then k := k + 1; end;
+    begin perform public.invite_member(org_a, 'iso-test-155@example.invalid', 'X', 'engineer'); exception when others then k := k + 1; end;
+    execute 'reset role';
+    res := res || array['23g|signed out: no invites, people or inviting|' || case when k = 3 then 'PASS|3 refused' else 'FAIL|' || (3 - k) || ' answered' end];
+    -- 23h: put back — B out of A's business, the test invites gone, B's main and plan as before.
+    delete from public.memberships where org_id = org_a and user_id = b;
+    delete from public.invites where org_id = org_a
+      and email in ((select lower(btrim(email)) from auth.users where id = b), 'iso-test-155@example.invalid');
+    if public.default_org(b) is distinct from def_b then
+      update public.memberships set is_default = false where user_id = b and is_default;
+      update public.memberships set is_default = true where user_id = b and org_id = def_b;
+    end if;
+    select count(*) into n from public.memberships where org_id = org_a and user_id = b;
+    select count(*) into k from public.invites where org_id = org_a and email = 'iso-test-155@example.invalid';
+    res := res || array['23h|B out of A''s business; B''s main and plan as before; nothing left behind|'
+      || case when n = 0 and k = 0 and public.default_org(b) = def_b and (select plan from public.profiles where id = b) is not distinct from plan_b
+              then 'PASS|' else 'FAIL|' || n || ' membership, ' || k || ' invites, plan ' || coalesce((select plan from public.profiles where id = b), '?') end];
   end if;
   perform set_config('request.jwt.claims', '', true);
 
