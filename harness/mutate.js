@@ -517,8 +517,8 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V154';",
-    to:   "const APP_VERSION = 'V153';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
+    from: "const APP_VERSION = 'V155';",   // V155: re-pointed
+    to:   "const APP_VERSION = 'V154';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
   {
@@ -640,9 +640,9 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V152</strong> &middot; November 2026</p>',   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
+    from: '        <p><strong>V153</strong> &middot; November 2026</p>',   // V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
-    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 92c)',
+    why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 94e)',
   },
 
   {
@@ -6122,9 +6122,9 @@ const MUTATIONS = [
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
     // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
-    from: "<li><strong>Move a job to another business.</strong>",   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
+    from: "<li><strong>Invite people to your business.</strong>",   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (93e)",
+    why:  "11A: the welcome says plainly what changed on screen (94e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -7736,8 +7736,8 @@ const MUTATIONS = [
   {
     name: "M1091 (V127) the Jobs list loses the plan line",
     file: "render-core.js",
-    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${tabs}\n      ${unreadableBanner}",   // V151: re-anchored (the version line above it). V152: (the unreadable banner below)
-    to:   "      ${header}\n      ${versionBanner}\n      ${tabs}\n      ${unreadableBanner}",
+    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${inviteBanner}\n      ${tabs}",   // V151: re-anchored (the version line above it). V152: (the unreadable banner below). V155: (the invite line below)
+    to:   "      ${header}\n      ${versionBanner}\n      ${inviteBanner}\n      ${tabs}",
     why:  "4A 6b: the countdown is on the Jobs list (65e)",
   },
   {
@@ -8604,9 +8604,9 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V150';",   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
-    to:   "const WELCOME_VERSION = 'V149';",
-    why:  "What's new is rolled on a feature release (93e)",
+    from: "const WELCOME_VERSION = 'V155';",   // V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
+    to:   "const WELCOME_VERSION = 'V154';",
+    why:  "What's new is rolled on a feature release (94e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
@@ -8619,9 +8619,10 @@ const MUTATIONS = [
     // V148: no welcome — V147's one line stays, so the anchor stays.
     // V149: one line — re-aimed at its end.
     // V150: one line — re-aimed at its end.
-    from: "Working for just one business? Nothing changes.</li>\n",
-    to:   "Working for just one business? Nothing changes.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (93e)",
+    // V155: two lines — re-aimed at the second's end; still caught by the count.
+    from: "Your own jobs stay where they are.</li>\n",
+    to:   "Your own jobs stay where they are.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (94e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8635,9 +8636,9 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Behind the scenes: PATGo now checks what comes in from a backup file",
+    from: "Invite people to your business by email address, see who&rsquo;s in it",   // V155: at V155's (V154's moves to M1259, V153's to M1238).
     to:   "Better",
-    why:  "the About page must say what changed in this version (93e)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
+    why:  "the About page must say what changed in this version (94e)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8752,9 +8753,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Behind the scenes: if PATGo ever can&rsquo;t read something saved on this phone",   // V154: V151's rolled off — re-aimed at V152's, the oldest now (93e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (93e)
+    from: "Behind the scenes: a phone that&rsquo;s too old to sync now stops reliably",   // V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (93e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
+    why:  "the About page keeps the last three versions' lines (94e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8914,9 +8915,9 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Behind the scenes: a phone that&rsquo;s too old to sync now stops",
+    from: "Behind the scenes: PATGo now checks what comes in from a backup file",   // V155: at V154's, still in the window.
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (93e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
+    why:  "the About page keeps the last three versions' lines (94e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9043,9 +9044,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v154';",   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v153';",
-    why:  "a release needs its cache bump or phones never get it (93e)",
+    from: "const CACHE_VERSION = 'pat-v155';",   // V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v154';",
+    why:  "a release needs its cache bump or phones never get it (94e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -9925,7 +9926,8 @@ const MUTATIONS = [
     name: "M1401 (V142) reading the plan doesn't refresh the plan record",
     file: "plan.js",
     // V143: re-aimed — + lapsed_at.
-    from: "      try { planNote({ plan: info.plan, trial_ends_at: info.trial_ends_at, lapsed_at: info.lapsed_at }); } catch (e) { /* record only */ }",
+    // V155: re-aimed — the record now takes the cover (cov).
+    from: "      try { planNote({ plan: cov.plan, trial_ends_at: cov.trial_ends_at, lapsed_at: cov.lapsed_at }); } catch (e) { /* record only */ }",
     to:   "",
     why:  "paying must lift a lock at once, no restart (81c)",
   },
@@ -10262,15 +10264,15 @@ const MUTATIONS = [
   {
     name: "M1449 (V143) the Jobs list keeps Renew now while held",
     file: "plan.js",
-    from: "  return (st && st.unchecked && st.phase !== 'locked')\n    ? `<button",
-    to:   "  return (false)\n    ? `<button",
+    from: "  return ((st && st.unchecked && st.phase !== 'locked') || planIsMember())",   // V155: re-anchored (the member's Check now)
+    to:   "  return ((false) || planIsMember())",
     why:  "4A: the line's button is Check now (82b)",
   },
   {
     name: "M1450 (V143) the Account page keeps Renew now while held",
     file: "plan.js",
-    from: "  const check = st.unchecked && st.phase !== 'locked';",
-    to:   "  const check = false;",
+    from: "  const check = (st.unchecked && st.phase !== 'locked') || planIsMember();",   // V155: re-anchored
+    to:   "  const check = (false) || planIsMember();",
     why:  "4A: the Account page's button is Check now (82b)",
   },
   {
@@ -10304,8 +10306,8 @@ const MUTATIONS = [
   {
     name: "M1455 (V143) the Subscription page’s read drops lapsed_at",
     file: "plan.js",
-    from: "trial_ends_at: info.trial_ends_at, lapsed_at: info.lapsed_at }); } catch",
-    to:   "trial_ends_at: info.trial_ends_at }); } catch",
+    from: "trial_ends_at: cov.trial_ends_at, lapsed_at: cov.lapsed_at }); } catch",   // V155: re-anchored (cov)
+    to:   "trial_ends_at: cov.trial_ends_at }); } catch",
     why:  "3A: my_billing's read overwrites the record without the date (82b)",
   },
   {
@@ -10339,7 +10341,7 @@ const MUTATIONS = [
   {
     name: "M1460 (V143) the database’s own words are shown",
     file: "sync.js",
-    from: "  if (_syncIsPlanRefusal(err)) return SYNC_PLAN_PAUSED_WORDS;\n",
+    from: "  if (_syncIsPlanRefusal(err)) return syncPlanPausedWords();\n",   // V155: re-anchored
     to:   "",
     why:  "5A: our professional line, not the database's (82c)",
   },
@@ -10423,14 +10425,14 @@ const MUTATIONS = [
   {
     name: "M1472 (V143) resuming keeps the paused line",
     file: "sync.js",
-    from: "  if (state.sync && state.sync.message === SYNC_PLAN_PAUSED_WORDS) state.sync.message = '';\n",
+    from: "  if (state.sync && (state.sync.message === SYNC_PLAN_PAUSED_WORDS || state.sync.message === SYNC_PLAN_PAUSED_MEMBER_WORDS)) state.sync.message = '';\n",   // V155: re-anchored
     to:   "",
     why:  "the line would claim paused after paying (82c)",
   },
   {
     name: "M1473 (V143) a paused run reports an ordinary result",
     file: "sync.js",
-    from: "      state.sync.message = (r && r.paused) ? SYNC_PLAN_PAUSED_WORDS : _syncOutcome(r);",
+    from: "      state.sync.message = (r && r.paused) ? syncPlanPausedWords() : _syncOutcome(r);",   // V155: re-anchored
     to:   "      state.sync.message = _syncOutcome(r);",
     why:  "5A: the Sync page keeps saying why nothing went (82c)",
   },
@@ -12387,8 +12389,8 @@ const MUTATIONS = [
   {
     name: "M1752 (V151) the Jobs list loses the version line",
     file: "render-core.js",
-    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${tabs}\n      ${unreadableBanner}",   // V152: re-anchored (the unreadable banner below)
-    to:   "      ${header}\n      ${planBanner}\n      ${tabs}\n      ${unreadableBanner}",
+    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${inviteBanner}\n      ${tabs}\n      ${unreadableBanner}",   // V152: re-anchored (the unreadable banner below). V155: (the invite line)
+    to:   "      ${header}\n      ${planBanner}\n      ${inviteBanner}\n      ${tabs}\n      ${unreadableBanner}",
     why:  "syncing stops with nothing on the Jobs list to say why (90c)",
   },
   {
@@ -12896,6 +12898,224 @@ const MUTATIONS = [
     from: "<span class=\"result-badge ${escapeHTML(existing.result)}\">",
     to:   "<span class=\"result-badge ${existing.result}\">",
     why:  "the entry screen shows an item from any backup (93a)",
+  },
+  // ---- V155 (Peter 11 Nov: 0A 1A 2A 3A 4A 5A 6A 7C 8A): invites, roles, people; a paid seat anywhere. Group 94 + M1825–M1855. ----
+  {
+    name: "M1825 (V155) a Team leader may offer Team leader",
+    file: "business.js",
+    from: "team_leader: ['engineer'], office: ['engineer'] };",
+    to:   "team_leader: ['engineer', 'team_leader'], office: ['engineer'] };",
+    why:  "2A: only the Owner makes managers (94a)",
+  },
+  {
+    name: "M1826 (V155) a bad invite row to me is kept",
+    file: "business.js",
+    from: "    if (!r || !businessValidId(r.id) || !businessValidId(r.business_id) || !BUSINESS_OFFER.owner.includes(r.role)) continue;\n",
+    to:   "    if (!r) continue;\n",
+    why:  "an id or an Owner offer PATGo never sends reaches the page (94a)",
+  },
+  {
+    name: "M1827 (V155) another account's invites are shown",
+    file: "business.js",
+    from: "  return uid && _bizMine.u === uid ? _bizMine.list : [];",
+    to:   "  return _bizMine.list;",
+    why:  "a sign-out or a takeover must show nothing stale (94a)",
+  },
+  {
+    name: "M1828 (V155) a bad person or invite row is kept",
+    file: "business.js",
+    from: "    if (!r || !businessValidId(r.business_id) || !businessValidId(r.user_id) || !BUSINESS_ROLE_WORDS[r.role]) continue;\n",
+    to:   "    if (!r) continue;\n",
+    why:  "an unknown role reaches the page (94a)",
+  },
+  {
+    name: "M1829 (V155) an Engineer gets Invite someone",
+    file: "business.js",
+    from: "function businessMayInvite(b) { return !!(b && BUSINESS_OFFER[b.role]); }",
+    to:   "function businessMayInvite(b) { return !!b; }",
+    why:  "2A / R58: Owner, Team leader and Office invite (94a)",
+  },
+  {
+    name: "M1830 (V155) the joiner's old phone is said as a generic failure",
+    file: "business.js",
+    from: "  if (/patgo_your_phones_behind/.test(t)) return",
+    to:   "  if (false) return",
+    why:  "3A: the joiner must be told what to do (94a)",
+  },
+  {
+    name: "M1831 (V155) the address goes up as typed",
+    file: "business.js",
+    from: "      const e = String(v).trim().toLowerCase();",
+    to:   "      const e = String(v).trim();",
+    why:  "1A: the database compares lowercase; the phone sends it so (94c)",
+  },
+  {
+    name: "M1832 (V155) a bad address is sent anyway",
+    file: "business.js",
+    from: "      if (!_BIZ_EMAIL_RE.test(e)) {",
+    to:   "      if (false) {",
+    why:  "1A: checked on the phone first (94c)",
+  },
+  {
+    name: "M1833 (V155) Yes at Join keeps the old main",
+    file: "business.js",
+    from: "onPick: () => businessJoin(id, true) },",
+    to:   "onPick: () => businessJoin(id, false) },",
+    why:  "4A: the joiner's answer is what goes up (94c)",
+  },
+  {
+    name: "M1834 (V155) Join never says whether to make it main",
+    file: "business.js",
+    from: "{ i: id, make_main: main === true }",
+    to:   "{ i: id }",
+    why:  "4A: the answer must reach the database (94c)",
+  },
+  {
+    name: "M1835 (V155) my invites aren't read with the list",
+    file: "business.js",
+    from: ".then(() => businessMyInvitesRead(c, uid).then(() => ok, () => ok));",
+    to:   ".then(() => ok);",
+    why:  "1A: an invite shows on start / return (94c)",
+  },
+  {
+    name: "M1836 (V155) the Business page never reads its people",
+    file: "business.js",
+    from: ".then((ok) => businessTeamRead(c, uid).then(() => ok, () => ok)))   // V155: the people and invites",
+    to:   ".then((ok) => ok))",
+    why:  "6A: the page shows who is in the business (94b)",
+  },
+  {
+    name: "M1837 (V155) anyone gets Change role",
+    file: "business.js",
+    from: "  if (!b || b.role !== 'owner' || !p || p.you || p.role === 'owner') return false;",
+    to:   "  if (!p) return false;",
+    why:  "2A: only the Owner, never their own (94c)",
+  },
+  {
+    name: "M1838 (V155) an answered invite offers Cancel",
+    file: "business.js",
+    from: "    const acts = v.st === 'waiting' && v.cancel ? `",
+    to:   "    const acts = true ? `",
+    why:  "nothing to cancel once answered (94b)",
+  },
+  {
+    name: "M1839 (V155) the main business offers Make main",
+    file: "business.js",
+    from: "${!x.def ? `<button class=\"backup-action-btn\" id=\"biz-main-${i}\"",
+    to:   "${true ? `<button class=\"backup-action-btn\" id=\"biz-main-${i}\"",
+    why:  "4A: Make main only where it would change something (94b)",
+  },
+  {
+    name: "M1840 (V155) the Jobs list loses the invite line",
+    file: "render-core.js",
+    from: "      ${inviteBanner}\n      ${tabs}\n      ${unreadableBanner}",
+    to:   "      ${tabs}\n      ${unreadableBanner}",
+    why:  "1A: the invitee must be told (94b)",
+  },
+  {
+    name: "M1841 (V155) Join isn't wired",
+    file: "dispatch.js",
+    from: "  'biz-join': (arg) => { if (typeof businessJoinStart === 'function') businessJoinStart(arg); },\n",
+    to:   "",
+    why:  "the button must reach the code (94c)",
+  },
+  {
+    name: "M1842 (V155) the address box loses the email keyboard",
+    file: "feedback.js",
+    from: "${opts.inputType === 'email' ? 'type=\"email\"",
+    to:   "${false ? 'type=\"email\"",
+    why:  "1A: the address is typed on a phone (94c)",
+  },
+  {
+    name: "M1843 (V155) the plan record ignores the cover",
+    file: "plan.js",
+    from: "      const cov = (info.cover && typeof info.cover === 'object') ? info.cover : info;",
+    to:   "      const cov = info;",
+    why:  "a paid seat anywhere means never locked (94d)",
+  },
+  {
+    name: "M1844 (V155) a member is never recognised",
+    file: "plan.js",
+    from: "    return !!(d && d.role !== 'owner');",
+    to:   "    return false;",
+    why:  "8A (94d)",
+  },
+  {
+    name: "M1845 (V155) a member's line says Renew",
+    file: "plan.js",
+    from: "  if (planIsMember() && !st.unchecked) {",
+    to:   "  if (false) {",
+    why:  "8A: the owner looks after it (94d)",
+  },
+  {
+    name: "M1846 (V155) a member gets Renew now",
+    file: "plan.js",
+    from: "|| planIsMember())   // V155 (8A): a member checks",
+    to:   "|| false)   // V155 (8A): a member checks",
+    why:  "8A (94d)",
+  },
+  {
+    name: "M1847 (V155) a member gets the Renew sheets",
+    file: "plan.js",
+    from: "    if (planIsMember()) return '';   // V155 (8A)",
+    to:   "    // gone",
+    why:  "8A: the sheets say Renew now (94d)",
+  },
+  {
+    name: "M1848 (V155) a member's Sync page says renew",
+    file: "sync.js",
+    from: "  try { return (typeof planIsMember === 'function' && planIsMember()) ? SYNC_PLAN_PAUSED_MEMBER_WORDS : SYNC_PLAN_PAUSED_WORDS; }",
+    to:   "  try { return SYNC_PLAN_PAUSED_WORDS; }",
+    why:  "8A (94d)",
+  },
+  {
+    name: "M1849 (V155) a new project's offers drift from the migration",
+    file: "supabase/schema.sql",
+    from: "    when 'office' then r = 'engineer'\n",
+    to:   "    when 'office' then r in ('engineer','office')\n",
+    why:  "2A: a new project gets exactly what an existing one does (94f)",
+  },
+  {
+    name: "M1850 (V155) an unconfirmed address may accept",
+    file: "supabase/v155-invites.sql",
+    from: "  where u.id = auth.uid() and u.email_confirmed_at is not null\n",
+    to:   "  where u.id = auth.uid()\n",
+    why:  "1A: an invite is accepted by proving you own the address (94f)",
+  },
+  {
+    name: "M1851 (V155) the cover is pushed into the person's own business",
+    file: "supabase/v155-invites.sql",
+    from: "  if coalesce(current_setting('patgo.plan_copy', true), '') = 'on' then return null; end if;\n",
+    to:   "",
+    why:  "a team's paid plan would make an employee's own business paid (94f)",
+  },
+  {
+    name: "M1852 (V155) the joiner's phones aren't checked",
+    file: "supabase/v155-invites.sql",
+    from: "  if public._user_phones_behind(me) > 0 then raise exception 'patgo_your_phones_behind'; end if;\n",
+    to:   "",
+    why:  "3A (94f)",
+  },
+  {
+    name: "M1853 (V155) every member sees addresses",
+    file: "supabase/v155-invites.sql",
+    from: "         case when public.can_read_org(m.org_id) then u.email end\n",
+    to:   "         u.email\n",
+    why:  "6A (94f)",
+  },
+  {
+    name: "M1854 (V155) joining makes the business main by itself",
+    file: "supabase/v155-invites.sql",
+    from: "  values (v.org_id, me, v.role, false, v.name);",
+    to:   "  values (v.org_id, me, v.role, true, v.name);",
+    why:  "4A: only the joiner's answer changes main (94f)",
+  },
+  {
+    name: "M1855 (V155) a new invite waits for the next paint",
+    file: "business.js",
+    from: "      if (businessMyInvites().map(v => v.id).join(',') !== was) _bizJobsRepaint();\n",
+    to:   "",
+    why:  "the read finishes seconds after the Jobs list is drawn (94b)",
   },
 ];
 
