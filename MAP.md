@@ -281,13 +281,19 @@ is discoverable from the file you happen to be editing.
     `cloudOwnerAllows` is checked by sync.js `syncActive` (no trigger fires) and
     by `_syncRun` against the LIVE session (the account a write is filed under).
     Every sign-in lands through `_cloudSignedIn` → `_cloudOwnerLanding`: no
-    owner → adopted (8A); another account → asked to take over if
+    owner → the sync record's account (`_cloudOwnerFromSyncRecord`, V158), else
+    adopted (8A) — V158: not while ownership is uncertain (`_cloudOwnerUncertain`:
+    V152 kept a copy of an unreadable owner / sync record) with jobs on the phone,
+    and not when the owner can't be SAVED with jobs (memory alone can't protect
+    the next start); `cloudOwnerSet` holds the owner in memory BEFORE saving and
+    `_cloudOwnerRetry` saves it later (cloudOwnerAllows, sign-out); another
+    account → asked to take over if
     `syncOwnerPending(owner)` is 0 (2A, `state.cloud.handover`), else signed
     straight out (1A). ⚠ A NEW THING THAT SYNCS must be counted in sync.js
     `syncOwnerPending`, or a takeover can wipe it unsent (84b). ⚠ A NEW STORAGE
     KEY: `RESET_KEY_PLAN` (rule 17) AND, if it is this phone's own preference
     (doesn't sync), `RESET_HANDOVER_KEEP` — everything else of ours goes at a
-    takeover. Harness 84.
+    takeover. Harness 84, 97 (V158).
 
 30. **A job's business (V149).** A job may carry `businessId` (business.js:
     "For:" on New job, only for someone in 2+ businesses). sync.js sends it as

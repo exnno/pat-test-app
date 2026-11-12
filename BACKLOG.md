@@ -8,6 +8,37 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V158
+V158 = a phone's jobs stay with their account (R68 1A 2A — the second GPT audit, finding 1).
+cloud.js only: owner held in memory before saving (+ `_cloudOwnerRetry`); the sync record's
+account at every landing; uncertain (V152's kept copy, no account) + jobs → nobody; owner
+can't be saved + jobs → sign-in refused. Harness 97 + M1915–M1923; 96e's release checks → 97d.
+**Next (model: Opus):** the rest of the audit, one release each (R68):
+- V159 Office never holds a job (app + SQL): Office businesses out of For: / Make main /
+  Change…; the database re-files an Office member's first upload to their main business (as
+  for a non-member), refuses Make main and `move_job` to an Office business, and drops an
+  approval whose asker is now Office there. 3A: a person changed to Office finishes their
+  started jobs. Word the rule "Office never HOLDS a job" — R69: an assigned job is created in
+  the engineer's name (held by them, owned by the business), so assigning stays possible.
+- V160 Join rechecks the business's phones (`accept_invite` + `org_phones_behind`), joiner's
+  own words, the invite stays waiting.
+- V161 a signed-out device loses cloud access at once: a pre-request check (the token's
+  session must still exist) + the same check on the photo-file rules; the app reads the
+  refusal as "signed out from another device", jobs held (V145). 4A: token stays 1 hour.
+- Then V162 leaving / removing a member (was V158). Office corrections (text fields, finished
+  jobs, "edited by") its own release after V162, before seat billing.
+- Seat billing + the per-business lock (before launch) now also takes audit finding 5:
+  refusals remembered per business, photo files judged by the job's business (not the main
+  one), a mixed-business sync test.
+
+### V158 residuals (known, accepted)
+- Owner held in memory only (full phone, no jobs at sign-in) and jobs then logged and the
+  login lost before there is room: the next start has no owner. Room is needed to save the
+  jobs too, and the stored login (V145 first run) or the sync record name the owner in
+  every other case.
+- Delete in Backup & Restore removes V152's kept copy — the evidence. After that an
+  ownerless phone is treated as never owned (8A). Accepted: Delete is a deliberate tap.
+
 ### Next after V157
 V157 = the Approve / Refuse screen (Peter 11 Nov, R67: 1A 2A 3A 4A 5A, the defaults).
 business.js fifth part (`_bizWait`, memory only; `tell` / `by` on JOB_MOVES_KEY entries).
@@ -142,8 +173,8 @@ release checks → 91e.
   without a name, one item that isn't an object) is still dropped by its reader as before.
 - A very large unreadable value on a nearly full phone can't be copied → the stop screen.
   Save a copy is then the way out; there is no in-app repair.
-- An unreadable owner record (OWNER_KEY) is set aside like anything else, leaving the
-  phone unowned until the next sign-in adopts it — as an unreadable one behaved before.
+- (V158 closed this one: an unreadable owner record no longer leaves the phone for the next
+  sign-in to adopt — the sync record's account, or nobody while there are jobs.)
 - Restoring from the kept copy itself isn't offered (it's unreadable by definition) —
   daily snapshots or a backup are the way back; the copy is for us to look at.
 

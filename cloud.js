@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — cloud.js (cloud sign-in)
- * v85 (September 2026) · V139 (October 2026): password sign-in · V140: Google · V145: one owner per phone
+ * v85 (September 2026) · V139 (October 2026): password sign-in · V140: Google · V145: one owner per phone · V158: an owner never lost
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -106,7 +106,9 @@ function cloudUserId() {
 //   • sync.js _syncRun: the live session's account, the one a write is filed
 //     under, must be the owner — or the run stops before reading or sending.
 // No owner = whoever signs in first adopts the phone (8A), as a free user's work
-// has always carried across. Signing out never clears the owner (3A): the jobs
+// has always carried across — V158: only a phone that never had one. The last
+// synced account is the owner if the record is lost; a phone that had an owner
+// nobody can name, or whose owner can't be saved, hands its jobs to nobody. Signing out never clears the owner (3A): the jobs
 // stay, and another account takes them off only through the handover.
 let _cloudOwnerMemo;   // undefined = not read yet; storage is the truth
 function cloudOwner() {
@@ -117,25 +119,66 @@ function cloudOwner() {
     if (raw && typeof raw === 'object' && typeof raw.id === 'string' && raw.id) {
       o = { id: raw.id, email: typeof raw.email === 'string' ? raw.email : '' };
     }
-  } catch { o = null; }   // unreadable = no owner: the next sign-in stamps it
+  } catch { o = null; }   // unreadable = no owner here; V152 kept a copy, which V158 reads as "uncertain"
   _cloudOwnerMemo = o;
   return o;
 }
+// V158 (R68, audit finding 1): the owner is held in memory BEFORE it is saved,
+// so a save that fails (a full phone) can never leave this page ownerless — that
+// was how a second account could adopt the jobs with no handover. false = held
+// in memory only; _cloudOwnerUnsaved then retries the save at every sync check
+// (cloudOwnerAllows) and sign-out, and the landing refuses a sign-in that would
+// adopt a phone's jobs without a saved owner (2A) — memory alone cannot protect
+// the next start.
+let _cloudOwnerUnsaved = false;
 function cloudOwnerSet(id, email) {
-  _cloudOwnerMemo = undefined;
-  if (!id) { try { localStorage.removeItem(OWNER_KEY); } catch {} return false; }
+  if (!id) { _cloudOwnerMemo = undefined; _cloudOwnerUnsaved = false; try { localStorage.removeItem(OWNER_KEY); } catch {} return false; }
+  _cloudOwnerMemo = { id, email: email || '' };
   try {
     localStorage.setItem(OWNER_KEY, JSON.stringify({ id, email: email || '', at: new Date().toISOString() }));
+    _cloudOwnerUnsaved = false;
     return true;
-  } catch { return false; }   // full: no stamp — the guard then reads "no owner" (8A)
+  } catch { _cloudOwnerUnsaved = true; return false; }   // full: held in memory only
+}
+// V158: a held-in-memory owner is saved as soon as there is room.
+function _cloudOwnerRetry() {
+  if (!_cloudOwnerUnsaved || !_cloudOwnerMemo) return;
+  cloudOwnerSet(_cloudOwnerMemo.id, _cloudOwnerMemo.email);
+}
+// V158: the account this phone last synced as (its sync record) — the owner
+// when the owner record itself is missing or couldn't be read. Read at every
+// sign-in, not only at start (V145's first run), so a phone that was A's stays
+// A's whenever the record survives.
+function _cloudOwnerFromSyncRecord() {
+  let st = null;
+  try { st = JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || 'null'); } catch { st = null; }
+  if (st && typeof st.userId === 'string' && st.userId) { cloudOwnerSet(st.userId, ''); return true; }
+  return false;
+}
+// V158 (1A): the phone HAD an owner but nobody can now say who — the owner
+// record, or the sync record, was unreadable and V152 set it aside (its kept
+// copy is the evidence) and no account could be recovered from either. A phone
+// that never had an owner leaves no such copy: the first sign-in adopts it (8A).
+function _cloudOwnerUncertain() {
+  if (cloudOwner()) return false;
+  try {
+    return localStorage.getItem(UNREADABLE_PREFIX + OWNER_KEY) !== null
+      || localStorage.getItem(UNREADABLE_PREFIX + SYNC_STATE_KEY) !== null;
+  } catch { return true; }   // can't look = can't be sure
+}
+// V158: jobs on this phone — what an adoption would hand to the new account.
+function _cloudPhoneHasJobs() {
+  return !!(state && Array.isArray(state.sessions) && state.sessions.length);
 }
 // May sync run as this account? Only the owner — or anyone on a phone with no
-// owner (it is stamped at the landing; this only covers a stamp that could not
-// be written). An empty id never may.
+// owner (stamped at the landing), except while ownership is uncertain and there
+// are jobs (V158). An empty id never may.
 function cloudOwnerAllows(uid) {
   if (!uid) return false;
+  _cloudOwnerRetry();   // V158
   const o = cloudOwner();
-  return !o || o.id === uid;
+  if (o) return o.id === uid;
+  return !(_cloudOwnerUncertain() && _cloudPhoneHasJobs());   // V158 (1A): nobody, while uncertain
 }
 // The owner in words. A phone stamped from its sync record (V145's first run,
 // signed out) knows the account but not its address.
@@ -190,8 +233,23 @@ function _cloudOwnerLanding(user, email) {
   const uid = (user && typeof user.id === 'string' && user.id) || (stored && stored.id) || '';
   const addr = (user && user.email) || email || '';
   if (!uid) return true;                                  // nothing to judge by: the guards still hold
+  if (!cloudOwner()) _cloudOwnerFromSyncRecord();          // V158: the last synced account first
   const o = cloudOwner();
-  if (!o) { cloudOwnerSet(uid, addr); return true; }      // 8A: adopted
+  if (!o) {
+    // V158 (1A): the phone had an owner nobody can name — its jobs go to no one.
+    if (_cloudPhoneHasJobs() && _cloudOwnerUncertain()) {
+      return _cloudOwnerRefuse('PATGo can\u2019t tell which account this phone\u2019s jobs belong to \u2014 the record of it couldn\u2019t be read. ' +
+        'Your jobs are safe here and you can keep working. To use the cloud on this phone, save a backup, then Reset this phone (Everything, as new).');
+    }
+    // 8A: adopted — but only once the owner is saved (V158, 2A): held in memory
+    // alone, the next start would forget it and another account could adopt.
+    if (!cloudOwnerSet(uid, addr) && _cloudPhoneHasJobs()) {
+      _cloudOwnerMemo = null; _cloudOwnerUnsaved = false;     // the refused account is not kept
+      return _cloudOwnerRefuse('This phone\u2019s storage for PATGo is full, so it can\u2019t record which account its jobs belong to. ' +
+        'Your jobs are safe here and you can keep working. Back up, then clear old jobs to make room, and sign in again.');
+    }
+    return true;
+  }
   if (o.id === uid) {
     if (addr && addr !== o.email) cloudOwnerSet(uid, addr);   // a changed address, or one learned now
     return true;
@@ -202,15 +260,19 @@ function _cloudOwnerLanding(user, email) {
     return false;
   }
   // 1A: refused. Nothing of the owner's has been read, shown or sent as this account.
-  _cloudForgetLogin();
   const who = cloudOwnerName(o);
   const w = p ? cloudPendingWords(p) : null;
-  _cloudSet({ status: 'signed-out', busy: false, plan: null, trialEndsAt: null, checkedAt: null,
-    pwOpen: false, pwReset: false, pwNew: false, welcome: '', signup: false, google: '', handover: null,
-    message: w
+  return _cloudOwnerRefuse(w
       ? `This phone has ${w.what.charAt(0).toLowerCase() + w.what.slice(1)} from ${who} that ${w.have} reached the cloud. ` +
         `Sign in as ${who} to send ${w.them} first — or save a backup, then Reset this phone (Everything, as new).`
-      : `This phone belongs to ${who}. Sign in as ${who} first.` });
+      : `This phone belongs to ${who}. Sign in as ${who} first.`);
+}
+// The landing's refusal (V145 1A; V158's two): signed straight back out, told why.
+function _cloudOwnerRefuse(message) {
+  _cloudForgetLogin();
+  _cloudSet({ status: 'signed-out', busy: false, plan: null, trialEndsAt: null, checkedAt: null,
+    pwOpen: false, pwReset: false, pwNew: false, welcome: '', signup: false, google: '', handover: null,
+    message });
   return false;
 }
 
@@ -256,9 +318,7 @@ function cloudClient() {
 function _cloudOwnerFirstRun(stored) {
   if (cloudOwner()) return;
   if (stored && stored.id) { cloudOwnerSet(stored.id, stored.email || ''); return; }
-  let st = null;
-  try { st = JSON.parse(localStorage.getItem(SYNC_STATE_KEY) || 'null'); } catch { st = null; }
-  if (st && typeof st.userId === 'string' && st.userId) cloudOwnerSet(st.userId, '');
+  _cloudOwnerFromSyncRecord();   // V158: shared with the landing
 }
 
 // ---- boot --------------------------------------------------------------------
@@ -1029,6 +1089,7 @@ function cloudSignOut() {
 function cloudSignOutAsk() {
   if (!cloudAvailable() || state.cloud.busy || state.cloud.status !== 'signed-in') return Promise.resolve(false);
   const uid = cloudUserId();
+  _cloudOwnerRetry();   // V158: a held owner saved before the login goes
   const canSend = !_cloudOffline() && typeof syncPush === 'function' && typeof syncWhenIdle === 'function'
     && typeof syncActive === 'function' && syncActive();
   let send = Promise.resolve();
