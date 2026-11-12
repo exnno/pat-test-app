@@ -65,12 +65,12 @@ function renderSettingsAbout() {
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V157</strong> &middot; November 2026</p>
+        <p class="muted">Approve or refuse job moves: a request to move a job out of your business waits on the Business page for the Owner, a Team leader or the Office, and the person who asked is told how it was decided and by whom.</p>
         <p><strong>V156</strong> &middot; November 2026</p>
         <p class="muted">Your devices: see every phone, tablet or computer signed in to your account and sign out one you don&rsquo;t use. An old device that&rsquo;s signed out no longer holds up invites, and PATGo names the one that does.</p>
         <p><strong>V155</strong> &middot; November 2026</p>
         <p class="muted">Invite people to your business by email address, see who&rsquo;s in it and their roles, and join a business you&rsquo;ve been invited to. While any business you&rsquo;re in covers you, PATGo stays unlocked.</p>
-        <p><strong>V154</strong> &middot; November 2026</p>
-        <p class="muted">Behind the scenes: PATGo now checks what comes in from a backup file or the cloud, and turns away anything it didn&rsquo;t make itself &mdash; so a changed file can&rsquo;t slip anything onto your screen.</p>
 
 
 

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V156)
+# PATGo — Code Map (V157)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1837,7 +1837,7 @@ V148 (4A): `planRecord` falls back to `_planOwnerUid()` — the owner's record w
 `_planSignedOut()` turns the line's button, the Account line and the two sheets' first
 choice into Sign in (`settings-page` → cloudAccount). Harness 87d, M1652–M1655.
 
-### business.js (~1,420 ln) — every job knows its business; V150 moving one; V155 invites + people; V156 devices — NEW V149 — OPTIONAL SUBSYSTEM
+### business.js (~1,580 ln) — every job knows its business; V150 moving one; V155 invites + people; V156 devices; V157 approvals — NEW V149 — OPTIONAL SUBSYSTEM
 The owner's businesses (BUSINESSES_KEY `{u, at, list}`, read via rpc `my_businesses`),
 New job's "For:" (`businessForHTML` / `businessNewJobPick`, LAST_BUSINESS_KEY — 2+ only),
 the compare key (`jobBusinessKey`, rule 30), and the Business page
@@ -1895,6 +1895,19 @@ which names them on `openChoiceSheet` (feedback.js `opts.lines`); unreadable →
 **Coupling:** render-core.js routes `cloudDevices` (unlocked only); session.js setView reads
 on open; render-help.js `renderCloudAccount` draws the button; dispatch.js `dev-refresh` /
 `dev-signout`; styles.css `.dev-*`, `.choice-sheet-lines`. Harness 95a–95f; M1856–M1883.
+V157 (fifth part): the Approve / Refuse screen — memory only (`_bizWait`). `businessRead`
+also reads rpc `business_waiting_moves` (after `my_invites`; a change repaints the Jobs list
+and the Business page). The section sits in each card (`businessWaitingHTML`, approver roles
+only); Jobs list lines `businessWaitingBannerHTML` (approver, See → cloudBusiness) and
+`businessDecidedBannerHTML` (the asker, once — `tell` on JOB_MOVES_KEY entries, set by
+`businessMovesFromRows` when a request this phone knew as waiting comes back moved / refused;
+OK → `businessMovesTold`). Approve / Refuse → `openConfirmSheet` → `_bizCall('decide_job_move')`
+(through `_bizClient`, the minimum version) → re-read. `patgo_move_stale` detail
+'status|name|you' → `businessStaleWords` (via `businessTeamError`). `businessMoveLine` names
+who decided (`by`, from my_job_moves `decided_name`).
+**Coupling:** render-core.js draws `waitBanner` / `decidedBanner` after the invite line;
+dispatch.js `biz-approve` / `biz-refuse` / `biz-told`; styles.css `.biz-wait*`.
+Harness 96a–96f; M1884–M1914.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

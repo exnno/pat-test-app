@@ -4543,6 +4543,13 @@ body.has-selection-bar .cs-screen { padding-bottom: 100px; }
 .biz-person-name { font-weight: 600; }
 .biz-person-email { font-size: 0.8125rem; overflow-wrap: anywhere; }
 .biz-person .link-btn { margin-right: 14px; }
+/* V157 — Waiting for your approval (business.js) */
+.biz-wait { margin-top: 14px; padding-top: 10px; border-top: 1px solid var(--border); }
+.biz-wait-title { margin: 0 0 4px; font-size: 0.8125rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; }
+.biz-wait-row { padding: 8px 0; border-top: 1px solid var(--border); }
+.biz-wait-row:first-of-type { border-top: none; }
+.biz-wait-words { margin: 0; font-size: 0.9375rem; font-weight: 600; overflow-wrap: anywhere; }
+.biz-wait-detail { margin: 2px 0 0; font-size: 0.8125rem; }
 
 /* @@ V156 — devices (business.js) and the lines on a choice sheet (feedback.js) */
 .choice-sheet-lines { margin: 0 0 16px; padding-left: 18px; font-size: 0.875rem; line-height: 1.5; color: var(--text); }

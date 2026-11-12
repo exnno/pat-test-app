@@ -288,8 +288,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Your devices.</strong> Settings &rarr; Account &amp; Sync &rarr; Account &rarr; Your devices: every phone, tablet or computer signed in to your account, with Sign it out for one you don&rsquo;t use any more. Everything on it stays on it.</li>
-        <li><strong>Invites that won&rsquo;t send?</strong> PATGo now names the device with an older PATGo that&rsquo;s holding it up &mdash; and a device that&rsquo;s been signed out no longer counts.</li>
+        <li><strong>Approve or refuse job moves.</strong> When someone asks to move a job out of your business, it waits on the Business page &mdash; and the Jobs list tells you &mdash; for the Owner, a Team leader or the Office to approve or refuse.</li>
+        <li><strong>Asked to move a job?</strong> The Jobs list tells you once it&rsquo;s been decided, and Job settings says who decided it.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -994,6 +994,10 @@ function renderSessions() {
   // V155 (1A): an invite waiting for this account (business.js, optional).
   let inviteBanner = '';
   try { inviteBanner = (typeof businessInviteBannerHTML === 'function') ? businessInviteBannerHTML() : ''; } catch (e) { inviteBanner = ''; }
+  // V157 (1A 4A): moves waiting for this approver; the asker's decided request, once.
+  let waitBanner = '', decidedBanner = '';
+  try { waitBanner = (typeof businessWaitingBannerHTML === 'function') ? businessWaitingBannerHTML() : ''; } catch (e) { waitBanner = ''; }
+  try { decidedBanner = (typeof businessDecidedBannerHTML === 'function') ? businessDecidedBannerHTML() : ''; } catch (e) { decidedBanner = ''; }
 
   // V93 (4A — O9): signed in, the Jobs screen has two tabs. "In the cloud" is
   // how old jobs are reached once a phone only brings down recent ones (R21):
@@ -1030,6 +1034,8 @@ function renderSessions() {
       ${versionBanner}
       ${planBanner}
       ${inviteBanner}
+      ${waitBanner}
+      ${decidedBanner}
       ${tabs}
       ${unreadableBanner}
       ${storageBanner}

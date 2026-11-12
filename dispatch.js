@@ -862,6 +862,10 @@ registerActions({
   'biz-invite-cancel': (arg) => { if (typeof businessInviteCancel === 'function') businessInviteCancel(arg); },
   'biz-join': (arg) => { if (typeof businessJoinStart === 'function') businessJoinStart(arg); },
   'biz-decline': (arg) => { if (typeof businessDecline === 'function') businessDecline(arg); },
+  // V157 — the Approve / Refuse screen (business.js, optional): asked first, then the cloud decides.
+  'biz-approve': (arg) => { if (typeof businessDecideStart === 'function') businessDecideStart(arg, true); },
+  'biz-refuse': (arg) => { if (typeof businessDecideStart === 'function') businessDecideStart(arg, false); },
+  'biz-told': () => { if (typeof businessMovesTold === 'function') businessMovesTold(); },
   'biz-role': (arg) => { if (typeof businessRoleStart === 'function') businessRoleStart(arg); },
   'biz-myname': (arg) => { if (typeof businessMyNameStart === 'function') businessMyNameStart(arg); },
   'biz-main': (arg) => { if (typeof businessMakeMain === 'function') businessMakeMain(arg); },

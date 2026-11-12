@@ -1,4 +1,4 @@
-// ============== PATGo PWA — V156 — Devices that hold up invites ===
+// ============== PATGo PWA — V157 — The Approve / Refuse screen ===
 // (c) 2026 Peter Birchley. All rights reserved.
 //
 // business.js (Stage 16 / Teams v1).
@@ -181,7 +181,8 @@ function businessRead(c, uid) {
       // V150: the moves too — on their own, so a project without the V150 SQL
       // (or a failed read) never stops the list. V155: and the invites to me.
       return businessMovesRead(c, uid).then(() => ok, () => ok)
-        .then(() => businessMyInvitesRead(c, uid).then(() => ok, () => ok));
+        .then(() => businessMyInvitesRead(c, uid).then(() => ok, () => ok))
+        .then(() => businessWaitingRead(c, uid).then(() => ok, () => ok));   // V157 (1A): moves for me to decide
     });
 }
 
@@ -306,6 +307,7 @@ function renderCloudBusiness() {
         ${x.def ? `<p class="muted" id="biz-default-${i}">Your main business — new jobs go here unless you choose another.</p>` : ''}
         ${btn}
         ${!x.def ? `<button class="backup-action-btn" id="biz-main-${i}" data-action="biz-main" data-arg="${escapeHTML(x.id)}" style="margin-top:8px">Make this my main business</button>` : ''}
+        ${businessWaitingHTML(x, i)}
         ${businessPeopleHTML(x, i)}
       </div>`;
     }).join('');
@@ -362,6 +364,8 @@ function businessMovesLoad() {
       fromName: typeof m.fromName === 'string' ? m.fromName.slice(0, 80) : '',
       toName: typeof m.toName === 'string' ? m.toName.slice(0, 80) : '',
       at: typeof m.at === 'string' ? m.at : '',
+      by: typeof m.by === 'string' ? m.by.slice(0, 60) : '',                          // V157 (4A): who decided
+      tell: m.tell === true && (m.st === 'moved' || m.st === 'refused'),             // V157 (4A): not yet told
     });
   }
   return out;
@@ -372,15 +376,24 @@ function businessMovesSave(rec) {
 }
 
 // Rows from my_job_moves (one per job, the latest) → the stored shape.
+// V157 (4A): a request this phone last knew as WAITING that comes back moved or
+// refused is to be told once on the Jobs list (tell) — carried until OK. Only
+// this account's previous record counts (another account's waits say nothing).
 function businessMovesFromRows(uid, rows) {
   if (!Array.isArray(rows)) return null;
+  const prev = businessMovesLoad();
+  const was = new Map(prev.u === uid ? prev.list.map(m => [m.id, m]) : []);
   const list = [];
   for (const r of rows) {
     if (!r || !businessValidId(r.id) || typeof r.session_id !== 'string') continue;
+    const before = was.get(r.id);
+    const decided = r.status === 'moved' || r.status === 'refused';
     list.push({ id: r.id, job: r.session_id, from: r.from_org, to: r.to_org, st: r.status,
       fromName: typeof r.from_name === 'string' ? r.from_name : '',
       toName: typeof r.to_name === 'string' ? r.to_name : '',
-      at: typeof (r.decided_at || r.requested_at) === 'string' ? (r.decided_at || r.requested_at) : '' });
+      at: typeof (r.decided_at || r.requested_at) === 'string' ? (r.decided_at || r.requested_at) : '',
+      by: typeof r.decided_name === 'string' ? r.decided_name : '',
+      tell: !!(decided && before && (before.st === 'waiting' || (before.tell && before.st === r.status))) });
   }
   businessMovesSave({ u: uid, at: Date.now(), list });
   return businessMovesLoad();
@@ -482,8 +495,9 @@ function businessMoveLine(m) {
   if (!m) return '';
   if (m.st === 'waiting') return `Move to ${_bizNameFor(m.to, m.toName)} waiting for approval`;
   const day = _bizDay(m.at);
-  if (m.st === 'moved') return `Moved from ${_bizNameFor(m.from, m.fromName)} to ${_bizNameFor(m.to, m.toName)}${day ? ' · ' + day : ''}`;
-  if (m.st === 'refused') return `Move to ${_bizNameFor(m.to, m.toName)} refused${day ? ' · ' + day : ''}`;
+  const by = m.by ? ` by ${m.by}` : '';   // V157 (4A): who decided, when someone else did
+  if (m.st === 'moved') return `Moved from ${_bizNameFor(m.from, m.fromName)} to ${_bizNameFor(m.to, m.toName)}${m.by ? ' · approved' + by : ''}${day ? ' · ' + day : ''}`;
+  if (m.st === 'refused') return `Move to ${_bizNameFor(m.to, m.toName)} refused${by}${day ? ' · ' + day : ''}`;
   return '';   // cancelled / dropped: nothing to tell
 }
 
@@ -849,6 +863,9 @@ function businessTeamError(err) {
   if (/patgo_invite_name/.test(t)) return 'Add a name — up to 60 letters.';
   if (/patgo_invite_gone/.test(t)) return 'This invite has ended — it was cancelled, answered or is more than 14 days old. Ask for a new one.';
   if (/patgo_not_allowed/.test(t)) return 'That isn’t something your role in this business can do.';
+  if (/patgo_move_stale/.test(t)) return businessStaleWords(err);                                  // V157
+  if (/patgo_move_self/.test(t)) return 'You asked for this move — someone else in the business has to decide it.';
+  if (/patgo_move_role/.test(t)) return 'Only the Owner, a Team leader or the Office can decide this.';
   return 'That didn’t go through — try again with a signal.';
 }
 
@@ -1358,4 +1375,205 @@ function businessHeldUp(err, orgId) {
       return true;
     })
     .catch(() => { plain(); return false; });
+}
+
+// ============================================================================
+// V157 — the Approve / Refuse screen (Teams v1)
+// ============================================================================
+// Locked 11 Nov (Peter, R67 — 1A 2A 3A 4A 5A, the defaults):
+//   1A the Business page: each business card where I'm Owner / Team leader /
+//      Office has "Waiting for your approval"; the Jobs list says how many wait,
+//      with See. Read on every start / return with the businesses (businessRead).
+//   2A each request: who asked, the job (site / name), items, from → to, the day
+//      asked; Approve / Refuse. No look inside the job (a later Teams release).
+//   3A Refuse: asked first, no reason.
+//   4A the asker: Job settings names who decided (businessMoveLine), and the
+//      Jobs list says once that a waiting request was decided (tell, OK).
+//   5A nothing expires.
+// Claude's calls: every approver sees the same list and the first decision wins
+// — a later tap hears how it ended and who (supabase/v157-approvals.sql gives it
+// in the error's detail) and the list is read again; never your own request
+// (the database lists none and refuses it); approval answered 'dropped' → "the
+// job was finished first"; deciding needs a signal and goes through _bizClient
+// (the V151 / V153 minimum-version gate), like every other cloud action.
+// Memory only (_bizWait): the list is the cloud's, read again each start.
+
+let _bizWait = { u: '', list: [] };
+
+// Rows from business_waiting_moves → the phone's shape; bad values made safe.
+function businessWaitingFromRows(uid, rows) {
+  const list = [];
+  for (const r of (Array.isArray(rows) ? rows : [])) {
+    if (!r || !businessValidId(r.id) || !businessValidId(r.business_id) || !businessValidId(r.to_org)) continue;
+    const items = Number(r.items);
+    list.push({ id: r.id, org: r.business_id, to: r.to_org,
+      fromName: _bizStr(r.from_name, 80), toName: _bizStr(r.to_name, 80),
+      who: _bizStr(r.asker, 60), job: _bizStr(r.job, 120),
+      items: Number.isInteger(items) && items >= 0 && items < 100000 ? items : 0,
+      at: _bizStr(r.requested_at, 40) });
+  }
+  _bizWait = { u: uid, list };
+  return _bizWait;
+}
+
+function businessWaiting() {
+  const uid = _bizUid();
+  return uid && _bizWait.u === uid ? _bizWait.list : [];
+}
+
+// A failed read keeps what was known (a project without the V157 SQL: nothing).
+function businessWaitingRead(c, uid) {
+  return Promise.resolve()
+    .then(() => c.rpc('business_waiting_moves'))
+    .then((res) => {
+      if (!res || res.error || !Array.isArray(res.data)) throw (res && res.error) || new Error('no answer');
+      const was = businessWaiting().map(w => w.id).join(',');
+      businessWaitingFromRows(uid, res.data);
+      if (businessWaiting().map(w => w.id).join(',') !== was) { _bizJobsRepaint(); _bizRepaint(); }
+      return true;
+    });
+}
+
+function _bizWaitDay(iso) { const ms = Date.parse(String(iso || '').replace(/(\.\d{3})\d+/, '$1')); return isFinite(ms) ? _bizDay(ms) : ''; }
+function _bizWaitJob(w) { return w.job ? `“${w.job}”` : 'a job'; }
+
+// What a request says (2A): "Dave Smith wants to move “Tesco – Lincoln” to Smith Electrical".
+function businessWaitingWords(w) {
+  return `${w.who || 'Someone'} wants to move ${_bizWaitJob(w)} to ${_bizNameFor(w.to, w.toName)}`;
+}
+function businessWaitingDetail(w) {
+  const day = _bizWaitDay(w.at);
+  return `${w.items === 1 ? '1 item' : w.items + ' items'}${day ? ' · asked ' + day : ''}`;
+}
+
+// The section inside a business's card (1A) — approvers only, and only when waiting.
+function businessWaitingHTML(b, i) {
+  if (!b || !/^(owner|team_leader|office)$/.test(b.role)) return '';
+  const list = businessWaiting().filter(w => w.org === b.id);
+  if (!list.length) return '';
+  return `
+        <div class="biz-wait" id="biz-wait-${i}">
+          <h4 class="biz-wait-title" id="biz-wait-title-${i}">Waiting for your approval</h4>
+          ${list.map((w, k) => `
+          <div class="biz-wait-row" id="biz-wait-${i}-${k}">
+            <p class="biz-wait-words" id="biz-wait-words-${i}-${k}">${escapeHTML(businessWaitingWords(w))}</p>
+            <p class="muted biz-wait-detail" id="biz-wait-detail-${i}-${k}">${escapeHTML(businessWaitingDetail(w))}</p>
+            <div style="display:flex;gap:8px;margin-top:6px">
+              <button class="btn-primary" id="biz-approve-${i}-${k}" data-action="biz-approve" data-arg="${escapeHTML(w.id)}" style="flex:1">Approve</button>
+              <button class="btn-secondary" id="biz-refuse-${i}-${k}" data-action="biz-refuse" data-arg="${escapeHTML(w.id)}" style="flex:1">Refuse</button>
+            </div>
+          </div>`).join('')}
+        </div>`;
+}
+
+// The Jobs list line for an approver (1A).
+function businessWaitingBannerHTML() {
+  const n = businessWaiting().length;
+  if (!n) return '';
+  const text = n === 1 ? 'A job move is waiting for your approval.' : `${n} job moves are waiting for your approval.`;
+  return `
+    <div class="backup-banner plan-banner" id="wait-banner" role="status">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text" id="wait-banner-text">${escapeHTML(text)}</div>
+        <div class="backup-banner-actions">
+          <button class="backup-banner-action primary" id="wait-banner-open" data-action="settings-page" data-arg="cloudBusiness">See</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Approve / Refuse: asked first (3A for Refuse; Approve too — a job leaves the business).
+function businessDecideStart(id, approve) {
+  const w = businessWaiting().find(x => x.id === id);
+  if (!w || !businessValidId(id)) return false;
+  const from = _bizNameFor(w.org, w.fromName), to = _bizNameFor(w.to, w.toName);
+  const who = w.who || 'The person who asked';
+  openConfirmSheet(approve ? {
+    title: 'Approve this move?',
+    message: `${_bizWaitJob(w).replace(/^a /, 'A ')} moves from ${from} to ${to}, with its photos. ${who} carries on with it there.`,
+    confirmLabel: 'Approve', cancelLabel: 'Not now', danger: false,
+    onConfirm: () => { businessDecideGo(id, true); },
+  } : {
+    title: 'Refuse this move?',
+    message: `${_bizWaitJob(w).replace(/^a /, 'A ')} stays in ${from}. ${who} sees that it was refused.`,
+    confirmLabel: 'Refuse', cancelLabel: 'Not now',
+    onConfirm: () => { businessDecideGo(id, false); },
+  });
+  return true;
+}
+
+function businessDecideGo(id, approve) {
+  const w = businessWaiting().find(x => x.id === id) || null;
+  return _bizCall('decide_job_move', { move: id, approve: !!approve }, 'You need a signal to decide a move.')
+    .then((out) => {
+      if (out === 'moved') showToast(`Approved — the job has moved to ${w ? _bizNameFor(w.to, w.toName) : 'the other business'}`);
+      else if (out === 'refused') showToast('Refused — the job stays where it is');
+      else if (out === 'dropped') openInfoSheet({ title: 'Not moved', message: 'The job was finished first, so it stays put. Nothing more to do.' });
+      return out;
+    })
+    .then((out) => businessWaitingRefresh().then(() => out, () => out));
+}
+
+// The list read again (after a decision, or a refusal that it was already decided).
+function businessWaitingRefresh() {
+  const uid = _bizUid();
+  if (!uid || _bizOffline()) return Promise.resolve(false);
+  return _bizClient()
+    .then((c) => businessWaitingRead(c, uid))
+    .catch(() => false)
+    .then((ok) => { _bizRepaint(); return ok; });
+}
+
+// A second approver (Claude's call): "Already refused by Sarah" — the detail is
+// 'status|name|you' (supabase/v157-approvals.sql); two at once: no detail.
+function businessStaleWords(err) {
+  const d = String((err && err.details) || '').split('|');
+  const st = d[0], name = (d[1] || '').trim(), you = d[2] === 'you';
+  const by = you ? ' by you' : (name ? ` by ${name}` : '');
+  if (st === 'moved') return `Already approved${by} — the job has moved.`;
+  if (st === 'refused') return `Already refused${by}.`;
+  if (st === 'cancelled') return `${name || 'The person who asked'} took the request back.`;
+  if (st === 'dropped') return 'The job was finished first, so it stays put.';
+  return 'Someone has already decided this one.';
+}
+
+// The asker's line, once (4A): a waiting request of mine was decided.
+function businessDecidedBannerHTML() {
+  const uid = _bizUid();
+  const rec = businessMovesLoad();
+  if (!uid || rec.u !== uid) return '';
+  const list = rec.list.filter(m => m.tell);
+  if (!list.length) return '';
+  let text;
+  if (list.length === 1) {
+    const m = list[0];
+    const s = (state.sessions || []).find(x => x && String(x.id) === m.job);
+    const title = s ? String(s.site || s.name || '').trim() : '';
+    const what = title ? `Your move of “${title}”` : 'Your job move';
+    text = m.st === 'moved'
+      ? `${what} to ${_bizNameFor(m.to, m.toName)} was approved${m.by ? ' by ' + m.by : ''}.`
+      : `${what} to ${_bizNameFor(m.to, m.toName)} was refused${m.by ? ' by ' + m.by : ''} — it stays in ${_bizNameFor(m.from, m.fromName)}.`;
+  } else {
+    text = `${list.length} of your job moves have been decided — Job settings on each job says how.`;
+  }
+  return `
+    <div class="backup-banner plan-banner" id="decided-banner" role="status">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text" id="decided-banner-text">${escapeHTML(text)}</div>
+        <div class="backup-banner-actions">
+          <button class="backup-banner-action primary" id="decided-banner-ok" data-action="biz-told">OK</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+function businessMovesTold() {
+  const rec = businessMovesLoad();
+  let any = false;
+  for (const m of rec.list) if (m.tell) { m.tell = false; any = true; }
+  if (any) businessMovesSave(rec);
+  render();
+  return any;
 }

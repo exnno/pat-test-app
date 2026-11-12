@@ -8,6 +8,27 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V157
+V157 = the Approve / Refuse screen (Peter 11 Nov, R67: 1A 2A 3A 4A 5A, the defaults).
+business.js fifth part (`_bizWait`, memory only; `tell` / `by` on JOB_MOVES_KEY entries).
+SQL supabase/v157-approvals.sql (+ schema.sql): `business_waiting_moves`, `my_job_moves`
+remade with `decided_name`, `decide_job_move` gives a finished request's detail. Isolation
+25a–25e. Harness 96 + M1884–M1914; 95e's release checks → 96e.
+**Next (model: Opus — database rules):** V158 leaving / removing a member (R5: the jobs stay
+with the business, the login stays; what the leaver's phone does with its copies — and a
+leaver's waiting move requests). Seat billing + the per-business lock — its own release
+before launch. O11 unchanged.
+
+### V157 residuals (known, accepted)
+- Two approvers tapping at the same moment: the second gets "Someone has already decided
+  this one." without a name (V150's row lock answers before V157's check can).
+- The asker's Jobs line only appears for a request this phone saw waiting. A request decided
+  before the phone ever read it (e.g. asked on another phone) shows on Job settings only.
+- The approvals list is read on start / return and on the Business page, not live: a
+  request made while the app is open shows at the next return or Check again.
+- A job deleted from the cloud while waiting still lists (no site words); approving it says
+  it stays put (V150 drops it).
+
 ### Next after V156
 V156 = devices that hold up invites (Peter 11 Nov, "defaults", R66: 1A only signed-in devices
 count; 2A the refusal names them, Sign out for your own; 3A Account → Your devices).
