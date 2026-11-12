@@ -11,6 +11,10 @@
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
+-- V159: CHECKS 26a–26e NEED supabase/v159-office.sql RUN FIRST (26a names it
+-- if not). B is put into A's business as Office and tries to start a job there,
+-- move one in and make it main; then B is taken out and B's test job removed.
+-- B's main business is checked unchanged. Nothing is left behind.
 -- V157: CHECKS 25a–25e NEED supabase/v157-approvals.sql RUN FIRST (25a names
 -- it if not). B is put into A's business as Engineer with a test job there and
 -- asks to move it out; A sees it and refuses; then B is taken out and the job and
@@ -1324,6 +1328,53 @@ begin
     select count(*) into n from public.memberships where org_id = org_a and user_id = b;
     select count(*) into k from public.job_moves where session_id like 'iso-test-%';
     res := res || array['25e|B out of A''s business; nothing left behind|' || case when n = 0 and k = 0 then 'PASS|' else 'FAIL|' || n || ' membership, ' || k || ' records left' end];
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
+  -- ------------------------------------------------- V159: Office never holds a job (26a–26e)
+  if not exists (select 1 from pg_proc p join pg_namespace x on x.oid = p.pronamespace
+                 where x.nspname = 'public' and p.proname = 'move_job' and p.prosrc like '%patgo_move_office%') then
+    res := res || array['26a|Office never holds a job|FAIL|run supabase/v159-office.sql first'];
+  else
+    org_a := public.default_org(a);
+    org_b := public.default_org(b);
+    insert into public.memberships (org_id, user_id, role) values (org_a, b, 'office')
+    on conflict (org_id, user_id) do update set role = excluded.role;
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    -- 26a: B (Office in A's business) sends a new job naming A's business — it lands in B's own.
+    begin
+      insert into public.sessions (id, user_id, doc, last_modified, org_id)
+      values ('iso-test-v159-1', b, '{"site":"Isolation test","items":[{"id":1}]}', now(), org_a);
+      execute 'reset role';
+      select count(*) into n from public.sessions where id = 'iso-test-v159-1' and user_id = b and org_id = org_b;
+      res := res || array['26a|B (Office in A''s business) starts a job naming it; it lands in B''s own|' || case when n = 1 then 'PASS|' else 'FAIL|not in B''s own business' end];
+    exception when others then
+      execute 'reset role';
+      res := res || array['26a|B (Office in A''s business) starts a job naming it; it lands in B''s own|FAIL|' || sqlerrm];
+    end;
+    -- 26b: B can't move it into A's business.
+    execute 'set local role authenticated';
+    begin msg := public.move_job('iso-test-v159-1', org_a); exception when others then msg := sqlerrm; end;
+    execute 'reset role';
+    select count(*) into n from public.sessions where id = 'iso-test-v159-1' and org_id = org_a;
+    res := res || array['26b|B can''t move a job into A''s business|' || case when msg like 'patgo_move_office%' and n = 0 then 'PASS|' else 'FAIL|' || coalesce(msg, '?') end];
+    -- 26c: B can't make A's business main; B's main is unchanged.
+    execute 'set local role authenticated';
+    begin perform public.set_main_business(org_a); msg := 'allowed'; exception when others then msg := sqlerrm; end;
+    execute 'reset role';
+    res := res || array['26c|B can''t make A''s business main; B''s main unchanged|' || case when msg = 'patgo_main_office' and public.default_org(b) = org_b then 'PASS|' else 'FAIL|' || coalesce(msg, '?') end];
+    -- 26d: phones can't reach the main-business helper.
+    execute 'set local role authenticated';
+    begin perform public._main_off_office(b); msg := 'answered'; exception when others then msg := 'refused'; end;
+    execute 'reset role';
+    res := res || array['26d|the main-business helper is closed to phones|' || case when msg = 'refused' then 'PASS|' else 'FAIL|answered' end];
+    -- 26e: put back.
+    delete from public.sessions where id = 'iso-test-v159-1' and user_id = b;
+    delete from public.memberships where org_id = org_a and user_id = b;
+    select count(*) into n from public.memberships where org_id = org_a and user_id = b;
+    select count(*) into k from public.sessions where id = 'iso-test-v159-1';
+    res := res || array['26e|B out of A''s business; nothing left behind|' || case when n = 0 and k = 0 and public.default_org(b) = org_b then 'PASS|' else 'FAIL|' || n || ' membership, ' || k || ' jobs left' end];
   end if;
   perform set_config('request.jwt.claims', '', true);
 
