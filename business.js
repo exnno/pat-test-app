@@ -1,4 +1,4 @@
-// ============== PATGo PWA — V159 — Office never holds a job ===
+// ============== PATGo PWA — V160 — Join rechecks the business's phones ===
 // (c) 2026 Peter Birchley. All rights reserved.
 //
 // business.js (Stage 16 / Teams v1).
@@ -894,6 +894,7 @@ function _bizOrg(id) { return businessList().find(x => x.id === id) || null; }
 function businessTeamError(err) {
   const t = [err && err.message, err && err.hint, err && err.details].map(x => String(x || '')).join(' ');
   if (/patgo_phones_behind/.test(t)) return 'A phone in this business has an older PATGo. Everyone in the business needs to open PATGo with a signal so it updates — then try again.';
+  if (/patgo_team_phones_behind/.test(t)) return 'A phone in that business has an older PATGo, so you can’t join just yet. Ask them to open PATGo with a signal so it updates, then tap Join again. Your invite is still waiting.';   // V160
   if (/patgo_your_phones_behind/.test(t)) return 'A phone you’ve signed in on has an older PATGo, or hasn’t synced since you signed in. Open PATGo on each of your phones with a signal so it updates, wait a minute, then tap Join again.';
   if (/patgo_invite_member/.test(t)) return 'They’re already in this business.';
   if (/patgo_invite_waiting/.test(t)) return 'They already have an invite waiting — share it again, or cancel it first.';
@@ -921,6 +922,12 @@ function _bizCall(name, args, needSignal) {
       return res.data === undefined ? true : (res.data === null ? true : res.data);
     }))
     .catch((e) => {
+      // V160 (2A): Join refused for the business's phones — the business named,
+      // never its devices or people (the joiner isn't in it yet). Invite waits.
+      if (name === 'accept_invite' && _bizTeamBehind(e)) {
+        openInfoSheet({ title: 'Not joined yet', message: businessJoinTeamBehindWords(args && args.i) });
+        return null;
+      }
       // V156 (2A): an older device holding it up — name it, with Sign it out.
       if (_bizHeldUp(e) && typeof businessHeldUp === 'function') {
         return businessHeldUp(e, name === 'invite_member' && args ? args.o : '').then(() => null, () => null);
@@ -1065,6 +1072,21 @@ function businessJoinStart(id) {
     ],
   });
   return true;
+}
+
+// V160 (1A 2A): the database checks the joiner's own phones first (the V156
+// sheet), then every phone in the business — this refusal. Said with the
+// business's name only; the invite stays waiting, so Join can be tapped again.
+function _bizTeamBehind(err) {
+  const t = [err && err.message, err && err.hint, err && err.details].map(x => String(x || '')).join(' ');
+  return /patgo_team_phones_behind/.test(t);
+}
+
+function businessJoinTeamBehindWords(id) {
+  const v = businessMyInvites().find(x => x.id === id);
+  const org = v && v.orgName ? v.orgName : 'that business';
+  return `A phone in ${org} has an older PATGo, so you can’t join just yet. `
+    + 'Ask them to open PATGo with a signal so it updates, then tap Join again. Your invite is still waiting.';
 }
 
 function businessJoin(id, main) {

@@ -8,6 +8,26 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V160
+V160 = Join rechecks the business's phones (R68 finding 4; round 1A–4A, the defaults). SQL
+supabase/v160-join.sql (accept_invite; + schema.sql's last section). business.js (`_bizCall`
+branch, `_bizTeamBehind`, `businessJoinTeamBehindWords`, a `businessTeamError` line).
+Isolation 27a–27c. Harness 99 + M1938–M1950; 98f's release checks → 99f.
+**Next (model: Opus — database rules / security):** V161 a signed-out device loses cloud
+access at once (4A: token stays 1 h), V162 leaving / removing. Then Office corrections,
+seat billing + per-business lock (with audit finding 5).
+
+### V160 residuals (known, accepted)
+- The check holds at the moment of joining only: a teammate can sign in an old phone a
+  minute later. The lasting protection is V161 plus the minimum version (V151).
+- The joiner isn't told which device or whose — by design (2A). The Owner finds it on a
+  refused invite or Account → Your devices.
+- Nothing is recorded for the business when a Join is held up (3A).
+- A V159 phone that gets this refusal shows the generic "didn't go through" words — only
+  test phones are affected, and they update to V160.
+- Re-running v155-invites.sql or v159-office.sql puts the older Join back: run
+  v160-join.sql again after.
+
 ### Next after V159
 V159 = Office never holds a job (R68 3A, R69; round 1A–4A, the defaults). business.js
 (`businessHoldable`, `businessNewJobChoices`, `businessMoveTargets`, `businessForCopy`, the

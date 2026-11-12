@@ -1,4 +1,4 @@
-# PATGo — Code Map (V159)
+# PATGo — Code Map (V160)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1922,6 +1922,11 @@ a job → `businessForCopy` (session.js split + `_dupJobBuild`). Office card lin
 question); Change role to Office → `businessRoleOfficeAsk` → `businessRoleSet`. The database
 enforces it all: supabase/v159-office.sql (org_stamp re-files, move_job / decide, Join,
 Change role, Make main). Harness 98a–98f; M1924–M1937.
+V160: Join rechecks the business's phones (database: supabase/v160-join.sql — accept_invite,
+own phones then org_phones_behind → `patgo_team_phones_behind`). `_bizCall` sends that code
+on accept_invite to an info sheet (`_bizTeamBehind`, `businessJoinTeamBehindWords` — the
+business named, no device read); `_bizHeldUp` (V156's device sheet) never matches it.
+Harness 99a–99f; M1938–M1950.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This
