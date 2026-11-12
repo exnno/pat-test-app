@@ -517,7 +517,7 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V157';",   // V157: re-pointed. V156: re-pointed
+    from: "const APP_VERSION = 'V158';",   // V158: re-pointed. V157: re-pointed. V156: re-pointed
     to:   "const APP_VERSION = 'V154';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
@@ -640,7 +640,7 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V155</strong> &middot; November 2026</p>',   // V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
+    from: '        <p><strong>V156</strong> &middot; November 2026</p>',   // V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 95e)',
   },
@@ -8636,7 +8636,7 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Approve or refuse job moves: a request to move a job out of your business waits",   // V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
+    from: "A phone&rsquo;s jobs stay with the account they belong to, even when the phone is full",   // V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
     to:   "Better",
     why:  "the About page must say what changed in this version (96e)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
   },
@@ -8753,7 +8753,7 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Invite people to your business by email address, see who&rsquo;s in it",   // V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
+    from: "Your devices: see every phone, tablet or computer signed in to your account",   // V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
     to:   "Better",
     why:  "the About page keeps the last three versions' lines (96e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
@@ -8915,7 +8915,7 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Your devices: see every phone, tablet or computer signed in to your account",   // V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
+    from: "Approve or refuse job moves: a request to move a job out of your business waits",   // V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
     to:   "Better",
     why:  "the About page keeps the last three versions' lines (96e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
   },
@@ -9044,8 +9044,8 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v157';",   // V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v156';",
+    from: "const CACHE_VERSION = 'pat-v158';",   // V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v157';",
     why:  "a release needs its cache bump or phones never get it (96e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
@@ -10854,14 +10854,14 @@ const MUTATIONS = [
   {
     name: "M1533 (V145) cloudOwnerAllows lets any account",
     file: "cloud.js",
-    from: "  return !o || o.id === uid;",
-    to:   "  return true;",
+    from: "  if (o) return o.id === uid;",   // V158: re-anchored (the line became two)
+    to:   "  if (o) return true;",
     why:  "1A: the phone's owner is the only account that may sync it (84a)",
   },
   {
     name: "M1534 (V145) first run ignores the account the phone last synced to",
     file: "cloud.js",
-    from: "  if (st && typeof st.userId === 'string' && st.userId) cloudOwnerSet(st.userId, '');",
+    from: "  if (st && typeof st.userId === 'string' && st.userId) { cloudOwnerSet(st.userId, ''); return true; }",   // V158: re-anchored (moved to _cloudOwnerFromSyncRecord)
     to:   "",
     why:  "a phone signed out before V145 would be adopted by whoever signs in next, with the last account's jobs on it (84a)",
   },
@@ -10875,8 +10875,8 @@ const MUTATIONS = [
   {
     name: "M1536 (V145) the landing adopts a phone that already has an owner",
     file: "cloud.js",
-    from: "  if (!o) { cloudOwnerSet(uid, addr); return true; }      // 8A: adopted",
-    to:   "  { cloudOwnerSet(uid, addr); return true; }      // 8A: adopted",
+    from: "  const o = cloudOwner();\n  if (!o) {\n    // V158 (1A)",   // V158: re-anchored (the adoption became a block)
+    to:   "  const o = cloudOwner();\n  if (true) {\n    // V158 (1A)",
     why:  "1A: THE bug — another account signs in and the owner's jobs go up as its own (84c)",
   },
   {
@@ -10889,8 +10889,8 @@ const MUTATIONS = [
   {
     name: "M1538 (V145) a refused login is left on the phone",
     file: "cloud.js",
-    from: "  // 1A: refused. Nothing of the owner's has been read, shown or sent as this account.\n  _cloudForgetLogin();",
-    to:   "  // 1A: refused. Nothing of the owner's has been read, shown or sent as this account.",
+    from: "function _cloudOwnerRefuse(message) {\n  _cloudForgetLogin();",   // V158: re-anchored (the refusal is shared)
+    to:   "function _cloudOwnerRefuse(message) {",
     why:  "1A: signed straight back out — the login must not stay behind (84c)",
   },
   {
@@ -13529,6 +13529,70 @@ const MUTATIONS = [
     from: "    res := res || array['25e|",
     to:   "    res := res || array['2Xe|",
     why:  "isolation 25a\u201325e (96f)",
+  },
+  // ---- V158 (R68 1A 2A): a phone's jobs stay with their account (audit 2, finding 1). Group 97 + M1915–M1923. ----
+  {
+    name: "M1915 (V158) the owner isn't held in memory before the save",
+    file: "cloud.js",
+    from: "  _cloudOwnerMemo = { id, email: email || '' };\n  try {",
+    to:   "  _cloudOwnerMemo = undefined;\n  try {",
+    why:  "a failed save left the page ownerless — the audit's A → B (97a)",
+  },
+  {
+    name: "M1916 (V158) the sync check never retries a held owner's save",
+    file: "cloud.js",
+    from: "  _cloudOwnerRetry();   // V158\n",
+    to:   "",
+    why:  "memory alone can't protect the next start (97a)",
+  },
+  {
+    name: "M1917 (V158) sign-out doesn't save a held owner first",
+    file: "cloud.js",
+    from: "  _cloudOwnerRetry();   // V158: a held owner saved before the login goes\n",
+    to:   "",
+    why:  "signed out with the owner only in memory, the next start forgets it (97a)",
+  },
+  {
+    name: "M1918 (V158) the landing doesn't read the sync record",
+    file: "cloud.js",
+    from: "  if (!cloudOwner()) _cloudOwnerFromSyncRecord();          // V158: the last synced account first\n",
+    to:   "",
+    why:  "an owner record lost after start: the last synced account is still the owner (97c)",
+  },
+  {
+    name: "M1919 (V158) a kept copy isn't read as evidence of an owner",
+    file: "cloud.js",
+    from: "  if (cloudOwner()) return false;\n  try {\n    return localStorage.getItem(UNREADABLE_PREFIX + OWNER_KEY) !== null",
+    to:   "  if (true) return false;\n  try {\n    return localStorage.getItem(UNREADABLE_PREFIX + OWNER_KEY) !== null",
+    why:  "1A: a phone that had an owner nobody can name is not 'never owned' (97c)",
+  },
+  {
+    name: "M1920 (V158) the landing adopts while ownership is uncertain",
+    file: "cloud.js",
+    from: "    if (_cloudPhoneHasJobs() && _cloudOwnerUncertain()) {",
+    to:   "    if (false) {",
+    why:  "1A: nobody adopts the jobs (97c)",
+  },
+  {
+    name: "M1921 (V158) the sync guard lets anyone sync while uncertain",
+    file: "cloud.js",
+    from: "  return !(_cloudOwnerUncertain() && _cloudPhoneHasJobs());   // V158 (1A): nobody, while uncertain",
+    to:   "  return true;",
+    why:  "1A: the sync guard is the second wall (97c)",
+  },
+  {
+    name: "M1922 (V158) a sign-in is adopted though the owner can't be saved",
+    file: "cloud.js",
+    from: "    if (!cloudOwnerSet(uid, addr) && _cloudPhoneHasJobs()) {",
+    to:   "    if (!cloudOwnerSet(uid, addr) && false) {",
+    why:  "2A: refused — memory alone can't protect the next start (97b)",
+  },
+  {
+    name: "M1923 (V158) the refused account is kept as the owner in memory",
+    file: "cloud.js",
+    from: "      _cloudOwnerMemo = null; _cloudOwnerUnsaved = false;     // the refused account is not kept\n",
+    to:   "",
+    why:  "2A: a refused account must not own the page (97b)",
   },
 ];
 
