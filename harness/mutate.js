@@ -517,7 +517,7 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V156';",   // V156: re-pointed
+    from: "const APP_VERSION = 'V157';",   // V157: re-pointed. V156: re-pointed
     to:   "const APP_VERSION = 'V154';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
@@ -640,7 +640,7 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V154</strong> &middot; November 2026</p>',   // V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
+    from: '        <p><strong>V155</strong> &middot; November 2026</p>',   // V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 95e)',
   },
@@ -6122,9 +6122,9 @@ const MUTATIONS = [
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
     // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
-    from: "<li><strong>Your devices.</strong>",   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
+    from: "<li><strong>Approve or refuse job moves.</strong>",   // V157: welcome rolled (two lines) — re-aimed at the first; 96e pins it.   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (95e)",
+    why:  "11A: the welcome says plainly what changed on screen (96e)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -7736,8 +7736,8 @@ const MUTATIONS = [
   {
     name: "M1091 (V127) the Jobs list loses the plan line",
     file: "render-core.js",
-    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${inviteBanner}\n      ${tabs}",   // V151: re-anchored (the version line above it). V152: (the unreadable banner below). V155: (the invite line below)
-    to:   "      ${header}\n      ${versionBanner}\n      ${inviteBanner}\n      ${tabs}",
+    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${inviteBanner}\n      ${waitBanner}",   // V157: re-anchored (the approval lines below)   // V151: re-anchored (the version line above it). V152: (the unreadable banner below). V155: (the invite line below)
+    to:   "      ${header}\n      ${versionBanner}\n      ${inviteBanner}\n      ${waitBanner}",
     why:  "4A 6b: the countdown is on the Jobs list (65e)",
   },
   {
@@ -8604,9 +8604,9 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V156';",   // V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
-    to:   "const WELCOME_VERSION = 'V155';",
-    why:  "What's new is rolled on a feature release (95e)",
+    from: "const WELCOME_VERSION = 'V157';",   // V157: re-aimed. V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
+    to:   "const WELCOME_VERSION = 'V156';",
+    why:  "What's new is rolled on a feature release (96e)",
   },
   {
     name: "M1222 (V132) the What's new sheet gains a second line",
@@ -8620,9 +8620,9 @@ const MUTATIONS = [
     // V149: one line — re-aimed at its end.
     // V150: one line — re-aimed at its end.
     // V155: two lines — re-aimed at the second's end; still caught by the count.
-    from: "a device that&rsquo;s been signed out no longer counts.</li>\n",   // V156: two lines — re-aimed at the second's end; still caught by the count.
-    to:   "a device that&rsquo;s been signed out no longer counts.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "two lines (95e)",
+    from: "and Job settings says who decided it.</li>\n",   // V157: two lines — re-aimed at the second's end; still caught by the count. V156: two lines — re-aimed at the second's end; still caught by the count.
+    to:   "and Job settings says who decided it.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "two lines (96e)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8636,9 +8636,9 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Your devices: see every phone, tablet or computer signed in to your account",   // V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
+    from: "Approve or refuse job moves: a request to move a job out of your business waits",   // V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
     to:   "Better",
-    why:  "the About page must say what changed in this version (95e)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
+    why:  "the About page must say what changed in this version (96e)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8753,9 +8753,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Behind the scenes: PATGo now checks what comes in from a backup file",   // V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
+    from: "Invite people to your business by email address, see who&rsquo;s in it",   // V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (95e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
+    why:  "the About page keeps the last three versions' lines (96e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8915,9 +8915,9 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Invite people to your business by email address, see who&rsquo;s in it",   // V156: at V155's, still in the window. V155: at V154's.
+    from: "Your devices: see every phone, tablet or computer signed in to your account",   // V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (95e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
+    why:  "the About page keeps the last three versions' lines (96e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9044,9 +9044,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v156';",   // V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v155';",
-    why:  "a release needs its cache bump or phones never get it (95e)",
+    from: "const CACHE_VERSION = 'pat-v157';",   // V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v156';",
+    why:  "a release needs its cache bump or phones never get it (96e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -12175,7 +12175,7 @@ const MUTATIONS = [
   {
     name: "M1722 (V150) a refusal isn't said",
     file: "business.js",
-    from: "  if (m.st === 'refused') return `Move to ${_bizNameFor(m.to, m.toName)} refused${day ? ' · ' + day : ''}`;\n",
+    from: "  if (m.st === 'refused') return `Move to ${_bizNameFor(m.to, m.toName)} refused${by}${day ? ' · ' + day : ''}`;\n",   // V157: re-anchored (who decided)
     to:   "",
     why:  "the engineer never learns the request was refused (89a)",
   },
@@ -12389,8 +12389,8 @@ const MUTATIONS = [
   {
     name: "M1752 (V151) the Jobs list loses the version line",
     file: "render-core.js",
-    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${inviteBanner}\n      ${tabs}\n      ${unreadableBanner}",   // V152: re-anchored (the unreadable banner below). V155: (the invite line)
-    to:   "      ${header}\n      ${planBanner}\n      ${inviteBanner}\n      ${tabs}\n      ${unreadableBanner}",
+    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${tabs}\n      ${unreadableBanner}",   // V157: re-anchored (the approval lines)   // V152: re-anchored (the unreadable banner below). V155: (the invite line)
+    to:   "      ${header}\n      ${planBanner}\n      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${tabs}\n      ${unreadableBanner}",
     why:  "syncing stops with nothing on the Jobs list to say why (90c)",
   },
   {
@@ -12973,8 +12973,8 @@ const MUTATIONS = [
   {
     name: "M1835 (V155) my invites aren't read with the list",
     file: "business.js",
-    from: ".then(() => businessMyInvitesRead(c, uid).then(() => ok, () => ok));",
-    to:   ".then(() => ok);",
+    from: ".then(() => businessMyInvitesRead(c, uid).then(() => ok, () => ok))\n",   // V157: re-anchored (the waiting list read after it)
+    to:   ".then(() => ok)\n",
     why:  "1A: an invite shows on start / return (94c)",
   },
   {
@@ -13008,8 +13008,8 @@ const MUTATIONS = [
   {
     name: "M1840 (V155) the Jobs list loses the invite line",
     file: "render-core.js",
-    from: "      ${inviteBanner}\n      ${tabs}\n      ${unreadableBanner}",
-    to:   "      ${tabs}\n      ${unreadableBanner}",
+    from: "      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${tabs}",   // V157: re-anchored (the approval lines)
+    to:   "      ${waitBanner}\n      ${decidedBanner}\n      ${tabs}",
     why:  "1A: the invitee must be told (94b)",
   },
   {
@@ -13311,6 +13311,224 @@ const MUTATIONS = [
     from: "           case when mm.user_id = me then d.session_id end as session_id,",
     to:   "           d.session_id as session_id,",
     why:  "2A: a teammate's named only (95f)",
+  },
+  // ---- V157 (R67, 1A 2A 3A 4A 5A — the defaults): the Approve / Refuse screen. Group 96 + M1884–M1914. ----
+  {
+    name: "M1884 (V157) a waiting row keeps an id PATGo can't trust",
+    file: "business.js",
+    from: "    if (!r || !businessValidId(r.id) || !businessValidId(r.business_id) || !businessValidId(r.to_org)) continue;\n    const items",
+    to:   "    if (!r || !businessValidId(r.business_id) || !businessValidId(r.to_org)) continue;\n    const items",
+    why:  "bad values from the cloud are dropped (96a)",
+  },
+  {
+    name: "M1885 (V157) a waiting row's item count is taken as sent",
+    file: "business.js",
+    from: "items: Number.isInteger(items) && items >= 0 && items < 100000 ? items : 0,",
+    to:   "items: r.items,",
+    why:  "2A: a count that isn't a whole number is 0 (96a)",
+  },
+  {
+    name: "M1886 (V157) a request with no name says nothing about who asked",
+    file: "business.js",
+    from: "  return `${w.who || 'Someone'} wants to move",
+    to:   "  return `${w.who} wants to move",
+    why:  "2A: no name, still words (96a 96b)",
+  },
+  {
+    name: "M1887 (V157) an Engineer's card shows the approvals",
+    file: "business.js",
+    from: "  if (!b || !/^(owner|team_leader|office)$/.test(b.role)) return '';\n  const list = businessWaiting()",
+    to:   "  if (!b || !/^(owner|team_leader|office|engineer)$/.test(b.role)) return '';\n  const list = businessWaiting()",
+    why:  "1A: approvers only (96b)",
+  },
+  {
+    name: "M1888 (V157) every business's requests in every card",
+    file: "business.js",
+    from: "  const list = businessWaiting().filter(w => w.org === b.id);",
+    to:   "  const list = businessWaiting();",
+    why:  "1A: each in its own business's card (96b)",
+  },
+  {
+    name: "M1889 (V157) the Business page loses the approvals",
+    file: "business.js",
+    from: "        ${businessWaitingHTML(x, i)}\n",
+    to:   "",
+    why:  "1A: Waiting for your approval (96b)",
+  },
+  {
+    name: "M1890 (V157) the Jobs list loses the approvals line",
+    file: "render-core.js",
+    from: "  try { waitBanner = (typeof businessWaitingBannerHTML === 'function') ? businessWaitingBannerHTML() : ''; } catch (e) { waitBanner = ''; }",
+    to:   "  waitBanner = '';",
+    why:  "1A: the Jobs list says how many wait (96b)",
+  },
+  {
+    name: "M1891 (V157) the approvals aren't read with the businesses",
+    file: "business.js",
+    from: "        .then(() => businessWaitingRead(c, uid).then(() => ok, () => ok));",
+    to:   "        .then(() => ok);",
+    why:  "1A: read on every start / return (96b 96c)",
+  },
+  {
+    name: "M1892 (V157) Approve decides without asking",
+    file: "dispatch.js",
+    from: "businessDecideStart(arg, true); },",
+    to:   "businessDecideGo(arg, true); },",
+    why:  "Approve is asked first (96c)",
+  },
+  {
+    name: "M1893 (V157) Refuse approves",
+    file: "business.js",
+    from: "    onConfirm: () => { businessDecideGo(id, false); },",
+    to:   "    onConfirm: () => { businessDecideGo(id, true); },",
+    why:  "3A: Refuse refuses (96c)",
+  },
+  {
+    name: "M1894 (V157) Refuse decides without asking",
+    file: "dispatch.js",
+    from: "businessDecideStart(arg, false); },",
+    to:   "businessDecideGo(arg, false); },",
+    why:  "3A: asked first (96c)",
+  },
+  {
+    name: "M1895 (V157) the list isn't read again after deciding",
+    file: "business.js",
+    from: "    .then((out) => businessWaitingRefresh().then(() => out, () => out));",
+    to:   "    .then((out) => out);",
+    why:  "the decided request leaves the list (96c)",
+  },
+  {
+    name: "M1896 (V157) a job finished first isn't said",
+    file: "business.js",
+    from: "      else if (out === 'dropped') openInfoSheet(",
+    to:   "      else if (out === 'never') openInfoSheet(",
+    why:  "the approver hears it stayed put (96c)",
+  },
+  {
+    name: "M1897 (V157) a second approver isn't told who decided",
+    file: "business.js",
+    from: "  const by = you ? ' by you' : (name ? ` by ${name}` : '');",
+    to:   "  const by = '';",
+    why:  "Claude's call: \"Already refused by Sarah\" (96a 96c)",
+  },
+  {
+    name: "M1898 (V157) the cloud's 'already decided' goes unexplained",
+    file: "business.js",
+    from: "  if (/patgo_move_stale/.test(t)) return businessStaleWords(err);",
+    to:   "  if (/patgo_move_stale_never/.test(t)) return businessStaleWords(err);",
+    why:  "Claude's call: a second approver hears how it ended (96a 96c)",
+  },
+  {
+    name: "M1899 (V157) the asker is never told",
+    file: "business.js",
+    from: "      tell: !!(decided && before && (before.st === 'waiting' || (before.tell && before.st === r.status))) });",
+    to:   "      tell: false });",
+    why:  "4A: told once on the Jobs list (96a 96d)",
+  },
+  {
+    name: "M1900 (V157) the asker is told about a request this phone never saw waiting",
+    file: "business.js",
+    from: "tell: !!(decided && before && (",
+    to:   "tell: !!(decided && (!before || ",
+    why:  "4A: only a request this phone knew as waiting (96a)",
+  },
+  {
+    name: "M1901 (V157) another account's waiting request counts",
+    file: "business.js",
+    from: "  const was = new Map(prev.u === uid ? prev.list.map(m => [m.id, m]) : []);",
+    to:   "  const was = new Map(prev.list.map(m => [m.id, m]));",
+    why:  "4A: this account's record only (96a)",
+  },
+  {
+    name: "M1902 (V157) OK doesn't stick",
+    file: "business.js",
+    from: "  if (any) businessMovesSave(rec);\n  render();",
+    to:   "  render();",
+    why:  "4A: once \u2014 OK clears it for good (96d)",
+  },
+  {
+    name: "M1903 (V157) a stored request keeps 'tell' while waiting",
+    file: "business.js",
+    from: "      tell: m.tell === true && (m.st === 'moved' || m.st === 'refused'),",
+    to:   "      tell: m.tell === true,",
+    why:  "4A: tell only on a decided one (96a)",
+  },
+  {
+    name: "M1904 (V157) who decided isn't kept",
+    file: "business.js",
+    from: "      by: typeof r.decided_name === 'string' ? r.decided_name : '',",
+    to:   "      by: '',",
+    why:  "4A: Job settings names who decided (96a 96d)",
+  },
+  {
+    name: "M1905 (V157) Job settings doesn't name who decided",
+    file: "business.js",
+    from: "  const by = m.by ? ` by ${m.by}` : '';",
+    to:   "  const by = '';",
+    why:  "4A: \"refused by Sarah\" (96a 96d)",
+  },
+  {
+    name: "M1906 (V157) the Jobs list loses the asker's line",
+    file: "render-core.js",
+    from: "  try { decidedBanner = (typeof businessDecidedBannerHTML === 'function') ? businessDecidedBannerHTML() : ''; } catch (e) { decidedBanner = ''; }",
+    to:   "  decidedBanner = '';",
+    why:  "4A: the asker is told (96d)",
+  },
+  {
+    name: "M1907 (V157) the approval's toast is lost",
+    file: "business.js",
+    from: "      if (out === 'moved') showToast(",
+    to:   "      if (out === 'never') showToast(",
+    why:  "the approver hears it moved (96c)",
+  },
+  {
+    name: "M1908 (V157) one waiting request counted as many",
+    file: "business.js",
+    from: "  const text = n === 1 ? 'A job move is waiting for your approval.' : `${n} job moves are waiting for your approval.`;",
+    to:   "  const text = `${n} job moves are waiting for your approval.`;",
+    why:  "plain words for one (96b)",
+  },
+  {
+    name: "M1909 (V157) the approvals list holds the asker's own",
+    file: "supabase/v157-approvals.sql",
+    from: "    and m.requested_by is distinct from auth.uid()\n    and m.user_id is distinct from auth.uid()\n",
+    to:   "",
+    why:  "never your own (96f)",
+  },
+  {
+    name: "M1910 (V157) Engineers get the approvals list",
+    file: "supabase/v157-approvals.sql",
+    from: "    and coalesce(public.member_role(m.from_org, auth.uid()) in ('owner','team_leader','office'), false)\n  order by",
+    to:   "    and coalesce(public.member_role(m.from_org, auth.uid()) is not null, false)\n  order by",
+    why:  "1A: approvers of the business it leaves only (96f)",
+  },
+  {
+    name: "M1911 (V157) anyone hears who decided",
+    file: "supabase/v157-approvals.sql",
+    from: "     and coalesce(public.member_role(m.from_org, me) in ('owner','team_leader','office'), false) then",
+    to:   "     then",
+    why:  "the detail is for that business's approvers only (96f)",
+  },
+  {
+    name: "M1912 (V157) a move of your own names you as the decider",
+    file: "supabase/v157-approvals.sql",
+    from: "         case when m.status in ('moved','refused') and m.decided_by is distinct from m.requested_by",
+    to:   "         case when m.status in ('moved','refused')",
+    why:  "4A: someone else's decision only (96f)",
+  },
+  {
+    name: "M1913 (V157) a new project misses my_job_moves' new shape",
+    file: "supabase/schema.sql",
+    from: "drop function if exists public.my_job_moves();\ncreate function public.my_job_moves()",
+    to:   "create function public.my_job_moves()",
+    why:  "schema.sql carries V157 byte for byte (96f)",
+  },
+  {
+    name: "M1914 (V157) isolation loses the put-back check",
+    file: "supabase/isolation-test.sql",
+    from: "    res := res || array['25e|",
+    to:   "    res := res || array['2Xe|",
+    why:  "isolation 25a\u201325e (96f)",
   },
 ];
 
