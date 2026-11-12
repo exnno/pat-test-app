@@ -340,6 +340,7 @@ module.exports = async function () {
     t.includes(sh, 'Now: Engineer.', 'Change role: says the role now');
     t.excludes(sh, '>Engineer — logs', '…offers the others');
     app.doc.getElementById('choice-sheet-1').click();   // office (team_leader, office)
+    app.doc.getElementById('confirm-sheet-yes').click();   // V159 (4A): Office is asked first
     await until(() => app.srv.rpcs('set_member_role').length > 0);
     t.deepEq(app.srv.rpcs('set_member_role')[0].body, { o: OWN, u: DAVE, r: 'office' }, 'set_member_role');
     t.eq(app.run(`businessRoleStart('${OWN}:${UID}')`), false, 'never your own');

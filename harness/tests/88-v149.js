@@ -355,7 +355,7 @@ module.exports = async function () {
     // Duplicate: the copy is the team's.
     const src = read('session.js');
     const dup = src.slice(src.indexOf('function _dupJobBuild('), src.indexOf('normaliseSessionRetest(job);', src.indexOf('function _dupJobBuild(')));
-    t.includes(dup, 'if (src.businessId) job.businessId = src.businessId;', 'duplicate: the copy keeps the business');
+    t.includes(dup, "businessForCopy(src.businessId) : (src.businessId || '');\n  if (biz) job.businessId = biz;", 'duplicate: the copy keeps the business (V159: through businessForCopy)');
     const copy = app.fn('_dupJobBuild')({ client: 'Team', client0: 'Team', site: '', site0: '', date: team.date, engineer: 'Pat', name: '', prefix: '', instrumentId: '' },
       JSON.parse(JSON.stringify(team)), 'dup-1', []);
     t.eq(copy.businessId, TEAM, 'duplicate: built for the same business');

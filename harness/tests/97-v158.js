@@ -15,8 +15,7 @@
           adopts; with a readable sync record that account is the owner; the
           landing reads the sync record itself; a never-owned phone still adopted
           (8A); the restart.
-     97d  release: V158; cache pat-v158; What's new NOT rolled (a fix release);
-          About V158 / V157 / V156.
+     97d  V158's About line; cloud.js header (V159: the release checks → 98d).
 
    ⚠ WHAT THIS FILE CANNOT PROVE: a real iPhone's storage filling up (Safari's
    quota). The post-commit checklist covers what can be checked by hand. */
@@ -328,19 +327,10 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 97d */
-  await t.group('97d — release: V158; cache pat-v158; What’s new not rolled; About V158 / V157 / V156', () => {
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V158', 'APP_VERSION V158');
-    t.eq(rel.run('WELCOME_VERSION'), 'V157', 'What’s new NOT rolled (a fix release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v158';", 'cache key pat-v158');
-    t.eq(rel.fn('updateVersionLabel')('pat-v158'), 'V158', 'the update banner reads the key as V158');
+  // V159: the release checks moved to 98d; this keeps V158's own About line.
+  await t.group('97d — V158’s About line; cloud.js header', () => {
     const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V158</strong>'), y = help.indexOf('<p><strong>V157</strong>'), z = help.indexOf('<p><strong>V156</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V158, V157, V156');
-    t.excludes(help, '<p><strong>V155</strong>', 'V155 rolled off');
     t.includes(help, 'A phone&rsquo;s jobs stay with the account they belong to, even when the phone is full', 'About: V158’s line');
-    t.includes(help, 'Approve or refuse job moves: a request to move a job out of your business waits', 'About: V157’s line still there');
-    t.includes(help, 'Your devices: see every phone, tablet or computer signed in to your account', 'About: V156’s line still there');
     t.includes(read('cloud.js'), 'V158: an owner never lost', 'cloud.js header names V158');
   });
 };
