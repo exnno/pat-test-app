@@ -281,6 +281,10 @@ $$;
 
 -- The phone's view: the latest move or request for each of MY jobs, with both
 -- businesses' names (a business I've since left still has its name here).
+-- V157: dropped first — V157 widens it (decided_name), and Postgres won't change a
+-- function's columns in place, so a re-run would otherwise stop here. Re-running
+-- this puts V150's shape back: run supabase/v157-approvals.sql again after.
+drop function if exists public.my_job_moves();
 create or replace function public.my_job_moves()
 returns table (id uuid, session_id text, from_org uuid, from_name text, to_org uuid, to_name text,
                status text, requested_at timestamptz, decided_at timestamptz)

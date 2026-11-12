@@ -11,6 +11,10 @@
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
+-- V157: CHECKS 25a–25e NEED supabase/v157-approvals.sql RUN FIRST (25a names
+-- it if not). B is put into A's business as Engineer with a test job there and
+-- asks to move it out; A sees it and refuses; then B is taken out and the job and
+-- its record removed. Nothing is left behind.
 -- V156: CHECKS 24a–24e NEED supabase/v156-devices.sql RUN FIRST (24a names it
 -- if not). A pretend sign-in of A's is added for the test and removed (24e);
 -- B only tries.
@@ -71,6 +75,7 @@ declare
   min0 int; ovr0 bigint; got_min int;              -- V151
   inv uuid; inv2 uuid; def_b uuid; plan_b text; skip155 text;   -- V155
   dev_a uuid; devs_a uuid[];                        -- V156
+  mv157 uuid; det157 text;                          -- V157
 begin
   select id into a from auth.users where lower(email) = lower(email_a);
   select id into b from auth.users where lower(email) = lower(email_b);
@@ -1244,6 +1249,81 @@ begin
     delete from auth.sessions where user_agent = 'patgo-iso-test-156';
     res := res || array['24e|the test sign-in is gone; nothing left behind|'
       || case when not exists (select 1 from auth.sessions where user_agent = 'patgo-iso-test-156') then 'PASS|' else 'FAIL|' end];
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
+  -- ------------------------------------------------- V157: approvals (25a–25e)
+  if to_regprocedure('public.business_waiting_moves()') is null then
+    res := res || array['25a|approvals|FAIL|run supabase/v157-approvals.sql first'];
+  else
+    org_a := public.default_org(a);
+    org_b := public.default_org(b);
+    delete from public.job_moves where session_id like 'iso-test-%';
+    insert into public.memberships (org_id, user_id, role) values (org_a, b, 'engineer')
+    on conflict (org_id, user_id) do update set role = excluded.role;
+    insert into public.sessions (id, user_id, doc, last_modified, org_id)
+    values ('iso-test-v157-1', b, '{"site":"Isolation test","items":[{"id":1}]}', now(), org_a);
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      msg := public.move_job('iso-test-v157-1', org_b);
+      -- 25a: B (the asker, an Engineer in A's business) sees no request to decide — not even B's own.
+      select count(*) into n from public.business_waiting_moves() w where w.job = 'Isolation test';
+      execute 'reset role';
+      select x.id into mv157 from public.job_moves x where x.session_id = 'iso-test-v157-1' and x.status = 'waiting';
+      res := res || array['25a|B asks to move B''s job out of A''s business; B''s approvals list doesn''t have it|' || case when msg = 'waiting' and n = 0 and mv157 is not null then 'PASS|' else 'FAIL|' || coalesce(msg, '?') || ', ' || n || ' seen' end];
+    exception when others then
+      execute 'reset role';
+      res := res || array['25a|B asks to move B''s job out of A''s business; B''s approvals list doesn''t have it|FAIL|' || sqlerrm];
+    end;
+    -- 25b: A (the Owner) sees it, with the job's words.
+    perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    select count(*) into n from public.business_waiting_moves() w where w.id = mv157 and w.job = 'Isolation test' and w.items = 1 and w.to_org = org_b;
+    execute 'reset role';
+    res := res || array['25b|A (Owner) sees B''s request to decide|' || case when n = 1 then 'PASS|' else 'FAIL|' || n || ' seen' end];
+    -- 25c: B can't decide it; A refuses it; B's own record says refused; asked
+    -- again, A hears it was A.
+    k := 0;
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin perform public.decide_job_move(mv157, true); k := k + 1; exception when others then null; end;
+    execute 'reset role';
+    perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      g := public.decide_job_move(mv157, false);
+      begin perform public.decide_job_move(mv157, true); det157 := 'answered'; exception when others then
+        get stacked diagnostics det157 = pg_exception_detail; end;
+      execute 'reset role';
+    exception when others then
+      execute 'reset role';
+      g := sqlerrm;
+    end;
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    select x.status into rn from public.my_job_moves() x where x.session_id = 'iso-test-v157-1';
+    execute 'reset role';
+    select count(*) into n from public.sessions where id = 'iso-test-v157-1' and org_id = org_a;
+    res := res || array['25c|B can''t decide B''s own; A refuses; B''s record says so; asked again, it was A|'
+      || case when k = 0 and g = 'refused' and rn = 'refused' and n = 1 and det157 like 'refused|%|you' then 'PASS|'
+              else 'FAIL|' || k || ' allowed, ' || coalesce(g, '?') || ', ' || coalesce(rn, '?') || ', ' || coalesce(det157, '?') end];
+    -- 25d: signed out, nothing.
+    perform set_config('request.jwt.claims', '', true);
+    execute 'set local role anon';
+    k := 0;
+    begin perform public.business_waiting_moves(); exception when others then k := k + 1; end;
+    begin perform public.my_job_moves(); exception when others then k := k + 1; end;
+    begin perform public.decide_job_move(mv157, true); exception when others then k := k + 1; end;
+    execute 'reset role';
+    res := res || array['25d|signed out: no approvals list, no record, no deciding|' || case when k = 3 then 'PASS|3 refused' else 'FAIL|' || (3 - k) || ' answered' end];
+    -- 25e: put back.
+    delete from public.job_moves where session_id like 'iso-test-%';
+    delete from public.sessions where id = 'iso-test-v157-1' and user_id = b;
+    delete from public.memberships where org_id = org_a and user_id = b;
+    select count(*) into n from public.memberships where org_id = org_a and user_id = b;
+    select count(*) into k from public.job_moves where session_id like 'iso-test-%';
+    res := res || array['25e|B out of A''s business; nothing left behind|' || case when n = 0 and k = 0 then 'PASS|' else 'FAIL|' || n || ' membership, ' || k || ' records left' end];
   end if;
   perform set_config('request.jwt.claims', '', true);
 

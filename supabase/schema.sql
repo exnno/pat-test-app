@@ -1515,6 +1515,10 @@ $$;
 
 -- The phone's view: the latest move or request for each of MY jobs, with both
 -- businesses' names (a business I've since left still has its name here).
+-- V157: dropped first — V157 widens it (decided_name), and Postgres won't change a
+-- function's columns in place, so a re-run would otherwise stop here. Re-running
+-- this puts V150's shape back: run supabase/v157-approvals.sql again after.
+drop function if exists public.my_job_moves();
 create or replace function public.my_job_moves()
 returns table (id uuid, session_id text, from_org uuid, from_name text, to_org uuid, to_name text,
                status text, requested_at timestamptz, decided_at timestamptz)
@@ -2232,3 +2236,89 @@ revoke all on function public.sign_out_device(uuid) from public, anon;
 grant execute on function public.my_devices() to authenticated;
 grant execute on function public.business_devices_behind(uuid) to authenticated;
 grant execute on function public.sign_out_device(uuid) to authenticated;
+
+
+-- ================================================================ V157
+-- The Approve / Refuse screen (Teams v1 — Peter, 11 Nov: R67, 1A 2A 3A 4A 5A).
+-- Existing projects: supabase/v157-approvals.sql (plus self-checks W1–W3).
+-- Kept in step with it byte for byte by harness group 96f.
+
+-- The requests waiting for me (1A 2A). Mine never: the asker can't decide their
+-- own (V150 refuses it too), and a job's owner is always its asker.
+create or replace function public.business_waiting_moves()
+returns table (id uuid, business_id uuid, from_name text, to_org uuid, to_name text,
+               asker text, job text, items integer, job_date text, requested_at timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select m.id, m.from_org, f.name, m.to_org, t.name,
+         coalesce(nullif(btrim(am.name), ''), ''),
+         left(coalesce(nullif(btrim(s.doc ->> 'site'), ''), nullif(btrim(s.doc ->> 'name'), ''), ''), 120),
+         case when jsonb_typeof(s.doc -> 'items') = 'array' then jsonb_array_length(s.doc -> 'items') else 0 end,
+         left(coalesce(s.doc ->> 'date', ''), 10),
+         m.requested_at
+  from public.job_moves m
+  join public.organisations f on f.id = m.from_org
+  join public.organisations t on t.id = m.to_org
+  left join public.memberships am on am.org_id = m.from_org and am.user_id = m.requested_by
+  left join public.sessions s on s.user_id = m.user_id and s.id = m.session_id
+  where m.status = 'waiting'
+    and m.requested_by is distinct from auth.uid()
+    and m.user_id is distinct from auth.uid()
+    and coalesce(public.member_role(m.from_org, auth.uid()) in ('owner','team_leader','office'), false)
+  order by m.from_org, m.requested_at, m.id
+$$;
+
+-- V150's view, plus who decided (4A): their name in the business the job was
+-- leaving, '' for a move the asker made themselves (out of a business they own),
+-- a cancel, or someone since gone from it. The return shape grows, so it is
+-- dropped and made again (the grants with it).
+drop function if exists public.my_job_moves();
+create function public.my_job_moves()
+returns table (id uuid, session_id text, from_org uuid, from_name text, to_org uuid, to_name text,
+               status text, requested_at timestamptz, decided_at timestamptz, decided_name text)
+language sql stable security definer set search_path = '' as $$
+  select distinct on (m.session_id)
+         m.id, m.session_id, m.from_org, f.name, m.to_org, t.name, m.status, m.requested_at, m.decided_at,
+         case when m.status in ('moved','refused') and m.decided_by is distinct from m.requested_by
+              then coalesce(nullif(btrim(dm.name), ''), '') else '' end
+  from public.job_moves m
+  join public.organisations f on f.id = m.from_org
+  join public.organisations t on t.id = m.to_org
+  left join public.memberships dm on dm.org_id = m.from_org and dm.user_id = m.decided_by
+  where m.user_id = auth.uid()
+  order by m.session_id, m.requested_at desc, m.id
+$$;
+
+-- Approve / refuse, as the signed-in person — V150's, plus: a request that's no
+-- longer waiting, asked by someone who may decide it, says how it ended in the
+-- error's detail ('status|name|you'), so the phone can say "Already refused by
+-- Sarah". Two approvers at the same moment: the second waits on V150's row lock
+-- and gets V150's plain 'patgo_move_stale' (no detail) — the phone says
+-- "already decided" without a name.
+create or replace function public.decide_job_move(move uuid, approve boolean)
+returns text language plpgsql security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  m record;
+  who text;
+begin
+  if me is null then
+    raise exception 'patgo_move_role: sign in first' using errcode = '42501';
+  end if;
+  select x.status, x.from_org, x.decided_by into m from public.job_moves x where x.id = move;
+  if found and m.status <> 'waiting'
+     and coalesce(public.member_role(m.from_org, me) in ('owner','team_leader','office'), false) then
+    select coalesce(nullif(btrim(d.name), ''), '') into who
+    from public.memberships d where d.org_id = m.from_org and d.user_id = m.decided_by;
+    raise exception 'patgo_move_stale: that request is no longer waiting' using errcode = 'P0002',
+      detail = m.status || '|' || coalesce(who, '') || '|' || case when m.decided_by = me then 'you' else '' end;
+  end if;
+  return public._job_move_decide(move, approve, me);
+end;
+$$;
+
+revoke all on function public.business_waiting_moves() from public, anon;
+revoke all on function public.my_job_moves() from public, anon;
+revoke all on function public.decide_job_move(uuid, boolean) from public, anon;
+grant execute on function public.business_waiting_moves() to authenticated;
+grant execute on function public.my_job_moves() to authenticated;
+grant execute on function public.decide_job_move(uuid, boolean) to authenticated;
