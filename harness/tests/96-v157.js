@@ -379,11 +379,8 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 96e */
-  await t.group('96e — release: V157; cache pat-v157; What’s new rolled; About V157 / V156 / V155', () => {
+  await t.group('96e — V157’s What’s new and About lines (its release checks → 97e at V158)', () => {
     const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V157', 'APP_VERSION V157');
-    t.eq(rel.run('WELCOME_VERSION'), 'V157', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v157';", 'cache key pat-v157');
     t.eq(rel.fn('updateVersionLabel')('pat-v157'), 'V157', 'the update banner reads the key as V157');
     const core = read('render-core.js');
     const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
@@ -393,12 +390,7 @@ module.exports = async function () {
     t.includes(sheetCopy, 'for the Owner, a Team leader or the Office to approve or refuse.</li>', '…who decides');
     t.includes(sheetCopy, 'and Job settings says who decided it.</li>', '…the asker is told');
     const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V157</strong>'), y = help.indexOf('<p><strong>V156</strong>'), z = help.indexOf('<p><strong>V155</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V157, V156, V155');
-    t.excludes(help, '<p><strong>V154</strong>', 'V154 rolled off');
     t.includes(help, 'Approve or refuse job moves: a request to move a job out of your business waits', 'About: V157’s line');
-    t.includes(help, 'Your devices: see every phone, tablet or computer signed in to your account', 'About: V156’s line still there');
-    t.includes(help, 'Invite people to your business by email address, see who&rsquo;s in it', 'About: V155’s line still there');
   });
 
   /* ------------------------------------------------------------------ 96f */
