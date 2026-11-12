@@ -21,8 +21,7 @@
           business_devices_behind for that business — yours with Sign out, a
           teammate's named only; a Join reads my_devices and lists only those
           behind; a list that can't be read falls back to V155's words.
-     95e  Release: V156; cache pat-v156; What's new rolled (two lines); About
-          V156 / V155 / V154.
+     95e  Carried: the update banner reads pat-v156 (release checks → 96e).
      95f  The SQL's text: schema.sql carries v156-devices.sql's block byte for
           byte; only signed-in devices; never another's sign-in or this one;
           the kinds as the app has them; isolation 24a–24e.
@@ -306,26 +305,10 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 95e */
-  await t.group('95e — release: V156; cache pat-v156; What’s new rolled; About V156 / V155 / V154', () => {
+  await t.group('95e — V156 carried (release checks → 96e)', () => {
     const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V156', 'APP_VERSION V156');
-    t.eq(rel.run('WELCOME_VERSION'), 'V156', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v156';", 'cache key pat-v156');
-    t.eq(rel.fn('updateVersionLabel')('pat-v156'), 'V156', 'the update banner reads the key as V156');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 2, 'What’s new: two lines');
-    t.includes(sheetCopy, '<li><strong>Your devices.</strong>', '…Your devices');
-    t.includes(sheetCopy, 'Everything on it stays on it.</li>', '…nothing lost');
-    t.includes(sheetCopy, 'a device that&rsquo;s been signed out no longer counts.</li>', '…invites that won’t send');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V156</strong>'), y = help.indexOf('<p><strong>V155</strong>'), z = help.indexOf('<p><strong>V154</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V156, V155, V154');
-    t.excludes(help, '<p><strong>V153</strong>', 'V153 rolled off');
-    t.includes(help, 'Your devices: see every phone, tablet or computer signed in to your account', 'About: V156’s line');
-    t.includes(help, 'Invite people to your business by email address, see who&rsquo;s in it', 'About: V155’s line still there');
-    t.includes(help, 'Behind the scenes: PATGo now checks what comes in from a backup file', 'About: V154’s line still there');
+    t.eq(rel.fn('updateVersionLabel')('pat-v156'), 'V156', 'the update banner reads pat-v156 as V156');
+    t.eq(rel.fn('updateVersionLabel')('pat-v156-1'), 'V156.1', '…and a hotfix key as V156.1');
   });
 
   /* ------------------------------------------------------------------ 95f */
