@@ -21,8 +21,7 @@
           database's two new refusals in words.
      98e  the SQL's text: schema.sql carries v159-office.sql's block byte for
           byte; the six rules; the fix-up; isolation 26a–26e.
-     98f  release: V159; cache pat-v159; What's new NOT rolled (a fix release);
-          About V159 / V158 / V157.
+     98f  V159's About line (V160 moved the release checks to 99f).
 
    ⚠ WHAT THIS FILE CANNOT PROVE: that the database files, refuses and drops
    what it should. That is supabase/v159-office.sql's own checks (O1–O4) and
@@ -346,7 +345,8 @@ module.exports = async function () {
       mig.indexOf('-- ================================================================ self-checks')).trimEnd();
     t.ok(block.length > 3000, 'the migration has its definitions');
     t.includes(read('supabase/schema.sql'), block, 'a new project gets them byte for byte (schema.sql)');
-    t.ok(read('supabase/schema.sql').trimEnd().endsWith(block), '…as the last section (it overrides the earlier definitions)');
+    const sch = read('supabase/schema.sql');
+    t.ok(sch.indexOf(block) < sch.indexOf('-- ================================================================ V160'), '…after the earlier sections, before V160’s (which redefines only Join)');
     t.includes(block, "    if new.org_id is not null and tg_table_name in ('sessions', 'photos')\n       and public.member_role(new.org_id, new.user_id) = 'office' then\n      new.org_id := null;", '1A: a new job or photo naming an Office business is filed as naming none');
     t.ok(block.indexOf("= 'office' then\n      new.org_id := null;") < block.indexOf("if new.org_id is null and tg_table_name = 'photos' then"), '…before a photo looks up its job');
     t.includes(block, "  if r_to = 'office' then\n    raise exception 'patgo_move_office:", 'move_job: never into an Office business');
@@ -364,19 +364,8 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 98f */
-  await t.group('98f — release: V159; cache pat-v159; What’s new not rolled; About V159 / V158 / V157', () => {
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V159', 'APP_VERSION V159');
-    t.eq(rel.run('WELCOME_VERSION'), 'V157', 'What’s new NOT rolled (a fix release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v159';", 'cache key pat-v159');
-    t.eq(rel.fn('updateVersionLabel')('pat-v159'), 'V159', 'the update banner reads the key as V159');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V159</strong>'), y = help.indexOf('<p><strong>V158</strong>'), z = help.indexOf('<p><strong>V157</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V159, V158, V157');
-    t.excludes(help, '<p><strong>V156</strong>', 'V156 rolled off');
-    t.includes(help, 'Office sees and approves but never holds a job', 'About: V159’s line');
-    t.includes(help, 'A phone&rsquo;s jobs stay with the account they belong to', 'About: V158’s line still there');
-    t.includes(help, 'Approve or refuse job moves: a request to move a job out of your business waits', 'About: V157’s line still there');
-    t.includes(read('business.js'), '// ============== PATGo PWA — V159 — Office never holds a job ===', 'business.js header names V159');
+  // V160: the release checks moved to 99f; V159's About line stays pinned here.
+  await t.group('98f — V159’s About line', () => {
+    t.includes(read('render-help.js'), 'Office sees and approves but never holds a job: an Office business isn&rsquo;t offered for new jobs', 'About: V159’s line');
   });
 };

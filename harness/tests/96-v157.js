@@ -389,8 +389,7 @@ module.exports = async function () {
     t.includes(sheetCopy, '<li><strong>Approve or refuse job moves.</strong>', '…approving');
     t.includes(sheetCopy, 'for the Owner, a Team leader or the Office to approve or refuse.</li>', '…who decides');
     t.includes(sheetCopy, 'and Job settings says who decided it.</li>', '…the asker is told');
-    const help = read('render-help.js');
-    t.includes(help, 'Approve or refuse job moves: a request to move a job out of your business waits', 'About: V157’s line');
+    // V160: V157's About line rolled off (99f checks it's gone).
   });
 
   /* ------------------------------------------------------------------ 96f */

@@ -181,7 +181,8 @@ module.exports = async function () {
     t.eq(b.storage.getItem('pat:minVersion'), null, '…and nothing is kept');
 
     // Known too old, then the read fails: still stopped.
-    const c = await signedIn({ localStorage: { 'pat:minVersion': minRec(160) } });
+    // V160: was minRec(160) — this release IS 160, so "too old" is now any number above every version to come.
+    const c = await signedIn({ localStorage: { 'pat:minVersion': minRec(9999) } });
     c.srv.minFail = true;
     await c.run('syncPull()');
     t.eq(c.srv.work().length, 0, 'known too old and the read fails: still nothing read or sent');
