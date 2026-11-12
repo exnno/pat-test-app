@@ -11,6 +11,12 @@
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
+-- V160: CHECKS 27a–27c NEED supabase/v160-join.sql RUN FIRST (27a names it
+-- if not). A invites B as Engineer; a pretend old sign-in of A's is added; B's
+-- Join is refused and the invite stays waiting; the sign-in is removed and B
+-- joins; then B is taken out and the invite removed. B's main business is
+-- checked unchanged. 27a–27b say INCONCLUSIVE while a real phone of A's or B's
+-- is below the minimum app version (update it and run again).
 -- V159: CHECKS 26a–26e NEED supabase/v159-office.sql RUN FIRST (26a names it
 -- if not). B is put into A's business as Office and tries to start a job there,
 -- move one in and make it main; then B is taken out and B's test job removed.
@@ -1375,6 +1381,72 @@ begin
     select count(*) into n from public.memberships where org_id = org_a and user_id = b;
     select count(*) into k from public.sessions where id = 'iso-test-v159-1';
     res := res || array['26e|B out of A''s business; nothing left behind|' || case when n = 0 and k = 0 and public.default_org(b) = org_b then 'PASS|' else 'FAIL|' || n || ' membership, ' || k || ' jobs left' end];
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
+  -- ------------------------------------------------- V160: Join rechecks the business's phones (27a–27c)
+  if not exists (select 1 from pg_proc p join pg_namespace x on x.oid = p.pronamespace
+                 where x.nspname = 'public' and p.proname = 'accept_invite' and p.prosrc like '%patgo_team_phones_behind%') then
+    res := res || array['27a|Join rechecks the business''s phones|FAIL|run supabase/v160-join.sql first'];
+  else
+    org_a := public.default_org(a);
+    org_b := public.default_org(b);
+    delete from public.memberships where org_id = org_a and user_id = b;
+    delete from public.invites where org_id = org_a and email = (select lower(btrim(email)) from auth.users where id = b);
+    delete from auth.sessions where user_agent = 'patgo-iso-test-160';
+    skip155 := null;
+    -- A invites B as Engineer while A's business is up to date.
+    perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      inv := public.invite_member(org_a, email_b, 'Iso Test B', 'engineer');
+      execute 'reset role';
+    exception when others then
+      execute 'reset role';
+      if sqlerrm like 'patgo_phones_behind%' then skip155 := 'a phone in A''s business is already below the minimum app version';
+      else skip155 := 'the invite failed: ' || sqlerrm; end if;
+    end;
+    if skip155 is not null then
+      res := res || array['27a|B''s Join refused while a phone in A''s business is older; invite still waiting|INCONCLUSIVE|' || skip155];
+    else
+      -- Then A signs in an old phone (a pretend sign-in that never reported — removed in 27c).
+      insert into auth.sessions (id, user_id, created_at, updated_at, user_agent)
+        values (gen_random_uuid(), a, now(), now(), 'patgo-iso-test-160');
+      -- 27a: B's Join is refused for the business's phones; nothing changes.
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      begin msg := public.accept_invite(inv, true); exception when others then msg := sqlerrm; end;
+      execute 'reset role';
+      if msg like 'patgo_your_phones_behind%' then
+        skip155 := 'a phone of B''s is below the minimum app version';
+        res := res || array['27a|B''s Join refused while a phone in A''s business is older; invite still waiting|INCONCLUSIVE|' || skip155];
+      else
+        res := res || array['27a|B''s Join refused while a phone in A''s business is older; invite still waiting|'
+          || case when msg like 'patgo_team_phones_behind%' and public.member_role(org_a, b) is null
+                   and (select status from public.invites where id = inv) = 'waiting' and public.default_org(b) = org_b
+                  then 'PASS|' else 'FAIL|' || coalesce(msg, '?') end];
+      end if;
+      -- 27b: the old phone signed out — B can join (not made main).
+      delete from auth.sessions where user_agent = 'patgo-iso-test-160';
+      if skip155 is null then
+        perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+        execute 'set local role authenticated';
+        begin msg := public.accept_invite(inv, false); exception when others then msg := sqlerrm; end;
+        execute 'reset role';
+        res := res || array['27b|the old phone signed out: B joins; B''s main business unchanged|'
+          || case when msg = 'joined' and public.member_role(org_a, b) = 'engineer' and public.default_org(b) = org_b then 'PASS|' else 'FAIL|' || coalesce(msg, '?') end];
+      else
+        res := res || array['27b|the old phone signed out: B joins; B''s main business unchanged|INCONCLUSIVE|' || skip155];
+      end if;
+    end if;
+    -- 27c: put back.
+    delete from auth.sessions where user_agent = 'patgo-iso-test-160';
+    delete from public.memberships where org_id = org_a and user_id = b;
+    delete from public.invites where org_id = org_a and email = (select lower(btrim(email)) from auth.users where id = b);
+    select count(*) into n from public.memberships where org_id = org_a and user_id = b;
+    select count(*) into k from auth.sessions where user_agent = 'patgo-iso-test-160';
+    select count(*) + k into k from public.invites where org_id = org_a and email = (select lower(btrim(email)) from auth.users where id = b);
+    res := res || array['27c|B out of A''s business; no invite or pretend sign-in left|' || case when n = 0 and k = 0 and public.default_org(b) = org_b then 'PASS|' else 'FAIL|' || n || ' membership, ' || k || ' left' end];
   end if;
   perform set_config('request.jwt.claims', '', true);
 
