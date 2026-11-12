@@ -517,7 +517,7 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V159';",   // V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
+    from: "const APP_VERSION = 'V160';",   // V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
     to:   "const APP_VERSION = 'V154';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
@@ -640,7 +640,7 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V157</strong> &middot; November 2026</p>',   // V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
+    from: '        <p><strong>V158</strong> &middot; November 2026</p>',   // V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 95e)',
   },
@@ -8636,9 +8636,9 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Office sees and approves but never holds a job",   // V159: at V159's (V158's moves to M1259, V157's to M1238). V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
+    from: "Joining a business checks its phones again",   // V160: at V160's (V159's moves to M1259, V158's to M1238). V159: at V159's (V158's moves to M1259, V157's to M1238). V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
     to:   "Better",
-    why:  "the About page must say what changed in this version (96e)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
+    why:  "the About page must say what changed in this version (99f)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8753,9 +8753,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Approve or refuse job moves: a request to move a job out of your business waits",   // V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
+    from: "A phone&rsquo;s jobs stay with the account they belong to, even when the phone is full",   // V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (96e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
+    why:  "the About page keeps the last three versions' lines (97d)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8915,9 +8915,9 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "A phone&rsquo;s jobs stay with the account they belong to, even when the phone is full",   // V159: at V158's, still in the window. V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
+    from: "Office sees and approves but never holds a job",   // V160: at V159's, still in the window (98f). V159: at V158's, still in the window. V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (96e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
+    why:  "the About page keeps the last three versions' lines (98f)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9044,9 +9044,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v159';",   // V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v158';",
-    why:  "a release needs its cache bump or phones never get it (96e)",
+    from: "const CACHE_VERSION = 'pat-v160';",   // V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v159';",
+    why:  "a release needs its cache bump or phones never get it (99f)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -13697,6 +13697,99 @@ const MUTATIONS = [
     from: "  order by (m.role = 'owner') desc, m.created_at, m.org_id limit 1;",
     to:   "  order by m.created_at desc, m.org_id limit 1;",
     why:  "the main goes back to their own business (98e)",
+  },
+
+  // ---- V160 (R68 4A; round 1A–4A): Join rechecks the business's phones (audit 2, finding 4). Group 99 + M1938–M1950. ----
+  {
+    name: "M1938 (V160) the Join refusal falls to the generic sheet",
+    file: "business.js",
+    from: "      if (name === 'accept_invite' && _bizTeamBehind(e)) {",
+    to:   "      if (false && name === 'accept_invite' && _bizTeamBehind(e)) {",
+    why:  "2A: Not joined yet, the business named (99a)",
+  },
+  {
+    name: "M1939 (V160) the Join refusal never names the business",
+    file: "business.js",
+    from: "  const org = v && v.orgName ? v.orgName : 'that business';",
+    to:   "  const org = 'that business';",
+    why:  "2A: the business is named (99a)",
+  },
+  {
+    name: "M1940 (V160) the new refusal isn't recognised",
+    file: "business.js",
+    from: "  return /patgo_team_phones_behind/.test(t);",
+    to:   "  return /patgo_team_phones_behnid/.test(t);",
+    why:  "2A: the business's phones, in words (99a)",
+  },
+  {
+    name: "M1941 (V160) the device sheet takes the business's refusal too",
+    file: "business.js",
+    from: "  return /patgo_(your_)?phones_behind/.test(t);",
+    to:   "  return /patgo_(your_|team_)?phones_behind/.test(t);",
+    why:  "the joiner is never shown the business's devices (99b)",
+  },
+  {
+    name: "M1942 (V160) businessTeamError loses the words",
+    file: "business.js",
+    from: "  if (/patgo_team_phones_behind/.test(t)) return 'A phone in that business has an older PATGo, so you can’t join just yet.",
+    to:   "  if (/patgo_team_phones_behind_x/.test(t)) return 'A phone in that business has an older PATGo, so you can’t join just yet.",
+    why:  "the words, wherever it lands (99b)",
+  },
+  {
+    name: "M1943 (V160) the words lose the invite still waiting",
+    file: "business.js",
+    from: "    + 'Ask them to open PATGo with a signal so it updates, then tap Join again. Your invite is still waiting.';",
+    to:   "    + 'Ask them to open PATGo with a signal so it updates, then tap Join again.';",
+    why:  "2A: the invite stays waiting (99a)",
+  },
+  {
+    name: "M1944 (V160) SQL: Join doesn't check the business's phones",
+    file: "supabase/v160-join.sql",
+    from: "  if public.org_phones_behind(v.org_id) > 0 then raise exception 'patgo_team_phones_behind'; end if;\n",
+    to:   "",
+    why:  "finding 4: the moment of joining (99e)",
+  },
+  {
+    name: "M1945 (V160) SQL: the business's phones checked before the joiner's own",
+    file: "supabase/v160-join.sql",
+    from: "  if public._user_phones_behind(me) > 0 then raise exception 'patgo_your_phones_behind'; end if;\n  -- V160:",
+    to:   "  -- V160:",
+    why:  "1A: the joiner's own phones first (99e)",
+  },
+  {
+    name: "M1946 (V160) SQL: Office joiners skip the check",
+    file: "supabase/v160-join.sql",
+    from: "  if public.org_phones_behind(v.org_id) > 0 then raise",
+    to:   "  if public.org_phones_behind(v.org_id) > 0 and v.role <> 'office' then raise",
+    why:  "4A: every role (99e)",
+  },
+  {
+    name: "M1947 (V160) SQL: the check reads the joiner's own business",
+    file: "supabase/v160-join.sql",
+    from: "  if public.org_phones_behind(v.org_id) > 0",
+    to:   "  if public.org_phones_behind(public.default_org(me)) > 0",
+    why:  "the invite's business (99e)",
+  },
+  {
+    name: "M1948 (V160) schema.sql: a new project's Join misses the check",
+    file: "supabase/schema.sql",
+    from: "  if public.org_phones_behind(v.org_id) > 0 then raise exception 'patgo_team_phones_behind'; end if;\n",
+    to:   "",
+    why:  "a new project gets V160 byte for byte (99e)",
+  },
+  {
+    name: "M1949 (V160) SQL: an already-member is checked too",
+    file: "supabase/v160-join.sql",
+    from: "  if exists (select 1 from public.memberships m where m.org_id = v.org_id and m.user_id = me) then\n    update public.invites set status = 'joined', decided_at = now() where id = i;\n    return 'joined';\n  end if;\n  -- 3A",
+    to:   "  -- 3A",
+    why:  "an existing member is just marked joined (99e)",
+  },
+  {
+    name: "M1950 (V160) isolation: the pretend sign-in left behind",
+    file: "supabase/isolation-test.sql",
+    from: "    -- 27c: put back.\n    delete from auth.sessions where user_agent = 'patgo-iso-test-160';\n",
+    to:   "    -- 27c: put back.\n",
+    why:  "nothing left behind on the test project (99e)",
   },
 ];
 
