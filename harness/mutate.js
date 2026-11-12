@@ -517,7 +517,7 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V158';",   // V158: re-pointed. V157: re-pointed. V156: re-pointed
+    from: "const APP_VERSION = 'V159';",   // V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
     to:   "const APP_VERSION = 'V154';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
@@ -640,7 +640,7 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V156</strong> &middot; November 2026</p>',   // V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
+    from: '        <p><strong>V157</strong> &middot; November 2026</p>',   // V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 95e)',
   },
@@ -8636,7 +8636,7 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "A phone&rsquo;s jobs stay with the account they belong to, even when the phone is full",   // V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
+    from: "Office sees and approves but never holds a job",   // V159: at V159's (V158's moves to M1259, V157's to M1238). V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
     to:   "Better",
     why:  "the About page must say what changed in this version (96e)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
   },
@@ -8753,7 +8753,7 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Your devices: see every phone, tablet or computer signed in to your account",   // V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
+    from: "Approve or refuse job moves: a request to move a job out of your business waits",   // V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
     to:   "Better",
     why:  "the About page keeps the last three versions' lines (96e)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
@@ -8915,7 +8915,7 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Approve or refuse job moves: a request to move a job out of your business waits",   // V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
+    from: "A phone&rsquo;s jobs stay with the account they belong to, even when the phone is full",   // V159: at V158's, still in the window. V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
     to:   "Better",
     why:  "the About page keeps the last three versions' lines (96e)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
   },
@@ -9044,8 +9044,8 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v158';",   // V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v157';",
+    from: "const CACHE_VERSION = 'pat-v159';",   // V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v158';",
     why:  "a release needs its cache bump or phones never get it (96e)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
@@ -11767,8 +11767,9 @@ const MUTATIONS = [
   {
     name: "M1664 (V149) For: for someone in one business",
     file: "business.js",
-    from: "  return list.length >= 2 ? list : [];",
-    to:   "  return list.length >= 1 ? list : [];",
+    // V159: For: reads businessNewJobChoices (Office businesses left out) — re-anchored there.
+    from: "  const list = businessHoldable();\n  return list.length >= 2 ? list : [];",
+    to:   "  const list = businessHoldable();\n  return list.length >= 1 ? list : [];",
     why:  "1A: only 2+ are asked (88a)",
   },
   {
@@ -11851,14 +11852,16 @@ const MUTATIONS = [
   {
     name: "M1676 (V149) a split loses the business",
     file: "session.js",
-    from: "  if (sess.businessId) job.businessId = sess.businessId;\n",
+    // V159: re-anchored on businessForCopy's line (2A).
+    from: "  const biz = (typeof businessForCopy === 'function') ? businessForCopy(sess.businessId) : (sess.businessId || '');\n  if (biz) job.businessId = biz;\n",
     to:   "",
     why:  "1A: a team's items leave the team by splitting (88d)",
   },
   {
     name: "M1677 (V149) a duplicate loses the business",
     file: "session.js",
-    from: "  if (src.businessId) job.businessId = src.businessId;   // V149 (1A): the copy is the same business's\n",
+    // V159: re-anchored on businessForCopy's line (2A).
+    from: "  const biz = (typeof businessForCopy === 'function') ? businessForCopy(src.businessId) : (src.businessId || '');\n  if (biz) job.businessId = biz;\n",
     to:   "",
     why:  "1A: a team's job copied out of the team (88d, 88f)",
   },
@@ -12105,8 +12108,9 @@ const MUTATIONS = [
   {
     name: "M1712 (V150) the sheet offers the business the job is already in",
     file: "business.js",
-    from: "  const rows = businessChoices().filter(b => b.id !== curId).map((b) => `",
-    to:   "  const rows = businessChoices().map((b) => `",
+    // V159: the list is businessMoveTargets (Office left out) — re-anchored.
+    from: "  const rows = businessMoveTargets(curId).map((b) => `",
+    to:   "  const rows = businessHoldable().map((b) => `",
     why:  "a pointless choice (89b)",
   },
   {
@@ -12238,9 +12242,10 @@ const MUTATIONS = [
   {
     name: "M1731 (V150) SQL: schema.sql lets the asker approve",
     file: "supabase/schema.sql",
-    from: "  if decider is null or decider = m.requested_by then\n",
-    to:   "  if decider is null then\n",
-    why:  "a Team leader approves their own move (89f; on the stand-in M4)",
+    // V159: V159's copy of _job_move_decide is the live one (last in schema.sql) — aimed at it.
+    from: "-- in the business it was going to (they were changed while it waited).\ncreate or replace function public._job_move_decide(move uuid, approve boolean, decider uuid)\nreturns text language plpgsql security definer set search_path = '' as $$\ndeclare m record; s record;\nbegin\n  select * into m from public.job_moves x where x.id = move for update;\n  if not found or m.status <> 'waiting' then\n    raise exception 'patgo_move_stale: that request is no longer waiting' using errcode = 'P0002';\n  end if;\n  if decider is null or decider = m.requested_by then\n",
+    to:   "-- in the business it was going to (they were changed while it waited).\ncreate or replace function public._job_move_decide(move uuid, approve boolean, decider uuid)\nreturns text language plpgsql security definer set search_path = '' as $$\ndeclare m record; s record;\nbegin\n  select * into m from public.job_moves x where x.id = move for update;\n  if not found or m.status <> 'waiting' then\n    raise exception 'patgo_move_stale: that request is no longer waiting' using errcode = 'P0002';\n  end if;\n  if decider is null then\n",
+    why:  "a Team leader approves their own move (98e: schema.sql in step; on the stand-in M4)",
   },
   {
     name: "M1732 (V150) SQL: the stamp's exception skips the membership",
@@ -13001,8 +13006,8 @@ const MUTATIONS = [
   {
     name: "M1839 (V155) the main business offers Make main",
     file: "business.js",
-    from: "${!x.def ? `<button class=\"backup-action-btn\" id=\"biz-main-${i}\"",
-    to:   "${true ? `<button class=\"backup-action-btn\" id=\"biz-main-${i}\"",
+    from: "${!x.def && x.role !== 'office' ? `<button class=\"backup-action-btn\" id=\"biz-main-${i}\"",
+    to:   "${x.role !== 'office' ? `<button class=\"backup-action-btn\" id=\"biz-main-${i}\"",
     why:  "4A: Make main only where it would change something (94b)",
   },
   {
@@ -13593,6 +13598,105 @@ const MUTATIONS = [
     from: "      _cloudOwnerMemo = null; _cloudOwnerUnsaved = false;     // the refused account is not kept\n",
     to:   "",
     why:  "2A: a refused account must not own the page (97b)",
+  },
+  // ---- V159 (R68 3A, R69; round 1A–4A): Office never holds a job (audit 2, finding 2). Group 98 + M1924–M1937. ----
+  {
+    name: "M1924 (V159) For: offers an Office business",
+    file: "business.js",
+    from: "function businessHoldable() { return businessList().filter(b => b.role !== 'office'); }",
+    to:   "function businessHoldable() { return businessList(); }",
+    why:  "Office never holds a job: For: / Change… / the starting choice (98a)",
+  },
+  {
+    name: "M1925 (V159) businessIsOffice never says yes",
+    file: "business.js",
+    from: "function businessIsOffice(id) { return businessValidId(id) && businessList().some(b => b.id === id && b.role === 'office'); }",
+    to:   "function businessIsOffice(id) { return false; }",
+    why:  "2A: a copy of a job in an Office business stays there (98b)",
+  },
+  {
+    name: "M1926 (V159) a copy keeps an Office business",
+    file: "business.js",
+    from: "  return businessIsOffice(id) ? '' : id;",
+    to:   "  return id;",
+    why:  "2A: the copy goes to the main business (98b)",
+  },
+  {
+    name: "M1927 (V159) the Office card doesn't say where jobs go",
+    file: "business.js",
+    from: "        ${x.role === 'office' ? `<p class=\"muted\" id=\"biz-office-${i}\">${escapeHTML(businessOfficeLine())}</p>` : ''}\n",
+    to:   "",
+    why:  "3A: the Office line (98c)",
+  },
+  {
+    name: "M1928 (V159) Make main on an Office business is asked",
+    file: "business.js",
+    from: "  if (!b || b.def || b.role === 'office') return false;   // V159: never an Office business",
+    to:   "  if (!b || b.def) return false;",
+    why:  "never main: the database refuses it, the phone mustn't offer it (98c)",
+  },
+  {
+    name: "M1929 (V159) Change… with nowhere to go",
+    file: "business.js",
+    from: "          : (several && canMove ? `<button",
+    to:   "          : (several ? `<button",
+    why:  "an empty move list (98c)",
+  },
+  {
+    name: "M1930 (V159) a pick is checked against all businesses",
+    file: "business.js",
+    from: "  if (!businessMoveTargets(businessOfJob(sess)).some(b => b.id === id)) return false;",
+    to:   "  if (!businessChoices().some(b => b.id === id) || id === businessOfJob(sess)) return false;",
+    why:  "a stale tap picks the Office business (98c)",
+  },
+  {
+    name: "M1931 (V159) Join as Office asks about main",
+    file: "business.js",
+    from: "  if (v.role === 'office') {\n    // V159:",
+    to:   "  if (false) {\n    // V159:",
+    why:  "Office never main (98d)",
+  },
+  {
+    name: "M1932 (V159) Office is made without asking",
+    file: "business.js",
+    from: "      onPick: () => (r === 'office' ? businessRoleOfficeAsk(orgId, user, p.name) : businessRoleSet(orgId, user, r)) })),",
+    to:   "      onPick: () => businessRoleSet(orgId, user, r) })),",
+    why:  "4A: said before the change (98d)",
+  },
+  {
+    name: "M1933 (V159) the move refusal in vague words",
+    file: "business.js",
+    from: "  if (msg.indexOf('patgo_move_office') !== -1) return",
+    to:   "  if (msg.indexOf('patgo_move_officeX') !== -1) return",
+    why:  "the refusal says why (98d)",
+  },
+  {
+    name: "M1934 (V159) the Make main refusal in vague words",
+    file: "business.js",
+    from: "  if (/patgo_main_office/.test(t)) return",
+    to:   "  if (/patgo_main_officeX/.test(t)) return",
+    why:  "the refusal says why (98d)",
+  },
+  {
+    name: "M1935 (V159) SQL: photos not re-filed",
+    file: "supabase/schema.sql",
+    from: "    if new.org_id is not null and tg_table_name in ('sessions', 'photos')\n       and public.member_role",
+    to:   "    if new.org_id is not null and tg_table_name in ('sessions')\n       and public.member_role",
+    why:  "a new job's photos left in the Office business (98e; on the stand-in, photos too)",
+  },
+  {
+    name: "M1936 (V159) SQL: Join as Office makes it main",
+    file: "supabase/v159-office.sql",
+    from: "  if coalesce(make_main, false) and v.role <> 'office' then",
+    to:   "  if coalesce(make_main, false) then",
+    why:  "Office never main (98e; on the stand-in, accept office)",
+  },
+  {
+    name: "M1937 (V159) SQL: the fix-up order loses the owned business",
+    file: "supabase/v159-office.sql",
+    from: "  order by (m.role = 'owner') desc, m.created_at, m.org_id limit 1;",
+    to:   "  order by m.created_at desc, m.org_id limit 1;",
+    why:  "the main goes back to their own business (98e)",
   },
 ];
 
