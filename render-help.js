@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V158: rolled forward — V158 on top, V155 dropped. -->
+      <!-- v8: rolling 3-version changelog. V159: rolled forward — V159 on top, V156 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V159</strong> &middot; November 2026</p>
+        <p class="muted">Office sees and approves but never holds a job: an Office business isn&rsquo;t offered for new jobs, moves or as your main business, and new jobs go to a business you test for. Someone changed to Office finishes the jobs they&rsquo;d started.</p>
         <p><strong>V158</strong> &middot; November 2026</p>
         <p class="muted">A phone&rsquo;s jobs stay with the account they belong to, even when the phone is full or its record of the account can&rsquo;t be read: no other account can take them over, and PATGo says what to do.</p>
         <p><strong>V157</strong> &middot; November 2026</p>
         <p class="muted">Approve or refuse job moves: a request to move a job out of your business waits on the Business page for the Owner, a Team leader or the Office, and the person who asked is told how it was decided and by whom.</p>
-        <p><strong>V156</strong> &middot; November 2026</p>
-        <p class="muted">Your devices: see every phone, tablet or computer signed in to your account and sign out one you don&rsquo;t use. An old device that&rsquo;s signed out no longer holds up invites, and PATGo names the one that does.</p>
 
 
 

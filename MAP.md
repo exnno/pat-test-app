@@ -1,4 +1,4 @@
-# PATGo — Code Map (V157)
+# PATGo — Code Map (V159)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1914,6 +1914,14 @@ who decided (`by`, from my_job_moves `decided_name`).
 **Coupling:** render-core.js draws `waitBanner` / `decidedBanner` after the invite line;
 dispatch.js `biz-approve` / `biz-refuse` / `biz-told`; styles.css `.biz-wait*`.
 Harness 96a–96f; M1884–M1914.
+V159: Office never HOLDS a job. `businessHoldable` (every business but Office) feeds For:
+(`businessNewJobChoices`), Change… (`businessMoveTargets`) and the starting choice;
+`businessChoices` (all) still decides whether the Job settings card shows. A job made from
+a job → `businessForCopy` (session.js split + `_dupJobBuild`). Office card line
+`businessOfficeLine`; no Make main there. Join as Office → `openConfirmSheet` (no main
+question); Change role to Office → `businessRoleOfficeAsk` → `businessRoleSet`. The database
+enforces it all: supabase/v159-office.sql (org_stamp re-files, move_job / decide, Join,
+Change role, Make main). Harness 98a–98f; M1924–M1937.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

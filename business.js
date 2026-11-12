@@ -1,4 +1,4 @@
-// ============== PATGo PWA — V157 — The Approve / Refuse screen ===
+// ============== PATGo PWA — V159 — Office never holds a job ===
 // (c) 2026 Peter Birchley. All rights reserved.
 //
 // business.js (Stage 16 / Teams v1).
@@ -40,6 +40,14 @@
 //   • 1A the record: my_job_moves → JOB_MOVES_KEY → the Job settings line.
 //   • 3A the cloud's column is the truth: sync.js hands over each listed job's
 //     org_id and businessReconcileJobs() quietly puts the job right.
+//
+// V159 (the second audit, finding 2 — R68 3A, R69; round 1A–4A): Office never
+// HOLDS a job. New job's For:, Change…'s list and Make main skip a business where
+// you're Office (businessHoldable); a job made from a job there goes to your main
+// (businessForCopy, 2A); its card says where your jobs go (3A); Join as Office
+// asks nothing about main; changing someone to Office says what happens (4A). The
+// database enforces all of it (supabase/v159-office.sql). A job already in an
+// Office business (started before the change) carries on as before (R68 3A).
 
 const BUSINESS_ROLE_WORDS = { owner: 'Owner', team_leader: 'Team leader', engineer: 'Engineer', office: 'Office' };
 const _BUSINESS_ID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -105,6 +113,24 @@ function businessChoices() {
   return list.length >= 2 ? list : [];
 }
 
+// V159 (R68 3A, R69): Office never HOLDS a job. The businesses a job of yours can
+// be in — every one but those where you're Office — and the New job choice, only
+// when there are two or more of them. (The database files a new job named for an
+// Office business in your main one anyway: supabase/v159-office.sql org_stamp.)
+function businessHoldable() { return businessList().filter(b => b.role !== 'office'); }
+function businessIsOffice(id) { return businessValidId(id) && businessList().some(b => b.id === id && b.role === 'office'); }
+function businessNewJobChoices() {
+  const list = businessHoldable();
+  return list.length >= 2 ? list : [];
+}
+
+// A job made from a job (a retest copy, items moved to a new job) is the same
+// business's — unless that's one where you're Office: then your main (2A).
+function businessForCopy(id) {
+  if (!businessValidId(id)) return '';
+  return businessIsOffice(id) ? '' : id;
+}
+
 function businessLastUsed() {
   try { const v = localStorage.getItem(LAST_BUSINESS_KEY); return businessValidId(v) ? v : ''; } catch (e) { return ''; }
 }
@@ -112,7 +138,7 @@ function businessLastUsed() {
 // The business the form starts on: the last used on this phone if still one of
 // yours, else the default, else the first.
 function businessForInitial() {
-  const list = businessChoices();
+  const list = businessNewJobChoices();
   if (!list.length) return '';
   const last = businessLastUsed();
   if (last && list.some(b => b.id === last)) return last;
@@ -121,7 +147,7 @@ function businessForInitial() {
 }
 
 function businessForHTML() {
-  const list = businessChoices();
+  const list = businessNewJobChoices();
   if (!list.length) return '';
   const pick = (state.newForm && businessValidId(state.newForm.businessId) && list.some(b => b.id === state.newForm.businessId))
     ? state.newForm.businessId : businessForInitial();
@@ -135,7 +161,7 @@ function businessForHTML() {
 // On Start: the business picked (or '' when there was no choice). Remembered as
 // the last used. An id that isn't one of yours is never recorded.
 function businessNewJobPick(value) {
-  const list = businessChoices();
+  const list = businessNewJobChoices();
   if (!list.length) return '';
   const v = businessValidId(value) && list.some(b => b.id === value) ? value : businessForInitial();
   if (v) { try { localStorage.setItem(LAST_BUSINESS_KEY, v); } catch (e) { /* the choice still stands */ } }
@@ -278,6 +304,12 @@ function businessRowStatus() {
   return n > 1 ? `${businessLabel(d)} + ${n - 1} more` : businessLabel(d);
 }
 
+// V159 (3A of the round): what someone who's Office in a business is told on its card.
+function businessOfficeLine() {
+  const d = businessHoldable().find(b => b.def) || businessHoldable().find(b => b.role === 'owner');
+  return `As Office you see and approve here. Jobs you test go to ${d ? businessLabel(d) : 'your own business'}.`;
+}
+
 function renderCloudBusiness() {
   const signedIn = !!(state.cloud && state.cloud.status === 'signed-in');
   const b = _biz();
@@ -306,7 +338,8 @@ function renderCloudBusiness() {
         <p class="muted" id="biz-role-${i}">You: ${escapeHTML(who)} · ${escapeHTML(people)}</p>
         ${x.def ? `<p class="muted" id="biz-default-${i}">Your main business — new jobs go here unless you choose another.</p>` : ''}
         ${btn}
-        ${!x.def ? `<button class="backup-action-btn" id="biz-main-${i}" data-action="biz-main" data-arg="${escapeHTML(x.id)}" style="margin-top:8px">Make this my main business</button>` : ''}
+        ${x.role === 'office' ? `<p class="muted" id="biz-office-${i}">${escapeHTML(businessOfficeLine())}</p>` : ''}
+        ${!x.def && x.role !== 'office' ? `<button class="backup-action-btn" id="biz-main-${i}" data-action="biz-main" data-arg="${escapeHTML(x.id)}" style="margin-top:8px">Make this my main business</button>` : ''}
         ${businessWaitingHTML(x, i)}
         ${businessPeopleHTML(x, i)}
       </div>`;
@@ -509,6 +542,7 @@ function businessJobCardHTML(sess) {
   const m = businessMoveFor(sess.id);
   if (!several && !m) return '';
   const cur = businessOfJob(sess);
+  const canMove = businessMoveTargets(cur).length > 0;   // V159: never into an Office business
   const name = cur ? _bizNameFor(cur, '') : 'Your business';
   const line = businessMoveLine(m);
   const waiting = !!(m && m.st === 'waiting');
@@ -519,7 +553,7 @@ function businessJobCardHTML(sess) {
         ${line ? `<p class="muted biz-job-line" id="ef-biz-line">${escapeHTML(line)}</p>` : ''}
         ${waiting
           ? `<button class="btn-secondary" id="ef-biz-cancel" data-action="biz-move-cancel" data-arg="${escapeHTML(m.id)}">Cancel request</button>`
-          : (several ? `<button class="btn-secondary" id="ef-biz-change" data-action="biz-move-open">Change…</button>` : '')}
+          : (several && canMove ? `<button class="btn-secondary" id="ef-biz-change" data-action="biz-move-open">Change…</button>` : '')}
       </div>`;
 }
 
@@ -579,11 +613,15 @@ function businessMoveClose() {
   return true;
 }
 
+// V159: where a job can be moved — your businesses but the one it's in and any
+// where you're Office (the database refuses those: patgo_move_office).
+function businessMoveTargets(curId) { return businessHoldable().filter(b => b.id !== curId); }
+
 function businessMovePick(id) {
   const m = state.bizMove;
   const sess = _bizMoveJob();
   if (!m || !sess || m.step !== 'pick') return false;
-  if (!businessChoices().some(b => b.id === id) || id === businessOfJob(sess)) return false;
+  if (!businessMoveTargets(businessOfJob(sess)).some(b => b.id === id)) return false;
   m.to = id; m.step = 'confirm';
   render();
   return true;
@@ -617,6 +655,7 @@ function businessMoveError(e) {
   if (msg.indexOf('patgo_move_waiting') !== -1) return 'This job already has a move waiting for approval.';
   if (msg.indexOf('patgo_move_both') !== -1) return 'You need to belong to both businesses — check Settings → Account & Sync → Business.';
   if (msg.indexOf('patgo_move_same') !== -1) return 'The job is already in that business.';
+  if (msg.indexOf('patgo_move_office') !== -1) return 'You’re Office in that business, so your jobs can’t go there.';   // V159
   if (msg.indexOf('patgo_plan_locked') !== -1) return 'That business’s PATGo plan has ended, so it can’t take jobs just now.';
   return 'The job wasn’t moved — try again with a signal.';
 }
@@ -723,7 +762,7 @@ function renderBusinessMoveSheet(sess) {
         <button class="btn-secondary move-job-back" id="biz-move-back" data-action="biz-move-back">Back</button>
       </div>`;
   }
-  const rows = businessChoices().filter(b => b.id !== curId).map((b) => `
+  const rows = businessMoveTargets(curId).map((b) => `
           <li class="move-to-job">
             <button type="button" class="move-to-job-btn" data-action="biz-move-pick" data-arg="${escapeHTML(b.id)}">
               <span class="move-to-job-title">${escapeHTML(businessLabel(b))}</span>
@@ -862,6 +901,7 @@ function businessTeamError(err) {
   if (/patgo_invite_email/.test(t)) return 'That doesn’t look like an email address.';
   if (/patgo_invite_name/.test(t)) return 'Add a name — up to 60 letters.';
   if (/patgo_invite_gone/.test(t)) return 'This invite has ended — it was cancelled, answered or is more than 14 days old. Ask for a new one.';
+  if (/patgo_main_office/.test(t)) return 'You’re Office in that business, so it can’t be your main one — your jobs go to a business you test for.';   // V159
   if (/patgo_not_allowed/.test(t)) return 'That isn’t something your role in this business can do.';
   if (/patgo_move_stale/.test(t)) return businessStaleWords(err);                                  // V157
   if (/patgo_move_self/.test(t)) return 'You asked for this move — someone else in the business has to decide it.';
@@ -1005,6 +1045,16 @@ function businessJoinStart(id) {
   const v = businessMyInvites().find(x => x.id === id);
   if (!v) return false;
   const org = _bizInviteOrgLabel(v);
+  if (v.role === 'office') {
+    // V159: Office never holds a job, so there's no "make it main" to ask.
+    openConfirmSheet({
+      title: `Join ${org}?`,
+      message: `You’ll join as Office: you see and approve their jobs. Your own jobs and your main business stay as they are.`,
+      confirmLabel: 'Join', cancelLabel: 'Not now', danger: false,
+      onConfirm: () => { businessJoin(id, false); },
+    });
+    return true;
+  }
   openChoiceSheet({
     title: `Join ${org}?`,
     message: `Make ${org} your main business? Choose Yes if you work for them: new jobs go to ${org} unless you choose another. `
@@ -1049,7 +1099,22 @@ function businessRoleStart(arg) {
     title: `${p.name || 'Their'} role`,
     message: `Now: ${BUSINESS_ROLE_WORDS[p.role]}. Choose their new role in ${businessLabel(b)}.`,
     choices: BUSINESS_OFFER.owner.filter(r => r !== p.role).map((r) => ({ label: BUSINESS_ROLE_ABOUT[r], style: 'secondary',
-      onPick: () => { _bizCall('set_member_role', { o: orgId, u: user, r }).then((x) => { if (x !== null) { showToast('Role changed'); businessAfterChange(); } }); } })),
+      onPick: () => (r === 'office' ? businessRoleOfficeAsk(orgId, user, p.name) : businessRoleSet(orgId, user, r)) })),
+  });
+  return true;
+}
+
+function businessRoleSet(orgId, user, r) {
+  return _bizCall('set_member_role', { o: orgId, u: user, r }).then((x) => { if (x !== null) { showToast('Role changed'); businessAfterChange(); } });
+}
+
+// V159 (4A): Office never holds a job — said before the change.
+function businessRoleOfficeAsk(orgId, user, name) {
+  openConfirmSheet({
+    title: `Make ${name || 'them'} Office?`,
+    message: 'They can finish jobs they’ve already started here. New jobs go to their own business.',
+    confirmLabel: 'Make Office', cancelLabel: 'Cancel', danger: false,
+    onConfirm: () => { businessRoleSet(orgId, user, 'office'); },
   });
   return true;
 }
@@ -1067,7 +1132,7 @@ function businessMyNameStart(orgId) {
 
 function businessMakeMain(orgId) {
   const b = _bizOrg(orgId);
-  if (!b || b.def) return false;
+  if (!b || b.def || b.role === 'office') return false;   // V159: never an Office business
   openConfirmSheet({
     title: `Make ${businessLabel(b)} your main business?`,
     message: 'New jobs go there unless you choose another on New job. Nothing already made moves.',

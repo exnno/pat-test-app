@@ -8,6 +8,27 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V159
+V159 = Office never holds a job (R68 3A, R69; round 1A–4A, the defaults). business.js
+(`businessHoldable`, `businessNewJobChoices`, `businessMoveTargets`, `businessForCopy`, the
+Office card line, Join / Change role words) + session.js (copies). SQL supabase/v159-office.sql
+(+ schema.sql). Isolation 26a–26e. Harness 98 + M1924–M1937; 97d's release checks → 98f.
+**Next (model: Opus — database rules):** V160 Join rechecks the business's phones, V161 a
+signed-out device loses cloud access at once, V162 leaving / removing. Then Office
+corrections, seat billing + per-business lock (with audit finding 5).
+
+### V159 residuals (known, accepted)
+- A job started on a phone before its holder became Office there, but never sent, lands in
+  their main business when it is sent (1A) — the phone follows quietly; Job settings shows it.
+- A job already in an Office business (3A) can still be duplicated / split; the copy goes to
+  the main business (2A). Moving the original out still needs someone else's approval (V150).
+- The database can't tell logging from other edits inside a job you hold: "finish what you'd
+  started" is the app's rule only.
+- Re-running v150-business-move.sql or v155-invites.sql puts older functions back: run
+  v159-office.sql again after.
+- The Office role's words on Change role ("sees the whole team's jobs") run ahead of the
+  app: seeing teammates' jobs is a later Teams release.
+
 ### Next after V158
 V158 = a phone's jobs stay with their account (R68 1A 2A — the second GPT audit, finding 1).
 cloud.js only: owner held in memory before saving (+ `_cloudOwnerRetry`); the sync record's

@@ -3693,7 +3693,9 @@ function moveItemsToNewJob() {
   if (sess.startPad) job.startPad = sess.startPad;
   // V149 (1A): a job made from a job is for the same business — items never
   // leave a business this way (V150 brings the deliberate, approved move).
-  if (sess.businessId) job.businessId = sess.businessId;
+  // V159 (2A): …unless it's one where you're Office — then your main business.
+  const biz = (typeof businessForCopy === 'function') ? businessForCopy(sess.businessId) : (sess.businessId || '');
+  if (biz) job.businessId = biz;
   // A frozen tester copy only means something for the tester it froze.
   if (sess.instrumentSnapshot && job.instrumentId === String(sess.instrumentId || '')) {
     job.instrumentSnapshot = JSON.parse(JSON.stringify(sess.instrumentSnapshot));
@@ -4363,7 +4365,9 @@ function _dupJobBuild(m, src, jobId, items) {
     syncedAt: null
   };
   if (src.startPad) job.startPad = src.startPad;
-  if (src.businessId) job.businessId = src.businessId;   // V149 (1A): the copy is the same business's
+  // V149 (1A): the copy is the same business's — V159 (2A): unless you're Office there.
+  const biz = (typeof businessForCopy === 'function') ? businessForCopy(src.businessId) : (src.businessId || '');
+  if (biz) job.businessId = biz;
   if (src.instrumentSnapshot && job.instrumentId === String(src.instrumentId || '')) {
     job.instrumentSnapshot = JSON.parse(JSON.stringify(src.instrumentSnapshot));
   }
