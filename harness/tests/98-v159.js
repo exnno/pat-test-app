@@ -365,7 +365,8 @@ module.exports = async function () {
 
   /* ------------------------------------------------------------------ 98f */
   // V160: the release checks moved to 99f; V159's About line stays pinned here.
-  await t.group('98f — V159’s About line', () => {
-    t.includes(read('render-help.js'), 'Office sees and approves but never holds a job: an Office business isn&rsquo;t offered for new jobs', 'About: V159’s line');
+  // V162: V159's About line rolled off (101f checks it's gone); this keeps the check that it went cleanly.
+  await t.group('98f — V159’s About line (rolled off at V162)', () => {
+    t.excludes(read('render-help.js'), 'Office sees and approves but never holds a job', 'About: V159’s line rolled off');
   });
 };

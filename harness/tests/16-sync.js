@@ -281,7 +281,11 @@ module.exports = async function () {
   /* ------------------------------------------------------------------ 16g */
   await t.group('16g — sync state belongs to one account', async () => {
     const other = JSON.stringify({ userId: UID_A, sent: {}, gone: {}, lastPushAt: '2026-09-01T00:00:00Z' });
-    const app = signedIn({ uid: UID_B, localStorage: { 'pat:syncState': other } });
+    // V162: B OWNS this phone (a takeover finished) but the sync state is still
+    // A's. Before V162 the start made B the owner on its saved login alone; it
+    // now reads the sync record first (A), so B must be the owner of record.
+    const app = signedIn({ uid: UID_B, localStorage: { 'pat:syncState': other,
+      'pat:owner': JSON.stringify({ id: UID_B, email: '', at: '2026-09-01T00:00:00Z' }) } });
     const a = job(app, 'ZZACCOUNTB');
     // Pretend account A had sent this exact job.
     const h = app.fn('syncHash')(app.fn('_syncCanonical')(app.state().sessions.find(s => s.id === a.id)));

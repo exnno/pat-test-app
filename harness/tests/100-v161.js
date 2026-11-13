@@ -17,8 +17,7 @@
            for byte as its last section; an error never an empty answer; the run-
            out time (3A); no sign-in passes; the photo rule restrictive; the
            switch last; the undo lines; S1–S3; isolation 28a–28d.
-     100f  release: V161; cache pat-v161; What's new NOT rolled (a fix release);
-           About V161 / V160 / V159; cloud.js header.
+     100f  V161's About line; cloud.js header (V162: the release checks → 101f).
 
    ⚠ WHAT THIS FILE CANNOT PROVE: that the database refuses. That is
    supabase/v161-signed-out.sql's own checks (S1–S3) and isolation-test.sql
@@ -216,7 +215,8 @@ module.exports = async function () {
     t.includes(block, "  select q.s is null\n      or exists (select 1 from auth.sessions x\n                 where x.id = q.s and (x.not_after is null or x.not_after > now()))\n",
       'no sign-in passes; otherwise it must exist and not be run out (3A)');
     t.includes(block, "    raise sqlstate 'PGRST' using\n      message = json_build_object('code', 'patgo_signed_out',", 'refused with an error and the code');
-    t.includes(block, "      detail = json_build_object('status', 401)::text;", '…401');
+    // V162: the V161 form ({"status":401} alone) is what PostgREST cannot parse — 101e.
+    t.includes(block, "      detail = json_build_object('status', 401, 'headers', json_build_object())::text;", '…401, with the headers PostgREST requires');
     t.includes(block, "  if not public._request_signed_in() then raise exception 'patgo_signed_out'; end if;\n  return true;", 'photo files: raised, never a quiet false');
     t.includes(block, '  as restrictive for all to authenticated\n', '2A: photo files — a restrictive rule beside the four');
     t.includes(block, 'revoke all on function public._request_signed_in() from public, anon, authenticated;', 'the inner check closed to phones');
@@ -232,18 +232,10 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 100f */
-  await t.group('100f — release: V161; cache pat-v161; What’s new not rolled; About V161 / V160 / V159', () => {
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V161', 'APP_VERSION V161');
-    t.eq(rel.run('WELCOME_VERSION'), 'V157', 'What’s new NOT rolled (a fix release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v161';", 'cache key pat-v161');
-    t.eq(rel.fn('updateVersionLabel')('pat-v161'), 'V161', 'the update banner reads the key as V161');
+  // V162: the release checks moved to 101f; this keeps V161's own About line.
+  await t.group('100f — V161’s About line; cloud.js header', () => {
     const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V161</strong>'), y = help.indexOf('<p><strong>V160</strong>'), z = help.indexOf('<p><strong>V159</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V161, V160, V159');
-    t.excludes(help, '<p><strong>V158</strong>', 'V158 rolled off');
     t.includes(help, 'loses cloud access straight away, not up to an hour later', 'About: V161’s line');
-    t.includes(help, 'Joining a business checks its phones again', 'About: V160’s line still there');
     t.includes(read('cloud.js'), 'V161: signed out from another device', 'cloud.js header names V161');
   });
 };
