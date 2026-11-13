@@ -867,6 +867,9 @@ registerActions({
   'biz-refuse': (arg) => { if (typeof businessDecideStart === 'function') businessDecideStart(arg, false); },
   'biz-told': () => { if (typeof businessMovesTold === 'function') businessMovesTold(); },
   'biz-role': (arg) => { if (typeof businessRoleStart === 'function') businessRoleStart(arg); },
+  'biz-remove': (arg) => { if (typeof businessRemoveStart === 'function') businessRemoveStart(arg); },   // V163
+  'biz-leave': (arg) => { if (typeof businessLeaveStart === 'function') businessLeaveStart(arg); },      // V163
+  'biz-left-see': (arg) => { if (typeof businessDepartedSee === 'function') businessDepartedSee(arg); }, // V163
   'biz-myname': (arg) => { if (typeof businessMyNameStart === 'function') businessMyNameStart(arg); },
   'biz-main': (arg) => { if (typeof businessMakeMain === 'function') businessMakeMain(arg); },
   'billing-manage':      () => { if (typeof billingManage === 'function') billingManage(''); },

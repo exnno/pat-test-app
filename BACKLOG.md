@@ -8,7 +8,37 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V162
+### Planned audits
+- **Fourth GPT audit after V169** (Peter, 13 Nov). V170 is reserved for fixing what it finds —
+  plan V164–V169 so nothing lands in V170 but the audit's fixes. Brief it that the second
+  audit's finding 5 is scheduled with seat billing (if not yet built).
+
+### Next after V163
+V163 = leaving and removing a member (R5; round 1A 2A 3B 4C 5B 6A). SQL supabase/v163-leaving.sql
+(departures, may_hold, org_stamp, remove_member / leave_business / member_devices /
+my_departures / finish_delivery, the photo-file rule; schema.sql's last section). business.js
+fifth→sixth part (departures, delivery, settle, sheet, Remove / Leave); sync.js (held jobs, the
+departures read first, the delivery finished, the main business named); session.js guards.
+Isolation 29a–29e. Harness 102 + M1986–M2018 (M1994 retired in the build — a dead second guard).
+**Next (model: Opus — database rules):** Office corrections (O12), then seat billing + the
+per-business lock (with the second audit's finding 5). The fourth GPT audit after V169 (V170 its fixes).
+
+### V163 residuals (known, accepted)
+- A phone that never comes online again keeps what it had — nothing reaches into a phone.
+- A leaver with two phones: the first to connect delivers and finishes; the second, later, finds
+  the window shut — its unsent work stays read-only there.
+- Removed while on V162 (before updating): if that phone read the business list again first, a
+  never-sent job made for the old main business can't be told apart — it is refused (never
+  filed in their own business) and stays on the phone, sendable only if invited back.
+- A kept (read-only) job is locked on the phone only; the lock goes up if they're invited back.
+- Clients, sites and other lists follow the leaver (a row can be in one business only; the phone
+  holds them anyway). Shared lists per business are their own release.
+- Photos of the business's jobs on the leaver's phone go with their jobs (removeJobsFromPhone);
+  photos the leaver took for a kept job stay with it.
+- Not proved here: a real browser pass of the remove sheet and the leaver's sheet (no browser
+  reachable this session); the hosted project (the deploy steps).
+
+### Next after V162 (done — V163)
 V162 = the third audit's findings 1 and 2 (a fix release). cloud.js: ONE owner decision
 (`_cloudOwnerResolve`) for the sign-in landing and the start — the start no longer adopts a
 saved login over the sync record, nor while ownership is uncertain or the owner can't be saved

@@ -169,7 +169,13 @@ function _syncSessions() {
   // jobIdsSafe — only a tampered file restored before V154 can put one here) is
   // left out exactly as an example job is: kept and shown on this phone, never
   // sent, never counted. syncUnsafeHereCount() is the Sync page's line for it.
-  return (state.sessions || []).filter(s => s && s.id != null && s.id !== '' && !s[flag] && jobIdsSafe(s));
+  // V163 (3B, 6A): a job of a business this account has LEFT is left out the same
+  // way once its last delivery is over (or there was none) — the cloud refuses it,
+  // and one refused row fails its whole batch, so every later sync would stop.
+  // During the delivery it is sent as ever (business.js businessDepartedHeldIds).
+  const left = (typeof businessDepartedHeldIds === 'function') ? businessDepartedHeldIds() : null;
+  return (state.sessions || []).filter(s => s && s.id != null && s.id !== '' && !s[flag] && jobIdsSafe(s)
+    && !(left && left.has(String(s.id))));
 }
 
 // V154 (5A): how many jobs on this phone are kept off the cloud for their ids.
@@ -516,15 +522,17 @@ function _syncJobHash(s, fresh) {
   return syncHash(_syncCanonical(s));
 }
 
-function syncJobsSafety(fresh) {
+function syncJobsSafety(fresh, list) {
   if (!syncActive()) return null;
   const uid = _syncCurrentUserId();
   const st = _syncStateFor(uid);
-  const pending = (uid && st.userId === uid) ? _syncPhotosPendingByJob(st) : null;
+  // V163: `list` — judge these jobs (a business you've left: no longer syncing)
+  // by the same rule; their photos are counted from the same list.
+  const pending = (uid && st.userId === uid) ? _syncPhotosPendingByJob(st, list) : null;
   const held = new Set(_syncHeldLoad().filter(e => e.kind === 'session').map(e => e.id));
   const map = new Map();
   let safe = 0;
-  for (const s of _syncSessions()) {
+  for (const s of (Array.isArray(list) ? list : _syncSessions())) {
     const id = String(s.id);
     const h = _syncJobHash(s, !!fresh);
     let r;
@@ -1595,6 +1603,8 @@ function _syncPull(c, uid, st, out, chk) {
   // been cleared away. Decided exactly as that marker would have been: clean
   // here → removed here; edited here → held, and the Sync page asks. Before the
   // pages, so nothing read below is mistaken for it.
+  // (V163: a business you've left never reaches here — _syncKnownIds leaves its
+  // jobs out of the listing's "known", so they can't look deleted elsewhere.)
   for (const id of ((chk && chk.jobs) || [])) decide({ id, deleted: true, ask: !!chk.ask });
 
   return page(since).then(() => {
@@ -1699,9 +1709,13 @@ const _SYNC_DELETABLE_KINDS = ['client', 'site', 'instrument', 'preset', 'templa
 // What this phone holds as known in the cloud, per table. Settings rows are
 // never deleted by any version, so they are never in question.
 function _syncKnownIds(st, k) {
-  if (k === 'jobs') return Object.keys(st.sent);
+  // V163: a business this account has left is no longer its to list — those
+  // rows can't be read now. Counted, they'd look deleted elsewhere, or (if they
+  // were all it knew) make the listing come back empty and stop every sync.
+  const left = (typeof businessDepartedAnyIds === 'function') ? businessDepartedAnyIds() : null;
+  if (k === 'jobs') return Object.keys(st.sent).filter(id => !(left && left.has(id)));
   if (k === 'rec') return Object.keys(st.rec.sent).filter(id => SYNC_SETTINGS_IDS.indexOf(id) === -1);
-  return Object.keys(st.ph.sent);
+  return Object.keys(st.ph.sent).filter(id => !(left && st.ph.sent[id] && left.has(String(st.ph.sent[id].s))));
 }
 
 // The kind of a record this phone holds — on a list, or deleted here (its
@@ -2008,7 +2022,15 @@ function _syncRun(o) {
     // SYNC_MIN_CHECK_MS. Below it the run stops here: nothing read, nothing sent.
     return syncMinVersionRead(c, uid).then(() => {
       if (syncTooOld(uid)) { const e = new Error('PATGo needs updating'); e.syncStage = 'version'; throw e; }
-      return _syncRunAs(c, uid, session, opts);
+      return _syncRunAs(c, uid, session, opts).catch((e) => {
+        // V163: a refusal by the row rules may mean this account was removed
+        // from a business while PATGo was open — the next run asks first.
+        try {
+          const t = [e && e.message, e && e.hint, e && e.details].map((x) => String(x || '')).join(' ');
+          if (/row-level security|patgo_left_business/i.test(t) && typeof businessDeparturesOwe === 'function') businessDeparturesOwe();
+        } catch (x) { /* only a hint */ }
+        throw e;
+      });
     });
   }));
 }
@@ -2033,7 +2055,11 @@ function _syncRunAs(c, uid, session, opts) {
     const checking = due.jobs || due.rec || due.ph;
     const reads = !!opts.pull || checking;
     const at = new Date(serverAt ? Math.min(Date.now(), serverAt) : Date.now()).toISOString();
-    const found = checking ? _syncCheckRun(c, uid, st, due) : Promise.resolve({ jobs: null, rec: null, ph: null, ask: false });
+    // V163: a business this account has left is known BEFORE anything is read or
+    // sent — its jobs are then held back (or delivered, 6A). Never rejects.
+    const left = (typeof businessDeparturesMaybeRead === 'function')
+      ? businessDeparturesMaybeRead(c, uid).catch(() => false) : Promise.resolve(false);
+    const found = left.then(() => (checking ? _syncCheckRun(c, uid, st, due) : { jobs: null, rec: null, ph: null, ask: false }));
     return found.then((f) => {
     const chk = Object.assign({ at }, f);
     // v82: clients and sites go FIRST, so a job that arrives in this run finds
@@ -2064,7 +2090,11 @@ function _syncRunAs(c, uid, session, opts) {
           // not go never stops jobs, and the run still reports what it did.
           if (!reads) return base;
           return _syncPhotosHalf(c, uid, st, chk).then(
-            (ph) => Object.assign(base, { photos: ph }),
+            // V163 (6A): everything this run could send has gone — a last
+            // delivery that's complete is finished now. Never rejects.
+            (ph) => ((ph && !ph.skipped && typeof businessDeliveryFinish === 'function')
+              ? businessDeliveryFinish(c, uid).then(() => Object.assign(base, { photos: ph }), () => Object.assign(base, { photos: ph }))
+              : Object.assign(base, { photos: ph })),
             (e) => {
               console.error('Sync: photos not sent this time (non-fatal).', e);
               _syncNotePlanRefusal(e);   // V143
@@ -2331,8 +2361,16 @@ function _syncPhoneReport(c, uid) {
 // malformed value (an old backup, a hand edit) is never sent: the cloud column is
 // a uuid, and one bad row would fail its whole batch.
 function _syncJobBusiness(s) {
+  const re = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   const v = s && typeof s.businessId === 'string' ? s.businessId : '';
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v : '';
+  if (re.test(v)) return v;
+  // V163: a job with none was made for the main business as this phone knows it
+  // — named, so a job made for a business that has since removed you is
+  // delivered there (6A) or refused, never quietly filed in your own business.
+  try {
+    const d = (typeof businessDefault === 'function') ? businessDefault() : null;
+    return d && re.test(d.id) ? d.id : '';
+  } catch (e) { return ''; }
 }
 
 function _syncPushHalf(c, uid, st, force) {
@@ -2388,6 +2426,7 @@ function _syncPushHalf(c, uid, st, force) {
     //   • the job was cleared from this phone AFTER the delete (its cleared-list
     //     entry is newer) → it came back and left again, kept in the cloud.
     const clearedAt = new Map(_syncPrunedLoad().map(e => [e.id, e.at]));
+    const leftAny = (typeof businessDepartedAnyIds === 'function') ? businessDepartedAnyIds() : null;   // V163
     const stale = new Set();
     for (const t of (state.tombstones || [])) {
       if (!t || t.kind !== 'session') continue;
@@ -2396,6 +2435,9 @@ function _syncPushHalf(c, uid, st, force) {
       const cAt = clearedAt.get(id);
       if (typeof cAt === 'string' && (typeof t.at !== 'string' || cAt >= t.at)) { stale.add(t); continue; }
       if (heldIds.has(id)) continue;                 // awaiting a decision
+      // V163 (6A): a business you've left — its delete is never sent (refused,
+      // and it would fail the batch). Kept: if you're invited back it goes then.
+      if (leftAny && leftAny.has(id)) continue;
       // V154 (5A, 4A): a job with an id PATGo could never have made is never sent
       // — its delete neither (the database refuses that id, and one refused row
       // fails its whole batch). Kept, so a later fix can still send it.
@@ -4426,11 +4468,11 @@ function _syncThumbPath(uid, id) {
 // the cloud: its job syncs (not the example) and its item is still in that job.
 // A photo written before sessionId was recorded is matched by its item. null
 // until the mirror is known to be complete (photoMetaReady).
-function _syncPhotoJobs() {
+function _syncPhotoJobs(list) {
   if (!state.photoMetaReady) return null;
   const meta = state.photoMeta || {};
   const itemJob = new Map();
-  for (const s of _syncSessions()) {
+  for (const s of (Array.isArray(list) ? list : _syncSessions())) {   // V163: or these jobs
     for (const it of (s.items || [])) if (it && it.id != null) itemJob.set(String(it.id), String(s.id));
   }
   const out = new Map();
@@ -4446,8 +4488,8 @@ function _syncPhotoJobs() {
 
 // sessionId → how many of its photos are not in the cloud yet. null when the
 // mirror isn't loaded (the prune guard then clears nothing).
-function _syncPhotosPendingByJob(st) {
-  const jobs = _syncPhotoJobs();
+function _syncPhotosPendingByJob(st, list) {
+  const jobs = _syncPhotoJobs(list);
   if (!jobs) return null;
   const out = new Map();
   for (const [id, job] of jobs) if (!st.ph.sent[id]) out.set(job, (out.get(job) || 0) + 1);
@@ -4620,9 +4662,12 @@ function _syncThumbUpload(c, uid, id, blob) {
 // job; a failure throws to the photos half, which is fail-soft (tried next run).
 function _syncPhotoMoves(c, uid, st, out) {
   const byJob = new Map();
+  // V163: not for a business you've left (outside its last delivery) — refused.
+  const left = (typeof businessDepartedHeldIds === 'function') ? businessDepartedHeldIds() : null;
   for (const id of Object.keys(st.ph.mv)) {
     if (!st.ph.sent[id]) { delete st.ph.mv[id]; continue; }   // no longer known in the cloud
     const job = st.ph.mv[id];
+    if (left && (left.has(String(job)) || left.has(String(st.ph.sent[id].s)))) continue;   // V163
     if (!byJob.has(job)) byJob.set(job, []);
     byJob.get(job).push(id);
   }
@@ -4660,12 +4705,16 @@ function _syncPhotosHalf(c, uid, st, chk) {
       //    v89: anything KNOWN to be in the cloud (5A), not only this phone's own.
       const del = [];
       const seen = new Set();
+      // V163 (6A): a photo of a job of a business you've left is never deleted
+      // from here — refused, and it would stop every photo after it.
+      const leftAny = (typeof businessDepartedAnyIds === 'function') ? businessDepartedAnyIds() : null;
       for (const t of (state.tombstones || [])) {
         if (!t || t.kind !== 'photo') continue;
         const id = String(t.id);
         if (seen.has(id)) continue;
         if (meta[id]) continue;                    // on this phone again (restored): live
         if (!st.ph.sent[id]) continue;             // not known to be in the cloud
+        if (leftAny && leftAny.has(String(st.ph.sent[id].s))) continue;   // V163
         seen.add(id); del.push(id);
       }
       for (const id of Object.keys(st.ph.sent)) {

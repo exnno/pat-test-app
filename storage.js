@@ -313,6 +313,7 @@ const STORE_JSON = [
   ['OWNER_STATS_KEY', OWNER_STATS_KEY, 'object', 'stats kept for another account'],
   ['BUSINESSES_KEY', BUSINESSES_KEY, 'object', 'your businesses'],
   ['JOB_MOVES_KEY', JOB_MOVES_KEY, 'object', 'your job moves'],
+  ['DEPARTED_KEY', DEPARTED_KEY, 'object', 'the businesses you\u2019ve left'],
   ['MIN_VERSION_KEY', MIN_VERSION_KEY, 'object', 'the cloud\u2019s minimum version'],
 ];
 const STORE_TEXT = [

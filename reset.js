@@ -153,6 +153,8 @@ const RESET_KEY_PLAN = [
   ['LAST_BUSINESS_KEY', LAST_BUSINESS_KEY, 'account'],
   // V150: the moves Job settings shows follow the account too.
   ['JOB_MOVES_KEY', JOB_MOVES_KEY, 'account'],
+  // V163: the businesses this account has left — the account's.
+  ['DEPARTED_KEY', DEPARTED_KEY, 'account'],
   // V151: the minimum app version as last read — the account's.
   ['MIN_VERSION_KEY', MIN_VERSION_KEY, 'account'],
 ];

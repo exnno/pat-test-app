@@ -1,4 +1,4 @@
-# PATGo — Code Map (V162)
+# PATGo — Code Map (V163)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1554,7 +1554,18 @@ saved login over A's sync record). `cloudOwnerHeld()` (no owner + jobs + refused
 headers → 500 PGRST121) — supabase/v162-signed-out-fix.sql; harness/pgrst-raise.js is the
 PostgREST port the harness crosses. Harness 101, M1970–M1985.
 
-### sync.js (~5420 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner, V149 job business, V151 minimum app version, V153 held in memory
+### sync.js (~5480 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner, V149 job business, V151 minimum app version, V153 held in memory, V163 a business left
+⚠ V163: a business this account has LEFT (business.js DEPARTED_KEY) — `_syncSessions` leaves its
+jobs out once its last delivery is over (`businessDepartedHeldIds`; one refused row fails the whole
+batch, so every later sync would stop); its tombstones and photo deletes are never sent
+(`businessDepartedAnyIds`); `_syncKnownIds` drops them (else the full listing calls them deleted
+elsewhere, or comes back empty and stops every sync); `_syncPhotoMoves` skips them.
+`_syncRunAs` reads the departures FIRST (`businessDeparturesMaybeRead`) and finishes a delivery
+after the photos (`businessDeliveryFinish`); a refusal by the row rules / patgo_left_business owes
+a departures read. `_syncJobBusiness` names the MAIN business (stored list) for a job with none —
+so a job made for a business that removed you is delivered there or refused, never filed in your
+own. `syncJobsSafety(fresh, list)` / `_syncPhotoJobs(list)` / `_syncPhotosPendingByJob(st, list)`
+take an optional job list (3B judges a business left's jobs). Harness 102.
 ⚠ V151: `_syncRun` reads the minimum (`syncMinVersionRead` — rpc `my_min_version`, at most
 every SYNC_MIN_CHECK_MS, at once after a start or a return: `_syncMinOwed` / `syncMinOwe`
 from the resume listener) BEFORE anything else, then stops (stage 'version') when
@@ -1950,6 +1961,25 @@ own phones then org_phones_behind → `patgo_team_phones_behind`). `_bizCall` se
 on accept_invite to an info sheet (`_bizTeamBehind`, `businessJoinTeamBehindWords` — the
 business named, no device read); `_bizHeldUp` (V156's device sheet) never matches it.
 Harness 99a–99f; M1938–M1950.
+V163 (sixth part): leaving and removing. DEPARTED_KEY {u, list} (config.js; reset 'account';
+storage.js unreadable-key list) — `businessDeparturesLoad/Save` (held in memory first),
+`businessDeparturesFromRows` (rpc `my_departures`: the cloud's job ids + this phone's —
+businessId, or no businessId while the departed business was main by the stored list, so
+`businessRead` reads the departures BEFORE `my_businesses`; marks only never-sent jobs).
+Phases deliver → settle → done. ⚠ sync.js reads it: `businessDepartedHeldIds` (left out of
+_syncSessions — every phase but an open, unexpired delivery), `businessDepartedAnyIds` (no job or
+photo delete ever sent; out of the full listing's "known"). `businessDeparturesMaybeRead` runs at
+the START of every sync run (owed at start / resume / after a refusal; every run while a departure
+is open; else BUSINESS_READ_MS). `businessDeliveryFinish` runs after the run's photos: an open
+delivery with nothing left to send → rpc `finish_delivery`; then `_bizDepSettle` (3B: removes the
+shield-safe jobs via session.js `removeJobsFromPhone`, locks the rest). 5B: `_bizDepTellSoon`
+(sheet on the Jobs list only, at a safe moment; session.js setView calls it) and
+`businessDepartedBannerHTML` (render-core.js `leftBanner`). Read-only: `businessJobLeft` /
+`businessJobLeftLine` — session.js `saveSessionEdits` and `unlockActiveSession`,
+`businessMoveBlockReason`, `businessJobCardHTML`. Remove (`businessMayRemove` = BUSINESS_OFFER;
+`businessRemoveStart` → rpc `member_devices` → choice sheet → `businessRemoveGo`, deliver flag) and
+Leave (`businessLeaveStart` → rpc `leave_business` → a sync run). Words: patgo_member_gone,
+patgo_owner_leave. Database: supabase/v163-leaving.sql. Harness 102a–102f; M1986–M2018.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V162: rolled forward — V162 on top, V159 dropped. -->
+      <!-- v8: rolling 3-version changelog. V163: rolled forward — V163 on top, V160 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V163</strong> &middot; November 2026</p>
+        <p class="muted">Leaving and removing: someone can be removed from a business, or leave one themselves. Their jobs stay with the business; their phone sends anything unsent first, then takes the business&rsquo;s jobs off and says what it did.</p>
         <p><strong>V162</strong> &middot; November 2026</p>
         <p class="muted">A phone whose record of its account is lost or can&rsquo;t be saved no longer starts up signed in as a different account; its jobs stay safe on the phone. And a phone signed out from another device is now told so reliably.</p>
         <p><strong>V161</strong> &middot; November 2026</p>
         <p class="muted">A phone you sign out from another device (Account &rarr; Your devices) loses cloud access straight away, not up to an hour later. That phone signs itself out, keeps its jobs, and says why.</p>
-        <p><strong>V160</strong> &middot; November 2026</p>
-        <p class="muted">Joining a business checks its phones again: if a phone there has an older PATGo, you&rsquo;re asked to wait until it&rsquo;s updated, and your invite stays waiting.</p>
       </div>
 
       <div class="info-card">

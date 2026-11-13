@@ -288,8 +288,8 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Approve or refuse job moves.</strong> When someone asks to move a job out of your business, it waits on the Business page &mdash; and the Jobs list tells you &mdash; for the Owner, a Team leader or the Office to approve or refuse.</li>
-        <li><strong>Asked to move a job?</strong> The Jobs list tells you once it&rsquo;s been decided, and Job settings says who decided it.</li>
+        <li><strong>Remove someone from your business.</strong> On the Business page, the Owner can remove anyone; a Team leader or the Office can remove Engineers. You see their devices and when each was last used, and can let their phone send what it&rsquo;s still holding first.</li>
+        <li><strong>Leave a business.</strong> Anyone but the Owner can leave. Your jobs for it stay with the business &mdash; your phone sends anything unsent, then takes them off and tells you what it did.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -998,6 +998,8 @@ function renderSessions() {
   let waitBanner = '', decidedBanner = '';
   try { waitBanner = (typeof businessWaitingBannerHTML === 'function') ? businessWaitingBannerHTML() : ''; } catch (e) { waitBanner = ''; }
   try { decidedBanner = (typeof businessDecidedBannerHTML === 'function') ? businessDecidedBannerHTML() : ''; } catch (e) { decidedBanner = ''; }
+  let leftBanner = '';   // V163 (5B): removed from / left a business
+  try { leftBanner = (typeof businessDepartedBannerHTML === 'function') ? businessDepartedBannerHTML() : ''; } catch (e) { leftBanner = ''; }
 
   // V93 (4A — O9): signed in, the Jobs screen has two tabs. "In the cloud" is
   // how old jobs are reached once a phone only brings down recent ones (R21):
@@ -1036,6 +1038,7 @@ function renderSessions() {
       ${inviteBanner}
       ${waitBanner}
       ${decidedBanner}
+      ${leftBanner}
       ${tabs}
       ${unreadableBanner}
       ${storageBanner}

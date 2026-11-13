@@ -199,6 +199,9 @@ function businessFromRows(uid, rows) {
 
 function businessRead(c, uid) {
   return Promise.resolve()
+    // V163: the businesses left FIRST — while the stored list still names the
+    // old main business, whose unmarked jobs were that business's.
+    .then(() => (typeof businessDeparturesRead === 'function' ? businessDeparturesRead(c, uid).catch(() => false) : false))
     .then(() => c.rpc('my_businesses'))
     .then((res) => {
       if (!res || res.error) throw (res && res.error) || new Error('no answer');
@@ -225,7 +228,7 @@ function businessReadDue(rec, uid, now) {
 // (businessReadOwe, from sync.js's resume listener) — whatever the 6 hours say.
 let _bizReadOwed = true;
 
-function businessReadOwe() { _bizReadOwed = true; }
+function businessReadOwe() { _bizReadOwed = true; _bizDepOwed = true; }   // V163: the departures too
 
 function businessMaybeRead(c, uid) {
   if (!uid || (!_bizReadOwed && !businessReadDue(businessLoad(), uid, Date.now()))) return Promise.resolve(false);
@@ -342,6 +345,7 @@ function renderCloudBusiness() {
         ${!x.def && x.role !== 'office' ? `<button class="backup-action-btn" id="biz-main-${i}" data-action="biz-main" data-arg="${escapeHTML(x.id)}" style="margin-top:8px">Make this my main business</button>` : ''}
         ${businessWaitingHTML(x, i)}
         ${businessPeopleHTML(x, i)}
+        ${x.role !== 'owner' ? `<button class="link-btn biz-leave" id="biz-leave-${i}" data-action="biz-leave" data-arg="${escapeHTML(x.id)}" style="margin-top:10px">Leave ${escapeHTML(businessLabel(x))}</button>` : ''}
       </div>`;
     }).join('');
     body = `
@@ -538,6 +542,15 @@ function businessMoveLine(m) {
 // record. Nothing at all for everyone else (solo users: Job settings as before).
 function businessJobCardHTML(sess) {
   if (!sess) return '';
+  // V163: a job of a business you've left — said, and nothing offered.
+  const left = (typeof businessJobLeftLine === 'function') ? businessJobLeftLine(sess) : '';
+  if (left) {
+    return `
+      <div class="card biz-job-card" id="ef-biz-card">
+        <label class="label">Business</label>
+        <p class="muted biz-job-line" id="ef-biz-left">${escapeHTML(left)}</p>
+      </div>`;
+  }
   const several = businessChoices().length >= 2;
   const m = businessMoveFor(sess.id);
   if (!several && !m) return '';
@@ -586,6 +599,7 @@ function _bizMoveRepaint() {
 // Why this job can't be moved now ('' = it can).
 function businessMoveBlockReason(sess) {
   if (!sess) return 'This job isn’t here any more.';
+  if (typeof businessJobLeftLine === 'function' && businessJobLeftLine(sess)) return businessJobLeftLine(sess);   // V163
   if (!(state.cloud && state.cloud.status === 'signed-in') || (typeof syncActive === 'function' && !syncActive())) {
     return 'Sign in to move a job to another business.';
   }
@@ -904,6 +918,8 @@ function businessTeamError(err) {
   if (/patgo_invite_name/.test(t)) return 'Add a name — up to 60 letters.';
   if (/patgo_invite_gone/.test(t)) return 'This invite has ended — it was cancelled, answered or is more than 14 days old. Ask for a new one.';
   if (/patgo_main_office/.test(t)) return 'You’re Office in that business, so it can’t be your main one — your jobs go to a business you test for.';   // V159
+  if (/patgo_member_gone/.test(t)) return 'They’re not in this business any more.';                      // V163
+  if (/patgo_owner_leave/.test(t)) return 'You own this business, so you can’t leave it.';                   // V163
   if (/patgo_not_allowed/.test(t)) return 'That isn’t something your role in this business can do.';
   if (/patgo_move_stale/.test(t)) return businessStaleWords(err);                                  // V157
   if (/patgo_move_self/.test(t)) return 'You asked for this move — someone else in the business has to decide it.';
@@ -1212,7 +1228,10 @@ function businessPeopleHTML(b, i) {
     const btn = p.you
       ? `<button class="link-btn" id="biz-myname-${i}" data-action="biz-myname" data-arg="${escapeHTML(b.id)}">${p.name ? 'Change your name' : 'Add your name'}</button>`
       : (b.role === 'owner' && p.role !== 'owner'
-        ? `<button class="link-btn" id="biz-role-${i}-${k}" data-action="biz-role" data-arg="${escapeHTML(b.id + ':' + p.user)}">Change role</button>` : '');
+        ? `<button class="link-btn" id="biz-role-${i}-${k}" data-action="biz-role" data-arg="${escapeHTML(b.id + ':' + p.user)}">Change role</button>` : '')
+        // V163 (1A): whoever may invite their role may remove them.
+        + (typeof businessMayRemove === 'function' && businessMayRemove(b, p)
+          ? ` <button class="link-btn" id="biz-remove-${i}-${k}" data-action="biz-remove" data-arg="${escapeHTML(b.id + ':' + p.user)}">Remove</button>` : '');
     return `
           <li class="biz-person" id="biz-person-${i}-${k}">
             <span class="biz-person-name">${escapeHTML(nm)}${p.you && p.name ? ' (you)' : ''}</span>
@@ -1664,4 +1683,392 @@ function businessMovesTold() {
   if (any) businessMovesSave(rec);
   render();
   return any;
+}
+
+// ============================================================================
+// V163 — leaving and removing a member (R5; locked 13 Nov: 1A 2A 3B 4C 5B 6A)
+// ============================================================================
+// 1A who removes whom = who may invite whom (BUSINESS_OFFER / the SQL's
+// _may_offer) · 2A anyone but the Owner may leave · 3B the leaver's phone takes
+// off the business's jobs the cloud holds in full (the shield), keeps unsent
+// ones read-only · 4C the remover sees the person's devices and when each was
+// last used — warned, never blocked · 5B the leaver is told on a sheet · 6A the
+// last delivery: their phone sends its own unsent jobs and photos for that
+// business first, then tells the cloud it's finished (7 days at most); "Cut off
+// now" skips it. The database: supabase/v163-leaving.sql.
+//
+// DEPARTED_KEY {u, list:[{id, name, kind, by, at, until, deliver, phase, jobs,
+// removed, kept, told}]} — the businesses this phone's account has left. phase:
+// 'deliver' (sending its last work) → 'settle' (to be cleared) → 'done'. jobs:
+// the job ids that were the business's — the cloud's own list (my_departures)
+// plus this phone's (businessId, or the main business before it changed).
+// ⚠ sync.js leaves a job out of _syncSessions while it's held (businessDepartedHeldIds:
+// every phase but an open delivery) — the cloud refuses it, and one refused row
+// fails its whole batch. Its deletes are never sent (businessDepartedAnyIds).
+
+const BUSINESS_DELIVER_DAYS = 7;   // supabase/v163-leaving.sql: the last delivery's limit — said in the words
+const _BIZ_DEP_PHASES = ['deliver', 'settle', 'done'];
+let _bizDepMemo = null;            // held first (a full phone still knows), then stored
+let _bizDepOwed = true;            // a start owes a read; so does a refusal by the row rules
+
+function _bizDepNorm(raw) {
+  const out = { u: '', list: [] };
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
+  out.u = typeof raw.u === 'string' ? raw.u : '';
+  const seen = new Set();
+  for (const d of (Array.isArray(raw.list) ? raw.list : [])) {
+    if (!d || !businessValidId(d.id) || seen.has(d.id)) continue;
+    seen.add(d.id);
+    const jobs = Array.from(new Set((Array.isArray(d.jobs) ? d.jobs : []).map(String)
+      .filter(j => typeof safeId !== 'function' || safeId(j))));
+    out.list.push({
+      id: d.id,
+      name: _bizStr(d.name, 80),
+      kind: d.kind === 'left' ? 'left' : 'removed',
+      by: _bizStr(d.by, 60),
+      at: _bizStr(d.at, 40),
+      until: _bizStr(d.until, 40),
+      deliver: d.deliver === true,
+      phase: _BIZ_DEP_PHASES.indexOf(d.phase) !== -1 ? d.phase : 'settle',
+      jobs,
+      removed: Number.isInteger(d.removed) && d.removed > 0 ? d.removed : 0,
+      kept: Number.isInteger(d.kept) && d.kept > 0 ? d.kept : 0,
+      told: d.told === true,
+    });
+  }
+  return out;
+}
+
+function businessDeparturesLoad() {
+  if (_bizDepMemo) return _bizDepMemo;
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(DEPARTED_KEY) || 'null'); } catch (e) { raw = null; }
+  _bizDepMemo = _bizDepNorm(raw);
+  return _bizDepMemo;
+}
+
+function businessDeparturesSave(rec) {
+  _bizDepMemo = _bizDepNorm(rec);
+  try {
+    if (_bizDepMemo.list.length) localStorage.setItem(DEPARTED_KEY, JSON.stringify(_bizDepMemo));
+    else localStorage.removeItem(DEPARTED_KEY);
+    return true;
+  } catch (e) { return false; }   // a full phone: held in memory; the cloud says it again next start
+}
+
+// Reset / a takeover cleared the key: forget the copy held in memory too.
+function businessDeparturesForget() { _bizDepMemo = null; }
+
+function businessDepartures() { return businessDeparturesLoad().list; }
+
+// The delivery's own limit, by this phone's clock — past it the cloud refuses.
+function _bizDepExpired(d) {
+  const ms = Date.parse(String(d && d.until || '').replace(/(\.\d{3})\d+/, '$1'));
+  return !isFinite(ms) || ms <= Date.now();
+}
+
+// sync.js: never sent — every job of a business left, but during an open delivery.
+function businessDepartedHeldIds() {
+  const out = new Set();
+  for (const d of businessDepartures()) {
+    if (d.phase === 'deliver' && !_bizDepExpired(d)) continue;
+    for (const j of d.jobs) out.add(j);
+  }
+  return out;
+}
+
+// sync.js: no delete is ever sent for these (a leaver delivers, never wipes).
+function businessDepartedAnyIds() {
+  const out = new Set();
+  for (const d of businessDepartures()) for (const j of d.jobs) out.add(j);
+  return out;
+}
+
+// The departure a job belongs to, or null — the job is then read-only here.
+function businessJobLeft(sess) {
+  if (!sess || sess.id == null) return null;
+  const id = String(sess.id);
+  return businessDepartures().find(d => d.jobs.indexOf(id) !== -1) || null;
+}
+
+function businessDepartedName(d) { return (d && d.name) ? d.name : 'that business'; }
+
+function businessDeparturesOwe() { _bizDepOwed = true; }
+
+// Rows from my_departures → the stored record. `def` is the main business as
+// this phone knew it BEFORE the list is read again: a job with no businessId was
+// the main one's, so if that's the business left, those jobs were its.
+function businessDeparturesFromRows(uid, rows) {
+  if (!uid || !Array.isArray(rows)) return null;
+  const rec = businessDeparturesLoad();
+  const prev = rec.u === uid ? rec.list : [];
+  const def = businessDefault();
+  const flag = (typeof DEMO_SESSION_FLAG !== 'undefined') ? DEMO_SESSION_FLAG : 'isExample';
+  const out = [];
+  let stamped = 0;
+  for (const r of rows) {
+    if (!r || !businessValidId(r.business_id)) continue;
+    const id = r.business_id;
+    const was = prev.find(d => d.id === id) || null;
+    const jobs = new Set(was ? was.jobs : []);
+    for (const j of (Array.isArray(r.jobs) ? r.jobs : [])) jobs.add(String(j));
+    if (!was) {
+      for (const s of (state.sessions || [])) {
+        if (!s || s.id == null || s[flag]) continue;
+        const b = businessValidId(s.businessId) ? s.businessId : '';
+        if (b === id || (!b && def && def.id === id)) jobs.add(String(s.id));
+      }
+    }
+    // A job the cloud never had now names the business it was made for, so its
+    // last delivery lands there, never in the leaver's own. One the cloud has is
+    // left as it is: the cloud knows its business, and changing it here would
+    // change its fingerprint and lose its shield (3B).
+    const inCloud = new Set((Array.isArray(r.jobs) ? r.jobs : []).map(String));
+    for (const s of (state.sessions || [])) {
+      if (s && s.id != null && !s[flag] && jobs.has(String(s.id)) && !inCloud.has(String(s.id)) && s.businessId !== id) { s.businessId = id; stamped++; }
+    }
+    const deliver = r.deliver === true;
+    out.push({
+      id, name: _bizStr(r.business_name, 80), kind: r.kind === 'left' ? 'left' : 'removed', by: _bizStr(r.by_name, 60),
+      at: _bizStr(r.at, 40), until: _bizStr(r.deliver_until, 40), deliver, jobs: Array.from(jobs),
+      phase: (was && was.phase === 'done') ? 'done' : (deliver ? 'deliver' : 'settle'),
+      removed: was ? was.removed : 0, kept: was ? was.kept : 0, told: was ? was.told : false,
+    });
+  }
+  // A business that isn't in the answer any more: invited back. Its jobs are
+  // this account's to change and send again (a kept one stays locked until unlocked).
+  businessDeparturesSave({ u: uid, list: out });
+  if (stamped && typeof save === 'function') save();
+  return out;
+}
+
+function businessDeparturesRead(c, uid) {
+  return Promise.resolve()
+    .then(() => c.rpc('my_departures'))
+    .then((res) => {
+      if (!res || res.error) throw (res && res.error) || new Error('no answer');
+      const out = businessDeparturesFromRows(uid, res.data);
+      if (out) _bizDepOwed = false;
+      _bizJobsRepaint();
+      return !!out;
+    });
+}
+
+// sync.js, BEFORE anything is read or sent: on every start and return to the
+// front (owed), after a refusal by the row rules (owed), while a departure is
+// still being settled, and otherwise with the business list (BUSINESS_READ_MS).
+// Never rejects; a project without the V163 SQL simply has none.
+function businessDeparturesMaybeRead(c, uid) {
+  if (!uid) return Promise.resolve(false);
+  const rec = businessDeparturesLoad();
+  const open = rec.u === uid && rec.list.some(d => d.phase !== 'done');
+  if (!_bizDepOwed && !open && !businessReadDue(businessLoad(), uid, Date.now())) return Promise.resolve(false);
+  return businessDeparturesRead(c, uid).catch((e) => {
+    console.error('Business: departures not read this time (non-fatal).', e);
+    return false;
+  });
+}
+
+// 3B: take off the jobs the cloud holds in full; keep the rest here, read-only
+// (locked — kept off the cloud, so the lock never goes up). `safety` is
+// sync.js's shield judged over just these jobs.
+function _bizDepSettle(d, safety) {
+  const here = (state.sessions || []).filter(s => s && d.jobs.indexOf(String(s.id)) !== -1);
+  const safe = here.filter(s => { const r = safety && safety.map.get(String(s.id)); return !!(r && r.safe); }).map(s => s.id);
+  const n = (safe.length && typeof removeJobsFromPhone === 'function') ? removeJobsFromPhone(safe) : 0;
+  const kept = (state.sessions || []).filter(s => s && d.jobs.indexOf(String(s.id)) !== -1);
+  const now = new Date().toISOString();
+  for (const s of kept) {
+    if (!s.locked) { s.locked = true; s.lockedAt = now; if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(s); }
+  }
+  d.phase = 'done'; d.removed = (d.removed || 0) + n; d.kept = kept.length; d.told = false;
+  if (kept.length || n) save();
+}
+
+// sync.js, after a run's photos: a delivery with nothing left to send is
+// finished (the cloud told), and every departure not yet settled is settled.
+// An open delivery waits while any of its jobs could still go — unsent, photos
+// to send, or not yet read back — until its 7 days are up. Never rejects.
+function businessDeliveryFinish(c, uid) {
+  const rec = businessDeparturesLoad();
+  if (!uid || rec.u !== uid || !rec.list.some(d => d.phase !== 'done')) return Promise.resolve(false);
+  if (!state.photoMetaReady || typeof syncJobsSafety !== 'function') return Promise.resolve(false);
+  let chain = Promise.resolve();
+  let changed = false;
+  for (const d of rec.list) {
+    if (d.phase === 'done') continue;
+    const here = (state.sessions || []).filter(s => s && d.jobs.indexOf(String(s.id)) !== -1);
+    const safety = syncJobsSafety(true, here);
+    if (!safety) continue;
+    if (d.phase === 'deliver') {
+      const going = here.some((s) => {
+        const r = safety.map.get(String(s.id));
+        return r && !r.safe && r.why !== 'held' && (typeof jobIdsSafe !== 'function' || jobIdsSafe(s));
+      });
+      if (going && !_bizDepExpired(d)) continue;
+      chain = chain.then(() => c.rpc('finish_delivery', { o: d.id }).then(() => {}, () => {}));   // best effort: the 7 days close it anyway
+    }
+    chain = chain.then(() => { _bizDepSettle(d, safety); changed = true; });
+  }
+  return chain.then(() => {
+    if (!changed) return false;
+    businessDeparturesSave(rec);
+    _bizDepTellSoon();
+    _bizJobsRepaint();
+    return true;
+  }).catch((e) => { console.error('Business: last delivery not finished this time (non-fatal).', e); return false; });
+}
+
+// ---- 5B: telling the person ---------------------------------------------------
+function businessDepartedWords(d) {
+  const nm = businessDepartedName(d);
+  const head = d.kind === 'left' ? `You’ve left ${nm}.` : `You’ve been removed from ${nm}${d.by ? ' by ' + d.by : ''}.`;
+  const jobs = (n) => `${n} ${n === 1 ? 'job' : 'jobs'}`;
+  let body;
+  if (!d.removed && !d.kept) body = ' None of its jobs were on this phone.';
+  else if (!d.kept) body = ` All your work for ${nm} was sent and has been taken off this phone (${jobs(d.removed)}). It’s safe with the business.`;
+  else {
+    body = (d.removed ? ` ${jobs(d.removed)} ${d.removed === 1 ? 'was' : 'were'} safe in the cloud and ${d.removed === 1 ? 'has' : 'have'} been taken off this phone.` : '') +
+      ` ${jobs(d.kept)} couldn’t be sent to ${nm}, so ${d.kept === 1 ? 'it stays' : 'they stay'} on this phone, read-only. You can still make a certificate or CSV from ${d.kept === 1 ? 'it' : 'them'}, or remove ${d.kept === 1 ? 'it' : 'them'} from this phone.`;
+  }
+  return head + body + ' Your sign-in and your own business are unchanged.';
+}
+
+function _bizDepUntold() { return businessDepartures().filter(d => d.phase === 'done' && !d.told); }
+
+function businessDepartedTold(id) {
+  const rec = businessDeparturesLoad();
+  let n = 0;
+  for (const d of rec.list) if (d.phase === 'done' && !d.told && (!id || d.id === id)) { d.told = true; n++; }
+  if (n) businessDeparturesSave(rec);
+  return n;
+}
+
+function businessDepartedSee(id) {
+  const d = _bizDepUntold().find(x => !id || x.id === id) || businessDepartures().find(x => x.id === id);
+  if (!d) return false;
+  openInfoSheet({
+    title: d.kind === 'left' ? `Left ${businessDepartedName(d)}` : `Removed from ${businessDepartedName(d)}`,
+    message: businessDepartedWords(d),
+    onClose: () => { businessDepartedTold(d.id); try { render(); } catch (e) { /* next paint */ } },
+  });
+  return true;
+}
+
+// 5B: the sheet opens itself on the Jobs list at a calm moment (no sheet open,
+// nothing being typed); otherwise the Jobs list line (below) waits with See.
+function _bizDepTellSoon() {
+  try {
+    if (!_bizDepUntold().length || state.view !== 'sessions') return;
+    if (typeof _syncSafeToRepaint === 'function' && !_syncSafeToRepaint()) return;
+    businessDepartedSee('');
+  } catch (e) { /* the line says it instead */ }
+}
+
+// The Jobs list: while delivering, and until told.
+function businessDepartedBannerHTML() {
+  const list = businessDepartures();
+  const sending = list.find(d => d.phase === 'deliver' && !_bizDepExpired(d));
+  const untold = list.find(d => d.phase === 'done' && !d.told);
+  if (untold) {
+    return `
+      <div class="info-card biz-left-line" id="biz-left-line" role="status">
+        <p>${escapeHTML(untold.kind === 'left' ? `You’ve left ${businessDepartedName(untold)}.` : `You’ve been removed from ${businessDepartedName(untold)}.`)}</p>
+        <button class="backup-action-btn" id="biz-left-see" data-action="biz-left-see" data-arg="${escapeHTML(untold.id)}">See what happened</button>
+      </div>`;
+  }
+  if (sending) {
+    return `
+      <div class="info-card biz-left-line" id="biz-left-sending" role="status">
+        <p>${escapeHTML(`You’re no longer in ${businessDepartedName(sending)} — sending your last work for them…`)}</p>
+      </div>`;
+  }
+  return '';
+}
+
+// Job settings: the line, and the reason Change… isn't offered.
+function businessJobLeftLine(sess) {
+  const d = businessJobLeft(sess);
+  if (!d) return '';
+  return `No longer in ${businessDepartedName(d)} — this job stays with the business. It can’t be changed on this phone.`;
+}
+
+// ---- removing someone (1A, 4C, 6A) --------------------------------------------
+function businessMayRemove(b, p) {
+  return !!(b && p && !p.you && p.role !== 'owner' && (BUSINESS_OFFER[b.role] || []).indexOf(p.role) !== -1);
+}
+
+function _bizDevLine(d) {
+  const kind = _bizKindHead(BUSINESS_DEVICE_KINDS[d.kind] || 'device');
+  const v = _BIZ_VERSION_RE.test(String(d.app_version || '')) ? d.app_version : '';
+  const ms = Date.parse(String(d.last_used || '').replace(/(\.\d{3})\d+/, '$1'));
+  let when = 'not used yet';
+  if (isFinite(ms)) {
+    const t = new Date(ms);
+    const p = (k) => String(k).padStart(2, '0');
+    when = 'last used ' + _bizDay(ms) + ' ' + p(t.getHours()) + ':' + p(t.getMinutes());
+  }
+  return [kind, v, when].filter(Boolean).join(' · ');
+}
+
+function businessRemoveStart(arg) {
+  const [orgId, user] = String(arg || '').split(':');
+  const b = _bizOrg(orgId);
+  const p = businessTeam().people.find(x => x.org === orgId && x.user === user);
+  if (!businessMayRemove(b, p)) return false;
+  const who = p.name || 'this person';
+  const biz = businessLabel(b);
+  _bizCall('member_devices', { o: orgId, u: user }, 'You need a signal to remove someone.').then((rows) => {
+    if (rows === null) return;
+    const devs = (Array.isArray(rows) ? rows : []).slice(0, 6).map(_bizDevLine);
+    openChoiceSheet({
+      title: `Remove ${who} from ${biz}?`,
+      message: `${who} loses access to ${biz}’s jobs straight away. Their jobs stay with ${biz}; their sign-in and own business don’t change. ` +
+        (devs.length
+          ? `Anything not yet sent from ${devs.length === 1 ? 'this device' : 'these devices'} won’t reach ${biz} unless their phone can send it — ask them to Sync first if you can:`
+          : `They have no devices signed in, so nothing more can come from them.`),
+      lines: devs,
+      choices: [
+        { label: `Remove — let their phone send what it’s still holding (up to ${BUSINESS_DELIVER_DAYS} days)`, style: 'primary',
+          onPick: () => businessRemoveGo(orgId, user, true, who) },
+        { label: 'Remove — cut off now', style: 'danger',
+          onPick: () => businessRemoveGo(orgId, user, false, who) },
+      ],
+    });
+  });
+  return true;
+}
+
+function businessRemoveGo(orgId, user, deliver, who) {
+  return _bizCall('remove_member', { o: orgId, u: user, deliver: !!deliver }).then((x) => {
+    if (x === null) return false;
+    showToast(`${who || 'They'} removed`);
+    businessAfterChange();
+    return true;
+  });
+}
+
+// ---- leaving (2A) ---------------------------------------------------------------
+function businessLeaveStart(orgId) {
+  const b = _bizOrg(orgId);
+  if (!b || b.role === 'owner') return false;
+  const biz = businessLabel(b);
+  openConfirmSheet({
+    title: `Leave ${biz}?`,
+    message: `Your jobs for ${biz} stay with the business. This phone first sends anything you haven’t sent yet, then takes ${biz}’s jobs off. ` +
+      `To come back, someone in ${biz} would have to invite you again.`,
+    confirmLabel: 'Leave', cancelLabel: 'Cancel', danger: true,
+    onConfirm: () => {
+      _bizCall('leave_business', { o: orgId }).then((x) => {
+        if (x === null) return;
+        showToast(`You’ve left ${biz}`);
+        businessDeparturesOwe();
+        businessAfterChange().then(() => {
+          // the last delivery starts now, not at the next sync
+          if (typeof syncPull === 'function') syncPull({ manual: false }).catch(() => false);
+        });
+      });
+    },
+  });
+  return true;
 }

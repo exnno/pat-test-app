@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V162';
+const APP_VERSION = 'V163';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -133,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V157';
+const WELCOME_VERSION = 'V163';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -437,6 +437,14 @@ const BUSINESS_READ_MS = 6 * 60 * 60 * 1000;
 // toName, st, at }] }. Per device, NEVER in a backup or setup export; Reset
 // 'account', and a takeover clears it — like BUSINESSES_KEY.
 const JOB_MOVES_KEY = 'pat:jobMoves';
+// DEPARTED_KEY (V163): the businesses this phone's account has left or been
+// removed from (my_departures — supabase/v163-leaving.sql), with which of its jobs
+// were theirs, whether its last delivery is open, what was cleared and whether
+// it's been told. Shape (business.js businessDeparturesLoad): { u: uid, list:
+// [{ id, name, kind, by, at, until, deliver, phase, jobs, removed, kept, told }] }.
+// sync.js never sends those jobs outside the delivery. Per device, NEVER in a
+// backup or setup export; Reset 'account', and a takeover clears it.
+const DEPARTED_KEY = 'pat:departed';
 // MIN_VERSION_KEY (V151): the oldest PATGo the cloud last said this account may
 // sync with (my_min_version — supabase/v151-min-version.sql), as last read. Kept
 // so a phone KNOWN to be too old stays stopped after a restart or a failed read;

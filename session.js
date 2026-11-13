@@ -3064,6 +3064,8 @@ function setView(v) {
   if (v === 'cloudBusiness' && typeof businessRefresh === 'function') businessRefresh();
   // V156 (3A): Your devices reads the account's signed-in devices on every open.
   if (v === 'cloudDevices' && typeof businessDevicesRefresh === 'function') businessDevicesRefresh();
+  // V163 (5B): back on the Jobs list with a leaving not yet told — the sheet.
+  if (v === 'sessions' && typeof _bizDepTellSoon === 'function') _bizDepTellSoon();
 }
 
 // ---------- Bulk-edit (v7, extended in v11) ----------
@@ -4423,6 +4425,12 @@ function editFormSiteText(f) {
 function saveSessionEdits() {
   const sess = activeSession();
   if (!sess) return;
+  // V163 (3B): a job of a business you've left is read-only on this phone.
+  if (typeof businessJobLeftLine === 'function' && businessJobLeftLine(sess)) {
+    showToast(businessJobLeftLine(sess));
+    state.view = 'overview'; render();
+    return;
+  }
   const { name, engineer, prefix, date, locked, instrumentId } = state.editForm;
   if (!String(state.editForm.site || '').trim()) {
     showToast('Site is required');
@@ -4484,6 +4492,8 @@ function saveSessionEdits() {
 function unlockActiveSession() {
   const sess = activeSession();
   if (!sess) return;
+  // V163 (3B): never for a job of a business you've left.
+  if (typeof businessJobLeftLine === 'function' && businessJobLeftLine(sess)) { showToast(businessJobLeftLine(sess)); return; }
   sess.locked = false;
   delete sess.lockedAt;   // V100
   save(); render();
