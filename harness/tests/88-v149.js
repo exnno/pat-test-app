@@ -288,8 +288,11 @@ module.exports = async function () {
     t.ok(rows.length >= 4, `the jobs went up (${rows.length} rows)`);
     t.eq(row(team.id) && row(team.id).org_id, TEAM, 'a team job’s row names the team');
     t.eq(row(own.id) && row(own.id).org_id, OWN, 'a job for your own names it');
-    t.ok(row(plain.id) && !('org_id' in row(plain.id)), 'a job naming none sends none (the default, as before)');
-    t.ok(row(bad.id) && !('org_id' in row(bad.id)), 'a malformed business is never sent (it would fail the batch)');
+    // V163: a job naming none names the main business as this phone knows it — so
+    // a job made for a business that has since removed you is delivered there or
+    // refused, never quietly filed in your own (102c).
+    t.eq(row(plain.id) && row(plain.id).org_id, OWN, 'a job naming none names the main business (V163)');
+    t.eq(row(bad.id) && row(bad.id).org_id, OWN, 'a malformed business is never sent (it would fail the batch) — the main one is');
     const otherRows = [].concat(...app.srv.calls.filter(c => c.method === 'POST' && /\/rest\/v1\/(records|photos)\?/.test(c.url))
       .map(c => Array.isArray(c.body) ? c.body : [c.body]));
     t.ok(otherRows.every(r => !r || !('org_id' in r)), `no record or photo row names a business (${otherRows.length} checked)`);

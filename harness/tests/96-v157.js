@@ -382,13 +382,8 @@ module.exports = async function () {
   await t.group('96e — V157’s What’s new and About lines (its release checks → 97e at V158)', () => {
     const rel = freshApp();
     t.eq(rel.fn('updateVersionLabel')('pat-v157'), 'V157', 'the update banner reads the key as V157');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 2, 'What’s new: two lines');
-    t.includes(sheetCopy, '<li><strong>Approve or refuse job moves.</strong>', '…approving');
-    t.includes(sheetCopy, 'for the Owner, a Team leader or the Office to approve or refuse.</li>', '…who decides');
-    t.includes(sheetCopy, 'and Job settings says who decided it.</li>', '…the asker is told');
+    // V163: V157's What's new rolled off with V163's welcome (102f checks the new one).
+    t.excludes(read('render-core.js'), '<li><strong>Approve or refuse job moves.</strong>', 'V157’s What’s new rolled off at V163');
     // V160: V157's About line rolled off (99f checks it's gone).
   });
 

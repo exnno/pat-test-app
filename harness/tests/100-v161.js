@@ -211,7 +211,9 @@ module.exports = async function () {
     const block = mig.slice(mig.indexOf('-- ================================================================ V161'),
       mig.indexOf('-- ================================================================ self-checks')).trimEnd();
     t.ok(block.length > 1500, 'the migration has its definition');
-    t.ok(read('supabase/schema.sql').trimEnd().endsWith(block), 'a new project gets it byte for byte, as schema.sql’s last section');
+    // V163: no longer the last section — V163's follows it (102e).
+    const sch = read('supabase/schema.sql');
+    t.ok(sch.indexOf(block) > 0 && sch.indexOf(block) < sch.indexOf('-- ================================================================ V163'), 'a new project gets it byte for byte, before V163’s section');
     t.includes(block, "  select q.s is null\n      or exists (select 1 from auth.sessions x\n                 where x.id = q.s and (x.not_after is null or x.not_after > now()))\n",
       'no sign-in passes; otherwise it must exist and not be run out (3A)');
     t.includes(block, "    raise sqlstate 'PGRST' using\n      message = json_build_object('code', 'patgo_signed_out',", 'refused with an error and the code');

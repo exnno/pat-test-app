@@ -253,7 +253,7 @@ module.exports = async function () {
   // V161: the release checks moved to 100f; this keeps V160's own About line.
   await t.group('99f — V160’s About line; business.js header', () => {
     const help = read('render-help.js');
-    t.includes(help, 'Joining a business checks its phones again', 'About: V160’s line');
+    t.excludes(help, 'Joining a business checks its phones again', 'About: V160’s line rolled off at V163');
     t.includes(read('business.js'), "// ============== PATGo PWA — V160 — Join rechecks the business's phones ===", 'business.js header names V160');
   });
 };

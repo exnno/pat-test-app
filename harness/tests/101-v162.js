@@ -39,8 +39,7 @@
            carry the same function; all three parse to 401 patgo_signed_out;
            the corrective migration's checks; the port itself against
            PostgREST's own wording.
-     101f  release: V162; cache pat-v162; What's new NOT rolled (a fix release);
-           About V162 / V161 / V160; cloud.js header.
+     101f  V162's About line; cloud.js header (V163: the release checks → 102f).
 
    ⚠ WHAT THIS FILE CANNOT PROVE: the hosted PostgREST and Auth. 101c crosses a
    ported parser, not the server: at V162 the port and the SQL were checked
@@ -392,17 +391,9 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 101f */
-  await t.group('101f — release: V162; cache pat-v162; What’s new not rolled; About V162 / V161 / V160', () => {
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V162', 'APP_VERSION V162');
-    t.eq(rel.run('WELCOME_VERSION'), 'V157', 'What’s new NOT rolled (a fix release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v162';", 'cache key pat-v162');
-    t.eq(rel.fn('updateVersionLabel')('pat-v162'), 'V162', 'the update banner reads the key as V162');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V162</strong>'), y = help.indexOf('<p><strong>V161</strong>'), z = help.indexOf('<p><strong>V160</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V162, V161, V160');
-    t.excludes(help, '<p><strong>V159</strong>', 'V159 rolled off');
-    t.includes(help, 'no longer starts up signed in as a different account', 'About: V162’s line');
+  // V163: the release checks moved to 102f; this keeps V162's own About line.
+  await t.group('101f — V162’s About line; cloud.js header', () => {
+    t.includes(read('render-help.js'), 'no longer starts up signed in as a different account', 'About: V162’s line');
     t.includes(read('cloud.js'), 'V162: one owner decision, at sign-in and start', 'cloud.js header names V162');
   });
 };
