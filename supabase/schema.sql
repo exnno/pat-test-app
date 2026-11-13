@@ -2621,7 +2621,9 @@ begin
     raise sqlstate 'PGRST' using
       message = json_build_object('code', 'patgo_signed_out',
         'message', 'patgo_signed_out: this sign-in has been signed out')::text,
-      detail = json_build_object('status', 401)::text;
+      -- V162: PostgREST needs BOTH status and headers here, or it answers 500
+      -- PGRST121 and the phone never hears patgo_signed_out (third audit, 2).
+      detail = json_build_object('status', 401, 'headers', json_build_object())::text;
   end if;
 end;
 $$;
