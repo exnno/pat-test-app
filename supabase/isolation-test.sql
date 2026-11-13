@@ -11,6 +11,12 @@
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
+-- V163: CHECKS 29a–29e NEED supabase/v163-leaving.sql RUN FIRST (29a names it
+-- if not). B is put into A's business as Engineer with a test job there; A
+-- removes B (cut off now); B can no longer read or change that job, and a new
+-- job naming A's business is refused (never filed in B's own); B sees the
+-- departure; A still has the job; then everything is removed. B's main business
+-- is checked unchanged.
 -- V161: CHECKS 28a–28d NEED supabase/v161-signed-out.sql RUN FIRST (28a names it
 -- if not). B's requests on a sign-in that has been signed out are refused with
 -- an error — the check before every request (28a) and photo files (28b); a live
@@ -92,6 +98,7 @@ declare
   dev_a uuid; devs_a uuid[];                        -- V156
   mv157 uuid; det157 text;                          -- V157
   sid161 uuid; e161 text; f161 text;               -- V161
+  e163 text; d163 text;                             -- V163
 begin
   select id into a from auth.users where lower(email) = lower(email_a);
   select id into b from auth.users where lower(email) = lower(email_b);
@@ -1497,6 +1504,63 @@ begin
     delete from auth.sessions where user_agent = 'patgo-iso-test-161';
     select count(*) into k from auth.sessions where user_agent = 'patgo-iso-test-161';
     res := res || array['28d|no pretend sign-in left|' || case when k = 0 then 'PASS|' else 'FAIL|' || k || ' left' end];
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
+  -- ------------------------------------------------- V163: leaving and removing (29a–29e)
+  if not exists (select 1 from pg_proc p join pg_namespace x on x.oid = p.pronamespace
+                 where x.nspname = 'public' and p.proname = 'remove_member') then
+    res := res || array['29a|A removes B from A''s business|FAIL|run supabase/v163-leaving.sql first'];
+  else
+    org_a := public.default_org(a);
+    org_b := public.default_org(b);
+    delete from public.sessions where id = 'iso-test-v163-1' and user_id = b;
+    delete from public.departures where org_id = org_a and user_id = b;
+    delete from public.memberships where org_id = org_a and user_id = b;
+    insert into public.memberships (org_id, user_id, role, is_default) values (org_a, b, 'engineer', false);
+    insert into public.sessions (id, user_id, doc, last_modified, org_id)
+      values ('iso-test-v163-1', b, '{}'::jsonb, now(), org_a);
+    -- 29a: A removes B, cut off now.
+    perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin e163 := public.remove_member(org_a, b, false); exception when others then e163 := sqlerrm; end;
+    execute 'reset role';
+    res := res || array['29a|A removes B from A''s business; B''s main business unchanged|'
+      || case when e163 = 'removed' and public.member_role(org_a, b) is null and public.default_org(b) = org_b
+               and exists (select 1 from public.departures where org_id = org_a and user_id = b)
+              then 'PASS|' else 'FAIL|' || coalesce(e163, '?') end];
+    -- 29b: B can't read or change the job, and a new one naming A's business is refused.
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    select count(*) into n from public.sessions where id = 'iso-test-v163-1';
+    begin update public.sessions set doc = '{"x":1}'::jsonb where id = 'iso-test-v163-1' and user_id = b; get diagnostics k = row_count;
+    exception when others then k := -1; end;
+    begin insert into public.sessions (id, user_id, doc, last_modified, org_id) values ('iso-test-v163-2', b, '{}'::jsonb, now(), org_a); d163 := 'inserted';
+    exception when others then d163 := sqlerrm; end;
+    execute 'reset role';
+    res := res || array['29b|B can''t read or change the job; a new job naming A''s business is refused|'
+      || case when n = 0 and k <= 0 and d163 like 'patgo_left_business%' then 'PASS|'
+              else 'FAIL|read ' || n || ', changed ' || k || ', new: ' || coalesce(d163, '?') end];
+    -- 29c: B sees the departure, with the job; and can't remove anyone there.
+    execute 'set local role authenticated';
+    select count(*) into n from public.my_departures() where business_id = org_a and 'iso-test-v163-1' = any(jobs) and kind = 'removed';
+    begin perform public.remove_member(org_a, a); e163 := 'answered'; exception when others then e163 := sqlerrm; end;
+    execute 'reset role';
+    res := res || array['29c|B sees the departure and its job; B can''t remove anyone there|'
+      || case when n = 1 and e163 like 'patgo_%' then 'PASS|' else 'FAIL|' || n || ' / ' || coalesce(e163, '?') end];
+    -- 29d: A still has B's job.
+    perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    select count(*) into n from public.sessions where id = 'iso-test-v163-1' and user_id = b;
+    execute 'reset role';
+    res := res || array['29d|A''s business keeps B''s job|' || case when n = 1 then 'PASS|' else 'FAIL|' || n end];
+    -- 29e: put back.
+    delete from public.sessions where id in ('iso-test-v163-1', 'iso-test-v163-2') and user_id = b;
+    delete from public.departures where org_id = org_a and user_id = b;
+    delete from public.memberships where org_id = org_a and user_id = b;
+    select count(*) into n from public.departures where org_id = org_a and user_id = b;
+    select count(*) into k from public.sessions where id like 'iso-test-v163-%';
+    res := res || array['29e|B out of A''s business; nothing left behind|' || case when n = 0 and k = 0 and public.default_org(b) = org_b then 'PASS|' else 'FAIL|' || n || ' departure, ' || k || ' jobs left' end];
   end if;
   perform set_config('request.jwt.claims', '', true);
 
