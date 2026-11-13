@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — cloud.js (cloud sign-in)
- * v85 (September 2026) · V139 (October 2026): password sign-in · V140: Google · V145: one owner per phone · V158: an owner never lost · V161: signed out from another device
+ * v85 (September 2026) · V139 (October 2026): password sign-in · V140: Google · V145: one owner per phone · V158: an owner never lost · V161: signed out from another device · V162: one owner decision, at sign-in and start
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -172,19 +172,66 @@ function _cloudPhoneHasJobs() {
 }
 // May sync run as this account? Only the owner — or anyone on a phone with no
 // owner (stamped at the landing), except while ownership is uncertain and there
-// are jobs (V158). An empty id never may.
+// are jobs (V158), or an adoption of these jobs was refused (V162). An empty id
+// never may.
 function cloudOwnerAllows(uid) {
   if (!uid) return false;
   _cloudOwnerRetry();   // V158
   const o = cloudOwner();
   if (o) return o.id === uid;
+  if (_cloudAdoptRefused && _cloudPhoneHasJobs()) return false;   // V162
   return !(_cloudOwnerUncertain() && _cloudPhoneHasJobs());   // V158 (1A): nobody, while uncertain
+}
+
+// ---- V162: ONE owner decision, for the sign-in AND the start (the third audit,
+// finding 1). V161's start-up (_cloudOwnerFirstRun) made the SAVED LOGIN the
+// owner before it read the sync record, and without V158's two refusals — so a
+// phone that was A's, its owner record lost, could start up as B's with B's
+// login left behind by a takeover question the app closed on. Now the landing
+// (_cloudOwnerLanding) and the start (cloudBoot) both ask this, in this order:
+//   1. an owner record → that's the owner;
+//   2. none → the sync record's account is (V158);
+//   3. still none, jobs here, and the phone HAD an owner nobody can name → no one
+//      adopts them (V158 1A);
+//   4. still none → this account adopts — but with jobs here only once the owner
+//      is SAVED (V158 2A); held in memory alone, the next start would forget it.
+// Returns '' (go on: compare against cloudOwner()) or the refusal's words.
+// Nothing here touches a job; a refusal only stops the cloud.
+let _cloudAdoptRefused = false;   // V162: an adoption of these jobs was refused this run
+const CLOUD_OWNER_UNCERTAIN_WORDS = 'PATGo can’t tell which account this phone’s jobs belong to — the record of it couldn’t be read. ' +
+  'Your jobs are safe here and you can keep working. To use the cloud on this phone, save a backup, then Reset this phone (Everything, as new).';
+const CLOUD_OWNER_FULL_WORDS = 'This phone’s storage for PATGo is full, so it can’t record which account its jobs belong to. ' +
+  'Your jobs are safe here and you can keep working. Back up, then clear old jobs to make room, and sign in again.';
+function _cloudOwnerResolve(uid, addr) {
+  if (!cloudOwner()) _cloudOwnerFromSyncRecord();          // 2. the last synced account first
+  if (cloudOwner()) return '';                              // 1/2. there is an owner
+  if (_cloudPhoneHasJobs() && _cloudOwnerUncertain()) {     // 3. had one nobody can name
+    _cloudAdoptRefused = true;
+    return CLOUD_OWNER_UNCERTAIN_WORDS;
+  }
+  if (!cloudOwnerSet(uid, addr) && _cloudPhoneHasJobs()) {   // 4. adopted only once saved
+    _cloudOwnerMemo = null; _cloudOwnerUnsaved = false;     // the refused account is not kept
+    _cloudAdoptRefused = true;
+    return CLOUD_OWNER_FULL_WORDS;
+  }
+  _cloudAdoptRefused = false;
+  return '';
 }
 // The owner in words. A phone stamped from its sync record (V145's first run,
 // signed out) knows the account but not its address.
 function cloudOwnerName(o) {
   const own = o || cloudOwner();
   return (own && own.email) || 'the account this phone belongs to';
+}
+
+// V162: this phone's jobs are held from every account — no owner, jobs here,
+// and either it had an owner nobody can name (V158) or an adoption of them was
+// refused this run (owner couldn't be saved). The wall stands aside for it.
+function cloudOwnerHeld() {
+  try {
+    if (cloudOwner() || !_cloudPhoneHasJobs()) return false;
+    return _cloudAdoptRefused || _cloudOwnerUncertain();
+  } catch (e) { return true; }   // can't tell: keep the work reachable
 }
 
 // "3 jobs, 2 photos and other changes" — the shared words of the sign-out
@@ -233,23 +280,10 @@ function _cloudOwnerLanding(user, email) {
   const uid = (user && typeof user.id === 'string' && user.id) || (stored && stored.id) || '';
   const addr = (user && user.email) || email || '';
   if (!uid) return true;                                  // nothing to judge by: the guards still hold
-  if (!cloudOwner()) _cloudOwnerFromSyncRecord();          // V158: the last synced account first
+  const refused = _cloudOwnerResolve(uid, addr);           // V162: shared with the start
+  if (refused) return _cloudOwnerRefuse(refused);
   const o = cloudOwner();
-  if (!o) {
-    // V158 (1A): the phone had an owner nobody can name — its jobs go to no one.
-    if (_cloudPhoneHasJobs() && _cloudOwnerUncertain()) {
-      return _cloudOwnerRefuse('PATGo can\u2019t tell which account this phone\u2019s jobs belong to \u2014 the record of it couldn\u2019t be read. ' +
-        'Your jobs are safe here and you can keep working. To use the cloud on this phone, save a backup, then Reset this phone (Everything, as new).');
-    }
-    // 8A: adopted — but only once the owner is saved (V158, 2A): held in memory
-    // alone, the next start would forget it and another account could adopt.
-    if (!cloudOwnerSet(uid, addr) && _cloudPhoneHasJobs()) {
-      _cloudOwnerMemo = null; _cloudOwnerUnsaved = false;     // the refused account is not kept
-      return _cloudOwnerRefuse('This phone\u2019s storage for PATGo is full, so it can\u2019t record which account its jobs belong to. ' +
-        'Your jobs are safe here and you can keep working. Back up, then clear old jobs to make room, and sign in again.');
-    }
-    return true;
-  }
+  if (!o) return true;                                     // (unreachable: resolve adopts or refuses)
   if (o.id === uid) {
     if (addr && addr !== o.email) cloudOwnerSet(uid, addr);   // a changed address, or one learned now
     return true;
@@ -382,14 +416,19 @@ function cloudSignedOutElsewhere() {
   return true;
 }
 
-// V145's first run: a phone with no owner yet takes the account signed in on it
-// now — or, signed out, the account its sync record says it last sent to, so a
-// phone that was syncing as A stays A's (better than "whoever signs in first").
-// A phone that never synced stays unowned: the first sign-in adopts it (8A).
+// V145's first run, V162: the start asks the SAME question as a sign-in
+// (_cloudOwnerResolve). Signed out (or a login with no readable account): the
+// sync record alone can name the owner — nobody is adopted. Signed in: the
+// owner record, then the sync record, then (only on a phone that never had an
+// owner) the stored login adopts it — refused, as at the landing, while
+// ownership is uncertain or can't be saved and there are jobs. Returns '' or
+// the refusal's words. Never touches a job; offline, nothing here needs signal.
 function _cloudOwnerFirstRun(stored) {
-  if (cloudOwner()) return;
-  if (stored && stored.id) { cloudOwnerSet(stored.id, stored.email || ''); return; }
-  _cloudOwnerFromSyncRecord();   // V158: shared with the landing
+  if (!stored || !stored.id) {
+    if (!cloudOwner()) _cloudOwnerFromSyncRecord();
+    return '';
+  }
+  return _cloudOwnerResolve(stored.id, stored.email || '');
 }
 
 // ---- boot --------------------------------------------------------------------
@@ -401,8 +440,12 @@ function cloudBoot() {
   cloudWallTestFromUrl();   // V148 (1A): ?wall / ?wall=off — before the first paint
   _cloudGoogleListen();   // V140: ready for the Google window's answer (no network)
   const stored = _cloudReadStoredSession();
-  _cloudOwnerFirstRun(stored);   // V145
+  const refused = _cloudOwnerFirstRun(stored);   // V145; V162: the landing's own rules
   if (!stored) { state.cloud.status = 'signed-out'; return; }
+  // V162: the saved login may not adopt these jobs (ownership uncertain, or the
+  // owner can't be saved) — signed out, told why, exactly as at a sign-in. The
+  // jobs stay and the app works offline as ever; only the cloud waits.
+  if (refused) { _cloudOwnerRefuse(refused); return; }
   // V145: a login that isn't the owner's (the app closed while the takeover was
   // being asked) is not kept — nothing has been sent as it. Signed out, told why.
   const own = cloudOwner();
@@ -1344,7 +1387,13 @@ function cloudWallShows() {
     if (!cloudWallOn()) return false;
     const c = state.cloud || {};
     if (c.status === 'signed-in') return !!(c.pwOpen && c.pwNew);
-    return !cloudOwner();
+    if (cloudOwner()) return false;
+    // V162: never over jobs no account may take — the phone HAD an owner nobody
+    // can name, or this run refused to adopt them. The wall's way in is a
+    // sign-in that would be refused, so it would lock the engineer out of their
+    // own work (Peter's rule, 22 Oct). They work on, signed out, told why.
+    if (cloudOwnerHeld()) return false;
+    return true;
   } catch (e) { return false; }
 }
 

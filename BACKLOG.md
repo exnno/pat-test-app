@@ -8,7 +8,36 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
-### Next after V161
+### Next after V162
+V162 = the third audit's findings 1 and 2 (a fix release). cloud.js: ONE owner decision
+(`_cloudOwnerResolve`) for the sign-in landing and the start — the start no longer adopts a
+saved login over the sync record, nor while ownership is uncertain or the owner can't be saved
+(jobs here); `cloudOwnerHeld` keeps the wall off jobs no account may take. SQL: the refusal's
+detail carries `headers` (PostgREST requires it; without it 500 PGRST121 and the phone never
+signed out) — supabase/v162-signed-out-fix.sql for a project that ran V161; schema.sql and
+v161-signed-out.sql corrected. Harness 101 + harness/pgrst-raise.js (PostgREST's parser,
+ported) + M1970–M1985. Finding 3 (billing on a run-out sign-in): not reachable in PATGo —
+Supabase Auth writes not_after only for SAML SSO sessions; see V162 residuals.
+**Next (model: Opus — database rules / leaving):** leaving / removing (was planned as V162 —
+now V163). Then Office corrections, seat billing + per-business lock (with audit finding 5).
+
+### V162 residuals (known, accepted)
+- Live check outstanding: the real-token test (handoff checklist) is the only proof the hosted
+  PostgREST answers 401 patgo_signed_out; the harness crosses a port of its parser.
+- Product (wall on), owner can't be saved, jobs, no sync record: the wall stands aside for the
+  run that refused, but after a restart (login gone, nothing recorded — the phone is full) the
+  wall shows again over those jobs; "Save a copy first" still works from the wall. Needs a phone
+  too full to write ~100 bytes AND an owner never recorded — not seen; a persistent marker
+  can't be written on a full phone.
+- A held phone (uncertain, jobs) shows its reason on the Account page only (no Jobs-list line).
+- Billing (third audit, 3): Supabase Auth's /auth/v1/user checks the session row exists but
+  not not_after / time-box / inactivity (upstream auth.go maybeLoadUserOrSession; CheckValidity
+  only on refresh and the admin middleware). not_after is only ever written for SAML SSO, which
+  PATGo doesn't use, so V161's Data API rule and billing agree in practice. If Peter ever turns
+  on time-boxed or inactivity-limited sessions (Pro), neither V161's rule nor billing enforces
+  them until the access token runs out (≤1 h) — revisit then.
+
+### Next after V161 (done — V162 took the audit's fixes; leaving / removing → V163)
 V161 = a signed-out device loses cloud access at once (R68 finding 3; round 1A–3A, the
 defaults). SQL supabase/v161-signed-out.sql (pre-request `patgo_check_request` + restrictive
 photo rule; + schema.sql's last section). cloud.js (`_cloudFetch`, `cloudSignedOutElsewhere`,

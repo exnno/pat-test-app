@@ -1,4 +1,4 @@
-# PATGo — Code Map (V161)
+# PATGo — Code Map (V162)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1451,7 +1451,7 @@ byte-identical to V147's) so `renderAccountWall` (the launch wall, drawn by
 **render-core.js** `render()` when cloud.js `cloudWallShows()`) shows the SAME cards.
 ⚠ Change a card in one place only. Harness 87b, 87e.
 
-### cloud.js (~1260 ln) — cloud sign-in — NEW v79, password V139, Google V140, sign-up V144, one owner per phone V145, the launch switch V148, signed out from another device V161
+### cloud.js (~1260 ln) — cloud sign-in — NEW v79, password V139, Google V140, sign-up V144, one owner per phone V145, the launch switch V148, signed out from another device V161, one owner decision V162
 Sign-in (Supabase): email + password (V139) or an emailed code (v79); session state in `state.cloud`, the TEST strip
 and version tag, lazy load of `supabase.umd.js`. v85: the Cloud access code —
 `cloudPagesUnlocked()`, `cloudUnlock()`, `CLOUD_UNLOCK_KEY` (config.js; per
@@ -1540,6 +1540,19 @@ toast. ⚠ The one cloud promise that repaints any view: gated by **sync.js**
 `_syncSafeToRepaint` (stricter than `_cloudRepaint`; typeof-guarded). Readers of the
 words: **sync.js** `syncErrorMessage`, **business.js** `businessTeamError`. The caller
 still gets its own error. Owner untouched (V145 holds the jobs). Harness 100, M1951–M1967.
+V162: ONE OWNER DECISION (third audit, 1). `_cloudOwnerResolve(uid, addr)` is the ONLY place a
+phone gets an owner from a login: owner record → sync record (`_cloudOwnerFromSyncRecord`) →
+refuse if jobs + `_cloudOwnerUncertain` → adopt only once `cloudOwnerSet` SAVES (jobs here).
+Returns '' or the refusal words (`CLOUD_OWNER_UNCERTAIN_WORDS` / `CLOUD_OWNER_FULL_WORDS`);
+sets `_cloudAdoptRefused`. Callers: `_cloudOwnerLanding` (sign-in) and `_cloudOwnerFirstRun`
+(start, stored login only; signed out = sync record only) → `cloudBoot` → `_cloudOwnerRefuse`.
+⚠ Never add an owner-setting path beside it — V161's start did and drifted (adopted B's
+saved login over A's sync record). `cloudOwnerHeld()` (no owner + jobs + refused or uncertain)
+→ `cloudWallShows` false: the wall never covers jobs no account may take (PETER'S RULE);
+`cloudOwnerAllows` refuses everyone while `_cloudAdoptRefused`. SQL: `patgo_check_request`'s
+`detail` MUST carry `status` AND `headers` (PostgREST parses both as required; without
+headers → 500 PGRST121) — supabase/v162-signed-out-fix.sql; harness/pgrst-raise.js is the
+PostgREST port the harness crosses. Harness 101, M1970–M1985.
 
 ### sync.js (~5420 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner, V149 job business, V151 minimum app version, V153 held in memory
 ⚠ V151: `_syncRun` reads the minimum (`syncMinVersionRead` — rpc `my_min_version`, at most
