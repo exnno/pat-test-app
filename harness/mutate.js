@@ -517,7 +517,7 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V162';",   // V162: re-pointed. V161: re-pointed. V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
+    from: "const APP_VERSION = 'V163';",   // V163: re-pointed. V162: re-pointed. V161: re-pointed. V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
     to:   "const APP_VERSION = 'V154';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
@@ -640,7 +640,7 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V160</strong> &middot; November 2026</p>',   // V162: V159 rolled off — the oldest is V160 (101f). V161: V158 rolled off — the oldest is V159 (100f). V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
+    from: '        <p><strong>V161</strong> &middot; November 2026</p>',   // V163: V160 rolled off — the oldest is V161 (102f). V162: V159 rolled off — the oldest is V160 (101f). V161: V158 rolled off — the oldest is V159 (100f). V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 95e)',
   },
@@ -1087,8 +1087,8 @@ const MUTATIONS = [
   {
     name: 'M144 (V80) the example job is sent',
     file: 'sync.js',
-    from: "&& !s[flag] && jobIdsSafe(s));",   // V154: re-anchored (the id check joined the line)
-    to:   '&& jobIdsSafe(s));',
+    from: "&& !s[flag] && jobIdsSafe(s)\n    && !(left",   // V163: re-anchored (the left-business check joined). V154: re-anchored (the id check joined the line)
+    to:   '&& jobIdsSafe(s)\n    && !(left',
     why:  'the demo job would appear in every engineer\u2019s cloud data (16d)',
   },
   {
@@ -6122,7 +6122,7 @@ const MUTATIONS = [
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
     // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
-    from: "<li><strong>Approve or refuse job moves.</strong>",   // V157: welcome rolled (two lines) — re-aimed at the first; 96e pins it.   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
+    from: "<li><strong>Remove someone from your business.</strong>",   // V163: welcome rolled (two lines) — re-aimed at the first; 102f pins it. V157: welcome rolled (two lines) — re-aimed at the first; 96e pins it.   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
     to:   "<li><strong>Better.</strong>",
     why:  "11A: the welcome says plainly what changed on screen (96e)",
   },
@@ -7903,8 +7903,8 @@ const MUTATIONS = [
   {
     name: "M1116 (V128) the check never runs",
     file: "sync.js",
-    from: "    const found = checking ? _syncCheckRun(c, uid, st, due) :",
-    to:   "    const found = false ? _syncCheckRun(c, uid, st, due) :",
+    from: "(checking ? _syncCheckRun(c, uid, st, due) :",   // V163: re-anchored (after the departures read)
+    to:   "(false ? _syncCheckRun(c, uid, st, due) :",
     why:  "3A: the job deleted elsewhere stays here and goes back up at its next edit (66b 66d)",
   },
   {
@@ -8604,7 +8604,7 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V157';",   // V157: re-aimed. V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
+    from: "const WELCOME_VERSION = 'V163';",   // V163: re-aimed. V157: re-aimed. V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
     to:   "const WELCOME_VERSION = 'V156';",
     why:  "What's new is rolled on a feature release (96e)",
   },
@@ -8620,8 +8620,8 @@ const MUTATIONS = [
     // V149: one line — re-aimed at its end.
     // V150: one line — re-aimed at its end.
     // V155: two lines — re-aimed at the second's end; still caught by the count.
-    from: "and Job settings says who decided it.</li>\n",   // V157: two lines — re-aimed at the second's end; still caught by the count. V156: two lines — re-aimed at the second's end; still caught by the count.
-    to:   "and Job settings says who decided it.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    from: "then takes them off and tells you what it did.</li>\n",   // V163: two lines — re-aimed at the second's end. V157: two lines — re-aimed at the second's end; still caught by the count. V156: two lines — re-aimed at the second's end; still caught by the count.
+    to:   "then takes them off and tells you what it did.</li>\n        <li><strong>More.</strong> And more.</li>\n",
     why:  "two lines (96e)",
   },
   {
@@ -8753,7 +8753,7 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Joining a business checks its phones again",   // V162: V159's rolled off — re-aimed at V160's, the oldest now (99f). V161: V158's rolled off — re-aimed at V159's, the oldest now (98f). V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
+    from: "loses cloud access straight away, not up to an hour later",   // V163: V160's rolled off — re-aimed at V161's, the oldest now (100f). V162: V159's rolled off — re-aimed at V160's, the oldest now (99f). V161: V158's rolled off — re-aimed at V159's, the oldest now (98f). V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
     to:   "Better",
     why:  "the About page keeps the last three versions' lines (97d)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
@@ -8915,7 +8915,7 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Joining a business checks its phones again",   // V161: at V160's, still in the window (99f). V160: at V159's, still in the window (98f). V159: at V158's, still in the window. V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
+    from: "no longer starts up signed in as a different account",   // V163: at V162's, still in the window (101f). V161: at V160's, still in the window (99f). V160: at V159's, still in the window (98f). V159: at V158's, still in the window. V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
     to:   "Better",
     why:  "the About page keeps the last three versions' lines (98f)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
   },
@@ -9044,9 +9044,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v162';",   // V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v161';",
-    why:  "a release needs its cache bump or phones never get it (101f)",
+    from: "const CACHE_VERSION = 'pat-v163';",   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v162';",
+    why:  "a release needs its cache bump or phones never get it (102f)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -11831,8 +11831,8 @@ const MUTATIONS = [
   {
     name: "M1673 (V149) a malformed business is sent",
     file: "sync.js",
-    from: "  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v) ? v : '';",
-    to:   "  return v;",
+    from: "  if (re.test(v)) return v;",   // V163: re-anchored (the main business named after it)
+    to:   "  if (v) return v;",
     why:  "one bad id fails the whole batch of jobs (88c)",
   },
   {
@@ -12284,8 +12284,8 @@ const MUTATIONS = [
   },  {
     name: "M1737 (V151) the run never stops for an old version",
     file: "sync.js",
-    from: "      if (syncTooOld(uid)) { const e = new Error('PATGo needs updating'); e.syncStage = 'version'; throw e; }\n      return _syncRunAs(c, uid, session, opts);",
-    to:   "      return _syncRunAs(c, uid, session, opts);",
+    from: "      if (syncTooOld(uid)) { const e = new Error('PATGo needs updating'); e.syncStage = 'version'; throw e; }\n      return _syncRunAs(c, uid, session, opts).catch(",   // V163: re-anchored (the refusal hint)
+    to:   "      return _syncRunAs(c, uid, session, opts).catch(",
     why:  "a phone below the minimum carries on reading and sending — the thing V151 exists to stop (90b)",
   },
   {
@@ -12394,8 +12394,8 @@ const MUTATIONS = [
   {
     name: "M1752 (V151) the Jobs list loses the version line",
     file: "render-core.js",
-    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${tabs}\n      ${unreadableBanner}",   // V157: re-anchored (the approval lines)   // V152: re-anchored (the unreadable banner below). V155: (the invite line)
-    to:   "      ${header}\n      ${planBanner}\n      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${tabs}\n      ${unreadableBanner}",
+    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${leftBanner}\n      ${tabs}\n      ${unreadableBanner}",   // V163: + the left line. V157: re-anchored (the approval lines)   // V152: re-anchored (the unreadable banner below). V155: (the invite line)
+    to:   "      ${header}\n      ${planBanner}\n      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${leftBanner}\n      ${tabs}\n      ${unreadableBanner}",
     why:  "syncing stops with nothing on the Jobs list to say why (90c)",
   },
   {
@@ -12823,8 +12823,8 @@ const MUTATIONS = [
   {
     name: "M1813 (V154) a bad job on this phone is sent",
     file: "sync.js",
-    from: " && jobIdsSafe(s));\n}\n\n// V154 (5A): how many",
-    to:   "));\n}\n\n// V154 (5A): how many",
+    from: " && jobIdsSafe(s)\n    && !(left && left.has(String(s.id))));\n}\n\n// V154 (5A): how many",   // V163: re-anchored
+    to:   "\n    && !(left && left.has(String(s.id))));\n}\n\n// V154 (5A): how many",
     why:  "5A: kept on the phone, never sent — the database refuses it anyway (93d)",
   },
   {
@@ -13013,8 +13013,8 @@ const MUTATIONS = [
   {
     name: "M1840 (V155) the Jobs list loses the invite line",
     file: "render-core.js",
-    from: "      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${tabs}",   // V157: re-anchored (the approval lines)
-    to:   "      ${waitBanner}\n      ${decidedBanner}\n      ${tabs}",
+    from: "      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${leftBanner}\n      ${tabs}",   // V163: + the left line. V157: re-anchored (the approval lines)
+    to:   "      ${waitBanner}\n      ${decidedBanner}\n      ${leftBanner}\n      ${tabs}",
     why:  "1A: the invitee must be told (94b)",
   },
   {
@@ -13680,8 +13680,8 @@ const MUTATIONS = [
   {
     name: "M1935 (V159) SQL: photos not re-filed",
     file: "supabase/schema.sql",
-    from: "    if new.org_id is not null and tg_table_name in ('sessions', 'photos')\n       and public.member_role",
-    to:   "    if new.org_id is not null and tg_table_name in ('sessions')\n       and public.member_role",
+    from: "    end if;\n    -- V159: Office never holds a job.\n    if new.org_id is not null and tg_table_name in ('sessions', 'photos')\n       and public.member_role(new.org_id, new.user_id) = 'office' then\n      new.org_id := null;\n    end if;\n    -- (Only reached for photos: NEW.session_id exists on that table alone.)\n    if new.org_id is null and tg_table_name = 'photos' then\n      select s.org_id into new.org_id from public.sessions s\n      where s.user_id = new.user_id and s.id = new.session_id;\n      if new.org_id is not null and not exists (\n        select 1 from public.memberships m where m.org_id = new.org_id and m.user_id = new.user_id\n      ) then",   // V163: re-anchored on V159's own copy (V163's org_stamp follows it)
+    to:   "    end if;\n    -- V159: Office never holds a job.\n    if new.org_id is not null and tg_table_name in ('sessions')\n       and public.member_role(new.org_id, new.user_id) = 'office' then\n      new.org_id := null;\n    end if;\n    -- (Only reached for photos: NEW.session_id exists on that table alone.)\n    if new.org_id is null and tg_table_name = 'photos' then\n      select s.org_id into new.org_id from public.sessions s\n      where s.user_id = new.user_id and s.id = new.session_id;\n      if new.org_id is not null and not exists (\n        select 1 from public.memberships m where m.org_id = new.org_id and m.user_id = new.user_id\n      ) then",
     why:  "a new job's photos left in the Office business (98e; on the stand-in, photos too)",
   },
   {
@@ -14024,6 +14024,232 @@ const MUTATIONS = [
     from: "  if (!isObj(d.headers)) return null;   // Map Text Text — required\n",
     to:   "",
     why:  "the port is the boundary: it must fail V161's detail as PostgREST does (101e)",
+  },
+  // ---------------------------------------------------------------- V163
+  {
+    name: "M1986 (V163) the leaver's held jobs are sent (the batch is refused every run)",
+    file: "sync.js",
+    from: "  return (state.sessions || []).filter(s => s && s.id != null && s.id !== '' && !s[flag] && jobIdsSafe(s)\n    && !(left && left.has(String(s.id))));",
+    to:   "  return (state.sessions || []).filter(s => s && s.id != null && s.id !== '' && !s[flag] && jobIdsSafe(s));",
+    why:  "THE BUG V163 PREVENTS: one refused Big Co job stops every sync of his own work (102b)",
+  },
+  {
+    name: "M1987 (V163) a delete of a job of a business left is sent",
+    file: "sync.js",
+    from: "      if (leftAny && leftAny.has(id)) continue;\n",
+    to:   "",
+    why:  "refused, and it fails the batch (102b)",
+  },
+  {
+    name: "M1988 (V163) a photo delete of a job of a business left is sent",
+    file: "sync.js",
+    from: "        if (leftAny && leftAny.has(String(st.ph.sent[id].s))) continue;   // V163\n",
+    to:   "",
+    why:  "refused, and it stops every photo after it (102b)",
+  },
+  {
+    name: "M1989 (V163) the departures aren't read before sending",
+    file: "sync.js",
+    from: "    const left = (typeof businessDeparturesMaybeRead === 'function')\n      ? businessDeparturesMaybeRead(c, uid).catch(() => false) : Promise.resolve(false);",
+    to:   "    const left = Promise.resolve(false);",
+    why:  "the first sync after reopening sends what the cloud refuses (102a)",
+  },
+  {
+    name: "M1990 (V163) the last delivery is never finished",
+    file: "sync.js",
+    from: "            (ph) => ((ph && !ph.skipped && typeof businessDeliveryFinish === 'function')",
+    to:   "            (ph) => ((false && ph && !ph.skipped && typeof businessDeliveryFinish === 'function')",
+    why:  "the cloud never told; nothing cleared; nobody told (102a)",
+  },
+  {
+    name: "M1991 (V163) a refusal by the row rules doesn't owe a departures read",
+    file: "sync.js",
+    from: "if (/row-level security|patgo_left_business/i.test(t) && typeof businessDeparturesOwe === 'function') businessDeparturesOwe();",
+    to:   "if (false) businessDeparturesOwe();",
+    why:  "removed while PATGo was open: refused every run until a restart (102c)",
+  },
+  {
+    name: "M1992 (V163) a job naming none sends none (V149's way)",
+    file: "sync.js",
+    from: "    const d = (typeof businessDefault === 'function') ? businessDefault() : null;\n    return d && re.test(d.id) ? d.id : '';",
+    to:   "    return '';",
+    why:  "a job made for Big Co filed in his own business (88c 102c)",
+  },
+  {
+    name: "M1993 (V163) the full listing counts a business left",
+    file: "sync.js",
+    from: "  if (k === 'jobs') return Object.keys(st.sent).filter(id => !(left && left.has(id)));",
+    to:   "  if (k === 'jobs') return Object.keys(st.sent);",
+    why:  "the kept jobs taken for deleted elsewhere — or every sync stopped (102b)",
+  },
+
+  {
+    name: "M1995 (V163) an open delivery is held back too",
+    file: "business.js",
+    from: "    if (d.phase === 'deliver' && !_bizDepExpired(d)) continue;\n",
+    to:   "",
+    why:  "the unsent job never delivered (102a)",
+  },
+  {
+    name: "M1996 (V163) the main business's unmarked jobs aren't counted as the business's",
+    file: "business.js",
+    from: "        if (b === id || (!b && def && def.id === id)) jobs.add(String(s.id));",
+    to:   "        if (b === id) jobs.add(String(s.id));",
+    why:  "the never-sent job left out — sent to his own business, or refused (102a 102b)",
+  },
+  {
+    name: "M1997 (V163) the business list is read before the departures",
+    file: "business.js",
+    from: "    .then(() => (typeof businessDeparturesRead === 'function' ? businessDeparturesRead(c, uid).catch(() => false) : false))\n    .then(() => c.rpc('my_businesses'))",
+    to:   "    .then(() => c.rpc('my_businesses'))",
+    why:  "the old main is forgotten before the unmarked jobs are judged (102a)",
+  },
+  {
+    name: "M1998 (V163) a job the cloud has gets marked (its shield lost)",
+    file: "business.js",
+    from: "jobs.has(String(s.id)) && !inCloud.has(String(s.id)) && s.businessId !== id)",
+    to:   "jobs.has(String(s.id)) && s.businessId !== id)",
+    why:  "3B: a safe job kept on the phone (102a 102b)",
+  },
+  {
+    name: "M1999 (V163) the kept jobs aren't locked",
+    file: "business.js",
+    from: "    if (!s.locked) { s.locked = true; s.lockedAt = now;",
+    to:   "    if (false) { s.locked = true; s.lockedAt = now;",
+    why:  "read-only (102b)",
+  },
+  {
+    name: "M2000 (V163) nothing safe is taken off the phone",
+    file: "business.js",
+    from: "  const n = (safe.length && typeof removeJobsFromPhone === 'function') ? removeJobsFromPhone(safe) : 0;",
+    to:   "  const n = 0;",
+    why:  "3B: the business's data left on his device (102a 102b)",
+  },
+  {
+    name: "M2001 (V163) unlock isn't refused",
+    file: "session.js",
+    from: "  if (typeof businessJobLeftLine === 'function' && businessJobLeftLine(sess)) { showToast(businessJobLeftLine(sess)); return; }\n",
+    to:   "",
+    why:  "read-only (102b)",
+  },
+  {
+    name: "M2002 (V163) Job settings saves a change",
+    file: "session.js",
+    from: "  if (typeof businessJobLeftLine === 'function' && businessJobLeftLine(sess)) {\n    showToast(businessJobLeftLine(sess));\n    state.view = 'overview'; render();\n    return;\n  }\n",
+    to:   "",
+    why:  "read-only (102b)",
+  },
+  {
+    name: "M2003 (V163) Change… is offered",
+    file: "business.js",
+    from: "  if (typeof businessJobLeftLine === 'function' && businessJobLeftLine(sess)) return businessJobLeftLine(sess);   // V163\n",
+    to:   "",
+    why:  "a job of a business left could be moved (102b)",
+  },
+  {
+    name: "M2004 (V163) the Jobs list loses the left line",
+    file: "render-core.js",
+    from: "      ${decidedBanner}\n      ${leftBanner}\n",
+    to:   "      ${decidedBanner}\n",
+    why:  "5B (102b)",
+  },
+  {
+    name: "M2005 (V163) the sheet waits only for the Jobs list",
+    file: "session.js",
+    from: "  if (v === 'sessions' && typeof _bizDepTellSoon === 'function') _bizDepTellSoon();\n",
+    to:   "",
+    why:  "5B: back on the Jobs list, nothing (102b)",
+  },
+  {
+    name: "M2006 (V163) the sheet opens over his work",
+    file: "business.js",
+    from: "    if (!_bizDepUntold().length || state.view !== 'sessions') return;",
+    to:   "    if (!_bizDepUntold().length) return;",
+    why:  "5B, never over a job (102b)",
+  },
+  {
+    name: "M2007 (V163) an Engineer may remove",
+    file: "business.js",
+    from: "  return !!(b && p && !p.you && p.role !== 'owner' && (BUSINESS_OFFER[b.role] || []).indexOf(p.role) !== -1);",
+    to:   "  return !!(b && p && !p.you && p.role !== 'owner');",
+    why:  "1A (102d)",
+  },
+  {
+    name: "M2008 (V163) Cut off now still delivers",
+    file: "business.js",
+    from: "          onPick: () => businessRemoveGo(orgId, user, false, who) },",
+    to:   "          onPick: () => businessRemoveGo(orgId, user, true, who) },",
+    why:  "6A: the person's own choice (102d)",
+  },
+  {
+    name: "M2009 (V163) the Owner may leave",
+    file: "business.js",
+    from: "  if (!b || b.role === 'owner') return false;\n  const biz = businessLabel(b);\n  openConfirmSheet({\n    title: `Leave ${biz}?`,",
+    to:   "  if (!b) return false;\n  const biz = businessLabel(b);\n  openConfirmSheet({\n    title: `Leave ${biz}?`,",
+    why:  "2A (102d)",
+  },
+  {
+    name: "M2010 (V163) the remove sheet without the devices",
+    file: "business.js",
+    from: "    const devs = (Array.isArray(rows) ? rows : []).slice(0, 6).map(_bizDevLine);",
+    to:   "    const devs = [];",
+    why:  "4C (102d)",
+  },
+  {
+    name: "M2011 (V163) SQL: a leaver may mark deleted while delivering",
+    file: "supabase/v163-leaving.sql",
+    from: "                  and (public.my_role(org_id) is not null or (public.may_hold(org_id) and not deleted)))', t, t);\n    execute format('create policy \"change own %s\"",
+    to:   "                  and (public.my_role(org_id) is not null or public.may_hold(org_id)))', t, t);\n    execute format('create policy \"change own %s\"",
+    why:  "a leaver delivers, never wipes (102e)",
+  },
+  {
+    name: "M2012 (V163) SQL: the photo rule is permissive",
+    file: "supabase/v163-leaving.sql",
+    from: "  as restrictive for all to authenticated",
+    to:   "  as permissive for all to authenticated",
+    why:  "any other photo rule would widen it (102e)",
+  },
+  {
+    name: "M2013 (V163) SQL: no seven-day limit",
+    file: "supabase/v163-leaving.sql",
+    from: "case when deliver then now() + interval '7 days' end",
+    to:   "case when deliver then now() + interval '7000 days' end",
+    why:  "6A (102e)",
+  },
+  {
+    name: "M2014 (V163) SQL: a job naming a business left is quietly re-filed",
+    file: "supabase/v163-leaving.sql",
+    from: "      raise exception 'patgo_left_business: you are no longer in this business' using errcode = '42501';\n    end if;\n    if new.org_id is not null and not exists (",
+    to:   "      null;\n    end if;\n    if new.org_id is not null and not exists (",
+    why:  "a Big Co job lands in his own business (102e; on the stand-in, 102c's twin)",
+  },
+  {
+    name: "M2015 (V163) SQL: the lists don't follow",
+    file: "supabase/v163-leaving.sql",
+    from: "    update public.records set org_id = tgt where user_id = u and org_id = o;",
+    to:   "    null;",
+    why:  "every later sync of his lists refused (102e)",
+  },
+  {
+    name: "M2016 (V163) SQL: anyone may remove",
+    file: "supabase/v163-leaving.sql",
+    from: "  if not public._may_offer(o, r) then raise exception 'patgo_not_allowed'; end if;",
+    to:   "  null;",
+    why:  "1A (102e)",
+  },
+  {
+    name: "M2017 (V163) schema.sql out of step with the migration",
+    file: "supabase/schema.sql",
+    from: "case when deliver then now() + interval '7 days' end",
+    to:   "case when deliver then now() + interval '8 days' end",
+    why:  "a new project differs from an upgraded one (102e)",
+  },
+  {
+    name: "M2018 (V163) the departures key isn't cleared by Reset",
+    file: "reset.js",
+    from: "  ['DEPARTED_KEY', DEPARTED_KEY, 'account'],\n",
+    to:   "",
+    why:  "a reset phone keeps another time's departures (43a)",
   },
 ];
 
