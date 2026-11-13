@@ -439,3 +439,12 @@ bug; leaving it red trains everyone to ignore the suite.
   `cron.schedule`), a seeded scenario (reported / unreported / older phones, a
   teammate held, a photo whose file is still there) run in report and clear
   mode, and ten broken copies each caught. Group 71g pins the SQL's text.
+- V161 (group 100): the first three-digit group. A mutation's `why` hint and the
+  group names are read as 10–199 (`\d\d|1\d\d` in 01j/01k and mutate.js
+  `hintFiles`) — wider would turn words like "404s" into group names. Files sort
+  as text, so 100-v161.js runs between 10-… and 11-…; nothing depends on order.
+  100a–100c run the REAL supabase.umd.js through `cloudClient()`, so the refusal
+  passes the library's own fetch (`_cloudFetch`) exactly as on a phone. The
+  database side (S1–S3, isolation 28a–28d) was run on a local Postgres 16
+  stand-in with a 14-step scenario through the photo-file rules; seven broken
+  copies of the SQL each caught.

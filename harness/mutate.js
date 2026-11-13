@@ -517,7 +517,7 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V160';",   // V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
+    from: "const APP_VERSION = 'V161';",   // V161: re-pointed. V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
     to:   "const APP_VERSION = 'V154';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
@@ -640,7 +640,7 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V158</strong> &middot; November 2026</p>',   // V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
+    from: '        <p><strong>V159</strong> &middot; November 2026</p>',   // V161: V158 rolled off — the oldest is V159 (100f). V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 95e)',
   },
@@ -8636,7 +8636,7 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Joining a business checks its phones again",   // V160: at V160's (V159's moves to M1259, V158's to M1238). V159: at V159's (V158's moves to M1259, V157's to M1238). V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
+    from: "loses cloud access straight away, not up to an hour later",   // V161: at V161's (V160's moves to M1259, V159's to M1238). V160: at V160's (V159's moves to M1259, V158's to M1238). V159: at V159's (V158's moves to M1259, V157's to M1238). V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
     to:   "Better",
     why:  "the About page must say what changed in this version (99f)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
   },
@@ -8753,7 +8753,7 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "A phone&rsquo;s jobs stay with the account they belong to, even when the phone is full",   // V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
+    from: "Office sees and approves but never holds a job",   // V161: V158's rolled off — re-aimed at V159's, the oldest now (98f). V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
     to:   "Better",
     why:  "the About page keeps the last three versions' lines (97d)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
@@ -8915,7 +8915,7 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Office sees and approves but never holds a job",   // V160: at V159's, still in the window (98f). V159: at V158's, still in the window. V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
+    from: "Joining a business checks its phones again",   // V161: at V160's, still in the window (99f). V160: at V159's, still in the window (98f). V159: at V158's, still in the window. V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
     to:   "Better",
     why:  "the About page keeps the last three versions' lines (98f)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
   },
@@ -9044,8 +9044,8 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v160';",   // V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v159';",
+    from: "const CACHE_VERSION = 'pat-v161';",   // V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v160';",
     why:  "a release needs its cache bump or phones never get it (99f)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
@@ -9741,8 +9741,8 @@ const MUTATIONS = [
   {
     name: "M1375 (V140) signing out keeps the Google address on screen",
     file: "cloud.js",
-    from: "      google: '', googlePending: '', googleOff: false,                // V140",
-    to:   "      googlePending: '', googleOff: false,                // V140",   // V144: re-aimed
+    from: "    google: '', googlePending: '', googleOff: false,                // V140",   // V161: re-aimed — the line moved into _cloudSignedOutPatch
+    to:   "    googlePending: '', googleOff: false,                // V140",   // V144: re-aimed
     why:  "a signed-out phone must not show someone's Google address (79d)",
   },
   {
@@ -10643,8 +10643,8 @@ const MUTATIONS = [
   {
     name: "M1503 (V144) signing out keeps the half-made sign-up",
     file: "cloud.js",
-    from: "      signup: false, pwNew: false, welcome: '',                       // V144",   // V145: re-aimed
-    to:   "      welcome: '',                       // V144",
+    from: "    signup: false, pwNew: false, welcome: '',                       // V144",   // V161: re-aimed — moved into _cloudSignedOutPatch. V145: re-aimed
+    to:   "    welcome: '',                       // V144",
     why:  "a signed-out phone must not carry a password card or a welcome (83b)",
   },
   {
@@ -13791,6 +13791,127 @@ const MUTATIONS = [
     to:   "    -- 27c: put back.\n",
     why:  "nothing left behind on the test project (99e)",
   },
+
+  // ---- V161 (R68 4A; round 1A–3A): a signed-out device loses cloud access at once (audit 2, finding 3). Group 100 + M1951–M1967. ----
+  {
+    name: "M1951 (V161) the library's requests skip _cloudFetch",
+    file: "cloud.js",
+    from: "    global: { fetch: _cloudFetch },   // V161: every request the library makes passes _cloudFetch\n",
+    to:   "",
+    why:  "1A: one place catches every caller's refusal (100a)",
+  },
+  {
+    name: "M1952 (V161) the refusal's code isn't recognised",
+    file: "cloud.js",
+    from: "  return /patgo_signed_out/.test(String(text || ''));",
+    to:   "  return /patgo_signed_ou7/.test(String(text || ''));",
+    why:  "1A: signed out here (100a)",
+  },
+  {
+    name: "M1953 (V161) an old token's refusal signs out the new sign-in",
+    file: "cloud.js",
+    from: "        if (!now || (tok && tok !== now)) return;",
+    to:   "        if (!now) return;",
+    why:  "only this sign-in's refusal counts (100b)",
+  },
+  {
+    name: "M1954 (V161) signed out twice",
+    file: "cloud.js",
+    from: "  if (!state.cloud || state.cloud.status !== 'signed-in') return false;\n  _cloudForgetLogin();",
+    to:   "  if (!state.cloud) return false;\n  _cloudForgetLogin();",
+    why:  "once only, one toast (100b)",
+  },
+  {
+    name: "M1955 (V161) the stored sign-in kept",
+    file: "cloud.js",
+    from: "  _cloudForgetLogin();\n  _cloudSet(_cloudSignedOutPatch(CLOUD_SIGNED_OUT_ELSEWHERE_WORDS));",
+    to:   "  _cloudSet(_cloudSignedOutPatch(CLOUD_SIGNED_OUT_ELSEWHERE_WORDS));",
+    why:  "1A: the login gone from this phone (100a)",
+  },
+  {
+    name: "M1956 (V161) repaints over typing",
+    file: "cloud.js",
+    from: "  if (safe) { try { render(); } catch (e) { console.error(e); } }",
+    to:   "  if (true) { try { render(); } catch (e) { console.error(e); } }",
+    why:  "MAP rules 2/3 (100c)",
+  },
+  {
+    name: "M1957 (V161) any refusal signs out",
+    file: "cloud.js",
+    from: "        if (!cloudSignedOutCode(t)) return;",
+    to:   "        if (false) return;",
+    why:  "an ordinary 401 never signs out (100b)",
+  },
+  {
+    name: "M1958 (V161) the Sync page says \"lapsed\"",
+    file: "sync.js",
+    from: "  if (/patgo_signed_out/.test(code + ' ' + msg)) {",
+    to:   "  if (/patgo_signed_ou7/.test(code + ' ' + msg)) {",
+    why:  "the words where the run's error lands (100b)",
+  },
+  {
+    name: "M1959 (V161) the Business page loses the words",
+    file: "business.js",
+    from: "  if (/patgo_signed_out/.test(t)) return CLOUD_SIGNED_OUT_ELSEWHERE_WORDS;",
+    to:   "  if (/patgo_signed_ou7/.test(t)) return CLOUD_SIGNED_OUT_ELSEWHERE_WORDS;",
+    why:  "the words where a Business tap's error lands (100b)",
+  },
+  {
+    name: "M1960 (V161) the words drop \"your jobs are safe\"",
+    file: "cloud.js",
+    from: "const CLOUD_SIGNED_OUT_ELSEWHERE_WORDS = 'This phone was signed out from another device. Your jobs are safe here \\u2014 sign in again to send them.';",
+    to:   "const CLOUD_SIGNED_OUT_ELSEWHERE_WORDS = 'This phone was signed out from another device.';",
+    why:  "1A: the words say the jobs are held (100a)",
+  },
+  {
+    name: "M1961 (V161) SQL: a run-out sign-in passes",
+    file: "supabase/v161-signed-out.sql",
+    from: " and (x.not_after is null or x.not_after > now())",
+    to:   "",
+    why:  "3A: past its own use-until time (100e)",
+  },
+  {
+    name: "M1962 (V161) SQL: the photo rule only widens",
+    file: "supabase/v161-signed-out.sql",
+    from: "  as restrictive for all to authenticated\n",
+    to:   "  as permissive for all to authenticated\n",
+    why:  "2A: photo files refused too (100e)",
+  },
+  {
+    name: "M1963 (V161) SQL: photo files answer quietly",
+    file: "supabase/v161-signed-out.sql",
+    from: "  if not public._request_signed_in() then raise exception 'patgo_signed_out'; end if;\n  return true;",
+    to:   "  if not public._request_signed_in() then return false; end if;\n  return true;",
+    why:  "an error, never an empty answer (100e)",
+  },
+  {
+    name: "M1964 (V161) SQL: the check never switched on",
+    file: "supabase/v161-signed-out.sql",
+    from: "-- Switched on last, once the check exists.\nalter role authenticator set pgrst.db_pre_request = 'public.patgo_check_request';\n",
+    to:   "-- Switched on last, once the check exists.\n",
+    why:  "every request checked (100e)",
+  },
+  {
+    name: "M1965 (V161) schema.sql: a new project lacks the switch",
+    file: "supabase/schema.sql",
+    from: "alter role authenticator set pgrst.db_pre_request = 'public.patgo_check_request';\n",
+    to:   "",
+    why:  "a new project gets V161 byte for byte (100e)",
+  },
+  {
+    name: "M1966 (V161) SQL: requests with no sign-in refused",
+    file: "supabase/v161-signed-out.sql",
+    from: "  select q.s is null\n      or exists",
+    to:   "  select q.s is not null\n      and exists",
+    why:  "the server and the tests pass (100e)",
+  },
+  {
+    name: "M1967 (V161) isolation: the pretend sign-in left behind",
+    file: "supabase/isolation-test.sql",
+    from: "    -- 28d: put back.\n    delete from auth.sessions where user_agent = 'patgo-iso-test-161';\n",
+    to:   "    -- 28d: put back.\n",
+    why:  "nothing left behind on the test project (100e)",
+  },
 ];
 
 
@@ -13819,7 +13940,7 @@ function anchorCount(src, from) {
 
 function hintFiles(m) {
   const out = [];
-  for (const x of String(m.why || '').matchAll(/\b(\d\d)[a-z]\d?\b/g)) {
+  for (const x of String(m.why || '').matchAll(/\b(\d\d|1\d\d)[a-z]\d?\b/g)) {   // V161: groups 10–199 (100 is the first three-digit group; "404s" is not a group)
     const f = TEST_FILES.find(n => n.startsWith(x[1] + '-'));
     if (f && !out.includes(f)) out.push(f);
   }
