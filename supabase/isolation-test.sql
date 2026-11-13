@@ -11,6 +11,11 @@
 --
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
+-- V161: CHECKS 28a–28d NEED supabase/v161-signed-out.sql RUN FIRST (28a names it
+-- if not). B's requests on a sign-in that has been signed out are refused with
+-- an error — the check before every request (28a) and photo files (28b); a live
+-- pretend sign-in of B's passes and still can't see A's files (28c); the pretend
+-- sign-in is removed (28d).
 -- V160: CHECKS 27a–27c NEED supabase/v160-join.sql RUN FIRST (27a names it
 -- if not). A invites B as Engineer; a pretend old sign-in of A's is added; B's
 -- Join is refused and the invite stays waiting; the sign-in is removed and B
@@ -86,6 +91,7 @@ declare
   inv uuid; inv2 uuid; def_b uuid; plan_b text; skip155 text;   -- V155
   dev_a uuid; devs_a uuid[];                        -- V156
   mv157 uuid; det157 text;                          -- V157
+  sid161 uuid; e161 text; f161 text;               -- V161
 begin
   select id into a from auth.users where lower(email) = lower(email_a);
   select id into b from auth.users where lower(email) = lower(email_b);
@@ -1447,6 +1453,50 @@ begin
     select count(*) into k from auth.sessions where user_agent = 'patgo-iso-test-160';
     select count(*) + k into k from public.invites where org_id = org_a and email = (select lower(btrim(email)) from auth.users where id = b);
     res := res || array['27c|B out of A''s business; no invite or pretend sign-in left|' || case when n = 0 and k = 0 and public.default_org(b) = org_b then 'PASS|' else 'FAIL|' || n || ' membership, ' || k || ' left' end];
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
+  -- ------------------------------------------------- V161: a signed-out device loses cloud access at once (28a–28d)
+  if not exists (select 1 from pg_proc p join pg_namespace x on x.oid = p.pronamespace
+                 where x.nspname = 'public' and p.proname = 'patgo_check_request') then
+    res := res || array['28a|a signed-out sign-in is refused before every request|FAIL|run supabase/v161-signed-out.sql first'];
+  else
+    delete from auth.sessions where user_agent = 'patgo-iso-test-161';
+    -- 28a: B on a sign-in that no longer exists — refused with an error.
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated', 'session_id', gen_random_uuid()::text)::text, true);
+    execute 'set local role authenticated';
+    begin perform public.patgo_check_request(); e161 := 'passed'; exception when others then e161 := sqlstate || ' ' || sqlerrm; end;
+    -- 28b: photo files on that sign-in — refused, never a quiet "no file".
+    if real_a is not null then
+      begin select count(*) into n from storage.objects where bucket_id = 'photos' and name = real_a; f161 := 'read ' || n;
+      exception when others then f161 := sqlerrm; end;
+    else
+      begin perform public.patgo_files_signed_in(); f161 := 'passed'; exception when others then f161 := sqlerrm; end;
+    end if;
+    execute 'reset role';
+    res := res || array['28a|a signed-out sign-in is refused before every request|'
+      || case when e161 like 'PGRST %patgo_signed_out%' then 'PASS|' else 'FAIL|' || coalesce(e161, '?') end];
+    res := res || array['28b|a signed-out sign-in can''t touch photo files (an error, not "no file")|'
+      || case when f161 like 'patgo_signed_out%' and exists (select 1 from pg_policies where schemaname = 'storage' and tablename = 'objects'
+                and policyname = 'photo files need a live sign-in' and permissive = 'RESTRICTIVE')
+              then 'PASS|' || case when real_a is null then 'checked without a real file of A''s' else '' end
+              else 'FAIL|' || coalesce(f161, '?') end];
+    -- 28c: a live sign-in of B's passes — and still sees none of A's files.
+    sid161 := gen_random_uuid();
+    insert into auth.sessions (id, user_id, created_at, updated_at, user_agent)
+      values (sid161, b, now(), now(), 'patgo-iso-test-161');
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated', 'session_id', sid161::text)::text, true);
+    execute 'set local role authenticated';
+    begin perform public.patgo_check_request(); e161 := 'passed'; exception when others then e161 := sqlerrm; end;
+    begin select count(*) into n from storage.objects where bucket_id = 'photos' and name = coalesce(real_a, '-'); f161 := 'read ' || n;
+    exception when others then f161 := sqlerrm; end;
+    execute 'reset role';
+    res := res || array['28c|a live sign-in passes, and still can''t see A''s files|'
+      || case when e161 = 'passed' and f161 = 'read 0' then 'PASS|' else 'FAIL|' || coalesce(e161, '?') || ' / ' || coalesce(f161, '?') end];
+    -- 28d: put back.
+    delete from auth.sessions where user_agent = 'patgo-iso-test-161';
+    select count(*) into k from auth.sessions where user_agent = 'patgo-iso-test-161';
+    res := res || array['28d|no pretend sign-in left|' || case when k = 0 then 'PASS|' else 'FAIL|' || k || ' left' end];
   end if;
   perform set_config('request.jwt.claims', '', true);
 

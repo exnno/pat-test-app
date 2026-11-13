@@ -2593,3 +2593,58 @@ $$;
 
 revoke all on function public.accept_invite(uuid, boolean) from public, anon;
 grant execute on function public.accept_invite(uuid, boolean) to authenticated;
+
+-- ================================================================ V161
+-- A signed-out device loses cloud access at once (the second audit, finding 3 —
+-- Peter, 12 Nov: R68 4A, V161 round 1A–3A). Existing projects:
+-- supabase/v161-signed-out.sql (plus self-checks S1–S3). Kept in step with it
+-- byte for byte by harness group 100e.
+
+-- true = this request may go on. No sign-in on the request (the server, the
+-- dashboard, the tests: _my_session() is null) passes; otherwise its sign-in
+-- must still exist and not be past its own "use until" time (3A).
+create or replace function public._request_signed_in()
+returns boolean language sql stable security definer set search_path = '' as $$
+  select q.s is null
+      or exists (select 1 from auth.sessions x
+                 where x.id = q.s and (x.not_after is null or x.not_after > now()))
+  from (select public._my_session() as s) q
+$$;
+revoke all on function public._request_signed_in() from public, anon, authenticated;
+
+-- The Data API's check before every request (1A, 2A). An error, never an empty
+-- answer; the app reads the code patgo_signed_out.
+create or replace function public.patgo_check_request()
+returns void language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public._request_signed_in() then
+    raise sqlstate 'PGRST' using
+      message = json_build_object('code', 'patgo_signed_out',
+        'message', 'patgo_signed_out: this sign-in has been signed out')::text,
+      detail = json_build_object('status', 401)::text;
+  end if;
+end;
+$$;
+revoke all on function public.patgo_check_request() from public;
+grant execute on function public.patgo_check_request() to anon, authenticated, service_role;
+
+-- Photo files (2A): the same check, raised — never a quiet "no file".
+create or replace function public.patgo_files_signed_in()
+returns boolean language plpgsql stable security definer set search_path = '' as $$
+begin
+  if not public._request_signed_in() then raise exception 'patgo_signed_out'; end if;
+  return true;
+end;
+$$;
+revoke all on function public.patgo_files_signed_in() from public, anon;
+grant execute on function public.patgo_files_signed_in() to authenticated;
+
+drop policy if exists "photo files need a live sign-in" on storage.objects;
+create policy "photo files need a live sign-in" on storage.objects
+  as restrictive for all to authenticated
+  using ((select public.patgo_files_signed_in()))
+  with check ((select public.patgo_files_signed_in()));
+
+-- Switched on last, once the check exists.
+alter role authenticator set pgrst.db_pre_request = 'public.patgo_check_request';
+notify pgrst, 'reload config';
