@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V160: rolled forward — V160 on top, V157 dropped. -->
+      <!-- v8: rolling 3-version changelog. V161: rolled forward — V161 on top, V158 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V161</strong> &middot; November 2026</p>
+        <p class="muted">A phone you sign out from another device (Account &rarr; Your devices) loses cloud access straight away, not up to an hour later. That phone signs itself out, keeps its jobs, and says why.</p>
         <p><strong>V160</strong> &middot; November 2026</p>
         <p class="muted">Joining a business checks its phones again: if a phone there has an older PATGo, you&rsquo;re asked to wait until it&rsquo;s updated, and your invite stays waiting.</p>
         <p><strong>V159</strong> &middot; November 2026</p>
         <p class="muted">Office sees and approves but never holds a job: an Office business isn&rsquo;t offered for new jobs, moves or as your main business, and new jobs go to a business you test for. Someone changed to Office finishes the jobs they&rsquo;d started.</p>
-        <p><strong>V158</strong> &middot; November 2026</p>
-        <p class="muted">A phone&rsquo;s jobs stay with the account they belong to, even when the phone is full or its record of the account can&rsquo;t be read: no other account can take them over, and PATGo says what to do.</p>
 
 
 

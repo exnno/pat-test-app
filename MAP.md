@@ -1,4 +1,4 @@
-# PATGo — Code Map (V160)
+# PATGo — Code Map (V161)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1451,7 +1451,7 @@ byte-identical to V147's) so `renderAccountWall` (the launch wall, drawn by
 **render-core.js** `render()` when cloud.js `cloudWallShows()`) shows the SAME cards.
 ⚠ Change a card in one place only. Harness 87b, 87e.
 
-### cloud.js (~1260 ln) — cloud sign-in — NEW v79, password V139, Google V140, sign-up V144, one owner per phone V145, the launch switch V148
+### cloud.js (~1260 ln) — cloud sign-in — NEW v79, password V139, Google V140, sign-up V144, one owner per phone V145, the launch switch V148, signed out from another device V161
 Sign-in (Supabase): email + password (V139) or an emailed code (v79); session state in `state.cloud`, the TEST strip
 and version tag, lazy load of `supabase.umd.js`. v85: the Cloud access code —
 `cloudPagesUnlocked()`, `cloudUnlock()`, `CLOUD_UNLOCK_KEY` (config.js; per
@@ -1530,6 +1530,16 @@ holds — never a network answer, never for a phone with an owner. `cloudPagesUn
 is true wherever the wall is on (5A). Readers: **render-core.js** `render()` (the wall,
 before the view chain) and `renderSessions` (the line); **plan.js** `_planOwnerUid`;
 **boot.js** `updateSafeMoment`. Harness 87, M1637–M1660.
+V161: SIGNED OUT FROM ANOTHER DEVICE. Section before `_cloudOwnerFirstRun`: `cloudClient()`
+passes `global.fetch = _cloudFetch`, so EVERY library request (rest, rpc, storage, auth)
+goes through it; a non-ok answer whose body carries `patgo_signed_out` (the database's
+pre-request / photo rule — supabase/v161-signed-out.sql) for the token stored now →
+`cloudSignedOutElsewhere()` (once: signed-in only) → `_cloudForgetLogin`,
+`_cloudSignedOutPatch(CLOUD_SIGNED_OUT_ELSEWHERE_WORDS)` (shared with `cloudSignOut`),
+toast. ⚠ The one cloud promise that repaints any view: gated by **sync.js**
+`_syncSafeToRepaint` (stricter than `_cloudRepaint`; typeof-guarded). Readers of the
+words: **sync.js** `syncErrorMessage`, **business.js** `businessTeamError`. The caller
+still gets its own error. Owner untouched (V145 holds the jobs). Harness 100, M1951–M1967.
 
 ### sync.js (~5420 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner, V149 job business, V151 minimum app version, V153 held in memory
 ⚠ V151: `_syncRun` reads the minimum (`syncMinVersionRead` — rpc `my_min_version`, at most

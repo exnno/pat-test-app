@@ -8,6 +8,10 @@ Every capability and release entry, one `##` section each.
 
 ---
 
+## A signed-out device loses cloud access at once (V161)
+
+The second GPT audit, finding 3 (Peter, 12 Nov — R68 4A; the round 1A 2A 3A, the defaults). Signing a device out (Account → Your devices → Sign it out, V156) deleted its sign-in, but the token that device already held kept working for up to an hour. Now every cloud request checks its sign-in still exists and hasn't passed its own "use until" time (3A): jobs and server functions by a check before every request, photo files by one extra restrictive rule (2A) — supabase/v161-signed-out.sql. A refused request gets an error (patgo_signed_out), never an empty answer. The phone then signs itself out (1A): "This phone was signed out from another device. Your jobs are safe here — sign in again to send them." — on the Account page, the Sync and Business pages, and a toast. The owner stays, so unsent jobs send at that account's next sign-in (V145). The token still lasts an hour (4A). Requests with no sign-in (the server, the tests) pass. Undo lines at the top of the SQL file.
+
 ## Join rechecks the business's phones (V160)
 The second GPT audit, finding 4 (Peter, 12 Nov — R68; the round 1A 2A 3A 4A, the defaults). An invite checks the business's phones when it is sent, which can be up to 14 days before anyone joins. Now Join checks again at the moment of joining: first the joiner's own phones (1A — V156's sheet naming them, with Sign it out), then every signed-in device in the business, for every role including Office (4A). If one there has an older PATGo, the joiner sees "Not joined yet" — "A phone in [business] has an older PATGo, so you can't join just yet. Ask them to open PATGo with a signal so it updates, then tap Join again. Your invite is still waiting." — naming the business only, never its devices or people (2A); nothing is recorded for the business (3A). The database decides (supabase/v160-join.sql). It guards the moment of joining only; V161 makes a signed-out device lose access at once.
 

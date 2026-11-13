@@ -8,6 +8,28 @@ here rather than restating it. Delete an item when it ships.
 
 ## Next release
 
+### Next after V161
+V161 = a signed-out device loses cloud access at once (R68 finding 3; round 1A–3A, the
+defaults). SQL supabase/v161-signed-out.sql (pre-request `patgo_check_request` + restrictive
+photo rule; + schema.sql's last section). cloud.js (`_cloudFetch`, `cloudSignedOutElsewhere`,
+`_cloudSignedOutPatch`), sync.js / business.js words. Isolation 28a–28d. Harness 100 +
+M1951–M1967. The second audit's findings 1–4 are now all fixed; finding 5 goes with seat billing.
+**Next (model: Opus — database rules / leaving):** V162 leaving / removing. Then Office
+corrections, seat billing + per-business lock (with audit finding 5). Peter plans a third
+audit after V161 — tell it finding 5 is known and scheduled.
+
+### V161 residuals (known, accepted)
+- Asking for a photo file that doesn't exist still answers "not found" on a gone sign-in
+  (the rule is only weighed against a file that's there) — true either way, nothing to misread.
+- A V160-or-older phone refused shows its old "Your sign-in has lapsed" words and stays
+  signed in until it updates (test phones only).
+- A photo-file refusal's body is Storage's own; if a future Storage hides the code, that
+  step just fails and the next job request (always the Data API) signs the phone out.
+- If the hosted pre-request ever misbehaves, the cloud refuses everyone: the three undo
+  lines are at the top of v161-signed-out.sql.
+- Re-running an older SQL file does not undo V161 (the check is its own function and its
+  own rule) — unlike V160's Join.
+
 ### Next after V160
 V160 = Join rechecks the business's phones (R68 finding 4; round 1A–4A, the defaults). SQL
 supabase/v160-join.sql (accept_invite; + schema.sql's last section). business.js (`_bizCall`
@@ -63,9 +85,6 @@ can't be saved + jobs → sign-in refused. Harness 97 + M1915–M1923; 96e's rel
   the engineer's name (held by them, owned by the business), so assigning stays possible.
 - V160 Join rechecks the business's phones (`accept_invite` + `org_phones_behind`), joiner's
   own words, the invite stays waiting.
-- V161 a signed-out device loses cloud access at once: a pre-request check (the token's
-  session must still exist) + the same check on the photo-file rules; the app reads the
-  refusal as "signed out from another device", jobs held (V145). 4A: token stays 1 hour.
 - Then V162 leaving / removing a member (was V158). Office corrections (text fields, finished
   jobs, "edited by") its own release after V162, before seat billing.
 - Seat billing + the per-business lock (before launch) now also takes audit finding 5:

@@ -893,6 +893,7 @@ function _bizOrg(id) { return businessList().find(x => x.id === id) || null; }
 // The cloud's refusals in plain words.
 function businessTeamError(err) {
   const t = [err && err.message, err && err.hint, err && err.details].map(x => String(x || '')).join(' ');
+  if (/patgo_signed_out/.test(t)) return CLOUD_SIGNED_OUT_ELSEWHERE_WORDS;   // V161: cloud.js signs this phone out
   if (/patgo_phones_behind/.test(t)) return 'A phone in this business has an older PATGo. Everyone in the business needs to open PATGo with a signal so it updates — then try again.';
   if (/patgo_team_phones_behind/.test(t)) return 'A phone in that business has an older PATGo, so you can’t join just yet. Ask them to open PATGo with a signal so it updates, then tap Join again. Your invite is still waiting.';   // V160
   if (/patgo_your_phones_behind/.test(t)) return 'A phone you’ve signed in on has an older PATGo, or hasn’t synced since you signed in. Open PATGo on each of your phones with a signal so it updates, wait a minute, then tap Join again.';

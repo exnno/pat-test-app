@@ -1,6 +1,6 @@
 /*!
  * PATGo PWA — cloud.js (cloud sign-in)
- * v85 (September 2026) · V139 (October 2026): password sign-in · V140: Google · V145: one owner per phone · V158: an owner never lost
+ * v85 (September 2026) · V139 (October 2026): password sign-in · V140: Google · V145: one owner per phone · V158: an owner never lost · V161: signed out from another device
  * Copyright (c) 2026 Peter Birchley. All rights reserved.
  * Unauthorised use, reproduction, or distribution prohibited.
  * See LICENSE.txt for full terms.
@@ -304,11 +304,82 @@ function cloudClient() {
       autoRefreshToken: true,
       detectSessionInUrl: false,   // codes, not links — nothing arrives in the URL
     },
+    global: { fetch: _cloudFetch },   // V161: every request the library makes passes _cloudFetch
   })).catch((e) => {
     _cloudClientPromise = null;    // allow a retry (e.g. first load was offline)
     throw e;
   });
   return _cloudClientPromise;
+}
+
+// ---- V161: signed out from another device (the second audit, finding 3) -------
+// Signing a device out (Your devices → Sign it out, V156) deletes its sign-in at
+// once; from V161 the cloud refuses every request on a sign-in that has gone —
+// jobs, server functions and photo files — with the code patgo_signed_out
+// (supabase/v161-signed-out.sql). It is an ERROR, never an empty answer, so
+// nothing here can mistake it for "deleted". One place catches it for every
+// caller (sync, business, plan, photos): the library's own fetch. The caller
+// still gets its error untouched; this phone then signs itself out (1A) — the
+// owner stays, so its unsent jobs wait here for that account's next sign-in
+// (V145) — and says why.
+const CLOUD_SIGNED_OUT_ELSEWHERE_WORDS = 'This phone was signed out from another device. Your jobs are safe here \u2014 sign in again to send them.';
+
+function cloudSignedOutCode(text) {
+  return /patgo_signed_out/.test(String(text || ''));
+}
+
+// The bearer token a request carried ('' if none is readable).
+function _cloudReqToken(input, init) {
+  try {
+    const h = (init && init.headers) || (input && typeof input === 'object' && input.headers) || null;
+    let v = '';
+    if (h && typeof h.get === 'function') v = h.get('Authorization') || h.get('authorization') || '';
+    else if (h && typeof h === 'object') v = h.Authorization || h.authorization || '';
+    const m = /^Bearer\s+(.+)$/i.exec(String(v || ''));
+    return m ? m[1] : '';
+  } catch { return ''; }
+}
+
+// The access token stored for this phone's sign-in now ('' if signed out).
+function _cloudStoredToken() {
+  try {
+    const raw = localStorage.getItem(CLOUD_AUTH_STORAGE_KEY);
+    const s = raw ? JSON.parse(raw) : null;
+    return (s && typeof s.access_token === 'string') ? s.access_token : '';
+  } catch { return ''; }
+}
+
+function _cloudFetch(input, init) {
+  return fetch(input, init).then((res) => {
+    if (res && !res.ok && typeof res.clone === 'function') {
+      // Only a refusal is looked at, read from a copy so the caller's is unread.
+      // A refusal for a token this phone no longer holds (an old request landing
+      // after signing in again) is not this sign-in's: ignored.
+      const tok = _cloudReqToken(input, init);
+      res.clone().text().then((t) => {
+        if (!cloudSignedOutCode(t)) return;
+        const now = _cloudStoredToken();
+        if (!now || (tok && tok !== now)) return;
+        cloudSignedOutElsewhere();
+      }).catch(() => { /* unreadable body: the caller's own error stands */ });
+    }
+    return res;
+  });
+}
+
+// 1A: signed out here at once; the jobs stay (V145); the Account page and a
+// toast say why. Once only — a second refusal finds it already signed out.
+function cloudSignedOutElsewhere() {
+  if (!state.cloud || state.cloud.status !== 'signed-in') return false;
+  _cloudForgetLogin();
+  _cloudSet(_cloudSignedOutPatch(CLOUD_SIGNED_OUT_ELSEWHERE_WORDS));
+  _cloudGoogleCloseWindow();
+  try { if (typeof showToast === 'function') showToast('This phone was signed out from another device.'); } catch (e) { /* the Account page still says it */ }
+  // ⚠ MAP rules 2/3: never repaint over typing or an open sheet — sync.js's test.
+  let safe = true;
+  try { if (typeof _syncSafeToRepaint === 'function') safe = _syncSafeToRepaint(); } catch (e) { safe = false; }
+  if (safe) { try { render(); } catch (e) { console.error(e); } }
+  return true;
 }
 
 // V145's first run: a phone with no owner yet takes the account signed in on it
@@ -1059,17 +1130,23 @@ function cloudCheckConnection() {
     .then((ok) => { _cloudRepaint(); return ok; });
 }
 
+// Everything a sign-out resets (cloudSignOut, and V161's signed out from another
+// device), with the line the Account page shows.
+function _cloudSignedOutPatch(message) {
+  return { status: cloudAvailable() ? 'signed-out' : 'off', busy: false, message,
+    plan: null, trialEndsAt: null, checkedAt: null,
+    useCode: false, forgot: false, pwOpen: false, pwReset: false,   // V139
+    google: '', googlePending: '', googleOff: false,                // V140
+    signup: false, pwNew: false, welcome: '',                       // V144
+    handover: null, signingOut: false };                            // V145
+}
+
 // Local sign-out: works offline. The library call is best-effort; the stored
 // keys are removed directly regardless, so a sign-out can never fail to stick.
 function cloudSignOut() {
   const finish = () => {
     _cloudSweepLogin();
-    _cloudSet({ status: cloudAvailable() ? 'signed-out' : 'off', busy: false, message: 'Signed out.',
-      plan: null, trialEndsAt: null, checkedAt: null,
-      useCode: false, forgot: false, pwOpen: false, pwReset: false,   // V139
-      google: '', googlePending: '', googleOff: false,                // V140
-      signup: false, pwNew: false, welcome: '',                       // V144
-      handover: null, signingOut: false });                           // V145
+    _cloudSet(_cloudSignedOutPatch('Signed out.'));
     _cloudGoogleCloseWindow();
     render();
   };

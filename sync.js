@@ -4296,6 +4296,10 @@ function syncErrorMessage(err) {
   if (status === 0 || /fetch|network/i.test(msg) || (err && err.name === 'AuthRetryableFetchError')) {
     return 'Couldn\u2019t reach the server. Your jobs are safe on this phone \u2014 try again when you have signal.';
   }
+  // V161: this sign-in was signed out from another device (cloud.js signs it out here).
+  if (/patgo_signed_out/.test(code + ' ' + msg)) {
+    return typeof CLOUD_SIGNED_OUT_ELSEWHERE_WORDS === 'string' ? CLOUD_SIGNED_OUT_ELSEWHERE_WORDS : 'This phone was signed out from another device.';
+  }
   if (status === 401 || /jwt|PGRST30/i.test(code + ' ' + msg)) {
     return 'Your sign-in has lapsed. Sign out and back in on the Account page.';
   }
