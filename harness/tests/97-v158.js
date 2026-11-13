@@ -330,7 +330,7 @@ module.exports = async function () {
   // V159: the release checks moved to 98d; this keeps V158's own About line.
   await t.group('97d — V158’s About line; cloud.js header', () => {
     const help = read('render-help.js');
-    t.includes(help, 'A phone&rsquo;s jobs stay with the account they belong to, even when the phone is full', 'About: V158’s line');
+    // V161: V158's About line rolled off (100f checks it's gone).
     t.includes(read('cloud.js'), 'V158: an owner never lost', 'cloud.js header names V158');
   });
 };

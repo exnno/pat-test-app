@@ -139,11 +139,11 @@ module.exports = function run() {
     vm.runInNewContext(body + '\n;module.exports = { MUTATIONS, hintFiles, anchorCount };', box);
     return box.module.exports;
   }
-  const HINT = /\b(\d\d)[a-z]\d?\b/g;
+  const HINT = /\b(\d\d|1\d\d)[a-z]\d?\b/g;   // V161: groups 10–199 (100 is the first three-digit group; "404s" is not a group)
   const groupIds = new Set();
   for (const f of fs.readdirSync(path.join(APP_DIR, 'harness', 'tests')).filter(x => x.endsWith('.js'))) {
     const src = fs.readFileSync(path.join(APP_DIR, 'harness', 'tests', f), 'utf8');
-    for (const m of src.matchAll(/\bgroup\(\s*['"`](\d\d[a-z]\d?) /g)) groupIds.add(m[1]);
+    for (const m of src.matchAll(/\bgroup\(\s*['"`]((?:\d\d|1\d\d)[a-z]\d?) /g)) groupIds.add(m[1]);
   }
 
   t.group('01j — every test group a mutation names exists', () => {

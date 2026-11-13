@@ -17,8 +17,7 @@
           as its last section; the order (own phones, then the business's, then
           the membership); every role; the already-member Join untouched;
           self-checks J1–J2; isolation 27a–27c.
-     99f  release: V160; cache pat-v160; What's new NOT rolled (a fix release);
-          About V160 / V159 / V158.
+     99f  V160's About line; business.js header (V161: the release checks → 100f).
 
    ⚠ WHAT THIS FILE CANNOT PROVE: that the database refuses. That is
    supabase/v160-join.sql's own checks (J1–J2) and isolation-test.sql 27a–27c —
@@ -229,7 +228,8 @@ module.exports = async function () {
       mig.indexOf('-- ================================================================ self-checks')).trimEnd();
     t.ok(block.length > 1500, 'the migration has its definition');
     t.includes(read('supabase/schema.sql'), block, 'a new project gets it byte for byte (schema.sql)');
-    t.ok(read('supabase/schema.sql').trimEnd().endsWith(block), '…as the last section (it overrides V159’s Join)');
+    const sch = read('supabase/schema.sql');   // V161: no longer the last section — V161's follows (100e)
+    t.ok(sch.indexOf(block) > sch.indexOf('-- ================================================================ V159') && sch.indexOf(block) < sch.indexOf('-- ================================================================ V161'), '…after V159’s (it overrides V159’s Join), before V161’s');
     const own = "  if public._user_phones_behind(me) > 0 then raise exception 'patgo_your_phones_behind'; end if;\n";
     const team = "  if public.org_phones_behind(v.org_id) > 0 then raise exception 'patgo_team_phones_behind'; end if;\n";
     const member = "    return 'joined';\n  end if;\n";
@@ -250,18 +250,10 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 99f */
-  await t.group('99f — release: V160; cache pat-v160; What’s new not rolled; About V160 / V159 / V158', () => {
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V160', 'APP_VERSION V160');
-    t.eq(rel.run('WELCOME_VERSION'), 'V157', 'What’s new NOT rolled (a fix release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v160';", 'cache key pat-v160');
-    t.eq(rel.fn('updateVersionLabel')('pat-v160'), 'V160', 'the update banner reads the key as V160');
+  // V161: the release checks moved to 100f; this keeps V160's own About line.
+  await t.group('99f — V160’s About line; business.js header', () => {
     const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V160</strong>'), y = help.indexOf('<p><strong>V159</strong>'), z = help.indexOf('<p><strong>V158</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V160, V159, V158');
-    t.excludes(help, '<p><strong>V157</strong>', 'V157 rolled off');
     t.includes(help, 'Joining a business checks its phones again', 'About: V160’s line');
-    t.includes(help, 'Office sees and approves but never holds a job', 'About: V159’s line still there');
     t.includes(read('business.js'), "// ============== PATGo PWA — V160 — Join rechecks the business's phones ===", 'business.js header names V160');
   });
 };
