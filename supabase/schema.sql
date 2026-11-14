@@ -3039,15 +3039,18 @@ grant execute on function public.business_biggest_jobs(uuid, integer) to authent
 -- plus self-checks C1–C5). Kept in step by harness 106e.
 --
 -- correct_job(holder, job, org, changes, reason) — SECURITY DEFINER, because it
--- writes a row the caller doesn't hold; so everything is checked here, in this
+-- writes a row the caller may not hold (V167.1, Peter 14 Nov — 1A 2A 3A 4A: your
+-- OWN locked job too, when you're Owner / Team leader / Office of its business —
+-- solo owners included — e.g. a job only in the cloud, or from a computer); so everything is checked here, in this
 -- order, and anything it can't fully check is refused (raise — nothing written):
 --   patgo_correct_signed_out   nobody signed in
 --   patgo_correct_bad          changes isn't a list of 1–100 {item?, field, from, to}
 --                              of the right kinds, or a value out of range
 --   patgo_correct_gone         no such job, or deleted
 --   patgo_correct_moved        the job is no longer in the business the caller was looking at
---   patgo_correct_own          your own job — edited on your phone, as always
---   patgo_correct_not_allowed  not Owner / Team leader / Office of the JOB's business (1A)
+--   patgo_correct_not_allowed  not Owner / Team leader / Office of the JOB's business (1A) —
+--                              your own job included (V167.1: an Engineer's own job is
+--                              changed on their phone; the office corrects it in the cloud)
 --   patgo_correct_unlocked     the job isn't locked (3A)
 --   patgo_correct_field        a field outside 2C's list
 --   patgo_correct_changed      a `from` that no longer matches the job, or an item
@@ -3082,7 +3085,6 @@ begin
   select x.* into s from public.sessions x where x.user_id = holder and x.id = job for update;
   if not found or s.deleted then raise exception 'patgo_correct_gone'; end if;
   if org is not null and s.org_id is distinct from org then raise exception 'patgo_correct_moved'; end if;
-  if holder = me then raise exception 'patgo_correct_own'; end if;
   if not public.can_read_org(s.org_id) then raise exception 'patgo_correct_not_allowed'; end if;
   d := s.doc;
   if jsonb_typeof(d) is distinct from 'object' or (d -> 'locked') is distinct from 'true'::jsonb then
