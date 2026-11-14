@@ -9,6 +9,10 @@
 -- email addresses on the next two lines → Run. Every row of the result must
 -- say PASS. Any FAIL: do not promote, and bring the output to the next chat.
 --
+-- V167: CHECKS 32a–32c NEED supabase/v167-corrections.sql RUN FIRST (32a names
+-- it if not). B is put into A's business as Engineer with a locked job; A corrects
+-- it (kept with A's name); B can't correct A's job, as an Engineer or once out of
+-- the business; then everything is removed.
 -- V166: CHECKS 31a–31c NEED supabase/v166-storage.sql RUN FIRST (31a names it
 -- if not). A job and a photo of B's are left in A's business with B no longer a
 -- member: A sees B's line and job in the business's storage figures; B sees
@@ -1647,6 +1651,55 @@ begin
     select count(*) into k from public.sessions where id like 'iso-test-v166-%';
     select count(*) + k into k from public.photos where id like 'iso-test-v166-%';
     res := res || array['31c|an Engineer sees nothing of the business''s storage; nothing left behind|' || case when n = 0 and k = 0 then 'PASS|' else 'FAIL|' || n || ' / ' || k || ' left' end];
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
+  -- ------------------------------------------------- V167: correcting someone else's job (32a–32c)
+  if not exists (select 1 from pg_proc p join pg_namespace x on x.oid = p.pronamespace
+                 where x.nspname = 'public' and p.proname = 'correct_job') then
+    res := res || array['32a|A corrects B''s locked job in A''s business, the change kept with A''s name|FAIL|run supabase/v167-corrections.sql first'];
+  else
+    org_a := public.default_org(a);
+    -- B, an Engineer in A's business, with a locked job there; A's own locked job.
+    delete from public.sessions where id in ('iso-test-v167-1', 'iso-test-v167-2');
+    delete from public.memberships where org_id = org_a and user_id = b;
+    insert into public.memberships (org_id, user_id, role, is_default) values (org_a, b, 'engineer', false);
+    insert into public.sessions (id, user_id, doc, last_modified, org_id) values
+      ('iso-test-v167-1', b, '{"id":"iso-test-v167-1","site":"iso B","locked":true,"items":[]}'::jsonb, now(), org_a),
+      ('iso-test-v167-2', a, '{"id":"iso-test-v167-2","site":"iso A","locked":true,"items":[]}'::jsonb, now(), org_a);
+    -- 32a: A (the Owner) corrects B's job.
+    perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      perform public.correct_job(b, 'iso-test-v167-1', org_a, '[{"field":"site","from":"iso B","to":"iso B fixed"}]'::jsonb, null);
+    exception when others then null;
+    end;
+    execute 'reset role';
+    select count(*) into n from public.sessions where id = 'iso-test-v167-1' and user_id = b
+      and doc->>'site' = 'iso B fixed' and doc->'corrections'->0->>'by' = a::text;
+    res := res || array['32a|A corrects B''s locked job in A''s business, the change kept with A''s name|' || case when n = 1 then 'PASS|' else 'FAIL|' || n end];
+    -- 32b: B, an Engineer there, can't correct A's job.
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      perform public.correct_job(a, 'iso-test-v167-2', org_a, '[{"field":"site","from":"iso A","to":"by B"}]'::jsonb, null);
+    exception when others then null;
+    end;
+    execute 'reset role';
+    select count(*) into n from public.sessions where id = 'iso-test-v167-2' and doc->>'site' = 'iso A' and not (doc ? 'corrections');
+    res := res || array['32b|an Engineer can''t correct someone else''s job|' || case when n = 1 then 'PASS|' else 'FAIL|' || n end];
+    -- 32c: B, no longer a member, can't either; put back.
+    delete from public.memberships where org_id = org_a and user_id = b;
+    execute 'set local role authenticated';
+    begin
+      perform public.correct_job(a, 'iso-test-v167-2', null, '[{"field":"site","from":"iso A","to":"by B"}]'::jsonb, null);
+    exception when others then null;
+    end;
+    execute 'reset role';
+    select count(*) into n from public.sessions where id = 'iso-test-v167-2' and doc->>'site' = 'iso A';
+    delete from public.sessions where id in ('iso-test-v167-1', 'iso-test-v167-2');
+    select count(*) into k from public.sessions where id like 'iso-test-v167-%';
+    res := res || array['32c|someone outside the business can''t correct its jobs; nothing left behind|' || case when n = 1 and k = 0 then 'PASS|' else 'FAIL|' || n || ' / ' || k || ' left' end];
   end if;
   perform set_config('request.jwt.claims', '', true);
 
