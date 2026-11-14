@@ -389,7 +389,11 @@ module.exports = async function () {
     const block = mig.slice(mig.indexOf('-- ================================================================ V163\n'),
       mig.indexOf('-- ================================================================ end V163\n') + '-- ================================================================ end V163\n'.length);
     t.ok(block.length > 6000, 'the migration has its definition');
-    t.ok(read('supabase/schema.sql').trimEnd().endsWith(block.trimEnd()), 'a new project gets it byte for byte, as schema.sql’s last section');
+    // V165: no longer the LAST section (V165's follows — 104e); still whole, and
+    // nothing after it redefines what it defines.
+    const sch = read('supabase/schema.sql');
+    t.ok(sch.includes(block), 'a new project gets it byte for byte');
+    t.excludes(sch.slice(sch.indexOf(block) + block.length), 'function public.org_stamp', '…and no later section redefines org_stamp');
     t.includes(block, "using ((user_id = (select auth.uid()) and public.may_hold(org_id))", 'jobs and photos: readable during the delivery');
     t.includes(block, "(public.my_role(org_id) is not null or (public.may_hold(org_id) and not deleted))", '…writable, never marked deleted');
     t.includes(block, "and d.deliver_until > now())", 'the window ends by itself');

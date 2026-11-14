@@ -392,8 +392,8 @@ module.exports = async function () {
 
   /* ------------------------------------------------------------------ 101f */
   // V163: the release checks moved to 102f; this keeps V162's own About line.
-  await t.group('101f — V162’s About line; cloud.js header', () => {
-    t.includes(read('render-help.js'), 'no longer starts up signed in as a different account', 'About: V162’s line');
+  // V165: V162 rolled off the About page (104f checks it is gone).
+  await t.group('101f — cloud.js header names V162', () => {
     t.includes(read('cloud.js'), 'V162: one owner decision, at sign-in and start', 'cloud.js header names V162');
   });
 };

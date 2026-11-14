@@ -82,6 +82,7 @@ function fieldOf(r, k) {
 function test1(r, k, v) {
   if (v.startsWith('eq.')) return String(fieldOf(r, k)) === v.slice(3);
   if (v.startsWith('gt.')) return cmp(fieldOf(r, k), v.slice(3)) > 0;
+  if (v.startsWith('gte.')) return cmp(fieldOf(r, k), v.slice(4)) >= 0;   // V165: a real sync run's page read
   if (v.startsWith('in.(')) return v.slice(4, -1).split(',').map(s => s.replace(/^"|"$/g, '')).includes(String(fieldOf(r, k)));
   throw new Error('stand-in: unknown filter ' + k + '=' + v);
 }
@@ -524,24 +525,13 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 103f */
-  await t.group('103f — release: V164; cache pat-v164; What’s new rolled (one line); About V164 / V163 / V162', () => {
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V164', 'APP_VERSION V164');
-    t.eq(rel.run('WELCOME_VERSION'), 'V164', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v164';", 'cache key pat-v164');
-    t.eq(rel.fn('updateVersionLabel')('pat-v164'), 'V164', 'the update banner reads the key as V164');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>One place for your jobs in the cloud.</strong>', '…the Cloud tab');
-    t.includes(sheetCopy, 'pick your business at the top to see everyone&rsquo;s jobs, or just one person&rsquo;s.</li>', '…and the business view');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V164</strong>'), y = help.indexOf('<p><strong>V163</strong>'), z = help.indexOf('<p><strong>V162</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V164, V163, V162');
-    t.excludes(help, '<p><strong>V161</strong>', 'V161 rolled off');
-    t.excludes(help, 'loses cloud access straight away, not up to an hour later', '…with its line');
-    t.includes(help, 'One place for your jobs in the cloud: every job is listed', 'About: V164’s line');
+  // V165: the release checks moved to 104f; this keeps V164's own About line.
+  await t.group('103f — V164’s About line; sync.js names V164', () => {
+    t.includes(read('render-help.js'), 'One place for your jobs in the cloud: every job is listed', 'About: V164’s line');
     t.includes(read('sync.js'), 'V164 — the business view', 'sync.js names V164');
   });
 };
+
+// V165: the stand-in and helpers, for 104-v165.js (the same team, extended there).
+module.exports.kit = { cloud, phone, localJob, tap, pick, openCloud, openBig, until, seedBig, query, json, login,
+  storageSnap, html, O, ED, TOM, LEE, BIG, TWO, ONE, EDOWN };
