@@ -24,7 +24,7 @@
            choice sends its own deliver flag; Leave asks first, then leaves.
      102e  the SQL: schema.sql carries v163-leaving.sql's block byte for byte as
            its last section; the pieces the rules rest on; self-checks L1–L5.
-     102f  release: V163; cache pat-v163; What's new rolled (two lines); About
+     102f  V163's About line (V164: the release checks → 103f). Was: release: V163; cache pat-v163; What's new rolled (two lines); About
            V163 / V162 / V161.
 
    ⚠ WHAT THIS FILE CANNOT PROVE: the database's rules. The stand-in server here
@@ -409,23 +409,9 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 102f */
-  await t.group('102f — release: V163; cache pat-v163; What’s new rolled; About V163 / V162 / V161', () => {
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V163', 'APP_VERSION V163');
-    t.eq(rel.run('WELCOME_VERSION'), 'V163', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v163';", 'cache key pat-v163');
-    t.eq(rel.fn('updateVersionLabel')('pat-v163'), 'V163', 'the update banner reads the key as V163');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 2, 'What’s new: two lines');
-    t.includes(sheetCopy, '<li><strong>Remove someone from your business.</strong>', '…removing');
-    t.includes(sheetCopy, 'then takes them off and tells you what it did.</li>', '…leaving');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V163</strong>'), y = help.indexOf('<p><strong>V162</strong>'), z = help.indexOf('<p><strong>V161</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V163, V162, V161');
-    t.excludes(help, '<p><strong>V160</strong>', 'V160 rolled off');
-    t.includes(help, 'Leaving and removing: someone can be removed from a business', 'About: V163’s line');
+  // V164: the release checks moved to 103f; this keeps V163's own About line.
+  await t.group('102f — V163’s About line; business.js names V163', () => {
+    t.includes(read('render-help.js'), 'Leaving and removing: someone can be removed from a business', 'About: V163’s line');
     t.includes(read('business.js'), 'V163 — leaving and removing a member', 'business.js names V163');
   });
 };

@@ -190,6 +190,8 @@ function fakeServer() {
   srv.docGets = () => srv.sessGets().filter(c => sel(c).includes('doc'));
   srv.docIds = () => srv.docGets().flatMap((c) => {
     const v = new URLSearchParams(c.url.split('?')[1] || '').get('id') || '';
+    // V164: the look-only job reads one job by id=eq. — contents too, so counted.
+    if (v.startsWith('eq.')) return [v.slice(3)];
     return v.startsWith('in.(') ? v.slice(4, -1).split(',').map(s => s.replace(/^"|"$/g, '')) : [];
   });
   srv.pageGets = () => srv.sessGets().filter(c => c.url.includes('updated_at='));
@@ -465,7 +467,7 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 30f */
-  await t.group('30f — the cloud tab: one list read (no contents), counts from the database, jobs here hidden, search (6B, 8A)', async () => {
+  await t.group('30f — the cloud tab: one list read (no contents), counts from the database, jobs here listed and marked (V164 2A), search (6B, 8A)', async () => {
     const app = await signedIn();
     const here = plainJob(app, 'ZZHEREJOB');
     away(app);
@@ -490,9 +492,14 @@ module.exports = async function () {
     t.includes(html, '2 fail', '…its fails');
     t.includes(html, app.fn('icon')('camera') + ' 2', '…and its photos, deleted ones left out');
     t.includes(html, 'ZZCERT-77', '…and its certificate number');
-    t.includes(html, 'session-cloud', 'marked \u2601 (R19)');
     t.includes(html, 'March 2024', 'grouped by month');
-    t.excludes(html, 'ZZHEREJOB', 'a job on this phone is not listed');
+    // V164 (2A): every job in the cloud — one also on this phone is listed and
+    // marked (it was hidden, R19, before V164).
+    const hereAt = html.indexOf('data-arg="' + here + '"');
+    t.ok(hereAt > -1 && html.indexOf('ZZHEREJOB', hereAt) > -1, 'a job on this phone is listed too (V164 2A)');
+    const nextCard = html.indexOf('session-card', hereAt);
+    const hereCard = html.slice(hereAt, nextCard > -1 ? nextCard : html.length);
+    t.includes(hereCard, 'On this phone', '…marked On this phone');
     t.ok(html.indexOf('ZZ Acme Works') < html.indexOf('ZZ Beta Hall'), 'newest first');
     // Search: the input stays, the list area refreshes.
     const input = app.doc.getElementById('cloud-search');
@@ -515,7 +522,9 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 30g */
-  await t.group('30g — tap a cloud job: it comes onto this phone and opens; never-here jobs add to the lifetime count once (5A)', async () => {
+  // V164 (2A): a tap opens the job LOOK-ONLY; Bring onto this phone is the
+  // sheet's button (was: the tap itself brought it down).
+  await t.group('30g — tap a cloud job: it opens look-only; Bring onto this phone brings it and opens it; never-here jobs add to the lifetime count once (5A)', async () => {
     const app = await signedIn();
     seed(app, 'ZZTAPME', { site: 'ZZ Tap Site', date: '2022-02-02',
       items: [{ id: 't1', assetNo: 'T1', result: 'pass' }, { id: 't2', assetNo: 'T2', result: 'pass' }] });
@@ -528,10 +537,16 @@ module.exports = async function () {
     await openCloud(app);
     const docsBefore = docIds(app).length;
     tap(app, 'cloud-tap', 'ZZTAPME');
+    await until(() => app.state().cloudLook && !app.state().cloudLook.loading);
+    t.notOk(onPhone(app, 'ZZTAPME'), 'a tap only looks: nothing comes onto this phone');
+    t.includes(app.doc.getElementById('cloud-look-body').innerHTML, '>T2<', 'the look shows its items');
+    t.eq(docIds(app).length, docsBefore + 1, 'the look read that job once');
+    app.doc.getElementById('cloud-look-bring').click();
     await until(() => onPhone(app, 'ZZTAPME'));
     await tick(20);
     t.ok(onPhone(app, 'ZZTAPME'), 'it is on this phone');
-    t.eq(docIds(app).length, docsBefore + 1, 'one download: that job');
+    t.eq(docIds(app).length, docsBefore + 2, 'one more download: that job');
+    t.eq(app.state().cloudLook, null, 'the look is forgotten');
     t.eq(app.state().activeId, 'ZZTAPME', '…and it is open');
     t.eq(app.state().jobsTab, 'phone', 'Back lands on the phone list, where it now is');
     t.eq(lifetime(app), before + 2, 'it was never counted here: its 2 items are added, not subtracted');

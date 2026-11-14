@@ -357,7 +357,8 @@ module.exports = async function () {
     app.run('state.jobsTab = "phone";');
     await openCloud(app);
     t.ok(app.state().cloudJobs.ok, 'the list was read');
-    t.includes(app.html(), 'Every job in the cloud is on this phone.', 'nothing is cloud-only');
+    // V164 (2A): the job on this phone is listed, marked — and can't be ticked.
+    t.includes(app.html(), 'On this phone', 'nothing is cloud-only (the one job is marked On this phone)');
     t.excludes(cloudHead(app), 'cloud-select-toggle', '…so no Select');
     t.includes(cloudHead(app), 'data-action="cs-open"', '…and Cloud Storage is still offered (phone jobs use cloud space too)');
     // A cloud-only job: the link sits left of Select.

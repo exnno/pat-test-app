@@ -139,7 +139,14 @@ module.exports = async function () {
     t.deepEq(code('sync.js').map(l => l.trim()), [
       "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS;",
       'if (biz) row.org_id = biz;',
-    ], 'two lines: the job list reads it (V150), the job row names it from the job\u2019s own businessId');
+      // V164: the business view READS by business (a look, never a write) and the
+      // look-only job checks the row is still in that business.
+      "let q = client.from('sessions').select(_SYNC_BIZ_JOB_COLS).eq('org_id', res.org).eq('deleted', false);",
+      "return syncDataClient().then((c) => c.from('sessions').select('id,doc,deleted,org_id').eq('user_id', u).eq('id', sid).limit(1))",
+      "if (o && String(row.org_id || '') !== o) { res.moved = true; return res; }",
+    ], 'one write: the job row names it from the job\u2019s own businessId; the rest are reads (V150 the job list, V164 the business view)');
+    // Still: no write of org_id anywhere but the job row.
+    t.eq(code('sync.js').filter(l => /org_id\s*=[^=]/.test(l)).length, 1, 'org_id is written in one place only (the job row)');
   });
 
   /* ------------------------------------------------------------------ 50e */

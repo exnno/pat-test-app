@@ -98,7 +98,10 @@ function tableCalls() {
       const names = links.map(l => l.name);
       const kind = names.includes('upsert') ? 'upsert' : names.includes('update') ? 'update'
         : names.includes('delete') ? 'delete' : names.includes('insert') ? 'insert' : 'select';
-      out.push({ file, line: src.slice(0, m.index).split('\n').length, table: m[2], links, kind });
+      // V164: the top-level function the call sits in (for 48a's one exception).
+      const fnAt = src.lastIndexOf('\nfunction ', m.index);
+      const fnName = fnAt > -1 ? (/^\nfunction ([A-Za-z_$][\w$]*)/.exec(src.slice(fnAt, fnAt + 120)) || [])[1] || '' : '';
+      out.push({ file, line: src.slice(0, m.index).split('\n').length, table: m[2], links, kind, fn: fnName });
     }
   }
   return out;
@@ -359,8 +362,18 @@ module.exports = async function () {
     t.ok(calls.length >= 29, 'and the app still reads the cloud tables (29 calls at V111)');
     t.ok(calls.every(c => c.links.length >= 1), 'every call has a chain to read');
     const reads = calls.filter(c => c.kind === 'select' || c.kind === 'update' || c.kind === 'delete');
-    const blind = reads.filter(c => !named(c)).map(c => `${c.file}:${c.line} ${c.table}`);
-    t.deepEq(blind, [], 'every read, update and delete filters by user_id (never the rules alone)');
+    // V164 — THE ONE EXCEPTION (rule 45): the business view (sync.js
+    // syncBusinessList) reads a business's jobs by org_id and their photo counts
+    // for the people on that list. Its result is a look, held by the Cloud tab and
+    // never handed to the pull, the sync state or storage (103c proves that). Only
+    // that function, only selects, and each says what it reads by.
+    const byBiz = (c) => c.file === 'sync.js' && c.fn === 'syncBusinessList' && c.kind === 'select'
+      && ((c.table === 'sessions' && c.links.some(l => l.name === 'eq' && /^\s*'org_id'\s*,/.test(l.args)))
+        || (c.table === 'session_photo_counts' && c.links.some(l => l.name === 'in' && /^\s*'user_id'\s*,/.test(l.args))));
+    const blind = reads.filter(c => !named(c) && !byBiz(c)).map(c => `${c.file}:${c.line} ${c.table}`);
+    t.deepEq(blind, [], 'every read, update and delete filters by user_id (never the rules alone) — bar the business view');
+    t.deepEq(calls.filter(c => !named(c) && byBiz(c)).map(c => c.table), ['sessions', 'session_photo_counts'],
+      'V164: the business view is the only read that does not name an account — two calls, both in syncBusinessList');
     const ups = calls.filter(c => c.kind === 'upsert');
     t.ok(ups.length >= 3, 'the three upserts are found (jobs, records, photos)');
     const loose = ups.filter(c => !c.links.some(l => l.name === 'upsert' && /onConflict:\s*'user_id,id'/.test(l.args))).map(c => `${c.file}:${c.line}`);

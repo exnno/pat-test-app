@@ -235,9 +235,8 @@ module.exports = async function () {
 
   /* ------------------------------------------------------------------ 100f */
   // V162: the release checks moved to 101f; this keeps V161's own About line.
-  await t.group('100f — V161’s About line; cloud.js header', () => {
-    const help = read('render-help.js');
-    t.includes(help, 'loses cloud access straight away, not up to an hour later', 'About: V161’s line');
+  // V164: V161 rolled off the About page (103f checks it is gone).
+  await t.group('100f — cloud.js header names V161', () => {
     t.includes(read('cloud.js'), 'V161: signed out from another device', 'cloud.js header names V161');
   });
 };

@@ -512,8 +512,11 @@ module.exports = async function () {
     t.includes(listed[0].site, 'ZZBRINGBACK', '…by its name');
     const look = sessGets(app).slice(n).map(c => decodeURIComponent(c.url));
     t.ok(look.length && look.every(u => !/select=id,doc[,&]/.test(u)), 'the list never downloads the job itself (R17)');
-    t.includes(app.html(), 'data-action="cloud-tap"', 'with a tap to bring it back');
+    t.includes(app.html(), 'data-action="cloud-tap"', 'with a tap to open it');
+    // V164 (2A): the tap opens it look-only; Bring onto this phone is in the sheet.
     tap(app, 'cloud-tap', g);
+    await until(() => app.state().cloudLook && !app.state().cloudLook.loading);
+    app.doc.getElementById('cloud-look-bring').click();
     await until(() => onPhone(app, g));
     app.stopTimer();
     t.ok(onPhone(app, g), 'it is back on this phone');

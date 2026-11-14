@@ -271,11 +271,13 @@ module.exports = async function () {
     t.includes(html(app), '>Show them</button>', 'cloud: Show them, before the list is read');
     stepTo(app, 'list');
     shown = html(app);
-    t.includes(shown, '5 jobs only in the cloud', 'cloud: Show them reads the five sample jobs');
+    // V164 (2A): the practice cloud holds the phone's three too, marked On this phone.
+    t.includes(shown, '8 jobs in the cloud', 'cloud: Show them reads the eight sample jobs (five only in the cloud)');
+    t.eq((shown.match(/On this phone<\/span>/g) || []).length, 3, '…the phone\u2019s three marked On this phone');
     t.includes(shown, 'Certificate PAT-', '…with their certificate numbers');
     t.ok(inMarkup(shown, '.cloud-storage-link'), 'cloud: Cloud Storage is there for its step');
     stepTo(app, 'select');
-    t.includes(html(app), '2 of 5 jobs match', 'cloud: the search finds the two Riverside jobs');
+    t.includes(html(app), '3 of 8 jobs match', 'cloud: the search finds the three Riverside jobs (one on this phone — V164)');
     stepTo(app, 'delete');
     t.includes(html(app), '1 selected', 'cloud: the first one ticked');
     t.eq(app.run('Object.keys(_tut.st.cloudJobs.selected).join()'), 'tutorial-cloud-1', '…the newest (the list comes newest first)');
