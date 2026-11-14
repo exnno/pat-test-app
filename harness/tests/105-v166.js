@@ -24,8 +24,7 @@
            nothing shown); Back to the Cloud tab.
      105e  the SQL: schema.sql ends with v166-storage.sql's block byte for byte;
            the reader's own rights; who it answers for; K1–K4; isolation 31a–31c.
-     105f  release: V166; cache pat-v166; What's new rolled (one line); About V166 /
-           V165 / V164 (V163 rolled off).
+     105f  V166's About line; sync.js names V166 (V167: the release checks → 106f).
 
    ⚠ WHAT THIS FILE CANNOT PROVE: what the database adds up and for whom. The
    stand-in answers as the functions are written; the functions themselves were
@@ -374,7 +373,12 @@ module.exports = async function () {
     const end = '-- ================================================================ end V166\n';
     const block = mig.slice(mig.indexOf('-- ================================================================ V166\n'), mig.indexOf(end) + end.length);
     t.ok(block.length > 3000, 'the migration has its definitions');
-    t.ok(read('supabase/schema.sql').trimEnd().endsWith(block.trimEnd()), 'a new project gets them byte for byte, as schema.sql’s last section');
+    // V167: no longer the LAST section (V167's follows — 106e); still whole, and
+    // nothing after it redefines the three.
+    const sch = read('supabase/schema.sql');
+    t.ok(sch.includes(block), 'a new project gets them byte for byte');
+    const after = sch.slice(sch.indexOf(block) + block.length);
+    for (const f of ['my_storage', 'business_storage', 'business_biggest_jobs']) t.excludes(after, 'function public.' + f + '(', '…and no later section redefines ' + f);
     t.eq((block.match(/language sql stable security invoker set search_path = '' as \$\$/g) || []).length, 3, 'all three run with the reader’s own rights, a pinned search path');
     t.excludes(block, 'security definer', '…none with more');
     t.includes(block, "  where public.can_read_org(o)\n  order by 1", 'a business’s lines only for one the caller may read whole');
@@ -392,25 +396,9 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 105f */
-  await t.group('105f — release: V166; cache pat-v166; What’s new rolled (one line); About V166 / V165 / V164', () => {
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V166', 'APP_VERSION V166');
-    t.eq(rel.run('WELCOME_VERSION'), 'V166', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v166';", 'cache key pat-v166');
-    t.eq(rel.fn('updateVersionLabel')('pat-v166'), 'V166', 'the update banner reads the key as V166');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>How much is in the cloud, at a glance.</strong>', '…the line');
-    t.includes(sheetCopy, 'its total, each person&rsquo;s share and its biggest jobs.</li>', '…and a business’s page');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V166</strong>'), y = help.indexOf('<p><strong>V165</strong>'), z = help.indexOf('<p><strong>V164</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V166, V165, V164');
-    t.excludes(help, '<p><strong>V163</strong>', 'V163 rolled off');
-    t.excludes(help, 'Leaving and removing: someone can be removed from a business', '…with its line');
-    t.includes(help, 'One place for your jobs in the cloud: every job is listed', 'About: V164’s line, the oldest');
-    t.includes(help, 'How much is in the cloud, at a glance: the cloud tab shows your jobs', 'About: V166’s line');
+  // V167: the release checks moved to 106f; this keeps V166's own About line.
+  await t.group('105f — V166’s About line; sync.js names V166', () => {
+    t.includes(read('render-help.js'), 'How much is in the cloud, at a glance: the cloud tab shows your jobs', 'About: V166’s line');
     t.includes(read('sync.js'), 'V166 (1A 2A 3A 5A): how much is stored', 'sync.js names V166');
   });
 };
