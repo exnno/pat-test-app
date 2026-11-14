@@ -1564,6 +1564,43 @@ begin
   end if;
   perform set_config('request.jwt.claims', '', true);
 
+  -- ------------------------------------------------- V165: a business holding someone else's jobs (30a–30c)
+  if not exists (select 1 from pg_proc p join pg_namespace x on x.oid = p.pronamespace
+                 where x.nspname = 'public' and p.proname = 'business_others_jobs') then
+    res := res || array['30a|A is told A''s business holds someone else''s job|FAIL|run supabase/v165-business-jobs.sql first'];
+  else
+    org_a := public.default_org(a);
+    -- A job of B's left in A's business, B no longer a member (as after a removal).
+    delete from public.sessions where id = 'iso-test-v165-1' and user_id = b;
+    delete from public.memberships where org_id = org_a and user_id = b;
+    insert into public.memberships (org_id, user_id, role, is_default) values (org_a, b, 'engineer', false);
+    insert into public.sessions (id, user_id, doc, last_modified, org_id)
+      values ('iso-test-v165-1', b, '{}'::jsonb, now(), org_a);
+    delete from public.memberships where org_id = org_a and user_id = b;
+    -- 30a: A (the Owner) is told yes for A's business.
+    perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    select count(*) into n from public.business_others_jobs() where business_id = org_a and others;
+    execute 'reset role';
+    res := res || array['30a|A is told A''s business holds someone else''s job|' || case when n = 1 then 'PASS|' else 'FAIL|' || n end];
+    -- 30b: B, not a member, is told nothing about A's business.
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    select count(*) into n from public.business_others_jobs() where business_id = org_a;
+    execute 'reset role';
+    res := res || array['30b|B is told nothing about A''s business|' || case when n = 0 then 'PASS|' else 'FAIL|' || n end];
+    -- 30c: as an Engineer in A's business B is still told nothing about it.
+    insert into public.memberships (org_id, user_id, role, is_default) values (org_a, b, 'engineer', false);
+    execute 'set local role authenticated';
+    select count(*) into n from public.business_others_jobs() where business_id = org_a;
+    execute 'reset role';
+    delete from public.sessions where id = 'iso-test-v165-1' and user_id = b;
+    delete from public.memberships where org_id = org_a and user_id = b;
+    select count(*) into k from public.sessions where id like 'iso-test-v165-%';
+    res := res || array['30c|an Engineer is told nothing; nothing left behind|' || case when n = 0 and k = 0 then 'PASS|' else 'FAIL|' || n || ' / ' || k || ' left' end];
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
   delete from public.sessions where id like 'iso-test-%';
   delete from public.records where id like 'iso-test-%';
   delete from public.photos where id like 'iso-test-%';

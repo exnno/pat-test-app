@@ -2923,3 +2923,32 @@ grant execute on function public.remove_member(uuid, uuid, boolean), public.leav
 
 notify pgrst, 'reload schema';
 -- ================================================================ end V163
+
+
+-- ================================================================ V165
+-- Which of my businesses hold someone else's jobs. KEEP IN STEP with
+-- supabase/v165-business-jobs.sql (the same, plus self-checks J1–J3). Kept in
+-- step by harness 104e.
+--
+-- V164's business view offered a business only while it had two or more members.
+-- Found in Peter's live test (14 Nov): remove the only other person and the
+-- business has one member but still holds their jobs — and the Owner had no way
+-- to see them. The phone can't tell that from the member count, so the cloud
+-- says it: for each business the caller may read whole (Owner / Team leader /
+-- Office — V113's can_read_org), whether it holds a job that isn't the caller's
+-- own. A yes or no only — no job, no person, no count. An Engineer gets no row.
+create or replace function public.business_others_jobs()
+returns table (business_id uuid, others boolean)
+language sql stable security definer set search_path = '' as $$
+  select m.org_id,
+         exists (select 1 from public.sessions s
+                 where s.org_id = m.org_id
+                   and s.user_id <> (select auth.uid())
+                   and s.deleted = false)
+  from public.memberships m
+  where m.user_id = (select auth.uid())
+    and m.role in ('owner', 'team_leader', 'office')
+$$;
+revoke all on function public.business_others_jobs() from public, anon;
+grant execute on function public.business_others_jobs() to authenticated;
+-- ================================================================ end V165
