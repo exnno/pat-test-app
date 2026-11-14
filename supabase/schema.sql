@@ -2952,3 +2952,84 @@ $$;
 revoke all on function public.business_others_jobs() from public, anon;
 grant execute on function public.business_others_jobs() to authenticated;
 -- ================================================================ end V165
+
+-- ================================================================ V166
+-- How much is stored. KEEP IN STEP with supabase/v166-storage.sql (the same, plus
+-- self-checks K1–K4). Kept in step by harness 105e.
+--
+-- All three are SECURITY INVOKER: they add up rows the caller's own read rules
+-- already let them see (V113 / V163: your own jobs in a business you're in, or
+-- every job of a business you may read whole). A count, a size, and for a
+-- business's biggest jobs the same few fields the business view already lists —
+-- never a job's contents, never a photo.
+
+-- Your own: every live job and photo of yours the cloud lets you read — the same
+-- as Cloud Storage's own page (V108) adds up, in one small answer, for the line
+-- in the Cloud tab (1A). Signed out: nothing.
+create or replace function public.my_storage()
+returns table (jobs integer, job_bytes bigint, photos integer, photo_bytes bigint)
+language sql stable security invoker set search_path = '' as $$
+  select (select count(*)::integer from public.sessions s
+          where s.user_id = (select auth.uid()) and s.deleted = false),
+         (select coalesce(sum(s.doc_bytes), 0)::bigint from public.sessions s
+          where s.user_id = (select auth.uid()) and s.deleted = false),
+         (select count(*)::integer from public.photos p
+          where p.user_id = (select auth.uid()) and p.deleted = false),
+         (select coalesce(sum(p.bytes), 0)::bigint from public.photos p
+          where p.user_id = (select auth.uid()) and p.deleted = false)
+  where (select auth.uid()) is not null
+$$;
+revoke all on function public.my_storage() from public, anon;
+grant execute on function public.my_storage() to authenticated;
+
+-- A business, a line per person (2A): their live jobs and photos in it, and the
+-- name the latest of their jobs was logged with (a leaver is no longer a member,
+-- so business_people can't name them). Only for a business the caller may read
+-- whole (5A — V113's can_read_org: Owner / Team leader / Office); anyone else, an
+-- Engineer included, gets no rows.
+create or replace function public.business_storage(o uuid)
+returns table (user_id uuid, jobs integer, job_bytes bigint, photos integer, photo_bytes bigint, engineer text)
+language sql stable security invoker set search_path = '' as $$
+  with j as (
+    select s.user_id as u, count(*)::integer as n, coalesce(sum(s.doc_bytes), 0)::bigint as b,
+           left((array_agg(nullif(btrim(s.doc->>'engineer'), '') order by s.updated_at desc)
+                 filter (where nullif(btrim(s.doc->>'engineer'), '') is not null))[1], 80) as eng
+    from public.sessions s
+    where s.org_id = o and s.deleted = false
+    group by s.user_id),
+  p as (
+    select ph.user_id as u, count(*)::integer as n, coalesce(sum(ph.bytes), 0)::bigint as b
+    from public.photos ph
+    where ph.org_id = o and ph.deleted = false
+    group by ph.user_id)
+  select coalesce(j.u, p.u), coalesce(j.n, 0), coalesce(j.b, 0), coalesce(p.n, 0), coalesce(p.b, 0), j.eng
+  from j full join p on p.u = j.u
+  where public.can_read_org(o)
+  order by 1
+$$;
+revoke all on function public.business_storage(uuid) from public, anon;
+grant execute on function public.business_storage(uuid) to authenticated;
+
+-- A business's biggest jobs (3A): each job's size and its photos', biggest first,
+-- with the fields the Cloud tab's business list already shows (V164), so a tap can
+-- open it look-only. At most 50. Same rule as above: Owner / Team leader / Office.
+create or replace function public.business_biggest_jobs(o uuid, lim integer default 10)
+returns table (user_id uuid, id text, job_bytes bigint, photos integer, photo_bytes bigint,
+               site text, name text, date text, client_id text, engineer text, locked text,
+               cert_no text, items integer, fails integer)
+language sql stable security invoker set search_path = '' as $$
+  select s.user_id, s.id, coalesce(s.doc_bytes, 0)::bigint, pc.n, pc.b,
+         s.doc->>'site', s.doc->>'name', s.doc->>'date', s.doc->>'clientId',
+         left(s.doc->>'engineer', 80), s.doc->>'locked', s.doc->>'certNo', s.n_items, s.n_fails
+  from public.sessions s
+  cross join lateral (
+    select count(*)::integer as n, coalesce(sum(ph.bytes), 0)::bigint as b
+    from public.photos ph
+    where ph.user_id = s.user_id and ph.session_id = s.id and ph.deleted = false) pc
+  where s.org_id = o and s.deleted = false and public.can_read_org(o)
+  order by coalesce(s.doc_bytes, 0) + pc.b desc, s.user_id, s.id
+  limit least(greatest(coalesce(lim, 10), 1), 50)
+$$;
+revoke all on function public.business_biggest_jobs(uuid, integer) from public, anon;
+grant execute on function public.business_biggest_jobs(uuid, integer) to authenticated;
+-- ================================================================ end V166

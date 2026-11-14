@@ -9,6 +9,10 @@
 -- email addresses on the next two lines → Run. Every row of the result must
 -- say PASS. Any FAIL: do not promote, and bring the output to the next chat.
 --
+-- V166: CHECKS 31a–31c NEED supabase/v166-storage.sql RUN FIRST (31a names it
+-- if not). A job and a photo of B's are left in A's business with B no longer a
+-- member: A sees B's line and job in the business's storage figures; B sees
+-- nothing of A's business, nor as an Engineer there; then everything is removed.
 -- V93: CHECKS 8a–8c NEED supabase/v93-archive.sql RUN FIRST (8c names it if not).
 -- V108: CHECK 8d NEEDS supabase/v108-storage.sql RUN FIRST (8d names it if not).
 -- V163: CHECKS 29a–29e NEED supabase/v163-leaving.sql RUN FIRST (29a names it
@@ -1598,6 +1602,51 @@ begin
     delete from public.memberships where org_id = org_a and user_id = b;
     select count(*) into k from public.sessions where id like 'iso-test-v165-%';
     res := res || array['30c|an Engineer is told nothing; nothing left behind|' || case when n = 0 and k = 0 then 'PASS|' else 'FAIL|' || n || ' / ' || k || ' left' end];
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
+  -- ------------------------------------------------- V166: how much a business stores (31a–31c)
+  if not exists (select 1 from pg_proc p join pg_namespace x on x.oid = p.pronamespace
+                 where x.nspname = 'public' and p.proname = 'business_storage') then
+    res := res || array['31a|A sees what A''s business stores, B''s line and job included|FAIL|run supabase/v166-storage.sql first'];
+  else
+    org_a := public.default_org(a);
+    -- A job and a photo of B's left in A's business, B no longer a member.
+    delete from public.photos where id = 'iso-test-v166-p1' and user_id = b;
+    delete from public.sessions where id = 'iso-test-v166-1' and user_id = b;
+    delete from public.memberships where org_id = org_a and user_id = b;
+    insert into public.memberships (org_id, user_id, role, is_default) values (org_a, b, 'engineer', false);
+    insert into public.sessions (id, user_id, doc, last_modified, org_id)
+      values ('iso-test-v166-1', b, '{"site":"iso-test-v166"}'::jsonb, now(), org_a);
+    insert into public.photos (id, user_id, session_id, item_id, storage_path, bytes, last_modified, org_id)
+      values ('iso-test-v166-p1', b, 'iso-test-v166-1', 'i1', b::text || '/iso-test-v166-p1.jpg', 4321, now(), org_a);
+    delete from public.memberships where org_id = org_a and user_id = b;
+    -- 31a: A (the Owner) sees B's line and B's job among the biggest.
+    perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    select count(*) into n from public.business_storage(org_a) where user_id = b and jobs >= 1 and photos >= 1 and photo_bytes >= 4321;
+    select count(*) into k from public.business_biggest_jobs(org_a, 50) where user_id = b and id = 'iso-test-v166-1';
+    execute 'reset role';
+    res := res || array['31a|A sees what A''s business stores, B''s line and job included|' || case when n = 1 and k = 1 then 'PASS|' else 'FAIL|' || n || ' / ' || k end];
+    -- 31b: B, not a member, sees nothing of A's business — and B's own total leaves it out.
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    select count(*) into n from public.business_storage(org_a);
+    select count(*) into k from public.business_biggest_jobs(org_a, 50);
+    execute 'reset role';
+    res := res || array['31b|B sees nothing of A''s business|' || case when n = 0 and k = 0 then 'PASS|' else 'FAIL|' || n || ' / ' || k end];
+    -- 31c: as an Engineer in A's business B still sees nothing of it; put back.
+    insert into public.memberships (org_id, user_id, role, is_default) values (org_a, b, 'engineer', false);
+    execute 'set local role authenticated';
+    select count(*) into n from public.business_storage(org_a);
+    select count(*) + n into n from public.business_biggest_jobs(org_a, 50);
+    execute 'reset role';
+    delete from public.photos where id = 'iso-test-v166-p1' and user_id = b;
+    delete from public.sessions where id = 'iso-test-v166-1' and user_id = b;
+    delete from public.memberships where org_id = org_a and user_id = b;
+    select count(*) into k from public.sessions where id like 'iso-test-v166-%';
+    select count(*) + k into k from public.photos where id like 'iso-test-v166-%';
+    res := res || array['31c|an Engineer sees nothing of the business''s storage; nothing left behind|' || case when n = 0 and k = 0 then 'PASS|' else 'FAIL|' || n || ' / ' || k || ' left' end];
   end if;
   perform set_config('request.jwt.claims', '', true);
 
