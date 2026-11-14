@@ -517,7 +517,7 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V167';",   // V167: re-pointed.   // V166: re-pointed.   // V165: re-pointed.   // V164: re-pointed.   // V163: re-pointed. V162: re-pointed. V161: re-pointed. V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
+    from: "const APP_VERSION = 'V168';",   // V168: re-pointed.   // V167: re-pointed.   // V166: re-pointed.   // V165: re-pointed.   // V164: re-pointed.   // V163: re-pointed. V162: re-pointed. V161: re-pointed. V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
     to:   "const APP_VERSION = 'V154';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
@@ -640,7 +640,7 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V165</strong> &middot; November 2026</p>',   // V167: V164 rolled off — the oldest is V165 (106f).   // V166: V163 rolled off — the oldest is V164 (105f).   // V165: V162 rolled off — the oldest is V163 (104f).   // V164: V161 rolled off — the oldest is V162 (103f).   // V163: V160 rolled off — the oldest is V161 (102f). V162: V159 rolled off — the oldest is V160 (101f). V161: V158 rolled off — the oldest is V159 (100f). V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
+    from: '        <p><strong>V166</strong> &middot; November 2026</p>',   // V168: V165 rolled off — the oldest is V166 (108f).   // V167: V164 rolled off — the oldest is V165 (106f).   // V166: V163 rolled off — the oldest is V164 (105f).   // V165: V162 rolled off — the oldest is V163 (104f).   // V164: V161 rolled off — the oldest is V162 (103f).   // V163: V160 rolled off — the oldest is V161 (102f). V162: V159 rolled off — the oldest is V160 (101f). V161: V158 rolled off — the oldest is V159 (100f). V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 95e)',
   },
@@ -1131,8 +1131,9 @@ const MUTATIONS = [
     name: 'M150 (V80) an upload error is treated as success',
     file: 'sync.js',
     // V110: re-anchored to one place in the file (it matched 8 places and broke syncVerifyJobs; the job UPLOAD in _syncPushHalf is meant).
-    from: "        .then(() => c.from('sessions').upsert(batch.map(w => w.row), { onConflict: 'user_id,id' }))\n        .then((r) => {\n          if (r && r.error) throw r.error;\n",
-    to:   "        .then(() => c.from('sessions').upsert(batch.map(w => w.row), { onConflict: 'user_id,id' }))\n        .then((r) => {\n",
+    // V168: re-pointed (the push half, per business).
+    from: "          if (r && r.error) throw r.error;\n          for (const w of batch) landed.add(w.id);\n",
+    to:   "          for (const w of batch) landed.add(w.id);\n",
     why:  'jobs the server refused would be marked sent and never retried (29d)',
   },
   {
@@ -1308,8 +1309,9 @@ const MUTATIONS = [
   {
     name: 'M173 (V81) the push sends a job that is waiting on a decision',
     file: 'sync.js',
-    from: "      if (heldIds.has(id)) continue;\n      // \u26a0 v81.2:",
-    to:   "      // \u26a0 v81.2:",
+    // V168: re-pointed (the business key follows it).
+    from: "      if (heldIds.has(id)) continue;\n      const key = multi ? _syncBizKey(s) : '';",
+    to:   "      const key = multi ? _syncBizKey(s) : '';",
     why:  'the real bug 17k found during this release. The question is answered on the server, in this phone\u2019s favour, before anyone is asked \u2014 so choosing "use the cloud copy" fetches back what the push has just overwritten it with',
   },
   {
@@ -1563,8 +1565,9 @@ const MUTATIONS = [
     name: 'M207 (V82) records are pushed after their read failed',
     file: 'sync.js',
     // V128: re-aimed — the pull takes the check (chk). V143: re-aimed — the push is skipped while paused.
-    from: "  return _syncPullRecords(c, uid, st, out, chk)\n    .then(() => (paused ? null : _syncPushRecords(c, uid, st, out)))",
-    to:   "  return _syncPullRecords(c, uid, st, out, chk).catch(() => {})\n    .then(() => (paused ? null : _syncPushRecords(c, uid, st, out)))",
+    // V168: re-pointed (the push line now names the main business).
+    from: "  return _syncPullRecords(c, uid, st, out, chk)\n",
+    to:   "  return _syncPullRecords(c, uid, st, out, chk).catch(() => {})\n",
     why:  'rule 4: a push may only ever follow a pull. Without the look first, the push overwrites work it never saw (18j)',
   },
   {
@@ -2669,15 +2672,17 @@ const MUTATIONS = [
   {
     name: "M361 (V88) a photo delete marks the row but leaves the file",
     file: "sync.js",
-    from: "          .then(() => c.storage.from('photos').remove(\n            chunk.map(id => _syncPhotoPath(uid, id)).concat(chunk.map(id => _syncThumbPath(uid, id)))))",
-    to:   "          .then(() => ({}))",
+    // V168: re-pointed (a held chunk skips it).
+    from: "          .then(() => (held ? { held: true } : c.storage.from('photos').remove(",
+    to:   "          .then(() => (held ? { held: true } : ({ data: [] }) || c.storage.from('photos').remove(",
     why:  "the file is the client's data and the storage bill — delete means delete (25f)",
   },
   {
     name: "M362 (V88) a photo is forgotten before its delete succeeds",
     file: "sync.js",
-    from: "            .eq('user_id', uid).in('id', chunk))\n          .then((r) => { if (r && r.error) throw r.error; })",
-    to:   "            .eq('user_id', uid).in('id', chunk))\n          .then((r) => { if (r && r.error) throw r.error; for (const id of chunk) delete st.ph.sent[id]; _syncSave(st); })",
+    // V168: re-pointed (deletes per business).
+    from: "            if (r && r.error) throw r.error;\n          })\n",
+    to:   "            if (r && r.error) throw r.error;\n            for (const id of chunk) delete st.ph.sent[id]; _syncSave(st);\n          })\n",
     why:  "a refused delete would never be retried: the photo stays in the cloud for ever (25f)",
   },
   {
@@ -3222,7 +3227,8 @@ const MUTATIONS = [
   {
     name: "M439 (V92) nothing is read back after the push",
     file: "sync.js",
-    from: "      return _syncConfirmPushed(c, uid, st, work.filter(w => !w.gone).map(w => w.id));",
+    // V168: re-pointed (only what landed is read back).
+    from: "      return _syncConfirmPushed(c, uid, st, work.filter(w => !w.gone && landed.has(w.id)).map(w => w.id));",
     to:   "      return null;",
     why:  "4A: 🛡 one sync late again (29a)",
   },
@@ -5705,8 +5711,9 @@ const MUTATIONS = [
   {
     name: "M793 (V111) a jobs upsert stops landing on (user_id, id)",
     file: "sync.js",
-    from: ".then(() => c.from('sessions').upsert(batch.map(w => w.row), { onConflict: 'user_id,id' }))",
-    to:   ".then(() => c.from('sessions').upsert(batch.map(w => w.row), { onConflict: 'id' }))",
+    // V168: re-pointed (a refused business skips its batches).
+    from: ": c.from('sessions').upsert(batch.map(w => w.row), { onConflict: 'user_id,id' })))",
+    to:   ": c.from('sessions').upsert(batch.map(w => w.row), { onConflict: 'id' })))",
     why:  "ids are unique per account only: an upsert keyed on id alone would collide with a teammate's job of the same id (48a)",
   },
   {
@@ -6117,9 +6124,9 @@ const MUTATIONS = [
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
     // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
-    from: "<li><strong>Mistakes can be corrected by the office.</strong>",   // V167: welcome rolled (one line) — re-aimed; 106f pins it.   // V166: welcome rolled (one line) — re-aimed; 105f pins it.   // V165: welcome rolled (one line) — re-aimed; 104f pins it.   // V164: welcome rolled (one line) — re-aimed; 103f pins it.   // V163: welcome rolled (two lines) — re-aimed at the first; 102f pins it. V157: welcome rolled (two lines) — re-aimed at the first; 96e pins it.   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
+    from: "<li><strong>Each business on its own plan.</strong>",   // V168: welcome rolled (one line) — re-aimed; 108f pins it.   // V167: welcome rolled (one line) — re-aimed; 106f pins it.   // V166: welcome rolled (one line) — re-aimed; 105f pins it.   // V165: welcome rolled (one line) — re-aimed; 104f pins it.   // V164: welcome rolled (one line) — re-aimed; 103f pins it.   // V163: welcome rolled (two lines) — re-aimed at the first; 102f pins it. V157: welcome rolled (two lines) — re-aimed at the first; 96e pins it.   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (106f)",
+    why:  "11A: the welcome says plainly what changed on screen (108f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -7640,91 +7647,104 @@ const MUTATIONS = [
   {
     name: "M1078 (V127) PASS is not gated",
     file: "session.js",
-    from: "function passClicked() {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    // V168: re-pointed (the gate names the job).
+    from: "function passClicked() {\n  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business\n",
     to:   "function passClicked() {\n",
     why:  "the old FAIL's 'Change to PASS?' asks first, then the save refuses (65b)",
   },
   {
     name: "M1079 (V127) FAIL is not gated",
     file: "session.js",
-    from: "function failClicked() {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    // V168: re-pointed (the gate names the job).
+    from: "function failClicked() {\n  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business\n",
     to:   "function failClicked() {\n",
     why:  "FAIL's reasons sheet would open on a locked account (65b)",
   },
   {
     name: "M1080 (V127) the save backstop is not gated",
     file: "session.js",
-    from: "function saveItem(result, readings) {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    // V168: re-pointed (the gate names the job).
+    from: "function saveItem(result, readings) {\n  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business\n",
     to:   "function saveItem(result, readings) {\n",
     why:  "every other logging path ends in saveItem (65b)",
   },
   {
     name: "M1081 (V127) copy last is not gated",
     file: "session.js",
-    from: "function copyLastResult() {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    // V168: re-pointed (the gate names the job).
+    from: "function copyLastResult() {\n  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business\n",
     to:   "function copyLastResult() {\n",
     why:  "copy last writes its own item (65b)",
   },
   {
     name: "M1082 (V127) Log again \u00d7N is not gated",
     file: "session.js",
-    from: "function repeatLastResult(n) {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    // V168: re-pointed (the gate names the job).
+    from: "function repeatLastResult(n) {\n  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business\n",
     to:   "function repeatLastResult(n) {\n",
     why:  "Log again writes its own items (65b)",
   },
   {
     name: "M1083 (V127) createSession is not gated",
     file: "session.js",
-    from: "function createSession() {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    // V168: re-pointed (the gate names the business).
+    from: "function createSession() {\n  // V168: the business the job is being made for decides (plan.js; 5A greys an ended one out).\n  if (typeof planGate === 'function' && !planGate({ businessId: typeof businessNewJobTarget === 'function' ? businessNewJobTarget() : '' })) return;   // V127: the plan lock (plan.js)\n",
     to:   "function createSession() {\n",
     why:  "the backstop for a new job (65b)",
   },
   {
     name: "M1084 (V127) Duplicate job is not gated",
     file: "session.js",
-    from: "function openDupJob() {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    // V168: re-pointed (the gate names the job).
+    from: "function openDupJob() {\n  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business\n",
     to:   "function openDupJob() {\n",
     why:  "a duplicate is a new job (65b)",
   },
   {
     name: "M1085 (V127) Move items to a new job is not gated",
     file: "session.js",
-    from: "function moveItemsToNewJob() {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    // V168: re-pointed (the gate names the job).
+    from: "function moveItemsToNewJob() {\n  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business\n",
     to:   "function moveItemsToNewJob() {\n",
     why:  "a new job by another door (65b)",
   },
   {
     name: "M1086 (V127) Multi Pick is not gated",
     file: "multipick.js",
-    from: "function multiPickFire(idx) {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    // V168: re-pointed (the gate names the job).
+    from: "function multiPickFire(idx) {\n  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business\n",
     to:   "function multiPickFire(idx) {\n",
     why:  "Multi Pick writes its own items (65b)",
   },
   {
     name: "M1087 (V127) a Quick Pick tile is not gated",
     file: "multipick.js",
-    from: "function qpTileFire(qp) {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    // V168: re-pointed (the gate names the job).
+    from: "function qpTileFire(qp) {\n  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business\n",
     to:   "function qpTileFire(qp) {\n",
     why:  "a tile writes its own items (65b)",
   },
   {
     name: "M1088 (V127) a certificate is not gated",
     file: "report.js",
-    from: "async function produceReport(sessionId) {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    // V168: re-pointed (the gate names the job).
+    from: "async function produceReport(sessionId) {\n  if (typeof planGate === 'function' && !planGate(state.sessions.find(s => s.id === sessionId) || null)) return;   // V127: the plan lock (plan.js); V168: the job's business\n",
     to:   "async function produceReport(sessionId) {\n",
     why:  "8B: no new certificates (65b)",
   },
   {
     name: "M1089 (V127) the rebuilt preview is not gated",
     file: "report.js",
-    from: "async function reopenReportPreview(sessionId) {\n  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)\n",
+    // V168: re-pointed (the gate names the job).
+    from: "async function reopenReportPreview(sessionId) {\n  if (typeof planGate === 'function' && !planGate(state.sessions.find(s => s.id === sessionId) || null)) return;   // V127: the plan lock (plan.js); V168: the job's business\n",
     to:   "async function reopenReportPreview(sessionId) {\n",
     why:  "8B: the preview rebuilt from Report settings is a new certificate too (65b)",
   },
   {
     name: "M1090 (V127) New job opens its form on a locked account",
     file: "dispatch.js",
-    from: "    if (typeof planGate === 'function' && !planGate()) return;   // V127: before the form, not after it\n",
+    // V168: re-pointed (the gate names the business).
+    from: "    if (typeof planGate === 'function' && !planGate({ businessId: typeof businessForInitial === 'function' ? businessForInitial() : '' })) return;   // V127: before the form, not after it\n",
     to:   "",
     why:  "refuse before the typing, not after it (65b)",
   },
@@ -8599,8 +8619,8 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V167';",   // V167: re-aimed.   // V166: re-aimed.   // V165: re-aimed.   // V164: re-aimed.   // V163: re-aimed. V157: re-aimed. V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
-    to:   "const WELCOME_VERSION = 'V166';",
+    from: "const WELCOME_VERSION = 'V168';",   // V168: re-aimed.   // V167: re-aimed.   // V166: re-aimed.   // V165: re-aimed.   // V164: re-aimed.   // V163: re-aimed. V157: re-aimed. V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
+    to:   "const WELCOME_VERSION = 'V167';",
     why:  "What's new is rolled on a feature release (96e)",
   },
   {
@@ -8615,9 +8635,9 @@ const MUTATIONS = [
     // V149: one line — re-aimed at its end.
     // V150: one line — re-aimed at its end.
     // V155: two lines — re-aimed at the second's end; still caught by the count.
-    from: "picks it up on its next sync.</li>\n",   // V167: one line — re-aimed at its end; 106f counts one.   // V166: one line — re-aimed at its end; 105f counts one.   // V165: one line — re-aimed at its end; 104f counts one.   // V164: one line — re-aimed at its end; 103f counts one.   // V163: two lines — re-aimed at the second's end. V157: two lines — re-aimed at the second's end; still caught by the count. V156: two lines — re-aimed at the second's end; still caught by the count.
-    to:   "picks it up on its next sync.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (106f)",
+    from: "and its jobs say so.</li>\n",   // V168: one line — re-aimed at its end; 108f counts one.   // V167: one line — re-aimed at its end; 106f counts one.   // V166: one line — re-aimed at its end; 105f counts one.   // V165: one line — re-aimed at its end; 104f counts one.   // V164: one line — re-aimed at its end; 103f counts one.   // V163: two lines — re-aimed at the second's end. V157: two lines — re-aimed at the second's end; still caught by the count. V156: two lines — re-aimed at the second's end; still caught by the count.
+    to:   "and its jobs say so.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (108f)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8631,9 +8651,9 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Photos when you look at a cloud job: tap Show photos",   // V165: at V165's (V164's moves to M1259, V163's to M1238).   // V164: at V164's (V163's moves to M1259, V162's to M1238).   // V161: at V161's (V160's moves to M1259, V159's to M1238). V160: at V160's (V159's moves to M1259, V158's to M1238). V159: at V159's (V158's moves to M1259, V157's to M1238). V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
+    from: "Each business on its own plan: for anyone in more than one business",   // V168: at V168's (V167's moves to M1259, V166's to M1238).   // V165: at V165's (V164's moves to M1259, V163's to M1238).   // V164: at V164's (V163's moves to M1259, V162's to M1238).   // V161: at V161's (V160's moves to M1259, V159's to M1238). V160: at V160's (V159's moves to M1259, V158's to M1238). V159: at V159's (V158's moves to M1259, V157's to M1238). V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
     to:   "Better",
-    why:  "the About page must say what changed in this version (104f)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
+    why:  "the About page must say what changed in this version (108f)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8748,9 +8768,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Photos when you look at a cloud job: tap Show photos",   // V167: V164's rolled off — re-aimed at V165's, the oldest now (106f).   // V166: V163's rolled off — re-aimed at V164's, the oldest now (105f).   // V165: V162's rolled off — re-aimed at V163's, the oldest now (102f).   // V164: V161's rolled off — re-aimed at V162's, the oldest now (101f).   // V163: V160's rolled off — re-aimed at V161's, the oldest now (100f). V162: V159's rolled off — re-aimed at V160's, the oldest now (99f). V161: V158's rolled off — re-aimed at V159's, the oldest now (98f). V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
+    from: "How much is in the cloud, at a glance",   // V168: V165's rolled off — re-aimed at V166's, the oldest now (108f).   // V167: V164's rolled off — re-aimed at V165's, the oldest now (106f).   // V166: V163's rolled off — re-aimed at V164's, the oldest now (105f).   // V165: V162's rolled off — re-aimed at V163's, the oldest now (102f).   // V164: V161's rolled off — re-aimed at V162's, the oldest now (101f).   // V163: V160's rolled off — re-aimed at V161's, the oldest now (100f). V162: V159's rolled off — re-aimed at V160's, the oldest now (99f). V161: V158's rolled off — re-aimed at V159's, the oldest now (98f). V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (106f)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
+    why:  "the About page keeps the last three versions' lines (108f)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8910,7 +8930,7 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "How much is in the cloud, at a glance: the cloud tab shows",   // V167: at V166's, still in the window (105f).   // V165: at V164's, still in the window (103f).   // V164: at V163's, still in the window (102f).   // V163: at V162's, still in the window (101f). V161: at V160's, still in the window (99f). V160: at V159's, still in the window (98f). V159: at V158's, still in the window. V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
+    from: "Corrections: Owners, Team leaders and the Office can fix a mistake",   // V168: at V167's, still in the window (106f).   // V167: at V166's, still in the window (105f).   // V165: at V164's, still in the window (103f).   // V164: at V163's, still in the window (102f).   // V163: at V162's, still in the window (101f). V161: at V160's, still in the window (99f). V160: at V159's, still in the window (98f). V159: at V158's, still in the window. V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
     to:   "Better",
     why:  "the About page keeps the last three versions' lines (105f)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
   },
@@ -9039,9 +9059,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v167-1';",   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v167';",
-    why:  "a release needs its cache bump or phones never get it (106f)",
+    from: "const CACHE_VERSION = 'pat-v168';",   // V168: re-aimed (→ 108f).   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v167-1';",
+    why:  "a release needs its cache bump or phones never get it (108f)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -10287,8 +10307,9 @@ const MUTATIONS = [
   {
     name: "M1453 (V143) the plan read names its columns again",
     file: "plan.js",
-    from: "    .then((c) => c.from('profiles').select('*').eq('id', uid).maybeSingle())",
-    to:   "    .then((c) => c.from('profiles').select('plan, trial_ends_at').eq('id', uid).maybeSingle())",
+    // V168: re-pointed (the client is kept for the business plans read).
+    from: "    .then((c) => { client = c; return c.from('profiles').select('*').eq('id', uid).maybeSingle(); })",
+    to:   "    .then((c) => { client = c; return c.from('profiles').select('plan, trial_ends_at').eq('id', uid).maybeSingle(); })",
     why:  "3A: lapsed_at never reaches the phone (82b)",
   },
   {
@@ -10343,22 +10364,25 @@ const MUTATIONS = [
   {
     name: "M1461 (V143) a paused account still sends",
     file: "sync.js",
-    from: "    const paused = syncPlanRefused() && !opts.manual;",
+    // V168: re-pointed (paused = everything waits).
+    from: "    const paused = syncPlanRefused() && !opts.manual && _syncPausedAll();",
     to:   "    const paused = false;",
     why:  "5A: no more sending until the plan changes (82c)",
   },
   {
     name: "M1462 (V143) Sync now doesn’t try",
     file: "sync.js",
-    from: "    const paused = syncPlanRefused() && !opts.manual;",
-    to:   "    const paused = syncPlanRefused();",
+    // V168: re-pointed (paused = everything waits).
+    from: "    const paused = syncPlanRefused() && !opts.manual && _syncPausedAll();",
+    to:   "    const paused = syncPlanRefused() && _syncPausedAll();",
     why:  "a tap on Sync now tries once anyway (82c)",
   },
   {
     name: "M1463 (V143) settings still go up while paused",
     file: "sync.js",
-    from: "    .then(() => (paused ? null : _syncPushRecords(c, uid, st, out)))   // V143: paused — read only",
-    to:   "    .then(() => _syncPushRecords(c, uid, st, out))   // V143: paused — read only",
+    // V168: re-pointed (the main business held too).
+    from: "    .then(() => ((paused || (_syncSkip && _syncSkip.has(''))) ? null : _syncPushRecords(c, uid, st, out)))   // V143: paused — read only\n",
+    to:   "    .then(() => _syncPushRecords(c, uid, st, out))   // V143: paused — read only\n",
     why:  "5A: a paused run only reads (82c)",
   },
   {
@@ -10378,7 +10402,8 @@ const MUTATIONS = [
   {
     name: "M1466 (V143) a refusal of settings is not noted",
     file: "sync.js",
-    from: "      if (records && records.error) _syncNotePlanRefusal(records.error);   // V143: fail-soft, but heard\n",
+    // V168: re-pointed (noted as the main business).
+    from: "      if (records && records.error) _syncNotePlanRefusal(records.error, '');   // V143: fail-soft, but heard (V168: the main business's)\n",
     to:   "",
     why:  "records are fail-soft: their refusal must still pause (82c)",
   },
@@ -14407,15 +14432,17 @@ const MUTATIONS = [
   {
     name: "M2041 (V165) the others-jobs answer isn't read with the businesses",
     file: "business.js",
-    from: "        .then(() => businessOthersRead(c, uid).then(() => ok, () => ok));",
-    to:   "        .then(() => ok);",
+    // V168: re-pointed (the plans read follows it).
+    from: "        .then(() => businessOthersRead(c, uid).then(() => ok, () => ok))     // V165 (1A): others' jobs held\n",
+    to:   "        .then(() => ok)\n",
     why:  "1A: read on every start / return (104a)",
   },
   {
     name: "M2042 (V165) another account's answer is carried over",
     file: "business.js",
-    from: "new Map(old.u === uid ? old.list.map(b => [b.id, b.oj]) : [])",
-    to:   "new Map(old.list.map(b => [b.id, b.oj]))",
+    // V168: re-pointed (the whole record is carried).
+    from: "new Map(old.u === uid ? old.list.map(b => [b.id, b]) : [])",
+    to:   "new Map(old.list.map(b => [b.id, b]))",
     why:  "one account's businesses never colour another's (104a)",
   },
   {
@@ -14435,8 +14462,9 @@ const MUTATIONS = [
   {
     name: "M2045 (V165) the answer isn't kept between reads",
     file: "business.js",
-    from: "      oj: was.get(r.id) === true });",
-    to:   "      oj: false });",
+    // V168: re-pointed (the whole record is carried).
+    from: "      oj: w.oj === true,   // V165: kept until the cloud says otherwise",
+    to:   "      oj: false,",
     why:  "a project without the SQL, or a failed read, changes nothing (104a)",
   },
   {
@@ -14907,6 +14935,286 @@ const MUTATIONS = [
     from: "    if (look.doc.locked !== true) return { show: true, can: false, why: 'Lock this job",
     to:   "    if (false) return { show: true, can: false, why: 'Lock this job",
     why:  "3A: locked jobs only, your own too (107a)",
+  },
+  {
+    name: "M2113 (V168) the business plans aren't read with the businesses",
+    file: "business.js",
+    from: "        .then(() => businessPlansRead(c, uid).then(() => ok, () => ok));     // V168: each business's plan",
+    to:   "        .then(() => ok);",
+    why:  "each business's plan is read with the businesses (108d)",
+  },
+  {
+    name: "M2114 (V168) a business's old plan outlives the answer",
+    file: "business.js",
+    from: "      if (r) { b.p = p; b.te = te; b.la = la; } else { delete b.p; delete b.te; delete b.la; }",
+    to:   "      if (r) { b.p = p; b.te = te; b.la = la; }",
+    why:  "a business gone from the answer keeps no stale plan (108d)",
+  },
+  {
+    name: "M2115 (V168) any stored plan word is trusted",
+    file: "business.js",
+    from: "    if (BUSINESS_PLANS.indexOf(b.p) !== -1) {",
+    to:   "    if (b.p) {",
+    why:  "a plan PATGo doesn't know is \"not known\" (108a)",
+  },
+  {
+    name: "M2116 (V168) the job's business is ignored",
+    file: "plan.js",
+    from: "    if (!b || !b.p) return planCurrent();\n    const rec = { plan: b.p,",
+    to:   "    return planCurrent();\n    const rec = { plan: b.p,",
+    why:  "two or more: each job by its business's plan (108a)",
+  },
+  {
+    name: "M2117 (V168) one business goes by its business plan",
+    file: "plan.js",
+    from: "    if (!acc || !_planMulti()) return planCurrent();",
+    to:   "    if (!acc) return planCurrent();",
+    why:  "one business: the account's record, as before (108a)",
+  },
+  {
+    name: "M2118 (V168) a business escapes the 30-day hold",
+    file: "plan.js",
+    from: "lapsedSeenAt: null, checkedAt: acc.checkedAt };",
+    to:   "lapsedSeenAt: null, checkedAt: Date.now() };",
+    why:  "the 30-day hold holds every business (108a)",
+  },
+  {
+    name: "M2119 (V168) the gate asks the account only",
+    file: "plan.js",
+    from: "  if (job !== undefined && job !== null && _planMulti()) return _planGateFor(job);\n",
+    to:   "",
+    why:  "the gate asks the job's business (108a)",
+  },
+  {
+    name: "M2120 (V168) the per-business lock never switches on",
+    file: "plan.js",
+    from: "  try { return typeof businessList === 'function' && businessList().length >= 2; } catch (e) { return false; }\n}\n\n// The business of a job",
+    to:   "  try { return false; } catch (e) { return false; }\n}\n\n// The business of a job",
+    why:  "two or more businesses switch it on (108a)",
+  },
+  {
+    name: "M2121 (V168) a member is asked to renew a team's plan",
+    file: "plan.js",
+    from: "  else choices.push({ label: 'Check now', style: 'primary', onPick: () => planCheckNow() });",
+    to:   "  else choices.push({ label: 'Renew now', style: 'primary', onPick: () => planRenew() });",
+    why:  "a member is told who renews — Check now, not Renew (108a)",
+  },
+  {
+    name: "M2122 (V168) a non-main own business offers no way on",
+    file: "plan.js",
+    from: "  else if (owner) choices.push({ label: 'Business page', style: 'primary', onPick: () => setView('cloudBusiness') });\n",
+    to:   "",
+    why:  "a non-main own business: the Business page (108a)",
+  },
+  {
+    name: "M2123 (V168) a team you're an Engineer in nags",
+    file: "plan.js",
+    from: "    if (b.role !== 'owner') continue;\n    if (!(b.n >= 2)",
+    to:   "    if (!(b.n >= 2)",
+    why:  "6A: only a business you own nags (108c)",
+  },
+  {
+    name: "M2124 (V168) an idle own business nags",
+    file: "plan.js",
+    from: "    if (!(b.n >= 2) && !_planJobsIn(b)) continue;\n",
+    to:   "",
+    why:  "6A: an idle own business stays quiet (108c)",
+  },
+  {
+    name: "M2125 (V168) the sheets ignore the businesses",
+    file: "plan.js",
+    from: "  if (_planMulti()) return _planMaybePromptFor();   // V168 (6A)\n",
+    to:   "",
+    why:  "6A: the sheets follow the business that matters (108c)",
+  },
+  {
+    name: "M2126 (V168) the ended sheet repeats",
+    file: "plan.js",
+    from: "    const key = n.b.id + ':' + String(st.lockAt);",
+    to:   "    const key = n.b.id + ':' + String(Date.now());",
+    why:  "each sheet once per ending (108c)",
+  },
+  {
+    name: "M2127 (V168) the member isn't told who renews",
+    file: "plan.js",
+    from: "    : `— ${PLAN_MEMBER_WORDS}`;\n  openChoiceSheet({",
+    to:   "    : '';\n  openChoiceSheet({",
+    why:  "the member's sheet says who renews (108a)",
+  },
+  {
+    name: "M2128 (V168) the job's quiet line is missing",
+    file: "render-review.js",
+    from: "      ${typeof planJobLineHTML === 'function' ? planJobLineHTML(sess) : ''}\n",
+    to:   "",
+    why:  "6A: the job's quiet line (108c)",
+  },
+  {
+    name: "M2129 (V168) New job doesn't grey an ended business",
+    file: "business.js",
+    from: "        ${list.map(b => `<option value=\"${escapeHTML(b.id)}\"${b.id === pick ? ' selected' : ''}${grey.has(b.id) ? ' disabled' : ''}>",
+    to:   "        ${list.map(b => `<option value=\"${escapeHTML(b.id)}\"${b.id === pick ? ' selected' : ''}>",
+    why:  "5A: an ended business is greyed out (108b)",
+  },
+  {
+    name: "M2130 (V168) New job starts on an ended business",
+    file: "business.js",
+    from: "  const list = open.length ? open : all;",
+    to:   "  const list = all;",
+    why:  "5A: New job starts on an open business (108b)",
+  },
+  {
+    name: "M2131 (V168) everything greyed when all have ended",
+    file: "business.js",
+    from: "  const grey = shut.size < list.length ? shut : new Set();",
+    to:   "  const grey = shut;",
+    why:  "every one ended: nothing greyed, Start explains (108b)",
+  },
+  {
+    name: "M2132 (V168) Start asks the account only",
+    file: "session.js",
+    from: "  if (typeof planGate === 'function' && !planGate({ businessId: typeof businessNewJobTarget === 'function' ? businessNewJobTarget() : '' })) return;   // V127: the plan lock (plan.js)\n",
+    to:   "  if (typeof planGate === 'function' && !planGate(null)) return;   // V127: the plan lock (plan.js)\n",
+    why:  "Start asks the picked business's plan (108b)",
+  },
+  {
+    name: "M2133 (V168) New job asks the account only",
+    file: "dispatch.js",
+    from: "!planGate({ businessId: typeof businessForInitial === 'function' ? businessForInitial() : '' })) return;   // V127: before the form",
+    to:   "!planGate(null)) return;   // V127: before the form",
+    why:  "New job opens while one business is open, not when all have ended (108b)",
+  },
+  {
+    name: "M2134 (V168) PASS asks the account only",
+    file: "session.js",
+    from: "function passClicked() {\n  if (typeof planGate === 'function' && !planGate(activeSession())) return;",
+    to:   "function passClicked() {\n  if (typeof planGate === 'function' && !planGate(null)) return;",
+    why:  "PASS asks the job's business (108a)",
+  },
+  {
+    name: "M2135 (V168) a certificate asks the account only",
+    file: "report.js",
+    from: "async function produceReport(sessionId) {\n  if (typeof planGate === 'function' && !planGate(state.sessions.find(s => s.id === sessionId) || null)) return;",
+    to:   "async function produceReport(sessionId) {\n  if (typeof planGate === 'function' && !planGate(null)) return;",
+    why:  "a certificate asks its job's business (108a)",
+  },
+  {
+    name: "M2136 (V168) a refused business pauses the whole account",
+    file: "sync.js",
+    from: "          if (r && r.error && multi && _syncNotePlanRefusal(r.error, batch[0].key)) { shut.add(batch[0].key); refused = true; return; }\n",
+    to:   "",
+    why:  "finding 5: one business's refusal no longer pauses the account (108d)",
+  },
+  {
+    name: "M2137 (V168) batches mix businesses",
+    file: "sync.js",
+    from: " || cur[0].key !== w.key)) {",
+    to:   ")) {",
+    why:  "one business per batch — a refused row fails its batch (108d)",
+  },
+  {
+    name: "M2138 (V168) a refused business's jobs are sent every run",
+    file: "sync.js",
+    from: "      if (skip && skip.has(key)) continue;   // V168: its business is refused\n",
+    to:   "",
+    why:  "a refused business's jobs wait (108d)",
+  },
+  {
+    name: "M2139 (V168) a refused business's photos queue rounds for ever",
+    file: "sync.js",
+    from: "          if (multi && shut.has(kj(job))) continue;      // V168: its business is refused\n",
+    to:   "",
+    why:  "a refused business's photos aren't counted as more to send (108d)",
+  },
+  {
+    name: "M2140 (V168) every photo of a refused business is tried",
+    file: "sync.js",
+    from: "          up = up.then(() => (shut.has(ck) ? null : photoBlob(cand.id))).then((blob) => {",
+    to:   "          up = up.then(() => photoBlob(cand.id)).then((blob) => {",
+    why:  "after one refused photo, its business's next one waits (108d)",
+  },
+  {
+    name: "M2141 (V168) a refused photo fails the round",
+    file: "sync.js",
+    from: "                if (multi && _syncNotePlanRefusal(err, ck)) { shut.add(ck); out.refused = true; return null; }\n",
+    to:   "",
+    why:  "a refused photo is noted for its business (108d)",
+  },
+  {
+    name: "M2142 (V168) settings go while the main business is refused",
+    file: "sync.js",
+    from: "    .then(() => ((paused || (_syncSkip && _syncSkip.has(''))) ? null : _syncPushRecords(c, uid, st, out)))",
+    to:   "    .then(() => (paused ? null : _syncPushRecords(c, uid, st, out)))",
+    why:  "settings (the main business's) wait with it (108d)",
+  },
+  {
+    name: "M2143 (V168) nothing is held back",
+    file: "sync.js",
+    from: "    _syncSkip = paused ? null : _syncSkipKeys(opts);\n",
+    to:   "    _syncSkip = null;\n",
+    why:  "the run holds the refused businesses back (108d)",
+  },
+  {
+    name: "M2144 (V168) photos of a business refused this run are still sent",
+    file: "sync.js",
+    from: "          _syncSkip = _syncSkipKeys(opts);\n",
+    to:   "",
+    why:  "a business refused just now holds its photos too (108d)",
+  },
+  {
+    name: "M2145 (V168) any refusal pauses everything again",
+    file: "sync.js",
+    from: "  return syncPlanRefused() && (!_syncPlanMulti() || _syncPlanRefusedKeys.has('*'));",
+    to:   "  return syncPlanRefused();",
+    why:  "two or more: only '*' pauses everything (108d)",
+  },
+  {
+    name: "M2146 (V168) any plan read lets a refused business go",
+    file: "sync.js",
+    from: "      try { shut = k !== '?' && typeof planLockedFor === 'function' && planLockedFor(k); } catch (e) { shut = false; }",
+    to:   "      try { shut = false; } catch (e) { shut = false; }",
+    why:  "a read that still says ended keeps it waiting (108d)",
+  },
+  {
+    name: "M2147 (V168) a renewed business keeps waiting",
+    file: "sync.js",
+    from: "      if (!shut) _syncPlanRefusedKeys.delete(k);",
+    to:   "      if (!shut) {}",
+    why:  "a renewed business goes again (108d)",
+  },
+  {
+    name: "M2148 (V168) the named line outlives the renewal",
+    file: "sync.js",
+    from: "  if (state.sync && _syncPausedMsg && state.sync.message === _syncPausedMsg) state.sync.message = '';   // V168: the named line too\n",
+    to:   "",
+    why:  "renewed: the named line goes (108d)",
+  },
+  {
+    name: "M2149 (V168) every business reads as refused",
+    file: "sync.js",
+    from: "  return syncPlanRefused() && (_syncPlanRefusedKeys.has('*') || _syncPlanRefusedKeys.has(key));",
+    to:   "  return syncPlanRefused();",
+    why:  "per business: the team isn't held (108d)",
+  },
+  {
+    name: "M2150 (V168) an unnamed own business reads \"Your business\" mid-sentence",
+    file: "sync.js",
+    from: "        const n = !b ? '' : (b.role === 'owner' && !String(b.name || '').trim()) ? 'your own business'",
+    to:   "        const n = !b ? '' : (false) ? 'your own business'",
+    why:  "the line names the business (108d)",
+  },
+  {
+    name: "M2151 (V168) a plan read doesn't bring each business's plan",
+    file: "plan.js",
+    from: "      ? Promise.resolve().then(() => businessPlansRead(client, uid)).then(() => ok, () => ok) : ok))",
+    to:   "      ? ok : ok))",
+    why:  "every plan read brings each business's plan (108d)",
+  },
+  {
+    name: "M2152 (V168) the plans read doesn't let a renewed business go",
+    file: "business.js",
+    from: "      try { if (typeof syncPlanChecked === 'function' && typeof planLocked === 'function') syncPlanChecked(!planLocked()); } catch (e) { /* optional */ }",
+    to:   "      try { } catch (e) { /* optional */ }",
+    why:  "a business renewed in a plans read lets its work go at once (108d)",
   },
 ];
 
