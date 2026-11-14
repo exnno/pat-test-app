@@ -318,7 +318,7 @@ function sortedSessions() {
 // axis. V131: Status maps to jobDoneStatus() (certificates count):
 //   'unexported' → 'none'  (neither — distinct from 'modified')
 //   'exported'   → 'exported' or 'certificate'
-//   'modified'   → 'modified' or 'reopened' (4A)
+//   'modified'   → 'modified' or 'reopened' (4A), or V167's 'corrected'
 //   'notdone'    → anything not done — the nudge's own list (2A), not saved
 // Applied only when not searching (see renderSessionsListAreaHTML).
 function sessionMatchesControlFilters(s) {
@@ -337,7 +337,7 @@ function sessionMatchesControlFilters(s) {
       const st = jobDoneStatus(s);
       if (state.sessionFilter === 'unexported' && st !== 'none') return false;
       if (state.sessionFilter === 'exported' && st !== 'exported' && st !== 'certificate') return false;
-      if (state.sessionFilter === 'modified' && st !== 'modified' && st !== 'reopened') return false;
+      if (state.sessionFilter === 'modified' && st !== 'modified' && st !== 'reopened' && st !== 'corrected') return false;
     }
   }
   if (state.lockFilter === 'unlocked' && s.locked) return false;
@@ -498,9 +498,14 @@ function markSessionNotExported(sess) {
 // certificate (one badge, the CSV's). exportStatus() stays CSV-only for the
 // things that must not trust a PDF: pruning (deletes jobs — a PDF can't be
 // imported back) and the "Already exported" warning.
+//   'corrected'   — V167 (4A): corrected in the cloud after its certificate was
+//                   made — the certificate needs making again (✓✎ Corrected
+//                   since certificate). A clean CSV can't co-exist with it: the
+//                   correction marks the CSV modified too.
 function jobDoneStatus(sess) {
   const x = exportStatus(sess);
   if (x === 'exported') return 'exported';
+  if (jobCorrectedSinceCertificate(sess)) return 'corrected';
   if (jobPaperworkDone(sess)) return 'certificate';
   if (x === 'modified') return 'modified';
   if (reportAtMs(sess) != null) return 'reopened';
@@ -592,7 +597,19 @@ function reportAtMs(sess) {
 function jobPaperworkDone(sess) {
   if (exportStatus(sess) === 'exported') return true;
   const lk = lockedAtMs(sess), rp = reportAtMs(sess);
-  return lk != null && rp != null && rp >= lk;
+  return lk != null && rp != null && rp >= lk && !jobCorrectedSinceCertificate(sess);
+}
+
+// V167 (4A / 8A): someone corrected the job in the cloud (Owner, Team leader or
+// Office — supabase correct_job stamps `correctedAt`) AFTER its certificate was
+// last made (`reportAt`): the certificate on file no longer matches the job, so
+// it is to be made again. Making it again moves reportAt past correctedAt.
+// Pure — the cloud list rows use it too, with just those two fields.
+function jobCorrectedSinceCertificate(sess) {
+  if (!sess || typeof sess.correctedAt !== 'string') return false;
+  const rp = reportAtMs(sess);
+  const co = Date.parse(sess.correctedAt);
+  return rp != null && Number.isFinite(co) && co > rp;
 }
 
 // When "not exported" becomes due for a job locked at lockedMs.

@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V166: rolled forward — V166 on top, V163 dropped. -->
+      <!-- v8: rolling 3-version changelog. V167: rolled forward — V167 on top, V164 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V167</strong> &middot; November 2026</p>
+        <p class="muted">Corrections: Owners, Team leaders and the Office can fix a mistake in someone else&rsquo;s locked job from the cloud tab &mdash; text, results and readings (a result or reading needs a reason). Each change is kept in the job with who made it and when, and a job corrected after its certificate says the certificate needs making again.</p>
         <p><strong>V166</strong> &middot; November 2026</p>
         <p class="muted">How much is in the cloud, at a glance: the cloud tab shows your jobs, photos and the space they take, and opens Cloud Storage. Owners, Team leaders and the Office can see a business&rsquo;s total, each person&rsquo;s share and its biggest jobs, and open any of them to look through.</p>
         <p><strong>V165</strong> &middot; November 2026</p>
         <p class="muted">Photos when you look at a cloud job: tap Show photos and they load from the cloud, without being kept on this phone. A business that still holds the jobs of someone who has left can be picked in the cloud tab, so those jobs can be seen.</p>
-        <p><strong>V164</strong> &middot; November 2026</p>
-        <p class="muted">One place for your jobs in the cloud: every job is listed, with those also on this phone marked, and any job can be opened to look through. Owners, Team leaders and the Office can pick their business to see the whole team&rsquo;s jobs, or one person&rsquo;s.</p>
       </div>
 
       <div class="info-card">

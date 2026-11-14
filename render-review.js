@@ -336,6 +336,7 @@ function renderOverview() {
     <div class="screen">
       ${header}
       ${stats}
+      ${renderOverviewCorrectedHTML(sess)}
       ${siteNotes}
       ${actionRow}
       ${jobDetails}
@@ -1680,6 +1681,7 @@ function renderCloudRowHTML(j, cj) {
   if (j.who) tags.push(`<span class="cloud-who${j.who.left ? ' is-left' : ''}">${escapeHTML(j.who.you ? 'You' : j.who.name)}${j.who.left ? ' · left' : ''}</span>`);
   if (j.certNo) tags.push(`<span class="cloud-cert">${icon('lock')} Certificate ${escapeHTML(j.certNo)}</span>`);
   else if (j.locked) tags.push(`<span class="cloud-cert">${icon('lock')} Locked</span>`);
+  if (j.redo) tags.push(`<span class="cloud-redo">${icon('pencil')} Corrected &mdash; certificate to make again</span>`);   // V167
   if (j.onPhone) tags.push(`<span class="cloud-onphone">${icon('smartphone')} On this phone</span>`);
   // V120: the tick is the only sign of selection, so VoiceOver reads it.
   const tick = (cj.selecting && !j.onPhone) ? `<span class="jm-tick${on ? ' is-on' : ''}" role="img" aria-label="${on ? 'Selected' : 'Not selected'}">${on ? icon('check') : ''}</span>` : '';
@@ -1743,7 +1745,7 @@ function openCloudLookSheet(look) {
     <p class="muted cloud-look-sub">${sub}</p>
     <div class="sheet-scroll cloud-look-body" id="cloud-look-body"></div>
     <div class="sheet-pin">
-      <p class="muted cloud-look-note">${icon('eye')} Look only &mdash; nothing here can be changed, and nothing is kept on this phone.</p>
+      <p class="muted cloud-look-note" id="cloud-look-note">${icon('eye')} Look only &mdash; nothing here can be changed, and nothing is kept on this phone.</p>
       <div style="display:flex;gap:10px;margin-top:8px">
         <button class="btn-secondary" id="cloud-look-done"${action ? '' : ' style="flex:1"'}>Close</button>
         ${action}
@@ -1767,6 +1769,8 @@ function openCloudLookSheet(look) {
     if (act === 'photos' && typeof cloudLookPhotosShow === 'function') cloudLookPhotosShow();
     else if (act === 'photo' && typeof cloudLookPhotoOpen === 'function') cloudLookPhotoOpen(el.dataset.arg);
     else if (act === 'photo-back' && typeof cloudLookPhotoBack === 'function') cloudLookPhotoBack();
+    else if (act === 'fix' && typeof cloudFixOpen === 'function') cloudFixOpen(el.dataset.arg);   // V167
+    else if (act === 'fix-job' && typeof cloudFixOpen === 'function') cloudFixOpen('');
   });
   renderCloudLookBody(look);
   if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);
@@ -1829,6 +1833,9 @@ function renderCloudLookBody(look) {
   if (r.who) facts.push(`<li>${r.who.left ? 'Logged by' : 'By'} <strong>${escapeHTML(r.who.you ? 'you' : r.who.name)}</strong>${r.who.left ? ' (has left the business)' : ''}</li>`);
   if (r.certNo) facts.push(`<li>Certificate ${escapeHTML(r.certNo)}</li>`);
   else if (r.locked) facts.push(`<li>Locked</li>`);
+  // V167 (4A / 8A): corrected after its certificate was made.
+  const redo = look.doc ? (typeof jobCorrectedSinceCertificate === 'function' && jobCorrectedSinceCertificate(look.doc)) : !!r.redo;
+  if (redo) facts.push(`<li class="cloud-redo">${icon('pencil')} Corrected since its certificate &mdash; make the certificate again</li>`);
   if (r.onPhone) facts.push(`<li>On this phone too</li>`);
   if (r.photos && !look.ph) facts.push(`<li>${icon('camera')} ${pl(r.photos, 'photo')} in the cloud</li>`);
   const head = facts.length ? `<ul class="cloud-look-facts">${facts.join('')}</ul>` : '';
@@ -1837,12 +1844,22 @@ function renderCloudLookBody(look) {
   const doc = look.doc;
   const items = Array.isArray(doc.items) ? doc.items.filter(it => it && typeof it === 'object') : [];
   const fails = items.filter(it => it.result === 'fail').length;
+  // V167: who may correct it, and the trail of what has been.
+  const fx = (typeof cloudLookFixState === 'function') ? cloudLookFixState(look) : { show: false, can: false, why: '' };
+  const note = document.getElementById('cloud-look-note');
+  if (note) note.innerHTML = fx.can
+    ? `${icon('pencil')} You can correct this job &mdash; each change is kept with your name. Nothing is kept on this phone.`
+    : `${icon('eye')} Look only &mdash; nothing here can be changed, and nothing is kept on this phone.`;
+  const fixHead = !fx.show ? '' : (fx.can
+    ? `<div class="cloud-fix-head"><button class="pm-look-link cloud-fix-job" data-look="fix-job">${icon('pencil')} Correct the site or job name</button></div>`
+    : `<p class="muted pm-note cloud-fix-why" id="cloud-fix-why">${escapeHTML(fx.why)}</p>`);
+  const trail = renderJobCorrectionsHTML(doc, items);
   const extra = [];
   if (doc.name && doc.name !== r.title) extra.push(`<li>Job: ${escapeHTML(String(doc.name))}</li>`);
   if (doc.engineer && !r.who) extra.push(`<li>Engineer: ${escapeHTML(String(doc.engineer))}</li>`);
   const counts = `<p class="cloud-look-counts" id="cloud-look-counts">${pl(items.length, 'item')}${fails ? ` · <span class="fail-text">${pl(fails, 'fail')}</span>` : ''}</p>`;
   const photosHTML = renderCloudLookPhotosHTML(look, items);
-  if (!items.length) { body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + counts + `<p class="muted pm-note">No items logged in this job.</p>` + photosHTML; return; }
+  if (!items.length) { body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + fixHead + counts + `<p class="muted pm-note">No items logged in this job.</p>` + photosHTML + trail; return; }
   const rows = items.map((it) => {
     const result = String(it.result || '');
     const rd = cloudLookReadingsText(it.readings);
@@ -1852,9 +1869,225 @@ function renderCloudLookBody(look) {
           <span class="cloud-look-what">${escapeHTML(String(it.itemType || ''))}${it.location ? ` <span class="muted">· ${escapeHTML(String(it.location))}</span>` : ''}</span>
           <span class="td-result ${escapeHTML(result)}">${escapeHTML(capitalise(result))}</span></div>
         ${rd ? `<div class="cloud-look-rd muted">${rd}</div>` : ''}${notes}
+        ${fx.can ? `<button class="pm-look-link cloud-fix-btn" data-look="fix" data-arg="${escapeHTML(String(it.id))}" aria-label="Correct item ${escapeHTML(String(it.assetNo == null ? '' : it.assetNo))}">${icon('pencil')} Correct</button>` : ''}
       </li>`;
   }).join('');
-  body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + photosHTML + counts + `<ul class="cloud-look-items" id="cloud-look-items">${rows}</ul>`;
+  body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + fixHead + photosHTML + counts + `<ul class="cloud-look-items" id="cloud-look-items">${rows}</ul>` + trail;
+}
+
+// ---- V167 (5A): the trail of corrections ------------------------------------------
+// A job's `corrections` (written only by the cloud's correct_job): newest first —
+// who, their role, when, the reason, and each change old → new, by item. Shared
+// by the look-only job (Office) and the job's Overview on the holder's phone.
+// Everything in it came from the cloud: escaped, and a malformed entry is skipped.
+// ' (Office)' etc. — '' for a role PATGo doesn't have. A function, not a table:
+// render-review.js declares no top-level bindings (harness 09p).
+function correctionRoleText(r) {
+  const t = r === 'owner' ? 'Owner' : r === 'team_leader' ? 'Team leader' : r === 'office' ? 'Office' : r === 'engineer' ? 'Engineer' : '';
+  return t ? ` (${t})` : '';
+}
+function correctionValueText(field, v) {
+  if (field === 'readings.polarity') return v === true ? 'ticked' : 'not ticked';
+  const t = (typeof v === 'string' || typeof v === 'number') ? String(v) : '';
+  if (!t) return '(blank)';
+  if (field === 'result') return capitalise(t);
+  return `‘${t}’`;
+}
+function correctionWhen(at) {
+  const d = new Date(String(at || ''));
+  if (!Number.isFinite(d.getTime())) return '';
+  return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+function renderJobCorrectionsHTML(doc, items) {
+  const list = (doc && Array.isArray(doc.corrections)) ? doc.corrections.filter(e => e && typeof e === 'object' && Array.isArray(e.changes)) : [];
+  if (!list.length) return '';
+  const labels = (typeof CLOUD_FIX_LABELS === 'object') ? CLOUD_FIX_LABELS : {};
+  const entries = list.slice(-50).reverse().map((e) => {
+    const who = `<strong>${escapeHTML(String(e.name || 'Someone'))}</strong>${escapeHTML(correctionRoleText(e.role))}`;
+    const when = correctionWhen(e.at);
+    const ch = e.changes.filter(c => c && typeof c === 'object' && typeof c.field === 'string').map((c) => {
+      const where = (c.item != null && c.item !== '') ? `Item ${escapeHTML(String(c.asset == null || c.asset === '' ? '?' : c.asset))} · ` : '';
+      const label = escapeHTML(labels[c.field] || c.field);
+      return `<li>${where}${label}: ${escapeHTML(correctionValueText(c.field, c.from))} → ${escapeHTML(correctionValueText(c.field, c.to))}</li>`;
+    }).join('');
+    const why = (typeof e.reason === 'string' && e.reason) ? `<div class="cfx-why">Reason: ${escapeHTML(e.reason)}</div>` : '';
+    return `<li class="cfx-entry"><div class="cfx-who">${who}${when ? ` · ${escapeHTML(when)}` : ''}</div>${why}<ul class="cfx-changes">${ch}</ul></li>`;
+  }).join('');
+  return `<section class="cfx-trail" id="cfx-trail"><h4 class="cfx-trail-h">${icon('pencil')} Corrections (${list.length})</h4><ul class="cfx-list">${entries}</ul></section>`;
+}
+
+// ---- V167 (2C 6A 7A): the correction sheet ------------------------------------------
+// Over the look-only job. Has inputs — never render() while open (MAP rule 3);
+// everything it shows changes in place (paintCloudFixState). It sits above the
+// look sheet (z 302 / 303). Works the same on a phone and a computer: the
+// bulk-sheet is centred at 560 px, and the boxes go two across when there's room.
+function _cfxId(f) { return 'cfx-' + f.replace('.', '-'); }
+function _cfxText(f, label, v, opts) {
+  const o = opts || {};
+  const max = f === 'notes' ? 1000 : (f.indexOf('readings.') === 0 ? 40 : 200);
+  // Readings stay free text (</>/≥ shorthand — data.js READING_FIELD_META), so no
+  // number keyboard.
+  const box = f === 'notes'
+    ? `<textarea class="textarea" id="${_cfxId(f)}" rows="3" maxlength="${max}">${escapeHTML(v)}</textarea>`
+    : `<input class="input" id="${_cfxId(f)}" value="${escapeHTML(v)}" maxlength="${max}" autocomplete="off">`;
+  // A unit keeps its case (labels are upper-cased: mA, not MA).
+  const unit = o.unit ? ` <span class="cfx-unit">(${escapeHTML(o.unit)})</span>` : '';
+  return `<div class="cfx-field${o.wide ? ' cfx-wide' : ''}"${o.rk ? ` data-rk="${o.rk}"` : ''}><label class="label" for="${_cfxId(f)}">${escapeHTML(label)}${unit}</label>${box}</div>`;
+}
+function openCloudFixSheet(fix) {
+  if (typeof _openSheet !== 'function' || !fix || !fix.look) return;
+  const look = fix.look, v = fix.from;
+  const { sheet, backdrop, cleanup } = _openSheet(fix.item ? 'Correct an item' : 'Correct the job');
+  backdrop.style.zIndex = '302';
+  sheet.style.zIndex = '303';
+  sheet.id = 'cloud-fix-sheet';
+  sheet.classList.add('cloud-fix-sheet');
+  backdrop.id = 'cloud-fix-backdrop';
+  backdrop.addEventListener('click', () => { if (typeof cloudFixClose === 'function') cloudFixClose(); });
+  const it = fix.item ? ((look.doc.items || []).find(x => x && String(x.id) === fix.item) || {}) : null;
+  const who = (look.row && look.row.who && look.row.who.name) ? look.row.who.name : '';
+  const title = fix.item ? `Correct item ${escapeHTML(String(it.assetNo == null ? '' : it.assetNo))}` : 'Correct the job';
+  let form;
+  if (fix.item) {
+    const opt = (val, label, cur) => `<option value="${val}"${cur === val ? ' selected' : ''}>${label}</option>`;
+    const cls = v['readings.class'];
+    form = `
+      <div class="cfx-grid">
+        ${_cfxText('assetNo', 'Asset number', v.assetNo)}
+        ${_cfxText('itemType', 'Description', v.itemType)}
+        ${_cfxText('location', 'Location', v.location)}
+        <div class="cfx-field"><label class="label" for="cfx-result">Result</label>
+          <select class="input" id="cfx-result">${opt('pass', 'Pass', v.result)}${opt('fail', 'Fail', v.result)}</select></div>
+      </div>
+      <h4 class="cfx-h">Readings</h4>
+      <div class="cfx-grid">
+        <div class="cfx-field"><label class="label" for="cfx-readings-class">Class</label>
+          <select class="input" id="cfx-readings-class">${opt('', 'None', cls)}${opt('I', 'Class I', cls)}${opt('II', 'Class II', cls)}${opt('III', 'Class III', cls)}</select></div>
+        ${_cfxText('readings.earth', 'Earth continuity', v['readings.earth'], { rk: 'earth', unit: 'Ω' })}
+        ${_cfxText('readings.insulation', 'Insulation', v['readings.insulation'], { rk: 'insulation', unit: 'MΩ' })}
+        ${_cfxText('readings.leakage', 'Leakage', v['readings.leakage'], { rk: 'leakage', unit: 'mA' })}
+        <div class="cfx-field cfx-tick" data-rk="polarity"><label class="filter-toggle"><input type="checkbox" id="cfx-readings-polarity"${v['readings.polarity'] ? ' checked' : ''}> <span>Polarity checked</span></label></div>
+      </div>
+      ${_cfxText('notes', 'Notes (on a fail, its reason)', v.notes, { wide: true })}`;
+  } else {
+    form = `<div class="cfx-grid">${_cfxText('site', 'Site', v.site)}${_cfxText('name', 'Job name', v.name)}</div>`;
+  }
+  sheet.innerHTML = `
+    <div class="bulk-sheet-handle"></div>
+    <div class="bulk-sheet-header">
+      <span class="fail-close-spacer"></span>
+      <h3 class="bulk-sheet-title">${title}</h3>
+      <button class="fail-close-btn" id="cloud-fix-cancel-x" aria-label="Cancel">&times;</button>
+    </div>
+    <div class="sheet-scroll cloud-fix-body">
+      <p class="muted cfx-intro">${who ? `${escapeHTML(who)}&rsquo;s job.` : ''} Your change is kept in the job with your name, and their phone gets it the next time it syncs.</p>
+      ${form}
+      <div class="cfx-field cfx-wide"><label class="label" for="cfx-reason">Reason for the change</label>
+        <input class="input" id="cfx-reason" maxlength="300" autocomplete="off" placeholder="${fix.item ? 'Needed when a result or reading changes' : 'Optional'}"></div>
+    </div>
+    <div class="sheet-pin">
+      <p class="pm-note pm-error" id="cloud-fix-error" role="status"${fix.error ? '' : ' hidden'}>${escapeHTML(fix.error || '')}</p>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn-secondary" id="cloud-fix-cancel">Cancel</button>
+        <button class="btn-primary" id="cloud-fix-save" style="flex:1">Save correction</button>
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+  const close = () => { if (typeof cloudFixClose === 'function') cloudFixClose(); cleanup(); };
+  // Kept on the correction itself (not enumerable: never in a JSON copy of state),
+  // so closeCloudFixSheet() finds this sheet without looking it up.
+  Object.defineProperty(fix, '_sheet', { value: sheet, writable: true, configurable: true, enumerable: false });
+  Object.defineProperty(fix, '_cleanup', { value: cleanup, writable: true, configurable: true, enumerable: false });
+  for (const id of ['cloud-fix-cancel', 'cloud-fix-cancel-x']) {
+    const b = document.getElementById(id);
+    if (b) b.addEventListener('click', close);
+  }
+  const save = document.getElementById('cloud-fix-save');
+  if (save) save.addEventListener('click', () => {
+    if (typeof cloudFixSave === 'function') cloudFixSave(readCloudFixValues(fix), (document.getElementById('cfx-reason') || {}).value || '');
+  });
+  const clsSel = document.getElementById('cfx-readings-class');
+  if (clsSel) clsSel.addEventListener('change', () => cloudFixShowReadings(clsSel.value));
+  if (fix.item) cloudFixShowReadings(v['readings.class']);
+  if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);
+}
+// Only the reading boxes the class has (data.js), as the phone's readings sheet.
+function cloudFixShowReadings(cls) {
+  const sheet = document.getElementById('cloud-fix-sheet');
+  if (!sheet) return;
+  const keep = (READING_FIELDS_BY_CLASS[cls] || []).slice();
+  if (READING_POLARITY_CLASSES.indexOf(cls) !== -1) keep.push('polarity');
+  for (const k of ['earth', 'insulation', 'leakage', 'polarity']) {
+    const el = sheet.querySelector(`[data-rk="${k}"]`);
+    if (el) el.hidden = !!cls && keep.indexOf(k) === -1;
+  }
+}
+function readCloudFixValues(fix) {
+  const val = (f) => { const el = document.getElementById(_cfxId(f)); return el ? String(el.value == null ? '' : el.value) : ''; };
+  const out = {};
+  const fields = fix.item ? CLOUD_FIX_ITEM_FIELDS : CLOUD_FIX_JOB_FIELDS;
+  for (const f of fields) {
+    if (f === 'readings.polarity') { const el = document.getElementById(_cfxId(f)); out[f] = !!(el && el.checked); }
+    else out[f] = val(f);
+  }
+  return out;
+}
+// Busy / the error line — in place.
+function paintCloudFixState(fix) {
+  const err = document.getElementById('cloud-fix-error');
+  if (err) { err.textContent = fix.error || ''; err.hidden = !fix.error; }
+  const save = document.getElementById('cloud-fix-save');
+  if (save) { save.disabled = !!fix.busy; save.textContent = fix.busy ? 'Saving…' : 'Save correction'; }
+}
+function closeCloudFixSheet() {
+  const fix = state.cloudFix;
+  if (fix && typeof fix._cleanup === 'function') { const c = fix._cleanup; fix._cleanup = null; c(); }
+}
+
+// ---- V167: the trail on the holder's phone ------------------------------------------
+// The job's Overview names the latest correction; a tap opens the whole trail
+// (read-only, no inputs — a repaint underneath is harmless).
+function renderOverviewCorrectedHTML(sess) {
+  const list = (sess && Array.isArray(sess.corrections)) ? sess.corrections.filter(e => e && typeof e === 'object') : [];
+  if (!list.length || state.selectionMode) return '';
+  const last = list[list.length - 1];
+  const who = escapeHTML(String(last.name || 'Someone') + correctionRoleText(last.role));
+  const when = correctionWhen(last.at);
+  const redo = (typeof jobCorrectedSinceCertificate === 'function') && jobCorrectedSinceCertificate(sess);
+  return `<button type="button" class="cfx-card${redo ? ' is-redo' : ''}" id="cfx-card" data-action="corrections-open">
+      <span class="cfx-card-head">${icon('pencil')} Corrected by ${who}${when ? ` · ${escapeHTML(when)}` : ''}</span>
+      ${redo ? `<span class="cfx-card-redo">Corrected since its certificate &mdash; make the certificate again.</span>` : ''}
+      <span class="cfx-card-more">${list.length === 1 ? 'See what changed' : `See all ${list.length} corrections`}</span>
+    </button>`;
+}
+function openCorrectionsSheet() {
+  const sess = (typeof activeSession === 'function') ? activeSession() : null;
+  if (!sess || typeof _openSheet !== 'function') return;
+  const trail = renderJobCorrectionsHTML(sess, sess.items || []);
+  if (!trail) return;
+  const { sheet, backdrop, cleanup } = _openSheet('Corrections');
+  sheet.id = 'corrections-sheet';
+  sheet.classList.add('corrections-sheet');
+  sheet.innerHTML = `
+    <div class="bulk-sheet-handle"></div>
+    <div class="bulk-sheet-header">
+      <span class="fail-close-spacer"></span>
+      <h3 class="bulk-sheet-title">Corrections</h3>
+      <button class="fail-close-btn" id="corrections-close" aria-label="Close">&times;</button>
+    </div>
+    <div class="sheet-scroll">
+      <p class="muted cfx-intro">Made in the cloud by your business&rsquo;s owner, a team leader or the office. This phone took them at its last sync.</p>
+      ${trail}
+    </div>
+    <div class="sheet-pin"><button class="btn-secondary" id="corrections-done" style="width:100%">Close</button></div>`;
+  document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+  for (const id of ['corrections-close', 'corrections-done']) {
+    const b = document.getElementById(id);
+    if (b) b.addEventListener('click', cleanup);
+  }
+  if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);
 }
 
 // V107 (Stage 5 part 3): the review before a cloud delete. `o` is

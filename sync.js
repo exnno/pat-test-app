@@ -5070,7 +5070,15 @@ function syncPhotoKnowForDelete(list) {
 // jobs like any other (3A, 7A).
 // Resolves { ok, offline, error, uid, capped, photos, jobs: [{id, site, name,
 //   date, clientId, locked, certNo, items, fails, photos}] }.
-const _SYNC_CLOUD_JOB_COLS = 'id,site:doc->>site,name:doc->>name,date:doc->>date,clientId:doc->>clientId,locked:doc->>locked,certNo:doc->>certNo,n_items,n_fails';
+// V167 (4A / 8A): + when its certificate was made and when it was last corrected,
+// so a list row can say "Corrected — make the certificate again" (~60 bytes).
+const _SYNC_CLOUD_JOB_COLS = 'id,site:doc->>site,name:doc->>name,date:doc->>date,clientId:doc->>clientId,locked:doc->>locked,certNo:doc->>certNo,n_items,n_fails,rep:doc->>reportAt,cor:doc->>correctedAt';
+// V167: the cloud row's "make the certificate again" — the job's own rule
+// (session.js jobCorrectedSinceCertificate) on the two picked fields.
+function _syncRedo(j) {
+  if (!j || typeof jobCorrectedSinceCertificate !== 'function') return false;
+  return jobCorrectedSinceCertificate({ reportAt: j.rep == null ? undefined : String(j.rep), correctedAt: j.cor == null ? undefined : String(j.cor) });
+}
 function syncCloudList() {
   const res = { ok: false, offline: false, error: '', uid: '', capped: false, photos: false, jobs: [] };
   if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
@@ -5091,7 +5099,7 @@ function syncCloudList() {
         const id = String(j && j.id != null ? j.id : '');
         if (!id) continue;
         res.jobs.push({ id, site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
-          locked: j.locked === true || j.locked === 'true', certNo: str(j.certNo),
+          locked: j.locked === true || j.locked === 'true', certNo: str(j.certNo), redo: _syncRedo(j),
           items: num(j.n_items), fails: num(j.n_fails), photos: 0 });
       }
       if (rows.length < SYNC_CLOUD_PAGE) return;
@@ -5181,7 +5189,7 @@ function syncBusinessList(org) {
         const u = str(j && j.user_id);
         if (!id || !u) continue;
         res.jobs.push({ id, user: u, site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
-          engineer: str(j.engineer).slice(0, 80), locked: j.locked === true || j.locked === 'true', certNo: str(j.certNo),
+          engineer: str(j.engineer).slice(0, 80), locked: j.locked === true || j.locked === 'true', certNo: str(j.certNo), redo: _syncRedo(j),
           items: num(j.n_items), fails: num(j.n_fails), photos: 0 });
       }
       if (rows.length < SYNC_CLOUD_PAGE) return;
@@ -5264,6 +5272,59 @@ function syncCloudJob(user, id, org) {
       return res;
     }).catch((e) => {
       res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
+      return res;
+    });
+}
+
+// ---- V167 (1A 2C 3A 5A 7A): correcting someone else's job -----------------------
+// One call to the cloud's correct_job (supabase/v167-corrections.sql), which
+// checks everything itself — the caller's role in the JOB's business, never their
+// own job, locked only, the fields, each `from` still true, a reason for a result
+// or reading — and writes the change and its trail in one go. Nothing here
+// touches this phone's jobs or sync state: the job isn't held here. Its holder's
+// phones take it at their next sync (the fingerprint is blanked, V92).
+// `changes` = [{ item?: id, field, from, to }] (settings-actions.js
+// cloudFixChanges). Resolves { ok, doc, at, code, offline, needsUpdate, error }.
+// Never rejects.
+const SYNC_FIX_CODES = ['signed_out', 'bad', 'gone', 'moved', 'own', 'not_allowed', 'unlocked', 'field', 'changed', 'nothing', 'reason'];
+function _syncFixCode(e) {
+  const msg = String((e && (e.message || e.details || e.hint)) || '');
+  const m = /patgo_correct_([a-z_]+)/.exec(msg);
+  if (m && SYNC_FIX_CODES.includes(m[1])) return m[1];
+  if (/patgo_plan_locked/.test(msg)) return 'plan';
+  return '';
+}
+function _syncFixNeedsUpdate(e) {
+  if (!e) return false;
+  const msg = String(e.message || '');
+  if ((e.code === 'PGRST202' || e.code === '42883') && !/patgo_/.test(msg)) return true;
+  return /Could not find the function|does not exist/i.test(msg) && /correct_job/.test(msg);
+}
+function syncCorrectJob(holder, id, org, changes, reason) {
+  const res = { ok: false, doc: null, at: '', code: '', offline: false, needsUpdate: false, error: '' };
+  const u = String(holder || ''), sid = String(id == null ? '' : id), o = String(org || '');
+  if (!_SYNC_UUID_RE.test(u) || typeof safeId !== 'function' || !safeId(sid) || !_SYNC_UUID_RE.test(o)
+      || !Array.isArray(changes) || !changes.length) {
+    res.code = 'bad'; return Promise.resolve(res);
+  }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const why = String(reason == null ? '' : reason).trim();
+  return syncDataClient()
+    .then((c) => c.rpc('correct_job', { holder: u, job: sid, org: o, changes, reason: why || null }))
+    .then((r) => {
+      if (r && r.error) throw r.error;
+      const out = r ? r.data : null;
+      const doc = out && typeof out === 'object' ? out.doc : null;
+      // The answer is the job as the cloud now holds it — for the look only. Saved
+      // either way; an answer that can't be read leaves doc null (the look re-reads).
+      res.ok = true;
+      res.doc = _syncValidDoc(doc, sid) ? doc : null;
+      res.at = (out && typeof out.at === 'string') ? out.at : '';
+      return res;
+    }).catch((e) => {
+      res.code = _syncFixCode(e);
+      if (!res.code) res.needsUpdate = _syncFixNeedsUpdate(e);
+      if (!res.code && !res.needsUpdate) res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
       return res;
     });
 }
@@ -5407,7 +5468,7 @@ function syncCloudStorage() {
             const j = picks.get(t.id);
             if (!j) continue;
             res.top.push(Object.assign({ site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
-              locked: j.locked === true || j.locked === 'true', certNo: str(j.certNo),
+              locked: j.locked === true || j.locked === 'true', certNo: str(j.certNo), redo: _syncRedo(j),
               items: (typeof j.n_items === 'number' && j.n_items >= 0) ? j.n_items : null,
               fails: num(j.n_fails) }, t));
           }

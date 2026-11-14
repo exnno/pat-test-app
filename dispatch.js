@@ -273,6 +273,7 @@ registerActions({
   // V108 (Stage 5 pt 3, second half): Settings → Data → Cloud Storage.
   'cs-open':            (arg) => cloudStoreOpen(arg),   // V166: a business's id from the Cloud tab's line
   'cs-look':            (arg) => cloudStoreLook(arg),   // V166 (3A): a business's biggest job, look-only
+  'corrections-open':   () => openCorrectionsSheet(),   // V167 (5A): the job's trail, read-only
   'cs-back':            () => cloudStoreBack(),
   'cs-refresh':         () => cloudStoreLoad(),
   'cs-select-toggle':   () => cloudStoreToggleSelecting(),

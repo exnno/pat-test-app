@@ -1,4 +1,4 @@
-# PATGo — Code Map (V166)
+# PATGo — Code Map (V167)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1099,6 +1099,9 @@ numbers and templates → `settings-actions.js`. First-run wizard and demo seed 
   `jobDoneStatus` / `jobIsDone` — a clean CSV OR a certificate after locking
   (`jobPaperworkDone`, below) — drive the nudge (`unexportedSessionCount`), the
   badges (**render-core.js**) and the Status filter (`sessionMatchesControlFilters`).
+  V167: `jobCorrectedSinceCertificate` (correctedAt — written only by the cloud's
+  correct_job — after reportAt) → status 'corrected', not paperwork-done; sync.js
+  `_syncRedo` uses it on the cloud row's two picks.
   `exportStatus` stays CSV-only for pruning (`prunableSessions`) and the
   "Already exported" pop-up (`requestOpenSession`) — a PDF can't be imported
   back. `reviewUnexported` sets the transient 'notdone' filter (storage load
@@ -1266,6 +1269,15 @@ after a cloud-tab delete, in syncWhenIdle) → **sync.js** `syncMyStorage` /
 **render-review.js** `renderCloudStorageLineInner`) — never render() (MAP rule 3).
 `'cloudStorage'` is in `_MGR_RETURN_VIEWS` (Manage Photos returns to it) and
 `mgrGoBack` re-reads on arriving there. Actions `cs-*` in **dispatch.js**.
+⚠ V167: OFFICE CORRECTIONS — `state.cloudFix` {look, item, from, busy, error}
+(memory only) from the look-only job: `cloudLookFixState(look)` (someone else's
+LOCKED job in a `cloudScopeChoices` business), `cloudFixCurrent` / `cloudFixNormalise`
+/ `cloudFixChanges` / `cloudFixCheck` (pure: only what changed, with what it was;
+class empties readings it hasn't; reason for result / readings; a fail's notes),
+`cloudFixSave` → **sync.js** `syncCorrectJob` → `_cloudFixFollow` (look row + list
+rows: fails, `redo`). `_cloudLookRead(look)` is the look's read (open, and after a
+refusal). The sheet has inputs: never render() while open (MAP rule 3).
+Sheet + trail in **render-review.js**; `CLOUD_FIX_LABELS` read there too.
 
 ### onboarding.js (~250 ln) — first-run wizard — NEW v70
 The wizard state machine (step capture, paging, fresh/import fork, theme pick,
@@ -1365,6 +1377,12 @@ the tab because 'sessions' is in `_MGR_RETURN_VIEWS` (settings-actions.js).
 V166: it is the Cloud Storage LINE (`renderCloudStorageLineHTML(scope)`, data-arg
 'mine' or the business id; figures from settings-actions.js `cloudStorageLine`),
 in every scope; `renderCloudStorageBusiness(cs)` is the page for a business.
+V167: the look-only job carries Correct (data-look fix / fix-job → settings-actions
+`cloudFixOpen`); `openCloudFixSheet` (z 302/303, over the look; its sheet kept on
+the fix, non-enumerable) / `paintCloudFixState` / `closeCloudFixSheet`; the trail
+`renderJobCorrectionsHTML(doc)` (look AND Overview — `renderOverviewCorrectedHTML`,
+`openCorrectionsSheet` via `corrections-open`); a row's `redo` tag. No top-level
+binding here (09p): role words are `correctionRoleText()`.
 V98: the Overview's title bar is `.header-row.header-sticky` (styles.css; both the
 normal and selection headers). The site-notes card and its sheet
 (`state.siteNotesSheet`, cleared by setView) are drawn here; the sheet holds an
@@ -1864,6 +1882,12 @@ Server columns from **supabase/v108-storage.sql**; "column does not exist"
 — **supabase/v166-storage.sql**, SECURITY INVOKER (they count only what the reader
 may read). RPCs, not table reads: rule 45 / 48a untouched. Missing function
 (PGRST202 / 42883) → `needsUpdate`. Memory only. Harness 105a–105e, M2061–M2078.
+⚠ V167: `syncCorrectJob(holder, id, org, changes, reason)` — rpc correct_job
+(**supabase/v167-corrections.sql**, SECURITY DEFINER: the ONLY way anyone changes a
+job they don't hold; it checks role / own / locked / fields / `from` / reason itself).
+Refusals `patgo_correct_*` → `code` (SYNC_FIX_CODES only); missing → `needsUpdate`.
+Touches nothing on this phone. `_SYNC_CLOUD_JOB_COLS` + rep / cor picks →
+`_syncRedo` (row.redo). Harness 106a–106f, M2079–M2104.
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
 19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q, 27a–27m, 28a–28i and
 29a–29i and 30a–30i, mutations M142–M295, M306–M325, M355–M395, M396–M418, M419–M434, M436–M451, M452–M474.

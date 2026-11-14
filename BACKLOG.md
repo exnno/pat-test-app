@@ -13,7 +13,32 @@ here rather than restating it. Delete an item when it ships.
   plan V164–V169 so nothing lands in V170 but the audit's fixes. Brief it that the second
   audit's finding 5 is scheduled with seat billing (if not yet built).
 
-### Next after V166
+### Next after V167
+V167 = Office corrections (O12; round 1A 2C 3A 4A 5A 6A 7A 8A, 14 Nov; built in Opus). SQL:
+supabase/v167-corrections.sql (correct_job; C1–C5; isolation 32a–32c). settings-actions.js (`cloudFix*`,
+`cloudLookFixState`, `_cloudLookRead`), sync.js (`syncCorrectJob`, `_syncRedo`, the list's rep / cor picks),
+render-review.js (the sheet, the trail, the Overview card), session.js (`jobCorrectedSinceCertificate`,
+status 'corrected'), render-core.js (badge), dispatch.js, styles.css. Harness 106 + M2079–M2104.
+**Next — V168:** seat billing + per-business lock (finding 5), its own spec round (Opus). Then V169
+certificate numbering per business — now also: Office makes the certificate (Peter, 14 Nov: in a firm
+with several engineers the office does the paperwork), who may make certificates (a role rule), and a
+frozen copy of the tester's details taken when the job is locked (today a job points at the engineer's
+tester, so a recalibration since would print the new date). The fourth GPT audit after V169, V170 its fixes.
+After V170: O13 shared lists, the combined certificate, same-site view, a team-jobs delete — and O15
+(new, Peter 14 Nov): business setup — what a business presets and locks for its engineers (shared item
+types / presets / clients, required fields, a simpler engineer mode). Settle with O13.
+Peter (14 Nov): Office works on a computer as much as a phone — every Office screen must work well at
+desktop width. The tablet / laptop layout (Stage 15) may need to come before launch — raise at V168.
+
+### V167 residuals (known, accepted)
+- An engineer who unlocked the job on their phone and changed it before their phone synced is asked
+  "both changed" (V81); "keep this phone's" would send their copy over the correction — the trail is lost
+  with it. Rare (3A: corrections are for locked jobs); a held card that names the correction is a later fix.
+- The certificate PDF doesn't mention corrections (V169 decides what a business's certificate says).
+- A business's Biggest jobs (Cloud Storage) doesn't show the make-again tag; the look does.
+- Not proved here: a real phone / a real computer browser; the hosted project (deploy steps).
+
+### Next after V166 (done — V167 took Office corrections)
 V166 = how much is stored — the Cloud tab's line and a business's Cloud Storage (round 1A 2A 3A 4A 5A 6A,
 14 Nov, all defaults; built in Opus). SQL: supabase/v166-storage.sql (K1–K4; isolation 31a–31c). sync.js
 (`syncMyStorage`, `syncBusinessStorage`), settings-actions.js (the line `_cloudLineLoad` / `cloudStorageLine`,

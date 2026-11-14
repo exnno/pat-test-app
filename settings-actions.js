@@ -2258,6 +2258,15 @@ function _cloudLookStart(row, scope, from) {
   if (state.cloudLook) _cloudLookDropPhotos(state.cloudLook);   // V165: a look left open
   state.cloudLook = look;
   if (typeof openCloudLookSheet === 'function') openCloudLookSheet(look);
+  _cloudLookRead(look);
+}
+
+// The look's read — on opening, and again after a correction (V167) that found
+// the job changed under it. Painted in place when it lands.
+function _cloudLookRead(look) {
+  look.loading = true;
+  look.error = '';
+  look.doc = null;
   if (typeof _syncOffline === 'function' && _syncOffline()) {
     look.loading = false;
     look.error = 'No signal — opening a job from the cloud needs a connection.';
@@ -2279,10 +2288,215 @@ function _cloudLookStart(row, scope, from) {
   });
 }
 
+// ---- V167 (1A 2C 3A 5A 6A 7A): correcting someone else's job ----------------------
+// From the look-only job (V164), the Owner, a Team leader or the Office of a
+// business corrects a teammate's — or a leaver's — LOCKED job: its site and name,
+// and on each item the asset number, description, location, result, readings and
+// notes (2C). A result or reading needs a reason (7A). Save goes straight to the
+// cloud (6A — supabase correct_job checks it all again and keeps the trail, 5A);
+// the person's phone takes it at its next sync. Your own jobs are edited on your
+// phone, as always. state.cloudFix = { look, item, from, busy, error } — memory
+// only. The sheet has inputs: never render() while it is open (MAP rule 3).
+const CLOUD_FIX_JOB_FIELDS = ['site', 'name'];
+const CLOUD_FIX_ITEM_FIELDS = ['assetNo', 'itemType', 'location', 'result', 'notes',
+  'readings.class', 'readings.earth', 'readings.insulation', 'readings.leakage', 'readings.polarity'];
+const CLOUD_FIX_LABELS = { site: 'Site', name: 'Job name', assetNo: 'Asset number', itemType: 'Description',
+  location: 'Location', result: 'Result', notes: 'Notes', 'readings.class': 'Class',
+  'readings.earth': 'Earth continuity', 'readings.insulation': 'Insulation', 'readings.leakage': 'Leakage',
+  'readings.polarity': 'Polarity' };
+// The cloud's own limits (correct_job): the same here, so a long value is said
+// before Save rather than refused after it.
+const CLOUD_FIX_MAX = { notes: 1000, reading: 40, text: 200, reason: 300 };
+const _cloudFixIsReading = (f) => f.indexOf('readings.') === 0;
+
+// Whether this look can be corrected: { show, can, why }. Shown only for someone
+// else's job in a business this account may read whole (1A — the picker's own
+// rule, cloudScopeChoices); can only once it is locked (3A).
+function cloudLookFixState(look) {
+  const no = { show: false, can: false, why: '' };
+  if (!look || !look.doc || !look.org || !look.row || look.row.mine) return no;
+  // (row.mine is the list's own "yours": Your jobs, or your row in a business.)
+  if (!cloudScopeChoices().some(c => c.id === look.org)) return no;
+  if (look.doc.locked !== true) {
+    const who = (look.row.who && look.row.who.name) ? look.row.who.name : 'Whoever is testing it';
+    return { show: true, can: false,
+      why: (look.row.who && look.row.who.left)
+        ? 'This job was never locked, so it can’t be corrected.'
+        : `Still being worked on — ${who} needs to lock it before it can be corrected.` };
+  }
+  return { show: true, can: true, why: '' };
+}
+
+// The values a correction starts from: the job's, or one item's. Text as text
+// ('' for nothing — a number asset reads as its digits); polarity a tick.
+function cloudFixCurrent(doc, itemId) {
+  const txt = (v) => (typeof v === 'string' || typeof v === 'number') ? String(v) : '';
+  if (!itemId) return { site: txt(doc && doc.site), name: txt(doc && doc.name) };
+  const items = (doc && Array.isArray(doc.items)) ? doc.items : [];
+  const it = items.find(x => x && typeof x === 'object' && String(x.id) === String(itemId));
+  if (!it) return null;
+  const rd = (it.readings && typeof it.readings === 'object') ? it.readings : {};
+  return { assetNo: txt(it.assetNo), itemType: txt(it.itemType), location: txt(it.location),
+    result: txt(it.result), notes: txt(it.notes), 'readings.class': txt(rd.class),
+    'readings.earth': txt(rd.earth), 'readings.insulation': txt(rd.insulation),
+    'readings.leakage': txt(rd.leakage), 'readings.polarity': rd.polarity === true };
+}
+
+// What the sheet's boxes say, made consistent: trimmed text; readings that don't
+// belong to the class are emptied, and polarity is Class I only (as the phone's
+// readings sheet does — session.js).
+function cloudFixNormalise(values, itemId) {
+  const v = Object.assign({}, values || {});
+  const fields = itemId ? CLOUD_FIX_ITEM_FIELDS : CLOUD_FIX_JOB_FIELDS;
+  for (const f of fields) {
+    if (f === 'readings.polarity') v[f] = v[f] === true;
+    else v[f] = String(v[f] == null ? '' : v[f]).trim();
+  }
+  if (itemId) {
+    const cls = v['readings.class'];
+    const keep = (typeof READING_FIELDS_BY_CLASS === 'object' && READING_FIELDS_BY_CLASS[cls]) || [];
+    for (const k of ['earth', 'insulation', 'leakage']) if (cls && keep.indexOf(k) === -1) v['readings.' + k] = '';
+    const pol = (typeof READING_POLARITY_CLASSES !== 'undefined') ? READING_POLARITY_CLASSES : ['I'];
+    if (pol.indexOf(cls) === -1) v['readings.polarity'] = false;
+  }
+  return v;
+}
+
+// The changes to send: only the fields that differ, each with what it was.
+function cloudFixChanges(from, values, itemId) {
+  const out = [];
+  if (!from) return out;
+  const v = cloudFixNormalise(values, itemId);
+  for (const f of (itemId ? CLOUD_FIX_ITEM_FIELDS : CLOUD_FIX_JOB_FIELDS)) {
+    if (v[f] === from[f]) continue;
+    const c = { field: f, from: from[f], to: v[f] };
+    if (itemId) c.item = String(itemId);
+    out.push(c);
+  }
+  return out;
+}
+
+// '' when the correction may be sent, else what to say in the sheet.
+function cloudFixCheck(changes, values, reason, itemId) {
+  if (!changes.length) return 'Nothing has changed yet.';
+  const v = cloudFixNormalise(values, itemId);
+  for (const c of changes) {
+    const lim = c.field === 'notes' ? CLOUD_FIX_MAX.notes : (_cloudFixIsReading(c.field) ? CLOUD_FIX_MAX.reading : CLOUD_FIX_MAX.text);
+    if (typeof c.to === 'string' && c.to.length > lim) return `${CLOUD_FIX_LABELS[c.field]} is too long — ${lim} characters at most.`;
+  }
+  const why = String(reason == null ? '' : reason).trim();
+  if (changes.some(c => c.field === 'result' || _cloudFixIsReading(c.field)) && !why) {
+    return 'Add a reason — a result or a reading can only be changed with one.';
+  }
+  if (why.length > CLOUD_FIX_MAX.reason) return `The reason is too long — ${CLOUD_FIX_MAX.reason} characters at most.`;
+  if (itemId && v.result === 'fail' && !v.notes && changes.some(c => c.field === 'result' || c.field === 'notes')) {
+    return 'A fail needs its reason — add it in Notes.';
+  }
+  return '';
+}
+
+function cloudFixOpen(itemId) {
+  const look = state.cloudLook;
+  if (!look || state.cloudFix) return;
+  if (!cloudLookFixState(look).can) return;
+  const id = itemId ? String(itemId) : '';
+  const from = cloudFixCurrent(look.doc, id);
+  if (!from) return;
+  state.cloudFix = { look, item: id, from, busy: false, error: '' };
+  if (typeof openCloudFixSheet === 'function') openCloudFixSheet(state.cloudFix);
+}
+
+function cloudFixClose() {
+  state.cloudFix = null;
+}
+
+function _cloudFixPaint(fix) {
+  if (state.cloudFix === fix && typeof paintCloudFixState === 'function') paintCloudFixState(fix);
+}
+
+// After a correction: the look's own row and the list's (fails, "make the
+// certificate again") follow the job as the cloud now holds it.
+function _cloudFixFollow(look, doc) {
+  const items = Array.isArray(doc.items) ? doc.items.filter(it => it && typeof it === 'object') : [];
+  const fails = items.filter(it => it.result === 'fail').length;
+  const redo = (typeof jobCorrectedSinceCertificate === 'function') && jobCorrectedSinceCertificate(doc);
+  const same = (j) => j && String(j.id) === look.id && (j.user || '') === (look.user || '');
+  const lists = [];
+  const cj = state.cloudJobs;
+  if (cj && cj.biz && Array.isArray(cj.biz.jobs)) lists.push(cj.biz.jobs);
+  const cs = state.cloudStore;
+  if (cs && Array.isArray(cs.top)) lists.push(cs.top);
+  for (const r of [look.row].concat(...lists.map(l => l.filter(same)))) {
+    if (!r) continue;
+    r.fails = fails; r.items = items.length; r.redo = redo;
+    if (typeof doc.site === 'string') r.site = doc.site;
+    if (typeof doc.name === 'string') r.name = doc.name;
+  }
+  if (state.view === 'sessions' && state.jobsTab === 'cloud' && typeof refreshCloudListAreaOnly === 'function') refreshCloudListAreaOnly();
+}
+
+// Save: checked here first (the sheet says what's wrong), then the cloud.
+// Resolves when the answer has landed (the harness waits on it).
+function cloudFixSave(values, reason) {
+  const fix = state.cloudFix;
+  if (!fix || fix.busy) return Promise.resolve(false);
+  const look = fix.look;
+  if (state.cloudLook !== look || !cloudLookFixState(look).can) {
+    if (typeof closeCloudFixSheet === 'function') closeCloudFixSheet();
+    state.cloudFix = null;
+    return Promise.resolve(false);
+  }
+  const changes = cloudFixChanges(fix.from, values, fix.item);
+  const msg = cloudFixCheck(changes, values, reason, fix.item);
+  if (msg) { fix.error = msg; _cloudFixPaint(fix); return Promise.resolve(false); }
+  if (typeof syncCorrectJob !== 'function') return Promise.resolve(false);
+  fix.busy = true; fix.error = '';
+  _cloudFixPaint(fix);
+  return syncCorrectJob(look.user, look.id, look.org, changes, reason).then((res) => {
+    if (state.cloudFix !== fix) return false;
+    fix.busy = false;
+    const who = (look.row && look.row.who && look.row.who.name && !look.row.who.left) ? look.row.who.name : '';
+    const done = () => { if (typeof closeCloudFixSheet === 'function') closeCloudFixSheet(); state.cloudFix = null; };
+    if (res.ok) {
+      done();
+      if (state.cloudLook === look) {
+        if (res.doc) { look.doc = res.doc; _cloudFixFollow(look, res.doc); _cloudLookPaint(look); }
+        else _cloudLookRead(look);
+      }
+      showToast(who ? `Corrected. ${who}’s phone gets it the next time it syncs.` : 'Corrected in the cloud.');
+      return true;
+    }
+    // The job moved on under the sheet: close it and read the job again.
+    const reread = { changed: 'Someone changed this job since you opened it — it’s been read again. Check it and try once more.',
+      unlocked: 'This job has been unlocked since you opened it, so it can’t be corrected now.',
+      gone: 'This job isn’t in the cloud any more.',
+      moved: 'This job has moved to another business.',
+      not_allowed: 'You can’t correct jobs in this business any more.',
+      own: 'This is your own job — change it on your phone.' };
+    if (reread[res.code]) {
+      done();
+      if (state.cloudLook === look) _cloudLookRead(look);
+      showToast(reread[res.code]);
+      return false;
+    }
+    fix.error = res.offline ? 'No signal — a correction needs a connection.'
+      : res.needsUpdate ? 'The cloud needs a small update before jobs can be corrected (the V167 database update).'
+      : res.code === 'reason' ? 'Add a reason — a result or a reading can only be changed with one.'
+      : res.code === 'nothing' ? 'Nothing has changed yet.'
+      : res.code === 'plan' ? 'This business’s PATGo plan has ended, so the cloud isn’t taking changes.'
+      : res.code ? 'The cloud didn’t accept that correction. Check the values and try again.'
+      : (res.error || 'Couldn’t reach the cloud. Try again.');
+    _cloudFixPaint(fix);
+    return false;
+  });
+}
+
 // Closing forgets everything read for the look — the pictures too (V165).
 function cloudLookClose() {
   const look = state.cloudLook;
   state.cloudLook = null;
+  if (state.cloudFix && typeof closeCloudFixSheet === 'function') closeCloudFixSheet();   // V167
+  state.cloudFix = null;
   if (look) _cloudLookDropPhotos(look);
 }
 

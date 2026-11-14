@@ -288,7 +288,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>How much is in the cloud, at a glance.</strong> The In the cloud tab now shows how many jobs and photos you have there and the space they take &mdash; tap it for the details. Owners, Team leaders and the Office can pick their business to see its total, each person&rsquo;s share and its biggest jobs.</li>
+        <li><strong>Mistakes can be corrected by the office.</strong> Owners, Team leaders and the Office can now fix a mistake in a teammate&rsquo;s locked job straight from the In the cloud tab &mdash; a typo, a wrong location, even a result or reading (with a reason). Every change is kept in the job with who made it, and the engineer&rsquo;s phone picks it up on its next sync.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -1428,7 +1428,9 @@ function renderSessionsListAreaHTML() {
             ? '<span class="export-badge modified" title="Edited since last export">' + icon('check') + icon('pencil') + ' Modified since export</span>'
             : xStatus === 'reopened'
               ? '<span class="export-badge modified" title="Unlocked since the certificate was made">' + icon('check') + icon('pencil') + ' Reopened since certificate</span>'
-              : '';
+              : xStatus === 'corrected'   // V167 (4A)
+                ? '<span class="export-badge modified" title="Corrected since the certificate was made — make it again">' + icon('check') + icon('pencil') + ' Corrected since certificate</span>'
+                : '';
       // v10: when the query only hit item-level fields, show how many items matched
       // and (via data-open-at) jump straight to the first match.
       const itemBadge = matchedItemIndex !== -1
