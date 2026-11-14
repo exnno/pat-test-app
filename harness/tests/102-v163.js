@@ -24,7 +24,7 @@
            choice sends its own deliver flag; Leave asks first, then leaves.
      102e  the SQL: schema.sql carries v163-leaving.sql's block byte for byte as
            its last section; the pieces the rules rest on; self-checks L1–L5.
-     102f  V163's About line (V164: the release checks → 103f). Was: release: V163; cache pat-v163; What's new rolled (two lines); About
+     102f  business.js names V163 (V166: its About line rolled off; V164: the release checks → 103f). Was: release: V163; cache pat-v163; What's new rolled (two lines); About
            V163 / V162 / V161.
 
    ⚠ WHAT THIS FILE CANNOT PROVE: the database's rules. The stand-in server here
@@ -414,8 +414,8 @@ module.exports = async function () {
 
   /* ------------------------------------------------------------------ 102f */
   // V164: the release checks moved to 103f; this keeps V163's own About line.
-  await t.group('102f — V163’s About line; business.js names V163', () => {
-    t.includes(read('render-help.js'), 'Leaving and removing: someone can be removed from a business', 'About: V163’s line');
+  // V166: V163's About line rolled off (the window is V166 / V165 / V164).
+  await t.group('102f — business.js names V163', () => {
     t.includes(read('business.js'), 'V163 — leaving and removing a member', 'business.js names V163');
   });
 };

@@ -497,7 +497,8 @@ module.exports = async function () {
     t.includes(h, '>Lee Smith (left)</button>', '…the leaver');
     t.includes(h, '>Olive (you)</button>', '…and you');
     t.excludes(h, 'data-action="cloud-select-toggle"', 'no Select in a business (look only)');
-    t.excludes(h, 'data-action="cs-open"', 'no Cloud Storage in a business (it’s your account’s)');
+    // V166 (2A): Cloud Storage in a business opens the BUSINESS's figures (105).
+    t.includes(h, 'data-action="cs-open" data-arg="' + BIG + '"', 'Cloud Storage in a business is the business’s (V166 2A)');
     tap(app, 'cloud-person', ED);
     h = html(app);
     t.includes(h, '2 jobs in the cloud', 'Eddie: his two');

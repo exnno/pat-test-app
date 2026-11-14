@@ -24,8 +24,7 @@
            said; the sheet closed mid-download paints nothing and keeps nothing.
      104e  the SQL: schema.sql ends with v165-business-jobs.sql's block byte for
            byte; who it answers for; self-checks J1–J3; isolation 30a–30c.
-     104f  release: V165; cache pat-v165; What's new rolled (one line); About V165 /
-           V164 / V163 (V162 rolled off).
+     104f  V165's About line; sync.js names V165 (V166: the release checks → 105f).
 
    ⚠ WHAT THIS FILE CANNOT PROVE: the database's rules — who may read a photo row
    or file, and what business_others_jobs answers. The stand-in applies them as
@@ -323,7 +322,11 @@ module.exports = async function () {
     const end = '-- ================================================================ end V165\n';
     const block = mig.slice(mig.indexOf('-- ================================================================ V165\n'), mig.indexOf(end) + end.length);
     t.ok(block.length > 900, 'the migration has its definition');
-    t.ok(read('supabase/schema.sql').trimEnd().endsWith(block.trimEnd()), 'a new project gets it byte for byte, as schema.sql’s last section');
+    // V166: no longer the LAST section (V166's follows — 105e); still whole, and
+    // nothing after it redefines business_others_jobs.
+    const sch = read('supabase/schema.sql');
+    t.ok(sch.includes(block), 'a new project gets it byte for byte');
+    t.excludes(sch.slice(sch.indexOf(block) + block.length), 'function public.business_others_jobs', '…and no later section redefines it');
     t.includes(block, "and m.role in ('owner', 'team_leader', 'office')", 'only for a business the caller may read whole');
     t.includes(block, 'where m.user_id = (select auth.uid())', '…and is in');
     t.includes(block, 'and s.user_id <> (select auth.uid())', 'someone ELSE’s job');
@@ -338,24 +341,9 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 104f */
-  await t.group('104f — release: V165; cache pat-v165; What’s new rolled (one line); About V165 / V164 / V163', () => {
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V165', 'APP_VERSION V165');
-    t.eq(rel.run('WELCOME_VERSION'), 'V165', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v165';", 'cache key pat-v165');
-    t.eq(rel.fn('updateVersionLabel')('pat-v165'), 'V165', 'the update banner reads the key as V165');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>Photos when you look at a cloud job.</strong>', '…the photos');
-    t.includes(sheetCopy, 'you can still pick the business at the top to see the jobs they did for it.</li>', '…and a leaver’s jobs');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V165</strong>'), y = help.indexOf('<p><strong>V164</strong>'), z = help.indexOf('<p><strong>V163</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V165, V164, V163');
-    t.excludes(help, '<p><strong>V162</strong>', 'V162 rolled off');
-    t.excludes(help, 'no longer starts up signed in as a different account', '…with its line');
-    t.includes(help, 'Photos when you look at a cloud job: tap Show photos', 'About: V165’s line');
+  // V166: the release checks moved to 105f; this keeps V165's own About line.
+  await t.group('104f — V165’s About line; sync.js names V165', () => {
+    t.includes(read('render-help.js'), 'Photos when you look at a cloud job: tap Show photos', 'About: V165’s line');
     t.includes(read('sync.js'), 'V165 (2A): the photos of a job being LOOKED at', 'sync.js names V165');
   });
 };
