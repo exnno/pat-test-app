@@ -73,6 +73,7 @@ function businessLoad() {
       role: BUSINESS_ROLE_WORDS[b.role] ? b.role : 'engineer',
       def: b.def === true,
       n: (typeof b.n === 'number' && b.n > 0) ? Math.floor(b.n) : 1,
+      oj: b.oj === true,   // V165: the business holds someone else's jobs (businessOthersApply)
     });
   }
   return out;
@@ -189,12 +190,43 @@ function _bizOffline() {
 function businessFromRows(uid, rows) {
   if (!Array.isArray(rows)) return null;
   const list = [];
+  const old = businessLoad();
+  const was = new Map(old.u === uid ? old.list.map(b => [b.id, b.oj]) : []);   // never another account's
   for (const r of rows) {
     if (!r || !businessValidId(r.id)) continue;
-    list.push({ id: r.id, name: typeof r.name === 'string' ? r.name : '', role: r.role, def: r.is_default === true, n: r.members });
+    list.push({ id: r.id, name: typeof r.name === 'string' ? r.name : '', role: r.role, def: r.is_default === true, n: r.members,
+      oj: was.get(r.id) === true });   // V165: kept until the cloud says otherwise
   }
   businessSave({ u: uid, at: Date.now(), list });
   return businessLoad();
+}
+
+// V165 (1A): which of my businesses hold someone else's jobs — the cloud's yes
+// or no per business I may read whole (rpc business_others_jobs; an Engineer
+// gets no row). The Cloud tab offers such a business even with one member left
+// (settings-actions.js cloudScopeChoices). A business with no row is a no. A
+// project without the V165 SQL, or a failed read, changes nothing.
+function businessOthersApply(uid, rows) {
+  if (!Array.isArray(rows)) return false;
+  const rec = businessLoad();
+  if (!uid || rec.u !== uid) return false;
+  const yes = new Set(rows.filter(r => r && businessValidId(r.business_id) && r.others === true).map(r => r.business_id));
+  let changed = false;
+  for (const b of rec.list) {
+    const v = yes.has(b.id);
+    if (b.oj !== v) { b.oj = v; changed = true; }
+  }
+  if (changed) businessSave(rec);
+  return changed;
+}
+
+function businessOthersRead(c, uid) {
+  return Promise.resolve(c.rpc('business_others_jobs')).then((res) => {
+    if (!res || res.error) return false;
+    const changed = businessOthersApply(uid, res.data);
+    if (changed && state.view === 'sessions' && state.jobsTab === 'cloud' && typeof render === 'function') render();
+    return changed;
+  });
 }
 
 function businessRead(c, uid) {
@@ -211,7 +243,8 @@ function businessRead(c, uid) {
       // (or a failed read) never stops the list. V155: and the invites to me.
       return businessMovesRead(c, uid).then(() => ok, () => ok)
         .then(() => businessMyInvitesRead(c, uid).then(() => ok, () => ok))
-        .then(() => businessWaitingRead(c, uid).then(() => ok, () => ok));   // V157 (1A): moves for me to decide
+        .then(() => businessWaitingRead(c, uid).then(() => ok, () => ok))   // V157 (1A): moves for me to decide
+        .then(() => businessOthersRead(c, uid).then(() => ok, () => ok));    // V165 (1A): others' jobs held
     });
 }
 

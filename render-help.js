@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V164: rolled forward — V164 on top, V161 dropped. -->
+      <!-- v8: rolling 3-version changelog. V165: rolled forward — V165 on top, V162 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V165</strong> &middot; November 2026</p>
+        <p class="muted">Photos when you look at a cloud job: tap Show photos and they load from the cloud, without being kept on this phone. A business that still holds the jobs of someone who has left can be picked in the cloud tab, so those jobs can be seen.</p>
         <p><strong>V164</strong> &middot; November 2026</p>
         <p class="muted">One place for your jobs in the cloud: every job is listed, with those also on this phone marked, and any job can be opened to look through. Owners, Team leaders and the Office can pick their business to see the whole team&rsquo;s jobs, or one person&rsquo;s.</p>
         <p><strong>V163</strong> &middot; November 2026</p>
         <p class="muted">Leaving and removing: someone can be removed from a business, or leave one themselves. Their jobs stay with the business; their phone sends anything unsent first, then takes the business&rsquo;s jobs off and says what it did.</p>
-        <p><strong>V162</strong> &middot; November 2026</p>
-        <p class="muted">A phone whose record of its account is lost or can&rsquo;t be saved no longer starts up signed in as a different account; its jobs stay safe on the phone. And a phone signed out from another device is now told so reliably.</p>
       </div>
 
       <div class="info-card">

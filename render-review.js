@@ -1737,6 +1737,17 @@ function openCloudLookSheet(look) {
   if (x) x.addEventListener('click', close);
   if (d) d.addEventListener('click', close);
   if (bring) bring.addEventListener('click', () => { cleanup(); if (typeof cloudLookBring === 'function') cloudLookBring(); });
+  // V165: the photo buttons live in the body, which is rebuilt as things land —
+  // one listener on the body itself (the sheet is outside #app's dispatcher).
+  const bodyEl = document.getElementById('cloud-look-body');
+  if (bodyEl) bodyEl.addEventListener('click', (e) => {
+    let el = e && e.target;
+    if (el && !(el.dataset && el.dataset.look) && typeof el.closest === 'function') el = el.closest('[data-look]');
+    const act = el && el.dataset ? el.dataset.look : '';
+    if (act === 'photos' && typeof cloudLookPhotosShow === 'function') cloudLookPhotosShow();
+    else if (act === 'photo' && typeof cloudLookPhotoOpen === 'function') cloudLookPhotoOpen(el.dataset.arg);
+    else if (act === 'photo-back' && typeof cloudLookPhotoBack === 'function') cloudLookPhotoBack();
+  });
   renderCloudLookBody(look);
   if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);
 }
@@ -1753,9 +1764,45 @@ function cloudLookReadingsText(rd) {
   return bits.map(b => escapeHTML(String(b))).join(' · ');
 }
 
+// V165 (2A): the photos part of the look. Before the tap: "Show photos (N)".
+// After: the previews, each named by its item's asset number; a preview the
+// cloud doesn't have is a plain tile that still opens the photo.
+function renderCloudLookPhotosHTML(look, items) {
+  const r = look.row;
+  const ph = look.ph;
+  const pl = (n) => `${n} photo${n === 1 ? '' : 's'}`;
+  if (!ph) {
+    if (!r.photos) return '';
+    const err = look.phError ? `<p class="pm-note pm-error" role="status">${escapeHTML(look.phError)}</p>` : '';
+    return `<div class="cloud-look-photos" id="cloud-look-photos">${err}
+      <button class="btn-secondary cloud-look-show" data-look="photos">${icon('camera')} Show photos (${r.photos})</button>
+      <p class="muted cloud-look-photos-note">They load from the cloud when you tap, and aren&rsquo;t kept on this phone.</p></div>`;
+  }
+  if (ph.loading) return `<div class="cloud-look-photos" id="cloud-look-photos"><p class="muted pm-note" role="status">Reading the photos\u2026</p></div>`;
+  if (!ph.list.length) return `<div class="cloud-look-photos" id="cloud-look-photos"><p class="muted pm-note">No photos in the cloud for this job.</p></div>`;
+  const assetOf = new Map(items.map(it => [String(it.id), String(it.assetNo == null ? '' : it.assetNo)]));
+  const tiles = ph.list.map((p) => {
+    const asset = assetOf.get(p.item) || '';
+    const label = asset ? `Photo of item ${asset}` : 'Photo';
+    const inner = p.url ? `<img src="${escapeHTML(p.url)}" alt="">`
+      : `<span class="cloud-look-tile-wait">${p.tried ? icon('camera') : '\u2026'}</span>`;
+    return `<button class="cloud-look-tile" data-look="photo" data-arg="${escapeHTML(p.id)}" aria-label="${escapeHTML(label)}">${inner}${asset ? `<span class="cloud-look-tile-cap">${escapeHTML(asset)}</span>` : ''}</button>`;
+  }).join('');
+  return `<div class="cloud-look-photos" id="cloud-look-photos"><p class="cloud-look-counts">${pl(ph.list.length)}</p><div class="cloud-look-grid">${tiles}</div></div>`;
+}
+
 function renderCloudLookBody(look) {
   const body = document.getElementById('cloud-look-body');
   if (!body || !look || state.cloudLook !== look) return;
+  // V165: one photo, full size — in place of the job until Back.
+  if (look.ph && look.ph.open) {
+    const o = look.ph.open;
+    const pic = o.loading ? `<p class="muted pm-note" role="status">Opening the photo\u2026</p>`
+      : (o.url ? `<img class="cloud-look-full" id="cloud-look-full" src="${escapeHTML(o.url)}" alt="Photo">`
+        : `<p class="pm-note pm-error" role="status">${escapeHTML(o.error || 'Couldn\u2019t open this photo.')}</p>`);
+    body.innerHTML = `<button class="pm-look-link cloud-look-back" data-look="photo-back">${icon('chevron-left')} Back to the job</button>${pic}`;
+    return;
+  }
   const r = look.row;
   const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
   const facts = [];
@@ -1763,7 +1810,7 @@ function renderCloudLookBody(look) {
   if (r.certNo) facts.push(`<li>Certificate ${escapeHTML(r.certNo)}</li>`);
   else if (r.locked) facts.push(`<li>Locked</li>`);
   if (r.onPhone) facts.push(`<li>On this phone too</li>`);
-  if (r.photos) facts.push(`<li>${icon('camera')} ${pl(r.photos, 'photo')} in the cloud</li>`);
+  if (r.photos && !look.ph) facts.push(`<li>${icon('camera')} ${pl(r.photos, 'photo')} in the cloud</li>`);
   const head = facts.length ? `<ul class="cloud-look-facts">${facts.join('')}</ul>` : '';
   if (look.loading) { body.innerHTML = head + `<p class="muted pm-note" role="status">Reading the job…</p>`; return; }
   if (look.error || !look.doc) { body.innerHTML = head + `<p class="pm-note pm-error" role="status">${escapeHTML(look.error || 'Couldn’t read this job.')}</p>`; return; }
@@ -1774,7 +1821,8 @@ function renderCloudLookBody(look) {
   if (doc.name && doc.name !== r.title) extra.push(`<li>Job: ${escapeHTML(String(doc.name))}</li>`);
   if (doc.engineer && !r.who) extra.push(`<li>Engineer: ${escapeHTML(String(doc.engineer))}</li>`);
   const counts = `<p class="cloud-look-counts" id="cloud-look-counts">${pl(items.length, 'item')}${fails ? ` · <span class="fail-text">${pl(fails, 'fail')}</span>` : ''}</p>`;
-  if (!items.length) { body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + counts + `<p class="muted pm-note">No items logged in this job.</p>`; return; }
+  const photosHTML = renderCloudLookPhotosHTML(look, items);
+  if (!items.length) { body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + counts + `<p class="muted pm-note">No items logged in this job.</p>` + photosHTML; return; }
   const rows = items.map((it) => {
     const result = String(it.result || '');
     const rd = cloudLookReadingsText(it.readings);
@@ -1786,7 +1834,7 @@ function renderCloudLookBody(look) {
         ${rd ? `<div class="cloud-look-rd muted">${rd}</div>` : ''}${notes}
       </li>`;
   }).join('');
-  body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + counts + `<ul class="cloud-look-items" id="cloud-look-items">${rows}</ul>`;
+  body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + photosHTML + counts + `<ul class="cloud-look-items" id="cloud-look-items">${rows}</ul>`;
 }
 
 // V107 (Stage 5 part 3): the review before a cloud delete. `o` is

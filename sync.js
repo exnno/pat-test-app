@@ -5268,6 +5268,51 @@ function syncCloudJob(user, id, org) {
     });
 }
 
+// ---- V165 (2A): the photos of a job being LOOKED at -------------------------------
+// The look-only sheet's "Show photos". Nothing here touches this phone's photo
+// store, state.photoCloud or the sync state: the rows and the pictures go to
+// the sheet's memory only and are dropped when it closes (settings-actions.js
+// cloudLookClose). The rows are read by the job's own person (rule 45); the
+// file path is that person's folder, and the cloud decides the read by the photo
+// ROW's business (V113 7A can_read_photo_file) — so a teammate's, or a leaver's,
+// job's photos open for someone who may read the whole business, and for nobody else.
+// Resolves { ok, offline, error, photos: [{ id, item, thumb }] }. Never rejects.
+const SYNC_LOOK_PHOTOS_MAX = 200;
+function syncCloudJobPhotos(user, id) {
+  const res = { ok: false, offline: false, error: '', photos: [] };
+  const u = String(user || ''), sid = String(id == null ? '' : id);
+  if (!_SYNC_UUID_RE.test(u) || typeof safeId !== 'function' || !safeId(sid)) { res.ok = true; return Promise.resolve(res); }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  return syncDataClient()
+    .then((c) => c.from('photos').select('id,item_id,thumb').eq('user_id', u).eq('session_id', sid).eq('deleted', false)
+      .order('id', { ascending: true }).limit(SYNC_LOOK_PHOTOS_MAX))
+    .then((r) => {
+      if (r && r.error) throw r.error;
+      for (const p of ((r && r.data) || [])) {
+        const pid = String(p && p.id != null ? p.id : '');
+        if (!safeId(pid)) continue;   // a name PATGo could never have made is never built into a path
+        res.photos.push({ id: pid, item: String(p.item_id == null ? '' : p.item_id), thumb: p.thumb === true });
+      }
+      res.ok = true;
+      return res;
+    }).catch((e) => {
+      res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn\u2019t reach the cloud.';
+      return res;
+    });
+}
+
+// One picture of such a job: its small preview, or (full) the photo itself.
+// Resolves a Blob, or null (none, refused, no signal). Never rejects, never stored.
+function syncCloudLookPhoto(user, photoId, full) {
+  const u = String(user || ''), pid = String(photoId == null ? '' : photoId);
+  if (!_SYNC_UUID_RE.test(u) || typeof safeId !== 'function' || !safeId(pid)) return Promise.resolve(null);
+  if (!syncActive() || _syncOffline()) return Promise.resolve(null);
+  return syncDataClient()
+    .then((c) => c.storage.from('photos').download(full ? _syncPhotoPath(u, pid) : _syncThumbPath(u, pid)))
+    .then((r) => (r && !r.error && r.data) ? r.data : null)
+    .catch(() => null);
+}
+
 // V108 (Stage 5 part 3, second half): Settings → Data → Cloud Storage. How much
 // the account holds in the cloud — the jobs, the photos, the total — and its
 // biggest jobs (CLOUD_STORAGE_TOP, 3A: the job plus its photos, jobs on this

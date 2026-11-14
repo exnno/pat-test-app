@@ -288,7 +288,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>One place for your jobs in the cloud.</strong> The In the cloud tab now lists every job, with those also on this phone marked, and you can tap any of them to look through it. If you run a team, pick your business at the top to see everyone&rsquo;s jobs, or just one person&rsquo;s.</li>
+        <li><strong>Photos when you look at a cloud job.</strong> Open any job in the In the cloud tab and tap Show photos to see them &mdash; nothing is kept on this phone. And if someone has left your business, you can still pick the business at the top to see the jobs they did for it.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

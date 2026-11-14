@@ -1959,7 +1959,9 @@ function cloudScopeChoices() {
   if (typeof businessList !== 'function') return [];
   let list = [];
   try { list = businessList(); } catch (e) { list = []; }
-  return list.filter(b => b && CLOUD_SCOPE_ROLES.includes(b.role) && Number(b.n) >= 2)
+  // V165 (1A): …or one member left but someone else's jobs still held (a person
+  // removed, their jobs kept) — the cloud says so (business.js businessOthersApply).
+  return list.filter(b => b && CLOUD_SCOPE_ROLES.includes(b.role) && (Number(b.n) >= 2 || b.oj === true))
     .map(b => ({ id: b.id, label: (typeof businessLabel === 'function' ? businessLabel(b) : (b.name || 'Your business')) }));
 }
 
@@ -2196,6 +2198,7 @@ function cloudLookOpen(key) {
   const me = (typeof _syncCurrentUserId === 'function') ? (_syncCurrentUserId() || '') : '';
   const look = { key: String(key), scope: m.scope, user: m.scope === 'mine' ? me : row.user, id: String(row.id),
     org: m.scope === 'mine' ? '' : m.scope, row, loading: true, error: '', doc: null };
+  if (state.cloudLook) _cloudLookDropPhotos(state.cloudLook);   // V165: a look left open
   state.cloudLook = look;
   if (typeof openCloudLookSheet === 'function') openCloudLookSheet(look);
   if (typeof _syncOffline === 'function' && _syncOffline()) {
@@ -2218,7 +2221,108 @@ function cloudLookOpen(key) {
   });
 }
 
-function cloudLookClose() { state.cloudLook = null; }
+// Closing forgets everything read for the look — the pictures too (V165).
+function cloudLookClose() {
+  const look = state.cloudLook;
+  state.cloudLook = null;
+  if (look) _cloudLookDropPhotos(look);
+}
+
+// ---- V165 (2A): photos inside the look-only job ----------------------------------
+// "Show photos (N)" — nothing comes down until it's tapped (the cloud download
+// principle). look.ph = { loading, error, list: [{ id, item, thumb, url }],
+// open: { id, loading, url, error } | null } — memory only. Previews come one at
+// a time (a phone, mobile data); a tap opens that photo full size. Every picture
+// is a browser object URL made from the download and revoked when the sheet
+// closes: nothing is written to this phone's photo store, state.photoCloud or
+// storage, for your own job or anyone's.
+function _cloudLookUrl(blob) {
+  try { return (blob && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') ? URL.createObjectURL(blob) : ''; }
+  catch (e) { return ''; }
+}
+function _cloudLookRevoke(url) {
+  if (!url) return;
+  try { if (typeof URL !== 'undefined' && typeof URL.revokeObjectURL === 'function') URL.revokeObjectURL(url); } catch (e) { /* gone already */ }
+}
+function _cloudLookDropPhotos(look) {
+  const ph = look && look.ph;
+  if (!ph) return;
+  for (const p of (ph.list || [])) { _cloudLookRevoke(p.url); p.url = ''; }
+  if (ph.open) { _cloudLookRevoke(ph.open.url); ph.open = null; }
+  look.ph = null;
+}
+function _cloudLookPaint(look) {
+  if (state.cloudLook === look && typeof renderCloudLookBody === 'function') renderCloudLookBody(look);
+}
+
+function cloudLookPhotosShow() {
+  const look = state.cloudLook;
+  if (!look || !look.doc || look.ph) return;
+  if (typeof syncCloudJobPhotos !== 'function') return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    look.phError = 'No signal \u2014 photos need a connection.';
+    _cloudLookPaint(look);
+    return;
+  }
+  const ph = { loading: true, error: '', list: [], open: null };
+  look.ph = ph;
+  look.phError = '';
+  _cloudLookPaint(look);
+  syncCloudJobPhotos(look.user, look.id).then((res) => {
+    if (state.cloudLook !== look || look.ph !== ph) return;
+    if (!res.ok) {
+      look.ph = null;
+      look.phError = res.offline ? 'No signal \u2014 photos need a connection.' : (res.error || 'Couldn\u2019t read the photos. Try again.');
+      _cloudLookPaint(look);
+      return;
+    }
+    ph.list = res.photos.map(p => ({ id: p.id, item: p.item, thumb: p.thumb, url: '', tried: !p.thumb }));
+    ph.loading = false;
+    _cloudLookPaint(look);
+    // The previews, one at a time; each paints as it lands.
+    let chain = Promise.resolve();
+    for (const p of ph.list) {
+      if (!p.thumb) continue;
+      chain = chain.then(() => {
+        if (state.cloudLook !== look || look.ph !== ph) return null;
+        return syncCloudLookPhoto(look.user, p.id, false).then((blob) => {
+          const url = _cloudLookUrl(blob);
+          if (state.cloudLook !== look || look.ph !== ph) { _cloudLookRevoke(url); return; }
+          p.url = url; p.tried = true;
+          if (!ph.open) _cloudLookPaint(look);
+        });
+      });
+    }
+  });
+}
+
+// A tap on a preview: that photo, full size, in the sheet. Back returns to the job.
+function cloudLookPhotoOpen(photoId) {
+  const look = state.cloudLook;
+  const ph = look && look.ph;
+  const id = String(photoId || '');
+  if (!ph || ph.loading || !ph.list.some(p => p.id === id)) return;
+  if (ph.open) _cloudLookRevoke(ph.open.url);
+  const open = { id, loading: true, url: '', error: '' };
+  ph.open = open;
+  _cloudLookPaint(look);
+  syncCloudLookPhoto(look.user, id, true).then((blob) => {
+    const url = _cloudLookUrl(blob);
+    if (state.cloudLook !== look || look.ph !== ph || ph.open !== open) { _cloudLookRevoke(url); return; }
+    open.loading = false;
+    if (url) open.url = url; else open.error = 'Couldn\u2019t open this photo. Check your signal and try again.';
+    _cloudLookPaint(look);
+  });
+}
+
+function cloudLookPhotoBack() {
+  const look = state.cloudLook;
+  const ph = look && look.ph;
+  if (!ph || !ph.open) return;
+  _cloudLookRevoke(ph.open.url);
+  ph.open = null;
+  _cloudLookPaint(look);
+}
 
 // From the sheet: your own job, onto this phone (V93's bring, one job, opened);
 // or, already here, opened on the phone.
@@ -2297,6 +2401,9 @@ function cloudDeleteOverview(ids, pool) {
   for (const raw of (ids || [])) {
     const id = String(raw);
     const j = (m && m.byId.get(id)) || all.get(id);
+    // V165: a ticked job that has since landed on this phone is left out — the
+    // delete would skip it anyway (sync.js syncCloudDelete), so the sheet doesn't name it.
+    if (m && j && j.onPhone) continue;
     if (j && !jobs.some(x => x.id === id)) jobs.push(j);
   }
   const num = (v) => (typeof v === 'number' && isFinite(v) && v > 0) ? v : 0;

@@ -4341,6 +4341,19 @@ body.has-selection-bar .cloud-tab { padding-bottom: 100px; }
 .cloud-look-line .td-result { flex: 0 0 auto; font-weight: 600; }
 .cloud-look-rd, .cloud-look-notes { font-size: 0.8125rem; margin: 2px 0 0 calc(3em + 8px); overflow-wrap: anywhere; }
 .cloud-look-note { margin: 0; font-size: 0.8125rem; }
+/* V165: photos inside the look-only job. */
+.cloud-look-photos { margin: 8px 0 12px; }
+.cloud-look-show { width: 100%; min-height: 44px; }
+.cloud-look-photos-note { margin: 6px 0 0; font-size: 0.8125rem; }
+.cloud-look-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(84px, 1fr)); gap: 8px; }
+.cloud-look-tile { position: relative; aspect-ratio: 1 / 1; padding: 0; overflow: hidden; border: 1px solid var(--border);
+  border-radius: 10px; background: var(--card-bg); color: var(--text-muted); }
+.cloud-look-tile img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.cloud-look-tile-wait { display: flex; align-items: center; justify-content: center; width: 100%; height: 100%; }
+.cloud-look-tile-cap { position: absolute; left: 0; right: 0; bottom: 0; padding: 2px 4px; font-size: 0.6875rem; font-weight: 600;
+  background: rgba(0, 0, 0, 0.6); color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.cloud-look-back { display: inline-flex; align-items: center; min-height: 44px; }
+.cloud-look-full { display: block; width: 100%; height: auto; border-radius: 10px; }
 /* V108: Cloud Storage (Settings → Data). Reuses the photo manager's totals and
    the cloud tab's cards; only the size line and the "on this phone" tag are new. */
 .cs-total strong { font-size: 1rem; }

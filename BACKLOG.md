@@ -13,7 +13,27 @@ here rather than restating it. Delete an item when it ships.
   plan V164–V169 so nothing lands in V170 but the audit's fixes. Brief it that the second
   audit's finding 5 is scheduled with seat billing (if not yet built).
 
-### Next after V164
+### Next after V165
+V165 = a business holding someone else's jobs (the V164 gap from Peter's live test) + photos inside the
+look-only job (round 1A 2A 3A, 14 Nov; built in Fable). SQL: supabase/v165-business-jobs.sql (J1–J3).
+business.js (`oj`, businessOthersRead/Apply), settings-actions.js (picker rule, `cloudLook*Photo*`, delete
+review), sync.js (`syncCloudJobPhotos`, `syncCloudLookPhoto`), render-review.js, styles.css. Harness 104 +
+M2040–M2060.
+**Next — V166 (3A):** the storage line / photo storage review in the Cloud tab (its own spec round).
+Then V167 Office corrections (O12), V168 seat billing + per-business lock (finding 5), V169 certificate
+numbering per business. Shared client / site lists (O13) move after V170 with the combined certificate (R4)
+and teammates' same-site view (R3) (Claude, 14 Nov — the window can't hold them).
+Offered to Peter (14 Nov): a full Fable audit of the whole app once V165 is live — his call.
+
+### V165 residuals (known, accepted)
+- At most 200 photos per job in the look (SYNC_LOOK_PHOTOS_MAX); previews one at a time.
+- The "others' jobs" answer is as fresh as the last business read (every start / return to the front).
+- A look sheet left open when the phone is signed out from another device keeps what it shows until closed.
+- Fable's check of V164 (14 Nov): the member-count gap (fixed here); the delete review naming a job now on
+  the phone (fixed here); the old-phone rule was first reported missing on the business read — it is NOT
+  missing (every on-request read goes through syncDataClient, which stops a phone below the minimum).
+
+### Next after V164 (done — V165 took the gap and photos)
 V164 = the one Cloud tab and the business view (Teams v1; round 1A 2A 3A 4A 5A, 14 Nov). settings-actions.js
 (scope, `cloudScopeChoices`, model, look-only `cloudLook*`), render-review.js (picker, chips, rows, look
 sheet), sync.js (`syncBusinessList` — rule 45's one exception — and `syncCloudJob`), dispatch.js,

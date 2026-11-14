@@ -1,4 +1,4 @@
-# PATGo — Code Map (V164)
+# PATGo — Code Map (V165)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1222,7 +1222,15 @@ list: Owner/Team leader/Office, n ≥ 2; never inside a tutorial — `_tut`);
 **sync.js** `syncBusinessList` — a LOOK (rule 45's one exception; harness 48a/103c).
 Tap → `cloudLookOpen` (look-only sheet, `state.cloudLook`, memory only) →
 **sync.js** `syncCloudJob(user, id, org)`; `cloudLookBring` (own jobs only) →
-`_cloudBring` → `syncBringBack` → `requestOpenSession`. Select → several (Your jobs). The search
+`_cloudBring` → `syncBringBack` → `requestOpenSession`. Select → several (Your jobs).
+⚠ V165: a business is also offered with ONE member when the stored list says `oj`
+(someone else's jobs held) — **business.js** `businessOthersRead` / `businessOthersApply`
+(rpc business_others_jobs, read with the businesses; carried between reads by
+`businessFromRows`, never from another account). Photos in the look: `look.ph`
+(memory only) — `cloudLookPhotosShow` → **sync.js** `syncCloudJobPhotos` (rows, by the
+job's person) → `syncCloudLookPhoto` (preview / full, a Blob) → object URLs, all revoked
+by `cloudLookClose` (`_cloudLookDropPhotos`). Never photos.js, state.photoCloud or storage.
+The sheet's photo buttons go through ONE click listener on #cloud-look-body (`data-look`). The search
 box is an input: `cloudJobsSearch` → `refreshCloudListAreaOnly` (render-review.js),
 never render(). Markup `renderCloudJobsHTML`/`renderCloudListAreaHTML` in
 **render-review.js**, drawn by **render-core.js** `renderSessions`; actions
