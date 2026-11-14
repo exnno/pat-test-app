@@ -1,4 +1,4 @@
-// ============== PATGo PWA — V127 — The plan: trial end, grace, the lock (V142: + paying; V143: + enforcement) ==============
+// ============== PATGo PWA — V127 — The plan: trial end, grace, the lock (V142: + paying; V143: + enforcement; V168: each business on its own plan) ==============
 // (c) 2026 Peter Birchley. All rights reserved.
 //
 // WHAT THIS FILE OWNS. What the signed-in account's plan means on this phone:
@@ -222,12 +222,178 @@ function planLocked() {
 // The one gate. Every place that starts a job, logs a test or makes a
 // certificate asks this first: true = carry on; false = locked, and the Renew
 // (or V143: Check now) sheet is already up. Fails open.
-function planGate() {
+// V168: given the job (or { businessId } for a job about to be made), the JOB'S
+// business decides — planStatusFor. Given nothing (null), the account, as before.
+function planGate(job) {
+  if (job !== undefined && job !== null && _planMulti()) return _planGateFor(job);
   let st = null;
   try { st = planCurrent(); } catch (e) { st = null; }
   if (!st || (st.phase !== 'locked' && !st.unchecked)) return true;
   try { if (st.phase === 'locked') planShowLocked(); else planShowUnchecked(); } catch (e) { /* the refusal stands without its sheet */ }
   return false;
+}
+
+// ---- V168: each business on its own plan (Peter, 11 Nov; round 14 Nov 0B 5A 6A) --
+// A job follows ITS business's plan: a member's own lapsed business locks only its
+// own jobs, and a paid team's jobs carry on ("a paid seat anywhere" no longer
+// unlocks a lapsed business's jobs — Peter, 11 Nov). The phone learns each
+// business's plan from my_business_plans (business.js businessPlansApply → each
+// stored business's p / te / la).
+// ⚠ ONLY for someone in two or more businesses (_planMulti). Someone in one
+// business goes by the account's record exactly as before — the record is what a
+// payment updates first (billingRead), so a lone business never waits on a second
+// read to unlock. And the account record still decides the 30-day hold (V143 4A)
+// for every business: checkedAt is the account's.
+function _planMulti() {
+  try { return typeof businessList === 'function' && businessList().length >= 2; } catch (e) { return false; }
+}
+
+// The business of a job, of { businessId }, or of a business id ('' = the main
+// one) — the stored record, or null.
+function planBusinessOf(x) {
+  try {
+    if (typeof businessList !== 'function') return null;
+    const id = (typeof x === 'string') ? x : (x && typeof x === 'object' ? x.businessId : '');
+    const list = businessList();
+    const b = (typeof businessValidId === 'function' && businessValidId(id)) ? list.find(y => y.id === id) : null;
+    return b || (typeof businessDefault === 'function' ? businessDefault() : null);
+  } catch (e) { return null; }
+}
+
+// The plan status of a job's business. Falls back to the account's (planCurrent)
+// when the phone doesn't know that business's plan (a database before V168, or
+// not read yet) — the cover, as V155 did.
+function planStatusFor(x) {
+  try {
+    const acc = planRecord();
+    if (!acc || !_planMulti()) return planCurrent();
+    const b = planBusinessOf(x);
+    if (!b || !b.p) return planCurrent();
+    const rec = { plan: b.p, trialEndsAt: b.te || null, lapsedAt: b.la || null, lapsedSeenAt: null, checkedAt: acc.checkedAt };
+    return planStatus(rec, planNow(acc));
+  } catch (e) { return { phase: 'none' }; }
+}
+
+function planLockedFor(x) {
+  const st = planStatusFor(x);
+  return st.phase === 'locked' || st.unchecked === true;
+}
+
+function _planGateFor(job) {
+  let st = null;
+  try { st = planStatusFor(job); } catch (e) { st = null; }
+  if (!st || (st.phase !== 'locked' && st.unchecked !== true)) return true;
+  try {
+    const b = planBusinessOf(job);
+    if (st.phase === 'locked' && b) planShowLockedFor(b); else if (st.phase === 'locked') planShowLocked(); else planShowUnchecked();
+  } catch (e) { /* the refusal stands without its sheet */ }
+  return false;
+}
+
+function _planBizName(b) {
+  return (typeof businessLabel === 'function') ? businessLabel(b) : 'This business';
+}
+
+// The refusal for one business (someone in two or more). The Owner renews — on
+// the Subscription page, which looks after the MAIN business; an Owner whose own
+// business isn't main makes it main first (the Business page). Anyone else: the
+// owner looks after it (V155 8A's words).
+function planShowLockedFor(b) {
+  const name = _planBizName(b);
+  const owner = b.role === 'owner';
+  const choices = [];
+  if (_planSignedOut()) choices.push(_planSignInChoice());
+  else if (owner && b.def) choices.push({ label: 'Renew now', style: 'primary', onPick: () => planRenew() });
+  else if (owner) choices.push({ label: 'Business page', style: 'primary', onPick: () => setView('cloudBusiness') });
+  else choices.push({ label: 'Check now', style: 'primary', onPick: () => planCheckNow() });
+  if (typeof exportAllOpen === 'function') choices.push({ label: 'Export everything', style: 'secondary', onPick: () => exportAllOpen() });
+  const how = owner
+    ? (b.def ? 'until you renew' : 'until it’s renewed — make it your main business on the Business page, then renew it on the Subscription page')
+    : `— ${PLAN_MEMBER_WORDS}`;
+  openChoiceSheet({
+    title: owner ? 'Renew to carry on' : `${name}’s plan has ended`,
+    message: `${name}’s PATGo plan has ended, so ${PLAN_LOCKED_WORDS} for its jobs are paused ${how}. Jobs for your other businesses carry on as normal. ${PLAN_SAFE_WORDS}`,
+    choices,
+    cancelLabel: 'Close',
+  });
+}
+
+// 6A — which business the Jobs list line and the sheets are about (someone in two
+// or more): only one you OWN that matters here — it has jobs on this phone, or
+// other people in it — and the one in the worst state (locked, then the grace,
+// then a trial ending). A business that doesn't matter here (an engineer's own
+// business left idle after joining a team) gets nothing; every business's jobs
+// carry their own quiet line (planJobLineHTML). Returns { b, st } or null.
+const _PLAN_WORST = { locked: 3, grace: 2, ending: 1 };
+function _planJobsIn(b) {
+  try {
+    const key = (typeof jobBusinessKey === 'function') ? (b.def ? '' : b.id) : '';
+    return (state.sessions || []).some(s => s && jobBusinessKey(s) === key);
+  } catch (e) { return false; }
+}
+function planNagBusiness() {
+  if (!_planMulti()) return null;
+  let best = null;
+  for (const b of businessList()) {
+    if (b.role !== 'owner') continue;
+    if (!(b.n >= 2) && !_planJobsIn(b)) continue;
+    const st = planStatusFor(b.id);
+    const paused = _planCloudPausedFor(b);
+    const w = (_PLAN_WORST[st.phase] || 0) + (paused ? 4 : 0);
+    if (!w) continue;
+    if (!best || w > best.w) best = { b, st, w, paused };
+  }
+  return best;
+}
+
+// V168: the cloud has refused this business's changes (sync.js, per business).
+function _planCloudPausedFor(b) {
+  try {
+    if (typeof syncPlanRefusedFor !== 'function') return _planCloudPaused();
+    return syncPlanRefusedFor(b.def ? '' : b.id);
+  } catch (e) { return false; }
+}
+
+function _planNagText(n) {
+  const name = _planBizName(n.b), st = n.st;
+  if (st.phase === 'locked') {
+    return n.paused
+      ? `${name}’s plan has ended, so ${PLAN_LOCKED_WORDS} for its jobs are locked and its cloud syncing is paused. Renew to carry on.`
+      : `${name}’s plan has ended, so ${PLAN_LOCKED_WORDS} for its jobs are locked. Renew to carry on.`;
+  }
+  if (n.paused) return `Cloud syncing is paused for ${name}’s jobs because its plan has ended. Renew to resume — your work remains safe on this phone.`;
+  if (st.phase === 'ending') return `${name}’s free trial ends on ${_planDate(st.endsAt)}.`;
+  if (st.phase === 'grace') return `${name}’s plan has ended. ${_planCountdownWords(st).replace('Logging locks', 'Logging on its jobs locks')}`;
+  return '';
+}
+
+function _planNagButton(n, id) {
+  if (_planSignedOut()) return '<button class="backup-banner-action primary" id="' + id + '" data-action="settings-page" data-arg="cloudAccount">Sign in</button>';
+  return n.b.def
+    ? `<button class="backup-banner-action primary" id="${id}" data-action="plan-renew">Renew now</button>`
+    : `<button class="backup-banner-action primary" id="${id}" data-action="settings-page" data-arg="cloudBusiness">Business page</button>`;
+}
+
+// The quiet line on a job of a business whose plan has ended (6A) — every
+// business, owned or not; someone in two or more only (one business: the Jobs
+// list line says it). '' otherwise.
+function planJobLineText(sess) {
+  if (!_planMulti() || !sess) return '';
+  const b = planBusinessOf(sess);
+  if (!b || !b.p) return '';
+  const st = planStatusFor(sess);
+  const paused = _planCloudPausedFor(b);
+  if (st.phase !== 'locked' && st.phase !== 'grace' && !paused) return '';
+  const name = _planBizName(b);
+  const who = b.role === 'owner' ? 'renew it to carry on' : PLAN_MEMBER_WORDS;
+  if (st.phase === 'locked') return `${name}’s plan has ended, so this job is locked for logging and certificates — ${who}.`;
+  if (paused) return `${name}’s plan has ended, so this job isn’t syncing — ${who}. It’s safe on this phone.`;
+  return `${name}’s plan has ended — ${who}. ${_planCountdownWords(st).replace('Logging locks', 'Logging on this job locks')}`;
+}
+
+function planJobLineHTML(sess) {
+  const text = planJobLineText(sess);
+  return text ? `<p class="plan-job-line" id="plan-job-line">${escapeHTML(text)}</p>` : '';
 }
 
 // ---- words -----------------------------------------------------------------
@@ -416,7 +582,25 @@ function _planLineButton(st, id) {
 }
 
 // The Jobs list line (4A, 6b). Not dismissible — it is the countdown.
+// V168 (6A): someone in two or more businesses — the line is about one they own
+// that matters here (planNagBusiness), by name; the 30-day hold stays the
+// account's.
 function planBannerHTML() {
+  if (_planMulti() && !planCurrent().unchecked) {
+    const n = planNagBusiness();
+    const text = n ? _planNagText(n) : '';
+    if (!text) return '';
+    return `
+    <div class="backup-banner plan-banner${n.st.phase === 'locked' ? ' plan-banner-locked' : ''}" id="plan-banner">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text" id="plan-banner-text">${escapeHTML(text)}</div>
+        <div class="backup-banner-actions">
+          ${_planNagButton(n, 'plan-banner-renew')}
+        </div>
+      </div>
+    </div>
+  `;
+  }
   const st = planCurrent();
   const text = planLineText(st);
   if (!text) return '';
@@ -435,6 +619,18 @@ function planBannerHTML() {
 
 // The Account page (Settings → Cloud): the same line and button.
 function planAccountHTML() {
+  if (_planMulti() && !planCurrent().unchecked) {   // V168 (6A): as the Jobs list line
+    const n = planNagBusiness();
+    const t = n ? _planNagText(n) : '';
+    if (!t) return '';
+    if (_planSignedOut()) return `
+        <p class="muted" id="cloud-plan-status">${escapeHTML(t)}</p>`;
+    return `
+        <p class="muted" id="cloud-plan-status">${escapeHTML(t)}</p>
+        ${n.b.def
+          ? '<button class="btn-primary" id="cloud-plan-renew" data-action="plan-renew" style="margin-top:6px">Renew now</button>'
+          : '<button class="btn-primary" id="cloud-plan-renew" data-action="settings-page" data-arg="cloudBusiness" style="margin-top:6px">Business page</button>'}`;
+  }
   const st = planCurrent();
   const text = planLineText(st);
   if (!text) return '';
@@ -563,6 +759,7 @@ function _planCanPrompt() {
 // a new trial or a later lapse asks again). Returns which sheet it showed.
 function planMaybePrompt() {
   if (planMaybeThank(false)) return 'thanks';   // V144 (8A): owed from a payment
+  if (_planMulti()) return _planMaybePromptFor();   // V168 (6A)
   try {
     const rec = planRecord();
     const st = planStatus(rec, planNow(rec));
@@ -582,6 +779,41 @@ function planMaybePrompt() {
       _planWrite(rec);
       _planShowLastDay();
       return 'last';
+    }
+  } catch (e) { /* fail open */ }
+  return '';
+}
+
+// V168 (6A): someone in two or more — the ended / last-day sheets only for a
+// business they own that matters here (planNagBusiness), by name, each once per
+// ending of THAT business (keyed by its id and lock time).
+function _planMaybePromptFor() {
+  try {
+    const rec = planRecord();
+    if (!rec) return '';
+    const n = planNagBusiness();
+    if (!n || n.st.phase !== 'grace' || !_planCanPrompt()) return '';
+    const st = n.st;
+    const key = n.b.id + ':' + String(st.lockAt);
+    const name = _planBizName(n.b);
+    const choices = _planSignedOut() ? [_planSignInChoice()]
+      : [n.b.def ? { label: 'Renew now', style: 'primary', onPick: () => planRenew() }
+                 : { label: 'Business page', style: 'primary', onPick: () => setView('cloudBusiness') }];
+    if (typeof exportAllOpen === 'function') choices.push({ label: 'Export everything', style: 'secondary', onPick: () => exportAllOpen() });
+    const last = st.daysLeft <= 1;
+    if (rec.shownEnded !== key || (last && rec.shownLastDay !== key)) {
+      const first = rec.shownEnded !== key;
+      rec.shownEnded = key;
+      if (last) rec.shownLastDay = key;
+      _planWrite(rec);
+      openChoiceSheet(last
+        ? { title: 'Last day before the lock',
+            message: `Within a day, ${PLAN_LOCKED_WORDS} for ${name}’s jobs lock until it’s renewed. ${PLAN_SAFE_WORDS}`,
+            choices, cancelLabel: 'Not now' }
+        : { title: `${name}’s plan has ended`,
+            message: `Everything keeps working for ${PLAN_GRACE_DAYS} more days, until ${_planDate(st.lockAt)}. After that, ${PLAN_LOCKED_WORDS} for its jobs are locked until it’s renewed. Jobs for your other businesses carry on. ${PLAN_SAFE_WORDS}`,
+            choices, cancelLabel: 'Not now' });
+      return last ? 'last' : (first ? 'ended' : '');
     }
   } catch (e) { /* fail open */ }
   return '';
@@ -607,14 +839,18 @@ function planRefresh() {
   if (!uid || _planRefreshing || typeof cloudClient !== 'function') return Promise.resolve(false);
   try { if (navigator.onLine === false) return Promise.resolve(false); } catch (e) { /* assume online */ }
   _planRefreshing = true;
+  let client = null;
   return cloudClient()
-    .then((c) => c.from('profiles').select('*').eq('id', uid).maybeSingle())   // V143: * — lapsed_at when the database has it, nothing breaks when it doesn't
+    .then((c) => { client = c; return c.from('profiles').select('*').eq('id', uid).maybeSingle(); })   // V143: * — lapsed_at when the database has it, nothing breaks when it doesn't
     .then((res) => {
       const row = res && !res.error ? res.data : null;
       if (!row || _planUid() !== uid) return false;   // signed out (or switched) meanwhile
       planNote(row);
       return true;
     })
+    // V168: each business's own plan with it (someone in two or more goes by it).
+    .then((ok) => (ok && client && typeof businessPlansRead === 'function'
+      ? Promise.resolve().then(() => businessPlansRead(client, uid)).then(() => ok, () => ok) : ok))
     .catch(() => false)
     .then((ok) => {
       _planRefreshing = false;
@@ -731,6 +967,10 @@ function billingRead() {
       const cov = (info.cover && typeof info.cover === 'object') ? info.cover : info;
       try { planNote({ plan: cov.plan, trial_ends_at: cov.trial_ends_at, lapsed_at: cov.lapsed_at }); } catch (e) { /* record only */ }
       if (state.cloud) { state.cloud.plan = info.plan || null; state.cloud.trialEndsAt = info.trial_ends_at || null; }
+      // V168: and each business's own plan — a payment unlocks its jobs at once.
+      if (typeof businessPlansRead === 'function') {
+        return cloudClient().then((c) => businessPlansRead(c, uid)).then(() => true, () => true);
+      }
       return true;
     })
     .catch(() => { b.error = 'read'; return false; })

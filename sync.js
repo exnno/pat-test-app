@@ -2043,7 +2043,10 @@ function _syncRunAs(c, uid, session, opts) {
     // V143 (5A): the cloud refused this account's changes, and no plan read
     // since says it may work again — this run only READS. A tap on Sync now
     // tries once anyway (the person asked; it costs one refusal).
-    const paused = syncPlanRefused() && !opts.manual;
+    const paused = syncPlanRefused() && !opts.manual && _syncPausedAll();
+    // V168: someone in two or more businesses — only the refused businesses' work
+    // waits; everything else goes (null = nothing held back, or all of it: paused).
+    _syncSkip = paused ? null : _syncSkipKeys(opts);
     // V128 (2A, 5A). A phone that may have slept through the clean-up job lists
     // the due tables first, and every run it makes READS — so a save's quick
     // send, or "Re-send all jobs", cannot put back something deleted elsewhere.
@@ -2067,7 +2070,7 @@ function _syncRunAs(c, uid, session, opts) {
     // "Re-send all jobs", which is jobs only. Fail-soft: see _syncRecordsHalf.
     const recs = reads ? _syncRecordsHalf(c, uid, st, chk, paused) : Promise.resolve(null);
     return recs.then((records) => {
-      if (records && records.error) _syncNotePlanRefusal(records.error);   // V143: fail-soft, but heard
+      if (records && records.error) _syncNotePlanRefusal(records.error, '');   // V143: fail-soft, but heard (V168: the main business's)
       // V93 (2A): the retest look straight after the jobs pull, once a month —
       // fail-soft (a failure never stops the run; the month isn't stamped).
       const look = () => _syncRetestLook(c, uid, st, pulled)
@@ -2084,12 +2087,18 @@ function _syncRunAs(c, uid, session, opts) {
         .then((r) => {
           const base = { sent: r.sent, deleted: r.deleted, pulled, records };
           if (paused) { base.paused = true; return base; }   // V143: no photos up either
+          // V168: a business refused just now holds its photos back in this run
+          // too (Sync now excepted — it tries everything once).
+          _syncSkip = _syncSkipKeys(opts);
+          if (r.refused || _syncSkip) base.paused = true;    // V168: one business's work waits — said as a pause
           // v88: photos LAST — after the jobs push, so a photo's job is in the
           // cloud before the photo is. Reading runs only (never "Re-send all
           // jobs"). Fail-soft on their own, like records: a photo that will
           // not go never stops jobs, and the run still reports what it did.
           if (!reads) return base;
-          return _syncPhotosHalf(c, uid, st, chk).then(
+          return _syncPhotosHalf(c, uid, st, chk)
+            .then((ph) => { if (ph && ph.refused) base.paused = true; return ph; })   // V168: a business's photos wait
+            .then(
             // V163 (6A): everything this run could send has gone — a last
             // delivery that's complete is finished now. Never rejects.
             (ph) => ((ph && !ph.skipped && typeof businessDeliveryFinish === 'function')
@@ -2387,11 +2396,18 @@ function _syncPushHalf(c, uid, st, force) {
     // answer is still sent immediately.
     // v82: jobs only — a held client says nothing about any job.
     const heldIds = new Set(_syncHeldLoad().filter(e => e.kind === 'session').map(e => e.id));
+    // V168: someone in two or more businesses sends one business at a time, and a
+    // business the cloud has refused waits (_syncSkip) — its refusal no longer
+    // stops the others. One business: exactly as before (a refusal pauses all).
+    const multi = _syncPlanMulti();
+    const skip = _syncSkip;
 
     for (const s of _syncSessions()) {
       const id = String(s.id);
       live.add(id);
       if (heldIds.has(id)) continue;
+      const key = multi ? _syncBizKey(s) : '';
+      if (skip && skip.has(key)) continue;   // V168: its business is refused
       // ⚠ v81.2: the row is sent as JSON.stringify (that is the wire format), but
       // the FINGERPRINT is canonical — the two are different jobs and must not
       // share a variable. Hashing `json` here is what V81.2 first shipped by
@@ -2408,7 +2424,7 @@ function _syncPushHalf(c, uid, st, force) {
       // later uploads never move it. A job with none gets the default, as before.
       const biz = _syncJobBusiness(s);
       if (biz) row.org_id = biz;
-      work.push({ id, hash, gone: false, bytes: json.length, row });
+      work.push({ id, hash, gone: false, bytes: json.length, row, key });
     }
 
     // Deletions (decision 4A): the cloud copy is emptied, and the row kept as a
@@ -2444,8 +2460,10 @@ function _syncPushHalf(c, uid, st, force) {
       if (!safeId(id)) continue;
       if (!st.sent[id] && !st.gone[id] && !st.resend[id]) continue;  // server never had it
       if (st.gone[id] && !force && !st.resend[id]) continue;          // already sent
+      // V168: a delete's business isn't known here (the job is gone) — '?'.
+      if (multi && skip && skip.has('?')) continue;
       const at = (typeof t.at === 'string' && !isNaN(Date.parse(t.at))) ? t.at : now;
-      work.push({ id, hash: null, gone: true, bytes: 64,
+      work.push({ id, hash: null, gone: true, bytes: 64, key: multi ? '?' : '',
         row: { id, user_id: uid, doc: {}, fp: null, deleted: true, last_modified: at } });
     }
     if (stale.size) {
@@ -2454,23 +2472,37 @@ function _syncPushHalf(c, uid, st, force) {
     }
 
     // Batches by size as well as count: one long job can be hundreds of KB.
+    // V168: and, for someone in two or more businesses, one business per batch.
+    if (multi) {
+      const order = [];
+      for (const w of work) if (order.indexOf(w.key) === -1) order.push(w.key);
+      work.sort((x, y) => order.indexOf(x.key) - order.indexOf(y.key));   // stable: each business in its own order
+    }
     const batches = [];
     let cur = [], size = 0;
     for (const w of work) {
-      if (cur.length && (cur.length >= SYNC_BATCH_ROWS || size + w.bytes > SYNC_BATCH_BYTES)) {
+      if (cur.length && (cur.length >= SYNC_BATCH_ROWS || size + w.bytes > SYNC_BATCH_BYTES || cur[0].key !== w.key)) {
         batches.push(cur); cur = []; size = 0;
       }
       cur.push(w); size += w.bytes;
     }
     if (cur.length) batches.push(cur);
 
-    let sent = 0, deleted = 0;
+    let sent = 0, deleted = 0, refused = false;
+    const landed = new Set();
+    const shut = new Set();   // V168: refused in this run
     let chain = Promise.resolve();
     for (const batch of batches) {
       chain = chain
-        .then(() => c.from('sessions').upsert(batch.map(w => w.row), { onConflict: 'user_id,id' }))
+        .then(() => (shut.has(batch[0].key) ? { skipped: true }
+          : c.from('sessions').upsert(batch.map(w => w.row), { onConflict: 'user_id,id' })))
         .then((r) => {
+          if (r && r.skipped) return;
+          // V168: one business refused (its plan has ended): noted, its other
+          // batches wait, and the run carries on with the rest.
+          if (r && r.error && multi && _syncNotePlanRefusal(r.error, batch[0].key)) { shut.add(batch[0].key); refused = true; return; }
           if (r && r.error) throw r.error;
+          for (const w of batch) landed.add(w.id);
           // Record each batch as it lands, so a failure part-way loses nothing
           // already sent and the retry sends only what's left.
           _syncNoteUploaded('jobs', batch.map(w => w.id));   // V128: rows exist again
@@ -2485,8 +2517,8 @@ function _syncPushHalf(c, uid, st, force) {
     return chain.then(() => {
       st.lastPushAt = now;
       _syncSave(st);
-      return _syncConfirmPushed(c, uid, st, work.filter(w => !w.gone).map(w => w.id));
-    }).then(() => ({ sent, deleted }));
+      return _syncConfirmPushed(c, uid, st, work.filter(w => !w.gone && landed.has(w.id)).map(w => w.id));
+    }).then(() => ({ sent, deleted, refused }));
   });
 }
 
@@ -3918,7 +3950,9 @@ function _syncRecordsHalf(c, uid, st, chk, paused) {
     gs: { in: 0, out: 0, held: 0 },   // v86: general settings
     skip: {}, inUseNow: null };
   return _syncPullRecords(c, uid, st, out, chk)
-    .then(() => (paused ? null : _syncPushRecords(c, uid, st, out)))   // V143: paused — read only
+    // V168: settings are the main business's (the database stamps them so) — held
+    // back while that business is refused, though others' jobs go.
+    .then(() => ((paused || (_syncSkip && _syncSkip.has(''))) ? null : _syncPushRecords(c, uid, st, out)))   // V143: paused — read only
     .then(() => out, (e) => { out.error = e || new Error('records'); return out; });
 }
 
@@ -4287,9 +4321,44 @@ const SYNC_PLAN_PAUSED_WORDS = 'Cloud syncing is paused because your PATGo subsc
 // V155 (8A): for someone whose main business is another person's (plan.js planIsMember).
 const SYNC_PLAN_PAUSED_MEMBER_WORDS = 'Cloud syncing is paused because your business’s plan has ended — the business owner looks after it. Your work remains safe on this phone and will upload automatically once it’s renewed.';
 function syncPlanPausedWords() {
+  // V168: someone in two or more businesses, with only some refused — named.
+  try {
+    if (_syncPlanMulti() && syncPlanRefused() && !_syncPlanRefusedKeys.has('*')) {
+      const names = [];
+      for (const k of _syncPlanRefusedKeys) {
+        if (k === '?') continue;
+        const b = (typeof planBusinessOf === 'function') ? planBusinessOf(k) : null;
+        // Mid-sentence, an unnamed business of your own reads "your own business".
+        const n = !b ? '' : (b.role === 'owner' && !String(b.name || '').trim()) ? 'your own business'
+          : (typeof businessLabel === 'function' ? businessLabel(b) : '');
+        if (n && names.indexOf(n) === -1) names.push(n);
+      }
+      _syncPausedMsg = names.length
+        ? `Cloud syncing is paused for ${names.join(' and ')}’s jobs because ${names.length > 1 ? 'their plans have' : 'its plan has'} ended. Everything else is syncing, and those jobs are safe on this phone — they’ll upload once ${names.length > 1 ? 'they’re' : 'it’s'} renewed.`
+        : 'Some deletions are waiting because a business’s plan has ended. Everything else is syncing.';
+      return _syncPausedMsg;
+    }
+  } catch (e) { /* the general words below */ }
   try { return (typeof planIsMember === 'function' && planIsMember()) ? SYNC_PLAN_PAUSED_MEMBER_WORDS : SYNC_PLAN_PAUSED_WORDS; } catch (e) { return SYNC_PLAN_PAUSED_WORDS; }
 }
 let _syncPlanRefusedUid = '';
+// V168 (finding 5): WHICH businesses the cloud refused, for the account above —
+// '' the main one, a business id, '?' a delete whose business isn't known here,
+// '*' not known at all (a refusal from outside a per-business send: everything
+// waits, as before V168). Someone in ONE business: any refusal pauses everything.
+let _syncPlanRefusedKeys = new Set();
+// This run's businesses held back (null = none — or all of them: `paused`).
+let _syncSkip = null;
+let _syncPausedMsg = '';
+
+function _syncPlanMulti() {
+  try { return typeof businessList === 'function' && businessList().length >= 2; } catch (e) { return false; }
+}
+
+// A job's business as refusals go: '' = the main one (business.js jobBusinessKey).
+function _syncBizKey(s) {
+  try { return typeof jobBusinessKey === 'function' ? jobBusinessKey(s) : ''; } catch (e) { return ''; }
+}
 
 function _syncUid() {
   try { return (typeof cloudUserId === 'function') ? (cloudUserId() || '') : ''; } catch (e) { return ''; }
@@ -4307,9 +4376,12 @@ function _syncIsPlanRefusal(err) {
   return false;
 }
 
-function _syncNotePlanRefusal(err) {
+function _syncNotePlanRefusal(err, key) {
   if (!_syncIsPlanRefusal(err)) return false;
-  _syncPlanRefusedUid = _syncUid();
+  const uid = _syncUid();
+  if (uid !== _syncPlanRefusedUid) _syncPlanRefusedKeys = new Set();   // another account's are forgotten
+  _syncPlanRefusedUid = uid;
+  _syncPlanRefusedKeys.add(typeof key === 'string' ? key : '*');
   try { if (typeof _planRepaint === 'function') _planRepaint(); } catch (e) { /* the Jobs list line waits for the next paint */ }
   return true;
 }
@@ -4319,10 +4391,46 @@ function syncPlanRefused() {
   return !!uid && uid === _syncPlanRefusedUid;
 }
 
+// V168: is this business's work waiting? ('' = the main business.)
+function syncPlanRefusedFor(key) {
+  return syncPlanRefused() && (_syncPlanRefusedKeys.has('*') || _syncPlanRefusedKeys.has(key));
+}
+
+// Everything waits (a run only reads): one business, or a refusal not tied to one.
+function _syncPausedAll() {
+  return syncPlanRefused() && (!_syncPlanMulti() || _syncPlanRefusedKeys.has('*'));
+}
+
+// The businesses this run holds back — none on Sync now (the person asked: each
+// is tried once, as V143's single pause was).
+function _syncSkipKeys(opts) {
+  if ((opts && opts.manual) || !syncPlanRefused() || _syncPausedAll()) return null;
+  return new Set(_syncPlanRefusedKeys);
+}
+
 // plan.js, after every fresh read: canUpload = not locked (nor held unchecked).
 function syncPlanChecked(canUpload) {
   if (!canUpload || !_syncPlanRefusedUid) return false;
+  // V168: someone in two or more — only the businesses that may work again are
+  // let go (each by its own plan: plan.js planLockedFor); '*' and '?' are tried
+  // again on any fresh read that lets the account work.
+  if (_syncPlanMulti() && !_syncPlanRefusedKeys.has('*')) {
+    const before = _syncPlanRefusedKeys.size;
+    for (const k of Array.from(_syncPlanRefusedKeys)) {
+      let shut = false;
+      try { shut = k !== '?' && typeof planLockedFor === 'function' && planLockedFor(k); } catch (e) { shut = false; }
+      if (!shut) _syncPlanRefusedKeys.delete(k);
+    }
+    if (_syncPlanRefusedKeys.size === before) return false;
+    if (_syncPlanRefusedKeys.size) {
+      if (state.sync && _syncPausedMsg && state.sync.message === _syncPausedMsg) state.sync.message = syncPlanPausedWords();
+      try { syncPushSoon(1000, { pull: true }); } catch (e) { /* the next trigger will */ }
+      return true;
+    }
+  }
+  _syncPlanRefusedKeys = new Set();
   _syncPlanRefusedUid = '';
+  if (state.sync && _syncPausedMsg && state.sync.message === _syncPausedMsg) state.sync.message = '';   // V168: the named line too
   if (state.sync && (state.sync.message === SYNC_PLAN_PAUSED_WORDS || state.sync.message === SYNC_PLAN_PAUSED_MEMBER_WORDS)) state.sync.message = '';
   try { syncPushSoon(1000, { pull: true }); } catch (e) { /* the next trigger sends it */ }
   return true;
@@ -4700,6 +4808,14 @@ function _syncPhotosHalf(c, uid, st, chk) {
     return _syncPhotoRowsPull(c, uid, st, out, chk).then(() => _syncPhotoMoves(c, uid, st, out)).then(() => {
       const meta = state.photoMeta || {};
       const now = new Date().toISOString();
+      // V168 (finding 5): someone in two or more businesses — a photo goes with
+      // its JOB's business: one the cloud has refused waits (and its refusal
+      // stops only its own photos). '?' = a job no longer on this phone.
+      const multi = _syncPlanMulti();
+      const shut = new Set(_syncSkip || []);
+      const keyOf = new Map();
+      if (multi) for (const s of _syncSessions()) keyOf.set(String(s.id), _syncBizKey(s));
+      const kj = (job) => (keyOf.has(String(job)) ? keyOf.get(String(job)) : '?');
 
       // 1. Deletes: they are small, and they free space before uploads use it.
       //    v89: anything KNOWN to be in the cloud (5A), not only this phone's own.
@@ -4721,18 +4837,34 @@ function _syncPhotosHalf(c, uid, st, chk) {
         if (seen.has(id)) continue;
         if (st.gone[st.ph.sent[id].s]) { seen.add(id); del.push(id); }
       }
+      // V168: one business per chunk (someone in two or more), refused ones held.
+      const groups = new Map();
+      for (const id of del) {
+        const k = multi ? kj(st.ph.sent[id].s) : '';
+        if (shut.has(k)) continue;
+        if (!groups.has(k)) groups.set(k, []);
+        groups.get(k).push(id);
+      }
+      const chunks = [];
+      for (const [k, ids] of groups) for (let i = 0; i < ids.length; i += SYNC_PHOTO_DELETE_BATCH) chunks.push({ k, ids: ids.slice(i, i + SYNC_PHOTO_DELETE_BATCH) });
       let chain = Promise.resolve();
-      for (let i = 0; i < del.length; i += SYNC_PHOTO_DELETE_BATCH) {
-        const chunk = del.slice(i, i + SYNC_PHOTO_DELETE_BATCH);
+      for (const ch of chunks) {
+        const chunk = ch.ids;
+        let held = false;
         chain = chain
-          .then(() => c.from('photos').update({ deleted: true, last_modified: now })
-            .eq('user_id', uid).in('id', chunk))
-          .then((r) => { if (r && r.error) throw r.error; })
+          .then(() => (shut.has(ch.k) ? { held: true } : c.from('photos').update({ deleted: true, last_modified: now })
+            .eq('user_id', uid).in('id', chunk)))
+          .then((r) => {
+            if (r && r.held) { held = true; return; }
+            if (r && r.error && multi && _syncNotePlanRefusal(r.error, ch.k)) { shut.add(ch.k); out.refused = true; held = true; return; }
+            if (r && r.error) throw r.error;
+          })
           // v89: the preview goes with the photo. Removing one that was never
           // made is not an error.
-          .then(() => c.storage.from('photos').remove(
-            chunk.map(id => _syncPhotoPath(uid, id)).concat(chunk.map(id => _syncThumbPath(uid, id)))))
+          .then(() => (held ? { held: true } : c.storage.from('photos').remove(
+            chunk.map(id => _syncPhotoPath(uid, id)).concat(chunk.map(id => _syncThumbPath(uid, id))))))
           .then((r) => {
+            if (r && r.held) return;
             if (r && r.error) throw r.error;
             for (const id of chunk) { delete st.ph.sent[id]; delete st.ph.mv[id]; out.gone++; }
             _syncSave(st);
@@ -4746,6 +4878,7 @@ function _syncPhotosHalf(c, uid, st, chk) {
         for (const [id, job] of jobs) {
           if (st.ph.sent[id]) continue;
           if (!st.sent[job] || st.gone[job]) continue;   // job not in the cloud (yet)
+          if (multi && shut.has(kj(job))) continue;      // V168: its business is refused
           cands.push({ id, job, m: meta[id] });
         }
         cands.sort((a, b) => String(a.m.at).localeCompare(String(b.m.at)) || a.id.localeCompare(b.id));
@@ -4753,7 +4886,8 @@ function _syncPhotosHalf(c, uid, st, chk) {
         out.more = cands.length - take.length;
         let up = Promise.resolve();
         for (const cand of take) {
-          up = up.then(() => photoBlob(cand.id)).then((blob) => {
+          const ck = multi ? kj(cand.job) : '';
+          up = up.then(() => (shut.has(ck) ? null : photoBlob(cand.id))).then((blob) => {
             // Deleted while the run was going, or unreadable: skip, don't fail.
             if (!blob || !(state.photoMeta || {})[cand.id]) return null;
             const path = _syncPhotoPath(uid, cand.id);
@@ -4783,6 +4917,12 @@ function _syncPhotosHalf(c, uid, st, chk) {
                 st.ph.sent[cand.id] = e;
                 out.up++;
                 _syncSave(st);
+              })
+              // V168: its business refused (someone in two or more): noted, its
+              // other photos wait, and the round carries on with the rest.
+              .catch((err) => {
+                if (multi && _syncNotePlanRefusal(err, ck)) { shut.add(ck); out.refused = true; return null; }
+                throw err;
               });
           });
         }

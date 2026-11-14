@@ -336,6 +336,7 @@ function renderOverview() {
     <div class="screen">
       ${header}
       ${stats}
+      ${typeof planJobLineHTML === 'function' ? planJobLineHTML(sess) : ''}
       ${renderOverviewCorrectedHTML(sess)}
       ${siteNotes}
       ${actionRow}

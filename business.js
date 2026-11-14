@@ -7,6 +7,9 @@
 // never stops the app starting. Without it a job simply names no business and the
 // database files it under the person's default — exactly as V148 did.
 //
+// V168: also each business's own plan (businessPlansApply / businessPlansRead) — the
+// per-business lock (plan.js planStatusFor) and New job's greyed For: (5A).
+//
 // What it does (Peter, 2 and 5 Nov — 1A 3A 4A; 0A split the move into V150):
 //   • Knows the signed-in person's businesses (the cloud's my_businesses), kept
 //     on the phone (BUSINESSES_KEY) so New job's choice works with no signal.
@@ -75,9 +78,21 @@ function businessLoad() {
       n: (typeof b.n === 'number' && b.n > 0) ? Math.floor(b.n) : 1,
       oj: b.oj === true,   // V165: the business holds someone else's jobs (businessOthersApply)
     });
+    // V168: the business's own plan (businessPlansApply) — only a plan PATGo
+    // knows, and dates as text; anything else is "not known" (the account's
+    // plan then decides — plan.js planStatusFor).
+    const last = out.list[out.list.length - 1];
+    if (BUSINESS_PLANS.indexOf(b.p) !== -1) {
+      last.p = b.p;
+      last.te = _bizIso(b.te);
+      last.la = _bizIso(b.la);
+    }
   }
   return out;
 }
+
+const BUSINESS_PLANS = ['trial', 'active', 'comped', 'lapsed'];
+function _bizIso(v) { return (typeof v === 'string' && v.length <= 40 && isFinite(Date.parse(v.replace(/(\.\d{3})\d+/, '$1')))) ? v : null; }
 
 function businessSave(rec) {
   try { localStorage.setItem(BUSINESSES_KEY, JSON.stringify(rec)); return true; } catch (e) { return false; }
@@ -138,25 +153,49 @@ function businessLastUsed() {
 
 // The business the form starts on: the last used on this phone if still one of
 // yours, else the default, else the first.
+// V168 (5A): never one whose plan has ended (locked) while another is open.
 function businessForInitial() {
-  const list = businessNewJobChoices();
-  if (!list.length) return '';
+  const all = businessNewJobChoices();
+  if (!all.length) return '';
+  const open = all.filter(b => !businessLockedForNew(b.id));
+  const list = open.length ? open : all;
   const last = businessLastUsed();
   if (last && list.some(b => b.id === last)) return last;
   const d = list.find(b => b.def);
   return d ? d.id : list[0].id;
 }
 
+// V168 (5A): a business whose plan has ended — locked — can't take a new job.
+function businessLockedForNew(id) {
+  try { return typeof planLockedFor === 'function' && planLockedFor(id); } catch (e) { return false; }
+}
+
+// V168: the business a new job would be made for, without recording it (the gate
+// on New job and Start asks this one's plan). '' = no choice (the main one).
+function businessNewJobTarget() {
+  const list = businessNewJobChoices();
+  if (!list.length) return '';
+  const v = state.newForm ? state.newForm.businessId : '';
+  return (businessValidId(v) && list.some(b => b.id === v)) ? v : businessForInitial();
+}
+
 function businessForHTML() {
   const list = businessNewJobChoices();
   if (!list.length) return '';
-  const pick = (state.newForm && businessValidId(state.newForm.businessId) && list.some(b => b.id === state.newForm.businessId))
-    ? state.newForm.businessId : businessForInitial();
+  // V168 (5A): a business whose plan has ended is greyed out, with one line
+  // saying why — unless every one has ended (then Start says so: plan.js).
+  const shut = new Set(list.filter(b => businessLockedForNew(b.id)).map(b => b.id));
+  const grey = shut.size < list.length ? shut : new Set();
+  const want = (state.newForm && businessValidId(state.newForm.businessId) && list.some(b => b.id === state.newForm.businessId))
+    ? state.newForm.businessId : '';
+  const pick = (want && !grey.has(want)) ? want : businessForInitial();
+  const why = list.filter(b => grey.has(b.id)).map(b => businessLabel(b));
   return `
       <label class="label" for="nf-business">For</label>
       <select class="input" id="nf-business" data-change-action="nf-business" aria-label="Which business this job is for">
-        ${list.map(b => `<option value="${escapeHTML(b.id)}"${b.id === pick ? ' selected' : ''}>${escapeHTML(businessLabel(b))}${b.role !== 'owner' ? ` (${escapeHTML(BUSINESS_ROLE_WORDS[b.role])})` : ''}</option>`).join('')}
-      </select>`;
+        ${list.map(b => `<option value="${escapeHTML(b.id)}"${b.id === pick ? ' selected' : ''}${grey.has(b.id) ? ' disabled' : ''}>${escapeHTML(businessLabel(b))}${b.role !== 'owner' ? ` (${escapeHTML(BUSINESS_ROLE_WORDS[b.role])})` : ''}${grey.has(b.id) ? ' — plan ended' : ''}</option>`).join('')}
+      </select>${why.length ? `
+      <p class="muted nf-business-shut" id="nf-business-shut">${escapeHTML(why.join(', '))} — ${why.length > 1 ? 'their plans have' : 'its plan has'} ended, so new jobs can’t start there until ${why.length > 1 ? 'they’re' : 'it’s'} renewed.</p>` : ''}`;
 }
 
 // On Start: the business picked (or '' when there was no choice). Remembered as
@@ -191,11 +230,13 @@ function businessFromRows(uid, rows) {
   if (!Array.isArray(rows)) return null;
   const list = [];
   const old = businessLoad();
-  const was = new Map(old.u === uid ? old.list.map(b => [b.id, b.oj]) : []);   // never another account's
+  const was = new Map(old.u === uid ? old.list.map(b => [b.id, b]) : []);   // never another account's
   for (const r of rows) {
     if (!r || !businessValidId(r.id)) continue;
+    const w = was.get(r.id) || {};
     list.push({ id: r.id, name: typeof r.name === 'string' ? r.name : '', role: r.role, def: r.is_default === true, n: r.members,
-      oj: was.get(r.id) === true });   // V165: kept until the cloud says otherwise
+      oj: w.oj === true,   // V165: kept until the cloud says otherwise
+      p: w.p, te: w.te, la: w.la });   // V168: likewise the plan (businessPlansApply)
   }
   businessSave({ u: uid, at: Date.now(), list });
   return businessLoad();
@@ -218,6 +259,42 @@ function businessOthersApply(uid, rows) {
   }
   if (changed) businessSave(rec);
   return changed;
+}
+
+// V168: each of my businesses' own plan — the cloud's my_business_plans (one row
+// per business I'm in). A business with no row loses its plan (the account's plan
+// then decides for its jobs). A project without the V168 SQL, or a failed read,
+// changes nothing. Returns whether anything changed.
+function businessPlansApply(uid, rows) {
+  if (!Array.isArray(rows)) return false;
+  const rec = businessLoad();
+  if (!uid || rec.u !== uid) return false;
+  const by = new Map();
+  for (const r of rows) if (r && businessValidId(r.id) && BUSINESS_PLANS.indexOf(r.plan) !== -1) by.set(r.id, r);
+  let changed = false;
+  for (const b of rec.list) {
+    const r = by.get(b.id);
+    const p = r ? r.plan : undefined, te = r ? _bizIso(r.trial_ends_at) : null, la = r ? _bizIso(r.lapsed_at) : null;
+    if (b.p !== p || (b.te || null) !== te || (b.la || null) !== la) {
+      if (r) { b.p = p; b.te = te; b.la = la; } else { delete b.p; delete b.te; delete b.la; }
+      changed = true;
+    }
+  }
+  if (changed) businessSave(rec);
+  return changed;
+}
+
+function businessPlansRead(c, uid) {
+  return Promise.resolve().then(() => c.rpc('my_business_plans')).then((res) => {
+    if (!res || res.error) return false;
+    const changed = businessPlansApply(uid, res.data);
+    if (changed) {
+      // A business that may work again lets the cloud try its jobs again (sync.js).
+      try { if (typeof syncPlanChecked === 'function' && typeof planLocked === 'function') syncPlanChecked(!planLocked()); } catch (e) { /* optional */ }
+      try { if (typeof _planRepaint === 'function') _planRepaint(); } catch (e) { /* the next paint */ }
+    }
+    return changed;
+  });
 }
 
 function businessOthersRead(c, uid) {
@@ -244,7 +321,8 @@ function businessRead(c, uid) {
       return businessMovesRead(c, uid).then(() => ok, () => ok)
         .then(() => businessMyInvitesRead(c, uid).then(() => ok, () => ok))
         .then(() => businessWaitingRead(c, uid).then(() => ok, () => ok))   // V157 (1A): moves for me to decide
-        .then(() => businessOthersRead(c, uid).then(() => ok, () => ok));    // V165 (1A): others' jobs held
+        .then(() => businessOthersRead(c, uid).then(() => ok, () => ok))     // V165 (1A): others' jobs held
+        .then(() => businessPlansRead(c, uid).then(() => ok, () => ok));     // V168: each business's plan
     });
 }
 

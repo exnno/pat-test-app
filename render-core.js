@@ -288,7 +288,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Mistakes can be corrected by the office.</strong> Owners, Team leaders and the Office can now fix a mistake in a teammate&rsquo;s locked job straight from the In the cloud tab &mdash; a typo, a wrong location, even a result or reading (with a reason). Every change is kept in the job with who made it, and the engineer&rsquo;s phone picks it up on its next sync.</li>
+        <li><strong>Each business on its own plan.</strong> If you work for more than one business, a plan that ends now only locks that business&rsquo;s jobs &mdash; the rest carry on as normal. New job greys out a business whose plan has ended, and its jobs say so.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

@@ -201,7 +201,8 @@ registerActions({
   // Sessions screen header / new-session form (click parts only).
   'open-settings': () => { state.settingsCategory = null; state.settingsSearchQuery = ''; setView('settings'); },
   'new-session': () => {
-    if (typeof planGate === 'function' && !planGate()) return;   // V127: before the form, not after it
+    // V168: someone in two or more businesses can start one while any of theirs is open (5A).
+    if (typeof planGate === 'function' && !planGate({ businessId: typeof businessForInitial === 'function' ? businessForInitial() : '' })) return;   // V127: before the form, not after it
     state.newForm.show = true;
     state.newFormError = '';
     if (!state.newForm.engineer && state.engineer) state.newForm.engineer = state.engineer;

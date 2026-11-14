@@ -9,9 +9,32 @@ here rather than restating it. Delete an item when it ships.
 ## Next release
 
 ### Planned audits
-- **Fourth GPT audit after V169** (Peter, 13 Nov). V170 is reserved for fixing what it finds —
-  plan V164–V169 so nothing lands in V170 but the audit's fixes. Brief it that the second
-  audit's finding 5 is scheduled with seat billing (if not yet built).
+- **Fourth GPT audit after V170** (moved at the V168 round, 14 Nov — 0B split seat billing out).
+  V171 is reserved for fixing what it finds. Brief it that the second audit's finding 5 was
+  fixed in V168 (refusals per business; photo files by their job's business).
+  (Was: after V169, V170 its fixes — Peter, 13 Nov.)
+
+### Next after V168
+V168 = each business on its own plan (Peter 11 Nov; round 14 Nov 0B 5A 6A; built in Opus) + the
+second audit's finding 5. SQL: supabase/v168-business-plans.sql (my_business_plans, can_upload_file and
+the two photo-file rules; D1–D5; isolation 33a–33c, 19e now the file of a photo row). plan.js
+(`planStatusFor`, `planLockedFor`, `planGate(job)`, `planShowLockedFor`, `planNagBusiness`,
+`_planMaybePromptFor`, `planJobLineHTML`), business.js (`businessPlansApply/Read`, p/te/la,
+`businessLockedForNew`, `businessNewJobTarget`, the greyed For:), sync.js (refusals per business —
+`_syncPlanRefusedKeys`, `_syncSkip`, one business per batch, photos per job's business,
+`syncPlanRefusedFor`), the 13 gate sites, render-review.js (the job's line), styles.css.
+Harness 108 + M2113–M2152.
+**Locked at the round (14 Nov):** 0B — seat billing is its own release, V169: 1A part-month charged on
+the next bill (credit when someone leaves); 2A a seat costs from joining / being made Engineer or Team
+leader (Office frees it); 3A anyone allowed to invite may add a seat — the invite sheet says "+£3 a
+month", the Owner sees the count and total on the Business page; 4A any number free in the trial, the
+count at the day of subscribing. Then V170 the certificate per business (was V169 — below), the fourth
+GPT audit after V170, V171 its fixes. 7B: Stage 15 (tablet / laptop) after Teams v2, before launch;
+every Office screen still checked at desktop width meanwhile.
+**Founders (Peter, 14 Nov — for the V169 round):** "comped" (free, unlimited seats) is Peter's own
+only. Every other founder pays a small fee with a discounted seat fee too — a Stripe discount on the
+subscription (base and seat prices together) or founder prices; ask at V169.
+**Next — V169:** seat billing (above) — its own spec round (Opus: billing / database rules / Stripe).
 
 ### Next after V167
 V167 = Office corrections (O12; round 1A 2C 3A 4A 5A 6A 7A 8A, 14 Nov; built in Opus). SQL:
@@ -19,7 +42,7 @@ supabase/v167-corrections.sql (correct_job; C1–C5; isolation 32a–32c). setti
 `cloudLookFixState`, `_cloudLookRead`), sync.js (`syncCorrectJob`, `_syncRedo`, the list's rep / cor picks),
 render-review.js (the sheet, the trail, the Overview card), session.js (`jobCorrectedSinceCertificate`,
 status 'corrected'), render-core.js (badge), dispatch.js, styles.css. Harness 106 + M2079–M2104.
-**Next — V168:** seat billing + per-business lock (finding 5), its own spec round (Opus). Then V169
+**Next — V168:** (done — see Next after V168.) Then V170 (was V169)
 certificate numbering per business — now also: Office makes the certificate (Peter, 14 Nov: in a firm
 with several engineers the office does the paperwork), who may make certificates (a role rule), and a
 frozen copy of the tester's details taken when the job is locked (today a job points at the engineer's
@@ -36,6 +59,24 @@ the job's business (solo owners included); also on this phone (a sync is started
 amended (run again — no own refusal; C3); sync.js (`syncCloudJob` → org), settings-actions.js (`cloudFixOwnOk`,
 `cloudLookFixOrg`, own toasts), render-review.js (intro), sw.js pat-v167-1. Harness 107 + M2105–M2112; M2080,
 M2099 re-aimed; 50d (one more org_id read).
+
+### V168 residuals (known, accepted)
+- A NEW photo file (no photo row yet) is let in while ANY of the person's businesses may upload —
+  the file goes up before its row (v89 order). Its ROW is still refused by its own business
+  (plan_guard), so the photo never joins a locked business's job; the phone sends no file for a
+  business already refused. The rare orphan file is overwritten on the retry after renewal.
+- can_upload_file's "nobody signed in" branch is belt-and-braces: with nobody signed in no
+  membership matches either (the broken-copy run found it equivalent) — kept for readability.
+- A delete of a job no longer on the phone is '?' (its business isn't known here): refused, it waits
+  until the next plan read that lets the account work, then is tried again.
+- The per-business lock is for someone in two or more businesses. One business goes by the account
+  record exactly as before (a payment updates it first, so a lone business never waits on a second read).
+- billingRead's business-plans read (a payment lifting one business's lock at once) is not driven by a
+  harness test of its own — planRefresh's is (108d); both call the same businessPlansRead.
+- An Owner whose own business isn't main renews by making it main first (the Subscription page and
+  Stripe look after the MAIN business — V142). Seat billing (V169) can revisit.
+- Not checked per mutation that each V168 mutation fails ONLY group 108 (the hint path runs 108 first);
+  the full sweep on the Mac is the check.
 
 ### V167 residuals (known, accepted)
 - V167.1: correcting your own job that is also on another of your phones with unsent changes there asks

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V167)
+# PATGo — Code Map (V168)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1609,7 +1609,15 @@ saved login over A's sync record). `cloudOwnerHeld()` (no owner + jobs + refused
 headers → 500 PGRST121) — supabase/v162-signed-out-fix.sql; harness/pgrst-raise.js is the
 PostgREST port the harness crosses. Harness 101, M1970–M1985.
 
-### sync.js (~5600 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner, V149 job business, V151 minimum app version, V153 held in memory, V163 a business left, V164 the business view
+### sync.js (~5600 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner, V149 job business, V151 minimum app version, V153 held in memory, V163 a business left, V164 the business view, V168 refusals per business
+⚠ V168 (finding 5): a plan refusal is remembered PER BUSINESS (`_syncPlanRefusedKeys`: '' main, an
+id, '?' a delete, '*' unknown → all). 2+ businesses (`_syncPlanMulti`): `_syncSkip` (this run's held
+keys, recomputed after the push) — the push batches ONE business per batch (`_syncBizKey` =
+business.js `jobBusinessKey`), a refused batch is noted and its business's other batches skipped;
+records wait while '' is refused; photos (deletes and uploads) skip / note by their job's business.
+ONE business: exactly V143 (any refusal pauses all — `_syncPausedAll`). `syncPlanRefusedFor(key)`
+(plan.js lines); `syncPlanChecked` lets go each business plan.js `planLockedFor` says may work.
+`syncPlanPausedWords` names them. Harness 108d; 82c (one business).
 ⚠ V164: `syncBusinessList(org)` — the ONE read of the synced tables that does not name an
 account (rule 45): a business's jobs by org_id, keyset paged by (user_id, id)
 (`_syncKeysetAfter`; a page edge not a uuid + safeId is never put in a filter — capped),
@@ -1950,6 +1958,18 @@ V148 (4A): `planRecord` falls back to `_planOwnerUid()` — the owner's record w
 **cloud.js** `cloudSignedOutOwner()` (wall on only; the test site is unchanged).
 `_planSignedOut()` turns the line's button, the Account line and the two sheets' first
 choice into Sign in (`settings-page` → cloudAccount). Harness 87d, M1652–M1655.
+V168 (per-business lock, 5A 6A): someone in 2+ businesses (`_planMulti`) — `planStatusFor(job |
+{businessId} | id)` = the job's business's plan (business.js stored `p/te/la`) with the ACCOUNT
+record's checkedAt (30-day hold); unknown → `planCurrent()`. ONE business: always the account
+record (a payment updates it first). `planGate(job)` (null = account): every gate site passes its
+job — session.js (save/pass/fail/copy/repeat/move/dup), multipick.js, report.js, createSession
+`{businessId: businessNewJobTarget()}`, dispatch new-session `{businessId: businessForInitial()}`.
+`planShowLockedFor(b)` names it (Owner+main Renew / Owner non-main Business page / member Check
+now). 6A: `planNagBusiness()` (owned, and jobs here or n≥2, worst state) drives `planBannerHTML`,
+`planAccountHTML`, `_planMaybePromptFor` (keyed id:lockAt); `planJobLineHTML(sess)` = the job's
+quiet line (render-review.js Overview). `planRefresh` and `billingRead` also call business.js
+`businessPlansRead`. ⚠ sync.js `syncPlanRefusedFor` / `syncPlanChecked` (per business). Harness
+108a–108c; M2113–M2152.
 
 ### business.js (~1,580 ln) — every job knows its business; V150 moving one; V155 invites + people; V156 devices; V157 approvals — NEW V149 — OPTIONAL SUBSYSTEM
 The owner's businesses (BUSINESSES_KEY `{u, at, list}`, read via rpc `my_businesses`),
@@ -1957,6 +1977,11 @@ New job's "For:" (`businessForHTML` / `businessNewJobPick`, LAST_BUSINESS_KEY �
 the compare key (`jobBusinessKey`, rule 30), and the Business page
 (`renderCloudBusiness`, `businessRefresh`, `businessRename` → `openNameSheet` →
 rpc `set_business_name`, Owner only).
+V168: each business's own plan — rpc `my_business_plans` → `businessPlansApply` (p/te/la on each
+stored business; a missing one forgets its plan) → `syncPlanChecked` + `_planRepaint`; read in
+`businessRead` and by plan.js. 5A: `businessLockedForNew` (plan.js `planLockedFor`) greys an
+ended business in For: (unless all have ended), `businessForInitial` skips it,
+`businessNewJobTarget` = the pick without recording it (the Start gate). Harness 108b, 108d.
 **Touch to:** change who is asked For:, the page's words, how often the list is read
 (BUSINESS_READ_MS), or the V150 move (Change… / approval) — it belongs here.
 **Coupling:** keys in **config.js**; sync.js calls `businessMaybeRead(c, uid)` on

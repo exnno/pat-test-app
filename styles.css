@@ -4647,3 +4647,10 @@ li.cloud-redo { font-size: 0.875rem; }
 .cfx-card-redo { font-size: 0.8125rem; color: var(--warn-soft-text); }
 .cfx-card-more { font-size: 0.75rem; color: var(--text-muted); }
 .cfx-unit { text-transform: none; }
+
+/* ================= V168 — each business on its own plan ================= */
+/* The quiet line on a job whose business's plan has ended (plan.js planJobLineHTML). */
+.plan-job-line { margin: 0 0 10px; padding: 8px 12px; border-radius: 10px; font-size: 0.8125rem;
+  border: 1px solid var(--warn-soft-border); background: var(--warn-soft-bg); color: var(--warn-soft-text); }
+/* New job's "For": the line under it naming a business whose plan has ended (5A). */
+.nf-business-shut { margin: 4px 0 0; font-size: 0.8125rem; }

@@ -1116,7 +1116,8 @@ function validateBeforeSave(opts = {}) {
 
 // ---------- Actions ----------
 function createSession() {
-  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
+  // V168: the business the job is being made for decides (plan.js; 5A greys an ended one out).
+  if (typeof planGate === 'function' && !planGate({ businessId: typeof businessNewJobTarget === 'function' ? businessNewJobTarget() : '' })) return;   // V127: the plan lock (plan.js)
   const { name, engineer, prefix, startNo } = state.newForm;
 
   // v19: resolve the Client and Site fields. The form carries the typed text in
@@ -1644,7 +1645,7 @@ function deleteSession(id) {
 }
 
 function saveItem(result, readings) {
-  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
+  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business
   const sess = activeSession();
   if (!sess) return;
   const err = validateBeforeSave();
@@ -1751,7 +1752,7 @@ function saveItem(result, readings) {
 }
 
 function passClicked() {
-  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
+  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business
   // v8: belt-and-braces — UI disables the buttons when locked, but block here too.
   const sess = activeSession();
   if (sess && sess.locked) return;
@@ -1876,7 +1877,7 @@ function commitPassResult() {
 }
 
 function failClicked() {
-  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
+  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business
   const sess = activeSession();
   if (sess && sess.locked) return;
   if (state.form.qpTile) return;   // V94: a multi-pick is passes only (FAIL is greyed)
@@ -2665,7 +2666,7 @@ function closeReadingsSheetState() {
 
 
 function copyLastResult() {
-  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
+  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business
   const sess = activeSession();
   if (!sess || sess.items.length === 0) return;
   if (sess.locked) return;   // v8
@@ -2760,7 +2761,7 @@ function loggedAnnouncement(item, position, edited) {
 // engineer may have moved on since the last item, and the form is what they can
 // see. Item type and result come from the last item.
 function repeatLastResult(n) {
-  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
+  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business
   const sess = activeSession();
   if (!sess || sess.items.length === 0) return;
   if (sess.locked) return;   // belt-and-braces; the button is disabled too
@@ -3662,7 +3663,7 @@ function moveJobTitle(clientName, siteName) {
 }
 
 function moveItemsToNewJob() {
-  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
+  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business
   const m = state.moveJob;
   if (!m || m.step !== 'confirm') return;
   const sess = activeSession();
@@ -4166,7 +4167,7 @@ function editFormDirty(sess) {
 }
 
 function openDupJob() {
-  if (typeof planGate === 'function' && !planGate()) return;   // V127: the plan lock (plan.js)
+  if (typeof planGate === 'function' && !planGate(activeSession())) return;   // V127: the plan lock (plan.js); V168: the job's business
   const sess = activeSession();
   if (!sess) return;
   if (editFormDirty(sess)) {
