@@ -1,4 +1,4 @@
-# PATGo — Code Map (V163)
+# PATGo — Code Map (V164)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1213,8 +1213,16 @@ v93: the Cleared section is a link (`jobMgrCloudLink`, `jm-cloud-link`) to the c
 `cloudJobsLoad` → **sync.js** `syncCloudList` (memory only; kept for the session,
 re-read on ⟳, a different account, or `stale` — set by **session.js**
 `removeJobsFromPhone`). `cloudJobsModel()` is synchronous (render calls it):
-hides jobs on the phone, search, month groups. Tap → `_cloudBring` →
-`syncBringBack` → `requestOpenSession` (one job) or stays (several). The search
+V164 — every job in the scope (jobs on this phone too, `onPhone`, never tickable),
+person / Fails only / search, month groups; rows keyed `cloudRowKey` (id for Your
+jobs; `user|id` in a business — ids are unique per person only). ⚠ V164 SCOPE:
+`cj.scope` 'mine' | a business id, only while in `cloudScopeChoices()` (business.js
+list: Owner/Team leader/Office, n ≥ 2; never inside a tutorial — `_tut`);
+`cloudScope()` is what decides. A business's list is `cj.biz` (memory only) from
+**sync.js** `syncBusinessList` — a LOOK (rule 45's one exception; harness 48a/103c).
+Tap → `cloudLookOpen` (look-only sheet, `state.cloudLook`, memory only) →
+**sync.js** `syncCloudJob(user, id, org)`; `cloudLookBring` (own jobs only) →
+`_cloudBring` → `syncBringBack` → `requestOpenSession`. Select → several (Your jobs). The search
 box is an input: `cloudJobsSearch` → `refreshCloudListAreaOnly` (render-review.js),
 never render(). Markup `renderCloudJobsHTML`/`renderCloudListAreaHTML` in
 **render-review.js**, drawn by **render-core.js** `renderSessions`; actions
@@ -1554,7 +1562,15 @@ saved login over A's sync record). `cloudOwnerHeld()` (no owner + jobs + refused
 headers → 500 PGRST121) — supabase/v162-signed-out-fix.sql; harness/pgrst-raise.js is the
 PostgREST port the harness crosses. Harness 101, M1970–M1985.
 
-### sync.js (~5480 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner, V149 job business, V151 minimum app version, V153 held in memory, V163 a business left
+### sync.js (~5600 ln) — cloud sync, PUSH AND PULL — v80–v93, V101 moves, V107 cloud delete, V108 cloud storage read, V128 stale-phone check, V145 owner, V149 job business, V151 minimum app version, V153 held in memory, V163 a business left, V164 the business view
+⚠ V164: `syncBusinessList(org)` — the ONE read of the synced tables that does not name an
+account (rule 45): a business's jobs by org_id, keyset paged by (user_id, id)
+(`_syncKeysetAfter`; a page edge not a uuid + safeId is never put in a filter — capped),
+names from rpc business_people, photo counts per person. Its result goes ONLY to the Cloud
+tab's memory (settings-actions.js `cj.biz`) — never to the pull, the sync state, storage or a
+push. Harness 48a allows exactly this function; 103c proves nothing lands. `syncCloudJob(user,
+id, org)` — one doc for the look-only sheet, named by its person (rule 45), checked like any
+cloud doc, never kept.
 ⚠ V163: a business this account has LEFT (business.js DEPARTED_KEY) — `_syncSessions` leaves its
 jobs out once its last delivery is over (`businessDepartedHeldIds`; one refused row fails the whole
 batch, so every later sync would stop); its tombstones and photo deletes are never sent

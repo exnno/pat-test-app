@@ -1560,9 +1560,42 @@ function renderJobManager() {
 
 // ============== V93 (roadmap Stage 5 part 2) — the "In the cloud" tab ==============
 // Drawn by renderSessions() (render-core.js) when the cloud tab is chosen. Logic
-// and model in settings-actions.js (cloudJobsModel). Every job here is ☁ — only
-// in the cloud (R19). The search box sits OUTSIDE #cloud-list-area so typing
-// refreshes the list without rebuilding the input (MAP rule 3).
+// and model in settings-actions.js (cloudJobsModel). The search box sits OUTSIDE
+// #cloud-list-area so typing refreshes the list without rebuilding the input
+// (MAP rule 3).
+// V164 (1A 2A 3A): one Cloud tab — "Showing ▾" (only when there is a business to
+// pick), person chips for a business, Fails only, every job in the cloud with
+// those also on this phone marked, a tap opens it look-only (openCloudLookSheet).
+// A person chip's words (plain text — chip() escapes them).
+function cloudChipLabel(p) {
+  if (!p) return '';
+  return String(p.name || '') + (p.you ? ' (you)' : (p.left ? ' (left)' : ''));
+}
+
+function renderCloudScopeHTML(m) {
+  const cj = state.cloudJobs || {};
+  const choices = (typeof cloudScopeChoices === 'function') ? cloudScopeChoices() : [];
+  let picker = '';
+  if (choices.length && !cj.selecting) {
+    const opts = [`<option value="mine"${m.scope === 'mine' ? ' selected' : ''}>Your jobs</option>`]
+      .concat(choices.map(c => `<option value="${escapeHTML(c.id)}"${m.scope === c.id ? ' selected' : ''}>${escapeHTML(c.label)} · everyone</option>`));
+    picker = `
+      <label class="cloud-scope" for="cloud-scope">
+        <span class="cloud-scope-label">Showing</span>
+        <select class="cloud-scope-select" id="cloud-scope" data-change-action="cloud-scope" aria-label="Showing">${opts.join('')}</select>
+      </label>`;
+  }
+  let chips = '';
+  if (m.scope !== 'mine' && m.people.length) {
+    const chip = (u, label, on) => `<button class="cloud-chip${on ? ' is-on' : ''}" data-action="cloud-person" data-arg="${escapeHTML(u)}" aria-pressed="${on ? 'true' : 'false'}">${escapeHTML(label)}</button>`;
+    chips = `<div class="cloud-chips" role="group" aria-label="Whose jobs">` +
+      chip('', 'Everyone', !m.person) +
+      m.people.map(p => chip(p.user, cloudChipLabel(p), m.person === p.user)).join('') +
+      `</div>`;
+  }
+  return picker + chips;
+}
+
 function renderCloudJobsHTML() {
   const cj = state.cloudJobs || {};
   const busy = cj.busy ? `<p class="pm-busy" id="cloud-busy" role="status">${escapeHTML(cj.busy)}</p>` : '';
@@ -1573,21 +1606,24 @@ function renderCloudJobsHTML() {
   // selection bar. Settings → Data → Cloud Storage stays (3A). Back returns
   // here: cloudStoreOpen notes 'sessions' as the view to go back to, and the
   // Jobs screen remembers its tab.
-  const storageBtn = (cj.selecting || typeof cloudStoreOpen !== 'function') ? ''
-    : `<button class="pm-look-link cloud-storage-link" data-action="cs-open">${icon('cloud')} Cloud Storage ${icon('chevron-right', 'ic-trail')}</button>`;
-  if (!cj.ok) {
-    let msg;
-    if (cj.loading) msg = `<p class="muted pm-note" role="status">Reading the cloud\u2026</p>`;
-    else if (cj.error) msg = `<p class="pm-note pm-error">${escapeHTML(cj.error)}</p><button class="btn-secondary cloud-retry" data-action="cloud-refresh">Try again</button>`;
-    else msg = `<p class="muted pm-note">Jobs that aren't on this phone stay in the cloud. <button class="pm-look-link" data-action="cloud-refresh">Show them</button></p>`;
-    return `<div class="cloud-tab"><div class="cloud-head">${storageBtn}</div>${msg}</div>`;
-  }
   const m = cloudJobsModel();
+  const st = (typeof cloudScopeStatus === 'function') ? cloudScopeStatus() : { ok: !!cj.ok, loading: !!cj.loading, error: cj.error || '' };
+  const storageBtn = (cj.selecting || typeof cloudStoreOpen !== 'function' || m.scope !== 'mine') ? ''
+    : `<button class="pm-look-link cloud-storage-link" data-action="cs-open">${icon('cloud')} Cloud Storage ${icon('chevron-right', 'ic-trail')}</button>`;
+  const scopeHTML = renderCloudScopeHTML(m);
+  if (!st.ok) {
+    let msg;
+    if (st.loading) msg = `<p class="muted pm-note" role="status">Reading the cloud…</p>`;
+    else if (st.error) msg = `<p class="pm-note pm-error">${escapeHTML(st.error)}</p><button class="btn-secondary cloud-retry" data-action="cloud-refresh">Try again</button>`;
+    else msg = `<p class="muted pm-note">Jobs that aren't on this phone stay in the cloud. <button class="pm-look-link" data-action="cloud-refresh">Show them</button></p>`;
+    return `<div class="cloud-tab">${scopeHTML}<div class="cloud-head">${storageBtn}</div>${msg}</div>`;
+  }
   const search = m.total ? `
-    <div class="sessions-search-row">
-      <input aria-label="Search jobs in the cloud" type="search" class="search-input" id="cloud-search" data-input-action="cloud-search" placeholder="Search client, site or certificate\u2026" value="${escapeHTML(cj.q || '')}" autocomplete="off">
+    <div class="sessions-search-row cloud-search-row">
+      <input aria-label="Search jobs in the cloud" type="search" class="search-input" id="cloud-search" data-input-action="cloud-search" placeholder="Search client, site or certificate…" value="${escapeHTML(cj.q || '')}" autocomplete="off">
+      <button class="cloud-chip cloud-fails${cj.fails ? ' is-on' : ''}" data-action="cloud-fails" aria-pressed="${cj.fails ? 'true' : 'false'}">Fails only</button>
     </div>` : '';
-  const selectBtn = m.total ? `<button class="pm-select-btn cloud-select-btn" data-action="cloud-select-toggle" ${cj.busy ? 'disabled' : ''}>${cj.selecting ? 'Done' : 'Select'}</button>` : '';
+  const selectBtn = (m.scope === 'mine' && m.cloudOnly) ? `<button class="pm-select-btn cloud-select-btn" data-action="cloud-select-toggle" ${cj.busy ? 'disabled' : ''}>${cj.selecting ? 'Done' : 'Select'}</button>` : '';
   let bar = '';
   if (cj.selecting) {
     const n = Object.keys(cj.selected || {}).filter((id) => m.byId.has(id)).length;
@@ -1595,11 +1631,12 @@ function renderCloudJobsHTML() {
       <div class="selection-bar pm-bar">
         <span class="selection-bar-count">${n} selected</span>
         <button class="selection-bar-action pm-bar-btn" data-action="cloud-bring" ${n && !cj.busy ? '' : 'disabled'}>Bring onto this phone</button>
-        <button class="selection-bar-action pm-bar-btn is-danger" data-action="cloud-delete" ${n && !cj.busy ? '' : 'disabled'}>${icon('trash-2')} Delete\u2026</button>
+        <button class="selection-bar-action pm-bar-btn is-danger" data-action="cloud-delete" ${n && !cj.busy ? '' : 'disabled'}>${icon('trash-2')} Delete…</button>
       </div>`;
   }
   return `
     <div class="cloud-tab">
+      ${scopeHTML}
       <div class="cloud-head">${storageBtn}${selectBtn}</div>
       ${search}
       ${busy}
@@ -1608,41 +1645,148 @@ function renderCloudJobsHTML() {
     ${bar}`;
 }
 
+// One job row — the same in every scope (3A): the site (or job name), the date;
+// the client and counts; then who (a business), the certificate or lock, and
+// "On this phone".
+function renderCloudRowHTML(j, cj) {
+  const sel = cj.selected || {};
+  const on = !!sel[j.key];
+  const counts = [];
+  if (j.items !== null && j.items !== undefined) counts.push(`${j.items} item${j.items === 1 ? '' : 's'}`);
+  if (j.fails) counts.push(`<span class="fail-text">${j.fails} fail${j.fails === 1 ? '' : 's'}</span>`);
+  if (j.photos) counts.push(`<span class="photo-text">${icon('camera')} ${j.photos}</span>`);
+  const meta = [j.client ? escapeHTML(j.client) : ''].concat(counts).filter(Boolean).join(' · ');
+  const tags = [];
+  if (j.who) tags.push(`<span class="cloud-who${j.who.left ? ' is-left' : ''}">${escapeHTML(j.who.you ? 'You' : j.who.name)}${j.who.left ? ' · left' : ''}</span>`);
+  if (j.certNo) tags.push(`<span class="cloud-cert">${icon('lock')} Certificate ${escapeHTML(j.certNo)}</span>`);
+  else if (j.locked) tags.push(`<span class="cloud-cert">${icon('lock')} Locked</span>`);
+  if (j.onPhone) tags.push(`<span class="cloud-onphone">${icon('smartphone')} On this phone</span>`);
+  // V120: the tick is the only sign of selection, so VoiceOver reads it.
+  const tick = (cj.selecting && !j.onPhone) ? `<span class="jm-tick${on ? ' is-on' : ''}" role="img" aria-label="${on ? 'Selected' : 'Not selected'}">${on ? icon('check') : ''}</span>` : '';
+  return `
+        <div class="session-card cloud-card${on ? ' is-selected' : ''}${j.locked ? ' locked' : ''}${j.onPhone ? ' is-on-phone' : ''}">
+          <div class="session-info" data-action="cloud-tap" data-arg="${escapeHTML(j.key)}">
+            <div class="session-title cloud-title">${tick}<span class="cloud-title-text">${escapeHTML(j.title)}</span><span class="cloud-date">${escapeHTML(formatDate(j.date))}</span></div>
+            ${meta ? `<div class="session-meta">${meta}</div>` : ''}
+            ${tags.length ? `<div class="session-meta cloud-tags">${tags.join('')}</div>` : ''}
+          </div>
+        </div>`;
+}
+
 function renderCloudListAreaHTML(model) {
   const cj = state.cloudJobs || {};
   const m = model || cloudJobsModel();
-  const when = cj.at ? escapeHTML(new Date(cj.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) : '';
-  const q = String(cj.q || '').trim();
-  const count = q
-    ? `${m.shown} of ${m.total} job${m.total === 1 ? '' : 's'} match`
-    : `${m.total} job${m.total === 1 ? '' : 's'} only in the cloud`;
-  const head = `<p class="muted pm-note cloud-count">${count} \u00b7 checked ${when} \u00b7 <button class="pm-look-link" data-action="cloud-refresh" aria-label="Read the cloud list again">${icon('refresh-cw')} Refresh</button></p>` +
-    (cj.capped ? `<p class="muted pm-note">Showing the first ${SYNC_CLOUD_MAX.toLocaleString('en-GB')} jobs.</p>` : '');
-  if (!m.total) return head + `<p class="muted pm-note">Every job in the cloud is on this phone.</p>`;
-  if (!m.shown) return head + `<p class="muted pm-note">No cloud jobs match.</p>`;
-  const sel = cj.selected || {};
+  const st = (typeof cloudScopeStatus === 'function') ? cloudScopeStatus() : { at: cj.at, capped: cj.capped };
+  const when = st.at ? escapeHTML(new Date(st.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) : '';
+  const filtered = String(cj.q || '').trim() || cj.fails;
+  const pl = (n) => `${n} job${n === 1 ? '' : 's'}`;
+  const count = filtered ? `${m.shown} of ${pl(m.total)} match` : `${pl(m.total)} in the cloud`;
+  const head = `<p class="muted pm-note cloud-count">${count} · checked ${when} · <button class="pm-look-link" data-action="cloud-refresh" aria-label="Read the cloud list again">${icon('refresh-cw')} Refresh</button></p>` +
+    (st.capped ? `<p class="muted pm-note">Showing the first ${SYNC_CLOUD_MAX.toLocaleString('en-GB')} jobs.</p>` : '');
+  if (!m.total) return head + `<p class="muted pm-note">${m.scope === 'mine' ? 'No jobs in the cloud yet.' : 'No jobs in this business yet.'}</p>`;
+  if (!m.shown) return head + `<p class="muted pm-note">${cj.fails && !String(cj.q || '').trim() ? 'No jobs with fails.' : 'No cloud jobs match.'}</p>`;
   const groups = m.groups.map((g) => {
-    const rows = g.rows.map((j) => {
-      const on = !!sel[j.id];
-      const counts = [];
-      if (j.items !== null && j.items !== undefined) counts.push(`${j.items} item${j.items === 1 ? '' : 's'}`);
-      if (j.fails) counts.push(`<span class="fail-text">${j.fails} fail</span>`);
-      if (j.photos) counts.push(`<span class="photo-text">${icon('camera')} ${j.photos}</span>`);
-      const meta = [j.client ? escapeHTML(j.client) : '', escapeHTML(formatDate(j.date))].concat(counts).filter(Boolean).join(' \u00b7 ');
-      // V120: the tick is the only sign of selection, so VoiceOver reads it (it was aria-hidden).
-      const tick = cj.selecting ? `<span class="jm-tick${on ? ' is-on' : ''}" role="img" aria-label="${on ? 'Selected' : 'Not selected'}">${on ? icon('check') : ''}</span>` : '';
-      return `
-        <div class="session-card cloud-card${on ? ' is-selected' : ''}${j.locked ? ' locked' : ''}">
-          <div class="session-info" data-action="cloud-tap" data-arg="${escapeHTML(j.id)}">
-            <div class="session-title">${tick}<span class="session-cloud" title="Only in the cloud" aria-label="Only in the cloud">${icon('cloud')}</span>${j.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : ''}${escapeHTML(j.title)}</div>
-            <div class="session-meta">${meta}</div>
-            ${j.certNo ? `<div class="session-meta cloud-cert">Certificate ${escapeHTML(j.certNo)}</div>` : ''}
-          </div>
-        </div>`;
-    }).join('');
-    return `<h3 class="cloud-month">${escapeHTML(g.label)}</h3>${rows}`;
+    const n = g.rows.length;
+    return `<h3 class="cloud-month">${escapeHTML(g.label)} <span class="cloud-month-n">· ${pl(n)}</span></h3>` + g.rows.map(j => renderCloudRowHTML(j, cj)).join('');
   }).join('');
   return head + groups;
+}
+
+// ---- V164 (2A): the look-only job --------------------------------------------------
+// A tall sheet over the Cloud tab: what the list knows at once, the job's items
+// when the read lands (renderCloudLookBody, in place). No inputs — a repaint
+// underneath can't hurt it. Nothing read here is kept: closing forgets it.
+function openCloudLookSheet(look) {
+  if (typeof _openSheet !== 'function' || !look || !look.row) return;
+  const old = document.getElementById('cloud-look-sheet');
+  if (old && old.parentNode) { const b = old.previousElementSibling; old.remove(); if (b && b.classList.contains('modal-backdrop')) b.remove(); }
+  const r = look.row;
+  const { sheet, backdrop, cleanup } = _openSheet('Job in the cloud');
+  const close = () => { if (typeof cloudLookClose === 'function') cloudLookClose(); cleanup(); };
+  backdrop.addEventListener('click', () => { if (typeof cloudLookClose === 'function') cloudLookClose(); });
+  sheet.id = 'cloud-look-sheet';
+  sheet.classList.add('cloud-look-sheet');
+  const sub = [r.client ? escapeHTML(r.client) : '', escapeHTML(formatDate(r.date))].filter(Boolean).join(' · ');
+  let action = '';
+  if (r.mine) {
+    action = r.onPhone
+      ? `<button class="btn-primary" id="cloud-look-bring" style="flex:1">Open on this phone</button>`
+      : `<button class="btn-primary" id="cloud-look-bring" style="flex:1">${icon('download')} Bring onto this phone</button>`;
+  }
+  sheet.innerHTML = `
+    <div class="bulk-sheet-handle"></div>
+    <div class="bulk-sheet-header">
+      <span class="fail-close-spacer"></span>
+      <h3 class="bulk-sheet-title">${escapeHTML(r.title)}</h3>
+      <button class="fail-close-btn" id="cloud-look-close" aria-label="Close">&times;</button>
+    </div>
+    <p class="muted cloud-look-sub">${sub}</p>
+    <div class="sheet-scroll cloud-look-body" id="cloud-look-body"></div>
+    <div class="sheet-pin">
+      <p class="muted cloud-look-note">${icon('eye')} Look only &mdash; nothing here can be changed, and nothing is kept on this phone.</p>
+      <div style="display:flex;gap:10px;margin-top:8px">
+        <button class="btn-secondary" id="cloud-look-done"${action ? '' : ' style="flex:1"'}>Close</button>
+        ${action}
+      </div>
+    </div>`;
+  document.body.appendChild(backdrop);
+  document.body.appendChild(sheet);
+  const x = document.getElementById('cloud-look-close');
+  const d = document.getElementById('cloud-look-done');
+  const bring = document.getElementById('cloud-look-bring');
+  if (x) x.addEventListener('click', close);
+  if (d) d.addEventListener('click', close);
+  if (bring) bring.addEventListener('click', () => { cleanup(); if (typeof cloudLookBring === 'function') cloudLookBring(); });
+  renderCloudLookBody(look);
+  if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);
+}
+
+// The readings of one item, as words — only the ones it has.
+function cloudLookReadingsText(rd) {
+  if (!rd || typeof rd !== 'object') return '';
+  const bits = [];
+  if (rd.class) bits.push(`Class ${rd.class}`);
+  if (rd.earth) bits.push(`Earth ${rd.earth} Ω`);
+  if (rd.insulation) bits.push(`Insulation ${rd.insulation} MΩ`);
+  if (rd.leakage) bits.push(`Leakage ${rd.leakage} mA`);
+  if (rd.polarity === true) bits.push('Polarity ✓');
+  return bits.map(b => escapeHTML(String(b))).join(' · ');
+}
+
+function renderCloudLookBody(look) {
+  const body = document.getElementById('cloud-look-body');
+  if (!body || !look || state.cloudLook !== look) return;
+  const r = look.row;
+  const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const facts = [];
+  if (r.who) facts.push(`<li>${r.who.left ? 'Logged by' : 'By'} <strong>${escapeHTML(r.who.you ? 'you' : r.who.name)}</strong>${r.who.left ? ' (has left the business)' : ''}</li>`);
+  if (r.certNo) facts.push(`<li>Certificate ${escapeHTML(r.certNo)}</li>`);
+  else if (r.locked) facts.push(`<li>Locked</li>`);
+  if (r.onPhone) facts.push(`<li>On this phone too</li>`);
+  if (r.photos) facts.push(`<li>${icon('camera')} ${pl(r.photos, 'photo')} in the cloud</li>`);
+  const head = facts.length ? `<ul class="cloud-look-facts">${facts.join('')}</ul>` : '';
+  if (look.loading) { body.innerHTML = head + `<p class="muted pm-note" role="status">Reading the job…</p>`; return; }
+  if (look.error || !look.doc) { body.innerHTML = head + `<p class="pm-note pm-error" role="status">${escapeHTML(look.error || 'Couldn’t read this job.')}</p>`; return; }
+  const doc = look.doc;
+  const items = Array.isArray(doc.items) ? doc.items.filter(it => it && typeof it === 'object') : [];
+  const fails = items.filter(it => it.result === 'fail').length;
+  const extra = [];
+  if (doc.name && doc.name !== r.title) extra.push(`<li>Job: ${escapeHTML(String(doc.name))}</li>`);
+  if (doc.engineer && !r.who) extra.push(`<li>Engineer: ${escapeHTML(String(doc.engineer))}</li>`);
+  const counts = `<p class="cloud-look-counts" id="cloud-look-counts">${pl(items.length, 'item')}${fails ? ` · <span class="fail-text">${pl(fails, 'fail')}</span>` : ''}</p>`;
+  if (!items.length) { body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + counts + `<p class="muted pm-note">No items logged in this job.</p>`; return; }
+  const rows = items.map((it) => {
+    const result = String(it.result || '');
+    const rd = cloudLookReadingsText(it.readings);
+    const notes = it.notes ? `<div class="cloud-look-notes">${escapeHTML(String(it.notes))}</div>` : '';
+    return `<li class="cloud-look-item${result === 'fail' ? ' is-fail' : ''}">
+        <div class="cloud-look-line"><span class="cloud-look-asset">${escapeHTML(String(it.assetNo == null ? '' : it.assetNo))}</span>
+          <span class="cloud-look-what">${escapeHTML(String(it.itemType || ''))}${it.location ? ` <span class="muted">· ${escapeHTML(String(it.location))}</span>` : ''}</span>
+          <span class="td-result ${escapeHTML(result)}">${escapeHTML(capitalise(result))}</span></div>
+        ${rd ? `<div class="cloud-look-rd muted">${rd}</div>` : ''}${notes}
+      </li>`;
+  }).join('');
+  body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + counts + `<ul class="cloud-look-items" id="cloud-look-items">${rows}</ul>`;
 }
 
 // V107 (Stage 5 part 3): the review before a cloud delete. `o` is

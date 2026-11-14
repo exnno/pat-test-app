@@ -1018,15 +1018,26 @@ function _tutCloseHistory() { _tut.st.assetHistorySheetOpen = false; _tut.st.ass
 function _tutJobsTab(tab) { _tut.st.jobsTab = tab; }
 
 // In the cloud — the practice's cloudJobsLoad / select / tick / bring.
+// V164 (2A): the Cloud tab lists every job in the cloud — the practice phone's
+// own three too (they're in its pretend cloud), marked On this phone.
 function _tutCloudShow() {
-  Object.assign(_tut.st.cloudJobs, { ok: true, loading: false, error: '', at: new Date().toISOString(), jobs: _tutCloudOnlyJobs() });
+  const onPhone = (_tut.st.sessions || []).map((s) => {
+    const items = Array.isArray(s.items) ? s.items : [];
+    return { id: String(s.id), site: s.site || '', name: s.name || '', clientId: '', date: s.date || '',
+      items: items.length, fails: items.filter((it) => it && it.result === 'fail').length, photos: 0,
+      certNo: s.certNo || '', locked: !!s.locked };
+  });
+  Object.assign(_tut.st.cloudJobs, { ok: true, loading: false, error: '', at: new Date().toISOString(),
+    jobs: _tutCloudOnlyJobs().concat(onPhone) });
 }
 function _tutCloudSearch(q) { _tut.st.cloudJobs.q = q; }
 function _tutCloudSelect() { const cj = _tut.st.cloudJobs; cj.selecting = true; cj.selected = {}; }
 function _tutCloudTickFirst() {
   const m = _tutDraw(() => cloudJobsModel());
-  const first = m && m.groups && m.groups[0] && m.groups[0].rows[0];
-  if (first) _tut.st.cloudJobs.selected[first.id] = true;
+  // V164: the first job NOT on this phone — one on the phone can't be ticked.
+  const rows = (m && m.groups) ? [].concat(...m.groups.map((g) => g.rows)) : [];
+  const first = rows.find((r) => !r.onPhone);
+  if (first) _tut.st.cloudJobs.selected[first.key] = true;
 }
 // The ticked jobs come down as whole jobs (their items made up here — the
 // list only knows the counts), then the phone tab shows them (5A).
@@ -1101,7 +1112,7 @@ const TUT_STEPS_CLOUD = [
     text: 'Old jobs aren’t downloaded until you ask, so a phone isn’t filled up with them. Tap <strong>Show them</strong>.',
     run: () => _tutCloudShow() },
   { key: 'list', target: '.cloud-card',
-    text: 'The jobs only in the cloud, by month: the client and site, the date, items, fails and the certificate number. They take no space on your phone.' },
+    text: 'Every job in the cloud, by month: the site, the date, the client, items, fails and the certificate number. Jobs also on this phone are marked <strong>On this phone</strong>; the rest take no space on it. Tap any job to look at it.' },
   { key: 'storage', target: '.cloud-storage-link', when: true,
     text: '<strong>Cloud Storage</strong> shows how much room your jobs and photos take in the cloud.' },
   { key: 'search', target: '#cloud-search', go: true, pause: true,
@@ -1110,7 +1121,7 @@ const TUT_STEPS_CLOUD = [
   { key: 'select', target: '.cloud-select-btn', go: true,
     text: 'To bring a job back onto this phone, tap <strong>Select</strong>.',
     run: () => _tutCloudSelect() },
-  { key: 'tick', target: '.cloud-card .session-info', go: true,
+  { key: 'tick', target: '.cloud-card:not(.is-on-phone) .session-info', go: true,
     text: 'Tap the first job to tick it.',
     run: () => _tutCloudTickFirst() },
   { key: 'delete', target: '[data-tut-action="cloud-delete"]',

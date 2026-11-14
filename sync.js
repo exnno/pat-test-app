@@ -5062,8 +5062,9 @@ function syncPhotoKnowForDelete(list) {
 // the photos table's own rule decides what it counts; isolation 8a–8c). That
 // read is fail-soft: without it the cards just show no 📷.
 // Memory only (rule 25): nothing is written. The screen keeps the result for
-// the app session (8A) and hides jobs that are on this phone when it draws, so
-// a job brought down or arriving by the pull simply drops out of the list.
+// the app session (8A). V164 (2A): it no longer hides jobs that are on this
+// phone — they are listed and marked "On this phone" (the Cloud tab is every job
+// in the cloud), and can't be ticked for a cloud delete.
 // Keyset paged by id, SYNC_CLOUD_PAGE a request, at most SYNC_CLOUD_MAX (said
 // on screen — `capped`). Replaces V91's cleared look: cleared jobs are cloud
 // jobs like any other (3A, 7A).
@@ -5124,6 +5125,145 @@ function syncCloudList() {
     }).catch((e) => {
       res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn\u2019t reach the cloud.';
       res.jobs = [];
+      return res;
+    });
+}
+
+// ---- V164 — the business view (Teams v1; round 1A 2A 3A 4A 5A) -------------------
+// The Cloud tab's "Showing ▾" picker offers, beside Your jobs, each business this
+// account may READ whole: Owner, Team leader or Office of a business of two or
+// more (V113's rule can_read_org — the database decides; this only asks).
+//
+// ⚠ RULE 45. Every OTHER phone read of a synced table names its account
+// (user_id = me), because whatever the pull reads it takes as this account's own.
+// This read is the one exception: it names the BUSINESS (org_id), returns every
+// member's jobs, and its result is a LOOK — held in memory by the Cloud tab
+// (state.cloudJobs.biz), never handed to the pull, the sync state, state.sessions,
+// storage or a push. Harness 48a allows exactly this function (and requires its
+// org_id filter); 103 proves nothing it reads lands anywhere else.
+//
+// Paged by (user_id, id) — ids are unique per account only (the primary key),
+// so a page edge is a person AND an id. A value that could not have come from
+// PATGo (not a uuid / not safeId) is never put into a filter: the read stops
+// there and says it was capped.
+// Names: business_people (a member's name in that business); a job whose person
+// has left keeps the name it was logged with (doc.engineer) and is marked left.
+// Photo counts: session_photo_counts for the people on the list, keyed person+id
+// (fail-soft, as the cloud tab's own).
+// Resolves { ok, offline, error, org, uid, capped, photos, people: [{user, name,
+//   role, you}], jobs: [{id, user, site, name, date, clientId, engineer, locked,
+//   certNo, items, fails, photos}] }. Never rejects.
+const _SYNC_BIZ_JOB_COLS = _SYNC_CLOUD_JOB_COLS + ',user_id,engineer:doc->>engineer';
+const _SYNC_UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function _syncKeysetAfter(col, user, key) {
+  return `user_id.gt.${user},and(user_id.eq.${user},${col}.gt.${key})`;
+}
+function syncBusinessList(org) {
+  const res = { ok: false, offline: false, error: '', org: String(org || ''), uid: '', capped: false, photos: false, people: [], jobs: [] };
+  if (!_SYNC_UUID_RE.test(res.org)) { res.error = 'That business isn’t one of yours.'; return Promise.resolve(res); }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  res.uid = uid;
+  const str = (v) => (typeof v === 'string') ? v : '';
+  const num = (v) => (typeof v === 'number' && isFinite(v) && v >= 0) ? Math.round(v) : null;
+  const okKey = (u, id) => _SYNC_UUID_RE.test(u) && typeof safeId === 'function' && safeId(id);
+  const counts = new Map();
+  let client = null;
+  function jobsPage(after) {
+    let q = client.from('sessions').select(_SYNC_BIZ_JOB_COLS).eq('org_id', res.org).eq('deleted', false);
+    if (after) q = q.or(_syncKeysetAfter('id', after.u, after.id));
+    return q.order('user_id', { ascending: true }).order('id', { ascending: true }).limit(SYNC_CLOUD_PAGE).then((r) => {
+      if (r && r.error) throw r.error;
+      const rows = (r && r.data) || [];
+      for (const j of rows) {
+        const id = String(j && j.id != null ? j.id : '');
+        const u = str(j && j.user_id);
+        if (!id || !u) continue;
+        res.jobs.push({ id, user: u, site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.clientId),
+          engineer: str(j.engineer).slice(0, 80), locked: j.locked === true || j.locked === 'true', certNo: str(j.certNo),
+          items: num(j.n_items), fails: num(j.n_fails), photos: 0 });
+      }
+      if (rows.length < SYNC_CLOUD_PAGE) return;
+      if (res.jobs.length >= SYNC_CLOUD_MAX) { res.capped = true; return; }
+      const last = rows[rows.length - 1];
+      const lu = str(last && last.user_id), lid = String(last && last.id != null ? last.id : '');
+      if (!okKey(lu, lid)) { res.capped = true; return; }
+      return jobsPage({ u: lu, id: lid });
+    });
+  }
+  function photoPage(users, after, n) {
+    let q = client.from('session_photo_counts').select('user_id,session_id,n').in('user_id', users);
+    if (after) q = q.or(_syncKeysetAfter('session_id', after.u, after.id));
+    return q.order('user_id', { ascending: true }).order('session_id', { ascending: true }).limit(SYNC_CLOUD_PAGE).then((r) => {
+      if (r && r.error) throw r.error;
+      const rows = (r && r.data) || [];
+      for (const x of rows) {
+        const sid = String(x && x.session_id != null ? x.session_id : '');
+        const c = num(x && x.n);
+        if (sid && c) counts.set(str(x.user_id) + '|' + sid, c);
+      }
+      if (rows.length < SYNC_CLOUD_PAGE || n > SYNC_CLOUD_MAX / SYNC_CLOUD_PAGE) return;
+      const last = rows[rows.length - 1];
+      const lu = str(last && last.user_id), lid = String(last && last.session_id != null ? last.session_id : '');
+      if (!okKey(lu, lid)) return;
+      return photoPage(users, { u: lu, id: lid }, n + 1);
+    });
+  }
+  return syncDataClient().then((c) => {
+    client = c;
+    return c.rpc('business_people').then((r) => {
+      if (r && r.error) throw r.error;
+      for (const p of ((r && r.data) || [])) {
+        if (!p || str(p.business_id) !== res.org || !_SYNC_UUID_RE.test(str(p.user_id))) continue;
+        res.people.push({ user: str(p.user_id), name: str(p.name).slice(0, 80), role: str(p.role), you: p.is_you === true });
+      }
+    });
+  }).then(() => jobsPage(null))
+    .then(() => {
+      const users = Array.from(new Set(res.jobs.map(j => j.user))).filter(u => _SYNC_UUID_RE.test(u));
+      if (!users.length) { res.photos = true; return; }
+      return photoPage(users, null, 0).then(() => { res.photos = true; },
+        (e) => { console.error('Business list: photo counts not read (non-fatal).', e); });
+    })
+    .then(() => {
+      for (const j of res.jobs) j.photos = counts.get(j.user + '|' + j.id) || 0;
+      res.jobs.sort((a, b) => (b.date || '').localeCompare(a.date || '') || a.user.localeCompare(b.user) || a.id.localeCompare(b.id));
+      res.ok = true;
+      return res;
+    }).catch((e) => {
+      res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
+      res.jobs = [];
+      res.people = [];
+      return res;
+    });
+}
+
+// V164 (2A): one job, read to LOOK at — the Cloud tab's look-only sheet, for a job
+// of yours or (business view) a teammate's. Names the job's account (rule 45) and
+// the id; when `org` is given the row must still be in that business. The doc is
+// checked as every cloud doc is (_syncValidDoc) and returned to the caller only —
+// never taken onto the phone, stored or sent.
+// Resolves { ok, offline, error, gone, moved, doc }. Never rejects.
+function syncCloudJob(user, id, org) {
+  const res = { ok: false, offline: false, error: '', gone: false, moved: false, doc: null };
+  const u = String(user || ''), sid = String(id == null ? '' : id), o = String(org || '');
+  if (!_SYNC_UUID_RE.test(u) || typeof safeId !== 'function' || !safeId(sid) || (o && !_SYNC_UUID_RE.test(o))) {
+    res.gone = true; return Promise.resolve(res);
+  }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  return syncDataClient().then((c) => c.from('sessions').select('id,doc,deleted,org_id').eq('user_id', u).eq('id', sid).limit(1))
+    .then((r) => {
+      if (r && r.error) throw r.error;
+      const row = ((r && r.data) || [])[0];
+      if (!row || row.deleted === true) { res.gone = true; return res; }
+      if (o && String(row.org_id || '') !== o) { res.moved = true; return res; }
+      if (!_syncValidDoc(row.doc, sid)) { res.gone = true; return res; }
+      res.doc = row.doc;
+      res.ok = true;
+      return res;
+    }).catch((e) => {
+      res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
       return res;
     });
 }

@@ -1913,10 +1913,25 @@ function savePhotoAge() {
 // ⚠ The search box is an input: typing refreshes only #cloud-list-area (as the
 // Jobs search does), never render(), or iOS drops the keyboard (MAP rule 3).
 
+// V164 — the one Cloud tab (Teams v1, the business view; round 1A 2A 3A 4A 5A).
+//   1A "Showing ▾": Your jobs, then each business this account may read whole
+//      (Owner / Team leader / Office of a business of two or more). Picking a
+//      business adds person chips (Everyone + each person with jobs there). Solo,
+//      or an Engineer: no picker — the tab is exactly Your jobs.
+//   2A every job in the cloud is listed — those also on this phone too, marked
+//      "On this phone" (a ticked cloud delete never includes one) — and a tap
+//      opens it LOOK-ONLY, any job, yours or the business's (cloudLookOpen).
+//      Bring onto this phone is a button in that sheet, for your own jobs only.
+//   3A by month, newest first, the person on each row in a business, search,
+//      and a Fails only switch.
+// The business list is sync.js syncBusinessList — a LOOK, held here in memory
+// (cj.biz), never stored, never handed to the pull (rule 45; harness 48a / 103).
 function _cloudReset() {
+  const old = state.cloudJobs || {};
   state.cloudJobs = { loading: false, ok: false, error: '', at: '', uid: '', jobs: [],
-    capped: false, photos: false, stale: false, q: (state.cloudJobs && state.cloudJobs.q) || '',
-    selecting: false, selected: {}, busy: '' };
+    capped: false, photos: false, stale: false, q: old.q || '',
+    selecting: false, selected: {}, busy: '',
+    scope: 'mine', person: '', fails: !!old.fails, biz: null };   // V164
 }
 
 function cloudTabActive() {
@@ -1934,15 +1949,69 @@ function jobsTabSet(tab) {
   render();
 }
 
+// V164 (1A): the businesses this phone's account may look at whole. The business
+// list (business.js) says the role and the head count; the database's
+// can_read_org is the real decision. Never inside a tutorial: the practice phone
+// must never show the real phone's businesses.
+const CLOUD_SCOPE_ROLES = ['owner', 'team_leader', 'office'];
+function cloudScopeChoices() {
+  if (typeof _tut !== 'undefined' && _tut) return [];
+  if (typeof businessList !== 'function') return [];
+  let list = [];
+  try { list = businessList(); } catch (e) { list = []; }
+  return list.filter(b => b && CLOUD_SCOPE_ROLES.includes(b.role) && Number(b.n) >= 2)
+    .map(b => ({ id: b.id, label: (typeof businessLabel === 'function' ? businessLabel(b) : (b.name || 'Your business')) }));
+}
+
+// The scope in force: a business only while it is still one of the choices (a
+// role changed to Engineer, or removed, falls back to Your jobs at once).
+function cloudScope() {
+  const cj = state.cloudJobs || {};
+  const s = String(cj.scope || 'mine');
+  if (s === 'mine') return 'mine';
+  return cloudScopeChoices().some(c => c.id === s) ? s : 'mine';
+}
+
+function cloudScopeSet(v) {
+  if (!state.cloudJobs) _cloudReset();
+  const cj = state.cloudJobs;
+  const want = String(v || 'mine');
+  const next = (want !== 'mine' && cloudScopeChoices().some(c => c.id === want)) ? want : 'mine';
+  if (cj.busy) return;
+  cj.scope = next;
+  cj.person = '';
+  cj.selecting = false;
+  cj.selected = {};
+  cloudJobsLoad(false);
+  render();
+}
+
+function cloudPersonSet(u) {
+  const cj = state.cloudJobs;
+  if (!cj) return;
+  cj.person = String(u || '');
+  render();
+}
+
+function cloudFailsToggle() {
+  if (!state.cloudJobs) _cloudReset();
+  state.cloudJobs.fails = !state.cloudJobs.fails;
+  render();
+}
+
+function _cloudOfflineWords() { return 'No signal — the cloud list needs a connection.'; }
+
 function cloudJobsLoad(force) {
   if (!state.cloudJobs) _cloudReset();
+  const scope = cloudScope();
+  if (scope !== 'mine') return _cloudBizLoad(scope, force);
   const cj = state.cloudJobs;
   if (cj.loading) return;
   const uid = (typeof _syncCurrentUserId === 'function') ? _syncCurrentUserId() : '';
   if (!force && cj.ok && !cj.stale && cj.uid === uid) return;
   if (typeof syncCloudList !== 'function') return;
   if (typeof _syncOffline === 'function' && _syncOffline()) {
-    cj.error = 'No signal \u2014 the cloud list needs a connection.';
+    cj.error = _cloudOfflineWords();
     if (state.view === 'sessions') render();
     return;
   }
@@ -1956,33 +2025,109 @@ function cloudJobsLoad(force) {
       Object.assign(cj, { ok: true, stale: false, error: '', at: new Date().toISOString(), uid: res.uid,
         jobs: res.jobs, capped: res.capped, photos: res.photos });
     } else {
-      cj.error = res.offline ? 'No signal \u2014 the cloud list needs a connection.' : (res.error || 'Couldn\u2019t reach the cloud. Try again.');
+      cj.error = res.offline ? _cloudOfflineWords() : (res.error || 'Couldn’t reach the cloud. Try again.');
     }
     if (state.view === 'sessions') render();
   });
 }
 
-// What the tab shows: the list minus jobs now on this phone, filtered by the
-// search, newest first, grouped by month. Pure — render-core/review draw it.
+// V164: a business's list — read when the business is picked, again with ⟳.
+// One business at a time; another pick starts a fresh read (an answer for a
+// business no longer picked is dropped).
+function _cloudBizLoad(org, force) {
+  const cj = state.cloudJobs;
+  const uid = (typeof _syncCurrentUserId === 'function') ? _syncCurrentUserId() : '';
+  const b = cj.biz;
+  if (b && b.org === org && b.loading) return;
+  if (!force && b && b.org === org && b.ok && b.uid === uid) return;
+  if (typeof syncBusinessList !== 'function') return;
+  const nb = { org, loading: false, ok: false, error: '', at: '', uid, jobs: [], people: [], capped: false, photos: false };
+  cj.biz = nb;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    nb.error = _cloudOfflineWords();
+    if (state.view === 'sessions') render();
+    return;
+  }
+  nb.loading = true;
+  if (state.view === 'sessions') render();
+  syncBusinessList(org).then((res) => {
+    if (state.cloudJobs !== cj || cj.biz !== nb) return;
+    nb.loading = false;
+    if (res.ok) {
+      Object.assign(nb, { ok: true, error: '', at: new Date().toISOString(), uid: res.uid,
+        jobs: res.jobs, people: res.people, capped: res.capped, photos: res.photos });
+    } else {
+      nb.error = res.offline ? _cloudOfflineWords() : (res.error || 'Couldn’t reach the cloud. Try again.');
+    }
+    if (state.view === 'sessions') render();
+  });
+}
+
+// The state the tab draws from for the scope in force: { loading, ok, error,
+// at, capped } — Your jobs' own, or the picked business's.
+function cloudScopeStatus() {
+  const cj = state.cloudJobs || {};
+  const scope = cloudScope();
+  if (scope === 'mine') return { scope, loading: !!cj.loading, ok: !!cj.ok, error: cj.error || '', at: cj.at || '', capped: !!cj.capped };
+  const b = (cj.biz && cj.biz.org === scope) ? cj.biz : null;
+  if (!b) return { scope, loading: false, ok: false, error: '', at: '', capped: false };
+  return { scope, loading: !!b.loading, ok: !!b.ok, error: b.error || '', at: b.at || '', capped: !!b.capped };
+}
+
+// A row's key: the id for Your jobs (ids are unique within one account); the
+// person and id in a business (ids are unique per person only).
+function cloudRowKey(j, scope) { return scope === 'mine' ? String(j.id) : String(j.user) + '|' + String(j.id); }
+
+// What the tab shows — pure; render-review draws it, tour draws the practice's.
+// Every job in the scope (2A: those on this phone too, `onPhone`), filtered by
+// the person (business), Fails only and the search, newest first, by month.
 function cloudJobsModel() {
   const cj = state.cloudJobs || {};
+  const scope = cloudScope();
+  const me = (typeof _syncCurrentUserId === 'function') ? (_syncCurrentUserId() || '') : '';
   const local = new Set((state.sessions || []).map(s => String(s && s.id)));
-  const all = (cj.jobs || []).filter(j => !local.has(j.id));
-  const q = String(cj.q || '').trim().toLowerCase();
-  const clientName = (id) => {
-    const c = (id && typeof clientById === 'function') ? clientById(id) : null;
-    return c && c.name ? c.name : '';
+  const biz = scope !== 'mine' && cj.biz && cj.biz.org === scope ? cj.biz : null;
+  const source = scope === 'mine' ? (cj.jobs || []) : (biz ? (biz.jobs || []) : []);
+  const names = new Map(((biz && biz.people) || []).map(p => [p.user, p]));
+  const personOf = (j) => {
+    if (scope === 'mine') return null;
+    const p = names.get(j.user);
+    if (p) return { user: j.user, name: p.name || j.engineer || 'No name yet', left: false, you: !!p.you || j.user === me };
+    return { user: j.user, name: j.engineer || 'Someone', left: true, you: j.user === me };
   };
+  const clientName = (j, split) => {
+    if (scope === 'mine' || j.user === me) {
+      const c = (j.clientId && typeof clientById === 'function') ? clientById(j.clientId) : null;
+      if (c && c.name) return c.name;
+    }
+    return split.client || '';
+  };
+  // The people with jobs here, for the chips — in the order of the business's
+  // own list (Owner first), then anyone who has left.
+  const people = [];
+  if (biz) {
+    const withJobs = new Set(source.map(j => j.user));
+    for (const p of (biz.people || [])) if (withJobs.has(p.user)) people.push({ user: p.user, name: p.name || 'No name yet', left: false, you: !!p.you });
+    const seen = new Set(people.map(p => p.user));
+    for (const j of source) if (!seen.has(j.user)) { seen.add(j.user); people.push({ user: j.user, name: j.engineer || 'Someone', left: true, you: j.user === me }); }
+  }
+  const person = (biz && cj.person && people.some(p => p.user === cj.person)) ? cj.person : '';
+  const inScope = source.filter(j => !person || j.user === person);
+  const q = String(cj.q || '').trim().toLowerCase();
   const rows = [];
-  for (const j of all) {
-    const client = clientName(j.clientId);
-    const title = j.site || j.name || 'Untitled job';
+  for (const j of inScope) {
+    if (cj.fails && !(j.fails > 0)) continue;
+    const split = (typeof splitSiteSnapshot === 'function') ? splitSiteSnapshot(j.site) : { client: '', site: j.site || '' };
+    const client = clientName(j, split);
+    const title = split.site || j.name || j.site || 'Untitled job';
+    const who = personOf(j);
+    const onPhone = (scope === 'mine' || j.user === me) && local.has(String(j.id));
     if (q) {
-      const hay = [j.site, j.name, client, j.certNo, j.date, (typeof formatDate === 'function' ? formatDate(j.date) : '')]
-        .join(' ').toLowerCase();
+      const hay = [j.site, j.name, client, j.certNo, j.date, (typeof formatDate === 'function' ? formatDate(j.date) : ''),
+        who ? who.name : ''].join(' ').toLowerCase();
       if (hay.indexOf(q) === -1) continue;
     }
-    rows.push(Object.assign({}, j, { client, title }));
+    rows.push(Object.assign({}, j, { client, title, who, onPhone, key: cloudRowKey(j, scope), mine: scope === 'mine' || j.user === me }));
   }
   const groups = [];
   let last = null;
@@ -1999,7 +2144,9 @@ function cloudJobsModel() {
     }
     last.rows.push(r);
   }
-  return { total: all.length, shown: rows.length, groups, byId: new Map(rows.map(r => [r.id, r])) };
+  const cloudOnly = scope === 'mine' ? inScope.filter(j => !local.has(String(j.id))).length : 0;
+  return { scope, total: inScope.length, cloudOnly, shown: rows.length, groups, people, person,
+    byId: new Map(rows.map(r => [r.key, r])) };
 }
 
 function cloudJobsSearch(v) {
@@ -2008,25 +2155,84 @@ function cloudJobsSearch(v) {
   if (typeof refreshCloudListAreaOnly === 'function') refreshCloudListAreaOnly();
 }
 
+// Select is Your jobs only (Bring onto this phone, Delete…) — a business's jobs
+// are looked at, never ticked.
 function cloudJobsToggleSelecting() {
   const cj = state.cloudJobs;
-  if (!cj || cj.busy) return;
+  if (!cj || cj.busy || cloudScope() !== 'mine') return;
   cj.selecting = !cj.selecting;
   cj.selected = {};
   render();
 }
 
-// A tap: in select mode, tick it; otherwise bring it down and open it (5A).
+// A tap: in select mode, tick it (never a job already on this phone — 2A);
+// otherwise open it look-only (2A, every job).
 function cloudJobsTap(id) {
   const cj = state.cloudJobs;
   if (!cj || !id || cj.busy) return;
   const key = String(id);
-  if (cj.selecting) {
+  if (cj.selecting && cloudScope() === 'mine') {
+    const row = cloudJobsModel().byId.get(key);
+    if (!row || row.onPhone) {
+      if (row && row.onPhone) showToast('It’s on this phone — delete it from the phone tab');
+      return;
+    }
     if (cj.selected[key]) delete cj.selected[key]; else cj.selected[key] = true;
     render();
     return;
   }
-  _cloudBring([key], true);
+  cloudLookOpen(key);
+}
+
+// ---- V164 (2A): the look-only job ------------------------------------------------
+// state.cloudLook = { key, scope, user, id, org, row, loading, error, doc } —
+// memory only, gone when the sheet closes. The sheet (render-review.js
+// openCloudLookSheet) has no inputs, so a repaint underneath is harmless; it is
+// filled in place when the read lands (renderCloudLookBody).
+function cloudLookOpen(key) {
+  const m = cloudJobsModel();
+  const row = m.byId.get(String(key));
+  if (!row) return;
+  const me = (typeof _syncCurrentUserId === 'function') ? (_syncCurrentUserId() || '') : '';
+  const look = { key: String(key), scope: m.scope, user: m.scope === 'mine' ? me : row.user, id: String(row.id),
+    org: m.scope === 'mine' ? '' : m.scope, row, loading: true, error: '', doc: null };
+  state.cloudLook = look;
+  if (typeof openCloudLookSheet === 'function') openCloudLookSheet(look);
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    look.loading = false;
+    look.error = 'No signal — opening a job from the cloud needs a connection.';
+    if (typeof renderCloudLookBody === 'function') renderCloudLookBody(look);
+    return;
+  }
+  if (typeof syncCloudJob !== 'function') return;
+  syncCloudJob(look.user, look.id, look.org).then((res) => {
+    if (state.cloudLook !== look) return;
+    look.loading = false;
+    if (res.ok) look.doc = res.doc;
+    else if (res.offline) look.error = 'No signal — opening a job from the cloud needs a connection.';
+    else if (res.moved) look.error = 'This job has moved to another business since the list was read.';
+    else if (res.gone) look.error = 'This job isn’t in the cloud any more.';
+    else look.error = res.error || 'Couldn’t reach the cloud. Try again.';
+    if (typeof renderCloudLookBody === 'function') renderCloudLookBody(look);
+    if ((res.moved || res.gone) && state.cloudJobs) cloudJobsLoad(true);
+  });
+}
+
+function cloudLookClose() { state.cloudLook = null; }
+
+// From the sheet: your own job, onto this phone (V93's bring, one job, opened);
+// or, already here, opened on the phone.
+function cloudLookBring() {
+  const look = state.cloudLook;
+  if (!look || !look.row || !look.row.mine) return;   // your own jobs only
+  const id = look.id;
+  cloudLookClose();
+  if ((state.sessions || []).some(s => String(s.id) === id)) {
+    state.jobsTab = 'phone';
+    requestOpenSession(id);
+    return;
+  }
+  _cloudBring([id], true);
 }
 
 function cloudJobsBringSelected() {

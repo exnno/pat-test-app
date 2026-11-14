@@ -268,6 +268,8 @@ registerActions({
   'cloud-select-toggle': () => cloudJobsToggleSelecting(),
   'cloud-bring':        () => cloudJobsBringSelected(),
   'cloud-delete':       () => cloudJobsDeleteSelected(),        // V107 (Stage 5 pt 3)
+  'cloud-person':       (arg) => cloudPersonSet(arg),            // V164 (1A): a business's person chips
+  'cloud-fails':        () => cloudFailsToggle(),                // V164 (3A): Fails only
   // V108 (Stage 5 pt 3, second half): Settings → Data → Cloud Storage.
   'cs-open':            () => cloudStoreOpen(),
   'cs-back':            () => cloudStoreBack(),
@@ -1278,6 +1280,7 @@ registerInputActions({
 // render-core.js (bindSessionsListAreaEvents / bindOverviewBodyEvents).
 // ===========================================================================
 registerChangeActions({
+  'cloud-scope': (v) => cloudScopeSet(v),   // V164 (1A): the Cloud tab's "Showing ▾"
   'nf-business': (v) => { state.newForm.businessId = v; },   // V149 (1A): New job's "For:" — no repaint (MAP rule 3)
   'move-job-field': (v, el) => setMoveJobField(el && el.dataset ? el.dataset.arg : '', v),   // V101 (the tester picker)
   'dup-job-field': (v, el) => setDupJobField(el && el.dataset ? el.dataset.arg : '', v),     // V102 (the tester picker)

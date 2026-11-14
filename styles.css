@@ -4308,6 +4308,39 @@ body.has-selection-bar .screen.jm-screen { padding-bottom: 120px; }
 .cloud-cert { font-size: 0.75rem; }
 .cloud-retry { margin-top: 8px; }
 body.has-selection-bar .cloud-tab { padding-bottom: 100px; }
+/* V164: the one Cloud tab — "Showing ▾", person chips, Fails only, the row's
+   tags, and the look-only job sheet. */
+.cloud-scope { display: flex; align-items: center; gap: 10px; margin: 0 0 10px; padding: 6px 10px;
+  background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px; }
+.cloud-scope-label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.03em; }
+.cloud-scope-select { flex: 1 1 auto; min-width: 0; min-height: 40px; border: 0; background: transparent;
+  color: var(--text); font-size: 1rem; font-weight: 600; }
+.cloud-chips { display: flex; gap: 6px; overflow-x: auto; padding: 0 0 8px; margin: 0 0 4px; -webkit-overflow-scrolling: touch; }
+.cloud-chip { flex: 0 0 auto; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--border);
+  background: var(--card-bg); color: var(--text); font-size: 0.875rem; white-space: nowrap; }
+.cloud-chip.is-on { background: var(--accent-soft); border-color: var(--accent-border); color: var(--accent-text); font-weight: 600; }
+.cloud-search-row { display: flex; gap: 8px; align-items: center; }
+.cloud-search-row .search-input { flex: 1 1 auto; min-width: 0; }
+.cloud-month-n { font-weight: 600; text-transform: none; letter-spacing: 0; }
+.cloud-title-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.cloud-date { flex: 0 0 auto; margin-left: auto; font-size: 0.75rem; font-weight: 400; color: var(--text-muted); }
+.cloud-tags { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin-top: 4px; }
+.cloud-who { padding: 1px 8px; border-radius: 999px; background: var(--accent-soft); color: var(--accent-text); font-weight: 600; }
+.cloud-who.is-left { background: transparent; border: 1px solid var(--border); color: var(--text-muted); }
+.cloud-onphone { font-weight: 600; color: var(--accent-text); }
+.cloud-look-sheet { max-height: 92vh; display: flex; flex-direction: column; }
+.cloud-look-sub { margin: 0 16px 6px; font-size: 0.8125rem; text-align: center; }
+.cloud-look-facts { list-style: none; margin: 0 0 8px; padding: 0; font-size: 0.875rem; }
+.cloud-look-facts li { margin: 2px 0; }
+.cloud-look-counts { margin: 6px 0; font-weight: 600; }
+.cloud-look-items { list-style: none; margin: 0; padding: 0; }
+.cloud-look-item { padding: 8px 0; border-top: 1px solid var(--border); }
+.cloud-look-line { display: flex; gap: 8px; align-items: baseline; }
+.cloud-look-asset { flex: 0 0 auto; font-weight: 600; min-width: 3em; }
+.cloud-look-what { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.cloud-look-line .td-result { flex: 0 0 auto; font-weight: 600; }
+.cloud-look-rd, .cloud-look-notes { font-size: 0.8125rem; margin: 2px 0 0 calc(3em + 8px); overflow-wrap: anywhere; }
+.cloud-look-note { margin: 0; font-size: 0.8125rem; }
 /* V108: Cloud Storage (Settings → Data). Reuses the photo manager's totals and
    the cloud tab's cards; only the size line and the "on this phone" tag are new. */
 .cs-total strong { font-size: 1rem; }

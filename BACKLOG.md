@@ -13,7 +13,30 @@ here rather than restating it. Delete an item when it ships.
   plan V164–V169 so nothing lands in V170 but the audit's fixes. Brief it that the second
   audit's finding 5 is scheduled with seat billing (if not yet built).
 
-### Next after V163
+### Next after V164
+V164 = the one Cloud tab and the business view (Teams v1; round 1A 2A 3A 4A 5A, 14 Nov). settings-actions.js
+(scope, `cloudScopeChoices`, model, look-only `cloudLook*`), render-review.js (picker, chips, rows, look
+sheet), sync.js (`syncBusinessList` — rule 45's one exception — and `syncCloudJob`), dispatch.js,
+tour.js (practice cloud lists the phone's three), styles.css, icons.js (eye). No SQL. Harness 103 +
+M2019–M2039; 48a's one exception; 30f/30g/28g/46a/50d/75d follow 2A. M464 retired.
+**Next — V165 (5A, Peter 14 Nov):** inside the look-only job — photos opened on tap (the cloud's photo
+files, read by the job's business — V113 7A), and the storage line / photo storage review in the Cloud
+tab. Peter: keep the phone tab's layout in step once jobs drift to the cloud on their own (one design).
+Model: Peter has Fable usage to spend — offered after V164 (see the handoff).
+Then (V166–V169): Office corrections (O12), seat billing + per-business lock (with the second audit's
+finding 5), certificate numbering per business, shared client / site lists (O13). The combined
+certificate (R4) and teammates' same-site view (R3) move after V170 (Claude, 14 Nov — the window can't
+hold them; the business view took "seeing teammates' jobs" forward).
+
+### V164 residuals (known, accepted)
+- The business list is read whole (paged) on each pick and ⟳ — at most SYNC_CLOUD_MAX jobs; a very
+  large business would want server-side search. Fine for teams of this size.
+- A leaver's name is the job's own engineer field (business_people lists current members only).
+- Photos: counts only in V164 (5A → V165).
+- Not proved here: a real browser pass on a phone (no device browser reachable this session — a
+  headless Chrome pass at 390 px stands in), and the hosted project (the deploy steps).
+
+### Next after V163 (done — V164 took the business view forward; Office corrections → V166)
 V163 = leaving and removing a member (R5; round 1A 2A 3B 4C 5B 6A). SQL supabase/v163-leaving.sql
 (departures, may_hold, org_stamp, remove_member / leave_business / member_devices /
 my_departures / finish_delivery, the photo-file rule; schema.sql's last section). business.js

@@ -288,8 +288,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Remove someone from your business.</strong> On the Business page, the Owner can remove anyone; a Team leader or the Office can remove Engineers. You see their devices and when each was last used, and can let their phone send what it&rsquo;s still holding first.</li>
-        <li><strong>Leave a business.</strong> Anyone but the Owner can leave. Your jobs for it stay with the business &mdash; your phone sends anything unsent, then takes them off and tells you what it did.</li>
+        <li><strong>One place for your jobs in the cloud.</strong> The In the cloud tab now lists every job, with those also on this phone marked, and you can tap any of them to look through it. If you run a team, pick your business at the top to see everyone&rsquo;s jobs, or just one person&rsquo;s.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
