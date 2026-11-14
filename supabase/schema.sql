@@ -3185,3 +3185,71 @@ $$;
 revoke all on function public.correct_job(uuid, text, uuid, jsonb, text) from public, anon;
 grant execute on function public.correct_job(uuid, text, uuid, jsonb, text) to authenticated;
 -- ================================================================ end V167
+
+-- ================================================================ V168
+-- Each business on its own plan (the per-business lock — Peter, 11 Nov; round
+-- 14 Nov 0B 5A 6A) and the second audit's finding 5. KEEP IN STEP with
+-- supabase/v168-business-plans.sql (the same, plus self-checks D1–D5). Kept in
+-- step by harness 108e.
+--
+-- my_business_plans() — the plan of every business the caller belongs to, so the
+-- phone can lock only the jobs of a business whose plan has ended (each job
+-- follows ITS business — a paid seat in a team never unlocks a member's own
+-- lapsed business, and the member's own lapse never locks the team's jobs). The
+-- cover (V155, plan_cover) is unchanged: it still decides what the person as a
+-- whole sees (the 30-day check, the account line).
+create or replace function public.my_business_plans()
+returns table (id uuid, plan text, trial_ends_at timestamptz, lapsed_at timestamptz)
+language sql stable security definer set search_path = '' as $$
+  select o.id, o.plan, o.trial_ends_at, o.lapsed_at
+  from public.memberships m
+  join public.organisations o on o.id = m.org_id
+  where m.user_id = auth.uid()
+  order by m.is_default desc, o.created_at, o.id
+$$;
+revoke all on function public.my_business_plans() from public, anon;
+grant execute on function public.my_business_plans() to authenticated;
+
+-- Photo files (finding 5): judged by the JOB's business, not the person's main
+-- one. The file goes up before its photo row (v89: photo, preview, then the
+-- row), so:
+--   • a file whose photo row exists (a re-send, a preview after its photo) →
+--     that row's business may upload;
+--   • a new file → any business of the person may upload. Its ROW is what puts
+--     the photo into a job, and plan_guard judges the row by its own business —
+--     so a locked business's photo never reaches its job; the phone sends no
+--     file for a business the cloud has refused (sync.js).
+-- ⚠ Before V168 a member whose OWN business had lapsed had every photo file
+-- refused — the team's too — because the rule asked about the main business.
+-- ⚠ The policy runs as the signed-in person, who may not call can_upload — so
+-- this helper reads with the owner's rights (the V143 lesson).
+create or replace function public.can_upload_file(name text)
+returns boolean language sql stable security definer set search_path = '' as $$
+  select case
+    when auth.uid() is null then false
+    when exists (select 1 from public.photos p
+                 where p.user_id = auth.uid()
+                   and p.storage_path in (name, regexp_replace(name, '_t\.jpg$', '.jpg')))
+      then exists (select 1 from public.photos p
+                   where p.user_id = auth.uid()
+                     and p.storage_path in (name, regexp_replace(name, '_t\.jpg$', '.jpg'))
+                     and public.can_upload(p.org_id))
+    else exists (select 1 from public.memberships m
+                 where m.user_id = auth.uid() and public.can_upload(m.org_id))
+  end
+$$;
+revoke all on function public.can_upload_file(text) from public, anon;
+grant execute on function public.can_upload_file(text) to authenticated;
+
+drop policy if exists "add own photo files" on storage.objects;
+drop policy if exists "change own photo files" on storage.objects;
+create policy "add own photo files" on storage.objects
+  for insert to authenticated
+  with check (bucket_id = 'photos' and (storage.foldername(name))[1] = (select auth.uid())::text
+              and public.can_upload_file(name));
+create policy "change own photo files" on storage.objects
+  for update to authenticated
+  using      (bucket_id = 'photos' and (storage.foldername(name))[1] = (select auth.uid())::text)
+  with check (bucket_id = 'photos' and (storage.foldername(name))[1] = (select auth.uid())::text
+              and public.can_upload_file(name));
+-- ================================================================ end V168

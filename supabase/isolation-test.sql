@@ -9,6 +9,13 @@
 -- email addresses on the next two lines → Run. Every row of the result must
 -- say PASS. Any FAIL: do not promote, and bring the output to the next chat.
 --
+-- V168: CHECKS 33a–33c NEED supabase/v168-business-plans.sql RUN FIRST (33a names
+-- it if not). B reads each of B's businesses' plans and nobody else's; with B in
+-- A's business and B's own business made to look lapsed, the photo file of a job
+-- of B's own business is refused while a new file is still taken (A's business may
+-- upload) — asked of the rule, nothing uploaded; then everything is put back.
+-- 19e now uploads the file of a photo row of B's lapsed business (V168: a file is
+-- judged by its photo's job).
 -- V167: CHECKS 32a–32c NEED supabase/v167-corrections.sql RUN FIRST (32a names
 -- it if not). B is put into A's business as Engineer with a locked job; A corrects
 -- it (kept with A's name); B can't correct A's job, as an Engineer or once out of
@@ -107,6 +114,7 @@ declare
   mv157 uuid; det157 text;                          -- V157
   sid161 uuid; e161 text; f161 text;               -- V161
   e163 text; d163 text;                             -- V163
+  own_a uuid; own_b uuid; in168 boolean; g168 text; lap168 timestamptz; f168 boolean; t168 boolean;   -- V168
 begin
   select id into a from auth.users where lower(email) = lower(email_a);
   select id into b from auth.users where lower(email) = lower(email_b);
@@ -803,6 +811,9 @@ begin
     -- One job of B's (written as the dashboard, never refused), then B's
     -- business made to look lapsed 20 days ago.
     insert into public.sessions (id, user_id, doc, last_modified) values ('iso-test-v143', b, '{"items":[]}', now());
+    -- V168: and a photo row of that job (its business is B's), for 19e.
+    insert into public.photos (id, user_id, session_id, item_id, storage_path, last_modified, org_id)
+    values ('iso-test-v143-f', b, 'iso-test-v143', 'i1', b::text || '/iso-test-v143-f.jpg', now(), org_b);
     update public.organisations set plan = 'lapsed', lapsed_at = now() - interval '20 days' where id = org_b;
     perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
     execute 'set local role authenticated';
@@ -833,10 +844,12 @@ begin
     exception when others then if sqlerrm like 'patgo_plan_locked%' then k := k + 1; end if;
     end;
     res := res || array['19d|…nor send settings or a photo|' || case when k = 2 then 'PASS|2 refused' else 'FAIL|' || k || ' of 2 refused' end];
-    -- 19e: a photo FILE in B's own folder.
+    -- 19e: the photo FILE of that job's photo, in B's own folder. (V168: a file
+    -- is judged by its photo's job — a new file with no photo row yet by any of
+    -- B's businesses, which 33b checks without uploading anything.)
     begin
-      insert into storage.objects (bucket_id, name) values ('photos', b::text || '/iso-test-v143.jpg');
-      res := res || array['19e|…nor upload a photo file|FAIL|accepted — remove photos/' || b::text || '/iso-test-v143.jpg by hand'];
+      insert into storage.objects (bucket_id, name) values ('photos', b::text || '/iso-test-v143-f.jpg');
+      res := res || array['19e|…nor upload a photo file|FAIL|accepted — remove photos/' || b::text || '/iso-test-v143-f.jpg by hand'];
     exception when others then
       res := res || array['19e|…nor upload a photo file|PASS|refused'];
     end;
@@ -1700,6 +1713,69 @@ begin
     delete from public.sessions where id in ('iso-test-v167-1', 'iso-test-v167-2');
     select count(*) into k from public.sessions where id like 'iso-test-v167-%';
     res := res || array['32c|someone outside the business can''t correct its jobs; nothing left behind|' || case when n = 1 and k = 0 then 'PASS|' else 'FAIL|' || n || ' / ' || k || ' left' end];
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
+  -- ------------------------------------------------- V168: each business on its own plan (33a–33c)
+  if to_regprocedure('public.my_business_plans()') is null or to_regprocedure('public.can_upload_file(text)') is null then
+    res := res || array['33a|B reads the plan of each of B''s businesses, and no other|FAIL|run supabase/v168-business-plans.sql first'];
+  else
+    -- Each person's OWN business (where they're the Owner), whatever is main.
+    select m.org_id into own_a from public.memberships m where m.user_id = a and m.role = 'owner' order by m.is_default desc limit 1;
+    select m.org_id into own_b from public.memberships m where m.user_id = b and m.role = 'owner' order by m.is_default desc limit 1;
+    -- 33a: B reads the plans of B's businesses — each one's own plan — and nothing else.
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      select count(*) into n from public.my_business_plans() x
+      where not exists (select 1 from public.organisations o where o.id = x.id and o.plan is not distinct from x.plan
+                          and o.lapsed_at is not distinct from x.lapsed_at and o.trial_ends_at is not distinct from x.trial_ends_at);
+      select count(*) into k from public.my_business_plans();
+      execute 'reset role';
+      select count(*) - k into j from public.memberships where user_id = b;
+      res := res || array['33a|B reads the plan of each of B''s businesses, and no other|' || case when n = 0 and j = 0 and k > 0 then 'PASS|' || k || ' business(es)' else 'FAIL|' || n || ' wrong, ' || j || ' missing' end];
+    exception when others then
+      execute 'reset role';
+      res := res || array['33a|B reads the plan of each of B''s businesses, and no other|FAIL|' || sqlerrm];
+    end;
+    perform set_config('request.jwt.claims', '', true);
+    if own_a is null or own_b is null or own_a = own_b or not public.can_upload(own_a) then
+      res := res || array['33b|B''s own business ended: a photo of its job refused, a new file still taken (B is in A''s)|INCONCLUSIVE|A''s own business must be able to upload (on its trial or paid) — check A''s plan'];
+    else
+      -- B in A's business (as Engineer, unless already in it); B's own business
+      -- made to look lapsed 20 days ago; a job of B's own business with a photo row.
+      in168 := exists (select 1 from public.memberships where org_id = own_a and user_id = b);
+      if not in168 then insert into public.memberships (org_id, user_id, role, is_default) values (own_a, b, 'engineer', false); end if;
+      select plan, lapsed_at into g168, lap168 from public.organisations where id = own_b;
+      delete from public.photos where id = 'iso-test-v168';
+      delete from public.sessions where id = 'iso-test-v168';
+      insert into public.sessions (id, user_id, doc, last_modified, org_id) values ('iso-test-v168', b, '{"items":[]}', now(), own_b);
+      insert into public.photos (id, user_id, session_id, item_id, storage_path, last_modified, org_id)
+      values ('iso-test-v168', b, 'iso-test-v168', 'i1', b::text || '/iso-test-v168.jpg', now(), own_b);
+      update public.organisations set plan = 'lapsed', lapsed_at = now() - interval '20 days' where id = own_b;
+      -- 33b: asked as B (the rule itself — nothing is uploaded).
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      begin
+        f168 := public.can_upload_file(b::text || '/iso-test-v168.jpg');
+        t168 := public.can_upload_file(b::text || '/iso-test-v168-new.jpg');
+      exception when others then f168 := null; t168 := null;
+      end;
+      execute 'reset role';
+      perform set_config('request.jwt.claims', '', true);
+      res := res || array['33b|B''s own business ended: a photo of its job refused, a new file still taken (B is in A''s)|'
+        || case when f168 is false and t168 is true then 'PASS|' else 'FAIL|its photo ' || coalesce(f168::text, 'error') || ', a new file ' || coalesce(t168::text, 'error') end];
+      -- 33c: everything put back.
+      update public.organisations set plan = g168, lapsed_at = lap168 where id = own_b;
+      delete from public.photos where id = 'iso-test-v168';
+      delete from public.sessions where id = 'iso-test-v168';
+      if not in168 then delete from public.memberships where org_id = own_a and user_id = b; end if;
+      select count(*) into n from public.organisations where id = own_b and plan is not distinct from g168 and lapsed_at is not distinct from lap168;
+      select count(*) into k from public.memberships where org_id = own_a and user_id = b;
+      res := res || array['33c|B''s plan, lapse date and memberships are put back; nothing left behind|'
+        || case when n = 1 and (k = 1) = in168 and not exists (select 1 from public.sessions where id = 'iso-test-v168')
+                then 'PASS|' || g168 else 'FAIL|plan ' || n || ', in A''s ' || k end];
+    end if;
   end if;
   perform set_config('request.jwt.claims', '', true);
 
