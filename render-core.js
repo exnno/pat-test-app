@@ -288,7 +288,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Photos when you look at a cloud job.</strong> Open any job in the In the cloud tab and tap Show photos to see them &mdash; nothing is kept on this phone. And if someone has left your business, you can still pick the business at the top to see the jobs they did for it.</li>
+        <li><strong>How much is in the cloud, at a glance.</strong> The In the cloud tab now shows how many jobs and photos you have there and the space they take &mdash; tap it for the details. Owners, Team leaders and the Office can pick their business to see its total, each person&rsquo;s share and its biggest jobs.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

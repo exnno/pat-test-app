@@ -61,16 +61,16 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V165: rolled forward — V165 on top, V162 dropped. -->
+      <!-- v8: rolling 3-version changelog. V166: rolled forward — V166 on top, V163 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
 
+        <p><strong>V166</strong> &middot; November 2026</p>
+        <p class="muted">How much is in the cloud, at a glance: the cloud tab shows your jobs, photos and the space they take, and opens Cloud Storage. Owners, Team leaders and the Office can see a business&rsquo;s total, each person&rsquo;s share and its biggest jobs, and open any of them to look through.</p>
         <p><strong>V165</strong> &middot; November 2026</p>
         <p class="muted">Photos when you look at a cloud job: tap Show photos and they load from the cloud, without being kept on this phone. A business that still holds the jobs of someone who has left can be picked in the cloud tab, so those jobs can be seen.</p>
         <p><strong>V164</strong> &middot; November 2026</p>
         <p class="muted">One place for your jobs in the cloud: every job is listed, with those also on this phone marked, and any job can be opened to look through. Owners, Team leaders and the Office can pick their business to see the whole team&rsquo;s jobs, or one person&rsquo;s.</p>
-        <p><strong>V163</strong> &middot; November 2026</p>
-        <p class="muted">Leaving and removing: someone can be removed from a business, or leave one themselves. Their jobs stay with the business; their phone sends anything unsent first, then takes the business&rsquo;s jobs off and says what it did.</p>
       </div>
 
       <div class="info-card">

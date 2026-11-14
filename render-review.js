@@ -1606,10 +1606,11 @@ function renderCloudJobsHTML() {
   // selection bar. Settings → Data → Cloud Storage stays (3A). Back returns
   // here: cloudStoreOpen notes 'sessions' as the view to go back to, and the
   // Jobs screen remembers its tab.
+  // V166 (1A): the link carries the figures, for the scope in force — Your jobs,
+  // or the picked business (2A, opening that business's page).
   const m = cloudJobsModel();
   const st = (typeof cloudScopeStatus === 'function') ? cloudScopeStatus() : { ok: !!cj.ok, loading: !!cj.loading, error: cj.error || '' };
-  const storageBtn = (cj.selecting || typeof cloudStoreOpen !== 'function' || m.scope !== 'mine') ? ''
-    : `<button class="pm-look-link cloud-storage-link" data-action="cs-open">${icon('cloud')} Cloud Storage ${icon('chevron-right', 'ic-trail')}</button>`;
+  const storageBtn = (cj.selecting || typeof cloudStoreOpen !== 'function') ? '' : renderCloudStorageLineHTML(m.scope);
   const scopeHTML = renderCloudScopeHTML(m);
   if (!st.ok) {
     let msg;
@@ -1643,6 +1644,25 @@ function renderCloudJobsHTML() {
       <div id="cloud-list-area">${renderCloudListAreaHTML(m)}</div>
     </div>
     ${bar}`;
+}
+
+// V166 (1A): the Cloud Storage line. With figures: "214 jobs · 1,930 photos ·
+// about 1.2 GB ›"; without (not read yet, no V166 SQL, a failed read): the plain
+// link, as before. settings-actions.js _cloudLinePaint repaints it in place.
+function cloudStorageLineLabel(f) {
+  if (!f) return 'Cloud Storage';
+  const pl = (n, w) => `${n.toLocaleString('en-GB')} ${w}${n === 1 ? '' : 's'}`;
+  return `Cloud Storage: ${pl(f.jobs, 'job')}, ${pl(f.photos, 'photo')}, about ${cloudBytesText(f.bytes)}`;
+}
+function renderCloudStorageLineInner(f) {
+  if (!f) return `${icon('cloud')} Cloud Storage ${icon('chevron-right', 'ic-trail')}`;
+  const pl = (n, w) => `${n.toLocaleString('en-GB')} ${w}${n === 1 ? '' : 's'}`;
+  // Each figure kept whole when the line wraps beside Select on a narrow phone.
+  return `${icon('cloud')} <span class="cloud-storage-figures"><span class="cs-part">${escapeHTML(pl(f.jobs, 'job'))}</span> · <span class="cs-part">${escapeHTML(pl(f.photos, 'photo'))}</span> · <span class="cs-part">about ${escapeHTML(cloudBytesText(f.bytes))}</span></span> ${icon('chevron-right', 'ic-trail')}`;
+}
+function renderCloudStorageLineHTML(scope) {
+  const f = (typeof cloudStorageLine === 'function') ? cloudStorageLine() : null;
+  return `<button class="pm-look-link cloud-storage-link" id="cloud-storage-line" data-action="cs-open" data-arg="${escapeHTML(scope || 'mine')}" aria-label="${escapeHTML(cloudStorageLineLabel(f))}">${renderCloudStorageLineInner(f)}</button>`;
 }
 
 // One job row — the same in every scope (3A): the site (or job name), the date;
@@ -1931,6 +1951,7 @@ function cloudBytesText(b) {
 
 function renderCloudStorage() {
   const cs = state.cloudStore || {};
+  if (cs.org) return renderCloudStorageBusiness(cs);   // V166
   const m = cloudStoreModel();
   const about = (b) => 'about ' + cloudBytesText(b || 0);
   const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
@@ -2010,4 +2031,83 @@ function renderCloudStorage() {
       ${top}
     </div>
     ${bar}`;
+}
+
+// V166 (2A 3A 4A): Cloud Storage for a BUSINESS — opened from the Cloud tab's line
+// while "[Business] · everyone" is showing. The total, a line per person (you,
+// a name, or a leaver marked "left"), and the biggest jobs with the person on
+// each; a tap opens the job look-only. Look only (4A): no Select, no Delete, no
+// Manage Photos. No inputs — render() may run while it is up (MAP rule 3).
+function renderCloudStorageBusiness(cs) {
+  const m = cloudStoreModel();
+  const about = (b) => 'about ' + cloudBytesText(b || 0);
+  const pl = (n, w) => `${(n || 0).toLocaleString('en-GB')} ${w}${n === 1 ? '' : 's'}`;
+  const header = `
+    <header class="header-row">
+      <button class="icon-btn" data-action="cs-back" aria-label="Back">${icon('chevron-left')}</button>
+      <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Cloud Storage</div>
+      <span style="width:40px"></span>
+    </header>
+    ${m.label ? `<p class="muted pm-note cs-scope" id="cs-scope">${icon('building-2')} ${escapeHTML(m.label)} · everyone</p>` : ''}`;
+  const err = cs.error ? `<p class="pm-note pm-error" id="cs-error">${escapeHTML(cs.error)}</p>` +
+    (cs.needsUpdate ? `<p class="muted pm-note" id="cs-needs-update">It’s a one-off step on the cloud’s side (the V166 database update). Nothing on this phone is affected.</p>` : '') : '';
+  if (!cs.ok) {
+    const body = cs.loading
+      ? `<p class="muted pm-note" role="status">Reading the cloud…</p>`
+      : `${err}${(typeof cloudStoreScopeOk === 'function' && !cloudStoreScopeOk()) ? '' : `<button class="btn-secondary cloud-retry" data-action="cs-refresh">Try again</button>`}`;
+    return `<div class="screen cs-screen cs-business">${header}${body}</div>`;
+  }
+  const when = cs.at ? escapeHTML(new Date(cs.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) : '';
+  const checked = cs.loading
+    ? `<p class="muted pm-note cs-checked" role="status">Reading the cloud…</p>`
+    : `<p class="muted pm-note cs-checked">Checked ${when} · <button class="pm-look-link" data-action="cs-refresh" aria-label="Read the cloud again">${icon('refresh-cw')} Refresh</button></p>`;
+  const totals = `
+    <div class="settings-section pm-totals" id="cs-totals">
+      <div class="pm-total-row"><span>${icon('clipboard-list')} Jobs</span><strong>${escapeHTML(m.jobs.n.toLocaleString('en-GB'))} · ${escapeHTML(about(m.jobs.bytes))}</strong></div>
+      <div class="pm-total-row"><span>${icon('camera')} Photos</span><strong>${escapeHTML(m.photos.n.toLocaleString('en-GB'))} · ${escapeHTML(about(m.photos.bytes))}</strong></div>
+      <div class="pm-total-row cs-total"><span>${icon('cloud')} In the cloud</span><strong>${escapeHTML(about(m.total))}</strong></div>
+      ${checked}
+      <p class="muted pm-note">Sizes are approximate. Photos are counted at full size.</p>
+    </div>`;
+  const people = m.people.length ? `
+    <div class="settings-section pm-totals" id="cs-people">
+      <h2 class="h2">People</h2>
+      ${m.people.map(p => `
+        <div class="pm-total-row cs-person${p.left ? ' is-left' : ''}">
+          <span><span class="cs-person-name">${escapeHTML(p.you ? 'You' : p.name)}${p.left ? ' · left' : ''}</span>
+            <span class="muted cs-person-counts">${escapeHTML(pl(p.jobs, 'job'))} · ${escapeHTML(pl(p.photos, 'photo'))}</span></span>
+          <strong>${escapeHTML(about(p.total))}</strong>
+        </div>`).join('')}
+    </div>` : '';
+  const cards = m.rows.map((j) => {
+    const counts = [];
+    if (typeof j.items === 'number') counts.push(pl(j.items, 'item'));
+    if (j.photos) counts.push(`<span class="photo-text">${icon('camera')} ${j.photos}</span>`);
+    const meta = [j.client ? escapeHTML(j.client) : '', escapeHTML(formatDate(j.date))].concat(counts).filter(Boolean).join(' · ');
+    const who = `<span class="cloud-who${j.who.left ? ' is-left' : ''}">${escapeHTML(j.who.you ? 'You' : j.who.name)}${j.who.left ? ' · left' : ''}</span>`;
+    const parts = j.photoBytes ? ` <span class="muted">(job ${escapeHTML(cloudBytesText(j.bytes))} + photos ${escapeHTML(cloudBytesText(j.photoBytes))})</span>` : '';
+    return `
+        <div class="session-card cloud-card cs-card${j.locked ? ' locked' : ''}${j.onPhone ? ' cs-on-phone' : ''}">
+          <div class="session-info" data-action="cs-look" data-arg="${escapeHTML(j.key)}">
+            <div class="session-title">${j.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : ''}${escapeHTML(j.title)}</div>
+            <div class="session-meta">${meta}</div>
+            <div class="session-meta cs-size"><strong>${escapeHTML(about(j.total))}</strong>${parts}</div>
+            <div class="session-meta cloud-tags">${who}${j.onPhone ? `<span class="cloud-onphone">${icon('smartphone')} On this phone</span>` : ''}</div>
+          </div>
+        </div>`;
+  }).join('');
+  const top = m.rows.length ? `
+    <div class="settings-section" id="cs-top">
+      <h2 class="h2">Biggest jobs</h2>
+      ${cards}
+      <p class="muted pm-note">Tap a job to look at it. Nothing in the business can be deleted from here.</p>
+    </div>` : `<p class="muted pm-note">No jobs in this business yet.</p>`;
+  return `
+    <div class="screen cs-screen cs-business">
+      ${header}
+      ${err}
+      ${totals}
+      ${people}
+      ${top}
+    </div>`;
 }

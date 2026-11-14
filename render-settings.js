@@ -102,7 +102,8 @@ function settingsPageSubtitle(pageId) {
     case 'settingsSetup':   return 'Share your setup to another device';
     case 'cloudStorage': {   // V108: the last figures read this app session, if any
       const cs = state.cloudStore;
-      if (cs && cs.ok && typeof cloudBytesText === 'function') return `About ${cloudBytesText((cs.jobs.bytes || 0) + (cs.photos.bytes || 0))} in the cloud`;
+      // V166: the account's own figures only — never a business's page's.
+      if (cs && cs.ok && !cs.org && typeof cloudBytesText === 'function') return `About ${cloudBytesText((cs.jobs.bytes || 0) + (cs.photos.bytes || 0))} in the cloud`;
       return 'Space your jobs and photos take in the cloud';
     }
     case 'settingsReset':   return 'Clear this phone, or start again as new';   // V106

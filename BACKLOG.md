@@ -13,7 +13,27 @@ here rather than restating it. Delete an item when it ships.
   plan V164–V169 so nothing lands in V170 but the audit's fixes. Brief it that the second
   audit's finding 5 is scheduled with seat billing (if not yet built).
 
-### Next after V165
+### Next after V166
+V166 = how much is stored — the Cloud tab's line and a business's Cloud Storage (round 1A 2A 3A 4A 5A 6A,
+14 Nov, all defaults; built in Opus). SQL: supabase/v166-storage.sql (K1–K4; isolation 31a–31c). sync.js
+(`syncMyStorage`, `syncBusinessStorage`), settings-actions.js (the line `_cloudLineLoad` / `cloudStorageLine`,
+`cs.org`, `_cloudStoreBizModel`, `cloudStoreLook`, `_cloudLookStart`), render-review.js (the line,
+`renderCloudStorageBusiness`), render-settings.js, dispatch.js, styles.css. Harness 105 + M2061–M2078.
+**Next — V167:** Office corrections (O12) — its own spec round (Opus). Then V168 seat billing + per-business
+lock (finding 5), V169 certificate numbering per business; the fourth GPT audit after V169, V170 its fixes.
+After V170 (R76 4A): a team-jobs delete from a business's Biggest jobs (Owner / Team leader / Office).
+
+### V166 residuals (known, accepted)
+- The line is as fresh as the last list read (⟳ or a new pick); a delete from Cloud Storage's own page
+  updates it through the page's re-read; Bring onto this phone doesn't change cloud figures.
+- A business's page shows the ten biggest jobs (CLOUD_STORAGE_TOP; the function allows up to 50).
+- A person with photos but no live jobs in the business (photos of a deleted job) still has a line —
+  they take space. A leaver whose jobs carry no engineer name is "Someone · left".
+- Your own page is still the V108 read (paged lists); the line's own read is one rpc. They agree except
+  when the page is capped (20,000 jobs) — then the line keeps its own figures.
+- Not proved here: a real phone; the hosted project (deploy steps). Headless Chrome at 390 px stands in.
+
+### Next after V165 (done — V166 took the storage review)
 V165 = a business holding someone else's jobs (the V164 gap from Peter's live test) + photos inside the
 look-only job (round 1A 2A 3A, 14 Nov; built in Fable). SQL: supabase/v165-business-jobs.sql (J1–J3).
 business.js (`oj`, businessOthersRead/Apply), settings-actions.js (picker rule, `cloudLook*Photo*`, delete

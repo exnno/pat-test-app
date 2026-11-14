@@ -1931,7 +1931,8 @@ function _cloudReset() {
   state.cloudJobs = { loading: false, ok: false, error: '', at: '', uid: '', jobs: [],
     capped: false, photos: false, stale: false, q: old.q || '',
     selecting: false, selected: {}, busy: '',
-    scope: 'mine', person: '', fails: !!old.fails, biz: null };   // V164
+    scope: 'mine', person: '', fails: !!old.fails, biz: null,   // V164
+    store: null, storeAsk: null };   // V166 (1A): the Cloud Storage line's figures
 }
 
 function cloudTabActive() {
@@ -2019,6 +2020,7 @@ function cloudJobsLoad(force) {
   }
   cj.loading = true;
   cj.error = '';
+  _cloudLineLoad(cj, '');   // V166 (1A): the line's figures, read with the list
   if (state.view === 'sessions') render();
   syncCloudList().then((res) => {
     if (state.cloudJobs !== cj) return;
@@ -2051,6 +2053,8 @@ function _cloudBizLoad(org, force) {
     return;
   }
   nb.loading = true;
+  nb.store = null; nb.storeAsk = null;
+  _cloudLineLoad(nb, org);   // V166 (1A): the business's figures, read with its list
   if (state.view === 'sessions') render();
   syncBusinessList(org).then((res) => {
     if (state.cloudJobs !== cj || cj.biz !== nb) return;
@@ -2074,6 +2078,53 @@ function cloudScopeStatus() {
   const b = (cj.biz && cj.biz.org === scope) ? cj.biz : null;
   if (!b) return { scope, loading: false, ok: false, error: '', at: '', capped: false };
   return { scope, loading: !!b.loading, ok: !!b.ok, error: b.error || '', at: b.at || '', capped: !!b.capped };
+}
+
+// ---- V166 (1A): the Cloud Storage line ----------------------------------------------
+// The Cloud tab's link to Cloud Storage shows the figures — "214 jobs · 1,930
+// photos · about 1.2 GB" — for the scope in force: Your jobs (my_storage), or the
+// picked business (business_storage — 5A, only offered to those who may read it
+// whole). Read WITH the list (cloudJobsLoad / _cloudBizLoad), never at start.
+// `holder` is the list's own state (state.cloudJobs, or its .biz), so a read for
+// a business no longer picked, or another account, is never shown. Memory only.
+// Until it lands, or without the V166 SQL, or when it fails: the plain link.
+// It lands in place (#cloud-storage-line) — never render(): the search box may
+// have the keyboard (MAP rule 3).
+function _cloudLineLoad(holder, org) {
+  const fn = org
+    ? (typeof syncBusinessStorage === 'function' ? () => syncBusinessStorage(org, false) : null)
+    : (typeof syncMyStorage === 'function' ? syncMyStorage : null);
+  if (!holder || !fn) return;
+  const ask = {};
+  holder.storeAsk = ask;
+  fn().then((res) => {
+    if (holder.storeAsk !== ask) return;
+    holder.storeAsk = null;
+    // A failed read keeps what this account last had; no SQL means no figures.
+    if (res.ok) holder.store = { uid: res.uid, jobs: res.jobs, photos: res.photos };
+    else if (res.needsUpdate) holder.store = null;
+    _cloudLinePaint();
+  });
+}
+
+// What the line shows for the scope in force: { jobs, photos, bytes } or null.
+function cloudStorageLine() {
+  const cj = state.cloudJobs || {};
+  const scope = cloudScope();
+  const me = (typeof _syncCurrentUserId === 'function') ? (_syncCurrentUserId() || '') : '';
+  const holder = scope === 'mine' ? cj : ((cj.biz && cj.biz.org === scope) ? cj.biz : null);
+  const st = holder && holder.store;
+  if (!st || !me || st.uid !== me) return null;
+  return { scope, jobs: st.jobs.n || 0, photos: st.photos.n || 0, bytes: (st.jobs.bytes || 0) + (st.photos.bytes || 0) };
+}
+
+function _cloudLinePaint() {
+  if (typeof document === 'undefined' || state.view !== 'sessions') return;
+  const el = document.getElementById('cloud-storage-line');
+  if (!el || typeof renderCloudStorageLineInner !== 'function') return;
+  const f = cloudStorageLine();
+  el.innerHTML = renderCloudStorageLineInner(f);
+  if (typeof cloudStorageLineLabel === 'function') el.setAttribute('aria-label', cloudStorageLineLabel(f));
 }
 
 // A row's key: the id for Your jobs (ids are unique within one account); the
@@ -2195,9 +2246,15 @@ function cloudLookOpen(key) {
   const m = cloudJobsModel();
   const row = m.byId.get(String(key));
   if (!row) return;
+  _cloudLookStart(row, m.scope, '');
+}
+
+// V166 (3A): a look opened from a business's Biggest jobs on Cloud Storage
+// (`from` 'store') is the same look — the row carries the same fields.
+function _cloudLookStart(row, scope, from) {
   const me = (typeof _syncCurrentUserId === 'function') ? (_syncCurrentUserId() || '') : '';
-  const look = { key: String(key), scope: m.scope, user: m.scope === 'mine' ? me : row.user, id: String(row.id),
-    org: m.scope === 'mine' ? '' : m.scope, row, loading: true, error: '', doc: null };
+  const look = { key: String(row.key), scope, user: scope === 'mine' ? me : row.user, id: String(row.id),
+    org: scope === 'mine' ? '' : scope, row, from: from || '', loading: true, error: '', doc: null };
   if (state.cloudLook) _cloudLookDropPhotos(state.cloudLook);   // V165: a look left open
   state.cloudLook = look;
   if (typeof openCloudLookSheet === 'function') openCloudLookSheet(look);
@@ -2218,6 +2275,7 @@ function cloudLookOpen(key) {
     else look.error = res.error || 'Couldn’t reach the cloud. Try again.';
     if (typeof renderCloudLookBody === 'function') renderCloudLookBody(look);
     if ((res.moved || res.gone) && state.cloudJobs) cloudJobsLoad(true);
+    if ((res.moved || res.gone) && look.from === 'store' && state.view === 'cloudStorage') cloudStoreLoad();   // V166
   });
 }
 
@@ -2331,6 +2389,13 @@ function cloudLookBring() {
   if (!look || !look.row || !look.row.mine) return;   // your own jobs only
   const id = look.id;
   cloudLookClose();
+  // V166: from Cloud Storage, back to the Jobs screen first — Back from the job
+  // then lands on the Jobs list, as it does from the Cloud tab.
+  if (look.from === 'store') {
+    if (!state.cloudJobs) _cloudReset();
+    state.jobsTab = 'cloud';
+    setView('sessions');
+  }
   if ((state.sessions || []).some(s => String(s.id) === id)) {
     state.jobsTab = 'phone';
     requestOpenSession(id);
@@ -2469,6 +2534,12 @@ function _cloudDelete(ids) {
     else if (bits.length) showToast(bits.join(' · '));
     // Something changed that the list didn't know: read it again.
     if ((res.missing || res.error) && state.cloudJobs === cj) cloudJobsLoad(true);
+    // V166: the line's figures, again — after the run that removes the photo
+    // rows (as Cloud Storage's own delete waits for it).
+    if (res.deleted) {
+      const again = () => { if (state.cloudJobs === cj) _cloudLineLoad(cj, ''); };
+      if (typeof syncWhenIdle === 'function') { syncWhenIdle(again); } else { again(); }
+    }
     if (state.view === 'sessions') render();
   });
 }
@@ -2484,17 +2555,34 @@ function _cloudDelete(ids) {
 // opened, with ⟳ (6A); the last figures stay on screen while it reads. Memory
 // only (state.cloudStore), never saved.
 // The read is sync.js syncCloudStorage; nothing here touches the cloud.
+//
+// V166 (2A 3A 4A 5A): the same page for a BUSINESS — opened from the Cloud tab's
+// line while "[Business] · everyone" is showing (cs.org). The business's total,
+// a line per person (leavers marked), and its biggest jobs with the person on
+// each; a tap opens the job look-only (V164's sheet, Show photos and all). Look
+// only (4A): no Select, no Delete, no Manage Photos (that is this phone's own).
+// Only while the business is one this account may read whole (cloudScopeChoices
+// — 5A); the database's own rule decides the read (business_storage). The read
+// is sync.js syncBusinessStorage. Memory only, as the account's own.
 
-function _cloudStoreReset(ret) {
+function _cloudStoreReset(ret, org) {
   const old = state.cloudStore || {};
-  state.cloudStore = { loading: false, ok: !!old.ok, error: '', needsUpdate: false, at: old.at || '', uid: old.uid || '',
-    jobs: old.jobs || { n: 0, bytes: 0 }, photos: old.photos || { n: 0, bytes: 0 }, top: old.top || [],
-    capped: !!old.capped, selecting: false, selected: {}, busy: '', ret: ret || old.ret || 'settingsStorage',
+  const o = org || '';
+  // Figures are carried between visits only for the same account and scope.
+  const same = (old.org || '') === o;
+  state.cloudStore = { loading: false, ok: same && !!old.ok, error: '', needsUpdate: false, at: same ? (old.at || '') : '',
+    uid: same ? (old.uid || '') : '', org: o,
+    jobs: (same && old.jobs) || { n: 0, bytes: 0 }, photos: (same && old.photos) || { n: 0, bytes: 0 },
+    top: (same && old.top) || [], people: (same && old.people) || [], named: same && !!old.named,
+    capped: same && !!old.capped, selecting: false, selected: {}, busy: '', ret: ret || old.ret || 'settingsStorage',
     gen: (old.gen || 0) + 1 };
 }
 
-function cloudStoreOpen() {
-  _cloudStoreReset(_MGR_RETURN_VIEWS.indexOf(state.view) !== -1 && state.view !== 'cloudStorage' ? state.view : 'settingsStorage');
+// `arg`: a business id from the Cloud tab's line (V166), else the account's own.
+function cloudStoreOpen(arg) {
+  const want = String(arg || '');
+  const org = (want && want !== 'mine' && cloudScopeChoices().some(c => c.id === want)) ? want : '';
+  _cloudStoreReset(_MGR_RETURN_VIEWS.indexOf(state.view) !== -1 && state.view !== 'cloudStorage' ? state.view : 'settingsStorage', org);
   // Another account's figures are never shown, not even while reading.
   const uid = (typeof _syncCurrentUserId === 'function') ? _syncCurrentUserId() : '';
   if (state.cloudStore.uid && state.cloudStore.uid !== uid) _cloudStoreForget();
@@ -2503,7 +2591,15 @@ function cloudStoreOpen() {
 }
 
 function _cloudStoreForget() {
-  Object.assign(state.cloudStore, { ok: false, at: '', uid: '', jobs: { n: 0, bytes: 0 }, photos: { n: 0, bytes: 0 }, top: [], capped: false });
+  Object.assign(state.cloudStore, { ok: false, at: '', uid: '', jobs: { n: 0, bytes: 0 }, photos: { n: 0, bytes: 0 }, top: [],
+    people: [], named: false, capped: false });
+}
+
+// V166 (5A): a business's page only while this account may still read it whole —
+// a role changed to Engineer, or a removal, ends it at once.
+function cloudStoreScopeOk() {
+  const cs = state.cloudStore || {};
+  return !cs.org || cloudScopeChoices().some(c => c.id === cs.org);
 }
 
 function cloudStoreBack() {
@@ -2516,7 +2612,16 @@ function cloudStoreBack() {
 function cloudStoreLoad() {
   if (!state.cloudStore) _cloudStoreReset();
   const cs = state.cloudStore;
-  if (cs.loading || typeof syncCloudStorage !== 'function') return;
+  const org = cs.org || '';
+  const read = org ? (typeof syncBusinessStorage === 'function' ? () => syncBusinessStorage(org, true) : null)
+    : (typeof syncCloudStorage === 'function' ? syncCloudStorage : null);
+  if (cs.loading || !read) return;
+  if (!cloudStoreScopeOk()) {
+    _cloudStoreForget();
+    cs.error = 'You can’t see this business’s figures any more.';
+    if (state.view === 'cloudStorage') render();
+    return;
+  }
   if (typeof _syncOffline === 'function' && _syncOffline()) {
     cs.error = 'No signal — Cloud Storage needs a connection.';
     if (state.view === 'cloudStorage') render();
@@ -2525,12 +2630,14 @@ function cloudStoreLoad() {
   cs.loading = true;
   cs.error = '';
   if (state.view === 'cloudStorage') render();
-  syncCloudStorage().then((res) => {
+  read().then((res) => {
     if (state.cloudStore !== cs) return;
     cs.loading = false;
     if (res.ok) {
       Object.assign(cs, { ok: true, error: '', needsUpdate: false, at: new Date().toISOString(), uid: res.uid,
-        jobs: res.jobs, photos: res.photos, top: res.top, capped: res.capped });
+        jobs: res.jobs, photos: res.photos, top: res.top, capped: !!res.capped,
+        people: res.people || [], named: !!res.named });
+      _cloudStoreToLine(cs);
       // A ticked job that has left the list can't stay ticked.
       const ids = new Set(res.top.map(j => j.id));
       for (const id of Object.keys(cs.selected)) if (!ids.has(id)) delete cs.selected[id];
@@ -2542,6 +2649,17 @@ function cloudStoreLoad() {
   });
 }
 
+// V166: the page's own read is the newest word on the same figures — the Cloud
+// tab's line takes them too (not when capped: the page's totals are then "at
+// least", the line's are whole).
+function _cloudStoreToLine(cs) {
+  const cj = state.cloudJobs;
+  if (!cj || !cs || !cs.ok) return;
+  const st = { uid: cs.uid, jobs: cs.jobs, photos: cs.photos };
+  if (!cs.org) { if (!cs.capped) cj.store = st; }
+  else if (cj.biz && cj.biz.org === cs.org) cj.biz.store = st;
+}
+
 // What the page shows. Pure. A job is "on this phone" by the phone's own list,
 // at draw time — a job brought down since the read moves across by itself.
 function cloudStoreModel() {
@@ -2551,6 +2669,7 @@ function cloudStoreModel() {
     const c = (id && typeof clientById === 'function') ? clientById(id) : null;
     return c && c.name ? c.name : '';
   };
+  if (cs.org) return _cloudStoreBizModel(cs, local, clientName);
   const rows = (cs.top || []).map(j => Object.assign({}, j, {
     client: clientName(j.clientId), title: j.site || j.name || 'Untitled job', onPhone: local.has(j.id),
   }));
@@ -2561,9 +2680,49 @@ function cloudStoreModel() {
     selectable: rows.filter(r => !r.onPhone).length };
 }
 
+// V166 (2A 3A): a business's page. People biggest first (then by name); each
+// biggest job named by its person, its row shaped as the Cloud tab's business
+// rows so the same look-only sheet opens it. Nothing selectable (4A).
+function _cloudStoreBizModel(cs, local, clientName) {
+  const me = (typeof _syncCurrentUserId === 'function') ? (_syncCurrentUserId() || '') : '';
+  const choice = cloudScopeChoices().find(c => c.id === cs.org);
+  const people = (cs.people || []).map((p) => {
+    // Named by the business's member list; someone not on it has left — named by
+    // the job they logged. If the names couldn't be read, nobody is called a leaver.
+    const left = !!cs.named && !p.member;
+    const you = !!p.you || p.user === me;
+    return { user: p.user, name: (p.member && p.name) || p.engineer || (you ? 'You' : 'Someone'), left, you,
+      jobs: p.jobs || 0, photos: p.photos || 0, total: p.total || 0 };
+  });
+  people.sort((a, b) => (b.total - a.total) || a.name.localeCompare(b.name) || (a.user < b.user ? -1 : 1));
+  const byUser = new Map(people.map(p => [p.user, p]));
+  const rows = (cs.top || []).map((j) => {
+    const split = (typeof splitSiteSnapshot === 'function') ? splitSiteSnapshot(j.site) : { client: '', site: j.site || '' };
+    const mine = j.user === me;
+    const p = byUser.get(j.user);
+    const who = p ? { user: j.user, name: p.name, left: p.left, you: p.you }
+      : { user: j.user, name: j.engineer || 'Someone', left: !!cs.named, you: mine };
+    return Object.assign({}, j, { key: j.user + '|' + j.id, mine, who, onPhone: mine && local.has(String(j.id)),
+      client: (mine && clientName(j.clientId)) || split.client || '', title: split.site || j.name || j.site || 'Untitled job' });
+  });
+  const jobs = cs.jobs || { n: 0, bytes: 0 };
+  const photos = cs.photos || { n: 0, bytes: 0 };
+  return { org: cs.org, label: choice ? choice.label : '', rows, people, jobs, photos,
+    total: (jobs.bytes || 0) + (photos.bytes || 0), selected: [], selectable: 0, byKey: new Map(rows.map(r => [r.key, r])) };
+}
+
+// V166 (3A): a business's biggest job, opened look-only.
+function cloudStoreLook(key) {
+  const cs = state.cloudStore;
+  if (!cs || !cs.org || cs.busy || !cloudStoreScopeOk()) return;
+  const row = cloudStoreModel().byKey.get(String(key || ''));
+  if (!row) return;
+  _cloudLookStart(row, cs.org, 'store');
+}
+
 function cloudStoreToggleSelecting() {
   const cs = state.cloudStore;
-  if (!cs || cs.busy) return;
+  if (!cs || cs.busy || cs.org) return;   // V166 (4A): a business's page is look only
   cs.selecting = !cs.selecting;
   cs.selected = {};
   render();
@@ -2572,7 +2731,7 @@ function cloudStoreToggleSelecting() {
 // Only in Select. A job on this phone is never ticked (4A).
 function cloudStoreTap(id) {
   const cs = state.cloudStore;
-  if (!cs || !id || cs.busy || !cs.selecting) return;
+  if (!cs || !id || cs.busy || !cs.selecting || cs.org) return;
   const key = String(id);
   const row = cloudStoreModel().rows.find(r => r.id === key);
   if (!row) return;
@@ -2586,7 +2745,7 @@ function cloudStoreTap(id) {
 
 function cloudStoreDeleteSelected() {
   const cs = state.cloudStore;
-  if (!cs || cs.busy) return;
+  if (!cs || cs.busy || cs.org) return;   // V166 (4A): never a business's jobs
   const m = cloudStoreModel();
   // m.selected never holds a job on this phone (cloudStoreModel) — the one guard.
   const o = cloudDeleteOverview(m.selected, m.rows);

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V165)
+# PATGo — Code Map (V166)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1250,6 +1250,20 @@ own return (`cs.ret`, from `_MGR_RETURN_VIEWS`) and reads every open →
 sync's `skipped` is the backstop). Delete… → `cloudDeleteOverview(sel, rows)` →
 **render-review.js** `openCloudDeleteSheet` → `syncCloudDelete` → re-read inside
 `syncWhenIdle` (after the follow-up run that removes the photos — M749).
+⚠ V166: `cs.org` — the same page for a BUSINESS (opened from the Cloud tab's line,
+`cs-open` with the business id; `cloudStoreOpen` accepts only a `cloudScopeChoices`
+id, else your own). `_cloudStoreBizModel` (people, biggest jobs keyed person|id),
+`cloudStoreLook` → `_cloudLookStart(row, org, 'store')` (V164's look-only sheet;
+`look.from` 'store' → Bring returns to the Jobs screen first). Look only: Select /
+Delete guarded by `cs.org`; `cloudStoreScopeOk()` ends it when the role goes.
+→ **sync.js** `syncBusinessStorage(org, true)`. The page's read feeds the tab's
+line (`_cloudStoreToLine`). render-settings.js's Data summary: own figures only.
+⚠ V166: the CLOUD STORAGE LINE — `cj.store` / `cj.biz.store` {uid, jobs, photos},
+read WITH the list (`_cloudLineLoad` in cloudJobsLoad / _cloudBizLoad; again
+after a cloud-tab delete, in syncWhenIdle) → **sync.js** `syncMyStorage` /
+`syncBusinessStorage(org, false)`; `cloudStorageLine()` for the scope in force
+(never another account's); lands IN PLACE (`_cloudLinePaint` → #cloud-storage-line,
+**render-review.js** `renderCloudStorageLineInner`) — never render() (MAP rule 3).
 `'cloudStorage'` is in `_MGR_RETURN_VIEWS` (Manage Photos returns to it) and
 `mgrGoBack` re-reads on arriving there. Actions `cs-*` in **dispatch.js**.
 
@@ -1348,6 +1362,9 @@ v93: `renderCloudJobsHTML()`, `renderCloudListAreaHTML()` and
 render-core.js, model in settings-actions.js). V109: its top row (`.cloud-head`)
 carries `cs-open` (Cloud Storage) in every state but selecting; Back returns to
 the tab because 'sessions' is in `_MGR_RETURN_VIEWS` (settings-actions.js).
+V166: it is the Cloud Storage LINE (`renderCloudStorageLineHTML(scope)`, data-arg
+'mine' or the business id; figures from settings-actions.js `cloudStorageLine`),
+in every scope; `renderCloudStorageBusiness(cs)` is the page for a business.
 V98: the Overview's title bar is `.header-row.header-sticky` (styles.css; both the
 normal and selection headers). The site-notes card and its sheet
 (`state.siteNotesSheet`, cleared by setView) are drawn here; the sheet holds an
@@ -1842,6 +1859,11 @@ for every live job (sizePage), the view with `b` (bytesPage), then
 `_SYNC_CLOUD_JOB_COLS` for the CLOUD_STORAGE_TOP biggest only (one `in` request).
 Server columns from **supabase/v108-storage.sql**; "column does not exist"
 (42703) → `needsUpdate`. Memory only. Harness 45a–45d, M740–M745, M758.
+⚠ V166: `syncMyStorage()` (rpc my_storage) and `syncBusinessStorage(org, full)`
+(business_storage; full: + business_people names, fail-soft, + business_biggest_jobs)
+— **supabase/v166-storage.sql**, SECURITY INVOKER (they count only what the reader
+may read). RPCs, not table reads: rule 45 / 48a untouched. Missing function
+(PGRST202 / 42883) → `needsUpdate`. Memory only. Harness 105a–105e, M2061–M2078.
 Not probed at boot (optional subsystem). Harness 16a–16n, 17a–17z, 18a–18r,
 19a–19w, 20a–20f2, 21a–21q, 23a–23l, 25a–25n, 26a–26q, 27a–27m, 28a–28i and
 29a–29i and 30a–30i, mutations M142–M295, M306–M325, M355–M395, M396–M418, M419–M434, M436–M451, M452–M474.

@@ -4361,6 +4361,17 @@ body.has-selection-bar .cloud-tab { padding-bottom: 100px; }
 .cs-size { margin-top: 2px; }
 .cs-where { font-size: 0.75rem; font-weight: 600; color: var(--accent-text); }
 .cs-card.cs-on-phone { opacity: 0.92; }
+/* V166 (1A): the Cloud tab's line carries the figures; (2A) a business's page —
+   the business named under the title, and a line per person. */
+.cloud-head .cloud-storage-link { display: inline-flex; align-items: center; gap: 4px; flex: 1 1 auto; min-width: 0; text-align: left; }
+.cloud-head .cloud-storage-link .ic-trail { flex: none; }
+.cloud-storage-figures { min-width: 0; }   /* wraps rather than cut the size off beside Select */
+.cloud-storage-figures .cs-part { white-space: nowrap; }
+.cs-scope { margin: -4px 2px 8px; display: flex; align-items: center; gap: 6px; }
+.cs-person > span { display: flex; flex-direction: column; min-width: 0; }
+.cs-person-name { font-weight: 600; overflow-wrap: anywhere; }
+.cs-person-counts { font-size: 0.75rem; }
+.cs-person.is-left .cs-person-name { color: var(--text-muted); }
 body.has-selection-bar .cs-screen { padding-bottom: 100px; }
 
 /* ===== V94: location count, Multi Pick tiles, Undo ===== */

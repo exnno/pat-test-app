@@ -271,7 +271,8 @@ registerActions({
   'cloud-person':       (arg) => cloudPersonSet(arg),            // V164 (1A): a business's person chips
   'cloud-fails':        () => cloudFailsToggle(),                // V164 (3A): Fails only
   // V108 (Stage 5 pt 3, second half): Settings → Data → Cloud Storage.
-  'cs-open':            () => cloudStoreOpen(),
+  'cs-open':            (arg) => cloudStoreOpen(arg),   // V166: a business's id from the Cloud tab's line
+  'cs-look':            (arg) => cloudStoreLook(arg),   // V166 (3A): a business's biggest job, look-only
   'cs-back':            () => cloudStoreBack(),
   'cs-refresh':         () => cloudStoreLoad(),
   'cs-select-toggle':   () => cloudStoreToggleSelecting(),

@@ -5427,6 +5427,131 @@ function syncCloudStorage() {
     });
 }
 
+// ---- V166 (1A 2A 3A 5A): how much is stored — the Cloud tab's line, a business's page ----
+// Three database functions (supabase/v166-storage.sql), each run with the
+// READER's own rights, so they add up only rows the caller may already read:
+//   my_storage()                → your live jobs and photos, and their sizes — the
+//                                 same figures Cloud Storage's own page adds up;
+//   business_storage(o)         → a line per person of a business you may read whole
+//                                 (Owner / Team leader / Office — 5A), with the name
+//                                 their latest job was logged with (for a leaver);
+//   business_biggest_jobs(o, n) → its biggest jobs, with the fields the business
+//                                 list already shows, so a tap can open one look-only.
+// Counts and sizes only: never a job's contents, never a photo. These are rpcs,
+// not reads of a synced table, so rule 45 (and harness 48a) is untouched.
+// ⚠ Memory only (rules 25 and 70): nothing read here is stored, synced or sent.
+// Without the V166 SQL the database says the function isn't there: needsUpdate
+// (the Cloud tab's line then stays a plain "Cloud Storage" link).
+function _syncStoreCount(v) { const x = Number(v); return (isFinite(x) && x > 0) ? Math.round(x) : 0; }
+function _syncStoreNeedsUpdate(e) {
+  if (!e) return false;
+  if (e.code === 'PGRST202' || e.code === '42883') return true;
+  const msg = String(e.message || '');
+  return /Could not find the function|does not exist/i.test(msg) && /my_storage|business_storage|business_biggest_jobs/.test(msg);
+}
+
+// Resolves { ok, offline, error, needsUpdate, uid, jobs: { n, bytes },
+//   photos: { n, bytes } }. Never rejects.
+function syncMyStorage() {
+  const res = { ok: false, offline: false, error: '', needsUpdate: false, uid: '', jobs: { n: 0, bytes: 0 }, photos: { n: 0, bytes: 0 } };
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  res.uid = uid;
+  return syncDataClient().then((c) => c.rpc('my_storage')).then((r) => {
+    if (r && r.error) throw r.error;
+    const row = ((r && r.data) || [])[0];
+    // The function always answers one row for someone signed in: none means it
+    // isn't the V166 function answering.
+    if (!row || typeof row !== 'object') { res.needsUpdate = true; return res; }
+    res.jobs = { n: _syncStoreCount(row.jobs), bytes: _syncStoreCount(row.job_bytes) };
+    res.photos = { n: _syncStoreCount(row.photos), bytes: _syncStoreCount(row.photo_bytes) };
+    res.ok = true;
+    return res;
+  }).catch((e) => {
+    if (_syncStoreNeedsUpdate(e)) res.needsUpdate = true;
+    else res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
+    return res;
+  });
+}
+
+// `full`: the page (people's names and the biggest jobs too); without it, just
+// the totals for the Cloud tab's line.
+// Resolves { ok, offline, error, needsUpdate, org, uid, named, jobs: { n, bytes },
+//   photos: { n, bytes }, people: [{ user, name, member, you, engineer, jobs,
+//   jobBytes, photos, photoBytes, total }], top: [{ id, user, site, name, date,
+//   clientId, engineer, locked, certNo, items, fails, photos, bytes, photoBytes,
+//   total }] }. Never rejects.
+function syncBusinessStorage(org, full) {
+  const res = { ok: false, offline: false, error: '', needsUpdate: false, org: String(org || ''), uid: '', named: false,
+    jobs: { n: 0, bytes: 0 }, photos: { n: 0, bytes: 0 }, people: [], top: [] };
+  if (!_SYNC_UUID_RE.test(res.org)) { res.error = 'That business isn’t one of yours.'; return Promise.resolve(res); }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  const uid = _syncCurrentUserId();
+  if (!uid) { res.offline = true; return Promise.resolve(res); }
+  res.uid = uid;
+  const str = (v) => (typeof v === 'string') ? v : '';
+  const num = (v) => (typeof v === 'number' && isFinite(v) && v >= 0) ? Math.round(v) : null;
+  let client = null;
+  return syncDataClient().then((c) => { client = c; return c.rpc('business_storage', { o: res.org }); })
+    .then((r) => {
+      if (r && r.error) throw r.error;
+      for (const x of ((r && r.data) || [])) {
+        const u = str(x && x.user_id);
+        if (!_SYNC_UUID_RE.test(u)) continue;
+        const p = { user: u, name: '', member: false, you: u === uid, engineer: str(x.engineer).slice(0, 80),
+          jobs: _syncStoreCount(x.jobs), jobBytes: _syncStoreCount(x.job_bytes),
+          photos: _syncStoreCount(x.photos), photoBytes: _syncStoreCount(x.photo_bytes) };
+        p.total = p.jobBytes + p.photoBytes;
+        res.people.push(p);
+        res.jobs.n += p.jobs; res.jobs.bytes += p.jobBytes;
+        res.photos.n += p.photos; res.photos.bytes += p.photoBytes;
+      }
+      if (!full) return;
+      // Names: the business's current members. Fail-soft — without them a line is
+      // named by the job it was logged with.
+      return client.rpc('business_people').then((n) => {
+        if (n && n.error) throw n.error;
+        const by = new Map();
+        for (const m of ((n && n.data) || [])) {
+          if (m && str(m.business_id) === res.org && _SYNC_UUID_RE.test(str(m.user_id))) by.set(str(m.user_id), m);
+        }
+        for (const p of res.people) {
+          const m = by.get(p.user);
+          if (m) { p.member = true; p.name = str(m.name).slice(0, 80); p.you = p.you || m.is_you === true; }
+        }
+        res.named = true;
+      }).catch((e) => { console.error('Business storage: names not read (non-fatal).', e); })
+        .then(() => client.rpc('business_biggest_jobs', {
+          o: res.org, lim: (typeof CLOUD_STORAGE_TOP === 'number' && CLOUD_STORAGE_TOP > 0) ? CLOUD_STORAGE_TOP : 10 }))
+        .then((b) => {
+          if (b && b.error) throw b.error;
+          for (const j of ((b && b.data) || [])) {
+            const id = String(j && j.id != null ? j.id : '');
+            const u = str(j && j.user_id);
+            // Only a job PATGo could have made can be opened (syncCloudJob checks again).
+            if (!_SYNC_UUID_RE.test(u) || typeof safeId !== 'function' || !safeId(id)) continue;
+            const bytes = _syncStoreCount(j.job_bytes), photoBytes = _syncStoreCount(j.photo_bytes);
+            res.top.push({ id, user: u, site: str(j.site), name: str(j.name), date: str(j.date), clientId: str(j.client_id),
+              engineer: str(j.engineer).slice(0, 80), locked: j.locked === true || j.locked === 'true', certNo: str(j.cert_no),
+              items: num(j.items), fails: _syncStoreCount(j.fails), photos: _syncStoreCount(j.photos),
+              bytes, photoBytes, total: bytes + photoBytes });
+          }
+        });
+    })
+    .then(() => { res.ok = true; return res; })
+    .catch((e) => {
+      if (_syncStoreNeedsUpdate(e)) {
+        res.needsUpdate = true;
+        res.error = 'The cloud needs a small update before it can show a business’s sizes.';
+      } else {
+        res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
+      }
+      res.jobs = { n: 0, bytes: 0 }; res.photos = { n: 0, bytes: 0 }; res.people = []; res.top = [];
+      return res;
+    });
+}
+
 // Bring jobs from the cloud onto this phone: each job's row is read (the one
 // download a job on request needs), checked like any pulled job, and added
 // through _syncTakeJob — exactly as the pull adds one, plus st.conf (safe the
