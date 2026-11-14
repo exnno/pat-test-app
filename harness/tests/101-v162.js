@@ -313,14 +313,18 @@ module.exports = async function () {
     t.eq(JSON.parse(await rpc(app)).status, 200, 'its Data API request goes through');
     const jobs = jobsOf(app);
     const exp = JSON.parse(app.storage.getItem(AUTH)).expires_at;
+    // V165: the token is taken NOW. The 401 starts the sign-out at once; on a slower
+    // computer the saved login can already be gone when the check below runs, and a
+    // stand-in login made then can carry a later second in its expiry — a false
+    // failure (Peter's Mac, 14 Nov), not the app.
+    const token = JSON.parse(app.storage.getItem(AUTH)).access_token;
     // Revoked (Your devices → Sign it out) while that token is still unexpired.
     app.srv.gone = true;
     t.ok(exp * 1000 > Date.now() + 30 * 60000, 'the access token is still unexpired');
     const r = JSON.parse(await rpc(app));
     t.eq(r.status, 401, 'HTTP 401 — not 500');
     t.eq(r.code, 'patgo_signed_out', 'the caller gets the real code, patgo_signed_out');
-    t.eq(app.srv.calls[app.srv.calls.length - 1].auth, 'Bearer ' + JSON.parse(app.storage.getItem(AUTH) || login(A)).access_token,
-      '…sent on this phone’s own token');
+    t.eq(app.srv.calls[app.srv.calls.length - 1].auth, 'Bearer ' + token, '…sent on this phone’s own token');
     await until(() => status(app) === 'signed-out');
     t.eq(status(app), 'signed-out', 'this phone signs itself out');
     t.eq(app.run('state.cloud.message'), SIGNED_OUT_WORDS, '…and the Account page says why');
