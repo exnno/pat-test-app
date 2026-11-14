@@ -458,12 +458,16 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 106f */
-  await t.group('106f — the SQL in step (C1–C5, isolation 32a–32c); release: V167; cache pat-v167; What’s new one line; About V167 / V166 / V165', () => {
+  await t.group('106f — the SQL in step (C1–C5, isolation 32a–32c); V167’s About line (release checks → 108f)', () => {
     const mig = read('supabase/v167-corrections.sql');
     const end = '-- ================================================================ end V167\n';
     const block = mig.slice(mig.indexOf('-- ================================================================ V167\n'), mig.indexOf(end) + end.length);
     t.ok(block.length > 4000, 'the migration has its definition');
-    t.ok(read('supabase/schema.sql').trimEnd().endsWith(block.trimEnd()), 'a new project gets it byte for byte, as schema.sql’s last section');
+    // V168: no longer the LAST section (V168's follows — 108e); still whole, and
+    // nothing after it redefines correct_job.
+    const sch = read('supabase/schema.sql');
+    t.ok(sch.includes(block), 'a new project gets it byte for byte');
+    t.excludes(sch.slice(sch.indexOf(block) + block.length), 'function public.correct_job(', '…and no later section redefines it');
     t.includes(block, "returns jsonb language plpgsql volatile security definer set search_path = '' as $$", 'its own rights, a pinned search path');
     t.includes(block, "if not public.can_read_org(s.org_id) then raise exception 'patgo_correct_not_allowed'; end if;", 'only Owner / Team leader / Office of the JOB’s business');
     t.excludes(block, "patgo_correct_own", 'V167.1: your own job too — no own refusal (107d)');
@@ -476,24 +480,10 @@ module.exports = async function () {
     const iso = read('supabase/isolation-test.sql');
     for (const g of ['32a', '32b', '32c']) t.includes(iso, `res := res || array['${g}|`, 'isolation ' + g);
     t.includes(iso, "32a|A corrects B''s locked job in A''s business, the change kept with A''s name|FAIL|run supabase/v167-corrections.sql first", '…32a names the file');
-    // Release.
+    // Release checks moved to 108f (V168). Kept: V167's About line.
     const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V167', 'APP_VERSION V167');
-    t.eq(rel.run('WELCOME_VERSION'), 'V167', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v167-1';", 'cache key pat-v167-1 (V167.1 hotfix — the key only; 107d)');
-    t.eq(rel.fn('updateVersionLabel')('pat-v167-1'), 'V167.1', 'the update banner reads the key as V167.1');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>Mistakes can be corrected by the office.</strong>', '…corrections');
-    t.includes(sheetCopy, 'picks it up on its next sync.</li>', '…and the engineer’s phone');
+    t.eq(rel.fn('updateVersionLabel')('pat-v167-1'), 'V167.1', 'the update banner reads a hotfix key as V167.1');
     const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V167</strong>'), y = help.indexOf('<p><strong>V166</strong>'), z = help.indexOf('<p><strong>V165</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V167, V166, V165');
-    t.excludes(help, '<p><strong>V164</strong>', 'V164 rolled off');
-    t.excludes(help, 'One place for your jobs in the cloud: every job is listed', '…with its line');
-    t.includes(help, 'Photos when you look at a cloud job: tap Show photos', 'About: V165’s line, the oldest');
     t.includes(help, 'Corrections: Owners, Team leaders and the Office can fix a mistake', 'About: V167’s line');
     t.includes(read('sync.js'), "V167 (1A 2C 3A 5A 7A): correcting someone else's job", 'sync.js names V167');
   });

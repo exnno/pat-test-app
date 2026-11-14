@@ -142,7 +142,7 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 107d */
-  await t.group('107d — the SQL: no own refusal, C3 checks it’s in, schema.sql in step; release: pat-v167-1, still V167', () => {
+  await t.group('107d — the SQL: no own refusal, C3 checks it’s in, schema.sql in step', () => {
     const mig = read('supabase/v167-corrections.sql');
     const end = '-- ================================================================ end V167\n';
     const block = mig.slice(mig.indexOf('-- ================================================================ V167\n'), mig.indexOf(end) + end.length);
@@ -150,11 +150,7 @@ module.exports = async function () {
     t.includes(block, "if not public.can_read_org(s.org_id) then raise exception 'patgo_correct_not_allowed'; end if;", '…the role still decides — an Engineer’s own refused');
     t.includes(mig, "not like '%patgo_correct_own%'", 'C3 checks the V167.1 function is in');
     t.includes(mig, 'V167.1 (14 Nov): run it AGAIN after the V167.1 files', 'the file says to run it again');
-    t.ok(read('supabase/schema.sql').trimEnd().endsWith(block.trimEnd()), 'schema.sql in step');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v167-1';", 'cache key pat-v167-1');
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V167', 'a hotfix: APP_VERSION stays V167');
-    t.eq(rel.run('WELCOME_VERSION'), 'V167', '…What’s new too');
+    t.ok(read('supabase/schema.sql').includes(block), 'schema.sql in step');   // V168: no longer its last section (106f)
     t.includes(read('sync.js'), "V167.1: + org — the job's business as the cloud says", 'sync.js names V167.1');
   });
 };

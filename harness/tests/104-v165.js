@@ -342,8 +342,8 @@ module.exports = async function () {
 
   /* ------------------------------------------------------------------ 104f */
   // V166: the release checks moved to 105f; this keeps V165's own About line.
-  await t.group('104f — V165’s About line; sync.js names V165', () => {
-    t.includes(read('render-help.js'), 'Photos when you look at a cloud job: tap Show photos', 'About: V165’s line');
+  await t.group('104f — sync.js names V165 (V165’s About line rolled off at V168)', () => {
+    // V168: V165's About line rolled off (108f checks it's gone).
     t.includes(read('sync.js'), 'V165 (2A): the photos of a job being LOOKED at', 'sync.js names V165');
   });
 };
