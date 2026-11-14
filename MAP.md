@@ -1278,6 +1278,10 @@ class empties readings it hasn't; reason for result / readings; a fail's notes),
 rows: fails, `redo`). `_cloudLookRead(look)` is the look's read (open, and after a
 refusal). The sheet has inputs: never render() while open (MAP rule 3).
 Sheet + trail in **render-review.js**; `CLOUD_FIX_LABELS` read there too.
+V167.1: your OWN job too — `look.jobOrg` (sync.js `syncCloudJob`'s `org`, the cloud's
+answer) + `cloudFixOwnOk(org)` (stored list role ∈ CLOUD_SCOPE_ROLES — a solo owner
+included; never in a tutorial); `cloudLookFixOrg(look)` names it to the rpc; on this
+phone a sync is started (`syncPushSoon(0, {pull})`).
 
 ### onboarding.js (~250 ln) — first-run wizard — NEW v70
 The wizard state machine (step capture, paging, fresh/import fork, theme pick,

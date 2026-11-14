@@ -30,7 +30,16 @@ types / presets / clients, required fields, a simpler engineer mode). Settle wit
 Peter (14 Nov): Office works on a computer as much as a phone — every Office screen must work well at
 desktop width. The tablet / laptop layout (Stage 15) may need to come before launch — raise at V168.
 
+V167.1 (hotfix, 14 Nov — Peter's live test: "I can correct someone else's job but not my own that exists in the
+cloud"; 1A 2A 3A 4A): your own locked job too — Your jobs and the business view; Owner / Team leader / Office of
+the job's business (solo owners included); also on this phone (a sync is started). supabase/v167-corrections.sql
+amended (run again — no own refusal; C3); sync.js (`syncCloudJob` → org), settings-actions.js (`cloudFixOwnOk`,
+`cloudLookFixOrg`, own toasts), render-review.js (intro), sw.js pat-v167-1. Harness 107 + M2105–M2112; M2080,
+M2099 re-aimed; 50d (one more org_id read).
+
 ### V167 residuals (known, accepted)
+- V167.1: correcting your own job that is also on another of your phones with unsent changes there asks
+  "both changed" on that phone, as for a teammate's.
 - An engineer who unlocked the job on their phone and changed it before their phone synced is asked
   "both changed" (V81); "keep this phone's" would send their copy over the correction — the trail is lost
   with it. Rare (3A: corrections are for locked jobs); a held card that names the correction is a later fix.

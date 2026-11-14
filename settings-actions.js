@@ -2277,7 +2277,7 @@ function _cloudLookRead(look) {
   syncCloudJob(look.user, look.id, look.org).then((res) => {
     if (state.cloudLook !== look) return;
     look.loading = false;
-    if (res.ok) look.doc = res.doc;
+    if (res.ok) { look.doc = res.doc; look.jobOrg = res.org || ''; }   // V167.1
     else if (res.offline) look.error = 'No signal — opening a job from the cloud needs a connection.';
     else if (res.moved) look.error = 'This job has moved to another business since the list was read.';
     else if (res.gone) look.error = 'This job isn’t in the cloud any more.';
@@ -2309,13 +2309,35 @@ const CLOUD_FIX_LABELS = { site: 'Site', name: 'Job name', assetNo: 'Asset numbe
 const CLOUD_FIX_MAX = { notes: 1000, reading: 40, text: 200, reason: 300 };
 const _cloudFixIsReading = (f) => f.indexOf('readings.') === 0;
 
-// Whether this look can be corrected: { show, can, why }. Shown only for someone
-// else's job in a business this account may read whole (1A — the picker's own
-// rule, cloudScopeChoices); can only once it is locked (3A).
+// Whether this look can be corrected: { show, can, why }. Someone else's job: in a
+// business this account may read whole (1A — the picker's own rule,
+// cloudScopeChoices). V167.1 (Peter, 14 Nov — 1A 2A 3A): your OWN job too, from Your
+// jobs or the business view, when you are Owner / Team leader / Office of the
+// business the cloud says it is in (solo owners included — a business of one is
+// never a picker choice, so this is the stored list's role); on this phone as well
+// (it takes the correction at its next sync). Can only once it is locked (3A).
+function cloudFixOwnOk(org) {
+  if (typeof _tut !== 'undefined' && _tut) return false;
+  if (!org || typeof businessList !== 'function') return false;
+  let list = [];
+  try { list = businessList(); } catch (e) { list = []; }
+  return list.some(b => b && b.id === org && CLOUD_SCOPE_ROLES.includes(b.role));
+}
+function cloudLookFixOrg(look) {
+  if (!look || !look.row) return '';
+  return look.row.mine ? String(look.jobOrg || '') : String(look.org || '');
+}
 function cloudLookFixState(look) {
   const no = { show: false, can: false, why: '' };
-  if (!look || !look.doc || !look.org || !look.row || look.row.mine) return no;
-  // (row.mine is the list's own "yours": Your jobs, or your row in a business.)
+  if (!look || !look.doc || !look.row) return no;
+  if (look.row.mine) {
+    // (row.mine is the list's own "yours": Your jobs, or your row in a business.)
+    // (A job that moved since is the cloud's to refuse: patgo_correct_moved.)
+    if (!look.jobOrg || !cloudFixOwnOk(look.jobOrg)) return no;
+    if (look.doc.locked !== true) return { show: true, can: false, why: 'Lock this job before correcting it here — or change it on the phone that has it.' };
+    return { show: true, can: true, why: '' };
+  }
+  if (!look.org) return no;
   if (!cloudScopeChoices().some(c => c.id === look.org)) return no;
   if (look.doc.locked !== true) {
     const who = (look.row.who && look.row.who.name) ? look.row.who.name : 'Whoever is testing it';
@@ -2420,10 +2442,13 @@ function _cloudFixFollow(look, doc) {
   const items = Array.isArray(doc.items) ? doc.items.filter(it => it && typeof it === 'object') : [];
   const fails = items.filter(it => it.result === 'fail').length;
   const redo = (typeof jobCorrectedSinceCertificate === 'function') && jobCorrectedSinceCertificate(doc);
-  const same = (j) => j && String(j.id) === look.id && (j.user || '') === (look.user || '');
+  // A Your jobs row carries no person: it is yours (V167.1).
+  const me = (typeof _syncCurrentUserId === 'function') ? (_syncCurrentUserId() || '') : '';
+  const same = (j) => j && String(j.id) === look.id && (j.user || me) === (look.user || '');
   const lists = [];
   const cj = state.cloudJobs;
   if (cj && cj.biz && Array.isArray(cj.biz.jobs)) lists.push(cj.biz.jobs);
+  if (cj && Array.isArray(cj.jobs)) lists.push(cj.jobs);   // V167.1: Your jobs
   const cs = state.cloudStore;
   if (cs && Array.isArray(cs.top)) lists.push(cs.top);
   for (const r of [look.row].concat(...lists.map(l => l.filter(same)))) {
@@ -2452,10 +2477,11 @@ function cloudFixSave(values, reason) {
   if (typeof syncCorrectJob !== 'function') return Promise.resolve(false);
   fix.busy = true; fix.error = '';
   _cloudFixPaint(fix);
-  return syncCorrectJob(look.user, look.id, look.org, changes, reason).then((res) => {
+  return syncCorrectJob(look.user, look.id, cloudLookFixOrg(look), changes, reason).then((res) => {
     if (state.cloudFix !== fix) return false;
     fix.busy = false;
-    const who = (look.row && look.row.who && look.row.who.name && !look.row.who.left) ? look.row.who.name : '';
+    const own = !!(look.row && look.row.mine);
+    const who = (!own && look.row && look.row.who && look.row.who.name && !look.row.who.left) ? look.row.who.name : '';
     const done = () => { if (typeof closeCloudFixSheet === 'function') closeCloudFixSheet(); state.cloudFix = null; };
     if (res.ok) {
       done();
@@ -2463,7 +2489,12 @@ function cloudFixSave(values, reason) {
         if (res.doc) { look.doc = res.doc; _cloudFixFollow(look, res.doc); _cloudLookPaint(look); }
         else _cloudLookRead(look);
       }
-      showToast(who ? `Corrected. ${who}’s phone gets it the next time it syncs.` : 'Corrected in the cloud.');
+      // V167.1: your own job on this phone — it comes down at the next sync; start one.
+      if (own && look.row.onPhone && typeof syncPushSoon === 'function') {
+        try { syncPushSoon(0, { pull: true }); } catch (e) { /* the next sync takes it */ }
+      }
+      showToast(own ? (look.row.onPhone ? 'Corrected. This phone takes it at its next sync.' : 'Corrected in the cloud.')
+        : (who ? `Corrected. ${who}’s phone gets it the next time it syncs.` : 'Corrected in the cloud.'));
       return true;
     }
     // The job moved on under the sheet: close it and read the job again.
@@ -2471,8 +2502,7 @@ function cloudFixSave(values, reason) {
       unlocked: 'This job has been unlocked since you opened it, so it can’t be corrected now.',
       gone: 'This job isn’t in the cloud any more.',
       moved: 'This job has moved to another business.',
-      not_allowed: 'You can’t correct jobs in this business any more.',
-      own: 'This is your own job — change it on your phone.' };
+      not_allowed: 'You can’t correct jobs in this business any more.' };
     if (reread[res.code]) {
       done();
       if (state.cloudLook === look) _cloudLookRead(look);
@@ -2481,6 +2511,8 @@ function cloudFixSave(values, reason) {
     }
     fix.error = res.offline ? 'No signal — a correction needs a connection.'
       : res.needsUpdate ? 'The cloud needs a small update before jobs can be corrected (the V167 database update).'
+      // V167.1: a cloud still on V167's function refuses your own job — run the file again.
+      : res.code === 'own' ? 'The cloud needs a small update before you can correct your own jobs (run the V167 database update again).'
       : res.code === 'reason' ? 'Add a reason — a result or a reading can only be changed with one.'
       : res.code === 'nothing' ? 'Nothing has changed yet.'
       : res.code === 'plan' ? 'This business’s PATGo plan has ended, so the cloud isn’t taking changes.'

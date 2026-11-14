@@ -1980,7 +1980,9 @@ function openCloudFixSheet(fix) {
       <button class="fail-close-btn" id="cloud-fix-cancel-x" aria-label="Cancel">&times;</button>
     </div>
     <div class="sheet-scroll cloud-fix-body">
-      <p class="muted cfx-intro">${who ? `${escapeHTML(who)}&rsquo;s job.` : ''} Your change is kept in the job with your name, and their phone gets it the next time it syncs.</p>
+      <p class="muted cfx-intro">${look.row && look.row.mine
+        ? 'Your own job. The change is kept in the job with your name, and your phones get it at their next sync.'
+        : `${who ? `${escapeHTML(who)}&rsquo;s job.` : ''} Your change is kept in the job with your name, and their phone gets it the next time it syncs.`}</p>
       ${form}
       <div class="cfx-field cfx-wide"><label class="label" for="cfx-reason">Reason for the change</label>
         <input class="input" id="cfx-reason" maxlength="300" autocomplete="off" placeholder="${fix.item ? 'Needed when a result or reading changes' : 'Optional'}"></div>

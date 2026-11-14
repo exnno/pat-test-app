@@ -5254,7 +5254,9 @@ function syncBusinessList(org) {
 // never taken onto the phone, stored or sent.
 // Resolves { ok, offline, error, gone, moved, doc }. Never rejects.
 function syncCloudJob(user, id, org) {
-  const res = { ok: false, offline: false, error: '', gone: false, moved: false, doc: null };
+  // V167.1: + org — the job's business as the cloud says, so your own job can be
+  // corrected from Your jobs (settings-actions.js cloudLookFixState).
+  const res = { ok: false, offline: false, error: '', gone: false, moved: false, doc: null, org: '' };
   const u = String(user || ''), sid = String(id == null ? '' : id), o = String(org || '');
   if (!_SYNC_UUID_RE.test(u) || typeof safeId !== 'function' || !safeId(sid) || (o && !_SYNC_UUID_RE.test(o))) {
     res.gone = true; return Promise.resolve(res);
@@ -5268,6 +5270,7 @@ function syncCloudJob(user, id, org) {
       if (o && String(row.org_id || '') !== o) { res.moved = true; return res; }
       if (!_syncValidDoc(row.doc, sid)) { res.gone = true; return res; }
       res.doc = row.doc;
+      res.org = _SYNC_UUID_RE.test(String(row.org_id || '')) ? String(row.org_id) : '';
       res.ok = true;
       return res;
     }).catch((e) => {
