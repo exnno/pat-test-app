@@ -144,6 +144,8 @@ module.exports = async function () {
       "let q = client.from('sessions').select(_SYNC_BIZ_JOB_COLS).eq('org_id', res.org).eq('deleted', false);",
       "return syncDataClient().then((c) => c.from('sessions').select('id,doc,deleted,org_id').eq('user_id', u).eq('id', sid).limit(1))",
       "if (o && String(row.org_id || '') !== o) { res.moved = true; return res; }",
+      // V167.1: the look names the job's business, so your own job can be corrected.
+      "res.org = _SYNC_UUID_RE.test(String(row.org_id || '')) ? String(row.org_id) : '';",
     ], 'one write: the job row names it from the job\u2019s own businessId; the rest are reads (V150 the job list, V164 the business view)');
     // Still: no write of org_id anywhere but the job row.
     t.eq(code('sync.js').filter(l => /org_id\s*=[^=]/.test(l)).length, 1, 'org_id is written in one place only (the job row)');

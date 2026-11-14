@@ -61,7 +61,11 @@ function cloud(opts) {
   srv.add(ED, BIG, 'ZZOPEN', { site: 'ZZ Open Site', date: '2026-11-12', locked: false, items: [{ id: 'o1', assetNo: 'E-9', result: 'pass' }] });
   srv.add(LEE, BIG, 'ZZLFIX', { site: 'ZZ Leaver Fix', date: '2026-08-16', engineer: 'Lee Smith', locked: true,
     items: [{ id: 'l1', assetNo: 'L-1', location: 'Hal', result: 'pass' }] });
-  srv.add(O.id, BIG, 'ZZOWN', { site: 'ZZ Own Locked', date: '2026-11-08', locked: true, items: [{ id: 'w1', assetNo: 'W-1', result: 'pass' }] });
+  srv.add(O.id, BIG, 'ZZOWN', { site: 'ZZ Own Locked', date: '2026-11-08', locked: true, reportAt: REP, items: [{ id: 'w1', assetNo: 'W-1', result: 'pass' }] });
+  // V167.1: Olive's own jobs elsewhere — an Engineer in Other Co; the Owner of One Ltd (a business of one).
+  srv.add(O.id, TWO, 'ZZTWOOWN', { site: 'ZZ Other Co Own', date: '2026-11-07', locked: true, items: [{ id: 't1', assetNo: 'T-1', result: 'pass' }] });
+  srv.add(O.id, K.ONE, 'ZZONELOCK', { site: 'ZZ One Ltd Locked', date: '2026-11-06', locked: true, items: [{ id: 'n1', assetNo: 'N-1', location: 'Hal', result: 'pass' }] });
+  srv.add(O.id, BIG, 'ZZOWNOPEN', { site: 'ZZ Own Open', date: '2026-11-05', locked: false, items: [{ id: 'q1', assetNo: 'Q-1', result: 'pass' }] });
   srv.noSql = !!(opts && opts.noSql);
   srv.lapsed = false;
   srv.fixes = [];
@@ -73,7 +77,7 @@ function cloud(opts) {
     const row = srv.sessions.find(s => s.user_id === b.holder && s.id === b.job);
     if (!row || row.deleted) return no('gone');
     if (b.org && row.org_id !== b.org) return no('moved');
-    if (b.holder === O.id) return no('own');
+    if (b.holder === O.id && srv.oldOwn) return no('own');   // a cloud still on V167's function
     if (!srv.readable({ user_id: 'someone-else', org_id: row.org_id })) return no('not_allowed');
     if (row.doc.locked !== true) return no('unlocked');
     if (srv.lapsed) return json({ code: '42501', message: 'patgo_plan_locked: this business\'s PATGo plan has ended, so the cloud is not taking changes', details: null, hint: null }, 403);
@@ -198,17 +202,7 @@ module.exports = async function () {
     await lookAt(app, LEE + '|ZZLFIX');
     t.includes(body(app).innerHTML, 'data-look="fix" data-arg="l1"', 'a leaver’s locked job: correctable');
     app.doc.getElementById('cloud-look-close').click();
-    // Your own, in the business view.
-    await lookAt(app, O.id + '|ZZOWN');
-    t.excludes(body(app).innerHTML, 'data-look="fix', 'your own job: never (edit it on your phone)');
-    t.includes(app.doc.getElementById('cloud-look-note').innerHTML, 'Look only', '…look only');
-    app.doc.getElementById('cloud-look-close').click();
-    // Your jobs.
-    pick(app, 'mine');
-    await tick(20);
-    await lookAt(app, 'ZZOWN');
-    t.excludes(body(app).innerHTML, 'data-look="fix', 'Your jobs: never');
-    app.doc.getElementById('cloud-look-close').click();
+    // V167.1: your own job is correctable too — 107a has it (an Engineer's own isn't).
     // Office and Team leader may too; an Engineer has no business view at all.
     for (const role of ['office', 'team_leader']) {
       const a = await ready({}, [{ id: BIG, name: 'Big Co', role, def: true, n: 3 }]);
@@ -472,7 +466,7 @@ module.exports = async function () {
     t.ok(read('supabase/schema.sql').trimEnd().endsWith(block.trimEnd()), 'a new project gets it byte for byte, as schema.sql’s last section');
     t.includes(block, "returns jsonb language plpgsql volatile security definer set search_path = '' as $$", 'its own rights, a pinned search path');
     t.includes(block, "if not public.can_read_org(s.org_id) then raise exception 'patgo_correct_not_allowed'; end if;", 'only Owner / Team leader / Office of the JOB’s business');
-    t.includes(block, "if holder = me then raise exception 'patgo_correct_own'; end if;", 'never your own');
+    t.excludes(block, "patgo_correct_own", 'V167.1: your own job too — no own refusal (107d)');
     t.includes(block, "(d -> 'locked') is distinct from 'true'::jsonb then", 'locked only');
     t.includes(block, "raise exception 'patgo_correct_changed';", 'what it was must still be so');
     t.includes(block, "if (needs and why is null) or length(coalesce(why, '')) > 300 then raise exception 'patgo_correct_reason'; end if;", 'a reason for a result or reading');
@@ -486,8 +480,8 @@ module.exports = async function () {
     const rel = freshApp();
     t.eq(rel.run('APP_VERSION'), 'V167', 'APP_VERSION V167');
     t.eq(rel.run('WELCOME_VERSION'), 'V167', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v167';", 'cache key pat-v167');
-    t.eq(rel.fn('updateVersionLabel')('pat-v167'), 'V167', 'the update banner reads the key as V167');
+    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v167-1';", 'cache key pat-v167-1 (V167.1 hotfix — the key only; 107d)');
+    t.eq(rel.fn('updateVersionLabel')('pat-v167-1'), 'V167.1', 'the update banner reads the key as V167.1');
     const core = read('render-core.js');
     const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
     const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
@@ -504,3 +498,6 @@ module.exports = async function () {
     t.includes(read('sync.js'), "V167 (1A 2C 3A 5A 7A): correcting someone else's job", 'sync.js names V167');
   });
 };
+
+// V167.1: the stand-in and helpers, for 107-v167-1.js.
+module.exports.kit = { cloud, phone, body, lookTap, lookAt, ready, fill, fillFrom, save, sheetErr, sheetOf };
