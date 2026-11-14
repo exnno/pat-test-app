@@ -9039,8 +9039,8 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v167';",   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v166';",
+    from: "const CACHE_VERSION = 'pat-v167-1';",   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v167';",
     why:  "a release needs its cache bump or phones never get it (106f)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
@@ -14678,11 +14678,11 @@ const MUTATIONS = [
     why:  "3A: locked jobs only — an open one says lock it first (106a)",
   },
   {
-    name: "M2080 (V167) your own job offers Correct",
+    name: "M2080 (V167; re-aimed V167.1) your own job offers Correct whatever the business",
     file: "settings-actions.js",
-    from: "  if (!look || !look.doc || !look.org || !look.row || look.row.mine) return no;",
-    to:   "  if (!look || !look.doc || !look.org || !look.row) return no;",
-    why:  "your own job is edited on your phone; the cloud refuses it anyway (106a)",
+    from: "    if (!look.jobOrg || !cloudFixOwnOk(look.jobOrg)) return no;",   // V167.1: own jobs are correctable now — re-aimed at their guard.
+    to:   "    if (!look.jobOrg) return no;",
+    why:  "V167.1: only where you are Owner / Team leader / Office of the job's business (107a)",
   },
   {
     name: "M2081 (V167) Correct offered without the role",
@@ -14811,11 +14811,11 @@ const MUTATIONS = [
     why:  "6A: reached from the look-only job (106a)",
   },
   {
-    name: "M2099 (V167) the database lets you correct your own job",
+    name: "M2099 (V167; re-aimed V167.1) the database lets anyone in correct",
     file: "supabase/v167-corrections.sql",
-    from: "  if holder = me then raise exception 'patgo_correct_own'; end if;\n",
+    from: "  if not public.can_read_org(s.org_id) then raise exception 'patgo_correct_not_allowed'; end if;\n",   // V167.1: the own refusal is gone — re-aimed at the role.
     to:   "",
-    why:  "your own jobs are edited on your phone (106f; proved in Postgres)",
+    why:  "Owner / Team leader / Office only — an Engineer's own job too (106f 107d; proved in Postgres)",
   },
   {
     name: "M2100 (V167) the trail opens from nowhere",
@@ -14851,6 +14851,62 @@ const MUTATIONS = [
     from: "  if (msg) { fix.error = msg; _cloudFixPaint(fix); return Promise.resolve(false); }",
     to:   "  if (false) { fix.error = msg; _cloudFixPaint(fix); return Promise.resolve(false); }",
     why:  "nothing sent until the sheet's rules pass (106c)",
+  },
+  {
+    name: "M2105 (V167.1) your own job correctable as an Engineer",
+    file: "settings-actions.js",
+    from: "  return list.some(b => b && b.id === org && CLOUD_SCOPE_ROLES.includes(b.role));",
+    to:   "  return list.some(b => b && b.id === org);",
+    why:  "1A: Owner / Team leader / Office of the job's business — an Engineer's own is the office's to correct (107a)",
+  },
+  {
+    name: "M2106 (V167.1) your own job correctable inside a tutorial",
+    file: "settings-actions.js",
+    from: "function cloudFixOwnOk(org) {\n  if (typeof _tut !== 'undefined' && _tut) return false;\n",
+    to:   "function cloudFixOwnOk(org) {\n",
+    why:  "a tutorial never reaches the cloud (107a)",
+  },
+  {
+    name: "M2107 (V167.1) your own job sent without its business",
+    file: "settings-actions.js",
+    from: "  return look.row.mine ? String(look.jobOrg || '') : String(look.org || '');",
+    to:   "  return String(look.org || '');",
+    why:  "the cloud checks the job is in the business named (107b)",
+  },
+  {
+    name: "M2108 (V167.1) the look doesn't learn the job's business",
+    file: "sync.js",
+    from: "      res.org = _SYNC_UUID_RE.test(String(row.org_id || '')) ? String(row.org_id) : '';\n",
+    to:   "",
+    why:  "Your jobs rows carry no business; the cloud's answer names it (107a)",
+  },
+  {
+    name: "M2109 (V167.1) your own job on this phone waits for a sync",
+    file: "settings-actions.js",
+    from: "        try { syncPushSoon(0, { pull: true }); } catch (e) { /* the next sync takes it */ }",
+    to:   "",
+    why:  "3A: this phone takes it — a sync is started (107b)",
+  },
+  {
+    name: "M2110 (V167.1) a V167 cloud's own refusal isn't explained",
+    file: "settings-actions.js",
+    from: "      : res.code === 'own' ? 'The cloud needs a small update before you can correct your own jobs (run the V167 database update again).'\n",
+    to:   "",
+    why:  "names the database update to run again (107c)",
+  },
+  {
+    name: "M2111 (V167.1) Your jobs' row doesn't follow a correction",
+    file: "settings-actions.js",
+    from: "  if (cj && Array.isArray(cj.jobs)) lists.push(cj.jobs);   // V167.1: Your jobs\n",
+    to:   "",
+    why:  "the row says make the certificate again at once (107b)",
+  },
+  {
+    name: "M2112 (V167.1) your own open job offers Correct",
+    file: "settings-actions.js",
+    from: "    if (look.doc.locked !== true) return { show: true, can: false, why: 'Lock this job",
+    to:   "    if (false) return { show: true, can: false, why: 'Lock this job",
+    why:  "3A: locked jobs only, your own too (107a)",
   },
 ];
 
