@@ -517,7 +517,7 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V164';",   // V164: re-pointed.   // V163: re-pointed. V162: re-pointed. V161: re-pointed. V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
+    from: "const APP_VERSION = 'V165';",   // V165: re-pointed.   // V164: re-pointed.   // V163: re-pointed. V162: re-pointed. V161: re-pointed. V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
     to:   "const APP_VERSION = 'V154';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
@@ -640,7 +640,7 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V162</strong> &middot; November 2026</p>',   // V164: V161 rolled off — the oldest is V162 (103f).   // V163: V160 rolled off — the oldest is V161 (102f). V162: V159 rolled off — the oldest is V160 (101f). V161: V158 rolled off — the oldest is V159 (100f). V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
+    from: '        <p><strong>V163</strong> &middot; November 2026</p>',   // V165: V162 rolled off — the oldest is V163 (104f).   // V164: V161 rolled off — the oldest is V162 (103f).   // V163: V160 rolled off — the oldest is V161 (102f). V162: V159 rolled off — the oldest is V160 (101f). V161: V158 rolled off — the oldest is V159 (100f). V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 95e)',
   },
@@ -6117,9 +6117,9 @@ const MUTATIONS = [
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
     // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
-    from: "<li><strong>One place for your jobs in the cloud.</strong>",   // V164: welcome rolled (one line) — re-aimed; 103f pins it.   // V163: welcome rolled (two lines) — re-aimed at the first; 102f pins it. V157: welcome rolled (two lines) — re-aimed at the first; 96e pins it.   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
+    from: "<li><strong>Photos when you look at a cloud job.</strong>",   // V165: welcome rolled (one line) — re-aimed; 104f pins it.   // V164: welcome rolled (one line) — re-aimed; 103f pins it.   // V163: welcome rolled (two lines) — re-aimed at the first; 102f pins it. V157: welcome rolled (two lines) — re-aimed at the first; 96e pins it.   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (103f)",
+    why:  "11A: the welcome says plainly what changed on screen (104f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8599,8 +8599,8 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V164';",   // V164: re-aimed.   // V163: re-aimed. V157: re-aimed. V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
-    to:   "const WELCOME_VERSION = 'V163';",
+    from: "const WELCOME_VERSION = 'V165';",   // V165: re-aimed.   // V164: re-aimed.   // V163: re-aimed. V157: re-aimed. V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
+    to:   "const WELCOME_VERSION = 'V164';",
     why:  "What's new is rolled on a feature release (96e)",
   },
   {
@@ -8615,9 +8615,9 @@ const MUTATIONS = [
     // V149: one line — re-aimed at its end.
     // V150: one line — re-aimed at its end.
     // V155: two lines — re-aimed at the second's end; still caught by the count.
-    from: "pick your business at the top to see everyone&rsquo;s jobs, or just one person&rsquo;s.</li>\n",   // V164: one line — re-aimed at its end; 103f counts one.   // V163: two lines — re-aimed at the second's end. V157: two lines — re-aimed at the second's end; still caught by the count. V156: two lines — re-aimed at the second's end; still caught by the count.
-    to:   "pick your business at the top to see everyone&rsquo;s jobs, or just one person&rsquo;s.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (103f)",
+    from: "you can still pick the business at the top to see the jobs they did for it.</li>\n",   // V165: one line — re-aimed at its end; 104f counts one.   // V164: one line — re-aimed at its end; 103f counts one.   // V163: two lines — re-aimed at the second's end. V157: two lines — re-aimed at the second's end; still caught by the count. V156: two lines — re-aimed at the second's end; still caught by the count.
+    to:   "you can still pick the business at the top to see the jobs they did for it.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (104f)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8631,9 +8631,9 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "One place for your jobs in the cloud: every job is listed",   // V164: at V164's (V163's moves to M1259, V162's to M1238).   // V161: at V161's (V160's moves to M1259, V159's to M1238). V160: at V160's (V159's moves to M1259, V158's to M1238). V159: at V159's (V158's moves to M1259, V157's to M1238). V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
+    from: "Photos when you look at a cloud job: tap Show photos",   // V165: at V165's (V164's moves to M1259, V163's to M1238).   // V164: at V164's (V163's moves to M1259, V162's to M1238).   // V161: at V161's (V160's moves to M1259, V159's to M1238). V160: at V160's (V159's moves to M1259, V158's to M1238). V159: at V159's (V158's moves to M1259, V157's to M1238). V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
     to:   "Better",
-    why:  "the About page must say what changed in this version (103f)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
+    why:  "the About page must say what changed in this version (104f)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8748,9 +8748,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "no longer starts up signed in as a different account",   // V164: V161's rolled off — re-aimed at V162's, the oldest now (101f).   // V163: V160's rolled off — re-aimed at V161's, the oldest now (100f). V162: V159's rolled off — re-aimed at V160's, the oldest now (99f). V161: V158's rolled off — re-aimed at V159's, the oldest now (98f). V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
+    from: "Leaving and removing: someone can be removed from a business",   // V165: V162's rolled off — re-aimed at V163's, the oldest now (102f).   // V164: V161's rolled off — re-aimed at V162's, the oldest now (101f).   // V163: V160's rolled off — re-aimed at V161's, the oldest now (100f). V162: V159's rolled off — re-aimed at V160's, the oldest now (99f). V161: V158's rolled off — re-aimed at V159's, the oldest now (98f). V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (101f)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
+    why:  "the About page keeps the last three versions' lines (102f)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -8910,9 +8910,9 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Leaving and removing: someone can be removed from a business",   // V164: at V163's, still in the window (102f).   // V163: at V162's, still in the window (101f). V161: at V160's, still in the window (99f). V160: at V159's, still in the window (98f). V159: at V158's, still in the window. V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
+    from: "One place for your jobs in the cloud: every job is listed",   // V165: at V164's, still in the window (103f).   // V164: at V163's, still in the window (102f).   // V163: at V162's, still in the window (101f). V161: at V160's, still in the window (99f). V160: at V159's, still in the window (98f). V159: at V158's, still in the window. V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (102f)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
+    why:  "the About page keeps the last three versions' lines (103f)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
   },
   {
     name: "M1260 (V134) setup still offers the 30-second tour",
@@ -9039,9 +9039,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v164';",   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v163';",
-    why:  "a release needs its cache bump or phones never get it (103f)",
+    from: "const CACHE_VERSION = 'pat-v165';",   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v164';",
+    why:  "a release needs its cache bump or phones never get it (104f)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -13365,8 +13365,8 @@ const MUTATIONS = [
   {
     name: "M1891 (V157) the approvals aren't read with the businesses",
     file: "business.js",
-    from: "        .then(() => businessWaitingRead(c, uid).then(() => ok, () => ok));",
-    to:   "        .then(() => ok);",
+    from: "        .then(() => businessWaitingRead(c, uid).then(() => ok, () => ok))   // V157",   // V165: re-aimed (another read follows it).
+    to:   "        .then(() => ok)   // V157",
     why:  "1A: read on every start / return (96b 96c)",
   },
   {
@@ -14272,9 +14272,9 @@ const MUTATIONS = [
   {
     name: "M2022 (V164) a business of one is offered",
     file: "settings-actions.js",
-    from: "CLOUD_SCOPE_ROLES.includes(b.role) && Number(b.n) >= 2)",
-    to:   "CLOUD_SCOPE_ROLES.includes(b.role) && Number(b.n) >= 1)",
-    why:  "1A: solo sees no picker — the tab is Your jobs (103a)",
+    from: "CLOUD_SCOPE_ROLES.includes(b.role) && (Number(b.n) >= 2 || b.oj === true))",   // V165: re-aimed (others' jobs too).
+    to:   "CLOUD_SCOPE_ROLES.includes(b.role))",
+    why:  "1A: solo with nobody else's jobs sees no picker (103a, 104a)",
   },
   {
     name: "M2023 (V164) the practice phone shows the real businesses",
@@ -14394,6 +14394,155 @@ const MUTATIONS = [
     from: "    look.error = 'No signal — opening a job from the cloud needs a connection.';\n    if (typeof renderCloudLookBody",
     to:   "    look.error = '';\n    if (typeof renderCloudLookBody",
     why:  "2A: no signal is said plainly (103d)",
+  },
+
+  // ---- V165 (1A 2A 3A): a business holding someone else's jobs; photos inside the look. Group 104 + M2040–M2060. ----
+  {
+    name: "M2040 (V165) a business of one holding someone else's jobs isn't offered",
+    file: "settings-actions.js",
+    from: " || b.oj === true))",
+    to:   "))",
+    why:  "1A: found in Peter's live test — an Owner must see a leaver's jobs (104a 104b)",
+  },
+  {
+    name: "M2041 (V165) the others-jobs answer isn't read with the businesses",
+    file: "business.js",
+    from: "        .then(() => businessOthersRead(c, uid).then(() => ok, () => ok));",
+    to:   "        .then(() => ok);",
+    why:  "1A: read on every start / return (104a)",
+  },
+  {
+    name: "M2042 (V165) another account's answer is carried over",
+    file: "business.js",
+    from: "new Map(old.u === uid ? old.list.map(b => [b.id, b.oj]) : [])",
+    to:   "new Map(old.list.map(b => [b.id, b.oj]))",
+    why:  "one account's businesses never colour another's (104a)",
+  },
+  {
+    name: "M2043 (V165) the cloud's no doesn't clear a stored yes",
+    file: "business.js",
+    from: "    const v = yes.has(b.id);",
+    to:   "    const v = yes.has(b.id) || b.oj === true;",
+    why:  "1A: the picker goes when nobody else's jobs remain (104a)",
+  },
+  {
+    name: "M2044 (V165) garbage counts as a yes",
+    file: "business.js",
+    from: "      oj: b.oj === true,",
+    to:   "      oj: !!b.oj,",
+    why:  "stored garbage collapses to a safe default (104a)",
+  },
+  {
+    name: "M2045 (V165) the answer isn't kept between reads",
+    file: "business.js",
+    from: "      oj: was.get(r.id) === true });",
+    to:   "      oj: false });",
+    why:  "a project without the SQL, or a failed read, changes nothing (104a)",
+  },
+  {
+    name: "M2046 (V165) the answer is applied to another account's list",
+    file: "business.js",
+    from: "  if (!uid || rec.u !== uid) return false;\n  const yes",
+    to:   "  if (!uid) return false;\n  const yes",
+    why:  "one account's businesses never colour another's (104a)",
+  },
+  {
+    name: "M2047 (V165) the delete review names a job now on this phone",
+    file: "settings-actions.js",
+    from: "    if (m && j && j.onPhone) continue;\n",
+    to:   "",
+    why:  "the review names only what will go (104b)",
+  },
+  {
+    name: "M2048 (V165) the photo rows aren't read by the job's person",
+    file: "sync.js",
+    from: "select('id,item_id,thumb').eq('user_id', u).eq('session_id', sid)",
+    to:   "select('id,item_id,thumb').eq('session_id', sid)",
+    why:  "rule 45: every read names its account (104c, 48a)",
+  },
+  {
+    name: "M2049 (V165) deleted photos are shown",
+    file: "sync.js",
+    from: ".eq('session_id', sid).eq('deleted', false)\n      .order('id'",
+    to:   ".eq('session_id', sid)\n      .order('id'",
+    why:  "a deleted photo is gone (104c)",
+  },
+  {
+    name: "M2050 (V165) a photo id PATGo never made is listed",
+    file: "sync.js",
+    from: "        if (!safeId(pid)) continue;   // a name PATGo could never have made is never built into a path\n",
+    to:   "",
+    why:  "an id from the cloud is never built into a path unchecked (104c)",
+  },
+  {
+    name: "M2051 (V165) a preview is fetched where the cloud has none",
+    file: "settings-actions.js",
+    from: "      if (!p.thumb) continue;\n      chain = chain.then",
+    to:   "      chain = chain.then",
+    why:  "no wasted downloads; the tile is plain (104c)",
+  },
+  {
+    name: "M2052 (V165) the previews are the full photos",
+    file: "settings-actions.js",
+    from: "syncCloudLookPhoto(look.user, p.id, false)",
+    to:   "syncCloudLookPhoto(look.user, p.id, true)",
+    why:  "2A: small previews; the photo itself only on a tap (104c)",
+  },
+  {
+    name: "M2053 (V165) closing the look keeps its pictures",
+    file: "settings-actions.js",
+    from: "  if (look) _cloudLookDropPhotos(look);\n}",
+    to:   "}",
+    why:  "2A: nothing is kept (104c)",
+  },
+  {
+    name: "M2054 (V165) a picture landing after closing is kept",
+    file: "settings-actions.js",
+    from: "if (state.cloudLook !== look || look.ph !== ph || ph.open !== open) { _cloudLookRevoke(url); return; }",
+    to:   "if (state.cloudLook !== look || look.ph !== ph || ph.open !== open) { return; }",
+    why:  "2A: nothing is kept (104d)",
+  },
+  {
+    name: "M2055 (V165) the full photo is read from your own folder",
+    file: "settings-actions.js",
+    from: "syncCloudLookPhoto(look.user, id, true)",
+    to:   "syncCloudLookPhoto(_syncCurrentUserId(), id, true)",
+    why:  "the job's own person — never your photo of the same id (104c)",
+  },
+  {
+    name: "M2056 (V165) a photo not on the list can be asked for",
+    file: "settings-actions.js",
+    from: "  if (!ph || ph.loading || !ph.list.some(p => p.id === id)) return;",
+    to:   "  if (!ph || ph.loading) return;",
+    why:  "only this job's photos (104d)",
+  },
+  {
+    name: "M2057 (V165) Show photos isn't wired",
+    file: "render-review.js",
+    from: "    if (act === 'photos' && typeof cloudLookPhotosShow === 'function') cloudLookPhotosShow();",
+    to:   "    if (false) cloudLookPhotosShow();",
+    why:  "2A: the button works through the sheet's own listener (104c)",
+  },
+  {
+    name: "M2058 (V165) no signal isn't said on Show photos",
+    file: "settings-actions.js",
+    from: "    look.phError = 'No signal \\u2014 photos need a connection.';\n    _cloudLookPaint(look);\n    return;",
+    to:   "    _cloudLookPaint(look);\n    return;",
+    why:  "said plainly (104d)",
+  },
+  {
+    name: "M2059 (V165) an Engineer is answered by business_others_jobs",
+    file: "supabase/schema.sql",
+    from: "    and m.role in ('owner', 'team_leader', 'office')\n$$;",
+    to:   "$$;",
+    why:  "only a business the caller may read whole (104e)",
+  },
+  {
+    name: "M2060 (V165) the photos open as soon as the job does",
+    file: "render-review.js",
+    from: "  if (!ph) {\n    if (!r.photos) return '';",
+    to:   "  if (!ph) {\n    if (!r.photos) return '';\n    if (!look.phError && typeof cloudLookPhotosShow === 'function') { setTimeout(cloudLookPhotosShow, 0); }",
+    why:  "2A: nothing comes down until Show photos is tapped (104c)",
   },
 ];
 
