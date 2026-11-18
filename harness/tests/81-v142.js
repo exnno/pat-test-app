@@ -295,7 +295,7 @@ module.exports = async function () {
     p = page(app, null);
     t.includes(p, 'Checking your plan…', 'not read yet: checking');
     p = page(app, info(), { pending: 'checkout' });
-    t.includes(p, 'Continue in the Stripe window, then come back here.', 'waiting: says where to look');
+    t.includes(p, 'Continue in the Stripe window, then come back here', 'waiting: says where to look');   // V169.1: + "— this page updates by itself."
     t.includes(p, 'data-action="billing-cancel-wait"', '…with Cancel');
     t.excludes(p, 'data-action="billing-subscribe"', '…and nothing to tap twice');
     p = page(app, info(), { message: 'You’re subscribed. <b>' });

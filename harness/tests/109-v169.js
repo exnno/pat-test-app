@@ -294,7 +294,7 @@ module.exports = async function () {
     t.eq(labels[1], 'Team leader — logs jobs and sees the whole team’s · +£3 a month', 'Team leader: +£3 a month');
     t.eq(labels[2], 'Office — sees the whole team’s jobs, doesn’t log · free', 'Office: free');
     app.sheets[0].choices[0].onPick();
-    t.includes(app.sheets[1].blurb, 'A paid seat: +£3 a month, from when they join.', 'the name sheet says it, from joining (2A)');
+    t.includes(app.sheets[1].blurb, 'When they accept, a £3 a month seat is added to your plan straight away', 'the name sheet says it, from joining (2A; V169.1 words — 110a)');
     app.sheets = [];
     app.fn('businessInviteStart')(OWN);
     app.sheets[0].choices[2].onPick();
@@ -320,7 +320,7 @@ module.exports = async function () {
     app.sheets = [];
     app.fn('businessInviteStart')(OWN);
     t.eq(app.sheets[0].kind, 'openNameSheet', 'a Team leader: Engineer only, the name sheet');
-    t.includes(app.sheets[0].blurb, 'A paid seat: +£3 a month, from when they join.', '…saying what the seat costs (3A — anyone allowed to invite)');
+    t.includes(app.sheets[0].blurb, 'When they accept, a £3 a month seat is added to Birchley Testing’s plan straight away', '…saying what the seat costs (3A — anyone allowed to invite)');
 
     // A role change (2A) and Remove (1A).
     setBiz(app, null, [seatRow({ every: 'month' })]);
@@ -686,7 +686,7 @@ module.exports = async function () {
     const rel = freshApp();
     t.eq(rel.run('APP_VERSION'), 'V169', 'APP_VERSION V169');
     t.eq(rel.run('WELCOME_VERSION'), 'V169', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v169';", 'cache key pat-v169');
+    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v169", 'cache key pat-v169 (V169.1: -1 — 110d)');
     const core = read('render-core.js');
     const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
     const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
@@ -704,3 +704,6 @@ module.exports = async function () {
     t.includes(read('plan.js'), '// ---- V169 (3A): monthly ↔ yearly from inside PATGo', 'plan.js names V169');
   });
 };
+
+// V169.1: group 110 reuses these.
+module.exports.helpers = { signedIn, setBiz, setTeam, seatRow, fakeServer, until, server, deps, due, ENV, OWN, UID, JO, json, DAY, iso };
