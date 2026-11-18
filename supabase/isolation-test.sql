@@ -9,6 +9,11 @@
 -- email addresses on the next two lines → Run. Every row of the result must
 -- say PASS. Any FAIL: do not promote, and bring the output to the next chat.
 --
+-- V169: CHECKS 34a–34c NEED supabase/v169-seats.sql RUN FIRST (34a names it if
+-- not). The seat record is closed to B; B made an Engineer in A's business is
+-- written down as a paid seat that A (the Owner) sees and B (an Engineer) doesn't;
+-- then everything is put back and the test's seat lines removed — the seats
+-- function never sees them (one transaction), so nobody is emailed or billed.
 -- V168: CHECKS 33a–33c NEED supabase/v168-business-plans.sql RUN FIRST (33a names
 -- it if not). B reads each of B's businesses' plans and nobody else's; with B in
 -- A's business and B's own business made to look lapsed, the photo file of a job
@@ -115,6 +120,7 @@ declare
   sid161 uuid; e161 text; f161 text;               -- V161
   e163 text; d163 text;                             -- V163
   own_a uuid; own_b uuid; in168 boolean; g168 text; lap168 timestamptz; f168 boolean; t168 boolean;   -- V168
+  r169 text; max169 bigint; own169 int; eng169 int; den169 boolean;                                  -- V169
 begin
   select id into a from auth.users where lower(email) = lower(email_a);
   select id into b from auth.users where lower(email) = lower(email_b);
@@ -1775,6 +1781,58 @@ begin
       res := res || array['33c|B''s plan, lapse date and memberships are put back; nothing left behind|'
         || case when n = 1 and (k = 1) = in168 and not exists (select 1 from public.sessions where id = 'iso-test-v168')
                 then 'PASS|' || g168 else 'FAIL|plan ' || n || ', in A''s ' || k end];
+    end if;
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
+  -- ------------------------------------------------- V169: seat billing (34a–34c)
+  if to_regprocedure('public.business_seats()') is null or to_regclass('public.seat_changes') is null then
+    res := res || array['34a|the seat record is closed to B; B reads no seat figures of A''s business|FAIL|run supabase/v169-seats.sql first'];
+  else
+    select m.org_id into own_a from public.memberships m where m.user_id = a and m.role = 'owner' order by m.is_default desc limit 1;
+    select coalesce(max(id), 0) into max169 from public.seat_changes;
+    r169 := public.member_role(own_a, b);
+    -- 34a: as B — the record is closed, and B reads nothing an Owner reads of A's business.
+    perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+    execute 'set local role authenticated';
+    begin
+      perform 1 from public.seat_changes limit 1;
+      den169 := false;
+    exception when insufficient_privilege then den169 := true;
+    end;
+    select count(*) into n from public.business_seats() x where x.business_id = own_a and (x.is_owner or jsonb_array_length(x.changes) > 0);
+    execute 'reset role';
+    res := res || array['34a|the seat record is closed to B; B reads no seat figures of A''s business|' || case when den169 and n = 0 then 'PASS|' else 'FAIL|record closed ' || den169 || ', owner rows ' || n end];
+    if own_a is null or r169 = 'owner' then
+      res := res || array['34b|B made an Engineer in A''s business: a paid seat, A sees it, B (Engineer) doesn''t|INCONCLUSIVE|A has no business of A''s own apart from B'];
+    else
+      -- 34b: B made an Engineer in A's business → a paid seat, noted; A sees it, B doesn't.
+      if r169 is null then
+        insert into public.memberships (org_id, user_id, role, name) values (own_a, b, 'engineer', 'iso B');
+      elsif r169 = 'office' then
+        update public.memberships set role = 'engineer' where org_id = own_a and user_id = b;
+      end if;
+      select count(*) into own169 from public.seat_changes c
+        where c.id > max169 and c.org_id = own_a and c.user_id = b and c.role_to in ('engineer','team_leader');
+      if r169 in ('engineer','team_leader') then own169 := 1; end if;   -- already a paid seat: nothing new to note
+      perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      select count(*) into n from public.business_seats() x where x.business_id = own_a and x.is_owner and x.seats >= 1;
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      select count(*) into eng169 from public.business_seats() x where x.business_id = own_a;
+      execute 'reset role';
+      res := res || array['34b|B made an Engineer in A''s business: a paid seat, A sees it, B (Engineer) doesn''t|'
+        || case when own169 = 1 and n = 1 and eng169 = 0 then 'PASS|' else 'FAIL|noted ' || own169 || ', A ' || n || ', B ' || eng169 end];
+      -- 34c: put back, and the test's seat lines removed (one transaction — never billed or emailed).
+      if r169 is null then delete from public.memberships where org_id = own_a and user_id = b;
+      elsif r169 = 'office' then update public.memberships set role = 'office' where org_id = own_a and user_id = b;
+      end if;
+      delete from public.seat_changes where id > max169;
+      select count(*) into k from public.memberships where org_id = own_a and user_id = b;
+      res := res || array['34c|B''s place in A''s business put back; no test seat line left|'
+        || case when (k = 1) = (r169 is not null) and public.member_role(own_a, b) is not distinct from r169
+                     and not exists (select 1 from public.seat_changes where id > max169)
+                then 'PASS|' else 'FAIL|member ' || k end];
     end if;
   end if;
   perform set_config('request.jwt.claims', '', true);
