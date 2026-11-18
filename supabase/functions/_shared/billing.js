@@ -325,7 +325,13 @@ export async function sendEmail(deps, to, msg) {
     body: JSON.stringify({ from: deps.env('EMAIL_FROM') || DEFAULT_FROM, to: [to], subject: msg.subject, text: msg.text,
                            reply_to: 'hello@patgo.co.uk' }),
   });
-  if (!res.ok) return { ok: false, why: 'email ' + res.status };
+  if (!res.ok) {
+    // V169.1: Resend's own reason kept (seat_changes.email_result) — "email 403" alone
+    // didn't say whether the key, the sending domain or the address was the trouble.
+    let m = '';
+    try { const j = await res.json(); m = (j && (j.message || (j.error && j.error.message) || j.name)) || ''; } catch { /* no body */ }
+    return { ok: false, why: ('email ' + res.status + (m ? ': ' + String(m) : '')).slice(0, 200) };
+  }
   return { ok: true };
 }
 
