@@ -40,6 +40,10 @@ certificates; a frozen copy of the tester's details at lock). Its own spec round
 audit, V171 its fixes.
 
 ### V169 residuals (known, accepted)
+- V169.1: coming back to PATGo while the Stripe window is still open (after 3 s) ends the wait; a payment
+  finished afterwards still lands (webhook) but the "Payment done — thank you" line isn't shown that time.
+- V169.1: Resend refused the test project's first seat email — "This API key is not authorized to send emails
+  from patgo.co.uk" (the key's domain). Put right in Resend / EMAIL_FROM; the waiting email then goes.
 - The seat price lives in three places that must agree: Stripe's two seat prices, config.js PLAN_PENCE and
   billing.js PENCE (109d pins the last two equal). Changing a price = all three.
 - The Jobs line (4B) shows changes someone else made since Got it, within 30 days and the newest 20; an older

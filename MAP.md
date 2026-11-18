@@ -1976,6 +1976,8 @@ V169 (seats, 3A 4A): `billingSeats()` = the MAIN business's paid seats (business
 `businessSeatsRead`. Switch (3A): `billingSwitchStart` (sheet; not past_due / cancelling —
 billingView actions `toYear` / `toMonth`, buttons in render-help.js) → `billingSwitch` →
 function `billing-switch` (no window) → `billingRead`. Harness 109c; M2175–M2180.
+V169.1: the Stripe wait ends by itself — `_billWatch` (window seen closed, 1 s), `_billOnBack` (focus /
+pageshow / visible, after BILL_BACK_MS; never 'switch'); the button says Done. Harness 110b.
 
 ### business.js (~1,580 ln) — every job knows its business; V150 moving one; V155 invites + people; V156 devices; V157 approvals — NEW V149 — OPTIONAL SUBSYSTEM
 The owner's businesses (BUSINESSES_KEY `{u, at, list}`, read via rpc `my_businesses`),
@@ -2347,7 +2349,7 @@ another file having parsed. Don't "DRY" this.
   V169: secrets STRIPE_PRICE_SEAT_MONTH / _YEAR, RESEND_API_KEY (optional EMAIL_FROM).
   `seatsRun` makes Stripe's seat line = the DATABASE's count (`billing_seats_due`), claims
   changes (`billing_seats_told` returns ids) before emailing the Owner (Resend), records
-  (`billing_seats_record`, `billing_seats_result`). The webhook records Stripe's seat count;
+  (`billing_seats_record`, `billing_seats_result` — V169.1: Resend's reason kept). The webhook records Stripe's seat count;
   `subscriptionFacts(sub, seatIds)` reads the BASE line's interval. ⚠ PENCE (server) =
   PLAN_PENCE (config.js) = Stripe's prices. Harness 109d; M2181–M2197.
   V169 SQL: `supabase/v169-seats.sql` (E1–E7; schema.sql's LAST section — 109e). Trigger

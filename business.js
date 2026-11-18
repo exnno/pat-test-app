@@ -1101,14 +1101,36 @@ function businessRoleCostTag(orgId, r) {
   return businessPaidRole(r) ? ` · ${cost}` : ' · free';
 }
 
-// V169 (3A): the seat said on the invite itself, "when they join" (2A).
+// V169.1 (Peter, 18 Nov: "make it clear that on acceptance this adds a cost as you
+// go through no new checkout"): the paid seat is added to the plan by itself the
+// moment they accept — no payment page, nothing to confirm. Said plainly on the
+// name sheet and again on "Invite sent". Yearly: the rest of the year (about £X)
+// is charged that day (2A).
+function businessSeatPartYear(s) {
+  const end = s && s.end ? Date.parse(s.end) : NaN;
+  if (!isFinite(end)) return '';
+  const left = Math.max(0, Math.min(1, (end - Date.now()) / (365 * 86400000)));
+  const p = Math.round(PLAN_PENCE.seat.year * left);
+  return p > 0 ? _bizPounds(p) : '';
+}
+
 function businessInviteCostLine(orgId, role) {
-  const cost = businessSeatCostWords(orgId);
-  if (!cost || !businessPaidRole(role)) return '';
+  if (!businessPaidRole(role)) return '';
   const s = businessSeatsFor(orgId);
-  return s && !s.billed
-    ? ` A paid seat — ${cost}.`
-    : ` A paid seat: ${cost}, from when they join.`;
+  if (s && s.plan === 'comped') return '';
+  const b = _bizOrg(orgId);
+  const mine = !b || b.role === 'owner';
+  const plan = mine ? 'your plan' : `${businessLabel(b)}’s plan`;
+  if (s && s.billed) {
+    const head = ` When they accept, a ${businessSeatPrice(s.every)} seat is added to ${plan} straight away — there’s no checkout or payment page.`;
+    const how = s.every === 'year'
+      ? (businessSeatPartYear(s) ? ` The rest of this year (about ${businessSeatPartYear(s)}) is charged to the card on file that day.` : ' The rest of this year is charged to the card on file that day.')
+      : ' Stripe adds it to the next bill.';
+    return head + how + (mine ? ' You’re emailed about it.' : ' The owner is emailed about it.');
+  }
+  if (s && s.plan === 'trial') return ` A paid seat: free during the trial, then ${businessSeatPrice('month')} on ${plan} — added by itself, no checkout.`;
+  if (s) return ` A paid seat: ${businessSeatPrice('month')} on ${plan} once it’s subscribed.`;
+  return ` A paid seat: +${businessSeatPrice('month')} on ${plan} when they accept — added by itself, no checkout.`;
 }
 
 function _bizInviteName(orgId, role, value) {
@@ -1140,7 +1162,8 @@ function businessInviteSend(orgId, role, name, email) {
       const b = _bizOrg(orgId);
       openChoiceSheet({
         title: 'Invite sent',
-        message: `${name} can join ${businessLabel(b)} by signing in to PATGo with ${email}. Let them know — the invite waits ${BUSINESS_INVITE_DAYS} days.`,
+        message: `${name} can join ${businessLabel(b)} by signing in to PATGo with ${email}. Let them know — the invite waits ${BUSINESS_INVITE_DAYS} days.`
+          + businessInviteCostLine(orgId, role),   // V169.1: the cost again, at the moment it's real
         choices: [{ label: 'Share the invite', style: 'primary', onPick: () => businessInviteShare({ org: orgId, email, role }) }],
         cancelLabel: 'Done',
       });
@@ -1213,7 +1236,9 @@ function businessJoinStart(id) {
   }
   openChoiceSheet({
     title: `Join ${org}?`,
-    message: `Make ${org} your main business? Choose Yes if you work for them: new jobs go to ${org} unless you choose another. `
+    // V169.1: the joiner hears who pays — the business, never them.
+    message: (businessPaidRole(v.role) ? `Joining as ${BUSINESS_ROLE_WORDS[v.role]} adds a paid seat to ${v.orgName ? v.orgName + '’s' : 'the business’s'} PATGo plan — ${v.orgName || 'the business'} pays for it; there’s nothing for you to pay. ` : '')
+      + `Make ${org} your main business? Choose Yes if you work for them: new jobs go to ${org} unless you choose another. `
       + `Choose No if you run your own PATGo business and only do some work for them. Your own jobs stay where they are either way, and you can change this later.`,
     choices: [
       { label: 'Yes — make it my main business', style: 'primary', onPick: () => businessJoin(id, true) },
@@ -2270,6 +2295,7 @@ function businessSeatsFromRows(uid, rows) {
       plan: BUSINESS_PLANS.indexOf(r.plan) !== -1 ? r.plan : '',
       every: r.every === 'year' ? 'year' : r.every === 'month' ? 'month' : '',
       billed: r.billed === true,
+      end: _bizIso(r.period_end),   // V169.1: the yearly part-year in words
       owner: r.is_owner === true,
       changes,
       unseen: r.is_owner === true ? _bizInt(r.unseen, 100000) : 0,

@@ -863,9 +863,7 @@ function _planOnVisible() {
   try { if (document.visibilityState !== 'visible') return; } catch (e) { return; }
   // V142: back from Stripe's window without word from it (closed by hand, or the
   // message lost) — stop waiting and read the plan as it now stands.
-  try {
-    if (state.billing && state.billing.pending && (!_billWindow || _billWindow.closed)) billingCancelWait();
-  } catch (e) { /* nothing waiting */ }
+  try { _billOnBack(); } catch (e) { /* nothing waiting */ }   // V169.1: closed or not, back in front = done
   const rec = planRecord();
   if (rec && Date.now() - (Number(rec.checkedAt) || 0) < PLAN_REFRESH_MS) {
     _planRepaint();          // the countdown may have moved a day
@@ -1104,6 +1102,39 @@ function _billOpenWindow() {
 
 let _billWindow = null;
 let _billListening = false;
+// V169.1 (Peter, 18 Nov: the page stuck on "Your billing page is open in the
+// Stripe window" after he'd closed it — he had to swap pages). Three ways back,
+// whichever the phone or computer gives us: the window seen closed (checked every
+// second), PATGo coming back to the front (focus / pageshow / visible — after a
+// moment, so the tap that opened Stripe doesn't count), and a Done button.
+let _billSince = 0;
+let _billTimer = null;
+const BILL_BACK_MS = 3000;
+
+function _billWatch() {
+  if (_billTimer) return;
+  try {
+    _billTimer = setInterval(() => {
+      const b = state.billing;
+      if (!b || !b.pending || b.pending === 'switch') { clearInterval(_billTimer); _billTimer = null; return; }
+      let shut = false;
+      try { shut = !!(_billWindow && _billWindow.closed); } catch (e) { shut = false; }
+      if (shut) billingCancelWait();
+    }, 1000);
+  } catch (e) { _billTimer = null; }
+}
+
+// PATGo is in front again: if a Stripe window was waited on, stop waiting and read
+// the plan as it now stands (Stripe's own message, when it comes, got here first).
+function _billOnBack() {
+  const b = state.billing;
+  if (!b || !b.pending || b.pending === 'switch') return false;
+  let shut = false;
+  try { shut = !_billWindow || _billWindow.closed; } catch (e) { shut = true; }
+  if (!shut && Date.now() - _billSince < BILL_BACK_MS) return false;
+  billingCancelWait();
+  return true;
+}
 
 function _billCloseWindow() {
   const w = _billWindow;
@@ -1171,6 +1202,8 @@ function _billStart(kind, fn, body) {
   _billWindow = w;
   _billListen();
   b.pending = kind; b.message = '';
+  _billSince = Date.now();
+  _billWatch();
   _billRepaint();
   return _billGo(fn, body, w);
 }
@@ -1195,6 +1228,7 @@ function _billListen() {
   if (_billListening) return;
   _billListening = true;
   try { window.addEventListener('message', _billOnMessage); } catch (e) { /* no window */ }
+  try { window.addEventListener('focus', _billOnBack); window.addEventListener('pageshow', _billOnBack); } catch (e) { /* no window */ }   // V169.1
   try {
     if (typeof BroadcastChannel === 'function') {
       const ch = new BroadcastChannel(BILLING_MSG);

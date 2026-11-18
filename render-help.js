@@ -1033,8 +1033,8 @@ function renderCloudSubscription() {
       toMonth: `<button class="backup-action-btn" id="billing-switch" data-action="billing-switch" ${dis} style="margin-top:8px">Switch to monthly</button>`,
     };
     const wait = busy ? `
-        <p class="muted" id="billing-wait">${b.pending === 'checkout' ? 'Continue in the Stripe window, then come back here.' : b.pending === 'switch' ? 'Changing your plan with Stripe…' : 'Your billing page is open in the Stripe window.'}</p>
-        ${b.pending === 'switch' ? '' : '<button class="backup-action-btn" id="billing-cancel-wait" data-action="billing-cancel-wait" style="margin-top:6px">Cancel</button>'}` : '';
+        <p class="muted" id="billing-wait">${b.pending === 'checkout' ? 'Continue in the Stripe window, then come back here — this page updates by itself.' : b.pending === 'switch' ? 'Changing your plan with Stripe…' : 'Your billing page is open in the Stripe window. Close it when you’re finished — this page updates by itself.'}</p>
+        ${b.pending === 'switch' ? '' : '<button class="backup-action-btn" id="billing-cancel-wait" data-action="billing-cancel-wait" style="margin-top:6px">Done</button>'}` : '';   /* V169.1: Done (was Cancel) */
     body = `
       <div class="info-card" id="billing-card-${escapeHTML(v.kind)}">
         <h3 id="billing-title">${escapeHTML(v.title || 'Your plan')}</h3>
