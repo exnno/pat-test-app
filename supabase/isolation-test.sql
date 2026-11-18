@@ -9,6 +9,11 @@
 -- email addresses on the next two lines → Run. Every row of the result must
 -- say PASS. Any FAIL: do not promote, and bring the output to the next chat.
 --
+-- V170: CHECKS 35a–35c NEED supabase/v170-certificates.sql RUN FIRST (35a names
+-- it if not). B outside A's business can't read or number A's certificates; B made
+-- an Engineer can't take a number; B made Office takes two numbers in a row (never
+-- the same) and may save the settings; then A's settings, counter and B's place are
+-- put back and the test's seat lines removed (one transaction).
 -- V169: CHECKS 34a–34c NEED supabase/v169-seats.sql RUN FIRST (34a names it if
 -- not). The seat record is closed to B; B made an Engineer in A's business is
 -- written down as a paid seat that A (the Owner) sees and B (an Engineer) doesn't;
@@ -121,6 +126,7 @@ declare
   e163 text; d163 text;                             -- V163
   own_a uuid; own_b uuid; in168 boolean; g168 text; lap168 timestamptz; f168 boolean; t168 boolean;   -- V168
   r169 text; max169 bigint; own169 int; eng169 int; den169 boolean;                                  -- V169
+  r170 text; max170 bigint; had170 boolean; s170 jsonb; nx170 int; t1 int; t2 int; den170 boolean; eng170 boolean; -- V170
 begin
   select id into a from auth.users where lower(email) = lower(email_a);
   select id into b from auth.users where lower(email) = lower(email_b);
@@ -1832,6 +1838,63 @@ begin
       res := res || array['34c|B''s place in A''s business put back; no test seat line left|'
         || case when (k = 1) = (r169 is not null) and public.member_role(own_a, b) is not distinct from r169
                      and not exists (select 1 from public.seat_changes where id > max169)
+                then 'PASS|' else 'FAIL|member ' || k end];
+    end if;
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
+  -- ------------------------------------------------- V170: the business's certificate (35a–35c)
+  if to_regprocedure('public.cert_take(uuid)') is null or to_regclass('public.cert_settings') is null then
+    res := res || array['35a|B can''t read or number A''s certificates from outside or as an Engineer|FAIL|run supabase/v170-certificates.sql first'];
+  else
+    select m.org_id into own_a from public.memberships m where m.user_id = a and m.role = 'owner' order by m.is_default desc limit 1;
+    r170 := public.member_role(own_a, b);
+    select coalesce(max(id), 0) into max170 from public.seat_changes;
+    select true, c.settings, c.next_no into had170, s170, nx170 from public.cert_settings c where c.org_id = own_a;
+    had170 := coalesce(had170, false);
+    if own_a is null or r170 = 'owner' then
+      res := res || array['35a|B can''t read or number A''s certificates from outside or as an Engineer|INCONCLUSIVE|A has no business of A''s own apart from B'];
+    else
+      -- 35a: B as Engineer in A's business (put there for the test if not a member) —
+      -- the table closed; no number taken; no settings saved.
+      if r170 is null then insert into public.memberships (org_id, user_id, role, name) values (own_a, b, 'engineer', 'iso B');
+      else update public.memberships set role = 'engineer' where org_id = own_a and user_id = b;
+      end if;
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      begin perform 1 from public.cert_settings limit 1; den170 := false;
+      exception when insufficient_privilege then den170 := true; end;
+      begin perform public.cert_take(own_a); eng170 := false;
+      exception when others then eng170 := (sqlerrm like 'patgo_cert_not_allowed%'); end;
+      begin perform public.cert_settings_save(own_a, '{}'::jsonb, null); eng170 := false;
+      exception when others then eng170 := eng170 and (sqlerrm like 'patgo_cert_not_allowed%'); end;
+      execute 'reset role';
+      res := res || array['35a|B can''t read or number A''s certificates from outside or as an Engineer|'
+        || case when den170 and eng170 then 'PASS|' else 'FAIL|table closed ' || den170 || ', engineer refused ' || eng170 end];
+      -- 35b: B made Office — two numbers in a row, never the same; may save the settings.
+      update public.memberships set role = 'office' where org_id = own_a and user_id = b;
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      t1 := public.cert_take(own_a);
+      t2 := public.cert_take(own_a);
+      begin perform public.cert_settings_save(own_a, coalesce(s170, '{}'::jsonb), null); ok := true;
+      exception when others then ok := false; end;
+      execute 'reset role';
+      res := res || array['35b|B as Office takes two numbers in a row (different) and may save the settings|'
+        || case when t2 = t1 + 1 and ok then 'PASS|' || t1 || ', ' || t2 else 'FAIL|numbers ' || coalesce(t1::text, '-') || ', ' || coalesce(t2::text, '-') || ', save ' || ok end];
+      -- 35c: everything put back.
+      if r170 is null then delete from public.memberships where org_id = own_a and user_id = b;
+      else update public.memberships set role = r170 where org_id = own_a and user_id = b;
+      end if;
+      if had170 then update public.cert_settings set settings = s170, next_no = nx170 where org_id = own_a;
+      else delete from public.cert_settings where org_id = own_a;
+      end if;
+      delete from public.seat_changes where id > max170;
+      select count(*) into k from public.memberships where org_id = own_a and user_id = b;
+      res := res || array['35c|A''s certificate settings and counter, and B''s place, put back|'
+        || case when (k = 1) = (r170 is not null) and public.member_role(own_a, b) is not distinct from r170
+                     and (not had170 or exists (select 1 from public.cert_settings where org_id = own_a and next_no = nx170))
+                     and (had170 or not exists (select 1 from public.cert_settings where org_id = own_a))
                 then 'PASS|' else 'FAIL|member ' || k end];
     end if;
   end if;
