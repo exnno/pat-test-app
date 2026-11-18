@@ -517,7 +517,7 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V168';",   // V168: re-pointed.   // V167: re-pointed.   // V166: re-pointed.   // V165: re-pointed.   // V164: re-pointed.   // V163: re-pointed. V162: re-pointed. V161: re-pointed. V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
+    from: "const APP_VERSION = 'V169';",   // V169: re-pointed.   // V168: re-pointed.   // V167: re-pointed.   // V166: re-pointed.   // V165: re-pointed.   // V164: re-pointed.   // V163: re-pointed. V162: re-pointed. V161: re-pointed. V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
     to:   "const APP_VERSION = 'V154';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
@@ -640,7 +640,7 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V166</strong> &middot; November 2026</p>',   // V168: V165 rolled off — the oldest is V166 (108f).   // V167: V164 rolled off — the oldest is V165 (106f).   // V166: V163 rolled off — the oldest is V164 (105f).   // V165: V162 rolled off — the oldest is V163 (104f).   // V164: V161 rolled off — the oldest is V162 (103f).   // V163: V160 rolled off — the oldest is V161 (102f). V162: V159 rolled off — the oldest is V160 (101f). V161: V158 rolled off — the oldest is V159 (100f). V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
+    from: '        <p><strong>V167</strong> &middot; November 2026</p>',   // V169: V166 rolled off — the oldest is V167 (109f).   // V168: V165 rolled off — the oldest is V166 (108f).   // V167: V164 rolled off — the oldest is V165 (106f).   // V166: V163 rolled off — the oldest is V164 (105f).   // V165: V162 rolled off — the oldest is V163 (104f).   // V164: V161 rolled off — the oldest is V162 (103f).   // V163: V160 rolled off — the oldest is V161 (102f). V162: V159 rolled off — the oldest is V160 (101f). V161: V158 rolled off — the oldest is V159 (100f). V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 95e)',
   },
@@ -6124,9 +6124,9 @@ const MUTATIONS = [
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
     // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
-    from: "<li><strong>Each business on its own plan.</strong>",   // V168: welcome rolled (one line) — re-aimed; 108f pins it.   // V167: welcome rolled (one line) — re-aimed; 106f pins it.   // V166: welcome rolled (one line) — re-aimed; 105f pins it.   // V165: welcome rolled (one line) — re-aimed; 104f pins it.   // V164: welcome rolled (one line) — re-aimed; 103f pins it.   // V163: welcome rolled (two lines) — re-aimed at the first; 102f pins it. V157: welcome rolled (two lines) — re-aimed at the first; 96e pins it.   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
+    from: "<li><strong>Team seats.</strong>",   // V169: welcome rolled (one line) — re-aimed; 109f pins it.   // V168: welcome rolled (one line) — re-aimed; 108f pins it.   // V167: welcome rolled (one line) — re-aimed; 106f pins it.   // V166: welcome rolled (one line) — re-aimed; 105f pins it.   // V165: welcome rolled (one line) — re-aimed; 104f pins it.   // V164: welcome rolled (one line) — re-aimed; 103f pins it.   // V163: welcome rolled (two lines) — re-aimed at the first; 102f pins it. V157: welcome rolled (two lines) — re-aimed at the first; 96e pins it.   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (108f)",
+    why:  "11A: the welcome says plainly what changed on screen (109f)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8619,8 +8619,8 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V168';",   // V168: re-aimed.   // V167: re-aimed.   // V166: re-aimed.   // V165: re-aimed.   // V164: re-aimed.   // V163: re-aimed. V157: re-aimed. V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
-    to:   "const WELCOME_VERSION = 'V167';",
+    from: "const WELCOME_VERSION = 'V169';",   // V169: re-aimed.   // V168: re-aimed.   // V167: re-aimed.   // V166: re-aimed.   // V165: re-aimed.   // V164: re-aimed.   // V163: re-aimed. V157: re-aimed. V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
+    to:   "const WELCOME_VERSION = 'V168';",
     why:  "What's new is rolled on a feature release (96e)",
   },
   {
@@ -8635,9 +8635,9 @@ const MUTATIONS = [
     // V149: one line — re-aimed at its end.
     // V150: one line — re-aimed at its end.
     // V155: two lines — re-aimed at the second's end; still caught by the count.
-    from: "and its jobs say so.</li>\n",   // V168: one line — re-aimed at its end; 108f counts one.   // V167: one line — re-aimed at its end; 106f counts one.   // V166: one line — re-aimed at its end; 105f counts one.   // V165: one line — re-aimed at its end; 104f counts one.   // V164: one line — re-aimed at its end; 103f counts one.   // V163: two lines — re-aimed at the second's end. V157: two lines — re-aimed at the second's end; still caught by the count. V156: two lines — re-aimed at the second's end; still caught by the count.
-    to:   "and its jobs say so.</li>\n        <li><strong>More.</strong> And more.</li>\n",
-    why:  "one line (108f)",
+    from: "monthly and yearly in Subscription.</li>\n",   // V169: one line — re-aimed at its end; 109f counts one.   // V168: one line — re-aimed at its end; 108f counts one.   // V167: one line — re-aimed at its end; 106f counts one.   // V166: one line — re-aimed at its end; 105f counts one.   // V165: one line — re-aimed at its end; 104f counts one.   // V164: one line — re-aimed at its end; 103f counts one.   // V163: two lines — re-aimed at the second's end. V157: two lines — re-aimed at the second's end; still caught by the count. V156: two lines — re-aimed at the second's end; still caught by the count.
+    to:   "monthly and yearly in Subscription.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    why:  "one line (109f)",
   },
   {
     name: "M1223 (V132; re-aimed V135) the About changelog loses this release's line",
@@ -8768,9 +8768,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "How much is in the cloud, at a glance",   // V168: V165's rolled off — re-aimed at V166's, the oldest now (108f).   // V167: V164's rolled off — re-aimed at V165's, the oldest now (106f).   // V166: V163's rolled off — re-aimed at V164's, the oldest now (105f).   // V165: V162's rolled off — re-aimed at V163's, the oldest now (102f).   // V164: V161's rolled off — re-aimed at V162's, the oldest now (101f).   // V163: V160's rolled off — re-aimed at V161's, the oldest now (100f). V162: V159's rolled off — re-aimed at V160's, the oldest now (99f). V161: V158's rolled off — re-aimed at V159's, the oldest now (98f). V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
+    from: "Corrections: Owners, Team leaders and the Office can fix a mistake",   // V169: V166's rolled off — re-aimed at V167's, the oldest now (109f).   // V168: V165's rolled off — re-aimed at V166's, the oldest now (108f).   // V167: V164's rolled off — re-aimed at V165's, the oldest now (106f).   // V166: V163's rolled off — re-aimed at V164's, the oldest now (105f).   // V165: V162's rolled off — re-aimed at V163's, the oldest now (102f).   // V164: V161's rolled off — re-aimed at V162's, the oldest now (101f).   // V163: V160's rolled off — re-aimed at V161's, the oldest now (100f). V162: V159's rolled off — re-aimed at V160's, the oldest now (99f). V161: V158's rolled off — re-aimed at V159's, the oldest now (98f). V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (108f)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
+    why:  "the About page keeps the last three versions' lines (109f)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -9059,8 +9059,8 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v168';",   // V168: re-aimed (→ 108f).   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v167-1';",
+    from: "const CACHE_VERSION = 'pat-v169';",   // V169: re-aimed (→ 109f).   // V168: re-aimed (→ 108f).   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v168';",
     why:  "a release needs its cache bump or phones never get it (108f)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
@@ -9891,8 +9891,8 @@ const MUTATIONS = [
   {
     name: "M1394 (V142) the yearly button asks for monthly",
     file: "plan.js",
-    from: "{ label: PLAN_PRICES.year + ' — two months free', style: 'primary', onPick: () => billingCheckout('year') },",
-    to:   "{ label: PLAN_PRICES.year + ' — two months free', style: 'primary', onPick: () => billingCheckout('month') },",
+    from: "{ label: billingPriceWords('year', seats) + ' — two months free', style: 'primary', onPick: () => billingCheckout('year') },",   // V169: re-aimed (the seats in the price)
+    to:   "{ label: billingPriceWords('year', seats) + ' — two months free', style: 'primary', onPick: () => billingCheckout('month') },",
     why:  "1A: the button charges what it says (81b)",
   },
   {
@@ -12414,8 +12414,8 @@ const MUTATIONS = [
   {
     name: "M1752 (V151) the Jobs list loses the version line",
     file: "render-core.js",
-    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${leftBanner}\n      ${tabs}\n      ${unreadableBanner}",   // V163: + the left line. V157: re-anchored (the approval lines)   // V152: re-anchored (the unreadable banner below). V155: (the invite line)
-    to:   "      ${header}\n      ${planBanner}\n      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${leftBanner}\n      ${tabs}\n      ${unreadableBanner}",
+    from: "      ${header}\n      ${versionBanner}\n      ${planBanner}\n      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${leftBanner}\n      ${seatBanner}\n      ${tabs}\n      ${unreadableBanner}",   // V169: + the seat line. V163: + the left line. V157: re-anchored (the approval lines)   // V152: re-anchored (the unreadable banner below). V155: (the invite line)
+    to:   "      ${header}\n      ${planBanner}\n      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${leftBanner}\n      ${seatBanner}\n      ${tabs}\n      ${unreadableBanner}",
     why:  "syncing stops with nothing on the Jobs list to say why (90c)",
   },
   {
@@ -13033,8 +13033,8 @@ const MUTATIONS = [
   {
     name: "M1840 (V155) the Jobs list loses the invite line",
     file: "render-core.js",
-    from: "      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${leftBanner}\n      ${tabs}",   // V163: + the left line. V157: re-anchored (the approval lines)
-    to:   "      ${waitBanner}\n      ${decidedBanner}\n      ${leftBanner}\n      ${tabs}",
+    from: "      ${inviteBanner}\n      ${waitBanner}\n      ${decidedBanner}\n      ${leftBanner}\n      ${seatBanner}\n      ${tabs}",   // V169: + the seat line. V163: + the left line. V157: re-anchored (the approval lines)
+    to:   "      ${waitBanner}\n      ${decidedBanner}\n      ${leftBanner}\n      ${seatBanner}\n      ${tabs}",
     why:  "1A: the invitee must be told (94b)",
   },
   {
@@ -14939,8 +14939,8 @@ const MUTATIONS = [
   {
     name: "M2113 (V168) the business plans aren't read with the businesses",
     file: "business.js",
-    from: "        .then(() => businessPlansRead(c, uid).then(() => ok, () => ok));     // V168: each business's plan",
-    to:   "        .then(() => ok);",
+    from: "        .then(() => businessPlansRead(c, uid).then(() => ok, () => ok))      // V168: each business's plan",   // V169: re-aimed (the seats read follows)
+    to:   "        .then(() => ok)",
     why:  "each business's plan is read with the businesses (108d)",
   },
   {
@@ -15215,6 +15215,321 @@ const MUTATIONS = [
     from: "      try { if (typeof syncPlanChecked === 'function' && typeof planLocked === 'function') syncPlanChecked(!planLocked()); } catch (e) { /* optional */ }",
     to:   "      try { } catch (e) { /* optional */ }",
     why:  "a business renewed in a plans read lets its work go at once (108d)",
+  },  // ---- V169 (R80 1A 2A 3A 4B 5A): seat billing. Group 109 + M2153–M2197. ----
+  {
+    name: "M2153 (V169) a seat step asks billing-seats straight after",
+    file: "business.js",
+    from: "      if (BUSINESS_SEAT_CALLS.indexOf(name) !== -1) businessSeatsNudge();",
+    to:   "      ",
+    why:  "a seat step asks billing-seats straight after (109b)",
+  },
+  {
+    name: "M2154 (V169) an invite",
+    file: "business.js",
+    from: "const BUSINESS_SEAT_CALLS = ['accept_invite', 'set_member_role', 'remove_member', 'leave_business'];",
+    to:   "const BUSINESS_SEAT_CALLS = ['accept_invite', 'set_member_role', 'remove_member', 'leave_business', 'invite_member'];",
+    why:  "an invite (no seat yet) never nudges (109b)",
+  },
+  {
+    name: "M2155 (V169) the seats are read with the businesses",
+    file: "business.js",
+    from: "        .then(() => businessSeatsRead(c, uid).then(() => ok, () => ok));     // V169: the seats (3A, 4B)",
+    to:   "        .then(() => ok);",
+    why:  "the seats are read with the businesses (109b)",
+  },
+  {
+    name: "M2156 (V169) Office is free",
+    file: "business.js",
+    from: "const BUSINESS_PAID_ROLES = ['engineer', 'team_leader'];",
+    to:   "const BUSINESS_PAID_ROLES = ['engineer', 'team_leader', 'office'];",
+    why:  "Office is free (109a)",
+  },
+  {
+    name: "M2157 (V169) a change naming an unknown role is dropped",
+    file: "business.js",
+    from: "      if (rf === undefined || rt === undefined) continue;",
+    to:   "",
+    why:  "a change naming an unknown role is dropped (109a)",
+  },
+  {
+    name: "M2158 (V169) unseen is the Owner's only",
+    file: "business.js",
+    from: "      unseen: r.is_owner === true ? _bizInt(r.unseen, 100000) : 0,",
+    to:   "      unseen: _bizInt(r.unseen, 100000),",
+    why:  "unseen is the Owner's only (109a)",
+  },
+  {
+    name: "M2159 (V169) the total adds every seat",
+    file: "business.js",
+    from: "  if (!n) return `${_bizPounds(base)} a ${e}`;\n  return `${_bizPounds(base)} + ${n} × ${_bizPounds(each)} = ${_bizPounds(base + n * each)} a ${e}`;",
+    to:   "  if (!n) return `${_bizPounds(base)} a ${e}`;\n  return `${_bizPounds(base)} + ${n} × ${_bizPounds(each)} = ${_bizPounds(base + (n - 1) * each)} a ${e}`;",
+    why:  "the total adds every seat (109a)",
+  },
+  {
+    name: "M2160 (V169) a yearly business says \u00a330 a year",
+    file: "business.js",
+    from: "  if (s && s.billed) return '+' + businessSeatPrice(s.every);",
+    to:   "  if (s && s.billed) return '+' + businessSeatPrice('month');",
+    why:  "a yearly business says £30 a year (109a)",
+  },
+  {
+    name: "M2161 (V169) comped says nothing",
+    file: "business.js",
+    from: "  if (s && s.plan === 'comped') return '';\n  if (s && s.billed) return",
+    to:   "  if (s && s.billed) return",
+    why:  "comped says nothing (109a)",
+  },
+  {
+    name: "M2162 (V169) the trial is free",
+    file: "business.js",
+    from: "  if (s && s.plan === 'trial') return 'free in the trial, then ' + businessSeatPrice('month');",
+    to:   "  if (s && s.plan === 'trial') return '+' + businessSeatPrice('month');",
+    why:  "the trial is free (4A, 109a)",
+  },
+  {
+    name: "M2163 (V169) Office is free on the invite",
+    file: "business.js",
+    from: "  return businessPaidRole(r) ? ` · ${cost}` : ' · free';",
+    to:   "  return ` · ${cost}`;",
+    why:  "Office is free on the invite (109a)",
+  },
+  {
+    name: "M2164 (V169) the invite says what a seat costs",
+    file: "business.js",
+    from: "    blurb: `Shown to everyone in the business. Invited as ${BUSINESS_ROLE_WORDS[role]}.${businessInviteCostLine(orgId, role)}`,",
+    to:   "    blurb: `Shown to everyone in the business. Invited as ${BUSINESS_ROLE_WORDS[role]}.`,",
+    why:  "the invite says what a seat costs (3A, 109a)",
+  },
+  {
+    name: "M2165 (V169) Engineer \u2194 Team leader costs the same",
+    file: "business.js",
+    from: "  if (businessPaidRole(from) === businessPaidRole(to)) return '';\n  const s = businessSeatsFor(orgId);",
+    to:   "  const s = businessSeatsFor(orgId);",
+    why:  "Engineer ↔ Team leader costs the same (109a)",
+  },
+  {
+    name: "M2166 (V169) Remove says it frees a seat",
+    file: "business.js",
+    from: "        businessRemoveSeatLine(orgId, p.role) +",
+    to:   "",
+    why:  "Remove says it frees a seat (109a)",
+  },
+  {
+    name: "M2167 (V169) the count and total are the Owner's",
+    file: "business.js",
+    from: "  if (!s || !s.owner) return '';\n  const e = s.every || 'month';",
+    to:   "  if (!s) return '';\n  const e = s.every || 'month';",
+    why:  "the count and total are the Owner's (109a)",
+  },
+  {
+    name: "M2168 (V169) the total in the business's own interval",
+    file: "business.js",
+    from: "  else if (s.billed) plan = `Your plan: ${businessBillWords(n, e)}.`;",
+    to:   "  else if (s.billed) plan = `Your plan: ${businessBillWords(n, 'month')}.`;",
+    why:  "the total in the business's own interval (109a)",
+  },
+  {
+    name: "M2169 (V169) only unseen changes make the line",
+    file: "business.js",
+    from: "    const theirs = s.changes.filter(c => !c.byYou).slice(0, s.unseen);",
+    to:   "    const theirs = s.changes.filter(c => !c.byYou).slice(0, 20);",
+    why:  "only unseen changes make the line (109b)",
+  },
+  {
+    name: "M2170 (V169) your own change never makes the line",
+    file: "business.js",
+    from: "    const theirs = s.changes.filter(c => !c.byYou).slice(0, s.unseen);",
+    to:   "    const theirs = s.changes.slice(0, s.unseen);",
+    why:  "your own change never makes the line (109b)",
+  },
+  {
+    name: "M2171 (V169) Got it: gone at once",
+    file: "business.js",
+    from: "  for (const x of news) x.s.unseen = 0;",
+    to:   "",
+    why:  "Got it: gone at once (109b)",
+  },
+  {
+    name: "M2172 (V169) Got it tells the cloud",
+    file: "business.js",
+    from: "  _bizClient().then((c) => Promise.all(news.map((x) => Promise.resolve(c.rpc('seats_seen', { o: x.s.id })).catch(() => null))))",
+    to:   "  _bizClient().then((c) => Promise.all([]))",
+    why:  "Got it tells the cloud (109b)",
+  },
+  {
+    name: "M2173 (V169) leaving said as leaving",
+    file: "business.js",
+    from: "    if (c.self) return `${who} left (−1 paid seat)`;",
+    to:   "    if (false) return `${who} left (−1 paid seat)`;",
+    why:  "leaving said as leaving (109a)",
+  },
+  {
+    name: "M2174 (V169) the seat line is drawn on the Jobs list",
+    file: "render-core.js",
+    from: "      ${leftBanner}\n      ${seatBanner}\n      ${tabs}\n      ${unreadableBanner}",
+    to:   "      ${leftBanner}\n      ${tabs}\n      ${unreadableBanner}",
+    why:  "the seat line is drawn on the Jobs list (109b)",
+  },
+  {
+    name: "M2175 (V169) the price adds every seat",
+    file: "plan.js",
+    from: "  return `${pd(base + n * each)} a ${e} (${pd(base)} + ${n} ${n === 1 ? 'seat' : 'seats'} × ${pd(each)})`;",
+    to:   "  return `${pd(base + each)} a ${e} (${pd(base)} + ${n} ${n === 1 ? 'seat' : 'seats'} × ${pd(each)})`;",
+    why:  "the price adds every seat (109c)",
+  },
+  {
+    name: "M2176 (V169) the Subscription page counts the main business's seats",
+    file: "plan.js",
+    from: "    return s && s.owner ? s.seats : 0;",
+    to:   "    return 0;",
+    why:  "the Subscription page counts the main business's seats (109c)",
+  },
+  {
+    name: "M2177 (V169) no switch while failing or set to end",
+    file: "plan.js",
+    from: "      if (info.status !== 'past_due' && !info.cancel_at_period_end) out.actions.push(info.interval === 'year' ? 'toMonth' : 'toYear');",
+    to:   "      out.actions.push(info.interval === 'year' ? 'toMonth' : 'toYear');",
+    why:  "no switch while failing or set to end (109c)",
+  },
+  {
+    name: "M2178 (V169) the switch sends the choice",
+    file: "plan.js",
+    from: "    .then((c) => c.functions.invoke('billing-switch', { body: { every: every === 'month' ? 'month' : 'year' } }))",
+    to:   "    .then((c) => c.functions.invoke('billing-switch', { body: { every: 'year' } }))",
+    why:  "the switch sends the choice (109c)",
+  },
+  {
+    name: "M2179 (V169) the trial's switch says nothing is charged",
+    file: "plan.js",
+    from: "  if (trialing) message = `Your plan becomes ${price}. Nothing is charged until your first payment${first ? ' on ' + first : ''}.`;\n  else if",
+    to:   "  if",
+    why:  "the trial's switch says nothing is charged (109c)",
+  },
+  {
+    name: "M2180 (V169) the Subscription page's read takes the seats",
+    file: "plan.js",
+    from: "          .then(() => (typeof businessSeatsRead === 'function' ? businessSeatsRead(c, uid) : false), () => false))",
+    to:   "          .then(() => false, () => false))",
+    why:  "the Subscription page's read takes the seats (109c)",
+  },
+  {
+    name: "M2181 (V169) yearly: the part-year charged that day",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  return every === 'year' ? 'always_invoice' : 'create_prorations';",
+    to:   "  return 'create_prorations';",
+    why:  "yearly: the part-year charged that day (2A, 109d)",
+  },
+  {
+    name: "M2182 (V169) the trial: nothing charged",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  if (status === 'trialing') return 'none';\n  return every",
+    to:   "  return every",
+    why:  "the trial: nothing charged (109d)",
+  },
+  {
+    name: "M2183 (V169) a wrong interval's seat price is put right",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  const wrongPrice = !!price && seat.price.id !== price;   // the base switched interval without it",
+    to:   "  const wrongPrice = false;   // the base switched interval without it",
+    why:  "a wrong interval's seat price is put right (109d)",
+  },
+  {
+    name: "M2184 (V169) none left: the seat line goes",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  if (n === 0) return { act: 'remove', item: seat.id, every, proration };",
+    to:   "  if (n === 0) return { act: 'none', every, proration };",
+    why:  "none left: the seat line goes (109d)",
+  },
+  {
+    name: "M2185 (V169) the interval from the base line, whatever the order",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  const item = items.find((it) => !isSeat(it)) || items[0] || {};",
+    to:   "  const item = items[0] || {};",
+    why:  "the interval from the base line, whatever the order (109d)",
+  },
+  {
+    name: "M2186 (V169) checkout: the seats on the day",
+    file: "supabase/functions/_shared/billing.js",
+    from: "    line_items: seats > 0 && seatPrice ? [{ price, quantity: 1 }, { price: seatPrice, quantity: seats }] : [{ price, quantity: 1 }],",
+    to:   "    line_items: [{ price, quantity: 1 }],",
+    why:  "checkout: the seats on the day (4A, 109d)",
+  },
+  {
+    name: "M2187 (V169) never subscribed without the seats",
+    file: "supabase/functions/_shared/billing.js",
+    from: "      if (Number(ctx.seats) > 0 && !seatPrice) return json({ error: 'Team seats aren’t set up yet.' }, 503, cors);\n",
+    to:   "",
+    why:  "never subscribed without the seats (109d)",
+  },
+  {
+    name: "M2188 (V169) a run claims before emailing",
+    file: "supabase/functions/_shared/billing.js",
+    from: "          const claimed = await rpc(deps, 'billing_seats_told', { o: d.org_id, ids, outcome: 'sending' });\n          const mine = Array.isArray(claimed) ? claimed.map(Number) : [];",
+    to:   "          const claimed = ids;\n          const mine = Array.isArray(claimed) ? claimed.map(Number) : [];",
+    why:  "a run claims before emailing (109d)",
+  },
+  {
+    name: "M2189 (V169) a failed email is owed again",
+    file: "supabase/functions/_shared/billing.js",
+    from: "              outcome: sent.ok ? 'sent' : sent.why, retry: !sent.ok && !sent.final });",
+    to:   "              outcome: sent.ok ? 'sent' : sent.why, retry: false });",
+    why:  "a failed email is owed again (109d)",
+  },
+  {
+    name: "M2190 (V169) the trial: no email",
+    file: "supabase/functions/_shared/billing.js",
+    from: "          await rpc(deps, 'billing_seats_told', { o: d.org_id, ids, outcome: 'no bill' });\n          r.email = 'no bill';",
+    to:   "          await sendEmail(deps, d.owner_email, seatEmail(d, every, status));\n          r.email = 'no bill';",
+    why:  "the trial: no email (109d)",
+  },
+  {
+    name: "M2191 (V169) the count Stripe now has is recorded",
+    file: "supabase/functions/_shared/billing.js",
+    from: "        await rpc(deps, 'billing_seats_record', { o: d.org_id, cus: null, n: live ? d.seats : null });",
+    to:   "        await rpc(deps, 'billing_seats_record', { o: d.org_id, cus: null, n: d.seats_billed });",
+    why:  "the count Stripe now has is recorded (109d)",
+  },
+  {
+    name: "M2192 (V169) the switch moves the seats too",
+    file: "supabase/functions/_shared/billing.js",
+    from: "    items: items.map((it) => ({ id: it.id, price: it.price && ids.includes(it.price.id) ? seat : base })),",
+    to:   "    items: items.map((it) => ({ id: it.id, price: base })),",
+    why:  "the switch moves the seats too (109d)",
+  },
+  {
+    name: "M2193 (V169) the trial's switch charges nothing",
+    file: "supabase/functions/_shared/billing.js",
+    from: "    proration_behavior: sub.status === 'trialing' ? 'none' : 'always_invoice',\n    metadata",
+    to:   "    proration_behavior: 'always_invoice',\n    metadata",
+    why:  "the trial's switch charges nothing (109d)",
+  },
+  {
+    name: "M2194 (V169) only the Owner switches",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  if (ctx.role !== 'owner') return { status: 403, error: 'Only your business’s owner can change the plan.' };",
+    to:   "",
+    why:  "only the Owner switches (109d)",
+  },
+  {
+    name: "M2195 (V169) never switches a plan set to end",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  if (ctx.cancelling) return { status: 409, error: 'Your plan is set to end. Turn it back on in Manage billing first, then switch.' };",
+    to:   "",
+    why:  "never switches a plan set to end (109d)",
+  },
+  {
+    name: "M2196 (V169) the email's plan in its own interval",
+    file: "supabase/functions/_shared/billing.js",
+    from: "    `Your PATGo plan: ${seatBillWords(d.seats, e)}.`,",
+    to:   "    `Your PATGo plan: ${seatBillWords(d.seats, 'month')}.`,",
+    why:  "the email's plan in its own interval (109d)",
+  },
+  {
+    name: "M2197 (V169) the webhook records Stripe's count",
+    file: "supabase/functions/_shared/billing.js",
+    from: "        await rpc(deps, 'billing_seats_record', { o: org, cus, n: LIVE.includes(f.status) ? f.seats : null });",
+    to:   "        await rpc(deps, 'billing_seats_record', { o: org, cus, n: null });",
+    why:  "the webhook records Stripe's count (109d)",
   },
 ];
 
