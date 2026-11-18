@@ -25,7 +25,8 @@
 //                          sends PATGo's sign-in codes). Unset = no email yet;
 //                          each one waits and goes once it is set (7 days).
 //   EMAIL_FROM             optional: who the seat emails are from
-//                          (default: PATGo <hello@patgo.co.uk>)
+//                          (default: PATGo <hello@mail.patgo.co.uk>; a value
+//                          that isn't an address is ignored)
 //   APP_ORIGINS            optional: where the app may be, comma-separated
 //                          (default: the test site, https://exnno.github.io)
 // Supabase provides SUPABASE_URL and the project's own keys by itself.
@@ -44,7 +45,18 @@ export const SIGNATURE_TOLERANCE_SECONDS = 300;
 // Stripe price (STRIPE_PRICE_SEAT_*): change both together, and the app's
 // config.js PLAN_PENCE.
 export const PENCE = { base: { month: 600, year: 6000 }, seat: { month: 300, year: 3000 } };
-export const DEFAULT_FROM = 'PATGo <hello@patgo.co.uk>';
+// V169.1: Resend's verified sending domain is mail.patgo.co.uk (Peter, 18 Nov) — a
+// plain patgo.co.uk address is refused (403).
+export const DEFAULT_FROM = 'PATGo <hello@mail.patgo.co.uk>';
+
+// EMAIL_FROM as typed into the dashboard: stray quotes or spaces taken off; anything
+// that still isn't "a@b.c" or "Name <a@b.c>" is ignored (the default is used) —
+// a mistyped secret must never stop the Owner's email (Resend 422).
+export function fromAddress(raw) {
+  const v = String(raw || '').trim().replace(/^["'\u2018\u2019\u201c\u201d]+|["'\u2018\u2019\u201c\u201d]+$/g, '').trim();
+  const ok = /^[^<>@\s]+@[^<>@\s]+\.[^<>@\s]+$/.test(v) || /^[^<>]*<[^<>@\s]+@[^<>@\s]+\.[^<>@\s]+>$/.test(v);
+  return ok ? v : DEFAULT_FROM;
+}
 export const ROLE_WORDS = { owner: 'Owner', team_leader: 'Team leader', engineer: 'Engineer', office: 'Office' };
 
 // ---------------------------------------------------------------- small helpers
@@ -322,7 +334,7 @@ export async function sendEmail(deps, to, msg) {
   const res = await deps.fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { authorization: 'Bearer ' + key, 'content-type': 'application/json' },
-    body: JSON.stringify({ from: deps.env('EMAIL_FROM') || DEFAULT_FROM, to: [to], subject: msg.subject, text: msg.text,
+    body: JSON.stringify({ from: fromAddress(deps.env('EMAIL_FROM')), to: [to], subject: msg.subject, text: msg.text,
                            reply_to: 'hello@patgo.co.uk' }),
   });
   if (!res.ok) {
