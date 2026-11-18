@@ -484,7 +484,7 @@ module.exports = async function () {
     const rel = freshApp();
     t.eq(rel.fn('updateVersionLabel')('pat-v167-1'), 'V167.1', 'the update banner reads a hotfix key as V167.1');
     const help = read('render-help.js');
-    t.includes(help, 'Corrections: Owners, Team leaders and the Office can fix a mistake', 'About: V167’s line');
+    t.excludes(help, 'Corrections: Owners, Team leaders and the Office can fix a mistake', 'About: V167’s line rolled off (V170 — 111f)');
     t.includes(read('sync.js'), "V167 (1A 2C 3A 5A 7A): correcting someone else's job", 'sync.js names V167');
   });
 };

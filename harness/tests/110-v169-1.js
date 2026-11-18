@@ -135,8 +135,7 @@ module.exports = async function () {
     t.eq(sentFrom, 'Seats <seats@mail.patgo.co.uk>', 'a good EMAIL_FROM is what goes to Resend');
   });
 
-  await t.group('110d — release: cache pat-v169-2; APP_VERSION stays V169 (a hotfix)', () => {
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v169-2';", 'cache pat-v169-2 (V169.2: the mail.patgo.co.uk sender)');
-    t.includes(read('config.js'), "const APP_VERSION = 'V169';", 'APP_VERSION V169');
+  await t.group('110d — the hotfix’s release checks moved on (V170 — 111f)', () => {
+    t.excludes(read('sw.js'), "const CACHE_VERSION = 'pat-v169", 'no V169 cache key left (111f has the current one)');
   });
 };

@@ -659,7 +659,7 @@ module.exports = async function () {
     const end = '-- ================================================================ end V169\n';
     const block = mig.slice(mig.indexOf('-- ================================================================ V169\n'), mig.indexOf(end) + end.length);
     t.ok(block.length > 6000, 'the migration has its definitions');
-    t.ok(read('supabase/schema.sql').trimEnd().endsWith(block.trimEnd()), 'a new project gets them byte for byte, as schema.sql’s last section');
+    t.includes(read('supabase/schema.sql'), block.trimEnd(), 'a new project gets them byte for byte (V170: no longer the last section — 111e)');
     t.includes(block, "select coalesce(r in ('engineer','team_leader'), false)", 'a paid seat: Engineer or Team leader');
     t.includes(block, 'create trigger seat_note after insert or update of role or delete on public.memberships', 'every membership change looked at — no route can miss one');
     t.includes(block, 'if public.paid_role(rf) = public.paid_role(rt) then return null; end if;', '…only a change in paid-ness written');
@@ -682,24 +682,9 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 109f */
-  await t.group('109f — release: V169; cache pat-v169; What’s new one line; About V169 / V168 / V167', () => {
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V169', 'APP_VERSION V169');
-    t.eq(rel.run('WELCOME_VERSION'), 'V169', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v169", 'cache key pat-v169 (V169.1: -1 — 110d)');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>Team seats.</strong>', '…team seats');
-    t.includes(sheetCopy, 'monthly and yearly in Subscription.</li>', '…and the switch');
+  await t.group('109f — V169’s About line; business.js / plan.js name V169 (V170: the release checks → 111f)', () => {
     const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V169</strong>'), y = help.indexOf('<p><strong>V168</strong>'), z = help.indexOf('<p><strong>V167</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V169, V168, V167');
-    t.excludes(help, '<p><strong>V166</strong>', 'V166 rolled off');
-    t.excludes(help, 'How much is in the cloud, at a glance', '…with its line');
     t.includes(help, 'Team seats: each Engineer or Team leader is &pound;3 a month', 'About: V169’s line');
-    t.includes(help, 'Corrections: Owners, Team leaders and the Office can fix a mistake', 'About: V167’s line, the oldest');
     t.includes(read('business.js'), '// V169 — seat billing (Teams v1; R65 7C; 14 Nov 1A–4A; 18 Nov R80 1A 2A 3A 4B 5A)', 'business.js names V169');
     t.includes(read('plan.js'), '// ---- V169 (3A): monthly ↔ yearly from inside PATGo', 'plan.js names V169');
   });
