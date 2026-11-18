@@ -9059,8 +9059,8 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v169-1';",   // V169.1: re-aimed (→ 110d). V169: re-aimed (→ 109f).   // V168: re-aimed (→ 108f).   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v169';",
+    from: "const CACHE_VERSION = 'pat-v169-2';",   // V169.2: re-aimed. V169.1: re-aimed (→ 110d). V169: re-aimed (→ 109f).   // V168: re-aimed (→ 108f).   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v169-1';",
     why:  "a release needs its cache bump or phones never get it (108f)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
@@ -15531,7 +15531,7 @@ const MUTATIONS = [
     to:   "        await rpc(deps, 'billing_seats_record', { o: org, cus, n: null });",
     why:  "the webhook records Stripe's count (109d)",
   },
-  // ---- V169.1 (hotfix): what accepting costs; the Stripe wait; Resend's reason. Group 110 + M2198–M2209. ----
+  // ---- V169.1 (hotfix): what accepting costs; the Stripe wait; Resend's reason. Group 110 + M2198–M2211. ----
   {
     name: "M2198 (V169.1) accepting adds the seat by itself, no checkout — said",
     file: "business.js",
@@ -15615,6 +15615,20 @@ const MUTATIONS = [
     from: "    return { ok: false, why: ('email ' + res.status + (m ? ': ' + String(m) : '')).slice(0, 200) };",
     to:   "    return { ok: false, why: 'email ' + res.status };",
     why:  "Resend's reason kept (110c)",
+  },
+  {
+    name: "M2210 (V169.1) a mistyped EMAIL_FROM is used as typed",
+    file: "supabase/functions/_shared/billing.js",
+    from: "  return ok ? v : DEFAULT_FROM;",
+    to:   "  return v || DEFAULT_FROM;",
+    why:  "a mistyped EMAIL_FROM never stops the email (110c)",
+  },
+  {
+    name: "M2211 (V169.1) EMAIL_FROM ignored",
+    file: "supabase/functions/_shared/billing.js",
+    from: "body: JSON.stringify({ from: fromAddress(deps.env('EMAIL_FROM')), to: [to],",
+    to:   "body: JSON.stringify({ from: DEFAULT_FROM, to: [to],",
+    why:  "a good EMAIL_FROM is used (110c)",
   },
 ];
 
