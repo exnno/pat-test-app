@@ -552,7 +552,7 @@ module.exports = async function () {
     t.ok(mail, 'the Owner emailed (4B)');
     const m = JSON.parse(mail.body);
     t.deepEq(m.to, ['owner@x.co'], '…to the business’s Owner');
-    t.eq(m.from, 'PATGo <hello@patgo.co.uk>', '…from hello@patgo.co.uk');
+    t.eq(m.from, 'PATGo <hello@mail.patgo.co.uk>', '…from hello@mail.patgo.co.uk (V169.1: Resend’s verified domain)');
     t.eq(mail.headers.authorization, 'Bearer re_ZZ', '…with the Resend key from the secrets');
     t.eq(m.subject, 'PATGo: paid seats changed in Birchley Testing', '…a plain subject');
     t.includes(m.text, 'Sam added Jo as Engineer (+1 paid seat)', '…who, what');

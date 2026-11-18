@@ -120,10 +120,23 @@ module.exports = async function () {
     t.notOk(r.final, '…and tried again later (put right in Resend → it goes)');
     d.fetch = async () => new Response('', { status: 500 });
     t.eq((await B.sendEmail(d, 'o@x.co', { subject: 's', text: 't' })).why, 'email 500', 'no body: the status alone');
+    // Peter's live fix (18 Nov): Resend's domain is mail.patgo.co.uk; a mistyped EMAIL_FROM never stops the email.
+    t.eq(B.DEFAULT_FROM, 'PATGo <hello@mail.patgo.co.uk>', 'sent from Resend’s verified domain by default');
+    t.eq(B.fromAddress('"PATGo <hello@mail.patgo.co.uk>"'), 'PATGo <hello@mail.patgo.co.uk>', 'EMAIL_FROM with quotes typed in: taken off');
+    t.eq(B.fromAddress('mail.patgo.co.uk'), 'PATGo <hello@mail.patgo.co.uk>', 'EMAIL_FROM not an address: the default');
+    t.eq(B.fromAddress('Seats <seats@mail.patgo.co.uk>'), 'Seats <seats@mail.patgo.co.uk>', 'a good EMAIL_FROM is used');
+    let sentFrom = '';
+    d.env = (k) => (k === 'EMAIL_FROM' ? 'mail.patgo.co.uk' : H.ENV[k]);
+    d.fetch = async (u, i) => { sentFrom = JSON.parse(i.body).from; return new Response('{}', { status: 200 }); };
+    await B.sendEmail(d, 'o@x.co', { subject: 's', text: 't' });
+    t.eq(sentFrom, 'PATGo <hello@mail.patgo.co.uk>', '…and it is what actually goes to Resend');
+    d.env = (k) => (k === 'EMAIL_FROM' ? 'Seats <seats@mail.patgo.co.uk>' : H.ENV[k]);
+    await B.sendEmail(d, 'o@x.co', { subject: 's', text: 't' });
+    t.eq(sentFrom, 'Seats <seats@mail.patgo.co.uk>', 'a good EMAIL_FROM is what goes to Resend');
   });
 
-  await t.group('110d — release: cache pat-v169-1; APP_VERSION stays V169 (a hotfix)', () => {
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v169-1';", 'cache pat-v169-1');
+  await t.group('110d — release: cache pat-v169-2; APP_VERSION stays V169 (a hotfix)', () => {
+    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v169-2';", 'cache pat-v169-2 (V169.2: the mail.patgo.co.uk sender)');
     t.includes(read('config.js'), "const APP_VERSION = 'V169';", 'APP_VERSION V169');
   });
 };
