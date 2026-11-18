@@ -24,7 +24,8 @@
            nothing shown); Back to the Cloud tab.
      105e  the SQL: schema.sql ends with v166-storage.sql's block byte for byte;
            the reader's own rights; who it answers for; K1–K4; isolation 31a–31c.
-     105f  V166's About line; sync.js names V166 (V167: the release checks → 106f).
+     105f  sync.js names V166 (V167: the release checks → 106f; V169: V166's About
+           line rolled off).
 
    ⚠ WHAT THIS FILE CANNOT PROVE: what the database adds up and for whom. The
    stand-in answers as the functions are written; the functions themselves were
@@ -397,8 +398,8 @@ module.exports = async function () {
 
   /* ------------------------------------------------------------------ 105f */
   // V167: the release checks moved to 106f; this keeps V166's own About line.
-  await t.group('105f — V166’s About line; sync.js names V166', () => {
-    t.includes(read('render-help.js'), 'How much is in the cloud, at a glance: the cloud tab shows your jobs', 'About: V166’s line');
+  // V169: V166's About line rolled off (109f checks it's gone).
+  await t.group('105f — sync.js names V166', () => {
     t.includes(read('sync.js'), 'V166 (1A 2A 3A 5A): how much is stored', 'sync.js names V166');
   });
 };

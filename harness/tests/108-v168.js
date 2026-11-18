@@ -31,7 +31,8 @@
            this one's.
      108e  the SQL: v168-business-plans.sql's parts; schema.sql's last section in
            step; D1–D5; isolation 33a–33c and 19e's photo row.
-     108f  release: V168; cache pat-v168; What's new one line; About V168 / V167 / V166.
+     108f  V168's About line; plan.js / sync.js / business.js name V168 (V169: the
+           release checks → 109f).
 
    ⚠ The database rules themselves were proved in a real Postgres (PGlite + a Supabase
    stand-in, the WHOLE schema.sql: an upgraded project and a new one, the migration
@@ -591,7 +592,11 @@ module.exports = async function () {
     const end = '-- ================================================================ end V168\n';
     const block = mig.slice(mig.indexOf('-- ================================================================ V168\n'), mig.indexOf(end) + end.length);
     t.ok(block.length > 2000, 'the migration has its definitions');
-    t.ok(read('supabase/schema.sql').trimEnd().endsWith(block.trimEnd()), 'a new project gets them byte for byte, as schema.sql’s last section');
+    // V169: no longer the LAST section (V169's follows — 109e); still whole, and
+    // nothing after it redefines its two functions or the photo-file rules.
+    const sch = read('supabase/schema.sql');
+    t.ok(sch.includes(block), 'a new project gets them byte for byte');
+    t.ok(!/function public\.(my_business_plans|can_upload_file)\(|own photo files/.test(sch.slice(sch.indexOf(block) + block.length)), '…and no later section redefines them');
     t.includes(block, "  where m.user_id = auth.uid()\n  order by m.is_default desc, o.created_at, o.id", 'my_business_plans: only the caller’s businesses');
     t.includes(block, "revoke all on function public.my_business_plans() from public, anon;", '…nobody signed out');
     t.eq((block.match(/language sql stable security definer set search_path = '' as \$\$/g) || []).length, 2, 'both with their own rights, a pinned search path');
@@ -608,24 +613,10 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 108f */
-  await t.group('108f — release: V168; cache pat-v168; What’s new one line; About V168 / V167 / V166', () => {
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V168', 'APP_VERSION V168');
-    t.eq(rel.run('WELCOME_VERSION'), 'V168', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v168';", 'cache key pat-v168');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>Each business on its own plan.</strong>', '…the per-business lock');
-    t.includes(sheetCopy, 'and its jobs say so.</li>', '…and what shows');
+  // V169: the release checks moved to 109f; this keeps V168's own lines.
+  await t.group('108f — V168’s About line; plan.js / sync.js / business.js name V168', () => {
     const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V168</strong>'), y = help.indexOf('<p><strong>V167</strong>'), z = help.indexOf('<p><strong>V166</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V168, V167, V166');
-    t.excludes(help, '<p><strong>V165</strong>', 'V165 rolled off');
-    t.excludes(help, 'Photos when you look at a cloud job: tap Show photos', '…with its line');
     t.includes(help, 'Each business on its own plan: for anyone in more than one business', 'About: V168’s line');
-    t.includes(help, 'How much is in the cloud, at a glance', 'About: V166’s line, the oldest');
     t.includes(read('plan.js'), '// ---- V168: each business on its own plan', 'plan.js names V168');
     t.includes(read('sync.js'), "// V168 (finding 5): WHICH businesses the cloud refused", 'sync.js names V168');
     t.includes(read('business.js'), "// V168: each of my businesses' own plan", 'business.js names V168');

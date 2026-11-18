@@ -223,6 +223,7 @@ function serverDeps(o = {}) {
     if (url.endsWith('/rpc/billing_set_customer')) return json(o.storedCustomer || 'cus_new');
     if (url.endsWith('/rpc/billing_apply')) return o.dbDown ? json({ message: 'down' }, 503) : json('plan active');
     if (url.endsWith('/rpc/billing_event_log')) return new Response(null, { status: 204 });
+    if (url.endsWith('/rpc/billing_seats_record')) return new Response(null, { status: 204 });   // V169 (109d)
     if (url.endsWith('/v1/customers')) return json({ id: 'cus_new' });
     if (url.endsWith('/v1/checkout/sessions')) return json({ url: CHECKOUT_URL });
     if (url.endsWith('/v1/billing_portal/sessions')) return json({ url: PORTAL_URL });
@@ -670,9 +671,9 @@ module.exports = async function () {
     t.deepEq(B.eventTarget({ data: { object: { object: 'invoice', parent: { subscription_details: { subscription: 'sub_4' } } } } }), { sub: 'sub_4', org: null }, 'an invoice (newer Stripe)');
     // What a subscription says, in Stripe's older and newer shapes.
     const f1 = B.subscriptionFacts({ status: 'active', current_period_end: 1800000000, cancel_at_period_end: true, items: { data: [{ plan: { interval: 'month' } }] } });
-    t.deepEq(f1, { status: 'active', every: 'month', ends: new Date(1800000000 * 1000).toISOString(), cancelling: true }, 'older shape');
+    t.deepEq(f1, { status: 'active', every: 'month', ends: new Date(1800000000 * 1000).toISOString(), cancelling: true, seats: 0 }, 'older shape');
     const f2 = B.subscriptionFacts({ status: 'trialing', cancel_at: 1700000000, items: { data: [{ price: { recurring: { interval: 'year' } }, current_period_end: 1800000000 }] } });
-    t.deepEq(f2, { status: 'trialing', every: 'year', ends: new Date(1700000000 * 1000).toISOString(), cancelling: true }, 'newer shape: the end on the item, cancel_at');
+    t.deepEq(f2, { status: 'trialing', every: 'year', ends: new Date(1700000000 * 1000).toISOString(), cancelling: true, seats: 0 }, 'newer shape: the end on the item, cancel_at');
 
     // A legacy key goes on both headers; the entry files.
     d = serverDeps({ env: { SUPABASE_SECRET_KEYS: '', SUPABASE_SERVICE_ROLE_KEY: 'eyJLEGACY' } });
