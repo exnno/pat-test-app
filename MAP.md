@@ -1,4 +1,4 @@
-# PATGo — Code Map (V168)
+# PATGo — Code Map (V169)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1970,6 +1970,12 @@ now). 6A: `planNagBusiness()` (owned, and jobs here or n≥2, worst state) drive
 quiet line (render-review.js Overview). `planRefresh` and `billingRead` also call business.js
 `businessPlansRead`. ⚠ sync.js `syncPlanRefusedFor` / `syncPlanChecked` (per business). Harness
 108a–108c; M2113–M2152.
+V169 (seats, 3A 4A): `billingSeats()` = the MAIN business's paid seats (business.js
+`businessSeatsFor`, Owner only); `billingPriceWords(every, n)` = the price with seats
+(config.js PLAN_PENCE) — Subscribe's choice, the subscribed title. `billingRead` also calls
+`businessSeatsRead`. Switch (3A): `billingSwitchStart` (sheet; not past_due / cancelling —
+billingView actions `toYear` / `toMonth`, buttons in render-help.js) → `billingSwitch` →
+function `billing-switch` (no window) → `billingRead`. Harness 109c; M2175–M2180.
 
 ### business.js (~1,580 ln) — every job knows its business; V150 moving one; V155 invites + people; V156 devices; V157 approvals — NEW V149 — OPTIONAL SUBSYSTEM
 The owner's businesses (BUSINESSES_KEY `{u, at, list}`, read via rpc `my_businesses`),
@@ -1982,6 +1988,16 @@ stored business; a missing one forgets its plan) → `syncPlanChecked` + `_planR
 `businessRead` and by plan.js. 5A: `businessLockedForNew` (plan.js `planLockedFor`) greys an
 ended business in For: (unless all have ended), `businessForInitial` skips it,
 `businessNewJobTarget` = the pick without recording it (the Start gate). Harness 108b, 108d.
+V169 (seat billing): rpc `business_seats` → `businessSeatsFromRows` (memory `_bizSeats`, never
+stored) — read LAST in `businessRead`. Paid = `businessPaidRole` (Engineer / Team leader).
+Words: `businessSeatCostWords` / `businessRoleCostTag` / `businessInviteCostLine` (invite),
+`businessRoleChangeTag` (Change role), `businessRemoveSeatLine` (Remove), `businessSeatsHTML`
+(the Owner's block in the card), `businessSeatChangeWords` (⚠ keep in step with
+supabase/functions/_shared/billing.js `seatChangeWords` — the email). 4B: `businessSeatNews` /
+`businessSeatNewsBannerHTML` (render-core.js Jobs list, after leftBanner) / `businessSeatsSeen`
+(rpc `seats_seen`; dispatch `biz-seats-seen`). `_bizCall` → `businessSeatsNudge()` (function
+`billing-seats`, fire and forget) after any BUSINESS_SEAT_CALLS step. Harness 109a–109b;
+M2153–M2174.
 **Touch to:** change who is asked For:, the page's words, how often the list is read
 (BUSINESS_READ_MS), or the V150 move (Change… / approval) — it belongs here.
 **Coupling:** keys in **config.js**; sync.js calls `businessMaybeRead(c, uid)` on
@@ -2319,14 +2335,25 @@ another file having parsed. Don't "DRY" this.
   `org_phones_behind(o)` (the invite check: members' phones reported older, or sign-ins
   never reported, in the window) closed. Nothing refuses by version (1A). Isolation 22a–22e.
   ⚠ Raise `min_version` only to a version already live.
-- `supabase/functions/` (V142) — the three Edge Functions (Deno, plain JS, no packages):
-  `billing-checkout`, `billing-portal`, `stripe-webhook`, each a one-line `index.js`
+- `supabase/functions/` (V142) — the Edge Functions (Deno, plain JS, no packages):
+  `billing-checkout`, `billing-portal`, `stripe-webhook` (+ V169 `billing-seats`,
+  `billing-switch`), each a one-line `index.js`
   serving a maker from `_shared/billing.js` (all the logic). Deployed with "Verify JWT"
   OFF (they check the caller themselves / Stripe's signature). Secrets in Supabase:
   STRIPE_SECRET_KEY, STRIPE_WEBHOOK_SECRET, STRIPE_PRICE_MONTH, STRIPE_PRICE_YEAR,
   optional APP_ORIGINS. ⚠ The webhook always re-reads the subscription from Stripe.
   ⚠ A `sb_secret_` key goes on `apikey` only. Harness 81d imports `_shared/billing.js`
   in Node with a pretend Stripe + database; M1421–M1434.
+  V169: secrets STRIPE_PRICE_SEAT_MONTH / _YEAR, RESEND_API_KEY (optional EMAIL_FROM).
+  `seatsRun` makes Stripe's seat line = the DATABASE's count (`billing_seats_due`), claims
+  changes (`billing_seats_told` returns ids) before emailing the Owner (Resend), records
+  (`billing_seats_record`, `billing_seats_result`). The webhook records Stripe's seat count;
+  `subscriptionFacts(sub, seatIds)` reads the BASE line's interval. ⚠ PENCE (server) =
+  PLAN_PENCE (config.js) = Stripe's prices. Harness 109d; M2181–M2197.
+  V169 SQL: `supabase/v169-seats.sql` (E1–E7; schema.sql's LAST section — 109e). Trigger
+  `seat_note` on memberships → `seat_changes` (closed); `billing_settings.seats_url` +
+  pg_cron `patgo-seats` (`seats_nudge`, pg_net, every 10 min while owed). App reads:
+  `business_seats()`, `seats_seen(o)`. Isolation 34a–34c.
 - `manifest.webmanifest` — icons, name, display mode.
 - Icons (V109): `favicon.ico` (the plug alone, 16/32/48 — browser tab) and
   `apple-touch-icon.png` (180, home screen) are linked in **index.html** and

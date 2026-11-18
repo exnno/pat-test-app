@@ -1,4 +1,4 @@
-// ============== PATGo PWA — V127 — The plan: trial end, grace, the lock (V142: + paying; V143: + enforcement; V168: each business on its own plan) ==============
+// ============== PATGo PWA — V127 — The plan: trial end, grace, the lock (V142: + paying; V143: + enforcement; V168: each business on its own plan; V169: seats in the prices, monthly ↔ yearly in PATGo) ==============
 // (c) 2026 Peter Birchley. All rights reserved.
 //
 // WHAT THIS FILE OWNS. What the signed-in account's plan means on this phone:
@@ -900,7 +900,7 @@ function planBoot() {
 // Account & Sync) always shows the plan, and Renew now opens the same choice;
 // 3A paying during the trial keeps the rest of it (the server sets Stripe's
 // trial end); 4A a failed payment: "Update card", the plan stays while Stripe
-// retries; 5A monthly ↔ yearly on Stripe's billing page; 6A Stripe test mode
+// retries; 5A monthly ↔ yearly on Stripe's billing page (V169 3A: in PATGo — billingSwitch); 6A Stripe test mode
 // on the test site first; 7A the server functions in supabase/functions.
 //
 // HOW IT FLOWS. A tap opens a window AT ONCE (iOS only allows a window inside
@@ -969,7 +969,10 @@ function billingRead() {
       if (state.cloud) { state.cloud.plan = info.plan || null; state.cloud.trialEndsAt = info.trial_ends_at || null; }
       // V168: and each business's own plan — a payment unlocks its jobs at once.
       if (typeof businessPlansRead === 'function') {
-        return cloudClient().then((c) => businessPlansRead(c, uid)).then(() => true, () => true);
+        return cloudClient().then((c) => businessPlansRead(c, uid)
+          // V169: and the seats — the page's prices carry them.
+          .then(() => (typeof businessSeatsRead === 'function' ? businessSeatsRead(c, uid) : false), () => false))
+          .then(() => true, () => true);
       }
       return true;
     })
@@ -996,19 +999,95 @@ function billingSubscribe() {
     if (st.phase === 'trial' || st.phase === 'ending') endMs = Number(st.endsAt);
   }
   const first = isFinite(endMs) && endMs > planNow(planRecord()) ? _planDate(endMs) : '';
+  // V169 (4A): the paid seats on the day go on the plan — said in the prices.
+  const seats = billingSeats();
   openChoiceSheet({
     title: 'Choose your plan',
     message: (first
       ? `Your free trial carries on — the first payment is taken on ${first}. `
       : '')
+      + (seats ? `With your ${seats === 1 ? 'paid seat' : seats + ' paid seats'} (Engineers and Team leaders). ` : '')
       + 'Payments are handled by Stripe; PATGo never sees your card. Cancel any time.',
     choices: [
-      { label: PLAN_PRICES.year + ' — two months free', style: 'primary', onPick: () => billingCheckout('year') },
-      { label: PLAN_PRICES.month, style: 'secondary', onPick: () => billingCheckout('month') },
+      { label: billingPriceWords('year', seats) + ' — two months free', style: 'primary', onPick: () => billingCheckout('year') },
+      { label: billingPriceWords('month', seats), style: 'secondary', onPick: () => billingCheckout('month') },
     ],
     cancelLabel: 'Not now',
   });
   return true;
+}
+
+// V169: the main business's paid seats (the plan the Subscription page pays for —
+// billing is the main business's, V142). 0 when not read or not the Owner.
+function billingSeats() {
+  try {
+    if (typeof businessDefault !== 'function' || typeof businessSeatsFor !== 'function') return 0;
+    const b = businessDefault();
+    const s = b ? businessSeatsFor(b.id) : null;
+    return s && s.owner ? s.seats : 0;
+  } catch (e) { return 0; }
+}
+
+// "£6 a month", or with seats "£12 a month (£6 + 2 seats × £3)".
+function billingPriceWords(every, seats) {
+  const e = every === 'year' ? 'year' : 'month';
+  const n = Math.max(0, Math.floor(Number(seats) || 0));
+  if (!n || typeof PLAN_PENCE !== 'object') return PLAN_PRICES[e];
+  const pd = (p) => '£' + (p % 100 === 0 ? String(p / 100) : (p / 100).toFixed(2));
+  const base = PLAN_PENCE.base[e], each = PLAN_PENCE.seat[e];
+  return `${pd(base + n * each)} a ${e} (${pd(base)} + ${n} ${n === 1 ? 'seat' : 'seats'} × ${pd(each)})`;
+}
+
+// ---- V169 (3A): monthly ↔ yearly from inside PATGo ---------------------------
+// Stripe's own billing page can't change a plan with two lines (the base and
+// the seats), so PATGo does it: the server function billing-switch moves both
+// at once, the unused time credited. No Stripe window — nothing to pay on a
+// page; Stripe charges the card it has and emails its receipt.
+function billingSwitchStart() {
+  if (!billingAvailable()) return false;
+  const b = _bill();
+  const info = b.info;
+  if (!info || !info.can_manage || !info.has_subscription || info.cancel_at_period_end) return false;
+  const to = info.interval === 'year' ? 'month' : 'year';
+  if (_billOffline()) { showToast('You need a signal to change your plan.'); return false; }
+  const seats = billingSeats();
+  const price = billingPriceWords(to, seats);
+  const trialing = info.status === 'trialing';
+  const end = _planTime(info.period_end);
+  const first = isFinite(end) ? _planDate(end) : '';
+  let message;
+  if (trialing) message = `Your plan becomes ${price}. Nothing is charged until your first payment${first ? ' on ' + first : ''}.`;
+  else if (to === 'year') message = `Your plan becomes ${price}, from today — two months free. Stripe takes the year now, less what’s left of this month, which is credited.`;
+  else message = `Your plan becomes ${price}, from today. What’s left of your year is kept as credit and pays your monthly bills until it runs out — nothing is lost.`;
+  openConfirmSheet({
+    title: to === 'year' ? 'Switch to yearly?' : 'Switch to monthly?',
+    message,
+    confirmLabel: to === 'year' ? 'Switch to yearly' : 'Switch to monthly', cancelLabel: 'Not now', danger: false,
+    onConfirm: () => { billingSwitch(to); },
+  });
+  return true;
+}
+
+function billingSwitch(every) {
+  if (!billingAvailable()) return Promise.resolve(false);
+  const b = _bill();
+  if (b.pending) return Promise.resolve(false);
+  b.pending = 'switch'; b.message = '';
+  _billRepaint();
+  return cloudClient()
+    .then((c) => c.functions.invoke('billing-switch', { body: { every: every === 'month' ? 'month' : 'year' } }))
+    .then((res) => {
+      if (res && res.error) {
+        return _billRefusal(res.error).then((said) => {
+          b.message = (said && said.error) || 'Couldn’t change your plan. Try again in a moment — nothing has changed.';
+          return false;
+        });
+      }
+      b.message = every === 'month' ? 'Switched to monthly.' : 'Switched to yearly. Thank you!';
+      return true;
+    })
+    .catch(() => { b.message = 'Couldn’t change your plan. Try again in a moment — nothing has changed.'; return false; })
+    .then((ok) => { b.pending = ''; _billRepaint(); return billingRead().then(() => ok, () => ok); });
 }
 
 function _billOpenWindow() {
@@ -1211,7 +1290,8 @@ function billingView() {
     const live = info.has_subscription && ['trialing', 'active', 'past_due'].indexOf(info.status) !== -1;
     if (live) {
       out.kind = 'subscribed';
-      out.title = info.interval === 'month' ? 'Monthly — ' + PLAN_PRICES.month : 'Yearly — ' + PLAN_PRICES.year;
+      const seats = billingSeats();   // V169: the plan with its seats
+      out.title = info.interval === 'month' ? 'Monthly — ' + billingPriceWords('month', seats) : 'Yearly — ' + billingPriceWords('year', seats);
       const end = date(info.period_end);
       if (info.status === 'past_due') {
         out.lines.push('Your last payment didn’t go through. Stripe will try again over the next few days — update your card to keep things running.');
@@ -1223,6 +1303,9 @@ function billingView() {
       } else if (end) {
         out.lines.push(`Renews on ${end}.`);
       }
+      // V169 (3A): monthly ↔ yearly here — not while a payment is failing or the
+      // plan is set to end (turn it back on in Manage billing first).
+      if (info.status !== 'past_due' && !info.cancel_at_period_end) out.actions.push(info.interval === 'year' ? 'toMonth' : 'toYear');
       out.actions.push('manage');
       return out;
     }

@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V168';
+const APP_VERSION = 'V169';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -133,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V168';
+const WELCOME_VERSION = 'V169';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -492,6 +492,12 @@ const BILLING_MSG = 'patgo-billing-return';   // the landing page sends this typ
 // Stripe price the server is set up with (STRIPE_PRICE_YEAR / _MONTH): change
 // both together. Not VAT-registered — no VAT (V142 round, 8).
 const PLAN_PRICES = { year: '£60 a year', month: '£6 a month' };
+// V169: seat billing (R65 7C; R80). A PAID SEAT is an Engineer or Team leader;
+// the Owner is in the base price, Office is free. In pence, for the totals the
+// app works out ("£6 + 2 × £3 = £12 a month"). The PRICE charged is Stripe's
+// (STRIPE_PRICE_SEAT_MONTH / _YEAR on the server): change all three together,
+// and the server's own copy in supabase/functions/_shared/billing.js (PENCE).
+const PLAN_PENCE = { base: { month: 600, year: 6000 }, seat: { month: 300, year: 3000 } };
 // After paying, how long to wait before each re-read of the plan, while
 // Stripe's message reaches the database (usually a second or two).
 const BILLING_CONFIRM_DELAYS = [0, 2000, 4000, 8000, 15000];

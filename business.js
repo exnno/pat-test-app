@@ -322,7 +322,8 @@ function businessRead(c, uid) {
         .then(() => businessMyInvitesRead(c, uid).then(() => ok, () => ok))
         .then(() => businessWaitingRead(c, uid).then(() => ok, () => ok))   // V157 (1A): moves for me to decide
         .then(() => businessOthersRead(c, uid).then(() => ok, () => ok))     // V165 (1A): others' jobs held
-        .then(() => businessPlansRead(c, uid).then(() => ok, () => ok));     // V168: each business's plan
+        .then(() => businessPlansRead(c, uid).then(() => ok, () => ok))      // V168: each business's plan
+        .then(() => businessSeatsRead(c, uid).then(() => ok, () => ok));     // V169: the seats (3A, 4B)
     });
 }
 
@@ -455,6 +456,7 @@ function renderCloudBusiness() {
         ${x.role === 'office' ? `<p class="muted" id="biz-office-${i}">${escapeHTML(businessOfficeLine())}</p>` : ''}
         ${!x.def && x.role !== 'office' ? `<button class="backup-action-btn" id="biz-main-${i}" data-action="biz-main" data-arg="${escapeHTML(x.id)}" style="margin-top:8px">Make this my main business</button>` : ''}
         ${businessWaitingHTML(x, i)}
+        ${typeof businessSeatsHTML === 'function' ? businessSeatsHTML(x, i) : ''}
         ${businessPeopleHTML(x, i)}
         ${x.role !== 'owner' ? `<button class="link-btn biz-leave" id="biz-leave-${i}" data-action="biz-leave" data-arg="${escapeHTML(x.id)}" style="margin-top:10px">Leave ${escapeHTML(businessLabel(x))}</button>` : ''}
       </div>`;
@@ -1047,6 +1049,8 @@ function _bizCall(name, args, needSignal) {
   return _bizClient()
     .then((c) => c.rpc(name, args).then((res) => {
       if (!res || res.error) throw (res && res.error) || new Error('no answer');
+      // V169: a step that can change a seat → the server puts Stripe right now.
+      if (BUSINESS_SEAT_CALLS.indexOf(name) !== -1) businessSeatsNudge();
       return res.data === undefined ? true : (res.data === null ? true : res.data);
     }))
     .catch((e) => {
@@ -1085,15 +1089,32 @@ function businessInviteStart(orgId) {
   openChoiceSheet({
     title: 'Invite someone',
     message: `What will they do in ${businessLabel(b)}?`,
-    choices: roles.map((r) => ({ label: BUSINESS_ROLE_ABOUT[r], style: r === 'engineer' ? 'primary' : 'secondary', onPick: () => _bizInviteName(orgId, r, '') })),
+    choices: roles.map((r) => ({ label: BUSINESS_ROLE_ABOUT[r] + businessRoleCostTag(orgId, r), style: r === 'engineer' ? 'primary' : 'secondary', onPick: () => _bizInviteName(orgId, r, '') })),
   });
   return true;
+}
+
+// V169 (3A): " · +£3 a month" on a paid role, " · free" on Office ('' when comped).
+function businessRoleCostTag(orgId, r) {
+  const cost = businessSeatCostWords(orgId);
+  if (!cost) return '';
+  return businessPaidRole(r) ? ` · ${cost}` : ' · free';
+}
+
+// V169 (3A): the seat said on the invite itself, "when they join" (2A).
+function businessInviteCostLine(orgId, role) {
+  const cost = businessSeatCostWords(orgId);
+  if (!cost || !businessPaidRole(role)) return '';
+  const s = businessSeatsFor(orgId);
+  return s && !s.billed
+    ? ` A paid seat — ${cost}.`
+    : ` A paid seat: ${cost}, from when they join.`;
 }
 
 function _bizInviteName(orgId, role, value) {
   openNameSheet({
     title: 'Their name',
-    blurb: `Shown to everyone in the business. Invited as ${BUSINESS_ROLE_WORDS[role]}.`,
+    blurb: `Shown to everyone in the business. Invited as ${BUSINESS_ROLE_WORDS[role]}.${businessInviteCostLine(orgId, role)}`,
     value, placeholder: 'e.g. Dave Smith', confirmLabel: 'Next', maxlength: 60,
     onConfirm: (v) => _bizInviteEmail(orgId, role, v, ''),
   });
@@ -1248,10 +1269,19 @@ function businessRoleStart(arg) {
   openChoiceSheet({
     title: `${p.name || 'Their'} role`,
     message: `Now: ${BUSINESS_ROLE_WORDS[p.role]}. Choose their new role in ${businessLabel(b)}.`,
-    choices: BUSINESS_OFFER.owner.filter(r => r !== p.role).map((r) => ({ label: BUSINESS_ROLE_ABOUT[r], style: 'secondary',
+    choices: BUSINESS_OFFER.owner.filter(r => r !== p.role).map((r) => ({ label: BUSINESS_ROLE_ABOUT[r] + businessRoleChangeTag(orgId, p.role, r), style: 'secondary',
       onPick: () => (r === 'office' ? businessRoleOfficeAsk(orgId, user, p.name) : businessRoleSet(orgId, user, r)) })),
   });
   return true;
+}
+
+// V169 (2A): a role change that adds or frees a paid seat says so.
+function businessRoleChangeTag(orgId, from, to) {
+  if (businessPaidRole(from) === businessPaidRole(to)) return '';
+  const s = businessSeatsFor(orgId);
+  if (s && s.plan === 'comped') return '';
+  if (businessPaidRole(to)) return ` · ${businessSeatCostWords(orgId)}`;
+  return s && s.billed ? ` · frees a seat (−${businessSeatPrice(s.every)})` : ' · frees a seat';
 }
 
 function businessRoleSet(orgId, user, r) {
@@ -2135,6 +2165,7 @@ function businessRemoveStart(arg) {
     openChoiceSheet({
       title: `Remove ${who} from ${biz}?`,
       message: `${who} loses access to ${biz}’s jobs straight away. Their jobs stay with ${biz}; their sign-in and own business don’t change. ` +
+        businessRemoveSeatLine(orgId, p.role) +
         (devs.length
           ? `Anything not yet sent from ${devs.length === 1 ? 'this device' : 'these devices'} won’t reach ${biz} unless their phone can send it — ask them to Sync first if you can:`
           : `They have no devices signed in, so nothing more can come from them.`),
@@ -2148,6 +2179,16 @@ function businessRemoveStart(arg) {
     });
   });
   return true;
+}
+
+// V169 (1A): removing a paid seat frees it — what's paid for and unused is credited.
+function businessRemoveSeatLine(orgId, role) {
+  if (!businessPaidRole(role)) return '';
+  const s = businessSeatsFor(orgId);
+  if (s && s.plan === 'comped') return '';
+  return s && s.billed
+    ? `It frees a paid seat (−${businessSeatPrice(s.every)}); the unused part is credited to your next bill. `
+    : 'It frees a paid seat. ';
 }
 
 function businessRemoveGo(orgId, user, deliver, who) {
@@ -2183,3 +2224,207 @@ function businessLeaveStart(orgId) {
   });
   return true;
 }
+
+// ============================================================================
+// V169 — seat billing (Teams v1; R65 7C; 14 Nov 1A–4A; 18 Nov R80 1A 2A 3A 4B 5A)
+// ============================================================================
+// A PAID SEAT is an Engineer or Team leader: £3 a month (£30 a year) each, on
+// top of the £6 base that includes the Owner; Office is free. 2A: a seat costs
+// from joining or being made Engineer / Team leader, and Office frees it. 3A:
+// whoever may invite sees what a seat costs on the invite sheet; the Owner sees
+// the count and the total on the Business page. 4A: free in the trial — the
+// count on the day of subscribing. 4B: the Owner is emailed about every change
+// (the server — supabase/functions billing-seats) and, for a change someone
+// ELSE made, a line on the Jobs list until Got it.
+//
+// The DATABASE decides who has a seat (supabase/v169-seats.sql — a trigger on
+// memberships writes every change down); the phone only reads the figures
+// (business_seats) and nudges the server after a change it made. Nothing here
+// is stored: memory only, read with the businesses (businessRead).
+
+const BUSINESS_PAID_ROLES = ['engineer', 'team_leader'];
+// The cloud steps that can change a seat — after each, the server is nudged.
+const BUSINESS_SEAT_CALLS = ['accept_invite', 'set_member_role', 'remove_member', 'leave_business'];
+let _bizSeats = { u: '', list: [] };
+
+function businessPaidRole(r) { return BUSINESS_PAID_ROLES.indexOf(r) !== -1; }
+
+function _bizInt(v, max) { return (typeof v === 'number' && isFinite(v) && v >= 0 && v <= max) ? Math.floor(v) : 0; }
+
+function businessSeatsFromRows(uid, rows) {
+  const list = [];
+  const role = (r) => (r === null || r === undefined) ? null : (BUSINESS_ROLE_WORDS[r] ? r : undefined);
+  for (const r of (Array.isArray(rows) ? rows : []).slice(0, 50)) {
+    if (!r || !businessValidId(r.business_id)) continue;
+    const changes = [];
+    for (const c of (Array.isArray(r.changes) ? r.changes : []).slice(0, 20)) {
+      if (!c || typeof c !== 'object') continue;
+      const rf = role(c.role_from), rt = role(c.role_to);
+      if (rf === undefined || rt === undefined) continue;
+      changes.push({ id: _bizInt(c.id, 9e15), at: _bizIso(c.at), person: _bizStr(c.person, 80), from: rf, to: rt,
+        by: _bizStr(c.by_name, 80), byYou: c.by_you === true, self: c.self === true, after: _bizInt(c.seats_after, 100000) });
+    }
+    list.push({
+      id: r.business_id,
+      seats: _bizInt(r.seats, 100000),
+      plan: BUSINESS_PLANS.indexOf(r.plan) !== -1 ? r.plan : '',
+      every: r.every === 'year' ? 'year' : r.every === 'month' ? 'month' : '',
+      billed: r.billed === true,
+      owner: r.is_owner === true,
+      changes,
+      unseen: r.is_owner === true ? _bizInt(r.unseen, 100000) : 0,
+    });
+  }
+  _bizSeats = { u: uid, list };
+  return _bizSeats;
+}
+
+// Read with the businesses. A project without the V169 SQL simply has none.
+function businessSeatsRead(c, uid) {
+  return Promise.resolve().then(() => c.rpc('business_seats')).then((res) => {
+    if (!res || res.error || !Array.isArray(res.data)) return false;
+    businessSeatsFromRows(uid, res.data);
+    return true;
+  });
+}
+
+function businessSeatsFor(orgId) {
+  const uid = _bizUid();
+  if (!uid || _bizSeats.u !== uid) return null;
+  return _bizSeats.list.find(x => x.id === orgId) || null;
+}
+
+function _bizPounds(p) { return '£' + (p % 100 === 0 ? String(p / 100) : (p / 100).toFixed(2)); }
+
+// What one seat costs this business, in words: "£3 a month" (or a year).
+function businessSeatPrice(every) {
+  const e = every === 'year' ? 'year' : 'month';
+  return `${_bizPounds(PLAN_PENCE.seat[e])} a ${e}`;
+}
+
+// The plan in words: "£6 + 2 × £3 = £12 a month".
+function businessBillWords(seats, every) {
+  const e = every === 'year' ? 'year' : 'month';
+  const n = Math.max(0, Math.floor(Number(seats) || 0));
+  const base = PLAN_PENCE.base[e], each = PLAN_PENCE.seat[e];
+  if (!n) return `${_bizPounds(base)} a ${e}`;
+  return `${_bizPounds(base)} + ${n} × ${_bizPounds(each)} = ${_bizPounds(base + n * each)} a ${e}`;
+}
+
+// 3A: what a NEW paid seat costs here, said where people are invited or made
+// Engineer / Team leader. '' when it costs nothing (comped).
+//   paying → "+£3 a month"   ·   not paying yet → "free in your trial, then £3 a month"
+function businessSeatCostWords(orgId) {
+  const s = businessSeatsFor(orgId);
+  if (s && s.plan === 'comped') return '';
+  if (s && s.billed) return '+' + businessSeatPrice(s.every);
+  if (s && s.plan === 'trial') return 'free in the trial, then ' + businessSeatPrice('month');
+  if (s) return businessSeatPrice('month') + ' once subscribed';
+  return '+' + businessSeatPrice('month');   // not read (an older project, no signal): the usual price
+}
+
+// One change in words — the same as the Owner's email (billing.js seatChangeWords).
+function businessSeatChangeWords(c) {
+  const who = c.person || 'Someone';
+  const by = c.byYou ? 'You' : (c.by || '');
+  const role = (r) => BUSINESS_ROLE_WORDS[r] || 'member';
+  if (!businessPaidRole(c.from) && businessPaidRole(c.to)) {
+    if (!c.from) return (c.self || !by ? `${who} joined as ${role(c.to)}` : `${by} added ${who} as ${role(c.to)}`) + ' (+1 paid seat)';
+    return (by ? `${by} made ${who} ${role(c.to)}` : `${who} was made ${role(c.to)}`) + ' (+1 paid seat)';
+  }
+  if (!c.to) {
+    if (c.self) return `${who} left (−1 paid seat)`;
+    return (by ? `${by} removed ${who}` : `${who}’s account was closed`) + ' (−1 paid seat)';
+  }
+  return (by ? `${by} made ${who} ${role(c.to)}` : `${who} was made ${role(c.to)}`) + ' — Office is free (−1 paid seat)';
+}
+
+// The Owner's block on the Business page (3A): count, the plan, the changes.
+function businessSeatsHTML(b, i) {
+  const s = businessSeatsFor(b.id);
+  if (!s || !s.owner) return '';
+  const e = s.every || 'month';
+  const n = s.seats;
+  const count = `Paid seats: ${n} — ${n === 1 ? 'one Engineer or Team leader' : 'Engineers and Team leaders'} at ${businessSeatPrice(e)} each. You and Office are free.`;
+  let plan;
+  if (s.plan === 'comped') plan = 'Free — seats included.';
+  else if (s.billed) plan = `Your plan: ${businessBillWords(n, e)}.`;
+  else if (s.plan === 'trial') plan = `Seats are free in your trial. When you subscribe: ${businessBillWords(n, 'month')} (or ${businessBillWords(n, 'year')}).`;
+  else plan = `When you subscribe: ${businessBillWords(n, 'month')} (or ${businessBillWords(n, 'year')}).`;
+  const rows = s.changes.slice(0, 5).map((c, k) => `
+            <li class="biz-seat-change" id="biz-seat-change-${i}-${k}">${escapeHTML((_bizUntil(c.at) ? _bizUntil(c.at) + ' — ' : '') + businessSeatChangeWords(c))}</li>`).join('');
+  return `
+        <h4 class="biz-sub" id="biz-seats-head-${i}">Paid seats</h4>
+        <p class="muted" id="biz-seats-${i}">${escapeHTML(count)}</p>
+        <p class="muted" id="biz-seats-plan-${i}">${escapeHTML(plan)}</p>
+        ${rows ? `<ul class="biz-seat-changes" id="biz-seat-changes-${i}">${rows}</ul>` : ''}
+        ${rows && s.plan !== 'comped' ? `<p class="muted biz-seat-note" id="biz-seats-mail-${i}">Each change is emailed to you too.</p>` : ''}`;
+}
+
+// 4B: the Jobs list line — a seat changed by someone ELSE, until Got it.
+function businessSeatNews() {
+  const out = [];
+  const uid = _bizUid();
+  if (!uid || _bizSeats.u !== uid) return out;
+  for (const s of _bizSeats.list) {
+    if (!s.owner || !s.unseen) continue;
+    const theirs = s.changes.filter(c => !c.byYou).slice(0, s.unseen);
+    if (theirs.length) out.push({ s, theirs });
+  }
+  return out;
+}
+
+function businessSeatNewsBannerHTML() {
+  const news = businessSeatNews();
+  if (!news.length) return '';
+  let text;
+  if (news.length === 1 && news[0].theirs.length === 1) {
+    const { s, theirs } = news[0];
+    const b = _bizOrg(s.id);
+    const cost = s.plan === 'comped' ? '' : s.billed
+      ? ` Your plan is now ${businessBillWords(s.seats, s.every)}.`
+      : ' Seats are free until you subscribe.';
+    text = `${b ? businessLabel(b) : 'Your business'}: ${businessSeatChangeWords(theirs[0])}.${cost}`;
+  } else {
+    const n = news.reduce((k, x) => k + x.theirs.length, 0);
+    text = news.length === 1
+      ? `${_bizOrg(news[0].s.id) ? businessLabel(_bizOrg(news[0].s.id)) : 'Your business'}: ${n} changes to paid seats. The Business page has them.`
+      : `${n} changes to paid seats in your businesses. The Business page has them.`;
+  }
+  return `
+    <div class="backup-banner plan-banner" id="seat-banner" role="status">
+      <div class="backup-banner-body">
+        <div class="backup-banner-text" id="seat-banner-text">${escapeHTML(text)}</div>
+        <div class="backup-banner-actions">
+          <button class="backup-banner-action" id="seat-banner-see" data-action="settings-page" data-arg="cloudBusiness">See</button>
+          <button class="backup-banner-action primary" id="seat-banner-ok" data-action="biz-seats-seen">Got it</button>
+        </div>
+      </div>
+    </div>
+  `;
+}
+
+// Got it: gone from this phone at once; the cloud remembers it for every phone.
+function businessSeatsSeen() {
+  const news = businessSeatNews();
+  if (!news.length) return false;
+  for (const x of news) x.s.unseen = 0;
+  try { render(); } catch (e) { /* the next paint */ }
+  _bizClient().then((c) => Promise.all(news.map((x) => Promise.resolve(c.rpc('seats_seen', { o: x.s.id })).catch(() => null))))
+    .catch(() => null);
+  return true;
+}
+
+// After a change this phone made: ask the server to put Stripe right and tell
+// the Owner now. Fire and forget — if it doesn't get through, the database asks
+// again within 10 minutes (seats_nudge). Never holds anything up.
+function businessSeatsNudge() {
+  try {
+    if (typeof cloudClient !== 'function') return Promise.resolve(false);
+    return cloudClient()
+      .then((c) => c.functions.invoke('billing-seats', { body: { from: 'app' } }))
+      .then(() => true, () => false);
+  } catch (e) { return Promise.resolve(false); }
+}
+
+// (c) 2026 Peter Birchley. All rights reserved.

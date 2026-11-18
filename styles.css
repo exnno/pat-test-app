@@ -4654,3 +4654,9 @@ li.cloud-redo { font-size: 0.875rem; }
   border: 1px solid var(--warn-soft-border); background: var(--warn-soft-bg); color: var(--warn-soft-text); }
 /* New job's "For": the line under it naming a business whose plan has ended (5A). */
 .nf-business-shut { margin: 4px 0 0; font-size: 0.8125rem; }
+
+/* V169 — seat billing: the Owner's Paid seats block on the Business page. */
+.biz-seat-changes { list-style: none; margin: 6px 0 0; padding: 0; }
+.biz-seat-change { font-size: 0.8125rem; color: var(--text-muted); padding: 4px 0; border-top: 1px solid var(--border); overflow-wrap: anywhere; }
+.biz-seat-change:first-child { border-top: 0; }
+.biz-seat-note { font-size: 0.75rem; margin-top: 4px; }

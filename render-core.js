@@ -288,7 +288,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Each business on its own plan.</strong> If you work for more than one business, a plan that ends now only locks that business&rsquo;s jobs &mdash; the rest carry on as normal. New job greys out a business whose plan has ended, and its jobs say so.</li>
+        <li><strong>Team seats.</strong> Engineers and Team leaders in your business are &pound;3 a month each (&pound;30 a year) on top of your plan &mdash; you and the Office are free. The Business page shows your seats and total, the invite says what a seat costs, and you&rsquo;re emailed whenever a seat changes. You can now switch between monthly and yearly in Subscription.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -999,6 +999,8 @@ function renderSessions() {
   try { decidedBanner = (typeof businessDecidedBannerHTML === 'function') ? businessDecidedBannerHTML() : ''; } catch (e) { decidedBanner = ''; }
   let leftBanner = '';   // V163 (5B): removed from / left a business
   try { leftBanner = (typeof businessDepartedBannerHTML === 'function') ? businessDepartedBannerHTML() : ''; } catch (e) { leftBanner = ''; }
+  let seatBanner = '';   // V169 (4B): a paid seat changed by someone else, until Got it
+  try { seatBanner = (typeof businessSeatNewsBannerHTML === 'function') ? businessSeatNewsBannerHTML() : ''; } catch (e) { seatBanner = ''; }
 
   // V93 (4A — O9): signed in, the Jobs screen has two tabs. "In the cloud" is
   // how old jobs are reached once a phone only brings down recent ones (R21):
@@ -1038,6 +1040,7 @@ function renderSessions() {
       ${waitBanner}
       ${decidedBanner}
       ${leftBanner}
+      ${seatBanner}
       ${tabs}
       ${unreadableBanner}
       ${storageBanner}

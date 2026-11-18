@@ -61,16 +61,17 @@ function renderSettingsAbout() {
         <button class="backup-action-btn" id="about-party-btn" data-action="party-open" style="margin-top:4px">${icon('sparkles')} Play the V100 moment again</button>
       </div>
 
-      <!-- v8: rolling 3-version changelog. V168: rolled forward — V168 on top, V165 dropped. -->
+      <!-- v8: rolling 3-version changelog. V169: rolled forward — V169 on top, V166 dropped. -->
       <div class="info-card">
         <h3>What's new</h3>
+
+        <p><strong>V169</strong> &middot; November 2026</p>
+        <p class="muted">Team seats: each Engineer or Team leader is &pound;3 a month (&pound;30 a year) on top of the plan, from the day they join; the Owner and Office are free, and seats are free during the trial. The Business page shows the seats and the total, invites say what a seat costs, and the Owner is emailed about every change. Monthly and yearly can now be switched in Subscription.</p>
 
         <p><strong>V168</strong> &middot; November 2026</p>
         <p class="muted">Each business on its own plan: for anyone in more than one business, a plan that ends locks only that business&rsquo;s jobs, and the cloud keeps syncing the others. New job greys out a business whose plan has ended; its jobs carry a short line saying so. Photos now follow their own job&rsquo;s business.</p>
         <p><strong>V167</strong> &middot; November 2026</p>
         <p class="muted">Corrections: Owners, Team leaders and the Office can fix a mistake in someone else&rsquo;s locked job from the cloud tab &mdash; text, results and readings (a result or reading needs a reason). Each change is kept in the job with who made it and when, and a job corrected after its certificate says the certificate needs making again.</p>
-        <p><strong>V166</strong> &middot; November 2026</p>
-        <p class="muted">How much is in the cloud, at a glance: the cloud tab shows your jobs, photos and the space they take, and opens Cloud Storage. Owners, Team leaders and the Office can see a business&rsquo;s total, each person&rsquo;s share and its biggest jobs, and open any of them to look through.</p>
       </div>
 
       <div class="info-card">
@@ -1027,10 +1028,13 @@ function renderCloudSubscription() {
       subscribe: `<button class="btn-primary" id="billing-subscribe" data-action="billing-subscribe" ${dis} style="margin-top:10px">Subscribe</button>`,
       card: `<button class="btn-primary" id="billing-card" data-action="billing-card" ${dis} style="margin-top:10px">Update card</button>`,
       manage: `<button class="backup-action-btn" id="billing-manage" data-action="billing-manage" ${dis} style="margin-top:8px">Manage billing</button>`,
+      // V169 (3A): monthly ↔ yearly in PATGo (Stripe's page can't with seats on it)
+      toYear: `<button class="backup-action-btn" id="billing-switch" data-action="billing-switch" ${dis} style="margin-top:8px">Switch to yearly — two months free</button>`,
+      toMonth: `<button class="backup-action-btn" id="billing-switch" data-action="billing-switch" ${dis} style="margin-top:8px">Switch to monthly</button>`,
     };
     const wait = busy ? `
-        <p class="muted" id="billing-wait">${b.pending === 'checkout' ? 'Continue in the Stripe window, then come back here.' : 'Your billing page is open in the Stripe window.'}</p>
-        <button class="backup-action-btn" id="billing-cancel-wait" data-action="billing-cancel-wait" style="margin-top:6px">Cancel</button>` : '';
+        <p class="muted" id="billing-wait">${b.pending === 'checkout' ? 'Continue in the Stripe window, then come back here.' : b.pending === 'switch' ? 'Changing your plan with Stripe…' : 'Your billing page is open in the Stripe window.'}</p>
+        ${b.pending === 'switch' ? '' : '<button class="backup-action-btn" id="billing-cancel-wait" data-action="billing-cancel-wait" style="margin-top:6px">Cancel</button>'}` : '';
     body = `
       <div class="info-card" id="billing-card-${escapeHTML(v.kind)}">
         <h3 id="billing-title">${escapeHTML(v.title || 'Your plan')}</h3>

@@ -9,10 +9,52 @@ here rather than restating it. Delete an item when it ships.
 ## Next release
 
 ### Planned audits
+- V169 (seat billing): brief the fourth audit on billing-seats (no-orders design, claim before email),
+  billing-switch, and the seat_note trigger.
 - **Fourth GPT audit after V170** (moved at the V168 round, 14 Nov — 0B split seat billing out).
   V171 is reserved for fixing what it finds. Brief it that the second audit's finding 5 was
   fixed in V168 (refusals per business; photo files by their job's business).
   (Was: after V169, V170 its fixes — Peter, 13 Nov.)
+
+### Next after V169
+V169 = seat billing (R65 7C; round 14 Nov 1A–4A; round 18 Nov R80 "1 A 2 A 3 A 4 B 5 A"; built in Opus).
+SQL: supabase/v169-seats.sql (seat_changes + trigger seat_note, billing_seats_due / _record / _told /
+_result, billing_context + seats, business_seats, seats_seen, billing_settings.seats_url + cron
+patgo-seats → seats_nudge (pg_net); E1–E7; isolation 34a–34c). Server: supabase/functions/_shared/billing.js
+(seatPlan, seatProration, seatsRun / makeSeats, switchRefusal / switchParams / makeSwitch, seatEmail,
+sendEmail; checkout's seat line; the webhook records the seat count) + billing-seats/ and billing-switch/
+(new). App: business.js (V169 section), plan.js (billingSeats, billingPriceWords, billingSwitchStart /
+billingSwitch), render-help.js (switch buttons), render-core.js (seat line), dispatch.js, config.js
+(PLAN_PENCE), styles.css. Harness 109 + M2153–M2197.
+**Locked 18 Nov (R80):** 1A the database writes every change; the server puts Stripe right at once and the
+database asks every 10 minutes while anything is owed · 2A yearly: the part-year charged that day ("if they
+join in month 10 it's pro rata for the 2 months"), credit on leaving · 3A monthly ↔ yearly inside PATGo
+("so people can change and don't feel locked in") · 4B the Owner emailed about every change ("it's a money
+thing") + the Jobs line for someone else's · 5A founders = a Stripe discount code (nothing built).
+Claude's calls: an invite costs nothing until joined; comped never touches Stripe; existing subscriptions get
+the seat line the first time they have a paid seat; a failed payment as before; the trial (not subscribed):
+changes recorded "no bill", no email; the Owner's own changes are emailed too but make no Jobs line;
+Stripe's billing page: plan changes OFF (deploy step) — it can't move two lines together.
+**Next — V170:** the certificate per business (numbering, branding, Office makes it — R77 8A; who may make
+certificates; a frozen copy of the tester's details at lock). Its own spec round (Opus). Then the fourth GPT
+audit, V171 its fixes.
+
+### V169 residuals (known, accepted)
+- The seat price lives in three places that must agree: Stripe's two seat prices, config.js PLAN_PENCE and
+  billing.js PENCE (109d pins the last two equal). Changing a price = all three.
+- The Jobs line (4B) shows changes someone else made since Got it, within 30 days and the newest 20; an older
+  one is on the email only.
+- An untold change over 7 days old is never emailed (past news) — the count is still put right.
+- The email's "about" amounts are not shown: Stripe computes the exact part-month / part-year (its receipt
+  says it). The email says how it's charged, not the pence.
+- billing-seats takes no orders and has no sign-in check (Verify JWT off): anyone calling it only makes it
+  re-read what's owed. Each call costs one database read when nothing is owed.
+- seats_url is set by hand once per project (billing_settings) — blank = only the phone's nudge works.
+- Switching while past_due or set to end is refused (turn it back on / update the card first).
+- A business whose Owner isn't the main business's owner pays through its own main business (V142 rule —
+  unchanged); the Business page shows its seats regardless.
+- The PGlite proof stands in for pg_cron / pg_net (a recorded call, not a real request); the hosted project's
+  pg_net is Peter's step 3 check (the cron row) and the live test.
 
 ### Next after V168
 V168 = each business on its own plan (Peter 11 Nov; round 14 Nov 0B 5A 6A; built in Opus) + the

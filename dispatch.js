@@ -871,6 +871,7 @@ registerActions({
   'biz-approve': (arg) => { if (typeof businessDecideStart === 'function') businessDecideStart(arg, true); },
   'biz-refuse': (arg) => { if (typeof businessDecideStart === 'function') businessDecideStart(arg, false); },
   'biz-told': () => { if (typeof businessMovesTold === 'function') businessMovesTold(); },
+  'biz-seats-seen': () => { if (typeof businessSeatsSeen === 'function') businessSeatsSeen(); },   // V169 (4B)
   'biz-role': (arg) => { if (typeof businessRoleStart === 'function') businessRoleStart(arg); },
   'biz-remove': (arg) => { if (typeof businessRemoveStart === 'function') businessRemoveStart(arg); },   // V163
   'biz-leave': (arg) => { if (typeof businessLeaveStart === 'function') businessLeaveStart(arg); },      // V163
@@ -879,6 +880,7 @@ registerActions({
   'biz-main': (arg) => { if (typeof businessMakeMain === 'function') businessMakeMain(arg); },
   'billing-manage':      () => { if (typeof billingManage === 'function') billingManage(''); },
   'billing-card':        () => { if (typeof billingManage === 'function') billingManage('card'); },
+  'billing-switch':      () => { if (typeof billingSwitchStart === 'function') billingSwitchStart(); },   // V169 (3A)
   'billing-cancel-wait': () => { if (typeof billingCancelWait === 'function') billingCancelWait(); },
   // V106: a level on Reset This Phone opens its confirm (reset.js, optional).
   'reset-open': (arg) => { if (typeof resetOpen === 'function') resetOpen(arg); },
