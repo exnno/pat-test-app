@@ -1514,6 +1514,17 @@ function renderSettingsClients() {
 
 function renderSettingsReport(part) {
   const rs = state.reportSettings;
+  // V170 (R81 1A 2B): in a business of more than one, the certificate is the
+  // business's — only its Owner and Office change it. An Engineer or Team leader
+  // sees why, and no form (business.js businessCertReadOnly).
+  const roBiz = (typeof businessCertReadOnly === 'function') ? businessCertReadOnly() : '';
+  if (roBiz) {
+    return `
+      <div class="screen">
+        ${renderSettingsSubHeader(part === 'content' ? 'Certificate Content' : 'Company & Branding')}
+        <p class="muted" id="cert-biz-ro">Certificates for ${escapeHTML(roBiz)} are set by its Owner or Office, so every certificate the business makes looks the same and is numbered in one series. Ask them if something needs changing.</p>
+      </div>`;
+  }
   // Reusable toggle-row builder matching the SQP / Multi Pick markup. `id` is the
   // checkbox id (and its data-change-action). `on` is current state.
   const toggle = (id, title, on, sub) => `

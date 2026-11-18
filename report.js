@@ -56,6 +56,15 @@ function pdfSafe(v) {
 // autotable plugin (self-applies onto it). One-shot shared promise so concurrent
 // or repeat produce-report taps share a single load. Rejects cleanly so the caller
 // can show a failure message rather than hang.
+// V170 (R81 1A): the settings this certificate is built with. Normally the
+// phone's (state.reportSettings — for an Owner / Office, their main business's).
+// A certificate for a team's job is built from the business's settings as the
+// cloud gave them at that moment (produceReport sets this; the preview's close
+// clears it). The preview's quick-adjust chips then change THIS certificate only
+// ("if it needs to be different for a customer office or owner would sort this").
+let _reportRsUse = null;
+function reportRs() { return _reportRsUse || state.reportSettings; }
+
 const REPORT_JSPDF_SRC = './jspdf.umd.min.js';
 const REPORT_AUTOTABLE_SRC = './jspdf.plugin.autotable.min.js';
 let _reportEngineLoadPromise = null;
@@ -248,7 +257,7 @@ async function ensureReportPhotos(session) {
 // pattern for every other optional block: the setting is on, AND there is photo
 // data, AND that data actually contains something printable.
 function _photoAppendixWanted(data) {
-  return !!(state.reportSettings && state.reportSettings.showPhotos === true
+  return !!(reportRs() && reportRs().showPhotos === true
     && data && data.groups && data.groups.length);
 }
 
@@ -431,13 +440,13 @@ function _appendPhotoPages(doc, session, data, margin, headerRgb) {
 // A job with no fails gets no section, switch on or not.
 // ---------------------------------------------------------------------------
 function _remedialWanted(session) {
-  const rs = state.reportSettings || {};
+  const rs = reportRs() || {};
   return rs.showRemedial === true && !!session && Array.isArray(session.items)
     && session.items.some(i => i && i.result === 'fail');
 }
 
 function _appendRemedialPages(doc, session, data, margin, headerRgb) {
-  const rs = state.reportSettings || {};
+  const rs = reportRs() || {};
   const G = _photoGeom(doc, margin);
   const contentW = G.contentW;
   const fails = session.items.filter(i => i && i.result === 'fail');
@@ -503,7 +512,7 @@ function _appendRemedialPages(doc, session, data, margin, headerRgb) {
 function buildReportDoc(session, photoData) {
   const JsPDF = getJsPDF();
   if (!JsPDF) throw new Error('PDF engine not loaded');
-  const rs = state.reportSettings;
+  const rs = reportRs();
 
   // v54: decide which reading columns this certificate needs BEFORE creating the
   // doc, because the column count drives the page ORIENTATION (a detailed Class I
@@ -855,7 +864,7 @@ function buildReportDoc(session, photoData) {
     doc.text(`Page ${p} of ${pageCount}`, pageW - margin, pageH - 20, { align: 'right' });
     // v48: app credit is optional. When off, the footer shows just the generated
     // stamp; when on (default), it reads "Generated … · PATGo {version}".
-    const creditOn = !(state.reportSettings && state.reportSettings.showAppCredit === false);
+    const creditOn = !(reportRs() && reportRs().showAppCredit === false);
     const footerLeft = creditOn
       ? `Generated ${genStamp} · PATGo ${APP_VERSION}`
       : `Generated ${genStamp}`;
@@ -865,7 +874,7 @@ function buildReportDoc(session, photoData) {
     // on the text baseline. A bad image never blocks the report (same guard as
     // the header/signature logos). The text then starts to the right of the mark.
     let textX = margin;
-    const footerLogoOn = creditOn && !(state.reportSettings && state.reportSettings.showFooterLogo === false);
+    const footerLogoOn = creditOn && !(reportRs() && reportRs().showFooterLogo === false);
     if (footerLogoOn && typeof PATGO_FOOTER_LOGO === 'string' && PATGO_FOOTER_LOGO) {
       try {
         const sz = 11;                 // pt square — matches the 8pt text height band
@@ -913,7 +922,7 @@ function reportDocProperties(session, rs) {
 // it now produces "PAT Report Site Name 28-09-2026.pdf" — underscores become
 // spaces and {date} is day-first. An empty result falls back to "PAT Report".
 function reportFilename(session, patternOverride) {
-  const rs = state.reportSettings || {};
+  const rs = reportRs() || {};
   const pattern = (typeof patternOverride === 'string' && patternOverride.trim())
     ? patternOverride
     : (typeof rs.reportFilenamePattern === 'string' && rs.reportFilenamePattern.trim())
@@ -972,22 +981,28 @@ async function reopenReportPreview(sessionId) {
 // or the session already has one. Builds the number from certPrefix (with an
 // optional {year} token) + a zero-padded counter, then increments the counter
 // and persists both the session and the settings. Returns nothing.
+// V170 (R81 3): the number as printed — prefix (with {year} = the job's year) and
+// the zero-padded counter. One place, for the phone's counter and the cloud's.
+function certNoFormat(rs, session, n) {
+  const pad = Number.isFinite(parseInt(rs.certPadding, 10)) ? parseInt(rs.certPadding, 10) : 4;
+  const year = (session.date && String(session.date).slice(0, 4)) || String(new Date().getFullYear());
+  const prefix = String(rs.certPrefix || '').replace(/\{year\}/gi, year);
+  return prefix + String(n).padStart(pad, '0');
+}
+
 function stampCertNumber(session) {
   const rs = state.reportSettings;
   if (!rs.certEnabled) return;
   if (session.certNo) return;            // already stamped — reuse (A2)
   const n = Number.isFinite(parseInt(rs.certNextNumber, 10)) ? parseInt(rs.certNextNumber, 10) : 1;
-  const pad = Number.isFinite(parseInt(rs.certPadding, 10)) ? parseInt(rs.certPadding, 10) : 4;
-  const year = (session.date && String(session.date).slice(0, 4)) || String(new Date().getFullYear());
-  const prefix = String(rs.certPrefix || '').replace(/\{year\}/gi, year);
   // v84 (Q2A): never a number a job on this phone already has — including jobs
   // pulled from your other device, which may have issued it while this phone's
   // counter was behind. Bounded: at most one step per job holding a number.
   const used = new Set((state.sessions || []).map(s => s && s.certNo).filter(Boolean));
-  let n2 = n, no = prefix + String(n2).padStart(pad, '0');
+  let n2 = n, no = certNoFormat(rs, session, n2);
   for (let guard = 0; used.has(no) && guard <= used.size; guard++) {
     n2++;
-    no = prefix + String(n2).padStart(pad, '0');
+    no = certNoFormat(rs, session, n2);
   }
   session.certNo = no;
   rs.certNextNumber = n2 + 1;
@@ -997,8 +1012,28 @@ function stampCertNumber(session) {
 
 async function produceReport(sessionId) {
   if (typeof planGate === 'function' && !planGate(state.sessions.find(s => s.id === sessionId) || null)) return;   // V127: the plan lock (plan.js); V168: the job's business
-  if (!state.reportSettings.enabled) { setView('settings'); return; }
-  const session = state.sessions.find(s => s.id === sessionId);
+  _reportRsUse = null;
+  // V170 (R81 3 5C 8A): who makes this job's certificate, and from whose
+  // settings — business.js businessCertMode. An Engineer in a team: the office
+  // makes it. Owner / Team leader / Office of a team: the business's settings and
+  // number from the cloud, so a connection is needed. A business of one, or no
+  // business known here: this phone's settings and counter, offline, as before.
+  const found = state.sessions.find(s => s.id === sessionId) || null;
+  const mode = (found && typeof businessCertMode === 'function') ? businessCertMode(found) : { kind: 'phone', org: '', name: '' };
+  if (mode.kind === 'refuse') { _reportRefused(mode.name); return; }
+  let bizRs = null;
+  if (mode.kind === 'cloud') {
+    const got = await businessCertFetch(mode.org);
+    if (got.offline) { _reportNeedsSignal(mode.name); return; }
+    if (got.refused || (got.ok && !got.canMake)) { _reportRefused(mode.name); return; }
+    if (!got.ok) { _reportCloudFailed(got.error); return; }
+    bizRs = normaliseReportSettings(got.settings);
+    if (!bizRs.enabled) {
+      openInfoSheet({ title: 'Certificates are switched off', message: `Certificates are switched off for ${mode.name}. Its Owner or Office switches them on in Settings \u203a Company & Branding.` });
+      return;
+    }
+  } else if (!state.reportSettings.enabled) { setView('settings'); return; }
+  const session = found;
   if (!session) { openInfoSheet({ title: 'Job not found', message: 'Couldn\u2019t find that job. Please try again.' }); return; }
 
   // v51: the PDF engine is loaded lazily on first report rather than at startup.
@@ -1019,15 +1054,17 @@ async function produceReport(sessionId) {
     }
   }
 
+  _reportRsUse = bizRs;   // V170: from here on, this certificate's settings
+
   // v89 (4A): photos of this job that are only in the cloud. Asked BEFORE the
   // certificate number is stamped, so Cancel costs nothing. Only when the
   // report shows photos at all. Downloaded photos stay on the phone.
-  if (state.reportSettings.showPhotos === true && typeof photoCloudOnlyForSession === 'function') {
+  if (reportRs().showPhotos === true && typeof photoCloudOnlyForSession === 'function') {
     const cloud = photoCloudOnlyForSession(session);
     if (cloud.length) {
       const offline = (typeof navigator !== 'undefined' && navigator.onLine === false);
       const choice = await _reportCloudPhotoChoice(cloud, offline);
-      if (choice === 'cancel') return;
+      if (choice === 'cancel') { _reportRsUse = null; return; }
       if (choice === 'download' && typeof syncPhotoDownload === 'function') {
         showToast(`Downloading photos\u2026 0 of ${cloud.length}`);
         const res = await syncPhotoDownload(cloud.map((e) => e.id),
@@ -1038,7 +1075,27 @@ async function produceReport(sessionId) {
     }
   }
 
-  stampCertNumber(session);   // v36: assign-once cert number before building
+  if (mode.kind === 'cloud') {
+    // V170 (3): the business's next number, from the cloud — never the same twice.
+    // Taken AFTER the photo question (Cancel costs nothing, as v89) and only for
+    // a job without one (assign-once, A2). No number, no certificate.
+    if (reportRs().certEnabled && !session.certNo) {
+      const t = await businessCertTake(mode.org);
+      if (!t.ok) {
+        _reportRsUse = null;
+        if (t.offline) _reportNeedsSignal(mode.name);
+        else if (t.refused) _reportRefused(mode.name);
+        else _reportCloudFailed(t.error);
+        return;
+      }
+      session.certNo = certNoFormat(reportRs(), session, t.n);
+      save();
+    }
+  } else {
+    // V170 (8A): for a business of one, stamping saves the settings, and that
+    // save (business.js businessCertNoteSave) tells the cloud how far the counter got.
+    stampCertNumber(session);   // v36: assign-once cert number before building
+  }
 
   // v64: read and re-encode the job's photos BEFORE building. This is the only
   // place that talks to the photo database on the report path — buildReportDoc
@@ -1047,7 +1104,7 @@ async function produceReport(sessionId) {
   // since the last report for this job. Wrapped, because a photo failure must
   // never cost the certificate.
   let photoData = _emptyPhotoData(session.id);
-  if (state.reportSettings.showPhotos === true) {
+  if (reportRs().showPhotos === true) {
     try { photoData = await collectReportPhotos(session); }
     catch (e) { console.error('Photo collection failed (non-fatal).', e); }
   }
@@ -1062,10 +1119,26 @@ async function produceReport(sessionId) {
   try {
     doc = buildReportDoc(session, photoData);
   } catch (e) {
+    _reportRsUse = null;
     openInfoSheet({ title: 'Couldn\u2019t build the report', message: 'Something went wrong building the report. Please try again.' });
     return;
   }
   openReportPreview(doc, session);
+}
+
+// V170 (5C): an Engineer in a team doesn't make certificates.
+function _reportRefused(name) {
+  openInfoSheet({ title: 'The office makes certificates',
+    message: `In ${name || 'your business'}, certificates are made by the Owner, a Team leader or Office, so every one is numbered in the business\u2019s series. Your job reaches them when it syncs.` });
+}
+// V170 (3): the number comes from the cloud.
+function _reportNeedsSignal(name) {
+  openInfoSheet({ title: 'Needs a connection',
+    message: `Certificates for ${name || 'your business'} take their number from the cloud, so no two people ever use the same one. Try again when you have signal.` });
+}
+function _reportCloudFailed(err) {
+  openInfoSheet({ title: 'Couldn\u2019t reach the cloud',
+    message: `The certificate wasn\u2019t made${err ? ' (' + err + ')' : ''}. Nothing was used up \u2014 please try again.` });
 }
 
 // v89 (4A): "N photos for this job are only in the cloud — download them for
@@ -1151,7 +1224,7 @@ function openReportPreview(doc, session) {
   sheet.setAttribute('role', 'dialog');
   sheet.setAttribute('aria-label', 'Report preview');
 
-  const rs = state.reportSettings;
+  const rs = reportRs();
 
   // v35: quick-adjust toggle row. Each flips a reportSettings field, saves, and
   // rebuilds the PDF in place. Signature side only shown when a signature exists.
@@ -1199,7 +1272,7 @@ function openReportPreview(doc, session) {
       <div class="report-preview-fallback">
         <div class="report-qa-label">Quick adjust</div>
         ${quickAdjustHTML()}
-        <button class="btn-secondary report-edit-settings-btn" id="report-edit-settings">${icon('settings')} Edit report settings</button>
+        ${_reportRsUse ? '' : `<button class="btn-secondary report-edit-settings-btn" id="report-edit-settings">${icon('settings')} Edit report settings</button>`}
         <label class="label report-filename-label" for="report-filename-input">File name</label>
         <div class="report-filename-row">
           <input class="input report-filename-input" id="report-filename-input" value="${baseName.replace(/"/g, '&quot;')}" autocapitalize="off" autocomplete="off" spellcheck="false">
@@ -1267,6 +1340,7 @@ function openReportPreview(doc, session) {
 
   function cleanup() {
     _renderToken++;
+    _reportRsUse = null;   // V170: the business's copy was for this certificate only
     URL.revokeObjectURL(url);
     backdrop.remove();
     sheet.remove();
@@ -1300,14 +1374,17 @@ function openReportPreview(doc, session) {
   // preview has to read and re-encode them first. ensureReportPhotos caches, so
   // toggling off and back on never re-encodes.
   async function onQuickAdjust(action) {
-    if (action === 'fails')        state.reportSettings.showFails = !state.reportSettings.showFails;
-    else if (action === 'calibration') state.reportSettings.showCalibration = !state.reportSettings.showCalibration;
-    else if (action === 'signature')   state.reportSettings.declaration = !state.reportSettings.declaration;
-    else if (action === 'sigside')      state.reportSettings.signaturePosition = (state.reportSettings.signaturePosition === 'right') ? 'left' : 'right';
-    else if (action === 'photos')       state.reportSettings.showPhotos = !state.reportSettings.showPhotos;
-    else if (action === 'remedial')     state.reportSettings.showRemedial = !(state.reportSettings.showRemedial === true);   // V95 (7A)
-    saveReportSettings();
-    if (action === 'photos' && state.reportSettings.showPhotos === true) {
+    // V170 (1A): a business's certificate — the chip changes this certificate
+    // only (reportRs is the cloud's copy); never the business's settings.
+    const q = reportRs();
+    if (action === 'fails')        q.showFails = !q.showFails;
+    else if (action === 'calibration') q.showCalibration = !q.showCalibration;
+    else if (action === 'signature')   q.declaration = !q.declaration;
+    else if (action === 'sigside')      q.signaturePosition = (q.signaturePosition === 'right') ? 'left' : 'right';
+    else if (action === 'photos')       q.showPhotos = !q.showPhotos;
+    else if (action === 'remedial')     q.showRemedial = !(q.showRemedial === true);   // V95 (7A)
+    if (!_reportRsUse) saveReportSettings();
+    if (action === 'photos' && q.showPhotos === true) {
       try { _setReportPhotoCache(await ensureReportPhotos(session)); }
       catch (e) { console.error('Photo collection failed (non-fatal).', e); }
     }

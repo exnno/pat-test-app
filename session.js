@@ -1304,6 +1304,7 @@ function lockFromReopenWarning() {
   if (s && !s.locked) {
     s.locked = true;
     s.lockedAt = new Date().toISOString();
+    if (typeof testerFreeze === 'function') testerFreeze(s, s.lockedAt);   // V170 (6A)
     save();
     showToast('Job locked');
   }
@@ -4487,6 +4488,8 @@ function saveSessionEdits() {
   sess.locked = !!locked;   // v8
   if (sess.locked && !wasLocked) sess.lockedAt = new Date().toISOString();
   else if (!sess.locked) delete sess.lockedAt;
+  // V170 (6A): the tester is copied AFTER the stamp below is settled — see the
+  // end of this function.
   // v66: the per-session instrument stamp (decision 2A).
   // ⚠ The snapshot describes the PREVIOUS stamp and nothing else, so it is
   // dropped whenever the stamp actually changes — unconditionally. An earlier
@@ -4501,6 +4504,9 @@ function saveSessionEdits() {
     sess.instrumentId = newInstId;
     delete sess.instrumentSnapshot;
   }
+  // V170 (6A): on the change to locked, the tester as it is now goes into the job —
+  // after the stamp, so a job locked with a new tester picked copies THAT one.
+  if (sess.locked && !wasLocked && typeof testerFreeze === 'function') testerFreeze(sess, sess.lockedAt);
   state.view = 'overview';
   save(); render();
 }

@@ -1,4 +1,4 @@
-# PATGo — Code Map (V169)
+# PATGo — Code Map (V170)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -690,6 +690,11 @@ on the caller having restored the flat fields first.
 Renders its own screens here rather than in render-settings — deliberate, and the
 editor screen is intentionally absent from `SETTINGS_CATEGORIES`.
 
+V170 (6A): `testerFreeze` copies the tester into `sess.tester` at every lock (session.js
+`lockFromReopenWarning` and `saveSessionEdits` — after the stamp — and business.js `_bizDepSettle`);
+`testerFreezeLocked` at boot (boot.js, after the apostrophe repair). `instrumentForSession` reads
+`sess.tester` first while locked. ⚠ storage.js `_sessionSig` carries `tester.at` (it is rewritten).
+
 ### sqp.js (~286 ln) — Smart Quick Pick
 Location→item-type learning, scoring, ordering, history persistence.
 **Touch to:** change how the quick-pick row adapts to location.
@@ -985,6 +990,13 @@ helpers; change photo block layout there, once.
 V100: the preview's Download and (successful) Share call **session.js**
 `noteReportMade(session.id)` — a certificate that leaves the phone stamps the
 job's `reportAt`; `shareOrDownloadReport` returns false on a cancelled share.
+
+V170 (R81): `reportRs()` = the settings THIS certificate is built from — `_reportRsUse` (a
+team's business settings from the cloud, set in `produceReport`, cleared on any early return and in the
+preview's `cleanup`) else state.reportSettings. Every build read goes through it; the chips flip it and
+save only when it's the phone's. `produceReport` asks **business.js** `businessCertMode` (refuse / cloud /
+solo / phone), `businessCertFetch`, `businessCertTake`; `certNoFormat` formats both counters.
+⚠ The cloud number is taken AFTER the photo question (Cancel costs nothing) and never for a job with one.
 
 ### pdfpreview.js (~135 ln) — multi-page preview rasteriser
 Lazy-loads vendored PDF.js, renders each page to a stacked canvas, DPR-capped,
@@ -2097,6 +2109,14 @@ shield-safe jobs via session.js `removeJobsFromPhone`, locks the rest). 5B: `_bi
 `businessRemoveStart` → rpc `member_devices` → choice sheet → `businessRemoveGo`, deliver flag) and
 Leave (`businessLeaveStart` → rpc `leave_business` → a sync run). Words: patgo_member_gone,
 patgo_owner_leave. Database: supabase/v163-leaving.sql. Harness 102a–102f; M1986–M2018.
+
+V170 (R81) — the business's certificate: `CERT_BIZ_KEY` (config.js) via `businessCertLoad/Save`;
+`businessCertReadOnly` (render-settings.js `renderSettingsReport`); `businessCertMode` /
+`businessCertFetch` / `businessCertTake` (report.js); `businessCertNoteSave` (storage.js
+`saveReportSettings` — Owner / Office edits owed); `businessCertRead` chained LAST in `businessRead`
+(send owed → `cert_seen` for a business of one → `business_cert` → apply via storage.js
+`_writeReportSettings`, ⚠ never saveReportSettings — that owes it back). Database:
+supabase/v170-certificates.sql. Harness 111a–111f; M2212–M2246.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

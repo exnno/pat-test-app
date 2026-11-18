@@ -288,7 +288,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Team seats.</strong> Engineers and Team leaders in your business are &pound;3 a month each (&pound;30 a year) on top of your plan &mdash; you and the Office are free. The Business page shows your seats and total, the invite says what a seat costs, and you&rsquo;re emailed whenever a seat changes. You can now switch between monthly and yearly in Subscription.</li>
+        <li><strong>The business&rsquo;s certificate.</strong> In a business with more than one person, every certificate uses the business&rsquo;s logo, wording and numbering, set by the Owner or Office. The Owner, Team leaders and Office make certificates, and each number comes from the cloud, so no two people ever use the same one. A locked job now keeps the tester&rsquo;s calibration details from the day it was tested. Working on your own? Nothing changes.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

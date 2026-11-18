@@ -323,7 +323,8 @@ function businessRead(c, uid) {
         .then(() => businessWaitingRead(c, uid).then(() => ok, () => ok))   // V157 (1A): moves for me to decide
         .then(() => businessOthersRead(c, uid).then(() => ok, () => ok))     // V165 (1A): others' jobs held
         .then(() => businessPlansRead(c, uid).then(() => ok, () => ok))      // V168: each business's plan
-        .then(() => businessSeatsRead(c, uid).then(() => ok, () => ok));     // V169: the seats (3A, 4B)
+        .then(() => businessSeatsRead(c, uid).then(() => ok, () => ok))      // V169: the seats (3A, 4B)
+        .then(() => businessCertRead(c, uid).then(() => ok, () => ok));      // V170: the business's certificate
     });
 }
 
@@ -2045,7 +2046,7 @@ function _bizDepSettle(d, safety) {
   const kept = (state.sessions || []).filter(s => s && d.jobs.indexOf(String(s.id)) !== -1);
   const now = new Date().toISOString();
   for (const s of kept) {
-    if (!s.locked) { s.locked = true; s.lockedAt = now; if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(s); }
+    if (!s.locked) { s.locked = true; s.lockedAt = now; if (typeof testerFreeze === 'function') testerFreeze(s, now); if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(s); }
   }
   d.phase = 'done'; d.removed = (d.removed || 0) + n; d.kept = kept.length; d.told = false;
   if (kept.length || n) save();
@@ -2451,6 +2452,207 @@ function businessSeatsNudge() {
       .then((c) => c.functions.invoke('billing-seats', { body: { from: 'app' } }))
       .then(() => true, () => false);
   } catch (e) { return Promise.resolve(false); }
+}
+
+// ==== V170 (R81): the business's certificate =====================================
+// Every certificate setting is the business's (1A); its Owner and Office change
+// them (2B); the cloud gives out each number when the Owner, a Team leader or
+// Office makes the certificate — a connection is needed (3, 5C); a business of one
+// keeps the phone's own counter, offline as now, and tells the cloud how far it
+// got (8A). supabase/v170-certificates.sql: business_cert, cert_settings_save,
+// cert_take, cert_seen.
+//
+// THE PHONE'S reportSettings ARE THE MAIN BUSINESS'S. Owner / Office edit them as
+// before; each save is owed to the cloud (businessCertNoteSave, from storage.js
+// saveReportSettings) and sent on the next read. Everyone else takes the cloud's
+// when it changes (businessCertRead, with the businesses). ⚠ Send BEFORE taking:
+// an unsent edit must never be overwritten by the cloud's older copy. ⚠ Applying
+// the cloud's writes through _writeReportSettings, never saveReportSettings —
+// that would owe the business its own settings back, for ever.
+// A certificate for a job of ANOTHER business (someone in two) reads that
+// business's settings at the moment it is made (businessCertFetch — report.js).
+
+function businessCertLoad() {
+  let raw = null;
+  try { raw = JSON.parse(localStorage.getItem(CERT_BIZ_KEY) || 'null'); } catch (e) { raw = null; }
+  const ok = raw && typeof raw === 'object' && !Array.isArray(raw);
+  return {
+    u: ok && typeof raw.u === 'string' ? raw.u : '',
+    o: ok && businessValidId(raw.o) ? raw.o : '',
+    at: ok && typeof raw.at === 'string' ? raw.at.slice(0, 40) : '',
+    owe: ok && raw.owe === true,
+    set: ok && typeof raw.set === 'string' ? raw.set.slice(0, 40) : '',
+  };
+}
+
+function businessCertSave(rec) {
+  try { localStorage.setItem(CERT_BIZ_KEY, JSON.stringify(rec)); return true; } catch (e) { return false; }
+}
+
+function _bizCertEditor(b) { return !!b && (b.role === 'owner' || b.role === 'office'); }
+
+// The settings screen (2B): the main business's name when it has more than one
+// person and you're its Engineer or Team leader — they see why, and no form.
+function businessCertReadOnly() {
+  const b = businessDefault();
+  if (!b || !_bizUid() || !(b.n > 1) || _bizCertEditor(b)) return '';
+  return businessLabel(b);
+}
+
+// How a certificate for this job is made (report.js produceReport):
+//   'phone'  — no business known here (not signed in, an old list): as before
+//   'solo'   — its business is you alone (8A): the phone's counter, offline
+//   'cloud'  — Owner / Team leader / Office of a team: the cloud's settings and number
+//   'refuse' — an Engineer in a team (5C)
+function businessCertMode(sess) {
+  if (!_bizUid()) return { kind: 'phone', org: '', name: '' };
+  const id = businessOfJob(sess);
+  const b = id ? businessList().find(x => x.id === id) : null;
+  if (!b) return { kind: 'phone', org: '', name: '' };
+  const name = businessLabel(b);
+  if (b.role === 'owner' && !(b.n > 1)) return { kind: 'solo', org: b.id, name };
+  if (b.role === 'engineer') return { kind: 'refuse', org: b.id, name };
+  return { kind: 'cloud', org: b.id, name };
+}
+
+function _bizCertCode(e) {
+  const m = /patgo_cert_([a-z_]+)/.exec(String((e && (e.message || e.details || e.hint)) || ''));
+  return m ? m[1] : '';
+}
+
+// The business's settings, read as the certificate is made. Never rejects:
+// { ok, offline, refused, settings, canMake, next, error }.
+function businessCertFetch(org) {
+  const out = { ok: false, offline: false, refused: false, settings: null, canMake: false, next: 0, error: '' };
+  if (!businessValidId(org)) { out.error = 'bad'; return Promise.resolve(out); }
+  if (_bizOffline()) { out.offline = true; return Promise.resolve(out); }
+  return _bizClient().then((c) => c.rpc('business_cert', { o: org })).then((res) => {
+    if (!res || res.error) throw (res && res.error) || new Error('no answer');
+    const row = Array.isArray(res.data) ? res.data[0] : res.data;
+    if (!row || typeof row !== 'object') throw new Error('no answer');
+    out.settings = (row.settings && typeof row.settings === 'object' && !Array.isArray(row.settings)) ? row.settings : {};
+    out.canMake = row.can_make === true;
+    out.next = _bizInt(row.next_no, 999999999);
+    out.ok = true;
+    return out;
+  }).catch((e) => {
+    if (_bizCertCode(e) === 'not_allowed') out.refused = true;
+    out.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
+    return out;
+  });
+}
+
+// The next number (3): one call, never the same number twice. Never rejects:
+// { ok, n, offline, refused, error }.
+function businessCertTake(org) {
+  const out = { ok: false, n: 0, offline: false, refused: false, error: '' };
+  if (!businessValidId(org)) { out.error = 'bad'; return Promise.resolve(out); }
+  if (_bizOffline()) { out.offline = true; return Promise.resolve(out); }
+  return _bizClient().then((c) => c.rpc('cert_take', { o: org })).then((res) => {
+    if (!res || res.error) throw (res && res.error) || new Error('no answer');
+    const n = _bizInt(res.data, 999999999);
+    if (!(n >= 1)) throw new Error('no number');
+    out.n = n; out.ok = true;
+    return out;
+  }).catch((e) => {
+    if (_bizCertCode(e) === 'not_allowed') out.refused = true;
+    out.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
+    return out;
+  });
+}
+
+// The settings as the business keeps them: everything but the phone's counter.
+function _bizCertSettings() {
+  const rs = normaliseReportSettings(state.reportSettings);
+  delete rs.certNextNumber; delete rs.certSetAt;
+  return rs;
+}
+
+let _bizCertTimer = null;
+
+// A read a few seconds from now (an edit to send, a number to report) — one at a time.
+function businessCertSoon() {
+  const uid = _bizUid();
+  if (!uid) return;
+  try { clearTimeout(_bizCertTimer); } catch (e) { /* none */ }
+  _bizCertTimer = setTimeout(() => {
+    _bizCertTimer = null;
+    Promise.resolve().then(() => _bizClient()).then((c) => businessCertRead(c, uid)).catch(() => false);
+  }, 3000);
+}
+
+// storage.js saveReportSettings: an Owner's or Office's edit is owed to the business.
+function businessCertNoteSave() {
+  const uid = _bizUid();
+  const b = businessDefault();
+  if (!uid || !_bizCertEditor(b)) return;
+  const rec = businessCertLoad();
+  const same = rec.u === uid && rec.o === b.id;
+  businessCertSave({ u: uid, o: b.id, at: same ? rec.at : '', owe: true, set: same ? rec.set : '' });
+  businessCertSoon();
+}
+
+// With the businesses (businessRead), and after an edit or a number. Send what's
+// owed, report a business of one's counter (8A), then take the cloud's settings
+// if they changed. Resolves true when something was applied.
+function businessCertRead(c, uid) {
+  const b = businessDefault();
+  if (!uid || !b || _bizOffline()) return Promise.resolve(false);
+  let rec = businessCertLoad();
+  if (rec.u !== uid || rec.o !== b.id) rec = { u: uid, o: b.id, at: '', owe: false, set: '' };
+  const rs = state.reportSettings || {};
+  const team = b.n > 1;
+  const send = (rec.owe && _bizCertEditor(b))
+    ? Promise.resolve().then(() => c.rpc('cert_settings_save', {
+        o: b.id, s: _bizCertSettings(),
+        // 4A: a counter typed in by hand (certSetAt) is the business's next number — once.
+        n: (team && rs.certSetAt && rs.certSetAt !== rec.set && rs.certNextNumber >= 1) ? rs.certNextNumber : null,
+      })).then((res) => {
+        // Refused (no longer Owner / Office here): nothing to send — take the cloud's.
+        if (res && res.error && _bizCertCode(res.error) === 'not_allowed') { rec.owe = false; businessCertSave(rec); return; }
+        if (!res || res.error) return;
+        rec.at = String(res.data || ''); rec.owe = false; rec.set = String(rs.certSetAt || '');
+        businessCertSave(rec);
+      })
+    : Promise.resolve();
+  return send
+    .then(() => ((b.role === 'owner' && !team && rs.certNextNumber >= 1)
+      ? Promise.resolve(c.rpc('cert_seen', { o: b.id, n: rs.certNextNumber })).catch(() => null) : null))
+    .then(() => c.rpc('business_cert', { o: b.id }))
+    .then((res) => {
+      if (!res || res.error) return false;
+      const row = Array.isArray(res.data) ? res.data[0] : res.data;
+      if (!row || typeof row !== 'object') return false;
+      if (rec.owe) return false;                                      // an edit not yet sent wins
+      if (REPORT_SETTINGS_VIEWS.indexOf(state.view) !== -1) return false;   // a form open: next time (MAP rule 3)
+      const at = String(row.updated_at || '');
+      const settings = (row.settings && typeof row.settings === 'object' && !Array.isArray(row.settings)) ? row.settings : null;
+      const next = _bizInt(row.next_no, 999999999);
+      const cur = state.reportSettings || {};
+      let changed = false;
+      if (at && at !== rec.at && settings && Object.keys(settings).length) {
+        const n2 = normaliseReportSettings(settings);
+        n2.certNextNumber = cur.certNextNumber; n2.certSetAt = cur.certSetAt;
+        state.reportSettings = n2;
+        changed = true;
+      } else if (at && at !== rec.at && _bizCertEditor(b)) {
+        // An empty business row: this phone's settings become the business's.
+        rec.owe = true; businessCertSave(rec); businessCertSoon();
+        return false;
+      }
+      // A team's next number is the cloud's — shown on the settings screen.
+      if (team && next >= 1 && state.reportSettings.certNextNumber !== next) {
+        state.reportSettings = Object.assign({}, state.reportSettings, { certNextNumber: next });
+        changed = true;
+      }
+      // ⚠ _writeReportSettings, NOT saveReportSettings: the latter owes the
+      // business its own settings back (businessCertNoteSave) — a loop.
+      if (changed) _writeReportSettings();
+      rec.at = at || rec.at;
+      businessCertSave(rec);
+      return changed;
+    })
+    .catch(() => false);
 }
 
 // (c) 2026 Peter Birchley. All rights reserved.

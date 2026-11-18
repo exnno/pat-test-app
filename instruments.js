@@ -153,6 +153,8 @@ function instrumentUseCount(id) {
 //   3. the active instrument (which is what EVERY pre-v66 session gets, so old
 //      certificates print exactly as they did before — decision 3A)
 function instrumentForSession(sess) {
+  // V170 (6A): a locked job prints the tester as it was when it was locked.
+  if (sess && sess.locked && sess.tester && typeof sess.tester === 'object') return sess.tester;
   if (sess && sess.instrumentId) {
     const stamped = findInstrument(sess.instrumentId);
     if (stamped) return stamped;
@@ -388,6 +390,38 @@ function instrumentSnapshotOf(inst) {
 // That is only safe because _sessionSig() (storage.js) covers the instrument
 // fields from V83 — before that, this write never reached the disk for any job
 // but the open one.
+// ---------- V170 (R81 6A): the tester as it was when the job was locked ----------
+// A job points at its tester (instrumentId); a recalibration since would print
+// the NEW date on a reprint. So the moment a job locks, the tester's five
+// certificate fields are copied into the job as `sess.tester` (+ `at`, the copy's
+// time) — again on every re-lock. instrumentForSession reads it FIRST while the
+// job is locked. Separate from `instrumentSnapshot` (the delete freeze, tier 2):
+// that one is set once and only its presence is in _sessionSig; this one is
+// rewritten, so its `at` is in the signature (storage.js) — without it a re-lock
+// or the upgrade freeze would never reach the disk (the V83 defect again).
+// The live tester: the stamped one, else the delete freeze, else (a job with no
+// stamp, pre-v66) the one in use. Returns false when there is nothing to copy.
+function testerFreeze(sess, when) {
+  if (!sess) return false;
+  let inst = null;
+  if (sess.instrumentId) inst = findInstrument(sess.instrumentId) || sess.instrumentSnapshot || null;
+  else inst = activeInstrument();
+  if (!inst) return false;
+  sess.tester = Object.assign(instrumentSnapshotOf(inst), { at: String(when || new Date().toISOString()) });
+  return true;
+}
+
+// Boot (upgrade, 6A): every locked job on this phone without a copy gets one,
+// from the tester as it is now — the best record there is. Idempotent; returns
+// how many jobs it wrote to (boot saves when > 0).
+function testerFreezeLocked() {
+  let n = 0;
+  (state.sessions || []).forEach(s => {
+    if (s && s.locked && !(s.tester && typeof s.tester === 'object') && testerFreeze(s, s.lockedAt)) n++;
+  });
+  return n;
+}
+
 function freezeInstrumentOntoJobs(id, snap) {
   if (!id || !snap) return 0;
   let n = 0;

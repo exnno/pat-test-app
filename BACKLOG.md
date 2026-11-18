@@ -11,10 +11,51 @@ here rather than restating it. Delete an item when it ships.
 ### Planned audits
 - V169 (seat billing): brief the fourth audit on billing-seats (no-orders design, claim before email),
   billing-switch, and the seat_note trigger.
-- **Fourth GPT audit after V170** (moved at the V168 round, 14 Nov — 0B split seat billing out).
-  V171 is reserved for fixing what it finds. Brief it that the second audit's finding 5 was
+- V170 (business certificate): brief the fourth audit on cert_take (one UPDATE … RETURNING), the
+  role checks in the four cert functions, _cert_row's seeding from the Owner's records, and the phone's
+  send-before-take order (business.js businessCertRead).
+- **Fourth GPT audit after V171** (R81 0B, 18 Nov — V170 split: V171 = Office makes the certificate;
+  V172 is reserved for fixing what the audit finds). (Was: after V170, V171 its fixes.) Brief it that the second audit's finding 5 was
   fixed in V168 (refusals per business; photo files by their job's business).
   (Was: after V169, V170 its fixes — Peter, 13 Nov.)
+
+### Next after V170
+V170 = the business's certificate (R81, 18 Nov: "0B 1A 2B 3 4A 5C 6A", then "7 … 8A"; built in Opus).
+SQL: supabase/v170-certificates.sql (cert_settings, _cert_row, business_cert, cert_settings_save,
+cert_take, cert_seen; F1–F5; isolation 35a–35c). business.js (V170 section: businessCertMode / Fetch /
+Take / Read / NoteSave / ReadOnly, CERT_BIZ_KEY), report.js (reportRs, _reportRsUse, certNoFormat, the
+gate and cloud number in produceReport, the chips), instruments.js (testerFreeze, testerFreezeLocked,
+instrumentForSession), session.js / business.js (the three lock sites), storage.js (_sessionSig,
+saveReportSettings hook, STORE_JSON), boot.js, render-settings.js, config.js, reset.js, sync.js (SKIP).
+Harness 111 + M2212–M2246.
+**Next — V171:** Office (and Owner / Team leader) make the certificate for a job held only in the
+cloud — from the business view's look-only job: built from the cloud copy (items, photos from the cloud,
+the job's frozen tester), the number from cert_take, and the number and reportAt written back onto the
+engineer's job (a definer function like V167's correct_job; the engineer's phone takes it at next sync).
+Decide at its round: whose signature prints when Office makes it (V170 keeps the signature with the
+business's settings — 1A); whether the Engineer's produce button hides in a team (V170: it explains).
+Then the fourth GPT audit; V172 its fixes.
+
+### V170 residuals (known, accepted)
+- Until V171, in a team only the Owner / a Team leader can certify — and only jobs on their own phone.
+  Accepted (R81 7): no live team business except Peter's own.
+- The signature is part of the business's settings (1A) — the same signature on every certificate.
+- Whether a business is "of one" comes from the phone's business list (re-read at app start, every
+  return to the front, the Business page). A phone that hasn't seen someone join keeps numbering
+  offline until its next read; cert_seen then moves the business's counter past what it issued, so
+  numbers never repeat — but the joiner's first cloud number may come from a counter that was moved
+  only after that read.
+- An Engineer's own synced report-settings row (from their other phone) can briefly put their old
+  settings back on a phone until the next business read; certificates aren't made by Engineers (5C).
+- Export everything rebuilds certificates from the phone's settings (for a team member, the copy of
+  the business's — as of the last read).
+- The manual certificate-number box on Job settings still lets anyone type a number on their own job.
+- A solo Owner's certificate also re-sends the settings with the counter tell (the stamp saves the
+  settings) — one small write; nothing else sees it.
+- cert_seen only moves forward: a solo Owner who types a LOWER next number keeps it on the phone,
+  but the business's counter stays at the higher one if people join.
+- PGlite proof: the V170 functions against the real organisations / memberships / records tables
+  and my_role / org_size, not the whole schema; isolation 35a–35c is the hosted check.
 
 ### Next after V169
 V169 = seat billing (R65 7C; round 14 Nov 1A–4A; round 18 Nov R80 "1 A 2 A 3 A 4 B 5 A"; built in Opus).

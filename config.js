@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V169';
+const APP_VERSION = 'V170';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -133,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V169';
+const WELCOME_VERSION = 'V170';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -437,6 +437,14 @@ const BUSINESS_READ_MS = 6 * 60 * 60 * 1000;
 // toName, st, at }] }. Per device, NEVER in a backup or setup export; Reset
 // 'account', and a takeover clears it — like BUSINESSES_KEY.
 const JOB_MOVES_KEY = 'pat:jobMoves';
+// CERT_BIZ_KEY (V170, R81): where this phone stands with its MAIN business's
+// certificate settings in the cloud (business.js businessCertLoad): { u: uid,
+// o: the business, at: the cloud's updated_at last taken or sent, owe: this
+// phone's edits not yet sent (Owner / Office), set: the hand-typed counter time
+// last sent }. Bookkeeping only — the settings themselves are reportSettings.
+// Per device, NEVER in a backup or setup export; Reset 'account', and a takeover
+// clears it — like BUSINESSES_KEY.
+const CERT_BIZ_KEY = 'pat:certBiz';
 // DEPARTED_KEY (V163): the businesses this phone's account has left or been
 // removed from (my_departures — supabase/v163-leaving.sql), with which of its jobs
 // were theirs, whether its last delivery is open, what was cleared and whether

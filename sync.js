@@ -4190,7 +4190,8 @@ function syncJobDiff(local, cloud) {
     clientId: 'Client in your list', siteId: 'Site in your list' };
   // V100: the lock time is shown by Locked; the certificate time by Export.
   // V101: movedOut is bookkeeping — the items' own differences say what moved.
-  const SKIP = { id: 1, items: 1, exportedAt: 1, exportDirty: 1, lockedAt: 1, reportAt: 1, movedOut: 1 };
+  // V170: tester is the lock's copy of the instrument — shown by Locked / Instrument.
+  const SKIP = { id: 1, items: 1, exportedAt: 1, exportDirty: 1, lockedAt: 1, reportAt: 1, movedOut: 1, tester: 1 };
   const jobVal = (key, v) => {
     if (key === 'instrumentId') {
       if (blankish(v)) return '(none)';

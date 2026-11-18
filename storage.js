@@ -184,6 +184,9 @@ function _sessionSig(s) {
     (s.movedOut && typeof s.movedOut === 'object') ? Object.keys(s.movedOut).length : 0,
     (s.items ? s.items.length : 0),
     s.instrumentId || '', s.instrumentSnapshot ? 1 : 0,
+    // V170 (6A): the tester copied at lock is REWRITTEN (each re-lock, the
+    // upgrade freeze) — its time is the signature, not its presence.
+    (s.tester && typeof s.tester === 'object') ? String(s.tester.at || 1) : '',
     // V150: a job's business changes in place (Change…, and the cloud's answer
     // read back by sync) — usually on a job that is not the open one.
     s.businessId || ''
@@ -313,6 +316,7 @@ const STORE_JSON = [
   ['OWNER_STATS_KEY', OWNER_STATS_KEY, 'object', 'stats kept for another account'],
   ['BUSINESSES_KEY', BUSINESSES_KEY, 'object', 'your businesses'],
   ['JOB_MOVES_KEY', JOB_MOVES_KEY, 'object', 'your job moves'],
+  ['CERT_BIZ_KEY', CERT_BIZ_KEY, 'object', 'your business\u2019s certificate'],
   ['DEPARTED_KEY', DEPARTED_KEY, 'object', 'the businesses you\u2019ve left'],
   ['MIN_VERSION_KEY', MIN_VERSION_KEY, 'object', 'the cloud\u2019s minimum version'],
 ];
@@ -1060,6 +1064,10 @@ function _writeReportSettings() {
 
 function saveReportSettings() {
   _writeReportSettings();
+  // V170 (2B): an Owner's or Office's edit is their business's — sent to the
+  // cloud (business.js; owed until it goes). A cloud read applying the
+  // business's settings saves through _writeReportSettings, never here.
+  if (typeof businessCertNoteSave === 'function') { try { businessCertNoteSave(); } catch (e) { console.error('Business certificate note failed (non-fatal).', e); } }
   // v84: report settings sync, and most edits save them here rather than via
   // save(), so they reach the sync trigger here too — same guarded line as
   // saveSessions().

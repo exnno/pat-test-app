@@ -607,6 +607,16 @@ try {
   console.error('Apostrophe repair failed; continuing with unrepaired data.', e);
 }
 
+// V170 (R81 6A): every locked job without a copy of its tester gets one, from the
+// tester as it is now. Same placement and wrapping as the repair above: after
+// load(), inside the guard's else, before sync starts (so the copy goes up with
+// the next push). Idempotent — a job with a copy is never touched again.
+try {
+  if (typeof testerFreezeLocked === 'function' && testerFreezeLocked() > 0) save();
+} catch (e) {
+  console.error('Tester copy on locked jobs failed (non-fatal).', e);
+}
+
 // v79: cloud sign-in state. AFTER load() and BEFORE the first render(), so the
 // TEST strip is right on the very first paint. The synchronous part only reads
 // localStorage; it makes no network request and does not load the library
