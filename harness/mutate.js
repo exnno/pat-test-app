@@ -9059,8 +9059,8 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v169';",   // V169: re-aimed (→ 109f).   // V168: re-aimed (→ 108f).   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v168';",
+    from: "const CACHE_VERSION = 'pat-v169-1';",   // V169.1: re-aimed (→ 110d). V169: re-aimed (→ 109f).   // V168: re-aimed (→ 108f).   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v169';",
     why:  "a release needs its cache bump or phones never get it (108f)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
@@ -9963,7 +9963,7 @@ const MUTATIONS = [
   {
     name: "M1404 (V142) back from a closed Stripe window, the app keeps waiting",
     file: "plan.js",
-    from: "    if (state.billing && state.billing.pending && (!_billWindow || _billWindow.closed)) billingCancelWait();",
+    from: "  try { _billOnBack(); } catch (e) { /* nothing waiting */ }   // V169.1: closed or not, back in front = done",   // V169.1: re-aimed
     to:   "",
     why:  "a window closed by hand must not leave the page stuck on 'waiting' (81c)",
   },
@@ -15530,6 +15530,91 @@ const MUTATIONS = [
     from: "        await rpc(deps, 'billing_seats_record', { o: org, cus, n: LIVE.includes(f.status) ? f.seats : null });",
     to:   "        await rpc(deps, 'billing_seats_record', { o: org, cus, n: null });",
     why:  "the webhook records Stripe's count (109d)",
+  },
+  // ---- V169.1 (hotfix): what accepting costs; the Stripe wait; Resend's reason. Group 110 + M2198–M2209. ----
+  {
+    name: "M2198 (V169.1) accepting adds the seat by itself, no checkout — said",
+    file: "business.js",
+    from: "    const head = ` When they accept, a ${businessSeatPrice(s.every)} seat is added to ${plan} straight away — there’s no checkout or payment page.`;",
+    to:   "    const head = ` A paid seat: ${businessSeatPrice(s.every)}.`;",
+    why:  "accepting adds the seat by itself, no checkout — said (110a)",
+  },
+  {
+    name: "M2199 (V169.1) the part-year is the rest of the year, not a whole year",
+    file: "business.js",
+    from: "  const p = Math.round(PLAN_PENCE.seat.year * left);",
+    to:   "  const p = Math.round(PLAN_PENCE.seat.year);",
+    why:  "the part-year is the rest of the year, not a whole year (110a)",
+  },
+  {
+    name: "M2200 (V169.1) a Team leader inviting: the business's plan",
+    file: "business.js",
+    from: "  const plan = mine ? 'your plan' : `${businessLabel(b)}’s plan`;",
+    to:   "  const plan = 'your plan';",
+    why:  "a Team leader inviting: the business's plan (110a)",
+  },
+  {
+    name: "M2201 (V169.1) who is emailed",
+    file: "business.js",
+    from: "    return head + how + (mine ? ' You’re emailed about it.' : ' The owner is emailed about it.');",
+    to:   "    return head + how;",
+    why:  "who is emailed (110a)",
+  },
+  {
+    name: "M2202 (V169.1) Invite sent says the cost again",
+    file: "business.js",
+    from: "          + businessInviteCostLine(orgId, role),   // V169.1: the cost again, at the moment it's real",
+    to:   "          + '',",
+    why:  "Invite sent says the cost again (110a)",
+  },
+  {
+    name: "M2203 (V169.1) the joiner hears the business pays",
+    file: "business.js",
+    from: "    message: (businessPaidRole(v.role) ? `Joining as",
+    to:   "    message: (false ? `Joining as",
+    why:  "the joiner hears the business pays (110a)",
+  },
+  {
+    name: "M2204 (V169.1) a window seen closed ends the wait",
+    file: "plan.js",
+    from: "      if (shut) billingCancelWait();\n    }, 1000);",
+    to:   "    }, 1000);",
+    why:  "a window seen closed ends the wait (110b)",
+  },
+  {
+    name: "M2205 (V169.1) back in front ends the wait even if the phone can't tell the window closed",
+    file: "plan.js",
+    from: "  if (!shut && Date.now() - _billSince < BILL_BACK_MS) return false;",
+    to:   "  if (!shut) return false;",
+    why:  "back in front ends the wait even if the phone can't tell the window closed (110b)",
+  },
+  {
+    name: "M2206 (V169.1) the switch is never ended by coming back",
+    file: "plan.js",
+    from: "  if (!b || !b.pending || b.pending === 'switch') return false;\n  let shut = false;",
+    to:   "  if (!b || !b.pending) return false;\n  let shut = false;",
+    why:  "the switch is never ended by coming back (110b)",
+  },
+  {
+    name: "M2207 (V169.1) focus ends the wait",
+    file: "plan.js",
+    from: "  try { window.addEventListener('focus', _billOnBack); window.addEventListener('pageshow', _billOnBack); } catch (e) { /* no window */ }   // V169.1",
+    to:   "  // gone",
+    why:  "focus ends the wait (110b)",
+  },
+  {
+    name: "M2208 (V169.1) the button says Done",
+    file: "render-help.js",
+    from: "data-action=\"billing-cancel-wait\" style=\"margin-top:6px\">Done</button>",
+    to:   "data-action=\"billing-cancel-wait\" style=\"margin-top:6px\">Cancel</button>",
+    why:  "the button says Done (110b)",
+  },
+  {
+    name: "M2209 (V169.1) Resend's reason kept",
+    file: "supabase/functions/_shared/billing.js",
+    from: "    return { ok: false, why: ('email ' + res.status + (m ? ': ' + String(m) : '')).slice(0, 200) };",
+    to:   "    return { ok: false, why: 'email ' + res.status };",
+    why:  "Resend's reason kept (110c)",
   },
 ];
 
