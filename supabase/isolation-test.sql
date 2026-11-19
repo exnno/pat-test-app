@@ -9,6 +9,11 @@
 -- email addresses on the next two lines → Run. Every row of the result must
 -- say PASS. Any FAIL: do not promote, and bring the output to the next chat.
 --
+-- V171: CHECKS 36a–36c NEED supabase/v171-office-certs.sql RUN FIRST (36a names
+-- it if not). With A's locked job in A's own business, B outside it and then B made
+-- an Engineer there can't put a certificate number on it; B made Office puts the
+-- number and "made by B" on it, and A's unlocked job is refused; then B's place is
+-- put back and the test jobs and seat lines removed (one transaction).
 -- V170: CHECKS 35a–35c NEED supabase/v170-certificates.sql RUN FIRST (35a names
 -- it if not). B outside A's business can't read or number A's certificates; B made
 -- an Engineer can't take a number; B made Office takes two numbers in a row (never
@@ -127,6 +132,7 @@ declare
   own_a uuid; own_b uuid; in168 boolean; g168 text; lap168 timestamptz; f168 boolean; t168 boolean;   -- V168
   r169 text; max169 bigint; own169 int; eng169 int; den169 boolean;                                  -- V169
   r170 text; max170 bigint; had170 boolean; s170 jsonb; nx170 int; t1 int; t2 int; den170 boolean; eng170 boolean; -- V170
+  r171 text; max171 bigint; c171 text; -- V171
 begin
   select id into a from auth.users where lower(email) = lower(email_a);
   select id into b from auth.users where lower(email) = lower(email_b);
@@ -1896,6 +1902,68 @@ begin
                      and (not had170 or exists (select 1 from public.cert_settings where org_id = own_a and next_no = nx170))
                      and (had170 or not exists (select 1 from public.cert_settings where org_id = own_a))
                 then 'PASS|' else 'FAIL|member ' || k end];
+    end if;
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
+  -- ------------------------------------------------- V171: Office makes the certificate (36a–36c)
+  if to_regprocedure('public.cert_stamp(uuid, text, uuid, text, boolean)') is null then
+    res := res || array['36a|an Engineer can''t put a certificate on someone else''s job, nor anyone outside|FAIL|run supabase/v171-office-certs.sql first'];
+  else
+    select m.org_id into own_a from public.memberships m where m.user_id = a and m.role = 'owner' order by m.is_default desc limit 1;
+    r171 := public.member_role(own_a, b);
+    select coalesce(max(id), 0) into max171 from public.seat_changes;
+    if own_a is null or r171 = 'owner' then
+      res := res || array['36a|an Engineer can''t put a certificate on someone else''s job, nor anyone outside|INCONCLUSIVE|A has no business of A''s own apart from B'];
+    else
+      -- A's locked job and A's unlocked job in A's own business; B outside it first.
+      delete from public.sessions where id in ('iso-test-v171-1', 'iso-test-v171-2');
+      insert into public.sessions (id, user_id, doc, last_modified, org_id) values
+        ('iso-test-v171-1', a, '{"id":"iso-test-v171-1","site":"iso A","locked":true,"items":[]}'::jsonb, now(), own_a),
+        ('iso-test-v171-2', a, '{"id":"iso-test-v171-2","site":"iso A open","locked":false,"items":[]}'::jsonb, now(), own_a);
+      -- 36a: B outside, then B an Engineer there — both refused, nothing written.
+      -- (B already in A's business: the outside half is skipped, B's role kept and put back.)
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      c171 := '';
+      if r171 is null then
+        execute 'set local role authenticated';
+        begin perform public.cert_stamp(a, 'iso-test-v171-1', null, 'ISO-1', true); c171 := 'outside took';
+        exception when others then c171 := case when sqlerrm like 'patgo_certstamp_not_allowed%' then '' else 'outside ' || sqlerrm end; end;
+        execute 'reset role';
+        insert into public.memberships (org_id, user_id, role, name) values (own_a, b, 'engineer', 'iso B');
+      else
+        update public.memberships set role = 'engineer' where org_id = own_a and user_id = b;
+      end if;
+      execute 'set local role authenticated';
+      begin perform public.cert_stamp(a, 'iso-test-v171-1', own_a, 'ISO-1', true); c171 := c171 || ' engineer took';
+      exception when others then if sqlerrm not like 'patgo_certstamp_not_allowed%' then c171 := c171 || ' engineer ' || sqlerrm; end if; end;
+      execute 'reset role';
+      select count(*) into n from public.sessions where id = 'iso-test-v171-1' and user_id = a
+        and not (doc ? 'certNo') and not (doc ? 'certMade');
+      res := res || array['36a|an Engineer can''t put a certificate on someone else''s job, nor anyone outside|'
+        || case when c171 = '' and n = 1 then 'PASS|' else 'FAIL|' || c171 || ' / ' || n end];
+      -- 36b: B made Office — the number and "made by B" on A's locked job; A's unlocked job refused.
+      update public.memberships set role = 'office' where org_id = own_a and user_id = b;
+      execute 'set local role authenticated';
+      begin perform public.cert_stamp(a, 'iso-test-v171-1', own_a, 'ISO-1', true); c171 := '';
+      exception when others then c171 := 'locked ' || sqlerrm; end;
+      begin perform public.cert_stamp(a, 'iso-test-v171-2', own_a, 'ISO-2', false); c171 := c171 || ' unlocked took';
+      exception when others then if sqlerrm not like 'patgo_certstamp_unlocked%' then c171 := c171 || ' unlocked ' || sqlerrm; end if; end;
+      execute 'reset role';
+      select count(*) into n from public.sessions where id = 'iso-test-v171-1' and user_id = a
+        and doc->>'certNo' = 'ISO-1' and doc->'certMade'->>'by' = b::text and doc->>'reportAt' = doc->'certMade'->>'at';
+      select count(*) into k from public.sessions where id = 'iso-test-v171-2' and not (doc ? 'certNo');
+      res := res || array['36b|B as Office puts the number and "made by B" on A''s locked job; an unlocked job refused|'
+        || case when c171 = '' and n = 1 and k = 1 then 'PASS|' else 'FAIL|' || c171 || ' / ' || n || ' / ' || k end];
+      -- 36c: everything put back.
+      if r171 is null then delete from public.memberships where org_id = own_a and user_id = b;
+      else update public.memberships set role = r171 where org_id = own_a and user_id = b;
+      end if;
+      delete from public.sessions where id in ('iso-test-v171-1', 'iso-test-v171-2');
+      delete from public.seat_changes where id > max171;
+      select count(*) into k from public.sessions where id like 'iso-test-v171-%';
+      res := res || array['36c|A''s test jobs gone and B''s place put back|'
+        || case when k = 0 and public.member_role(own_a, b) is not distinct from r171 then 'PASS|' else 'FAIL|' || k || ' left' end];
     end if;
   end if;
   perform set_config('request.jwt.claims', '', true);
