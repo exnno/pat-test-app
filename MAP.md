@@ -2134,6 +2134,8 @@ reminders), `businessReportsHidden()` (render-core.js Reports button), `business
 (dispatch 'finish-lock'). settings-actions.js `cloudLockFilter` + `cloudJobsModel` lockf (dispatch
 'cloud-lockf'). render-review.js `renderOverviewCertHTML`, `certMadeLineText`, `renderCloudLockChipsHTML`.
 Database: supabase/v171-office-certs.sql (`cert_stamp`). Harness 112a–112g; M2247–M2296.
+V171.1: a cloud job with no tester copy → sync.js `syncCertTester` (rpc `cert_tester`, supabase/v171-1-tester.sql —
+the HOLDER's saved instruments) before anything else is asked. Harness 113a–113c; M2297–M2304.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

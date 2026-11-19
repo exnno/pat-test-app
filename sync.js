@@ -5524,6 +5524,43 @@ function syncCertStamp(holder, id, org, cert, made) {
     });
 }
 
+// ---- V171.1: the tester for a locked job held only in the cloud --------------------
+// A job locked before V170 gets its tester copy when its phone opens PATGo — but
+// only if the job is ON that phone. One that is only in the cloud: the cloud's
+// cert_tester (supabase/v171-1-tester.sql) makes the copy from the holder's own
+// saved instruments, as their phone would have. Same checks as cert_stamp.
+// Resolves { ok, doc, from, code, offline, needsUpdate, error }. Never rejects.
+const SYNC_CERTTESTER_CODES = ['signed_out', 'bad', 'gone', 'moved', 'not_allowed', 'unlocked', 'none'];
+function syncCertTester(holder, id, org) {
+  const res = { ok: false, doc: null, from: '', code: '', offline: false, needsUpdate: false, error: '' };
+  const u = String(holder || ''), sid = String(id == null ? '' : id), o = String(org || '');
+  if (!_SYNC_UUID_RE.test(u) || typeof safeId !== 'function' || !safeId(sid) || !_SYNC_UUID_RE.test(o)) {
+    res.code = 'bad'; return Promise.resolve(res);
+  }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  return syncDataClient()
+    .then((c) => c.rpc('cert_tester', { holder: u, job: sid, org: o }))
+    .then((r) => {
+      if (r && r.error) throw r.error;
+      const out = (r && r.data && typeof r.data === 'object') ? r.data : null;
+      if (!out || !_syncValidDoc(out.doc, sid)) throw new Error('no answer');
+      res.ok = true; res.doc = out.doc;
+      res.from = (typeof out.from === 'string') ? out.from.slice(0, 20) : '';
+      return res;
+    }).catch((e) => {
+      const msg = String((e && (e.message || e.details || e.hint)) || '');
+      const m = /patgo_certtester_([a-z_]+)/.exec(msg);
+      if (m && SYNC_CERTTESTER_CODES.includes(m[1])) res.code = m[1];
+      else if (/patgo_plan_locked/.test(msg)) res.code = 'plan';
+      if (!res.code && e) {
+        res.needsUpdate = ((e.code === 'PGRST202' || e.code === '42883') && !/patgo_/.test(msg))
+          || (/Could not find the function|does not exist/i.test(msg) && /cert_tester/.test(msg));
+      }
+      if (!res.code && !res.needsUpdate) res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
+      return res;
+    });
+}
+
 // ---- V165 (2A): the photos of a job being LOOKED at -------------------------------
 // The look-only sheet's "Show photos". Nothing here touches this phone's photo
 // store, state.photoCloud or the sync state: the rows and the pictures go to

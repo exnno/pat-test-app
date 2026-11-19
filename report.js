@@ -1223,19 +1223,32 @@ async function produceCloudReport(look) {
     return;
   }
   // The tester as tested (V170 6A) — never this phone's own instruments. An older
-  // job's copy is made when its phone next opens PATGo, and then synced.
-  const tester = (doc.tester && typeof doc.tester === 'object' && !Array.isArray(doc.tester)) ? doc.tester
+  // job's copy is made when its phone next opens PATGo (if the job is on it), or
+  // by the cloud here (V171.1).
+  let tester = (doc.tester && typeof doc.tester === 'object' && !Array.isArray(doc.tester)) ? doc.tester
     : ((doc.instrumentSnapshot && typeof doc.instrumentSnapshot === 'object' && !Array.isArray(doc.instrumentSnapshot)) ? doc.instrumentSnapshot : null);
-  if (!tester) {
-    openInfoSheet({ title: 'The tester’s details aren’t in the cloud yet',
-      message: `This job was locked before PATGo kept the tester’s details with it. ${who === 'You' ? 'Open PATGo on the phone that has it' : 'Ask ' + who + ' to open PATGo'} once with signal, then try again.` });
-    return;
-  }
   const mode = (typeof businessCertModeOrg === 'function') ? businessCertModeOrg(org) : { kind: 'phone', org: '', name: '' };
   if (mode.kind === 'refuse') { _reportRefused(mode.name); return; }   // (never offered to an Engineer)
   if (mode.kind !== 'cloud' && mode.kind !== 'solo') {
     openInfoSheet({ title: 'Business not found', message: 'This phone doesn’t have this job’s business in its list yet. Open Settings › Business, then try again.' });
     return;
+  }
+  // V171.1 (Peter's live test): a job locked before V170 and held only in the cloud
+  // never gets the copy from a phone — the cloud makes it from the engineer's own
+  // saved instruments (sync.js syncCertTester), written onto the job.
+  if (!tester) {
+    const tt = await syncCertTester(look.user, look.id, mode.org);
+    if (tt.ok && tt.doc && tt.doc.tester && typeof tt.doc.tester === 'object' && !Array.isArray(tt.doc.tester)) {
+      look.doc = tt.doc;
+      tester = tt.doc.tester;
+    } else if (tt.code === 'none') {
+      openInfoSheet({ title: 'No tester to put on this job',
+        message: `This job was locked before PATGo kept the tester’s details with it, and ${who === 'You' ? 'you have' : who + ' has'} no tester saved to the cloud it could have been. ${who === 'You' ? 'Add it' : 'Ask ' + who + ' to add it'} in Settings › Instruments (with sync on), then try again.` });
+      return;
+    } else if (tt.needsUpdate) {
+      openInfoSheet({ title: 'The cloud needs updating', message: 'The cloud hasn’t been set up to fill in an older job’s tester yet (supabase/v171-1-tester.sql). Nothing was made.' });
+      return;
+    } else { _reportStampRefused(tt, mode.name, who); return; }
   }
   if (typeof planGate === 'function' && !planGate({ businessId: mode.org })) return;   // V168: the job's business
   let bizRs = null;

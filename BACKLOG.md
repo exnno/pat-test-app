@@ -39,9 +39,9 @@ teammates' same-site jobs (R3), a team-jobs delete (R76 4A).
 ### V171 residuals (known, accepted)
 - The signature is the business's (3A) — one signature on every certificate, whoever tested. A per-engineer
   signature copied at lock (3C) goes with business setup (O15).
-- A job locked before V170 with no instrument snapshot can't be certified from the cloud until its
-  engineer's phone opens PATGo (the tester copy is made then and synced). An engineer with no instrument
-  saved at all never gets a copy — such a job can only be certified on that phone.
+- (V171.1 fixed: a job locked before V170 held only in the cloud now gets its tester copy from the cloud —
+  cert_tester.) An engineer with no instrument saved to the cloud at all: "Ask them to add it". With two or
+  more saved and none in use, the cloud doesn't guess — the same message.
 - Two people making the same job's certificate at the same moment: both print the job's one number (the
   cloud's answer wins); the second's take is an unused number (a gap in the series, never a repeat).
 - A number taken from the cloud when the write onto the job then fails (no signal mid-way, unlocked since)
