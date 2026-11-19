@@ -30,7 +30,7 @@
            certificate only; no "Edit report settings" on a business's certificate;
            closing the preview drops the copy.
      111e  the SQL: schema.sql's last section in step; the rules; F1–F5; isolation 35a–35c.
-     111f  release: V170; cache pat-v170; What's new one line; About V170 / V169 / V168. */
+     111f  V170's About line; the key (V171: the release checks → 112g). */
 
 'use strict';
 
@@ -329,7 +329,7 @@ module.exports = async function () {
     const rep = read('report.js');
     t.includes(rep, '    const q = reportRs();\n', 'the chips flip the certificate’s own settings');
     t.includes(rep, '    if (!_reportRsUse) saveReportSettings();', '…saved only when they are the phone’s');
-    t.includes(rep, "${_reportRsUse ? '' : `<button class=\"btn-secondary report-edit-settings-btn\" id=\"report-edit-settings\">", 'no Edit report settings on a business’s certificate');
+    t.includes(rep, "${(_reportRsUse || _reportCloud) ? '' : `<button class=\"btn-secondary report-edit-settings-btn\" id=\"report-edit-settings\">", 'no Edit report settings on a business’s certificate (V171: nor a cloud job’s)');
     t.includes(rep, "    _reportRsUse = null;   // V170: the business's copy was for this certificate only", 'closing the preview drops the copy');
     t.eq((rep.match(/state\.reportSettings/g) || []).length, 5, 'report.js reads the phone’s settings only where meant (the reopen, the phone’s counter, the gate)');
     app.run('_reportRsUse = null');
@@ -342,7 +342,7 @@ module.exports = async function () {
     const end = '-- ================================================================ end V170\n';
     const block = mig.slice(mig.indexOf('-- ================================================================ V170\n'), mig.indexOf(end) + end.length);
     t.ok(block.length > 4000, 'the migration has its definitions');
-    t.ok(read('supabase/schema.sql').trimEnd().endsWith(block.trimEnd()), 'a new project gets them byte for byte, as schema.sql’s last section');
+    t.ok(read('supabase/schema.sql').includes(block), 'a new project gets them byte for byte, as a section of schema.sql (V171: no longer the last)');
     t.includes(block, 'revoke all on public.cert_settings from anon, authenticated;', 'the table closed to the app');
     t.includes(block, "  update public.cert_settings set next_no = next_no + 1 where org_id = o\n  returning next_no - 1 into got;", 'a number: one UPDATE … RETURNING (never the same twice)');
     t.includes(block, "if auth.uid() is null or coalesce(public.my_role(o), '') not in ('owner','team_leader','office') then", 'Owner / Team leader / Office take numbers (5C)');
@@ -363,21 +363,9 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 111f */
-  await t.group('111f — release: V170; cache pat-v170; What’s new one line; About V170 / V169 / V168; the key', () => {
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V170', 'APP_VERSION V170');
-    t.eq(rel.run('WELCOME_VERSION'), 'V170', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v170';", 'cache key pat-v170');
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>The business&rsquo;s certificate.</strong>', '…the business’s certificate');
+  // V171: the release checks moved to 112g; this keeps V170's own lines.
+  await t.group('111f — V170’s About line; the key', () => {
     const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V170</strong>'), y = help.indexOf('<p><strong>V169</strong>'), z = help.indexOf('<p><strong>V168</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V170, V169, V168');
-    t.excludes(help, '<p><strong>V167</strong>', 'V167 rolled off');
-    t.includes(help, 'Each business on its own plan: for anyone in more than one business', 'About: V168’s line, the oldest');
     t.includes(help, 'The business&rsquo;s certificate: in a business with more than one person', 'About: V170’s line');
     t.includes(read('reset.js'), "  ['CERT_BIZ_KEY', CERT_BIZ_KEY, 'account'],", 'the new key follows the account (Reset, takeover)');
     t.excludes(read('backup.js'), 'CERT_BIZ_KEY', '…never in a backup');

@@ -614,9 +614,8 @@ module.exports = async function () {
 
   /* ------------------------------------------------------------------ 108f */
   // V169: the release checks moved to 109f; this keeps V168's own lines.
-  await t.group('108f — V168’s About line; plan.js / sync.js / business.js name V168', () => {
-    const help = read('render-help.js');
-    t.includes(help, 'Each business on its own plan: for anyone in more than one business', 'About: V168’s line');
+  // V171: V168's About line rolled off (the window is V171 / V170 / V169).
+  await t.group('108f — plan.js / sync.js / business.js name V168', () => {
     t.includes(read('plan.js'), '// ---- V168: each business on its own plan', 'plan.js names V168');
     t.includes(read('sync.js'), "// V168 (finding 5): WHICH businesses the cloud refused", 'sync.js names V168');
     t.includes(read('business.js'), "// V168: each of my businesses' own plan", 'business.js names V168');
