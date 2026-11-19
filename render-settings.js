@@ -1282,15 +1282,25 @@ function reminderSettingsSummary() {
   const r = normaliseReminders(state.reminders);
   const on = [];
   if (r.exportAfter !== 'off') on.push('Not exported');
-  if (r.unlockedAt !== 'off') on.push('Unlocked jobs');
+  if (unlockedReminderAt().at !== 'off') on.push('Unlocked jobs');   // V171 (8B): always on for a team's Engineer
   const backup = r.backupDays === 'off' ? 'Backups off' : `Backups every ${r.backupDays} days`;
   return (on.length ? on.join(' · ') + ' · ' : '') + backup;
 }
-function _reminderSelect(id, field, action, list, label) {
+function _reminderSelect(id, field, action, list, label, value) {
   const r = normaliseReminders(state.reminders);
-  const opts = list.map(v => `<option value="${v}"${r[field] === v ? ' selected' : ''}>${escapeHTML(REMINDER_LABELS[field][v])}</option>`).join('');
+  const cur = value == null ? r[field] : value;
+  const opts = list.map(v => `<option value="${v}"${cur === v ? ' selected' : ''}>${escapeHTML(REMINDER_LABELS[field][v])}</option>`).join('');
   // V120: the heading above is not a <label>, so the select carries its own spoken name.
   return `<select class="input" id="${id}" aria-label="${escapeHTML(label || '')}" data-change-action="${action}">${opts}</select>`;
+}
+// V171 (8B): an Engineer in a team picks the time, but not Off — the office
+// can only make a job's certificate once it's locked.
+function _reminderUnlockedHTML() {
+  const team = (typeof businessTeamEngineer === 'function') ? businessTeamEngineer() : '';
+  if (!team) return _reminderSelect('remind-unlocked', 'unlockedAt', 'remind-unlocked', REMINDER_UNLOCKED_CHOICES, 'Jobs still unlocked');
+  const at = unlockedReminderAt().at;
+  return _reminderSelect('remind-unlocked', 'unlockedAt', 'remind-unlocked', REMINDER_UNLOCKED_CHOICES.filter(v => v !== 'off'), 'Jobs still unlocked', at) +
+    `<p class="muted pm-note" id="remind-unlocked-team">Always on in ${escapeHTML(team)} &mdash; the office makes each job&rsquo;s certificate once it&rsquo;s locked.</p>`;
 }
 function renderSettingsReminders() {
   return `
@@ -1304,7 +1314,7 @@ function renderSettingsReminders() {
       <div class="settings-section">
         <h2 class="h2">Jobs still unlocked</h2>
         <p class="muted">From this time each day, a reminder on the Jobs screen if any job on this phone is still unlocked &mdash; a nudge to finish and lock the day's work.</p>
-        ${_reminderSelect('remind-unlocked', 'unlockedAt', 'remind-unlocked', REMINDER_UNLOCKED_CHOICES, 'Jobs still unlocked')}
+        ${_reminderUnlockedHTML()}
       </div>
       <div class="settings-section">
         <h2 class="h2">Backup reminder</h2>

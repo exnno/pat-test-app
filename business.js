@@ -2506,7 +2506,12 @@ function businessCertReadOnly() {
 //   'refuse' — an Engineer in a team (5C)
 function businessCertMode(sess) {
   if (!_bizUid()) return { kind: 'phone', org: '', name: '' };
-  const id = businessOfJob(sess);
+  return businessCertModeOrg(businessOfJob(sess));
+}
+// V171: the same for a business by its id — a job read from the cloud (report.js
+// produceCloudReport) names its business as the cloud says.
+function businessCertModeOrg(id) {
+  if (!_bizUid()) return { kind: 'phone', org: '', name: '' };
   const b = id ? businessList().find(x => x.id === id) : null;
   if (!b) return { kind: 'phone', org: '', name: '' };
   const name = businessLabel(b);
@@ -2559,6 +2564,30 @@ function businessCertTake(org) {
     out.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
     return out;
   });
+}
+
+// ---- V171 (7B 8A 8B): an Engineer in a team doesn't make certificates -----------
+// So nothing offers them one (7B — no button that only says no): no Produce report
+// on the job, the job off the Reports list, and no Reports at all when every
+// business you're in is a team where you're an Engineer. In its place, Finish &
+// lock (8A — session.js lockJobFinish), and the unlocked reminder always on (8B —
+// session.js unlockedReminderDue). The office makes the certificate (report.js
+// produceCloudReport).
+function businessCertHidden(sess) {
+  return !!sess && businessCertMode(sess).kind === 'refuse';
+}
+function businessReportsHidden() {
+  if (!_bizUid()) return false;
+  const list = businessList();
+  return list.length > 0 && list.every(b => b && b.role === 'engineer' && b.n > 1);
+}
+// The team where you're an Engineer (8B), its name — '' for none. The main one first.
+function businessTeamEngineer() {
+  if (!_bizUid()) return '';
+  const list = businessList().filter(b => b && b.role === 'engineer' && b.n > 1);
+  if (!list.length) return '';
+  const def = list.find(b => b.def) || list[0];
+  return businessLabel(def);
 }
 
 // The settings as the business keeps them: everything but the phone's counter.

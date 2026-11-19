@@ -64,6 +64,12 @@ function pdfSafe(v) {
 // ("if it needs to be different for a customer office or owner would sort this").
 let _reportRsUse = null;
 function reportRs() { return _reportRsUse || state.reportSettings; }
+// V171 (1A 4A): a certificate for a job read from the cloud, not held here —
+// { holder, id, org } while its preview is open (produceCloudReport sets it, the
+// preview's close clears it). Its photos come from the cloud (collectReportPhotos),
+// "made" is written onto the job in the cloud (_reportCloudMade), and nothing of
+// the job is kept on this phone.
+let _reportCloud = null;
 
 const REPORT_JSPDF_SRC = './jspdf.umd.min.js';
 const REPORT_AUTOTABLE_SRC = './jspdf.plugin.autotable.min.js';
@@ -181,11 +187,12 @@ function _setReportPhotoCache(data) {
 async function collectReportPhotos(session) {
   const empty = _emptyPhotoData(session ? session.id : null);
   if (!session) return empty;
-  if (typeof photosSupported !== 'function' || !photosSupported()) return empty;
-  if (typeof photosForSession !== 'function' || typeof photoPrintDataUrl !== 'function') return empty;
+  const fromCloud = !!(_reportCloud && _reportCloud.id === session.id);
+  if (!fromCloud && (typeof photosSupported !== 'function' || !photosSupported())) return empty;
+  if ((!fromCloud && typeof photosForSession !== 'function') || typeof photoPrintDataUrl !== 'function') return empty;
 
   let records = [];
-  try { records = await photosForSession(session.id); } catch (e) { return empty; }
+  try { records = fromCloud ? await _reportCloudPhotoRecords(_reportCloud) : await photosForSession(session.id); } catch (e) { return empty; }
   if (!records || !records.length) return empty;
 
   // Group by item and walk in ITEM order, so the appendix reads in the same
@@ -251,6 +258,28 @@ async function ensureReportPhotos(session) {
   if (!session) return _emptyPhotoData(null);
   if (_reportPhotoCache.sessionId === session.id) return _reportPhotoCache;
   return _setReportPhotoCache(await collectReportPhotos(session));
+}
+
+// V171 (4A): a cloud job's photos, for this certificate only — the rows read by the
+// job's own person (sync.js syncCloudJobPhotos, the V165 look's read) and each
+// photo downloaded full size (its small preview when that's all there is). Held
+// in memory as [{ itemId, blob }] for the encode, never written to this phone's
+// photo store; the encoded copies live in the report's photo cache, which the
+// next certificate replaces. One at a time (a phone, mobile data).
+async function _reportCloudPhotoRecords(cloud) {
+  if (!cloud || typeof syncCloudJobPhotos !== 'function' || typeof syncCloudLookPhoto !== 'function') return [];
+  const list = await syncCloudJobPhotos(cloud.holder, cloud.id);
+  if (!list || !list.ok || !list.photos.length) return [];
+  const out = [];
+  let n = 0;
+  for (const p of list.photos) {
+    n++;
+    if (list.photos.length > 4 && typeof showToast === 'function') showToast(`Downloading photos\u2026 ${n} of ${list.photos.length}`);
+    let blob = await syncCloudLookPhoto(cloud.holder, p.id, true);
+    if (!blob && p.thumb) blob = await syncCloudLookPhoto(cloud.holder, p.id, false);
+    if (blob) out.push({ itemId: p.item, blob });
+  }
+  return out;
 }
 
 // Should this document carry an appendix at all? Three gates, matching the house
@@ -522,7 +551,9 @@ function buildReportDoc(session, photoData) {
   // some item must actually carry that reading — so a clean or readings-off job
   // is byte-identical to v53 and stays portrait. polarity is Class I only and
   // prints only when some Class I item has it ticked.
-  const readingsOn = !!state.readingsEnabled && rs.showReadings !== false;
+  // V171: a job from the cloud — the engineer's readings print whatever this
+  // phone's own readings switch says (the office may never have turned it on).
+  const readingsOn = (!!state.readingsEnabled || !!(_reportCloud && _reportCloud.id === session.id)) && rs.showReadings !== false;
   const readingCols = [];
   if (readingsOn) {
     const has = (pred) => session.items.some(it => it.readings && pred(it.readings));
@@ -1141,6 +1172,167 @@ function _reportCloudFailed(err) {
     message: `The certificate wasn\u2019t made${err ? ' (' + err + ')' : ''}. Nothing was used up \u2014 please try again.` });
 }
 
+// ==== V171 (R82): Office makes the certificate for a job held in the cloud ========
+// From the look-only job (the Cloud tab, settings-actions.js cloudLookCert): the
+// Owner, a Team leader or the Office of the job's business — someone else's job, or
+// their own held only in the cloud (1A) — once it is locked (2A). Built from the
+// cloud's copy of the job, with the tester as it was copied in at lock (V170 6A),
+// the business's settings and the next number in its series (V170 — cert_take;
+// a business of one: the phone's own counter, 8A), the signature with the
+// business's settings (3A), the photos downloaded for this certificate only (4A).
+// The number is written onto the job in the cloud BEFORE the certificate is built
+// (supabase cert_stamp — a job that already has one keeps it), and "made" when it
+// leaves this device (Download or Share — V100 2B), with who made it (5A). Nothing
+// of the job is kept here: the copy lives in the preview and goes when it closes.
+// Resolves when the preview is open or the reason has been said. Never rejects.
+const _CERTSTAMP_WHY = {
+  unlocked: (who) => `${who} unlocked this job since it was read. Its certificate can be made once it’s locked again.`,
+  moved: () => 'This job has moved to another business since it was read.',
+  gone: () => 'This job isn’t in the cloud any more.',
+  plan: () => 'This business’s plan has ended, so the cloud isn’t taking changes to its jobs.',
+};
+function _reportCloudWho(look) {
+  const w = look && look.row && look.row.who;
+  if (w && w.you) return 'You';
+  if (w && w.name) return String(w.name);
+  const e = look && look.doc && typeof look.doc.engineer === 'string' ? look.doc.engineer.trim() : '';
+  return e || 'The engineer';
+}
+function _reportStampRefused(res, name, who) {
+  if (res.offline) { _reportNeedsSignal(name); return; }
+  if (res.code === 'not_allowed') { _reportRefused(name); return; }
+  if (res.needsUpdate) {
+    openInfoSheet({ title: 'The cloud needs updating', message: 'The cloud hasn’t been set up for certificates made from it yet (supabase/v171-office-certs.sql). Nothing was made.' });
+    return;
+  }
+  const why = _CERTSTAMP_WHY[res.code];
+  if (why) { openInfoSheet({ title: 'Certificate not made', message: why(who) }); return; }
+  _reportCloudFailed(res.error);
+}
+
+async function produceCloudReport(look) {
+  _reportRsUse = null;
+  _reportCloud = null;
+  if (!look || !look.doc || !look.row) return;
+  const who = _reportCloudWho(look);
+  const org = (typeof cloudLookFixOrg === 'function') ? cloudLookFixOrg(look) : '';
+  const doc = look.doc;
+  // 2A: a job still being worked on has no certificate.
+  if (doc.locked !== true) {
+    openInfoSheet({ title: 'Not locked yet', message: `${who === 'You' ? 'You need' : who + ' needs'} to lock this job before its certificate can be made.` });
+    return;
+  }
+  // The tester as tested (V170 6A) — never this phone's own instruments. An older
+  // job's copy is made when its phone next opens PATGo, and then synced.
+  const tester = (doc.tester && typeof doc.tester === 'object' && !Array.isArray(doc.tester)) ? doc.tester
+    : ((doc.instrumentSnapshot && typeof doc.instrumentSnapshot === 'object' && !Array.isArray(doc.instrumentSnapshot)) ? doc.instrumentSnapshot : null);
+  if (!tester) {
+    openInfoSheet({ title: 'The tester’s details aren’t in the cloud yet',
+      message: `This job was locked before PATGo kept the tester’s details with it. ${who === 'You' ? 'Open PATGo on the phone that has it' : 'Ask ' + who + ' to open PATGo'} once with signal, then try again.` });
+    return;
+  }
+  const mode = (typeof businessCertModeOrg === 'function') ? businessCertModeOrg(org) : { kind: 'phone', org: '', name: '' };
+  if (mode.kind === 'refuse') { _reportRefused(mode.name); return; }   // (never offered to an Engineer)
+  if (mode.kind !== 'cloud' && mode.kind !== 'solo') {
+    openInfoSheet({ title: 'Business not found', message: 'This phone doesn’t have this job’s business in its list yet. Open Settings › Business, then try again.' });
+    return;
+  }
+  if (typeof planGate === 'function' && !planGate({ businessId: mode.org })) return;   // V168: the job's business
+  let bizRs = null;
+  if (mode.kind === 'cloud') {
+    const got = await businessCertFetch(mode.org);
+    if (got.offline) { _reportNeedsSignal(mode.name); return; }
+    if (!got.ok && !got.refused) { _reportCloudFailed(got.error); return; }
+    // The cloud's word on the role, as the certificate is made.
+    if (got.refused || !got.canMake) { _reportRefused(mode.name); return; }
+    bizRs = normaliseReportSettings(got.settings);
+  }
+  if (!(bizRs || reportRs()).enabled) {
+    openInfoSheet({ title: 'Certificates are switched off', message: `Certificates are switched off for ${mode.name}. Its Owner or Office switches them on in Settings › Company & Branding.` });
+    return;
+  }
+  if (!reportEngineReady()) {
+    showToast('Preparing report…');
+    try { await loadReportEngine(); }
+    catch (e) {
+      openInfoSheet({ title: 'Couldn’t load the report engine',
+        message: 'The PDF engine didn’t load. Close and reopen the app (reconnect once if you’re offline so it can refresh), then try again.' });
+      return;
+    }
+  }
+  // The job as the cloud holds it, copied for this certificate — the tester pinned
+  // on it, so nothing here ever reads this phone's own instruments for it.
+  let session;
+  try { session = JSON.parse(JSON.stringify(doc)); } catch (e) { session = null; }
+  if (!session || !Array.isArray(session.items)) { _reportCloudFailed(''); return; }
+  session.tester = JSON.parse(JSON.stringify(tester));
+  _reportRsUse = bizRs;
+  const rs = reportRs();
+  // The number — before building, and written onto the job (assign-once).
+  if (rs.certEnabled && !session.certNo) {
+    let no = '';
+    if (mode.kind === 'cloud') {
+      const t = await businessCertTake(mode.org);
+      if (!t.ok) {   // no number, no certificate
+        _reportRsUse = null;
+        if (t.offline) _reportNeedsSignal(mode.name);
+        else if (t.refused) _reportRefused(mode.name);
+        else _reportCloudFailed(t.error);   // nothing used up
+        return;
+      }
+      no = certNoFormat(rs, session, t.n);
+    } else {
+      // 8A: a business of one numbers from this phone's counter (and tells the
+      // cloud how far it got — V170). The copy isn't held here, so nothing else is saved.
+      stampCertNumber(session);
+      no = session.certNo || '';
+    }
+    if (no) {
+      const st = await syncCertStamp(look.user, look.id, mode.org, no, false);
+      if (!st.ok) { _reportRsUse = null; _reportStampRefused(st, mode.name, who); return; }
+      session.certNo = st.certNo || no;   // a number already on the job is the one
+      if (st.doc) look.doc = st.doc;
+    }
+  }
+  _reportCloud = { holder: look.user, id: String(look.id), org: mode.org, key: look.key };
+  let photoData = _emptyPhotoData(session.id);
+  if (rs.showPhotos === true) {
+    try { photoData = await collectReportPhotos(session); }
+    catch (e) { console.error('Photo collection failed (non-fatal).', e); }
+  }
+  _setReportPhotoCache(photoData);
+  if (photoData.hitCap && photoData.omitted > 0) showToast(`Report shows the first ${photoData.printed} of ${photoData.total} photos`);
+  let pdf;
+  try { pdf = buildReportDoc(session, photoData); }
+  catch (e) {
+    _reportRsUse = null; _reportCloud = null;
+    openInfoSheet({ title: 'Couldn’t build the report', message: 'Something went wrong building the report. Please try again.' });
+    return;
+  }
+  openReportPreview(pdf, session);
+}
+
+// 5A: the certificate left this device — the job in the cloud says so, and who.
+// The look (if still open on it) shows the cloud's answer. A failure is said; the
+// certificate itself is already saved or shared.
+function _reportCloudMade(cloud, session) {
+  if (!cloud || typeof syncCertStamp !== 'function') return Promise.resolve(false);
+  return syncCertStamp(cloud.holder, cloud.id, cloud.org, session && session.certNo ? session.certNo : '', true).then((res) => {
+    const look = state.cloudLook;
+    if (res.ok && res.doc && look && look.key === cloud.key && String(look.id) === cloud.id) {
+      look.doc = res.doc;
+      if (look.row) look.row = Object.assign({}, look.row, { certNo: res.certNo || look.row.certNo, redo: false });
+      if (typeof renderCloudLookBody === 'function') renderCloudLookBody(look);
+    }
+    if (res.ok) {
+      if (state.cloudJobs && typeof cloudJobsLoad === 'function') { try { cloudJobsLoad(true); } catch (e) { /* the list next time */ } }
+      return true;
+    }
+    showToast(res.offline ? 'No signal — the job doesn’t show the certificate as made yet' : 'Couldn’t mark the certificate as made on the job');
+    return false;
+  });
+}
+
 // v89 (4A): "N photos for this job are only in the cloud — download them for
 // the certificate?" Resolves 'download' | 'without' | 'cancel'. Built on the
 // feedback.js sheet like every other dialog; no inputs, no render(). Offline,
@@ -1197,6 +1389,8 @@ function _reportCloudPhotoChoice(cloud, offline) {
 function openReportPreview(doc, session) {
   // Keep the live session id so the settings deep-link can rebuild this preview.
   const sessionId = session.id;
+  // V171: a certificate for a job held in the cloud (produceCloudReport).
+  const cloudJob = (_reportCloud && _reportCloud.id === session.id) ? _reportCloud : null;
 
   function pageCountOf(d) {
     try { return d.internal.getNumberOfPages(); } catch (e) { return 1; }
@@ -1272,7 +1466,7 @@ function openReportPreview(doc, session) {
       <div class="report-preview-fallback">
         <div class="report-qa-label">Quick adjust</div>
         ${quickAdjustHTML()}
-        ${_reportRsUse ? '' : `<button class="btn-secondary report-edit-settings-btn" id="report-edit-settings">${icon('settings')} Edit report settings</button>`}
+        ${(_reportRsUse || _reportCloud) ? '' : `<button class="btn-secondary report-edit-settings-btn" id="report-edit-settings">${icon('settings')} Edit report settings</button>`}
         <label class="label report-filename-label" for="report-filename-input">File name</label>
         <div class="report-filename-row">
           <input class="input report-filename-input" id="report-filename-input" value="${baseName.replace(/"/g, '&quot;')}" autocapitalize="off" autocomplete="off" spellcheck="false">
@@ -1341,6 +1535,7 @@ function openReportPreview(doc, session) {
   function cleanup() {
     _renderToken++;
     _reportRsUse = null;   // V170: the business's copy was for this certificate only
+    _reportCloud = null;   // V171: so was the cloud job
     URL.revokeObjectURL(url);
     backdrop.remove();
     sheet.remove();
@@ -1397,7 +1592,11 @@ function openReportPreview(doc, session) {
     // V100 (2B): a certificate that leaves the phone is "made" — it stamps the
     // job's reportAt, which clears the not-exported reminder for a locked job.
     // Opening the preview alone does not; a cancelled share does not.
-    const made = () => { if (typeof noteReportMade === 'function') noteReportMade(session.id); };
+    // V171 (5A): a job from the cloud — written onto the job there, with who made it.
+    const made = () => {
+      if (cloudJob) { _reportCloudMade(cloudJob, session); return; }
+      if (typeof noteReportMade === 'function') noteReportMade(session.id);
+    };
     document.getElementById('report-preview-download').addEventListener('click', () => {
       triggerDownload(blob, currentFilename());
       made();

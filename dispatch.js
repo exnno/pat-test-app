@@ -271,6 +271,7 @@ registerActions({
   'cloud-delete':       () => cloudJobsDeleteSelected(),        // V107 (Stage 5 pt 3)
   'cloud-person':       (arg) => cloudPersonSet(arg),            // V164 (1A): a business's person chips
   'cloud-fails':        () => cloudFailsToggle(),                // V164 (3A): Fails only
+  'cloud-lockf':        (arg) => cloudLockFilter(arg),           // V171 (6B 8C): Needs certificate / Not locked yet
   // V108 (Stage 5 pt 3, second half): Settings → Data → Cloud Storage.
   'cs-open':            (arg) => cloudStoreOpen(arg),   // V166: a business's id from the Cloud tab's line
   'cs-look':            (arg) => cloudStoreLook(arg),   // V166 (3A): a business's biggest job, look-only
@@ -661,6 +662,7 @@ registerActions({
     render();
   },
   'produce-report': (arg) => { produceReport(arg).catch(() => {}); },
+  'finish-lock': (arg) => lockJobFinishAsk(arg),   // V171 (8A)
 
   // v56: Retest reminders nav + chase-list actions. open-retest-reminders is
   // defence-checked against the master switch (entry points are already hidden

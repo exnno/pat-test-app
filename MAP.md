@@ -1,4 +1,4 @@
-# PATGo — Code Map (V170)
+# PATGo — Code Map (V171)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -997,6 +997,15 @@ preview's `cleanup`) else state.reportSettings. Every build read goes through it
 save only when it's the phone's. `produceReport` asks **business.js** `businessCertMode` (refuse / cloud /
 solo / phone), `businessCertFetch`, `businessCertTake`; `certNoFormat` formats both counters.
 ⚠ The cloud number is taken AFTER the photo question (Cancel costs nothing) and never for a job with one.
+
+V171 (R82): `produceCloudReport(look)` — a certificate for a job read from the cloud (settings-actions.js
+`cloudLookCert`, from the look-only sheet). `_reportCloud` = { holder, id, org, key } while its preview is
+open (cleared in `cleanup`): `collectReportPhotos` then reads the cloud (`_reportCloudPhotoRecords` → sync.js
+`syncCloudJobPhotos` / `syncCloudLookPhoto`), `buildReportDoc` prints readings whatever this phone's switch,
+no Edit settings button, and Download / Share call `_reportCloudMade` (sync.js `syncCertStamp` made=true)
+instead of session.js `noteReportMade`. The job copy pins `tester` (or the job's instrumentSnapshot) — ⚠
+never this phone's instruments. Number: business.js `businessCertModeOrg` → cloud `businessCertTake` / solo
+`stampCertNumber`, then `syncCertStamp(cert)` BEFORE the build; the answer's certNo is the one printed.
 
 ### pdfpreview.js (~135 ln) — multi-page preview rasteriser
 Lazy-loads vendored PDF.js, renders each page to a stacked canvas, DPR-capped,
@@ -2117,6 +2126,14 @@ V170 (R81) — the business's certificate: `CERT_BIZ_KEY` (config.js) via `busin
 (send owed → `cert_seen` for a business of one → `business_cert` → apply via storage.js
 `_writeReportSettings`, ⚠ never saveReportSettings — that owes it back). Database:
 supabase/v170-certificates.sql. Harness 111a–111f; M2212–M2246.
+
+V171 (R82): `businessCertModeOrg(id)` (businessCertMode by a business id — report.js produceCloudReport);
+`businessCertHidden(sess)` (an Engineer in a team — render-review.js Overview / Reports list, session.js
+reminders), `businessReportsHidden()` (render-core.js Reports button), `businessTeamEngineer()` (session.js
+`unlockedReminderAt` — 8B, render-settings.js reminders page). session.js `lockJobFinishAsk` / `lockJobFinish`
+(dispatch 'finish-lock'). settings-actions.js `cloudLockFilter` + `cloudJobsModel` lockf (dispatch
+'cloud-lockf'). render-review.js `renderOverviewCertHTML`, `certMadeLineText`, `renderCloudLockChipsHTML`.
+Database: supabase/v171-office-certs.sql (`cert_stamp`). Harness 112a–112g; M2247–M2296.
 
 ### scanner.js (~470 ln) — HID barcode scanner
 A wedge scanner pairs as a Bluetooth **keyboard** and types the barcode. This

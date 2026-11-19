@@ -23,7 +23,7 @@
  * makeEmptyBugDraft, which reads three bug-report defaults from data.js).
  */
 
-const APP_VERSION = 'V170';
+const APP_VERSION = 'V171';
 
 const STORAGE_KEY = 'pat:sessions';
 const ACTIVE_KEY = 'pat:active';
@@ -133,7 +133,7 @@ const INSTRUMENTS_STORED_MAX = 100;
 // v64 rolls it to 'V64' — the first roll under the v63 design, and it is the ONLY
 // line that changes to do it (plus the copy in render-core.js). The key becomes
 // 'pat:v64welcome'; nothing else in the codebase names a version.
-const WELCOME_VERSION = 'V170';
+const WELCOME_VERSION = 'V171';
 const WELCOME_KEY = 'pat:' + WELCOME_VERSION.toLowerCase() + 'welcome';
 
 // v47: how long (ms) to hold the quick-pick grid before the preset switcher
@@ -1336,6 +1336,9 @@ const W3W_APP_WAIT_MS = 2500;
 const REMINDERS_KEY = 'pat:reminders';
 const REMINDER_EXPORT_CHOICES = ['off', '1h', '4h', 'morning'];
 const REMINDER_UNLOCKED_CHOICES = ['off', '16', '17', '18', '19', '20'];
+// V171 (8B): an Engineer in a team can't switch "jobs still unlocked" off —
+// left at Off, it comes on at this hour for the team's jobs.
+const UNLOCKED_TEAM_DEFAULT = '17';
 const REMINDER_BACKUP_CHOICES = ['off', '3', '7', '14', '30'];
 // 'morning' = this hour on the calendar day after the lock, phone's own clock.
 const REMINDER_MORNING_HOUR = 8;

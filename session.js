@@ -627,6 +627,8 @@ function exportReminderDueAt(lockedMs, mode) {
 // "Locked, not exported" filter.) Example job never; no lock time (1A) never.
 function isExportReminderJob(sess, now) {
   if (!sess || sess[DEMO_SESSION_FLAG]) return false;
+  // V171 (7B): an Engineer in a team doesn't make the paperwork — the office does.
+  if (typeof businessCertHidden === 'function' && businessCertHidden(sess)) return false;
   const mode = normaliseReminders(state.reminders).exportAfter;
   if (mode === 'off') return false;
   const lk = lockedAtMs(sess);
@@ -644,13 +646,23 @@ function exportReminderDue(now) {
 }
 
 // 4A: after the chosen hour, every unlocked job on this phone (not the example).
-function unlockedReminderDue(now) {
+// V171 (8B): an Engineer in a team can't switch it off — off means 5pm, for that
+// team's jobs (their own jobs elsewhere follow their own choice, as before).
+function unlockedReminderAt() {
   const at = normaliseReminders(state.reminders).unlockedAt;
+  const team = (typeof businessTeamEngineer === 'function') ? businessTeamEngineer() : '';
+  return { at: (at === 'off' && team) ? UNLOCKED_TEAM_DEFAULT : at, forced: !!team, own: at };
+}
+function unlockedReminderDue(now) {
+  const r = unlockedReminderAt();
+  const at = r.at;
   if (at === 'off') return [];
   const t = (now == null ? Date.now() : now);
   if (new Date(t).getHours() < parseInt(at, 10)) return [];
   if (_reminderQuiet().unl === reminderLocalDay(t)) return [];
-  return (state.sessions || []).filter(s => s && !s.locked && !s[DEMO_SESSION_FLAG]);
+  const teamOnly = r.own === 'off';
+  return (state.sessions || []).filter(s => s && !s.locked && !s[DEMO_SESSION_FLAG]
+    && (!teamOnly || (typeof businessCertHidden === 'function' && businessCertHidden(s))));
 }
 
 // "Review" on a banner: the Jobs list, filtered to what the banner counted.
@@ -1309,6 +1321,35 @@ function lockFromReopenWarning() {
     showToast('Job locked');
   }
   render();
+}
+
+// V171 (8A): "Finish & lock job" — an Engineer in a team, whose job's
+// certificate the office makes (7B: no Produce report for them). One tap, a
+// confirm, and the job is locked the way Job settings does it (the lock time,
+// the tester copied in — V170 6A); save() keeps it and syncs it, so the office
+// finds it under "Needs certificate".
+function lockJobFinishAsk(id) {
+  const s = id ? (state.sessions || []).find(x => x && x.id === id) : null;
+  if (!s || s.locked) return;
+  const name = (typeof businessCertMode === 'function') ? businessCertMode(s).name : '';
+  openConfirmSheet({
+    title: 'Finish and lock this job?',
+    message: `Locking tells ${name || 'the office'} the job is finished, so its certificate can be made. You won’t be able to log more items from the test screen — unlock it in Job settings if you need to.`,
+    confirmLabel: 'Lock job', danger: false,
+    onConfirm: () => lockJobFinish(id),
+  });
+}
+function lockJobFinish(id) {
+  const s = id ? (state.sessions || []).find(x => x && x.id === id) : null;
+  if (!s || s.locked) return false;
+  s.locked = true;
+  s.lockedAt = new Date().toISOString();
+  if (typeof testerFreeze === 'function') testerFreeze(s, s.lockedAt);   // V170 (6A)
+  if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(s);
+  save();
+  showToast('Job locked — the office makes its certificate');
+  render();
+  return true;
 }
 
 // Cancel the reopen warning → stay on the Sessions list.

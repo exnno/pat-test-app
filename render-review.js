@@ -152,7 +152,7 @@ function renderOverview() {
         <button class="icon-btn" id="back-btn" data-action="overview-back" aria-label="Back">${icon('chevron-left')}</button>
         <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Overview</div>
         <div class="header-actions">
-          ${state.reportSettings.enabled ? `<button class="icon-btn" id="produce-report-btn" data-action="produce-report" data-arg="${escapeHTML(sess.id)}" aria-label="Produce report" title="Produce report">${icon('file-text')}</button>` : ''}
+          ${(state.reportSettings.enabled && !(typeof businessCertHidden === 'function' && businessCertHidden(sess))) ? `<button class="icon-btn" id="produce-report-btn" data-action="produce-report" data-arg="${escapeHTML(sess.id)}" aria-label="Produce report" title="Produce report">${icon('file-text')}</button>` : ''}
           <button class="icon-btn" id="copy-btn" data-action="copy-current" aria-label="Copy CSV" title="Copy CSV">${icon('clipboard-list')}</button>
           <button class="icon-btn" id="export-btn" data-action="export-current" aria-label="Share CSV">${icon('share', 'share-icon')}</button>
         </div>
@@ -338,6 +338,7 @@ function renderOverview() {
       ${stats}
       ${typeof planJobLineHTML === 'function' ? planJobLineHTML(sess) : ''}
       ${renderOverviewCorrectedHTML(sess)}
+      ${renderOverviewCertHTML(sess)}
       ${siteNotes}
       ${actionRow}
       ${jobDetails}
@@ -1081,7 +1082,10 @@ function renderReports() {
     list = emptyStateHTML('file-text', 'Nothing to report yet',
       'Once you\'ve logged a job, you can turn it into a PDF report here.');
   } else {
-    list = sorted.map(s => {
+    // V171 (7B): an Engineer's jobs in a team are the office's to certify — not listed here.
+    const mine = sorted.filter(s => !(typeof businessCertHidden === 'function' && businessCertHidden(s)));
+    list = !mine.length ? emptyStateHTML('file-text', 'Nothing to report here',
+      'The office makes the certificates for your business\u2019s jobs.') : mine.map(s => {
       const passes = s.items.filter(i => i.result === 'pass').length;
       const fails = s.items.filter(i => i.result === 'fail').length;
       const lockMark = s.locked ? `<span class="session-lock" title="Locked">${icon('lock')}</span>` : '';
@@ -1625,7 +1629,7 @@ function renderCloudJobsHTML() {
     <div class="sessions-search-row cloud-search-row">
       <input aria-label="Search jobs in the cloud" type="search" class="search-input" id="cloud-search" data-input-action="cloud-search" placeholder="Search client, site or certificate…" value="${escapeHTML(cj.q || '')}" autocomplete="off">
       <button class="cloud-chip cloud-fails${cj.fails ? ' is-on' : ''}" data-action="cloud-fails" aria-pressed="${cj.fails ? 'true' : 'false'}">Fails only</button>
-    </div>` : '';
+    </div>${m.scope !== 'mine' ? renderCloudLockChipsHTML(m.lockf) : ''}` : '';
   const selectBtn = (m.scope === 'mine' && m.cloudOnly) ? `<button class="pm-select-btn cloud-select-btn" data-action="cloud-select-toggle" ${cj.busy ? 'disabled' : ''}>${cj.selecting ? 'Done' : 'Select'}</button>` : '';
   let bar = '';
   if (cj.selecting) {
@@ -1696,18 +1700,31 @@ function renderCloudRowHTML(j, cj) {
         </div>`;
 }
 
+// V171 (6B 8C): a business's view — what's waiting for the office.
+function renderCloudLockChipsHTML(lockf) {
+  const chip = (v, label) => `<button class="cloud-chip cloud-lockf${lockf === v ? ' is-on' : ''}" id="cloud-lockf-${v}" data-action="cloud-lockf" data-arg="${v}" aria-pressed="${lockf === v ? 'true' : 'false'}">${label}</button>`;
+  const note = lockf === 'open'
+    ? `<p class="muted pm-note cloud-lockf-note" id="cloud-lockf-note">Not locked in the cloud yet &mdash; a job locked with no signal shows here until that phone next syncs.</p>` : '';
+  return `<div class="cloud-chips cloud-lockf-row" role="group" aria-label="Certificates">${chip('cert', 'Needs certificate')}${chip('open', 'Not locked yet')}</div>${note}`;
+}
+
 function renderCloudListAreaHTML(model) {
   const cj = state.cloudJobs || {};
   const m = model || cloudJobsModel();
   const st = (typeof cloudScopeStatus === 'function') ? cloudScopeStatus() : { at: cj.at, capped: cj.capped };
   const when = st.at ? escapeHTML(new Date(st.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) : '';
-  const filtered = String(cj.q || '').trim() || cj.fails;
+  const filtered = String(cj.q || '').trim() || cj.fails || m.lockf;
   const pl = (n) => `${n} job${n === 1 ? '' : 's'}`;
   const count = filtered ? `${m.shown} of ${pl(m.total)} match` : `${pl(m.total)} in the cloud`;
   const head = `<p class="muted pm-note cloud-count">${count} · checked ${when} · <button class="pm-look-link" data-action="cloud-refresh" aria-label="Read the cloud list again">${icon('refresh-cw')} Refresh</button></p>` +
     (st.capped ? `<p class="muted pm-note">Showing the first ${SYNC_CLOUD_MAX.toLocaleString('en-GB')} jobs.</p>` : '');
   if (!m.total) return head + `<p class="muted pm-note">${m.scope === 'mine' ? 'No jobs in the cloud yet.' : 'No jobs in this business yet.'}</p>`;
-  if (!m.shown) return head + `<p class="muted pm-note">${cj.fails && !String(cj.q || '').trim() ? 'No jobs with fails.' : 'No cloud jobs match.'}</p>`;
+  if (!m.shown) {
+    const none = (m.lockf === 'cert' && !cj.fails && !String(cj.q || '').trim()) ? 'No jobs waiting for a certificate.'
+      : (m.lockf === 'open' && !cj.fails && !String(cj.q || '').trim()) ? 'Every job here is locked.'
+      : (cj.fails && !String(cj.q || '').trim()) ? 'No jobs with fails.' : 'No cloud jobs match.';
+    return head + `<p class="muted pm-note">${none}</p>`;
+  }
   const groups = m.groups.map((g) => {
     const n = g.rows.length;
     return `<h3 class="cloud-month">${escapeHTML(g.label)} <span class="cloud-month-n">· ${pl(n)}</span></h3>` + g.rows.map(j => renderCloudRowHTML(j, cj)).join('');
@@ -1772,6 +1789,7 @@ function openCloudLookSheet(look) {
     else if (act === 'photo-back' && typeof cloudLookPhotoBack === 'function') cloudLookPhotoBack();
     else if (act === 'fix' && typeof cloudFixOpen === 'function') cloudFixOpen(el.dataset.arg);   // V167
     else if (act === 'fix-job' && typeof cloudFixOpen === 'function') cloudFixOpen('');
+    else if (act === 'cert' && typeof cloudLookCert === 'function') cloudLookCert();   // V171
   });
   renderCloudLookBody(look);
   if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);
@@ -1851,8 +1869,12 @@ function renderCloudLookBody(look) {
   if (note) note.innerHTML = fx.can
     ? `${icon('pencil')} You can correct this job &mdash; each change is kept with your name. Nothing is kept on this phone.`
     : `${icon('eye')} Look only &mdash; nothing here can be changed, and nothing is kept on this phone.`;
+  // V171 (1A 2A): the same people, the same locked jobs, make its certificate.
+  const madeLine = certMadeLineText(doc, '');
+  const certBtn = `<button class="btn-primary cloud-cert-btn" id="cloud-cert-btn" data-look="cert">${icon('file-text')} ${doc.certNo ? 'Make the certificate again' : 'Make certificate'}</button>` +
+      (madeLine ? `<p class="muted pm-note cloud-cert-made" id="cloud-cert-made">${escapeHTML(madeLine)}</p>` : '');
   const fixHead = !fx.show ? '' : (fx.can
-    ? `<div class="cloud-fix-head"><button class="pm-look-link cloud-fix-job" data-look="fix-job">${icon('pencil')} Correct the site or job name</button></div>`
+    ? `<div class="cloud-fix-head">${certBtn}<button class="pm-look-link cloud-fix-job" data-look="fix-job">${icon('pencil')} Correct the site or job name</button></div>`
     : `<p class="muted pm-note cloud-fix-why" id="cloud-fix-why">${escapeHTML(fx.why)}</p>`);
   const trail = renderJobCorrectionsHTML(doc, items);
   const extra = [];
@@ -1898,6 +1920,20 @@ function correctionWhen(at) {
   const d = new Date(String(at || ''));
   if (!Number.isFinite(d.getTime())) return '';
   return d.toLocaleString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+}
+
+// V171 (5A): who made the job's certificate, when it wasn't you — "Certificate
+// BT-2026-041 made by Cath (Office), 19 Nov 2026, 14:02". Written only by the
+// cloud's cert_stamp; me = this account (that line is not shown for your own).
+// '' for nothing to say. Plain text: the caller escapes it.
+function certMadeLineText(doc, me) {
+  const m = doc && doc.certMade;
+  if (!m || typeof m !== 'object' || Array.isArray(m)) return '';
+  if (me && m.by === me) return '';
+  const when = correctionWhen(m.at);
+  const name = (typeof m.name === 'string' && m.name.trim()) ? m.name.trim().slice(0, 80) : 'Someone';
+  const no = (typeof m.no === 'string' && m.no) ? ' ' + m.no.slice(0, 60) : '';
+  return `Certificate${no} made by ${name}${correctionRoleText(m.role)}${when ? ', ' + when : ''}`;
 }
 function renderJobCorrectionsHTML(doc, items) {
   const list = (doc && Array.isArray(doc.corrections)) ? doc.corrections.filter(e => e && typeof e === 'object' && Array.isArray(e.changes)) : [];
@@ -2046,6 +2082,25 @@ function paintCloudFixState(fix) {
 function closeCloudFixSheet() {
   const fix = state.cloudFix;
   if (fix && typeof fix._cleanup === 'function') { const c = fix._cleanup; fix._cleanup = null; c(); }
+}
+
+// ---- V171 (8A 5A): the certificate on the holder's phone ----------------------------
+// An Engineer in a team (7B: no Produce report): an unlocked job with items offers
+// Finish & lock (8A); a locked one says the office makes it. Any job whose
+// certificate someone else made from the cloud says who and when (5A).
+function renderOverviewCertHTML(sess) {
+  if (!sess || state.selectionMode) return '';
+  const me = (typeof _syncCurrentUserId === 'function') ? (_syncCurrentUserId() || '') : '';
+  const made = certMadeLineText(sess, me);
+  const team = (typeof businessCertHidden === 'function') && businessCertHidden(sess);
+  if (made) return `<p class="cert-made-line" id="cert-made-line">${icon('file-text')} ${escapeHTML(made)}</p>`;
+  if (!team) return '';
+  if (sess.locked) return `<p class="muted cert-made-line" id="cert-office-line">${icon('lock')} Locked &mdash; the office makes its certificate.</p>`;
+  if (!(sess.items || []).length) return '';
+  return `<div class="card finish-lock-card">
+      <button class="btn-primary finish-lock-btn" id="finish-lock-btn" data-action="finish-lock" data-arg="${escapeHTML(sess.id)}">${icon('lock')} Finish &amp; lock job</button>
+      <p class="muted finish-lock-hint">When the job&rsquo;s done, lock it &mdash; the office makes its certificate from the cloud.</p>
+    </div>`;
 }
 
 // ---- V167: the trail on the holder's phone ------------------------------------------

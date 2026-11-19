@@ -1932,6 +1932,7 @@ function _cloudReset() {
     capped: false, photos: false, stale: false, q: old.q || '',
     selecting: false, selected: {}, busy: '',
     scope: 'mine', person: '', fails: !!old.fails, biz: null,   // V164
+    lockf: old.lockf === 'cert' || old.lockf === 'open' ? old.lockf : '',   // V171 (6B 8C)
     store: null, storeAsk: null };   // V166 (1A): the Cloud Storage line's figures
 }
 
@@ -1999,6 +2000,16 @@ function cloudPersonSet(u) {
 function cloudFailsToggle() {
   if (!state.cloudJobs) _cloudReset();
   state.cloudJobs.fails = !state.cloudJobs.fails;
+  render();
+}
+
+// V171 (6B 8C): in a business's view, "Needs certificate" (locked, no number yet)
+// and "Not locked yet" — one at a time (they can't both be true of a job); a
+// second tap on the same one turns it off.
+function cloudLockFilter(v) {
+  if (!state.cloudJobs) _cloudReset();
+  const want = (v === 'cert' || v === 'open') ? v : '';
+  state.cloudJobs.lockf = (state.cloudJobs.lockf === want) ? '' : want;
   render();
 }
 
@@ -2168,8 +2179,11 @@ function cloudJobsModel() {
   const inScope = source.filter(j => !person || j.user === person);
   const q = String(cj.q || '').trim().toLowerCase();
   const rows = [];
+  const lockf = scope !== 'mine' ? (cj.lockf || '') : '';   // V171 (6B 8C): a business's view only
   for (const j of inScope) {
     if (cj.fails && !(j.fails > 0)) continue;
+    if (lockf === 'cert' && !(j.locked === true && (!j.certNo || j.redo))) continue;   // never made, or corrected since (V167 4A)
+    if (lockf === 'open' && j.locked === true) continue;
     const split = (typeof splitSiteSnapshot === 'function') ? splitSiteSnapshot(j.site) : { client: '', site: j.site || '' };
     const client = clientName(j, split);
     const title = split.site || j.name || j.site || 'Untitled job';
@@ -2198,7 +2212,7 @@ function cloudJobsModel() {
     last.rows.push(r);
   }
   const cloudOnly = scope === 'mine' ? inScope.filter(j => !local.has(String(j.id))).length : 0;
-  return { scope, total: inScope.length, cloudOnly, shown: rows.length, groups, people, person,
+  return { scope, total: inScope.length, cloudOnly, shown: rows.length, groups, people, person, lockf,
     byId: new Map(rows.map(r => [r.key, r])) };
 }
 
@@ -2626,6 +2640,27 @@ function cloudLookPhotoBack() {
   _cloudLookRevoke(ph.open.url);
   ph.open = null;
   _cloudLookPaint(look);
+}
+
+// V171 (1A 2A): "Make certificate" in the look-only job — the people and the
+// locked jobs Correct is for (cloudLookFixState). Your own job that is on this
+// phone too: made from the phone's copy, as always. Otherwise from the cloud's
+// (report.js produceCloudReport). One at a time.
+function cloudLookCert() {
+  const look = state.cloudLook;
+  if (!look || !look.doc || look.loading || look.certBusy) return Promise.resolve(false);
+  if (!cloudLookFixState(look).can) return Promise.resolve(false);
+  const local = (look.row && look.row.mine) ? (state.sessions || []).find(s => s && String(s.id) === String(look.id)) : null;
+  if (local && typeof produceReport === 'function') return produceReport(local.id).then(() => true, () => false);
+  if (typeof produceCloudReport !== 'function') return Promise.resolve(false);
+  look.certBusy = true;
+  const btn = (typeof document !== 'undefined') ? document.getElementById('cloud-cert-btn') : null;
+  if (btn) { btn.disabled = true; btn.textContent = 'Making the certificate\u2026'; }
+  return produceCloudReport(look).then(() => true, () => false).then((r) => {
+    look.certBusy = false;
+    if (state.cloudLook === look && typeof renderCloudLookBody === 'function') renderCloudLookBody(look);
+    return r;
+  });
 }
 
 // From the sheet: your own job, onto this phone (V93's bring, one job, opened);

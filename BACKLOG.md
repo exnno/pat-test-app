@@ -14,10 +14,45 @@ here rather than restating it. Delete an item when it ships.
 - V170 (business certificate): brief the fourth audit on cert_take (one UPDATE … RETURNING), the
   role checks in the four cert functions, _cert_row's seeding from the Owner's records, and the phone's
   send-before-take order (business.js businessCertRead).
-- **Fourth GPT audit after V171** (R81 0B, 18 Nov — V170 split: V171 = Office makes the certificate;
+- V171 (Office makes the certificate): brief the fourth audit on cert_stamp (SECURITY DEFINER — role in
+  the JOB's business, locked only, assign-once, made), the number-before-build order in report.js
+  produceCloudReport (take → stamp → build), that the job copy pins the tester (never the office phone's
+  instruments), and _reportCloud's lifetime (set for the preview, cleared on close / every early return).
+- **Fourth GPT audit after V171 — NEXT** (R81 0B, 18 Nov — V170 split: V171 = Office makes the certificate;
   V172 is reserved for fixing what the audit finds). (Was: after V170, V171 its fixes.) Brief it that the second audit's finding 5 was
   fixed in V168 (refusals per business; photo files by their job's business).
   (Was: after V169, V170 its fixes — Peter, 13 Nov.)
+
+### Next after V171
+V171 = Office makes the certificate from the cloud; Finish & lock; the office's chips (R82, 19 Nov:
+"1A 2A 3A 4A 5A 6B 7B", then "8 A B C"; built in Opus). SQL: supabase/v171-office-certs.sql (cert_stamp;
+G1–G5; isolation 36a–36c). report.js (V171 section: produceCloudReport, _reportCloud, _reportCloudMade,
+_reportCloudPhotoRecords), sync.js (syncCertStamp; certMade in the diff's SKIP), business.js
+(businessCertModeOrg, businessCertHidden, businessReportsHidden, businessTeamEngineer), session.js
+(lockJobFinishAsk / lockJobFinish, the two reminders), settings-actions.js (cloudLookCert, cloudLockFilter),
+render-review.js (the button, the Overview card / line, the chips), render-settings.js, render-core.js,
+dispatch.js, config.js (UNLOCKED_TEAM_DEFAULT), styles.css. Harness 112 + M2247–M2296.
+**Next — the fourth GPT audit; V172 its fixes.** Then (after V172): shared client / site lists (O13) with
+business setup (O15 — where the per-engineer signature, R82 3C, belongs), the combined certificate (R4),
+teammates' same-site jobs (R3), a team-jobs delete (R76 4A).
+
+### V171 residuals (known, accepted)
+- The signature is the business's (3A) — one signature on every certificate, whoever tested. A per-engineer
+  signature copied at lock (3C) goes with business setup (O15).
+- A job locked before V170 with no instrument snapshot can't be certified from the cloud until its
+  engineer's phone opens PATGo (the tester copy is made then and synced). An engineer with no instrument
+  saved at all never gets a copy — such a job can only be certified on that phone.
+- Two people making the same job's certificate at the same moment: both print the job's one number (the
+  cloud's answer wins); the second's take is an unused number (a gap in the series, never a repeat).
+- A number taken from the cloud when the write onto the job then fails (no signal mid-way, unlocked since)
+  is unused — a gap, never a repeat.
+- "Made" failing after Download / Share (no signal): said in a toast; the job shows its number but not
+  "made" until the certificate is made again.
+- The forced unlocked reminder can still be hidden for the day with its × (as every reminder).
+- "Not locked yet" reads the cloud: a job locked on site with no signal shows there until that phone syncs
+  (the chip says so).
+- The office's own readings switch no longer decides a cloud certificate's readings; on the office's OWN
+  jobs (made on its phone) it still does, as before.
 
 ### Next after V170
 V170 = the business's certificate (R81, 18 Nov: "0B 1A 2B 3 4A 5C 6A", then "7 … 8A"; built in Opus).

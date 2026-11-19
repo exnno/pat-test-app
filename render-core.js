@@ -288,7 +288,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>The business&rsquo;s certificate.</strong> In a business with more than one person, every certificate uses the business&rsquo;s logo, wording and numbering, set by the Owner or Office. The Owner, Team leaders and Office make certificates, and each number comes from the cloud, so no two people ever use the same one. A locked job now keeps the tester&rsquo;s calibration details from the day it was tested. Working on your own? Nothing changes.</li>
+        <li><strong>Certificates from the office.</strong> In a business with more than one person, the Owner, a Team leader or the Office can now make a job&rsquo;s certificate straight from the Cloud tab once the engineer has locked it &mdash; and the engineer&rsquo;s phone shows who made it. Engineers get a <em>Finish &amp; lock job</em> button instead of Produce report, and the office can see which jobs need a certificate and which aren&rsquo;t locked yet. Working on your own? Nothing changes.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>
@@ -1016,7 +1016,7 @@ function renderSessions() {
   const header = `
       <header class="header">
         <h1 class="h1" id="screen-title" tabindex="-1">Jobs</h1>
-        ${state.reportSettings.enabled ? '<button class="icon-btn" id="reports-btn" data-action="open-reports" aria-label="Reports">' + icon('file-text') + '</button>' : ''}
+        ${(state.reportSettings.enabled && !(typeof businessReportsHidden === 'function' && businessReportsHidden())) ? '<button class="icon-btn" id="reports-btn" data-action="open-reports" aria-label="Reports">' + icon('file-text') + '</button>' : ''}
         <button class="icon-btn" id="settings-btn" data-action="open-settings" aria-label="Settings">${icon('settings')}</button>
       </header>`;
   if (cloudTab) {

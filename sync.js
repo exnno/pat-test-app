@@ -4191,7 +4191,8 @@ function syncJobDiff(local, cloud) {
   // V100: the lock time is shown by Locked; the certificate time by Export.
   // V101: movedOut is bookkeeping — the items' own differences say what moved.
   // V170: tester is the lock's copy of the instrument — shown by Locked / Instrument.
-  const SKIP = { id: 1, items: 1, exportedAt: 1, exportDirty: 1, lockedAt: 1, reportAt: 1, movedOut: 1, tester: 1 };
+  // V171: certMade is who made the certificate — shown by Export (reportAt).
+  const SKIP = { id: 1, items: 1, exportedAt: 1, exportDirty: 1, lockedAt: 1, reportAt: 1, movedOut: 1, tester: 1, certMade: 1 };
   const jobVal = (key, v) => {
     if (key === 'instrumentId') {
       if (blankish(v)) return '(none)';
@@ -5468,6 +5469,56 @@ function syncCorrectJob(holder, id, org, changes, reason) {
     }).catch((e) => {
       res.code = _syncFixCode(e);
       if (!res.code) res.needsUpdate = _syncFixNeedsUpdate(e);
+      if (!res.code && !res.needsUpdate) res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
+      return res;
+    });
+}
+
+// ---- V171 (1A 2A 5A): a certificate made for a job held in the cloud ---------------
+// One call to the cloud's cert_stamp (supabase/v171-office-certs.sql), which
+// checks it all itself — the caller's role in the JOB's business (Owner / Team
+// leader / Office), the job locked (2A), it still in the business looked at — and
+// writes onto the job, held by whoever holds it: `cert` gives it its number (a job
+// that already has one keeps it — the answer's certNo is the one to print), and
+// `made` stamps reportAt and who made it (certMade, 5A — the engineer's Overview
+// says so). Nothing here touches this phone's jobs: the job isn't held here. Its
+// holder's phones take it at their next sync (the fingerprint is blanked, V92).
+// Resolves { ok, certNo, at, doc, code, offline, needsUpdate, error }. Never rejects.
+const SYNC_CERTSTAMP_CODES = ['signed_out', 'bad', 'gone', 'moved', 'not_allowed', 'unlocked'];
+function _syncCertStampCode(e) {
+  const msg = String((e && (e.message || e.details || e.hint)) || '');
+  const m = /patgo_certstamp_([a-z_]+)/.exec(msg);
+  if (m && SYNC_CERTSTAMP_CODES.includes(m[1])) return m[1];
+  if (/patgo_plan_locked/.test(msg)) return 'plan';
+  return '';
+}
+function syncCertStamp(holder, id, org, cert, made) {
+  const res = { ok: false, certNo: '', at: '', doc: null, code: '', offline: false, needsUpdate: false, error: '' };
+  const u = String(holder || ''), sid = String(id == null ? '' : id), o = String(org || '');
+  const no = String(cert == null ? '' : cert).trim();
+  if (!_SYNC_UUID_RE.test(u) || typeof safeId !== 'function' || !safeId(sid) || !_SYNC_UUID_RE.test(o)
+      || (!no && made !== true) || no.length > 60) {
+    res.code = 'bad'; return Promise.resolve(res);
+  }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  return syncDataClient()
+    .then((c) => c.rpc('cert_stamp', { holder: u, job: sid, org: o, cert: no || null, made: made === true }))
+    .then((r) => {
+      if (r && r.error) throw r.error;
+      const out = (r && r.data && typeof r.data === 'object') ? r.data : null;
+      if (!out) throw new Error('no answer');
+      res.ok = true;
+      res.certNo = (typeof out.certNo === 'string') ? out.certNo.slice(0, 60) : '';
+      res.at = (typeof out.at === 'string') ? out.at.slice(0, 40) : '';
+      res.doc = _syncValidDoc(out.doc, sid) ? out.doc : null;
+      return res;
+    }).catch((e) => {
+      res.code = _syncCertStampCode(e);
+      if (!res.code && e) {
+        const msg = String(e.message || '');
+        res.needsUpdate = ((e.code === 'PGRST202' || e.code === '42883') && !/patgo_/.test(msg))
+          || (/Could not find the function|does not exist/i.test(msg) && /cert_stamp/.test(msg));
+      }
       if (!res.code && !res.needsUpdate) res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
       return res;
     });
