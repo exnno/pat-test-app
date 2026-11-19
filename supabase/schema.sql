@@ -3743,3 +3743,86 @@ $$;
 revoke all on function public.cert_stamp(uuid, text, uuid, text, boolean) from public, anon;
 grant execute on function public.cert_stamp(uuid, text, uuid, text, boolean) to authenticated;
 -- ================================================================ end V171
+
+-- ================================================================ V171.1
+-- The tester for a cloud-only job. KEEP IN STEP with supabase/v171-1-tester.sql (the
+-- same, plus self-checks H1–H5). Kept in step by harness 113.
+--
+-- cert_tester(holder, job, org) — SECURITY DEFINER (it reads and writes what the
+-- caller may not hold), checks as cert_stamp (V171) and raises, writing nothing:
+--   patgo_certtester_signed_out / _bad / _gone / _moved / _not_allowed / _unlocked
+--   (the same meanings), and _none: the engineer has no instrument saved to the
+--   cloud that it could be (nothing to copy).
+-- A job that already has its copy is returned as it is (never changed — V170 6A).
+-- Otherwise: the instrument the job names (doc.instrumentId, the holder's live
+-- 'instrument' record) → else the job's own instrumentSnapshot → else the holder's
+-- tester in use ('settings_instrument' → its instrument) → else their only
+-- instrument. ⚠ Never the caller's. The copy carries `at` = the job's lockedAt (as
+-- the phone's start-up copy does), and `from` says which it was.
+-- The write blanks the fingerprint (V92), so the holder's phones take it quietly.
+create or replace function public.cert_tester(holder uuid, job text, org uuid)
+returns jsonb language plpgsql volatile security definer set search_path = '' as $$
+declare
+  me uuid := auth.uid();
+  s record;
+  d jsonb;
+  inst jsonb;
+  src text;
+  iid text;
+  n int;
+begin
+  if me is null then raise exception 'patgo_certtester_signed_out'; end if;
+  if holder is null or job is null then raise exception 'patgo_certtester_bad'; end if;
+  select x.* into s from public.sessions x where x.user_id = holder and x.id = job for update;
+  if not found or s.deleted then raise exception 'patgo_certtester_gone'; end if;
+  if org is not null and s.org_id is distinct from org then raise exception 'patgo_certtester_moved'; end if;
+  if s.org_id is null or coalesce(public.my_role(s.org_id), '') not in ('owner','team_leader','office') then
+    raise exception 'patgo_certtester_not_allowed';
+  end if;
+  d := s.doc;
+  if jsonb_typeof(d) is distinct from 'object' or (d -> 'locked') is distinct from 'true'::jsonb then
+    raise exception 'patgo_certtester_unlocked';
+  end if;
+  if jsonb_typeof(d -> 'tester') = 'object' then
+    return jsonb_build_object('doc', d, 'from', 'job');
+  end if;
+  iid := case when jsonb_typeof(d -> 'instrumentId') = 'string' then nullif(d ->> 'instrumentId', '') end;
+  if iid is not null then
+    select r.doc into inst from public.records r
+      where r.user_id = holder and r.kind = 'instrument' and r.id = iid and not r.deleted;
+    if inst is not null then src := 'instrument'; end if;
+    if inst is null and jsonb_typeof(d -> 'instrumentSnapshot') = 'object' then
+      inst := d -> 'instrumentSnapshot'; src := 'snapshot';
+    end if;
+  else
+    select r.doc ->> 'instrumentId' into iid from public.records r
+      where r.user_id = holder and r.kind = 'settings' and r.id = 'settings_instrument' and not r.deleted;
+    if nullif(iid, '') is not null then
+      select r.doc into inst from public.records r
+        where r.user_id = holder and r.kind = 'instrument' and r.id = iid and not r.deleted;
+      if inst is not null then src := 'in use'; end if;
+    end if;
+    if inst is null then
+      select count(*) into n from public.records r where r.user_id = holder and r.kind = 'instrument' and not r.deleted;
+      if n = 1 then
+        select r.doc into inst from public.records r where r.user_id = holder and r.kind = 'instrument' and not r.deleted;
+        src := 'only';
+      end if;
+    end if;
+  end if;
+  if jsonb_typeof(inst) is distinct from 'object' then raise exception 'patgo_certtester_none'; end if;
+  d := d || jsonb_build_object('tester', jsonb_build_object(
+    'make',      case when jsonb_typeof(inst -> 'make') = 'string' then left(inst ->> 'make', 200) else '' end,
+    'model',     case when jsonb_typeof(inst -> 'model') = 'string' then left(inst ->> 'model', 200) else '' end,
+    'calDate',   case when jsonb_typeof(inst -> 'calDate') = 'string' then left(inst ->> 'calDate', 40) else '' end,
+    'calCertNo', case when jsonb_typeof(inst -> 'calCertNo') = 'string' then left(inst ->> 'calCertNo', 200) else '' end,
+    'calDue',    case when jsonb_typeof(inst -> 'calDue') = 'string' then left(inst ->> 'calDue', 40) else '' end,
+    'at',        case when jsonb_typeof(d -> 'lockedAt') = 'string' then d ->> 'lockedAt'
+                      else to_char(now() at time zone 'utc', 'YYYY-MM-DD"T"HH24:MI:SS.MS"Z"') end));
+  update public.sessions x set doc = d, last_modified = now() where x.user_id = holder and x.id = job;
+  return jsonb_build_object('doc', d, 'from', src);
+end;
+$$;
+revoke all on function public.cert_tester(uuid, text, uuid) from public, anon;
+grant execute on function public.cert_tester(uuid, text, uuid) to authenticated;
+-- ================================================================ end V171.1
