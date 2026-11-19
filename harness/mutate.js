@@ -9059,9 +9059,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v171';",   // V171: re-aimed (→ 112g).   // V170: re-aimed (→ 111f).   // V169.2: re-aimed. V169.1: re-aimed (→ 110d). V169: re-aimed (→ 109f).   // V168: re-aimed (→ 108f).   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v170';",
-    why:  "a release needs its cache bump or phones never get it (112g)",
+    from: "const CACHE_VERSION = 'pat-v171-1';",   // V171.1: re-aimed (→ 113c).   // V171: re-aimed (→ 112g).   // V170: re-aimed (→ 111f).   // V169.2: re-aimed. V169.1: re-aimed (→ 110d). V169: re-aimed (→ 109f).   // V168: re-aimed (→ 108f).   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v171';",
+    why:  "a release needs its cache bump or phones never get it (113c)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -15958,11 +15958,11 @@ const MUTATIONS = [
     why:  "nothing of the job kept here (112b)",
   },
   {
-    name: "M2258 (V171) no tester copy still certified",
+    name: "M2258 (V171) nothing to copy still certified",
     file: "report.js",
-    from: "  if (!tester) {\n    openInfoSheet({ title: 'The tester’s details aren’t in the cloud yet',",
-    to:   "  if (false) {\n    openInfoSheet({ title: 'The tester’s details aren’t in the cloud yet',",
-    why:  "no tester copy: said, nothing built (112c)",
+    from: "    } else if (tt.code === 'none') {",
+    to:   "    } else if (tt.code === 'noneX') {",
+    why:  "V171.1: nothing saved to copy — said by name, nothing built (112c, 113b)",
   },
   {
     name: "M2259 (V171) the instrument snapshot not used",
@@ -16229,6 +16229,63 @@ const MUTATIONS = [
     from: "  if s.org_id is null or coalesce(public.my_role(s.org_id), '') not in ('owner','team_leader','office') then",
     to:   "  if s.org_id is null or coalesce(public.my_role(s.org_id), '') not in ('owner','team_leader','office','engineer') then",
     why:  "roles (112g)",
+  },
+  // ---- V171.1: the cloud makes an older job's tester copy. Group 113 + M2297–M2304. ----
+  {
+    name: "M2297 (V171.1) the cloud not asked for the tester",
+    file: "report.js",
+    from: "    const tt = await syncCertTester(look.user, look.id, mode.org);",
+    to:   "    const tt = { ok: false, code: 'none' };",
+    why:  "V171.1 (113a)",
+  },
+  {
+    name: "M2298 (V171.1) the cloud's copy not used",
+    file: "report.js",
+    from: "      look.doc = tt.doc;\n      tester = tt.doc.tester;",
+    to:   "      look.doc = tt.doc;",
+    why:  "V171.1 (113a)",
+  },
+  {
+    name: "M2299 (V171.1) the look keeps the old doc",
+    file: "report.js",
+    from: "      look.doc = tt.doc;\n",
+    to:   "",
+    why:  "V171.1 (113a)",
+  },
+  {
+    name: "M2300 (V171.1) a refused tester copy goes on to build",
+    file: "report.js",
+    from: "    } else { _reportStampRefused(tt, mode.name, who); return; }",
+    to:   "    }",
+    why:  "V171.1 (113b)",
+  },
+  {
+    name: "M2301 (V171.1) no V171.1 SQL not named",
+    file: "report.js",
+    from: "    } else if (tt.needsUpdate) {\n      openInfoSheet({ title: 'The cloud needs updating', message: 'The cloud hasn’t been set up to fill in",
+    to:   "    } else if (false) {\n      openInfoSheet({ title: 'The cloud needs updating', message: 'The cloud hasn’t been set up to fill in",
+    why:  "V171.1 (113b)",
+  },
+  {
+    name: "M2302 (V171.1) cert_tester's codes not read",
+    file: "sync.js",
+    from: "      const m = /patgo_certtester_([a-z_]+)/.exec(msg);",
+    to:   "      const m = null;",
+    why:  "V171.1 (113b)",
+  },
+  {
+    name: "M2303 (V171.1) cert_tester called with the wrong job",
+    file: "sync.js",
+    from: "    .then((c) => c.rpc('cert_tester', { holder: u, job: sid, org: o }))",
+    to:   "    .then((c) => c.rpc('cert_tester', { holder: u, job: 'x', org: o }))",
+    why:  "V171.1 (113a)",
+  },
+  {
+    name: "M2304 (V171.1) the SQL reads anyone's instruments",
+    file: "supabase/v171-1-tester.sql",
+    from: "      where r.user_id = holder and r.kind = 'instrument' and r.id = iid and not r.deleted;\n    if inst is not null then src := 'instrument'",
+    to:   "      where r.kind = 'instrument' and r.id = iid and not r.deleted;\n    if inst is not null then src := 'instrument'",
+    why:  "V171.1 (113c)",
   },
 ];
 
