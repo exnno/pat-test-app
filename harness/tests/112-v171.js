@@ -99,13 +99,41 @@ function cloud() {
     row.doc = d;
     return json({ certNo: d.certNo || null, at, doc: d });
   };
+  // V171.1: the holder's saved instruments ({ user: { list: [...], inUse: id } }).
+  srv.instr = {};
+  srv.tester = (b) => {
+    const nt = (code) => json({ code: 'P0001', message: 'patgo_certtester_' + code, details: null, hint: null }, 400);
+    const row = srv.sessions.find(s => s.user_id === b.holder && s.id === b.job);
+    if (!row || row.deleted) return nt('gone');
+    if (b.org && row.org_id !== b.org) return nt('moved');
+    if (row.doc.locked !== true) return nt('unlocked');
+    if (row.doc.tester && typeof row.doc.tester === 'object') return json({ doc: row.doc, from: 'job' });
+    const mine = srv.instr[b.holder] || { list: [] };
+    let inst = null, from = '';
+    if (row.doc.instrumentId) {
+      inst = mine.list.find(i => i.id === row.doc.instrumentId) || null; from = 'instrument';
+      if (!inst && row.doc.instrumentSnapshot) { inst = row.doc.instrumentSnapshot; from = 'snapshot'; }
+    } else {
+      inst = mine.list.find(i => i.id === mine.inUse) || null; from = 'in use';
+      if (!inst && mine.list.length === 1) { inst = mine.list[0]; from = 'only'; }
+    }
+    if (!inst) return nt('none');
+    const d = JSON.parse(J(row.doc));
+    d.tester = { make: inst.make || '', model: inst.model || '', calDate: inst.calDate || '', calCertNo: inst.calCertNo || '', calDue: inst.calDue || '', at: d.lockedAt || '2026-11-19T15:00:00.000Z' };
+    row.doc = d;
+    return json({ doc: d, from });
+  };
   srv.fetchImpl = async (url, init = {}) => {
     const p = String(url).split('?')[0].replace(/^https:\/\/[^/]+/, '');
-    const m = /^\/rest\/v1\/rpc\/(business_cert|cert_take|cert_stamp|cert_settings_save|cert_seen)$/.exec(p);
+    const m = /^\/rest\/v1\/rpc\/(business_cert|cert_take|cert_stamp|cert_settings_save|cert_seen|cert_tester)$/.exec(p);
     if (m) {
       let b = null; try { b = JSON.parse(init.body); } catch { b = null; }
       srv.certCalls.push({ fn: m[1], body: b });
       srv.calls.push({ path: p, qs: '', method: 'POST', body: b });
+      if (m[1] === 'cert_tester') {   // V171.1 (supabase/v171-1-tester.sql, as proved in PGlite)
+        if (srv.noV1711) return json({ code: 'PGRST202', message: 'Could not find the function public.cert_tester(holder, job, org) in the schema cache', details: null, hint: null }, 404);
+        return srv.tester(b);
+      }
       if (m[1] === 'cert_stamp') {
         if (srv.noV171) return json({ code: 'PGRST202', message: 'Could not find the function public.cert_stamp(cert, holder, job, made, org) in the schema cache', details: null, hint: null }, 404);
         return srv.stamp(b);
@@ -167,7 +195,7 @@ function overview(app, sess) {
   return html(app);
 }
 
-module.exports = async function () {
+const run = async function () {
   /* ------------------------------------------------------------------ 112a */
   await t.group('112a — the button: the people who may correct, on a locked job; open jobs none; your own job on this phone from its copy (1A 2A)', async () => {
     const { app, srv } = await ready();
@@ -283,9 +311,11 @@ module.exports = async function () {
     await lookAt(app, ED + '|ZZC4');
     let r = stubs(app);
     await app.fn('cloudLookCert')();
-    t.eq(r.sheets[0] && r.sheets[0].title, 'The tester’s details aren’t in the cloud yet', 'locked before V170, no copy: said');
-    t.includes(r.sheets[0].message, 'Ask Eddie to open PATGo', '…by name');
-    t.eq(srv.certCalls.length + r.built.length, 0, '…nothing asked, nothing built');
+    // V171.1: the cloud is asked to make the copy; Eddie has no tester saved — said.
+    t.eq(r.sheets[0] && r.sheets[0].title, 'No tester to put on this job', 'locked before V170, no copy, nothing saved to make one: said');
+    t.includes(r.sheets[0].message, 'Ask Eddie to add it', '…by name');
+    t.eq(srv.fns(), 'cert_tester', '…only the tester asked for');
+    t.eq(r.built.length, 0, '…nothing built');
     // An older job with the instrument snapshot: that is the tester.
     srv.sessions.find(s => s.id === 'ZZC4').doc.instrumentSnapshot = { make: 'Snap', serial: 'SN-SNAP' };
     app.doc.getElementById('cloud-look-close').click();
@@ -513,7 +543,7 @@ module.exports = async function () {
     const end = '-- ================================================================ end V171\n';
     const block = mig.slice(mig.indexOf('-- ================================================================ V171\n'), mig.indexOf(end) + end.length);
     t.ok(block.length > 3000, 'the migration has its definitions');
-    t.ok(read('supabase/schema.sql').trimEnd().endsWith(block.trimEnd()), 'a new project gets them byte for byte, as schema.sql’s last section');
+    t.ok(read('supabase/schema.sql').includes(block), 'a new project gets them byte for byte, as a section of schema.sql (V171.1: no longer the last)');
     t.includes(block, "  if s.org_id is null or coalesce(public.my_role(s.org_id), '') not in ('owner','team_leader','office') then", 'Owner / Team leader / Office of the JOB’s business');
     t.includes(block, "  if jsonb_typeof(d) is distinct from 'object' or (d -> 'locked') is distinct from 'true'::jsonb then\n    raise exception 'patgo_certstamp_unlocked';", 'locked only (2A)');
     t.includes(block, '  if have is null and no is not null then', 'a job that has a number keeps it');
@@ -528,7 +558,7 @@ module.exports = async function () {
     const rel = freshApp();
     t.eq(rel.run('APP_VERSION'), 'V171', 'APP_VERSION V171');
     t.eq(rel.run('WELCOME_VERSION'), 'V171', 'What’s new rolled (a feature release)');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v171';", 'cache key pat-v171');
+    // V171.1: the cache key check moved to 113.
     const core = read('render-core.js');
     const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
     const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
@@ -542,3 +572,5 @@ module.exports = async function () {
     t.includes(help, 'Team seats: each Engineer or Team leader is &pound;3 a month', 'About: V169’s line, the oldest');
   });
 };
+run.kit = { cloud, stubs, ready, lookAt, TESTER };
+module.exports = run;
