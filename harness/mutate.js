@@ -517,7 +517,7 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V170';",   // V170: re-pointed.   // V169: re-pointed.   // V168: re-pointed.   // V167: re-pointed.   // V166: re-pointed.   // V165: re-pointed.   // V164: re-pointed.   // V163: re-pointed. V162: re-pointed. V161: re-pointed. V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
+    from: "const APP_VERSION = 'V171';",   // V171: re-pointed.   // V170: re-pointed.   // V169: re-pointed.   // V168: re-pointed.   // V167: re-pointed.   // V166: re-pointed.   // V165: re-pointed.   // V164: re-pointed.   // V163: re-pointed. V162: re-pointed. V161: re-pointed. V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
     to:   "const APP_VERSION = 'V154';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
@@ -640,7 +640,7 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V168</strong> &middot; November 2026</p>',   // V170: V167 rolled off — the oldest is V168 (111f).   // V169: V166 rolled off — the oldest is V167 (109f).   // V168: V165 rolled off — the oldest is V166 (108f).   // V167: V164 rolled off — the oldest is V165 (106f).   // V166: V163 rolled off — the oldest is V164 (105f).   // V165: V162 rolled off — the oldest is V163 (104f).   // V164: V161 rolled off — the oldest is V162 (103f).   // V163: V160 rolled off — the oldest is V161 (102f). V162: V159 rolled off — the oldest is V160 (101f). V161: V158 rolled off — the oldest is V159 (100f). V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
+    from: '        <p><strong>V169</strong> &middot; November 2026</p>',   // V171: V168 rolled off — the oldest is V169 (112g).   // V170: V167 rolled off — the oldest is V168 (111f).   // V169: V166 rolled off — the oldest is V167 (109f).   // V168: V165 rolled off — the oldest is V166 (108f).   // V167: V164 rolled off — the oldest is V165 (106f).   // V166: V163 rolled off — the oldest is V164 (105f).   // V165: V162 rolled off — the oldest is V163 (104f).   // V164: V161 rolled off — the oldest is V162 (103f).   // V163: V160 rolled off — the oldest is V161 (102f). V162: V159 rolled off — the oldest is V160 (101f). V161: V158 rolled off — the oldest is V159 (100f). V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 95e)',
   },
@@ -6124,9 +6124,9 @@ const MUTATIONS = [
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
     // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
-    from: "<li><strong>The business&rsquo;s certificate.</strong>",   // V170: welcome rolled (one line) — re-aimed; 111f pins it.   // V169: welcome rolled (one line) — re-aimed; 109f pins it.   // V168: welcome rolled (one line) — re-aimed; 108f pins it.   // V167: welcome rolled (one line) — re-aimed; 106f pins it.   // V166: welcome rolled (one line) — re-aimed; 105f pins it.   // V165: welcome rolled (one line) — re-aimed; 104f pins it.   // V164: welcome rolled (one line) — re-aimed; 103f pins it.   // V163: welcome rolled (two lines) — re-aimed at the first; 102f pins it. V157: welcome rolled (two lines) — re-aimed at the first; 96e pins it.   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
+    from: "<li><strong>Certificates from the office.</strong>",   // V171: welcome rolled (one line) — re-aimed; 112g pins it.   // V170: welcome rolled (one line) — re-aimed; 111f pins it.   // V169: welcome rolled (one line) — re-aimed; 109f pins it.   // V168: welcome rolled (one line) — re-aimed; 108f pins it.   // V167: welcome rolled (one line) — re-aimed; 106f pins it.   // V166: welcome rolled (one line) — re-aimed; 105f pins it.   // V165: welcome rolled (one line) — re-aimed; 104f pins it.   // V164: welcome rolled (one line) — re-aimed; 103f pins it.   // V163: welcome rolled (two lines) — re-aimed at the first; 102f pins it. V157: welcome rolled (two lines) — re-aimed at the first; 96e pins it.   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
     to:   "<li><strong>Better.</strong>",
-    why:  "11A: the welcome says plainly what changed on screen (111f)",
+    why:  "11A: the welcome says plainly what changed on screen (112g)",
   },
   {
     name: "M847 (V114) the retest how-to says Open any session",
@@ -8619,8 +8619,8 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V170';",   // V170: re-aimed.   // V169: re-aimed.   // V168: re-aimed.   // V167: re-aimed.   // V166: re-aimed.   // V165: re-aimed.   // V164: re-aimed.   // V163: re-aimed. V157: re-aimed. V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
-    to:   "const WELCOME_VERSION = 'V169';",
+    from: "const WELCOME_VERSION = 'V171';",   // V171: re-aimed.   // V170: re-aimed.   // V169: re-aimed.   // V168: re-aimed.   // V167: re-aimed.   // V166: re-aimed.   // V165: re-aimed.   // V164: re-aimed.   // V163: re-aimed. V157: re-aimed. V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
+    to:   "const WELCOME_VERSION = 'V170';",
     why:  "What's new is rolled on a feature release (96e)",
   },
   {
@@ -8651,9 +8651,9 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Each business on its own plan: for anyone in more than one business",   // V168: at V168's (V167's moves to M1259, V166's to M1238).   // V165: at V165's (V164's moves to M1259, V163's to M1238).   // V164: at V164's (V163's moves to M1259, V162's to M1238).   // V161: at V161's (V160's moves to M1259, V159's to M1238). V160: at V160's (V159's moves to M1259, V158's to M1238). V159: at V159's (V158's moves to M1259, V157's to M1238). V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
+    from: "Certificates from the office: the Owner, a Team leader or the Office",   // V171: at V171's (V168's rolled off).   // V168: at V168's (V167's moves to M1259, V166's to M1238).   // V165: at V165's (V164's moves to M1259, V163's to M1238).   // V164: at V164's (V163's moves to M1259, V162's to M1238).   // V161: at V161's (V160's moves to M1259, V159's to M1238). V160: at V160's (V159's moves to M1259, V158's to M1238). V159: at V159's (V158's moves to M1259, V157's to M1238). V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
     to:   "Better",
-    why:  "the About page must say what changed in this version (108f)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
+    why:  "the About page must say what changed in this version (112g)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
   },
 
   // ---- V133 (1A–6A): the clean-up job, part 1 (SQL) + the phone version report. Group 71 + M1224–M1239. ----
@@ -8768,9 +8768,9 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "Each business on its own plan: for anyone in more than one business",   // V170: V167's rolled off — re-aimed at V168's, the oldest now (111f).   // V169: V166's rolled off — re-aimed at V167's, the oldest now (109f).   // V168: V165's rolled off — re-aimed at V166's, the oldest now (108f).   // V167: V164's rolled off — re-aimed at V165's, the oldest now (106f).   // V166: V163's rolled off — re-aimed at V164's, the oldest now (105f).   // V165: V162's rolled off — re-aimed at V163's, the oldest now (102f).   // V164: V161's rolled off — re-aimed at V162's, the oldest now (101f).   // V163: V160's rolled off — re-aimed at V161's, the oldest now (100f). V162: V159's rolled off — re-aimed at V160's, the oldest now (99f). V161: V158's rolled off — re-aimed at V159's, the oldest now (98f). V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
+    from: "        <p class=\"muted\">Team seats: each Engineer or Team leader is &pound;3 a month",   // V171: V168's rolled off — re-aimed at V169's, the oldest now (112g).   // V170: V167's rolled off — re-aimed at V168's, the oldest now (111f).   // V169: V166's rolled off — re-aimed at V167's, the oldest now (109f).   // V168: V165's rolled off — re-aimed at V166's, the oldest now (108f).   // V167: V164's rolled off — re-aimed at V165's, the oldest now (106f).   // V166: V163's rolled off — re-aimed at V164's, the oldest now (105f).   // V165: V162's rolled off — re-aimed at V163's, the oldest now (102f).   // V164: V161's rolled off — re-aimed at V162's, the oldest now (101f).   // V163: V160's rolled off — re-aimed at V161's, the oldest now (100f). V162: V159's rolled off — re-aimed at V160's, the oldest now (99f). V161: V158's rolled off — re-aimed at V159's, the oldest now (98f). V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
     to:   "Better",
-    why:  "the About page keeps the last three versions' lines (111f)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
+    why:  "the About page keeps the last three versions' lines (112g)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
   {
     name: "M1239 (V133) Privacy doesn't mention the version report",
@@ -9059,9 +9059,9 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v170';",   // V170: re-aimed (→ 111f).   // V169.2: re-aimed. V169.1: re-aimed (→ 110d). V169: re-aimed (→ 109f).   // V168: re-aimed (→ 108f).   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v169-2';",
-    why:  "a release needs its cache bump or phones never get it (111f)",
+    from: "const CACHE_VERSION = 'pat-v171';",   // V171: re-aimed (→ 112g).   // V170: re-aimed (→ 111f).   // V169.2: re-aimed. V169.1: re-aimed (→ 110d). V169: re-aimed (→ 109f).   // V168: re-aimed (→ 108f).   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v170';",
+    why:  "a release needs its cache bump or phones never get it (112g)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
   {
@@ -15878,6 +15878,357 @@ const MUTATIONS = [
     from: "      if (!t.ok) {\n        _reportRsUse = null;\n",
     to:   "      if (!t.ok) {\n",
     why:  "the copy dropped (111b)",
+  },
+  // ---- V171 (R82): Office makes the certificate; Finish & lock; the chips. Group 112 + M2247–M2296. ----
+  {
+    name: "M2247 (V171) the cloud job's lock not checked",
+    file: "report.js",
+    from: "  if (doc.locked !== true) {\n    openInfoSheet({ title: 'Not locked yet'",
+    to:   "  if (false) {\n    openInfoSheet({ title: 'Not locked yet'",
+    why:  "2A: an open job never certified (112a)",
+  },
+  {
+    name: "M2248 (V171) the button shown on an open job",
+    file: "render-review.js",
+    from: "    : `<p class=\"muted pm-note cloud-fix-why\" id=\"cloud-fix-why\">${escapeHTML(fx.why)}</p>`);",
+    to:   "    : certBtn + `<p class=\"muted pm-note cloud-fix-why\" id=\"cloud-fix-why\">${escapeHTML(fx.why)}</p>`);",
+    why:  "2A: no button on an open job (112a)",
+  },
+  {
+    name: "M2249 (V171) cloudLookCert ignores who may",
+    file: "settings-actions.js",
+    from: "  if (!cloudLookFixState(look).can) return Promise.resolve(false);\n",
+    to:   "",
+    why:  "cloudLookCert does nothing on an open job (112a)",
+  },
+  {
+    name: "M2250 (V171) your own job on this phone made from the cloud",
+    file: "settings-actions.js",
+    from: "  if (local && typeof produceReport === 'function') return produceReport(local.id)",
+    to:   "  if (false && local) return produceReport(local.id)",
+    why:  "your own job on this phone: its copy (112a)",
+  },
+  {
+    name: "M2251 (V171) the sheet's cert button not wired",
+    file: "render-review.js",
+    from: "    else if (act === 'cert' && typeof cloudLookCert === 'function') cloudLookCert();   // V171\n",
+    to:   "",
+    why:  "the sheet's listener reaches it (112a)",
+  },
+  {
+    name: "M2252 (V171) the tester from this phone, not the job",
+    file: "report.js",
+    from: "  session.tester = JSON.parse(JSON.stringify(tester));\n",
+    to:   "  delete session.tester; session.locked = false;\n",
+    why:  "the tester as locked, never this phone's (112b)",
+  },
+  {
+    name: "M2253 (V171) the number not written onto the job",
+    file: "report.js",
+    from: "      const st = await syncCertStamp(look.user, look.id, mode.org, no, false);\n      if (!st.ok)",
+    to:   "      const st = { ok: true, certNo: '' };\n      if (!st.ok)",
+    why:  "the number onto the job before the build (112b)",
+  },
+  {
+    name: "M2254 (V171) the cloud's number ignored (two at once)",
+    file: "report.js",
+    from: "      session.certNo = st.certNo || no;   // a number already on the job is the one",
+    to:   "      session.certNo = no;",
+    why:  "never two numbers on one job (112b)",
+  },
+  {
+    name: "M2255 (V171) a numbered cloud job takes another number",
+    file: "report.js",
+    from: "  if (rs.certEnabled && !session.certNo) {\n    let no = '';",
+    to:   "  if (rs.certEnabled) {\n    let no = '';",
+    why:  "assign-once (112b)",
+  },
+  {
+    name: "M2256 (V171) a business of one takes the cloud's number",
+    file: "report.js",
+    from: "    if (mode.kind === 'cloud') {\n      const t = await businessCertTake(mode.org);",
+    to:   "    if (mode.kind === 'cloud' || mode.kind === 'solo') {\n      const t = await businessCertTake(mode.org);",
+    why:  "8A: a business of one, the phone's counter (112b)",
+  },
+  {
+    name: "M2257 (V171) the cloud copy kept on this phone",
+    file: "report.js",
+    from: "  let session;\n  try { session = JSON.parse(JSON.stringify(doc)); } catch (e) { session = null; }",
+    to:   "  let session;\n  try { session = JSON.parse(JSON.stringify(doc)); state.sessions.push(session); save(); } catch (e) { session = null; }",
+    why:  "nothing of the job kept here (112b)",
+  },
+  {
+    name: "M2258 (V171) no tester copy still certified",
+    file: "report.js",
+    from: "  if (!tester) {\n    openInfoSheet({ title: 'The tester’s details aren’t in the cloud yet',",
+    to:   "  if (false) {\n    openInfoSheet({ title: 'The tester’s details aren’t in the cloud yet',",
+    why:  "no tester copy: said, nothing built (112c)",
+  },
+  {
+    name: "M2259 (V171) the instrument snapshot not used",
+    file: "report.js",
+    from: "    : ((doc.instrumentSnapshot && typeof doc.instrumentSnapshot === 'object' && !Array.isArray(doc.instrumentSnapshot)) ? doc.instrumentSnapshot : null);",
+    to:   "    : null;",
+    why:  "an older job's snapshot stands in (112c)",
+  },
+  {
+    name: "M2260 (V171) a refused stamp still builds",
+    file: "report.js",
+    from: "      if (!st.ok) { _reportRsUse = null; _reportStampRefused(st, mode.name, who); return; }",
+    to:   "      if (!st.ok) { _reportStampRefused(st, mode.name, who); }",
+    why:  "unlocked since: nothing built, the copy dropped (112c)",
+  },
+  {
+    name: "M2261 (V171) unlocked since said as a failure",
+    file: "report.js",
+    from: "  unlocked: (who) => `${who} unlocked this job since it was read.",
+    to:   "  unlockedX: (who) => `${who} unlocked this job since it was read.",
+    why:  "unlocked since: said by name (112c)",
+  },
+  {
+    name: "M2262 (V171) no V171 SQL not named",
+    file: "report.js",
+    from: "  if (res.needsUpdate) {\n    openInfoSheet({ title: 'The cloud needs updating'",
+    to:   "  if (false) {\n    openInfoSheet({ title: 'The cloud needs updating'",
+    why:  "no V171 SQL: names the update (112c)",
+  },
+  {
+    name: "M2263 (V171) switched off still built",
+    file: "report.js",
+    from: "  if (!(bizRs || reportRs()).enabled) {",
+    to:   "  if (false) {",
+    why:  "switched off: said (112c)",
+  },
+  {
+    name: "M2264 (V171) an unknown business still built",
+    file: "report.js",
+    from: "  if (mode.kind !== 'cloud' && mode.kind !== 'solo') {\n    openInfoSheet({ title: 'Business not found'",
+    to:   "  if (false) {\n    openInfoSheet({ title: 'Business not found'",
+    why:  "the business not on this phone (112c)",
+  },
+  {
+    name: "M2265 (V171) made not sent as made",
+    file: "report.js",
+    from: "  return syncCertStamp(cloud.holder, cloud.id, cloud.org, session && session.certNo ? session.certNo : '', true).then((res) => {",
+    to:   "  return syncCertStamp(cloud.holder, cloud.id, cloud.org, session && session.certNo ? session.certNo : '', false).then((res) => {",
+    why:  "5A: made in the cloud (112d)",
+  },
+  {
+    name: "M2266 (V171) the look not repainted with the answer",
+    file: "report.js",
+    from: "      look.doc = res.doc;\n      if (look.row) look.row = Object.assign({}, look.row, { certNo: res.certNo || look.row.certNo, redo: false });",
+    to:   "      if (look.row) look.row = Object.assign({}, look.row, { certNo: res.certNo || look.row.certNo, redo: false });",
+    why:  "the look shows the cloud's answer (112d)",
+  },
+  {
+    name: "M2267 (V171) a failed made not said",
+    file: "report.js",
+    from: "    showToast(res.offline ? 'No signal — the job doesn’t show the certificate as made yet'",
+    to:   "    (() => {})(res.offline ? 'No signal — the job doesn’t show the certificate as made yet'",
+    why:  "a failure is said (112d)",
+  },
+  {
+    name: "M2268 (V171) the made line shown to its maker",
+    file: "render-review.js",
+    from: "  if (me && m.by === me) return '';\n",
+    to:   "",
+    why:  "never for your own (112d)",
+  },
+  {
+    name: "M2269 (V171) the made line unescaped on the Overview",
+    file: "render-review.js",
+    from: "  if (made) return `<p class=\"cert-made-line\" id=\"cert-made-line\">${icon('file-text')} ${escapeHTML(made)}</p>`;",
+    to:   "  if (made) return `<p class=\"cert-made-line\" id=\"cert-made-line\">${icon('file-text')} ${made}</p>`;",
+    why:  "escaped (112d)",
+  },
+  {
+    name: "M2270 (V171) a cloud job's photos from this phone's store",
+    file: "report.js",
+    from: "  const fromCloud = !!(_reportCloud && _reportCloud.id === session.id);\n",
+    to:   "  const fromCloud = false;\n",
+    why:  "4A: from the cloud (112d)",
+  },
+  {
+    name: "M2271 (V171) the full photo not tried first",
+    file: "report.js",
+    from: "    let blob = await syncCloudLookPhoto(cloud.holder, p.id, true);\n",
+    to:   "    let blob = null;\n",
+    why:  "full size first (112d)",
+  },
+  {
+    name: "M2272 (V171) a cloud job's readings follow this phone's switch",
+    file: "report.js",
+    from: "  const readingsOn = (!!state.readingsEnabled || !!(_reportCloud && _reportCloud.id === session.id)) && rs.showReadings !== false;",
+    to:   "  const readingsOn = !!state.readingsEnabled && rs.showReadings !== false;",
+    why:  "readings whatever this phone's switch (112d)",
+  },
+  {
+    name: "M2273 (V171) the preview keeps the cloud job",
+    file: "report.js",
+    from: "    _reportCloud = null;   // V171: so was the cloud job\n",
+    to:   "",
+    why:  "dropped on close (112d)",
+  },
+  {
+    name: "M2274 (V171) Download made on this phone",
+    file: "report.js",
+    from: "      if (cloudJob) { _reportCloudMade(cloudJob, session); return; }",
+    to:   "      if (false) { _reportCloudMade(cloudJob, session); return; }",
+    why:  "made in the cloud (112d)",
+  },
+  {
+    name: "M2275 (V171) Produce report shown to a team's Engineer",
+    file: "render-review.js",
+    from: "          ${(state.reportSettings.enabled && !(typeof businessCertHidden === 'function' && businessCertHidden(sess))) ? `<button",
+    to:   "          ${(state.reportSettings.enabled) ? `<button",
+    why:  "7B (112e)",
+  },
+  {
+    name: "M2276 (V171) no Finish & lock",
+    file: "render-review.js",
+    from: "  if (!team) return '';\n  if (sess.locked)",
+    to:   "  return '';\n  if (sess.locked)",
+    why:  "8A (112e)",
+  },
+  {
+    name: "M2277 (V171) the Reports button for an all-Engineer phone",
+    file: "render-core.js",
+    from: "        ${(state.reportSettings.enabled && !(typeof businessReportsHidden === 'function' && businessReportsHidden())) ?",
+    to:   "        ${(state.reportSettings.enabled) ?",
+    why:  "7B: no Reports (112e)",
+  },
+  {
+    name: "M2278 (V171) businessReportsHidden true with a business of one's own",
+    file: "business.js",
+    from: "  return list.length > 0 && list.every(b => b && b.role === 'engineer' && b.n > 1);",
+    to:   "  return list.length > 0 && list.some(b => b && b.role === 'engineer' && b.n > 1);",
+    why:  "with a business of their own: Reports stays (112e)",
+  },
+  {
+    name: "M2279 (V171) the Reports list keeps the team's jobs",
+    file: "render-review.js",
+    from: "    const mine = sorted.filter(s => !(typeof businessCertHidden === 'function' && businessCertHidden(s)));",
+    to:   "    const mine = sorted;",
+    why:  "7B: off the Reports list (112e)",
+  },
+  {
+    name: "M2280 (V171) Finish & lock with no confirm",
+    file: "session.js",
+    from: "    onConfirm: () => lockJobFinish(id),\n  });",
+    to:   "  });\n  lockJobFinish(id);",
+    why:  "a confirm first (112e)",
+  },
+  {
+    name: "M2281 (V171) Finish & lock doesn't copy the tester",
+    file: "session.js",
+    from: "  if (typeof testerFreeze === 'function') testerFreeze(s, s.lockedAt);   // V170 (6A)\n  if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(s);\n  save();\n  showToast('Job locked",
+    to:   "  if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(s);\n  save();\n  showToast('Job locked",
+    why:  "the tester copied in (112e)",
+  },
+  {
+    name: "M2282 (V171) Finish & lock not saved",
+    file: "session.js",
+    from: "  if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(s);\n  save();\n  showToast('Job locked — the office",
+    to:   "  if (typeof _invalidateSessionEncoding === 'function') _invalidateSessionEncoding(s);\n  showToast('Job locked — the office",
+    why:  "saved, which syncs it (112e)",
+  },
+  {
+    name: "M2283 (V171) Finish & lock relocks a locked job",
+    file: "session.js",
+    from: "  if (!s || s.locked) return false;\n  s.locked = true;",
+    to:   "  if (!s) return false;\n  s.locked = true;",
+    why:  "a locked job: nothing (112e)",
+  },
+  {
+    name: "M2284 (V171) the not-exported reminder for a team's job",
+    file: "session.js",
+    from: "  if (typeof businessCertHidden === 'function' && businessCertHidden(sess)) return false;\n",
+    to:   "",
+    why:  "7B: not theirs (112e)",
+  },
+  {
+    name: "M2285 (V171) the unlocked reminder can be switched off in a team",
+    file: "session.js",
+    from: "  return { at: (at === 'off' && team) ? UNLOCKED_TEAM_DEFAULT : at, forced: !!team, own: at };",
+    to:   "  return { at, forced: !!team, own: at };",
+    why:  "8B (112e)",
+  },
+  {
+    name: "M2286 (V171) the forced reminder nags every job",
+    file: "session.js",
+    from: "    && (!teamOnly || (typeof businessCertHidden === 'function' && businessCertHidden(s))));",
+    to:   "    );",
+    why:  "their own business's jobs follow their own choice (112e)",
+  },
+  {
+    name: "M2287 (V171) the settings page offers Off in a team",
+    file: "render-settings.js",
+    from: "REMINDER_UNLOCKED_CHOICES.filter(v => v !== 'off')",
+    to:   "REMINDER_UNLOCKED_CHOICES",
+    why:  "no Off (112e)",
+  },
+  {
+    name: "M2288 (V171) the team Engineer reminder hour not 5pm",
+    file: "config.js",
+    from: "const UNLOCKED_TEAM_DEFAULT = '17';",
+    to:   "const UNLOCKED_TEAM_DEFAULT = '20';",
+    why:  "5pm (112e)",
+  },
+  {
+    name: "M2289 (V171) Needs certificate misses a corrected job",
+    file: "settings-actions.js",
+    from: "    if (lockf === 'cert' && !(j.locked === true && (!j.certNo || j.redo))) continue;",
+    to:   "    if (lockf === 'cert' && !(j.locked === true && !j.certNo)) continue;",
+    why:  "6B: corrected since (112f)",
+  },
+  {
+    name: "M2290 (V171) Not locked yet shows locked jobs",
+    file: "settings-actions.js",
+    from: "    if (lockf === 'open' && j.locked === true) continue;\n",
+    to:   "",
+    why:  "8C (112f)",
+  },
+  {
+    name: "M2291 (V171) a second tap doesn't turn a chip off",
+    file: "settings-actions.js",
+    from: "  state.cloudJobs.lockf = (state.cloudJobs.lockf === want) ? '' : want;",
+    to:   "  state.cloudJobs.lockf = want;",
+    why:  "a second tap: off (112f)",
+  },
+  {
+    name: "M2292 (V171) the chips filter Your jobs",
+    file: "settings-actions.js",
+    from: "  const lockf = scope !== 'mine' ? (cj.lockf || '') : '';",
+    to:   "  const lockf = cj.lockf || '';",
+    why:  "Your jobs: no filter (112f)",
+  },
+  {
+    name: "M2293 (V171) the chips drawn on Your jobs",
+    file: "render-review.js",
+    from: "${m.scope !== 'mine' ? renderCloudLockChipsHTML(m.lockf) : ''}",
+    to:   "${renderCloudLockChipsHTML(m.lockf)}",
+    why:  "Your jobs: neither chip (112f)",
+  },
+  {
+    name: "M2294 (V171) the no-signal note gone",
+    file: "render-review.js",
+    from: "  const note = lockf === 'open'\n    ? `<p class=\"muted pm-note cloud-lockf-note\"",
+    to:   "  const note = false\n    ? `<p class=\"muted pm-note cloud-lockf-note\"",
+    why:  "the note about a lock with no signal (112f)",
+  },
+  {
+    name: "M2295 (V171) cert_stamp called with the wrong arguments",
+    file: "sync.js",
+    from: "cert: no || null, made: made === true }))",
+    to:   "cert: no || null, made: true }))",
+    why:  "the app calls it with exactly its arguments (112g)",
+  },
+  {
+    name: "M2296 (V171) the SQL lets an Engineer stamp",
+    file: "supabase/v171-office-certs.sql",
+    from: "  if s.org_id is null or coalesce(public.my_role(s.org_id), '') not in ('owner','team_leader','office') then",
+    to:   "  if s.org_id is null or coalesce(public.my_role(s.org_id), '') not in ('owner','team_leader','office','engineer') then",
+    why:  "roles (112g)",
   },
 ];
 
