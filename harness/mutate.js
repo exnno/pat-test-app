@@ -517,7 +517,7 @@ const MUTATIONS = [
     // ⚠ ANCHORED ON A VALUE THAT ROLLS EVERY RELEASE. Re-point it at the current
     // APP_VERSION each version, or the mutation ABORTS (defence 2) rather than
     // failing loudly. V72 is the first release that had to do this.
-    from: "const APP_VERSION = 'V171';",   // V171: re-pointed.   // V170: re-pointed.   // V169: re-pointed.   // V168: re-pointed.   // V167: re-pointed.   // V166: re-pointed.   // V165: re-pointed.   // V164: re-pointed.   // V163: re-pointed. V162: re-pointed. V161: re-pointed. V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
+    from: "const APP_VERSION = 'V172';",   // V172: re-pointed.   // V171: re-pointed.   // V170: re-pointed.   // V169: re-pointed.   // V168: re-pointed.   // V167: re-pointed.   // V166: re-pointed.   // V165: re-pointed.   // V164: re-pointed.   // V163: re-pointed. V162: re-pointed. V161: re-pointed. V160: re-pointed. V159: re-pointed. V158: re-pointed. V157: re-pointed. V156: re-pointed
     to:   "const APP_VERSION = 'V154';\nconst _FIRST_TYPE = DEFAULT_ITEM_TYPES[0];",
     why:  'the dependency has to stay one way — config.js runs first, so a top-level read of anything in data.js is a ReferenceError at boot for every user. Reading the source cannot tell this from the same read inside a function body; running config.js alone can (09j)',
   },
@@ -640,7 +640,7 @@ const MUTATIONS = [
     // the current oldest each version, same maintenance as M66.
     // V130: 15j dropped from the hint — the inserted entry sits ABOVE the real
     // oldest, so 15j's check still matches; 09w and 79e see it (80e from V141, 81e from V142, 82e from V143, 85e from V146, 86e from V147, 87e from V148, 88e from V149, 89e from V150, 90e from V151, 91e from V152, 92c from V153).
-    from: '        <p><strong>V169</strong> &middot; November 2026</p>',   // V171: V168 rolled off — the oldest is V169 (112g).   // V170: V167 rolled off — the oldest is V168 (111f).   // V169: V166 rolled off — the oldest is V167 (109f).   // V168: V165 rolled off — the oldest is V166 (108f).   // V167: V164 rolled off — the oldest is V165 (106f).   // V166: V163 rolled off — the oldest is V164 (105f).   // V165: V162 rolled off — the oldest is V163 (104f).   // V164: V161 rolled off — the oldest is V162 (103f).   // V163: V160 rolled off — the oldest is V161 (102f). V162: V159 rolled off — the oldest is V160 (101f). V161: V158 rolled off — the oldest is V159 (100f). V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
+    from: '        <p><strong>V170</strong> &middot; November 2026</p>',   // V172: V169 rolled off — the oldest is V170 (114j).   // V171: V168 rolled off — the oldest is V169 (112g).   // V170: V167 rolled off — the oldest is V168 (111f).   // V169: V166 rolled off — the oldest is V167 (109f).   // V168: V165 rolled off — the oldest is V166 (108f).   // V167: V164 rolled off — the oldest is V165 (106f).   // V166: V163 rolled off — the oldest is V164 (105f).   // V165: V162 rolled off — the oldest is V163 (104f).   // V164: V161 rolled off — the oldest is V162 (103f).   // V163: V160 rolled off — the oldest is V161 (102f). V162: V159 rolled off — the oldest is V160 (101f). V161: V158 rolled off — the oldest is V159 (100f). V160: V157 rolled off — the oldest is V158 (99f). V159: V156 rolled off — the oldest is V157 (98f). V158: V155 rolled off — the oldest is V156 (97e). V157: V154 rolled off — the oldest is V155 (96e). V156: V153 rolled off — the oldest is V154 (95e). V155: V152 rolled off — the oldest is V153 (94e).   // V151: V148 rolled off — the oldest is V149. V152: V149 rolled off — the oldest is V150. V153: V150 rolled off — the oldest is V151. V154: V151 rolled off — the oldest is V152
     to:   '        <p><strong>V148</strong> &middot; November 2026</p>\n        <p class="muted">Housekeeping only.</p>\n\n        <p><strong>V149</strong> &middot; November 2026</p>',
     why:  'the rolling 3-version changelog is a standing release rule that nothing enforced before V73. Appending rather than rolling grows the About page unboundedly and is the kind of thing that is only ever noticed months later (09w 95e)',
   },
@@ -3206,8 +3206,8 @@ const MUTATIONS = [
   {
     name: "M436 (V92) the pull's list read downloads the contents again",
     file: "sync.js",
-    from: "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS;",   // V150: + org
-    to:   "const _SYNC_JOB_LIST_COLS = 'id,doc,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS;",
+    from: "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS + ',' + _SYNC_JOB_BIN_PICKS;",   // V172: re-aimed (+ the bin picks).     // V150: + org
+    to:   "const _SYNC_JOB_LIST_COLS = 'id,doc,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS + ',' + _SYNC_JOB_BIN_PICKS;",
     why:  "R17: every push comes straight back down in full — the waste V92 exists to remove (29a, 29e)",
   },
   {
@@ -3334,8 +3334,8 @@ const MUTATIONS = [
   {
     name: "M454 (V93) a light row loses the list's picks",
     file: "sync.js",
-    from: "              else decide({ id: row.id, fp: row.fp, deleted: row.deleted, updated_at: row.updated_at,\n                date: row.date, rt: row.rt, rm: row.rm, rc: row.rc });",
-    to:   "              else decide({ id: row.id, fp: row.fp, deleted: row.deleted, updated_at: row.updated_at });",
+    from: "              else decide({ id: row.id, fp: row.fp, deleted: row.deleted, updated_at: row.updated_at,\n                date: row.date, rt: row.rt, rm: row.rm, rc: row.rc, binBy: row.binBy, binRole: row.binRole });",   // V172: re-aimed (+ binBy / binRole).
+    to:   "              else decide({ id: row.id, fp: row.fp, deleted: row.deleted, updated_at: row.updated_at, binBy: row.binBy, binRole: row.binRole });",
     why:  "the bug 30a found during the build: decide sees no date, so the cursor blocks on every old job (30a)",
   },
   {
@@ -3398,8 +3398,8 @@ const MUTATIONS = [
     name: "M463 (V93) the retest look is never run",
     file: "sync.js",
     // V128: re-aimed — "reads", and the check (chk).
-    from: "const first = reads ? _syncPull(c, uid, st, pulled, chk).then(look) : Promise.resolve();",
-    to:   "const first = reads ? _syncPull(c, uid, st, pulled, chk) : Promise.resolve();",
+    from: "const first = reads ? _syncPull(c, uid, st, pulled, chk).then((x) => { _syncBinNotice(pulled.binned); return x; }).then(look) : Promise.resolve();",   // V172: re-aimed (the notice).
+    to:   "const first = reads ? _syncPull(c, uid, st, pulled, chk).then((x) => { _syncBinNotice(pulled.binned); return x; }) : Promise.resolve();",
     why:  "2A: reminders for old jobs never reach a fresh phone (30c)",
   },
   // M464 (V93: the cloud tab lists jobs already on this phone) RETIRED V164: 2A lists them,
@@ -5248,15 +5248,15 @@ const MUTATIONS = [
   {
     name: "M727 (V107) the cloud delete marks the row deleted but keeps its contents",
     file: "sync.js",
-    from: "        .update({ doc: {}, fp: null, deleted: true, last_modified: now })",
-    to:   "        .update({ fp: null, deleted: true, last_modified: now })",
+    from: "      if (bin) { _syncHeldClear(id); return; }",   // V172: re-aimed — V107's photo-row update is gone: a binned job with unsent work asks a question again (44d).
+    to:   "",
     why:  "the job's contents stay in the database after the engineer was told they were deleted for good — not the row every other delete leaves (44a)",
   },
   {
     name: "M728 (V107) the photos of every chosen job are marked, not only the jobs the cloud took",
     file: "sync.js",
-    from: "    const gone = new Set(done);\n    const mine = photos.filter(p => gone.has(p.s));",
-    to:   "    const gone = new Set(ids);\n    const mine = photos.filter(p => gone.has(p.s));",
+    from: "    const gone = new Set(done);\n    if (gone.size) {",   // V172: re-aimed — every chosen job forgotten here, not only those the cloud took (44f / 44e).
+    to:   "    const gone = new Set(ids);\n    if (gone.size) {",
     why:  "a refused or partial update still sends the photos of jobs that were NOT deleted to the delete ledger: a live job loses its photos (44e, 44f)",
   },
   {
@@ -5269,8 +5269,8 @@ const MUTATIONS = [
   {
     name: "M730 (V107) the job's photos are never put on the delete ledger",
     file: "sync.js",
-    from: "        if (typeof recordTombstone === 'function') recordTombstone('photo', p.id);\n",
-    to:   "",
+    from: "  if (!binned) recordTombstone('session', id);",   // V172: re-aimed — V107's photo ledger is gone: a binned job leaves a session tombstone, so a restore asks (114c).
+    to:   "  recordTombstone('session', id);",
     why:  "the job goes but its photos stay in the cloud — rows and files — using the account's storage for ever, with no job to find them by (44a)",
   },
   {
@@ -5513,8 +5513,8 @@ const MUTATIONS = [
   {
     name: "M765 (V109) no Cloud Storage before the cloud list is read",
     file: "render-review.js",
-    from: "    return `<div class=\"cloud-tab\">${scopeHTML}<div class=\"cloud-head\">${storageBtn}</div>${msg}</div>`;",   // V164: re-aimed (the picker).
-    to:   "    return `<div class=\"cloud-tab\">${scopeHTML}${msg}</div>`;",
+    from: "    return `<div class=\"cloud-tab\">${scopeHTML}<div class=\"cloud-head\">${storageBtn}</div>${msg}${binLine}</div>`;",   // V172: re-aimed (+ the bin line).     // V164: re-aimed (the picker).
+    to:   "    return `<div class=\"cloud-tab\">${scopeHTML}${msg}${binLine}</div>`;",
     why:  "2A: always there \u2014 not only once the list has been read (46a)",
   },
   {
@@ -6124,8 +6124,8 @@ const MUTATIONS = [
     // V147: welcome rolled (one line) — re-aimed at it; 86e pins it.
     // V148: no welcome (nothing to show anyone yet) — V147's sheet stays, so the anchor stays; 87e pins it.
     // V149: welcome rolled (one line) — re-aimed at it; 88e pinned it.
-    from: "<li><strong>Certificates from the office.</strong>",   // V171: welcome rolled (one line) — re-aimed; 112g pins it.   // V170: welcome rolled (one line) — re-aimed; 111f pins it.   // V169: welcome rolled (one line) — re-aimed; 109f pins it.   // V168: welcome rolled (one line) — re-aimed; 108f pins it.   // V167: welcome rolled (one line) — re-aimed; 106f pins it.   // V166: welcome rolled (one line) — re-aimed; 105f pins it.   // V165: welcome rolled (one line) — re-aimed; 104f pins it.   // V164: welcome rolled (one line) — re-aimed; 103f pins it.   // V163: welcome rolled (two lines) — re-aimed at the first; 102f pins it. V157: welcome rolled (two lines) — re-aimed at the first; 96e pins it.   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
-    to:   "<li><strong>Better.</strong>",
+    from: "<li><strong>Recently deleted.</strong>",   // V172: welcome rolled (one line) — re-aimed; 114j pins it.     // V171: welcome rolled (one line) — re-aimed; 112g pins it.   // V170: welcome rolled (one line) — re-aimed; 111f pins it.   // V169: welcome rolled (one line) — re-aimed; 109f pins it.   // V168: welcome rolled (one line) — re-aimed; 108f pins it.   // V167: welcome rolled (one line) — re-aimed; 106f pins it.   // V166: welcome rolled (one line) — re-aimed; 105f pins it.   // V165: welcome rolled (one line) — re-aimed; 104f pins it.   // V164: welcome rolled (one line) — re-aimed; 103f pins it.   // V163: welcome rolled (two lines) — re-aimed at the first; 102f pins it. V157: welcome rolled (two lines) — re-aimed at the first; 96e pins it.   // V156: welcome rolled (two lines) — re-aimed at the first; 95e pins it.   // V155: welcome rolled (two lines) — re-aimed at the first; 94e pins it.   // V150: welcome rolled (one line) — re-aimed at it; 89e pins it. V151: no welcome — 90e pins it. V152: no welcome — 91e pins it. V153: no welcome — 92c pins it.
+    to:   "<li hidden><strong>Recently deleted.</strong>",
     why:  "11A: the welcome says plainly what changed on screen (112g)",
   },
   {
@@ -8619,8 +8619,8 @@ const MUTATIONS = [
     file: "config.js",
     // V133: What's new not rolled (6A) — still V132's, so the anchor stays.
     // V134: rolled to V134 — re-aimed. V135: rolled to V135 — re-aimed. V136: rolled — re-aimed. V137: re-aimed. V138: re-aimed. V139: re-aimed. V140: re-aimed. V141: re-aimed. V142: re-aimed. V143: re-aimed. V144: re-aimed.
-    from: "const WELCOME_VERSION = 'V171';",   // V171: re-aimed.   // V170: re-aimed.   // V169: re-aimed.   // V168: re-aimed.   // V167: re-aimed.   // V166: re-aimed.   // V165: re-aimed.   // V164: re-aimed.   // V163: re-aimed. V157: re-aimed. V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
-    to:   "const WELCOME_VERSION = 'V170';",
+    from: "const WELCOME_VERSION = 'V172';",   // V172: re-aimed.     // V171: re-aimed.   // V170: re-aimed.   // V169: re-aimed.   // V168: re-aimed.   // V167: re-aimed.   // V166: re-aimed.   // V165: re-aimed.   // V164: re-aimed.   // V163: re-aimed. V157: re-aimed. V156: re-aimed. V155: re-aimed.   // V145: re-aimed. V146: re-aimed. V147: re-aimed. V148: no welcome — anchor stays. V149: re-aimed. V150: re-aimed.
+    to:   "const WELCOME_VERSION = 'V171';",
     why:  "What's new is rolled on a feature release (96e)",
   },
   {
@@ -8635,8 +8635,8 @@ const MUTATIONS = [
     // V149: one line — re-aimed at its end.
     // V150: one line — re-aimed at its end.
     // V155: two lines — re-aimed at the second's end; still caught by the count.
-    from: "Working on your own? Nothing changes.</li>\n",   // V170: one line — re-aimed at its end; 111f counts one.   // V169: one line — re-aimed at its end; 109f counts one.   // V168: one line — re-aimed at its end; 108f counts one.   // V167: one line — re-aimed at its end; 106f counts one.   // V166: one line — re-aimed at its end; 105f counts one.   // V165: one line — re-aimed at its end; 104f counts one.   // V164: one line — re-aimed at its end; 103f counts one.   // V163: two lines — re-aimed at the second's end. V157: two lines — re-aimed at the second's end; still caught by the count. V156: two lines — re-aimed at the second's end; still caught by the count.
-    to:   "Working on your own? Nothing changes.</li>\n        <li><strong>More.</strong> And more.</li>\n",
+    from: "then Delete this job.</li>\n",   // V172: one line — re-aimed at its end; 114j counts one.     // V170: one line — re-aimed at its end; 111f counts one.   // V169: one line — re-aimed at its end; 109f counts one.   // V168: one line — re-aimed at its end; 108f counts one.   // V167: one line — re-aimed at its end; 106f counts one.   // V166: one line — re-aimed at its end; 105f counts one.   // V165: one line — re-aimed at its end; 104f counts one.   // V164: one line — re-aimed at its end; 103f counts one.   // V163: two lines — re-aimed at the second's end. V157: two lines — re-aimed at the second's end; still caught by the count. V156: two lines — re-aimed at the second's end; still caught by the count.
+    to:   "then Delete this job.</li>\n        <li><strong>More.</strong> And more.</li>\n",
     why:  "one line (111f)",
   },
   {
@@ -8651,7 +8651,7 @@ const MUTATIONS = [
     // V145: re-aimed at V145's own (V144's moves to M1259, V143's to M1238).
     // V146: re-aimed at V146's own (V145's moves to M1259, V144's to M1238).
     // V147: re-aimed at V147's own (V146's moves to M1259, V145's to M1238).
-    from: "Certificates from the office: the Owner, a Team leader or the Office",   // V171: at V171's (V168's rolled off).   // V168: at V168's (V167's moves to M1259, V166's to M1238).   // V165: at V165's (V164's moves to M1259, V163's to M1238).   // V164: at V164's (V163's moves to M1259, V162's to M1238).   // V161: at V161's (V160's moves to M1259, V159's to M1238). V160: at V160's (V159's moves to M1259, V158's to M1238). V159: at V159's (V158's moves to M1259, V157's to M1238). V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
+    from: "Recently deleted: a job deleted from the cloud waits there for 30 days",   // V172: at V172's (V169's rolled off).     // V171: at V171's (V168's rolled off).   // V168: at V168's (V167's moves to M1259, V166's to M1238).   // V165: at V165's (V164's moves to M1259, V163's to M1238).   // V164: at V164's (V163's moves to M1259, V162's to M1238).   // V161: at V161's (V160's moves to M1259, V159's to M1238). V160: at V160's (V159's moves to M1259, V158's to M1238). V159: at V159's (V158's moves to M1259, V157's to M1238). V158: at V158's (V157's moves to M1259, V156's to M1238). V157: at V157's (V156's moves to M1259, V155's to M1238). V156: at V156's (V155's moves to M1259, V154's to M1238). V155: at V155's.
     to:   "Better",
     why:  "the About page must say what changed in this version (112g)",   // V154: at V154's. V147: re-aimed at V147's line. V148: at V148's. V149: at V149's. V150: at V150's. V151: at V151's (M1238 carried it). V152: at V152's. V153: at V153's
   },
@@ -8768,7 +8768,7 @@ const MUTATIONS = [
     // V145: V142's line rolled off — re-aimed at V143's, the oldest now.
     // V146: V143's line rolled off — re-aimed at V144's, the oldest now.
     // V147: V144's line rolled off — re-aimed at V145's, the oldest now.
-    from: "        <p class=\"muted\">Team seats: each Engineer or Team leader is &pound;3 a month",   // V171: V168's rolled off — re-aimed at V169's, the oldest now (112g).   // V170: V167's rolled off — re-aimed at V168's, the oldest now (111f).   // V169: V166's rolled off — re-aimed at V167's, the oldest now (109f).   // V168: V165's rolled off — re-aimed at V166's, the oldest now (108f).   // V167: V164's rolled off — re-aimed at V165's, the oldest now (106f).   // V166: V163's rolled off — re-aimed at V164's, the oldest now (105f).   // V165: V162's rolled off — re-aimed at V163's, the oldest now (102f).   // V164: V161's rolled off — re-aimed at V162's, the oldest now (101f).   // V163: V160's rolled off — re-aimed at V161's, the oldest now (100f). V162: V159's rolled off — re-aimed at V160's, the oldest now (99f). V161: V158's rolled off — re-aimed at V159's, the oldest now (98f). V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
+    from: "        <p class=\"muted\">The business&rsquo;s certificate: in a business with more than one person",   // V172: V169's rolled off — re-aimed at V170's, the oldest now (114j).     // V171: V168's rolled off — re-aimed at V169's, the oldest now (112g).   // V170: V167's rolled off — re-aimed at V168's, the oldest now (111f).   // V169: V166's rolled off — re-aimed at V167's, the oldest now (109f).   // V168: V165's rolled off — re-aimed at V166's, the oldest now (108f).   // V167: V164's rolled off — re-aimed at V165's, the oldest now (106f).   // V166: V163's rolled off — re-aimed at V164's, the oldest now (105f).   // V165: V162's rolled off — re-aimed at V163's, the oldest now (102f).   // V164: V161's rolled off — re-aimed at V162's, the oldest now (101f).   // V163: V160's rolled off — re-aimed at V161's, the oldest now (100f). V162: V159's rolled off — re-aimed at V160's, the oldest now (99f). V161: V158's rolled off — re-aimed at V159's, the oldest now (98f). V160: V157's rolled off — re-aimed at V158's, the oldest now (97d). V159: V156's rolled off — re-aimed at V157's, the oldest now (98f). V158: V155's rolled off — re-aimed at V156's, the oldest now (97e). V157: V154's rolled off — re-aimed at V155's, the oldest now (96e). V156: V153's rolled off — re-aimed at V154's, the oldest now (95e). V155: V152's rolled off — re-aimed at V153's, the oldest now (94e).   // V154: V151's rolled off — re-aimed at V152's, the oldest now (94e). V151: V148's line rolled off — re-aimed at V151's (90e). V152: V149's rolled off — re-aimed at V150's, the oldest now (91e). V153: V150's rolled off — re-aimed at V151's, the oldest now (94e)
     to:   "Better",
     why:  "the About page keeps the last three versions' lines (112g)",   // V147: re-aimed at V145's, the oldest now. V148: at V146's. V149: at V147's. V150: at V148's, the oldest now
   },
@@ -8930,7 +8930,7 @@ const MUTATIONS = [
     // V145: re-aimed at V144's, still in the window.
     // V146: re-aimed at V145's, still in the window (V144's is the oldest: M1238).
     // V147: re-aimed at V146's, still in the window (V145's is the oldest: M1238).
-    from: "Team seats: each Engineer or Team leader is &pound;3 a month",   // V170: at V169's, still in the window (109f).   // V168: at V167's, still in the window (106f).   // V167: at V166's, still in the window (105f).   // V165: at V164's, still in the window (103f).   // V164: at V163's, still in the window (102f).   // V163: at V162's, still in the window (101f). V161: at V160's, still in the window (99f). V160: at V159's, still in the window (98f). V159: at V158's, still in the window. V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
+    from: "Certificates from the office: the Owner, a Team leader or the Office",   // V172: at V171's, still in the window (112g).     // V170: at V169's, still in the window (109f).   // V168: at V167's, still in the window (106f).   // V167: at V166's, still in the window (105f).   // V165: at V164's, still in the window (103f).   // V164: at V163's, still in the window (102f).   // V163: at V162's, still in the window (101f). V161: at V160's, still in the window (99f). V160: at V159's, still in the window (98f). V159: at V158's, still in the window. V158: at V157's, still in the window. V157: at V156's, still in the window. V156: at V155's, still in the window. V155: at V154's.
     to:   "Better",
     why:  "the About page keeps the last three versions' lines (109f)",   // V147: re-aimed at V146's. V148: at V147's. V149: at V148's. V150: at V149's, still in the window. V152: at V151's, still in the window. V153: at V152's, still in the window
   },
@@ -9059,8 +9059,8 @@ const MUTATIONS = [
     name: "M1277 (V134.1; re-aimed V135) the cache key isn't bumped",
     file: "sw.js",
     // V135: re-aimed at pat-v135 (73f's release checks moved to 74f). V136: pat-v136 (→ 75f). V137: pat-v137 (→ 76f). V138: pat-v138 (→ 77e). V139: pat-v139 (→ 78e). V140: pat-v140 (→ 79e). V141: pat-v141 (→ 80e). V142: pat-v142 (→ 81e). V143: pat-v143 (→ 82e). V144: pat-v144 (→ 84e).
-    from: "const CACHE_VERSION = 'pat-v171-1';",   // V171.1: re-aimed (→ 113c).   // V171: re-aimed (→ 112g).   // V170: re-aimed (→ 111f).   // V169.2: re-aimed. V169.1: re-aimed (→ 110d). V169: re-aimed (→ 109f).   // V168: re-aimed (→ 108f).   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
-    to:   "const CACHE_VERSION = 'pat-v171';",
+    from: "const CACHE_VERSION = 'pat-v172';",   // V172: re-aimed (→ 114j).     // V171.1: re-aimed (→ 113c).   // V171: re-aimed (→ 112g).   // V170: re-aimed (→ 111f).   // V169.2: re-aimed. V169.1: re-aimed (→ 110d). V169: re-aimed (→ 109f).   // V168: re-aimed (→ 108f).   // V167.1: re-aimed (→ 106f 107d).   // V167: re-aimed (→ 106f).   // V166: re-aimed (→ 105f).   // V165: re-aimed (→ 104f).   // V164: re-aimed (→ 103f).   // V163: re-aimed (→ 102f). V162: re-aimed (→ 101f). V161: re-aimed (→ 100f). V160: re-aimed (→ 99f). V159: re-aimed (→ 98f). V158: re-aimed (→ 97e). V157: re-aimed (→ 96e). V156: re-aimed (→ 95e). V155: re-aimed (→ 94e).   // V145: re-aimed (→ 84e). V146: re-aimed (→ 85e). V147: re-aimed (→ 86e). V148: re-aimed (→ 87e). V149: re-aimed (→ 88e). V150: re-aimed (→ 89e). V151: re-aimed (→ 90e). V152: re-aimed (→ 91e) — main carried a hand-made 'pat-v151.1' between them. V153: re-aimed (→ 92c).
+    to:   "const CACHE_VERSION = 'pat-v171-1';",
     why:  "a release needs its cache bump or phones never get it (113c)",
   },
   // ---- V135 (1A–10A, all defaults): Tutorials, part 2 — the Settings tutorials. Group 74 + M1278–M1294. ----
@@ -12051,8 +12051,8 @@ const MUTATIONS = [
   {
     name: "M1701 (V150) the job list doesn't read the business column",
     file: "sync.js",
-    from: "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS;",
-    to:   "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,' + _SYNC_JOB_PICKS;",
+    from: "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS + ',' + _SYNC_JOB_BIN_PICKS;",   // V172: re-aimed (+ the bin picks).
+    to:   "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,' + _SYNC_JOB_PICKS + ',' + _SYNC_JOB_BIN_PICKS;",
     why:  "3A: an approved move never reaches the phone (89d 50d)",
   },
   {
@@ -16286,6 +16286,330 @@ const MUTATIONS = [
     from: "      where r.user_id = holder and r.kind = 'instrument' and r.id = iid and not r.deleted;\n    if inst is not null then src := 'instrument'",
     to:   "      where r.kind = 'instrument' and r.id = iid and not r.deleted;\n    if inst is not null then src := 'instrument'",
     why:  "V171.1 (113c)",
+  },
+
+  // ---- V172 (R83): Recently deleted; the Owner deletes a business job. Group 114 + M2305–M2350. ----
+  {
+    name: "M2305 (V172) the marker's who never read",
+    file: "sync.js",
+    from: "  if (!by) return null;\n  const role",
+    to:   "  if (true) return null;\n  const role",
+    why:  "V172 — O-e / O-g: a binned job treated as an ordinary delete (114a)",
+  },
+  {
+    name: "M2306 (V172) the light row's who ignored",
+    file: "sync.js",
+    from: "  const by = (typeof row.binBy === 'string' && row.binBy) ? row.binBy : (d && typeof d.binnedBy === 'string' ? d.binnedBy : '');",
+    to:   "  const by = (d && typeof d.binnedBy === 'string' ? d.binnedBy : '');",
+    why:  "V172 — the list row carries who, not a doc (114a)",
+  },
+  {
+    name: "M2307 (V172) a binned job leaves a gone mark",
+    file: "sync.js",
+    from: "        } else {\n          st.gone[id] = true;\n          out.removed++;\n        }",
+    to:   "        }\n        st.gone[id] = true;\n        if (!bin) out.removed++;",
+    why:  "V172 — st.gone would delete the kept photo files (114a)",
+  },
+  {
+    name: "M2308 (V172) a binned job removed unnamed",
+    file: "sync.js",
+    from: "          if (Array.isArray(out.binned)) out.binned.push({ id, name, by: bin.by, role: bin.role });",
+    to:   "",
+    why:  "V172 — O-e: the engineer told (114a)",
+  },
+  {
+    name: "M2309 (V172) the engineer never told",
+    file: "sync.js",
+    from: ".then((x) => { _syncBinNotice(pulled.binned); return x; }).then(look)",
+    to:   ".then(look)",
+    why:  "V172 — O-e (114a)",
+  },
+  {
+    name: "M2310 (V172) the Sync line says nothing of it",
+    file: "sync.js",
+    from: "  if (nb) bits.push((bits.length ? 'removed ' : 'Removed ') + plural(nb, 'job', 'jobs') + ' ' + syncBinByText(p.binned));",
+    to:   "",
+    why:  "V172 — O-e: the Sync page (114a)",
+  },
+  {
+    name: "M2311 (V172) two people named twice",
+    file: "sync.js",
+    from: "    if (seen.indexOf(w) === -1) seen.push(w);",
+    to:   "    seen.push(w);",
+    why:  "V172 — 114a",
+  },
+  {
+    name: "M2312 (V172) the role left out of who",
+    file: "sync.js",
+    from: "    const w = String((b && b.by) || 'someone') + (r ? ` (${r})` : '');",
+    to:   "    const w = String((b && b.by) || 'someone');",
+    why:  "V172 — O-e: who and their role (114a)",
+  },
+  {
+    name: "M2313 (V172) the delete sent for the wrong account",
+    file: "sync.js",
+    from: "        return c.rpc('bin_job', { holder: uid, job: id, org: null }).then((r) => {",
+    to:   "        return c.rpc('bin_job', { holder: null, job: id, org: null }).then((r) => {",
+    why:  "V172 — 8A: your own (44a 114h)",
+  },
+  {
+    name: "M2314 (V172) a job already gone not counted",
+    file: "sync.js",
+    from: "          if (code === 'gone') { res.missing++; return; }",
+    to:   "          if (code === 'gone') { return; }",
+    why:  "V172 — 44f",
+  },
+  {
+    name: "M2315 (V172) no V172 SQL not named",
+    file: "sync.js",
+    from: "          if (_syncBinNeedsUpdate(e)) { res.needsUpdate = true; res.error = SYNC_BIN_UPDATE_WORDS; failed = true; return; }",
+    to:   "",
+    why:  "V172 — never the old way, and said (114f)",
+  },
+  {
+    name: "M2316 (V172) a refused delete says ok",
+    file: "sync.js",
+    from: "      res.ok = !failed;",
+    to:   "      res.ok = true;",
+    why:  "V172 — 44e",
+  },
+  {
+    name: "M2317 (V172) this phone's copies of the photos never swept",
+    file: "sync.js",
+    from: "    if (gone.size && typeof photosDeleteForSessions === 'function') {\n      try { sweep = Promise.resolve(photosDeleteForSessions(Array.from(gone)));",
+    to:   "    if (false) {\n      try { sweep = Promise.resolve(photosDeleteForSessions(Array.from(gone)));",
+    why:  "V172 — 44h",
+  },
+  {
+    name: "M2318 (V172) syncBinJob sends any holder",
+    file: "sync.js",
+    from: "  if (!_SYNC_UUID_RE.test(u) || typeof safeId !== 'function' || !safeId(sid) || (o && !_SYNC_UUID_RE.test(o))) {\n    res.code = 'bad'; return Promise.resolve(res);\n  }\n  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }\n  return syncDataClient()\n    .then((c) => c.rpc('bin_job'",
+    to:   "  if (typeof safeId !== 'function' || !safeId(sid) || (o && !_SYNC_UUID_RE.test(o))) {\n    res.code = 'bad'; return Promise.resolve(res);\n  }\n  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }\n  return syncDataClient()\n    .then((c) => c.rpc('bin_job'",
+    why:  "V172 — 114f",
+  },
+  {
+    name: "M2319 (V172) the business looked at not sent",
+    file: "sync.js",
+    from: "    .then((c) => c.rpc('bin_job', { holder: u, job: sid, org: o || null }))",
+    to:   "    .then((c) => c.rpc('bin_job', { holder: u, job: sid, org: null }))",
+    why:  "V172 — patgo_bin_moved needs it (114d)",
+  },
+  {
+    name: "M2320 (V172) an odd list row kept",
+    file: "sync.js",
+    from: "  if (!Number.isSafeInteger(n) || n <= 0 || !_SYNC_UUID_RE.test(String(x.user_id || ''))\n      || typeof safeId !== 'function' || !safeId(id)) return null;",
+    to:   "  if (!Number.isSafeInteger(n) || n <= 0) return null;",
+    why:  "V172 — 114f",
+  },
+  {
+    name: "M2321 (V172) the refusal codes not read",
+    file: "sync.js",
+    from: "const SYNC_BIN_CODES = ['signed_out', 'bad', 'gone', 'moved', 'not_allowed'];",
+    to:   "const SYNC_BIN_CODES = ['signed_out', 'bad'];",
+    why:  "V172 — each refusal said (114d 114e)",
+  },
+  {
+    name: "M2322 (V172) no V172 SQL never recognised",
+    file: "sync.js",
+    from: "  if ((e.code === 'PGRST202' || e.code === '42883') && !/patgo_/.test(msg)) return true;\n  return /Could not find the function|does not exist/i.test(msg) && /bin_(job|list|restore|forget)/.test(msg);",
+    to:   "  return false;",
+    why:  "V172 — 114d 114e",
+  },
+  {
+    name: "M2323 (V172) a restore not followed by a read",
+    file: "sync.js",
+    from: "    if (res.ok) { try { syncPush({ pull: true }); } catch (e) { /* the next trigger reads it */ } }",
+    to:   "",
+    why:  "V172 — O-g: your own comes back at once (114e)",
+  },
+  {
+    name: "M2324 (V172) the entry sent under the wrong name",
+    file: "sync.js",
+    from: "    .then((c) => c.rpc(fn, { entry: k }))",
+    to:   "    .then((c) => c.rpc(fn, { n: k }))",
+    why:  "V172 — 114e 114h",
+  },
+  {
+    name: "M2325 (V172) a Team leader or the Office may delete others' jobs",
+    file: "settings-actions.js",
+    from: "  return (b && b.role === 'owner') ? { show: true, can: true, own: false, why: '' } : no;",
+    to:   "  return (b && CLOUD_SCOPE_ROLES.includes(b.role)) ? { show: true, can: true, own: false, why: '' } : no;",
+    why:  "V172 — 2C / V173: the Owner only, for now (114d)",
+  },
+  {
+    name: "M2326 (V172) a job on this phone deleted from the look",
+    file: "settings-actions.js",
+    from: "    if (look.row.onPhone) return { show: true, can: false, own: true, why: 'It’s on this phone — delete it from the phone tab.' };",
+    to:   "    if (look.row.onPhone) return { show: true, can: true, own: true, why: '' };",
+    why:  "V172 — 114d",
+  },
+  {
+    name: "M2327 (V172) an Engineer in a team deletes their team job",
+    file: "settings-actions.js",
+    from: "    if (CLOUD_SCOPE_ROLES.includes(b.role) || !(Number(b.n) >= 2)) return { show: true, can: true, own: true, why: '' };",
+    to:   "    return { show: true, can: true, own: true, why: '' };",
+    why:  "V172 — the cloud's delete rule (114d)",
+  },
+  {
+    name: "M2328 (V172) the action doesn't check who may",
+    file: "settings-actions.js",
+    from: "  if (!bs.can) { if (bs.why) showToast(bs.why); return; }",
+    to:   "",
+    why:  "V172 — 114d",
+  },
+  {
+    name: "M2329 (V172) a locked job needs no word",
+    file: "settings-actions.js",
+    from: "    certs: certNo ? [certNo] : [], certJobs: (certNo || locked) ? 1 : 0, needWord: 1 >= at || !!(certNo || locked),",
+    to:   "    certs: certNo ? [certNo] : [], certJobs: (certNo || locked) ? 1 : 0, needWord: false,",
+    why:  "V172 — V107 4B (114d)",
+  },
+  {
+    name: "M2330 (V172) an unlocked job not warned",
+    file: "settings-actions.js",
+    from: "    open: !locked, who, own: !!r.mine };",
+    to:   "    open: false, who, own: !!r.mine };",
+    why:  "V172 — 3B (114d)",
+  },
+  {
+    name: "M2331 (V172) the deleted job stays in the business list",
+    file: "settings-actions.js",
+    from: "    if (cj.biz) cj.biz.jobs = (cj.biz.jobs || []).filter(j => !(String(j.id) === sid && String(j.user) === String(user)));",
+    to:   "",
+    why:  "V172 — 114d",
+  },
+  {
+    name: "M2332 (V172) the count never read with the list",
+    file: "settings-actions.js",
+    from: "  binCountLoad(!!force);   // V172: Recently deleted's count, with the list",
+    to:   "",
+    why:  "V172 — 114e",
+  },
+  {
+    name: "M2333 (V172) the links shown with no V172 SQL",
+    file: "settings-actions.js",
+    from: "  if (!bc || bc.missing) return { show: !(bc && bc.missing), n: null };",
+    to:   "  if (!bc || bc.missing) return { show: true, n: null };",
+    why:  "V172 — 114e",
+  },
+  {
+    name: "M2334 (V172) Delete now without asking",
+    file: "settings-actions.js",
+    from: "    onConfirm: () => binForget(row.n),\n  });\n}",
+    to:   "    onConfirm: () => binForget(row.n),\n  });\n  binForget(row.n);\n}",
+    why:  "V172 — 11A: asked first (114e)",
+  },
+  {
+    name: "M2335 (V172) a job already gone stays listed",
+    file: "settings-actions.js",
+    from: "  if (res.ok || res.code === 'gone') {\n    bl.rows = (bl.rows || []).filter(r => r.n !== row.n);",
+    to:   "  if (res.ok) {\n    bl.rows = (bl.rows || []).filter(r => r.n !== row.n);",
+    why:  "V172 — 114e",
+  },
+  {
+    name: "M2336 (V172) days left rounded down",
+    file: "settings-actions.js",
+    from: "  return Math.max(0, Math.ceil(ms / 86400000));",
+    to:   "  return Math.max(0, Math.floor(ms / 86400000));",
+    why:  "V172 — 114e",
+  },
+  {
+    name: "M2337 (V172) Back goes to Settings, not where it came from",
+    file: "settings-actions.js",
+    from: "  setView(bl.ret || 'settingsStorage');",
+    to:   "  setView('settingsStorage');",
+    why:  "V172 — 114e",
+  },
+  {
+    name: "M2338 (V172) no Delete on the look",
+    file: "render-review.js",
+    from: "  if (!bs.show || !bs.can) return '';\n  const open = look && look.doc",
+    to:   "  if (true) return '';\n  const open = look && look.doc",
+    why:  "V172 — 7A (114d)",
+  },
+  {
+    name: "M2339 (V172) the engineer not named on the sheet",
+    file: "render-review.js",
+    from: "      (j.who ? `<br><span class=\"cloud-del-who\">Engineer: ${escapeHTML(j.who)}</span>` : '') +   // V172 (6A)",
+    to:   "",
+    why:  "V172 — 6A (114d)",
+  },
+  {
+    name: "M2340 (V172) the Delete tap goes nowhere",
+    file: "render-review.js",
+    from: "    else if (act === 'bin' && typeof cloudLookDelete === 'function') cloudLookDelete();   // V172",
+    to:   "",
+    why:  "V172 — 114d",
+  },
+  {
+    name: "M2341 (V172) the line shown on the Cloud tab with nothing in it",
+    file: "render-review.js",
+    from: "  if (where === 'tab' && !(f.n > 0)) return `<span id=\"bin-line\" data-where=\"tab\" hidden></span>`;",
+    to:   "",
+    why:  "V172 — no clutter (114e)",
+  },
+  {
+    name: "M2342 (V172) a name not escaped on the page",
+    file: "render-review.js",
+    from: "          <div class=\"session-title cloud-title\"><span class=\"cloud-title-text\">${escapeHTML(r.title)}</span></div>",
+    to:   "          <div class=\"session-title cloud-title\"><span class=\"cloud-title-text\">${r.title}</span></div>",
+    why:  "V172 — 114e",
+  },
+  {
+    name: "M2343 (V172) who deleted it not said",
+    file: "render-review.js",
+    from: "          <div class=\"session-meta bin-by\">Deleted by ${by}",
+    to:   "          <div class=\"session-meta bin-by\">Deleted",
+    why:  "V172 — 114e",
+  },
+  {
+    name: "M2344 (V172) the files deleted all at once",
+    file: "supabase/functions/bin-files/index.js",
+    from: "      for (let i = 0; i < paths.length; i += 100) await removeFiles(deps, paths.slice(i, i + 100));",
+    to:   "      await removeFiles(deps, paths);",
+    why:  "V172 — 114g",
+  },
+  {
+    name: "M2345 (V172) a failed delete marked done",
+    file: "supabase/functions/bin-files/index.js",
+    from: "    try {\n      for (let i = 0; i < paths.length;",
+    to:   "    done.push(d.n);\n    try {\n      for (let i = 0; i < paths.length;",
+    why:  "V172 — 114g",
+  },
+  {
+    name: "M2346 (V172) the SQL lets a Team leader delete others' jobs",
+    file: "supabase/v172-recently-deleted.sql",
+    from: "  elsif s.org_id is null or coalesce(public.my_role(s.org_id), '') <> 'owner' then",
+    to:   "  elsif s.org_id is null or coalesce(public.my_role(s.org_id), '') not in ('owner','team_leader','office') then",
+    why:  "V172 — PGlite S2 (114h)",
+  },
+  {
+    name: "M2347 (V172) the SQL lets a Team leader restore",
+    file: "supabase/v172-recently-deleted.sql",
+    from: "  select coalesce(public.my_role(o) = 'owner', false)",
+    to:   "  select coalesce(public.my_role(o) in ('owner','team_leader'), false)",
+    why:  "V172 — PGlite S9 (114h)",
+  },
+  {
+    name: "M2348 (V172) the SQL lets a push revive it",
+    file: "supabase/v172-recently-deleted.sql",
+    from: "  if old.deleted and not new.deleted and public._bin_live(old.user_id, old.id) then",
+    to:   "  if false then",
+    why:  "V172 — PGlite S5 (114h)",
+  },
+  {
+    name: "M2349 (V172) the SQL lets its files be deleted",
+    file: "supabase/v172-recently-deleted.sql",
+    from: "  using (bucket_id <> 'photos' or not (select public.photo_file_binned(name)));",
+    to:   "  using (true);",
+    why:  "V172 — PGlite S10 (114h)",
+  },
+  {
+    name: "M2350 (V172) the SQL keeps them for ever",
+    file: "supabase/v172-recently-deleted.sql",
+    from: "select cron.schedule('patgo-bin', '23 * * * *', 'select public.bin_purge()');",
+    to:   "",
+    why:  "V172 — PGlite S11 (114h)",
   },
 ];
 
