@@ -98,7 +98,18 @@ function fakeServer() {
   const files = new Map();
   let stampN = 0;
   const stamp = () => { stampN++; return '2026-10-09T11:' + String(Math.floor(stampN / 60) % 60).padStart(2, '0') + ':' + String(stampN % 60).padStart(2, '0') + '.' + String(stampN).padStart(3, '0') + 'Z'; };
-  const srv = { calls, tables, files, stamp, failPatch: 0, onCall: null, noV108: false };
+  const srv = { calls, tables, files, stamp, failPatch: 0, onCall: null, noV108: false, bins: [] };
+  // V172: supabase bin_job (44's, the same) — the delete goes to Recently deleted.
+  srv.binJob = (b) => {
+    const row = tables.sessions.find(r => r.user_id === b.holder && String(r.id) === String(b.job));
+    if (!row || row.deleted) return json({ code: 'P0001', message: 'patgo_bin_gone', details: null, hint: null }, 400);
+    const ph = tables.photos.filter(x => x.user_id === b.holder && String(x.session_id) === String(b.job) && !x.deleted);
+    srv.bins.push({ id: String(b.job), doc: row.doc, photos: ph.map(x => x.id) });
+    const st = stamp();
+    for (const x of ph) { x.deleted = true; x.updated_at = st; }
+    Object.assign(row, { deleted: true, fp: null, doc: { binnedAt: st, binnedBy: 'Peter', binnedRole: 'owner' }, updated_at: st });
+    return json({ photos: ph.length, at: st });
+  };
   const guard = (old, row) => {
     const merged = Object.assign({}, old || {}, row);
     if (old && JSON.stringify(old.doc) !== JSON.stringify(merged.doc) && !('fp' in row)) merged.fp = null;
@@ -143,6 +154,7 @@ function fakeServer() {
         || (u.includes('/rest/v1/session_photo_counts') && /select=[^&]*,b(,|&|$)/.test(decodeURIComponent(u))))) {
       return json({ code: '42703', message: 'column sessions.doc_bytes does not exist', details: null, hint: null }, 400);
     }
+    if (u.includes('/rest/v1/rpc/bin_job')) return srv.binJob(body || {});   // V172
     if (u.includes('/rest/v1/session_photo_counts')) {
       const m = new Map();
       for (const p of tables.photos) if (!p.deleted) {
@@ -505,7 +517,7 @@ module.exports = async function () {
     const sh = sheetHTML(app);
     t.includes(sh, 'Delete from the cloud', 'V107’s review sheet');
     t.includes(sh, 'ZZG1SITE', 'naming the job');
-    t.includes(sh, 'No copy is kept', 'saying no copy is kept');
+    t.includes(sh, 'Recently deleted for 30 days', 'saying it waits in Recently deleted (V172)');
     t.includes(sh, app.fn('icon')('camera') + ' 1', 'with its photo');
     const r0 = reads(app);
     app.doc.getElementById('cloud-del-yes').click();
@@ -519,7 +531,7 @@ module.exports = async function () {
     t.notOk(app.state().cloudStore.top.some(j => j.id === 'ZZG1'), 'it leaves the biggest jobs');
     t.ok(app.fn('cloudStoreModel')().total < totalBefore - 300000, 'the total drops (its photo too)');
     t.notOk(app.state().cloudStore.selecting, 'Select mode ends');
-    t.ok(app.toasts.some(x => /Deleted 1 job from the cloud with 1 photo/.test(x)), 'the toast says what went');
+    t.ok(app.toasts.some(x => /Deleted 1 job — in Recently deleted for 30 days/.test(x)), 'the toast says what went, and where (V172)');
     t.notOk(app.state().cloudJobs.jobs.some(j => j.id === 'ZZG1'), 'the cloud tab’s list loses it without a re-read');
   });
 

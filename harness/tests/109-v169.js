@@ -684,7 +684,7 @@ module.exports = async function () {
   /* ------------------------------------------------------------------ 109f */
   await t.group('109f — V169’s About line; business.js / plan.js name V169 (V170: the release checks → 111f)', () => {
     const help = read('render-help.js');
-    t.includes(help, 'Team seats: each Engineer or Team leader is &pound;3 a month', 'About: V169’s line');
+    t.excludes(help, '<p><strong>V169</strong>', 'V169’s About line rolled off (V172)');
     t.includes(read('business.js'), '// V169 — seat billing (Teams v1; R65 7C; 14 Nov 1A–4A; 18 Nov R80 1A 2A 3A 4B 5A)', 'business.js names V169');
     t.includes(read('plan.js'), '// ---- V169 (3A): monthly ↔ yearly from inside PATGo', 'plan.js names V169');
   });

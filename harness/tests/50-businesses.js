@@ -137,7 +137,8 @@ module.exports = async function () {
     const hits = files.filter(f => code(f).length);
     t.deepEq(hits, ['sync.js'], 'only sync.js mentions org_id outside comments' + (hits.length ? ' — ' + hits.join(', ') : ''));
     t.deepEq(code('sync.js').map(l => l.trim()), [
-      "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS;",
+      // V172: + who deleted a job into Recently deleted (doc fields — no column).
+      "const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS + ',' + _SYNC_JOB_BIN_PICKS;",
       'if (biz) row.org_id = biz;',
       // V164: the business view READS by business (a look, never a write) and the
       // look-only job checks the row is still in that business.
@@ -146,6 +147,8 @@ module.exports = async function () {
       "if (o && String(row.org_id || '') !== o) { res.moved = true; return res; }",
       // V167.1: the look names the job's business, so your own job can be corrected.
       "res.org = _SYNC_UUID_RE.test(String(row.org_id || '')) ? String(row.org_id) : '';",
+      // V172: Recently deleted's list READS each entry's business (rpc bin_list).
+      "return { n, user: String(x.user_id), id, org: _SYNC_UUID_RE.test(String(x.org_id || '')) ? String(x.org_id) : '',",
     ], 'one write: the job row names it from the job\u2019s own businessId; the rest are reads (V150 the job list, V164 the business view)');
     // Still: no write of org_id anywhere but the job row.
     t.eq(code('sync.js').filter(l => /org_id\s*=[^=]/.test(l)).length, 1, 'org_id is written in one place only (the job row)');

@@ -16,6 +16,12 @@
    photos made known and tombstoned (the V89 ledger deletes rows and files on
    the next run), and this phone's copies swept. All under the run lock.
 
+   V172 (R83, 8A): the delete now goes to Recently deleted — rpc bin_job, one per
+   job (the fake mirrors supabase/v172-recently-deleted.sql as proved in PGlite,
+   harness 114): the row becomes the deleted marker naming who, the whole job and
+   its photo files are kept, no photo tombstones; a phone with unsent work sends it
+   into the kept copy and then lets the job go (44d). 44a, 44d, 44g, 44i re-aimed.
+
    Helpers are 30's, with the fake extended: PATCH (supabase-js update) applies
    its body to the rows its filters match and answers the `select` it asks for;
    one fake can serve two phones (o.srv).
@@ -102,7 +108,25 @@ function fakeServer() {
   const files = new Map();
   let stampN = 0;
   const stamp = () => { stampN++; return '2026-10-08T11:' + String(Math.floor(stampN / 60) % 60).padStart(2, '0') + ':' + String(stampN % 60).padStart(2, '0') + '.' + String(stampN).padStart(3, '0') + 'Z'; };
-  const srv = { calls, tables, files, stamp, failPatch: 0, onCall: null };
+  const srv = { calls, tables, files, stamp, failPatch: 0, onCall: null, bins: [] };
+  // V172: supabase bin_job / bin_catch, as proved in PGlite (114) — the job kept
+  // whole in Recently deleted, its photo rows marked (files kept), the row left as
+  // the deleted marker naming who; a push onto it lands in the kept copy.
+  const live = (u, id) => srv.bins.find(b => b.user_id === u && b.id === id && !b.restored && !b.gone);
+  srv.binJob = (b) => {
+    const no = (code) => json({ code: 'P0001', message: 'patgo_bin_' + code, details: null, hint: null }, 400);
+    if (srv.failPatch > 0) { srv.failPatch--; return json({ message: 'ZZ update refused' }, 500); }
+    const row = tables.sessions.find(r => r.user_id === b.holder && String(r.id) === String(b.job));
+    if (!row || row.deleted || live(b.holder, String(b.job))) return no('gone');
+    const ph = tables.photos.filter(x => x.user_id === b.holder && String(x.session_id) === String(b.job) && !x.deleted);
+    srv.bins.push({ n: srv.bins.length + 1, user_id: b.holder, id: String(b.job), doc: row.doc, fp: row.fp,
+      photos: ph.map(x => ({ id: x.id, path: x.storage_path })) });
+    const st = stamp();
+    for (const x of ph) { x.deleted = true; x.updated_at = st; }
+    Object.assign(row, { deleted: true, fp: null, doc: { binnedAt: st, binnedBy: 'Peter', binnedRole: 'owner' }, updated_at: st });
+    return json({ photos: ph.length, at: st });
+  };
+  srv.bin = (id) => srv.bins.find(b => b.id === String(id));
   const guard = (old, row) => {
     const merged = Object.assign({}, old || {}, row);
     if (old && JSON.stringify(old.doc) !== JSON.stringify(merged.doc) && !('fp' in row)) merged.fp = null;
@@ -142,6 +166,7 @@ function fakeServer() {
       return json({ Key: 'photos/' + p, Id: 'x' });
     }
     const qs = u.split('?')[1] || '';
+    if (u.includes('/rest/v1/rpc/bin_job')) return srv.binJob(body || {});   // V172
     if (u.includes('/rest/v1/session_photo_counts')) {
       const m = new Map();
       for (const p of tables.photos) if (!p.deleted) m.set(String(p.session_id), (m.get(String(p.session_id)) || 0) + 1);
@@ -169,7 +194,11 @@ function fakeServer() {
       const st = stamp();
       for (const row of (Array.isArray(body) ? body : [])) {
         const i = tables.sessions.findIndex(r => String(r.id) === String(row.id));
-        const stored = Object.assign(guard(i === -1 ? null : tables.sessions[i], row), { updated_at: st });
+        const old = i === -1 ? null : tables.sessions[i];
+        // V172 (O-d): bin_catch — work sent for a job in Recently deleted goes into the kept copy.
+        const kept = old && old.deleted && row.deleted === false ? live(old.user_id, String(old.id)) : null;
+        if (kept) { kept.doc = row.doc; kept.fp = row.fp; old.updated_at = st; continue; }
+        const stored = Object.assign(guard(old, row), { updated_at: st });
         if (i === -1) tables.sessions.push(stored); else tables.sessions[i] = stored;
       }
       return new Response(null, { status: 201 });
@@ -301,7 +330,9 @@ async function openCloud(app) {
 
 module.exports = async function () {
   /* ------------------------------------------------------------------ 44a */
-  await t.group('44a — a cloud-only job: its row is emptied and marked deleted, the next run deletes its photo rows and both files', async () => {
+  // V172 (8A): the delete now goes to Recently deleted (rpc bin_job): the row is the
+  // deleted marker naming who, the whole job and its photo FILES are kept.
+  await t.group('44a — a cloud-only job: to Recently deleted — its row the deleted marker, its photo rows marked, the files kept (V172)', async () => {
     const app = await signedIn();
     await run(app);
     seed(app, 'ZZA1', { certNo: 'ZZC-001', locked: true });
@@ -315,14 +346,16 @@ module.exports = async function () {
     t.eq(J(res.ids), J(['ZZA1']), 'names the job the cloud took');
     const row = app.srv.row('ZZA1');
     t.eq(row.deleted, true, 'the row is marked deleted');
-    t.eq(J(row.doc), '{}', 'its contents are emptied (the same row a delete everywhere sends)');
+    t.eq(J(Object.keys(row.doc).sort()), J(['binnedAt', 'binnedBy', 'binnedRole']), 'its contents are gone from the row — only who deleted it (V172)');
+    t.eq(app.srv.bin('ZZA1').doc.certNo, 'ZZC-001', 'the whole job is kept in Recently deleted');
+    t.eq(J(app.srv.calls.filter(c => c.url.includes('/rest/v1/rpc/bin_job')).map(c => c.body)), J([{ holder: UID, job: 'ZZA1', org: null }]), 'one bin_job, for this account’s own job');
     t.eq(row.fp, null, 'no fingerprint');
     t.eq(app.srv.row('ZZA2').deleted, false, 'the other job is untouched');
     t.eq(app.srv.tables.sessions.filter(r => r.id === 'ZZA1').length, 1, 'updated in place, never a second row');
-    t.ok(ph.every(id => tombs(app, 'photo').includes(id)), 'each photo is on the delete ledger');
+    t.ok(ph.every(id => !tombs(app, 'photo').includes(id)), 'no photo on the delete ledger (V172 — kept for a restore)');
     await run(app);
-    t.ok(ph.every(id => app.srv.photo(id).deleted === true), 'after a run: the photo rows are marked deleted');
-    t.ok(ph.every(id => !app.srv.files.has(UID + '/' + id + '.jpg') && !app.srv.files.has(UID + '/' + id + '_t.jpg')), '…and both files of each are gone');
+    t.ok(ph.every(id => app.srv.photo(id).deleted === true), 'the photo rows are marked deleted (by the cloud)');
+    t.ok(ph.every(id => app.srv.files.has(UID + '/' + id + '.jpg') && app.srv.files.has(UID + '/' + id + '_t.jpg')), '…and both files of each are KEPT, after a run too');
     t.eq(app.srv.photo(keep[0]).deleted, false, 'the other job’s photo is untouched');
     t.ok(app.srv.files.has(UID + '/' + keep[0] + '.jpg'), '…and its file');
     t.ok(ph.every(id => !syncState(app).ph.sent[id]), 'known no more once deleted');
@@ -373,7 +406,7 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 44d */
-  await t.group('44d — other phones: an unchanged copy goes on its next sync; a changed copy asks first, never lost', async () => {
+  await t.group('44d — other phones: an unchanged copy goes on its next sync; a changed copy sends its work into Recently deleted first, then goes (V172 O-d)', async () => {
     const a = await signedIn();
     const b = await signedIn({ srv: a.srv });
     const same = plainJob(b, 'ZZSAME'); away(b);
@@ -388,8 +421,11 @@ module.exports = async function () {
     await run(b);
     t.notOk(onPhone(b, same), 'phone B: the unchanged job goes');
     t.ok(onPhone(b, changed), 'phone B: the job it changed stays…');
-    const held = b.fn('_syncHeldLoad')().find(e => e.id === changed);
-    t.eq(held && held.reason, 'deleted-elsewhere', '…and asks ("deleted on another phone")');
+    t.eq(b.fn('_syncHeldLoad')().length, 0, '…without a question (V172: it was deleted into Recently deleted)');
+    t.eq(a.srv.bin(changed).doc.items.length, 2, '…its unsent work went into the kept copy');
+    t.eq(a.srv.row(changed).deleted, true, '…and the row stays deleted');
+    await run(b);
+    t.notOk(onPhone(b, changed), 'the next run takes it off — nothing lost');
   });
 
   /* ------------------------------------------------------------------ 44e */
@@ -409,6 +445,18 @@ module.exports = async function () {
     t.eq(J(syncState(app).ph.sent), sentBefore, 'no photo made known');
     await run(app);
     t.ok(ph.every(id => app.srv.photo(id).deleted === false && app.srv.files.has(UID + '/' + id + '.jpg')), 'after a run the photos are all still there');
+    // V172: a job cleared from this phone whose delete the cloud refused is still
+    // cleared here — only the jobs the cloud TOOK are forgotten (M728 re-aimed).
+    const id = plainJob(app, 'ZZREFUSED');
+    away(app);
+    await run(app);
+    app.fn('removeJobsFromPhone')([id]);
+    app.stopTimer(); await tick(10);
+    t.ok(pruned(app).includes(id), 'set-up: cleared from this phone');
+    app.srv.failPatch = 1;
+    const r2 = await del(app, [id]);
+    t.eq(r2.deleted, 0, 'refused');
+    t.ok(pruned(app).includes(id), 'still on the cleared list (never forgotten for a delete that didn’t happen)');
   });
 
   /* ------------------------------------------------------------------ 44f */
@@ -435,39 +483,41 @@ module.exports = async function () {
     seedPhotos(app, 'ZZG1', 1);
     const start = app.srv.calls.length;
     let fired = false;
+    let locked = null;
     app.srv.onCall = (c) => {
-      if (fired || c.method !== 'GET' || !c.url.includes('/rest/v1/photos') || !/session_id=in/.test(c.url)) return;
+      if (fired || !c.url.includes('/rest/v1/rpc/bin_job')) return;   // V172: the delete is bin_job
       fired = true;
+      locked = app.run('!!_syncRunning');   // V172: the delete holds the run lock while it talks to the cloud
       app.fn('syncPush')({ pull: true });   // a trigger arrives mid-delete
     };
     const res = await app.fn('syncCloudDelete')(['ZZG1']);
     app.srv.onCall = null;
     app.stopTimer();
-    t.ok(fired, 'set-up: the trigger arrived while the delete was reading');
+    t.ok(fired, 'set-up: the trigger arrived while the delete was running');
+    t.eq(locked, true, 'the delete held the run lock (a run started mid-delete would save its own copy of the state over it)');
     const calls = app.srv.calls.slice(start);
-    const first = calls.findIndex(c => c.url.includes('/rest/v1/photos') && /session_id=in/.test(c.url));
-    const patch = calls.findIndex(c => c.method === 'PATCH' && c.url.includes('/rest/v1/sessions'));
-    t.ok(first > -1 && patch > first, 'set-up: read, then the update');
-    const between = calls.slice(first + 1, patch).filter(c => !(c.url.includes('/rest/v1/photos') && /session_id=in/.test(c.url)));
-    t.eq(between.length, 0, 'nothing else reached the cloud between the delete’s read and its update');
+    const patch = calls.findIndex(c => c.url.includes('/rest/v1/rpc/bin_job'));
+    t.ok(patch > -1, 'set-up: the delete');
+    t.eq(calls.slice(0, patch).filter(c => c.url.includes('/rest/v1/sessions') || c.url.includes('/rest/v1/photos')).length, 0, 'nothing else reached the jobs or photos before it');
     t.eq(res.deleted, 1, 'the delete finished');
     await until(() => app.srv.calls.slice(start + patch + 1).some(c => c.method === 'GET' && c.url.includes('/rest/v1/sessions') && c.url.includes('updated_at=')));
     app.stopTimer();
     t.ok(app.srv.calls.slice(start + patch + 1).some(c => c.method === 'GET' && c.url.includes('/rest/v1/sessions') && c.url.includes('updated_at=')), 'the waiting trigger ran afterwards, with its pull');
     await idle(app); app.stopTimer();
 
-    // No trigger: the photo deletes still go, without waiting for one.
+    // No trigger: a reading run still follows, without waiting for one.
     seed(app, 'ZZG2');
-    const ph = seedPhotos(app, 'ZZG2', 1);
+    seedPhotos(app, 'ZZG2', 1);
+    const at = app.srv.calls.length;
     await app.fn('syncCloudDelete')(['ZZG2']);
     app.stopTimer();
-    await until(() => app.srv.photo(ph[0]).deleted === true);
+    await until(() => app.srv.calls.slice(at).some(c => c.method === 'GET' && c.url.includes('/rest/v1/sessions') && c.url.includes('updated_at=')));
     app.stopTimer();
-    t.eq(app.srv.photo(ph[0]).deleted, true, 'a run follows the delete by itself and removes the photos');
+    t.ok(app.srv.calls.slice(at).some(c => c.method === 'GET' && c.url.includes('/rest/v1/sessions') && c.url.includes('updated_at=')), 'a reading run follows the delete by itself');
   });
 
   /* ------------------------------------------------------------------ 44h */
-  await t.group('44h — copies of the job’s photos left on this phone are swept (a copy here would stop the cloud delete)', async () => {
+  await t.group('44h — copies of the job’s photos left on this phone are swept (V172: else left here with no job)', async () => {
     const app = await signedIn();
     await run(app);
     seed(app, 'ZZH1');
@@ -476,8 +526,12 @@ module.exports = async function () {
     await app.run(`photoAddFromCloud({ id: ${J(ph[0])}, s: 'ZZH1', i: 'ZZH1-i1', b: 6 }, new Blob(['ZZLEFT'], { type: 'image/jpeg' }))`);
     await tick(10);
     t.ok(!!(app.state().photoMeta || {})[ph[0]], 'set-up: a copy on this phone');
-    await del(app, ['ZZH1']);
-    t.notOk(!!(app.state().photoMeta || {})[ph[0]], 'the phone copy is gone');
+    // V172: not known as in the cloud (a cleared job's leftovers — st.ph.sent is trimmed
+    // to jobs on the phone), so the photo rows' pull never reaches it: only the sweep can.
+    app.run(`(() => { const st = _syncLoad(); if (st.ph && st.ph.sent) delete st.ph.sent[${J(ph[0])}]; _syncSave(st); })()`);
+    await app.fn('syncCloudDelete')(['ZZH1']);
+    t.notOk(!!(app.state().photoMeta || {})[ph[0]], 'the phone copy is gone at once (before the reading run that follows)');
+    app.stopTimer(); await idle(app); app.stopTimer(); await tick(20);
     await run(app);
     t.eq(app.srv.photo(ph[0]).deleted, true, 'so the cloud photo is deleted on the next run');
   });
@@ -516,17 +570,18 @@ module.exports = async function () {
     t.includes(sh, 'Delete from the cloud', 'the review sheet opens');
     t.includes(sh, 'ZZSITE1', 'it names the job');
     t.includes(sh, '2 photos', 'and its photos');
-    t.includes(sh, 'No copy is kept', 'says no copy is kept (5A)');
-    t.includes(sh, 'any other phone', 'says other phones lose it too');
+    t.includes(sh, 'Recently deleted for 30 days', 'says it waits in Recently deleted for 30 days (V172 6B)');
+    t.includes(sh, 'from any phone that has', 'says other phones lose it too');
+    t.includes(sh, 'gone for good, with', 'says after that it’s gone for good, with its photos');
     t.excludes(sh, 'cloud-del-input', 'no word box for one plain job');
-    t.includes(sh, 'Yes, delete this job for good', 'the final button says so (R20)');
+    t.includes(sh, 'Yes, delete this job', 'the final button says so (R20)');
     app.doc.getElementById('cloud-del-yes').click();
     await until(() => app.srv.row('ZZI1').deleted === true);
     await idle(app); app.stopTimer();
     t.eq(app.srv.row('ZZI1').deleted, true, 'deleted');
     t.notOk(app.state().cloudJobs.jobs.some(j => j.id === 'ZZI1'), 'it drops off the list without reading it again');
     t.notOk(app.state().cloudJobs.selecting, 'Select mode ends');
-    t.ok(app.toasts.some(x => /Deleted 1 job from the cloud with 2 photos/.test(x)), 'a toast says what went');
+    t.ok(app.toasts.some(x => /Deleted 1 job — in Recently deleted for 30 days/.test(x)), 'a toast says what went, and where (V172)');
 
     // A certificated job: the warning and the word.
     tap(app, 'cloud-select-toggle');
@@ -534,7 +589,7 @@ module.exports = async function () {
     tap(app, 'cloud-delete');
     sh = sheetHTML(app);
     t.includes(sh, 'ZZC-777', 'the certificate is named');
-    t.includes(sh, 'deletes your record', 'and what that means');
+    t.includes(sh, 'so is your record of', 'and what that means (V172: once gone for good)');
     t.includes(sh, 'cloud-del-input', 'the word box is there');
     t.includes(sh, 'id="cloud-del-yes" style="flex:1" disabled', 'the button starts grey');
     const yes = app.doc.getElementById('cloud-del-yes');
@@ -579,3 +634,5 @@ module.exports = async function () {
     t.includes(disp, "'cloud-delete':", 'dispatch wires cloud-delete');
   });
 };
+// V172: 114 reuses this file's stand-in (with bin_job) and helpers.
+module.exports.kit = { fakeServer, signedIn, run, until, idle, del, seed, seedPhotos, plainJob, away, onPhone, tombs, syncState, UID };

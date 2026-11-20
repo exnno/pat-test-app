@@ -538,7 +538,7 @@ const run = async function () {
   });
 
   /* ------------------------------------------------------------------ 112g */
-  await t.group('112g — the SQL in step; G1–G5; isolation 36a–36c; release V171', () => {
+  await t.group('112g — the SQL in step; G1–G5; isolation 36a–36c (V172: the release checks → 114)', () => {
     const mig = read('supabase/v171-office-certs.sql');
     const end = '-- ================================================================ end V171\n';
     const block = mig.slice(mig.indexOf('-- ================================================================ V171\n'), mig.indexOf(end) + end.length);
@@ -555,21 +555,8 @@ const run = async function () {
     for (const k of ['36a', '36b', '36c']) t.includes(iso, `['${k}|`, `isolation ${k}`);
     t.includes(read('sync.js'), "    .then((c) => c.rpc('cert_stamp', { holder: u, job: sid, org: o, cert: no || null, made: made === true }))", 'the app calls it with exactly its arguments');
 
-    const rel = freshApp();
-    t.eq(rel.run('APP_VERSION'), 'V171', 'APP_VERSION V171');
-    t.eq(rel.run('WELCOME_VERSION'), 'V171', 'What’s new rolled (a feature release)');
-    // V171.1: the cache key check moved to 113.
-    const core = read('render-core.js');
-    const at = core.indexOf('<ul class="welcome-list sheet-scroll">');
-    const sheetCopy = core.slice(at, core.indexOf('</ul>', at));
-    t.eq((sheetCopy.match(/<li>/g) || []).length, 1, 'What’s new: one line');
-    t.includes(sheetCopy, '<li><strong>Certificates from the office.</strong>', '…certificates from the office');
-    const help = read('render-help.js');
-    const x = help.indexOf('<p><strong>V171</strong>'), y = help.indexOf('<p><strong>V170</strong>'), z = help.indexOf('<p><strong>V169</strong>');
-    t.ok(x > -1 && y > x && z > y, 'About: V171, V170, V169');
-    t.excludes(help, '<p><strong>V168</strong>', 'V168 rolled off');
-    t.includes(help, 'Certificates from the office: the Owner, a Team leader or the Office', 'About: V171’s line');
-    t.includes(help, 'Team seats: each Engineer or Team leader is &pound;3 a month', 'About: V169’s line, the oldest');
+    // V172: the release checks moved to 114.
+    t.includes(read('render-help.js'), 'Certificates from the office: the Owner, a Team leader or the Office', 'About: V171’s line');
   });
 };
 run.kit = { cloud, stubs, ready, lookAt, TESTER };

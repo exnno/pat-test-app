@@ -111,18 +111,17 @@ module.exports = async function () {
   });
 
   /* ------------------------------------------------------------------ 113c */
-  await t.group('113c — the SQL in step; H1–H5; release pat-v171-1', () => {
+  await t.group('113c — the SQL in step; H1–H5 (V172: the release checks → 114)', () => {
     const mig = read('supabase/v171-1-tester.sql');
     const end = '-- ================================================================ end V171.1\n';
     const block = mig.slice(mig.indexOf('-- ================================================================ V171.1\n'), mig.indexOf(end) + end.length);
     t.ok(block.length > 2500, 'the migration has its definition');
-    t.ok(read('supabase/schema.sql').trimEnd().endsWith(block.trimEnd()), 'a new project gets it byte for byte, as schema.sql’s last section');
+    t.ok(read('supabase/schema.sql').includes(block.trimEnd()), 'a new project gets it byte for byte, as a section of schema.sql (V172: no longer the last)');
     t.includes(block, "  if s.org_id is null or coalesce(public.my_role(s.org_id), '') not in ('owner','team_leader','office') then", 'Owner / Team leader / Office of the JOB’s business');
     t.includes(block, "      where r.user_id = holder and r.kind = 'instrument' and r.id = iid and not r.deleted;", 'the HOLDER’s own instruments');
     t.includes(block, "  if jsonb_typeof(d -> 'tester') = 'object' then\n    return jsonb_build_object('doc', d, 'from', 'job');", 'a job with its copy: never changed');
     for (let n = 1; n <= 5; n++) t.ok(new RegExp('^select ' + n + ", '", 'm').test(mig), `self-check H${n}`);
     t.includes(read('sync.js'), "    .then((c) => c.rpc('cert_tester', { holder: u, job: sid, org: o }))", 'the app calls it with exactly its arguments');
-    t.includes(read('sw.js'), "const CACHE_VERSION = 'pat-v171-1';", 'cache key pat-v171-1');
-    t.eq(freshApp().run('APP_VERSION'), 'V171', 'APP_VERSION stays V171 (a hotfix)');
+    // V172: the release checks (cache key, APP_VERSION) moved to 114.
   });
 };
