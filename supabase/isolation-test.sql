@@ -9,6 +9,12 @@
 -- email addresses on the next two lines → Run. Every row of the result must
 -- say PASS. Any FAIL: do not promote, and bring the output to the next chat.
 --
+-- V172: CHECKS 37a–37c NEED supabase/v172-recently-deleted.sql RUN FIRST (37a names
+-- it if not). With A's job in A's own business, B outside it and then B made a Team
+-- leader there can't delete it, see A's Recently deleted, restore it or delete it for
+-- good; A (the Owner) deletes it — the job row becomes a marker, the whole job kept in
+-- Recently deleted — and restores it; then B's place is put back and the test job,
+-- its Recently deleted lines and seat lines removed (one transaction).
 -- V171: CHECKS 36a–36c NEED supabase/v171-office-certs.sql RUN FIRST (36a names
 -- it if not). With A's locked job in A's own business, B outside it and then B made
 -- an Engineer there can't put a certificate number on it; B made Office puts the
@@ -133,6 +139,7 @@ declare
   r169 text; max169 bigint; own169 int; eng169 int; den169 boolean;                                  -- V169
   r170 text; max170 bigint; had170 boolean; s170 jsonb; nx170 int; t1 int; t2 int; den170 boolean; eng170 boolean; -- V170
   r171 text; max171 bigint; c171 text; -- V171
+  r172 text; max172 bigint; c172 text; e172 bigint; -- V172
 begin
   select id into a from auth.users where lower(email) = lower(email_a);
   select id into b from auth.users where lower(email) = lower(email_b);
@@ -1964,6 +1971,83 @@ begin
       select count(*) into k from public.sessions where id like 'iso-test-v171-%';
       res := res || array['36c|A''s test jobs gone and B''s place put back|'
         || case when k = 0 and public.member_role(own_a, b) is not distinct from r171 then 'PASS|' else 'FAIL|' || k || ' left' end];
+    end if;
+  end if;
+  perform set_config('request.jwt.claims', '', true);
+
+  -- ------------------------------------------------- V172: Recently deleted (37a–37c)
+  if to_regprocedure('public.bin_job(uuid, text, uuid)') is null then
+    res := res || array['37a|nobody but the Owner deletes, sees, restores or empties A''s job|FAIL|run supabase/v172-recently-deleted.sql first'];
+  else
+    select m.org_id into own_a from public.memberships m where m.user_id = a and m.role = 'owner' order by m.is_default desc limit 1;
+    r172 := public.member_role(own_a, b);
+    select coalesce(max(id), 0) into max172 from public.seat_changes;
+    if own_a is null or r172 = 'owner' then
+      res := res || array['37a|nobody but the Owner deletes, sees, restores or empties A''s job|INCONCLUSIVE|A has no business of A''s own apart from B'];
+    else
+      delete from public.job_bin where id = 'iso-test-v172-1';
+      delete from public.sessions where id = 'iso-test-v172-1';
+      insert into public.sessions (id, user_id, doc, last_modified, org_id) values
+        ('iso-test-v172-1', a, '{"id":"iso-test-v172-1","site":"iso A bin","locked":true,"items":[]}'::jsonb, now(), own_a);
+      -- 37a: B outside, then a Team leader — can't delete it; then A deletes it and
+      -- B (still a Team leader) can't see, restore or empty it.
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      c172 := '';
+      if r172 is null then
+        execute 'set local role authenticated';
+        begin perform public.bin_job(a, 'iso-test-v172-1', null); c172 := 'outside deleted';
+        exception when others then c172 := case when sqlerrm like 'patgo_bin_not_allowed%' then '' else 'outside ' || sqlerrm end; end;
+        execute 'reset role';
+        insert into public.memberships (org_id, user_id, role, name) values (own_a, b, 'team_leader', 'iso B');
+      else
+        update public.memberships set role = 'team_leader' where org_id = own_a and user_id = b;
+      end if;
+      execute 'set local role authenticated';
+      begin perform public.bin_job(a, 'iso-test-v172-1', own_a); c172 := c172 || ' leader deleted';
+      exception when others then if sqlerrm not like 'patgo_bin_not_allowed%' then c172 := c172 || ' leader ' || sqlerrm; end if; end;
+      execute 'reset role';
+      perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      begin perform public.bin_job(a, 'iso-test-v172-1', own_a);
+      exception when others then c172 := c172 || ' owner ' || sqlerrm; end;
+      execute 'reset role';
+      select x.n into e172 from public.job_bin x where x.id = 'iso-test-v172-1' and x.user_id = a and x.restored_at is null and x.gone_at is null;
+      perform set_config('request.jwt.claims', json_build_object('sub', b::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      select count(*) into n from public.bin_list() x where x.id = 'iso-test-v172-1';
+      if n <> 0 then c172 := c172 || ' leader sees it'; end if;
+      begin perform public.bin_restore(e172); c172 := c172 || ' leader restored';
+      exception when others then if sqlerrm not like 'patgo_bin_not_allowed%' then c172 := c172 || ' restore ' || sqlerrm; end if; end;
+      begin perform public.bin_forget(e172); c172 := c172 || ' leader emptied';
+      exception when others then if sqlerrm not like 'patgo_bin_not_allowed%' then c172 := c172 || ' forget ' || sqlerrm; end if; end;
+      begin select count(*) into n from public.job_bin; c172 := c172 || ' table open';
+      exception when others then null; end;
+      execute 'reset role';
+      select count(*) into n from public.sessions s join public.job_bin x on x.user_id = s.user_id and x.id = s.id
+        where s.id = 'iso-test-v172-1' and s.user_id = a and s.deleted and x.n = e172 and x.doc->>'site' = 'iso A bin' and x.gone_at is null;
+      res := res || array['37a|nobody but the Owner deletes, sees, restores or empties A''s job|'
+        || case when c172 = '' and n = 1 then 'PASS|' else 'FAIL|' || c172 || ' / ' || n end];
+      -- 37b: A sees it in Recently deleted and restores it.
+      perform set_config('request.jwt.claims', json_build_object('sub', a::text, 'role', 'authenticated')::text, true);
+      execute 'set local role authenticated';
+      c172 := '';
+      select count(*) into k from public.bin_list() x where x.n = e172;
+      begin perform public.bin_restore(e172);
+      exception when others then c172 := 'restore ' || sqlerrm; end;
+      execute 'reset role';
+      select count(*) into n from public.sessions where id = 'iso-test-v172-1' and user_id = a and not deleted and doc->>'site' = 'iso A bin';
+      res := res || array['37b|A (the Owner) sees it in Recently deleted and puts it back|'
+        || case when c172 = '' and k = 1 and n = 1 then 'PASS|' else 'FAIL|' || c172 || ' / ' || k || ' / ' || n end];
+      -- 37c: everything put back.
+      if r172 is null then delete from public.memberships where org_id = own_a and user_id = b;
+      else update public.memberships set role = r172 where org_id = own_a and user_id = b;
+      end if;
+      delete from public.job_bin where id = 'iso-test-v172-1';
+      delete from public.sessions where id = 'iso-test-v172-1';
+      delete from public.seat_changes where id > max172;
+      select count(*) into k from public.sessions where id like 'iso-test-v172-%';
+      res := res || array['37c|A''s test job and its Recently deleted lines gone, B''s place put back|'
+        || case when k = 0 and public.member_role(own_a, b) is not distinct from r172 then 'PASS|' else 'FAIL|' || k || ' left' end];
     end if;
   end if;
   perform set_config('request.jwt.claims', '', true);
