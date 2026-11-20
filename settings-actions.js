@@ -2032,6 +2032,7 @@ function cloudJobsLoad(force) {
   cj.loading = true;
   cj.error = '';
   _cloudLineLoad(cj, '');   // V166 (1A): the line's figures, read with the list
+  binCountLoad(!!force);   // V172: Recently deleted's count, with the list
   if (state.view === 'sessions') render();
   syncCloudList().then((res) => {
     if (state.cloudJobs !== cj) return;
@@ -2663,6 +2664,120 @@ function cloudLookCert() {
   });
 }
 
+// ---- V172 (R83 — 2C 3B 6A 7A, 8A): Delete, from the look-only job -----------------
+// Someone else's job: the Owner of the business the list is showing (V172 — a Team
+// leader's or the Office's delete becomes a request the Owner approves, V173).
+// Your own job, held only in the cloud: whoever the cloud's delete rule allows
+// (can_wipe — Owner / Team leader / Office of its business, or a business of one),
+// through V107's own delete (syncCloudDelete — this phone's bookkeeping too). A
+// job of yours that is ON this phone is deleted from the phone tab, as always.
+// Locked or not (3B — an open job gets the stronger warning). Either way it goes
+// to Recently deleted for 30 days (6B). { show, can, own, why }.
+function _cloudBizEntry(org) {
+  if (!org || typeof businessList !== 'function') return null;
+  let list = [];
+  try { list = businessList(); } catch (e) { list = []; }
+  return list.find(b => b && b.id === org) || null;
+}
+function cloudLookBinState(look) {
+  const no = { show: false, can: false, own: false, why: '' };
+  if (typeof _tut !== 'undefined' && _tut) return no;
+  if (!look || !look.doc || !look.row) return no;
+  if (look.row.mine) {
+    if (look.row.onPhone) return { show: true, can: false, own: true, why: 'It’s on this phone — delete it from the phone tab.' };
+    const b = _cloudBizEntry(String(look.jobOrg || ''));
+    if (!b) return no;
+    if (CLOUD_SCOPE_ROLES.includes(b.role) || !(Number(b.n) >= 2)) return { show: true, can: true, own: true, why: '' };
+    return no;
+  }
+  if (!look.org || !cloudScopeChoices().some(c => c.id === look.org)) return no;
+  const b = _cloudBizEntry(String(look.org));
+  return (b && b.role === 'owner') ? { show: true, can: true, own: false, why: '' } : no;
+}
+
+// 6A: the confirm sheet names the job, the engineer, its items and photos and
+// whether it has a certificate; an unlocked job says so plainly (3B).
+function cloudLookBinOverview(look) {
+  const r = look.row || {};
+  const doc = look.doc || {};
+  const items = Array.isArray(doc.items) ? doc.items.filter(it => it && typeof it === 'object') : [];
+  const photos = (typeof r.photos === 'number' && r.photos > 0) ? r.photos : 0;
+  const certNo = (typeof doc.certNo === 'string' && doc.certNo) ? doc.certNo : '';
+  const locked = doc.locked === true;
+  const who = (!r.mine && r.who) ? String(r.who.name || '') : '';
+  const job = { id: String(look.id), title: r.title, client: r.client, date: r.date, items: items.length, photos, certNo, locked, who };
+  const at = (typeof CLOUD_DELETE_TYPE_AT === 'number') ? CLOUD_DELETE_TYPE_AT : 5;
+  return { ids: [job.id], jobs: [job], n: 1, items: items.length, photos, photosKnown: true,
+    certs: certNo ? [certNo] : [], certJobs: (certNo || locked) ? 1 : 0, needWord: 1 >= at || !!(certNo || locked),
+    open: !locked, who, own: !!r.mine };
+}
+
+function cloudLookDelete() {
+  const look = state.cloudLook;
+  if (!look || look.binBusy) return;
+  const bs = cloudLookBinState(look);
+  if (!bs.can) { if (bs.why) showToast(bs.why); return; }
+  if (typeof _syncOffline === 'function' && _syncOffline()) { showToast('No signal — try again when you’re connected'); return; }
+  if (typeof openCloudDeleteSheet !== 'function') return;
+  const o = cloudLookBinOverview(look);
+  openCloudDeleteSheet(o, (typed) => {
+    if (o.needWord && !cloudDeleteConfirmMatches(typed)) return false;   // checked here too: the button is a hint
+    _cloudLookBinGo(look, bs.own);
+    return true;
+  });
+}
+
+function _cloudLookBinGo(look, own) {
+  if (state.cloudLook !== look) return;
+  look.binBusy = true;
+  const btn = (typeof document !== 'undefined') ? document.getElementById('cloud-bin-btn') : null;
+  if (btn) { btn.disabled = true; btn.textContent = 'Deleting…'; }
+  const ask = own
+    ? syncCloudDelete([look.id]).then((r) => ({ ok: !!r.deleted, code: r.missing ? 'gone' : '', offline: r.offline,
+        needsUpdate: !!r.needsUpdate, error: r.deleted ? '' : (r.skipped ? 'It’s on this phone now — delete it from the phone tab.' : r.error) }))
+    : syncBinJob(look.user, look.id, look.org);
+  return ask.then((res) => {
+    look.binBusy = false;
+    if (res.ok) {
+      _cloudBinDrop(look.user, look.id);
+      if (state.cloudLook === look) {
+        const sh = (typeof document !== 'undefined') ? document.getElementById('cloud-look-sheet') : null;
+        if (sh) { const b = sh.previousElementSibling; sh.remove(); if (b && b.classList && b.classList.contains('modal-backdrop')) b.remove(); }
+        cloudLookClose();
+      }
+      showToast('Deleted — it’s in Recently deleted for 30 days');
+      binCountLoad(true);
+      if (state.view === 'sessions') render();
+      return true;
+    }
+    let msg;
+    if (res.offline) msg = 'No signal — nothing was deleted';
+    else if (res.needsUpdate) msg = (typeof SYNC_BIN_UPDATE_WORDS === 'string') ? SYNC_BIN_UPDATE_WORDS : 'The cloud needs updating.';
+    else if (res.code === 'gone') msg = 'This job isn’t in the cloud any more.';
+    else if (res.code === 'moved') msg = 'This job has moved to another business since the list was read.';
+    else if (res.code === 'not_allowed') msg = 'Only the business owner can delete this job.';
+    else if (res.code === 'plan') msg = 'This business’s plan has ended, so the cloud isn’t taking changes.';
+    else msg = 'Nothing was deleted: ' + String(res.error || 'couldn’t reach the cloud.').replace(/^./, (c) => c.toLowerCase());
+    showToast(msg);
+    if (state.cloudLook === look && typeof renderCloudLookBody === 'function') renderCloudLookBody(look);
+    if ((res.code === 'gone' || res.code === 'moved') && state.cloudJobs) cloudJobsLoad(true);
+    return false;
+  });
+}
+
+// A job gone to Recently deleted leaves every list this phone holds in memory.
+function _cloudBinDrop(user, id) {
+  const cj = state.cloudJobs;
+  const sid = String(id);
+  if (cj) {
+    cj.jobs = (cj.jobs || []).filter(j => String(j.id) !== sid);
+    if (cj.biz) cj.biz.jobs = (cj.biz.jobs || []).filter(j => !(String(j.id) === sid && String(j.user) === String(user)));
+    delete cj.selected[sid];
+  }
+  const cs = state.cloudStore;
+  if (cs) cs.top = (cs.top || []).filter(j => !(String(j.id) === sid && (!j.user || String(j.user) === String(user))));
+}
+
 // From the sheet: your own job, onto this phone (V93's bring, one job, opened);
 // or, already here, opened on the phone.
 function cloudLookBring() {
@@ -2804,7 +2919,7 @@ function _cloudDelete(ids) {
     }
     const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
     const bits = [];
-    if (res.deleted) bits.push(`Deleted ${pl(res.deleted, 'job')} from the cloud` + (res.photos ? ` with ${pl(res.photos, 'photo')}` : ''));
+    if (res.deleted) bits.push(`Deleted ${pl(res.deleted, 'job')} — in Recently deleted for 30 days`);   // V172
     if (res.missing) bits.push(`${res.missing} ${res.missing === 1 ? 'was' : 'were'} already gone`);
     if (res.skipped) bits.push(`${res.skipped} ${res.skipped === 1 ? 'is' : 'are'} on this phone now — delete ${res.skipped === 1 ? 'it' : 'them'} from the phone tab`);
     if (res.offline) showToast('No signal — nothing was deleted');
@@ -2815,6 +2930,7 @@ function _cloudDelete(ids) {
     else if (bits.length) showToast(bits.join(' · '));
     // Something changed that the list didn't know: read it again.
     if ((res.missing || res.error) && state.cloudJobs === cj) cloudJobsLoad(true);
+    if (res.deleted) binCountLoad(true);   // V172: Recently deleted's count
     // V166: the line's figures, again — after the run that removes the photo
     // rows (as Cloud Storage's own delete waits for it).
     if (res.deleted) {
@@ -3061,7 +3177,7 @@ function _cloudStoreDelete(ids) {
     }
     const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
     const bits = [];
-    if (res.deleted) bits.push(`Deleted ${pl(res.deleted, 'job')} from the cloud` + (res.photos ? ` with ${pl(res.photos, 'photo')}` : ''));
+    if (res.deleted) bits.push(`Deleted ${pl(res.deleted, 'job')} — in Recently deleted for 30 days`);   // V172
     if (res.missing) bits.push(`${res.missing} ${res.missing === 1 ? 'was' : 'were'} already gone`);
     if (res.skipped) bits.push(`${res.skipped} ${res.skipped === 1 ? 'is' : 'are'} on this phone now`);
     if (res.offline) showToast('No signal — nothing was deleted');
@@ -3073,8 +3189,187 @@ function _cloudStoreDelete(ids) {
     // The totals and the biggest jobs have changed: read them again — AFTER the
     // run syncCloudDelete starts, which is the one that removes the photo rows
     // (V107); read before it and the photos are still counted.
+    if (res.deleted) binCountLoad(true);   // V172: Recently deleted's count
     if (state.view === 'cloudStorage') render();
     const again = () => { if (state.cloudStore === cs && state.view === 'cloudStorage') cloudStoreLoad(); };
     if (typeof syncWhenIdle === 'function') syncWhenIdle(again); else again();
   });
+}
+
+// ---- V172 (R83 — 6B 10A 11A 12 both): Recently deleted ----------------------------
+// The page, reached from the Cloud tab and from Cloud Storage (12 — both). What
+// the cloud says this account may restore — the Owner of each business; a business
+// of one is its own Owner. Each job: Put back (10A) or Delete now (11A — a confirm,
+// then gone for good with its photos). Read every time the page opens, with ⟳.
+// Memory only (state.binList), never saved; the read is sync.js syncBinList.
+// state.binCount = { n, ok, uid, at, loading, missing } — the count beside the
+// links, read with the Cloud tab's list (binCountLoad); `missing` = the cloud has no
+// V172 SQL yet, so the links hide.
+const BIN_RETURN_VIEWS = ['sessions', 'cloudStorage', 'settingsStorage'];
+function binCountLoad(force) {
+  if (typeof syncBinList !== 'function' || typeof syncActive !== 'function' || !syncActive()) return;
+  if (typeof _tut !== 'undefined' && _tut) return;
+  const uid = (typeof _syncCurrentUserId === 'function') ? (_syncCurrentUserId() || '') : '';
+  const bc = state.binCount || (state.binCount = { n: 0, ok: false, uid: '', at: 0, loading: false, missing: false });
+  if (bc.loading) return;
+  if (!force && bc.ok && bc.uid === uid) return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) return;
+  bc.loading = true;
+  syncBinList().then((res) => {
+    bc.loading = false;
+    if (state.binCount !== bc) return;
+    if (res.ok) Object.assign(bc, { n: res.rows.length, ok: true, uid, at: Date.now(), missing: false });
+    else if (res.needsUpdate) Object.assign(bc, { ok: false, missing: true });
+    if (typeof _binLinePaint === 'function') _binLinePaint();
+  });
+}
+function binCountFor() {
+  const bc = state.binCount;
+  const uid = (typeof _syncCurrentUserId === 'function') ? (_syncCurrentUserId() || '') : '';
+  if (!bc || bc.missing) return { show: !(bc && bc.missing), n: null };
+  return { show: true, n: (bc.ok && bc.uid === uid) ? bc.n : null };
+}
+
+function binOpen() {
+  if (typeof syncActive !== 'function' || !syncActive()) return;
+  const ret = BIN_RETURN_VIEWS.includes(state.view) ? state.view : 'settingsStorage';
+  state.binList = { loading: false, ok: false, error: '', needsUpdate: false, uid: '', rows: [], busy: {}, ret, at: '' };
+  setView('recentlyDeleted');
+  binLoad();
+}
+
+function binBack() {
+  const bl = state.binList || {};
+  setView(bl.ret || 'settingsStorage');
+}
+
+function binLoad() {
+  const bl = state.binList || (state.binList = { loading: false, ok: false, error: '', needsUpdate: false, uid: '', rows: [], busy: {}, ret: 'settingsStorage', at: '' });
+  if (bl.loading || typeof syncBinList !== 'function') return;
+  if (typeof _syncOffline === 'function' && _syncOffline()) {
+    bl.error = 'No signal — Recently deleted needs a connection.';
+    if (state.view === 'recentlyDeleted') render();
+    return;
+  }
+  bl.loading = true;
+  bl.error = '';
+  if (state.view === 'recentlyDeleted') render();
+  syncBinList().then((res) => {
+    if (state.binList !== bl) return;
+    bl.loading = false;
+    const uid = (typeof _syncCurrentUserId === 'function') ? (_syncCurrentUserId() || '') : '';
+    if (res.ok) {
+      Object.assign(bl, { ok: true, error: '', needsUpdate: false, uid, rows: res.rows, at: new Date().toISOString() });
+      state.binCount = { n: res.rows.length, ok: true, uid, at: Date.now(), loading: false, missing: false };
+    } else {
+      bl.needsUpdate = !!res.needsUpdate;
+      bl.error = res.offline ? 'No signal — Recently deleted needs a connection.'
+        : res.needsUpdate ? ((typeof SYNC_BIN_UPDATE_WORDS === 'string') ? SYNC_BIN_UPDATE_WORDS : 'The cloud needs updating.')
+        : (res.error || 'Couldn’t reach the cloud. Try again.');
+    }
+    if (state.view === 'recentlyDeleted') render();
+  });
+}
+
+// Days left before it goes by itself — whole days, never below 0. Pure.
+function binDaysLeft(purgeAt, now) {
+  const t = Date.parse(purgeAt || '');
+  if (isNaN(t)) return null;
+  const ms = t - (typeof now === 'number' ? now : Date.now());
+  return Math.max(0, Math.ceil(ms / 86400000));
+}
+
+// What the page shows — pure. Another account's rows are never shown.
+function binModel() {
+  const bl = state.binList || {};
+  const uid = (typeof _syncCurrentUserId === 'function') ? (_syncCurrentUserId() || '') : '';
+  const rows = (bl.ok && bl.uid === uid) ? (bl.rows || []) : [];
+  const orgs = new Set(rows.map(r => r.org));
+  const now = Date.now();
+  return {
+    rows: rows.map((r) => {
+      const split = (typeof splitSiteSnapshot === 'function') ? splitSiteSnapshot(r.site) : { client: '', site: r.site };
+      return Object.assign({}, r, {
+        title: split.site || r.name || r.site || 'Untitled job', client: split.client || '',
+        you: r.user === uid, days: binDaysLeft(r.purgeAt, now), busy: (bl.busy || {})[r.n] || '' });
+    }),
+    several: orgs.size > 1,
+  };
+}
+
+function _binRow(n) {
+  const bl = state.binList;
+  if (!bl || !bl.ok) return null;
+  return (bl.rows || []).find(r => String(r.n) === String(n)) || null;
+}
+
+// 10A: put it back. No question — nothing is lost by it.
+function binRestore(n) {
+  const bl = state.binList;
+  const row = _binRow(n);
+  if (!bl || !row || bl.busy[row.n]) return Promise.resolve(false);
+  if (typeof _syncOffline === 'function' && _syncOffline()) { showToast('No signal — try again when you’re connected'); return Promise.resolve(false); }
+  bl.busy[row.n] = 'Putting it back…';
+  if (state.view === 'recentlyDeleted') render();
+  return syncBinRestore(row.n).then((res) => _binAfter(bl, row, res, 'restore'));
+}
+
+// 11A: delete it for good now — asked first.
+function binForgetAsk(n) {
+  const bl = state.binList;
+  const row = _binRow(n);
+  if (!bl || !row || bl.busy[row.n] || typeof openConfirmSheet !== 'function') return;
+  const name = binModel().rows.find(r => r.n === row.n);
+  const pl = (k, w) => `${k} ${w}${k === 1 ? '' : 's'}`;
+  const bits = [pl(row.items, 'item')];
+  if (row.photos) bits.push(pl(row.photos, 'photo'));
+  openConfirmSheet({
+    title: 'Delete for good?',
+    message: `“${name ? name.title : 'This job'}” (${bits.join(', ')}${row.certNo ? ', certificate ' + row.certNo : ''}) is deleted for good now, with its photos. It can’t be put back.`,
+    confirmLabel: 'Delete for good',
+    onConfirm: () => binForget(row.n),
+  });
+}
+
+function binForget(n) {
+  const bl = state.binList;
+  const row = _binRow(n);
+  if (!bl || !row || bl.busy[row.n]) return Promise.resolve(false);
+  if (typeof _syncOffline === 'function' && _syncOffline()) { showToast('No signal — try again when you’re connected'); return Promise.resolve(false); }
+  bl.busy[row.n] = 'Deleting for good…';
+  if (state.view === 'recentlyDeleted') render();
+  return syncBinForget(row.n).then((res) => _binAfter(bl, row, res, 'forget'));
+}
+
+function _binAfter(bl, row, res, what) {
+  delete bl.busy[row.n];
+  if (state.binList !== bl) return !!res.ok;
+  if (res.ok || res.code === 'gone') {
+    bl.rows = (bl.rows || []).filter(r => r.n !== row.n);
+    if (state.binCount && state.binCount.ok) state.binCount.n = bl.rows.length;
+  }
+  if (res.ok) {
+    if (what === 'restore') {
+      showToast(row.user === ((typeof _syncCurrentUserId === 'function') ? _syncCurrentUserId() : '')
+        ? 'Put back — it’s in the cloud again'
+        : `Put back — it’s in the cloud again. ${row.engineer ? row.engineer + '’s' : 'Their'} phone takes it back at its next sync if it’s a recent job`);
+      if (state.cloudJobs) { state.cloudJobs.stale = true; if (state.cloudJobs.biz) state.cloudJobs.biz.ok = false; }
+    } else {
+      showToast('Deleted for good');
+    }
+  } else if (res.code === 'gone') {
+    showToast(what === 'restore' ? 'It isn’t in Recently deleted any more.' : 'It was already gone.');
+  } else if (res.offline) {
+    showToast('No signal — nothing changed');
+  } else if (res.needsUpdate) {
+    showToast((typeof SYNC_BIN_UPDATE_WORDS === 'string') ? SYNC_BIN_UPDATE_WORDS : 'The cloud needs updating.');
+  } else if (res.code === 'not_allowed') {
+    showToast(what === 'restore' ? 'Only the business owner can put it back.' : 'Only the business owner can delete it for good.');
+  } else if (res.code === 'plan') {
+    showToast('This business’s plan has ended, so the cloud isn’t taking changes.');
+  } else {
+    showToast('Nothing changed: ' + String(res.error || 'couldn’t reach the cloud.').replace(/^./, (c) => c.toLowerCase()));
+  }
+  if (state.view === 'recentlyDeleted') render();
+  return !!res.ok;
 }

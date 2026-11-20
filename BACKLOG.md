@@ -18,10 +18,48 @@ here rather than restating it. Delete an item when it ships.
   the JOB's business, locked only, assign-once, made), the number-before-build order in report.js
   produceCloudReport (take → stamp → build), that the job copy pins the tester (never the office phone's
   instruments), and _reportCloud's lifetime (set for the preview, cleared on close / every early return).
-- **Fourth GPT audit after V171 — NEXT** (R81 0B, 18 Nov — V170 split: V171 = Office makes the certificate;
-  V172 is reserved for fixing what the audit finds). (Was: after V170, V171 its fixes.) Brief it that the second audit's finding 5 was
+- V172 (Recently deleted): brief the fourth audit on bin_job (SECURITY DEFINER — the Owner for someone
+  else's job, can_wipe for your own), bin_catch / bin_catch_photo (a push can never revive a binned job;
+  its late work lands in the entry), the restrictive storage policy on binned files, bin_restore closing
+  the entry BEFORE the rows go live, bin_purge / bin_forget emptying the doc and the bin-files Edge
+  Function (service key, no orders taken), and the phone side: no session tombstone and never st.gone
+  for a binned marker (sync.js _syncPull).
+- **Fourth GPT audit after V174 — NEXT after jobs drift to the cloud** (R83 1A + O-a, 19 Nov: the
+  team-jobs delete — V172 Recently deleted + the Owner's delete, V173 a Team leader's / Office's delete as
+  a request — and jobs drifting to the cloud, V174, all come BEFORE it; V175 its fixes). (Was: after V171,
+  V172 its fixes.) (Was: after V170, V171 its fixes.) Brief it that the second audit's finding 5 was
   fixed in V168 (refusals per business; photo files by their job's business).
   (Was: after V169, V170 its fixes — Peter, 13 Nov.)
+
+### Next after V172
+V172 = Recently deleted + the Owner deletes a business's job (R83, 19 Nov: "1A 2C 3B 4A 5A 6A+B 7A", then
+"0 defaults, 8A 9B 10A 11A 12 both"; built in Opus). SQL: supabase/v172-recently-deleted.sql (job_bin,
+bin_settings, bin_job / bin_list / bin_restore / bin_forget, bin_catch / bin_catch_photo, the binned-files
+policy, bin_purge hourly, bin_files_due / _done for the Edge Function; K1–K6; isolation 37a–37c);
+supabase/functions/bin-files/index.js (NEW). sync.js (the pull's binned marker; syncCloudDelete → bin_job;
+syncBinJob / List / Restore / Forget), settings-actions.js (the look's Delete; Recently deleted at the end),
+render-review.js, render-core.js, dispatch.js, styles.css. Harness 114 + M2305–M2350; 44 / 45 re-aimed.
+**Next — V173: a Team leader's or the Office's delete as a request the Owner approves or refuses** (R83 O-b:
+the job stays, marked "Delete requested by …", the Owner sees it like a move request, refused → the asker
+told; the database's can_wipe for others' jobs tightened to match — today bin_job already refuses them).
+Then V174 jobs drift to the cloud (own short round: the age, the pace, a switch, the words — R74: the phone
+tab then takes the Cloud tab's design), the fourth audit, V175 its fixes.
+
+### V172 residuals (known, accepted)
+- A phone's own Delete job (9B) still deletes from the cloud at once — not via Recently deleted. Could follow.
+- Restore brings a job back onto its engineer's phone only if it belongs there (the V93 window — recent, or
+  a retest due); an older one stays in the cloud, as any cloud job. The toast says "if it's a recent job".
+- A phone on V171 or older that had the job: an unchanged copy goes as before; a changed copy asks
+  "deleted on another phone" (it can't tell a binned marker); after a restore it asks "deleted here". The
+  minimum-version setting (V151) can move people on.
+- A V171 (or older) phone's Cloud-tab delete still sends the old permanent update on the V172 database — it
+  can't be told from a phone's own Delete job (9B). Update phones (raise the minimum once V172 is live).
+- An engineer who deleted the job on their own phone while it was in Recently deleted: the Owner can still
+  put it back (the Owner decides).
+- The photo files of a job gone for good wait until bin_settings.files_url is set and bin-files deployed —
+  until then they are counted (files_left) and nothing is lost or exposed (only the bin's own rules reach them).
+- PGlite stand-in: isolation 23c / 27a / 27b fail there on V171's schema too (the join flow needs the hosted
+  auth) — not V172.
 
 ### Next after V171
 V171 = Office makes the certificate from the cloud; Finish & lock; the office's chips (R82, 19 Nov:

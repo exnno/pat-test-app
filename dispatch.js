@@ -277,6 +277,11 @@ registerActions({
   'cs-look':            (arg) => cloudStoreLook(arg),   // V166 (3A): a business's biggest job, look-only
   'corrections-open':   () => openCorrectionsSheet(),   // V167 (5A): the job's trail, read-only
   'cs-back':            () => cloudStoreBack(),
+  'bin-open':           () => binOpen(),                        // V172 (12): Recently deleted
+  'bin-back':           () => binBack(),
+  'bin-refresh':        () => binLoad(),
+  'bin-restore':        (arg) => binRestore(arg),               // V172 (10A)
+  'bin-forget':         (arg) => binForgetAsk(arg),             // V172 (11A)
   'cs-refresh':         () => cloudStoreLoad(),
   'cs-select-toggle':   () => cloudStoreToggleSelecting(),
   'cs-tap':             (arg) => cloudStoreTap(arg),

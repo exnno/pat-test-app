@@ -4670,4 +4670,18 @@ li.cloud-redo { font-size: 0.875rem; }
 .cert-made-line { display: flex; align-items: center; gap: 6px; margin: 0 0 12px; font-size: 0.875rem; }
 .cloud-lockf-row { margin-top: 2px; }
 .cloud-lockf-note { margin: 0 0 8px; }
+/* V172 (R83): Recently deleted — the Delete at the foot of the look-only job, the
+   way in (Cloud tab, Cloud Storage) and the page's cards. */
+.cloud-bin-row { margin: 16px 0 4px; padding-top: 12px; border-top: 1px solid var(--border); }
+.cloud-bin-btn { width: 100%; display: flex; align-items: center; justify-content: center; gap: 6px; color: var(--fail-word); }
+.cloud-bin-row .pm-note { margin-top: 6px; }
+.cloud-del-who { font-size: 0.8125rem; color: var(--text-muted); }
+.bin-line { display: inline-flex; align-items: center; gap: 4px; margin: 10px 0 4px; min-height: 40px; font-size: 0.875rem; text-decoration: none; }
+.bin-count { display: inline-block; min-width: 1.25rem; padding: 0 6px; border-radius: 999px; background: var(--fail); color: #fff; font-size: 0.75rem; font-weight: 700; text-align: center; line-height: 1.25rem; }
+.bin-card { display: block; }
+.bin-card .bin-by { font-size: 0.8125rem; }
+.bin-actions { display: flex; align-items: center; gap: 12px; margin-top: 10px; }
+.bin-actions .bin-restore { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; font-size: 0.875rem; }
+.bin-actions .bin-forget { color: var(--fail-word); font-size: 0.875rem; }
+
 /* (c) 2026 Peter Birchley. All rights reserved. */

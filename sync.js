@@ -979,9 +979,13 @@ function _syncValidDoc(doc, id) {
 // this phone hasn't got comes down — its date and its retest reminder — picked
 // out of the doc by the database (~40 bytes), never the doc itself.
 const _SYNC_JOB_PICKS = 'date:doc->>date,rt:doc->>retestTrack,rm:doc->>retestMonths,rc:doc->retestContact->>status';
+// V172: a deleted marker made by Recently deleted (supabase bin_job) names who
+// deleted it — null on every other row. Doc fields, so no new column: any cloud
+// answers this select, with or without the V172 SQL.
+const _SYNC_JOB_BIN_PICKS = 'binBy:doc->>binnedBy,binRole:doc->>binnedRole';
 // V150 (3A): and the job's business (org_id, ~40 bytes) — the cloud's answer,
 // which wins over the job's own businessId (business.js businessReconcileJobs).
-const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS;
+const _SYNC_JOB_LIST_COLS = 'id,fp,deleted,updated_at,org:org_id,' + _SYNC_JOB_PICKS + ',' + _SYNC_JOB_BIN_PICKS;
 const _SYNC_JOB_DOC_COLS = 'id,doc,fp,deleted,updated_at';
 
 // ---- V93: which jobs belong on this phone (1A, 2A — R21, R22) -------------------
@@ -1135,6 +1139,17 @@ function syncBoot() {
 // object has no cached encoding and so cannot be written back from a stale one.
 // The outgoing object is invalidated too, because activeSession()'s memo and any
 // closure taken before this run may still be holding that exact reference.
+// V172 (O-e): the marker a job in Recently deleted leaves — { by, role } from the
+// list's picks (binBy / binRole) or a fetched doc; null for any other delete.
+function _syncBinOf(row) {
+  if (!row || row.deleted !== true) return null;
+  const d = (row.doc && typeof row.doc === 'object') ? row.doc : null;
+  const by = (typeof row.binBy === 'string' && row.binBy) ? row.binBy : (d && typeof d.binnedBy === 'string' ? d.binnedBy : '');
+  if (!by) return null;
+  const role = (typeof row.binRole === 'string') ? row.binRole : (d && typeof d.binnedRole === 'string' ? d.binnedRole : '');
+  return { by: by.slice(0, 80), role: role.slice(0, 20) };
+}
+
 function _syncReplaceSession(id, oldSess, doc) {
   const i = state.sessions.indexOf(oldSess);
   if (i === -1) return false;
@@ -1151,12 +1166,15 @@ function _syncReplaceSession(id, oldSess, doc) {
 // runs inside a promise, where render() would tear down a focused field (MAP
 // rules 2/3). The duplication is the point of harness 17f: if deleteSession
 // ever grows a fourth sweep, that test fails until this grows it too.
-function _syncApplyRemoteDelete(id) {
+// V172 (O-g): `binned` — the job went to Recently deleted. No session tombstone
+// then: it may be restored, and a restored job must come back here like any job
+// from the cloud (a tombstone would make it a "deleted here" question instead).
+function _syncApplyRemoteDelete(id, binned) {
   const going = state.sessions.filter(s => s.id === id);
   if (!going.length) return false;
   archiveSessionStats(going);
   photosDeleteForSessions([id]);
-  recordTombstone('session', id);
+  if (!binned) recordTombstone('session', id);
   state.sessions = state.sessions.filter(s => s.id !== id);
   return true;
 }
@@ -1356,6 +1374,7 @@ function _syncPull(c, uid, st, out, chk) {
 
     if (row.deleted === true) {
       delete st.conf[id];   // V91: nothing in the cloud to vouch for it
+      const bin = _syncBinOf(row);   // V172: deleted into Recently deleted, and by whom
       if (!local) {
         // Already gone here. Record that the cloud knows, so the push does not
         // send our own tombstone for it a second time.
@@ -1367,13 +1386,25 @@ function _syncPull(c, uid, st, out, chk) {
       // safety copy could be kept, so even a clean copy is asked about, not removed.
       if (!row.ask && st.sent[id] === syncHash(_syncCanonical(local))) {
         if (defer('delete')) return;
-        _syncApplyRemoteDelete(id);
+        _syncApplyRemoteDelete(id, !!bin);
         delete st.sent[id];
-        st.gone[id] = true;
-        out.removed++; changed = true;
+        // ⚠ V172: never st.gone for a binned job — the photo half deletes the
+        // FILES of jobs in st.gone, and Recently deleted keeps them to restore.
+        if (bin) {
+          if (Array.isArray(out.binned)) out.binned.push({ id, name, by: bin.by, role: bin.role });
+        } else {
+          st.gone[id] = true;
+          out.removed++;
+        }
+        changed = true;
         _syncHeldClear(id);
         return;
       }
+      // V172 (O-d): deleted into Recently deleted while this phone still has work
+      // the cloud hasn't got. Not a question: the push half of this run sends it
+      // as usual — the cloud keeps it in the Recently deleted copy (bin_catch) and
+      // the row stays deleted — and the next read takes the job off, nothing lost.
+      if (bin) { _syncHeldClear(id); return; }
       // Deleted on the other phone, edited on this one. The edit exists nowhere
       // else, so it is not being thrown away on a guess.
       _syncHeldNote({ id, reason: 'deleted-elsewhere', name,
@@ -1586,8 +1617,9 @@ function _syncPull(c, uid, st, out, chk) {
               if (d.want.has(id)) { if (d.got.has(id)) decide(d.got.get(id)); else blocked = true; }
               // V93: a light row keeps the list's picks (date, retest) — decide's
               // window check reads them (harness 30a found them dropped here).
+              // V172: and who deleted it into Recently deleted (binBy / binRole).
               else decide({ id: row.id, fp: row.fp, deleted: row.deleted, updated_at: row.updated_at,
-                date: row.date, rt: row.rt, rm: row.rm, rc: row.rc });
+                date: row.date, rt: row.rt, rm: row.rm, rc: row.rc, binBy: row.binBy, binRole: row.binRole });
             }
             if (typeof u === 'string' && u > high) high = u;
           }
@@ -1916,6 +1948,9 @@ function _syncOutcome(r) {
   // V128: capital R when it opens the line — a stale phone's check often removes
   // without bringing anything in, and the line used to start "removed …".
   if (p.removed) bits.push((bits.length ? 'removed ' : 'Removed ') + plural(p.removed, 'job deleted on your other device', 'jobs deleted on your other device'));
+  // V172 (O-e): taken off because someone deleted it from the cloud.
+  const nb = Array.isArray(p.binned) ? p.binned.length : 0;
+  if (nb) bits.push((bits.length ? 'removed ' : 'Removed ') + plural(nb, 'job', 'jobs') + ' ' + syncBinByText(p.binned));
   if (r.sent) bits.push((bits.length ? 'sent ' : 'Sent ') + plural(r.sent, 'job', 'jobs'));
   if (r.deleted) bits.push((bits.length ? 'sent ' : 'Sent ') + plural(r.deleted, 'deletion', 'deletions'));
 
@@ -2039,7 +2074,7 @@ function _syncRun(o) {
 // out of _syncRun unchanged).
 function _syncRunAs(c, uid, session, opts) {
     const st = _syncStateFor(uid);
-    const pulled = { applied: 0, added: 0, removed: 0, held: 0, waiting: null };
+    const pulled = { applied: 0, added: 0, removed: 0, held: 0, waiting: null, binned: [] };
     // V143 (5A): the cloud refused this account's changes, and no plan read
     // since says it may work again — this run only READS. A tap on Sync now
     // tries once anyway (the person asked; it costs one refusal).
@@ -2075,7 +2110,7 @@ function _syncRunAs(c, uid, session, opts) {
       // fail-soft (a failure never stops the run; the month isn't stamped).
       const look = () => _syncRetestLook(c, uid, st, pulled)
         .catch((e) => { console.error('Sync: retest look not done this time (non-fatal).', e); });
-      const first = reads ? _syncPull(c, uid, st, pulled, chk).then(look) : Promise.resolve();
+      const first = reads ? _syncPull(c, uid, st, pulled, chk).then((x) => { _syncBinNotice(pulled.binned); return x; }).then(look) : Promise.resolve();
       // v83: instruments deleted on the other phone are frozen onto this phone's
       // jobs HERE — after the jobs were read, before they are sent. See the v83
       // note on records. Failed read or not, the copies are written: a job left
@@ -5474,6 +5509,140 @@ function syncCorrectJob(holder, id, org, changes, reason) {
     });
 }
 
+// ---- V172 (R83 — 6B 8A 10A 11A, O-d O-e O-g): Recently deleted --------------------
+// A job deleted from the cloud goes to Recently deleted for 30 days (supabase
+// v172-recently-deleted.sql): bin_job keeps it whole and leaves the ordinary
+// deleted marker (naming who — _syncBinOf), so every phone takes it off (4A);
+// the Owner of its business restores it (bin_restore — it comes back to its
+// phones like any job from the cloud, O-g) or deletes it for good sooner
+// (bin_forget, 11A); after 30 days it goes by itself, its photos with it (5A).
+// Calls only: nothing here is stored. Each resolves, never rejects.
+const SYNC_BIN_CODES = ['signed_out', 'bad', 'gone', 'moved', 'not_allowed'];
+const SYNC_BIN_UPDATE_WORDS = 'The cloud needs updating before jobs can go to Recently deleted (the V172 database update).';
+function _syncBinCode(e) {
+  const msg = String((e && (e.message || e.details || e.hint)) || '');
+  const m = /patgo_bin_([a-z_]+)/.exec(msg);
+  if (m && SYNC_BIN_CODES.includes(m[1])) return m[1];
+  if (/patgo_plan_locked/.test(msg)) return 'plan';
+  return '';
+}
+function _syncBinNeedsUpdate(e) {
+  if (!e) return false;
+  const msg = String(e.message || '');
+  if ((e.code === 'PGRST202' || e.code === '42883') && !/patgo_/.test(msg)) return true;
+  return /Could not find the function|does not exist/i.test(msg) && /bin_(job|list|restore|forget)/.test(msg);
+}
+function _syncBinFail(res, e) {
+  res.code = _syncBinCode(e);
+  if (!res.code) res.needsUpdate = _syncBinNeedsUpdate(e);
+  if (!res.code && !res.needsUpdate) res.error = (typeof syncErrorMessage === 'function') ? syncErrorMessage(e) : 'Couldn’t reach the cloud.';
+  return res;
+}
+function syncBinRoleText(role) {
+  const w = (typeof BUSINESS_ROLE_WORDS === 'object' && BUSINESS_ROLE_WORDS) ? BUSINESS_ROLE_WORDS[role] : '';
+  return w || '';
+}
+// "by Peter (Owner)" — or "by Peter (Owner) and Cath (Office)" — for the jobs
+// taken off this phone (O-e).
+function syncBinByText(list) {
+  const seen = [];
+  for (const b of (list || [])) {
+    const r = syncBinRoleText(b && b.role);
+    const w = String((b && b.by) || 'someone') + (r ? ` (${r})` : '');
+    if (seen.indexOf(w) === -1) seen.push(w);
+  }
+  if (!seen.length) return 'deleted from the cloud';
+  return 'deleted from the cloud by ' + (seen.length === 1 ? seen[0] : seen.slice(0, -1).join(', ') + ' and ' + seen[seen.length - 1]);
+}
+// O-e: the engineer is told on this phone — one toast, after the read.
+function _syncBinNotice(list) {
+  if (!Array.isArray(list) || !list.length || typeof showToast !== 'function') return;
+  try {
+    const one = list.length === 1;
+    const what = one ? (list[0].name ? `“${String(list[0].name).slice(0, 60)}”` : 'A job') : `${list.length} jobs`;
+    showToast(`${what} removed from this phone — ${syncBinByText(list)}`);
+  } catch (e) { /* a notice only */ }
+}
+
+// The Owner (or, for their own job, whoever the cloud's delete rule allows)
+// deletes ONE job into Recently deleted. For a job held by someone else; your own
+// goes through syncCloudDelete (which also settles this phone's bookkeeping).
+// Resolves { ok, photos, code, offline, needsUpdate, error }.
+function syncBinJob(holder, id, org) {
+  const res = { ok: false, photos: 0, code: '', offline: false, needsUpdate: false, error: '' };
+  const u = String(holder || ''), sid = String(id == null ? '' : id), o = String(org || '');
+  if (!_SYNC_UUID_RE.test(u) || typeof safeId !== 'function' || !safeId(sid) || (o && !_SYNC_UUID_RE.test(o))) {
+    res.code = 'bad'; return Promise.resolve(res);
+  }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  return syncDataClient()
+    .then((c) => c.rpc('bin_job', { holder: u, job: sid, org: o || null }))
+    .then((r) => {
+      if (r && r.error) throw r.error;
+      const out = r ? r.data : null;
+      res.ok = true;
+      res.photos = (out && typeof out.photos === 'number' && isFinite(out.photos)) ? Math.max(0, Math.round(out.photos)) : 0;
+      return res;
+    }).catch((e) => _syncBinFail(res, e));
+}
+
+// What the caller may restore — each row checked, anything odd left out.
+// Resolves { ok, rows, offline, needsUpdate, error }.
+function _syncBinRow(x) {
+  if (!x || typeof x !== 'object') return null;
+  const n = Number(x.n);
+  const id = String(x.id == null ? '' : x.id);
+  if (!Number.isSafeInteger(n) || n <= 0 || !_SYNC_UUID_RE.test(String(x.user_id || ''))
+      || typeof safeId !== 'function' || !safeId(id)) return null;
+  const txt = (v, max) => (typeof v === 'string' ? v : '').slice(0, max);
+  const num = (v) => (typeof v === 'number' && isFinite(v) && v > 0) ? Math.round(v) : 0;
+  const when = (v) => (typeof v === 'string' && !isNaN(Date.parse(v))) ? v : '';
+  return { n, user: String(x.user_id), id, org: _SYNC_UUID_RE.test(String(x.org_id || '')) ? String(x.org_id) : '',
+    orgName: txt(x.org_name, 120), site: txt(x.site, 200), name: txt(x.name, 200), date: txt(x.job_date, 40),
+    engineer: txt(x.engineer, 80), items: num(x.items), fails: num(x.fails), photos: num(x.photos),
+    certNo: txt(x.cert_no, 60), locked: x.locked === true, at: when(x.binned_at), byName: txt(x.binned_name, 80),
+    byRole: txt(x.binned_role, 20), byYou: x.by_you === true, purgeAt: when(x.purge_at) };
+}
+function syncBinList() {
+  const res = { ok: false, rows: [], code: '', offline: false, needsUpdate: false, error: '' };
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  return syncDataClient()
+    .then((c) => c.rpc('bin_list'))
+    .then((r) => {
+      if (r && r.error) throw r.error;
+      const rows = Array.isArray(r && r.data) ? r.data : [];
+      res.rows = rows.map(_syncBinRow).filter(Boolean);
+      res.ok = true;
+      return res;
+    }).catch((e) => _syncBinFail(res, e));
+}
+
+// 10A / 11A: the Owner puts it back, or deletes it for good now. A restore is
+// followed by a reading run, so a job of this account's own comes back here at
+// once (if it belongs on the phone — the V93 window, as any cloud job).
+function _syncBinEntryCall(fn, n) {
+  const res = { ok: false, code: '', offline: false, needsUpdate: false, error: '', photos: 0 };
+  const k = Number(n);
+  if (!Number.isSafeInteger(k) || k <= 0) { res.code = 'bad'; return Promise.resolve(res); }
+  if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
+  return syncDataClient()
+    .then((c) => c.rpc(fn, { entry: k }))
+    .then((r) => {
+      if (r && r.error) throw r.error;
+      const out = r ? r.data : null;
+      res.ok = true;
+      if (out && typeof out.photos === 'number' && isFinite(out.photos)) res.photos = Math.max(0, Math.round(out.photos));
+      return res;
+    }).catch((e) => _syncBinFail(res, e));
+}
+function syncBinRestore(n) {
+  return _syncBinEntryCall('bin_restore', n).then((res) => {
+    if (res.ok) { try { syncPush({ pull: true }); } catch (e) { /* the next trigger reads it */ } }
+    return res;
+  });
+}
+function syncBinForget(n) { return _syncBinEntryCall('bin_forget', n); }
+
 // ---- V171 (1A 2A 5A): a certificate made for a job held in the cloud ---------------
 // One call to the cloud's cert_stamp (supabase/v171-office-certs.sql), which
 // checks it all itself — the caller's role in the JOB's business (Owner / Team
@@ -5907,28 +6076,20 @@ function syncBringBack(ids) {
 // In this order, holding the run lock (_syncRunning) so no pull or push starts
 // in between — a run holds its own copy of the sync state and would overwrite
 // what this writes (the reason syncWhenIdle exists):
-//   1. reads the jobs' photo ROWS (never an image — R17): id, job, item, size;
-//   2. empties and marks deleted each job's row — the same row a delete
-//      everywhere sends (doc {}, fp null, deleted true) — with an UPDATE, so only
-//      rows still live are touched and the answer says which were. Other phones
-//      learn of it as they learn of any delete: an unchanged copy goes, a changed
-//      copy asks first ("deleted on another phone") — never lost silently;
-//   3. only for the jobs the cloud took: forgets them here (sent, conf, resend,
+//   1. (V172) each job to Recently deleted — rpc bin_job, one at a time: the
+//      cloud keeps the job and its photos, marks the photo rows deleted, and
+//      leaves the ordinary deleted marker. Other phones learn of it as they learn
+//      of any delete; one with unsent work sends it first, into the kept copy
+//      (O-d — sync.js _syncPull, supabase bin_catch) — never lost;
+//   2. only for the jobs the cloud took: forgets them here (sent, conf, resend,
 //      held, and the cleared list — left there, the pull would skip their row for
-//      ever: the V80 backlog note), makes their photos KNOWN (st.ph.sent) and
-//      records a 'photo' tombstone for each, so the next run's photo half marks
-//      the rows deleted and removes both files — the V89 ledger path, which
-//      retries until it lands;
-//   4. sweeps any copy of those photos still on this phone (cleared-job
-//      leftovers). A copy on the phone reads as "live" and would stop the delete.
-// Then the lock is released and a READING run starts (the photo half runs only
-// in those): it carries the photo deletes, and any trigger that arrived meanwhile
-// (syncPush saw the lock) runs with it.
+//      ever: the V80 backlog note). No photo tombstones (V107 had them): the
+//      files stay in the cloud for a restore;
+//   3. sweeps any copy of those photos still on this phone (cleared-job
+//      leftovers).
+// Then the lock is released and a READING run starts: it reads the photo rows
+// the cloud marked, and any trigger that arrived meanwhile runs with it.
 //
-// ⚠ ORDER. The job rows go BEFORE any photo is marked. A failure or a closed app
-// between 2 and 3 leaves photos with no job in the cloud (the photo manager's
-// "Photos with no job" lists them); the other order could delete the photos of
-// a job that was never deleted.
 // ⚠ No session tombstone and no st.gone. The push sends a tombstone only for a
 // job it sent (rule 32's guards), and st.gone[id] would make the photo half
 // delete the job's photos again if it ever came back live (a phone that changed
@@ -5936,11 +6097,14 @@ function syncBringBack(ids) {
 // for an id this phone doesn't know changes nothing here.
 // Lifetime stats are untouched: a cleared job's tallies stay archived (no delete
 // lowers the counter, v59), and a job never on this phone was never counted.
-// Resolves { ok, offline, error, deleted, photos, skipped, missing, ids } —
+// ⚠ V172 (8A): the jobs now go to Recently deleted (bin_job, one each) — kept
+// whole for 30 days with their photo files, which nothing here deletes any more.
+// Without the V172 SQL nothing is deleted (needsUpdate) — never the old way.
+// Resolves { ok, offline, error, deleted, photos, skipped, missing, ids, needsUpdate } —
 // `ids` the jobs the cloud took (the tab drops them without reading again).
 function syncCloudDelete(ids) {
   const want = Array.from(new Set((ids || []).map(String).filter(Boolean)));
-  const res = { ok: false, offline: false, error: '', deleted: 0, photos: 0, skipped: 0, missing: 0, ids: [] };
+  const res = { ok: false, offline: false, error: '', deleted: 0, photos: 0, skipped: 0, missing: 0, ids: [], needsUpdate: false };
   if (!want.length) { res.ok = true; return Promise.resolve(res); }
   if (!syncActive() || _syncOffline()) { res.offline = true; return Promise.resolve(res); }
   const uid = _syncCurrentUserId();
@@ -5971,67 +6135,41 @@ function _syncCloudDeleteRun(uid, want, res) {
   const ids = want.filter(id => !local.has(id));
   res.skipped = want.length - ids.length;
   if (!ids.length) { res.ok = true; return Promise.resolve(res); }
-  const batch = (typeof SYNC_PHOTO_NEED_BATCH === 'number') ? SYNC_PHOTO_NEED_BATCH : 50;
-  const size = (typeof SYNC_BROWSE_PAGE === 'number') ? SYNC_BROWSE_PAGE : 1000;
-  const photos = [];
   const done = [];
-  let c = null, failed = null;
-  return syncDataClient().then((cl) => {
-    c = cl;
-    // 1. The photo rows, keyset paged within each batch of jobs.
+  let failed = null;
+  // V172 (8A): each job goes to Recently deleted — one bin_job each (the cloud
+  // checks it, keeps the whole job and its photos for 30 days, and leaves the
+  // ordinary deleted marker every phone obeys). No photo rows read, no photo
+  // tombstones: the files stay for a restore (and a binned file can't be deleted
+  // by anyone signed in). One that fails stops the rest; those already taken are
+  // still settled below.
+  return syncDataClient().then((c) => {
     let chain = Promise.resolve();
-    for (let k = 0; k < ids.length; k += batch) {
-      const chunk = ids.slice(k, k + batch);
-      const page = (after) => {
-        let q = c.from('photos').select('id,session_id,item_id,bytes').eq('user_id', uid).eq('deleted', false).in('session_id', chunk);
-        if (after) { q = q.gt('id', after); }
-        return q.order('id', { ascending: true }).limit(size).then((r) => {
-          if (r && r.error) { throw r.error; }
-          const got = (r && r.data) || [];
-          for (const row of got) {
-            const id = String(row && row.id != null ? row.id : '');
-            const s = String(row && row.session_id != null ? row.session_id : '');
-            const i = String(row && row.item_id != null ? row.item_id : '');
-            if (!id || !s || !i) continue;
-            const e = { id, s, i };
-            const b = Number(row.bytes);
-            if (b > 0 && isFinite(b)) e.b = Math.round(b);
-            photos.push(e);
-          }
-          if (got.length < size) return;
-          return page(String(got[got.length - 1].id));
+    for (const id of ids) {
+      chain = chain.then(() => {
+        if (failed) return;
+        const su = _syncLoad().userId;
+        if (su && su !== uid) { res.error = 'Signed in as someone else now.'; failed = true; return; }
+        return c.rpc('bin_job', { holder: uid, job: id, org: null }).then((r) => {
+          if (r && r.error) throw r.error;
+          const out = r ? r.data : null;
+          const n = out && typeof out.photos === 'number' && isFinite(out.photos) ? Math.max(0, Math.round(out.photos)) : 0;
+          done.push(id);
+          res.photos += n;
+        }).catch((e) => {
+          const code = _syncBinCode(e);
+          if (code === 'gone') { res.missing++; return; }
+          if (_syncBinNeedsUpdate(e)) { res.needsUpdate = true; res.error = SYNC_BIN_UPDATE_WORDS; failed = true; return; }
+          if (code === 'not_allowed') { res.error = 'Only the business owner can delete this from the cloud.'; failed = true; return; }
+          if (code === 'plan') { res.error = 'This business’s plan has ended, so the cloud isn’t taking changes.'; failed = true; return; }
+          failed = e;
         });
-      };
-      chain = chain.then(() => page(''));
+      });
     }
     return chain;
   }).then(() => {
-    const su = _syncLoad().userId;
-    if (su && su !== uid) { res.error = 'Signed in as someone else now.'; return; }
-    // 2. The job rows. A batch that fails stops the rest; those already taken
-    //    are still settled below.
-    const now = new Date().toISOString();
-    const rowsAt = (typeof SYNC_BATCH_ROWS === 'number') ? SYNC_BATCH_ROWS : 25;
-    let chain = Promise.resolve();
-    for (let k = 0; k < ids.length; k += rowsAt) {
-      const chunk = ids.slice(k, k + rowsAt);
-      chain = chain.then(() => c.from('sessions')
-        .update({ doc: {}, fp: null, deleted: true, last_modified: now })
-        .eq('user_id', uid).eq('deleted', false).in('id', chunk).select('id'))
-        .then((r) => {
-          if (r && r.error) { throw r.error; }
-          for (const row of ((r && r.data) || [])) {
-            const id = String(row && row.id != null ? row.id : '');
-            if (id && chunk.indexOf(id) !== -1 && done.indexOf(id) === -1) done.push(id);
-          }
-        });
-    }
-    return chain.catch((e) => { failed = e; });
-  }).then(() => {
-    if (res.error) return;
-    // 3. Settle what the cloud took, in one synchronous step (the lock is held).
+    // Settle what the cloud took, in one synchronous step (the lock is held).
     const gone = new Set(done);
-    const mine = photos.filter(p => gone.has(p.s));
     if (gone.size) {
       const st = _syncStateFor(uid);
       if (st.userId === uid) {
@@ -6039,38 +6177,26 @@ function _syncCloudDeleteRun(uid, want, res) {
           delete st.sent[id]; delete st.resend[id];
           if (st.conf) delete st.conf[id];
         }
-        for (const p of mine) {
-          if (st.ph.sent[p.id]) continue;
-          const o = { s: p.s, i: p.i };
-          if (p.b) o.b = p.b;
-          st.ph.sent[p.id] = o;
-        }
         _syncSave(st);
       }
       for (const id of gone) _syncHeldClear(id);
       const list = _syncPrunedLoad();
       const kept = list.filter(e => !gone.has(e.id));
       if (kept.length !== list.length) _syncPrunedSave(kept);
-      for (const p of mine) {
-        if (typeof recordTombstone === 'function') recordTombstone('photo', p.id);
-        if (typeof photoThumbForget === 'function') { try { photoThumbForget(p.id); } catch (e) { /* display only */ } }
-      }
-      if (mine.length && typeof saveTombstones === 'function') saveTombstones();
     }
     res.deleted = done.length;
     res.ids = done.slice();
-    res.photos = mine.length;
-    res.missing = failed ? 0 : ids.length - done.length;
-    // 4. This phone's copies of those photos — awaited, so the run that follows
-    //    sees them gone; done for the jobs taken even when a later batch failed.
+    // This phone's copies of those photos (a cleared job's, still here) —
+    // awaited, so the run that follows sees them gone; done for the jobs taken
+    // even when a later one failed. The cloud keeps its own for a restore.
     let sweep = Promise.resolve();
     if (gone.size && typeof photosDeleteForSessions === 'function') {
       try { sweep = Promise.resolve(photosDeleteForSessions(Array.from(gone))); } catch (e) { sweep = Promise.reject(e); }
       sweep = sweep.catch((e) => { console.error('Cloud delete: photos left on this phone (non-fatal).', e); });
     }
     return sweep.then(() => {
-      if (failed) throw failed;
-      res.ok = true;
+      if (failed && failed !== true) throw failed;
+      res.ok = !failed;
     });
   }).then(() => res);
 }

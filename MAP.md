@@ -1,4 +1,4 @@
-# PATGo — Code Map (V171)
+# PATGo — Code Map (V172)
 
 Routing only: which concern lives in which file, and the cross-file couplings you
 cannot discover by reading one file. Read this to decide *what to open*.
@@ -1303,6 +1303,16 @@ V167.1: your OWN job too — `look.jobOrg` (sync.js `syncCloudJob`'s `org`, the 
 answer) + `cloudFixOwnOk(org)` (stored list role ∈ CLOUD_SCOPE_ROLES — a solo owner
 included; never in a tutorial); `cloudLookFixOrg(look)` names it to the rpc; on this
 phone a sync is started (`syncPushSoon(0, {pull})`).
+⚠ V172: DELETE FROM THE LOOK — `cloudLookBinState(look)` {show, can, own, why}: someone else's
+job → stored list role 'owner' of `look.org` only (a TL / Office request is V173); your own
+held only in the cloud → `look.jobOrg`'s role ∈ CLOUD_SCOPE_ROLES or a business of one (the
+cloud's can_wipe), through `syncCloudDelete` (this phone's bookkeeping); on this phone → never.
+`cloudLookDelete` re-checks, `cloudLookBinOverview` feeds V107's `openCloudDeleteSheet` (+ who,
+open), `_cloudLookBinGo` → `_cloudBinDrop` (cj.jobs, cj.biz.jobs, cs.top). RECENTLY DELETED
+(section at the END of the file): `state.binList` {rows, busy, ret, …} memory only; `binOpen`
+(ret from BIN_RETURN_VIEWS) / `binBack` / `binLoad` / `binModel` / `binRestore` / `binForgetAsk`
+(openConfirmSheet) → `binForget` → `_binAfter`; `state.binCount` read with the Cloud tab's list
+(`binCountLoad`, `binCountFor` — `missing` = no V172 SQL → links hidden). Harness 114d–114e.
 
 ### onboarding.js (~250 ln) — first-run wizard — NEW v70
 The wizard state machine (step capture, paging, fresh/import fork, theme pick,
@@ -1408,6 +1418,12 @@ the fix, non-enumerable) / `paintCloudFixState` / `closeCloudFixSheet`; the trai
 `renderJobCorrectionsHTML(doc)` (look AND Overview — `renderOverviewCorrectedHTML`,
 `openCorrectionsSheet` via `corrections-open`); a row's `redo` tag. No top-level
 binding here (09p): role words are `correctionRoleText()`.
+V172: `renderCloudLookBinHTML(look)` (the look's foot; data-look bin → `cloudLookDelete`);
+`openCloudDeleteSheet` now says Recently deleted for 30 days (+ o.who, o.open — 3B);
+`renderBinLineHTML(where)` ('tab' — only when the count > 0, else a hidden placeholder;
+'store' — always) + `_binLinePaint` (in place); `renderRecentlyDeleted()` — view
+'recentlyDeleted' (render-core.js routes it, signed in only; dispatch bin-open / bin-back /
+bin-refresh / bin-restore / bin-forget).
 V98: the Overview's title bar is `.header-row.header-sticky` (styles.css; both the
 normal and selection headers). The site-notes card and its sheet
 (`state.siteNotesSheet`, cleared by setView) are drawn here; the sheet holds an
@@ -1915,6 +1931,19 @@ Server columns from **supabase/v108-storage.sql**; "column does not exist"
 — **supabase/v166-storage.sql**, SECURITY INVOKER (they count only what the reader
 may read). RPCs, not table reads: rule 45 / 48a untouched. Missing function
 (PGRST202 / 42883) → `needsUpdate`. Memory only. Harness 105a–105e, M2061–M2078.
+⚠ V172 (Recently deleted): every Cloud-tab / Cloud Storage delete is `syncCloudDelete` →
+`_syncCloudDeleteRun` → rpc bin_job per job (**supabase/v172-recently-deleted.sql**): the cloud
+keeps the job + photo FILES 30 days, marks the photo rows, leaves the deleted marker whose doc
+is only {binnedAt, binnedBy, binnedRole}. No photo tombstones any more; no V172 SQL → needsUpdate,
+nothing deleted (never the old update). The pull reads who from `_SYNC_JOB_BIN_PICKS` (doc
+fields, no column — ⚠ the light row passed to `decide` must carry binBy/binRole) → `_syncBinOf`.
+A binned marker: clean copy → `_syncApplyRemoteDelete(id, true)` — NO session tombstone and
+NEVER st.gone (the photo half deletes the files of st.gone jobs) — `out.binned` → the toast
+(`_syncBinNotice`) and the Sync line; unsent work → resolved, not held: the push sends it and
+the cloud's bin_catch keeps it in the bin entry (O-d). A restored row is a job from the cloud
+(the V93 window). `syncBinJob(holder, id, org)` (someone else's — the Owner), `syncBinList`,
+`syncBinRestore(n)` (+ a reading run), `syncBinForget(n)`; refusals `patgo_bin_*` →
+SYNC_BIN_CODES. Harness 114a–114c, 114f; 44 re-aimed; M2305–M2324.
 ⚠ V167: `syncCorrectJob(holder, id, org, changes, reason)` — rpc correct_job
 (**supabase/v167-corrections.sql**, SECURITY DEFINER: the ONLY way anyone changes a
 job they don't hold; it checks role / own / locked / fields / `from` / reason itself).
@@ -2376,6 +2405,11 @@ another file having parsed. Don't "DRY" this.
   `org_phones_behind(o)` (the invite check: members' phones reported older, or sign-ins
   never reported, in the window) closed. Nothing refuses by version (1A). Isolation 22a–22e.
   ⚠ Raise `min_version` only to a version already live.
+- `supabase/functions/bin-files/index.js` (V172) — ONE self-contained file (no imports; pasted
+  into the dashboard): deletes the photo files of jobs gone for good from Recently deleted
+  (`bin_files_due` → Storage DELETE in batches of 100 → `bin_files_done`), service key only,
+  "Verify JWT" OFF. Asked by the database (`bin_files_nudge`, pg_net) when bin_settings.files_url
+  is set. Harness 114g imports it in Node.
 - `supabase/functions/` (V142) — the Edge Functions (Deno, plain JS, no packages):
   `billing-checkout`, `billing-portal`, `stripe-webhook` (+ V169 `billing-seats`,
   `billing-switch`), each a one-line `index.js`

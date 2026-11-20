@@ -193,6 +193,8 @@ function render() {
   // V108 (Stage 5 part 3): Cloud Storage — signed in only; signed out (or its
   // markup missing) it falls back to Phone Storage, never a blank screen.
   else if (v === 'cloudStorage') html = (typeof renderCloudStorage === 'function' && typeof syncActive === 'function' && syncActive()) ? renderCloudStorage() : renderSettingsStorage();
+  // V172 (12): Recently deleted — signed in only, the same fallback.
+  else if (v === 'recentlyDeleted') html = (typeof renderRecentlyDeleted === 'function' && typeof syncActive === 'function' && syncActive()) ? renderRecentlyDeleted() : renderSettingsStorage();
   else if (v === 'settingsSetup') html = renderSettingsSetup();   // v33
   // V106 (Stage 10 part 2): Reset This Phone — reset.js is optional, so a stale
   // view without it falls back to Backup & Restore, never a blank screen.
@@ -288,7 +290,7 @@ function render() {
         <span class="fail-close-spacer"></span>
       </div>
       <ul class="welcome-list sheet-scroll">
-        <li><strong>Certificates from the office.</strong> In a business with more than one person, the Owner, a Team leader or the Office can now make a job&rsquo;s certificate straight from the Cloud tab once the engineer has locked it &mdash; and the engineer&rsquo;s phone shows who made it. Engineers get a <em>Finish &amp; lock job</em> button instead of Produce report, and the office can see which jobs need a certificate and which aren&rsquo;t locked yet. Working on your own? Nothing changes.</li>
+        <li><strong>Recently deleted.</strong> A job deleted from the cloud now waits in Recently deleted for 30 days, so a mistake can be put right &mdash; the business owner can put it back, or delete it for good sooner. The Owner can also delete any job in their business from the Cloud tab: open the job, then Delete this job.</li>
       </ul>
       <button class="btn-primary welcome-continue" data-action="welcome-dismiss">Continue</button>
     </div>

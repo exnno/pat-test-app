@@ -1617,13 +1617,14 @@ function renderCloudJobsHTML() {
   const m = cloudJobsModel();
   const st = (typeof cloudScopeStatus === 'function') ? cloudScopeStatus() : { ok: !!cj.ok, loading: !!cj.loading, error: cj.error || '' };
   const storageBtn = (cj.selecting || typeof cloudStoreOpen !== 'function') ? '' : renderCloudStorageLineHTML(m.scope);
+  const binLine = cj.selecting ? '' : renderBinLineHTML('tab');   // V172 (12): Recently deleted
   const scopeHTML = renderCloudScopeHTML(m);
   if (!st.ok) {
     let msg;
     if (st.loading) msg = `<p class="muted pm-note" role="status">Reading the cloud…</p>`;
     else if (st.error) msg = `<p class="pm-note pm-error">${escapeHTML(st.error)}</p><button class="btn-secondary cloud-retry" data-action="cloud-refresh">Try again</button>`;
     else msg = `<p class="muted pm-note">Jobs that aren't on this phone stay in the cloud. <button class="pm-look-link" data-action="cloud-refresh">Show them</button></p>`;
-    return `<div class="cloud-tab">${scopeHTML}<div class="cloud-head">${storageBtn}</div>${msg}</div>`;
+    return `<div class="cloud-tab">${scopeHTML}<div class="cloud-head">${storageBtn}</div>${msg}${binLine}</div>`;
   }
   const search = m.total ? `
     <div class="sessions-search-row cloud-search-row">
@@ -1648,6 +1649,7 @@ function renderCloudJobsHTML() {
       ${search}
       ${busy}
       <div id="cloud-list-area">${renderCloudListAreaHTML(m)}</div>
+      ${binLine}
     </div>
     ${bar}`;
 }
@@ -1790,6 +1792,7 @@ function openCloudLookSheet(look) {
     else if (act === 'fix' && typeof cloudFixOpen === 'function') cloudFixOpen(el.dataset.arg);   // V167
     else if (act === 'fix-job' && typeof cloudFixOpen === 'function') cloudFixOpen('');
     else if (act === 'cert' && typeof cloudLookCert === 'function') cloudLookCert();   // V171
+    else if (act === 'bin' && typeof cloudLookDelete === 'function') cloudLookDelete();   // V172
   });
   renderCloudLookBody(look);
   if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);
@@ -1882,7 +1885,8 @@ function renderCloudLookBody(look) {
   if (doc.engineer && !r.who) extra.push(`<li>Engineer: ${escapeHTML(String(doc.engineer))}</li>`);
   const counts = `<p class="cloud-look-counts" id="cloud-look-counts">${pl(items.length, 'item')}${fails ? ` · <span class="fail-text">${pl(fails, 'fail')}</span>` : ''}</p>`;
   const photosHTML = renderCloudLookPhotosHTML(look, items);
-  if (!items.length) { body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + fixHead + counts + `<p class="muted pm-note">No items logged in this job.</p>` + photosHTML + trail; return; }
+  const binHTML = renderCloudLookBinHTML(look);   // V172
+  if (!items.length) { body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + fixHead + counts + `<p class="muted pm-note">No items logged in this job.</p>` + photosHTML + trail + binHTML; return; }
   const rows = items.map((it) => {
     const result = String(it.result || '');
     const rd = cloudLookReadingsText(it.readings);
@@ -1895,7 +1899,20 @@ function renderCloudLookBody(look) {
         ${fx.can ? `<button class="pm-look-link cloud-fix-btn" data-look="fix" data-arg="${escapeHTML(String(it.id))}" aria-label="Correct item ${escapeHTML(String(it.assetNo == null ? '' : it.assetNo))}">${icon('pencil')} Correct</button>` : ''}
       </li>`;
   }).join('');
-  body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + fixHead + photosHTML + counts + `<ul class="cloud-look-items" id="cloud-look-items">${rows}</ul>` + trail;
+  body.innerHTML = head + (extra.length ? `<ul class="cloud-look-facts">${extra.join('')}</ul>` : '') + fixHead + photosHTML + counts + `<ul class="cloud-look-items" id="cloud-look-items">${rows}</ul>` + trail + binHTML;
+}
+
+// V172 (2C 3B 7A): Delete, at the foot of the look-only job — for the Owner (anyone's
+// job in the business) or for your own job held only in the cloud. It goes to
+// Recently deleted for 30 days. Nothing for anyone else.
+function renderCloudLookBinHTML(look) {
+  const bs = (typeof cloudLookBinState === 'function') ? cloudLookBinState(look) : { show: false };
+  if (!bs.show || !bs.can) return '';
+  const open = look && look.doc && look.doc.locked !== true;
+  return `<div class="cloud-bin-row" id="cloud-bin-row">
+      <button class="btn-secondary cloud-bin-btn" id="cloud-bin-btn" data-look="bin" ${look.binBusy ? 'disabled' : ''}>${icon('trash-2')} ${look.binBusy ? 'Deleting\u2026' : 'Delete this job\u2026'}</button>
+      <p class="muted pm-note">${open ? 'Not locked yet &mdash; ' : ''}It goes to Recently deleted for 30 days, where the business owner can put it back.</p>
+    </div>`;
 }
 
 // ---- V167 (5A): the trail of corrections ------------------------------------------
@@ -2165,14 +2182,19 @@ function openCloudDeleteSheet(o, onYes) {
     if (typeof j.items === 'number') bits.push(pl(j.items, 'item'));
     if (j.photos) bits.push(`${icon('camera')} ${j.photos}`);
     return `<li><strong>${escapeHTML(j.title || j.site || j.name || 'Untitled job')}</strong><br><span class="muted">${bits.filter(Boolean).join(' \u00b7 ')}</span>` +
+      (j.who ? `<br><span class="cloud-del-who">Engineer: ${escapeHTML(j.who)}</span>` : '') +   // V172 (6A)
       (j.certNo ? `<br><span class="cloud-del-cert">Certificate ${escapeHTML(j.certNo)}</span>` : (j.locked ? `<br><span class="cloud-del-cert">Locked</span>` : '')) + `</li>`;
   }).join('');
   const totals = [pl(o.n, 'job'), pl(o.items, 'item')];
   if (o.photos) totals.push(pl(o.photos, 'photo'));
   const certLine = o.certJobs
-    ? `<p class="reset-warn" id="cloud-del-certs">&#9888; ${o.certJobs === 1 ? 'One of these has' : `${o.certJobs} of these have`} a certificate${o.certs.length ? ` (${escapeHTML(o.certs.join(', '))})` : ''}. Deleting ${o.certJobs === 1 ? 'it' : 'them'} deletes your record of ${o.certJobs === 1 ? 'that test' : 'those tests'}.</p>`
+    ? `<p class="reset-warn" id="cloud-del-certs">&#9888; ${o.certJobs === 1 ? 'One of these has' : `${o.certJobs} of these have`} a certificate${o.certs.length ? ` (${escapeHTML(o.certs.join(', '))})` : ''}. Once ${o.certJobs === 1 ? 'it&rsquo;s' : 'they&rsquo;re'} gone for good, so is your record of ${o.certJobs === 1 ? 'that test' : 'those tests'}.</p>`
     : '';
-  const yesLabel = `Yes, delete ${o.n === 1 ? 'this job' : pl(o.n, 'job')} for good`;
+  // V172 (3B): a job not locked yet — its engineer may still be on it.
+  const openLine = o.open
+    ? `<p class="reset-warn" id="cloud-del-open">&#9888; Not locked yet &mdash; ${o.who ? escapeHTML(o.who) + ' may' : 'someone may'} still be working on it. ${o.who ? 'Their' : 'The'} phone takes it off at its next sync; anything it hasn&rsquo;t sent yet is kept with the deleted job.</p>`
+    : '';
+  const yesLabel = `Yes, delete ${o.n === 1 ? 'this job' : pl(o.n, 'job')}`;
   const { sheet, backdrop, cleanup } = _openSheet('Delete from the cloud');
   sheet.classList.add('reset-sheet', 'cloud-del-sheet');
   sheet.innerHTML = `
@@ -2183,12 +2205,12 @@ function openCloudDeleteSheet(o, onYes) {
       <button class="fail-close-btn" id="cloud-del-cancel" aria-label="Cancel">&times;</button>
     </div>
     <div class="sheet-scroll reset-overview">
-      ${certLine}
-      <h4 class="reset-h reset-h-gone">Deleted for good &mdash; ${escapeHTML(totals.join(' \u00b7 '))}</h4>
+      ${openLine}${certLine}
+      <h4 class="reset-h reset-h-gone">To Recently deleted &mdash; ${escapeHTML(totals.join(' \u00b7 '))}</h4>
       <ul class="reset-list reset-list-gone cloud-del-list" id="cloud-del-jobs">${rows}</ul>
-      <p class="reset-note">${o.n === 1 ? 'It goes' : 'They go'} from the cloud and from any other phone that has ${o.n === 1 ? 'it' : 'them'}, with ${o.photosKnown ? 'the photos' : 'any photos'}. A phone that has changed one and not sent it yet will ask before letting it go.</p>
-      <p class="reset-note">Want a copy? Bring the job onto this phone first, then make its certificate or export it.</p>
-      <p class="reset-final" id="cloud-del-final">No copy is kept, and it can&rsquo;t be undone.</p>
+      <p class="reset-note">${o.n === 1 ? 'It goes' : 'They go'} from the cloud list and from any phone that has ${o.n === 1 ? 'it' : 'them'}, at ${o.n === 1 ? 'its' : 'their'} next sync &mdash; with ${o.photosKnown ? 'the photos' : 'any photos'}.</p>
+      <p class="reset-note" id="cloud-del-bin">${o.n === 1 ? 'It waits' : 'They wait'} in Recently deleted for 30 days, where the business owner can put ${o.n === 1 ? 'it' : 'them'} back.</p>
+      <p class="reset-final" id="cloud-del-final">After 30 days ${o.n === 1 ? 'it&rsquo;s' : 'they&rsquo;re'} gone for good, with ${o.n === 1 ? 'its' : 'their'} photos.</p>
     </div>
     <div class="sheet-pin">
       ${o.needWord ? `<label class="label" for="cloud-del-input">Type ${word} to confirm</label>
@@ -2218,6 +2240,84 @@ function openCloudDeleteSheet(o, onYes) {
     onYes(typed);
   });
   if (typeof focusSheetOpened === 'function') focusSheetOpened(sheet);   // V123 (3A)
+}
+
+// ---- V172 (12 — both): the way to Recently deleted ----------------------------------
+// On the Cloud tab only while something is in it (no clutter — R74); on Cloud
+// Storage always. Hidden when the cloud has no V172 SQL yet. Repainted in place
+// when the count lands (_binLinePaint) — never render(): the search box may be up.
+function renderBinLineHTML(where) {
+  const f = (typeof binCountFor === 'function') ? binCountFor() : { show: false, n: null };
+  if (!f.show || typeof binOpen !== 'function') return '';
+  if (where === 'tab' && !(f.n > 0)) return `<span id="bin-line" data-where="tab" hidden></span>`;
+  const n = (f.n > 0) ? ` <span class="bin-count">${escapeHTML(String(f.n))}</span>` : '';
+  return `<button class="pm-look-link bin-line" id="bin-line" data-where="${where === 'tab' ? 'tab' : 'store'}" data-action="bin-open" aria-label="Recently deleted${f.n > 0 ? ', ' + f.n + (f.n === 1 ? ' job' : ' jobs') : ''}">${icon('trash-2')} Recently deleted${n} ${icon('chevron-right', 'ic-trail')}</button>`;
+}
+function _binLinePaint() {
+  if (typeof document === 'undefined') return;
+  const el = document.getElementById('bin-line');
+  if (!el) return;
+  const html = renderBinLineHTML(el.dataset ? el.dataset.where : 'store');
+  if (!html) { el.remove(); return; }
+  const t = document.createElement('div');
+  t.innerHTML = html;
+  const fresh = t.firstElementChild || t.firstChild;
+  if (fresh && el.parentNode) el.parentNode.replaceChild(fresh, el);
+}
+
+// ---- V172 (6B 10A 11A): the Recently deleted page ------------------------------------
+// Markup only; settings-actions.js binModel() works it out, sync.js syncBinList()
+// reads it. No inputs — render() may run while it is up (MAP rule 3).
+function renderRecentlyDeleted() {
+  const bl = state.binList || {};
+  const header = `
+    <header class="header-row">
+      <button class="icon-btn" data-action="bin-back" aria-label="Back">${icon('chevron-left')}</button>
+      <div class="site-name" id="screen-title" role="heading" aria-level="1" tabindex="-1">Recently deleted</div>
+      <span style="width:40px"></span>
+    </header>`;
+  const intro = `<p class="muted pm-note bin-intro">Jobs deleted from the cloud wait here for 30 days. Put one back and it&rsquo;s in the cloud again &mdash; and back on its engineer&rsquo;s phone at their next sync, if it&rsquo;s a recent job. After 30 days it&rsquo;s gone for good, with its photos.</p>`;
+  const when = bl.at ? escapeHTML(new Date(bl.at).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })) : '';
+  if (!bl.ok) {
+    const body = bl.loading
+      ? `<p class="muted pm-note" role="status">Reading the cloud…</p>`
+      : `${bl.error ? `<p class="pm-note pm-error" id="bin-error">${escapeHTML(bl.error)}</p>` : ''}<button class="btn-secondary cloud-retry" data-action="bin-refresh">Try again</button>`;
+    return `<div class="screen bin-screen">${header}${intro}${body}</div>`;
+  }
+  const m = binModel();
+  const checked = bl.loading
+    ? `<p class="muted pm-note" role="status">Reading the cloud…</p>`
+    : `<p class="muted pm-note">Checked ${when} · <button class="pm-look-link" data-action="bin-refresh" aria-label="Read Recently deleted again">${icon('refresh-cw')} Refresh</button></p>`;
+  if (!m.rows.length) return `<div class="screen bin-screen">${header}${intro}${checked}<p class="muted pm-note" id="bin-empty">Nothing here.</p></div>`;
+  const pl = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+  const cards = m.rows.map((r) => {
+    const meta = [r.client ? escapeHTML(r.client) : '', r.date ? escapeHTML(formatDate(r.date)) : ''];
+    if (!r.you && r.engineer) meta.push(escapeHTML(r.engineer));
+    if (m.several && r.orgName) meta.push(escapeHTML(r.orgName));
+    const counts = [pl(r.items, 'item')];
+    if (r.fails) counts.push(`<span class="fail-text">${pl(r.fails, 'fail')}</span>`);
+    if (r.photos) counts.push(`<span class="photo-text">${icon('camera')} ${r.photos}</span>`);
+    const role = (typeof syncBinRoleText === 'function') ? syncBinRoleText(r.byRole) : '';
+    const by = r.byYou ? 'you' : (escapeHTML(r.byName || 'someone') + (role ? ` (${escapeHTML(role)})` : ''));
+    const days = r.days === null ? '' : (r.days <= 1 ? 'goes for good within a day' : `${r.days} days left`);
+    const at = r.at ? escapeHTML(formatDate(r.at.slice(0, 10))) : '';
+    const n = escapeHTML(String(r.n));
+    return `
+      <div class="session-card cloud-card bin-card" id="bin-card-${n}">
+        <div class="session-info">
+          <div class="session-title cloud-title"><span class="cloud-title-text">${escapeHTML(r.title)}</span></div>
+          <div class="session-meta">${meta.filter(Boolean).concat(counts).join(' · ')}</div>
+          ${r.certNo ? `<div class="session-meta cloud-tags"><span class="cloud-cert">${icon('lock')} Certificate ${escapeHTML(r.certNo)}</span></div>` : ''}
+          <div class="session-meta bin-by">Deleted by ${by}${at ? ' · ' + at : ''}${days ? ' · ' + escapeHTML(days) : ''}</div>
+        </div>
+        ${r.busy ? `<p class="pm-busy" role="status">${escapeHTML(r.busy)}</p>` : `
+        <div class="bin-actions">
+          <button class="btn-secondary bin-restore" data-action="bin-restore" data-arg="${n}">${icon('rotate-ccw')} Put back</button>
+          <button class="pm-look-link bin-forget" data-action="bin-forget" data-arg="${n}">Delete now&hellip;</button>
+        </div>`}
+      </div>`;
+  }).join('');
+  return `<div class="screen bin-screen">${header}${intro}${checked}<div class="settings-section" id="bin-list">${cards}</div></div>`;
 }
 
 // The cloud search's partial refresh — the input itself is left alone.
@@ -2274,6 +2374,7 @@ function renderCloudStorage() {
       ${checked}
       <p class="muted pm-note">Sizes are approximate. Photos are counted at full size. This phone’s own space is on Phone Storage.</p>
       <button class="backup-action-btn" id="cs-photos-btn" data-action="cs-photos" ${cs.busy ? 'disabled' : ''}>${icon('images')} Manage Photos ${icon('chevron-right', 'ic-trail')}</button>
+      ${renderBinLineHTML('store')}
     </div>`;
   const sel = cs.selected || {};
   const cards = m.rows.map((j) => {
